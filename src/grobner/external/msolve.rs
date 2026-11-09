@@ -2883,10 +2883,17 @@ rational param(cpu)             0.75 sec
         assert!(line.contains("-t 8"), "{}", line);
         assert!(line.contains("-g 2"), "{}", line);
 
-        // The eliminant uses the default mode, so it must *not* pass `-g`.
+        // The eliminant uses the default mode, so it must *not* pass `-g`. Asserted over the
+        // command line's **tokens**: the recorded line embeds the temporary input and output paths,
+        // and a substring test for `-g` matches any checkout directory that happens to contain one
+        // — which made this assertion a fact about where the repository was cloned.
         let eliminant = solver.run(&pair(P30), Task::UnivariateEliminant, &limits);
         let line = eliminant.command_line.expect("a recorded command line");
-        assert!(!line.contains("-g"), "{}", line);
+        assert!(
+            !line.split_whitespace().any(|token| token == "-g"),
+            "{}",
+            line
+        );
         assert!(line.contains("-t 8"), "{}", line);
     }
 
