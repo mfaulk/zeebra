@@ -223,7 +223,8 @@ route to ask for when the inputs are not known to be small.
   admits it and falls back otherwise. That is attractive and is **not** done here, for the reason §4
   already gave: Brown's loses up to 5.2x on the smallest shapes, and what F4 and FGLM actually hand
   `gcd` is still unmeasured. Changing the default on this evidence would be tuning the tail of a
-  distribution nobody has looked at. It is now a three-way version of the same open question.
+  distribution nobody has looked at. **Filed as #658**, which asks for the solver's own input
+  distribution first and records a measured "no predictor exists" as an acceptable answer.
 * **The interpolation's own bound.** `brown` falls through to the subresultant route when the
   interpolated candidate fails to divide both inputs, which is what a degree bound that was not tight
   produces. `brown_outcomes` counts the two outcomes and
