@@ -2,7 +2,9 @@
 
 **Measured at:** §§1-10, publication bound `9d05baa2`…`cede98ac` — the commits that published those
 figures, recovered from git rather than recorded at the time
-([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§12** was
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§14** is
+history read from git plus one exact counter, so it carries no timing and names no box; its figure
+is asserted by a test rather than recorded. **§12** was
 measured at the tree that section's own change introduces, on branch
 `perf/536-interreduce-working-set` (#536), and **§13** at the tree its change introduces, on branch
 `perf/554-sparse-row-buffer` (#554): in both the figures and the code that produces them land in one
@@ -1317,3 +1319,77 @@ cargo nextest run -E 'test(subtract_scaled) + test(short_merge_does_not_inherit)
   + test(scratch_buffer_is_not_handed) + test(matrix_route_reproduces_the_division_route) \
   + test(the_allowance_covers_the_elimination)'
 ```
+
+---
+
+## 14. Where 20 000 000 came from, and what still crosses it (#490)
+
+#490 asks two things of `max_live_nonzeros`: where the number came from, and what the workloads that
+cross it by a hair actually need. The first is answered here from the history; the second is answered
+for one of the three workloads and not for the other two, and §14.3 says why.
+
+### 14.1 It was never measured. It is a round number from F4's first batch-reduction commit
+
+`20_000_000` arrives in **`057b4b6f`** (2026-11-02), the commit that added `reduce_batch` — the first
+commit in the repository that could run out of memory at all. Its message describes the budget's
+purpose and claims nothing about its size:
+
+> Resource exhaustion becomes a return value. `row_echelon_within` gives the sparse elimination a
+> budget on live nonzero entries, checked after every row operation, so fill-in reports
+> `F4Error::TooManyNonzeros` instead of exhausting memory […] `F4Options` carries the limits with
+> documented defaults
+
+And the field's own doc comment, as introduced, is explicit that it is not a memory limit:
+
+> This is a budget on the entries F4 holds, not a ceiling on the process. It does not account for
+> the monomial-to-column map, the term vectors of the basis, the scratch buffer elimination merges
+> through, or allocator overhead […] **Treat it as the knob that keeps matrix growth recoverable,
+> not as a memory limit.**
+
+So the entry count is the primary figure and it was chosen as a recoverability valve, not against a
+working set. **The 320 MB came second and is derived from it**, not the other way round: `max_live_bytes`
+arrives two days later in **`b2283f1e`**, whose message says the byte budgets
+
+> default to the 320 MB the entry budgets **already described** at 16 bytes an entry
+
+That settles #490's first checkbox. The answer to its title is **no** — and the follow-on question it
+poses is therefore the live one: whether 320 MB is the right ceiling for a machine with 503 GB of
+RAM. Nothing here answers that, and it is not a question about the entry count.
+
+### 14.2 `mq-random-10` is no longer a near-miss. It peaks 5.1x under the cap
+
+#490's table lists three workloads crossing 20 000 000 by less than 0.05%, which it rightly calls a
+coincidence rather than a policy. One of them can be re-measured cheaply, and the premise has
+expired:
+
+| | #322's figure | now | against the cap |
+|---|---:|---:|---:|
+| `mq-random-10` peak live entries | 20 000 277 *(stopped)* | **3 933 045** *(completes)* | **5.1x under** |
+
+#575's defaults are why: with each batch left reduced the matrices the elimination fills in are
+smaller, so the quantity this budget counts fell by a factor of five. The figure is identical at caps
+of 20 000 000, 25 000 000 and 64 000 000 — which is the check that the peak is the computation's and
+not the budget's — and
+`f4::tests::test_mq_random_10_no_longer_approaches_the_live_entry_cap` asserts it.
+
+A live-entry count is a **counter**, so this is exact: identical on any machine and under any load,
+which is what makes it reportable from a box that could not have produced a timing.
+
+### 14.3 The other two are not measured, and the re-sweep is not either
+
+`anemoi N = 6 PCICO` and `poseidon31-cico-t16-rf4-rp2` are full-width cryptanalysis rows costing
+minutes to hours each, and no instrument in the tree reports their peak at a raised budget without
+one being written — `examples/f4_memory.rs` reads `ZEEBRA_MAX_ENTRIES` but compiles the Fukuoka
+`N = 20` path only. Given that `mq-random-10`'s figure moved by 5.1x under a default change, the
+honest expectation is that **theirs moved too**, and that #490's table should be re-measured before
+its budget decision rather than reasoned from.
+
+#490's third checkbox — the re-sweep, if the budget moves — is untouched for a second reason: it is a
+board-row task, and over the hours this work ran the one-minute load average sat between **592 and
+1 261** from other agents' linkers, which `tools/benchlock.sh` does not serialize because they are
+builds. §12's own figures were taken under the lock on a quiet box; a re-sweep from this one would
+not be comparable with them.
+
+**So the budget does not move here**, and the reason is now a better one than #469's: not that
+changing it would reprice old figures, but that two of the three workloads said to need it have not
+been measured since the change that moved the third by 5.1x.

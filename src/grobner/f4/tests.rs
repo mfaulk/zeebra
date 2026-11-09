@@ -3995,3 +3995,56 @@ fn test_an_explicit_route_overrides_the_order() {
         "an explicit Division was overridden by the order"
     );
 }
+
+/// `mq-random-10`'s live-entry peak sits far under the default cap, which it used to cross — #490.
+///
+/// #322 recorded this instance stopping at **20 000 277** live entries against the 20 000 000
+/// cap — over by 0.0014%, one of three workloads whose refusal was a coincidence rather than a
+/// policy. #575's defaults changed the computation underneath that: with each batch left reduced
+/// the matrices are smaller, and the peak is now **3 933 045**, a factor of 5.1 under the cap.
+///
+/// So the question #490 asks of this workload is answered and the answer is that there is no
+/// longer anything to answer: the cap does not bind here at any of the three settings below, and
+/// raising it would change nothing. Asserted rather than recorded in prose because the figure is
+/// exact — a live-entry count is a counter, identical on any machine and under any load — and
+/// because a default that moved it back would otherwise be invisible.
+///
+/// `#[ignore]` for cost, not for confidence: three runs of a five-second instance is minutes in a
+/// debug build, and `docs/research/f4-resource-scaling.md` §14 carries the figure.
+#[test]
+#[ignore]
+fn test_mq_random_10_no_longer_approaches_the_live_entry_cap() {
+    use crate::grobner::external::corpus::{instance, REFERENCE_CHARACTERISTIC};
+    type G = Zp2147483647;
+    let built = instance(
+        "mq-random-10",
+        REFERENCE_CHARACTERISTIC,
+        MonomialOrder::GradedReverseLexicographic,
+    )
+    .expect("a corpus rung");
+    let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
+    let mut compiled = [""; 10];
+    compiled.copy_from_slice(&names[..10]);
+    let system: Vec<MultivariatePolynomial<10, G>> = built
+        .system
+        .iter()
+        .map(|t| MultivariatePolynomial::parse(t, compiled).expect("renders"))
+        .collect();
+
+    // Three caps spanning the default and the 25 000 000 that #490's 400 MB would buy. The peak is
+    // a property of the computation, so all three must agree — a peak that moved with the cap
+    // would mean the budget was shaping the work rather than bounding it.
+    for entries in [20_000_000usize, 25_000_000, 64_000_000] {
+        let options = F4Options::default().with_live_entries::<G>(entries);
+        let (result, statistics) =
+            f4_reported(&system, MonomialOrder::GradedReverseLexicographic, &options);
+        assert!(
+            result.is_ok(),
+            "the default cap no longer binds on this instance, so no setting of it should refuse"
+        );
+        assert_eq!(
+            statistics.max_live_nonzeros, 3_933_045,
+            "the peak is the computation's, not the cap's, at cap {entries}"
+        );
+    }
+}
