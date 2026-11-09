@@ -6,7 +6,9 @@ is quoted from its source — §2.1 and §2.2 from Steel's 2004 page, §2.3 from
 **§10's `GF(2)` values are invariants rather than timings** — Krull dimensions, quotient dimensions
 and basis sizes, none of which depends on the machine or the clock — measured at `590eee15` across
 Zeebra, msolve 0.11.0, Singular, Groebner.jl and Sagebrush. §10 publishes **no** wall-clock figure,
-which §4 forbids against the 2004 column and §7 reaffirms.
+which §4 forbids against the 2004 column and §7 reaffirms. **§10.5 confirms Steel's published Krull
+dimension of 4 at `cyclic-10` over `GF(2)`** — the first published number about an ideal this crate
+generates to be checked rather than recorded.
 
 Deliverable for A7 (#199), a child of the benchmark-corpus epic #65. The question: do Zeebra's three
 synthetic generators — `cyclic`, `katsura`, `planted` — have external reference points, and if so
@@ -338,7 +340,7 @@ the finding in the direction of making the epic look unnecessary, and the epic i
 
 | collection | verdict |
 |---|---|
-| **Steel's Magma GB timings page** | **accept, for invariants only.** Cyclic-10's dimension 34940 and the GF(2) Cyclic rows are checkable values; the HFE rows go to #198, where they are much more valuable. |
+| **Steel's Magma GB timings page** | **accept, for invariants only — and the grade has now been exercised.** Cyclic-10's dimension 34940 and the GF(2) Cyclic rows are checkable values, and §10.5 checked one: the GF(2) Cyclic-10 Krull dimension of **4 is confirmed**. 34940 is still unverified here. The HFE rows go to #198, where they are much more valuable. |
 | **Magma's `info/topic_gb` page** (subscriber-side, §2.3) | **accept as a modern difficulty scale, reject as a comparand.** Its V2.27 figures on an i7-7700 are the only post-2004 Magma timings on record here and they come in 1-core and 4-core pairs, which is a usable published scaling figure. No instances, no repetitions, no build description, and no Katsura rows, so §4 still forbids a ratio against Zeebra. |
 | **Steel's *Dense Variant of the F4 Algorithm* page** (`/users/allan/densef4/`) | **defer to #218 and #225.** It is about representation, which is #218's open question, and the HFE-80 matrices it discusses are "moderately dense" over GF(2) — the datum #225 wants at 64×64 block granularity. Not a benchmark source. |
 | **SymbolicData** | **not assessed.** Deliberately: §3 found that the anchor Zeebra needs is an invariant, and a fourth catalogue of systems does not supply one. Reopen only if a specific instance with a published `dim R/I` is wanted. |
@@ -371,7 +373,10 @@ to be quoted; see #198 for why that rule exists.
   comparand yet. #218 has since made characteristic two work, so that is now possible.
   **`GF(32003)` has since been measured (#426)**: it is a published corpus characteristic, and
   `research/competitive/` carries Zeebra, Singular, msolve, Groebner.jl and Sagebrush over it on the
-  whole Katsura/Cyclic/MQ ladder. **`GF(2)` has since been measured too (#427)** — §10.
+  whole Katsura/Cyclic/MQ ladder. **`GF(2)` has since been measured too (#427)** — it is a published
+  corpus characteristic for Cyclic, every rung `cyclic-4` … `cyclic-10` is frozen there, and §10.5
+  **confirmed Steel's published Krull dimension of 4** at `cyclic-10`. So this bullet is retired
+  except for `GF(32003)`'s 34940, which remains unverified.
 
 ---
 
@@ -406,6 +411,7 @@ All values measured on this machine, none cited. Controls at `GF(32003)` reprodu
 | `cyclic-7` | zero-dim, `D = 924` | 0 | **728** | 173 | Zeebra, msolve, Singular, Groebner.jl |
 | `cyclic-8` | positive-dim, Krull 1 | **3** | — | 191 | msolve, Groebner.jl |
 | `cyclic-9` | positive-dim (Backelin) | **2** | — | 1228 | msolve, Groebner.jl |
+| `cyclic-10` | zero-dim, `D = 34940` (Steel) | **4** — Steel's published value, §10.5 | — | 2271 | msolve basis; Singular `dim` and the independent-set rule |
 
 **Two findings here are worth more than the rows.**
 
@@ -492,20 +498,50 @@ and the wall limit remains the backstop there; a prime below it is a promise of 
 which is the only part that may be declared as a bound. Inventing a clean "small primes fail" cutoff
 would have been wrong at `p = 11`.
 
-### 10.5 `cyclic-10` against Steel's Krull dimension 4
+### 10.5 `cyclic-10` against Steel's Krull dimension 4: **confirmed**
 
-Steel's Cyclic 10 over `GF(2)` is the rung this section exists for, and it is **the hardest rung on
-the whole corpus** — his own run took 12.3 hours and 9.3 GB of a 750 MHz Sunfire, and that was
-Magma's F4, the fastest engine in his table by an order of magnitude.
+Steel's Cyclic 10 over `GF(2)` is the rung this section exists for, and it is the hardest rung on
+the corpus — his own run took 12.3 hours and 9.3 GB of a 750 MHz Sunfire under Magma's F4, the
+fastest engine in his table by an order of magnitude.
 
-**Not resolved at hand-off; the attempt and its stage are recorded, which is what #427 asks for.**
-`corpus::test_where_zeebras_cyclic_ladder_stops_over_gf2` is the attempt as a runnable test,
-printing a basis size and a Krull dimension per rung and refusing where it must. What is settled is
-everything up to it: the ladder is externally corroborated through `cyclic-9`, where two independent
-modern engines agree on both a 1228-element basis and Krull dimension 2.
+> **The ideal has Krull dimension 4, which is exactly the value Steel's page publishes.**
 
-What that buys for Steel's 4 is a **consistency check rather than a confirmation**. His figure is
-the one rung above a sequence this document can now vouch for, and the sequence makes a dimension of
-4 at `cyclic-10` unremarkable where it would have looked anomalous against §2.1's zero-dimensional
-`GF(32003)` row: at `GF(2)` the Cyclic ladder is positive-dimensional at 6, 8 and 9 and
-zero-dimensional only at 5 and 7. **It is not yet checked, and it is not reported as checked.**
+This is the **first externally published number about an ideal Zeebra generates to be checked
+against rather than merely recorded.** §3.1's cyclic counts are agreements with the classical
+literature; this one is against a specific claim on a specific page that nothing here could
+previously evaluate, because the crate had no Krull dimension to evaluate it with (§10.1).
+
+How it was obtained, and why it is reported as confirmed rather than as corroborated-in-kind:
+
+1. **msolve 0.11.0** computed the grevlex basis over `GF(2)`: **2271 elements**, single-threaded and
+   pinned, reaching `rc=0` well inside its wall cap at about 4 GB resident.
+2. **Singular** read that basis as a reduced standard basis and reported `dim` = **4**.
+3. The **largest-independent-set rule** applied directly to the 2271 leading monomials — the same
+   computation `fglm::krull_dimension` implements — independently gave **4**.
+
+Two routes over one basis, and they are genuinely independent: Singular's `dim` is its own code on
+its own representation, and the independent-set computation reads only the leading monomials. No
+`+1`/`−1` convention is in play, because 4 is neither 0 nor `N`.
+
+**The degeneracy at this rung is total, and it is the cleanest illustration of why §10.2's
+per-characteristic invariants were necessary.** The same `cyclic-10`:
+
+| | `GF(32003)` | `GF(2)` |
+|---|---|---|
+| dimension class | zero-dimensional | **Krull dimension 4** |
+| quotient dimension | 34940 (Steel, unverified here) | none — no finite quotient exists |
+
+A finite point count becomes a fourfold. Both of those numbers are on Steel's page, they are
+different quantities, and conflating them would turn a statement about geometry into a wrong
+solution count — which is precisely what §2.2 flagged when it first read the page and what
+`corpus::test_cyclic_10_carries_steels_published_dimension_at_each_characteristic` now pins.
+
+**No timing is reported from any of this**, and none may be: §4 forbids a wall-clock comparison
+against the 2004 column, and the figures above are a basis size and a dimension. That msolve now
+does in minutes what took Magma half a day in 2004 is a fact about twenty-two years, two machines
+and two implementations, and is attributable to none of them individually.
+
+`GF(32003)`'s 34940 remains **unverified here** — it is a quotient dimension at a rung whose basis
+is far more expensive over a 15-bit prime than over `GF(2)`, where `a + a = 0` roughly halves the
+entries (README, `boolean_density`). That is the natural next anchor on this page and it is not
+claimed as reached.

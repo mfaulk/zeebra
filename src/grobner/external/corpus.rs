@@ -439,6 +439,20 @@ const DEGENERACIES: &[(&str, u64, Degeneracy)] = &[
             corroborated_by: "msolve 0.11.0, Groebner.jl",
         },
     ),
+    (
+        "cyclic-10",
+        BINARY_CHARACTERISTIC,
+        Degeneracy {
+            // **Steel's published value, checked.** His `GF(2)` note reads "The ideal has dimension
+            // 4" — a Krull dimension, where the `GF(32003)` note's 34940 is a vector-space one —
+            // and this is 4. The only externally published number on that page about an ideal
+            // Zeebra generates, and it agrees. At `2^31 − 1` the same rung is zero-dimensional with
+            // `D = 34940`, so the degeneracy is total: a finite point count becomes a fourfold.
+            krull_dimension: 4,
+            quotient_dimension: None,
+            corroborated_by: "msolve 0.11.0 basis; Singular dim and the independent-set rule agree",
+        },
+    ),
 ];
 
 /// The recorded degeneracy for `name` at `characteristic`, if its invariants differ there.
@@ -3022,6 +3036,43 @@ mod tests {
         assert_eq!(
             at("cyclic-5").quotient_dimension_at(super::BINARY_CHARACTERISTIC),
             Some(70)
+        );
+    }
+
+    /// `cyclic-10`'s recorded Krull dimension at GF(2) is **Steel's published 4**, and at the
+    /// reference prime the same rung is zero-dimensional with his other published value, 34940.
+    ///
+    /// The one externally published number on Steel's page about an ideal Zeebra generates, and the
+    /// reason #427 existed. Asserted as a *record* here; the measurement that produced it is in
+    /// `docs/research/classical-benchmarks.md` §10.5.
+    #[test]
+    fn test_cyclic_10_carries_steels_published_dimension_at_each_characteristic() {
+        let ten = ladder()
+            .into_iter()
+            .find(|entry| entry.name == "cyclic-10")
+            .expect("in the ladder");
+
+        // GF(2): a Krull dimension, and positive — so there is no finite quotient to count.
+        assert_eq!(
+            super::degeneracy("cyclic-10", super::BINARY_CHARACTERISTIC)
+                .expect("recorded")
+                .krull_dimension,
+            4,
+            "Steel's GF(2) note states the ideal has dimension 4"
+        );
+        assert!(!ten.zero_dimensional_at(super::BINARY_CHARACTERISTIC));
+        assert_eq!(
+            ten.quotient_dimension_at(super::BINARY_CHARACTERISTIC),
+            None,
+            "a positive-dimensional ideal has no finite quotient dimension"
+        );
+
+        // The reference prime: zero-dimensional, with the vector-space dimension Steel states for
+        // GF(32003). The two published numbers are different quantities about the same rung.
+        assert!(ten.zero_dimensional_at(REFERENCE_CHARACTERISTIC));
+        assert_eq!(
+            ten.quotient_dimension_at(REFERENCE_CHARACTERISTIC),
+            Some(34940)
         );
     }
 

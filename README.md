@@ -68,6 +68,12 @@ As the saying goes, you can either make software so simple that it obviously has
       `cyclic-7`'s `D` from the proved 924 to **728** — so Backelin's squarefree criterion turns out
       to be a characteristic-zero statement, and `fglm::krull_dimension` is the quantity the crate
       needed to say so
+- [x] **Steel's published `GF(2)` Cyclic-10 Krull dimension of 4, confirmed** — the first externally
+      published number about an ideal this crate generates to be *checked* rather than recorded.
+      msolve's 2271-element grevlex basis over `GF(2)`, with Singular's `dim` and the
+      largest-independent-set rule agreeing on 4 over it. The same rung is zero-dimensional with
+      `D = 34940` at `2^31 − 1`, and those are two different quantities about one ideal, which is
+      what the per-characteristic invariants exist to keep apart
 - [x] The ladder to `katsura-11` and `cyclic-10`, with the quotient dimension **asserted** per rung
       against the published record rather than merely reported: `2^(N−1)` exact at eight consecutive
       Katsura rungs, 70/156/**924** for Cyclic against Björck–Fröberg and Backelin–Fröberg, and the
