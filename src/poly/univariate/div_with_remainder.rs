@@ -63,19 +63,34 @@
 //! three-tier per-element-width shape as `karatsuba_base_case`. The exponent is the crate's
 //! multiplication exponent rather than a second knob.
 //!
-//! # The floor on `k`, and what is not measured
+//! # The floor on `k`, measured by #527
 //!
-//! The rule above also carries `k > t`, which is **not** implied by the inequality: at `k = 2`
-//! and `m = 10^6` the inequality holds and the floor is what refuses it. The reason is the `C` the
-//! derivation dropped. Newton runs five products at the precision before the recovery, so at small
-//! `k` that fixed cost is not amortized, and `C * M(k)` is a worse model than `C * k^2` — at which
-//! point Newton is long division with allocations. The model says the true floor is near `t/68`;
-//! no measurement here covers `k < t`, so the floor sits at the one length that *was* measured.
-//! That is conservative in the safe direction — it can forgo a win, never cause a regression — and
-//! #527 is the issue to close the gap with a sweep over `k` at fixed large `m`.
+//! The rule above also carries a floor on `k`, which is **not** implied by the inequality: at
+//! `k = 2` and `m = 10^6` the inequality holds and the floor is what refuses it. The reason is the
+//! `C` the derivation dropped. Newton runs five products at the precision before the recovery, so
+//! at small `k` that fixed cost is not amortized.
+//!
+//! #193 put the floor at `t` because that was the only length it had measured, and guessed the
+//! true floor near `t/68`. **Both were wrong, and #527 measured it**: sweeping `k` downward at a
+//! fixed `m = 65536`, long division's last win is at `k = 32 / 8 / 16 / 4` over Mersenne-31 in a
+//! `u32`, Mersenne-31 in a `u64`, Goldilocks and BN254 `Fr`, and Newton wins by more than 10% from
+//! `64 / 16 / 32 / 8`. So a floor at `t` was **16x to 32x too high**, and it forgave 1.2x to 3.7x
+//! across a 16x band of `k` on every field.
+//!
+//! The floor is therefore **[`karatsuba_base_case`]**, not a fourth tuned constant per width.
+//! That is what #527 asked for — "a stated function of `t` ... rather than a fourth tuned number"
+//! — and it is better than a function of `t`, because it is an existing *measured* constant with
+//! the right reason behind it: below the base case every product inside the iteration is
+//! schoolbook, so Newton is long division with allocations, and at and above it Karatsuba starts
+//! paying for the recursion. Its 48 / 16 / 4 brackets every measured floor without regressing any
+//! field — 48 excludes `k = 32`, where the 4-byte field measures 0.99x, and admits `k = 64` at
+//! 1.25x; 4 excludes BN254's 1.01x tie at `k = 4` and admits its 1.21x at 8.
 
 use crate::{
-    poly::univariate::{karatsuba::multiply_karatsuba, Polynomial, UnivariatePolynomial},
+    poly::univariate::{
+        karatsuba::{karatsuba_base_case, multiply_karatsuba},
+        Polynomial, UnivariatePolynomial,
+    },
     FiniteField,
 };
 
@@ -127,24 +142,46 @@ pub(crate) fn newton_crossover<F: FiniteField>() -> usize {
 /// Whether Newton inversion is the cheaper route for a quotient of length `quotient_len` against a
 /// divisor of length `divisor_len`. See the module comment for the derivation.
 fn newton_is_cheaper<F: FiniteField>(quotient_len: usize, divisor_len: usize) -> bool {
-    newton_is_cheaper_at(quotient_len, divisor_len, newton_crossover::<F>())
+    newton_is_cheaper_within(
+        quotient_len,
+        divisor_len,
+        newton_crossover::<F>(),
+        karatsuba_base_case::<F>(),
+    )
 }
 
 /// [`newton_is_cheaper`] with the crossover supplied, so that a sweep can move it.
 fn newton_is_cheaper_at(quotient_len: usize, divisor_len: usize, crossover: usize) -> bool {
-    // The floor on the precision, which is a genuine extra condition rather than a restatement of
-    // the inequality below — see the module comment's second section for why it is here and for
-    // what it knowingly gives up. It doubles as an integer pre-filter that keeps the floating
-    // point off every small division, and small divisions are most of them: every `pow_mod`
-    // squaring reduces once.
-    //
-    // `<` rather than `<=` would leave the balanced case `quotient_len = divisor_len = crossover`
-    // to be decided by the rounding of two `powf` calls on two sides that are equal in exact
-    // arithmetic, and it fell the wrong way — selecting Newton *at* the measured crossover rather
-    // than above it. Taking that case integrally makes the balanced crossover exactly the constant
-    // by construction instead of to within a rounding error.
-    if quotient_len <= crossover {
+    newton_is_cheaper_within(quotient_len, divisor_len, crossover, crossover)
+}
+
+/// [`newton_is_cheaper_at`] with the floor supplied separately from the balanced crossover.
+///
+/// Two parameters because #527 measured them apart: the crossover sets `C` in the inequality and
+/// the floor bounds the precision, and they differ by 16x to 32x. A sweep can move either.
+fn newton_is_cheaper_within(
+    quotient_len: usize,
+    divisor_len: usize,
+    crossover: usize,
+    floor: usize,
+) -> bool {
+    // The floor on the precision, a genuine extra condition rather than a restatement of the
+    // inequality below — see the module comment for what #527 measured it at and why it is
+    // `karatsuba_base_case` rather than a tuned constant. It also keeps the floating point off
+    // every tiny division, and tiny divisions are most of them: every `pow_mod` squaring reduces
+    // once.
+    if quotient_len <= floor {
         return false;
+    }
+
+    // The balanced case, decided integrally and with no floating point at all. `k = m` is exactly
+    // what the crossover was measured at, and in exact arithmetic the inequality below reduces to
+    // `t > t` there — so it is already the right answer and the only risk is rounding. Left to two
+    // `powf` calls it fell the *wrong* way, selecting Newton at the measured crossover rather than
+    // above it. Before #527 this was covered by the floor equalling the crossover; now that they
+    // differ by 16x-32x it needs saying separately.
+    if quotient_len == divisor_len {
+        return quotient_len > crossover;
     }
     let c = (crossover as f64).powf(2.0 - KARATSUBA_EXPONENT);
     (divisor_len as f64) > c * (quotient_len as f64).powf(KARATSUBA_EXPONENT - 1.0)
@@ -374,6 +411,21 @@ pub fn newton_is_cheaper_at_unstable(
     newton_is_cheaper_at(quotient_len, divisor_len, crossover)
 }
 
+/// The shipped rule for `F`, floor included, reachable from an example binary.
+///
+/// #527 needs this rather than [`newton_is_cheaper_at_unstable`]: that one collapses the floor onto
+/// the crossover, which is exactly the thing the floor sweep measures apart from it.
+#[doc(hidden)]
+pub fn newton_is_cheaper_unstable<F: FiniteField>(quotient_len: usize, divisor_len: usize) -> bool {
+    newton_is_cheaper::<F>(quotient_len, divisor_len)
+}
+
+/// The shipped floor on the precision, reachable from an example binary.
+#[doc(hidden)]
+pub fn newton_floor_unstable<F: FiniteField>() -> usize {
+    karatsuba_base_case::<F>()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::poly::univariate::PolynomialParams;
@@ -382,8 +434,9 @@ mod tests {
 
     use super::{
         div_with_remainder, div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
-        invert_mod_xk, multiply_truncated, newton_crossover, newton_is_cheaper,
-        newton_is_cheaper_at, quotient, KARATSUBA_EXPONENT,
+        invert_mod_xk, karatsuba_base_case, multiply_truncated, newton_crossover,
+        newton_is_cheaper, newton_is_cheaper_at, newton_is_cheaper_within, quotient,
+        KARATSUBA_EXPONENT,
     };
     use crate::{
         fields::{PrimeFieldElement64, Zp7},
@@ -844,5 +897,73 @@ mod tests {
             let recovered = (quotient * q) + remainder;
             prop_assert_eq!(p, recovered)
         }
+    }
+
+    /// The floor admits every length #527 measured a win at and excludes every loss.
+    ///
+    /// The pairs are the measured boundary per element width — long division's last win and
+    /// Newton's first win by more than 10%, sweeping `k` down at `m = 65536`. Before #527 the floor
+    /// was the balanced crossover, which excluded all four win columns: 16x to 32x too high.
+    #[test]
+    fn test_the_floor_admits_what_527_measured() {
+        const M: usize = 1 << 16;
+        // (floor for the width, last measured loss, first measured win by >10%)
+        for (floor, loss, win) in [(48usize, 32usize, 64usize), (16, 16, 32), (4, 4, 8)] {
+            // `m` is far above the inequality's threshold at every `k` here, so the floor is what
+            // decides these rows and the crossover passed in does not matter.
+            assert!(
+                !newton_is_cheaper_within(loss, M, 1024, floor),
+                "the floor {} admits k = {}, which measured a loss",
+                floor,
+                loss
+            );
+            assert!(
+                newton_is_cheaper_within(win, M, 1024, floor),
+                "the floor {} excludes k = {}, which measured a win",
+                floor,
+                win
+            );
+        }
+    }
+
+    /// The shipped rule now takes Newton across the band #527 found it was forgoing.
+    #[test]
+    fn test_the_shipped_rule_no_longer_forgoes_the_measured_band() {
+        type Narrow = PrimeFieldElement64<2_147_483_647>;
+        const M: usize = 1 << 16;
+        // An 8-byte element: #527 measured Newton 1.2x-3.7x faster from k = 32 up, and the old
+        // floor of 256 refused all of it.
+        for k in [32usize, 64, 128, 256] {
+            assert!(
+                newton_is_cheaper::<Narrow>(k, M),
+                "the rule still forgoes k = {} against m = {}",
+                k,
+                M
+            );
+        }
+        // And still refuses at and below the floor, where the measurement says long division wins.
+        let floor = karatsuba_base_case::<Narrow>();
+        assert!(!newton_is_cheaper::<Narrow>(floor, M));
+        assert!(!newton_is_cheaper::<Narrow>(floor / 2, M));
+    }
+
+    /// The balanced case still turns on the crossover, not on the floor.
+    ///
+    /// Before #527 the two were the same constant and this was automatic; now they differ by 16x,
+    /// so the balanced case needs its own integral guard and this pins it.
+    #[test]
+    fn test_the_balanced_case_still_follows_the_crossover_not_the_floor() {
+        type Narrow = PrimeFieldElement64<2_147_483_647>;
+        let crossover = newton_crossover::<Narrow>();
+        let floor = karatsuba_base_case::<Narrow>();
+        assert!(
+            floor < crossover,
+            "the floor and the crossover should differ after #527"
+        );
+        assert!(!newton_is_cheaper::<Narrow>(crossover, crossover));
+        assert!(newton_is_cheaper::<Narrow>(crossover + 1, crossover + 1));
+        // Balanced above the floor but below the crossover: long division, which is the measured
+        // balanced result and not what the floor alone would have said.
+        assert!(!newton_is_cheaper::<Narrow>(floor + 1, floor + 1));
     }
 }
