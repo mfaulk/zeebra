@@ -2,8 +2,9 @@
 //!
 //! <https://www.mqchallenge.org/>. Six problem types: GF(2), GF(2^8) and GF(31), each as an
 //! encryption family (`m = 2n`, overdetermined) and a signature family (`n ≈ 1.5m`,
-//! underdetermined). The GF(31) and GF(2^8) types are importable here; GF(2) is not — see
-//! [`MqField`] for why.
+//! underdetermined). **All six import**, each at the coefficient type [`MqField`] names; what
+//! bounds the families whose real sizes are out of reach is [`SUPPORTED_DIMENSIONS`], not the
+//! field.
 //!
 //! # The file format, as it actually is
 //!

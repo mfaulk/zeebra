@@ -386,6 +386,11 @@ cargo test --release --lib -- --ignored --exact \
   `GF(2^8)` types also have a *basis* oracle now (§14), not only a published answer file — but
   only under `Gf256`'s modulus; the Fukuoka modulus is `Gf256Mq`'s `0x11D`, which is a one-line
   addition to the dispatch and is #197's to make when it needs it.
+  **Delivered.** #197 took §8's decision and removed the importer's GF(2) refusal, so all six
+  families now import — `Zp2`, `Gf256Mq`, `Zp31` — and `SUPPORTED_DIMENSIONS` gained `5` for the
+  signature toys. The `0x11D`-versus-`0x11B` question is now a test rather than a recorded
+  observation: 20 of 20 polynomials of type II `n = 10` vanish at the published answer under the
+  challenge modulus and 0 of 20 under the AES one. See `fukuoka-mq.md` §14.
 - **#198 (A6, HFE Challenge 1)** — the `GF(2)` ladder is unblocked, and the `GF(2^8)` text input the
   ladder's upper rungs need now exists (§13), with a `GF(2^8)` differential oracle behind it (§14).
   HFE-80 remains far out of reach; the reduced `HFE n_D` rungs on Steel's page are the target.
