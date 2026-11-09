@@ -180,8 +180,8 @@ jobs:
     # And on a pull request this job costs **no wall clock**, only job-minutes: **4m17s and
     # 5m14s** on the two runs that enabled it, against `Tests (release)`'s 25–27 minutes on the
     # same run, so it finishes well inside the critical path. (The ~8.4 minutes this comment used
-    # to cite is a cold-cache push run; a PR run hits `Swatinem/rust-cache`.) See README's
-    # "Testing the merged result" for the job-minute accounting.
+    # to cite is a cold-cache push run; a PR run hits `Swatinem/rust-cache`.) See
+    # `docs/guide/development.md`, "Testing the merged result", for the job-minute accounting.
     #
     # It still takes **no measurements** — `--test` runs each case once and samples nothing — so
     # nothing here produces a figure, which a shared runner could not produce comparably anyway.
@@ -302,8 +302,8 @@ jobs:
   # base before every merge. Measured, that is not affordable here: the release job is 806 s mean
   # over the last 25 successful runs (983 s worst), so a serialized merge queue admits 4.5 merges an
   # hour against a peak of 14 observed on 2026-11-06 and 58 merges that day — 13.0 h of CI inside a
-  # 24 h day, and 59 % of consecutive merges were less than one release job apart. See the README
-  # section "Testing the merged result".
+  # 24 h day, and 59 % of consecutive merges were less than one release job apart. See
+  # `docs/guide/development.md`, "Testing the merged result".
   #
   # So this reports instead of gating. It is **advisory by construction**: a stale-and-overlapping
   # result is a workflow warning and the job still succeeds, because making it a required check

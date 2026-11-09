@@ -323,7 +323,7 @@ fn multiply_chunked<const N: usize, F: FiniteField>(
 /// Accumulate into a flat `Vec<F>` indexed by the bivariate total-degree triangle.
 ///
 /// The inner loop is two additions and one indexed `+=`: no hashing, and no per-product branch on
-/// whether the monomial has been seen. `README.md`'s F4 matrix path made the same trade — a
+/// whether the monomial has been seen. F4's matrix path made the same trade — a
 /// polynomial's hash map for integer column indices — and measured it a win.
 ///
 /// Where the other routes check each exponent addition, this one establishes the same guarantee
