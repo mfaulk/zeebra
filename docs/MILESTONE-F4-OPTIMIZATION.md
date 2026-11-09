@@ -1847,6 +1847,18 @@ What is left:
   largest stage on either. 89% of what remains is the row scatter. The full split, both arms, and
   the reason the sort got *slower* are in `research/msolve-implementation.md` §4.1 under H1.
 
+  **The scatter split again (#582)**, at base `a756eb95` with the source blobs
+  `research/msolve-implementation.md` §4.1 names. The scatter is 81–89% **one hash lookup per
+  entry**: 3.19 ms of katsura-6 lex's 3.59 ms scatter, which is 26% of that 12.14 ms computation
+  under `recommended` and ~14% of the 8.28 ms one under `default`. Matrix assembly and the per-row
+  `Vec` — the two candidates that did not involve the map — are 0.00–0.14 ms between them. So the
+  quantity #330 priced at 1% was the map *build*, one insert per column, and the quantity that
+  costs is the map *read*, one lookup per entry; the sentence above about the `HashMap` being 1% of
+  construction remains true and is about a different operation. The duplication #330 removed from
+  the monomial set is still present in the rows, because symbolic preprocessing interns every
+  shifted monomial and discards the handle. #621 is the follow-up and states what must be measured
+  before anything is implemented.
+
 Both are consequences of succeeding elsewhere, which is the normal shape of a performance
 milestone and the reason the stage breakdown was built in M16-0 rather than inferred at the end.
 
