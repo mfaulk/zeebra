@@ -283,6 +283,15 @@ struct Row {
     /// Median seconds over `repetitions` transforms.
     seconds: f64,
     repetitions: usize,
+    /// Isolated multiplications per second, measured **immediately before this row's transform**.
+    ///
+    /// Paired per row rather than once per field, because this box's absolute speed moves by more
+    /// than the result does: one sweep measured 371 M mul/s and another, eleven minutes later, 133
+    /// — and a denominator from the start of a sweep divided into a numerator from the middle of it
+    /// produced `achieved` readings of 105–165%, which is a statement about the gap between the two
+    /// measurements and not about the transform. Interleaving them is the same discipline the rest
+    /// of this repository's A/B figures use.
+    isolated_rate: f64,
 }
 
 impl Row {
@@ -305,6 +314,11 @@ impl Row {
     /// Effective multiplications per second, charging one butterfly one multiplication.
     fn effective_rate(&self) -> f64 {
         self.butterflies() / self.seconds
+    }
+
+    /// The transform's rate as a fraction of the multiply rate measured beside it.
+    fn achieved(&self) -> f64 {
+        self.effective_rate() / self.isolated_rate
     }
 }
 
@@ -347,6 +361,8 @@ fn median(values: &mut [f64]) -> f64 {
 /// itself `n * size_of::<F>()` bytes and one pass to fill, which would be charged to the transform.
 fn time_transform<F: KnownOrder>(log_n: u32, seed: u64) -> Row {
     let n = 1usize << log_n;
+    // Before the transform, not before the sweep: see `Row::isolated_rate`.
+    let isolated_rate = multiply_rates::<F>(seed ^ 0xa417 ^ u64::from(log_n)).isolated;
     let mut rng = StdRng::seed_from_u64(seed ^ u64::from(log_n));
     let root = F::two_adic_root_of_unity(log_n, &mut rng);
     let domain = FFTDomain::from_generator(root, n);
@@ -385,6 +401,7 @@ fn time_transform<F: KnownOrder>(log_n: u32, seed: u64) -> Row {
         peak_bytes,
         seconds: median(&mut draws),
         repetitions,
+        isolated_rate,
     }
 }
 
@@ -458,13 +475,13 @@ fn measure_field<F: KnownOrder>(name: &str, criterion_arm: &str, budget: Duratio
     );
 
     let rates = multiply_rates::<F>(seed ^ 0xa417);
-    let rate = rates.isolated;
     println!(
-        "- multiply rate measured in this run, over a {}-element L1-resident window: **{:.1} M \
-         mul/s isolated** ({:.3} ns a multiply), and {:.1} M mul/s accumulated ({:.3} ns a \
-         multiply-accumulate). `achieved` below is against the isolated figure, which is what \
-         §6.3 specifies; the accumulated one is the shape §6.1's pre-#161 baseline used and is a \
-         lower bound, because its additions serialise.",
+        "- multiply rate at the head of this sweep, over a {}-element L1-resident window: **{:.1} \
+         M mul/s isolated** ({:.3} ns a multiply), and {:.1} M mul/s accumulated ({:.3} ns a \
+         multiply-accumulate). The isolated form is what §6.3 specifies and what `achieved` is \
+         against; the accumulated one is the shape §6.1's pre-#161 baseline used, and is a lower \
+         bound because its additions serialise. **Each row below re-measures the isolated rate \
+         immediately before its own transform** — this line is only the first of those.",
         ARITHMETIC_WINDOW_BYTES / element_bytes,
         rates.isolated / 1e6,
         1e9 / rates.isolated,
@@ -535,8 +552,29 @@ fn measure_field<F: KnownOrder>(name: &str, criterion_arm: &str, budget: Duratio
             row.seconds,
             row.nanos_per_butterfly(),
             row.effective_rate() / 1e6,
-            rate / 1e6,
-            100.0 * row.effective_rate() / rate
+            row.isolated_rate / 1e6,
+            100.0 * row.achieved()
+        );
+    }
+
+    // How far the denominator itself moved over the sweep. A wide spread does not invalidate the
+    // `achieved` column — that is the point of pairing — but it does invalidate any reading of the
+    // `ns/butterfly` column across rows, so it is printed rather than left for a reader to notice.
+    if rows.len() >= 2 {
+        let mut denominators: Vec<f64> = rows.iter().map(|row| row.isolated_rate).collect();
+        let low = denominators.iter().copied().fold(f64::INFINITY, f64::min);
+        let high = denominators.iter().copied().fold(0.0, f64::max);
+        let middle = median(&mut denominators);
+        println!();
+        println!(
+            "The paired multiply rate itself moved from {:.1} to {:.1} M mul/s over this sweep \
+             (median {:.1}), a span of **{:.2}x**. `achieved` is paired per row and survives that; \
+             the `ns/butterfly` and `s/transform` columns are **not** comparable across rows when \
+             this span is wide.",
+            low / 1e6,
+            high / 1e6,
+            middle / 1e6,
+            high / low
         );
     }
 

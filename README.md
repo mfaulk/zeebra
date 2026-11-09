@@ -2317,27 +2317,48 @@ geometric, and an evaluation–interpolation resultant needs an arbitrary point 
 ### Is the NTT access-bound? — `ntt_access`
 
 `cargo run --release --example ntt_access` sweeps transform sizes by doubling and reports
-`ns/butterfly` against the coefficient array's size, with the field's **own multiply rate measured
-in the same run and the same binary** as the denominator. The question is #68's one untested
-premise — that the post-elimination regime is bound by memory *access* rather than arithmetic — and
-`docs/research/graeffe-root-finding.md` §6.3 is the specification, §6.3.1 the result.
+`ns/butterfly` against the coefficient array's size, with the field's **own multiply rate
+re-measured immediately before each row** as the denominator. The question is #68's one untested
+premise — that the post-elimination regime is bound by memory *access* rather than arithmetic —
+specified in `docs/research/graeffe-root-finding.md` §6.3 and answered in §6.3.1.
 
-Two things are settled and one is not:
+Taken under `tools/benchlock.sh` on one pinned core at a one-minute load of **5.55**, against the
+binary's own publishable gate of 8:
+
+| coefficient array | KoalaBear (8 B) | Goldilocks (8 B) | BN254 `Fr` (32 B) |
+|---|---:|---:|---:|
+| 8–64 KB | 105% | 95% | 94–120% |
+| 4 MB | 90% | 83% | 83% |
+| **16 MB** | **93%** | **74%** | 78% |
+| **32 MB** | **61%** | **65%** | **73%** |
+| 128 MB | 63% | 55% | 80% |
+| 512 MB | — (two-adicity) | 46% | 77% |
+| 2 GB | — | — | 75% |
+
+Four results:
 
 - **The transform allocates its output and nothing else.** `peak bytes / coeff bytes` is **1.00** at
-  every one of 46 rows across three fields. The recursive kernel's `7nB` peak is gone. That column
-  is a counter from a counting global allocator, so it does not depend on the machine or the load.
-- **Below a few megabytes the NTT is arithmetic-bound**, at **90–107%** of its field's own multiply
-  rate, reproduced at three ambient loads to within 1%. The pre-#161 figure for the same quantity
-  was 8.7–9.6%, and that deficit was the allocator rather than the cache.
-- **Above a few megabytes this box cannot answer the question while it is shared.** The step in
-  `ns/butterfly` moves by two doublings between runs minutes apart, and the same `n = 2^20` row
-  reads 2.73 ns at one-minute load 998 and 6.25 ns at load 611. The L3 is 256 MB and shared, so
-  what a pinned process retains is a fraction of it. §6.3.1 reports that rather than tabulating it.
+  every one of 49 rows across three fields; the recursive kernel's `7nB` peak is gone. A counter, so
+  exact and machine-independent.
+- **Below a few MB the NTT is arithmetic-bound**, at 83–105% of its field's own multiply rate. The
+  pre-#161 figure for the same quantity was **8.7–9.6%**, and that deficit was the allocator rather
+  than the cache.
+- **Access binds at 16–32 MB of coefficients, and *not* at the 256 MB L3.** Both 8-byte fields step
+  down hard there — KoalaBear 93% → 61%, Goldilocks 74% → 65% — on a quiet box, so this is not
+  ambient eviction. Crossing the nominal L3 boundary costs Goldilocks 16.3% and BN254 **2.7%**, far
+  less than the step. A radix-2 transform revisits the whole array `log2 n` times with a doubling
+  stride, so what must stay resident is not bounded by the array's size alone.
+- **The degradation saturates, and lowest for the field with the most arithmetic per byte.** BN254's
+  multiply is 9x slower over a 4x wider element, and it is flat at 73–80% from 32 MB to 2 GB — six
+  doublings, four of them past the L3. An access-bound transform would degrade *more* for the field
+  carrying more bytes per operation.
 
-The binary therefore **refuses to measure** above a one-minute load of 8 and exits 3, the same gate
-`determinant_width` uses. `load-gate=N` raises it for exercising the sweep, and a run under a raised
-gate prints "**These numbers are not figures.**" above its own tables. Serialize a real run:
+The binary **refuses to measure** above a one-minute load of 8 and exits 3, the same gate
+`determinant_width` uses, because the subject is shared-cache traffic. `load-gate=N` raises it for
+exercising the sweep, and a raised-gate run prints "**These numbers are not figures.**" above its
+own tables. The arithmetic denominator is paired per row rather than per field after an unpaired
+version read 105–165% — §6.3.2 has that method note; it is why the sweep also prints how far the
+denominator moved over its own run.
 
 ```bash
 tools/benchlock.sh ntt-access cargo run --release --example ntt_access -- budget=30
@@ -2346,7 +2367,7 @@ tools/benchlock.sh ntt-access cargo run --release --example ntt_access -- budget
 Mersenne-31 is excluded and the exclusion printed: two-adicity 1, so no power-of-two transform above
 size 2. KoalaBear is swept as the registered challenge's field but **cannot** answer the access
 question on this box — its two-adicity caps `n` at `2^24`, which is 128 MB in eight bytes and inside
-the L3 — so Goldilocks (crosses at `2^26`) and BN254 (`2^24`) are where the answer would live.
+the L3 — so Goldilocks and BN254 are the fields that reach past it.
 `benches/field_arithmetic.rs` gained `p31_koalabear` and `p64_goldilocks` arms for the same reason:
 `p31` is the Mersenne-31 modulus and `p64` is `2^64 - 59`, whose two-adicity is 2, so neither could
 supply a committed comparand for an NTT-friendly field.
