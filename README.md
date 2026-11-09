@@ -4844,12 +4844,14 @@ Measured, the two findings both run against the expectation:
   dimension is exactly `α^r` by Bézout, which *is* the univariate's degree. The univariate is the
   smallest possible eliminant, and computing it beats computing the basis that encodes it.
 - **Removing the MDS layer moved the frontier in, not out.** Feistel-MiMC fails at nine variables
-  where Poseidon `t = 2` succeeds in 371 ms, both square. Variable count is the wrong axis: a
-  Feistel network spends one variable per round and Poseidon `t = 2` spends two, so nine variables
-  is nine rounds deep here against four there, and `α^{depth}` is what governs. `poseidon.md` §6's
-  "the dense MDS layer is the structural obstacle, not the variable count" needs amending — the
-  MDS layer is what makes `t = 3` fail where `t = 2` succeeds *at equal width*, not what bounds the
-  frontier in general.
+  where Poseidon `t = 2` succeeds in 371 ms, both square. Variable count is the wrong axis, and the
+  quotient dimension says why: in both families it is `α^{rounds}`, the degree of the univariate
+  eliminant, *not* the Bézout number `α^{variables}`. A Feistel network introduces one variable per
+  round, so nine variables is nine rounds and `3^9 = 19 683`; Poseidon `t = 2` introduces two, so
+  nine variables is four rounds and `3^4 = 81`. A factor of **243** in the governing quantity at
+  identical variable count. `poseidon.md` §6's "the dense MDS layer is the structural obstacle, not
+  the variable count" therefore needs amending — the MDS layer is what makes `t = 3` fail where
+  `t = 2` succeeds *at equal width*, not what bounds the frontier in general.
 
 Two rejections are recorded so they are not reopened. **MiMCSponge is not a polynomial-solving
 target**: its challenge objective is a *collision*, which is birthday-bounded. **Reinforced Concrete

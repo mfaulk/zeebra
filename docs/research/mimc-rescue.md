@@ -429,12 +429,37 @@ corrects.
 variables short of it.** Removing the MDS layer entirely did not move the frontier outward; it moved
 it in.
 
-The reason is that **variable count is the wrong axis, and round depth is the right one.** A
-Feistel network spends **one** variable per round; Poseidon at `t = 2` spends **two**. So nine
-variables is four rounds deep in Poseidon and nine rounds deep in Feistel-MiMC, and the solving cost
-tracks the depth: the quotient dimension is `α^{depth}`, which is `3^9 = 19 683` for the
-Feistel-MiMC row against `3^4 = 81`-ish for the Poseidon one. Matching variable count between a
-narrow-and-deep system and a wide-and-shallow one matches the wrong thing.
+The reason is that **variable count is the wrong axis, and round depth is the right one** — and the
+quantity that makes this precise is the quotient dimension.
+
+In both families the CICO ideal's quotient dimension is the degree of the univariate eliminant in the
+single free input, and that degree is the degree of the input-to-output map: **`α^{rounds}`**. It is
+*not* the Bézout number `α^{variables}`, because the per-round variables are not independent
+unknowns — each round's state is a function of the previous one, so the system is far from a generic
+complete intersection whenever a round introduces more than one variable.
+
+Feistel-MiMC is the degenerate case where the two coincide: it introduces exactly **one** variable
+per round, so `α^{rounds} = α^{variables}` and the ideal really is a complete intersection of `r`
+cubics at the full Bézout bound. That is why its eliminant has degree `α^r` — measured, 2 187 at
+`r = 7` in the `degree` column above — and it is the worst case rather than a cheap one.
+
+Poseidon at `t = 2` introduces **two** variables per round, so nine variables is `R_F = 4` rounds and
+its eliminant has degree `3^4 = 81`, not `3^9`. Against Feistel-MiMC at nine variables, which is nine
+rounds and `3^9 = 19 683`:
+
+| system | vars | rounds | quotient dimension `α^{rounds}` |
+|---|---:|---:|---:|
+| Poseidon `t = 2`, `R_F = 4` | 9 | **4** | **81** |
+| Feistel-MiMC `r = 9` | 9 | **9** | **19 683** |
+
+A factor of **243** in the quantity that governs, at identical variable count and identical
+algebraic dimension. Matching variable count between a narrow-and-deep system and a
+wide-and-shallow one matches the wrong thing.
+
+The `3^7 = 2 187` figure is measured here as the eliminant's degree; the Poseidon `81` is **derived**
+from its round structure and not measured in this work — computing it is cheap and would be worth
+adding to `poseidon.md` §4 as a column, since it is the number that makes that table's rows
+comparable.
 
 So `poseidon.md` §6's claim that "degree-3 equations with a dense MDS layer are the structural
 obstacle, not the variable count" survives in its *negative* half — the variable count is indeed not
