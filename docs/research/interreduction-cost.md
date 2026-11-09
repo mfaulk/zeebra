@@ -1455,8 +1455,15 @@ interreduction is no longer where it lives.
 * **Whether 418 MB is the right price.** The pair costs 2.58x the old default's memory on
   `mq-random-10` and that is a real charge against a budget, not free. Nothing here measures a rung
   where it is the binding constraint, and #536's refusal is what stands between it and one.
-* **`katsura-11`'s arms are one rep each.** The `mq-random-10` arms are three. A rung that takes
-  four minutes an arm did not get reps, so its ratios carry this box's full spread.
+* **`katsura-11`'s arms are one rep each, and two of them straddled a load excursion.** The
+  `mq-random-10` arms are three and ran at a one-minute load average of **2.2 to 5.5** throughout,
+  which is why their spread is 3.8%. `katsura-11`'s four took four minutes an arm and
+  `benchlock`'s own log puts them at: `division`+`echelon` **4.18 → 38.76**, `matrix`+`echelon`
+  **38.76 → 5.52**, `division`+`reduced` **5.52 → 4.94**, `matrix`+`reduced` **4.94 → 22.00**. The
+  8.10x is therefore a ratio between two single runs that each saw load rise under them, on 8 pinned
+  cores of 128. Load inflates both sides and the direction of the residual is not knowable from one
+  rep, so **8.10x is the figure to re-take first** if any of §3h is re-measured. The `mq-random-10`
+  figures do not depend on it.
 
 ---
 
