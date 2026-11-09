@@ -7,6 +7,9 @@
 //!   **Machine-independent**, so it needs no pinned environment and a disagreement is a defect
 //!   rather than a timing. The optional filter exists because the `N = 6` rows cost minutes of F4
 //!   each and the gate is worth running on them alone.
+//! - `shape [id-substring]` asks whether `R/I` is in shape position in the lex-last variable, and
+//!   whether the shape route's lex basis is the classical conversion's. **Machine-independent** for
+//!   the same reason `dimensions` is — a minimal-polynomial degree is not a timing.
 //! - `row <id>` runs one row through F4, FGLM and root finding, each timed separately, and
 //!   **refuses to print a single number** unless `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` are set.
 //!
@@ -19,6 +22,7 @@
 //! cargo run --release --example anemoi_ladder list
 //! cargo run --release --example anemoi_ladder dimensions
 //! cargo run --release --example anemoi_ladder dimensions n6
+//! cargo run --release --example anemoi_ladder shape n3
 //! ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
 //!     cargo run --release --example anemoi_ladder row anemoi64-cico-n3-fcico
 //! ```
@@ -31,8 +35,9 @@ use zeebra::{
     grobner::{
         f4_reported,
         fglm::{
-            fglm_to_lex_with_options, FglmMemory, FglmOptions, FglmStatistics,
-            OperatorConstruction, OperatorStorage,
+            fglm_to_lex_with_options, separating_variables, shape_lex_basis, shape_report,
+            FglmMemory, FglmOptions, FglmStatistics, OperatorConstruction, OperatorStorage,
+            QuotientAlgebra,
         },
         research::{
             anemoi::{ANEMOI_17_PRIME, ANEMOI_32_PRIME, ANEMOI_64_PRIME},
@@ -78,6 +83,7 @@ fn main() {
     match command {
         "list" => list(),
         "dimensions" => dimensions(arguments.get(1).map(String::as_str)),
+        "shape" => shape(arguments.get(1).map(String::as_str)),
         "msolve" => {
             let id = arguments
                 .get(1)
@@ -91,8 +97,8 @@ fn main() {
             row(id);
         }
         other => panic!(
-            "usage: anemoi_ladder [list | dimensions [id-substring] | msolve <challenge-id> | \
-             row <challenge-id>]; got {other}"
+            "usage: anemoi_ladder [list | dimensions [id-substring] | shape [id-substring] | \
+             msolve <challenge-id> | row <challenge-id>]; got {other}"
         ),
     }
 }
@@ -310,6 +316,169 @@ fn run_row<F: KnownOrder>(manifest: &ChallengeManifest, machine: &str, affinity:
         "\nThe published figures above are Magma on a 2015-era Xeon. Report the stage split, or \
          the ratio with both machines named -- never the ratio alone."
     );
+}
+
+/// Shape position on the registered rows — machine-independent, like `dimensions`.
+///
+/// Whether `1, t, ..., t^{D-1}` is a basis of `R/I` is an algebraic fact, so this subcommand pins
+/// no environment and prints no clock. It is #224's question 2, and `fglm::shape` had never been
+/// run on a cryptanalytic system: `MILESTONE-FGLM-SCALABILITY.md` §8.3's measured reach is the
+/// katsura family, nothing else in the benchmark corpus, and 76 of 120 differential fixtures.
+///
+/// Filter, because the cost is the *basis*: `n1`–`n4` are seconds, `n5` is a minute and `n6` does
+/// not reach a basis at all (#323). `tests/anemoi_shape_position.rs` pins `n1` and `n2` in the
+/// suite.
+fn shape(filter: Option<&str>) {
+    println!("# shape position on the registered Anemoi rows\n");
+    // "variables" and not "N": the models use 2N and N+1 variables for the same round count, so a
+    // column headed N would read as the rung on one model and not the other.
+    println!("| row | variables | D | deg of last variable | separating variables | shape basis |");
+    println!("|---|---:|---:|---:|---|---|");
+    let mut misses = 0;
+    let mut checked = 0;
+    for manifest in anemoi_rows() {
+        if let Some(filter) = filter {
+            if !manifest.id.contains(filter) {
+                continue;
+            }
+        }
+        let prime = manifest.anemoi_parameters().expect("an Anemoi row").prime;
+        misses += with_field!(prime, one_shape(&manifest));
+        checked += 1;
+    }
+    assert!(checked > 0, "no registered Anemoi row matched the filter");
+    println!(
+        "\nMachine-independent: a minimal-polynomial degree against a quotient dimension. \
+         `ACICO` (#201) is the model whose shape position is *proved* -- syntactically, from \
+         eprint 2025/814 section 5 -- so a miss there would be a detector defect. These two models \
+         carry no such proof, so a miss here would be a fact about the model."
+    );
+    if misses > 0 {
+        eprintln!("{misses} row(s) are not in shape position in the lex-last variable");
+    }
+}
+
+/// One row's shape-position probe, printed; returns 1 when the lex-last variable does not separate.
+fn one_shape<F: KnownOrder>(manifest: &ChallengeManifest) -> usize {
+    let parameters = manifest.anemoi_parameters().expect("an Anemoi row");
+    let instance = manifest
+        .anemoi_cico_instance::<F>()
+        .expect("the registered field");
+    let variables = instance.variables();
+    let outcome = dispatch_anemoi_cico::<F, _>(&instance, Shape(parameters.rounds))
+        .expect("a compiled dimension");
+    match outcome {
+        ShapeOutcome::Probed {
+            dimension,
+            minimal_polynomial_degree,
+            separating,
+            agrees,
+        } => {
+            let separating = if separating.is_empty() {
+                "none".to_string()
+            } else {
+                separating
+                    .iter()
+                    .map(|v| format!("x_{v}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            println!(
+                "| `{}` | {} | {} | {} | {} | {} |",
+                manifest.id,
+                variables,
+                dimension,
+                minimal_polynomial_degree,
+                separating,
+                match agrees {
+                    Some(true) => "**yes**, equal to the classical conversion's",
+                    Some(false) => "**WRONG** -- differs from the classical conversion's",
+                    None => "no -- not separating",
+                }
+            );
+            assert_ne!(
+                agrees,
+                Some(false),
+                "{}: the shape route produced a different lex basis from the classical \
+                 conversion's, and the reduced lex basis is unique",
+                manifest.id
+            );
+            usize::from(minimal_polynomial_degree != dimension)
+        }
+        ShapeOutcome::NotReached(why) => {
+            println!(
+                "| `{}` | {} | not reached ({}) | — | — | — |",
+                manifest.id, variables, why
+            );
+            0
+        }
+    }
+}
+
+/// Does one variable's Krylov sequence span the quotient, and does the shape route agree?
+///
+/// The route is compared against the classical conversion rather than trusted: the reduced lex
+/// basis is unique, so equality is the whole correctness statement. That is how
+/// `examples/fglm_ablation.rs` validates every other FGLM strategy.
+struct Shape(usize);
+
+impl<F: KnownOrder> AnemoiCicoVisitor<F> for Shape {
+    type Output = ShapeOutcome;
+
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> ShapeOutcome {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (basis, f4) = f4_reported(system, order, &basis_options(self.0));
+        let basis = match basis {
+            Ok(basis) => basis,
+            Err(e) => {
+                return ShapeOutcome::NotReached(format!(
+                    "F4 refused: {e} -- peak live nonzeros {}",
+                    f4.max_live_nonzeros
+                ))
+            }
+        };
+        // Unbounded, because the budgets exist to stop a caller paying for a conversion by
+        // accident and this is a deliberate diagnostic. `recommended()` caps `D` at 4 096, which
+        // would refuse the `N = 6` rung on a budget rather than on the algebra.
+        let options = FglmOptions::unbounded();
+        let algebra = match QuotientAlgebra::new(&basis, order, &options) {
+            Ok(algebra) => algebra,
+            Err(e) => return ShapeOutcome::NotReached(format!("no quotient algebra: {e}")),
+        };
+        let report = shape_report(&algebra, N - 1);
+        let agrees = match shape_lex_basis(&algebra) {
+            Ok(shape) => match fglm_to_lex_with_options(&basis, order, &options) {
+                Ok((classical, _)) => Some(shape == classical),
+                Err(e) => return ShapeOutcome::NotReached(format!("no classical basis: {e}")),
+            },
+            Err(_) => None,
+        };
+        ShapeOutcome::Probed {
+            dimension: report.dimension,
+            minimal_polynomial_degree: report.minimal_polynomial_degree,
+            separating: separating_variables(&algebra),
+            agrees,
+        }
+    }
+}
+
+/// What the shape-position probe found.
+enum ShapeOutcome {
+    /// The quotient algebra was built and probed.
+    Probed {
+        /// `dim F_p[x]/I`.
+        dimension: usize,
+        /// The degree of `x_{N-1}`'s minimal polynomial; equal to `dimension` iff it separates.
+        minimal_polynomial_degree: usize,
+        /// Every variable whose powers span the quotient.
+        separating: Vec<usize>,
+        /// Whether the shape route's lex basis equalled the classical conversion's; `None` when
+        /// the shape route declined because the lex-last variable does not separate.
+        agrees: Option<bool>,
+    },
+
+    /// The probe did not get far enough to have an opinion.
+    NotReached(String),
 }
 
 /// The registered Anemoi rows, in registry order.

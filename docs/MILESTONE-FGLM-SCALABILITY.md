@@ -1383,8 +1383,18 @@ quoted as a current argument against a Krylov route. Second, M25's competitive b
 (`docs/research/competitive-baseline.md`, #263) measured Zeebra's conversion ~30x behind msolve's
 Wiedemann scalar sequence on Anemoi CICO — **a family this section did not measure**, and whose
 stage split is the opposite of katsura-7's — which reopened the FGLM half as staged work under #368,
-with #224 as the alternatives survey. The three measurements above are unrefuted and #368 does not
-refute them; they simply do not cover that family.
+with #224 as the alternatives survey.
+
+**#224 is settled, and its record is [`docs/research/order-conversion.md`](research/order-conversion.md)**
+— eight alternatives assessed, the no-go **reaffirmed and narrowed**. Its §7 is the part a reader of
+this section needs: the first measurement above is confined to the small-`D` regime it was measured on, because on Anemoi border
+reduction is 16.7% and falling while the dependence test is 82.8% and rising; the second holds as
+written but is no longer the decisive disjointness it was, because Anemoi is in shape position
+(`order-conversion.md` §4, measured) with dense blocks at 0.97x its operators rather than 54x; and
+the third is untested on any cryptanalytic instance (#614). The no-go stands on new ground instead —
+eprint 2025/814's Table 7, where SparseFGLM fails at `d_I = 5^8` and Wiedemann returns in 1 212.9 s,
+so the cheap subset of sparse FGLM is the route that survives furthest and that subset is #368
+stage 2.
 
 ### 8.6 Follow-up (issue #56): the coordinate block is triangular too
 

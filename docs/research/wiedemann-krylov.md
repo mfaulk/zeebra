@@ -274,9 +274,14 @@ unambiguous rather than a close call.
 - **F4 half:** closed. `docs/MILESTONE-F4-OPTIMIZATION.md` §6.2, §7.4.1, §7.4.2 are the
   measurements; §1.4 above is what has been tried since and what came of it.
 - **FGLM half:** [#368](https://github.com/mfaulk/zeebra/issues/368) is the staged implementation
-  issue, [#224](https://github.com/mfaulk/zeebra/issues/224) the alternatives survey, and
+  issue, [#224](https://github.com/mfaulk/zeebra/issues/224) the alternatives survey — **settled, and
+  its record is [`order-conversion.md`](order-conversion.md)** — and
   `docs/MILESTONE-FGLM-SCALABILITY.md` §8.5 and §9.7 the record they both start from. If the question
   is "should Zeebra have a Krylov conversion", the answer is in #368's stage 1, not here.
+  `order-conversion.md` §7 is what became of §8.5: the no-go **stands, narrowed**, with the first of
+  its three measurements now confined to `D < 100` and the second no longer decisive. §4 there is the
+  first shape-position result on a cryptanalytic family, which satisfies the shape-position half of
+  §2.2's trigger.
   [#167](https://github.com/mfaulk/zeebra/issues/167) is the competing claim on the same stage —
   parallel border reduction — and #224 is required to defer to it if border reduction turns out to
   bind on the cryptanalytic families.
