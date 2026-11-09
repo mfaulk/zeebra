@@ -154,8 +154,9 @@ use std::time::Duration;
 
 use super::{
     contract::{
-        generators_agree, Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits,
-        Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
+        generators_agree, order_is_unsupported_externally, Answer, ExternalSolver, Instance,
+        Invariants, LimitStop, Limits, Measurement, RunFailure, RunReport, RunStatus, Support,
+        Task, ToolVersion, Unsupported, WEIGHTED_UNSUPPORTED,
     },
     process::{read_output, Invocation, Supervisor},
 };
@@ -343,6 +344,7 @@ fn sagebrush_order(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => "lex",
         MonomialOrder::GradedLexicographic => "deglex",
         MonomialOrder::GradedReverseLexicographic => "degrevlex",
+        MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
     }
 }
 
@@ -864,6 +866,14 @@ impl ExternalSolver for SagebrushSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
+        // Weighted orders (#306) are refused rather than approximated: no adapter here has a
+        // verified spelling for one, and substituting an unweighted order would answer a
+        // different question with a basis that looks right.
+        if order_is_unsupported_externally(instance.order) {
+            return Support::No(Unsupported::Order {
+                order: instance.order,
+            });
+        }
         // The three tasks the driver has entry points for. Everything else is refused rather than
         // approximated: answering `UnivariateEliminant` with the last element of a lex basis, or
         // `LexBasis` with a degrevlex one, is precisely the substitution the task taxonomy forbids.
@@ -1288,6 +1298,22 @@ mod tests {
     ///
     /// Computing a lex basis for an instance declaring degrevlex would answer under an order the
     /// instance did not ask for, which is the substitution the task taxonomy forbids.
+    /// A weighted-order instance is refused, because this tool has no verified spelling for one.
+    ///
+    /// Emitting an unweighted ordering instead would compare a correct basis for a different
+    /// question, which is agreement for the wrong reason.
+    #[test]
+    fn test_a_weighted_order_instance_is_refused() {
+        let solver = solver("sagebrush-gb-driver", "weighted");
+        let order =
+            MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::LastVariableFirst)
+                .unwrap();
+        assert!(matches!(
+            solver.supports(&instance(65521, order), Task::ReducedGrobnerBasis),
+            Support::No(Unsupported::Order { .. })
+        ));
+    }
+
     #[test]
     fn test_the_lex_basis_task_needs_an_instance_that_declares_lex() {
         let solver = solver("sagebrush-gb-driver", "lex-order");

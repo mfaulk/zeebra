@@ -84,8 +84,9 @@ use std::time::Duration;
 
 use super::{
     contract::{
-        generators_agree, Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits,
-        Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
+        generators_agree, order_is_unsupported_externally, Answer, ExternalSolver, Instance,
+        Invariants, LimitStop, Limits, Measurement, RunFailure, RunReport, RunStatus, Support,
+        Task, ToolVersion, Unsupported, WEIGHTED_UNSUPPORTED,
     },
     process::{read_output, CpuBasis, Invocation, Supervisor},
 };
@@ -159,6 +160,7 @@ fn internal_ordering(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => ":lex",
         MonomialOrder::GradedLexicographic => ":deglex",
         MonomialOrder::GradedReverseLexicographic => ":degrevlex",
+        MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
     }
 }
 
@@ -168,6 +170,7 @@ fn groebner_ordering(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => "Groebner.Lex()",
         MonomialOrder::GradedLexicographic => "Groebner.DegLex()",
         MonomialOrder::GradedReverseLexicographic => "Groebner.DegRevLex()",
+        MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
     }
 }
 
@@ -598,6 +601,14 @@ impl ExternalSolver for GroebnerJlSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
+        // Weighted orders (#306) are refused rather than approximated: no adapter here has a
+        // verified spelling for one, and substituting an unweighted order would answer a
+        // different question with a basis that looks right.
+        if order_is_unsupported_externally(instance.order) {
+            return Support::No(Unsupported::Order {
+                order: instance.order,
+            });
+        }
         match task {
             Task::ReducedGrobnerBasis => {}
             Task::LexBasis => {
@@ -1007,6 +1018,22 @@ mod tests {
     }
 
     /// A lex-basis task on a grevlex instance is refused, because the order is the task.
+    /// A weighted-order instance is refused, because this tool has no verified spelling for one.
+    ///
+    /// Emitting an unweighted ordering instead would compare a correct basis for a different
+    /// question, which is agreement for the wrong reason.
+    #[test]
+    fn test_a_weighted_order_instance_is_refused() {
+        let solver = solver("julia", "weighted");
+        let order =
+            MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::LastVariableFirst)
+                .unwrap();
+        assert!(matches!(
+            solver.supports(&instance(65521, order), Task::ReducedGrobnerBasis),
+            Support::No(Unsupported::Order { .. })
+        ));
+    }
+
     #[test]
     fn test_a_lex_task_needs_a_lex_instance() {
         let solver = solver("julia", "order");

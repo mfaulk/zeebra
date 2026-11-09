@@ -61,7 +61,7 @@ pub use poly::{
     resultant_from_coefficients, roots, xgcd, BuildMonomialHasher, GcdRoute, GraeffeError,
     GraeffeStats, Monomial, MonomialHasher, MonomialMap, MonomialOrder, MonomialSet,
     MultivariatePolynomial, Polynomial, PolynomialParams, PowerPermutation, SquarefreeError,
-    SubgroupRoute, UnivariatePolynomial,
+    SubgroupRoute, UnivariatePolynomial, WeightedOrder, WeightedOrderError, WeightedTieBreak,
 };
 pub use rings::Ring;
 

@@ -91,8 +91,9 @@ use std::{path::PathBuf, time::Duration};
 
 use super::{
     contract::{
-        Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
-        RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
+        order_is_unsupported_externally, Answer, ExternalSolver, Instance, Invariants, LimitStop,
+        Limits, Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion,
+        Unsupported,
     },
     process::{read_output, CpuBasis, Invocation, Supervisor},
 };
@@ -1036,6 +1037,14 @@ impl ExternalSolver for MsolveSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
+        // Weighted orders (#306) are refused rather than approximated: no adapter here has a
+        // verified spelling for one, and substituting an unweighted order would answer a
+        // different question with a basis that looks right.
+        if order_is_unsupported_externally(instance.order) {
+            return Support::No(Unsupported::Order {
+                order: instance.order,
+            });
+        }
         match task {
             // `-g 2` under the instance's order, which must be the only order msolve has.
             Task::ReducedGrobnerBasis => {

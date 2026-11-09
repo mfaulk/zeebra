@@ -58,8 +58,9 @@ use std::time::{Duration, Instant};
 
 use super::{
     contract::{
-        Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
-        RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
+        order_is_unsupported_externally, Answer, ExternalSolver, Instance, Invariants, LimitStop,
+        Limits, Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion,
+        Unsupported,
     },
     corpus::{ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC},
     process::{CpuBasis, RssBasis},
@@ -635,6 +636,14 @@ impl ExternalSolver for ZeebraSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
+        // Zeebra's own engine *can* compute under a weighted order since #306, but this board
+        // cannot pose one: `order_tag` does not round-trip a weight vector, so an instance
+        // carrying one has no textual contract and no comparand to be compared against.
+        if order_is_unsupported_externally(instance.order) {
+            return Support::No(Unsupported::Order {
+                order: instance.order,
+            });
+        }
         match task {
             Task::ReducedGrobnerBasis
             | Task::LexBasis

@@ -404,12 +404,39 @@ impl Instance {
 }
 
 /// The stable tag for a monomial order, for digests and records.
+///
+/// **Not injective, and deliberately not round-trippable, for weighted orders.** Every weighted
+/// order tags as `"weighted"` regardless of its weight vector, and [`order_from_tag`] does not
+/// accept that tag back. Two different weight vectors would otherwise digest identically, which
+/// is a record that names an order it was not computed under. Nothing on this board can be posed
+/// under a weighted order: every adapter's `supports` refuses one, so the tag exists for
+/// diagnostics only.
 pub fn order_tag(order: MonomialOrder) -> &'static str {
     match order {
         MonomialOrder::Lexicographic => "lex",
         MonomialOrder::GradedLexicographic => "grlex",
         MonomialOrder::GradedReverseLexicographic => "grevlex",
+        MonomialOrder::Weighted(_) => "weighted",
     }
+}
+
+/// What an adapter says when a weighted order reaches script generation.
+///
+/// It cannot: every adapter's `supports` returns [`Unsupported::Order`] for a weighted order
+/// first. The constant exists so that the four `unreachable!` arms guarding that say the same
+/// thing, and so that a future adapter that forgets the guard fails loudly at the one place
+/// where a wrong answer would otherwise be a plausible-looking basis in the wrong order.
+pub const WEIGHTED_UNSUPPORTED: &str =
+    "a weighted order has no verified spelling in this tool; `supports` refuses one before a \
+     script is built";
+
+/// True if `order` is one no external adapter here can be posed under.
+///
+/// Weighted orders are refused at the adapter boundary rather than approximated. Substituting
+/// degrevlex for a weighted order would return a correct basis for a different question, and a
+/// differential oracle that answers a different question agrees with nothing for the right reason.
+pub fn order_is_unsupported_externally(order: MonomialOrder) -> bool {
+    matches!(order, MonomialOrder::Weighted(_))
 }
 
 /// The order named by [`order_tag`].
@@ -1686,6 +1713,29 @@ mod tests {
             assert_eq!(Task::from_tag(task.tag()), Some(task), "{}", task.tag());
         }
         assert_eq!(Task::from_tag("grobner"), None);
+    }
+
+    /// A weighted order tags as "weighted", does not round-trip, and is unsupported externally.
+    ///
+    /// The tag is deliberately not injective, so it must not be reachable as an instance order:
+    /// two different weight vectors would otherwise produce records that claim the same order.
+    /// `order_from_tag` refusing the tag is what makes a weighted instance unconstructible from a
+    /// textual contract, and `order_is_unsupported_externally` is what every adapter checks.
+    #[test]
+    fn test_a_weighted_order_tag_does_not_round_trip() {
+        let order =
+            MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::LastVariableFirst)
+                .unwrap();
+        assert_eq!(order_tag(order), "weighted");
+        assert_eq!(order_from_tag("weighted"), None);
+        assert!(super::order_is_unsupported_externally(order));
+        for unweighted in [
+            MonomialOrder::Lexicographic,
+            MonomialOrder::GradedLexicographic,
+            MonomialOrder::GradedReverseLexicographic,
+        ] {
+            assert!(!super::order_is_unsupported_externally(unweighted));
+        }
     }
 
     /// Every monomial order tag round-trips.

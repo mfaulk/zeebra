@@ -9,7 +9,8 @@ pub use multivariate::{
 };
 pub use multivariate::{
     BuildMonomialHasher, GcdRoute, Monomial, MonomialHasher, MonomialMap, MonomialOrder,
-    MonomialSet, MultivariatePolynomial, NormalFormCounts, SquarefreeError,
+    MonomialSet, MultivariatePolynomial, NormalFormCounts, SquarefreeError, WeightedOrder,
+    WeightedOrderError, WeightedTieBreak,
 };
 pub(crate) use univariate::multiply_dense;
 #[doc(hidden)]
