@@ -933,6 +933,13 @@ average at 474 — read again *with the lock held*, because the lock's own one-m
 quiet while the fifteen-minute one says the box was not (#599). The branch SHA the run printed was
 `05c8e1c5`, recorded for the log and not relied on.
 
+One thing the base commit is load-bearing for here: it is one before #306, which widened
+`MonomialOrder` from one word to two and added a fourth arm to the comparator these arms call
+several times per column. Both arms call the same comparator, so the **ratio** is insulated — a
+dearer comparison is paid per comparison by whichever sort makes it — but the **absolute**
+milliseconds below are from before that change and should be re-taken if the comparator's own cost
+is ever the question rather than the sort's choice of algorithm.
+
 | system | order | batches | columns | `sort_by` | `sort_unstable_by` | ratio |
 |---|---|---|---|---|---|---|
 | cyclic-5 | lex | 24 | 1 949 | 0.057 ms | 0.054 ms | **1.05x** |
