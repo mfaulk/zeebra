@@ -539,12 +539,17 @@ impl SingularOracle {
         let script_path = self.work_dir.join(format!("{}.sing", stem));
         let output_path = self.work_dir.join(format!("{}.out", stem));
 
-        std::fs::write(&script_path, script)?;
-
         let invocation = Invocation::new(&self.binary, &self.work_dir, &output_path)
             .arg("-q")
             .arg("--no-warn")
             .arg(&script_path);
+        // Settled before the script is written and before the supervisor's clock starts: an absent
+        // Singular is a run that was never attempted, and neither this oracle's timeout nor a
+        // failed write may stand between that fact and the report of it (#391).
+        if let Some(absent) = invocation.unavailable() {
+            return Err(OracleError::from(absent));
+        }
+        std::fs::write(&script_path, script)?;
         let measurement = match Supervisor::new(self.timeout)
             .with_poll_interval(Duration::from_millis(5))
             .run(&invocation)

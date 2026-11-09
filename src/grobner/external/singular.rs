@@ -446,30 +446,45 @@ mod tests {
         )
     }
 
-    fn solver(binary: &str, tag: &str) -> SingularSolver {
-        let root = std::env::temp_dir().join(format!(
+    /// Where one test's scratch files go, so that a test can also assert what is *not* written.
+    fn scratch_root(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
             "zeebra-singular-solver-{}-{}-{:?}",
             tag,
             std::process::id(),
             std::thread::current().id()
-        ));
+        ))
+    }
+
+    fn solver(binary: &str, tag: &str) -> SingularSolver {
+        solver_with_timeout(binary, tag, Duration::from_secs(5))
+    }
+
+    /// The same solver under a stated oracle timeout, which is the budget a Singular run is held
+    /// to — [`Limits::wall`] is the contract's field and this adapter's limit is the oracle's.
+    fn solver_with_timeout(binary: &str, tag: &str, timeout: Duration) -> SingularSolver {
         SingularSolver::new(
-            SingularOracle::new(binary, root, Duration::from_secs(5), false)
+            SingularOracle::new(binary, scratch_root(tag), timeout, false)
                 .expect("a writable scratch directory"),
         )
     }
 
-    /// An absent Singular is reported as unavailable from a run, not as a failed solve.
+    /// An absent Singular is reported as unavailable from a run under a budget nothing could meet,
+    /// and without writing a scratch file.
     ///
     /// The skipped-and-reported path. Needs no Singular installed, which is the point: CI must be
     /// able to exercise it.
     #[test]
     fn test_an_absent_binary_is_reported_and_not_a_failed_solve() {
-        let mut solver = solver("zeebra-no-such-singular", "absent");
+        // `Duration::ZERO` on both budgets, because the assertion is about *which* failure is
+        // reported and must not depend on one the spawn-and-fail path could lose a race with under
+        // suite load (#391). A clock-coupled verdict fails this every time instead of once in a
+        // while.
+        let mut solver = solver_with_timeout("zeebra-no-such-singular", "absent", Duration::ZERO);
         let report = solver.run(
             &instance(65521, MonomialOrder::GradedReverseLexicographic),
             Task::ReducedGrobnerBasis,
-            &Limits::wall(Duration::from_secs(5)),
+            &Limits::wall(Duration::ZERO),
         );
         match &report.status {
             RunStatus::Failed(RunFailure::Unavailable { binary, .. }) => {
@@ -480,18 +495,27 @@ mod tests {
         assert!(report.was_skipped(), "an absent tool is a skipped row");
         assert!(report.measurement.is_unmeasured());
         assert_eq!(report.instance, "pair");
+        // Nothing was written, so nothing about the filesystem can decide this row either.
+        let root = scratch_root("absent");
+        let written = std::fs::read_dir(&root).map_or(0, |dir| dir.count());
+        assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
     }
 
-    /// An absent Singular is reported as unavailable from the version probe too.
+    /// An absent Singular is reported as unavailable from the version probe too, writing nothing
+    /// and consulting no clock on the way.
     #[test]
     fn test_an_absent_binary_fails_the_version_probe_the_same_way() {
-        let mut solver = solver("zeebra-no-such-singular", "absent-probe");
+        let mut solver =
+            solver_with_timeout("zeebra-no-such-singular", "absent-probe", Duration::ZERO);
         match solver.probe_version() {
             Err(RunFailure::Unavailable { binary, .. }) => {
                 assert_eq!(binary, "zeebra-no-such-singular")
             }
             other => panic!("expected Unavailable, got {:?}", other),
         }
+        let root = scratch_root("absent-probe");
+        let written = std::fs::read_dir(&root).map_or(0, |dir| dir.count());
+        assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
     }
 
     /// A characteristic at or above Singular's own bound is unsupported, naming the bound.

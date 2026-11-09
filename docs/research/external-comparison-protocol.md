@@ -188,6 +188,14 @@ The five outcomes, and what each licenses:
   the tool "failing" — the limit was the harness's choice.
 - An absent tool (`RunFailure::Unavailable`) is a **skipped row**, reported as skipped. `probe_version`
   is called once per sweep precisely so that this is discovered once rather than per instance.
+  **Absence is settled before any clock starts and before any scratch file is written**, by
+  `process::unavailable_binary` — a path lookup that spawns nothing — so the verdict cannot lose a
+  race with the run's own wall budget or with a filesystem that is momentarily unwell, and no log
+  file is named for a tool that opened none. A check whose subject is "an absent tool is skipped"
+  therefore holds under *any* budget, including none at all, which is what the tests assert it
+  under (#391). The resolution is deliberately asymmetric: only definite absence short-circuits,
+  and anything that might still start is left for the spawn to judge, because a false "unavailable"
+  would turn an installed tool into a skipped measurement.
 - A run refused because of **the harness's own environment** (`RunFailure::Environment`) is a
   skipped row for the same reason: nothing ran. This is the case where something inherited would
   have selected a different algorithm, a different thread count, or polluted the output being

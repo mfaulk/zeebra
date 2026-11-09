@@ -221,6 +221,51 @@ impl From<std::io::Error> for SpawnError {
     }
 }
 
+/// A definite verdict that `binary` cannot be started, reached without starting anything.
+///
+/// The absent-tool path must not be able to lose a race with anything else: this resolution
+/// consults no clock, spawns no process and writes no file, so neither a wall-clock budget nor
+/// scratch I/O can come between "the tool is not installed" and the report that says so (#391).
+///
+/// Asymmetric on purpose. `Some` is returned only where **no** file exists at any name the OS
+/// would try. Anything that might still start — a file that exists but may not be executable, a
+/// `PATH` this code cannot reconstruct — yields `None` and falls through to the spawn, which
+/// reports the kernel's own reason. A false `Some` would turn an installed tool into a skipped
+/// measurement, so the asymmetry runs in the direction that cannot corrupt a sweep.
+pub fn unavailable_binary(binary: &str) -> Option<SpawnError> {
+    let absent = |reason: &str| {
+        Some(SpawnError::Unavailable {
+            binary: binary.to_string(),
+            reason: reason.to_string(),
+        })
+    };
+    if binary.is_empty() {
+        return absent("no binary was named");
+    }
+    if binary.contains('/') {
+        // A name with a separator is used as given: the OS searches for it no more than this does.
+        if Path::new(binary).is_file() {
+            return None;
+        }
+        return absent("no such file");
+    }
+    // A bare name is searched for along `PATH`. With `PATH` unset the kernel applies a default
+    // this code declines to guess, so the spawn decides that case instead.
+    let search = std::env::var_os("PATH")?;
+    for directory in std::env::split_paths(&search) {
+        // POSIX reads an empty component as the current directory, and so does `execvp`.
+        let directory = if directory.as_os_str().is_empty() {
+            PathBuf::from(".")
+        } else {
+            directory
+        };
+        if directory.join(binary).is_file() {
+            return None;
+        }
+    }
+    absent("not found on PATH")
+}
+
 /// One invocation: a binary, its arguments, and where its output goes.
 ///
 /// Deliberately not a [`Command`]: an adapter describes the invocation and the supervisor owns the
@@ -282,6 +327,18 @@ impl Invocation {
     pub fn env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.environment.push((key.into(), value.into()));
         self
+    }
+
+    /// A definite verdict that this invocation cannot start, reached without starting it.
+    ///
+    /// [`unavailable_binary`] with one extra abstention: an invocation that sets `PATH` for the
+    /// child is searched along *that* `PATH`, so a lookup along this process's would be answering
+    /// a different question and the spawn is left to decide.
+    pub fn unavailable(&self) -> Option<SpawnError> {
+        if self.environment.iter().any(|(key, _)| key == "PATH") {
+            return None;
+        }
+        unavailable_binary(&self.binary)
     }
 
     /// The command line as a single shell-quoted string, for the reproduction field of a record.
@@ -354,14 +411,19 @@ impl Supervisor {
 
     /// Run `invocation` to completion, to the limit, or to a spawn failure.
     ///
-    /// The output file is created (and truncated) by this call. On return it holds whatever the
-    /// child wrote, including on a timeout — a partial log is evidence and is not discarded.
+    /// A definitely-absent binary ([`unavailable_binary`]) is reported before anything is created,
+    /// so the verdict depends on neither the wall limit nor the filesystem. Otherwise the output
+    /// file is created (and truncated) by this call, and on return it holds whatever the child
+    /// wrote, including on a timeout — a partial log is evidence and is not discarded.
     ///
     /// # Errors
     /// [`SpawnError::Unavailable`] if the binary could not be started, which is the case an
     /// adapter must turn into a skipped-and-reported run rather than a failure of the solver.
     /// [`SpawnError::Io`] if the output file could not be created.
     pub fn run(&self, invocation: &Invocation) -> Result<ProcessMeasurement, SpawnError> {
+        if let Some(absent) = invocation.unavailable() {
+            return Err(absent);
+        }
         std::fs::create_dir_all(&invocation.work_dir)?;
         let output_file = File::create(&invocation.output_path)?;
         let error_file = output_file.try_clone()?;
@@ -687,8 +749,8 @@ pub fn read_output(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        descendants_including, read_output, shell_quote, stat_fields, Invocation, RssBasis,
-        RssPolicy, SpawnError, Supervisor,
+        descendants_including, read_output, shell_quote, stat_fields, unavailable_binary,
+        Invocation, RssBasis, RssPolicy, SpawnError, Supervisor,
     };
     use std::time::Duration;
 
@@ -724,6 +786,72 @@ mod tests {
             other => panic!("expected Unavailable, got {:?}", other),
         }
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An absent binary is resolved under a zero budget and without creating any file, so neither
+    /// the clock nor the filesystem can stand between absence and the report of it.
+    #[test]
+    fn test_an_absent_binary_is_resolved_before_the_clock_and_before_any_file() {
+        // Deliberately not `scratch`, which would create the directory this asserts nothing
+        // creates.
+        let dir = std::env::temp_dir().join(format!(
+            "zeebra-supervisor-absent-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let output = dir.join("absent.out");
+        let invocation = Invocation::new("zeebra-no-such-solver-binary", &dir, &output);
+        // A budget nothing can meet: were the verdict ever clock-coupled again, this would fail
+        // every time rather than once under suite load (#391).
+        let outcome = Supervisor::new(Duration::ZERO).run(&invocation);
+        match outcome {
+            Err(SpawnError::Unavailable { binary, .. }) => {
+                assert_eq!(binary, "zeebra-no-such-solver-binary");
+            }
+            other => panic!("expected Unavailable, got {:?}", other),
+        }
+        assert!(!dir.exists(), "{} was created", dir.display());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Definite absence is reported by path lookup, and anything that might still start is left
+    /// for the spawn to judge.
+    #[test]
+    fn test_absence_is_resolved_by_path_lookup_and_only_when_definite() {
+        assert!(unavailable_binary("zeebra-no-such-solver-binary").is_some());
+        assert!(unavailable_binary("").is_some());
+        assert!(unavailable_binary("/no/such/directory/zeebra-solver").is_some());
+
+        // The test binary's own path exists, so it is not this function's to refuse.
+        let own = std::env::current_exe().expect("the test binary's own path");
+        assert!(unavailable_binary(&own.to_string_lossy()).is_none());
+
+        // A file that exists but may not be executable is the spawn's call: the kernel's reason is
+        // better than a guess, and a false refusal would skip an installed tool.
+        let dir = scratch("maybe-executable");
+        let file = dir.join("maybe-executable");
+        std::fs::write(&file, b"not a program").expect("a writable scratch file");
+        assert!(unavailable_binary(&file.to_string_lossy()).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An invocation that sets `PATH` for the child abstains from the parent-side lookup, so a
+    /// tool reachable only along the child's own `PATH` is never pre-emptively called absent.
+    #[test]
+    fn test_an_invocation_that_sets_path_defers_to_the_spawn() {
+        let dir = std::env::temp_dir().join("zeebra-supervisor-child-path");
+        let plain = Invocation::new("zeebra-no-such-solver-binary", &dir, dir.join("x.out"));
+        assert!(plain.unavailable().is_some());
+        assert!(plain.env("PATH", "/nowhere").unavailable().is_none());
+    }
+
+    /// A bare name that `PATH` resolves is not refused, which is the branch a present tool takes.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_a_bare_name_found_on_path_is_not_refused() {
+        // The same `/bin/sh` the measured-run tests here already depend on, reached as a bare name
+        // so that the `PATH` walk itself is covered.
+        assert!(unavailable_binary("sh").is_none());
     }
 
     /// A process that exits 0 is measured as succeeded, with its output captured to the file.
