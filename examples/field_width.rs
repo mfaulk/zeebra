@@ -605,11 +605,7 @@ fn f4_row<const N: usize>(
 }
 
 fn order_name(order: MonomialOrder) -> &'static str {
-    match order {
-        MonomialOrder::Lexicographic => "lex",
-        MonomialOrder::GradedLexicographic => "grlex",
-        MonomialOrder::GradedReverseLexicographic => "grevlex",
-    }
+    order.name()
 }
 
 fn millis(duration: Duration) -> f64 {

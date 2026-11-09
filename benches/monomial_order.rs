@@ -179,6 +179,10 @@ fn tight_cmp<const N: usize>(
             }
             ord => ord,
         },
+        // The three arms above are what this benchmark compares layouts over; a weighted order's
+        // degree is a dot product that none of these layouts caches, which is a different
+        // question from #317's. Unreachable because `ORDERS` holds only the three.
+        MonomialOrder::Weighted(_) => unreachable!("this benchmark does not cover weighted orders"),
     }
 }
 
@@ -206,6 +210,10 @@ fn summed_cmp<const N: usize>(
             }
             ord => ord,
         },
+        // The three arms above are what this benchmark compares layouts over; a weighted order's
+        // degree is a dot product that none of these layouts caches, which is a different
+        // question from #317's. Unreachable because `ORDERS` holds only the three.
+        MonomialOrder::Weighted(_) => unreachable!("this benchmark does not cover weighted orders"),
     }
 }
 
@@ -233,6 +241,10 @@ fn stored_cmp<const N: usize>(
             }
             ord => ord,
         },
+        // The three arms above are what this benchmark compares layouts over; a weighted order's
+        // degree is a dot product that none of these layouts caches, which is a different
+        // question from #317's. Unreachable because `ORDERS` holds only the three.
+        MonomialOrder::Weighted(_) => unreachable!("this benchmark does not cover weighted orders"),
     }
 }
 

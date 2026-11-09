@@ -159,7 +159,7 @@ Two separate things were conflated there, and separating them is the answer.
   (**measured**, §1.3). So the delicate assumption is **verified locally at `r = 3, 4, 5`** --
   which is what was measured. It is not shown to *hold* in the sense the paper's proof needs,
   because that would be a statement about every `r` and about generic parameters; `r = 6` and
-  `r = 7` are not checked here (§10). The distinction matters precisely because 2025/2040 flags
+  `r = 7` are not checked here (§11). The distinction matters precisely because 2025/2040 flags
   this hypothesis as delicate for Griffin.
 
 And the Gröbner-basis property itself needs **no computation at all** — which also means it needs
@@ -242,6 +242,9 @@ why **#306** carries it and costs it once.
 
 A weighted order alone is not sufficient for the method, though. §4 explains what else is needed.
 
+**Landed in #306, and the cost estimate above was wrong** — the blast radius turned out to be five
+`match` arms rather than a signature change. See §10.1.
+
 ## 3. Gate 2b: the grevlex comparand, measured
 
 The paper asserts that the same system in grevlex "well exceeds the security level" and Griffin's
@@ -311,7 +314,7 @@ form. Extrapolating a round-count wall from them would be exactly the complexity
 What can be said without extrapolation: at `r = 5`, where FreeLunch spends 0.72 s, a
 state-of-the-art grevlex engine spends 13.9 s on a *smaller* object than the attack needs, from the
 most favourable presentation of the system that exists. The `r = 6` rung would settle the scaling and
-is **open** — it needs the `r = 6` system, which §10 records as beyond this tool's CPython reach.
+is **open** — it needs the `r = 6` system, which §11 records as beyond this tool's CPython reach.
 
 Griffin's designers' claim that grevlex "well exceeds the security level" at the suggested round
 count is therefore **neither confirmed nor refuted here**. It is made checkable: §9 reproduces the
@@ -403,7 +406,8 @@ until nothing is reducible. Termination is by strict decrease in the **weighted*
 order is load-bearing for correctness even though no pair reduction ever happens. Zeebra has no
 "reduce against this given basis, in this given order" entry point exposed for a basis it did not
 compute; `src/grobner/fglm/` builds multiplication operators from a basis *it* produced under
-grevlex.
+grevlex. (**Overstated**: `normal_form(divisors, order)` always did reduce against a supplied
+divisor set, and what was missing was the contract rather than the loop. See §10.2.)
 
 And the FGLM machinery that looks applicable mostly is not. The paper is explicit that **FreeLunch
 systems do not satisfy the stability property**, which is what the fast change-of-order algorithms
@@ -525,13 +529,98 @@ tools/check-griffin-reconstruction.py --build-system 5
 # the degrevlex comparand (Singular, surrogate prime 2^31-1)
 tools/check-griffin-reconstruction.py --build-system 5 --singular /tmp/griffin-r5.sing
 timeout --signal=INT --kill-after=30s 480 Singular -q /tmp/griffin-r5.sing
+
+# regenerate the checked-in fixtures the Rust-side checks of section 10.3 read
+tools/check-griffin-reconstruction.py --build-system 4 --fixture research/griffin/freelunch-r4.txt
+tools/check-griffin-reconstruction.py --build-system 5 --fixture research/griffin/freelunch-r5.txt
+cargo test -p zeebra griffin
 ```
 
 Standard library only, no new Rust, nothing under `src/` touched. `r = 5` takes about 17 s to build
 and the degrevlex comparand about 200 s; `r = 6` exceeds CPython's practical reach in this tool
-(§10).
+(§11).
 
-## 10. Marked unverified, and open
+## 10. What #306 landed, and the one thing §2.3 got wrong
+
+The capability §2.3 costed is implemented. Three things are worth recording, two of them
+corrections to this document.
+
+### 10.1 The blast radius §2.3 predicted did not happen
+
+§2.3 priced the weighted order at "a day of mechanical refactoring plus a day of test repair,
+dominated by the signature change", and a later comment on #306 measured the signature in question:
+678 mentions of `MonomialOrder` and 134 functions taking one by value. Both of the routes considered
+there — making `MonomialOrder` generic in `N`, or threading the weights beside it — touch all of
+them.
+
+**Neither was necessary.** `MonomialOrder::Weighted(&'static WeightedOrder)` keeps the type `Copy`,
+keeps it non-generic, and keeps it two words wide, so every one of those 134 signatures accepts a
+weighted order **unchanged**. The weight vector's arity cannot be checked by the type system that
+way, so `cmp` asserts it at run time — and the assertion stays in release builds for the reason
+`&Monomial * &Monomial`'s `checked_add` does: a weight vector zipped short against an exponent
+vector is a consistent order on a *different* ring, which is wrong without being obviously wrong.
+
+What actually changed outside `src/poly/multivariate/monomial_order.rs` was five `match` arms the
+compiler demanded, all in `src/grobner/external/`, plus one guard per adapter. **Weighted orders are
+refused by every external comparand**, because no engine here has a weighted spelling whose
+ordering and coefficient conventions have been verified the way `tools/reference_bases.sing`
+verifies the unweighted ones — the hazard §"Correctness oracle" of #306 names. `order_tag` is
+deliberately non-injective for weighted orders and `order_from_tag` refuses the tag back, which is
+what makes a weighted instance unconstructible from a textual contract.
+
+### 10.2 The second half of the capability was mostly already there
+
+§4.2 says "Zeebra has no 'reduce against this given basis, in this given order' entry point exposed
+for a basis it did not compute". That overstates it:
+`MultivariatePolynomial::normal_form(divisors, order)` has always reduced against a caller-supplied
+divisor set under a caller-supplied order, and once the order is weighted it is already the
+operation `matGen` needs. What was genuinely missing was the **contract**, not the loop.
+
+`normal_form_modulo` is the entry point that states it: given a Gröbner basis under `order`, the
+result is *the* normal form — independent of the basis permutation, zero exactly on ideal members,
+linear in the dividend — and it refuses the two preconditions that can be checked cheaply (an
+all-zero basis, and a weighted order whose arity is not the ring's). Alongside it,
+`grobner::leading_monomials_are_pairwise_coprime` turns §1.4's one-line argument into a function:
+pairwise coprime leading monomials make Buchberger's first criterion dispose of every S-pair, so the
+set is a Gröbner basis with **no reduction performed**. That is the resolution of #202's "no way to
+assert that input generators already form a Gröbner basis" gap, and it is `O(k²N)`.
+
+### 10.3 The tie-break, and why the published witnesses were the test that mattered
+
+§2.1 records that `≺_G` is "not grevlex (grevlex favours the *smaller* exponent on the right-most
+variable; this order favours the larger)". That sentence turns out to be the whole correctness
+surface, because of something §2.1 does not spell out: Construction 1 sets
+`wt(x_i) = wt(LM(q_i))/α` **exactly**, so in every modelling equation `p_i = x_i^α − q_i` the pure
+power and the tail have the *same* weighted degree. At `r = 5`, `wt(x_1^3) = wt(x_0^21) = 21`, and
+both monomials are present in `p_1`. The grading decides nothing there; the tie-break decides
+everything.
+
+So choosing grevlex's tie-break by mistake does not fail — it returns a different leading ideal from
+the same polynomials. `research/griffin/freelunch-r{4,5}.txt` are the systems this document's
+§1.3 built, checked in by `tools/check-griffin-reconstruction.py --build-system R --fixture PATH`,
+and `src/grobner/research/griffin.rs` reads them back and asserts, under the derived weight vector:
+
+| check | `r = 4` | `r = 5` |
+|---|---|---|
+| weight vector from Construction 1 | `(1, 7)` | `(1, 7, 49)` |
+| leading monomials under `≺_G` | `x_1^3`, `x_0^147` | `x_1^3`, `x_2^3`, `x_0^1029` |
+| pairwise coprime, so a Gröbner basis by inspection | ✓ | ✓ |
+| `D_I` from Zeebra's standard-monomial enumeration | **441** | **9261** |
+| whole system vanishes at every published witness | — (none published) | **2 of 2** |
+
+The `D_I` column is a fourth independent route to the same number: the paper's closed form,
+`α_0 · D_H` from the symbolic build, Singular's `vdim` (§3.1), and now
+`QuotientBasis::new(generators, weighted_order)`. Substituting grevlex's tie-break in the fixture's
+order makes **four** of those tests fail, including both `D_I` checks — which is the only reason to
+trust the tie-break at all.
+
+What this does **not** change is §8's verdict. The capability existing does not make the attack
+worth building: `matGen` at `r = 7` is still 3 361 s and 27.6 GB in the authors' own
+implementation, full-round Griffin is still broken independently in eprint 2026/1281, and the
+instance's witnesses are still published. #306 delivers the capability and the published-witness
+regression tests; `sysGen`, `matGen`, `polyDet` and `uniSol` remain unbuilt and unscheduled.
+
+## 11. Marked unverified, and open
 
 - **`r = 6` and `r = 7` were not built symbolically here.** The reduced state carries up to
   `α_0 · D_H` monomials, so `r = 6` is 194 508 and `r = 7` is 4 084 182, and CPython dict-based

@@ -24,8 +24,9 @@ use std::time::Duration;
 
 use super::{
     contract::{
-        Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
-        RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
+        order_is_unsupported_externally, Answer, ExternalSolver, Instance, Invariants, LimitStop,
+        Limits, Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion,
+        Unsupported, WEIGHTED_UNSUPPORTED,
     },
     process::RssBasis,
 };
@@ -48,6 +49,10 @@ fn singular_order(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => "lp",
         MonomialOrder::GradedLexicographic => "Dp",
         MonomialOrder::GradedReverseLexicographic => "dp",
+        // Singular does have `wp`/`Wp`, but its weighted spelling and its choice of coefficient
+        // representatives are exactly the conventions this file's header says must be verified
+        // rather than assumed. Unverified, so refused in `supports` and unreachable here.
+        MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
     }
 }
 
@@ -307,6 +312,14 @@ impl ExternalSolver for SingularSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
+        // Weighted orders (#306) are refused rather than approximated: no adapter here has a
+        // verified spelling for one, and substituting an unweighted order would answer a
+        // different question with a basis that looks right.
+        if order_is_unsupported_externally(instance.order) {
+            return Support::No(Unsupported::Order {
+                order: instance.order,
+            });
+        }
         match task {
             Task::ReducedGrobnerBasis | Task::LexBasisByConversion | Task::UnivariateEliminant => {}
             Task::LexBasis => {
@@ -587,6 +600,35 @@ mod tests {
                 matches!(
                     solver.supports(&instance, task),
                     Support::No(Unsupported::Task { .. })
+                ),
+                "{}",
+                task
+            );
+        }
+    }
+
+    /// A weighted-order instance is refused for every task, with no script built.
+    ///
+    /// #306 added weighted orders to the engine. No adapter here has a verified spelling for one,
+    /// and the failure mode of guessing — emitting `dp` and comparing a degrevlex basis against a
+    /// weighted question — produces agreement for the wrong reason, which is the one outcome a
+    /// differential oracle must not be able to reach.
+    #[test]
+    fn test_a_weighted_order_instance_is_refused() {
+        let solver = solver("Singular", "weighted");
+        let order =
+            MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::LastVariableFirst)
+                .unwrap();
+        for task in [
+            Task::ReducedGrobnerBasis,
+            Task::LexBasis,
+            Task::LexBasisByConversion,
+            Task::UnivariateEliminant,
+        ] {
+            assert!(
+                matches!(
+                    solver.supports(&instance(65521, order), task),
+                    Support::No(Unsupported::Order { .. })
                 ),
                 "{}",
                 task
