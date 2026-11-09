@@ -740,6 +740,13 @@ holding every per-step allocation contends within 1.7% of the half holding two; 
 *falls* with order — 1.370x / 1.114x / 1.100x at 162 / 486 / 1 458 — which is thread-spawn overhead
 amortizing, the opposite shape from contention.
 
+> **#599 changed the allocation count this paragraph quotes, and not its conclusion.** The remainder
+> sequence now runs in two reused buffers, so the Euclidean kernel loses one allocator call per step
+> of the sequence and the 1 391 above is a **pre-#599** count. The refutation is untouched and in
+> fact tighter: the width penalty did not move when the allocations went away.
+> `structured-sylvester.md` §5.6.2, "#599, measured", carries the before and after counts with their
+> own stamp.
+
 **So what #451 required on record is this**: §5.2's prediction that axis 4 would not contend worse
 was **right**, the measurement that appeared to falsify it was a one-term cost law reading a missing
 term as contention, and the guard was right about `rf4-rp2` only because a 3x-low anchor and a
