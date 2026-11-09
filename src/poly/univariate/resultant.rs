@@ -115,33 +115,37 @@ fn trimmed<F: FiniteField>(coefficients: &[F]) -> Vec<F> {
     out
 }
 
-/// `a mod b`, trimmed, over raw coefficients. `b` must be nonzero.
-fn remainder<F: FiniteField>(a: &[F], b: &[F]) -> Vec<F> {
+/// `a mod b`, trimmed, written back over `a`. `b` must be nonzero.
+///
+/// In place rather than returning a fresh vector because `a` only ever **shortens**: the whole
+/// remainder sequence of [`exact_resultant`] therefore runs in the two buffers it starts with, and
+/// no step after the first two allocates. Empty on exit means `b` divides `a`.
+fn remainder_in_place<F: FiniteField>(a: &mut Vec<F>, b: &[F]) {
     let n = b.len() - 1;
     let inverse = b[n].inverse();
-    let mut r = a.to_vec();
-    while r.len() > n {
-        let top = r.len() - 1;
-        let factor = r[top] * inverse;
+    while a.len() > n {
+        let top = a.len() - 1;
+        let factor = a[top] * inverse;
         if !factor.is_zero() {
             for i in 0..=n {
                 let value = factor * b[i];
-                r[top - n + i] -= value;
+                a[top - n + i] -= value;
             }
         }
-        r.pop();
-        while r.last().is_some_and(|c| c.is_zero()) {
-            r.pop();
+        a.pop();
+        while a.last().is_some_and(|c| c.is_zero()) {
+            a.pop();
         }
     }
-    r
 }
 
 /// `Res(a, b)` over raw coefficients, both trimmed and nonzero so the degrees are exact.
 ///
-/// Iterative, and the same recurrence [`resultant`] uses. The difference is that this one never
-/// builds a [`UnivariatePolynomial`]: the sequence is as long as the degree, so at the orders a
-/// six-round elimination reaches, one allocation per step is the dominant cost of the step.
+/// Iterative, and the same recurrence [`resultant`] uses. The differences are that this one never
+/// builds a [`UnivariatePolynomial`], and that the sequence — as long as the degree — runs entirely
+/// in the two buffers cloned here: each step rewrites `a` into `a mod b` in place and then swaps,
+/// so no step allocates. Capacity never shrinks and each remainder is shorter than the divisor it
+/// came from, which is what makes the two buffers sufficient.
 fn exact_resultant<F: FiniteField>(a: &[F], b: &[F]) -> F {
     let mut a = a.to_vec();
     let mut b = b.to_vec();
@@ -164,15 +168,15 @@ fn exact_resultant<F: FiniteField>(a: &[F], b: &[F]) -> F {
         if (n * m) % 2 == 1 {
             accumulated = -accumulated;
         }
-        let r = remainder(&a, &b);
-        if r.is_empty() {
+        remainder_in_place(&mut a, &b);
+        if a.is_empty() {
             // `b` divides `a` and `deg b >= 1`, so the two share a root.
             return F::zero();
         }
-        accumulated *= b[m].pow((n - (r.len() - 1)) as u128);
-        // `deg b = m > deg r`, so the `deg a >= deg b` invariant is preserved.
-        a = b;
-        b = r;
+        accumulated *= b[m].pow((n - (a.len() - 1)) as u128);
+        // `deg b = m > deg r`, so the `deg a >= deg b` invariant is preserved: after the swap the
+        // new `a` is the old `b` and the new `b` is the remainder, each in the other's buffer.
+        std::mem::swap(&mut a, &mut b);
     }
 }
 
@@ -244,7 +248,9 @@ fn formal_determinant<F: FiniteField>(a: &[F], n: usize, b: &[F], m: usize) -> F
 
 #[cfg(test)]
 mod tests {
-    use super::{resultant, resultant_at_formal_degrees, resultant_from_coefficients};
+    use super::{
+        remainder_in_place, resultant, resultant_at_formal_degrees, resultant_from_coefficients,
+    };
     use crate::{
         fields::Zp2147483647,
         identities::{One, Zero},
@@ -434,6 +440,67 @@ mod tests {
     #[should_panic(expected = "a formal degree needs at least a constant term")]
     fn coefficient_form_refuses_an_empty_slice() {
         resultant_from_coefficients::<F>(&[], &[F::one()]);
+    }
+
+    /// `remainder_in_place` leaves `a` holding `a mod b`, trimmed, agreeing with the polynomial
+    /// `%` on random pairs across a range of degrees.
+    #[test]
+    fn remainder_in_place_agrees_with_polynomial_division() {
+        let mut rng = StdRng::seed_from_u64(599);
+        for degree_a in 1..=9usize {
+            for degree_b in 1..=degree_a {
+                for _ in 0..4 {
+                    let mut ac: Vec<u64> = (0..=degree_a).map(|_| rng.gen_range(0..1000)).collect();
+                    let mut bc: Vec<u64> = (0..=degree_b).map(|_| rng.gen_range(0..1000)).collect();
+                    ac[degree_a] = rng.gen_range(1..1000);
+                    bc[degree_b] = rng.gen_range(1..1000);
+                    let a: Vec<F> = ac.iter().map(|c| F::new(*c)).collect();
+                    let b: Vec<F> = bc.iter().map(|c| F::new(*c)).collect();
+                    let mut r = a.clone();
+                    remainder_in_place(&mut r, &b);
+                    let expected = &poly(&ac) % &poly(&bc);
+                    let expected: Vec<F> = if expected.is_zero() {
+                        Vec::new()
+                    } else {
+                        expected.coefficients()[..=expected.degree() as usize].to_vec()
+                    };
+                    assert_eq!(r, expected, "a = {ac:?}, b = {bc:?}");
+                }
+            }
+        }
+    }
+
+    /// The remainder sequence runs in the two buffers it starts with: `remainder_in_place` only
+    /// ever shortens its argument, so neither buffer reallocates once `exact_resultant` has
+    /// cloned its inputs. This is the whole point of #599, and a `Vec` that grew would fail it.
+    #[test]
+    fn the_remainder_sequence_never_reallocates() {
+        let mut rng = StdRng::seed_from_u64(600);
+        // Coprime-by-construction is not needed; a sequence that terminates early just checks
+        // fewer steps.
+        let mut a: Vec<F> = (0..=40).map(|_| F::new(rng.gen_range(1..1000))).collect();
+        let mut b: Vec<F> = (0..=37).map(|_| F::new(rng.gen_range(1..1000))).collect();
+        let fingerprint = |v: &Vec<F>| (v.as_ptr() as usize, v.capacity());
+        let (a_start, b_start) = (fingerprint(&a), fingerprint(&b));
+        let mut steps = 0usize;
+        while b.len() > 1 {
+            remainder_in_place(&mut a, &b);
+            if a.is_empty() {
+                break;
+            }
+            std::mem::swap(&mut a, &mut b);
+            steps += 1;
+            // Both buffers are still the two originals, in one order or the other.
+            let seen = [fingerprint(&a), fingerprint(&b)];
+            assert!(
+                seen.contains(&a_start) && seen.contains(&b_start),
+                "a buffer reallocated after {steps} steps: {seen:?} vs {a_start:?}, {b_start:?}"
+            );
+        }
+        assert!(
+            steps > 2,
+            "the sequence should run several steps, ran {steps}"
+        );
     }
 
     /// The two implementations agree over every combination of formal degrees up to 2 on a

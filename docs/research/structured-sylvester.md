@@ -8,7 +8,8 @@ commits that published those figures, recovered from git rather than recorded at
 branch's merge (#505): base commit `47b5ccd0`, which is an ancestor of `main` and cannot stop
 being one, plus the **blob** `9dba27fa0fe2` — `git hash-object examples/determinant_width.rs` —
 which names the measured source itself and so survives a rebase, a squash and a branch SHA that
-no longer exists.
+no longer exists. The #599 arm added inside §5.6.2 later carries its own stamp beside its tables —
+same instrument blob, a different base and a before/after pair of source blobs.
 
 §5.7's are stamped the same way, which is the better convention and is adopted here rather than
 re-invented: base commit `aa7cff8a`, an ancestor of `main`, plus the blobs
@@ -644,6 +645,54 @@ they are in the table in italics only so that nobody re-derives them and thinks 
 
 So `remainder`'s per-step `a.to_vec()` is still waste worth removing, and it is **not** what #412
 was looking for. **#599**, on its own terms rather than sold as a contention fix.
+
+##### #599, measured: the allocations are gone and the time is not
+
+**Measured at** base `ed252144`, an ancestor of `main`, plus the blobs `9dba27fa0fe2`
+(`git hash-object examples/determinant_width.rs` — the **same** instrument the tables above used, so
+these figures and those are the same measurement) and, for the measured source
+`src/poly/univariate/resultant.rs`, `c9b34bbd0c75` before and `033ee4ce08da` after. Two binaries
+from one tree, `--kernel remainder --pair synthetic --order 1458`, 64 samples a draw, arms
+**interleaved** inside two `tools/benchlock.sh` windows, `taskset --cpu-list 8` at one worker and
+`0-31` at 32, `RUSTC_WRAPPER=""` and a per-checkout `CARGO_TARGET_DIR`. Ambient load 5.5–6.8 at
+every arm's start, under the example's own gate of 8.
+
+The allocation is gone, and the counter says so rather than the diff:
+
+| allocation calls per determinant, one worker, order 300 | before | after |
+|---|---:|---:|
+| Euclidean kernel | 231 | **81** |
+| dense kernel — the unchanged control | 85 | 85 |
+
+−150, which is exactly the `order / 2` steps of the sequence, and the dense kernel's count does not
+move. The time does not move either:
+
+| order 1 458, remainder sequence only | before | after | after ÷ before |
+|---|---:|---:|---:|
+| 1 worker, median of 14 interleaved invocations | 1.199 ms | 1.194 ms | **0.995x** |
+| 1 worker, fastest invocation of the 14 | 1.174 ms | 1.157 ms | 0.986x |
+| 8 workers, core-time, median of 4 | 1.246 ms | 1.243 ms | 0.998x |
+| 32 workers, core-time, median of 6 | 1.767 ms | 1.773 ms | 1.004x |
+
+Invocation to invocation the one-worker arm spans 1.174–1.246 ms before and 1.157–1.246 ms after,
+so a 0.5% median difference sits **inside** the spread of either arm; the two wide arms disagree in
+sign, and every 32-worker arm was flagged `NOISY` by the example itself, because 64 samples over 32
+workers is two samples a worker and that is item 4's thread-spawn floor rather than the kernel.
+
+A third window was attempted at 1 024 samples a draw specifically to lift the 32-worker arms off
+that floor, and is **discarded rather than quoted**: it reached the lock while the box was coming
+down from a one-minute average of 609, so the gate — which reads the one-minute figure — let arms
+through that the fifteen-minute figure says were not quiet, and it then refused the rest mid-run.
+It is recorded here because a window that is thrown away after being taken is exactly the thing a
+reader cannot otherwise tell from one that was never run.
+
+**This is a null result, and it is the one the issue predicted.** ~730 allocate/free pairs of a
+~6 kB block, requested and released at one size in a loop, is a glibc fast path set against 532 000
+field multiply-adds — "almost certainly arena-local", as #599 put it, and it charges less than this
+box can resolve. The change is therefore landed as **allocation hygiene**: strictly not slower, one
+function shorter, and 150 fewer allocator calls per determinant at order 300. It is not a speedup
+and must not be cited as one. What it does buy is that the four refutations above no longer have an
+allocation-rate confound left in them at all.
 
 ##### What this changes in the guard
 
