@@ -4836,6 +4836,21 @@ before any cost is compared. The `t = 3` Rescue-Prime instances are **underdeter
 (`N − E = t − 2k`), so they are not comparable to a square rung at matched variable count without a
 slice.
 
+Measured, the two findings both run against the expectation:
+
+- **The univariate route wins at every round count measured.** At `r = 7`, root finding costs 957 ms
+  against F4's 11 255 ms — 12x — and the eliminant takes 0.9 ms to build. There is a reason rather
+  than a horse race: the per-round system is a complete intersection of `r` cubics, so its quotient
+  dimension is exactly `α^r` by Bézout, which *is* the univariate's degree. The univariate is the
+  smallest possible eliminant, and computing it beats computing the basis that encodes it.
+- **Removing the MDS layer moved the frontier in, not out.** Feistel-MiMC fails at nine variables
+  where Poseidon `t = 2` succeeds in 371 ms, both square. Variable count is the wrong axis: a
+  Feistel network spends one variable per round and Poseidon `t = 2` spends two, so nine variables
+  is nine rounds deep here against four there, and `α^{depth}` is what governs. `poseidon.md` §6's
+  "the dense MDS layer is the structural obstacle, not the variable count" needs amending — the
+  MDS layer is what makes `t = 3` fail where `t = 2` succeeds *at equal width*, not what bounds the
+  frontier in general.
+
 Two rejections are recorded so they are not reopened. **MiMCSponge is not a polynomial-solving
 target**: its challenge objective is a *collision*, which is birthday-bounded. **Reinforced Concrete
 is not expressible** at any useful degree: its S-box decomposes into digits and inverts each modulo

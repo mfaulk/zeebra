@@ -1,6 +1,6 @@
 # Feistel-MiMC and Rescue-Prime: generated, checked against the reference, and measured
 
-**Measured at:** `PENDING_SHA`
+**Measured at:** `e3c2a1b3`
 
 #203 (C7). The executable follow-on to `docs/research/ef-cryptanalysis.md` §4, which is #71's
 survey and **landed on 2026-11-08** — so this document does not restate the survey. What it adds is
@@ -323,7 +323,132 @@ No generator is written. Expect to reject was the right expectation.
 `CARGO_TARGET_DIR`, `RUSTC_WRAPPER=""`, `RUSTFLAGS` unset, `taskset`-pinned, load gated inside the
 lock per run and re-checked at the end.
 
-MEASUREMENT_SECTION_PENDING
+Machine: 128-core x86-64, pinned to cores 0–7, release profile with fat LTO. Single runs, quoted as
+the program prints them; nothing below rests on a difference under about 20%.
+
+**The gate is on the runnable thread count, not on the load average, and that is a diagnosis rather
+than a convenience.** During this session `/proc/loadavg`'s one-minute figure sat pinned between 878
+and 906 across samples twenty minutes apart — *not decaying* — while 4 to 19 of about 7 900 threads
+were runnable and 2 to 6 of about 2 000 processes were in `R` or `D` state. A one-minute average
+that does not decay while almost nothing is runnable on 128 cores is not tracking contention. Both
+numbers are recorded for every run so a reader can judge: this one cleared the gate with **no wait**
+at `runnable = 10`, and ended at `runnable = 9`, `R+D = 6`, `loadavg = 878.07`. Serialized under
+`tools/benchlock.sh` as `zb-203`.
+
+### 7.1 The per-round model stops at seven rounds
+
+`F4Options { max_matrix_columns: 60_000, max_live_bytes: 400_000_000 }`, so a refusal is
+reproducible rather than "it took too long on this machine". Planted target throughout.
+
+| `r` | vars | eqs | terms | ms | outcome |
+|---:|---:|---:|---:|---:|---|
+| 2 | 2 | 2 | 10 | **0.4** | solved, the plant itself |
+| 3 | 3 | 3 | 16 | **0.5** | solved, the plant itself |
+| 4 | 4 | 4 | 22 | **3.5** | solved, the plant itself |
+| 5 | 5 | 5 | 28 | **34.5** | solved, the plant itself |
+| 6 | 6 | 6 | 34 | **537.6** | solved, another preimage |
+| 7 | 7 | 7 | 40 | **11 254.6** | solved, the plant itself |
+| 8 | 8 | 8 | 46 | 82.0 | **column budget crossed** |
+| 9 | 9 | 9 | 52 | 96.0 | **column budget crossed** |
+| 10 | 10 | 10 | 58 | 102.8 | **column budget crossed** |
+
+Every solved row was verified by running the recovered input back through the permutation, not
+through the system that produced it. Two rows recovered a *different* preimage than the plant and
+both verify — correct, since a planted target does not make its plant the only solution.
+
+Roughly 15x per round, and then a wall between `r = 7` and `r = 8`.
+
+### 7.2 The univariate model wins at every round count measured
+
+| `r` | degree `3^r` | build ms | root-finding ms | roots | plant found |
+|---:|---:|---:|---:|---:|---|
+| 2 | 9 | 0.0 | **0.2** | 2 | yes |
+| 3 | 27 | 0.0 | **0.4** | 1 | yes |
+| 4 | 81 | 0.0 | **2.4** | 1 | yes |
+| 5 | 243 | 0.0 | **18.0** | 1 | yes |
+| 6 | 729 | 0.2 | **150.8** | 2 | yes |
+| 7 | 2 187 | 0.9 | **956.1** | 1 | yes |
+
+**At `r = 7` the univariate route costs 957 ms against F4's 11 255 ms — 12x cheaper — and it is not
+near its own limit there while F4 is at its wall.** Building the degree-2187 eliminant takes 0.9 ms;
+the cost is entirely root finding.
+
+This is #79's question answered on a new primitive, and the answer has a structural reason rather
+than being a horse race. The per-round system is a **complete intersection of `r` cubics**, so its
+quotient dimension is exactly `α^r` by Bézout — and `α^r` is precisely the degree of the univariate
+eliminant, which the `degree` column confirms at 2 187. The univariate is therefore the *smallest
+possible* eliminant, and obtaining it by substitution costs 0.9 ms while obtaining the Gröbner basis
+that encodes the same information costs 11 s. When elimination is available in closed form, computing
+it beats computing a basis.
+
+The scaling is still exponential and the route is still hopeless at the specified instances. Root
+finding needs `x^q mod f`, which is 64 squarings of a degree-`α^r` polynomial, so it scales as
+`r·α^{2r}` — not `α^r` — which is why the table stops at `r = 7` deliberately. At the easiest
+authoritative rung `r = 22` the eliminant alone would have about `3.1 × 10^10` coefficients.
+
+### 7.3 The stated objective usually has no solution at a reduced round count
+
+Target **zero**, which is what the bounty actually asks, with no plant:
+
+| `r` | roots over `F_p` | witness |
+|---:|---:|---|
+| 1 | 1 | `15765762954232078347` |
+| 2 | **0** | none over this field |
+| 3 | 2 | `1193016076841983358` |
+| 4 | **0** | none over this field |
+| 5 | **0** | none over this field |
+| 6 | **0** | none over this field |
+| 7 | **0** | none over this field |
+
+Exhaustive over the base field, and every witness verified through the permutation. A degree-`α^r`
+polynomial over `F_p` has about one root on average, and five of these seven rungs have none — so an
+empty answer at a reduced round count is the *expected* case and not a failure. §3.4; the same
+discipline as M21-E's rule about `EmptySlice`. The `r = 1` witness is checkable in closed form: it is
+`−c_0`.
+
+### 7.4 What the absent MDS layer buys, measured: **less than nothing**
+
+#203's research question 6, and the measured answer contradicts the issue's expectation. The issue
+reasons that "low coupling means a reachable frontier" and that a Feistel network with no MDS layer
+"is the natural next rung, and the first instance family where Zeebra might reach a round count that
+is not embarrassing."
+
+The controlled comparand is `docs/research/poseidon.md` §4's `t = 2`, `R_F = 4`, `R_P = 0` row:
+**nine variables, nine equations, solved in 371 ms.** It is matched to Feistel-MiMC in both axes
+#203's acceptance criterion requires — same `α = 3`, and `N − E = 0` on both sides, so this is the
+square-against-square comparison and not the confounded one `docs/research/degree-profiles.md` §4
+corrects.
+
+| system | MDS layer | vars | `N − E` | result |
+|---|---|---:|---:|---|
+| Poseidon `t = 2`, `R_F = 4` | **dense, 2×2** | 9 | 0 | solved, 371 ms |
+| Feistel-MiMC `r = 7` | **none** | 7 | 0 | solved, 11 255 ms |
+| Feistel-MiMC `r = 9` | **none** | 9 | 0 | **column budget crossed** |
+
+**Feistel-MiMC fails at the variable count where Poseidon `t = 2` succeeds, and is 30x slower two
+variables short of it.** Removing the MDS layer entirely did not move the frontier outward; it moved
+it in.
+
+The reason is that **variable count is the wrong axis, and round depth is the right one.** A
+Feistel network spends **one** variable per round; Poseidon at `t = 2` spends **two**. So nine
+variables is four rounds deep in Poseidon and nine rounds deep in Feistel-MiMC, and the solving cost
+tracks the depth: the quotient dimension is `α^{depth}`, which is `3^9 = 19 683` for the
+Feistel-MiMC row against `3^4 = 81`-ish for the Poseidon one. Matching variable count between a
+narrow-and-deep system and a wide-and-shallow one matches the wrong thing.
+
+So `poseidon.md` §6's claim that "degree-3 equations with a dense MDS layer are the structural
+obstacle, not the variable count" survives in its *negative* half — the variable count is indeed not
+the obstacle — and the positive half needs amending. The dense MDS layer is what makes `t = 3` fail
+where `t = 2` succeeds **at equal width**. It is not what bounds the frontier in general: a primitive
+with no MDS layer at all is bounded by its round count, through the quotient dimension, and more
+tightly. The honest generalization is that **`α^{rounds}` is the quantity that governs, and a
+coupling layer is one of several things that can raise the round count needed for security** — MiMC
+needs 81 rounds for 64-bit security against `3^r` equation solving, by its own designers' estimate
+(§2.1), where Poseidon needs `R_F + R_P` in the tens.
+
+This also explains why Feistel-MiMC was never the reachable target it looked like. The issue's
+reasoning was that fewer equations per round is easier; the measurement says more rounds per variable
+is harder, and for this family the second effect is the larger one.
 
 ## 8. What is not done, and where it is tracked
 
