@@ -61,7 +61,10 @@ use super::{
         Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
         RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
     },
-    corpus::{ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC},
+    corpus::{
+        ALTERNATE_CHARACTERISTIC, BINARY_CHARACTERISTIC, REFERENCE_CHARACTERISTIC,
+        SMALL_PRIME_CHARACTERISTIC,
+    },
     process::{CpuBasis, RssBasis},
 };
 /// The quotient dimension this adapter will enumerate to **report an invariant**.
@@ -74,7 +77,7 @@ use super::{
 const INVARIANT_DIMENSION_CEILING: usize = 1 << 20;
 
 use crate::{
-    fields::{PrimeFieldElement64, Zp32003},
+    fields::{PrimeFieldElement64, Zp2, Zp32003},
     grobner::{
         differential::polynomial_to_string,
         f4_reported,
@@ -172,6 +175,14 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
         // Montgomery field — so a small-prime row measures the narrow arithmetic regime rather
         // than the 64-bit path at a small modulus.
         SMALL_PRIME_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10, 11, 14],
+        // **Cyclic's widths only.** `GF(2)` is published for the Cyclic family alone
+        // (`corpus::BINARY_CHARACTERISTIC`), because at characteristic two Katsura's and planted
+        // MQ's invariants are not the generic ones — so compiling their widths here would
+        // monomorphize F4 and FGLM at a field no row of theirs may be quoted at, which is the cost
+        // without the reason. Zeebra is in this band rather than absent from it because the
+        // characteristic-two roster is the point of #427, and an engine missing from its own
+        // comparison measures nothing.
+        BINARY_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10],
         // The three planted Poseidon rows.
         KOALABEAR_PRIME => &[5, 7, 9],
         // Anemoi FCICO at N = 1 and 2.
@@ -517,6 +528,20 @@ impl ZeebraSolver {
     /// Parse and solve, dispatching on the characteristic and then the variable count.
     fn dispatch(&self, instance: &Instance, task: Task) -> Result<Solved, RunFailure> {
         match instance.field.characteristic {
+            BINARY_CHARACTERISTIC => dispatch!(
+                Zp2,
+                instance,
+                task,
+                &self.f4_options,
+                &self.fglm_options,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10
+            ),
             SMALL_PRIME_CHARACTERISTIC => dispatch!(
                 Zp32003,
                 instance,
