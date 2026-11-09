@@ -907,14 +907,17 @@ The paragraph above answers the second of #583's two gates, so what was left of 
 whether `sort_unstable_by` is simply faster on the input #330's handout produces, which would make
 the ordering question moot. It is, on every instance tried, and that is the whole of the fix.
 
-Stability has nothing to decide here, which is what makes this sound rather than a trade. A monomial
-order reports `Equal` only for equal monomials (`test_orders_are_total`) and the columns are distinct
-(`test_columns_are_distinct_and_descending`), so the descending sequence is **unique** and there is
-no tie either sort could break differently. That is a precondition and not a coincidence, so it now
-has a test of its own — `test_the_column_order_does_not_depend_on_the_handout_order` re-sorts three
-permutations of a real column set and demands the one answer. Were the order ever made non-strict,
-or the column set ever to admit a duplicate, the sorted output would start depending on the hash
-set's iteration order, and that test is what would say so.
+Stability has nothing to decide here, which is what makes this sound rather than a trade. Every
+`MonomialOrder` variant reports `Equal` only for equal monomials — `test_orders_are_total` for the
+three built-in orders, `test_weighted_order_axioms_on_random_inputs` for #306's weighted ones — and
+the columns are distinct (`test_columns_are_distinct_and_descending`), so the descending sequence is
+**unique** and there is no tie either sort could break differently. That is a precondition and not a
+coincidence, so it now has a test of its own:
+`test_the_column_order_does_not_depend_on_the_handout_order` re-sorts three permutations of a real
+column set and demands the one answer, over the weighted variant and all three of its tie-breaks as
+well as the built-in orders, because a tie-break is exactly where strictness would be lost. Were the
+order ever made non-strict, or the column set ever to admit a duplicate, the sorted output would
+start depending on the hash set's iteration order, and that test is what would say so.
 
 `examples/column_sort_routes` is the harness: it replays a `recommended` trace, snapshots the column
 vector each batch hands the sort — `preprocessed.monomials` drained in hash-set order, which is what

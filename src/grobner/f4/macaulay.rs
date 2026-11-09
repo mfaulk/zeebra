@@ -213,10 +213,11 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         let mut columns: Vec<Monomial<N>> = preprocessed.monomials.iter().copied().collect();
         timings.collect = clock.lap();
 
-        // Unstable because stability has nothing to decide here: a monomial order reports `Equal`
-        // only for equal monomials and the columns are distinct, so the descending sequence is
-        // unique and there is no tie for either sort to break
-        // (`test_the_column_order_does_not_depend_on_the_handout_order`). It is worth 1.04-1.15x of
+        // Unstable because stability has nothing to decide here: every `MonomialOrder` variant,
+        // weighted included, reports `Equal` only for equal monomials, and the columns are
+        // distinct — so the descending sequence is unique and there is no tie for either sort to
+        // break (`test_the_column_order_does_not_depend_on_the_handout_order`, over the weighted
+        // variant too, since a tie-break is where strictness would be lost). It is worth 1.02-1.24x of
         // the sort — pdqsort against an adaptive merge sort with nothing to adapt to, because #330
         // began handing this vector over drained from a hash set instead of in the first-appearance
         // order the old route pushed, and the runs the merge sort exploited went with it (#583).
@@ -465,7 +466,7 @@ mod tests {
             f4::symbolic::{symbolic_preprocessing, MonicBasis, Preprocessed},
             pairs::CriticalPair,
         },
-        poly::{MonomialOrder, MonomialSet},
+        poly::{MonomialOrder, MonomialSet, WeightedOrder, WeightedTieBreak},
         Monomial, MultivariatePolynomial, One,
     };
 
@@ -599,15 +600,34 @@ mod tests {
     /// says so directly: were the order ever made non-strict, or the column set ever to admit a
     /// duplicate, this goes red and the sort's output would depend on the hash set's iteration
     /// order.
+    ///
+    /// Covers a weighted order as well as the three built-in ones, because `MonomialOrder` is
+    /// reachable here in all its variants and a tie-break is exactly where strictness would be
+    /// lost. All three tie-breaks, since they differ only on ties.
     #[test]
     fn test_the_column_order_does_not_depend_on_the_handout_order() {
+        static WEIGHTED_LEX: WeightedOrder =
+            WeightedOrder::new(&[1, 7, 49], WeightedTieBreak::Lexicographic);
+        static WEIGHTED_REVLEX: WeightedOrder =
+            WeightedOrder::new(&[3, 1, 2], WeightedTieBreak::ReverseLexicographic);
+        static WEIGHTED_LAST: WeightedOrder =
+            WeightedOrder::new(&[1, 7, 49], WeightedTieBreak::LastVariableFirst);
+
         let systems: Vec<Vec<&str>> = vec![
             vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
             vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
             vec!["x*z - y^2", "x^3 - z^2"],
         ];
+        let orders: Vec<MonomialOrder> = ALL_ORDERS
+            .into_iter()
+            .chain([
+                MonomialOrder::Weighted(&WEIGHTED_LEX),
+                MonomialOrder::Weighted(&WEIGHTED_REVLEX),
+                MonomialOrder::Weighted(&WEIGHTED_LAST),
+            ])
+            .collect();
 
-        for order in ALL_ORDERS {
+        for order in orders {
             for strings in &systems {
                 let (_, matrix) = build(strings, order);
                 let sorted = matrix.columns().to_vec();
