@@ -201,6 +201,36 @@ const MAX_STAGES: usize = 64;
 /// and not a basis over `GF(p)`.
 pub const MIN_CHARACTERISTIC: u64 = 2;
 
+/// The smallest characteristic at which msolve's **eliminant** can recover from a non-generic
+/// staircase: `3`.
+///
+/// **A floor on the same task [`MAX_CHARACTERISTIC_ELIMINANT`] puts a ceiling on, and for the same
+/// kind of reason — above the ceiling and below this floor, msolve does not fail, it does not
+/// return.** `-g 2` is unaffected at every `p >= MIN_CHARACTERISTIC`: measured, msolve computes the
+/// `GF(2)` Cyclic bases this repository publishes, agreeing element-for-element with Singular,
+/// Groebner.jl, Sagebrush and Zeebra at `cyclic-5` through `cyclic-9`.
+///
+/// The parametrization path is different. Sparse-FGLM needs the ideal in shape position, and when
+/// the staircase is not generic enough msolve's remedy (`-c 2`, the default) is to permute the
+/// variables and then **adjoin a random linear form**. Over `GF(2)` there is no randomness to
+/// draw on: every nonzero coefficient is 1, so the candidate forms are a fixed finite set, and a
+/// retry redraws from candidates that have already failed. The loop has no exit —
+/// `msolve.c:2446`'s `goto restart` — and prints a `TIMINGS` block per attempt. **Measured on
+/// `cyclic-5` over `GF(2)`: 74 140 blocks and 156 MB of verbose output in 60 seconds, with the F4
+/// basis itself complete in under 0.01 s.** Run with `-c 0` the same input quits in 0.01 s with
+/// "Computation failed", which is the refusal this constant turns into a [`Support::No`] before any
+/// subprocess starts.
+///
+/// **This is a necessary and not a sufficient condition, and the evidence that no clean bound
+/// exists is recorded rather than smoothed over.** At `p >= 3` the retry is probabilistic in the
+/// prime and the instance: on `cyclic-5` the eliminant returns in 0.02 s at `p = 7, 13, 17, 251`
+/// and `32003`, and **does not return at `p = 3, 5` or `11`**. So a characteristic above this floor
+/// is not a promise of termination — the wall limit remains the backstop there — while a
+/// characteristic below it is a promise of non-termination, which is what may be declared.
+/// Declaring only the ceiling is what would let a sweep record a `GF(2)` eliminant row as a
+/// wall-clock *timing lower bound* for a computation that was never going to finish.
+pub const MIN_CHARACTERISTIC_ELIMINANT: u64 = 3;
+
 /// The monomial order `-g` computes in, and the only one msolve offers.
 ///
 /// `main.c:104-109` documents `-g` as printing a reduced basis "for first prime characteristic
@@ -1115,6 +1145,23 @@ impl ExternalSolver for MsolveSolver {
                 detail: format!(
                     "characteristic {} is not a prime field for msolve: 0 on line 2 of its input \
                      file means Q",
+                    instance.field.characteristic
+                ),
+            });
+        }
+        // The eliminant's **floor**, which the basis path does not share. Refused here rather than
+        // discovered by running, because what msolve does below it is retry a genericity remedy
+        // that cannot succeed over a field with no randomness in it — see
+        // [`MIN_CHARACTERISTIC_ELIMINANT`]. Without this the sweep's wall limit would turn a
+        // non-terminating run into a timing lower bound for a row that has no answer.
+        if task == Task::UnivariateEliminant
+            && instance.field.characteristic < MIN_CHARACTERISTIC_ELIMINANT
+        {
+            return Support::No(Unsupported::Representation {
+                detail: format!(
+                    "msolve's sparse-FGLM needs a separating linear form and at characteristic {} \
+                     its genericity retry has none to draw: the loop does not terminate, where \
+                     `-g 2` at the same field does",
                     instance.field.characteristic
                 ),
             });
