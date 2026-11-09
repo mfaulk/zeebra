@@ -561,9 +561,28 @@ Where the conversion's time goes, with `measure_stages` on:
 > (56.7% → 74.2% → 82.8% for `FCICO` at `N = 3, 4, 5`), which is what an `O(D³)` dependence test
 > against an `O(D²)`-ish border does.
 
-This is also the measurement that settles §8.5's sparse-FGLM no-go for this family rather than
-overturning it. Sparse FGLM attacks the operator construction; here the operator construction is
-16.7% and falling. Nothing in §8.5's three measurements is contradicted.
+> **Corrected under #224.** This paragraph said: "Sparse FGLM attacks the operator construction;
+> here the operator construction is 16.7% and falling. Nothing in §8.5's three measurements is
+> contradicted." **The first sentence has it backwards, and the error reverses the argument.** Sparse
+> FGLM replaces the dense **dependence test** — the 82.8% — with a scalar Krylov sequence plus
+> Berlekamp–Massey; it does not make the operator cheaper to build. `src/grobner/fglm/shape.rs`'
+> module doc, `MILESTONE-FGLM-SCALABILITY.md` §8.5 answer 5 and `msolve-implementation.md` §3 all say
+> so, and §8.5's first measurement is the same statement from the other side: 96% of katsura-7's
+> conversion is border reduction, "which sparse FGLM does not touch". On Anemoi that untouched
+> remainder is 82.8%, which is why `wiedemann-krylov.md` §2.3 and #368 call this split "the opposite
+> split, and the only reason this family qualifies at all".
+>
+> So this split **does** contradict §8.5's first measurement as a general claim, and narrows it to the
+> small-`D` regime it was measured on — §9.4 puts the crossover between `D = 64` and `D = 156`.
+> §8.5's no-go on a sparse-FGLM milestone nonetheless stands, for a different reason —
+> [`order-conversion.md`](order-conversion.md) §5.B and §7, from eprint 2025/814's Table 7, where
+> SparseFGLM fails at `d_I = 5^8` and Wiedemann returns.
+
+What this split does establish is that **the stage a conversion spends its time in is an input
+property**, not a property of FGLM: 16.7% border here against §9.4's 43–52% on katsura, and falling
+with the rung in both models. An alternative that attacks border reduction is therefore pointed at
+the small half on this family, and `MILESTONE-FGLM-SCALABILITY.md` §6.8 has already closed the one
+such proposal (#167) on its own measurements.
 
 ### 8a.5 `N = 6`: the budget, the ceiling, and the decision
 

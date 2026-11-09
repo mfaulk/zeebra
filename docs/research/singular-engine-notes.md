@@ -1,7 +1,9 @@
 # Reading Singular's engine: six things it does that Zeebra does not
 
-**Measured at:** not measured here — its one figure is quoted from `hilbert-driven.md` §5, which carries the era
-([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**Measured at:** not measured here — every timing is quoted from the document cited beside it, which
+carries the era
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). §0.3's
+redundant-element counts are new and are not timings.
 
 A source-reading record, in the style of `signature-based.md` §4.0 — read the primary source before
 contemplating an implementation. **No new code and no measurements here.** Every claim about
@@ -79,7 +81,21 @@ exception at 56.5% in grevlex, and is the one instance where the idea could be t
 §1 and §3 are the same discovery twice: **both are levers on the expensive-monomial-order path, and
 Singular takes that path where Zeebra does not.** `stdhilb` pays a cheap `dp` Gröbner basis to
 accelerate an expensive `lp` one, and the §6.2 table shows that ratio is real here too — katsura-6 is
-27 ms in grevlex against 2 963 ms in lex, katsura-5 is 1.87 against 15.64. Zeebra never pays it: it
+27 ms in grevlex against 2 963 ms in lex, katsura-5 is 1.87 against 15.64.
+
+> **Those two ratios are M16-0 baselines and are superseded; corrected under #224.** §6.2 is
+> `MILESTONE-F4-OPTIMIZATION.md`'s baseline column, and 2 479 ms of katsura-6 lex's 2 963 was the
+> final interreduction (§6.2's own headline: "The final interreduction is 84% of katsura-6 under
+> lex"). §7.3.2 re-measures the same instance with the pair criteria it recommends adopting —
+> **23.36 ms lex against 7.66 ms grevlex, 3.05x where §6.2 reads 110x** — and
+> `F4Options::recommended()` sets `criteria: PairCriteria::ALL`, so those criteria are the shipped
+> default. The ratio under the full `recommended()` configuration is **unmeasured**; #614 is the
+> measurement. The conclusion of this section is unaffected, because 3.05x still means the driving
+> computation costs about what it would save — but the headroom is a third of an order of magnitude,
+> not two, and [`order-conversion.md`](order-conversion.md) §5.H and §6.2 record why that matters to
+> the alternative of computing a lex basis directly.
+
+Zeebra never pays it: it
 computes in grevlex and converts with FGLM. So the series that would drive the hard computation
 would have to be bought with a homogenized grevlex computation of **about the cost of the one it is
 meant to accelerate**, and `pair-scheduling.md` §5 has already made the sharper version of this

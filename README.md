@@ -1186,6 +1186,12 @@ exposed. It is public and tested but not a `FglmOptions` strategy; `docs/MILESTO
 Wiedemann and Krylov methods in both places this crate eliminates — **won't-do** for F4's
 echelonization, and a deferral for order conversion that M25's competitive baseline has since
 reopened as staged work. Read it before proposing either.
+[`docs/research/order-conversion.md`](docs/research/order-conversion.md) is the survey of what else
+there is: eight alternatives to the classical conversion, each with a verdict and the measured figure
+that settles it, and the reaffirmed-but-narrowed §8.5 no-go. Its §4 is the first shape-position
+result on a cryptanalytic family — Anemoi `FCICO` and `PCICO` are in shape position at every rung
+tested, by `cargo run --release --example anemoi_ladder shape` and `tests/anemoi_shape_position.rs`,
+both machine-independent because a minimal-polynomial degree is not a timing.
 
 `fglm_storage` reports the operator representations three ways: bytes under each strategy, which are
 exact; operator *application*, on a unit input and a dense one, because the sparse path skips a zero
