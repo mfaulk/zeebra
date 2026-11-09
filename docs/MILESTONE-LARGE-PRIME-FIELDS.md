@@ -424,6 +424,14 @@ fields #160 already fixed. So the wider change — `pow` is `pub`, and `substitu
 for a measured nothing. The one call site with a large exponent and a plausible gain is
 `PowerPermutation::invert`'s `pow(inverse_exponent)`, which is not measured here.
 
+> **The deferral did not survive being measured.** §4.1.2 measures that call site and the small-
+> exponent ones, and `pow` is iterative now. Nothing above is wrong — what is wrong is reading
+> "the recursion costs 1% of p68's inversion" as "the recursion costs nothing", when p68 is the
+> field with the 137 ns multiply and `pow`'s own callers run over the fields with the 1 ns one.
+> `PowerPermutation::invert` is **1.88x and 1.96x** faster, and the straight one-line delegation
+> this paragraph priced would have been a 9x to 40x *regression* at `pow(1)` for a reason no
+> `inverse` harness could have shown.
+
 **Binary extended Euclid does not pay at single-limb width.** Recorded so that the question is not
 reopened without new evidence. `montgomery_256` inverts with binary extended Euclid, and the
 natural next step looks like using it at 31 and 64 bits too. A straightforward division-free
@@ -443,6 +451,155 @@ which for Mersenne-31 is 30 squarings and 5 products rather than the ~60 operati
 Not measured, and worth noting rather than quietly leaving: `benches/field_arithmetic.rs` has no
 KoalaBear and no Goldilocks arm, so neither appears in any table here. Adding them would have
 changed the binary mid-measurement.
+
+### 4.1.2 `pow`'s own body, and the walk that had to be chosen on the exponent (#181)
+
+**Measured at `a756eb95` plus the change itself.** The five arms of the first table are entry
+points in one binary, so there is no before-side tree to name there and nothing merged after
+`a756eb95` can have moved one arm relative to another; the call-site table is two binaries built
+from that one tree with only `src/fields/finite_field.rs` differing, run `before, after, after,
+before` so a drift across the run cannot favour a side. `a756eb95` is on `main` and so stays
+resolvable (#505). `benches/pow_strategy.rs` under `cargo bench`'s profile — `lto = "fat"`,
+`codegen-units = 1`, `-C target-cpu=x86-64-v3` from `.cargo/config.toml` — `taskset --cpu-list 0-7`,
+serialized through `tools/benchlock.sh`, 40 samples a cell, 64 operands per iteration divided out.
+Figures are per `pow` call.
+
+Ambient contention was sampled every ten seconds throughout and is reported as **runnable tasks**,
+not as the one-minute load average: on this machine the two disagree by two orders of magnitude —
+load 1121 with 6 of 64 tasks runnable — because the average counts uninterruptible sleep and
+several agents here are I/O bound, while the runnable count is what says whether anything contends
+for the eight pinned cores. Median 6, 90th percentile 13, with single ten-second windows at 274 and
+826; the findings below reproduce across four runs taken at loads from 9 to 1200, which is the
+reason to believe them rather than the gate.
+
+§4.1.1 declined to make `pow`'s own default body iterative, on a measurement showing the recursion
+costing about 1% of a 19 µs inversion. The field that produced that 1% is `p68`, whose multiply is
+137 ns; `pow`'s own callers run over the fields whose multiply is about 1 ns, and `field/inverse`
+cannot see them at all, because since #160 `inverse` does not go through `pow`. This asks the same
+question where `pow` is actually called.
+
+**The arms.** `production` is `FiniteField::pow` as shipped and `recursive` is the pre-#181 body.
+The other three are candidate loops, and all four candidates are bench-local transcriptions —
+including the two the shipped `pow_limbs` is now made of, since `pow_limbs` chooses between them
+and an arm that called it would measure the choice rather than the walk.
+
+| arm | accumulator starts at | multiplications | dependency chain |
+|---|---|---|---|
+| `ascending` | `one` | `highest` squarings + `popcount` | squaring and accumulate are two values |
+| `descending` | the base, at the top bit | `highest` squarings + `popcount - 1` | squaring and accumulate are one value |
+| `seeded` | `base^(2^lowest)` | `highest` squarings + `popcount - 1` | two values |
+
+`ascending` is `pow_limbs` as #160 left it, and is the one-line delegation #181 proposed. The other
+two exist because it pays one multiplication *by* one that the recursive body does not.
+
+| field | exponent | `recursive` | `ascending` | `descending` | `seeded` | `production` |
+|---|---|---:|---:|---:|---:|---:|
+| `p31_u32` | `d1` | 1.80 ns | 2.76 ns | 1.52 ns | 2.03 ns | 1.55 ns |
+| `p31_u32` | `d3` | 5.08 ns | 4.42 ns | 2.94 ns | 4.20 ns | 3.04 ns |
+| `p31_u32` | `d5` | 6.93 ns | 5.94 ns | 4.42 ns | 7.27 ns | 4.27 ns |
+| `p31_u32` | `e8` | 33.38 ns | 18.60 ns | 17.72 ns | 18.69 ns | 19.93 ns |
+| `p31_u32` | `e16` | 78.45 ns | 43.14 ns | 53.25 ns | 45.16 ns | 46.85 ns |
+| `p31_u32` | `e31` | 178.30 ns | 94.02 ns | 126.22 ns | 97.04 ns | 99.13 ns |
+| `p64` | `d1` | 1.82 ns | 2.61 ns | 1.52 ns | 2.16 ns | 2.34 ns |
+| `p64` | `d3` | 6.28 ns | 4.54 ns | 3.17 ns | 4.02 ns | 3.58 ns |
+| `p64` | `d5` | 8.11 ns | 6.27 ns | 4.99 ns | 5.85 ns | 4.74 ns |
+| `p64` | `e8` | 33.24 ns | 17.53 ns | 21.07 ns | 18.74 ns | 18.16 ns |
+| `p64` | `e16` | 82.87 ns | 44.94 ns | 61.44 ns | 49.69 ns | 45.43 ns |
+| `p64` | `e31` | 192.64 ns | 96.74 ns | 142.45 ns | 106.90 ns | 99.63 ns |
+| `p68` | `d1` | 2.24 ns | 89.38 ns | 1.79 ns | 2.90 ns | 2.84 ns |
+| `p68` | `d3` | 286.33 ns | 410.91 ns | 289.80 ns | 274.53 ns | 283.58 ns |
+| `p68` | `d5` | 451.33 ns | 554.97 ns | 577.28 ns | 445.72 ns | 420.11 ns |
+| `p68` | `e8` | 1.41 µs | 1.53 µs | 1.47 µs | 1.45 µs | 1.57 µs |
+| `p68` | `e16` | 3.10 µs | 3.31 µs | 3.22 µs | 3.20 µs | 3.22 µs |
+| `p68` | `e31` | 6.97 µs | 6.69 µs | 6.87 µs | 6.76 µs | 6.71 µs |
+| `p254_bn254` | `d1` | 2.12 ns | 19.95 ns | 3.05 ns | 3.82 ns | 3.48 ns |
+| `p254_bn254` | `d3` | 46.94 ns | 55.48 ns | 34.85 ns | 36.18 ns | 41.83 ns |
+| `p254_bn254` | `d5` | 67.81 ns | 72.40 ns | 54.12 ns | 54.66 ns | 56.67 ns |
+| `p254_bn254` | `e8` | 220.42 ns | 193.78 ns | 178.66 ns | 174.61 ns | 186.16 ns |
+| `p254_bn254` | `e16` | 475.09 ns | 390.14 ns | 378.44 ns | 376.70 ns | 393.89 ns |
+| `p254_bn254` | `e31` | 1.11 µs | 817.81 ns | 782.50 ns | 800.69 ns | 823.42 ns |
+
+`d1` to `d5` are the exponents of every small-exponent site; `e31` is the width of
+`PowerPermutation`'s inverse exponent; `e8` and `e16` are in no call site and are there only to
+bracket the crossover. The `p68` rows are the **control**: that field's 137 ns multiply dominates
+its wide cells completely, every arm lands within 5% of every other, and that is §4.1.1's "nothing
+moves" reproduced — correctly, for the one field it was measured on.
+
+**Four findings, in the order they bind.**
+
+1. **The recursion is half the call at a wide exponent.** `recursive` against `production` at
+   `e31`: **1.80x** at `p31_u32` and **1.93x** at `p64`. The mechanism is the ~`2 log2(b)`
+   non-inlined frames, which is why it shows up where a multiplication is 1 ns and vanishes where
+   it is 137 ns.
+
+2. **The one-line delegation is a large regression at `pow(1)`, scaled by what a multiplication
+   costs.** `recursive` against `ascending` at `d1`: 2.24 ns against 89.38 ns at `p68` — **39.9x** —
+   and 2.12 against 19.95 at BN254 `Fr`, **9.4x**. `pow(1)` performs no multiplication in the
+   recursive body and exactly one, by one, in the upward walk, so the whole cell is that
+   multiplication. Exponent-1 variables are the common case in `Monomial::eval`, so this is not a
+   corner, and it is a regression no `inverse` harness could have surfaced.
+
+3. **The downward walk loses what it saves once the exponent is long.** `descending` against
+   `ascending` at `e31`: 126.22 against 94.02 ns at `p31_u32` and 142.45 against 96.74 at `p64`,
+   **1.34x and 1.47x the wrong way**. Its squaring and its accumulate are the same value, so the
+   serial chain is squarings *plus* products where the upward walk's is squarings alone with the
+   products overlapped.
+
+4. **`seeded` should have taken both wins and does not.** It has `descending`'s multiplication
+   count and `ascending`'s dependency structure, so findings 2 and 3 predict it wins everywhere. It
+   never wins: 4.20 ns against `descending`'s 2.94 at `p31_u32`/`d3`, 97.04 against `ascending`'s
+   94.02 at `p31_u32`/`e31`. Locating the lowest set bit and splitting the walk in two costs about
+   a nanosecond a call, which is a whole multiplication on the fields where any of this matters.
+   A clean operation count is not a prediction; this is what the arm was added to find out.
+
+**So the walk is chosen on the exponent's width** — the "size check inside `pow`" #181 said would
+need its own number. `NARROW_EXPONENT_BITS = 2` puts exponents 1 through 7 on the downward walk and
+everything else on the upward one, which is every degree-1-to-5 site on one side and every
+`q`-sized exponent on the other.
+
+**The threshold is not at the crossover, because the crossover is field-dependent.** At `e8`
+(highest bit 7) `descending` is 1.08x *ahead* over BN254 `Fr`, where multiplication count rules, and
+1.20x *behind* over `p64`, where the dependency chain does; by `e16` it is behind on both. So there
+is no single width to sit on, and `2` is the widest threshold every field agrees about. Nothing in
+the crate uses an exponent between 8 and 2^30 anyway.
+
+**What it does to §4.1.1.** Nothing. A Fermat exponent is `q - 2` and takes the upward branch,
+whose body is the code #160 measured, so the inversion table above stands. The `p68` and BN254 rows
+there are also why this change could not have been read off that table.
+
+**The call sites, before against after.** Two binaries, four alternated passes, medians:
+
+| site | field | shape | before | after | factor |
+|---|---|---|---:|---:|---:|
+| `PowerPermutation::invert` | `p31_u32` | 31-bit inverse exponent | 169.53 ns | 90.24 ns | **1.88x** |
+| `PowerPermutation::invert` | `p64` | 64-bit inverse exponent | 414.05 ns | 210.88 ns | **1.96x** |
+| `Monomial::eval` | `p31_u32` | `x0^3 x2^5 x3` | 19.72 ns | 13.54 ns | **1.46x** |
+| `Monomial::eval` | `p64` | `x0^3 x2^5 x3` | 17.65 ns | 16.23 ns | 1.09x |
+| `Monomial::eval` | BN254 `Fr` | `x0^3 x2^5 x3` | 244.96 ns | 268.54 ns | **0.91x** |
+| `substitute` | `p31_u32` | 64 terms, degrees 0-5 | 1.52 µs | 1.45 µs | 1.05x |
+| `substitute` | `p64` | 64 terms, degrees 0-5 | 1.54 µs | 1.41 µs | 1.09x |
+| `substitute` | BN254 `Fr` | 64 terms, degrees 0-5 | 4.63 µs | 5.05 µs | **0.92x** |
+
+`PowerPermutation::invert` is the site #181 named and it carries the result: **1.88x and 1.96x**, at
+a 31-bit and a 64-bit inverse exponent, on the Poseidon CICO path.
+
+**The one regression, stated plainly.** `Monomial::eval` over BN254 `Fr` is **1.10x slower**, and
+`SparseMultiPoly::substitute` over the same field **1.09x slower**. It is not arithmetic: the
+monomial is `x0^3 x2^5 x3`, the shipped walk performs the same five multiplications the recursive
+body did, and the bench's own `descending` transcription of the same site runs it in 170 ns against
+the real `Monomial::eval`'s 268. It is code shape — a two-walk `pow_limbs` is large enough to
+change what inlines into a fold over a four-limb Montgomery type. Two fixes were measured and
+rejected: an `#[inline(never)]` free function for the wide walk cost **1.5x** at `pow`'s own wide
+BN254 cells and did not move the site, and `#[inline]` on `pow` fixed `Monomial::eval` at
+`p31_u32` — 1.46x, and it stabilized a cell that had been swinging 16-22 ns — without touching
+BN254. The `#[inline]` was kept for what it did fix. The trade accepted is 1.10x at a
+solution-verification path over one field against 1.9x on the CICO path over the fields that
+matter and 1.09x to 1.46x at the same site over the other two; it is tracked rather than closed
+over.
+
+**Not measured.** Where the crossover falls inside 8..2^30 bits, beyond the bracket above; and
+whether an addition chain for a *fixed* exponent — Poseidon's `alpha`, say — beats either walk,
+which is the same candidate §4.1.1 names for inversion.
 
 ### 4.2 Against hand-written assembly
 

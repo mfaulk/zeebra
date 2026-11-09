@@ -7,27 +7,35 @@
 //! separates the two reasons:
 //!
 //! - `production` — `FiniteField::pow` as shipped. The arm that moves when the default changes.
-//! - `recursive` — a bench-local transcription of the pre-#181 recursive body, so the comparison
-//!   survives the change rather than being lost with it.
-//! - `ascending` — the delegation as proposed: `pow_limbs` walking upward from an accumulator
-//!   seeded with `one`.
+//! - `recursive` — the pre-#181 recursive body.
+//! - `ascending` — the delegation as proposed: the upward walk `pow_limbs` was, from an
+//!   accumulator seeded with `one`.
 //! - `descending` — the same walk from the top bit down, which needs no seed because the top bit
 //!   is set, but whose squaring and accumulate are one value and so strictly serial.
 //! - `seeded` — upward, with the accumulator started at `a^(2^lowest)` rather than at one. The
 //!   multiplication count of `recursive` and `descending`, the dependency structure of
 //!   `ascending`.
 //!
-//! `production` against whichever arm `pow` currently is, is the fidelity check: this crate builds
-//! under fat LTO at one codegen unit, so a transcription is not automatically compiled like the
-//! trait default it copies, and a transcription that does not match the arm it claims to reproduce
-//! prices nothing.
+//! The four candidates are bench-local transcriptions, including the two the shipped `pow_limbs`
+//! is made of: `pow_limbs` chooses between them on the exponent's width, so an arm that called it
+//! would measure the shipped choice rather than the walk it names. `production` tracking the arm
+//! the threshold selects — `descending` at `d1` to `d5`, `ascending` above — is therefore the
+//! fidelity check, and it has to be made rather than assumed: this crate builds under fat LTO at
+//! one codegen unit, so a transcription is not automatically compiled like the trait default it
+//! copies, and one that does not match the arm it claims to reproduce prices nothing.
 //!
-//! The exponent widths are the ones in the tree. `d1` through `d5` are every small-exponent site —
-//! `Monomial::eval`, `SparseMultiPoly::substitute`, Poseidon's `x^alpha` — which are all literally
-//! `x.pow(d)` for a degree of 1 to 5. `e31` and `e63` are the width of `PowerPermutation`'s
-//! `inverse_exponent`, `d^-1 mod q - 1`, which is as wide as the field; the `power_permutation`
-//! group runs the real `invert` at the real inverse exponent, and the microbench cells hold the
-//! width fixed across fields so the per-field multiply cost is what varies.
+//! It does not match perfectly, and the `d1` cells are where it shows: at about 2 ns a call the
+//! whole measurement is a handful of cycles, and `production` and the arm it should be have been
+//! seen 0.8 ns apart. Read those cells as "both are about 2 ns" rather than as a ratio; the
+//! differences this benchmark exists to price are 1.2x to 41x and sit well clear of it.
+//!
+//! The exponent widths are the ones in the tree, plus two that are not. `d1` through `d5` are
+//! every small-exponent site — `Monomial::eval`, `SparseMultiPoly::substitute`, Poseidon's
+//! `x^alpha` — which are all literally `x.pow(d)` for a degree of 1 to 5. `e31` is the width of
+//! `PowerPermutation`'s `inverse_exponent`, `d^-1 mod q - 1`, which is as wide as the field; the
+//! `power_permutation` group runs the real `invert` at the real inverse exponent, and the
+//! microbench cells hold the width fixed across fields so the per-field multiply cost is what
+//! varies. `e8` and `e16` are in no call site and exist only to site `NARROW_EXPONENT_BITS`.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, SeedableRng};
@@ -81,14 +89,34 @@ fn recursive_pow<F: FiniteField>(a: &F, b: u128) -> F {
     }
 }
 
-/// The delegation as #181 proposed it: straight onto `pow_limbs` as it stands, which walks
-/// upward from an accumulator seeded with `one`. `pow_limbs` already answers `0^0 = 1` and
-/// `0^b = 0`, so the guards the recursive body opened with are not restated.
+/// The delegation as #181 proposed it: straight onto the upward walk `pow_limbs` was before this
+/// change, from an accumulator seeded with `one`.
 ///
-/// The seed costs one multiplication by one that the recursive body does not pay: zero against
-/// one at `b = 1`, one against two at `b = 2`, two against three at `b = 3`.
+/// Transcribed rather than calling `pow_limbs`, because `pow_limbs` now chooses between this walk
+/// and [`descending_pow_limbs`] on the exponent's width, so calling it would measure the shipped
+/// choice twice and the arm under test not at all.
+///
+/// The seed costs one multiplication by one that the recursive body does not pay: one against zero
+/// at `b = 1`, two against one at `b = 2`, three against two at `b = 3`.
 fn ascending_pow<F: FiniteField>(a: &F, b: u128) -> F {
-    a.pow_limbs(&[b as u64, (b >> 64) as u64])
+    ascending_pow_limbs(a, &[b as u64, (b >> 64) as u64])
+}
+
+fn ascending_pow_limbs<F: FiniteField>(a: &F, exponent: &[u64]) -> F {
+    let Some(highest) = highest_set_bit(exponent) else {
+        return F::one();
+    };
+    let mut result = F::one();
+    let mut square = *a;
+    for index in 0..=highest {
+        if bit(exponent, index) {
+            result *= square;
+        }
+        if index < highest {
+            square = square * square;
+        }
+    }
+    result
 }
 
 /// The walk from the top bit down, which spends the seed multiplication instead of paying it: the

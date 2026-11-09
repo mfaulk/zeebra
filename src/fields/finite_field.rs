@@ -44,11 +44,15 @@ fn big_uint_to_u128(value: &BigUInt) -> u128 {
 /// a fixed cost and the serialization grows with the exponent, so the downward walk wins while the
 /// exponent is short and loses once it is not.
 ///
-/// Measured at both ends and set at the top of the measured downward-wins region rather than at a
-/// crossover: `2` is `d5`'s highest bit, and the next width measured is `e31`'s 30. Nothing in this
-/// crate uses an exponent between 8 and 2^30 — the small sites are degrees 1 to 5 and the wide ones
-/// are `q`-sized — so the unmeasured middle is excluded by the threshold rather than guessed at.
-/// `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2 has the table.
+/// `2` is `d5`'s highest bit, so every degree-1-to-5 call site takes the downward walk, and the
+/// width where the crossover actually falls is not what sets this. The crossover is bracketed
+/// between 7 and 15 bits and it is **field-dependent inside that bracket** — at an 8-bit exponent
+/// the downward walk is 1.08x ahead over BN254 `Fr`, where multiplication count rules, and 1.20x
+/// behind over the largest 64-bit prime, where the dependency chain does — so there is no single
+/// crossover to sit on. `2` is the widest threshold every field agrees about, and nothing in the
+/// crate uses an exponent between 8 and 2^30 anyway: the small sites are monomial degrees and
+/// Poseidon's `alpha`, the wide ones are `q`-sized. `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2
+/// has the table.
 const NARROW_EXPONENT_BITS: usize = 2;
 
 /// Why a string could not be parsed as a finite field element.
@@ -161,11 +165,16 @@ where
     ///
     /// Exponentiation by squaring, by delegation to [`Self::pow_limbs`] — the same algorithm as a
     /// loop. The body was recursive until #181. The recursion cost about `2 log2(b)` non-inlined
-    /// frames, which is nothing against an expensive multiplication and most of the call against
-    /// a cheap one: dropping it is **1.9x** at the ~31- and ~63-bit exponents
-    /// `PowerPermutation::invert` uses over a 31-bit or 64-bit field, and 1.4x at the degree-3 and
-    /// degree-5 exponents of `Monomial::eval`, `SparseMultiPoly::substitute` and Poseidon's
-    /// S-box. See `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2.
+    /// frames, which is nothing against an expensive multiplication and half the call against a
+    /// cheap one: `PowerPermutation::invert` is **1.88x** at a 31-bit inverse exponent and
+    /// **1.96x** at a 64-bit one, and `Monomial::eval` is 1.09x to 1.46x over the two
+    /// single-limb fields. It is **1.10x slower** over BN254 `Fr`, for a reason that is code size
+    /// rather than arithmetic; `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2 has the table, the
+    /// mechanism and the two fixes that were measured and did not work.
+    /// `#[inline]` because the two-walk body is large enough that the compiler stopped
+    /// inlining it into `Monomial::eval`'s fold, which cost 1.16x there over BN254 `Fr`
+    /// with no change in the number of multiplications performed.
+    #[inline]
     fn pow(&self, b: u128) -> Self {
         self.pow_limbs(&[b as u64, (b >> 64) as u64])
     }
@@ -179,7 +188,8 @@ where
     ///
     /// `0^0 = 1`, as in [`Self::pow`].
     ///
-    /// Two walks, chosen on the exponent's width: see [`NARROW_EXPONENT_BITS`].
+    /// Two walks, chosen on the exponent's width: see `NARROW_EXPONENT_BITS` in this module,
+    /// which is where the reason for there being two is written down.
     fn pow_limbs(&self, exponent: &[u64]) -> Self {
         let Some(highest) = highest_set_bit(exponent) else {
             // A zero exponent, including for a zero base.
@@ -203,6 +213,11 @@ where
         // one, which is why the narrow case is not taken this way; what it buys is that the
         // squaring and the accumulate are two different values rather than one, so the pipeline
         // overlaps them instead of serializing them.
+        //
+        // Both walks are inline, and an `#[inline(never)]` free function for this one was tried
+        // and rejected: it cost **1.5x** at `pow`'s own wide cells over BN254 `Fr`, where the
+        // call passes a four-limb value by reference and returns one by value, and it did not
+        // move the site cell it was meant to fix.
         let mut result = Self::one();
         let mut square = *self;
         for index in 0..=highest {
