@@ -24,8 +24,8 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::{
-        batch_invert, Bls12_381Fr, Bn254Fr, Mersenne31, Proth68Fr, Zp18446744073709551557,
-        Zp2147483647,
+        batch_invert, Bls12_381Fr, Bn254Fr, Mersenne31, PrimeFieldElement64, Proth68Fr,
+        Zp18446744073709551557, Zp2147483647,
     },
     FiniteField,
 };
@@ -190,12 +190,32 @@ fn bench_field<F: FiniteField>(c: &mut Criterion, name: &str) {
 #[allow(deprecated)]
 type Zp128 = zeebra::fields::PrimeFieldElement128<221360928884514619393>;
 
+/// KoalaBear, `2^31 - 2^24 + 1`, in a `u64` — the NTT sweep's own storage width.
+///
+/// `examples/ntt_access.rs` measures its own multiply rate in-run and quotes this arm beside it, so
+/// the two have to be the same field in the same number of bytes or the comparison is of two
+/// different things. `docs/research/graeffe-root-finding.md` §6.3.
+type KoalaBearIn64 = PrimeFieldElement64<2_130_706_433>;
+
+/// Goldilocks, `2^64 - 2^32 + 1`.
+///
+/// The one field in the NTT sweep whose two-adicity lets a radix-2 coefficient array leave this
+/// box's 256 MB L3 at a reachable size, which is why the access-bound question is asked over it
+/// (`docs/research/graeffe-root-finding.md` §6.2). `p64` is a *different* 64-bit prime with a
+/// two-adicity of 2, so it cannot stand in for this one.
+type Goldilocks = PrimeFieldElement64<18_446_744_069_414_584_321>;
+
 fn benches(c: &mut Criterion) {
     bench_field::<Zp2147483647>(c, "p31");
     // The same modulus in four bytes rather than eight: `p31` against `p31_u32` is the storage
     // width alone, with the field held fixed.
     bench_field::<Mersenne31>(c, "p31_u32");
     bench_field::<Zp18446744073709551557>(c, "p64");
+    // The two NTT-friendly fields `examples/ntt_access.rs` sweeps. Neither was measurable here
+    // before: `p31`/`p31_u32` are the Mersenne-31 modulus and `p64` is a 64-bit prime with
+    // two-adicity 2, so an NTT comparand had to come from outside this bench.
+    bench_field::<KoalaBearIn64>(c, "p31_koalabear");
+    bench_field::<Goldilocks>(c, "p64_goldilocks");
     bench_field::<Zp128>(c, "p68");
     // The same 68-bit modulus as two limbs of a `PrimeModulus256`. `p68` against `p68_mont` is
     // the representation alone, with the field held fixed — the measurement #163 turns on.

@@ -477,10 +477,16 @@ instead.
    length comes out `2^32` against a two-adicity of 24. The 127 axis reaches Bluestein only through a
    factor-sized `bluestein_convolution_domain(127, ..)` attached by hand. Unverified whether any
    caller wants that today; no code path asks for a `2^24 · 127` domain.
-3. **The memory-access hypothesis was never tested.** 2025/950's 4/3-power FFT lower bound is half of
-   #68's own framing of this regime — "reportedly bound by memory *access* rather than arithmetic" —
-   and `examples/ntt_access.rs`, specified in [`graeffe-root-finding.md`](graeffe-root-finding.md)
-   §6.3 and listed as row 2 of its §10 plan, does not exist. Filed as #591.
+3. ~~**The memory-access hypothesis was never tested.**~~ **Tested, #591, and the answer is split.**
+   2025/950's 4/3-power FFT lower bound is half of #68's own framing of this regime — "reportedly
+   bound by memory *access* rather than arithmetic" — and `examples/ntt_access.rs` now exists to
+   [`graeffe-root-finding.md`](graeffe-root-finding.md) §6.3's specification, with the result in its
+   §6.3.1. Below a few MB of coefficients the transform is **arithmetic**-bound, at 90–107% of its
+   field's own multiply rate measured in the same run, so the premise does not hold there. Above
+   that, this workstation's shared 256 MB L3 makes the curve a measurement of ambient contention —
+   the same `n = 2^20` row reads 2.73 ns/butterfly at one-minute load 998 and 6.25 at load 611 — so
+   the asymptotic half is **unanswered** and needs a quiet box, which is one command and a load
+   gate away rather than a design question.
 
 ## 6. Per-child recommendation
 

@@ -933,6 +933,10 @@ cargo run --release --example feistel_mimc_cico    # Feistel-MiMC CICO: the roun
                                                    # per-round and univariate models side by side
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
+cargo run --release --example ntt_access           # #591: is the NTT access-bound or
+                                                   #   arithmetic-bound? Needs a quiet box
+cargo run --release --example ntt_access -- goldilocks budget=30
+cargo run --release --example ntt_access -- list
 cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
 cargo run --release --example karatsuba_crossover  # Karatsuba against schoolbook, per field width
 cargo run --release --example karatsuba_crossover -- bn254
@@ -2309,6 +2313,43 @@ at all. The two peak figures are the two arms, and the step between them is visi
 own bytes-per-element column exactly at the crossover. `multipoint_evaluate` is the public entry
 point for the evaluation half, which is the thing `fft::evaluate` cannot do: its domain has to be
 geometric, and an evaluation–interpolation resultant needs an arbitrary point set.
+
+### Is the NTT access-bound? — `ntt_access`
+
+`cargo run --release --example ntt_access` sweeps transform sizes by doubling and reports
+`ns/butterfly` against the coefficient array's size, with the field's **own multiply rate measured
+in the same run and the same binary** as the denominator. The question is #68's one untested
+premise — that the post-elimination regime is bound by memory *access* rather than arithmetic — and
+`docs/research/graeffe-root-finding.md` §6.3 is the specification, §6.3.1 the result.
+
+Two things are settled and one is not:
+
+- **The transform allocates its output and nothing else.** `peak bytes / coeff bytes` is **1.00** at
+  every one of 46 rows across three fields. The recursive kernel's `7nB` peak is gone. That column
+  is a counter from a counting global allocator, so it does not depend on the machine or the load.
+- **Below a few megabytes the NTT is arithmetic-bound**, at **90–107%** of its field's own multiply
+  rate, reproduced at three ambient loads to within 1%. The pre-#161 figure for the same quantity
+  was 8.7–9.6%, and that deficit was the allocator rather than the cache.
+- **Above a few megabytes this box cannot answer the question while it is shared.** The step in
+  `ns/butterfly` moves by two doublings between runs minutes apart, and the same `n = 2^20` row
+  reads 2.73 ns at one-minute load 998 and 6.25 ns at load 611. The L3 is 256 MB and shared, so
+  what a pinned process retains is a fraction of it. §6.3.1 reports that rather than tabulating it.
+
+The binary therefore **refuses to measure** above a one-minute load of 8 and exits 3, the same gate
+`determinant_width` uses. `load-gate=N` raises it for exercising the sweep, and a run under a raised
+gate prints "**These numbers are not figures.**" above its own tables. Serialize a real run:
+
+```bash
+tools/benchlock.sh ntt-access cargo run --release --example ntt_access -- budget=30
+```
+
+Mersenne-31 is excluded and the exclusion printed: two-adicity 1, so no power-of-two transform above
+size 2. KoalaBear is swept as the registered challenge's field but **cannot** answer the access
+question on this box — its two-adicity caps `n` at `2^24`, which is 128 MB in eight bytes and inside
+the L3 — so Goldilocks (crosses at `2^26`) and BN254 (`2^24`) are where the answer would live.
+`benches/field_arithmetic.rs` gained `p31_koalabear` and `p64_goldilocks` arms for the same reason:
+`p31` is the Mersenne-31 modulus and `p64` is `2^64 - 59`, whose two-adicity is 2, so neither could
+supply a committed comparand for an NTT-friendly field.
 
 The exponent is **1.6 and not 1**, and that is a bound rather than a shortfall: near 1 needs the
 transform, the transform needs `KnownOrder` and an RNG, and #162's own scope requires the

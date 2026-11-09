@@ -2,6 +2,12 @@
 
 **Measured at:** publication bound `bc8778cc`…`bfec9d71` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+[§6.3.1](#631-the-binary-landed--and-what-it-answers-which-is-half-the-question)'s post-#161 sweeps
+are stamped base `5e785fd1` plus blob `3146be5b24a2`
+(`git hash-object examples/ntt_access.rs`), per #505, and carry the one-minute load of each run
+because that is what the section is about. `5e785fd1` is the tree the measured binary was built
+from, which is not this branch's base; `git diff 5e785fd1 <base> -- src/fft/ src/poly/` is empty,
+so the transform and the polynomial code the figures describe are byte-identical at both.
 
 Reference for D3 (#84), a child of the #68 epic. This is the **reading and scoping half**; the
 implementation half is blocked on #124 (polynomial multiplication through the transform).
@@ -1007,6 +1013,10 @@ The issue requires this answered by measurement "regardless of the paper's model
 
 ### 6.1 Pre-#161 baseline, measured
 
+**Superseded in part by [§6.3.1](#631-the-binary-landed--and-what-it-answers-which-is-half-the-question), which re-takes this curve post-#161 from the committed binary.**
+Its conclusion survives; its `ns/butterfly` and `achieved` columns and its flatness observation do
+not. Read it for the baseline and §6.3.1 for what the kernel costs now.
+
 Agent C is replacing `src/fft/evaluate.rs`'s recursive split with an iterative in-place kernel on
 `perf/161-iterative-ntt`, so the curve below is **explicitly a pre-#161 baseline** and was taken from
 an uncommitted throwaway binary rather than a committed benchmark, for exactly that reason. Single
@@ -1077,10 +1087,19 @@ ceiling stated as a result rather than as a limitation of the sweep.
 
 ### 6.3 Specification for the committed `examples/` binary
 
+**Implemented, #591.** The binary exists at `examples/ntt_access.rs` and
+[§6.3.1](#631-the-binary-landed--and-what-it-answers-which-is-half-the-question) has its results.
+This section is kept as the specification it was written as, because the two deviations from it are
+worth being able to see: the arithmetic comparand reports **both** an isolated and an accumulated
+multiply rate rather than only the isolated one §6.3 asked for, since neither is tight enough to
+resolve the last few percent and the accumulated form is what §6.1 used; and the binary carries a
+**load gate** §6.3 did not specify, which turned out to be the load-bearing part.
+
 The issue asks for "an NTT size sweep reporting effective field operations per second against
-transform size, with peak bytes, from a committed `examples/` binary". This is the specification,
-**not** the code — #84's experimental half is blocked on #124 and the kernel is being rewritten under
-#161, so committing the binary now would commit a table that #161 invalidates on merge.
+transform size, with peak bytes, from a committed `examples/` binary". This was the specification,
+**not** the code — #84's experimental half was blocked on #124 and the kernel was being rewritten
+under #161, so committing the binary then would have committed a table that #161 invalidates on
+merge.
 
 **File** `examples/ntt_access.rs`. **Invocation**
 `cargo run --release --example ntt_access [field…] [budget=S] [list]`, following
@@ -1135,6 +1154,98 @@ belongs in `src/poly/univariate/` next to `roots.rs` once #124 lands, and its or
 assert it equals `∏(x − r_i²)` up to a unit. Two further checks that cost nothing and catch the
 errors this is actually prone to: `GT_2(GT_2(f)) == GT_4(f)` ([PC] Lemma 2) and
 `deg GT_ℓ(f) == deg f` ([PC] Lemma 1).
+
+### 6.3.1 The binary, landed — and what it answers, which is half the question
+
+`examples/ntt_access.rs` is §6.3's specification, implemented and committed for #591, with the
+KoalaBear and Goldilocks arms added to `benches/field_arithmetic.rs`. Neither field had one: `p31`
+and `p31_u32` are the Mersenne-31 modulus, and `p64` is `2^64 - 59`, a prime of two-adicity **2**, so
+before this an NTT comparand had to come from outside that bench — which is what §6.3 flagged.
+
+Two of the three things §6.1 left open are settled. The third turned out to be a question about this
+machine rather than about the transform, and saying so is the result.
+
+**1. The `7nB` footprint is gone, exactly.** `peak bytes / coeff bytes` is **1.00 at every one of
+the 46 rows** of a three-field sweep — KoalaBear to its `2^24` ceiling, Goldilocks to `2^26`, BN254
+to `2^23`. §6.1's `7nB` was the recursive formulation's `evens_and_odds`, a
+`UnivariatePolynomial::new` copy, `domain.split()` and a fresh output `Vec` at each of the `log2 n`
+levels; post-#161 the transform allocates its output and nothing else. This is a **counter**, from
+the same counting global allocator `univariate_scaling.rs` uses, so it is exact and independent of
+the machine, the load and the build — and it is the one figure here that needed no quiet box.
+
+**2. Below a few megabytes the transform runs at its field's own arithmetic rate, and §6.1's 90%
+deficit is gone.** `achieved %` — effective multiplications per second over the multiply rate
+measured *in the same run and the same binary* — reads **99–107%** on KoalaBear up to `2^13` and is
+still **90–97%** at `2^19` (a 4 MB coefficient array). §6.1's figure for the same quantity was
+**8.7–9.6%**.
+
+So: **a radix-2 NTT over a 31-bit or 64-bit prime costs one field multiplication per butterfly, to
+within the precision of either comparand, as long as the coefficient array stays within a few MB.**
+§6.1 concluded the pre-#161 shortfall was not a cache effect but the allocator, and it was right;
+removing the allocator did not uncover an access wall underneath at these sizes.
+
+Neither comparand is tight enough to resolve the last few percent, and the sweep prints both rather
+than choosing between them. Over KoalaBear the **isolated** multiply
+(`black_box(black_box(x) * black_box(y))` — the shape of the bench's `isolated/mul` arm, and what
+§6.3 specifies) measures 354–374 M mul/s, while the **accumulated** `acc += a[i]*b[i]` of §6.1
+measures 456 M mul/s. The "isolated" form is the *slower* of the two: a `black_box` on each operand
+forces a load and blocks the instruction-level parallelism the accumulate chain gets. Both are
+therefore lower bounds on multiply throughput, by different mechanisms, and `achieved %` is an upper
+bound. The butterfly charge compounds this the same way — `(n/2)·log2 n` multiplications over-counts,
+because a radix-2 kernel's first stage has unit twiddles. **Readings above 100% are those two
+artefacts, not a transform beating its own field arithmetic.**
+
+**3. Above a few megabytes this box cannot answer the question while it is shared — and that is a
+measurement, not an excuse.** Every sweep shows `ns/butterfly` stepping up at some size. But the
+step moves between runs taken minutes apart, which disqualifies exactly the claim it looks like it
+supports. Three KoalaBear sweeps, same binary, same `taskset --cpu-list 12`, each under
+`tools/benchlock.sh`:
+
+| one-minute load | isolated M mul/s | `ns/bf` at `2^12` (32 KB) | at `2^19` (4 MB) | at `2^20` (8 MB) | at `2^24` (128 MB) | where the step falls |
+|---:|---:|---:|---:|---:|---:|---|
+| 998 | 371.0 | 2.64 | 2.91 | **2.73** | 4.70 | `2^21`→`2^22` |
+| 644 | 354.0 | 2.65 | 2.92 | **3.00** | 5.37 | `2^20`→`2^21` |
+| 611 | 374.2 | 2.64 | 2.94 | **6.25** | — | `2^19`→`2^20` |
+
+Read the columns, not the rows. Up to `2^19` the three runs agree to **1%** — 2.64–2.65 at 32 KB and
+2.91–2.94 at 4 MB — with no trend in the load. At `2^20` they disagree by a factor of **2.3**, and
+the step's position moves by two doublings. The L3 on this part is 256 MB and **shared**: at a
+one-minute load of several hundred on 128 hardware threads, the share a single pinned process
+retains is a small fraction of the nominal size, and it is the share, not the nominal size, that
+decides where a transform falls out of cache. A step at 8 MB is evidence about the ambient eviction
+rate. A table of those figures would be a table of how busy the box was.
+
+**So the issue's question gets a split answer, with the line drawn where the evidence changes
+character.**
+
+- Where the measurement is reproducible on a contended box — up to `2^19` over an 8-byte field — the
+  transform is **arithmetic-bound**, at 90–107% of the field's own multiply rate, reproduced at three
+  loads to within 1%. The access bound does not bind there.
+- At the sizes §3.6's schedule actually wants — `2^24` and up, which is where §6.4 lives — this box's
+  curve is dominated by ambient contention and cannot separate the transform's own access cost from
+  eviction by other work. **Not answered.** The experiment is one command on a quiet box:
+  `tools/benchlock.sh ntt-access cargo run --release --example ntt_access -- budget=30`, and the
+  binary **refuses to measure** above a one-minute load of 8 rather than printing something that
+  looks like a result. `load-gate=N` raises that for exercising the sweep, and a run under a raised
+  gate prints "**These numbers are not figures.**" above its own tables.
+
+**One signature survives the contaminated half, because it is a comparison between fields rather
+than between sizes.** BN254's element is 32 bytes and its multiply is **8x** slower than KoalaBear's
+(45.2 against 371.0 M mul/s, measured in the same run), so it performs four times fewer
+multiplications per byte of traffic. It is also the field whose `achieved %` degrades *least* across
+its whole sweep — 94.7% down to 65.8%, against KoalaBear's 100.5% down to 57.3% over a smaller byte
+range. A transform bound by memory access would degrade **more** for the field carrying more bytes
+per operation, not less. That is the direction an arithmetic-bound stage predicts, and it is the one
+observed, on all three fields, in every run.
+
+**What §6.1 keeps and what it loses.** Its conclusion — that the 90% deficit was the recursive
+formulation and not the cache — stands and is now confirmed from the other side, since removing the
+formulation recovered the arithmetic rate. Its absolute `ns/butterfly` column (16.25–20.59) is a
+pre-#161 kernel's and is superseded by 2.64–2.92 in the reproducible region, a **6.2x** improvement
+at matched size; its `achieved / arithmetic rate` column (8.7–9.6%) is superseded by 90–107%. Its
+flatness observation — "`ns/butterfly` varies by ±13% over a 16 384-fold range of `n`" — does **not**
+survive: the post-#161 curve is flat only to `2^19`, and what happens above that is, on this box as
+it is currently used, unmeasurable rather than flat.
 
 ### 6.4 What progressive reduction is actually worth, measured
 
@@ -2119,7 +2230,7 @@ onward requires it merged.
 | PR | content | depends on | oracle | status |
 |---:|---|---|---|---|
 | 1 | **this document** | — | the PDFs, read | **landed** |
-| 2 | `examples/ntt_access.rs` to §6.3's specification, plus KoalaBear and Goldilocks arms in `benches/field_arithmetic.rs` | **#161 merged** | the `evaluate`/`interpolate` round trip; the in-run arithmetic figure against the criterion arm | open, blocked on #161 |
+| 2 | `examples/ntt_access.rs` to §6.3's specification, plus KoalaBear and Goldilocks arms in `benches/field_arithmetic.rs` | **#161 merged** | the `evaluate`/`interpolate` round trip; the in-run arithmetic figure against the criterion arm | **landed, #591** — §6.3.1. The `7nB` peak is gone (1.00x, a counter) and the transform is at 90–107% of its field's multiply rate to `2^19`; above that the curve is contention-dominated on a shared box and §6.3.1 says so rather than tabulating it |
 | 3 | `graeffe_2` — the order-2 transform, `(−1)^d(f_e² − x f_o²)` | **#124** | §6.3's three checks: squared roots at degree 16; `GT_2∘GT_2 == GT_4`; `deg` preserved | **landed**, `graeffe_2`, `graeffe_2_over_domain` |
 | 4 | `graeffe_l` for odd prime `ℓ`, by [PC] §3.2's product recursion | 3 | `GT_ℓ` against `∏(x − r_i^ℓ)`; `GT_{ℓ₀}∘GT_{ℓ₁} == GT_{ℓ₀ℓ₁}` | **landed** as a transform for any order, prime or not; **not** wired into row 6's descent — see §6.5 |
 | 5 | `sqrt` in `F_p` (Tonelli–Shanks) on `KnownOrder`, reusing `src/fields/two_adic.rs` | — | `x² == y` for the returned root; `None` for non-residues, cross-checked by the Euler criterion | **landed** separately as #175, `src/fields/sqrt.rs`; not reimplemented |
