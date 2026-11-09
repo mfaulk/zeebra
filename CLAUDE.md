@@ -51,6 +51,18 @@ isolation for concurrent writers. Rules:
 - Read-only fan-out (search, audit) parallelizes safely; **writes do not**.
 - After any parallel run, `git status` the orchestrator checkout and confirm no
   agent touched files outside its scope.
+- Give each agent a **private `CARGO_TARGET_DIR`** — `target-<issue>` inside its
+  own worktree, with `RUSTC_WRAPPER=""` — so concurrent builds neither clobber
+  each other nor link against a stale rlib. `.gitignore` covers `/target-*`,
+  but prefer an explicit file list to `git add -A` regardless.
+
+`cargo test --doc` is the one suite that fails for reasons that are not the
+diff. `/tmp` here is a 252 G tmpfs, its pages are RAM, and when it is near full
+the linker dies on its mapped temporaries — dozens of doctests failing at
+*varying* line numbers with `ld terminated with signal 7 [Bus error]`. A real
+breakage fails the same test every time. Check `df -h /tmp` and `uptime`, then
+re-run with `TMPDIR` off tmpfs; one session went from 32/70 failing to 67/67
+passing on that alone. Do not retry in a loop, which only adds load.
 
 All agents commit as the same git user, so the assignee cannot tell them apart.
 The distinguishing identity is **worktree + branch**:
