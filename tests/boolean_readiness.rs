@@ -176,9 +176,18 @@ fn one_missing_field_equation_is_still_a_resource_failure() {
             .into_iter()
             .take(7),
     );
+    // A **batch** budget, not a matrix one. This test needs a limit that lex crosses and grevlex
+    // does not, and until #575 that was the matrix size: lex wanted a wider matrix than the 2000
+    // the options allowed. Under #575's defaults it no longer does — on this system grevlex peaks
+    // at 430 x 321 and lex at **199 x 265**, so the window did not narrow, it **inverted**, and no
+    // matrix budget can separate them any more.
+    //
+    // What still separates them is how many batches each takes: grevlex 6, lex **30**. So the
+    // limit moves to `max_batches`, which leaves the subject untouched — the assertion below is
+    // about the error's *class*, that a budget stop on a zero-dimensional ideal stays a resource
+    // failure rather than being misdiagnosed, and not about which budget stopped it.
     let f4_options = F4Options {
-        max_matrix_rows: 2000,
-        max_matrix_columns: 2000,
+        max_batches: Some(10),
         ..Default::default()
     };
 

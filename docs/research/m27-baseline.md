@@ -20,6 +20,13 @@ before #437 landed and nothing in the tree could say whether #437 moved it.
 > now does carry matrix-route rows, each labelled in its `library_version`. §2.4's projection was
 > re-taken as a measured cohort and held to 2.0%; what keeps the default where it is turned out to
 > be unbudgeted memory rather than a missing A/B. `interreduction-cost.md` §3e and **#536**.
+>
+> **#575 then moved both defaults**, once #536 had budgeted that memory and #477's
+> `reduce_batch_rows` had removed the closure it lived in. `recommended()` now carries
+> `reduce_batch_rows: true` and `InterreductionRoute::ByOrder`, and `mq-random-10` is **4 695.7 ms
+> against Singular's 7 371.9 ms — 1.57x ahead**, where this baseline opens 3.74x behind. So the
+> ~80% interreduction share and the 29 011 ms figure now describe `baseline()`, not the shipping
+> path. `interreduction-cost.md` §3g.
 
 ## 0. Four conventions, because three of the four discrepancies below are conventions
 

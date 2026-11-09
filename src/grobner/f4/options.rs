@@ -96,33 +96,46 @@ pub enum ReductionStrategy {
 /// would be the finer criterion; `fglm::shape` ships a tested detector that is deliberately
 /// unwired, and choosing a route from the instance as well as the order is **#273**'s.
 ///
-/// # Why [`InterreductionRoute::ByOrder`] is nevertheless **not** the default
+/// # Why [`InterreductionRoute::ByOrder`] is the default, and only together with
+/// [`F4Options::reduce_batch_rows`]
 ///
-/// Because the time is not the whole cost, and the other half is unbudgeted. #507 measured peak
-/// RSS beside every wall time, one row per process, and the matrix route's memory does not scale
-/// with its speedup:
+/// #507 measured the route ahead on every graded rung and declined to move the default, because
+/// peak RSS said the matrix route's memory did not scale with its speedup — `katsura-11` went
+/// 534.6 MB to **13 148.3 MB** with every budget satisfied, since the refusal tested the matrix as
+/// built and the cost is the elimination's fill-in over #477's closure.
 ///
-/// | rung | division | matrix | memory | time |
+/// **Two things then landed.** #536 made that working set a budgeted quantity, so the pass is
+/// refused rather than taken. And #477's [`F4Options::reduce_batch_rows`] removed the closure
+/// itself: a candidate leaves a batch already in normal form, so there is almost nothing for the
+/// autoreduce matrix to close over.
+///
+/// #575 measured the 2x2 over both flags as a five-engine board cohort, three reps an arm, peak RSS
+/// beside every time (`docs/research/interreduction-cost.md` §3f):
+///
+/// | arm | `mq-random-10` | RSS | `katsura-11` | RSS |
 /// |---|---:|---:|---:|---:|
-/// | `mq-random-10` | 163.4 MB | 600.8 MB | 3.68x | 3.74x faster |
-/// | `katsura-11` | **534.6 MB** | **13 148.3 MB** | **24.59x** | 2.29x faster |
+/// | division + echelon, the old default | 27 536 ms | 162 MB | 241 043 ms | 539 MB |
+/// | division + reduced | 5 954 ms | 418 MB | 55 299 ms | 665 MB |
+/// | matrix + echelon | 7 437 ms | 603 MB | 233 294 ms *(fell back)* | 1 087 MB |
+/// | **ByOrder + reduced** | **4 696 ms** | **419 MB** | **29 769 ms** | **667 MB** |
 ///
-/// **No budget refused the katsura-11 pass.** The matrix route's refusal tests rows, columns and
-/// live *entries*, and the entries are not where the memory goes: `mq-random-10`'s matrix holds
-/// 893 531 nonzeros — on the order of ten megabytes — against a 437 MB increase in process peak.
-/// The cost is in building the closure, which is #477's mechanism, and it is invisible to the
-/// quantity being budgeted. That is the defect `docs/research/f4-resource-scaling.md` §10 records
-/// for symbolic preprocessing before #305, in a different stage: **the budget sees a fraction of
-/// what the run costs.**
+/// Three things that table settles:
 ///
-/// A default that can take a 535 MB computation to 13.1 GB with every budget satisfied is not a
-/// default, however much faster it is — it converts a working computation into an OOM on any
-/// machine smaller than this one. So the route ships *selectable and measured*, and the default
-/// stays where every published figure was taken. Flipping it is gated on the matrix pass's working
-/// set becoming a budgeted quantity, which is **#536**.
+/// * **The memory objection is gone.** `matrix + reduced` costs *less* than `matrix + echelon`
+///   — 419 MB against 603 MB on `mq-random-10`, 667 MB against 1 087 MB on `katsura-11` — because
+///   the closure it is not building was the cost. Against the old default it is 2.58x and 1.24x.
+/// * **Neither flag is worth much alone at the top.** On `katsura-11` the matrix route by itself
+///   now **falls back**, exactly as #536 intends, and buys nothing (233 294 ms against 241 043 ms).
+///   It is `reduce_batch_rows` that makes the pass small enough to run, and the route that then
+///   makes it fast: **8.10x** together against 1.03x for the route alone.
+/// * **Both arms beat Singular**, which M27 set as the target: **1.57x ahead** on `mq-random-10`
+///   and **1.80x ahead** on `katsura-11`, where the old default was 3.74x and 4.50x behind.
 ///
-/// Siting a size threshold instead would need a measured crossover, and two points — 3.68x and
-/// 24.59x — do not locate one.
+/// And the order criterion is unchanged by the pair. Re-run over the ladder with
+/// `reduce_batch_rows` on both arms, the matrix route still wins every graded rung (1.13x–1.93x)
+/// and still loses lex — milder than before, because the matrix is smaller, but a regression
+/// (katsura-6 lex 2.04x slower). So [`InterreductionRoute::ByOrder`] routes lex to division, and
+/// [`InterreductionRoute::Matrix`] stays selectable for measuring that.
 ///
 /// # When the matrix route falls back
 ///
@@ -146,18 +159,24 @@ pub enum ReductionStrategy {
 pub enum InterreductionRoute {
     /// One division per basis element, whatever the order.
     ///
-    /// The default, and the configuration every published figure was taken in. Kept nameable
-    /// separately from [`F4Options::default`] so that an ablation against it stays possible after
-    /// the default moves — the same reason [`F4Options::baseline`] exists. It is also the fallback
-    /// when a budget refuses the matrix, and the oracle the matrix route is tested against.
+    /// The configuration every figure before #575 was taken in, and still
+    /// [`F4Options::baseline`]'s. Kept nameable separately from [`F4Options::default`] so that an
+    /// ablation against it stays possible now that the default has moved — which is the same
+    /// reason `baseline` exists at all. It is also the fallback when a budget refuses the matrix,
+    /// and the oracle the matrix route is tested against.
+    ///
+    /// `#[default]` stays here rather than on [`InterreductionRoute::ByOrder`] so that
+    /// `InterreductionRoute::default()` is the conservative route: the shipping default lives in
+    /// [`F4Options::recommended`], where every other strategy decision does, and not in this
+    /// enum's `Default`.
     #[default]
     Division,
 
     /// One Macaulay matrix under a graded order, one division per basis element under lex.
     ///
-    /// **Measured ahead of the default on every graded rung of the ladder and behind it on every
-    /// lex one** (the table above), and not the default only because of the memory the table
-    /// after it reports. This is the route to select when the working set is known to fit.
+    /// **The default since #575**, together with [`F4Options::reduce_batch_rows`] — measured ahead
+    /// on every graded rung and behind on every lex one, which is what the order criterion exists
+    /// for. See the two tables above for why it moved and why the pair had to move together.
     ByOrder,
 
     /// One Macaulay matrix, whatever the order.
@@ -516,6 +535,22 @@ pub struct F4Options {
     /// [`super::BlockPlan::InterreducedBlock`] was measured and **rejected** for filling in the
     /// reducer block — which is the same fill-in paid before the elimination instead of after it.
     /// So the prior is unfavourable and the measurement is the point.
+    ///
+    /// # And the measurement moved the default — #575
+    ///
+    /// **On by default**, together with [`InterreductionRoute::ByOrder`]. The unfavourable prior
+    /// above did not hold: on `mq-random-10` this flag alone is **4.63x** end to end and the pair
+    /// is **5.86x**, and on `katsura-11` the pair is **8.10x** where the route alone is 1.03x
+    /// because without this flag the matrix pass is refused by #536's budget and falls back.
+    ///
+    /// It is also what makes the route affordable in memory: the autoreduce matrix it leaves is
+    /// small, so `ByOrder` costs 419 MB against the matrix route's 603 MB on the same rung. The
+    /// cost it does carry is real and is paid where this doc said it would be — 162 MB to 418 MB
+    /// on `mq-random-10`, 2.58x, in the batch loop. The tables are on
+    /// [`InterreductionRoute`] and in `docs/research/interreduction-cost.md` §3f.
+    ///
+    /// Still off in [`F4Options::baseline`], so an ablation against the pre-#575 configuration
+    /// stays available.
     pub reduce_batch_rows: bool,
 
     /// Break the work down by the degree it was done at, into
@@ -598,6 +633,11 @@ impl F4Options {
             elimination: Backend::Adaptive,
             reduction: ReductionStrategy::Structured,
             criteria: PairCriteria::ALL,
+            // #575 moved both of these together, because neither is worth much without the
+            // other and the pair is worth more than the sum of their parts suggests. See
+            // `InterreductionRoute` and `Self::reduce_batch_rows`.
+            reduce_batch_rows: true,
+            interreduction: InterreductionRoute::ByOrder,
             ..Self::baseline()
         }
     }
