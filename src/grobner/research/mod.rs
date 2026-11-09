@@ -10,6 +10,7 @@ pub mod anemoi;
 pub mod anemoi_cico;
 pub mod challenge;
 pub mod cost_model;
+pub mod griffin;
 pub mod linear;
 pub mod manifest;
 pub mod mq;
@@ -38,6 +39,7 @@ pub use cost_model::{
     FigureBasis, Intermediate, LimitingStage, NextSizeProjection, PredictionError, Quantity,
     RunSelectionError, SchemaError, SelectedRuns, COST_MODEL_HISTORY_CONTRACT,
 };
+pub use griffin::{FixtureError, FreeLunchSystem, FREELUNCH_PRIME, FREELUNCH_R4, FREELUNCH_R5};
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};
 pub use manifest::{Claim, InstanceManifest, Provenance};
 pub use mq::{MqError, MqField, MqInstance, MqVisitor, SUPPORTED_DIMENSIONS};
