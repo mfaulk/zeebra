@@ -2964,8 +2964,9 @@ polynomial as no terms at all.
 
 ## Gröbner Bases
 
-`grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
-standard orders are available, and `MonomialOrder` is exported from the crate root:
+`grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. The three
+standard orders and a weighted family are available, and `MonomialOrder` is exported from the crate
+root:
 
 ```rust
 use zeebra::{fields::Zp13, grobner::buchberger, MonomialOrder, MultivariatePolynomial};
@@ -2982,6 +2983,98 @@ let basis = buchberger(&system, MonomialOrder::GradedReverseLexicographic);
 The returned basis is reduced and in a deterministic order, so it is reproducible across runs.
 Which order you pick matters: graded reverse lexicographic is usually cheapest, while lexicographic
 is what makes a system easy to solve by back-substitution and can be dramatically more expensive.
+
+### Weighted monomial orders
+
+`MonomialOrder::Weighted` grades by a weighted degree `Σ wᵢeᵢ` instead of the total degree, with a
+tie-break you choose. The weights must be strictly positive — that is what makes the order a
+well-order, so reduction terminates — and a weight vector that is empty or holds a zero is refused
+at construction rather than producing a quietly wrong basis:
+
+```rust
+use zeebra::{Monomial, MonomialOrder, WeightedOrderError, WeightedTieBreak};
+use std::cmp::Ordering;
+
+// The FreeLunch order for Griffin at r = 5: weights (1, 7, 49), ties to the larger exponent at
+// the highest differing index.
+let order = MonomialOrder::weighted(&[1, 7, 49], WeightedTieBreak::LastVariableFirst).unwrap();
+
+// x_2 outranks x_0^48 despite 48 times the total degree, which no unweighted order does.
+let x2 = Monomial::<3>::new(&[0, 0, 1]);
+let x0_48 = Monomial::<3>::new(&[48, 0, 0]);
+assert_eq!(order.cmp(&x2, &x0_48), Ordering::Greater);
+assert_eq!(
+    MonomialOrder::GradedReverseLexicographic.cmp(&x2, &x0_48),
+    Ordering::Less
+);
+
+// A zero weight is not a usable grading.
+assert_eq!(
+    MonomialOrder::weighted(&[1, 0], WeightedTieBreak::Lexicographic),
+    Err(WeightedOrderError::NonPositiveWeight { index: 1 })
+);
+```
+
+`WeightedTieBreak::Lexicographic` with every weight 1 reproduces `GradedLexicographic` exactly, and
+`WeightedTieBreak::ReverseLexicographic` reproduces `GradedReverseLexicographic`; both agreements
+are asserted against the existing implementations. `LastVariableFirst` is Definition 2 of the
+Algebraic FreeLunch paper and is **not** the grevlex tie-break — it favours the larger exponent at
+the highest differing index where grevlex favours the smaller, so the two disagree on every tie.
+
+A weight vector known at compile time can skip the interning `MonomialOrder::weighted` does, and an
+invalid one then fails to compile:
+
+```rust
+use zeebra::{MonomialOrder, WeightedOrder, WeightedTieBreak};
+
+static GRIFFIN_R5: WeightedOrder = WeightedOrder::new(&[1, 7, 49], WeightedTieBreak::LastVariableFirst);
+let order = MonomialOrder::Weighted(&GRIFFIN_R5);
+assert_eq!(order.arity(), Some(3));
+```
+
+The weight vector's arity must equal the number of variables. A mismatch panics rather than
+comparing a prefix, because a truncated weight vector is a consistent order on a *different* ring;
+`normal_form_modulo` below reports it as an error instead, so a caller that assembled the order and
+the system separately learns which is wrong.
+
+Weighted orders are refused by every external comparand adapter. No third-party engine here has a
+weighted spelling whose coefficient and ordering conventions have been verified the way the
+unweighted ones have, and substituting degrevlex would compare a correct basis against a different
+question.
+
+### Reducing against a basis you already have
+
+`MultivariatePolynomial::normal_form_modulo` reduces by a basis the caller supplies rather than one
+Zeebra computed. `normal_form` has always accepted an arbitrary divisor set; what this adds is the
+contract that makes the answer canonical, plus the preconditions that can be checked cheaply:
+
+```rust
+use zeebra::fields::Zp13;
+use zeebra::grobner::leading_monomials_are_pairwise_coprime;
+use zeebra::{MonomialOrder, MultivariatePolynomial, WeightedTieBreak};
+
+let vars = ["x0", "x1", "x2"];
+let parse = |s: &str| MultivariatePolynomial::<3, Zp13>::parse(s, vars).unwrap();
+let order = MonomialOrder::weighted(&[1, 2, 4], WeightedTieBreak::LastVariableFirst).unwrap();
+let basis = [parse("x1^3 - x0^6"), parse("x2^3 - x0^12"), parse("x0^12 - x1*x2")];
+
+// Pure powers of distinct variables: pairwise coprime leading monomials, so Buchberger's first
+// criterion certifies this is already a Gröbner basis with no reduction performed.
+assert!(leading_monomials_are_pairwise_coprime(&basis, order));
+
+let reduced = parse("x0^15").normal_form_modulo(&basis, order).unwrap();
+// Canonical, so independent of the order the basis is given in.
+let mut rotated = basis.to_vec();
+rotated.rotate_left(1);
+assert_eq!(parse("x0^15").normal_form_modulo(&rotated, order).unwrap(), reduced);
+```
+
+If the supplied basis really is a Gröbner basis under the order, the result is *the* normal form:
+independent of the basis permutation, zero exactly on members of the ideal, and linear in the
+dividend. `grobner::leading_monomials_are_pairwise_coprime` is a sufficient certificate that costs
+no reduction — Buchberger's first criterion disposes of every S-pair when the leading monomials
+share no variable — and it is how the FreeLunch route establishes a Gröbner basis without running
+one. `false` means *not certified by this criterion*, never *not a Gröbner basis*.
 
 `buchberger_with_statistics` returns the same basis alongside counters describing the computation,
 which is useful for understanding cost on a hard system. `buchberger_with_criteria` additionally
