@@ -966,6 +966,7 @@ cargo run --release --example f4_profile -- mq     # the competitive MQ instance
 cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
 cargo run --release --example f4_profile -- divmask       # #331: the divisor-mask counters
 cargo run --release --example f4_profile -- scatter       # #582: the row scatter, split four ways
+cargo run --release --example column_sort_routes   # #583: the column sort, stable against unstable
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -1008,6 +1009,16 @@ beside the clocked `scatter_rows` as a control: if those two disagree, nothing b
 anything. Each arm carries a checksum that an emptied arm cannot produce
 (`test_the_scatter_ablation_arms_do_the_scatters_work` pins each one to a quantity derived from the
 built matrix), the arm order rotates per repetition, and each arm is min-reduced over its own runs.
+
+`column_sort_routes` is the smallest of these questions and the last of #583's: whether
+construction's column sort should be stable. It replays a `recommended` trace, snapshots the column
+vector each batch hands the sort — `preprocessed.monomials` drained in hash-set order, which is what
+construction itself collects — and sorts the same snapshot both ways, interleaved with the arm order
+rotated and each arm min-reduced. The arms assert **equal output** as well as timing it, because
+stability can only matter where the comparator reports a tie and a figure for two different column
+orders would mean nothing. `sort_unstable_by` wins on every instance tried, so it is what
+`build_measured` now calls; `docs/research/msolve-implementation.md` §4.1 has the table and what it
+decided about the rest of #583.
 
 A third configuration-free mode answers a question rather than reporting a cost. `f4_profile --
 divmask` is #331's counter-only experiment: `F4Options::measure_divmask` builds a 32-bit divisor
