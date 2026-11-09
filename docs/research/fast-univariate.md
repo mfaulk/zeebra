@@ -1051,8 +1051,10 @@ The paragraph this replaces named "a subproduct tree plus fast division by Newto
 pair, and the pairing was the load-bearing part: with long division the tree does not move the
 exponent **at all**, because the levels sum to `n^2 * sum_k 2^-k`. #193 supplied the division and
 §4.3.3 has the arithmetic. What it reaches is `O(M(n) log n)` with a Karatsuba `M`, measured at
-**1.46 – 1.62**, rather than the `O(n log^2 n)` this paragraph predicted — see §4.3.3's last
-section on why "near 1" is unreachable under this issue's own `FiniteField` bound (#559).
+**1.46 – 1.62**, rather than the `O(n log^2 n)` this paragraph predicted: "near 1" is unreachable
+under #162's own `FiniteField` bound, so #559 amended that issue's exponent criterion to ask for
+the multiplication exponent instead. §4.3.3's exponent-criterion section is the decision and the
+reasoning; #606 holds the `KnownOrder` specialization it deferred.
 
 #### 4.3.1 What #162 stage 1 changed, measured
 
@@ -1225,11 +1227,18 @@ n = 128 and 237.5 at n = 256 — `5 n B` below the 8-byte tier's constant and `~
 with the step exactly at the constant; over BN254 it is 160.2 then 722.8 at the same boundary.
 Nothing in this change writes that column.
 
-##### The exponent criterion, which is not met and cannot be
+##### The exponent criterion, amended rather than left unmet (#559)
 
-#162's acceptance asks for a `lagrange` exponent "near 1", and says an exponent that does not move
-"is the signal that the implementation is not what it claims to be". The exponent moved, from 2 to
-1.6. It is not near 1, and **it cannot be under this issue's own Scope**, which says:
+**The decision, in writing: #162's criterion now asks for an exponent near the multiplication
+exponent and measurably below 2, and that is met.** #559 listed three ways out of the tension and
+took the first — relax the criterion to what the specified bound can deliver. The criterion is
+amended in place, on #162 as well as here, so the closed issue does not read as having shipped
+with an acceptance criterion unmet. What follows is why that was the available choice.
+
+The criterion as written asks for a `lagrange` exponent "near 1", and says an exponent that does
+not move "is the signal that the implementation is not what it claims to be". The exponent moved,
+from 2 to 1.6, which is the signal the criterion was really asking for. It is not near 1, and **it
+cannot be under #162's own Scope**, which says:
 
 > `KnownOrder` is not required: nothing here needs the field's order, so the bound should stay
 > `FiniteField` as it is today.
@@ -1237,11 +1246,38 @@ Nothing in this change writes that column.
 Near 1 needs the transform; the transform needs a primitive `2^k`-th root of unity, hence
 `KnownOrder` and an RNG, which is precisely why `fft::multiply` carries that bound and `Mul` does
 not (§4.1). Under `FiniteField` the fastest product is Karatsuba and the best a tree can reach is
-`O(M(n) log n)` with `M(d) = d^1.585`. The two requirements are in tension; this stage resolved it
-the way the bound demands and **#559** is the issue to decide between relaxing the criterion,
-adding a `KnownOrder` specialization beside the `FiniteField` path, or recording near-1 as out of
-reach. Mersenne-31's two-adicity of 1 means the `FiniteField` path has to exist on that field
-whatever is decided.
+`O(M(n) log n)` with `M(d) = d^1.585`. Of the two requirements in tension, the bound is the one
+that was specified, implemented and tested, so the criterion is what gives way. The measured
+1.46 – 1.62 against `log2(3) = 1.585` is the amended criterion met *exactly* rather than
+approximately: the exponent is the multiplication exponent because the algorithm is
+multiplication-bound, which is a stronger statement about the implementation than "below 2" is.
+
+**What the other two options were, and why neither was taken.** Recording near-1 as out of reach
+and leaving the criterion standing is the paragraph above — it is the reason, not a decision, and
+on its own it leaves #162 reading as unmet, which is the thing this was opened to fix. A
+`KnownOrder` specialization beside the `FiniteField` path — the same tree, with the node products
+and the remainders going through `fft::multiply` and a transform-based division above a measured
+crossover — is the only option that would move a figure, and it is **deferred to #606 rather than
+rejected**, because what it is worth is not known:
+
+* A transform-based subproduct tree is `O(n log^2 n)`, not `O(n log n)` — the second log is the
+  tree's own levels — so against the measured `n^1.6` the asymptotic gap is `n^0.6 / log2(n)^2`
+  before any constants: about **1.7x at `n = 2^14`** and about **10x at `n = 2^20`**. The upper
+  end of that span is already past where the route stops for a reason this stage cannot fix —
+  §5.1 has root finding binding at comparable degrees, and stage 2 did not move it. #559's own
+  estimate of ~40x at `n = 16 384`
+  compares `n^1.6` against `n log n`, which is one multiplication rather than the tree, and so
+  overstates it by a factor of `log n`.
+* The constants run the other way. Karatsuba needs no root of unity, no twiddle tables and no
+  rounding up to a power-of-two domain, and §4.1's transform crossover is already degree ~460 to
+  ~12 000 depending on width — so the tree's own crossover may sit above every degree §5 says is
+  reachable.
+* It needs the dispatch question #185 answered for *division* the way #231 answered it for
+  multiplication, and §4.5's crossover is asymmetric in a way §4.1's is not, so that answer is not
+  a copy of this one.
+* **The `FiniteField` path stays whatever #606 concludes.** Mersenne-31 has two-adicity 1 (§1.1),
+  so a power-of-two transform is ruled out there at every degree above two and Karatsuba is the
+  only route that field has.
 
 ##### What this does not establish
 
@@ -1253,10 +1289,12 @@ whatever is decided.
   deliberately so it stays an independent oracle for the tree's own root. **#560** is the issue to
   change it.
 * **Anything about #82.** The degrees D1's evaluation–interpolation resultant wants are §5's
-  subject and this measures the stage, not the route.
+  subject and this measures the stage, not the route. §5.1 is where the 1.6 is carried over to that
+  route, and it is carried as an exponent rather than as a re-extrapolated table.
 * **`O(n log^2 n)`.** §4.3 predicted that figure for this machinery. What it reaches is
   `O(M(n) log n)` with a Karatsuba `M`, which is not the same thing, and the measured 1.6 is the
-  honest version of that prediction.
+  honest version of that prediction. #606 is where `O(n log^2 n)` would be reached, if the
+  measurement it asks for says the crossover is inside the reachable range.
 
 ### 4.4 Root finding: quadratic, and it is the binding stage
 
@@ -1493,6 +1531,18 @@ doublings earlier than anything else in the layer. That is the useful change, an
 ranked list keeps its order: the subproduct tree stays third because it is now worth what an
 asymptotic improvement is worth, and not what a missing implementation is worth.
 
+**Stage 2 moved the exponent this table extrapolates on, so the rows above are an upper bound.**
+The table is the quadratic form's, kept as the record of what stage 1 reached; the shipped
+dispatcher takes the tree from `n = 128` at four bytes and `n = 256` above (§4.3.3), at a measured
+**1.6**, so the real extrapolation to `2^20` samples is shallower than a square. **The number the
+D1 route (#82) should be read against is that 1.6, not the "near 1" #162 asked for** — #559
+amended that criterion
+because near-1 needs the transform and the stage's `FiniteField` bound rules it out, and #606
+holds the question of what a `KnownOrder` specialization would buy at exactly the degrees this
+section reaches. No figure here is re-measured for stage 2; the shallower row is deliberately not
+written down, because extrapolating from a measured exponent onto a table taken at a different one
+would put a number on record that no run produced.
+
 ## 6. Go / no-go for #68
 
 **Superseded in part.** [`elimination-beyond-grobner.md`](elimination-beyond-grobner.md) is the
@@ -1534,12 +1584,14 @@ Concretely, before D1 or D3 can run at interesting degrees:
    tier falling 4x from a figure that had never been measured. §4.1.2.
 2. **Fast division by Newton iteration**, which `pow_mod_limbs` would then inherit, taking root
    finding from `log q * d^2` to `log q * d log d`.
-3. **A subproduct tree**, for multipoint evaluation and interpolation at arbitrary points, taking
+3. ~~**A subproduct tree**, for multipoint evaluation and interpolation at arbitrary points, taking
    interpolation from `O(n^2)` to `O(n log^2 n)` and giving multipoint *evaluation* its first
-   sub-quadratic path. #162 stage 1 made interpolation quadratic without it, so this is now an
-   asymptotic improvement over a working stage rather than the only route to one; it is still what
-   D1 wants above `2^20` samples, and §4.3's reference implementation is what a tree would be
-   differentially tested against. #162 stays open for it.
+   sub-quadratic path.~~ Done, #162 stage 2 — but it reaches `O(M(n) log n)` with a Karatsuba `M`,
+   measured at **1.46 – 1.62**, not the `O(n log^2 n)` this item predicted, because the stage's
+   bound is `FiniteField` and a transform needs `KnownOrder`. #559 amended #162's "near 1" exponent
+   criterion to the multiplication exponent on that ground and #606 holds the specialization that
+   would change it; §4.3.3 is the measurement and the decision. The quadratic form of stage 1 is
+   kept reachable and is what the tree is differentially tested against.
 4. **Modular composition** (Brent–Kung) only if D3's Graeffe route needs it; its memory profile is
    the one place where this workstation's 300 GB could genuinely bind.
 
