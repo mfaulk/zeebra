@@ -1651,6 +1651,9 @@ fn six_worlds_points(prime: u64, rounds: usize, model: AnemoiModel) -> &'static 
     let column = match model {
         AnemoiModel::Fcico => 0,
         AnemoiModel::Pcico => 1,
+        // The Six Worlds sweep predates `ACICO` and publishes no row for it. Its comparand is
+        // eprint 2025/814's own Tables 6 and 7, at a different prime and a different machine.
+        AnemoiModel::Acico => return &[],
     };
     let index = 2 * (rounds - 1) + column;
     if index < low.len() {
@@ -1666,6 +1669,20 @@ fn six_worlds_points(prime: u64, rounds: usize, model: AnemoiModel) -> &'static 
 /// one implementation, and the designers' corresponding statement is a conjecture.
 pub fn published_quotient_dimension(alpha: u32, rounds: usize) -> Claim<u128> {
     Claim::Observed(u128::from(alpha + 2).pow(rounds as u32))
+}
+
+/// The quotient dimension of `⟨ACICO⟩`: `(α + 2)^{N·ℓ}`, **proved**.
+///
+/// [`published_quotient_dimension`] is the same arithmetic and a weaker claim, and the two are
+/// kept apart on purpose. eprint 2025/814's Proposition 4 proves this equality, and its proof is
+/// a count of the standard monomials of Proposition 2's DRL leading-term ideal — a statement
+/// about `⟨ACICO⟩` and about no other model of the same primitive. `FCICO` and `PCICO` are
+/// different ideals in different rings whose agreement with `(α + 2)^N` stays a measurement, as
+/// `docs/research/anemoi.md` §5 records.
+///
+/// A Zeebra figure that differs from this one — in either direction — is a defect.
+pub fn proved_acico_quotient_dimension(alpha: u32, rounds: usize, l: usize) -> Claim<u128> {
+    Claim::Proved(u128::from(alpha + 2).pow((rounds * l) as u32))
 }
 
 /// The input constants every KoalaBear CICO row shares: `C_1 = 0xc09de4`, `C_2 = 0xee6282`.
@@ -3346,6 +3363,8 @@ mod tests {
             let expected: Vec<usize> = match manifest.anemoi_model().expect("an Anemoi row") {
                 AnemoiModel::Fcico => vec![2 * rounds - 2, 2 * rounds - 1],
                 AnemoiModel::Pcico => vec![rounds],
+                // No ACICO row is registered yet; its output constraint is the last of 2N + 1.
+                AnemoiModel::Acico => vec![2 * rounds],
             };
             assert_eq!(failures, expected, "{}", manifest.id);
         }

@@ -13,10 +13,11 @@ pub mod planning;
 pub mod reference;
 pub mod research;
 mod s_polynomial;
-// Singular's weighted bases, committed as literals. Test data only: nothing on a shipping path
-// reads it, and `weighted_reference_bases::tests` is the differential check #624 asked for.
+pub mod shape_certificate;
 mod solve;
 mod solve_zero_dimensional;
+// Singular's weighted bases, committed as literals. Test data only: nothing on a shipping path
+// reads it, and `weighted_reference_bases::tests` is the differential check #624 asked for.
 #[cfg(test)]
 mod weighted_reference_bases;
 
@@ -55,6 +56,7 @@ pub use planning::{
     SolvePlan, SolvePolicy, SystemShape,
 };
 pub use s_polynomial::s_polynomial;
+pub use shape_certificate::{shape_position_hypotheses, HypothesisGap, PurePower, ShapeHypotheses};
 pub use solve::solve;
 pub use solve_zero_dimensional::{
     solve_from_lex_basis, solve_one, solve_one_reported, solve_one_with_options,

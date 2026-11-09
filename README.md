@@ -1276,6 +1276,17 @@ result on a cryptanalytic family — Anemoi `FCICO` and `PCICO` are in shape pos
 tested, by `cargo run --release --example anemoi_ladder shape` and `tests/anemoi_shape_position.rs`,
 both machine-independent because a minimal-polynomial degree is not a timing.
 
+`grobner::shape_position_hypotheses` is the cheap syntactic half of the same question, from Campa and
+Roy's Theorem 8 (eprint 2025/814): zero-dimensionality, a pure-power leader for every variable, and a
+finite `deg_≺`-top-form quotient, each decided from the basis for the price of a Hilbert series
+rather than a quotient algebra. It is **not** called a certificate of shape position, because those
+hypotheses do not imply it — `test_the_published_hypotheses_are_not_sufficient` exhibits an ideal
+that discharges every one of them and is not in shape position, and
+[`docs/research/anemoi.md`](docs/research/anemoi.md) §10.5 is the full reading, including the
+hypothesis Theorem 8's proof invokes and its statement omits. The missing condition is exactly
+`shape_report`'s `minimal_polynomial_degree == dimension`, so the two together are what settles a
+family and the module's docs say which half is a deduction and which a computation.
+
 `fglm_storage` reports the operator representations three ways: bytes under each strategy, which are
 exact; operator *application*, on a unit input and a dense one, because the sparse path skips a zero
 input coordinate and the dense path does not; and the whole conversion, where the difference turns
@@ -4824,6 +4835,42 @@ exits 2 if they are not. An unpinned wall-clock figure is not a measurement, and
 accident is one that gets quoted later; measurements must also be serialized under
 `tools/benchlock.sh`. The timed ladder is a follow-up, and `(α+2)^N` is checked at `N = 1 … 4` by a
 unit test so a regression fails CI rather than appearing as a table row.
+
+##### `ACICO`, the third model — where the basis is free instead of the conversion
+
+`AnemoiModel::Acico` is Campa and Roy's model of the same permutation (eprint 2025/814,
+Definition 14): `2N + 1` equations in `2N + 1` variables at `ℓ = 1`, with the `x` half of the state
+substituted by `Q_δ(y) + s^α` rather than carried. That substitution is the whole model, and it is
+why no degree compounds — `α, 1, 2α, α, …` at every round count, against `PCICO`'s `3, 4, 6, 8, 10`.
+
+```sh
+cargo run --release --example anemoi_acico structure  # Propositions 2 and 4, machine-independent
+cargo run --release --example anemoi_acico weighted   # alpha in {5, 7, 11} over WDRL, Proposition 3
+cargo run --release --example anemoi_acico shape      # both halves of shape position, labelled
+ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
+    cargo run --release --example anemoi_acico cost 4
+```
+
+What is reproduced, and each of these is a third-party prediction rather than a self-check: the
+**whole leading-monomial set** of the DRL basis, `{y_0} ∪ {y_j^α, s_j^α, y_j s_j}`, at `N = 1 … 6`;
+the quotient dimension `(α + 2)^N`, which Proposition 4 **proves** where §5's figure for the other
+two models is only observed, so `proved_acico_quotient_dimension` and
+`published_quotient_dimension` are two functions with the same arithmetic and different claim
+strengths; a solving degree flat in `N`, and in a stronger form than published — the F4 *step-degree
+sequence* is identical at every `N ≥ 2`, not just its maximum; and `α ∈ {5, 7, 11}` over the weighted
+order #306 introduced, where Proposition 3's different leading monomials `{y_j^2, s_j^{α+1}}` come out
+exactly. Faithfulness is checked against the permutation three ways, the strongest being that the
+model's last generator **evaluates to `Anemoi(0, y).0` at every input** rather than merely vanishing
+at a witness.
+
+The measured point of the model: at `D = 3 125` the basis is **0.00053 s** against `FCICO`'s ≈ 16 s
+and `PCICO`'s ≈ 0.8 s, while all three conversions sit within 1.3x of each other. The basis is a
+property of the model; the conversion is a property of `D`. `N = 6` reaches `D = 15 625` inside
+every default F4 budget, where the other two models needed all four lifted (#323).
+
+[`docs/research/anemoi.md`](docs/research/anemoi.md) §10 has the figures, the cross-characteristic
+caveat on that comparison, and §10.5's reading of why "`ACICO` is the first *proven* shape-position
+family" does not survive the proof as printed.
 
 #### Feistel-MiMC and Rescue-Prime, the 2021–2022 EF bounty primitives
 

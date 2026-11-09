@@ -1,7 +1,9 @@
 # Anemoi: what was taken unchanged, what was verified, and what is a reconstruction dependency
 
-**Measured at:** publication bound `bda7ed44`…`7aa9a9be` — the commits that published these figures,
-recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**Measured at:** publication bound `bda7ed44`…`7aa9a9be` for §§1–9 — the commits that published
+those figures, recovered from git rather than recorded at the time
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). §10's own
+figures are at `93898118`, recorded when they were taken rather than recovered.
 
 M24-C. The implementation half of candidate 1 of [`additional-benchmarks.md`](additional-benchmarks.md)
 §1, which ranks it first of four against a cap of five. This document records the sources actually
@@ -1084,8 +1086,376 @@ of the published 11 775.430 s conversion, and 12.5x behind msolve on the same ma
   `PCICO`, because msolve's conversion grew 184.1x per rung against this crate's 110.7x. Two rungs
   is not a trend worth extrapolating in either direction, and `N = 7` is the only thing that would
   settle it. Noted rather than claimed.
-- **`ACICO`.** A third model of the same primitive (`additional-benchmarks.md` §3.4). Cheap once the
-  permutation exists, and a separate issue.
+- **`ACICO`.** Done — see [§10](#10-acico-the-third-model--and-what-proved-shape-position-turns-out-to-mean).
+  `ℓ > 1` and `N > 6` within that model are what remain, and §10.8 scopes them.
 - **The reference's own `check_polynomial_verification` has not been executed.** It needs Sage. §4
   substitutes a stronger oracle built from committed reference output; if Sage becomes available,
   running it is still worth doing and would be a second independent check rather than the first one.
+
+## 10. `ACICO`, the third model — and what "proved shape position" turns out to mean
+
+**Measured at:** the wall-clock figures in §10.6 were taken at `93898118`, under
+`tools/benchlock.sh`, `ZEEBRA_MACHINE=fedora ZEEBRA_AFFINITY=0-7`, `taskset --cpu-list 0-7`.
+Everything else in §10 is algebraic and needs no commit to be reproducible at.
+
+#201 (C5) asked for Campa and Roy's third model of the same primitive and for "the first proven
+shape-position family". The model is here and it does what it was designed to do. The second half
+did not survive reading the proof, and that is the more useful result.
+
+**Source:** Luca Campa and Arnab Roy, *Gröbner Basis Cryptanalysis of Anemoi*, EUROCRYPT 2025,
+eprint 2025/814, read in full from a local copy of the eprint PDF. Both caveats
+`additional-benchmarks.md` §3.4 carried — cite the thesis, and do not quote the `d_I` columns — are
+lifted there and stay lifted here.
+
+### 10.1 The model
+
+`ACICO` is Definition 14. At `ℓ = 1` it is `2N + 1` equations in `2N + 1` variables
+`y_0, …, y_N, s_1, …, s_N`, where `s_r` is the input to the Flystel's power map at round `r` and
+`y_r` is the second state word after it. The `x` half of the state is **never a variable**: it is
+substituted by the Flystel verification circuit's own output, `x_r = Q_δ(y_r) + s_r^α`. That
+substitution is the whole model, and it is why no degree compounds.
+
+| generator | is | degree |
+|---|---|---:|
+| `a_1` | `L^{(1)}_1(0, y_0) − Q_γ(L^{(2)}_1(0, y_0)) − s_1^α` | `α` |
+| `b_1` | `L^{(2)}_1(0, y_0) − y_1 − s_1` | 1 |
+| `a_r`, `r > 1` | `L^{(1)}_r(m_r, y_{r−1}) − Q_γ(L^{(2)}_r(m_r, y_{r−1})) − s_r^α` | `2α` |
+| `b_r`, `r > 1` | `L^{(2)}_r(m_r, y_{r−1}) − y_r − s_r` | `α` |
+| `f_{N+1}` | `L^{(1)}_{N+1}(m_{N+1}, y_N)` — the output CICO condition | `α` |
+
+Those are equations (8) and (9), and `test_the_acico_generator_degrees_are_flat_in_the_round_count`
+asserts the built system against them. The contrast with `PCICO` is the point: `3, 4, 6, 8, 10, …`
+there against `α, 1, 2α, α, …` here, and `ACICO`'s largest generator degree is `2α` at **every** `N`.
+
+The variable order is the paper's ring order, `y_0 ≻ y_1 ≻ … ≻ y_N ≻ s_1 ≻ … ≻ s_N`. It is not a
+free choice: Proposition 2 has `LM(g_{i,0}) = y_0`, which requires `y_0` to be the greatest of the
+degree-one monomials, and a reordering changes the leading-monomial set — which
+`test_the_acico_drl_basis_has_the_published_leading_monomials` catches, confirmed by running the
+model with `y` and `s` swapped.
+
+### 10.2 Faithfulness, checked against the permutation and not against the algebra
+
+Three checks, in increasing strength, and none of them re-derives the model's own equations.
+
+1. **Every non-output generator vanishes at a trace of the permutation**, at `N = 1 … 5`. The
+   assignment comes from `Anemoi::trace`, so the model is being compared with the primitive. Only
+   the output constraint may fail at an arbitrary input, and it must: a last equation that vanished
+   everywhere would be a model of nothing.
+2. **The output constraint *is* the permutation's first output word.** `AnemoiCico::output_word`
+   evaluates `f_{N+1}` at the trace, and it equals `Anemoi(0, y).0` at every input tried. This is
+   stronger than vanishing at a witness, which pins one point: it says the last equation computes
+   the quantity the CICO condition is about. A sign error or a mis-ordered final linear layer
+   survives the witness test and dies here.
+3. **The whole system vanishes at a published witness.** `y = 1761853426583392112` at `N = 2` over
+   `p = 2^64 − 353` is the root the committed Six Worlds lex basis determines (§4), so it is
+   third-party data and not a point this crate chose. `ACICO` is prime-independent and the only
+   published Anemoi CICO witnesses are over that field, which is why the witness check is there and
+   not at the paper's prime.
+
+No `ACICO` witness is published anywhere, so (3) borrows one from the other models — legitimate
+because all three models have the same solution set. A **negative control** was run rather than
+assumed: dropping `δ` from the substituted `x_r` fails checks 1–3 and leaves every structural check
+in §10.3 passing, which is why the two kinds of test are separate.
+
+### 10.3 The published structure, reproduced — Propositions 2, 3 and 4
+
+`cargo run --release --example anemoi_acico structure`, machine-independent:
+
+| `α` | `N` | variables | basis | Proposition 2's leading monomials | `D` | proved `(α+2)^N` | `max_pair_degree` | step degrees |
+|---:|---:|---:|---:|---|---:|---:|---:|---|
+| 3 | 1 | 3 | 4 | **agrees** | 5 | 5 | 4 | `[3, 4, 4]` |
+| 3 | 2 | 5 | 7 | **agrees** | 25 | 25 | 6 | `[3, 4, 4, 6, 4, 4]` |
+| 3 | 3 | 7 | 10 | **agrees** | 125 | 125 | 6 | `[3, 4, 4, 6, 4, 4]` |
+| 3 | 4 | 9 | 13 | **agrees** | 625 | 625 | 6 | `[3, 4, 4, 6, 4, 4]` |
+| 3 | 5 | 11 | 16 | **agrees** | 3 125 | 3 125 | 6 | `[3, 4, 4, 6, 4, 4]` |
+| 3 | 6 | 13 | 19 | **agrees** | 15 625 | 15 625 | 6 | `[3, 4, 4, 6, 4, 4]` |
+
+Four things in that table are worth separating.
+
+**The leading-monomial set is Proposition 2's, exactly.** `{y_0} ∪ {y_j^α, s_j^α, y_j s_j}`, `3N + 1`
+elements, at every rung. That is a far stronger reproduction than the dimension alone, because the
+dimension is a *count derived from* this set and could agree while the set did not.
+
+**The quotient dimension is `Claim::Proved`, and that is new.** §5 tags `(α + 2)^N` as
+`Claim::Observed` for `FCICO` and `PCICO`, correctly: those are measurements and the designers'
+statement is a conjecture. Proposition 4 **proves** the equality — "In [29] `d_I` for Anemoi is
+conjectured as `d_I = (α+2)^N` for `l = 1` with experimental evidences. We prove and extend this
+conjecture" — and its proof is a count of the standard monomials of Proposition 2's leading-term
+ideal. So it is a statement about `⟨ACICO⟩` and about no other model of the same primitive:
+`FCICO` and `PCICO` are different ideals in different rings and their agreement with `(α + 2)^N`
+stays observed. `proved_acico_quotient_dimension` and `published_quotient_dimension` are two
+functions with the same arithmetic and different claim strengths for exactly that reason.
+
+**The solving degree is flat in `N`, and in a stronger form than published.** Table 6 reports
+`d_solv` constant in the round count. Zeebra's F4 **step-degree sequence** is *identical* at every
+`N ≥ 2` — `[3, 4, 4, 6, 4, 4]` at `N = 2, 3, 4, 5, 6` alike, not merely the same maximum.
+`docs/research/degree-profiles.md` has nothing like this: round count drives degree growth on every
+Poseidon family measured there. The figure quoted is `max_pair_degree`, the highest lcm degree a
+batch was selected at; the published `d_solv = 9` is **not** this quantity — the paper defines it
+only as "the maximum degree reached during the GB computation" with no reduction convention — so
+the two numbers are not comparable and **only the flatness is**. Stated rather than silently
+reported as a 6-against-9 disagreement.
+
+**`N = 6` reaches a basis inside every default F4 budget.** #323 is the record of `FCICO`/`PCICO` at
+`N = 6` crossing three of F4's four budgets in succession, needing all four lifted, and taking 20 s
+of F4 in the one model that finished. `ACICO` reaches the same `D = 15 625` with `F4Options::default()`
+untouched. That is a budget comparison and so machine-independent — budgets are counts, not times.
+
+### 10.4 `α > 3` is no longer blocked, and the published WDRL structure reproduces too
+
+#201's question 6 answered itself in advance: "`src/poly/multivariate/monomial_order.rs` declares
+exactly `{Lexicographic, GradedLexicographic, GradedReverseLexicographic}` … `ACICO` for `α > 3` is
+stated over weighted-DRL and is therefore **unreachable**. Record the gap; do not improvise an
+order."
+
+**The gap closed while this issue waited.** #306 landed `MonomialOrder::Weighted` on 2026-11-08, so
+WDRL is expressible with no new order and nothing improvised. `cargo run --release --example
+anemoi_acico weighted`:
+
+| `α` | `N` | basis | Proposition 3's leading monomials | `D` | proved `(α+2)^N` | `max_pair_degree` |
+|---:|---:|---:|---|---:|---:|---:|
+| 5 | 1 | 4 | **agrees** | 7 | 7 | 7 |
+| 5 | 2 | 7 | **agrees** | 49 | 49 | 7 |
+| 5 | 3 | 10 | **agrees** | 343 | 343 | 7 |
+| 7 | 1 | 4 | **agrees** | 9 | 9 | 9 |
+| 7 | 2 | 7 | **agrees** | 81 | 81 | 9 |
+| 7 | 3 | 10 | **agrees** | 729 | 729 | 9 |
+| 11 | 1 | 4 | **agrees** | 13 | 13 | 13 |
+| 11 | 2 | 7 | **agrees** | 169 | 169 | 13 |
+| 11 | 3 | 10 | **agrees** | 2 197 | 2 197 | 13 |
+
+Nine rows, three exponents, Proposition 3's leading monomials `{y_0} ∪ {y_j^2, s_j^{α+1}, y_j s_j}`
+on all of them, and Proposition 4's `(α + 2)^{N}` on all of them. The solving degree is flat in `N`
+here too, at `α + 2`.
+
+**The weights, and one detail the paper's prose gets backwards.** Definition 15's own example is
+`w(s) = 2k`, `w(y) = αk` with ties broken by revlex, which at `k = 1` is what is used above. Those
+weights satisfy the stated constraint `2w_0 ≥ αw_1` with **equality**, so `y_j^2` and `s_j^α` tie on
+weighted degree and the revlex tie-break decides between them — putting `y_j^2` *above* `s_j^α`,
+which is what moves the leading monomials from Proposition 2's `{y_j^α, s_j^α}` to Proposition 3's
+`{y_j^2, s_j^{α+1}}`. The surrounding prose says the order is chosen "such that `y² ≺_WDRL s^α`",
+which is the opposite of what Definition 15 plus those weights produces and the opposite of what
+Proposition 3 needs. Recorded because an implementer following the prose rather than the definition
+gets Proposition 2's structure at `α = 5`, which is precisely the case Remark 3 says DRL cannot do
+efficiently.
+
+Two things are still open at `α > 3` and neither is an order problem: no `ACICO` row is registered in
+the challenge registry at any `α`, and `ℓ > 1` is blocked on the `ℓ > 1` linear layers (§9), not on
+the model.
+
+### 10.5 Shape position: a deduction, a computation, and a gap in the printed theorem
+
+This is what #201 was for, and the answer is not the one the issue expected.
+
+#### The theorem, as printed
+
+Theorem 8: *let `I` be zero-dimensional and `G` a Gröbner basis of it containing, for each variable,
+an element whose leading monomial is a pure power `x_i^{α_i}`; if `I` has no solutions at infinity,
+then `I` has shape form in the reduced LEX basis.* Corollary 2 applies it to `⟨ACICO⟩`.
+
+Its proof invokes Theorem 7 ([13, Theorem 1.2]), whose standing hypothesis is that **the projection
+`V(I) → A¹` onto the last coordinate is injective**. Theorem 8's statement does not carry it. And
+the two hypotheses Theorem 8 *does* state are one hypothesis, already implied:
+
+- The paper's own Appendix A gives `V(I) finite ⟺ ∀i ∃f ∈ G : LM(f) = x_i^{α_i}`. The pure-power
+  condition **is** zero-dimensionality.
+- Under a graded order `LM(g)` is a monomial of top `deg_≺`, so `LM(top_form(g)) = LM(g)` and the
+  top-form ideal's leading-term ideal contains every `LM(g)`. A pure power of each variable is
+  therefore among them, the top-form quotient is finite, and the top forms cut out only the origin.
+  **"No solutions at infinity" is automatic** for a Gröbner basis under a graded order.
+
+Taken literally, Theorem 8 would say every zero-dimensional ideal is in shape form. This crate's own
+corpus refutes that — `MILESTONE-FGLM-SCALABILITY.md` §8.3: cyclic's separating set is empty and 44
+of 120 zero-dimensional differential fixtures fail the detector — and
+`test_the_published_hypotheses_are_not_sufficient` exhibits a two-line counterexample in-crate:
+planted-4 discharges every printed hypothesis, has `D = 16`, and its last coordinate has a
+degree-4 minimal polynomial, because the four points of each planted pair differ only inside the
+pair. The missing hypothesis is exactly what fails, and nothing syntactic about the basis can see
+it.
+
+Theorem 9 (the paper's own statement of the Shape Lemma, Appendix A) carries both missing
+conditions — radicality and "the `x_n` coordinate of the points in `V(I)` are distinct" — so this
+reads as an omission in Theorem 8's statement rather than a claim the paper disowns elsewhere.
+Nothing here says Corollary 2's **conclusion** is false; §10.5's computations are consistent with it
+at every rung tried. What is false is that the conclusion follows from the hypotheses as printed.
+
+#### What Zeebra therefore does, in two clearly separated halves
+
+`src/grobner/shape_certificate.rs` decides the syntactic half and names the other. It is deliberately
+**not** called a certificate of shape position:
+
+```sh
+cargo run --release --example anemoi_acico shape
+```
+
+| `α` | `N` | `D` | printed hypotheses | Theorem 4-strict variables | `deg` of the lex-last variable | separating | shape basis = classical |
+|---:|---:|---:|---|---|---:|---|---|
+| 3 | 1 | 5 | **discharged** | `[1, 2]` | 5 | all | **yes** |
+| 3 | 2 | 25 | **discharged** | `[3, 4]` | 25 | all | **yes** |
+| 3 | 3 | 125 | **discharged** | `[4, 5, 6]` | 125 | all | **yes** |
+| 3 | 4 | 625 | **discharged** | `[5, 6, 7, 8]` | 625 | all | **yes** |
+| 5 | 1 | 7 | **discharged** | `[2]` | 7 | all | **yes** |
+| 5 | 2 | 49 | **discharged** | `[3, 4]` | 49 | all | **yes** |
+| 7 | 1 | 9 | **discharged** | `[2]` | 9 | all | **yes** |
+| 7 | 2 | 81 | **discharged** | `[3, 4]` | 81 | all | **yes** |
+
+- The **hypotheses** column is a *deduction* about the instance: zero-dimensionality, a pure-power
+  leader per variable, and a finite `deg_≺`-top-form quotient, each computed from the basis. Cheap —
+  a Hilbert series and one auxiliary F4 on the top forms.
+- The **two degree columns** are a *computation* on it: `deg` of the lex-last variable's minimal
+  polynomial against `D`. Equality is the separating hypothesis Theorem 8 omits. It costs a quotient
+  algebra, which is `O(D²)` storage.
+- The last column is the *correctness* statement, and it is asserted rather than reported: the
+  reduced lex basis is unique, so a shape basis differing from the classical conversion's is simply
+  wrong. `shape_lex_basis` additionally verifies its own output algebraically before returning, so
+  the lex basis is certified whatever route produced it.
+
+**The honest summary, and the three claims kept apart:**
+
+1. **Family-level proof.** Corollary 2, cited and not reproduced here — and it inherits Theorem 8's
+   omission, so it is a proof whose printed hypotheses do not support it.
+2. **Instance-level deduction.** The printed hypotheses discharge on every rung above. This is
+   deductive and it is *not sufficient*.
+3. **Instance-level computation.** `deg = D` on every rung above, and every variable separates, not
+   only the last — the same thing #224 found on `FCICO`/`PCICO`.
+
+So **#201 does not deliver "the first proven shape-position family", and the reason is a gap in the
+proof rather than a limit of this crate.** What it delivers instead is the distinction: a per-rung
+machine-checked deduction of everything about shape position that is syntactic, an in-crate
+counterexample showing that half is not enough, and the computation that closes it. That is strictly
+more than #224's empirical 24-for-24, which has no theorem behind it at all, and strictly less than
+a theorem about the family.
+
+**The one thing the published argument does have that the syntactic check does not** is Theorem 4's
+*strict* `deg_≺` condition — `f_i = c_i x_i^{α_i} + q_i` with `deg_≺(q_i) < deg_≺(LM(f_i))`, so the
+top form is the bare monomial. That is genuinely stronger than "the leading monomial is a pure
+power", and on `ACICO` it holds for the `s` variables and **fails** for `y_2 … y_N`, whose degree-`α`
+tails carry `y_{j−1}^2 s_j`. Which is why Corollary 2 argues by back-substitution rather than by
+inspection, and why `PurePower::strict` is reported per variable instead of as one boolean.
+
+### 10.6 Where the cost goes — the basis really is free
+
+`ACICO`, `α = 3`, `p = 1481823929`, cores 0–7, one `benchlock` acquisition:
+
+| `N` | `D` | basis (F4) | conversion (FGLM) | univariate + roots | total | witness |
+|---:|---:|---:|---:|---:|---:|---|
+| 3 | 125 | 385.3 µs | 10.65 ms | 1.74 ms | 12.78 ms | none — no base-field point |
+| 4 | 625 | 493.1 µs | 366.3 ms | 35.68 ms | 402.5 ms | `y = 1225307342`, **verified** |
+| 5 | 3 125 | 529.1 µs | 36.13 s | 382.0 ms | 36.51 s | `y = 1452777724`, **verified** |
+
+Both witnesses are checked by **running the permutation**, not the system that produced them.
+
+> **The basis is free, flat, and inside the published column.** 385 µs → 493 µs → 529 µs across
+> three rungs, for a quotient dimension that grows 25-fold: it is not a function of `N` in any
+> useful sense, and it sits inside eprint 2025/814's own `T_GB` range of 0.0005–0.0013 s, on a
+> different machine. The conversion is **98.9%** of the wall at `N = 5`.
+
+**Five independent takings of these three rows, and the spread between them is the error bar.**
+The `N = 5` conversion read 34.52 s, 34.13 s, 33.29 s, 33.10 s and 36.13 s on successive
+runs — a **9.1%** spread, and the slowest came under the *lowest* reported load of the five. The
+load averages were 891, 2 049, 1 874, 974 and 323, with 22, 20, 11, 9 and 27 of 6 600–9 700 threads
+runnable. That the figures are insensitive to a 6.3x swing in reported load, and that the ordering
+does not even correlate with it, is the clearest in-document evidence for #352's point: this box's
+load average tracks tmpfs and IO pressure rather than CPU contention, and gating a measurement on it
+would have blocked all five runs for nothing.
+
+Only the last is quoted, because only it came from a binary built at the commit named above. The
+earlier four were built from trees that three rebases onto a moving `main` left unreachable, which
+is #505's complaint — and the reason to re-take rather than carry forward is that nobody can later
+re-measure at a commit that is not in the history. The 9.1% spread is therefore also the honest
+error bar on any single one of them, and no claim in §10.6 turns on a difference smaller than that:
+the cross-model comparison below is four orders of magnitude.
+
+The cross-model comparison is the finding #201 was filed for, and it holds. At the same
+`D = 3 125`:
+
+| model | basis | conversion | total |
+|---|---:|---:|---:|
+| `ACICO`, `p = 1481823929` | **0.00053 s** | 36.13 s | 36.51 s |
+| `FCICO`, `p = 65537` (§8a.7) | ≈ 16.2 s | 47.53 s | 63.71 s |
+| `PCICO`, `p = 65537` (§8a.7) | ≈ 0.8 s | 38.19 s | 39.0 s |
+
+> **The basis is a property of the model and the conversion is a property of `D`.** `ACICO`'s basis
+> is ~31 000x cheaper than `FCICO`'s and ~1 500x cheaper than `PCICO`'s at the same quotient
+> dimension, while the three conversions sit within 1.3x of each other. One primitive, one `D`,
+> three formulations, and the entire spread is in the half the model controls.
+
+Two caveats, both binding. The `ACICO` rows are at the 31-bit prime the paper measures over and the
+`FCICO`/`PCICO` rows at 17 bits, so the comparison is cross-characteristic; §8a.3's finding that this
+crate's cost is characteristic-flat to 12% across a 47-bit range is what makes it defensible, and it
+is an inference rather than a measurement. And the ambient load average read 323 during the run
+with only 27 of 6 638 threads runnable — this box's load is tmpfs and IO pressure rather than CPU
+contention (#352), so the figures are not contended, but they are not from a quiet machine either.
+
+**Root finding is not yet the wall, and the published data says where it becomes one.** It is 1.1%
+of the total at `N = 5` here. eprint 2025/814's Table 7 puts the crossover at `α = 3, N = 8`:
+14 567 s of factoring against 1 213 s of Wiedemann. Here the share is **falling** rather than
+rising — 13.6%, 8.9%, 1.0% of the total at `N = 3, 4, 5` — because this crate's conversion grows
+faster per rung than its root finding does at these sizes. So the crossover, if it arrives, arrives
+later here than in the reference, and nothing at `N ≤ 5` is evidence about where.
+
+So #201's question 5 — "`ACICO` may be the first cryptanalytic family whose bottleneck is the
+univariate layer" — is **not yet true at the rungs reachable here**, and the published figures locate
+where it would become true. `N = 6` would cost ≈ 1.2 h of conversion by §8a.8's measured per-rung
+growth and was not run.
+
+### 10.7 What `ACICO` says about the sparse-FGLM no-go, and about `shape.rs` as a strategy
+
+**On `MILESTONE-FGLM-SCALABILITY.md` §8.5.** `ACICO` is evidence about that no-go from the opposite
+direction to #214's, and it **strengthens** it. #214's argument was that the conversion is where the
+cost is, so an alternative conversion is where the win would be. `ACICO` makes that sharper rather
+than weaker: with the basis at 0.00053 s the conversion is 98.9% of the wall, so the family is
+*entirely* a conversion benchmark. But [`order-conversion.md`](order-conversion.md) §5.B already
+settles which alternative, on this family's own published data — SparseFGLM wins at `d_I = 5^4`,
+loses by 9.1x at `5^6` and **fails** at `5^8` where Wiedemann returns in 1 212.9 s. So the no-go
+stands for the reason #224 gave: a sparse-FGLM milestone would build the route that gives out first,
+and the faster of the two is already scoped as #368. Nothing in §10 widens #368's scope; it adds the
+family where its target is 98.9% of the cost instead of 82.8% (§8a.4).
+
+**On promoting `fglm::shape` to an `FglmOptions` strategy (question 7).** The recommendation is
+unchanged from `order-conversion.md` §5.A: **do not**, and `ACICO`'s positive result does not change
+it. The reason is §8.3's measurement, not detection: the Krylov shape route is 0.37x on the route at
+`D = 64` because it replaces the frontier's sparse-early vectors with a variable's powers, which
+densify immediately. Shape position being *available* on a family says nothing about the route being
+*cheaper* on it. What `ACICO` does add is the strongest reason yet to wire the **detector** into the
+planner (#273), because the planner now has two cryptanalytic families where it fires and a cheap
+syntactic pre-filter — `shape_position_hypotheses` costs a Hilbert series — that can be read before
+paying for a quotient algebra. Routed to #273 and #224; not duplicated here.
+
+**On "verify the inputs are already a Gröbner basis" (#201 gap 4, shared with #202).** `ACICO`'s
+input generators are **not** a Gröbner basis — the DRL basis has `3N + 1` elements against `2N + 1`
+generators, and the extra `N` are the degree-two filter equations `y_j s_j` that Proposition 2's
+quotient count depends on. So the capability #201 asked for would answer "no" on this family, and
+the thing actually worth having here is the weaker and more useful one Zeebra now has:
+**check the basis against a predicted leading-monomial set**, which is what
+`test_the_acico_drl_basis_has_the_published_leading_monomials` does and what caught the variable
+ordering in the negative control. #202's FreeLunch case is different — there the inputs genuinely
+are claimed to be a basis — so the proposal belongs with #202 and not here, with this note attached:
+`ACICO` is not a second consumer for it.
+
+### 10.8 Open, in `ACICO`
+
+- **No `ACICO` row is registered.** The model variant exists and
+  `ChallengeParameters::AnemoiCico`'s digest admits it (#201 gap 5 is satisfied: a third `model`
+  line, no collision), but no row was added, so `anemoi_ladder` cannot reach `ACICO` and
+  `examples/anemoi_acico.rs` is the runner. Registering rows means new digests and a frozen-registry
+  edit, which is its own change against a registry several agents touch —
+  [#643](https://github.com/mfaulk/zeebra/issues/643), which also records that
+  `PublishedWithoutAnswer` is the right `ExternalStatus` here because the paper publishes timings
+  and `d_I` but no witness.
+- **`N ≥ 6` timings.** The `N = 6` *basis* is free and inside every default budget (§10.3); the
+  conversion at `D = 15 625` projects to ≈ 1.2 h and was not run. `N = 7, 8` is where the published
+  data says factoring overtakes everything, and `N = 8` means `D = 390 625`, far past this crate's
+  conversion reach.
+- **`ℓ > 1`.** `ACICO`'s stated advantage over `FCICO`/`PCICO` is that it "extends past two
+  branches", and that is the half of the model this issue did not implement: `Anemoi::new` refuses
+  `ℓ ≠ 1` and the `ℓ > 1` linear layers are §9's standing gap. Proposition 4's `(α + 2)^{Nℓ}` is
+  therefore untested for `ℓ > 1`, and so is Table 6's second flatness claim — `d_solv` constant
+  across `ℓ = 1, 2, 3` as well as across rounds. [#644](https://github.com/mfaulk/zeebra/issues/644).
+- **The `d_solv` definition.** Zeebra reports `max_pair_degree`; the paper reports an undefined
+  "maximum degree reached". Only the flatness is compared (§10.3). Matching the number would need
+  the paper's convention, which is not stated.
+- **Theorem 8's omission has not been reported upstream.** §10.5 is this repository's reading of the
+  printed text, checked against the paper's own Theorem 9 and against an in-crate counterexample.
+  Telling the authors is an owner action rather than an agent one —
+  [#645](https://github.com/mfaulk/zeebra/issues/645).

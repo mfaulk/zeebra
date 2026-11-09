@@ -638,7 +638,8 @@ recommended unless new evidence emerges**.
 | #218–#221 | Boolean solving readiness, SAT4CryptoBench, SAT as backend, LowMC | Medium | the first same-machine external baseline outside Gröbner | research needed | #218 before #219 | M26 |
 | #195–#196, #205–#207 | MinRank and rank-based cryptanalysis; Boolean cryptanalysis | Medium | new challenge families | research needed | — | M26+ |
 | #197–#199 | Fukuoka MQ I–V; HFE Challenge 1; classical collections | Medium | published external timings exist | ready | #261 | M26 |
-| #201, #203, #204 | Anemoi ACICO; Feistel-MiMC and Rescue-Prime; Poseidon zero-test | Medium | more registered rows | research needed | ℓ>1 blocked by a u64-only primitive-root search | M26+ |
+| #203, #204 | Feistel-MiMC and Rescue-Prime; Poseidon zero-test | Medium | more registered rows | research needed | ℓ>1 blocked by a u64-only primitive-root search | M26+ |
+| #643, #644 | register the Anemoi `ACICO` rows; `ACICO` at `ℓ > 1` | Medium, Low | #201 landed the model and left the rows | ready; #644 blocked | #644 needs the `ℓ > 1` linear layers | M26+ |
 | #69, #86–#89, #225 | GPU suitability, sparse matvec, out-of-core, hardware cost | Low | unquantified | not recommended unless new evidence | a named kernel, workload, predicted benefit and benchmark | M27+ |
 | #200 | prize-status ledger | Medium | one presently claimable award | owner action | — | — |
 

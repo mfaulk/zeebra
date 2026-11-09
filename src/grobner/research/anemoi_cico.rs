@@ -50,6 +50,14 @@ pub enum AnemoiModel {
     ///
     /// `ℓ(N + 2)` variables before the CICO condition removes `ℓ`, so `ℓ(N + 1)` after.
     Pcico,
+
+    /// Model `A`: Campa and Roy's `ACICO`, whose degrees do not compound.
+    ///
+    /// `ℓ(2N + 1)` variables — one `y` per round boundary and one `s` per Flystel — and as many
+    /// equations. The `x` half of the state is never a variable: it is substituted by
+    /// `Q_δ(y) + s^α`, which is what keeps the degrees at `α` and `2α` instead of growing with the
+    /// round count. eprint 2025/814, Definition 14.
+    Acico,
 }
 
 impl AnemoiModel {
@@ -58,6 +66,7 @@ impl AnemoiModel {
         match self {
             Self::Fcico => "fcico",
             Self::Pcico => "pcico",
+            Self::Acico => "acico",
         }
     }
 
@@ -66,6 +75,7 @@ impl AnemoiModel {
         match self {
             Self::Fcico => 2 * l * rounds,
             Self::Pcico => l * (rounds + 1),
+            Self::Acico => l * (2 * rounds + 1),
         }
     }
 
@@ -78,6 +88,7 @@ impl AnemoiModel {
         match self {
             Self::Fcico => 2 * l * rounds,
             Self::Pcico => l * rounds + l,
+            Self::Acico => l * (2 * rounds + 1),
         }
     }
 
@@ -101,6 +112,18 @@ impl AnemoiModel {
                 }
                 // The output constraint, after the final linear layer.
                 degrees.push(rounds as u64 + 1);
+                degrees
+            }
+            // eprint 2025/814, equations (8) and (9): `deg a_1 = α`, `deg b_1 = 1`,
+            // `deg a_r = 2α` and `deg b_r = α` for `r > 1`, `deg f_{N+1} = α`. Flat in `N` —
+            // which is the whole difference from `PCICO`, whose degrees reach `2N`.
+            Self::Acico => {
+                let mut degrees = vec![alpha, 1];
+                for _ in 2..=rounds {
+                    degrees.push(2 * alpha);
+                    degrees.push(alpha);
+                }
+                degrees.push(alpha);
                 degrees
             }
         }
@@ -161,6 +184,7 @@ impl<F: KnownOrder> AnemoiCico<F> {
         Ok(match self.model {
             AnemoiModel::Fcico => self.full_state_system(),
             AnemoiModel::Pcico => self.partial_state_system(),
+            AnemoiModel::Acico => self.substituted_state_system(),
         })
     }
 
@@ -251,6 +275,47 @@ impl<F: KnownOrder> AnemoiCico<F> {
         equations
     }
 
+    /// Model `A`, in the paper's ring order `y_0 > y_1 > … > y_N > s_1 > … > s_N`.
+    ///
+    /// The `x` half of the state is substituted rather than carried: `x_r = Q_δ(y_r) + s_r^α`,
+    /// which is the Flystel verification circuit's own output and is why no degree compounds. The
+    /// generators are emitted `a_1, b_1, a_2, b_2, …, a_N, b_N, f_{N+1}`, where `a_r` relates the
+    /// two linear-layer outputs through `Q_γ` and the power map, `b_r` defines `s_r`, and
+    /// `f_{N+1}` is the output CICO condition after the final linear layer.
+    fn substituted_state_system<const N: usize>(&self) -> Vec<MultivariatePolynomial<N, F>> {
+        let rounds = self.anemoi.parameters.rounds;
+        let alpha = self.anemoi.parameters.alpha;
+        // `y_0 … y_N` at indices `0 … N`, then `s_1 … s_N`.
+        let y = |round: usize| -> MultivariatePolynomial<N, F> { variable(round) };
+        let s = |round: usize| -> MultivariatePolynomial<N, F> { variable(rounds + round) };
+
+        // `x_0 = 0` is the CICO condition on the input.
+        let mut x = MultivariatePolynomial::<N, F>::zero();
+        let mut equations = Vec::with_capacity(2 * rounds + 1);
+        for round in 1..=rounds {
+            let before = (
+                x + constant(self.anemoi.c[round - 1]),
+                y(round - 1) + constant(self.anemoi.d[round - 1]),
+            );
+            // `(L^{(1)}, L^{(2)})`, the Flystel's two inputs at this round.
+            let (first, second) = linear_layer(before);
+            // `a_r`: `L^{(1)} = Q_γ(L^{(2)}) + s_r^α`, with `γ = 0`.
+            equations
+                .push(first - square(&second).scale(&self.anemoi.beta) - power(&s(round), alpha));
+            // `b_r`: `s_r = L^{(2)} − y_r`.
+            equations.push(second - y(round) - s(round));
+            // `x_r = Q_δ(y_r) + s_r^α`, the substitution the model is built on.
+            x = square(&y(round)).scale(&self.anemoi.beta)
+                + constant(self.anemoi.delta)
+                + power(&s(round), alpha);
+        }
+        // The final linear layer carries no round constants, and the CICO condition is on its
+        // first output word.
+        let (output_x, _) = linear_layer((x, y(rounds)));
+        equations.push(output_x);
+        equations
+    }
+
     /// The assignment a trace of the permutation gives this model's variables.
     ///
     /// The faithfulness check's other half: a system that merely looked right would not vanish
@@ -286,8 +351,38 @@ impl<F: KnownOrder> AnemoiCico<F> {
                     point[rounds - round + 1] = state_y - trace[round].1;
                 }
             }
+            AnemoiModel::Acico => {
+                point[0] = y;
+                for round in 1..=rounds {
+                    // `y_r` is the Flystel's second output word at round `r`.
+                    point[round] = trace[round].1;
+                    let before = (
+                        trace[round - 1].0 + self.anemoi.c[round - 1],
+                        trace[round - 1].1 + self.anemoi.d[round - 1],
+                    );
+                    let (_, second) = Anemoi::<F>::linear_layer(before.0, before.1);
+                    // `s_r = L^{(2)} − y_r`, the input to the Flystel's power map.
+                    point[rounds + round] = second - trace[round].1;
+                }
+            }
         }
         Some(point)
+    }
+
+    /// What the model's output constraint evaluates to at the trace of `(0, y)`.
+    ///
+    /// For `ACICO` the last generator **is** the permutation's first output word as a polynomial,
+    /// so this is the strongest pointwise statement available about the model's faithfulness: not
+    /// "the system vanishes at a witness" but "the last equation computes the quantity the CICO
+    /// condition is about, at every input". Returns `None` for the other two models, whose output
+    /// constraints are in different coordinates, and when `N` is not [`Self::variables`].
+    pub fn output_word<const N: usize>(&self, y: F) -> Option<F> {
+        if self.model != AnemoiModel::Acico {
+            return None;
+        }
+        let point = self.assignment::<N>(y)?;
+        let system = self.system::<N>().ok()?;
+        Some(system.last()?.eval(&point))
     }
 
     /// Whether `(0, y)` solves this instance, checked through the permutation.
@@ -341,7 +436,8 @@ pub fn dispatch_anemoi_cico<F: KnownOrder, V: AnemoiCicoVisitor<F>>(
     let variables = instance.variables();
 
     // Every dimension the registry needs, and no others: a spare `N` monomorphizes the whole
-    // pipeline again. FCICO at N = 1..6 needs 2, 4, 6, 8, 10, 12; PCICO needs 2, 3, 4, 5, 6, 7.
+    // pipeline again. FCICO at N = 1..6 needs 2, 4, 6, 8, 10, 12; PCICO needs 2, 3, 4, 5, 6, 7;
+    // ACICO at N = 1..5 needs 3, 5, 7, 9, 11.
     macro_rules! dispatch {
         ($($n:literal),+ $(,)?) => {
             match variables {
@@ -353,7 +449,7 @@ pub fn dispatch_anemoi_cico<F: KnownOrder, V: AnemoiCicoVisitor<F>>(
             }
         };
     }
-    dispatch!(2, 3, 4, 5, 6, 7, 8, 10, 12)
+    dispatch!(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
 }
 
 /// `M(x, y) = (2x + y, x + y)`, over polynomials.
@@ -563,6 +659,9 @@ mod tests {
                         AnemoiModel::Pcico => dimension_of(
                             &instance($rounds, model).system::<$pcico>().expect("the right N"),
                         ),
+                        // `tests/anemoi_acico.rs` owns the third model's gate, against the
+                        // *proved* dimension rather than this one's observed figure.
+                        AnemoiModel::Acico => unreachable!("not in this loop"),
                     };
                     assert_eq!(
                         i128::from(system),
