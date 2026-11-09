@@ -2182,6 +2182,37 @@ mod tests {
         );
     }
 
+    /// A row under a weighted order round-trips, carrying its weight vector — #625.
+    ///
+    /// This is the thing #625 was filed for: until the tag encoded the vector, a weighted order
+    /// read back as `None` and `from_json` rejected the row, so **no record could be posed under
+    /// one at all**. The assertion that matters is the last one — the order that comes back is the
+    /// same order, vector and tie-break included, and not merely "some weighted order".
+    #[test]
+    fn test_a_row_under_a_weighted_order_round_trips_with_its_vector() {
+        let order =
+            MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::LastVariableFirst)
+                .expect("the Griffin weight vector is positive");
+        let mut original = row("zeebra", answered(8), 1_250);
+        original.order = order;
+
+        let text = original.to_json().to_json();
+        assert!(
+            text.contains("weighted:lastvar:1,7,49"),
+            "the record must name the vector it was computed under: {text}"
+        );
+
+        let back =
+            CompetitiveRecord::from_json(&Json::parse(&text).expect("valid")).expect("round trips");
+        assert_eq!(back.order, order);
+
+        // And a different vector is a different order, so two such rows cannot be conflated.
+        let other =
+            MonomialOrder::weighted(&[1, 7, 50], crate::WeightedTieBreak::LastVariableFirst)
+                .expect("positive");
+        assert_ne!(back.order, other);
+    }
+
     /// A row round-trips through JSON, and absent figures stay absent.
     #[test]
     fn test_a_row_round_trips_and_absent_figures_stay_absent() {

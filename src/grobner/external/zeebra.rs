@@ -58,9 +58,8 @@ use std::time::{Duration, Instant};
 
 use super::{
     contract::{
-        order_is_unsupported_externally, Answer, ExternalSolver, Instance, Invariants, LimitStop,
-        Limits, Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion,
-        Unsupported,
+        Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
+        RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
     },
     corpus::{ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC},
     process::{CpuBasis, RssBasis},
@@ -636,14 +635,16 @@ impl ExternalSolver for ZeebraSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
-        // Zeebra's own engine *can* compute under a weighted order since #306, but this board
-        // cannot pose one: `order_tag` does not round-trip a weight vector, so an instance
-        // carrying one has no textual contract and no comparand to be compared against.
-        if order_is_unsupported_externally(instance.order) {
-            return Support::No(Unsupported::Order {
-                order: instance.order,
-            });
-        }
+        // **No weighted-order refusal here, unlike the four subprocess adapters.** Zeebra's own
+        // engine computes under a weighted order (#306), and the two reasons the board could not
+        // pose one are both gone: #624 verified a comparand's weighted spelling, and #625 gave the
+        // order an injective tag that round-trips, so an instance carrying one has a textual
+        // contract and a digest of its own. `order_is_unsupported_externally` is now about the
+        // external tools, and this adapter is not one.
+        //
+        // A weighted row is therefore a one-engine row until a subprocess adapter follows — which
+        // is the same state the univariate eliminant was in before msolve joined it, and the board
+        // records a one-operand column honestly rather than refusing to hold it.
         match task {
             Task::ReducedGrobnerBasis
             | Task::LexBasis

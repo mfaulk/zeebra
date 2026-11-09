@@ -105,12 +105,13 @@
 //! ```
 
 use std::{
+    borrow::Cow,
     fmt::{Display, Formatter},
     path::PathBuf,
     time::Duration,
 };
 
-use crate::{util::sha256_hex, MonomialOrder};
+use crate::{util::sha256_hex, MonomialOrder, WeightedTieBreak};
 
 use super::process::{CpuBasis, ProcessMeasurement, RssBasis, SpawnError};
 
@@ -405,18 +406,48 @@ impl Instance {
 
 /// The stable tag for a monomial order, for digests and records.
 ///
-/// **Not injective, and deliberately not round-trippable, for weighted orders.** Every weighted
-/// order tags as `"weighted"` regardless of its weight vector, and [`order_from_tag`] does not
-/// accept that tag back. Two different weight vectors would otherwise digest identically, which
-/// is a record that names an order it was not computed under. Nothing on this board can be posed
-/// under a weighted order: every adapter's `supports` refuses one, so the tag exists for
-/// diagnostics only.
-pub fn order_tag(order: MonomialOrder) -> &'static str {
+/// **Injective, including for weighted orders** — a weighted order tags as
+/// `weighted:<tie-break>:<w_0>,<w_1>,...`, so `weighted:lastvar:1,7,49` and
+/// `weighted:lex:1,7,49` are different tags for different orders, and [`order_from_tag`] parses
+/// either back.
+///
+/// It was not always. Until #625 every weighted order tagged as `"weighted"` and the tag was
+/// refused back, because two vectors tagging identically would produce a record that names an
+/// order it was not computed under — and since nothing could be posed under one anyway, the
+/// non-injective tag cost nothing. #624 changed the second half of that by verifying a comparand's
+/// weighted spelling, which is the condition #625 said to wait for.
+///
+/// `Cow` rather than `String`: the three unweighted tags are the whole of the hot path — every
+/// record write and every digest — and they stay `&'static str` with no allocation. Only a
+/// weighted order pays for one.
+pub fn order_tag(order: MonomialOrder) -> Cow<'static, str> {
     match order {
-        MonomialOrder::Lexicographic => "lex",
-        MonomialOrder::GradedLexicographic => "grlex",
-        MonomialOrder::GradedReverseLexicographic => "grevlex",
-        MonomialOrder::Weighted(_) => "weighted",
+        MonomialOrder::Lexicographic => Cow::Borrowed("lex"),
+        MonomialOrder::GradedLexicographic => Cow::Borrowed("grlex"),
+        MonomialOrder::GradedReverseLexicographic => Cow::Borrowed("grevlex"),
+        MonomialOrder::Weighted(weighted) => {
+            let weights: Vec<String> = weighted
+                .weights()
+                .iter()
+                .map(|weight| weight.to_string())
+                .collect();
+            Cow::Owned(format!(
+                "weighted:{}:{}",
+                weighted_tie_break_tag(weighted.tie_break()),
+                weights.join(",")
+            ))
+        }
+    }
+}
+
+/// The tag for a tie-break, and the only place its spelling is written down.
+///
+/// Short rather than the Rust variant name, because this lands in a digest and in a filename.
+fn weighted_tie_break_tag(tie_break: WeightedTieBreak) -> &'static str {
+    match tie_break {
+        WeightedTieBreak::Lexicographic => "lex",
+        WeightedTieBreak::ReverseLexicographic => "revlex",
+        WeightedTieBreak::LastVariableFirst => "lastvar",
     }
 }
 
@@ -430,7 +461,7 @@ pub const WEIGHTED_UNSUPPORTED: &str =
     "a weighted order has no textual contract to be posed from (#625); `supports` refuses one \
      before a script is built";
 
-/// True if `order` is one no external adapter here can be posed under.
+/// True if `order` is one no *external tool* here can be posed under.
 ///
 /// Weighted orders are refused at the adapter boundary rather than approximated. Substituting
 /// degrevlex for a weighted order would return a correct basis for a different question, and a
@@ -444,23 +475,55 @@ pub const WEIGHTED_UNSUPPORTED: &str =
 /// by `tools/weighted_reference_bases.sing`, and `grobner::weighted_reference_bases` is the
 /// differential test that reads them.
 ///
-/// This still returns `true`, because the blocker moved rather than lifted: [`order_tag`] answers
-/// `"weighted"` for every weight vector and [`order_from_tag`] refuses it back, so an instance
-/// carrying a weighted order **has no textual contract** — no digest, no record key, no comparand
-/// row. Declaring the capability here would make a `Support::Yes` that nothing can reach. That is
-/// #625.
+/// # Why this still returns `true`, and who no longer asks
+///
+/// #625 gave a weighted order an injective tag that round-trips, so the second blocker — no
+/// textual contract — is gone too, and **Zeebra's own adapter no longer calls this**: its engine
+/// computes under a weighted order and the board can now pose one.
+///
+/// The four *subprocess* adapters still do, for two different reasons. Singular's spelling is
+/// verified but not yet reachable: `LastVariableFirst` is `Wp` on a **reversed variable list**, and
+/// `fn script` builds one fixed list, so spelling it needs that list reversed rather than a
+/// different order name. msolve, Groebner.jl and Sagebrush have no verified weighted spelling at
+/// all, and substituting an unweighted one is the failure this function exists to prevent.
 pub fn order_is_unsupported_externally(order: MonomialOrder) -> bool {
     matches!(order, MonomialOrder::Weighted(_))
 }
 
-/// The order named by [`order_tag`].
+/// The order named by [`order_tag`], or `None` if the tag names none.
+///
+/// A weighted tag is parsed rather than matched, and every way it can be wrong is a `None` rather
+/// than a guess: an unknown tie-break, a weight that is not a `u32`, an empty vector, and a zero
+/// weight — which [`MonomialOrder::weighted`] refuses, since a zero weight is not an admissible
+/// order at all. A tag that parsed loosely would be worse than one that is refused: it would name
+/// an order the record was not computed under, which is the hazard the non-injective tag existed
+/// to avoid.
 pub fn order_from_tag(tag: &str) -> Option<MonomialOrder> {
     match tag {
-        "lex" => Some(MonomialOrder::Lexicographic),
-        "grlex" => Some(MonomialOrder::GradedLexicographic),
-        "grevlex" => Some(MonomialOrder::GradedReverseLexicographic),
-        _ => None,
+        "lex" => return Some(MonomialOrder::Lexicographic),
+        "grlex" => return Some(MonomialOrder::GradedLexicographic),
+        "grevlex" => return Some(MonomialOrder::GradedReverseLexicographic),
+        _ => {}
     }
+
+    // `splitn(3, ..)` so a weight list cannot be truncated by a stray separator: anything after
+    // the second colon is the vector, and a colon inside it makes a weight that does not parse.
+    let mut parts = tag.splitn(3, ':');
+    if parts.next()? != "weighted" {
+        return None;
+    }
+    let tie_break = match parts.next()? {
+        "lex" => WeightedTieBreak::Lexicographic,
+        "revlex" => WeightedTieBreak::ReverseLexicographic,
+        "lastvar" => WeightedTieBreak::LastVariableFirst,
+        _ => return None,
+    };
+    let weights: Option<Vec<u32>> = parts
+        .next()?
+        .split(',')
+        .map(|weight| weight.parse::<u32>().ok())
+        .collect();
+    MonomialOrder::weighted(&weights?, tie_break).ok()
 }
 
 /// A polynomial as a canonical, sorted multiset of `coefficient*factors` terms over `GF(p)`.
@@ -1729,19 +1792,75 @@ mod tests {
         assert_eq!(Task::from_tag("grobner"), None);
     }
 
-    /// A weighted order tags as "weighted", does not round-trip, and is unsupported externally.
+    /// A weighted order's tag names its weight vector and its tie-break, and round-trips — #625.
     ///
-    /// The tag is deliberately not injective, so it must not be reachable as an instance order:
-    /// two different weight vectors would otherwise produce records that claim the same order.
-    /// `order_from_tag` refusing the tag is what makes a weighted instance unconstructible from a
-    /// textual contract, and `order_is_unsupported_externally` is what every adapter checks.
+    /// Before #625 every weighted order tagged as `"weighted"` and the tag was refused back,
+    /// because two different weight vectors tagging identically would produce records that claim
+    /// an order they were not computed under. Encoding the vector removes that hazard rather than
+    /// avoiding it: the tag is now injective, so a record naming one names exactly one.
     #[test]
-    fn test_a_weighted_order_tag_does_not_round_trip() {
+    fn test_a_weighted_order_tag_names_its_vector_and_round_trips() {
+        use crate::WeightedTieBreak::{LastVariableFirst, Lexicographic, ReverseLexicographic};
+
+        for (tie_break, spelling) in [
+            (Lexicographic, "lex"),
+            (ReverseLexicographic, "revlex"),
+            (LastVariableFirst, "lastvar"),
+        ] {
+            let order = MonomialOrder::weighted(&[1, 7, 49], tie_break).unwrap();
+            let tag = order_tag(order);
+            assert_eq!(tag, format!("weighted:{spelling}:1,7,49"));
+            assert_eq!(order_from_tag(&tag), Some(order));
+        }
+    }
+
+    /// Two different weight vectors tag differently, which is the whole point of encoding them.
+    #[test]
+    fn test_distinct_weight_vectors_tag_distinctly() {
+        let a = MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::LastVariableFirst)
+            .unwrap();
+        let b = MonomialOrder::weighted(&[1, 7, 50], crate::WeightedTieBreak::LastVariableFirst)
+            .unwrap();
+        let c =
+            MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::Lexicographic).unwrap();
+        assert_ne!(order_tag(a), order_tag(b), "the vector must reach the tag");
+        assert_ne!(order_tag(a), order_tag(c), "so must the tie-break");
+    }
+
+    /// A malformed weighted tag is refused rather than guessed at.
+    ///
+    /// Each of these would otherwise become an order the record does not name: an unknown
+    /// tie-break, a weight that is not a number, a zero weight — which `WeightedOrder` refuses as
+    /// inadmissible — and an empty vector.
+    #[test]
+    fn test_a_malformed_weighted_tag_is_refused() {
+        for tag in [
+            "weighted",
+            "weighted:lex",
+            "weighted:bogus:1,7",
+            "weighted:lex:1,seven",
+            "weighted:lex:1,0,7",
+            "weighted:lex:",
+            "weighted:lex:1,,7",
+            "weighted:lex:1,7:extra",
+            "weighted:lex:4294967296",
+        ] {
+            assert_eq!(order_from_tag(tag), None, "{tag:?} should not parse");
+        }
+    }
+
+    /// The four external tools still refuse a weighted order; Zeebra's own adapter does not.
+    ///
+    /// #624 verified Singular's spelling and #625 gives the order a textual contract, so the
+    /// engine that can actually compute under one is no longer refused by the board. The four
+    /// subprocess adapters still are: Singular needs `fn script` to reverse its variable list
+    /// before `LastVariableFirst` is spellable, and the other three have no verified spelling at
+    /// all.
+    #[test]
+    fn test_weighted_orders_are_refused_by_the_external_tools_only() {
         let order =
             MonomialOrder::weighted(&[1, 7, 49], crate::WeightedTieBreak::LastVariableFirst)
                 .unwrap();
-        assert_eq!(order_tag(order), "weighted");
-        assert_eq!(order_from_tag("weighted"), None);
         assert!(super::order_is_unsupported_externally(order));
         for unweighted in [
             MonomialOrder::Lexicographic,
@@ -1760,7 +1879,7 @@ mod tests {
             MonomialOrder::GradedLexicographic,
             MonomialOrder::GradedReverseLexicographic,
         ] {
-            assert_eq!(order_from_tag(order_tag(order)), Some(order));
+            assert_eq!(order_from_tag(&order_tag(order)), Some(order));
         }
         assert_eq!(order_from_tag("deglex"), None);
     }
