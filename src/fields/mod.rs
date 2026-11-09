@@ -113,6 +113,9 @@ pub type Zp65537 = PrimeFieldElement64<65537>;
 /// Z mod 2147483647, Mersenne prime 2^31 - 1.
 pub type Zp2147483647 = PrimeFieldElement64<2147483647>;
 
+/// Z mod 1481823929, the 31-bit prime of the `ACICO` experiments in eprint 2025/814.
+pub type Zp1481823929 = PrimeFieldElement64<1481823929>;
+
 /// 2^62 - 111 * 2^39 + 1 = 4611624995532046337
 pub type Zp4611624995532046337 = PrimeFieldElement64<4611624995532046337>;
 

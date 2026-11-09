@@ -56,6 +56,12 @@ pub const ANEMOI_32_PRIME: u64 = 4_294_967_087;
 /// this crate's conversion.
 pub const ANEMOI_17_PRIME: u64 = 65_537;
 
+/// `1481823929`, the 31-bit prime Campa and Roy's `ACICO` experiments are over.
+///
+/// eprint 2025/814, §7.3. Not a Six Worlds prime: it is carried so that an `ACICO` row is read at
+/// the characteristic its published `d_solv`, `d_I` and `T_GB` columns were measured at.
+pub const ANEMOI_ACICO_PRIME: u64 = 1_481_823_929;
+
 /// The first hundred decimal digits of π after the leading 3.
 const PI_0: &str = "1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679";
 

@@ -29,14 +29,18 @@ pub mod slices;
 pub mod specialization;
 pub mod univariate_cico;
 
-pub use anemoi::{smallest_primitive_root, Anemoi, AnemoiError, AnemoiParameters, ANEMOI_64_PRIME};
+pub use anemoi::{
+    smallest_primitive_root, Anemoi, AnemoiError, AnemoiParameters, ANEMOI_64_PRIME,
+    ANEMOI_ACICO_PRIME,
+};
 pub use anemoi_cico::{
     dispatch_anemoi_cico, verify_against_anemoi_trace, AnemoiCico, AnemoiCicoVisitor, AnemoiModel,
 };
 pub use challenge::{
-    challenge, dispatch_cico, published_quotient_dimension, registry, BenchmarkClass,
-    ChallengeError, ChallengeManifest, ChallengeParameters, ChallengeProgram, CicoTarget,
-    CicoVisitor, DisclosedMethod, ExternalStatus, Objective, ReferencePoint, Significance,
+    challenge, dispatch_cico, proved_acico_quotient_dimension, published_quotient_dimension,
+    registry, BenchmarkClass, ChallengeError, ChallengeManifest, ChallengeParameters,
+    ChallengeProgram, CicoTarget, CicoVisitor, DisclosedMethod, ExternalStatus, Objective,
+    ReferencePoint, Significance,
 };
 pub use cost_model::{
     retained_run_stems, select_runs_by_stem, Attribution, CostModelBoard, CostRow, Figure,
