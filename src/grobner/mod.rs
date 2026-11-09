@@ -18,7 +18,8 @@ mod solve_zero_dimensional;
 
 pub use buchberger::{
     buchberger, buchberger_with_criteria, buchberger_with_statistics,
-    interreduce_by_matrix_for_benchmark, interreduce_for_benchmark, Statistics,
+    interreduce_by_matrix_for_benchmark, interreduce_for_benchmark,
+    leading_monomials_are_pairwise_coprime, Statistics,
 };
 pub use f4::{
     certify_f4_output, certify_submitted_basis, f4, f4_observed, f4_observed_reported, f4_reported,

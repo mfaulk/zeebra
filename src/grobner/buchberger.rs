@@ -84,6 +84,46 @@ pub fn buchberger_with_statistics<const N: usize, F: FiniteField>(
     buchberger_with_criteria(f, order, &PairCriteria::default())
 }
 
+/// True if the leading monomials of `basis` are pairwise coprime under `order`.
+///
+/// # Why a predicate about coprimality is a Gröbner basis certificate
+///
+/// Buchberger's first criterion says that when `LM(f)` and `LM(g)` are coprime, `S(f, g)` reduces
+/// to zero modulo `{f, g}`. If that holds for *every* pair in a set, every S-polynomial reduces to
+/// zero and Buchberger's criterion is satisfied with **no reduction performed**, so the set is
+/// already a Gröbner basis of the ideal it generates.
+///
+/// This is the only way the FreeLunch route establishes its basis. Its leading monomials are pure
+/// powers of distinct variables — `x_0^{α_0}, x_1^α, …, x_{n-1}^α` — so the certificate is an
+/// inspection of the leading terms rather than a computation, which is what makes the whole attack
+/// F4-free (`docs/research/griffin-freelunch.md` §1.4). It is also the answer to "Zeebra cannot
+/// assert that input generators already form a Gröbner basis": for this instance class it can, in
+/// `O(k² N)`.
+///
+/// # What a `false` does and does not mean
+///
+/// Sufficient, not necessary: most Gröbner bases share variables among their leading monomials and
+/// are refused here. A `false` means *not certified by this criterion*, never *not a Gröbner
+/// basis*. A zero element has no leading monomial, so a basis containing one is never certified.
+pub fn leading_monomials_are_pairwise_coprime<const N: usize, F: FiniteField>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> bool {
+    if basis.iter().any(MultivariatePolynomial::is_zero) {
+        return false;
+    }
+    let leading: Vec<Monomial<N>> = basis.iter().map(|f| f.leading_monomial(order)).collect();
+    for (i, a) in leading.iter().enumerate() {
+        for b in &leading[i + 1..] {
+            // Coprime exactly when the lcm is the product, i.e. no variable is present in both.
+            if (0..N).any(|k| a.exponents()[k] > 0 && b.exponents()[k] > 0) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 /// As [`buchberger_with_statistics`], under the given pair-elimination criteria.
 ///
 /// A criterion is a theorem that a pair's S-polynomial reduces to zero modulo relations already
@@ -1084,6 +1124,52 @@ mod tests {
         // Both are nonetheless valid bases for the same ideal.
         assert_is_reduced_grobner_basis(&f, MonomialOrder::GradedLexicographic);
         assert_is_reduced_grobner_basis(&f, MonomialOrder::GradedReverseLexicographic);
+    }
+
+    /// A weighted order drives the whole engine, and the basis it returns is a Gröbner basis.
+    ///
+    /// The end-to-end check that matters for #306: a monomial order is load-bearing for every
+    /// stage, and a new one that satisfies the axioms in isolation could still be wrong where the
+    /// engine assumes something about it. So the basis is checked against the *definition* —
+    /// Buchberger's criterion, reducedness, monicity — and the quotient dimension is compared
+    /// against grevlex's, because `dim_F R/I` is a property of the ideal and must not depend on
+    /// the order at all. A weighted order that silently reduced in a different ideal would change
+    /// it.
+    #[test]
+    fn test_a_weighted_order_drives_the_engine() {
+        use crate::grobner::fglm::QuotientBasis;
+        use crate::WeightedTieBreak;
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let f: Vec<MultivariatePolynomial<3, F>> = ["x^2 - y", "y^2 - z", "z^2 - 1", "x*y*z - 1"]
+            .iter()
+            .map(|s| MultivariatePolynomial::parse(s, vars).unwrap())
+            .collect();
+
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        let reference = QuotientBasis::new(&buchberger(&f, grevlex), grevlex, 1 << 16)
+            .unwrap()
+            .dimension();
+
+        for tie_break in [
+            WeightedTieBreak::Lexicographic,
+            WeightedTieBreak::ReverseLexicographic,
+            WeightedTieBreak::LastVariableFirst,
+        ] {
+            for weights in [[1, 1, 1], [1, 3, 9], [5, 2, 1]] {
+                let order = MonomialOrder::weighted(&weights, tie_break).unwrap();
+                assert_is_reduced_grobner_basis(&f, order);
+                let basis = buchberger(&f, order);
+                assert_eq!(
+                    QuotientBasis::new(&basis, order, 1 << 16)
+                        .unwrap()
+                        .dimension(),
+                    reference,
+                    "weights {:?} changed the quotient dimension",
+                    weights
+                );
+            }
+        }
     }
 
     /// The optimized engine and the straightforward reference produce the same reduced basis.
