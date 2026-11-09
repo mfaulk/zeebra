@@ -237,6 +237,14 @@ cargo test --release --lib -- --ignored --exact \
     grobner::research::mq::tests::test_a_published_instance_is_reproduced
 cargo test --release --lib -- --ignored --exact \
     grobner::research::mq::tests::test_the_real_n24_challenges_import
+# the three #197 added: the modulus oracle, the GF(2) families, and the two real m = 16 instances
+# checked against the answer vectors their 2015 solver published
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_published_gf2_instances_import
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_real_m16_challenges_vanish_at_their_published_answers
 ```
 
 The second covers the two *real* challenge files at `m = 16` — type VI over GF(31) and type V over
@@ -3266,6 +3274,14 @@ cargo test --release --lib -- --ignored --exact \
     grobner::research::mq::tests::test_a_published_instance_is_reproduced
 cargo test --release --lib -- --ignored --exact \
     grobner::research::mq::tests::test_the_real_n24_challenges_import
+# the three #197 added: the modulus oracle, the GF(2) families, and the two real m = 16 instances
+# checked against the answer vectors their 2015 solver published
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_published_gf2_instances_import
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_real_m16_challenges_vanish_at_their_published_answers
 ```
 
 ### Other external engines, for comparison
@@ -4343,12 +4359,21 @@ on a quiet machine, so the lock now records `load=` on its START and END lines.
 #### External instances: the Fukuoka MQ Challenge
 
 `grobner::research::MqInstance` imports instances from the
-[Fukuoka MQ Challenge](https://www.mqchallenge.org/). The GF(31) families (types III and VI) need
-no new arithmetic — `PrimeFieldElement64<31>` already exists, and `Zp31` is the same field in four
-bytes. The GF(2^8) families (types II and V) import since #414; only GF(2) is still refused by
-name, and **not for want of an export**: `binary_field` and `extension_field` are public, and that
-claim was stale here long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2)
-needs only the import path written, against `Zp2` (§8 of the same document decides that).
+[Fukuoka MQ Challenge](https://www.mqchallenge.org/). **All six families import since #197**, each
+at a named coefficient type: the GF(31) families (types III and VI) over `Zp31`, the GF(2^8) ones
+(types II and V) over `Gf256Mq`, and the GF(2) ones (types I and IV) over `Zp2`. No new arithmetic
+was needed for any of them — what each was waiting on was a decision or a parser, not a field.
+
+GF(2) was the last refused, and **not for want of an export**: `binary_field` and `extension_field`
+have been public since `8757b4a`, and that claim was stale here long after it stopped being true
+(`docs/research/boolean-solving.md` §1). What it was actually waiting on was the choice between
+`Zp2` and `BinaryFieldElement<0b11>`, decided as `Zp2` on storage in §8 of that document. With the
+choice made the refusal had nothing left to protect: **the order alone identifies GF(2)**, since
+there is exactly one field of order two, so unlike GF(2^8) there is no modulus to check.
+`SUPPORTED_DIMENSIONS` is `[5, 10, 15, 20, 24]` — the union of the published toy sizes, which differ
+per family (types I–III publish `n = 10, 15, 20` and types IV–VI `n = 5, 10, 15`), plus the smallest
+real signature instance at `m = 16`. What blocks types I, II and IV at their *real* sizes is the
+compiled dimension and, over GF(2), the 16-bytes-per-bit sparse entry — not the field.
 
 GF(2^8) took three things, and they had to land together. The real header is
 `GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1` rather than `GF(2^8)`, so no genuine file parsed at all.
@@ -4367,7 +4392,11 @@ on a mismatch, so `Gf256` (AES, `0x11B`) is refused for a challenge file and `Gf
 accepted. No order comparison could separate them — the two fields have the same order.
 [`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §2.4 settles which is right against a
 published answer: all 20 polynomials of type II `n = 10` vanish under `0x11D` and none under
-`0x11B`.
+`0x11B`. Since #197 that is a **test** rather than a recorded observation —
+`mq::tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus` builds the AES
+system by hand, because the checked path refuses it, and asserts the 20-versus-0 split. Isomorphic
+fields of the same order cannot be separated by any shape or order check, so the challenge's own
+answer file is the only oracle that distinguishes a correct import from a silently wrong one.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
