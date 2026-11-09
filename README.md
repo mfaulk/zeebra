@@ -3307,6 +3307,12 @@ let report = solver.run(&instance, Task::ReducedGrobnerBasis, &Limits::wall(Dura
 assert!(report.status.answered() || report.was_skipped());
 ```
 
+An absent binary is resolved by `process::unavailable_binary`, a path lookup that starts nothing,
+**before** the run writes its input file and before the supervisor's clock starts — so the
+"unavailable" verdict never competes with the wall budget the run was given and the row is skipped
+under any budget, including none. Only definite absence takes that short cut; a file that exists
+but may not be executable is left to the spawn, whose reason is the kernel's rather than a guess.
+
 `RunReport::was_skipped()` is true for the three outcomes that mean **the tool did not run**:
 `Unsupported` (the input is unrepresentable), `RunFailure::Unavailable` (the tool is absent) and
 `RunFailure::Environment` (the harness's own environment would have invalidated the measurement).

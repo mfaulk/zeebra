@@ -1217,30 +1217,6 @@ impl ExternalSolver for MsolveSolver {
         }
 
         let (input_path, output_path, log_path) = self.paths();
-        if let Err(e) = std::fs::create_dir_all(&self.work_dir) {
-            return finish(
-                RunStatus::Failed(RunFailure::Io {
-                    reason: format!("{}: {}", self.work_dir.display(), e),
-                }),
-                Measurement::unmeasured(),
-                None,
-                None,
-            );
-        }
-        if let Err(e) = std::fs::write(&input_path, input_file(instance)) {
-            return finish(
-                RunStatus::Failed(RunFailure::Io {
-                    reason: format!("{}: {}", input_path.display(), e),
-                }),
-                Measurement::unmeasured(),
-                None,
-                None,
-            );
-        }
-        // msolve clears `-o` itself at `main.c:581-589`, but only once it has got far enough to
-        // parse its arguments. Removing it here means a file from a crashed earlier run can never
-        // be parsed as this run's answer.
-        let _ = std::fs::remove_file(&output_path);
 
         // `-v 1` is mandatory, not optional: at the default `-v 0` msolve prints nothing at all,
         // and the stage timings and the `COMPUTATIONAL DATA` cross-checks only exist above it.
@@ -1269,6 +1245,44 @@ impl ExternalSolver for MsolveSolver {
         }
 
         let command = invocation.command_line();
+        // The absent-tool path, settled before any scratch work and before the supervisor's clock:
+        // an absent msolve is a row that was not attempted, and neither the wall budget nor a
+        // failed write may stand between that fact and the report of it (#391). No log file is
+        // named, because none was opened.
+        if let Some(absent) = invocation.unavailable() {
+            return finish(
+                RunStatus::Failed(RunFailure::from(absent)),
+                Measurement::unmeasured(),
+                Some(command),
+                None,
+            );
+        }
+
+        if let Err(e) = std::fs::create_dir_all(&self.work_dir) {
+            return finish(
+                RunStatus::Failed(RunFailure::Io {
+                    reason: format!("{}: {}", self.work_dir.display(), e),
+                }),
+                Measurement::unmeasured(),
+                None,
+                None,
+            );
+        }
+        if let Err(e) = std::fs::write(&input_path, input_file(instance)) {
+            return finish(
+                RunStatus::Failed(RunFailure::Io {
+                    reason: format!("{}: {}", input_path.display(), e),
+                }),
+                Measurement::unmeasured(),
+                None,
+                None,
+            );
+        }
+        // msolve clears `-o` itself at `main.c:581-589`, but only once it has got far enough to
+        // parse its arguments. Removing it here means a file from a crashed earlier run can never
+        // be parsed as this run's answer.
+        let _ = std::fs::remove_file(&output_path);
+
         let process = match Supervisor::new(limits.wall).run(&invocation) {
             Ok(process) => process,
             Err(e) => {
@@ -1625,16 +1639,18 @@ rational param(cpu)             0.75 sec
         )
     }
 
+    /// Where one test's scratch files go, so that a test can also assert what is *not* written.
+    fn scratch_root(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "zeebra-msolve-solver-{}-{}-{:?}",
+            tag,
+            std::process::id(),
+            std::thread::current().id()
+        ))
+    }
+
     fn solver(binary: &str, tag: &str) -> MsolveSolver {
-        MsolveSolver::new(
-            binary,
-            std::env::temp_dir().join(format!(
-                "zeebra-msolve-solver-{}-{}-{:?}",
-                tag,
-                std::process::id(),
-                std::thread::current().id()
-            )),
-        )
+        MsolveSolver::new(binary, scratch_root(tag))
     }
 
     /// A corpus rung as the rendered [`Instance`] #263's sweep will hand msolve.
@@ -2686,17 +2702,21 @@ rational param(cpu)             0.75 sec
     // The absent-tool path, which CI must be able to exercise
     // ---------------------------------------------------------------------------------------
 
-    /// An absent msolve is reported as unavailable from a run, not as a failed solve.
+    /// An absent msolve is reported as unavailable from a run under a budget nothing could meet,
+    /// and without writing a scratch file.
     ///
     /// Needs no msolve installed, which is the point: CI must exercise this and must never depend
     /// on the binary's presence.
     #[test]
     fn test_an_absent_binary_is_reported_and_not_a_failed_solve() {
         let mut solver = solver("zeebra-no-such-msolve", "absent");
+        // `Duration::ZERO`, because the assertion is about *which* failure is reported and must not
+        // depend on a wall budget the spawn-and-fail path could lose a race with under suite load
+        // (#391). A clock-coupled verdict fails this every time instead of once in a while.
         let report = solver.run(
             &pair(P30),
             Task::ReducedGrobnerBasis,
-            &Limits::wall(Duration::from_secs(5)),
+            &Limits::wall(Duration::ZERO),
         );
         match &report.status {
             RunStatus::Failed(RunFailure::Unavailable { binary, .. }) => {
@@ -2713,6 +2733,10 @@ rational param(cpu)             0.75 sec
             .command_line
             .as_deref()
             .is_some_and(|line| line.contains("zeebra-no-such-msolve")));
+        // Nothing was written, so nothing about the filesystem can decide this row either.
+        let root = scratch_root("absent");
+        let written = std::fs::read_dir(&root).map_or(0, |dir| dir.count());
+        assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
     }
 
     /// An absent msolve fails the version probe the same way.

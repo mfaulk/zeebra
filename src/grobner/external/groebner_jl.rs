@@ -557,11 +557,6 @@ impl ExternalSolver for GroebnerJlSolver {
 
     fn probe_version(&mut self) -> Result<ToolVersion, RunFailure> {
         let (script_path, output_path) = self.scratch("version");
-        std::fs::write(
-            &script_path,
-            "import Groebner\nprintln(\"@groebner \", pkgversion(Groebner))\n\
-             println(\"@julia \", VERSION)\nprintln(\"@done 1\")\n",
-        )?;
         let invocation = Invocation::new(&self.binary, &self.work_dir, &output_path)
             .arg("--startup-file=no")
             .arg("--history-file=no")
@@ -570,6 +565,16 @@ impl ExternalSolver for GroebnerJlSolver {
             Some(depot) => invocation.env("JULIA_DEPOT_PATH", depot),
             None => invocation,
         };
+        // Absence is settled before the scratch write and before the 120 s budget below, so the
+        // probe reports a missing `julia` without touching either (#391).
+        if let Some(absent) = invocation.unavailable() {
+            return Err(RunFailure::from(absent));
+        }
+        std::fs::write(
+            &script_path,
+            "import Groebner\nprintln(\"@groebner \", pkgversion(Groebner))\n\
+             println(\"@julia \", VERSION)\nprintln(\"@done 1\")\n",
+        )?;
         let measurement = Supervisor::new(Duration::from_secs(120)).run(&invocation)?;
         let output = read_output(&output_path);
         if !measurement.succeeded() {
@@ -698,6 +703,19 @@ impl ExternalSolver for GroebnerJlSolver {
 
         let script = self.script(instance, task);
         let (script_path, output_path) = self.scratch(&instance.name);
+        let invocation = self.invocation(&script_path, &output_path, limits);
+        let command = Some(invocation.command_line());
+        // Settled before the script is written and before the supervisor's clock starts: an absent
+        // `julia` is a skipped row, and neither a wall budget nor a scratch write may stand between
+        // that fact and the report of it (#391). The command line is still recorded, so the row
+        // says what would have been attempted.
+        if let Some(absent) = invocation.unavailable() {
+            return finish(
+                RunStatus::Failed(RunFailure::from(absent)),
+                Measurement::unmeasured(),
+                command,
+            );
+        }
         if let Err(error) = std::fs::write(&script_path, &script) {
             return finish(
                 RunStatus::Failed(RunFailure::Io {
@@ -708,8 +726,6 @@ impl ExternalSolver for GroebnerJlSolver {
             );
         }
 
-        let invocation = self.invocation(&script_path, &output_path, limits);
-        let command = Some(invocation.command_line());
         let process = match Supervisor::new(limits.wall).run(&invocation) {
             Ok(process) => process,
             Err(error) => {
@@ -826,24 +842,33 @@ mod tests {
         )
     }
 
-    fn solver(binary: &str, tag: &str) -> GroebnerJlSolver {
-        let root = std::env::temp_dir().join(format!(
+    /// Where one test's scratch files go, so that a test can also assert what is *not* written.
+    fn scratch_root(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
             "zeebra-groebner-jl-{}-{}-{:?}",
             tag,
             std::process::id(),
             std::thread::current().id()
-        ));
-        GroebnerJlSolver::new(binary, None, root).expect("a writable scratch directory")
+        ))
     }
 
-    /// An absent `julia` is reported as unavailable from a run, not as a failed solve.
+    fn solver(binary: &str, tag: &str) -> GroebnerJlSolver {
+        GroebnerJlSolver::new(binary, None, scratch_root(tag))
+            .expect("a writable scratch directory")
+    }
+
+    /// An absent `julia` is reported as unavailable from a run under a budget nothing could meet,
+    /// and without writing a scratch file.
     #[test]
     fn test_an_absent_binary_is_reported_and_not_a_failed_solve() {
         let mut solver = solver("zeebra-no-such-julia", "absent");
+        // `Duration::ZERO`, because the assertion is about *which* failure is reported and must not
+        // depend on a wall budget the spawn-and-fail path could lose a race with under suite load
+        // (#391). A clock-coupled verdict fails this every time instead of once in a while.
         let report = solver.run(
             &instance(65521, MonomialOrder::GradedReverseLexicographic),
             Task::ReducedGrobnerBasis,
-            &Limits::wall(Duration::from_secs(5)),
+            &Limits::wall(Duration::ZERO),
         );
         match &report.status {
             RunStatus::Failed(RunFailure::Unavailable { binary, .. }) => {
@@ -853,9 +878,14 @@ mod tests {
         }
         assert!(report.was_skipped(), "an absent tool is a skipped row");
         assert!(report.measurement.is_unmeasured());
+        // Nothing was written, so nothing about the filesystem can decide this row either.
+        let root = scratch_root("absent");
+        let written = std::fs::read_dir(&root).map_or(0, |dir| dir.count());
+        assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
     }
 
-    /// An absent `julia` fails the version probe the same way.
+    /// An absent `julia` fails the version probe the same way, writing nothing and consulting no
+    /// clock on the way.
     #[test]
     fn test_an_absent_binary_fails_the_version_probe_the_same_way() {
         let mut solver = solver("zeebra-no-such-julia", "absent-probe");
@@ -865,6 +895,10 @@ mod tests {
             }
             other => panic!("expected Unavailable, got {:?}", other),
         }
+        // The probe carries its own 120 s budget, which an absence verdict must never reach.
+        let root = scratch_root("absent-probe");
+        let written = std::fs::read_dir(&root).map_or(0, |dir| dir.count());
+        assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
     }
 
     /// Every prime field Zeebra's `FieldSpec` can name is inside Groebner.jl's native range.

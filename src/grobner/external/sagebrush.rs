@@ -829,10 +829,15 @@ impl ExternalSolver for SagebrushSolver {
         // proved the only way it can be, by solving a one-variable system and reading back the
         // engine line.
         let (input_path, output_path) = self.scratch("version");
-        std::fs::write(&input_path, "x\n65521\nx^2-1\n")?;
         let invocation = Invocation::new(&self.binary, &self.work_dir, &output_path)
             .arg(&input_path)
             .env(THREADS_VARIABLE, "1");
+        // Absence is settled before the scratch write and before the 60 s budget below, so the
+        // probe reports a missing driver without touching either (#391).
+        if let Some(absent) = invocation.unavailable() {
+            return Err(RunFailure::from(absent));
+        }
+        std::fs::write(&input_path, "x\n65521\nx^2-1\n")?;
         let measurement = Supervisor::new(Duration::from_secs(60)).run(&invocation)?;
         let output = read_output(&output_path);
         if !measurement.succeeded() {
@@ -987,6 +992,19 @@ impl ExternalSolver for SagebrushSolver {
         }
 
         let (input_path, output_path) = self.scratch(&instance.name);
+        let invocation = self.invocation(&input_path, &output_path, instance, task, limits);
+        let command = Some(invocation.command_line());
+        // Settled before the input file is written and before the supervisor's clock starts: an
+        // absent driver is a skipped row, and neither a wall budget nor a scratch write may stand
+        // between that fact and the report of it (#391). The command line is still recorded, so
+        // the row says what would have been attempted.
+        if let Some(absent) = invocation.unavailable() {
+            return finish(
+                RunStatus::Failed(RunFailure::from(absent)),
+                Measurement::unmeasured(),
+                command,
+            );
+        }
         if let Err(error) = std::fs::write(&input_path, Self::input(instance)) {
             return finish(
                 RunStatus::Failed(RunFailure::Io {
@@ -997,8 +1015,6 @@ impl ExternalSolver for SagebrushSolver {
             );
         }
 
-        let invocation = self.invocation(&input_path, &output_path, instance, task, limits);
-        let command = Some(invocation.command_line());
         let process = match Supervisor::new(limits.wall).run(&invocation) {
             Ok(process) => process,
             Err(error) => {
@@ -1117,24 +1133,32 @@ mod tests {
         found
     }
 
-    fn solver(binary: &str, tag: &str) -> SagebrushSolver {
-        let root = std::env::temp_dir().join(format!(
+    /// Where one test's scratch files go, so that a test can also assert what is *not* written.
+    fn scratch_root(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
             "zeebra-sagebrush-{}-{}-{:?}",
             tag,
             std::process::id(),
             std::thread::current().id()
-        ));
-        SagebrushSolver::new(binary, root).expect("a writable scratch directory")
+        ))
     }
 
-    /// An absent driver is reported as unavailable from a run, not as a failed solve.
+    fn solver(binary: &str, tag: &str) -> SagebrushSolver {
+        SagebrushSolver::new(binary, scratch_root(tag)).expect("a writable scratch directory")
+    }
+
+    /// An absent driver is reported as unavailable from a run under a budget nothing could meet,
+    /// and without writing a scratch file.
     #[test]
     fn test_an_absent_binary_is_reported_and_not_a_failed_solve() {
         let mut solver = solver("zeebra-no-such-sagebrush", "absent");
+        // `Duration::ZERO`, because the assertion is about *which* failure is reported and must not
+        // depend on a wall budget the spawn-and-fail path could lose a race with under suite load
+        // (#391). A clock-coupled verdict fails this every time instead of once in a while.
         let report = solver.run(
             &instance(65521, MonomialOrder::GradedReverseLexicographic),
             Task::ReducedGrobnerBasis,
-            &Limits::wall(Duration::from_secs(5)),
+            &Limits::wall(Duration::ZERO),
         );
         match &report.status {
             RunStatus::Failed(RunFailure::Unavailable { binary, .. }) => {
@@ -1144,9 +1168,14 @@ mod tests {
         }
         assert!(report.was_skipped(), "an absent tool is a skipped row");
         assert!(report.measurement.is_unmeasured());
+        // Nothing was written, so nothing about the filesystem can decide this row either.
+        let root = scratch_root("absent");
+        let written = std::fs::read_dir(&root).expect("the scratch root").count();
+        assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
     }
 
-    /// An absent driver fails the version probe the same way.
+    /// An absent driver fails the version probe the same way, writing nothing and consulting no
+    /// clock on the way.
     #[test]
     fn test_an_absent_binary_fails_the_version_probe_the_same_way() {
         let mut solver = solver("zeebra-no-such-sagebrush", "absent-probe");
@@ -1156,6 +1185,10 @@ mod tests {
             }
             other => panic!("expected Unavailable, got {:?}", other),
         }
+        // The probe carries its own 60 s budget, which an absence verdict must never reach.
+        let root = scratch_root("absent-probe");
+        let written = std::fs::read_dir(&root).expect("the scratch root").count();
+        assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
     }
 
     /// Goldilocks is inside Sagebrush's 2^62 bound; a 2^63 prime is not.
