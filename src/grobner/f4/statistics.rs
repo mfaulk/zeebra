@@ -135,6 +135,10 @@ pub struct StageTimings {
 /// their ratio before anything was implemented: handing out column indices during interning can
 /// only remove `columns` and `map`, so if those two are a small share of the total then the cost
 /// is in `scatter`, which that restructuring does not touch.
+///
+/// That is what happened, so `scatter` carries two refining fields of its own (#582). Refinements
+/// are excluded from [`Self::total`]: `collect + sort + map + scatter` is the whole call, and
+/// `scatter_rows + scatter_assemble` is the whole of `scatter`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ConstructionTimings {
     /// Inserting every row monomial into the distinct-monomial set.
@@ -152,6 +156,21 @@ pub struct ConstructionTimings {
 
     /// Writing every row's entries through the map, and assembling the matrix.
     pub scatter: Duration,
+
+    /// The per-row half of `scatter`: the multiplier shift, the column lookup and the row build.
+    ///
+    /// Refines `scatter` rather than extending it, so it is **not** in [`Self::total`]. Split out
+    /// for #582, which found the scatter at 89% of construction with no counter ever having been
+    /// inside it. The finer split the issue asks for — shift against lookup against row build — is
+    /// per *term*, where a clock read costs more than the work it would time, so it comes from
+    /// [`ScatterPrefix`](super::macaulay::ScatterPrefix)'s ablation instead of from a counter here.
+    pub scatter_rows: Duration,
+
+    /// The assembly half of `scatter`: `SparseMatrix::new` and the row-provenance copy.
+    ///
+    /// #582's hypothesis 3 is exactly this field being non-negligible: `preprocessed.rows.clone()`
+    /// is a `Vec<PreprocessedRow<N>>` per matrix and was inside the undivided scatter lap.
+    pub scatter_assemble: Duration,
 }
 
 impl ConstructionTimings {
@@ -184,6 +203,18 @@ impl ConstructionTimings {
         self.share(self.collect + self.map)
     }
 
+    /// The share of the **scatter** spent assembling the matrix rather than writing rows.
+    ///
+    /// Over `scatter` and not over the total, because it prices one hypothesis inside one stage.
+    /// Zero when nothing was measured.
+    pub fn assembly_share(&self) -> f64 {
+        let scatter = self.scatter.as_secs_f64();
+        if scatter == 0.0 {
+            return 0.0;
+        }
+        self.scatter_assemble.as_secs_f64() / scatter
+    }
+
     /// `part` over the total, or zero when nothing was measured.
     fn share(&self, part: Duration) -> f64 {
         let total = self.total().as_secs_f64();
@@ -199,6 +230,8 @@ impl ConstructionTimings {
         self.sort += other.sort;
         self.map += other.map;
         self.scatter += other.scatter;
+        self.scatter_rows += other.scatter_rows;
+        self.scatter_assemble += other.scatter_assemble;
     }
 }
 
@@ -1297,6 +1330,8 @@ mod tests {
                 sort: Duration::from_micros(1),
                 map: Duration::from_micros(2),
                 scatter: Duration::from_micros(14),
+                scatter_rows: Duration::from_micros(12),
+                scatter_assemble: Duration::from_micros(2),
             },
         };
         // Both refinements — the interreduction halves and the construction phases — refine a
@@ -1328,6 +1363,7 @@ mod tests {
             sort: Duration::from_micros(10),
             map: Duration::from_micros(10),
             scatter: Duration::from_micros(60),
+            ..ConstructionTimings::default()
         };
         assert_eq!(split.total(), Duration::from_micros(100));
         assert_eq!(split.columns(), Duration::from_micros(30));
@@ -1337,6 +1373,35 @@ mod tests {
         assert_eq!(split.removable_share(), 0.3);
         assert_eq!(ConstructionTimings::default().handout_share(), 0.0);
         assert_eq!(ConstructionTimings::default().removable_share(), 0.0);
+    }
+
+    /// The scatter's halves refine the stage rather than extending it, and fold independently.
+    #[test]
+    fn test_the_scatter_halves_refine_the_scatter() {
+        let split = ConstructionTimings {
+            collect: Duration::from_micros(20),
+            sort: Duration::from_micros(10),
+            map: Duration::from_micros(10),
+            scatter: Duration::from_micros(60),
+            scatter_rows: Duration::from_micros(50),
+            scatter_assemble: Duration::from_micros(10),
+        };
+        // The halves are inside `scatter`, so the total is 100 and not 160.
+        assert_eq!(split.total(), Duration::from_micros(100));
+        assert_eq!(split.scatter_rows + split.scatter_assemble, split.scatter);
+        assert!((split.assembly_share() - 1.0 / 6.0).abs() < 1e-12);
+        assert_eq!(ConstructionTimings::default().assembly_share(), 0.0);
+
+        let mut folded = ConstructionTimings::default();
+        folded.add(&split);
+        folded.add(&split);
+        assert_eq!(folded.scatter_rows, Duration::from_micros(100));
+        assert_eq!(folded.scatter_assemble, Duration::from_micros(20));
+        assert_eq!(
+            folded.scatter_rows + folded.scatter_assemble,
+            folded.scatter
+        );
+        assert_eq!(folded.total(), Duration::from_micros(200));
     }
 
     /// Recording a batch accumulates the new per-stage and per-strategy counters too.

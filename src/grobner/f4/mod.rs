@@ -42,7 +42,7 @@ pub use certify::{certify_f4_output, certify_submitted_basis, CertificationRepor
 pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use divmask::{DivmaskCalibration, DIVMASK_BITS};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
-pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
+pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix, ScatterPrefix, ScatterPrefixTiming};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
     F4Error, F4Options, InterreductionRoute, ReducerSelection, ReductionStrategy, StopKind,

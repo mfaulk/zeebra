@@ -1,8 +1,9 @@
 # msolve 0.11.0: what it actually does, and which of it Zeebra may reimplement
 
-**Measured at:** `dbab79eb`, reproduced at `3139025d` — the only Zeebra timings published here are
-§4.1's settlement of H1. Every other figure is read from msolve's source or quoted from a cited
-paper.
+**Measured at:** `dbab79eb`, reproduced at `3139025d`; §4.1's scatter split is stamped base
+`a756eb95` plus source blobs, per #505 (see the subsection for the blobs). The only Zeebra timings
+published here are §4.1's settlement of H1 and that split. Every other figure is read from msolve's
+source or quoted from a cited paper.
 
 Source-grounded study for #264, a child of epic #256. The companion documents are
 `docs/research/external-comparands.md` (how msolve is provisioned and invoked) and
@@ -812,12 +813,93 @@ swamped — 0.15 ms against 3.34 ms — but a three-way split would have hidden 
 left the next reader unable to find it.
 
 **What this says about msolve.** Its `sht`-entries-are-columns design removes two things, and only
-one of them was worth anything here. The shared-table half — not interning the same monomials twice
-— is where the 1.9x was. The `idx`-field half, which is the part §4.1 was written about and the part
-the issue proposed, is worth ~1% against a multiplicative hash. Zeebra's remaining construction
-cost is **89% scatter** on katsura-6 lex, which is the one phase msolve has no structural advantage
-in, exactly as the refutation condition anticipated. Construction is no longer the largest stage on
-the lex instances; see `MILESTONE-F4-OPTIMIZATION.md` §8.5.
+one of them was worth anything *to the phases split here*. The shared-table half — not interning the
+same monomials twice — is where the 1.9x was. Building the `HashMap`, which is the part §4.1 was
+written about and the part the issue proposed removing, is worth ~1% against a multiplicative hash.
+Zeebra's remaining construction cost is **89% scatter** on katsura-6 lex. Construction is no longer
+the largest stage on the lex instances; see `MILESTONE-F4-OPTIMIZATION.md` §8.5.
+
+The sentence that used to end this paragraph — that the scatter is the one phase msolve has no
+structural advantage in, *"exactly as the refutation condition anticipated"* — is withdrawn by the
+section below. It was an inference from the map *build* being 1%, and the scatter does not build a
+map; it reads one, once per entry.
+
+#### Settled further (#582): the scatter is the per-entry map read, and msolve's advantage there is real
+
+#330 left the scatter at 89% of construction with no counter ever having been inside it.
+`ConstructionTimings` now refines it into `scatter_rows` — the multiplier shift, the column lookup
+and the row build — and `scatter_assemble`, which is `SparseMatrix::new` plus the row-provenance
+copy. The three steps inside the row loop are per *term*, where `Instant::now()` costs more than
+the work it would time, so they come from `ScatterPrefix`: arms that are **nested prefixes** of the
+real loop, timed whole and differenced. The full arm is the shipping loop verbatim, so it doubles
+as a control, and each arm carries a checksum pinned to a quantity derived from the built matrix —
+an arm the optimizer emptied would otherwise report a plausible time and no output.
+
+`examples/f4_profile scatter` is the harness, `taskset --cpu-list 2`, under `tools/benchlock.sh` at
+`load=472.96`, seven repetitions, arm order rotated per repetition and each arm min-reduced over its
+own runs. The batches are replayed from a `recommended` trace, which is what §8.5 reports and what
+#330's tables above were taken under.
+
+Stamped **base commit `a756eb95`** — an ancestor of `main`, which cannot stop being one — plus the
+**blobs** of the three files the binary's measured path came from (#505, and
+`structured-sylvester.md` §5.6.2 for the convention): `examples/f4_profile.rs` at
+`1400072b5f95`, `src/grobner/f4/macaulay.rs` at `6c2aa1cc114c`,
+`src/grobner/f4/statistics.rs` at `062229c306be`. The branch SHA the run printed was
+`10290fce`, recorded here for the log and not relied on: it does not survive this branch's merge,
+and the blobs do.
+
+| system | order | batches | scatter | rows | assemble | ablation | shift | lookup | row build | lookup/scatter |
+|---|---|---|---|---|---|---|---|---|---|---|
+| cyclic-5 | lex | 24 | 0.49 ms | 0.49 | 0.00 | 0.46 | 0.04 | 0.40 | 0.01 | **82%** |
+| katsura-6 | lex | 107 | 3.59 ms | 3.58 | 0.01 | 3.51 | 0.33 | 3.19 | 0.00 | **89%** |
+| katsura-6 | grevlex | 6 | 0.40 ms | 0.39 | 0.00 | 0.37 | 0.03 | 0.32 | 0.01 | **81%** |
+| katsura-7 | grlex | 7 | 2.64 ms | 2.63 | 0.01 | 2.66 | 0.22 | 2.29 | 0.14 | **87%** |
+
+`ablation` against `rows` is the control, and it holds: 3.51 against 3.58 on katsura-6 lex and 2.66
+against 2.63 on katsura-7 grlex, both within 2%, so the clocked half and the ablation are measuring
+the same loop and the differences beside them mean something.
+
+**#582's kill criterion did not fire, and this time the named cause is right.** The issue said to
+close construction out if the per-term lookup came in under a third of the scatter. It is **81–89%**:
+
+- **Assembly is nothing.** 0.00–0.01 ms. #582's hypothesis 3 — that `preprocessed.rows.clone()`
+  inside the scatter lap might not be free — is refuted; it is under half a percent of the stage.
+- **The per-row `Vec` is nothing.** 0.00 ms on katsura-6 lex, 0.14 on katsura-7 grlex. Hypothesis 2
+  — a scratch buffer or a flat CSR arena — would buy at most 5% of the scatter on the instance it
+  is largest on, and the allocator is evidently serving these from a hot free list.
+- **It is the per-entry hash read**, and it has an independent corroboration already in this
+  section. The pre-#330 route's `set` phase was 4.10 ms on katsura-6 lex for one
+  `MonomialSet::insert` per entry over *exactly these entries*. One `get` per entry at 3.19 ms is
+  the same operation count at the lower per-operation cost a read should have against an insert.
+  Two harnesses, two arms, one number.
+
+So the quantity #330 priced at 1% and the quantity that costs 81–89% of the scatter are different
+quantities: **building** the map is one hash insert per column, and **reading** it is one hash
+lookup per entry. Entries outnumber columns by the average column density, and #330's own text said
+so — *"the lookup result is needed and the insert was not"* — without the measurement to act on.
+
+**What this says about msolve, restated.** Its advantage in the scatter is real, and it is not the
+`idx` write-back on its own. msolve's rows are arrays of hash-table indices, so the column of a
+product is read off the entry the multiplication already produced; there is no second hash. Zeebra's
+rows are `(basis_index, multiplier)` and `MonicBasis::shifted_terms` recomputes `monomial *
+multiplier` per term, so there is no handle to read a rank from — writing a rank back after the sort
+would leave nothing able to read it.
+
+What makes this actionable rather than a rewrite is that **symbolic preprocessing already interns
+every one of those shifted monomials and then throws the handles away.** That is the invariant #330
+shipped on (`test_preprocessing_interns_exactly_the_column_set`): the column of every entry is
+discovered once in `symbolic` and rediscovered in `scatter`. The duplication #330 removed from the
+*set* is still there in the *rows*.
+
+**And the sort, which #583 is about, does not matter more than it looks.** #583 gated itself on
+#582 finding otherwise on a larger instance. At the same stamp the sort is 0.32 ms of katsura-6 lex's
+3.94 ms construction and 0.25 ms of katsura-7 grlex's 2.98 ms — 8% of the stage on both, as #330
+recorded, and 2.6% and 0.7% of those computations. Under `default` it is 1.9% and 1.0%. The second
+of #583's two gates therefore does not fire; it rests on the `sort_unstable_by` one-liner alone.
+
+The follow-up is #621, and it states what has to be established before anything is implemented: the
+memory cost of keeping a per-row-term handle against `max_live_bytes` and #536's release discipline,
+and whether the saving survives the indirection the handle introduces.
 
 ### H2 — A divmask would cut the reducer search, and Zeebra has no equivalent
 

@@ -6,6 +6,11 @@
 //! monomial, and the leftmost-first pivot rule of [`crate::linalg::sparse::row_echelon`] coincides
 //! with the monomial order. Nothing downstream has to translate between the two.
 
+use std::{
+    hint::black_box,
+    time::{Duration, Instant},
+};
+
 use crate::{
     grobner::f4::statistics::{ConstructionTimings, StageClock},
     grobner::f4::symbolic::{MonicBasis, Preprocessed, PreprocessedRow, RowKind},
@@ -23,6 +28,36 @@ pub enum BuildBudgetExceeded {
     /// The rows held more entries than the entry budget allowed. `nonzeros` is the count when the
     /// limit was crossed, so the overshoot is bounded by one row.
     Nonzeros { nonzeros: usize, limit: usize },
+}
+
+/// How much of the row scatter's per-term work to do, for #582's nested ablation.
+///
+/// Each variant is a **prefix** of the next, so the cost of one step is the difference between two
+/// adjacent arms. See
+/// [`MacaulayMatrix::scatter_prefix_for_benchmark`] for why the split is an ablation rather than
+/// another pair of counters.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScatterPrefix {
+    /// Shift each row's terms by its multiplier, and consume the result.
+    Shift,
+
+    /// Shift, then turn each shifted monomial into a column through the map.
+    ShiftAndLookup,
+
+    /// Shift, look up, collect the per-row `Vec` and build the `SparseRow`: the whole of the
+    /// shipping loop, so this arm doubles as a control against `scatter_rows`.
+    Row,
+}
+
+/// What one [`ScatterPrefix`] arm cost, and proof it was not optimized away.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ScatterPrefixTiming {
+    /// How long the arm took over every row of the batch.
+    pub elapsed: Duration,
+
+    /// A quantity derived from the arm's own output, pinned by test to one derived from the
+    /// matrix. An arm the optimizer emptied cannot produce it.
+    pub checksum: u64,
 }
 
 /// A sparse matrix whose columns are labelled by monomials and whose rows carry their provenance.
@@ -93,12 +128,15 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
                 .collect();
             sparse_rows.push(SparseRow::from_sorted_unchecked(entries));
         }
+        timings.scatter_rows = clock.lap();
+
         let built = Self {
             matrix: SparseMatrix::new(columns.len(), sparse_rows),
             columns,
             rows: preprocessed.rows.clone(),
         };
-        timings.scatter = clock.lap();
+        timings.scatter_assemble = clock.lap();
+        timings.scatter = timings.scatter_rows + timings.scatter_assemble;
 
         (built, timings)
     }
@@ -142,11 +180,14 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
 
     /// As [`MacaulayMatrix::build_within`], reporting where the time went when `measure` is set.
     ///
-    /// The three reported phases partition the call, so their sum is the whole of it. They exist
+    /// The four reported phases partition the call, so their sum is the whole of it. They exist
     /// because #330 asked whether the monomial-to-column map is worth removing, and the only way
     /// to answer that before writing the replacement is to price the map against the scatter it
     /// feeds. `measure` is threaded rather than always on so that the clock reads do not appear in
     /// the instruction stream of the default path at all — see [`StageClock`].
+    ///
+    /// `scatter` is in turn the sum of `scatter_rows` and `scatter_assemble` (#582), which costs
+    /// one extra clock read per matrix on the measured path and none on the default one.
     pub fn build_measured(
         basis: &MonicBasis<N, F>,
         preprocessed: &Preprocessed<N>,
@@ -211,15 +252,108 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
                 SparseRow::from_sorted_unchecked(entries)
             });
         }
+        timings.scatter_rows = clock.lap();
 
         let built = Self {
             matrix: SparseMatrix::new(columns.len(), sparse_rows),
             columns,
             rows: preprocessed.rows.clone(),
         };
-        timings.scatter = clock.lap();
+        timings.scatter_assemble = clock.lap();
+        timings.scatter = timings.scatter_rows + timings.scatter_assemble;
 
         Ok((built, timings))
+    }
+
+    /// Time one prefix of the scatter's per-term work, for #582's ablation.
+    ///
+    /// The scatter's inner steps are per *term*, and `Instant::now()` costs more than the term's
+    /// work does, so a counter around each step would measure the clock. The arms are therefore
+    /// **nested prefixes** of the real loop, timed whole and differenced: `ShiftAndLookup` less
+    /// `Shift` is the per-term map lookup, `Row` less `ShiftAndLookup` is the per-row `Vec` and
+    /// the `SparseRow` build, and `build_measured`'s `scatter_assemble` is the rest.
+    ///
+    /// The columns and the map are built outside the timing, because they are
+    /// [`ConstructionTimings`]'s other phases and charging them here would bury the difference.
+    ///
+    /// The returned checksum is what keeps an arm from being optimized into nothing: the arms
+    /// below `Row` discard the entries they compute, so without a consumed result the shift and
+    /// the lookup are both dead code.
+    /// `test_the_scatter_ablation_arms_do_the_scatters_work` pins each checksum to a quantity
+    /// derived from [`MacaulayMatrix::build`]'s matrix.
+    pub fn scatter_prefix_for_benchmark(
+        basis: &MonicBasis<N, F>,
+        preprocessed: &Preprocessed<N>,
+        order: MonomialOrder,
+        prefix: ScatterPrefix,
+    ) -> ScatterPrefixTiming {
+        let mut columns: Vec<Monomial<N>> = preprocessed.monomials.iter().copied().collect();
+        columns.sort_by(|a, b| order.cmp(b, a));
+        let column_of: MonomialMap<N, usize> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, monomial)| (*monomial, index))
+            .collect();
+
+        let column = |monomial: &Monomial<N>| {
+            *column_of
+                .get(monomial)
+                .expect("every row monomial is a column")
+        };
+
+        let mut checksum = 0u64;
+        let mut sparse_rows: Vec<SparseRow<F>> = Vec::new();
+        let started = Instant::now();
+        match prefix {
+            ScatterPrefix::Shift => {
+                for row in &preprocessed.rows {
+                    for (monomial, coefficient) in
+                        basis.shifted_terms(row.basis_index, &row.multiplier)
+                    {
+                        black_box(coefficient);
+                        checksum = checksum.wrapping_add(monomial.degree());
+                    }
+                }
+            }
+            ScatterPrefix::ShiftAndLookup => {
+                for row in &preprocessed.rows {
+                    for (monomial, coefficient) in
+                        basis.shifted_terms(row.basis_index, &row.multiplier)
+                    {
+                        black_box(coefficient);
+                        // The degree is added here too, so that differencing the two arms leaves
+                        // the map lookup and nothing else.
+                        checksum = checksum.wrapping_add(monomial.degree());
+                        checksum = checksum.wrapping_add(column(&monomial) as u64);
+                    }
+                }
+            }
+            ScatterPrefix::Row => {
+                // Byte-for-byte the shipping loop, so this arm is comparable against
+                // `build_measured`'s `scatter_rows` on the same build. The checksum is taken
+                // afterwards, outside the clock, for the same reason.
+                sparse_rows = Vec::with_capacity(preprocessed.rows.len());
+                for row in &preprocessed.rows {
+                    let entries: Vec<(usize, F)> = basis
+                        .shifted_terms(row.basis_index, &row.multiplier)
+                        .map(|(monomial, coefficient)| (column(&monomial), coefficient))
+                        .collect();
+                    sparse_rows.push(SparseRow::from_sorted_unchecked(entries));
+                }
+                black_box(&sparse_rows);
+            }
+        }
+        let elapsed = started.elapsed();
+
+        if prefix == ScatterPrefix::Row {
+            for built in &sparse_rows {
+                for (index, _) in built.entries() {
+                    checksum = checksum.wrapping_add(*index as u64);
+                }
+            }
+        }
+
+        ScatterPrefixTiming { elapsed, checksum }
     }
 
     /// Move the reducer multiples ahead of the pair rows, ascending by leading column, and report
@@ -314,11 +448,11 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
 mod tests {
     use std::time::Duration;
 
-    use super::{BuildBudgetExceeded, ConstructionTimings, MacaulayMatrix};
+    use super::{BuildBudgetExceeded, ConstructionTimings, MacaulayMatrix, ScatterPrefix};
     use crate::{
         fields::Zp13,
         grobner::{
-            f4::symbolic::{symbolic_preprocessing, MonicBasis},
+            f4::symbolic::{symbolic_preprocessing, MonicBasis, Preprocessed},
             pairs::CriticalPair,
         },
         poly::{MonomialOrder, MonomialSet},
@@ -339,6 +473,20 @@ mod tests {
 
     fn system(strings: &[&str]) -> Vec<MultivariatePolynomial<3, F>> {
         strings.iter().map(|s| parse(s)).collect()
+    }
+
+    /// The basis and the preprocessed batch of every pair of a system under one order.
+    fn batch(strings: &[&str], order: MonomialOrder) -> (MonicBasis<3, F>, Preprocessed<3>) {
+        let polynomials = system(strings);
+        let basis = MonicBasis::new(&polynomials, order);
+        let mut pairs = Vec::new();
+        for left in 0..polynomials.len() {
+            for right in (left + 1)..polynomials.len() {
+                pairs.push(CriticalPair::new(&polynomials, left, right, order));
+            }
+        }
+        let preprocessed = symbolic_preprocessing(&basis, &pairs);
+        (basis, preprocessed)
     }
 
     /// Build the matrix for every pair of a system under one order.
@@ -695,6 +843,77 @@ mod tests {
                 "{}",
                 order.name()
             );
+        }
+    }
+
+    /// The scatter's two clocked halves partition the scatter lap.
+    #[test]
+    fn test_the_scatter_halves_partition_the_scatter() {
+        for order in ALL_ORDERS {
+            let (basis, preprocessed) = batch(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"], order);
+            let (_, split) = MacaulayMatrix::<3, F>::build_measured(
+                &basis,
+                &preprocessed,
+                order,
+                usize::MAX,
+                usize::MAX,
+                true,
+            )
+            .expect("an unbounded construction cannot exceed its budget");
+
+            assert_eq!(
+                split.scatter_rows + split.scatter_assemble,
+                split.scatter,
+                "{}",
+                order.name()
+            );
+            assert!(split.scatter_rows > Duration::ZERO, "{}", order.name());
+            assert!(
+                (0.0..=1.0).contains(&split.assembly_share()),
+                "{}",
+                order.name()
+            );
+        }
+    }
+
+    /// Each scatter-ablation prefix does the scatter's real work, not a degenerate stand-in.
+    ///
+    /// The failure mode of an ablation is an arm the optimizer emptied, which still reports a
+    /// plausible time. Each arm's checksum is therefore compared against the same quantity derived
+    /// independently from the matrix `build` returns: the shift arm against the summed degrees of
+    /// the monomial behind every entry, the two column arms against the summed column indices.
+    #[test]
+    fn test_the_scatter_ablation_arms_do_the_scatters_work() {
+        for order in ALL_ORDERS {
+            let (basis, preprocessed) = batch(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"], order);
+            let matrix = MacaulayMatrix::<3, F>::build(&basis, &preprocessed, order);
+
+            let mut degrees = 0u64;
+            let mut indices = 0u64;
+            for index in 0..matrix.num_rows() {
+                for (column, _) in matrix.matrix().row(index).entries() {
+                    degrees = degrees.wrapping_add(matrix.columns()[*column].degree());
+                    indices = indices.wrapping_add(*column as u64);
+                }
+            }
+
+            let checksum = |prefix| {
+                MacaulayMatrix::<3, F>::scatter_prefix_for_benchmark(
+                    &basis,
+                    &preprocessed,
+                    order,
+                    prefix,
+                )
+                .checksum
+            };
+            assert_eq!(checksum(ScatterPrefix::Shift), degrees, "{}", order.name());
+            assert_eq!(
+                checksum(ScatterPrefix::ShiftAndLookup),
+                degrees.wrapping_add(indices),
+                "{}",
+                order.name()
+            );
+            assert_eq!(checksum(ScatterPrefix::Row), indices, "{}", order.name());
         }
     }
 
