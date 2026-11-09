@@ -191,14 +191,15 @@ jobs:
       #
       # This runs each case once and takes no measurements.
       #
-      # It selects exactly the eight criterion targets. It used to select ten: `bench` defaults to
-      # true, so the lib and the one `src/bin` were built as bench targets too and `--test` ran
+      # It selects exactly the ten criterion targets, and nothing else. Back when there were eight
+      # of them it selected ten, for an unrelated reason: `bench` defaults to true, so the lib and
+      # the one `src/bin` were bench targets too and `--test` ran
       # their unit tests here, in one process, under the built-in harness — duplicating the
       # nextest jobs above with worse isolation, and failing a `VmHWM` test that depends on it.
       # Both now carry `bench = false`; see #170 and the comments in `Cargo.toml`.
       #
       # `--profile ci-release` for exactly that reason. A bare `cargo bench` resolves
-      # `[profile.bench]`, which inherits `release`, so it links all eight criterion binaries
+      # `[profile.bench]`, which inherits `release`, so it links all ten criterion binaries
       # under fat LTO at one codegen unit — the settings that exist to make a *measurement*
       # reproducible, which this job does not take. Cold, for one bench target: 193s under
       # `bench`, 34s under `ci-release`. The build is most of this job's 8.4 minutes.

@@ -284,7 +284,9 @@ manual dispatch only, not on pull requests. They take 145s on a shared runner �
 job's wall clock, on the critical path of every pull request — and they reuse the build the steps
 before them already paid for, so running them after a merge costs almost nothing.
 
-A third job runs the benchmarks, on pushes to main and on manual dispatch only. The benchmark
+A third job runs the benchmarks, on pull requests as well since #586: compilation was always
+covered, but a benchmark that compiles and then *panics* was not, and such a commit is
+unmeasurable without cherry-picking the fix onto it. The benchmark
 targets are declared `test = false`, which keeps them out of `cargo test`: a `[[bench]]` target
 defaults to `test = true`, so a bare `cargo test` linked all eight criterion binaries under fat
 LTO and executed all 455 cases. That took 168s of the 180s a warm `cargo test --release` spent,
@@ -296,9 +298,12 @@ to its own job rather than being dropped:
 cargo bench --profile ci-release -- --test
 ```
 
-`cargo bench -- --test` and not `cargo test --benches`, which now selects nothing and would pass
-vacuously. A benchmark that stops *compiling* still breaks the `cargo build --all-targets` step in
-the pull-request jobs.
+`cargo bench -- --test` and not `cargo test --benches`. The reason is the profile and not, as this
+paragraph used to say, that `test = false` makes the latter select nothing: #586 measured that, and
+`test = false` governs what a bare `cargo test` picks up rather than what an explicit `--benches`
+selects, so `cargo test --benches` does build and run every case — in the **dev** profile, which
+made it 382.0s against 26.3s. A benchmark that stops *compiling* still breaks the
+`cargo build --all-targets` step in the pull-request jobs.
 
 The library and the `zeebra-differential` binary are declared `bench = false`, the mirror of the
 `test = false` above. `bench` also defaults to true, so this command used to select ten targets
@@ -310,7 +315,7 @@ raise it. The binary has no tests at all, so its entry was a whole-crate link fo
 `bench = false` does not affect `cargo test`, which still runs both.
 
 `--profile ci-release` because this job takes no measurements. A bare `cargo bench` resolves
-`[profile.bench]`, which inherits `release`, and links all eight criterion binaries under fat LTO
+`[profile.bench]`, which inherits `release`, and links all ten criterion binaries under fat LTO
 at one codegen unit — settings that exist to make a measurement reproducible. Cold, for one bench
 target, that is 193s against 34s under `ci-release`. The trade is that no CI job compiles the
 fat-LTO profile any more, so a failure that appears only at one codegen unit surfaces on the
@@ -805,6 +810,7 @@ cargo bench --bench fglm                 # order conversion: stages, pipeline, s
 cargo bench --bench polynomial_solving   # one solution against all of them, both routes
 cargo bench --bench sparse_polynomial    # multivariate arithmetic, four arities
 cargo bench --bench monomial_order       # MonomialOrder::cmp, three arms, two tie regimes
+cargo bench --bench pow_strategy         # FiniteField::pow's body, five arms, six exponent widths
 ```
 
 `monomial_order` is #317's gate rather than a coverage benchmark, and it has **three** arms where an
@@ -814,6 +820,19 @@ that never reads the degree. So `production` is `MonomialOrder::cmp` on the real
 `summed` is a bench-local transcription of it, and `stored` is that transcription with the degree in
 a field; `summed` against `production` is the fidelity check, and the `lex` rows of `summed` against
 `stored` are the control. See `docs/research/interreduction-cost.md` §3f.
+
+`pow_strategy` is #181's gate, and the same shape for the same reason: `production` is
+`FiniteField::pow` as shipped and the other four arms are bench-local transcriptions of the bodies
+it could have — the recursive one it had, and three loops. It needs that many because the obvious
+two-arm A/B gives the wrong answer. Making the default iterative is **1.9x** at the exponent widths
+`PowerPermutation::invert` uses and a **9x to 40x regression** at `pow(1)` over a field whose
+multiply is expensive, in the same change, because the loop seeds its accumulator with one and so
+pays a multiplication the recursion does not. So `pow_limbs` walks the exponent downward below
+`NARROW_EXPONENT_BITS` and upward above it, and `production` tracking whichever arm the threshold
+selects is the fidelity check. `e8` and `e16` are in no call site and exist only to bracket the
+threshold's crossover, which turns out to be field-dependent. Four arms also caught a candidate
+that should have won on operation count and did not — `seeded` — which is the reason the arm
+exists. See `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2.
 
 `sparse_polynomial`'s `mul_dense` arm is separate from `mul` because they are different shapes, not
 just different sizes. `mul` draws monomials independently, which is sparse in the total-degree sense
