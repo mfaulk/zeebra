@@ -2917,7 +2917,8 @@ classical primitive PRS. The recursion terminates because the coefficients of a 
 | method | what it gives |
 |---|---|
 | `gcd(&other)` | the GCD, normalized so the lexicographic leading coefficient is one |
-| `gcd_by(&other, route)` | the same, by a named `GcdRoute` |
+| `gcd_by(&other, route)` | the same, by a named `GcdRoute`; panics for `Brown` |
+| `try_gcd_by(&other, route)` | the same, returning `GcdError` where a route refuses (`KnownOrder`) |
 | `content(i)` / `primitive_part(i)` | the GCD of the coefficients in `x_i`, and the quotient by it |
 | `degree_in(i)` / `coefficients_in(i)` | the univariate-in-`x_i` view the recursion is built on |
 | `exact_div(&divisor)` | the quotient, or `None` when the division leaves a remainder |
@@ -3014,16 +3015,26 @@ divisor and asserts the defining property — the result divides both inputs, an
 divisor divides the result. That is the property to test, because a GCD is only unique up to a unit
 and several candidates share the maximal degree.
 
-#### Two remainder sequences
+#### Three routes: two remainder sequences and one modular
 
-`GcdRoute` picks which polynomial-remainder sequence the Euclidean step runs. Both are the same
-recursion and return the same value — a reduced GCD is unique once normalized — and differ only in
-what they do to a pseudo-remainder before the next step.
+`GcdRoute` picks the route. All three return the same value — a reduced GCD is unique once
+normalized — but only the first two are the same recursion, differing in what they do to a
+pseudo-remainder before the next step. Brown's does no Euclidean step at all.
 
-| route | per step | coefficient bound |
-|---|---|---|
-| `PrimitivePrs` | divide out the content, which is a recursive GCD | by construction: nothing grows |
-| `SubresultantPrs` (default) | divide by `g * h^delta`, one exact division | by a theorem: the entries are subresultants |
+| route | per step | coefficient bound | can refuse |
+|---|---|---|---|
+| `PrimitivePrs` | divide out the content, which is a recursive GCD | by construction: nothing grows | no |
+| `SubresultantPrs` (default) | divide by `g * h^delta`, one exact division | by a theorem: the entries are subresultants | no |
+| `Brown` | no step: evaluate, solve univariate, interpolate | none needed: no multivariate coefficient is ever formed | **yes** |
+
+`Brown` is reached through `try_gcd_by`, not `gcd_by`. It needs a **prime field** — fixing a
+variable at an element of an extension field and lifting back would answer a question about the
+prime subfield — and it needs **more elements than the degree it interpolates over**, which GF(2)
+and GF(3) do not have for most inputs. `FiniteField` carries no characteristic, so `gcd_by` cannot
+check either condition and panics rather than guessing; `try_gcd_by` is bounded on `KnownOrder` and
+returns `GcdError::ExtensionField`, `GcdError::TooFewPoints` or `GcdError::OrderNotEnumerable`
+saying which condition failed. The two sequences never refuse, so `try_gcd_by` is just `gcd_by` for
+them.
 
 Collins' subresultant PRS carries `g = lc(a)` and `h = h^(1-delta) * g^delta` across steps, and the
 fundamental theorem of subresultants is what makes the division by `g * h^delta` exact. The entries
@@ -3061,18 +3072,44 @@ a cliff on an input the caller did not know was special.
 
 **So `PrimitivePrs` is not merely the reference implementation.** It is 10–50% faster on most
 shapes, and `gcd_by(&other, GcdRoute::PrimitivePrs)` is a reasonable choice for a caller who knows
-its inputs are ordinary. [`docs/research/multivariate-gcd.md`](docs/research/multivariate-gcd.md)
-has the full tables, the single-repetition caveat on the 628x figure, and what the measurement does
+its inputs are ordinary.
+
+**And the same shape repeats one level up with `Brown` (#434): it owns the tail both sequences
+lose.** On every shape that defeats a sequence, on every field, Brown's is the fastest of the three
+— by **4.3x to 67x** against the better of the other two:
+
+| field | the sequences' worst shape | primitive | subresultant | **Brown** |
+|---|---|---:|---:|---:|
+| KoalaBear | 4 vars, shared 2, cofactor 6 | **1.3704 s** | 0.0020 s | **0.000459 s** |
+| KoalaBear | 3 vars, shared 5, cofactor 5, exp 4 | 0.0025 s | **0.0348 s** | **0.000518 s** |
+| BN254 `Fr` | 3 vars, shared 5, cofactor 5, exp 4 | **0.0510 s** | 0.0328 s | **0.003096 s** |
+
+And it loses the median on two fields of three, by up to **5.2x** on the smallest shapes — its cost
+is one univariate GCD per evaluation point per level of recursion plus one interpolation, which is
+the whole cost on a shape the sequences finish in ten microseconds. So all three routes are fastest
+somewhere, and the default is the best route that **always answers**.
+
+The ratio columns are load-independent and the absolute seconds are not: the whole sweep was taken
+at one-minute loads of 9.51 and 2 100.79, a **221x** range, and the `subresultant / brown` ratio
+agreed on all 40 paired shapes to within 0.06. `gcd_routes` prints the load at the head of every run
+and says which columns survive it.
+
+[`docs/research/multivariate-gcd.md`](docs/research/multivariate-gcd.md) has the full tables, the
+single-repetition caveat on the 628x figure, §5.3's cross-load check, and what the measurement does
 not establish — including that the input distribution F4 and FGLM actually hand `gcd` is still
-unmeasured.
+unmeasured, which is why the default is **not** changed to dispatch on the field.
 
 ```text
 cargo run --release --example gcd_routes
 ```
 
-Brown's modular algorithm — evaluate all but one variable at points over a prime field, take
-univariate GCDs, interpolate back, with degree bounds and a check against bad evaluation points —
-is the route that changes the asymptotics and is not implemented.
+`benches/multivariate_gcd.rs` is the criterion regression surface for the same question — four
+shapes, one per regime, with the Brown arm probed outside the timed region and not registered where
+it refuses, since criterion cannot express "this arm does not apply":
+
+```text
+cargo bench --bench multivariate_gcd
+```
 
 ### Composition
 

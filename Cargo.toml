@@ -134,6 +134,11 @@ harness = false
 test = false
 
 [[bench]]
+name = "multivariate_gcd"
+harness = false
+test = false
+
+[[bench]]
 name = "pow_strategy"
 harness = false
 test = false
