@@ -38,7 +38,8 @@ pub use subproduct_tree::multipoint_evaluate;
 pub use lagrange_interpolation::interpolate_quadratic_unstable;
 #[doc(hidden)]
 pub use subproduct_tree::{
-    subproduct_evaluate_unstable, subproduct_interpolate_unstable, tree_crossover_unstable,
+    from_zeros_crossover_unstable, product_of_factors_unstable, subproduct_evaluate_unstable,
+    subproduct_interpolate_unstable, tree_crossover_unstable,
 };
 mod univariate_parser;
 

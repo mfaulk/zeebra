@@ -48,8 +48,17 @@ impl<F: FiniteField> DensePolynomial<F> {
         Self { coefficients }
     }
 
-    /// A polynomial with the given zeros.
+    /// A polynomial with the given zeros, `prod (x - z)`.
+    ///
+    /// The naive fold below the subproduct tree's measured crossover and the tree above it (#560).
+    /// The fold is `O(n^2)` and stays `O(n^2)` however good the multiplication gets: it multiplies a
+    /// growing product by a **two-coefficient** operand, which is below every `karatsuba_base_case`
+    /// tier, so every step is the schoolbook loop. The tree's levels sum geometrically in
+    /// Karatsuba's exponent instead, giving `O(M(n))`.
     pub fn from_zeros(zeros: &[F]) -> Self {
+        if zeros.len() > super::subproduct_tree::from_zeros_crossover::<F>() {
+            return super::subproduct_tree::product_of_factors(zeros);
+        }
         // \prod (x - x_i)
         zeros
             .iter()
