@@ -327,7 +327,7 @@ any of it be believed.
 | #318, #319 | M27-0 | Rule 3. Unresolved, and they bound every ratio M27 quotes |
 | #334, #335 | M27-0 / M27-I | Cost-model rows emitted by runs rather than transcribed; and no measurement in `docs/research/` records its commit |
 | #410 | M27-0 | `RowCost::of` models the determinant term only — the 15% — and ignores the 73% symbolic build. A guard that admits a row by modelling the term that is no longer dominant |
-| #412 | M27-0 | The recorded **3.21x** width penalty is a ratio of two *pairs*, not of two widths. Swept in one process the Euclidean kernel is **1.049x at 32 workers, 95.3% efficiency** — the dense kernel's own figure. The gap was a missing specialization term in `euclidean_core_ms`, 2.00x the remainder sequence it feeds; the allocator candidate is refuted |
+| #412 | M27-0 | The recorded **3.21x** width penalty is a ratio of two *pairs*, not of two widths. Swept in one process the Euclidean kernel is **1.100x at 32 workers, 90.9% efficiency** over the row's own pair — lower than the dense kernel's 1.178x at 8 workers in the same session. The gap was a missing specialization term in `euclidean_core_ms`, 2.00x the remainder sequence it feeds; the allocator candidate is refuted |
 
 ### 4.2 New issues
 
@@ -455,7 +455,7 @@ label:
 
 **#410 is a safety fix and lands here**, not in a Poseidon workstream: a guard that models the 15%
 and ignores the 73% is a guard waiting to admit a row nobody costed. **#412's falsification does not survive its own
-mechanism**: the 3.21x was a pair ratio with a 1.049x width penalty folded into it, so §5.2's
+mechanism**: the 3.21x was a pair ratio with a 1.100x width penalty folded into it, so §5.2's
 prediction that axis 4 would not contend worse was right and the one-term cost law was what was
 wrong (`structured-sylvester.md` §5.6.2).
 

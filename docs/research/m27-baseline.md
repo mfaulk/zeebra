@@ -715,9 +715,10 @@ Corrected in #367 to a measured two-point penalty.
 `structured-sylvester.md` §5.6.2. The 3.21x above is correct arithmetic over two correct
 measurements and **it is not a width penalty**: the `1.109 ms` and the `3.563 ms` were taken over
 two different *pairs*, and the per-sample cost of those two pairs differs by **3.01x at identical
-width**. Swept in one process over one pair, the Euclidean kernel is **1.049x at 32 workers —
-95.3% parallel efficiency**, which is the dense kernel's own 1.058–1.063x. `3.01 × 1.049 = 3.16`
-against 3.21.
+width**. Swept in one process over the `rf4-rp2` row's own two polynomials the Euclidean kernel is
+**1.100x at 32 workers — 90.9% parallel efficiency**, and the dense kernel measured in the same
+session is the worse of the two at every width they share. `2.90 × 1.100 = 3.19` against 3.21, and
+the 32-worker end re-measures at 3.584 ms against the recorded 3.563 ms.
 
 The missing quantity is a **term of the cost law**, not a property of the machine.
 `sylvester_resultant_euclid` specializes the pair at each sample point inside the per-determinant
@@ -729,7 +730,7 @@ and 0.4% of the determinant. That is the whole of the gap.
 The **allocator candidate is refuted**: the Euclidean kernel makes 1 391 allocation calls per
 determinant against the dense kernel's 666 and has the *lower* width penalty; the half of the kernel
 holding every per-step allocation contends within 1.7% of the half holding two; and the penalty
-*falls* with order — 1.370x / 1.114x / 1.049x at 162 / 486 / 1 458 — which is thread-spawn overhead
+*falls* with order — 1.370x / 1.114x / 1.100x at 162 / 486 / 1 458 — which is thread-spawn overhead
 amortizing, the opposite shape from contention.
 
 **So what #451 required on record is this**: §5.2's prediction that axis 4 would not contend worse
