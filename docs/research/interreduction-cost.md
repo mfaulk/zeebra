@@ -12,7 +12,11 @@ path these figures describe nor their comparability with §3a and §3b. **§3e w
 `0840207f`, base `9746b4ce`**, also recorded at the time; its board rows carry their own resolvable
 #505 stamp, so that one is checkable from the data and not only from this header. **§3f was taken at
 `6c1eeb18` plus the benchmark it introduces**, recorded at the time; it is a microbenchmark of a
-comparison and touches no part of the F4 path, so it is independent of every other section here.
+comparison and touches no part of the F4 path, so it is independent of every other section here. **§3h was taken at
+`3d0e3759`**, with the binary rebuilt at that commit and its printed `commit:` checked against
+`git rev-parse --short HEAD` before anything was trusted — a loop left running across a rebase
+stamps rows with a tree it was not built from, which happened once while taking §3h and is why
+those rows were discarded.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -1109,6 +1113,11 @@ reducer multiples where Groebner.jl's adds about three.
 > the default and stays the configuration every published figure was taken in, and the flip is
 > gated on **#536** making the matrix pass's working set a budgeted quantity.
 
+**Both gates then opened, and §3h is the re-decision.** #536 budgeted the pass — observably, since
+it now refuses `katsura-11`'s — and #477's `reduce_batch_rows` removed the closure this section
+attributes the memory to. With the pair the route costs **less** memory than it did alone, 418.8 MB
+against 602.9 MB, and **both defaults moved**.
+
 Siting a size threshold instead was considered and rejected: two points, 3.68x and 24.59x, do not
 locate a crossover, and an unmeasured threshold is the thing this file exists not to produce.
 
@@ -1193,6 +1202,11 @@ that spoiled the other — but it is one rep, where §3e.0's figures are three. 
 the same direction, and now subject to #536's budget like everything else. Neither caution is a
 reason to doubt a 1.23x; both are reasons #575 takes the table rather than quoting these two rows as
 one.
+
+> **Taken in §3h, and the 1.23x held at three reps**: `division` + `reduced` means 5 953.8 ms
+> against a twelve-rep Singular of 7 371.9 ms, **1.24x ahead**. The arm that was missing here —
+> `matrix` + `reduced` — is **4 695.7 ms at 418.8 MB**, faster than either flag alone and cheaper in
+> memory than the route alone, which is what moved both defaults.
 
 
 ---
@@ -1289,13 +1303,18 @@ Candidates leaving each batch in normal form shrinks work the ceiling had treate
 interreduction stops being an outlier, and the remaining ceiling on it is 1.003x. There is no
 version of #436's loop worth optimizing in that arm.
 
-**None of it ships.** `F4Options::default()` is `recommended()`, and `src/grobner/f4/options.rs`
-sets `interreduce_by_matrix: false` and `reduce_batch_rows: false` — each documented "off by default
-until the A/B is on record", the discipline every strategy flag here follows. So the shipping path is
-the first row, the 5.10x ceiling is fully intact on it, and **the whole of the win is a default
-decision rather than an implementation one**. That decision is #507's, in a cohort rather than from a
-single-instance A/B, and #536 is the gate on half of it: the matrix route's working set is 13.1 GB on
-katsura-11 with every budget satisfied.
+**None of it shipped when this was written.** `F4Options::default()` is `recommended()`, and
+`src/grobner/f4/options.rs` set both flags off — each documented "off by default until the A/B is on
+record", the discipline every strategy flag here follows. So the shipping path was the first row,
+the 5.10x ceiling fully intact on it, and **the whole of the win was a default decision rather than
+an implementation one**. That decision was #507's, in a cohort rather than from a single-instance
+A/B, with #536 the gate on half of it.
+
+> **Both ship now.** #536 budgeted the matrix pass's working set and #575 took the 2x2, where the
+> pair costs *less* memory than the route alone. `recommended()` carries `reduce_batch_rows: true`
+> and `InterreductionRoute::ByOrder`, so the shipping path is **5.86x** the first row on
+> `mq-random-10` and **1.57x ahead of Singular**. §3g. `baseline()` keeps both off, so this
+> section's first row is still reachable for an ablation.
 
 ### 3g.4 So #436's framing was right about the stage and wrong about the remedy
 
@@ -1319,6 +1338,125 @@ That is the transferable finding, and it is worth more than the verdicts in §3g
 two fixes aimed at the operation the counters said was hot each returned a ratio inside the noise,
 and both large wins came from not generating the operation. §3d.2's warning applies to #562 for
 exactly this reason.
+
+---
+
+## 3h. #575: the 2x2 over both flags, and both defaults move
+
+Pinned at `3d0e3759`. Every figure a board row under `tools/benchlock.sh`, `taskset -c 0-7`,
+`ZEEBRA_MACHINE=workstation`, `ZEEBRA_AFFINITY=0-7`, `--measure --write`, one row per process so
+peak RSS is attributable, five engines on `mq-random-10` and two on `katsura-11`. **The binary was
+rebuilt at this commit and its printed `commit:` checked against `git rev-parse --short HEAD`**,
+because a measurement loop left running across a rebase stamps rows with a tree it was not built
+from — which happened once while taking this and is why those rows were discarded.
+
+§3e kept the division route the default on memory with no budget on it, and §3e.5 named the open
+question: the flags are not independent, and `reduce_batch_rows` removes the closure the route's
+memory was attributed to. This is that measurement.
+
+### 3h.0 The 2x2, three reps an arm
+
+`mq-random-10`, `reduced-grobner-basis`, grevlex, digest `72d0ad315fc2`, one cohort. Comparands
+twelve reps each: singular 7 371.9 ms / 23.6 MB, msolve 253.1 ms, groebner.jl 85.7 ms, sagebrush
+344.4 ms *(not authoritative)*.
+
+| arm | mean | min | peak RSS | against the old default | against Singular |
+|---|---:|---:|---:|---:|---|
+| division + echelon *(the old default)* | 27 536.2 ms | 26 460.6 | 162.1 MB | — | 3.74x behind |
+| division + reduced | 5 953.8 ms | 5 771.7 | 418.3 MB | 4.63x | **1.24x ahead** |
+| matrix + echelon | 7 436.7 ms | 7 202.7 | 602.9 MB | 3.70x | 1.01x behind |
+| **ByOrder + reduced** | **4 695.7 ms** | **4 550.8** | **418.8 MB** | **5.86x** | **1.57x ahead** |
+
+`katsura-11`, 600 s budget, one rep an arm, singular 53 591.9 ms / 41.7 MB over four reps:
+
+| arm | wall | peak RSS | against the old default | against Singular |
+|---|---:|---:|---:|---|
+| division + echelon | 241 042.6 ms | 538.9 MB | — | 4.50x behind |
+| division + reduced | 55 299.1 ms | 665.2 MB | 4.36x | 1.03x behind |
+| matrix + echelon | 233 294.3 ms | 1 087.2 MB | 1.03x | 4.35x behind |
+| **ByOrder + reduced** | **29 769.4 ms** | **667.0 MB** | **8.10x** | **1.80x ahead** |
+
+### 3h.1 The memory objection is gone, and the reason is the one §3e.5 predicted
+
+**`matrix + reduced` costs less memory than `matrix + echelon`** — 418.8 MB against 602.9 MB on
+`mq-random-10`, **667.0 MB against 1 087.2 MB** on `katsura-11`. The closure the route was not
+building was the cost, exactly as §3e.3 attributed it and §3e.5 predicted.
+
+Against the old default the pair costs **2.58x** on `mq-random-10` and **1.24x** on `katsura-11`,
+where the route alone cost 3.72x and §3e measured 24.59x before #536. So the quantity that gated
+§3e is now within a small factor and, since #536, inside a budget that refuses it when it is not.
+
+**And #536 is observably doing that.** `matrix + echelon` on `katsura-11` came in at 233 294.3 ms
+and 1 087.2 MB — not §3e's 119 460 ms and 13 148.3 MB. The pass was **refused and fell back**, which
+is why its time is within 3% of the division arm's. That is the budget working, and it is also why
+the route alone is now worth nothing on that rung.
+
+### 3h.2 Neither flag is worth at the top what the pair is
+
+| rung | route alone | flag alone | **together** |
+|---|---:|---:|---:|
+| `mq-random-10` | 3.70x | 4.63x | **5.86x** |
+| `katsura-11` | **1.03x** | 4.36x | **8.10x** |
+
+They are not independent and not additive: 3.70 x 4.63 is 17.1 where the pair is 5.86, because both
+attack the same stage. But on `katsura-11` the route alone is **1.03x — nothing** — and the pair is
+8.10x, because `reduce_batch_rows` is what makes the matrix small enough to clear the budget that
+would otherwise refuse it. A decision taken on either flag alone would have been wrong about the
+other.
+
+### 3h.3 The order criterion survives the pair
+
+The ladder re-run with `reduce_batch_rows` on **both** arms, so it stays a route comparison
+(`examples/interreduction_routes.rs --orders --reduce-batch-rows`):
+
+| order | range | verdict |
+|---|---|---|
+| grevlex | 1.13x–1.93x faster | matrix wins every rung |
+| grlex | 1.15x–1.74x faster | matrix wins every rung |
+| lex | katsura-6 **0.49x**, katsura-5 0.73x, katsura-4 0.87x, cyclic-5 0.97x | matrix loses or ties |
+
+So the split is the same shape §3e.2 measured and the criterion does not move. It is **milder** —
+katsura-6 lex is 2.04x slower where §3e.2 had 6.25x — because the matrix the route builds is smaller
+once the tails are already reduced. Milder is not absent, so `ByOrder` still routes lex to division.
+The lex rungs that favour the matrix route are `cyclic-4` (1.10x) and `mq-planted-10` (1.38x), both
+at the noise floor and neither in shape position, which is the same reading as §3e.2's.
+
+And `reduce_batch_rows` on its own regresses **no rung under any order**, which is what a global
+default needs. Comparing the division columns of the two ladder runs: katsura-7 grevlex 24.3 ms to
+11.2 ms, katsura-6 grevlex 2.9 ms to 1.8 ms, **katsura-6 lex 16.1 ms to 8.4 ms**, cyclic-5 grevlex
+1.2 ms to 0.9 ms, mq-random-6 grevlex 20.0 ms to 16.4 ms. Faster everywhere above the noise floor,
+lex included.
+
+### 3h.4 The decision
+
+**Both defaults move**, in `F4Options::recommended()`:
+
+```rust
+reduce_batch_rows: true,
+interreduction: InterreductionRoute::ByOrder,
+```
+
+`F4Options::baseline()` keeps both off, so an ablation against every figure published before this
+is still available — which is the reason `baseline` exists separately from `default`.
+
+What that makes true of `mq-random-10`, the row M27's 4.13x deficit was measured on: **4 695.7 ms
+against Singular's 7 371.9 ms, 1.57x ahead**, where the configuration M27 opened with was 3.74x
+behind. The remaining gaps on that row are msolve at 18.6x and Groebner.jl at **54.8x**, the latter
+from 347.8x at `7adb29e` — so the 348x this file was opened to explain is now 54.8x, and
+interreduction is no longer where it lives.
+
+### 3h.5 What this does not settle
+
+* **Any rung other than these two.** The 2x2 is `mq-random-10` and `katsura-11`. The ladder run in
+  §3h.3 is timings from one process with no peak RSS, so the memory claim is two rungs wide.
+* **The lex regression.** `ByOrder` avoids it rather than fixing it; a route chosen from the
+  instance as well as the order is still **#273**, and `fglm::shape`'s unwired detector is still the
+  candidate criterion.
+* **Whether 418 MB is the right price.** The pair costs 2.58x the old default's memory on
+  `mq-random-10` and that is a real charge against a budget, not free. Nothing here measures a rung
+  where it is the binding constraint, and #536's refusal is what stands between it and one.
+* **`katsura-11`'s arms are one rep each.** The `mq-random-10` arms are three. A rung that takes
+  four minutes an arm did not get reps, so its ratios carry this box's full spread.
 
 ---
 

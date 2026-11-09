@@ -1014,10 +1014,14 @@ mod tests {
     fn test_the_version_probe_records_the_interreduction_route() {
         use crate::grobner::{F4Options, InterreductionRoute};
 
-        let probe = |route| {
+        // Both flags named rather than inherited: `F4Options::default()` carries
+        // `reduce_batch_rows: true` since #575, so a control taken from it would couple this
+        // test's expected string to a default that is allowed to move.
+        let probe = |route, reduce_batch_rows| {
             ZeebraSolver::new()
                 .with_f4_options(F4Options {
                     interreduction: route,
+                    reduce_batch_rows,
                     ..F4Options::default()
                 })
                 .probe_version()
@@ -1030,7 +1034,7 @@ mod tests {
             (InterreductionRoute::Matrix, "matrix"),
         ] {
             assert_eq!(
-                probe(route).build.as_deref(),
+                probe(route, false).build.as_deref(),
                 Some(
                     format!(
                         "in-process, same build as the harness; \
@@ -1043,21 +1047,17 @@ mod tests {
 
         // The second flag is named too, because the two interact: with batches left reduced the
         // autoreduce matrix the route chooses over is a few hundred columns rather than ~8 000.
-        let reduced = ZeebraSolver::new()
-            .with_f4_options(F4Options {
-                reduce_batch_rows: true,
-                ..F4Options::default()
-            })
-            .probe_version()
-            .expect("in-process");
         assert_eq!(
-            reduced.build.as_deref(),
-            Some("in-process, same build as the harness; interreduction=division, batch-rows=reduced")
+            probe(InterreductionRoute::Division, true).build.as_deref(),
+            Some(
+                "in-process, same build as the harness; \
+                 interreduction=division, batch-rows=reduced"
+            )
         );
 
         assert_ne!(
-            probe(InterreductionRoute::Division).to_string(),
-            probe(InterreductionRoute::Matrix).to_string()
+            probe(InterreductionRoute::Division, false).to_string(),
+            probe(InterreductionRoute::Matrix, false).to_string()
         );
     }
 

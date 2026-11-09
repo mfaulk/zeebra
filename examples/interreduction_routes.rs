@@ -4,7 +4,12 @@
 //! cargo run --release --example interreduction_routes              # every reference-field rung
 //! cargo run --release --example interreduction_routes -- katsura-6 # one rung
 //! cargo run --release --example interreduction_routes -- --orders  # grevlex, grlex and lex
+//! cargo run --release --example interreduction_routes -- --orders --reduce-batch-rows
 //! ```
+//!
+//! `--reduce-batch-rows` turns #477's flag on for **both** arms, so the comparison stays a route
+//! comparison. It matters because that flag removes the reducible tails the matrix route has to
+//! close over, which is the thing the route is choosing about (#575).
 //!
 //! # Why this exists and the competitive board does not answer it
 //!
@@ -70,7 +75,7 @@ fn millis(d: Duration) -> f64 {
 /// A budget stop is reported rather than skipped: `f4_reported` returns its statistics whatever
 /// the outcome, and a rung that stops under both routes is still evidence about the stage.
 macro_rules! compare {
-    ($instance:expr, $order_name:expr, $order:expr, $wall:expr, $($n:literal),+ $(,)?) => {{
+    ($instance:expr, $order_name:expr, $order:expr, $wall:expr, $reduced:expr, $($n:literal),+ $(,)?) => {{
         let built: &Instance = $instance;
         let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
         match built.variables.len() {
@@ -85,7 +90,7 @@ macro_rules! compare {
                                 .expect("this crate rendered this text"),
                         );
                     }
-                    run_both(&built.name, $order_name, &system, $order, $wall)
+                    run_both(&built.name, $order_name, &system, $order, $wall, $reduced)
                 }
             )+
             other => {
@@ -104,6 +109,7 @@ fn run_both<const N: usize>(
     system: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     wall: Duration,
+    reduce_batch_rows: bool,
 ) -> Option<Row> {
     // A per-route wall budget, because this example sweeps rungs with no board row and therefore
     // no evidence that they finish. Both routes get the same budget, so a rung that stops stops
@@ -112,12 +118,14 @@ fn run_both<const N: usize>(
         measure_stages: true,
         interreduction: InterreductionRoute::Division,
         max_wall_time: Some(wall),
+        reduce_batch_rows,
         ..F4Options::default()
     };
     let matrix = F4Options {
         measure_stages: true,
         interreduction: InterreductionRoute::Matrix,
         max_wall_time: Some(wall),
+        reduce_batch_rows,
         ..F4Options::default()
     };
 
@@ -277,6 +285,10 @@ fn main() {
     };
     // The board's own policy, so a rung that stops here is a rung that stops there.
     let wall = Duration::from_secs(value("--wall").and_then(|s| s.parse().ok()).unwrap_or(60));
+    // #575: `reduce_batch_rows` removes the reducible tails the matrix route has to close over, so
+    // it changes the matrix the route is choosing about. Both arms get it, so the comparison stays
+    // a route comparison rather than becoming a comparison of two different main loops.
+    let reduce_batch_rows = arguments.iter().any(|a| a == "--reduce-batch-rows");
     // Rung names are the positional arguments. A flag's own value is skipped by position rather
     // than by text, so a rung whose name happened to equal it is still selectable.
     let mut wanted: Vec<&str> = Vec::new();
@@ -304,9 +316,15 @@ fn main() {
     };
 
     println!(
-        "# #507: both interreduction routes over the corpus ladder, GF({}), {} s per route",
+        "# #507/#575: both interreduction routes over the corpus ladder, GF({}), {} s per route, \
+         batch rows {}",
         REFERENCE,
-        wall.as_secs()
+        wall.as_secs(),
+        if reduce_batch_rows {
+            "reduced"
+        } else {
+            "echelon"
+        }
     );
     println!();
     header();
@@ -332,9 +350,22 @@ fn main() {
                 );
                 continue;
             }
-            if let Some(row) =
-                compare!(&built, order_name, *order, wall, 4, 5, 6, 7, 8, 9, 10, 11, 14)
-            {
+            if let Some(row) = compare!(
+                &built,
+                order_name,
+                *order,
+                wall,
+                reduce_batch_rows,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                14
+            ) {
                 emit(&row);
             }
         }

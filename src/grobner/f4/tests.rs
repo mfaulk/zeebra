@@ -1663,7 +1663,12 @@ fn test_structured_elimination_agrees_batch_by_batch_on_the_benchmark_families()
 /// `interreduce_by_matrix` rests on.
 #[test]
 fn test_reducing_batch_rows_returns_the_same_basis_on_the_corpus() {
-    let echelon = F4Options::default();
+    // Named explicitly rather than taken from `default()`, which carries `reduce_batch_rows: true`
+    // since #575 — a control inherited from the default would be the same arm twice.
+    let echelon = F4Options {
+        reduce_batch_rows: false,
+        ..F4Options::default()
+    };
     let reduced = F4Options {
         reduce_batch_rows: true,
         ..F4Options::default()
@@ -1689,7 +1694,12 @@ fn test_reducing_batch_rows_agrees_on_the_benchmark_families() {
     use crate::grobner::f4::reduce_batch;
     type G = Zp2147483647;
 
-    let echelon = F4Options::default();
+    // Named explicitly rather than taken from `default()`, which carries `reduce_batch_rows: true`
+    // since #575 — a control inherited from the default would be the same arm twice.
+    let echelon = F4Options {
+        reduce_batch_rows: false,
+        ..F4Options::default()
+    };
     let reduced = F4Options {
         reduce_batch_rows: true,
         ..F4Options::default()
@@ -2680,6 +2690,13 @@ fn test_what_an_uncapped_schedule_changes() {
             &F4Options {
                 max_pairs_per_batch: cap,
                 schedule,
+                // Echelon representatives explicitly. This test's subject is row order reaching
+                // later batches *through* them, and #575's `reduce_batch_rows` default normalizes
+                // a candidate's tail — which is the mechanism, so under it every schedule reaches
+                // the same widths and the measurement below has nothing to observe. That the
+                // default erases this effect is a finding about the default, not a reason to stop
+                // measuring the schedule.
+                reduce_batch_rows: false,
                 ..F4Options::default()
             },
         )
@@ -3808,8 +3825,14 @@ fn test_the_matrix_interreduction_falls_back_on_its_elimination_working_set() {
     let order = MonomialOrder::GradedReverseLexicographic;
     let system = katsura::<6, G>();
 
+    // Echelon batches explicitly. This test's premise is an interreduction pass whose working set
+    // dominates the batch loop's, and #575's `reduce_batch_rows` default removes the closure that
+    // makes it large — under it the guard below correctly reports that the test would no longer be
+    // about the interreduction. That the default shrinks this pass is #575's finding; this test is
+    // about the budget seeing the pass's elimination, so it keeps the configuration that has one.
     let unbounded = F4Options {
         interreduction: InterreductionRoute::Matrix,
+        reduce_batch_rows: false,
         max_live_nonzeros: usize::MAX,
         max_live_bytes: usize::MAX,
         ..F4Options::default()
@@ -3837,6 +3860,7 @@ fn test_the_matrix_interreduction_falls_back_on_its_elimination_working_set() {
     let entries = matrix.peak_nonzeros - 1;
     let bounded = F4Options {
         interreduction: InterreductionRoute::Matrix,
+        reduce_batch_rows: false,
         max_live_nonzeros: entries,
         max_live_bytes: entries * F4Options::bytes_per_entry::<G>(),
         ..F4Options::default()
@@ -3865,27 +3889,48 @@ fn test_the_matrix_interreduction_falls_back_on_its_elimination_working_set() {
     );
 }
 
-/// The default interreduction route is division, whatever the order.
+/// The default interreduction route is `ByOrder`, and the default batch form is reduced — #575.
 ///
-/// `interreduction_matrix` is recorded only on the matrix route, so its absence is the observable
-/// that says division ran. The default does **not** move to the measured winner: #507 found the
-/// matrix route ahead on every graded rung and behind on every lex one. #536 has since made the
-/// pass's elimination working set a budgeted quantity, so the memory is no longer taken silently —
-/// but a budget that now refuses it is a reason to measure which rungs still engage the route
-/// before moving the default, not a reason to move it. See #575.
+/// `interreduction_matrix` is recorded only on the matrix route, so its presence under a graded
+/// order and absence under lex is the observable that says `ByOrder` is the default and resolving.
+///
+/// Both flags moved together because neither is worth much without the other. Measured on
+/// `mq-random-10` as a five-engine board cohort, three reps an arm
+/// (`docs/research/interreduction-cost.md` §3f):
+///
+/// | arm | mean | against Singular |
+/// |---|---:|---|
+/// | division + echelon, the old default | 27 536 ms | 3.74x behind |
+/// | division + reduced | 5 954 ms | 1.24x ahead |
+/// | matrix + echelon | 7 437 ms | parity |
+/// | **ByOrder + reduced, the new default** | **4 696 ms** | **1.57x ahead** |
 #[test]
-fn test_the_default_interreduction_route_is_division_under_every_order() {
+fn test_the_defaults_are_by_order_and_reduced_batch_rows() {
     type G = Zp2147483647;
     let options = F4Options::default();
+    assert!(
+        options.reduce_batch_rows,
+        "#575 made a reduced batch form the default"
+    );
+    assert_eq!(options.interreduction, InterreductionRoute::ByOrder);
 
-    for order in ALL_ORDERS {
+    for order in [
+        MonomialOrder::GradedReverseLexicographic,
+        MonomialOrder::GradedLexicographic,
+    ] {
         let (_, statistics) = f4_reported(&katsura::<4, G>(), order, &options);
         assert!(
-            statistics.interreduction_matrix.is_none(),
-            "katsura-4 under {} built an interreduction matrix by default",
+            statistics.interreduction_matrix.is_some(),
+            "the default divided under {}, where the matrix route is measured ahead",
             order.name()
         );
     }
+
+    let (_, statistics) = f4_reported(&katsura::<4, G>(), MonomialOrder::Lexicographic, &options);
+    assert!(
+        statistics.interreduction_matrix.is_none(),
+        "the default built a matrix under lex, which is a regression on every shape-position rung"
+    );
 }
 
 /// `ByOrder` builds a matrix under the graded orders and divides under lex.

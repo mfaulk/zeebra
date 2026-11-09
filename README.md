@@ -3454,10 +3454,11 @@ class, the `poseidon31-cico-t16-rf4-rp2` row resolved across its three cost tabl
 when a ratio carries the #318/#319 systematic. **Cite it rather than re-deriving a baseline.** Three
 things it establishes that are easy to get wrong: a ratio formed *within* one cohort carries no
 systematic while one spanning a pre-M25 record carries +26%/−8%; `mq-random-10`'s interreduction
-share is unchanged at ~80% after #437 and is **still ~80% on the default path**, because
-`F4Options::recommended()` still selects `InterreductionRoute::Division`; and the interreduction A/B
-measures **3.63x** end to end on a box whose division side matches the board row, against the 4.18x
-measured on one 1.40x slower than it.
+share was unchanged at ~80% after #437 and stayed ~80% on the default path for as long as
+`F4Options::recommended()` selected the division route — **#575 moved that**, so the ~80% figure now
+describes `baseline()` and not the shipping path; and the interreduction A/B measures **3.63x** end
+to end on a box whose division side matches the board row, against the 4.18x measured on one 1.40x
+slower than it.
 
 #507 then took that A/B as a **five-engine board cohort** rather than a projection, and
 [`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) §3e is the result:
@@ -3466,10 +3467,14 @@ measured on one 1.40x slower than it.
 spread), with the matrix route ahead on
 every graded rung of the ladder above the timer's noise floor (1.01x–3.78x) and behind on every lex
 one (up to 6.25x, because a shape-position lex basis makes katsura-6 build 7 983 × 8 015 for a
-six-element basis). The default
-nevertheless stays on the division route, and the reason is **memory that no budget sees**:
-`katsura-11` goes 534.6 MB → 13 148.3 MB with every limit satisfied, because the refusal counts
-matrix entries and the entries are not where the memory goes. That gate is **#536**.
+six-element basis). #507 left the default on the division route, because `katsura-11` went 534.6 MB → 13 148.3 MB with
+every limit satisfied. **#536 then budgeted that working set and #575 took the 2x2 over both flags,
+and both defaults moved.** `F4Options::recommended()` now carries `reduce_batch_rows: true` and
+`InterreductionRoute::ByOrder`, which on `mq-random-10` is **4 695.7 ms against Singular's
+7 371.9 ms — 1.57x ahead**, where the configuration M27 opened with was 3.74x behind, and on
+`katsura-11` **1.80x ahead**. The memory objection dissolved rather than being overridden: the pair
+costs **418.8 MB** where the route alone cost 602.9 MB, because the closure it no longer builds was
+the cost.
 
 **Two strategy flags now sit off by default in that position, not one.** #477 found that the 80%
 interreduction share is a debt the *main loop* accrues — candidates are extracted from an echelon
@@ -3479,16 +3484,13 @@ autoreduce matrix from 7 642 x 7 996 to **252 x 606**, which is Groebner.jl's 25
 six columns, and the stage from 2 400 ms to **16.4 ms**. On the shipping division route it is
 **4.92x** end to end — more than `interreduce_by_matrix` is worth on its own — and the two together
 are **6.54x**. Unlike that flag it regresses no classical rung, including the katsura-5 lex case
-that costs the matrix route 25x. Both defaults are #507's to move, on a cohort rather than on one
-instance; §3c of [`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) has
-the four-arm table and says why the figures do not move the default by themselves. #507 moved the
-route's and left this one to **#575**, because the two are not independent in the direction that
-matters: with batches left reduced the autoreduce matrix is 252 x 606 rather than 7 642 x 7 996, and
-that closure is where the route's memory went before #536 budgeted it — so `matrix` + `reduced` may
-cost neither the 13.1 GB nor the 437 MB, and both defaults then move together at 6.54x. **One arm of
-that 2x2 is already a board row**: `division` + `reduced` on `mq-random-10` is **6 115.6 ms against
-its own cohort's Singular at 7 507.9 ms — 1.23x ahead**, the first `mq-random-10` basis row Zeebra
-is not behind Singular on.
+that costs the matrix route 25x. **#575 moved both defaults together**, on the 2x2 as a five-engine board cohort — §3g of
+[`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md). They are not
+independent: with batches left reduced the autoreduce matrix is 252 x 606 rather than
+7 642 x 7 996, and that closure is where the route's memory went, so `matrix` + `reduced` costs
+**418.8 MB** where the route alone cost 602.9 MB. On `katsura-11` the route *alone* is now worth
+nothing — #536's budget refuses its pass and it falls back — while the pair is **8.10x**. So
+neither flag could have been decided without the other.
 
 ### Solving zero-dimensional systems
 
