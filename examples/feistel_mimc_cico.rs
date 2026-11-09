@@ -240,6 +240,11 @@ fn main() {
     println!("The same solution set, reached by eliminating the r - 1 intermediate variables by");
     println!("substitution. The elimination is exact and costs degree exponentially.");
     println!();
+    println!("Stopped at r = 7 deliberately. Root finding needs x^q mod f, which is log2(q) = 64");
+    println!("squarings of a degree-3^r polynomial, so the solve scales as r * 3^(2r) and not as");
+    println!("3^r — the reason this route is hopeless well before the easiest specified r = 22,");
+    println!("and a cost the build column alone would not show.");
+    println!();
     println!(
         "| {:>3} | {:>9} | {:>10} | {:>10} | {:>5} | {:<24} |",
         "r", "degree", "build ms", "roots ms", "roots", "plant found"
@@ -253,7 +258,7 @@ fn main() {
         "-".repeat(7),
         "-".repeat(26)
     );
-    for rounds in 2..=9 {
+    for rounds in 2..=7 {
         let (degree, build, solve, roots, has_plant) = univariate_row(rounds);
         println!(
             "| {:>3} | {:>9} | {:>10} | {:>10} | {:>5} | {:<24} |",
@@ -275,7 +280,7 @@ fn main() {
     println!();
     println!("| {:>3} | {:>5} | {:<40} |", "r", "roots", "witness");
     println!("|{}|{}|{}|", "-".repeat(5), "-".repeat(7), "-".repeat(42));
-    for rounds in 1..=8 {
+    for rounds in 1..=7 {
         let mimc = FeistelMimc::<F>::new(FeistelMimcParameters::bounty(rounds)).expect("builds");
         let stated = FeistelMimcCico::new(mimc, FeistelMimcModel::Univariate);
         let found = stated.solutions();
