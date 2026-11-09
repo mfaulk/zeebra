@@ -1,9 +1,9 @@
 # msolve 0.11.0: what it actually does, and which of it Zeebra may reimplement
 
 **Measured at:** `dbab79eb`, reproduced at `3139025d`; §4.1's scatter split is stamped base
-`a756eb95` plus source blobs, per #505 (see the subsection for the blobs). The only Zeebra timings
-published here are §4.1's settlement of H1 and that split. Every other figure is read from msolve's
-source or quoted from a cited paper.
+`a756eb95` and its column-sort A/B base `87e11e72`, each plus source blobs, per #505 (see the
+subsections for the blobs). The only Zeebra timings published here are §4.1's settlement of H1, that
+split and that A/B. Every other figure is read from msolve's source or quoted from a cited paper.
 
 Source-grounded study for #264, a child of epic #256. The companion documents are
 `docs/research/external-comparands.md` (how msolve is provisioned and invoked) and
@@ -900,6 +900,62 @@ of #583's two gates therefore does not fire; it rests on the `sort_unstable_by` 
 The follow-up is #621, and it states what has to be established before anything is implemented: the
 memory cost of keeping a per-row-term handle against `max_live_bytes` and #536's release discipline,
 and whether the saving survives the indirection the handle introduces.
+
+#### Settled (#583): the sort wants to be unstable, and the handout order is not worth carrying
+
+The paragraph above answers the second of #583's two gates, so what was left of it is the first:
+whether `sort_unstable_by` is simply faster on the input #330's handout produces, which would make
+the ordering question moot. It is, on every instance tried, and that is the whole of the fix.
+
+Stability has nothing to decide here, which is what makes this sound rather than a trade. A monomial
+order reports `Equal` only for equal monomials (`test_orders_are_total`) and the columns are distinct
+(`test_columns_are_distinct_and_descending`), so the descending sequence is **unique** and there is
+no tie either sort could break differently. That is a precondition and not a coincidence, so it now
+has a test of its own — `test_the_column_order_does_not_depend_on_the_handout_order` re-sorts three
+permutations of a real column set and demands the one answer. Were the order ever made non-strict,
+or the column set ever to admit a duplicate, the sorted output would start depending on the hash
+set's iteration order, and that test is what would say so.
+
+`examples/column_sort_routes` is the harness: it replays a `recommended` trace, snapshots the column
+vector each batch hands the sort — `preprocessed.monomials` drained in hash-set order, which is what
+`build_measured` itself collects — and sorts the same snapshot both ways in one process on one build,
+arms interleaved with the order rotated per repetition and each min-reduced over its own runs, nine
+of them. The arms assert **equal output** as well as timing it, for the reason above.
+
+Stamped **base commit `87e11e72`** — an ancestor of `main` — plus the **blobs** of the two files the
+measured path came from (#505): `examples/column_sort_routes.rs` at `c9d9958ef0e9` and
+`src/grobner/f4/symbolic.rs` at `e7edcc363ead`, the latter because it produces the vectors being
+sorted. `taskset --cpu-list 2`, under `tools/benchlock.sh` at `load=5.11` with the fifteen-minute
+average at 474 — read again *with the lock held*, because the lock's own one-minute figure can be
+quiet while the fifteen-minute one says the box was not (#599). The branch SHA the run printed was
+`05c8e1c5`, recorded for the log and not relied on.
+
+| system | order | batches | columns | `sort_by` | `sort_unstable_by` | ratio |
+|---|---|---|---|---|---|---|
+| cyclic-5 | lex | 24 | 1 949 | 0.057 ms | 0.054 ms | **1.05x** |
+| katsura-5 | lex | 21 | 663 | 0.009 ms | 0.009 ms | **1.08x** |
+| katsura-6 | lex | 107 | 8 547 | 0.276 ms | 0.258 ms | **1.07x** |
+| katsura-6 | grevlex | 6 | 1 346 | 0.072 ms | 0.058 ms | **1.24x** |
+| katsura-7 | grlex | 7 | 2 847 | 0.209 ms | 0.205 ms | **1.02x** |
+
+The stable column is the control on the harness, and it holds against the clocked figures above:
+0.276 ms here against 0.32 ms inside `build_measured` on katsura-6 lex, and 0.209 against 0.25 on
+katsura-7 grlex. Two harnesses, the same sort, within 15%.
+
+So `build_measured` now calls `sort_unstable_by`, and it is worth saying plainly how little that
+buys: **0.018 ms of katsura-6 lex's 3.94 ms construction, 0.46% of the stage and 0.15% of the
+computation.** It is taken because it is one line, allocates nothing and cannot be got wrong, not
+because it is visible.
+
+**The first-appearance handout is declined, and #583 closes with it unimplemented.** #330 could hand
+over the discovery *order* as well as the set — `close_over_rows` finds monomials in exactly that
+order — and that was this issue's named fix, worth recovering the adaptive merge sort's runs. Against
+the table above that is at most the remaining 1.02x–1.24x, on a quantity that is 8% of the stage; and
+it costs a `Vec<Monomial<N>>` of `num_columns` live inside `Preprocessed` under the same release
+discipline #536 imposed on the interned set. #621, the live follow-up, will want preprocessing to
+carry a per-row-*term* handle rather than a per-column one, which a first-appearance vector would be
+redundant with. The regression #583 recorded therefore stands recorded, with its cause known and the
+free half of its fix taken — which is the resting state the issue itself named.
 
 ### H2 — A divmask would cut the reducer search, and Zeebra has no equivalent
 
