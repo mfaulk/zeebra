@@ -1,99 +1,8 @@
-//! The cross-library corpus: the same ideal, named the same way, for every engine.
-//!
-//! A cross-library comparison is meaningful only on **the same mathematical input**, and the two
-//! families everyone benchmarks on both have a naming hazard that produces a different ideal
-//! without producing an error. Both are resolved here by construction rather than by convention,
-//! and the resolutions are pinned by tests against another engine's own distributed input files.
-//!
-//! # Hazard 1: Katsura indexing
-//!
-//! The literature's "Katsura-n" has **n + 1 variables** `u_0 … u_n`, so the name and the variable
-//! count differ by one — and benchmark suites split on which number they use. Zeebra's
-//! [`katsura`](crate::grobner::benchmark_systems::katsura) is const-generic in the **variable
-//! count**: `katsura::<6>` is six variables, which the literature calls Katsura-5.
-//!
-//! **Resolved empirically.** msolve's distributed `input_files/kat6-31.ms` declares six variables
-//! `x1 … x6` and six equations, and is `katsura::<6>` generator for generator —
-//! `test_katsura_6_is_msolves_kat6` pins it against msolve's own literal. So msolve names by
-//! variable count and agrees with Zeebra's type parameter. **Every instance here is therefore
-//! named by variable count**, and the literature's `n` appears nowhere: an instance called
-//! `katsura-6` has six variables in every engine, and the digest is the real arbiter either way.
-//!
-//! # Hazard 2: affine versus homogenized Cyclic
-//!
-//! The cyclic-n roots system comes in two forms. The **affine** one closes with
-//! `x_1 ⋯ x_n − 1`, which is inhomogeneous and zero-dimensional for squarefree n. The
-//! **homogenized** one replaces that with `x_1 ⋯ x_n − h^n` in n + 1 variables, or drops the
-//! constant entirely; it is positive-dimensional, its Gröbner basis is a different object, and its
-//! cost is not comparable. Benchmark tables rarely say which they used.
-//!
-//! **Resolved empirically.** msolve's `input_files/cyclic5-16.ms` is the affine form, identical to
-//! [`cyclic`](crate::grobner::benchmark_systems::cyclic)`::<5>`, pinned by
-//! `test_cyclic_5_is_msolves_cyclic5`. The corpus is affine throughout. A homogenized instance
-//! would be a **different problem** with a different digest, and
-//! [`Instance::transformation`](super::Instance) is where that would be recorded.
-//!
-//! # Not every square system is zero-dimensional
-//!
-//! `cyclic::<4>` is **positive-dimensional** — its grevlex leading-term ideal contains no power of
-//! the last variable. It is in the corpus deliberately, as the easy rung that exercises the
-//! positive-dimensional path, and its entry says so. A task like
-//! [`Task::LexBasisByConversion`](super::Task) does not apply to it, which is a fact about the
-//! ideal and not a failure of any engine.
-//!
-//! # Hazard 3: a declared field that was not the generated one
-//!
-//! An instance carries a [`FieldSpec`] and a system, and nothing in the text ties them together:
-//! coefficients render as **residues**, so `−1` over `2^31 − 1` is the numeral `2147483646`, which
-//! is a perfectly well-formed element of a smaller prime field and a different one. A
-//! `characteristic` that reached only the label therefore produced a valid input file describing a
-//! different ideal from the one named, with a digest and a name both claiming otherwise (#425).
-//!
-//! **Resolved by construction.** The const-generic families are generated over the declared field
-//! via `over_prime!`, whose arms are [`GENERATED_CHARACTERISTICS`]; a prime with no compiled field
-//! yields `None`. `test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic` is
-//! the property, asserted on the rendered text rather than on the polynomials.
-//!
-//! # Where the ceiling is, and which stage sets it
-//!
-//! Measured, at [`REFERENCE_CHARACTERISTIC`] under grevlex at `F4Options::default()`, and the
-//! answer is not where the family index is largest:
-//!
-//! | rung | basis | `D` | conversion |
-//! |---|---:|---:|---:|
-//! | `katsura-8` | 0.22 s | 128 | 13 ms |
-//! | `katsura-9` | 2.1 s | 256 | 84 ms |
-//! | `katsura-10` | 21.8 s | 512 | 0.62 s |
-//! | `katsura-11` | 277 s | 1024 | 5.2 s |
-//! | `cyclic-7` | 1.4 s | 924 | 0.16 s |
-//! | `cyclic-8` | 21.3 s | — (positive-dimensional) | n/a |
-//! | `cyclic-9` | **refuses after 10.6 s** | — | — |
-//! | `cyclic-10` | **refuses after 24.3 s** | — | — |
-//!
-//! **The ceiling is `cyclic-9`, and the stage that sets it is the F4 basis**, which crosses the
-//! live-entry budget — `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`. The whole Katsura
-//! ladder is reachable to `katsura-11`, four rungs above the old ceiling, at roughly 10x per rung.
-//!
-//! That the refusal is a **resource** stop and not a wall-clock one is the point rather than a
-//! detail: an entry count crosses at the same counter on any machine, so the ceiling can be written
-//! down, where a time stop would make it a fact about how busy the box was.
-//! `test_the_ceiling_is_cyclic_9_and_the_basis_stage_sets_it` asserts all of it.
-//!
-//! A refusal is a **result**, so `cyclic-9` and `cyclic-10` are on the ladder rather than left off.
-//! Their dimension class comes from Backelin's theorem rather than from a computation, and
-//! `cyclic-10`'s `D = 34940` is Steel's published value this rung exists to one day be checked
-//! against. The timings above are from the development workstation with other agents at work on it;
-//! they bound reachability, and no cross-engine ratio is taken from them.
-//!
-//! # The ladder
-//!
-//! Rungs are chosen to be easy, intermediate and genuinely challenging rather than uniformly
-//! large: a family represented only by instances every engine times out on measures nothing, and a
-//! family represented only by instances every engine finishes in a millisecond measures startup
-//! cost. [`ladder`] is that selection, and [`manifest`] freezes each rung's digest.
+//! Frozen corpus digests bind a variable count, coefficient field and transformation to the
+//! generated system text. The Cyclic generator uses the affine formulation.
 
 use crate::{
-    fields::{PrimeFieldElement64, Zp32003},
+    fields::{PrimeFieldElement64, Zp2, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         differential::{polynomial_to_string, GeneratedSystem, SystemShape},
@@ -140,6 +49,37 @@ pub const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 /// reference prime uses.
 pub const SMALL_PRIME_CHARACTERISTIC: u64 = 32_003;
 
+/// The corpus's **characteristic-two** reference characteristic: `GF(2)`.
+///
+/// A third corpus identity, for the same reason [`SMALL_PRIME_CHARACTERISTIC`] is a second one —
+/// and published for **Cyclic only**, which is the one thing that makes it unlike the other two.
+///
+/// **It is the one field where Steel's Cyclic rows are Zeebra's ideal.** His `GF(32003)` Cyclic 7
+/// and Cyclic 8 carry `(Hom)`, the homogenized system, which is a different ideal; the `GF(2)`
+/// block carries no such mark, so `docs/research/classical-benchmarks.md` §4 reads it as the affine
+/// formulation [`cyclic`](crate::grobner::benchmark_systems::cyclic) generates. It is also the
+/// field Zeebra most recently gained end-to-end support for, and nothing external measured it.
+///
+/// **Why Cyclic only, and why that is a finding rather than a shortcut.** A characteristic the
+/// corpus publishes at must have invariants that are *true* there, and characteristic two is the
+/// first one where they are not simply the generic ones. Measured, four ways (§10 of
+/// `classical-benchmarks.md`): `cyclic-6` falls from zero-dimensional with `D = 156` to **Krull
+/// dimension 2**, and `cyclic-7`'s quotient dimension falls from the proved 924 to **728**. So
+/// Backelin's squarefree criterion — which `test_a_cyclic_rung_is_zero_dimensional_exactly_where_n_is_squarefree`
+/// asserts — is a statement about characteristic zero and does not survive the reduction. Katsura
+/// and planted MQ are worse off still: Katsura's generators carry coefficient 2, and
+/// [`planted_point`]'s `3 + 2i` collapses to all-ones mod 2, which destroys the distinctness the
+/// planted family's oracle depends on. Those families are therefore **generated** at `GF(2)` and
+/// not **published** there — the middle tier of [`PUBLISHED_CHARACTERISTICS`]' table, honest
+/// instances whose identity is not frozen and from which no figure may be quoted.
+///
+/// **No row at this characteristic adjoins the field equations.** `x^2 − x` is available over
+/// `GF(2)` and changes the ideal — it makes the quotient dimension count `GF(2)`-points rather than
+/// points over the closure — and Steel's rows do not have them, so neither do these. A row that did
+/// would be a different ideal and carries
+/// [`Instance::transformation`](super::Instance::transformation), which is inside the digest.
+pub const BINARY_CHARACTERISTIC: u64 = 2;
+
 /// The characteristics the corpus **publishes** at: every rung has a frozen digest at each.
 ///
 /// **A characteristic the corpus publishes at is part of its identity, not an argument to it**, and
@@ -162,8 +102,17 @@ pub const SMALL_PRIME_CHARACTERISTIC: u64 = 32_003;
 /// [`ALTERNATE_CHARACTERISTIC`] is the middle tier: `msolve.rs`'s eliminant tests need an instance
 /// there, and those tests check msolve's *behaviour* rather than quote a timing, so the instance
 /// must be correct but need not be frozen.
-pub const PUBLISHED_CHARACTERISTICS: [u64; 2] =
-    [SMALL_PRIME_CHARACTERISTIC, REFERENCE_CHARACTERISTIC];
+/// **Publication is per rung, not per characteristic**, and [`CorpusEntry::digest_at`] is the test:
+/// a rung is published at a characteristic exactly when it has a frozen digest there.
+/// [`BINARY_CHARACTERISTIC`] is what forced the distinction — it is published for the Cyclic family
+/// and generated-only for the rest, because characteristic two is not a generic characteristic and
+/// Katsura's and planted MQ's invariants do not survive it. `test_the_publication_matrix_is_frozen`
+/// pins which rungs are published where, so a digest cannot be dropped and read as "not published".
+pub const PUBLISHED_CHARACTERISTICS: [u64; 3] = [
+    BINARY_CHARACTERISTIC,
+    SMALL_PRIME_CHARACTERISTIC,
+    REFERENCE_CHARACTERISTIC,
+];
 
 /// A second prime the const-generic families are compiled over: `2^30 + 3`.
 ///
@@ -197,7 +146,8 @@ pub const WIDE_64_CHARACTERISTIC: u64 = 18_446_744_073_709_551_263;
 /// Random MQ is not listed here because it does not need to be: its generator reduces at run time
 /// through [`CaseField`](crate::grobner::differential::CaseField), so every prime is available to
 /// it.
-pub const GENERATED_CHARACTERISTICS: [u64; 3] = [
+pub const GENERATED_CHARACTERISTICS: [u64; 4] = [
+    BINARY_CHARACTERISTIC,
     SMALL_PRIME_CHARACTERISTIC,
     ALTERNATE_CHARACTERISTIC,
     REFERENCE_CHARACTERISTIC,
@@ -218,6 +168,14 @@ pub const GENERATED_CHARACTERISTICS: [u64; 3] = [
 macro_rules! over_prime {
     ($characteristic:expr, |$field:ident| $body:block) => {
         match $characteristic {
+            // Characteristic two. Every coefficient renders as 0 or 1, so Cyclic's `−1` closing
+            // generator becomes `+1` and the rendered text is *not* a residue-renaming of the
+            // reference prime's — it is a different, shorter system with a different digest, which
+            // is the whole reason this is a corpus identity and not a parameter.
+            BINARY_CHARACTERISTIC => {
+                type $field = Zp2;
+                Some($body)
+            }
             // A 32-bit Montgomery field, so the small-prime rows measure the narrow regime they
             // exist for. The *rendered text* is the same either way — a residue is a residue — so
             // the representation is invisible to the digest and visible only in Zeebra's timing.
@@ -323,7 +281,125 @@ pub struct CorpusEntry {
     pub digests: &'static [(u64, &'static str)],
 }
 
+/// A rung's invariants at a characteristic where they are **not** the generic ones.
+///
+/// Carries a Krull dimension rather than a `zero_dimensional` flag because characteristic two does
+/// not merely move rungs across that boundary — it moves them *along* it. `cyclic-8` is
+/// positive-dimensional at every characteristic and its Krull dimension is 1 at `2^31 − 1` and
+/// **3** at `GF(2)`, which a boolean cannot say.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Degeneracy {
+    /// `dim R/I`, the dimension of the variety. `0` is zero-dimensional.
+    pub krull_dimension: u64,
+
+    /// `dim_F(R/I)`, present only when [`Self::krull_dimension`] is 0.
+    pub quotient_dimension: Option<u64>,
+
+    /// Which engines produced this, so the row says what stands behind it.
+    pub corroborated_by: &'static str,
+}
+
+/// Where a rung's invariants at a published characteristic are not its generic ones.
+///
+/// **Sparse by nature, so a flat table rather than a `CorpusEntry` field.** Characteristic two and
+/// the Cyclic family are the whole of it, and keeping the exceptions in one readable place leaves
+/// the generic invariants as the thing a reader sees beside the rung.
+///
+/// Every value here is measured on this machine, not cited. `cyclic-4` and `cyclic-5` are absent
+/// because they are *not* degenerate — Krull dimension 1 and `D = 70` at `GF(2)` exactly as at the
+/// reference prime — which is itself worth knowing: the reduction is not uniformly destructive.
+///
+/// The pattern these record is that **Backelin's squarefree criterion is a characteristic-zero
+/// statement.** It predicts `cyclic-6`, `cyclic-7` and `cyclic-10` zero-dimensional, and at `GF(2)`
+/// the first and third are not. See `docs/research/classical-benchmarks.md` §10.
+const DEGENERACIES: &[(&str, u64, Degeneracy)] = &[
+    (
+        "cyclic-6",
+        BINARY_CHARACTERISTIC,
+        Degeneracy {
+            // Zero-dimensional with `D = 156` at every larger prime measured.
+            krull_dimension: 2,
+            quotient_dimension: None,
+            corroborated_by: "Zeebra, msolve 0.11.0, Singular, Groebner.jl",
+        },
+    ),
+    (
+        "cyclic-7",
+        BINARY_CHARACTERISTIC,
+        Degeneracy {
+            // Still zero-dimensional, but 728 rather than the 924 Backelin and Fröberg proved.
+            krull_dimension: 0,
+            quotient_dimension: Some(728),
+            corroborated_by: "Zeebra, msolve 0.11.0, Singular, Groebner.jl",
+        },
+    ),
+    (
+        "cyclic-8",
+        BINARY_CHARACTERISTIC,
+        Degeneracy {
+            // Positive-dimensional at both, and the dimension differs: 1 at `2^31 − 1`, 3 here.
+            krull_dimension: 3,
+            quotient_dimension: None,
+            corroborated_by: "msolve 0.11.0, Groebner.jl",
+        },
+    ),
+    (
+        "cyclic-9",
+        BINARY_CHARACTERISTIC,
+        Degeneracy {
+            krull_dimension: 2,
+            quotient_dimension: None,
+            corroborated_by: "msolve 0.11.0, Groebner.jl",
+        },
+    ),
+    (
+        "cyclic-10",
+        BINARY_CHARACTERISTIC,
+        Degeneracy {
+            // **Steel's published value, checked.** His `GF(2)` note reads "The ideal has dimension
+            // 4" — a Krull dimension, where the `GF(32003)` note's 34940 is a vector-space one —
+            // and this is 4. The only externally published number on that page about an ideal
+            // Zeebra generates, and it agrees. At `2^31 − 1` the same rung is zero-dimensional with
+            // `D = 34940`, so the degeneracy is total: a finite point count becomes a fourfold.
+            krull_dimension: 4,
+            quotient_dimension: None,
+            // Two engines computed the basis independently and agree on 2271 elements; three
+            // independent dimension computations over it agree on 4.
+            corroborated_by: "msolve 0.11.0 and Groebner.jl (2271 elements each); \
+                              Groebner.jl dimension, Singular dim, independent-set rule",
+        },
+    ),
+];
+
+/// The recorded degeneracy for `name` at `characteristic`, if its invariants differ there.
+pub fn degeneracy(name: &str, characteristic: u64) -> Option<Degeneracy> {
+    DEGENERACIES
+        .iter()
+        .find(|(rung, field, _)| *rung == name && *field == characteristic)
+        .map(|(_, _, degeneracy)| *degeneracy)
+}
+
 impl CorpusEntry {
+    /// Whether the ideal is zero-dimensional **at `characteristic`**.
+    ///
+    /// [`Self::zero_dimensional`] is the generic answer; this is the one a row may be published
+    /// against. They differ at [`BINARY_CHARACTERISTIC`] for two Cyclic rungs.
+    pub fn zero_dimensional_at(&self, characteristic: u64) -> bool {
+        match degeneracy(self.name, characteristic) {
+            Some(degeneracy) => degeneracy.krull_dimension == 0,
+            None => self.zero_dimensional,
+        }
+    }
+
+    /// `dim_F(R/I)` **at `characteristic`**, `None` where there is no finite quotient or nobody
+    /// knows.
+    pub fn quotient_dimension_at(&self, characteristic: u64) -> Option<u64> {
+        match degeneracy(self.name, characteristic) {
+            Some(degeneracy) => degeneracy.quotient_dimension,
+            None => self.quotient_dimension,
+        }
+    }
+
     /// The frozen digest for the instance this rung builds at `characteristic`.
     ///
     /// `characteristic` is the one the built instance **declares**, which for a single-field family
@@ -668,16 +744,25 @@ fn ceiling_for(engine: &str, task: super::Task) -> Option<u64> {
 /// Every engine the corpus compares against.
 pub const ENGINES: [&str; 4] = ["msolve", "singular", "sagebrush", "groebner.jl"];
 
-/// The corroboration available for `task` at `characteristic`.
-///
-/// Task-aware, because the rosters are. The case that matters most for #263: the **conversion**
-/// task, where Zeebra's only measured cross-library deficit lies, is missing **msolve** (no lex
-/// order) and **Groebner.jl** (no FGLM in 0.10.11) at every field — so it has two engines below
-/// `2^31` where the basis task has four, and none at all above, where the basis task has two.
+/// Minimum characteristic supported by the engine's adapter for this task.
+fn floor_for(engine: &str, task: super::Task) -> u64 {
+    use super::Task::*;
+    match (engine, task) {
+        ("msolve", UnivariateEliminant) => {
+            crate::grobner::external::msolve::MIN_CHARACTERISTIC_ELIMINANT
+        }
+        _ => 2,
+    }
+}
+
+/// Counts the external adapters that support this task at the given prime characteristic.
 pub fn corroboration_for(task: super::Task, characteristic: u64) -> Corroboration {
     let engines = ENGINES
         .iter()
-        .filter(|engine| ceiling_for(engine, task).is_some_and(|ceiling| characteristic < ceiling))
+        .filter(|engine| {
+            ceiling_for(engine, task).is_some_and(|ceiling| characteristic < ceiling)
+                && characteristic >= floor_for(engine, task)
+        })
         .count();
     Corroboration::from_engines(engines)
 }
@@ -966,6 +1051,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             },
             digests: &[
                 (
+                    BINARY_CHARACTERISTIC,
+                    "77f83e03b9305310932246b02494bde76ed6190f88f1f940df5e23bd8b800cce",
+                ),
+                (
                     SMALL_PRIME_CHARACTERISTIC,
                     "e5a49df27c74d4d71ef13c67b3681ae76f0af89b8cb96432e05fedda71e0c80f",
                 ),
@@ -986,6 +1075,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 file: "input_files/cyclic5-16.ms",
             },
             digests: &[
+                (
+                    BINARY_CHARACTERISTIC,
+                    "ae8c4aa8ce0ceb59d87494c41ea419a388b8a4a1c224db3bba8fd37f88473c68",
+                ),
                 (
                     SMALL_PRIME_CHARACTERISTIC,
                     "e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
@@ -1008,6 +1101,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             },
             digests: &[
                 (
+                    BINARY_CHARACTERISTIC,
+                    "82d27add6e12d56b95251259c115b6730ec48130c38252bbef872f1337773b45",
+                ),
+                (
                     SMALL_PRIME_CHARACTERISTIC,
                     "bf3bb57af08fcc94d7f5c8bf01b6f4a90557dad0a41c7ce12464ea90ad93a895",
                 ),
@@ -1028,6 +1125,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 file: "input_files/cyclic5-16.ms",
             },
             digests: &[
+                (
+                    BINARY_CHARACTERISTIC,
+                    "5bf1687f10275fc807c8d548b0e0bd88f377a5bc8617d62c4746f4f4818b0fd1",
+                ),
                 (
                     SMALL_PRIME_CHARACTERISTIC,
                     "18746449c45766c3ba73ab0417c2ea1bbe7f7842d88d8a1a55068c71e9aaa736",
@@ -1051,6 +1152,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 file: "input_files/cyclic5-16.ms",
             },
             digests: &[
+                (
+                    BINARY_CHARACTERISTIC,
+                    "50d21276dfc6b696d3150f4b21c29d038a4e38c3255fd5f6ce68fdfaea2ed91c",
+                ),
                 (
                     SMALL_PRIME_CHARACTERISTIC,
                     "e2f6be738bd1f215766d7184e248663e1a03c4ded31db736fe1b57fb03fd8843",
@@ -1076,6 +1181,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             },
             digests: &[
                 (
+                    BINARY_CHARACTERISTIC,
+                    "682c5c189e244f84fbe9e6147c6395871335d3d244385860a9643f0662c09d5d",
+                ),
+                (
                     SMALL_PRIME_CHARACTERISTIC,
                     "ccffb9b3e5ca7b8239026012a16bcd0c8e294f29598881bd4b9b9fcc046c6857",
                 ),
@@ -1099,6 +1208,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 file: "input_files/cyclic5-16.ms",
             },
             digests: &[
+                (
+                    BINARY_CHARACTERISTIC,
+                    "c20a7428b05e1e2a86a7b0de3db4b8d1ce7264dfef2875558c7df16ec448c388",
+                ),
                 (
                     SMALL_PRIME_CHARACTERISTIC,
                     "538964ac3a891da65bb0eaada43b7ed3a6a5aa51f1fa608a6f4119a500ff0d34",
@@ -1236,9 +1349,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
 /// [`Instance::canonical`](super::Instance::canonical) is line-oriented.
 ///
 /// The characteristic is a **column** rather than a document per field, so one sorted table carries
-/// the whole corpus and a reader can see at a glance which rungs have two identities and which have
-/// one. Rows are deduplicated by their own text, which is what keeps a single-field rung — the
-/// same instance whatever is asked for — to a single line.
+/// the whole corpus. Each Cyclic rung has three identities and the other rungs have two.
 pub fn manifest() -> String {
     let mut lines: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for characteristic in PUBLISHED_CHARACTERISTICS {
@@ -1249,13 +1360,19 @@ pub fn manifest() -> String {
                 MonomialOrder::GradedReverseLexicographic,
             )
             .expect("every ladder entry is buildable at every published characteristic");
+            // Built-but-not-published is a real tier, not a gap: Katsura and planted MQ build
+            // honestly at `BINARY_CHARACTERISTIC` and are not frozen there, so they must not appear
+            // in a manifest whose whole purpose is to pin publishable identities.
+            if entry.digest_at(built.field.characteristic).is_none() {
+                continue;
+            }
             lines.insert(format!(
                 "{} {} {} {} {} {} {} {}",
                 entry.name,
                 entry.family,
                 entry.rung.tag(),
                 entry.equivalence.tag(),
-                if entry.zero_dimensional {
+                if entry.zero_dimensional_at(built.field.characteristic) {
                     "zero-dimensional"
                 } else {
                     "positive-dimensional"
@@ -1785,6 +1902,61 @@ mod tests {
         ] {
             check_recorded_dimension(name);
         }
+    }
+
+    /// Where Zeebra's own ceiling falls on the Cyclic ladder **over GF(2)**, and the stage that
+    /// sets it.
+    ///
+    /// #427's fourth task. Reported as a printed table as well as asserted, because the point of
+    /// the rung is the comparison against Steel's published Krull dimension of 4 at `cyclic-10`,
+    /// and a refusal is the result if the rung is out of reach.
+    ///
+    /// `#[ignore]`d for cost. Run with `cargo test --release -- --ignored`.
+    #[test]
+    #[ignore = "minutes of F4 over GF(2); run with --ignored"]
+    fn test_where_zeebras_cyclic_ladder_stops_over_gf2() {
+        use crate::fields::Zp2;
+        use crate::grobner::{f4_with_options, fglm::krull_dimension, F4Options, StopKind};
+
+        fn basis<const N: usize>(name: &str) -> Result<(usize, Option<usize>), (StopKind, String)> {
+            let built =
+                instance(name, super::BINARY_CHARACTERISTIC, GREVLEX).expect("in the ladder");
+            let parsed: Vec<MultivariatePolynomial<N, Zp2>> = built
+                .system
+                .iter()
+                .map(|text| MultivariatePolynomial::parse(text, names::<N>()).expect("parses"))
+                .collect();
+            match f4_with_options(&parsed, GREVLEX, &F4Options::default()) {
+                Ok((basis, _)) => {
+                    let dimension = krull_dimension(&basis, GREVLEX);
+                    Ok((basis.len(), dimension))
+                }
+                Err(e) => Err((e.stop_kind(), format!("{e:?}"))),
+            }
+        }
+
+        for (name, outcome) in [
+            ("cyclic-5", basis::<5>("cyclic-5")),
+            ("cyclic-6", basis::<6>("cyclic-6")),
+            ("cyclic-7", basis::<7>("cyclic-7")),
+            ("cyclic-8", basis::<8>("cyclic-8")),
+            ("cyclic-9", basis::<9>("cyclic-9")),
+            ("cyclic-10", basis::<10>("cyclic-10")),
+        ] {
+            match outcome {
+                Ok((elements, dimension)) => {
+                    println!(
+                        "{name} over GF(2): {elements} elements, Krull dimension {dimension:?}"
+                    )
+                }
+                Err((kind, detail)) => println!("{name} over GF(2): refused, {kind:?}, {detail}"),
+            }
+        }
+
+        // The rungs the corpus publishes invariants for are reachable here, which is what makes
+        // those invariants Zeebra's own rather than only the comparands'.
+        assert_eq!(basis::<6>("cyclic-6").expect("reachable").1, Some(2));
+        assert_eq!(basis::<7>("cyclic-7").expect("reachable").1, Some(0));
     }
 
     /// The ceiling is `cyclic-9`, it is set by the **basis** stage, and the stop is a
@@ -2326,6 +2498,12 @@ mod tests {
             for entry in ladder() {
                 let built = instance(entry.name, characteristic, GREVLEX).expect("builds");
                 let frozen = entry.digest_at(built.field.characteristic);
+                // A rung the corpus does not publish at this characteristic has nothing to drift
+                // from. `test_the_publication_matrix_is_frozen` is what stops a digest being
+                // dropped and silently reread as "not published here".
+                if frozen.is_none() {
+                    continue;
+                }
                 if frozen != Some(built.digest().as_str()) {
                     // Collected rather than asserted one at a time: a generator change moves every
                     // rung at once, and a reader fixing it needs the whole list.
@@ -2346,30 +2524,197 @@ mod tests {
         );
     }
 
-    /// Every published characteristic has a frozen digest for every rung, and no rung has a stray.
+    /// Which rungs are published at which characteristic, asserted per family.
     ///
-    /// The gate [`PUBLISHED_CHARACTERISTICS`] records: a figure may be quoted at a characteristic
-    /// only where the rung's identity is pinned there. A rung with a digest at a field the corpus
-    /// does not publish would be an identity nothing checks, and a published field with no digest
-    /// would be a figure nothing pins — so both directions are asserted.
+    /// The gate [`PUBLISHED_CHARACTERISTICS`] records, now that publication is per rung: a figure
+    /// may be quoted at a characteristic only where that rung's identity is pinned there. Written
+    /// as an explicit matrix rather than derived, because the two failures it has to catch are
+    /// opposites — a rung with a digest at a field the corpus does not publish is an identity
+    /// nothing checks, and a *dropped* digest would otherwise read as the honest statement "not
+    /// published here" and silently retire a published row.
     #[test]
-    fn test_every_published_characteristic_is_frozen_for_every_rung() {
+    fn test_the_publication_matrix_is_frozen() {
         for entry in ladder() {
-            let declared: BTreeSet<u64> = super::PUBLISHED_CHARACTERISTICS
-                .iter()
-                .map(|characteristic| {
-                    instance(entry.name, *characteristic, GREVLEX)
-                        .expect("builds")
-                        .field
-                        .characteristic
-                })
-                .collect();
+            let expected: BTreeSet<u64> = match entry.family {
+                // Cyclic alone is published in characteristic two: its invariants there are
+                // measured, where Katsura's and planted MQ's are not the generic ones at all.
+                "cyclic" => [
+                    super::BINARY_CHARACTERISTIC,
+                    SMALL_PRIME_CHARACTERISTIC,
+                    REFERENCE_CHARACTERISTIC,
+                ]
+                .into_iter()
+                .collect(),
+                "katsura" | "mq-random" | "mq-planted" => {
+                    [SMALL_PRIME_CHARACTERISTIC, REFERENCE_CHARACTERISTIC]
+                        .into_iter()
+                        .collect()
+                }
+                other => panic!("{} has no recorded publication policy", other),
+            };
             let frozen: BTreeSet<u64> = entry.digests.iter().map(|(field, _)| *field).collect();
             assert_eq!(
-                frozen, declared,
-                "{}'s frozen fields and the fields it actually builds over disagree",
+                frozen, expected,
+                "{} is not published where its family says it is",
                 entry.name
             );
+
+            // And every field it is published at is one it genuinely builds over, so a digest
+            // cannot pin an instance that does not exist.
+            for (field, _) in entry.digests {
+                let built = instance(entry.name, *field, GREVLEX)
+                    .unwrap_or_else(|| panic!("{} does not build at {}", entry.name, field));
+                assert_eq!(
+                    built.field.characteristic, *field,
+                    "{}'s digest at {} pins an instance declaring another field",
+                    entry.name, field
+                );
+            }
+        }
+    }
+
+    /// Characteristic two is published for Cyclic and generated-only for every other family.
+    #[test]
+    fn test_characteristic_two_is_published_for_cyclic_alone() {
+        for entry in ladder() {
+            let published = entry.digest_at(super::BINARY_CHARACTERISTIC).is_some();
+            assert_eq!(
+                published,
+                entry.family == "cyclic",
+                "{} is published at GF(2): {}",
+                entry.name,
+                published
+            );
+            // Generated-but-not-published is still a buildable instance for every const-generic
+            // family, which is what makes the middle tier honest rather than absent.
+            if entry.family != "poseidon" && entry.family != "anemoi" {
+                assert!(
+                    instance(entry.name, super::BINARY_CHARACTERISTIC, GREVLEX).is_some(),
+                    "{} does not build at GF(2)",
+                    entry.name
+                );
+            }
+        }
+    }
+
+    /// Characteristic two moves Cyclic's invariants, so the corpus records them per characteristic.
+    #[test]
+    fn test_the_cyclic_invariants_degenerate_in_characteristic_two() {
+        let at = |name: &str| {
+            ladder()
+                .into_iter()
+                .find(|entry| entry.name == name)
+                .expect("in the ladder")
+        };
+
+        // cyclic-6: zero-dimensional with D = 156 generically, Krull dimension 2 at GF(2).
+        let six = at("cyclic-6");
+        assert!(six.zero_dimensional_at(REFERENCE_CHARACTERISTIC));
+        assert_eq!(
+            six.quotient_dimension_at(REFERENCE_CHARACTERISTIC),
+            Some(156)
+        );
+        assert!(!six.zero_dimensional_at(super::BINARY_CHARACTERISTIC));
+        assert_eq!(
+            six.quotient_dimension_at(super::BINARY_CHARACTERISTIC),
+            None
+        );
+        assert_eq!(
+            super::degeneracy("cyclic-6", super::BINARY_CHARACTERISTIC)
+                .expect("recorded")
+                .krull_dimension,
+            2
+        );
+
+        // cyclic-7: still zero-dimensional, but 728 rather than the proved 924.
+        let seven = at("cyclic-7");
+        assert_eq!(
+            seven.quotient_dimension_at(REFERENCE_CHARACTERISTIC),
+            Some(924)
+        );
+        assert!(seven.zero_dimensional_at(super::BINARY_CHARACTERISTIC));
+        assert_eq!(
+            seven.quotient_dimension_at(super::BINARY_CHARACTERISTIC),
+            Some(728)
+        );
+
+        // cyclic-5 is not degenerate, which is why it has no entry.
+        assert!(super::degeneracy("cyclic-5", super::BINARY_CHARACTERISTIC).is_none());
+        assert_eq!(
+            at("cyclic-5").quotient_dimension_at(super::BINARY_CHARACTERISTIC),
+            Some(70)
+        );
+    }
+
+    /// `cyclic-10`'s recorded Krull dimension at GF(2) is **Steel's published 4**, and at the
+    /// reference prime the same rung is zero-dimensional with his other published value, 34940.
+    ///
+    /// The one externally published number on Steel's page about an ideal Zeebra generates, and the
+    /// reason #427 existed. Asserted as a *record* here; the measurement that produced it is in
+    /// `docs/research/classical-benchmarks.md` §10.5.
+    #[test]
+    fn test_cyclic_10_carries_steels_published_dimension_at_each_characteristic() {
+        let ten = ladder()
+            .into_iter()
+            .find(|entry| entry.name == "cyclic-10")
+            .expect("in the ladder");
+
+        // GF(2): a Krull dimension, and positive — so there is no finite quotient to count.
+        assert_eq!(
+            super::degeneracy("cyclic-10", super::BINARY_CHARACTERISTIC)
+                .expect("recorded")
+                .krull_dimension,
+            4,
+            "Steel's GF(2) note states the ideal has dimension 4"
+        );
+        assert!(!ten.zero_dimensional_at(super::BINARY_CHARACTERISTIC));
+        assert_eq!(
+            ten.quotient_dimension_at(super::BINARY_CHARACTERISTIC),
+            None,
+            "a positive-dimensional ideal has no finite quotient dimension"
+        );
+
+        // The reference prime: zero-dimensional, with the vector-space dimension Steel states for
+        // GF(32003). The two published numbers are different quantities about the same rung.
+        assert!(ten.zero_dimensional_at(REFERENCE_CHARACTERISTIC));
+        assert_eq!(
+            ten.quotient_dimension_at(REFERENCE_CHARACTERISTIC),
+            Some(34940)
+        );
+    }
+
+    /// Backelin's squarefree criterion predicts the dimension class only away from characteristic
+    /// two, where `cyclic-6` is squarefree and positive-dimensional all the same.
+    #[test]
+    fn test_backelins_criterion_does_not_survive_the_reduction_mod_two() {
+        let six = ladder()
+            .into_iter()
+            .find(|entry| entry.name == "cyclic-6")
+            .expect("in the ladder");
+        // 6 = 2 * 3 is squarefree, so the theorem predicts zero-dimensional — and does, generically.
+        assert!(six.zero_dimensional_at(REFERENCE_CHARACTERISTIC));
+        assert!(six.zero_dimensional_at(SMALL_PRIME_CHARACTERISTIC));
+        // At GF(2) it is not, so the criterion is a characteristic-zero statement.
+        assert!(!six.zero_dimensional_at(super::BINARY_CHARACTERISTIC));
+    }
+
+    /// No published row adjoins the field equations, so every row names Steel's ideal.
+    #[test]
+    fn test_no_published_row_carries_a_field_equation_transformation() {
+        for characteristic in super::PUBLISHED_CHARACTERISTICS {
+            for entry in ladder() {
+                let built = instance(entry.name, characteristic, GREVLEX).expect("builds");
+                if entry.digest_at(built.field.characteristic).is_none() {
+                    continue;
+                }
+                let transformation = built.transformation.unwrap_or_default();
+                assert!(
+                    !transformation.contains("field equation"),
+                    "{} at {} adjoins the field equations, which is a different ideal",
+                    entry.name,
+                    characteristic
+                );
+            }
         }
     }
 
@@ -2426,6 +2771,58 @@ mod tests {
             "a narrow field would make the small-prime rows cheaper only if it narrowed the entry"
         );
         assert_eq!(std::mem::size_of::<(usize, Zp32003)>(), 16);
+    }
+
+    /// Characteristic two is four-way for a basis and one-way for the eliminant, msolve having a
+    /// floor on that task alone.
+    #[test]
+    fn test_characteristic_two_keeps_the_basis_roster_and_loses_msolves_eliminant() {
+        // Every engine's basis bound is an upper one, so all four reach GF(2) — verified by running
+        // each of them on `cyclic-5` over GF(2), where all four agree on a 20-element basis.
+        assert_eq!(
+            corroboration_for(Task::ReducedGrobnerBasis, super::BINARY_CHARACTERISTIC),
+            Corroboration::FourWay,
+            "no engine has a lower bound on the basis task"
+        );
+        // The eliminant loses msolve to its floor, leaving Singular alone and nothing to
+        // triangulate against.
+        assert_eq!(
+            corroboration_for(Task::UnivariateEliminant, super::BINARY_CHARACTERISTIC),
+            Corroboration::SoleEngine,
+            "msolve's adapter declines eliminants at GF(2)"
+        );
+        assert!(
+            !corroboration_for(Task::UnivariateEliminant, super::BINARY_CHARACTERISTIC)
+                .can_triangulate()
+        );
+        // Conversion is unaffected: Singular and Sagebrush both have upper bounds only.
+        assert_eq!(
+            corroboration_for(Task::LexBasisByConversion, super::BINARY_CHARACTERISTIC),
+            Corroboration::TwoWay
+        );
+    }
+
+    /// msolve's eliminant floor is declared, and sits below the small prime but above GF(2).
+    #[test]
+    fn test_msolves_eliminant_has_a_floor_as_well_as_a_ceiling() {
+        use crate::grobner::external::msolve::{
+            MAX_CHARACTERISTIC_ELIMINANT, MIN_CHARACTERISTIC, MIN_CHARACTERISTIC_ELIMINANT,
+        };
+        const {
+            assert!(
+                MIN_CHARACTERISTIC_ELIMINANT > MIN_CHARACTERISTIC
+                    && MIN_CHARACTERISTIC_ELIMINANT < MAX_CHARACTERISTIC_ELIMINANT,
+                "the eliminant is bounded on both sides, strictly inside the basis path's range"
+            )
+        };
+        const {
+            assert!(
+                super::BINARY_CHARACTERISTIC < MIN_CHARACTERISTIC_ELIMINANT
+                    && SMALL_PRIME_CHARACTERISTIC >= MIN_CHARACTERISTIC_ELIMINANT,
+                "GF(2) is below the floor and 32003 above it, which is the whole of the \
+                 difference between the two published small characteristics for this task"
+            )
+        };
     }
 
     /// `GF(32003)` is what adds msolve to the eliminant task.

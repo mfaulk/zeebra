@@ -201,6 +201,12 @@ const MAX_STAGES: usize = 64;
 /// and not a basis over `GF(p)`.
 pub const MIN_CHARACTERISTIC: u64 = 2;
 
+/// Minimum characteristic supported by this adapter for msolve's eliminant task.
+///
+/// At characteristic two, msolve's sparse-FGLM genericity retry looped on Cyclic-5.
+/// The Gröbner basis task uses `-g 2` and bypasses that path.
+pub const MIN_CHARACTERISTIC_ELIMINANT: u64 = 3;
+
 /// The monomial order `-g` computes in, and the only one msolve offers.
 ///
 /// `main.c:104-109` documents `-g` as printing a reduced basis "for first prime characteristic
@@ -1111,6 +1117,17 @@ impl ExternalSolver for MsolveSolver {
                 detail: format!(
                     "characteristic {} is not a prime field for msolve: 0 on line 2 of its input \
                      file means Q",
+                    instance.field.characteristic
+                ),
+            });
+        }
+        if task == Task::UnivariateEliminant
+            && instance.field.characteristic < MIN_CHARACTERISTIC_ELIMINANT
+        {
+            return Support::No(Unsupported::Representation {
+                detail: format!(
+                    "the msolve adapter declines eliminants at characteristic {}: \
+                     sparse-FGLM genericity retries can loop indefinitely",
                     instance.field.characteristic
                 ),
             });
@@ -2849,10 +2866,17 @@ rational param(cpu)             0.75 sec
         assert!(line.contains("-t 8"), "{}", line);
         assert!(line.contains("-g 2"), "{}", line);
 
-        // The eliminant uses the default mode, so it must *not* pass `-g`.
+        // The eliminant uses the default mode, so it must *not* pass `-g`. Asserted over the
+        // command line's **tokens**: the recorded line embeds the temporary input and output paths,
+        // and a substring test for `-g` matches any checkout directory that happens to contain one
+        // — which made this assertion a fact about where the repository was cloned.
         let eliminant = solver.run(&pair(P30), Task::UnivariateEliminant, &limits);
         let line = eliminant.command_line.expect("a recorded command line");
-        assert!(!line.contains("-g"), "{}", line);
+        assert!(
+            !line.split_whitespace().any(|token| token == "-g"),
+            "{}",
+            line
+        );
         assert!(line.contains("-t 8"), "{}", line);
     }
 

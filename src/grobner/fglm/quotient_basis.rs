@@ -1,12 +1,5 @@
-//! Classifying an ideal by the dimension of its quotient algebra, and enumerating that algebra's
-//! monomial basis.
-//!
-//! Both questions are answered from the leading monomials of a Gröbner basis alone. The order of
-//! the enumerated basis is the source monomial order ascending, which makes index 0 the monomial
-//! 1 — every monomial order has 1 below every other monomial — so the coordinate vector of the
-//! multiplicative identity is the first unit vector and not something a caller has to look up.
-//!
-//! See `docs/MILESTONE-FGLM-SOLVING.md` §4 and §5 for the mathematics and the pseudocode.
+//! The leading monomials determine ideal dimension and quotient coordinates; the coordinates
+//! follow the source monomial order, so index 0 represents the multiplicative identity.
 
 use crate::poly::{MonomialMap, MonomialSet};
 
@@ -64,6 +57,62 @@ pub fn classify_ideal<const N: usize, F: FiniteField>(
         IdealClass::ZeroDimensional
     } else {
         IdealClass::PositiveDimensional
+    }
+}
+
+/// Returns the Krull dimension of `R/I` from a Gröbner basis under `order`.
+///
+/// Returns `None` for the unit ideal, `Some(0)` for a nonempty finite variety, and `Some(N)`
+/// for the zero ideal. See [`QuotientBasis::dimension`] for the dimension as a vector space.
+///
+/// For a monomial ideal, the dimension is the size of the largest variable set that contains
+/// no generator's support. This search can take exponential time in the number of variables.
+pub fn krull_dimension<const N: usize, F: FiniteField>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> Option<usize> {
+    let mut supports = Vec::new();
+    for monomial in leading_monomials(basis, order) {
+        let support: Vec<_> = monomial
+            .exponents()
+            .iter()
+            .enumerate()
+            .filter(|(_, exponent)| **exponent > 0)
+            .map(|(index, _)| index)
+            .collect();
+        if support.is_empty() {
+            return None;
+        }
+        supports.push(support);
+    }
+    supports.sort_unstable_by_key(Vec::len);
+
+    let mut best = 0;
+    largest_independent(&supports, &mut [true; N], N, &mut best);
+    Some(best)
+}
+
+fn largest_independent(
+    supports: &[Vec<usize>],
+    chosen: &mut [bool],
+    size: usize,
+    best: &mut usize,
+) {
+    if size <= *best {
+        return;
+    }
+    // Any valid subset must drop at least one variable from each fully contained support.
+    let Some(conflict) = supports
+        .iter()
+        .find(|support| support.iter().all(|&index| chosen[index]))
+    else {
+        *best = size;
+        return;
+    };
+    for &index in conflict {
+        chosen[index] = false;
+        largest_independent(supports, chosen, size - 1, best);
+        chosen[index] = true;
     }
 }
 
@@ -227,9 +276,9 @@ fn enumerate_standard<const N: usize>(
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_ideal, is_pure_power_of, IdealClass, QuotientBasis};
+    use super::{classify_ideal, is_pure_power_of, krull_dimension, IdealClass, QuotientBasis};
     use crate::{
-        fields::{PrimeFieldElement64, Zp2147483647},
+        fields::{PrimeFieldElement64, Zp2, Zp2147483647},
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             f4,
@@ -687,5 +736,144 @@ mod tests {
 
         let point: Vec<F> = [3u64, 5, 7, 11].iter().map(|v| F::new(*v)).collect();
         assert_eq!(dimension_of(&planted::<4, F>(&point)), 16);
+    }
+
+    /// A Krull dimension of zero and the zero-dimensional class are the same statement.
+    #[test]
+    fn test_krull_dimension_zero_is_exactly_the_zero_dimensional_class() {
+        for order in ORDERS {
+            // x^2 - 1, y^2 - 1: four points, so dimension 0 and a quotient of dimension 4.
+            let basis = basis_of(&["x^2 - 1", "y^2 - 1"], ["x", "y"], order);
+            assert_eq!(classify_ideal(&basis, order), IdealClass::ZeroDimensional);
+            assert_eq!(krull_dimension(&basis, order), Some(0), "{:?}", order);
+        }
+    }
+
+    /// The unit ideal has no Krull dimension, its variety being empty.
+    #[test]
+    fn test_the_unit_ideal_has_no_krull_dimension() {
+        for order in ORDERS {
+            let basis = basis_of(&["x", "x - 1"], ["x", "y"], order);
+            assert_eq!(classify_ideal(&basis, order), IdealClass::Unit);
+            assert_eq!(krull_dimension(&basis, order), None, "{:?}", order);
+        }
+    }
+
+    /// The zero ideal has the Krull dimension of the whole ring, every variable being free.
+    #[test]
+    fn test_the_zero_ideal_has_the_krull_dimension_of_the_ring() {
+        for order in ORDERS {
+            let empty: Vec<MultivariatePolynomial<3, F>> = Vec::new();
+            assert_eq!(krull_dimension(&empty, order), Some(3), "{:?}", order);
+        }
+    }
+
+    /// A single generator leaves every variable outside its support free.
+    #[test]
+    fn test_krull_dimension_counts_the_largest_independent_variable_set() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+
+        // (xy) in F[x, y, z]: {x, z} and {y, z} are independent, {x, y, z} is not.
+        let basis = basis_of(&["x*y"], ["x", "y", "z"], order);
+        assert_eq!(krull_dimension(&basis, order), Some(2));
+
+        // (x) in F[x, y, z]: only x is constrained.
+        let basis = basis_of(&["x"], ["x", "y", "z"], order);
+        assert_eq!(krull_dimension(&basis, order), Some(2));
+
+        // (x, y) in F[x, y, z]: z alone is free.
+        let basis = basis_of(&["x", "y"], ["x", "y", "z"], order);
+        assert_eq!(krull_dimension(&basis, order), Some(1));
+    }
+
+    // A generator involving two variables leaves dimension 39 in a 40-variable ring.
+    #[test]
+    fn test_krull_dimension_skips_unconstrained_variables() {
+        let mut exponents = [0; 40];
+        exponents[0] = 1;
+        exponents[1] = 1;
+        let generator = MultivariatePolynomial::new(&[(Monomial::<40>::new(&exponents), F::one())]);
+        let order = MonomialOrder::GradedReverseLexicographic;
+        assert_eq!(krull_dimension(&[generator], order), Some(39));
+    }
+
+    /// `cyclic-4` has Krull dimension 1, which Singular's `dim` reports at both 2^31 − 1 and GF(2).
+    #[test]
+    fn test_cyclic_4_has_krull_dimension_one_in_both_characteristics() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+
+        let basis = f4(&cyclic::<4, F>(), order).expect("within limits");
+        assert_eq!(
+            classify_ideal(&basis, order),
+            IdealClass::PositiveDimensional
+        );
+        assert_eq!(krull_dimension(&basis, order), Some(1));
+
+        let binary = f4(&cyclic::<4, Zp2>(), order).expect("within limits");
+        assert_eq!(krull_dimension(&binary, order), Some(1));
+    }
+
+    /// `cyclic-6` over GF(2) has Krull dimension 2, where over a large prime it is zero-dimensional
+    /// with `D = 156` — the degeneracy Steel's GF(2) Cyclic rows are about.
+    #[test]
+    fn test_cyclic_6_degenerates_to_krull_dimension_two_over_gf2() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+
+        let reference = f4(&cyclic::<6, F>(), order).expect("within limits");
+        assert_eq!(krull_dimension(&reference, order), Some(0));
+        assert_eq!(
+            QuotientBasis::new(&reference, order, usize::MAX)
+                .expect("finite")
+                .dimension(),
+            156
+        );
+
+        // Singular's `dim` and Groebner.jl's `Groebner.dimension` both report 2 here.
+        let binary = f4(&cyclic::<6, Zp2>(), order).expect("within limits");
+        assert_eq!(
+            classify_ideal(&binary, order),
+            IdealClass::PositiveDimensional
+        );
+        assert_eq!(krull_dimension(&binary, order), Some(2));
+    }
+
+    /// `cyclic-7` over GF(2) stays zero-dimensional but its quotient dimension is 728, not the 924
+    /// Backelin and Fröberg proved in characteristic zero.
+    #[test]
+    fn test_cyclic_7_has_quotient_dimension_728_over_gf2() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let binary = f4(&cyclic::<7, Zp2>(), order).expect("within limits");
+        assert_eq!(krull_dimension(&binary, order), Some(0));
+        assert_eq!(
+            QuotientBasis::new(&binary, order, usize::MAX)
+                .expect("finite")
+                .dimension(),
+            728
+        );
+    }
+
+    /// `cyclic-5`'s invariants are **unmoved** by the reduction mod 2 — still `D = 70` — which is
+    /// why the corpus records no degeneracy for it and why characteristic two is not uniformly
+    /// destructive. msolve, Singular, Groebner.jl and Sagebrush all agree here.
+    #[test]
+    fn test_cyclic_5_keeps_its_seventy_points_over_gf2() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let binary = f4(&cyclic::<5, Zp2>(), order).expect("within limits");
+        assert_eq!(classify_ideal(&binary, order), IdealClass::ZeroDimensional);
+        assert_eq!(krull_dimension(&binary, order), Some(0));
+        assert_eq!(
+            QuotientBasis::new(&binary, order, usize::MAX)
+                .expect("finite")
+                .dimension(),
+            70
+        );
+        // The same count as at the reference prime, where the published value is also 70.
+        let reference = f4(&cyclic::<5, F>(), order).expect("within limits");
+        assert_eq!(
+            QuotientBasis::new(&reference, order, usize::MAX)
+                .expect("finite")
+                .dimension(),
+            70
+        );
     }
 }

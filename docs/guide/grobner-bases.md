@@ -123,6 +123,14 @@ standard `cyclic` and `katsura` families plus `planted`, which builds a zero-dim
 around a solution you choose. `grobner::reference` holds a deliberately naive textbook
 implementation kept as a correctness oracle — use `buchberger` or `f4` for real work.
 
+## Krull dimension
+
+Call `grobner::krull_dimension(&basis, order)` with a Gröbner basis and the order used to compute it.
+It returns `Some(0)` for a zero-dimensional ideal, `None` for the unit ideal, and the number of
+variables for the zero ideal. `QuotientBasis::dimension` gives the vector-space dimension of a
+finite quotient. The Krull dimension search works from the supports of the leading monomials and
+can take exponential time in the number of variables.
+
 ## Zero-dimensional ideals
 
 A Gröbner basis says whether the quotient `R/I` is finite-dimensional, and if it is, what its

@@ -89,6 +89,7 @@ required-features = ["external-runners"]
 
 [[example]]
 name = "competitive_sweep"
+test = true
 required-features = ["external-runners"]
 
 [[example]]

@@ -77,11 +77,6 @@ module generates is named by variable count, and the literature's `n` appears no
 test asserts that each such entry's trailing number equals its built variable count, so a future
 entry cannot reintroduce the ambiguity by being named carelessly.
 
-The two families taken from the cryptanalysis registry — Poseidon and Anemoi — keep their
-**registry id** instead. That id is their identity everywhere else in the crate, and renaming it to
-suit a convention local to the corpus would be the worse trade; their variable count is a
-consequence of the round count and is carried in the manifest.
-
 Groebner.jl exposes no `katsuran` in the provisioned version (checked: `names(Groebner, all=true)`
 contains no Katsura or Cyclic generator), so its adapter must be given the system as text from this
 corpus rather than asked for its own. That is the better arrangement anyway — a corpus of systems
@@ -157,9 +152,8 @@ nobody wrote down.
 |---|---|---|
 | Katsura, Cyclic, planted MQ | `None` | const-generic in the field; a prime nobody compiled is a field nobody has |
 | random MQ | builds | its generator reduces at run time through `CaseField`, so every prime is available |
-| Poseidon, Anemoi | builds, at the **registry's** field | round constants are keyed on the prime, so the argument is ignored by design (§5) |
 
-`test_an_uncompiled_characteristic_is_refused_rather_than_mislabeled` pins all three dispositions,
+`test_an_uncompiled_characteristic_is_refused_rather_than_mislabeled` pins these dispositions,
 and `test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic` asserts the
 property on the **rendered text** rather than on the polynomials in memory — which is the bytes
 every engine is handed.
@@ -197,19 +191,13 @@ So the corpus has **three tiers**, and `CorpusEntry::digest_at` is the boundary:
 
 | tier | constant | frozen digest | may a figure be published? |
 |---|---|---|---|
-| published | `PUBLISHED_CHARACTERISTICS` = `[32003, 2^31 − 1]` | yes, one per rung | **yes** |
+| published | `PUBLISHED_CHARACTERISTICS` = `[2, 32003, 2^31 − 1]` | yes, per rung (§6a) | **yes** |
 | generated | `GENERATED_CHARACTERISTICS`, which adds `2^30 + 3` | no | no — the instance is honest, its identity is not pinned |
 | neither | — | n/a | `corpus::instance` returns `None` |
 
 `CorpusEntry::digests` is therefore `&[(characteristic, digest)]`, keyed on the characteristic the
-built instance **declares**. Two consequences fall out instead of needing special cases:
-
-- A family whose field varies carries **two** digests.
-- A registry row carries **one**. Poseidon's and Anemoi's round constants are derived from the
-  prime, so asking for another one does not produce another instance (§5) — keying on the declared
-  rather than the requested characteristic is what makes that automatic.
-  `test_a_registry_rung_has_one_identity_at_both_published_characteristics` asserts both halves,
-  and the sweep skips such a rung at the small prime rather than appending a duplicate row.
+built instance **declares**. Every rung carries two digests for the larger primes. Each Cyclic rung
+also carries a `GF(2)` digest (§6a).
 
 **Why `32003` and not some other small prime.** Three reasons.
 
@@ -403,7 +391,7 @@ a conversion row by four engines to zero.
 |---|---|---|---|---|---|
 | basis | all four | — | four-way | four-way | two-way |
 | **conversion** | Singular, Sagebrush | msolve has no lex order; Groebner.jl 0.10.11 has no FGLM | **two-way** | **two-way** | **none** |
-| eliminant | msolve, Singular | neither Sagebrush nor Groebner.jl has the task | **two-way** | sole engine above `1515531529` | none |
+| eliminant | msolve, Singular | neither Sagebrush nor Groebner.jl has the task | **two-way** | sole engine at `p = 2` and at or above `1515531529` | none |
 
 Two notes a reader needs before using the eliminant row. msolve's eliminant bound is `1515531529`,
 below a tenth of its basis bound, which is what makes `32003` and `2^31 − 1` land in different cells.
@@ -448,22 +436,72 @@ digest rather than carried; that scoreboard moved out in #668.
 
 ---
 
-## 6. Characteristic two is blocked on a convention, not on effort
+## 6. Characteristic two: `GF(2)` is a published identity, `GF(2^k)` is still blocked
 
-`GF(2^k)` for `k > 1` is **not** in the corpus, and the reason is the one `FieldSpec` already
-encodes: two engines' default `GF(2^8)` need not be the same ring. Different Conway or defining
-polynomials give isomorphic but not identical representations, so a basis compared element by
-element across them disagrees for no mathematical reason, and an invariant like the leading
-monomials can genuinely differ.
+### 6a. `GF(2)` is the corpus's third published characteristic, for Cyclic only (#427)
+
+`corpus::BINARY_CHARACTERISTIC` is `2`, and the Cyclic rungs `cyclic-4` … `cyclic-10` each carry a
+frozen digest there alongside their `GF(32003)` and `2^31 − 1` ones. It is the **cheapest reachable
+external anchor** on Steel's page: his `GF(32003)` Cyclic 7 and Cyclic 8 carry `(Hom)` and are the
+homogenized system, a different ideal, while the `GF(2)` block carries no such mark and so names the
+affine system `benchmark_systems::cyclic` generates (`classical-benchmarks.md` §4).
+
+**Publication is now per rung, not per characteristic**, and that change is #427's finding rather
+than its convenience. A characteristic may only be published at where the rung's *invariants* are
+true, and characteristic two is the first one where they are not simply the generic ones:
+
+| rung | `2^31 − 1` / `32003` | `GF(2)` |
+|---|---|---|
+| `cyclic-4` | positive-dimensional, Krull 1 | **same** — Krull 1 |
+| `cyclic-5` | zero-dim, `D = 70` | **same** — zero-dim, `D = 70` |
+| `cyclic-6` | zero-dim, `D = 156` | **Krull dimension 2** |
+| `cyclic-7` | zero-dim, `D = 924` (proved) | zero-dim, **`D = 728`** |
+| `cyclic-8` | positive-dimensional, Krull 1 | **Krull dimension 3** |
+| `cyclic-9` | positive-dimensional (Backelin) | **Krull dimension 2** |
+| `cyclic-10` | zero-dimensional | **Krull dimension 4** |
+
+So **Backelin's squarefree criterion is a characteristic-zero statement**: it predicts `cyclic-6`
+zero-dimensional, and mod 2 it is not. `test_backelins_criterion_does_not_survive_the_reduction_mod_two`
+is that assertion, and `corpus::DEGENERACIES` is where the per-characteristic invariants live —
+sparse, because characteristic two and Cyclic are the whole of it. `CorpusEntry::zero_dimensional_at`
+and `quotient_dimension_at` are the accessors a row must go through.
+
+Katsura, random MQ and planted MQ are therefore **generated** at `GF(2)` and **not published**
+there — the middle tier of §4's table, honest instances whose identity is not frozen and from which
+no figure may be quoted. `competitive_sweep --characteristic 2 --list` shows the seven published
+rungs and their tasks. Katsura's generators carry coefficient 2, and `planted_point`'s `3 + 2i`
+collapses to all-ones mod 2, which destroys the coordinate distinctness the planted family's oracle
+depends on. `test_characteristic_two_is_published_for_cyclic_alone` pins the split.
+
+**No published row adjoins the field equations.** `x^2 − x` is available over `GF(2)` and *changes
+the ideal* — the README's phrasing is that field equations "make a quotient dimension count
+base-field points" — and Steel's rows do not have them, so neither do these. A row that did would
+carry `Instance::transformation`, which is inside the digest, so the two could never be confused for
+one another; `test_no_published_row_carries_a_field_equation_transformation` is the guard. The
+`D = 728` above is therefore a count over the algebraic closure with multiplicity, **not** a count of
+`GF(2)`-points.
+
+### 6b. `GF(2^k)` for `k > 1` is still blocked on a convention, not on effort
+
+The reason is the one `FieldSpec` already encodes: two engines' default `GF(2^8)` need not be the
+same ring. Different Conway or defining polynomials give isomorphic but not identical
+representations, so a basis compared element by element across them disagrees for no mathematical
+reason, and an invariant like the leading monomials can genuinely differ. #197 settled Zeebra's own
+side of this by test — `Gf256` is the AES modulus and `Gf256Mq` the Fukuoka one, isomorphic and
+explicitly not interchangeable — but that settles one engine, not a convention.
 
 So an entry needs, for each engine: the defining polynomial it uses by default, how to override it,
 and a verified statement that the override took. `FieldSpec::extension` requires the defining
-polynomial for exactly this reason, and `SingularSolver::supports` currently returns
+polynomial for exactly this reason, and `SingularSolver::supports` returns
 `Unsupported::ExtensionField` rather than guessing — which is the right behaviour until the
 convention is established the way `tools/reference_bases.sing` establishes Singular's ordering and
 printing conventions.
 
-`GF(2)` itself is not affected: it is a prime field and `Zp2` already exercises it.
+One concrete hazard is already on record from #262: a digest taken over Macaulay-matrix **entries
+alone** could not tell `GF(2)` from `GF(2^8)` on Cyclic, because Cyclic's `±1` coefficients make
+those matrices equal entry for entry. The corpus is not exposed to it — `Instance::canonical`
+includes `FieldSpec::canonical`, so the characteristic and extension degree are inside the identity
+digest, and `test_two_fields_with_identical_entries_digest_differently` pins the matrix-corpus side.
 
 ---
 
@@ -495,23 +533,30 @@ part of the digest, so no frozen value moved.
 ## 8. The manifest
 
 `corpus::manifest()` emits line-oriented ASCII, sorted, one row per rung **per identity** — so a
-rung whose field varies appears twice and a registry rung once (§4b):
+Cyclic rung appears three times and every other rung appears twice (§6a):
 
 ```
-# zeebra cross-library corpus, characteristics [32003, 2147483647] order grevlex
+# zeebra cross-library corpus, characteristics [2, 32003, 2147483647] order grevlex
 # name family rung equivalence dimension variables characteristic digest
+cyclic-10 cyclic challenging comparand-file positive-dimensional 10 2 c20a7428b05e1e2a…
 cyclic-10 cyclic challenging comparand-file zero-dimensional 10 2147483647 df450bfc1886aa26…
 cyclic-10 cyclic challenging comparand-file zero-dimensional 10 32003 538964ac3a891da6…
+cyclic-4 cyclic easy comparand-file positive-dimensional 4 2 77f83e03b9305310…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 2147483647 e1d8d59448b3d648…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 32003 e5a49df27c74d4d7…
+cyclic-5 cyclic easy comparand-file zero-dimensional 5 2 ae8c4aa8ce0ceb59…
 cyclic-5 cyclic easy comparand-file zero-dimensional 5 2147483647 3274d14b224664ae…
 cyclic-5 cyclic easy comparand-file zero-dimensional 5 32003 e80b7d8a6432b7d3…
+cyclic-6 cyclic intermediate comparand-file positive-dimensional 6 2 82d27add6e12d56b…
 cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 2147483647 ed89afe173d16024…
 cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 32003 bf3bb57af08fcc94…
+cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 2 5bf1687f10275fc8…
 cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 2147483647 30ce3b4f54c7b30e…
 cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 32003 18746449c45766c3…
+cyclic-8 cyclic challenging comparand-file positive-dimensional 8 2 50d21276dfc6b696…
 cyclic-8 cyclic challenging comparand-file positive-dimensional 8 2147483647 a5eda0f9e2642ffe…
 cyclic-8 cyclic challenging comparand-file positive-dimensional 8 32003 e2f6be738bd1f215…
+cyclic-9 cyclic challenging comparand-file positive-dimensional 9 2 682c5c189e244f84…
 cyclic-9 cyclic challenging comparand-file positive-dimensional 9 2147483647 ff4c2030a8f74d29…
 cyclic-9 cyclic challenging comparand-file positive-dimensional 9 32003 ccffb9b3e5ca7b82…
 katsura-10 katsura challenging comparand-file zero-dimensional 10 2147483647 67d6a96fadd21cc7…
@@ -544,15 +589,19 @@ mq-random-6 mq-random easy live-oracle zero-dimensional 6 2147483647 d98e5e5bf82
 mq-random-6 mq-random easy live-oracle zero-dimensional 6 32003 bbfecd7f5522e203…
 ```
 
-**Twenty-one rungs across four families, forty-two identities**, each rung carrying two (the two
-published characteristics). Before #668 the ladder also held five registry rows with one identity
-each, whose field was their own; they are preserved at commit 9532a9a2. `test_the_manifest_lists_every_rung_with_its_digest` checks the row count against
+**Twenty-one rungs across four families, forty-nine identities.** Seven Cyclic rungs carry three
+identities each. Fourteen Katsura and MQ rungs carry two each. Before #668 the ladder also held five
+registry rows, preserved at commit 9532a9a2. `test_the_manifest_lists_every_rung_with_its_digest`
+checks the row count against
 `digests.len()` summed over the ladder, so the manifest and the frozen table cannot disagree about
 how many problems the corpus holds, and asserts every digest in it is distinct. Digests are
 abbreviated above; the manifest carries all 64 hex digits.
 
 The characteristic is a **column** rather than a document per field, so one sorted table carries the
-whole corpus and a reader can see at a glance which rungs have two identities and which have one.
+whole corpus and a reader can see at a glance how many identities each rung has. The `2` rows are
+the Cyclic family's `GF(2)` identities, and their `dimension` column is the one at *that*
+characteristic rather than the generic one — which is why `cyclic-6` reads positive-dimensional
+there and zero-dimensional at both larger primes (§6a).
 
 Line-oriented and ASCII so another language's harness can read it and a digest can be reproduced by
 hand — the same property that makes `Instance::canonical` reproducible outside Rust.

@@ -155,6 +155,12 @@ ways that matter:
   differentially tested against Singular, and a cross-library corpus of standard families — Katsura,
   Cyclic, random MQ — is checked for ideal equivalence before any comparison is run.
 
+The Cyclic corpus includes seven affine systems over `GF(2)` with no field equations adjoined.
+The [characteristic-two results](docs/research/classical-benchmarks.md#10-gf2-the-cyclic-invariants-measured-427)
+record a Krull dimension of 4 for Cyclic-10. Use
+[`grobner::krull_dimension`](docs/guide/grobner-bases.md#krull-dimension) to compute the dimension from a Gröbner basis.
+List the published `GF(2)` systems with `cargo run --release --example competitive_sweep -- --characteristic 2 --list`.
+
 The [competitive board](research/competitive/COMPETITIVE.md) retains cross-engine attempts,
 including resource refusals. The [upper-rung sweep](docs/research/cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected)
 records the per-rung budgets and limitations of its single-run comparisons.
