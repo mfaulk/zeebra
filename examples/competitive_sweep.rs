@@ -280,30 +280,6 @@ fn sweep_rows(characteristic: u64, only_row: Option<&str>) -> Vec<&'static str> 
         .collect()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::sweep_rows;
-    use zeebra::grobner::external::corpus::BINARY_CHARACTERISTIC;
-
-    // The binary sweep lists seven Cyclic rungs and refuses an unpublished Katsura row.
-    #[test]
-    fn test_binary_sweep_only_selects_published_rows() {
-        assert_eq!(
-            sweep_rows(BINARY_CHARACTERISTIC, None),
-            [
-                "cyclic-4",
-                "cyclic-5",
-                "cyclic-6",
-                "cyclic-7",
-                "cyclic-8",
-                "cyclic-9",
-                "cyclic-10"
-            ]
-        );
-        assert!(sweep_rows(BINARY_CHARACTERISTIC, Some("katsura-4")).is_empty());
-    }
-}
-
 /// Run one (instance, task) across every engine, recording every outcome.
 ///
 /// Engines are constructed per row so that a measured run's scratch state cannot leak between
@@ -563,5 +539,29 @@ fn detect_environment(wall: Duration, measure: bool) -> Environment {
         // A sweep is run on a branch and merged, so the commit alone dangles — which is exactly
         // what happened to three of this board's four cohorts (#505).
         ..Environment::from_git()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sweep_rows;
+    use zeebra::grobner::external::corpus::BINARY_CHARACTERISTIC;
+
+    // The binary sweep lists seven Cyclic rungs and refuses an unpublished Katsura row.
+    #[test]
+    fn test_binary_sweep_only_selects_published_rows() {
+        assert_eq!(
+            sweep_rows(BINARY_CHARACTERISTIC, None),
+            [
+                "cyclic-4",
+                "cyclic-5",
+                "cyclic-6",
+                "cyclic-7",
+                "cyclic-8",
+                "cyclic-9",
+                "cyclic-10"
+            ]
+        );
+        assert!(sweep_rows(BINARY_CHARACTERISTIC, Some("katsura-4")).is_empty());
     }
 }
