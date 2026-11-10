@@ -15,6 +15,7 @@ Development checks, matching what CI enforces:
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets --no-default-features -- -D warnings
+cargo tree --locked -e normal --prefix none | grep '^proptest '   # must print nothing
 cargo test --doc
 cargo package --locked            # what crates.io would receive, built in isolation
 ```
@@ -191,7 +192,11 @@ start-up. It runs clippy twice: with all features, and with **no default feature
 the crate a consumer gets with `default-features = false`. Every other job builds the default
 feature set, which is how the library once stopped compiling without `external-runners` and
 nothing noticed; targets that drive the external engines declare `required-features` in
-`Cargo.toml` and are skipped by that build. The same job runs `cargo package --locked`, which
+`Cargo.toml` and are skipped by that build. The job then checks that proptest is absent from the
+dependency graph of a default build. The `Arbitrary` impls sit behind the `proptest` feature,
+compiled under `cfg(any(test, feature = "proptest"))`, so the unit suite keeps them through the
+dev-dependency. A generic test helper that draws `any::<F>()` must bound `F: Arbitrary` itself,
+because `Ring` no longer implies it. The same job runs `cargo package --locked`, which
 assembles the crate from the files `Cargo.toml`'s `exclude` leaves in and compiles it in
 isolation, so a guide page the doctests include, or any other file the build needs, cannot be
 left out of the package unnoticed.

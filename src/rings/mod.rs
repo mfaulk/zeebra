@@ -7,7 +7,6 @@
 //! 3. Multiplication is distributive with respect to addition.
 
 use crate::identities::{One, Zero};
-use proptest::arbitrary::Arbitrary;
 use std::{
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Mul, MulAssign},
@@ -26,7 +25,6 @@ pub trait Ring:
     + AddAssign
     + Mul
     + MulAssign
-    + Arbitrary
     + Sized
     + Copy
     + Clone

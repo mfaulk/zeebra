@@ -69,13 +69,19 @@ default = ["external-runners"]
 # promised.
 external-runners = []
 
+# `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
+# matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
+# unaffected by whether some other crate in the build turns this on.
+proptest = ["dep:proptest"]
+
 [dependencies]
 lazy_static = "1.4.0"
 pest = "2.7"
 pest_derive = "2.7"
-# `proptest` is a normal dependency, not a dev-dependency: `Arbitrary` is implemented for public
-# types so that downstream crates can property-test against them.
-proptest = "1.3.1"
+# Optional: the `proptest` feature implements `Arbitrary` for the public types, so a downstream
+# crate can property-test against them. Off by default, because proptest brings 17 crates
+# (rustix, tempfile, rusty-fork, regex-syntax, ...) that nothing else in the library needs.
+proptest = { version = "1.3.1", optional = true }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_arrays = "0.1.0"
@@ -116,6 +122,9 @@ required-features = ["external-runners"]
 name = "committed_records"
 required-features = ["external-runners"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dev-dependencies]
 # `ark-ff` is a *test oracle only*, in the role Singular already plays for Gröbner bases: the
 # 256-bit prime field arithmetic in `fields::prime_field_256` is checked against an independent,
@@ -125,6 +134,8 @@ required-features = ["external-runners"]
 ark-ff = { version = "0.6", default-features = false, features = ["std"] }
 bincode = "1.3.3"
 criterion = { version = "0.5", features = ["html_reports"] }
+# The crate's own property tests; the `Arbitrary` impls they use are compiled under `cfg(test)`.
+proptest = "1.3.1"
 
 # `test = false` on every benchmark, for CI wall-clock. A `[[bench]]` target defaults to `test =
 # true`, so a bare `cargo test` builds each criterion binary and runs it with `--test`, which

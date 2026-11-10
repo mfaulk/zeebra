@@ -118,6 +118,19 @@ to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254
 [half-GCD measurements](docs/research/fast-univariate.md#194-experimental-half-gcd)
 include the commands for a pinned run.
 
+### Cargo features
+
+| Feature | Default | What it adds |
+|---|---|---|
+| `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush and Singular as subprocesses. Uses only `std` and adds no dependency. |
+| `proptest` | off | `proptest::arbitrary::Arbitrary` for the public types: field elements, big integers, monomials, polynomials, vectors and matrices. Lets you property-test downstream code with `any::<T>()`. |
+
+```toml
+zeebra = { version = "0.1", features = ["proptest"] }
+```
+
+`Ring` does not require `Arbitrary`, so you can implement it for your own type whether or not the feature is on.
+
 ## What is in the box
 
 | Area | Guide |

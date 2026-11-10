@@ -644,7 +644,7 @@ mod tests {
     ];
 
     /// A strategy for a polynomial of at most `num_terms` distinct monomials over any field.
-    fn poly_strategy<const N: usize, F: FiniteField>(
+    fn poly_strategy<const N: usize, F: FiniteField + Arbitrary>(
         num_terms: usize,
     ) -> impl Strategy<Value = SparseMultiPoly<N, F>> {
         (
@@ -659,7 +659,7 @@ mod tests {
     }
 
     /// Each route agrees with [`multiply_materialize`], over `F` in `N` variables.
-    fn assert_routes_agree<const N: usize, F: FiniteField>() {
+    fn assert_routes_agree<const N: usize, F: FiniteField + Arbitrary>() {
         let strategy = (poly_strategy::<N, F>(5), poly_strategy::<N, F>(5));
         TestRunner::deterministic()
             .run(&strategy, |(a, b)| {
@@ -884,7 +884,7 @@ mod tests {
     /// `C(2·16·N + N, N)` for the simplex, which at `N = 4` is 12.6 million cells for a four-term
     /// operand. The differential test is about agreement, not about size, so the size is capped
     /// and the arity varied instead.
-    fn bounded_poly_strategy<const N: usize, F: FiniteField>(
+    fn bounded_poly_strategy<const N: usize, F: FiniteField + Arbitrary>(
         num_terms: usize,
         max_exponent: u32,
     ) -> impl Strategy<Value = SparseMultiPoly<N, F>> {
@@ -903,7 +903,7 @@ mod tests {
     }
 
     /// The dense routes agree with [`multiply_materialize`] over `F` in `N` variables.
-    fn assert_dense_routes_agree<const N: usize, F: FiniteField>(max_exponent: u32) {
+    fn assert_dense_routes_agree<const N: usize, F: FiniteField + Arbitrary>(max_exponent: u32) {
         let strategy = (
             bounded_poly_strategy::<N, F>(5, max_exponent),
             bounded_poly_strategy::<N, F>(5, max_exponent),

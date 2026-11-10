@@ -1125,7 +1125,7 @@ mod tests {
     /// Written out rather than reached through `any::<SparseMultiPoly<N, F>>()`, whose `Arbitrary`
     /// impl boxes its strategy and so requires `F: 'static` — a bound the generic body
     /// `for_each_field!` writes cannot state.
-    fn poly_strategy<const N: usize, F: FiniteField>(
+    fn poly_strategy<const N: usize, F: FiniteField + Arbitrary>(
         num_terms: usize,
     ) -> impl Strategy<Value = SparseMultiPoly<N, F>> {
         (
@@ -1313,7 +1313,7 @@ mod tests {
     ///
     /// A proptest driven through [`TestRunner`] rather than written with `proptest!`, because the
     /// macro expands to a `#[test]` item and so cannot sit inside `for_each_field!`'s generic body.
-    fn assert_mul_associates<const N: usize, F: FiniteField>() {
+    fn assert_mul_associates<const N: usize, F: FiniteField + Arbitrary>() {
         let strategy = (
             poly_strategy::<N, F>(4),
             poly_strategy::<N, F>(4),
@@ -1328,7 +1328,7 @@ mod tests {
     }
 
     /// `a * (b + c) = a * b + a * c` over `F` in `N` variables.
-    fn assert_mul_distributes<const N: usize, F: FiniteField>() {
+    fn assert_mul_distributes<const N: usize, F: FiniteField + Arbitrary>() {
         let strategy = (
             poly_strategy::<N, F>(4),
             poly_strategy::<N, F>(4),
@@ -1547,7 +1547,7 @@ mod tests {
     /// `subtract_shifted` — is the independent oracle that would catch it.
     #[test]
     fn test_normal_form_agrees_with_multi_div_rem_on_random_input() {
-        fn case<const N: usize, F: FiniteField>() {
+        fn case<const N: usize, F: FiniteField + Arbitrary>() {
             let mut runner = TestRunner::default();
             runner
                 .run(
@@ -1984,7 +1984,7 @@ mod tests {
     }
 
     /// `+=` agrees with `+`, `-=` with `-`, and addition associates, over `F` in `N` variables.
-    fn assert_in_place_add_agrees<const N: usize, F: FiniteField>() {
+    fn assert_in_place_add_agrees<const N: usize, F: FiniteField + Arbitrary>() {
         let strategy = (
             poly_strategy::<N, F>(4),
             poly_strategy::<N, F>(4),
@@ -2040,7 +2040,7 @@ mod tests {
     /// the uncounted one.
     #[test]
     fn test_counting_does_not_change_the_normal_form() {
-        fn case<const N: usize, F: FiniteField>() {
+        fn case<const N: usize, F: FiniteField + Arbitrary>() {
             let mut runner = TestRunner::default();
             runner
                 .run(
@@ -2129,7 +2129,7 @@ mod tests {
     /// The three merge regions partition the rewritten terms exactly, on every reduction.
     #[test]
     fn test_the_merge_regions_partition_the_rewritten_terms() {
-        fn case<const N: usize, F: FiniteField>() {
+        fn case<const N: usize, F: FiniteField + Arbitrary>() {
             let mut runner = TestRunner::default();
             runner
                 .run(

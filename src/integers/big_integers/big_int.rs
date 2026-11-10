@@ -1,6 +1,7 @@
 //! Variable-length signed integer.
 
 use crate::integers::{big_integers::big_uint::BigUInt, FromDecStrErr};
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::Arbitrary,
     prelude::{any, BoxedStrategy, Strategy},
@@ -311,6 +312,7 @@ impl Shr<usize> for &BigInt {
     }
 }
 
+#[cfg(any(test, feature = "proptest"))]
 impl Arbitrary for BigInt {
     type Parameters = ();
 

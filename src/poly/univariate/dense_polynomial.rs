@@ -2,6 +2,7 @@
 
 use std::fmt::{Display, Formatter};
 
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::{any, Arbitrary},
     collection::vec,
@@ -260,8 +261,8 @@ impl From<usize> for PolynomialParams {
     }
 }
 
-// impl Arbitrary
-impl<F: FiniteField + 'static> Arbitrary for DensePolynomial<F> {
+#[cfg(any(test, feature = "proptest"))]
+impl<F: FiniteField + Arbitrary + 'static> Arbitrary for DensePolynomial<F> {
     type Parameters = PolynomialParams;
 
     // Generate a random polynomial of the given degree.

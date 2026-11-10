@@ -15,6 +15,7 @@ use std::{
     ops,
 };
 
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     prelude::{any, Arbitrary},
     strategy::{BoxedStrategy, Strategy},
@@ -450,6 +451,7 @@ impl<'de, M: PrimeModulus256> Deserialize<'de> for PrimeFieldElement256<M> {
     }
 }
 
+#[cfg(any(test, feature = "proptest"))]
 impl<M: PrimeModulus256> Arbitrary for PrimeFieldElement256<M> {
     type Parameters = ();
 
