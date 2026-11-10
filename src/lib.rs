@@ -60,8 +60,9 @@ pub use poly::{
     permutation_exponents, pow_mod, resultant, resultant_at_formal_degrees,
     resultant_from_coefficients, roots, xgcd, BuildMonomialHasher, GcdError, GcdRoute,
     GraeffeError, GraeffeStats, Monomial, MonomialHasher, MonomialMap, MonomialOrder, MonomialSet,
-    MultivariatePolynomial, Polynomial, PolynomialParams, PowerPermutation, SquarefreeError,
-    SubgroupRoute, UnivariatePolynomial, WeightedOrder, WeightedOrderError, WeightedTieBreak,
+    MultivariatePolynomial, NormalFormError, Polynomial, PolynomialParams, PowerPermutation,
+    SquarefreeError, SubgroupRoute, UnivariatePolynomial, WeightedOrder, WeightedOrderError,
+    WeightedTieBreak,
 };
 pub use rings::Ring;
 

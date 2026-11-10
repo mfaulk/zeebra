@@ -103,3 +103,14 @@ fn test_an_explicit_resource_limit_is_a_typed_error() {
     // The same system within the default budgets completes.
     assert!(f4(&system, GREVLEX).is_ok());
 }
+
+/// A public function's error type can be named downstream, so a caller can match on it.
+#[test]
+fn test_normal_form_errors_can_be_matched_downstream() {
+    let vars = ["x", "y"];
+    let f = parse("x^2 + y", vars);
+    match f.normal_form_modulo(&[], GREVLEX) {
+        Err(zeebra::NormalFormError::NoDivisors) => {}
+        other => panic!("an empty basis has no divisors, got {other:?}"),
+    }
+}
