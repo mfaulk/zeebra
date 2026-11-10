@@ -466,8 +466,8 @@ mod tests {
         check::<BIG>(&[0, 1, 2, BIG / 2, BIG - 3, BIG - 2, BIG - 1]);
 
         // 2^64 - 353, the modulus the Anemoi reference data is over. Odd, so Montgomery form
-        // applies with no new arithmetic; it is here because `grobner::research::anemoi` is the
-        // first caller to instantiate this width at a modulus that was not already covered.
+        // applies with no new arithmetic; it is here because an Anemoi model was the first caller
+        // to instantiate this width at a modulus that was not already covered.
         const ANEMOI: u64 = 18446744073709551263;
         check::<ANEMOI>(&[0, 1, 2, ANEMOI / 2, ANEMOI - 3, ANEMOI - 2, ANEMOI - 1]);
 

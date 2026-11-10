@@ -63,6 +63,10 @@ The cleanest comparable measurement M25 produced. One machine, byte-identical ge
 fed the system from the same `instance.system::<N>()` the Zeebra rows use), both under `benchlock`,
 **msolve on one core and Zeebra on eight**.
 
+The rows are a cipher-derived system (Anemoi CICO). That family left the public corpus in #668
+(`research/competitive/CURATION.md`); the figures stay here as a measurement of order conversion
+against msolve, not as a statement about the cipher.
+
 | row | msolve | Zeebra | wall ratio | msolve RSS | Zeebra RSS |
 |---|---:|---:|---:|---:|---:|
 | Anemoi `n5-fcico` | **1.81 s** | **63.71 s** | **35x** | 32 MB | 330 MB |
@@ -95,7 +99,7 @@ result, because the basis stage is parallel and was given eight cores.
 
 ### A correction this report must not inherit
 
-`anemoi.md` §8a.1 recorded an apparent **507x Zeebra advantage** over published Magma. #283 found
+`anemoi.md` §8a.1 (moved out in #668) recorded an apparent **507x Zeebra advantage** over published Magma. #283 found
 that the published 2 400x Anemoi conversion/basis ratio is mostly **Magma's generic finite-field
 arithmetic at `p ≥ 2^32`**, not a property of the problem — the same ratio is 124.6 at
 `p = 65537`. **That 507x is not a competitive lead and does not appear in this report as one.**
@@ -294,11 +298,11 @@ Singular starting up.
 |---|---|---:|---:|---:|---:|---|
 | **mq-random-10** | basis | **28 709 ms** | **6 959 ms** | 0.24x | 194x | **Zeebra 4.13x slower** |
 | **mq-random-10** | conversion | **29 409 ms** | **8 235 ms** | 0.28x | 229x | **Zeebra 3.57x slower** |
-| poseidon-t2-rf4-rp0 | basis | 306 ms | 204 ms | 0.67x | 5.7x | Zeebra 1.50x slower |
-| poseidon-t2-rf4-rp0 | conversion | 312 ms | 225 ms | 0.72x | 6.3x | Zeebra 1.39x slower |
-| poseidon-t2-rf2-rp2 | basis | 109 ms | 92 ms | 0.85x | 2.6x | 1.18x, inside the 20% band |
-| poseidon-t2-rf2-rp2 | conversion | 111 ms | 102 ms | 0.92x | 2.9x | 1.08x, inside the 20% band |
 | **mq-planted-10** | conversion | **19.2 ms** | **158.6 ms** | 8.28x | 4.4x | **Zeebra 8.28x faster** |
+
+*Four rows on the cipher-derived `poseidon-t2-*` rungs were removed from this table when those rungs
+left the public corpus in #668 (`research/competitive/CURATION.md`); the counts in this section were
+taken with them included. The full table is preserved at commit 9532a9a2.*
 
 **Four of the seven are Zeebra losses, two are inside the noise band, and one is a win** — on a
 corpus whose raw numbers show Zeebra ahead on 28 of 28 pairs.
@@ -307,10 +311,12 @@ corpus whose raw numbers show Zeebra ahead on 28 of 28 pairs.
 
 | row | task | what happened |
 |---|---|---|
-| `anemoi64-cico-n1/n2-fcico` | both | Singular **unsupported**: `2^64 − 353` is above its `2^31` bound. Zeebra answers in 0.05–1.0 ms. §3.3's sole-engine band, as a row. |
 | `mq-random-14` | both | **both** stopped at limits — Zeebra at 20 M live entries, Singular at the 60 s wall. **Different limits, so no ratio**, and neither is a time. |
 | `mq-planted-14` | conversion | Zeebra **stopped-by-limit** at the 4 096 quotient-dimension cap; Singular completed in 45.8 s using 10.4 GB. A capability gap, below. |
 | `cyclic-4` | conversion | Positive-dimensional, so conversion does not apply. Zeebra reports `unsupported`; **Singular's row is stored as `failed`** — see the defect note below. |
+
+*One row on the cipher-derived `anemoi64-cico-*` rungs was removed from this table in #668, with
+those rungs; it is preserved at commit 9532a9a2.*
 
 Quotient dimensions agreed on **every** row where both engines reported one: 5, 9, 25, 57, 64, 70,
 81, 156, 354, 1024, 16 384. That is the invariant check that licenses the timings (§5 of the
@@ -788,7 +794,7 @@ compared:
 | criterion | status |
 |---|---|
 | ≥3 external tools | **Partially met, with reasons.** msolve measured (§1); **Singular measured on 19 corpus rungs across both tasks (§4a)**. Groebner.jl and Sagebrush are now adapted and wired into the sweep, but their four-engine run is **queued behind a 90-minute reproduction on `benchlock`** — the serialization protocol working, not failing. |
-| ≥6 families | **Corpus has six** (`katsura`, `cyclic`, `mq-random`, `mq-planted`, `poseidon`, `anemoi`); cross-library **agreement** on seven rungs of two of them against Zeebra's F4 (§4) **plus quotient-dimension agreement on every completed Singular row across all six** (§4a); cross-library **timing** on `anemoi` (§1) and on `mq-random`, `mq-planted` and `poseidon` (§4a). |
+| ≥6 families | **Corpus has six** (`katsura`, `cyclic`, `mq-random`, `mq-planted`, `poseidon`, `anemoi`); cross-library **agreement** on seven rungs of two of them against Zeebra's F4 (§4) **plus quotient-dimension agreement on every completed Singular row across all six** (§4a); cross-library **timing** on `anemoi` (§1) and on `mq-random`, `mq-planted` and `poseidon` (§4a). *`poseidon` and `anemoi` left the public corpus in #668.* |
 | every row verified or classified unverified, method named | **Met.** §4 names the method (invariant agreement against Zeebra's F4, dimensions against published values). §1's rows are verified at `N = 4, 5, 6`. |
 | **rows retained in the board** (#293, #299) | **Met for Zeebra and Singular.** `research/competitive/results/history.json` holds **72 rows** — 36 each, 19 rungs × 2 tasks, including the 5 `unsupported`, 5 `stopped-by-limit` and 1 `failed`. §4a is read out of it and `COMPETITIVE.md` is generated from it, so both are regenerable. **Outstanding:** msolve, Groebner.jl and Sagebrush rows, which is a lock-queue wait; and two blemishes in the stored non-timing rows, fixed in code and listed in §4a. |
 | failure stages and limits recorded for incomplete runs | **Met** by construction: `StoppedByLimit` carries the limit and `Unsupported` the missing capability, and neither is timing evidence. |

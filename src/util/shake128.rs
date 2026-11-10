@@ -4,9 +4,7 @@
 //! than tabulate them: `zkfriendlyhashzoo`'s Feistel-MiMC seeds a SHAKE128 with the string
 //! `"FeistelMimc"` and the field characteristic and reads field elements out of the squeeze
 //! stream. A tabulated copy of those constants could not be checked against the rule that produced
-//! them — the same argument [`sha256`](super::sha256) makes for being hand-written, and the same
-//! argument `research::anemoi` makes for recomputing π-derived constants instead of committing
-//! them.
+//! them — the same argument [`sha256`](super::sha256) makes for being hand-written.
 //!
 //! Not a security primitive as used here: nothing secret is absorbed and there is no
 //! constant-time requirement. What is wanted is that the squeeze stream is byte-for-byte the one

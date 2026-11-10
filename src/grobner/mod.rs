@@ -10,12 +10,14 @@ pub mod field_equations;
 pub mod hilbert;
 pub mod pairs;
 pub mod planning;
+pub mod record;
 pub mod reference;
-pub mod research;
+pub mod resultant;
 mod s_polynomial;
 pub mod shape_certificate;
 mod solve;
 mod solve_zero_dimensional;
+pub mod transform;
 // Singular's weighted bases, committed as literals. Test data only: nothing on a shipping path
 // reads it, and `weighted_reference_bases::tests` is the differential check #624 asked for.
 #[cfg(test)]

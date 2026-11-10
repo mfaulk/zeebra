@@ -15,7 +15,7 @@ same instrument blob, a different base and a before/after pair of source blobs.
 re-invented: base commit `aa7cff8a`, an ancestor of `main`, plus the blobs
 `1e50f36f7c4e` (`git hash-object examples/specialization_batch.rs`, the term-level
 instrument) and `b634dc281275` (`git hash-object src/grobner/research/resultant.rs`, the
-measured source).
+measured source, since moved to `src/grobner/resultant.rs`).
 
 M25-D deliverable 3. `docs/research/resultant-elimination.md` §6.7 ranks "the determinant's
 per-sample cost" first among what is left and calls it "the only axis left with an asymptotic
@@ -55,7 +55,7 @@ and that evidence must be named. §5.1 names it.
 The determinant is `Matrix::determinant` (`src/linalg/matrix/mod.rs:359-387`) → `crout_lu_pivoting`
 (`src/linalg/crout.rs:135`): Crout LU with partial pivoting, triple-nested scalar loops, one inverse
 per pivot, `O(n³)` at about `n³/3` multiply-subtracts, **purely serial per determinant**.
-Parallelism exists only *across* samples (`src/grobner/research/resultant.rs:376-403`, static blocks
+Parallelism exists only *across* samples (`src/grobner/resultant.rs`, `sample_determinants`, static blocks
 over `std::thread::scope`).
 
 ### 1.1 The cost law is cubic, and there is no cache cliff to exploit
@@ -206,7 +206,7 @@ because it saves a month.
 
 ### 5.1 It was rejected here; here is the named new evidence
 
-`src/grobner/research/resultant.rs` module docs, under *"Why the determinant and not a Euclidean
+`src/grobner/resultant.rs` module docs, under *"Why the determinant and not a Euclidean
 algorithm"*:
 
 > A subresultant or Euclidean approach would be asymptotically better and would need exactly the
@@ -283,7 +283,7 @@ the change of scale.
 in the surviving variable — have a root at a sample point. If either is a nonzero *constant*, no
 sample can trigger it. For `cico_bivariate`'s Poseidon outputs that is a property of the construction,
 inspectable in milliseconds. **That check gates any integration**, and it is not done here:
-`src/grobner/research/resultant.rs` is owned by another agent this milestone.
+`src/grobner/resultant.rs` is owned by another agent this milestone.
 
 ### 5.4 The prototype, and why it is not in this change
 
@@ -398,7 +398,7 @@ recommendation now that there is a measurement.
 
 #350 restored the held module to `src/poly/univariate/resultant.rs` and added the allocation-free
 form a sample loop needs, `resultant_from_coefficients`, whose formal degrees are the coefficient
-slice lengths. `src/grobner/research/resultant.rs` selects between the kernels through
+slice lengths. `src/grobner/resultant.rs` selects between the kernels through
 `DeterminantKernel::{Dense, Euclidean}` on `ResultantOptions`, **defaulting to dense** so every
 figure taken before this existed still reproduces.
 
@@ -824,7 +824,7 @@ the top two rows, not the bottom two.
 #### What this does not establish
 
 * **A row-level figure.** Everything above is the determinant stage in isolation. `resultant_cico`
-  is the row-level instrument and was not run; the end-to-end effect on a registered row is
+  (moved out in #668) is the row-level instrument and was not run; the end-to-end effect on a registered row is
   therefore un-measured, and the 1.25x–1.80x above is a stage figure. A stage share is never a
   speedup.
 * **The transform route.** Still priced at ~40x by #598's operation count and still unmeasured,
@@ -1037,7 +1037,7 @@ three rungs.
 
 **File, High.** *"Land the Euclidean resultant and integrate it into the bivariate elimination
 route"* — take `research/m25-euclidean-resultant`'s module (§5.4), then consume
-`resultant_at_formal_degrees` in `src/grobner/research/resultant.rs`'s sample loop behind a flag, so
+`resultant_at_formal_degrees` in `src/grobner/resultant.rs`'s sample loop behind a flag, so
 the dense determinant stays as the differential reference, **gated on §5.3's leading-coefficient
 check**. Deliverable: `rf4-rp2` and `rf6-rp0` run. It is the only item in M25-D the arithmetic says
 build, and it unblocks the two rows the milestone wants.

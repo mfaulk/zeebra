@@ -1,8 +1,9 @@
 # XL and block Wiedemann: a differently-posed problem, priced from construction
 
 **Measured at:** not measured here — no solver runs and no matrix is built. Every XL figure is an
-exact combinatorial count from `examples/xl_dimensions.rs`, reproducing bit-for-bit; the F4
-comparands are measurements transcribed from `research/scoreboard/runs/` and cited in
+exact combinatorial count from `examples/xl_dimensions.rs` (moved out in #668), reproducing
+bit-for-bit; the F4 comparands are measurements transcribed from `research/scoreboard/runs/` (moved
+out in #668) and cited in
 [`mq-comparison-methodology.md`](mq-comparison-methodology.md) §7; the external figures are
 published attacks' own reported numbers.
 
@@ -57,7 +58,7 @@ model fails and in which direction.
 
 The instrument asserts two things before printing anything, because every figure is linear in them.
 
-**The term count, against a real file.** `fukuoka-mq.md` §4 records the type III `n = 10` import as
+**The term count, against a real file.** `fukuoka-mq.md` (moved out in #668) §4 records the type III `n = 10` import as
 "parses, **66 coefficients** x 20 polynomials". Monomials of degree at most two in ten variables is
 66. Were that wrong, every row would be wrong by one factor and nothing would look odd.
 
@@ -193,10 +194,8 @@ justify.
 
 ## 7. Reproducing
 
-```sh
-cargo run --release --example xl_dimensions            # the default rungs: n = 10, 15, 20, 24
-cargo run --release --example xl_dimensions -- 38      # the published record's instance
-```
+*The `xl_dimensions` example that produces these counts was moved out with the cryptanalysis
+research in #668; it is preserved at commit 9532a9a2.*
 
 No lock, no build flags and no machine state matter: the figures are integer counts. The two
 self-checks of §2.1 run before anything is printed, so a run that prints at all has reproduced the

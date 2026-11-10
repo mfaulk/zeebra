@@ -161,9 +161,7 @@ impl SingularSolver {
                 // adapter consumer does not have to re-derive which generator it is.
                 script.push_str("printf(\"@eliminant %s\", Glex[ncols(Glex)]);\n");
             }
-            Task::OneFiniteFieldSolution
-            | Task::AllFiniteFieldSolutions
-            | Task::CryptanalyticWitness => {
+            Task::OneFiniteFieldSolution | Task::AllFiniteFieldSolutions => {
                 // `supports` refuses these, so reaching here is a harness bug rather than a run.
                 script.push_str("printf(\"@unsupported 1\");\n");
             }
@@ -338,9 +336,7 @@ impl ExternalSolver for SingularSolver {
             // has established conventions for — and an unestablished convention is how a
             // comparison becomes wrong without becoming obviously wrong. Declared unsupported
             // until a route is verified the way `tools/reference_bases.sing` verifies the others.
-            Task::OneFiniteFieldSolution
-            | Task::AllFiniteFieldSolutions
-            | Task::CryptanalyticWitness => {
+            Task::OneFiniteFieldSolution | Task::AllFiniteFieldSolutions => {
                 return Support::No(Unsupported::Task { task });
             }
         }
@@ -596,11 +592,7 @@ mod tests {
     fn test_solution_and_witness_tasks_are_unsupported() {
         let solver = solver("Singular", "tasks");
         let instance = instance(65521, MonomialOrder::GradedReverseLexicographic);
-        for task in [
-            Task::OneFiniteFieldSolution,
-            Task::AllFiniteFieldSolutions,
-            Task::CryptanalyticWitness,
-        ] {
+        for task in [Task::OneFiniteFieldSolution, Task::AllFiniteFieldSolutions] {
             assert!(
                 matches!(
                     solver.supports(&instance, task),

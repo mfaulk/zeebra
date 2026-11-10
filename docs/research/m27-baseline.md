@@ -34,7 +34,8 @@ before #437 landed and nothing in the tree could say whether #437 moved it.
    by term with a table of the other. §4 is entirely this.
 2. **A projection is not a measurement**, even when every input to it was measured. §4 and §6 both
    turn on a figure labelled *extrapolated* being read as though it were observed.
-3. **The three scoreboard classes are never added together** (`SCOREBOARD.md`, line 3). §3 respects
+3. **The three scoreboard classes are never added together** (`SCOREBOARD.md`, line 3, moved out in
+   #668). §3 respects
    this; so must anything quoting it.
 4. **Every figure here carries its commit**, per #335. Where the commit is unreachable from `main`,
    §5.2 says so — that is a real defect and recording the SHA does not repair it.
@@ -338,184 +339,13 @@ must be re-taken with the flag on before any of it is published.
 
 ## 3. The cryptanalysis frontier, by class, never summed
 
-From `research/scoreboard/SCOREBOARD.md` and the 61 registered challenges with 78 retained runs.
-**An engineering surrogate's witness is not evidence about a public challenge**, and these three
-tables may not be added together or read as one ladder.
-
-### 3.1 `Official` — 48 registered, 5 attempted, **43 not attempted**
-
-| | |
-|---|---|
-| **hardest completed** | `fukuoka-mq-III-n15-seed0` — 15 vars / 30 eqs, **verified witness in 7 798.5 ms**, as published |
-| also completed | `fukuoka-mq-III-n10-seed0` (10/20, 106.4 ms); `fukuoka-mq-VI-n10-seed0` (10/7, 577.8 ms, slice(3 fixed, seed 7)) |
-| attempted, not completed | `fukuoka-mq-III-n20-seed0`; `fukuoka-mq-VI-n15-seed0` |
-| **not attempted** | **43 of 48** |
-
-**Every completion in this class is a toy example published with its answer.** That is a real and
-correctly-labelled result, and it is not challenge participation: `SUPPORTED_DIMENSIONS` stops at
-`n = 20` and the smallest *real* contest instance in an importable type is type VI `m = 16`, which
-the generator renders at `n = 24` (#454). Until the dispatch reaches 24 there is no registered row
-Zeebra can attempt that is not a toy example.
-
-> **Correction to #451.** It states "39 of 48 official registry rows are `not attempted`". The
-> figure is **43 of 48** — 48 rows, 5 of which carry a run. Counted from the generated table and
-> from the 61 challenge files independently; both give 43.
-
-### 3.2 `FaithfulReduction` — 9 registered, 9 attempted, 5 completed
-
-| | |
-|---|---|
-| **hardest completed, by round count** | `poseidon31-cico-t16-rf4-rp2` — 80 vars / 68 eqs, **verified witness in 328 219.0 ms on 32 workers**, resultant, slice(12 fixed, seed 1) |
-| **hardest completed, by wall clock** | `poseidon31-cico-t16-rf2-rp4` — 50 vars / 70 eqs, 3 274 316.5 ms on 32 workers (**54.6 min**, 10x `rf4-rp2`'s wall) |
-| also completed | `rf2-rp0` (6.0 ms), `rf2-rp2` (47 598.5 ms), `rf4-rp0` (50 638.1 ms) |
-| not completed | `rf4-rp4`, `rf6-rp0`, `rf6-rp2`, `rf6-rp4` |
-
-**These two "hardest" are different achievements and the distinction is #370's acceptance criterion
-4.** `rf4-rp2` has more *full* rounds; `rf2-rp4` has more *partial* rounds and costs 10x the wall.
-A frontier claim must say which it means. #451 names `rf4-rp2` as the class frontier, which is the
-round-count reading, and this document adopts it **with the qualifier stated**.
-
-Every witness in this class says **nothing** about the official target it reduced from, which the
-retained record states in its own `significance` field: *"witness for a reduction of
-poseidon31-cico-rf6-rp8; says nothing about it."*
-
-### 3.3 `Engineering` — 4 registered, 4 attempted, 3 completed
-
-`poseidon-t2-rf2-rp0-planted` (0.8 ms), `poseidon-t2-rf2-rp2-planted` (141.2 ms),
-`poseidon-t2-rf4-rp0-planted` (348.3 ms), all as generated. `poseidon-t3-rf2-rp1-planted` stopped at
-`max_matrix_columns`, degree 11. Reduced width, planted targets: evidence about the implementation
-and about nothing else.
-
-### 3.4 One board defect found while reading the frontier
-
-`SCOREBOARD.md`'s "Where the unfinished runs stopped" table has **38 rows containing duplicates**:
-`poseidon-t3-rf2-rp1-planted / as generated / max_matrix_columns at degree 11 / 42229 cols /
-155.3 MB` appears **three times**, byte-identical. `poseidon31-cico-t16-rf2-rp0 / slice(12 fixed,
-seed 0)` appears twice with two different outcomes (`basis only, no witness` and `the slice is
-empty`). The table is generated, so the duplication is in the run set or the generator, not in the
-prose. It does not change any frontier figure above — none of the duplicated rows is a completion —
-but a reader counting stopped runs will overcount. **Filed for M27-C**, which owns the board
-defects; recorded here so the frontier count is not read off that table.
-
-**Resolved (#506): the generator, and no record is duplicated.** Checked by hashing each record in
-`results/history.json` whole — **zero** byte-identical records. The three planted rows are three
-real runs, at `7e333fb` twice (17.09 s and 17.19 s) and `744fdf9` once (18.68 s); the matrix figures
-are identical because F4 is deterministic, and the rows rendered identically because the table had a
-column for neither the commit nor the elapsed time. The `slice(12 fixed, seed 0)` pair is likewise
-**one problem, two runs**: identical frontier down to `peak_live_nonzeros`, at `3fe69c6`
-(`basis_only`, no quotient dimension recorded) and `7e333fb` (`slice_established_nothing`,
-`quotient_dimension = 81`) — the same computation under a later and more precise verdict, not two
-formulations sharing a label. The table now renders one row per distinct rendering with `runs` and
-`commits` columns, so the count is 38 rows standing for 40 runs and both facts are readable.
+*§3 (the cryptanalysis frontier by challenge class, and the scoreboard defect found reading it) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ---
 
 ## 4. The `rf4-rp2` row: the three cost tables agree, and the discrepancy was a unit
 
-#451 records three "mutually inconsistent" cost tables for `poseidon31-cico-t16-rf4-rp2` and asks
-that the row be resolved to the retained record with the other two retained and labelled. **The
-stronger result is available: read in the right units the three tables do not disagree on any term,
-and both conversion factors are independently measured.**
-
-### 4.1 The retained record is authoritative, and it closes
-
-`research/scoreboard/runs/poseidon31-cico-t16-rf4-rp2--resultant--slice-12-fixed--seed-1---c32--ad7ec4a.json`
-— `verified_witness`, class `faithful-reduction`, formulation `resultant, slice(12 fixed, seed 1)`,
-challenge digest `80957f3ccf46…`, commit **`ad7ec4a`**, machine **workstation**, **32 logical,
-affinity 0-31**, concurrency **32**, release with `RUSTFLAGS` from `.cargo/config.toml`.
-
-| term | seconds | share | source |
-|---|---:|---:|---|
-| generation (symbolic build) | **289.374** | 88.17% | `stages[generation]` |
-| elimination | **38.632** | 11.77% | `stages[elimination]` |
-|  — sampling (determinants) | 6.535 | 1.99% | `detail.sampling_us` |
-|  — interpolation | 29.323 | 8.93% | `detail.interpolation_us` |
-|  — off-domain validation | 2.774 | 0.85% | `detail.validation_us` |
-| univariate (root finding) | **0.212** | 0.06% | `stages[univariate]` |
-| verification | **0.000** | 0.00% | `stages[verification]`, 8 off-domain checks |
-| **total** | **328.219** | 100% | `elapsed_nanos` |
-| peak RSS | 825 307 136 B = **825.3 MB** | | `measured_peak_resident_bytes` |
-
-**It is the only one of the three tables that closes.** The four stages sum to the total to within
-**0.4 ms in 328 s**, and the three elimination sub-terms sum to the elimination stage to within
-**2 µs**. Reproduce with:
-
-```sh
-cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf4-rp2 \
-  --concurrency 32 --kernel euclidean --root-finder deflation \
-  --max-samples 59050 --wall-budget 3600 --write
-```
-
-### 4.2 #410's table is a **one-core cost model**, and that is the whole discrepancy
-
-| term | retained (32-worker wall) | #410 (one core) | #410 / retained | reconciles? |
-|---|---:|---:|---:|---|
-| symbolic build | 289.374 | 324.0 | 1.12x | sequential stage; spread is §6's systematic |
-| **determinants** | **6.535** | **65.5** | **10.02x** | **yes — exactly** |
-| interpolation | 29.323 | 36.0 *(extrapolated)* | 1.23x | a projection, 23% high |
-| **off-domain validation** | **2.774** | **18.6** | **6.70x** | **yes — exactly** |
-| root finding | 0.212 | 0.5 *(pessimistic gcd band)* | 2.36x | a band, not a point |
-
-**The determinant term.** 59 050 determinants × 1.109 ms one-core (§5.5 of #350) = **65.49 s**,
-which is #410's 65.5 s to three figures. Against the retained 32-worker wall of 6.535 s that is a
-speedup of **10.02x**. #412 measured the Euclidean kernel's width penalty at 32 workers as
-**3.21x**, which predicts 32 / 3.21 = **9.97x**. The two agree to **0.52%**.
-
-Reconstructed forward from first principles, 59 050 × 1.109 ms / 32 × 3.21 = **6.569 s** against the
-record's **6.535 s** — **0.5%**. The retained figure, #410's figure and #412's penalty are three
-views of one measurement and all three are consistent.
-
-**The off-domain term.** #412 puts the Euclidean kernel at **2 094x faster per determinant** than
-the dense one at order 1 458, so a dense determinant there costs 1.109 ms × 2 094 = **2.322 s** on
-one core and 8 of them **18.58 s** — which is #410's 18.6 s. Against the retained 2.774 s that is
-**6.70x**, and with only **8 tasks** the parallel ceiling is 8, not 32: the run achieved **84% of
-the available 8-way**. The term that looked like the one genuine 6.7x conflict is the same unit
-change with a smaller task count.
-
-**So #410's table is not a competing measurement of the row.** It is a one-core cost model, built
-for a budget guard, and its two parallel terms differ from the record by exactly the two measured
-parallel factors. Its `interpolation` is labelled *extrapolated* in #410 itself and was 23% high;
-its `root finding` is offered as a pessimistic band. Nothing in it contradicts the record.
-
-### 4.3 The third table is a different run, not a correction
-
-| term | retained | circulating | ratio |
-|---|---:|---:|---:|
-| total | 328.219 | 362 | 1.103x |
-| generation | 289.374 | 320.8 | 1.109x |
-| determinants | 6.535 | 6.57 | 1.005x |
-| interpolation | 29.323 | 31.7 | 1.081x |
-| root finding | 0.212 | 0.19 | 0.896x |
-| peak RSS | 825.3 MB | ~726 MB | 0.880x |
-
-Every term is within 1.005x–1.11x of the record **in the same units**, and the circulating table's
-stated terms sum to 359.26 against its total of 362 — leaving **2.74 s** unaccounted, which is the
-record's off-domain validation term (2.774 s) omitted rather than disagreed with. This is an
-**unretained run of the same configuration**, and its spread from the record sits inside §6's
-systematic. It is retained here as what it is and is **not** a correction to anything.
-
-### 4.4 The resolution, stated once
-
-> **The `rf4-rp2` row is `ad7ec4a`'s retained record: 328.219 s total, 289.374 s symbolic,
-> 38.632 s elimination, 0.212 s root finding, 825.3 MB peak, 32 workers at affinity 0-31.** #410's
-> table is a one-core cost model of the same row and agrees with it on every term once converted at
-> the two measured parallel factors (10.02x over 59 050 tasks, 6.70x over 8). The third table is an
-> unretained run of the same configuration, 1.10x slower end to end. **All three are retained**; the
-> cost-model register's append-only rule is what makes that the correct outcome rather than erasing
-> two of them.
-
-### 4.5 One stale reading this row invites, flagged rather than fixed
-
-`resultant-elimination.md` §6.9's "The rows restated" table, and the `README.md` passage that quotes
-it, project `rf4-rp2`'s determinant stage at **1.79 h on 32 workers**. The retained record measures that stage at **6.535 s** — a collapse of
-**986x**. Both figures are correct and properly labelled: 1.79 h is the **dense** route at
-2.404–3.148 s a determinant, and 6.535 s is the **Euclidean** route #350 introduced, whose
-per-determinant advantage #412 measures at 2 094x. The hazard is that §6.9's table is headed
-*"Determinant time only — the symbolic build … not in these numbers"*, so a reader taking 1.79 h as
-the row's cost is reading a dense-route determinant projection as a Euclidean-route row total and
-will be wrong by three orders of magnitude in one direction and by the missing 88% in the other.
-**Not edited here** — it belongs to #410's "report which terms are modelled" and to #370's prose
-pass — but no M27 figure should be derived from it.
+*§4 (reconciling the three cost tables for the `poseidon31-cico-t16-rf4-rp2` challenge row) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ---
 
@@ -527,8 +357,6 @@ pass — but no M27 figure should be derived from it.
 |---|---|---|
 | competitive rows (§1) | `examples/competitive_sweep` | `history.json`, append-only, per-row `environment.commit` |
 | the stage split (§2) | `examples/f4_profile -- mq` | digest-asserted in the example; commit `1985504` |
-| scoreboard rows (§3) | `examples/<row example> --write` | `research/scoreboard/runs/*.json`, one file per run |
-| the `rf4-rp2` row (§4) | `examples/resultant_cico … --write` | the retained record's own `reproduce` field |
 
 ### 5.2 Three of the four competitive cohorts were taken at commits unreachable from `main`
 
@@ -566,7 +394,7 @@ checkout; `commit` was left exactly as recorded rather than overwritten:
 | `a904145` | `6e67953` | `b0855cb27e70…` |
 
 A **second instance** turned up on the cryptanalysis side while fixing this one: `1409a48`, two runs
-in `research/scoreboard/results/history.json`, likewise unreachable, base `1985504`. Both boards
+in `research/scoreboard/results/history.json` (moved out in #668), likewise unreachable, base `1985504`. Both boards
 share one `Environment`, so both are fixed by the same change. The 23 cost-model rows #294
 transcribed carry an empty `commit` and remain unresolvable — that is #335's backlog, not this
 defect: nothing was lost by a merge, the commit was never written down.
@@ -660,29 +488,7 @@ Two consequences:
 
 ## 7. Each M27 target's barrier, by stage reached and the reason it stopped
 
-**Runtime alone is not an indicator of progress toward a solution, and a larger degree crossed is
-not nearer one.** This table names the bound that bound, not the time spent.
-
-| target | class | stage reached | the actual barrier |
-|---|---|---|---|
-| `mq-random-10` basis | corpus | **completes** | **time**: 80.9% in final interreduction on the default path (§2.3), 348x behind Groebner.jl. Not a limit. With `interreduce_by_matrix` on, 28.4% and 3.63x faster (§2.4) — but that flag is off by default |
-| `mq-random-10` under `baseline()` | corpus | refuses | `max_live_nonzeros`, 20 000 277 / 20 000 000 — **one part in 72 202** (§2.2) |
-| `fukuoka-mq-III-n20-seed0` | official | degree 5, **4 completed** | `max_live_nonzeros`, 20 001 424 / 20 000 000 — **one part in 14 045**; 10 297 × 10 147 matrix, 195.5 MB accounted. **Stale: predates #305** (#453) |
-| `fukuoka-mq-VI-n15-seed0` | official | degree 9, **8 completed**, 8 slices | `max_live_nonzeros` on every slice, 20 146 cols, ~217.9 MB; campaign reached **no verdict**. **No slice tested whether a solution exists** |
-| types I/II/IV/V, any real size | official | **not importable** | `SUPPORTED_DIMENSIONS = [10, 15, 20]`; smallest real instance needs **n = 24** (#454) |
-| `poseidon31-cico-t16-rf4-rp4` | faithful | degree 5, 4 completed | `max_live_nonzeros`; 24 441 cols, 29.8 MB |
-| `rf6-rp0` / `rp2` / `rp4` | faithful | degree 5, 4 completed | `max_live_nonzeros`; 28 794 / 31 296 / 34 639 cols, 30.6–40.7 MB |
-| `poseidon-t3-rf2-rp1-planted` | engineering | degree 11, 10 completed | `max_matrix_columns`; 42 229 cols, 155.3 MB |
-
-**The pattern is one barrier, and it is a policy rather than a resource.** Every target above that
-stops at a budget stops at `max_live_nonzeros` except one — the planted surrogate, which stops at
-`max_matrix_columns` — and three cross it by **less than 0.05%**: `mq-random-10` by one part in
-72 202, III n=20 by one part in 14 045, `rf4-rp2` by one part in 2 222. The accounted working sets
-at those stops are all **under 220 MB** on a 300 GB machine. #305 already took III n=20's peak RSS from 13 996 MB
-to 1 496.5 MB and the budget still refuses it on a 195 MB matrix, which is #453's whole point: that
-record describes a machine state that no longer exists, and **re-diagnosing it costs one short run**.
-
-Whether 20 000 000 was ever chosen against a measured working set is **unanswered** (#490).
+*§7 (each M27 target's barrier, by challenge row) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ---
 
@@ -760,42 +566,7 @@ this order and it is what made the row run in 5.47 minutes instead of a projecte
 
 ## 9. #410's defect, stated precisely — and why it is a safety fix
 
-**Not fixed here.** #410 is a separate issue, now Priority High, and it is a code change to
-`examples/resultant_cico.rs` under an issue whose own scope is to freeze figures. What this document
-owes it is the measured term shares that make the fix mechanical, and §4.2's finding that the
-guard's table is a one-core model.
-
-`RowCost::of` costs exactly one term:
-
-```rust
-let each = kernel_core_ms(kernel, matrix_order, workers) / 1e3 / workers.max(1) as f64;
-predicted_seconds: samples as f64 * each,
-```
-
-No symbolic build, no interpolation, no root finding. Against the **retained record's own measured
-shares** (§4.1):
-
-| term | share of the row | modelled by the guard? |
-|---|---:|:---:|
-| generation (symbolic build) | **88.17%** | **no** |
-| interpolation | 8.93% | no |
-| **determinants** | **1.99%** | **yes** |
-| off-domain validation | 0.85% | no |
-| root finding | 0.06% | no |
-
-**The guard models 1.99% of the row it admits.** #410 states this as "the 15% and ignores the 73%",
-from its own one-core table where the determinant term is inflated 10.02x by the unit (§4.2). In
-wall-clock terms — the units `--wall-budget` is denominated in — **the modelled fraction is 2%, not
-15%**, so the defect is about 7x worse than #410 describes it.
-
-And it fails in both directions: on `rf6-rp0`, `structured-sylvester.md` §7.1 puts the row at **78%
-root finding** after axis 4, a term the guard has never looked at.
-
-> A guard that admits a row by modelling 2% of its cost is not conservative in either direction. It
-> did not affect #367 — that row is inside its ceiling on every term — which is precisely why it
-> should be fixed before a row whose margin is thinner.
-
-**Not claimed:** that the guard has ever passed a row it should have refused.
+*§9 (the defect in the challenge-row budget guard of `examples/resultant_cico.rs`) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ---
 

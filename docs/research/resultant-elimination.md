@@ -8,12 +8,11 @@ are M23-E, with the figures it took; §6 supersedes §4 and amends §2 and §5; 
 ranked list. Each says so inline. Nothing is overwritten.**
 
 ```sh
-cargo run --release --example resultant_cico          # the rows the budget admits
-cargo run --release --example resultant_cico -- --concurrency 1,8,32          # §6.6's scaling
-cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
-cargo test --lib grobner::research::resultant
-cargo test --release --lib grobner::research::resultant -- --ignored   # the four-round row, ~1 min
+cargo test --lib grobner::resultant
+cargo run --release --example determinant_sweep       # §6.9's five-order sweep
 ```
+
+The `resultant_cico` example that produced the per-row figures was moved out in #668.
 
 The spike the plan asks for, on the instances that make the comparison mean something: these are the
 **registered** `t = 16` reductions M23-B measured, sliced at the same precommitted seed, so the
@@ -21,47 +20,11 @@ resultant's cost sits beside an F4 figure for exactly the same problem.
 
 ## 1. The structure, and why F4 is not told about it
 
-Fix twelve of the fourteen free inputs and two unknowns remain. Every S-box output is then a
-*polynomial in those two*: the permutation is a straight-line program, so there is nothing to solve
-for, only to evaluate. The whole 46-equation system collapses to **two polynomials in two
-variables**, and the CICO condition is their common root.
-
-The S-box-per-variable formulation exists to stop the degree compounding — `y − L^3 = 0` is degree 3
-whatever the round count — and pays 32 extra variables for it. At `t = 16` those variables are what
-make the matrices unaffordable: M23-B measured fourteen of eighteen rows dying on live entries at
-degree 4–5. Evaluating them away trades the variables back for degree `3^rounds`, and the question
-is where that trade stops paying.
+*§1 (the CICO slice formulation as two bivariate polynomials) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 2. Measured
 
-One resultant eliminates the second unknown; its roots are candidates for the first; each candidate
-is extended and then checked **by running the permutation**. Nothing here decides that a candidate
-is a solution — a resultant root is a necessary condition, not a sufficient one.
-
-**These are the M23-E figures, taken with Lagrange interpolation at consecutive points.** §6
-supersedes them: the interpolation is now an inverse NTT on a power-of-two subgroup, the four-round
-rows complete, and the two-round row's total drops. They are kept because §3 and §5 are written
-against them.
-
-| row | rounds | bivariate degree | terms | build | resultant degree | Bézout | eliminate | roots | verify | **total** | F4 on the same slice |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `t16 R_F=2 R_P=0` | 2 | 9 | 55 | 2.8 ms | **81** | 81 | 30.8 ms | 18.1 ms | 0.5 ms | **52.2 ms** | **30 142 ms** |
-| `t16 R_F=2 R_P=2` | 4 | 81 | 3 403 | 431 ms | — | 6 561 | see §4 | — | — | — | stopped at the entry cap |
-
-**578x on the row both routes can do**, and the resultant returns *all three* base-field witnesses
-where F4's search returns the first one it finds. Both were checked through the permutation.
-
-The bivariate degree is exactly `3^rounds` on every row — the straight-line bound, with no
-cancellation — and the resultant's degree on the 2-round row is exactly the Bézout bound `9 × 9`.
-So nothing about Poseidon's structure reduces the degree here; what the resultant exploits is the
-*variable count*, not a degree collapse. That is worth stating plainly because the plan asked
-whether a structural degree reduction appears, and the answer is **no**.
-
-> **Superseded by §6.3, and the sentence above is wrong.** The "no" was drawn from one row whose
-> `R_P = 0`, which is exactly the case where the Bézout bound `d^{2R_F+2R_P}` and the published
-> experimental degree `d^{2R_F+R_P}` coincide — so that row could not have seen a collapse whether
-> or not one exists. §6.3 measures the four-round row with `R_P = 2` at degree **729 against a
-> Bézout bound of 6 561**, confirming the published formula.
+*§2 (the M23-E per-row results on the registered CICO slices) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 3. Why this is not a general answer
 
@@ -151,25 +114,11 @@ is a reference implementation and the module says so; what the spike establishes
 three costs is worth an implementation milestone, and it is not the one that looked obvious.
 
 Together those are a factor of several before any algorithmic change, which is why the conclusion is
-"scope an implementation" rather than "the resultant route stops at two rounds". What can be said
-without an implementation milestone is: **two rounds in 52 ms, four rounds not in two hours, and
-six rounds never** — `3.3 × 10¹⁵` field operations for the resultant alone, before cubing a polynomial
-with 265 720 terms.
+"scope an implementation" rather than "the resultant route stops at two rounds".
 
 ## 5. What this decided
 
-The M23-E answers, with what §6 revised. **The original answers are kept verbatim**: the two
-columns are the record of what one measurement supported and what the next one changed.
-
-| question | M23-E answer | revised by §6 |
-|---|---|---|
-| Does structure-aware elimination beat general F4 here? | **Yes, by 578x** on the one row both can do, and it returns every witness rather than the first. | unchanged, and the factor is larger: the two-round total is now 7.0 ms, so **4 306x**. |
-| Is the univariate polynomial manageable? | Yes at two rounds — degree 81, 17 ms to find its roots over KoalaBear. | Yes at four — degree 729 in 60 ms, degree 6 561 in 4.2 s. |
-| Does Poseidon's structure reduce the degree below Bézout? | **No.** The bivariate degree is exactly `3^rounds` and the resultant's is exactly `d²`. | **Sometimes yes.** Four rounds with `R_P = 2` gives **729 against 6 561**; with `R_P = 0` it gives 6 561 exactly. The bivariate degree is still exactly `3^rounds`. §6.3. |
-| Does it scale? | No. The cost is `16 · 3^{5·rounds}`: two rounds in 52 ms, four rounds not in two hours with this implementation, six rounds `3.3 × 10^15` operations. | Four rounds in **40 s** by the reference route, 49 s by the subgroup one, and **2.16 s on 32 cores** (§6.6). The exponent is unchanged, so six rounds is `3.3 × 10^15` serially and `10^14` on 32 cores: the reach moved one step up the ladder and the constant moved 30x, neither of which is an order of growth. |
-| Which cost should an implementation attack first? | **The interpolation**, measured at `O(n³)` — not the determinant, which is a few minutes of the hour. §4.1. | Revised twice. §6.4: the interpolation is **3.9%** of the four-round row and, *serially*, provably cannot dominate again — so the sample count, then the determinant. §6.6 then measured the determinant: **the determinant, and it was 29–31x of parallelism at 92–95% efficiency**, 49.7 s to 2.16 s. That also undoes §6.4's "provably": with the determinants parallel the recovery is 55% of the reference route at 32 workers, so the ranking is now **the sample count, then the Sylvester structure, with the interpolation back in contention at high worker counts**. |
-| Did it extend the frontier? | **No** — both routes reach two rounds. What it changed is the cost there, by 578x. | **Yes** — verified CICO witnesses at **four rounds** on two registered reductions, where F4 stops at two. Credit goes to #162's quadratic `lagrange_interpolate` and the formulation of §1, **not** to the subgroup route, which §6.5 measures as slower. §6.1. |
-| Should a resultant implementation be scoped? | Yes, and narrowly: early-terminating interpolation plus a structured determinant, aimed at the slice shape, not at a general solver. | Narrower still. The interpolation half is finished and was the wrong half; the **parallel** determinant is done and measured (§6.6). What remains is a **predicted** sample count from §6.3's degree formula, guarded by an off-domain check, and a **structured** determinant exploiting the Sylvester form — the one piece that is asymptotic rather than a constant. |
+*§5 (the M23-E decision table on the attack) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 6. The four-round row completing, and a subgroup interpolation that does not help
 
@@ -194,65 +143,16 @@ CICO objective, the instance parameters or the verification condition changes; t
 `bivariate_resultant_reference` is the retained reference with its two stages timed apart, which is
 what makes §6.5 a comparison rather than two readings.
 
-All figures below from one run of the command below on the `perf/resultant-subgroup-interpolation`
+All figures below from one run of the `resultant_cico` example (moved out in #668) on the `perf/resultant-subgroup-interpolation`
 branch (#186) — the code as merged, which later commits on that branch change only in this
 document — seed 1, on the development
 workstation (128 logical cores, 500 GB; `-C target-cpu=x86-64-v3` from `.cargo/config.toml`,
 `profile.release` with fat LTO and one codegen unit). **Single-threaded, unpinned, and taken under
-the exclusive benchmark lock, `tools/benchlock.sh`** while five other agents were idle on it:
-
-```sh
-tools/benchlock.sh agentR cargo run --release --example resultant_cico
-```
+the exclusive benchmark lock, `tools/benchlock.sh`** while five other agents were idle on it.
 
 ### 6.1 Measured, stage-separated
 
-Subgroup route, which is the one the pipeline below consumes:
-
-| row | rounds | build | samples | matrix order | determinants | interpolate | off-domain check | roots | lift | verify | **total** | peak RSS |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `t16 R_F=2 R_P=0` | 2 | 2.9 ms | 256 | 18 | 2.9 ms | **0.0 ms** | 0.1 ms | 0.9 ms | 0.2 ms | 0.0 ms | **7.0 ms** | 2.6 MB |
-| `t16 R_F=2 R_P=2` | 4 | 419.3 ms | 16 384 | 162 | 48 054.4 ms | **1.9 ms** | 22.5 ms | 52.7 ms | 1.0 ms | 0.0 ms | **48 551.8 ms** | 14.2 MB |
-| `t16 R_F=4 R_P=0` | 4 | 397.7 ms | 16 384 | 162 | 49 175.7 ms | **2.1 ms** | 23.1 ms | 3 933.3 ms | 2.0 ms | 0.0 ms | **53 534.0 ms** | 15.2 MB |
-
-Peak RSS is the process figure from `/proc/self/status`'s `VmHWM`, measured. The estimate for the
-interpolation's own live arrays — sample vector, domain, inverse domain, coefficients, at
-`4 n · size_of::<F>()` — is **0.5 MB** at 16 384 points, and the gap to 14–15 MB is the bivariate
-polynomials and the process itself, not the transform.
-
-| row | resultant degree | Bézout | base-field roots | **verified witnesses** |
-|---|---:|---:|---:|---:|
-| `t16 R_F=2 R_P=0` | 81 | 81 | 3 | **3** |
-| `t16 R_F=2 R_P=2` | **729** | 6 561 | 1 | **1** |
-| `t16 R_F=4 R_P=0` | 6 561 | 6 561 | 2 | **2** |
-
-**The four-round rows complete, and they return verified witnesses.** Every witness is checked by
-`CicoInstance::is_solution`, which runs `permutation_plus_linear` — the same verifier every other
-registered result in this repository is checked by. Nothing in the resultant code decides a
-candidate is a solution. §2's two-hour non-result on `R_F=2 R_P=2` is superseded by the 48.6 s row
-above, and by the 39.7 s §6.5 reaches on the reference route.
-
-The witness coordinates are committed at
-[`research/witnesses/resultant-cico-t16.json`](../../research/witnesses/resultant-cico-t16.json)
-and re-verified through the permutation by
-`grobner::research::resultant::tests::test_the_recorded_witnesses_verify_through_the_permutation`,
-which takes milliseconds. The four-round run itself is reproduced by the `#[ignore]`d
-`test_the_four_round_row_completes_on_the_subgroup_route`.
-
-**This extends the verified-witness frontier on the registered reductions from two rounds to four.**
-F4 stops at two (M23-B: fourteen of eighteen rows die at degree 4–5) and so did the resultant. It
-is a frontier on *faithful reduced-round instances*, not on an official public problem: the
-official targets are `R_F = 6` with `R_P ∈ {6, 8, 10}`, which §6.4 still prices at `3.3 × 10^15`
-field operations and above. A larger reachable round count is not a fraction of those.
-
-**Credit for the frontier move belongs to #162 and to the formulation, not to the subgroup
-interpolation.** §4.1 blamed the cubic `lagrange_interpolate`, and #162 stage 1 made it quadratic:
-13 123 points now interpolate in 1.5 s measured here. That alone is enough to make the four-round
-row finish, and §6.5 measures the reference route doing so in 39.2 s of elimination. What the
-subgroup route contributes is the interpolation at 1.9 ms instead of 1.5 s — and it pays for that
-with 3 261 extra determinants, which costs more than it saves. The honest reading is that the elimination formulation of §1 and
-#162's quadratic interpolation did this, and the NTT route is a **measured negative result** whose
-value is §6.4's structural argument for why no interpolation improvement can matter here.
+*§6.1 (the stage-separated row timings and verified witnesses on the registered slices) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ### 6.2 The domain, and the degree bound
 
@@ -359,12 +259,6 @@ ranked list as of this section — see §6.6 for the current one — was:
 3. **The interpolation** — done, twice, and provably not where the cost is. **The "provably" is
    retracted: see the note above and §6.6.**
 
-The exponent is unchanged, which bounds every claim above. The route still costs about
-`16 · 3^{5·rounds}` field operations: `3.3 × 10^15` at six rounds and `1.9 × 10^20` at eight, before
-the bivariate evaluation has to cube a polynomial with 265 720 terms. **Four rounds in 52 s, six
-rounds not with any constant factor this list can supply.** What moved is the reach by one step of
-the ladder, not the growth.
-
 ### 6.5 The A/B: the subgroup route loses, at every size measured — single-threaded
 
 > **Scoped by §6.6.** Everything in this section is at one worker, and the sign of the result
@@ -423,16 +317,8 @@ abscissa sequence alone: the resultant's coefficients and the witness set are **
 `test_the_registered_slice_gives_the_same_witnesses_at_every_concurrency` and
 `test_the_resultant_does_not_depend_on_the_concurrency`.
 
-Measured with
-
-```sh
-ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=0-31 \
-  flock /tmp/zeebra-bench.lock \
-  taskset -c 0-31 \
-  cargo run --release --example resultant_cico -- --concurrency 1,8,32
-```
-
-on the development workstation (128 logical cores, 256 MB L3, 500 GB; `-C target-cpu=x86-64-v3`
+Measured with the `resultant_cico` example's `--concurrency 1,8,32` (moved out in #668), under
+`flock /tmp/zeebra-bench.lock` and `taskset -c 0-31`, on the development workstation (128 logical cores, 256 MB L3, 500 GB; `-C target-cpu=x86-64-v3`
 from `.cargo/config.toml`, `profile.release` with fat LTO and one codegen unit), seed 1, under an
 exclusive benchmark lock, with the worker set **pinned to a 32-core subset** rather than left to
 contend with the eight-core set the rest of the scoreboard uses. Two independent runs of the same
@@ -528,21 +414,11 @@ half* serial interpolation.
 So the two routes are not redundant after all, and retaining the one §6.5 measured as a loss turns
 out to have been the right call for a reason §6.5 could not see. The honest form of §6.4's claim is
 narrower: **a serial route cannot be helped by a faster interpolation; a parallel one can, and the
-NTT recovery is the one that keeps up.** Nothing here changes the exponent — the route still costs
-about `16 · 3^{5·rounds}` operations and six rounds is still `3.3 × 10^15`, which 32 cores move to
-`10^14` and not to reach.
+NTT recovery is the one that keeps up.**
 
 #### The scoreboard, and what is not recorded here
 
-The figures above are **not** on the cryptanalysis scoreboard as a speedup, and the machinery now
-refuses to make them one. `Environment::concurrency` is recorded on every run and defaults to 1 for
-every record written before it existed; `Comparison::of` returns
-`ScoreboardError::DifferentConcurrency` rather than a ratio when two runs disagree on it; and
-`Scoreboard::best` — the headline the rendered table quotes — considers uncontended runs only, so a
-30x core count cannot displace the single-core figure it is not comparable with.
-`Scoreboard::best_at` reaches the parallel rows deliberately. This differs from #166, which
-parallelized a differential sweep whose product was an agreement verdict and therefore needed none
-of this.
+*This subsection (how the cryptanalysis scoreboard records concurrency) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ### 6.7 The predicted sample count, measured — and §6.4's ranked list closed out
 
@@ -639,7 +515,8 @@ both reductions apply.
 
 ### 6.8 The six-round build, measured — and it is memory, not time
 
-The six-round attempt (#211) is costed in `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §7.4, which
+The six-round attempt (#211) is costed in `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` (moved out
+in #668) §7.4, which
 flags the symbolic build as the one stage whose cost law nothing had checked: it has been under 1%
 of every row measured here, and at six rounds the outputs grow from ~3 400 terms to ~266 000. §7.5
 of that plan therefore asks for `cico_bivariate` to be timed **alone** on
@@ -681,7 +558,8 @@ Two consequences:
    is 11% of this workstation's RAM for one single-threaded build, and two concurrent six-round
    builds would be noticed by every other process on the box.
 
-Measured with `--row poseidon31-cico-t16-rf2-rp4 --build-only`, which runs before the budget check
+Measured with `resultant_cico --row poseidon31-cico-t16-rf2-rp4 --build-only` (moved out in #668),
+which runs before the budget check
 on purpose: the budget is on the determinants and the build runs none of them, so the build of a
 row whose determinants are unaffordable is still a bounded, interruptible measurement. Peak RSS
 from `VmHWM`, polled externally and cross-checked against `util::peak_resident_bytes`, which reads
@@ -689,11 +567,7 @@ the same field. Reported as an upper bound on the elapsed: this agent's own `car
 `cargo test` ran on eight unrelated cores during part of the window, which the lock does not
 serialize and which inflates a memory-bandwidth-bound figure rather than deflating it.
 
-**No determinants were run on this row.** At six rounds the proven `2d²` fallback is 1 062 882
-order-1 458 determinants — 25.7 single-core days — so a falsified prediction there would be
-reported as *prediction falsified, generic bound unaffordable* rather than retried, and
-`examples/resultant_cico` now prints that consequence before it starts a row instead of discovering
-it mid-run.
+*The six-round row's determinant cost projection was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ### 6.9 The determinant cost law, calibrated at five orders
 
@@ -860,63 +734,7 @@ explain a figure on record being *faster*.
 
 #### What `RowCost::of` now does, and why it is not the fitted law
 
-The budget guard's purpose is to **refuse** runs, so the asymmetry matters: over-predicting costs an
-operator a flag, and under-predicting authorizes a multi-day run nobody costed.
-`determinant_core_ms` therefore takes
-
-```text
-core_ms(order, workers) = max( 3.624 · (order/162)³ , 3.624 · (order/162)^2.9953 )
-                        × (1 + 0.065 · log2(workers))
-```
-
-Three deliberate choices in that line:
-
-1. **The larger of the two laws, not the fit.** The measured exponent 2.9953 is *below* 3, so
-   anchored at order 162 the fitted law predicts **less** work than the cubic at every order above
-   it. Adopting the fit alone would have made the guard weaker than it was before it was calibrated.
-   The `max` keeps the conservative figure and picks a future re-fit up automatically if one comes
-   out above 3.
-2. **The anchor is 3.624 ms, not 2.868 ms.** A guard anchored to the fastest figure ever recorded on
-   a machine that no longer delivers it is a guard that does not bind. The current, reproducible
-   figure is the one to refuse runs with, and the 1.2x gap is documented above rather than averaged
-   away.
-3. **A measured width penalty.** 6.5% a doubling, linear in `log2(workers)` through the measured
-   1.00 / 1.17 / 1.31 at 1 / 8 / 32 workers, and **extrapolated at the same slope beyond 32** rather
-   than held flat: nothing wider has been measured, and flattening it would make the guard
-   optimistic exactly where it has no evidence.
-
-At order 1 458 the model gives 2.642 s a determinant against 2.404 s measured — 10% conservative,
-which is the intended direction. Above order 4 374 it is an extrapolation and the example says so on
-the line it prints.
-
-#### The rows restated
-
-Sample counts are **exact**: `alpha^(2 R_F + R_P) + 1` from each row's own parameters. The
-per-determinant cost at order 1 458 is **measured**; at order 13 122 it is **extrapolated** from the
-above-L2 law, three times past the largest order measured. Determinant time only — the symbolic
-build (§6.8: 48.4 min and 57 GB at six rounds), the recovery and the solve are not in these numbers.
-
-| row | rounds | samples | order | 1 worker | 32 workers | basis |
-|---|---:|---:|---:|---:|---:|---|
-| `rf2-rp4` | 6 | 6 562 | 1 458 | 4.82 h | **12.0 min** | measured |
-| `rf4-rp2` | 6 | 59 050 | 1 458 | 43.33 h | **1.79 h** | measured |
-| `rf6-rp0` | 6 | 531 442 | 1 458 | 16.25 d | **16.15 h** | measured |
-| `rf4-rp4` | 8 | 531 442 | 13 122 | 11 846 d | **490.5 d** | extrapolated |
-| `rf6-rp2` | 8 | 4 782 970 | 13 122 | 106 617 d | **4 415 d** | extrapolated |
-
-From the measured core-times alone, without the model's conservatism: `rf4-rp2` is
-59 050 × 2.404 s = **39.4 single-core hours**, and at 32 workers 59 050 × 3.148 s / 32 =
-**1.61 h**; `rf6-rp0` is 531 442 × 2.404 s = **354.9 single-core hours** and **14.5 h** at 32
-workers. The reconnaissance figures of 44.3 single-core hours and 1.38 h for `rf4-rp2`, and 398
-single-core hours and 12.5 h for `rf6-rp0`, are arithmetically correct for the 2.70 s core-time they
-assumed; the difference is entirely that input, which M25 measures as 2.404 s at one worker and
-3.148 s at 32.
-
-**The eight-round rows are out of reach by three orders of magnitude and no exponent in the
-plausible range changes that.** At 490 days on 32 workers, `rf4-rp4` would need the per-determinant
-cost to fall by 500x, not the sample count to be sized better. That is the useful negative result of
-the calibration: the question for eight rounds is not the cost model but whether an order-13 122
-determinant is the right object at all.
+*This subsection and "The rows restated" (the challenge-row budget guard, and determinant cost projections for the six- and eight-round rows) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 #### A note on #289's own arithmetic
 
@@ -995,7 +813,7 @@ slide 22's formula and not against an input built to pass these eight points.
 
 ### 6.11 The off-domain validation was counted twice, and the six-round totals carry it
 
-`examples/resultant_cico` charged the validation to `Stage::Elimination`, through
+`examples/resultant_cico` (moved out in #668) charged the validation to `Stage::Elimination`, through
 `Pass::elimination`, and again to `Stage::Verification` as `pass.off_domain.1`. `RunRecord::elapsed`
 is the sum of the stages, so **the recorded row total was inflated by the cost of the check.** It is
 visible in the six-round record without any recomputation: elimination 569.53 s = 551.37 sampling +
@@ -1021,7 +839,8 @@ dropped stage violates.
 
 **The records already written are not edited.** A historical measurement is not rewritten because a
 later implementation accounts for it better; what it says about the machine on the day is what it
-says. So the six-round run records, and `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §7.8's total of
+says. So the six-round run records, and `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` (moved out in
+#668) §7.8's total of
 59.71 min, continue to carry **17.75 s of double-counted validation** — 0.5% of that row, and the
 inflation is in `elapsed_nanos` and the verification stage, not in `sampling` or `interpolation`,
 which were never wrong. Any row recorded from this commit onwards does not carry it, and a total
@@ -1258,7 +1077,7 @@ not have caught a wrong predicate.
 
 #### End to end: the number that decides the issue
 
-`examples/resultant_cico --row poseidon31-cico-t16-rf2-rp4 --build-only`, single-threaded on one
+`resultant_cico --row poseidon31-cico-t16-rf2-rp4 --build-only` (moved out in #668), single-threaded on one
 pinned core, against §6.8's recorded before:
 
 | | §6.8, recorded | after #243 | |
@@ -1337,7 +1156,7 @@ because the point of the exercise is that a figure without its commit cannot be 
 whole programme was then run twice, hours apart, which is how the second finding came out: the two
 runs disagree with each other, and what differed was what else was on the box.
 
-`examples/determinant_era` is the second instrument, written against the narrowest API that is
+`examples/determinant_era` (moved out in #668) is the second instrument, written against the narrowest API that is
 byte-identical across the range so that one source file compiles against both libraries and only
 the library beneath it differs.
 
@@ -1503,152 +1322,12 @@ which is exactly what no one could do for §6.9's table.
   already called this. The load was *not* recorded anywhere, which is why #319 took two runs to
   find instead of one grep, and `tools/benchlock.sh` now writes `load=` on START and END.
 
-**Reproduce it.** The second instrument is in the tree, and the first end of the comparison needs a
-worktree at the commit whose figure is in question:
-
-```sh
-git worktree add --detach /tmp/era 93bb1c2
-cp examples/determinant_era.rs /tmp/era/examples/
-RUSTC_WRAPPER="" CARGO_TARGET_DIR=/tmp/era-target \
-  sh -c 'cd /tmp/era && cargo build --release --example determinant_era'
-ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=8 tools/benchlock.sh era \
-  taskset -c 8 /tmp/era-target/release/examples/determinant_era --workers 1 --determinants 13123
-```
+*The reproduction recipe, which builds `examples/determinant_era`, was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ### 6.14 The budget guard costed one term of five, and #350 made that the wrong one (#410)
 
-Everything above this subsection costs **determinants**. So did the guard: `RowCost::of` took the
-sample count times one per-determinant figure and `--wall-budget` was checked against that and
-nothing else. That was defensible while determinants were ~99% of a four-round row — line 139 of
-this document says so in as many words — and §6.13 is the last place it is true.
-
-**#350 and #351 inverted the composition, and the guard did not move with it.** #367's authorized
-`rf4-rp2` row re-costed, measured except where noted:
-
-| term | seconds | share | modelled by the pre-#410 guard? |
-|---|---:|---:|:---:|
-| symbolic build | 324.0 | **73%** | no |
-| determinants, Euclidean, 1 core | 65.5 | 15% | **yes** |
-| interpolation | 36.0 | 8% | no |
-| off-domain validation, 8 dense | 18.6 | 4% | no |
-| root finding, deflation | 0.5 | 0.1% | no |
-
-And on `rf6-rp0` the error runs the other way: `structured-sylvester.md` §7.1 puts that row at 78%
-root finding after axis 4, so the guard would have waved it through on a term it had never looked
-at. **Not claimed: that the guard ever passed a row it should have refused.** The budgets have been
-generous relative to the rows attempted — #367's row was inside its ceiling by 19.9x — which is
-exactly why this is fixed before a row whose margin is thinner.
-
-#### The model, and what each term's number is worth
-
-The cost model moved out of the example into **`src/grobner/research/row_cost.rs`**, which is pure
-and has unit tests over the race it exists to prevent: the determinant laws of §6.9 and of `structured-sylvester.md` §5.6 are
-there unchanged, and five terms are built on top of them. Every term carries a `TermBasis` and the
-printed budget line prints it, because a budget line that silently covers 15% of a row reads as
-though it covers the row.
-
-| term | law | basis |
-|---|---|---|
-| symbolic build | a **recorded constant per round count** — 2.9 ms at `R = 2`, 419.3 ms at `R = 4` (§6.1), **324.0 s at `R = 6`** (`MILESTONE-COMPETITIVE-ALGEBRA.md` §8.4.2, on the lock, post-#243) | **measured** |
-| determinants | §6.9's dense law or `structured-sylvester.md` §5.6's Euclidean one, times the measured width penalty | fitted to order 4 374 / 1 458 |
-| interpolation | **5.1 ms at `S = 730`** (§6.7) and **31.7 s at `S = 59 050`** (#367), log-log between them, `O(S²)` above | **measured anchors** |
-| off-domain validation | eight **dense** determinants — `off_domain_check` calls `sylvester_determinant_at` whatever `--kernel` says — over `min(8, workers)` | fitted |
-| root finding | a **band**: `graeffe-root-finding.md` §9.7.4's doubling sweep, its §9.7.2 and §6.1's real resultants as the gcd envelope; §9.7.2's deflation points as the other edge | fitted to degree 65 536 / 59 049 |
-
-Three things in that table are the point rather than bookkeeping.
-
-**The build is a constant and not a model.** It is 73% of a six-round row and the cheapest term to
-get right, because every row at a round count shares the same word degrees — §6.1's two four-round
-rows measure 419.3 ms and 397.7 ms, and §8.4.2's six-round figure is "identical for every six-round
-row". Round counts with **no** measurement return no figure rather than an extrapolation: the growth
-per two rounds is 145x then 772x, which no law covers, and `structured-sylvester.md` §7.3 predicts a ~1 TB transient at
-`R = 7`. So `rf4-rp4`, `rf6-rp2` and `rf6-rp4` are refused as **unbounded** — an unmodelled term is
-not a zero term, and a guard that totalled around one would admit a row on the strength of what it
-had not looked at.
-
-**Interpolation was never extrapolated; the figures were just never wired in.** #410 listed it as
-worth measuring. It had been measured twice — §6.7's 5.1 ms at 730 samples and the 31.7 s in #367's
-own stage table at 59 050 — and the implied exponent between them is **1.99**, which confirms the
-`O(S²)` the quadratic `lagrange_interpolate` of #162 derives. Inside `[730, 59 050]` the term is
-therefore a measurement and not a projection; above 59 050 it is an extrapolation and is labelled
-one. No new benchmark was needed and none was taken.
-
-**Root finding is a band because its cost is a property of the problem.** Deflation pays
-`(roots + 1)` Graeffe searches (`graeffe-root-finding.md` §9.7.1), so it is a bet on the eliminant's base-field root count —
-`O(1)` on all three registered rows that have one, and **unmeasured on exactly the rows nobody has
-attempted**. The gcd route is one quasi-quadratic pass and does not care. The guard carries both
-edges and refuses on the pessimistic one; the band's width *is* that assumption, and a guard sitting
-on its narrow edge would be assuming the thing it cannot check.
-
-The anchor tables are **monotone upper envelopes** — the running maximum of every measurement at or
-below a degree — rather than fits. That is not fussiness: §6.1's real `rf4-rp0` resultant takes
-**3 933.3 ms** at degree 6 561 where `graeffe-root-finding.md` §9.7.4's planted degree-8 192 polynomial takes **3 161.2 ms**,
-so a law fitted through the planted sweep alone under-predicts the row it exists to cost. Between
-anchors the law interpolates in log-log using only the local exponent, which stops a small anchor's
-fixed per-call overhead from being projected forward as a growth rate.
-
-**Every gcd anchor predates #193**, which landed while this was being written: it dispatched division
-to Newton inversion and measured `roots` **1.32x–1.67x faster over KoalaBear** at degrees 256–2 048,
-doubling its reachable degree from 4 096 to 8 192 (`fast-univariate.md` §4.5). So the pessimistic
-edge over-predicts the gcd route by roughly that factor on top of whatever else. That is the safe
-direction for an edge a guard refuses on, and the constants are **not** scaled down by a factor
-nobody measured at these degrees: re-anchoring honestly means re-running the doubling sweep in one
-session post-#193, which is **#552** and a measurement rather than an edit. §6.13 is the precedent —
-lowering a prefactor without re-fitting the exponent leaves the two in different sessions.
-
-#### The band against a row that was actually run
-
-`rf4-rp2`, Euclidean, 32 workers — the configuration #367 ran:
-
-| | predicted | **measured (#367)** |
-|---|---:|---:|
-| symbolic build | 5.4 min | 320.8 s |
-| determinants | 6.6 s | 6.57 s |
-| interpolation | 31.7 s | 31.7 s |
-| off-domain validation | 3.5 s | 2.76 s |
-| root finding, pessimistic / optimistic | 2.6 min / 0.5 s | 0.19 s (deflation) |
-| **row** | **6.1 min to 8.6 min** | **6.03 min** |
-
-Every term is at or above what the run measured and the optimistic edge is **1.2% above** the row,
-so the model is conservative throughout without being loose. A unit test pins both halves of that,
-which is the only way the property survives the next re-anchoring.
-
-A full ladder run at the default budget, under `tools/benchlock.sh` (`elapsed=133s`, `end=exited`,
-**`load=121.38`**), confirms the behaviour rather than the figures: the same three rows are admitted
-and return the same verified witnesses, and `rf4-rp0`'s **26 627.9 ms** total falls inside its
-predicted **24.7–28.6 s** band. The load was high — this box runs many agents — so the stage
-timings in that run are upper bounds and **nothing in this document is re-anchored on them**; §6.13
-is the reason that sentence is here.
-
-#### What the six-round rows cost once the whole row is costed
-
-| | `rf2-rp4` | `rf4-rp2` | `rf6-rp0` |
-|---|---:|---:|---:|
-| band, Euclidean, 32 workers | 5.5 min – 5.5 min | 6.1 min – 8.6 min | **49.3 min – 3.61 h** |
-| determinants' share of the pessimistic row | 0.2% | 1.3% | **0.5%** |
-
-`rf6-rp0` is the row this changes. `structured-sylvester.md` §7.1 totalled it at **7.2 h** after
-axis 4, of which 5.63 h was root finding extrapolated from §6.3's two points; #351's eight-point
-sweep moves the pessimistic edge to **2.79 h** and #243 takes the build from 48.4 min to 5.4 min, so
-the row is **0.82–3.61 h** and its largest *modelled* term is the 42.8 min of interpolation. Both
-edges are inside the §9 ceiling. That is **not** an authorization — §8.4 requires the owner's
-decision taken against a costing before execution, and the pessimistic edge rests on two
-extrapolated terms — but it is the first time the row has been costed with every stage in the total.
-
-**What this does not change.** The default `--wall-budget` is still 1 800 s and the same three rows
-are admitted: as whole rows at the pessimistic edge they cost 0.0 s, 3.2 s and 28.6 s, so none of
-them crosses it. The determinant laws are untouched, `DETERMINANT_MS_AT_162` is still 3.624, and
-§6.13's two findings — the ~1.2x era gap and the 1.4x of ambient contention the law deliberately
-excludes — apply to the determinant term of this model exactly as they did before it had any others.
+*§6.14 (the challenge-row budget guard's five-term cost model) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 7. The deeper consequence
 
-It is about the **formulation**, not the algorithm. Three orders of magnitude separate two ways of
-writing the same CICO slice, and the expensive one is the one the whole cryptanalysis literature
-uses by default because it bounds the degree. When the free-variable count is small, bounding the
-degree is the wrong trade — and the scoreboard is what made that visible, because both routes are
-measured against the same registered problem.
-
-§6 does not change that and is a smaller point by comparison: it moves one stage of the cheap
-formulation from cubic to quasi-linear, which buys a round count. The formulation is what bought
-the three orders of magnitude.
+*§7 (the consequence for the cryptanalysis formulation) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*

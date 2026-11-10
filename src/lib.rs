@@ -60,17 +60,32 @@ pub use poly::{
     permutation_exponents, pow_mod, resultant, resultant_at_formal_degrees,
     resultant_from_coefficients, roots, xgcd, BuildMonomialHasher, GcdError, GcdRoute,
     GraeffeError, GraeffeStats, Monomial, MonomialHasher, MonomialMap, MonomialOrder, MonomialSet,
-    MultivariatePolynomial, Polynomial, PolynomialParams, PowerPermutation, SquarefreeError,
-    SubgroupRoute, UnivariatePolynomial, WeightedOrder, WeightedOrderError, WeightedTieBreak,
+    MultivariatePolynomial, NormalFormError, Polynomial, PolynomialParams, PowerPermutation,
+    SquarefreeError, SubgroupRoute, UnivariatePolynomial, WeightedOrder, WeightedOrderError,
+    WeightedTieBreak,
 };
 pub use rings::Ring;
 
-/// The README's code examples, compiled and run.
+/// The code examples in the README and in `docs/guide/`, compiled and run.
 ///
-/// The README is where a reader meets the public API, so its examples are the ones most worth
-/// keeping true. `cfg(doctest)` means this item exists only when doc tests are collected, so the
-/// README is not pulled into the rendered crate documentation — only its fenced Rust blocks become
-/// tests.
+/// Those documents are where a reader meets the public API, so their examples are the ones most
+/// worth keeping true. `cfg(doctest)` means this item exists only when doc tests are collected, so
+/// the documents are not pulled into the rendered crate documentation — only their fenced Rust
+/// blocks become tests. Every guide file is listed, because a guide added without a line here would
+/// have examples nothing compiles.
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
-pub struct ReadmeExamples;
+#[doc = include_str!("../docs/guide/benchmarking.md")]
+#[doc = include_str!("../docs/guide/development.md")]
+#[doc = include_str!("../docs/guide/external-engines.md")]
+#[doc = include_str!("../docs/guide/f4.md")]
+#[doc = include_str!("../docs/guide/finite-fields.md")]
+#[doc = include_str!("../docs/guide/grobner-bases.md")]
+#[doc = include_str!("../docs/guide/linear-algebra.md")]
+#[doc = include_str!("../docs/guide/ntt.md")]
+#[doc = include_str!("../docs/guide/number-theory.md")]
+#[doc = include_str!("../docs/guide/polynomials.md")]
+#[doc = include_str!("../docs/guide/reed-solomon.md")]
+#[doc = include_str!("../docs/guide/solving-systems.md")]
+#[doc = include_str!("../docs/guide/status.md")]
+pub struct DocumentationExamples;

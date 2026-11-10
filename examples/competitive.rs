@@ -6,8 +6,8 @@
 //! ```
 //!
 //! **This program takes no measurements.** It exists so that `research/competitive/COMPETITIVE.md`
-//! is generated from `research/competitive/results/history.json` and can never drift from it —
-//! the same reason the cryptanalysis `SCOREBOARD.md` is generated. The rows arrive from the
+//! is generated from `research/competitive/results/history.json` and can never drift from it.
+//! The rows arrive from the
 //! per-library adapters, each of which appends to the history through
 //! [`CompetitiveBoard`](zeebra::grobner::external::CompetitiveBoard).
 //!
@@ -16,9 +16,9 @@
 
 use std::{fs, path::Path};
 
-use zeebra::grobner::{
-    external::{CompetitiveBoard, COMPETITIVE_HISTORY_CONTRACT},
-    research::Json,
+use zeebra::{
+    grobner::external::{CompetitiveBoard, COMPETITIVE_HISTORY_CONTRACT},
+    util::Json,
 };
 
 const ROOT: &str = "research/competitive";

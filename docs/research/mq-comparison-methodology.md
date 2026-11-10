@@ -1,9 +1,8 @@
 # MQ solver comparison methodology, and the F4 baseline column
 
 **Measured at:** not measured here — every figure is quoted from the record that produced it, and
-cited there. §7's baseline table transcribes `research/scoreboard/runs/` and
-[`fukuoka-mq.md`](fukuoka-mq.md) §4; the external figures in §6 are published attacks' own reported
-times.
+cited there. §7's baseline table transcribed `research/scoreboard/runs/` and `fukuoka-mq.md` §4
+(both moved out in #668); the external figures in §6 are published attacks' own reported times.
 
 Deliverable for **#77 (B4)**, a child of epic #66. It defines the comparison **before** B1–B3 are
 implemented, which is the issue's whole point: "whichever is implemented first will otherwise define
@@ -11,10 +10,16 @@ the benchmark in its own favour."
 
 **What this document is, and is not.** It is not a proposal. Nearly every rule below is already
 enforced in code, and this note's job is to say where, so the rules have one address. That address
-was missing and the code noticed: `src/grobner/external/board.rs:329` declines to put a check in
-`Environment` because "that type is shared with the cryptanalysis scoreboard, whose own
-comparability rules are **#77's to change**" — a deferral to a document that did not exist. §9 lists
+was missing and the code noticed: `src/grobner/external/board.rs` (`comparable_with`) declines to put a
+check in `Environment` because "that type is shared with other experiment records, whose own
+comparability rules are theirs to change" — a deferral to a document that did not exist. §9 lists
 what is genuinely absent rather than merely undocumented.
+
+*Since #668, the cryptanalysis scoreboard, the challenge registry and the Fukuoka MQ records this
+method was first applied to are no longer in this repository. Where a rule below is anchored on one
+of their types (`RunRecord`, `RunOutcome`, `Comparison`, `ChallengeManifest`, `BenchmarkClass`,
+`FigureBasis`), the type is named as the rule's origin and is preserved at commit 9532a9a2; the rule
+itself is general. The ladder (§3), the baseline column (§7) and the gap list (§9) were moved out.*
 
 ## 1. The primary metric: time and peak bytes to a verified solution
 
@@ -29,9 +34,7 @@ Two consequences, both load-bearing:
 - **A Gröbner basis is an intermediate result, not the deliverable.** An F4 figure must include FGLM
   and `solve_one`. `RunRecord::elapsed()` is the sum over *all* stages
   (`Generation`, `Grobner`, `Elimination`, `Conversion`, `Univariate`, `Verification`), so the
-  headline number already has verification inside it — the committed `fukuoka-mq-III-n15-seed0`
-  record is 7 873 596 977 ns over a `grobner` of 7 872 720 198, a `conversion` reporting `D = 1`,
-  a `univariate`, and a **`verification` of 226 118 ns**.
+  headline number already has verification inside it.
 - **Conversely, crossbred and XL never produce a basis**, so basis quality is not available as a
   comparison axis at all. It is not a secondary metric either (§2); it simply does not exist for two
   of the three candidates.
@@ -78,11 +81,6 @@ other, and the naming is the mechanism.
 reports one figure covering all seven, which is a *ceiling* over them rather than a measurement of
 any one. `measured_peak_is_attributable()` requires `measured_peak_rows_in_process == Some(1)`.
 
-**This is where the primary metric is currently half-populated, and §9 records it as a gap:** the
-three rungs with a verified witness carry no measured peak at all, and the four rungs that do carry
-`VmHWM` are all limit stops. So "time *and peak bytes* to a verified solution" has its time half on
-three rungs and its measured-bytes half on none of them.
-
 ## 2. Secondary metrics, and what makes them non-comparable
 
 Per-algorithm secondaries are worth recording because they *explain* the primary result, and are not
@@ -116,32 +114,8 @@ places two algorithms' secondaries in one column is wrong even when both numbers
 
 ## 3. The instance ladder
 
-The ladder for this comparison is the **Fukuoka MQ** one, from #70, because that is where published
-external results exist. `fukuoka-mq.md` §4 presents it as five size steps, each with a stated
-barrier, and `SUPPORTED_DIMENSIONS = [10, 15, 20, 24]` pins the frontier.
-
-| rung | what it is for |
-| --- | --- |
-| type III `n = 10` | the published toy. Sanity in both directions — the system vanishes at the published answer *and* is solved to it. **"Not a competitive result and should not be quoted as one"**: 24 variables short of the smallest published type III challenge |
-| type III `n = 15` | the largest toy that finishes under the standing budget |
-| type III `n = 20` | the first that does not fit. A **documented resource stop**, not a failure |
-| type VI `n = 10` | underdetermined, so sliced — and the size where the slices are *decided*, which makes a success rate meaningful |
-| type VI `n = 15` | the same family where **no slice is decided**: the campaign "reached no verdict", which is not eight failures |
-| type VI / V `m = 16` (`n = 24`) | the first *real* challenges. Imported and run; the solver stops at degree 6 |
-| type III `n = 34` | registered and **deliberately not implemented**, "to show the gap in the family this crate has actually measured" |
-
-### 3.1 Per-rung expectations are retrospective, and that is a gap
-
-#77 asks for "an instance ladder with per-rung expectations", so that "the point where each algorithm
-fails is itself a reportable result". The typed machinery for this exists — `Rung::{Easy,
-Intermediate, Challenging}`, "a judgement about the rung's role in the ladder, not a measurement",
-with `Challenging` defined as "expected to exhaust at least one engine's limits" — but **it carries
-no Fukuoka rung**: `Rung` lives on the cross-library corpus ladder, and the challenge registry has
-no difficulty label at all.
-
-So §3's table is what was *observed*, not what was *expected in advance*, and an expectation stated
-after the run cannot play the role #77 wants. Recorded as a gap in §9 rather than papered over by
-back-dating labels onto measured outcomes.
+*§3 (the Fukuoka MQ instance ladder, and §3.1 on its retrospective per-rung expectations)
+was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 4. Failures are data, and how they are encoded
 
@@ -208,12 +182,6 @@ reported: invariants, and ratios **between systems under one implementation**. T
 is why the rule is absolute: an apparent 507x advantage over published Magma was mostly Magma's
 generic arithmetic at `p >= 2^32`, the same ratio being 124.6 at `p = 65537`.
 
-Applied to this ladder, each external figure carries its own disclaimer in situ — III `n = 20` was
-solved by Magma F4 in 259.27 s in 2015 **on a 1 TB machine**, and "that is a published fact about the
-instance, not a comparison with the row above". What the external column establishes is better than a
-time: **these instances are solvable by F4 on one machine**, so a future attempt has a target known
-to exist.
-
 **The startup floor, for comparisons that involve a separate process.** Where a comparand is another
 program, a ratio within `FLOOR_MULTIPLE_REQUIRED = 2.0` of either operand's observed startup floor is
 not an engine comparison and is marked, never dropped. The floor is derived from the board rather
@@ -230,54 +198,8 @@ a floor that is not there.
 
 ## 7. The baseline column
 
-F4 + FGLM + `solve_one`, which is the only candidate that exists today — populating the column
-validates the methodology before there is anything to compare. All rows: `machine=fedora`,
-`cpu="8 logical, affinity 0-7"`, `concurrency=1`, `build="release, RUSTFLAGS=default"`, under the
-standing policy of 200 000 columns and 20 000 000 live entries.
-
-A witness row quotes its **fastest verified run**; a stopped row quotes the **observed range** over
-every committed run, because the stop is deterministic and the wall is not (below). Counts are
-`n` committed records.
-
-| rung | vars | eqs | field | outcome | elapsed | n | est. bytes | measured `VmHWM` | witness |
-| --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | --- |
-| III `n=10` | 10 | 20 | GF(31) | **verified witness** | **106.4 ms** | 2 | 2 695 192 | — | **yes** |
-| III `n=15` | 15 | 30 | GF(31) | **verified witness** | **7 798.5 ms** | 3 | 34 303 736 | — | **yes** |
-| III `n=20` | 20 | 40 | GF(31) | stopped, `max_live_nonzeros`, degree 5 (4 completed) | 66 933–67 496 ms | 2 | 195 474 568 | 1 954 025 472 | no |
-| VI `n=10` | 10 | 7 | GF(31) | **verified witness**, 6 of 8 slices | **577.8 ms** best witness slice | 9 | ~4.6 MB/slice | — | **yes** |
-| VI `n=15` | 15 | 10 | GF(31) | campaign reached **no verdict**; each slice stopped at degree 9 (8 completed) | 29 498 ms per slice, 236 998 ms campaign | 9 | ~217.9 MB | — | no |
-| VI `n=24` | 24 | 16 | GF(31) | stopped, `max_live_nonzeros`, degree 6 (5 completed) | 42 128–44 332 ms | 6 | 229 430 112 | 1 383 432 192 | no |
-| V `n=24` | 24 | 16 | GF(2^8) | stopped, `max_live_nonzeros`, degree 6 (5 completed) | 105 070–111 063 ms | 4 | 236 351 760 | 1 393 819 648 | no |
-| III `n=34` | 34 | 68 | GF(31) | **not attempted** — registered to show the gap | — | 0 | — | — | — |
-
-One figure in that table is deliberately not the smallest number available. VI `n = 10`'s fastest
-*run* is 569.1 ms and is an **empty slice** — `slice_established_nothing`, which established nothing
-about the instance. The fastest run that produced a witness is 577.8 ms, and that is the one a
-"time to a verified solution" column may carry. A table built by taking minima would have reported
-the empty slice.
-
-**Seven of eight rungs have a figure; three have a verified witness; four are documented resource
-stops; one is deliberately unattempted.** Every stop is `max_live_nonzeros` against the
-20 000 000-entry cap, with the degree reached and the last completed degree recorded.
-
-Reproduce any row with `tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq <id> [--seeds n]`,
-which wraps `examples/scoreboard.rs`; each record carries its own command in its `reproduce` field.
-
-Two readings the table supports and one it does not:
-
-- **The stop is deterministic and the wall clock is not.** VI `n = 24` stops at 20 010 753 entries
-  at degree 6 with a largest matrix of 13 602 x 19 132 on every run; its wall has read 42.1, 43.2,
-  43.4, 44.3, 50.9 and 65.6 s. Everything except the wall row is a property of the instance.
-- **The field costs about 2.5x at a fixed matrix.** V and VI at `n = 24` produce the *same* matrix
-  shape and nearly the same entry count, and differ 111.1 s against 44.3 s at the slowest committed run of each, 105.1 against 42.1 at the fastest. That is a wall ratio at
-  a fixed matrix, **not an attribution**: which part of the GF(2^8) multiply dominates is not
-  measured.
-- **It does not support a comparison with the external column.** §6.
-
-Four rungs stop where they do **by authorization, not by capability**: §9 withholds authorization for
-a III `n = 20` completion attempt and for any type VI `n = 15` campaign past the diagnostic. #77's
-go/no-go — "if the baseline cannot be populated on any public instance, that is a finding that blocks
-the epic" — passes on three rungs, and the authorization boundary is why the others are stops.
+*§7 (the F4 baseline column over the Fukuoka MQ rungs, transcribed from the scoreboard's runs)
+was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 8. The reporting template
 
@@ -296,29 +218,10 @@ A B1/B2/B3 author reports, per rung:
    ratio (§6).
 7. **Negative results as deliverables**, not omissions.
 
-The rendered form already exists and should be reused rather than reinvented: `SCOREBOARD.md`'s
-headline and stop tables, generated, with the three classes never added together. Its three machine-
-readable companions carry their contracts in-band — `history.json` is **append-only** and "array
-position is the only record of when a run was taken"; `best.json` is "the fastest verified witness
-per problem **among single-threaded runs**"; `solved.json` is "one verified witness per problem at
-**any** concurrency — an existence claim, not a ranking".
+*The pointer to the scoreboard's rendered form (`SCOREBOARD.md` and its JSON companions) was moved
+out with the scoreboard in #668.*
 
 ## 9. What is missing
 
-Honest list, so the next algorithm's author knows what this methodology does not yet give them.
-
-1. **Per-rung expectations are retrospective** (§3.1). `Rung` exists and carries no Fukuoka rung; the
-   challenge registry has no difficulty field. An expectation stated after the run cannot play #77's
-   role.
-2. **The primary metric's peak-bytes half is unpopulated where it matters** (§1.2). No rung has both
-   a verified witness and an attributable measured peak.
-3. **The metric is unexercised by a second algorithm.** One candidate exists. `Stage::Elimination`
-   anticipates a non-Gröbner route and the Poseidon rows use a `resultant` formulation, so the type
-   is ready; but no crossbred, XL or enumeration row exists on any Fukuoka rung, so "the primary
-   metric is identical across algorithms" is asserted and not yet demonstrated. #76's own reading is
-   that XL at the record size is 550x beyond Zeebra's largest matrix.
-4. **Secondary non-comparability is a rule here, not a type** (§2).
-5. **"Peak bytes" is not reconciled across the two boards.** The scoreboard has an estimate plus an
-   optional `VmHWM`; the competitive board has four named bases; `FigureBasis::Measured` carries a
-   free-text instrument. Nothing reconciles them, and this document picks the scoreboard's pair for
-   #77's purposes without claiming that settles it.
+*§9 (the gap list against the Fukuoka ladder and the scoreboard)
+was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*

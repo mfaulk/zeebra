@@ -2,9 +2,17 @@
 
 **Measured at:** publication bound `f94b3df0` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+The upper-rung sweep in §9c was measured at `19ff732c`.
 
 Policy and status for #261. The corpus itself is `src/grobner/external/corpus.rs`; its digest
 manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is_frozen`.
+
+> **Since #668** the public ladder is four families — Katsura, Cyclic, random MQ and planted MQ.
+> The Poseidon and Anemoi rungs described below left with the cryptanalysis research; a caller
+> supplies rungs like them through `CompetitiveBoard::with_corpus`. The sections about them are
+> kept as the record of what was measured; their equivalence-class rows in §5 and their manifest
+> rows in §8 were removed, and are preserved at commit 9532a9a2.
+> `research/competitive/CURATION.md` records what was removed from the board's history.
 
 A cross-library comparison measures nothing unless every engine was given **the same ideal**. The
 two families everyone benchmarks on each have a naming convention that produces a *different* ideal
@@ -348,8 +356,6 @@ though — fail-closed, because here the refusal is visible.
 | Cyclic (affine) | `cyclic-4 … 10` | msolve 0.11.0 `input_files/cyclic5-16.ms`, generator for generator | **yes** |
 | Random MQ | `mq-random-6,10,14` | live Singular invariants; seeded, reproducible from the name | **yes** |
 | Planted MQ | `mq-planted-6,10,14` | the planted point satisfies the **rendered text** | **yes** |
-| Poseidon | `poseidon-t2-rf2-rp0/rp2-planted`, `poseidon-t2-rf4-rp0-planted` | planted target, from the cryptanalysis registry | **yes** |
-| Anemoi | `anemoi64-cico-n1/n2-fcico` | **Groebner.jl only** — see below | **yes, uncorroborated** |
 | Zero-dimensional FGLM workloads | Katsura, Cyclic, both MQ families | as above | **yes**, as `lex-basis-by-conversion` |
 | Fukuoka MQ Type III | — | **excluded by licence**, not by effort — see below | n/a |
 | Characteristic two | — | **blocked on a convention** — see §6 | no |
@@ -363,39 +369,17 @@ pinned against msolve's own bytes at `N = 6` and `N = 5`. What the upper rungs a
 `cyclic-7` against Backelin–Fröberg, and the dimension class at `cyclic-8` and `cyclic-9` against
 Backelin's theorem. That is a second, independent anchor, and it is the one the upper rungs rest on.
 
-**Six families**, which is the milestone's minimum, and
-`test_the_corpus_covers_six_families_each_with_recorded_evidence` asserts both the count and that
-each of the four kinds of evidence is actually used — so none of the vocabulary is dead.
+**Four families.** M25 counted six, the milestone's minimum; the two cipher-derived families
+(Poseidon and Anemoi) left in #668, and their rows were removed from the table above.
+`test_the_corpus_covers_four_families_each_with_recorded_evidence` asserts the families and that
+each kind of evidence the ladder uses is actually used — so none of that vocabulary is dead;
+`sole-comparand` is now exercised by the board's tests rather than by a ladder rung.
 
 ### Anemoi's limit is corroboration, not representability
 
-**Groebner.jl reaches Anemoi's field.** Its ceiling is `typemax(UInt64)` and it was measured
-computing correctly at `2^31 − 1`, `2^32 − 5`, Goldilocks, `2^64 − 353` and `2^64 − 59`. Anemoi's
-published parameters are over `2^64 − 353`, so the family **is** representable and a timing against
-Groebner.jl **is** publishable.
-
-What is missing is a *second* external engine. Sagebrush stops at `2^62` (its own gate,
-`lib.rs:1552`) and msolve and Singular at `2^31`, so at Anemoi's field there is exactly one
-external engine and nothing to check it against. Agreement is two-way — Zeebra against
-Groebner.jl — and **cannot be triangulated**: a disagreement says one of the two is wrong without
-saying which, where a three-way disagreement usually names the odd one out.
-
-That is recorded as `Equivalence::SoleComparand`, and it is **derived** from §5a's bands rather
-than asserted about this family, so the row is a consequence of a general fact.
-
-An earlier draft of this document said no engine could represent the field. That was wrong, and
-wrong in the direction that matters: it would have told a reader to wait for a new tool when what
-is actually needed is a second one at the same field.
-
-The Poseidon contrast still holds and is still luck. Poseidon's rows are over KoalaBear,
-`2^31 − 2^24 + 1 = 2130706433`, which happens to sit **below every** comparand's ceiling, so those
-rows are four-way corroborated. Nothing was designed for that and it does not generalize.
-
-Note that for both, the corpus uses the **registry's** field and ignores the `characteristic`
-argument. Poseidon's round constants come out of a seeded LFSR keyed on the prime and Anemoi's
-depend on the smallest primitive root, so the same row over another prime is **another problem** —
-the characteristic cannot be varied the way it can for Katsura.
-`test_a_poseidon_rung_keeps_the_registrys_field_whatever_is_asked_for` pins that.
+*This subsection (the Anemoi family's sole-comparand equivalence, the Poseidon contrast, and the
+registry-field rule for both) was moved out with the cryptanalysis research in #668; it is preserved
+at commit 9532a9a2.*
 
 ## 5a. The corroboration bands
 
@@ -450,7 +434,7 @@ have nothing.
 
 The instances are **"All Rights Reserved, no stated licence"** and must never be redistributed
 (`docs/research/external-provenance-policy.md`). They are fetched locally by
-`tools/fetch-mq-challenge.sh` into `ZEEBRA_MQ_DIR` and referenced by digest.
+`tools/fetch-mq-challenge.sh` (moved out in #668) into `ZEEBRA_MQ_DIR` and referenced by digest.
 
 That is not a scheduling problem, it is structural: **a corpus entry cannot carry their system
 text**, which is what every other entry here is. An entry would have to name the file and its
@@ -459,8 +443,8 @@ families and would not be reproducible for anyone who has not fetched the files.
 families in the corpus — random and planted — cover the same shape of problem with instances that
 are freely reproducible from a seed, which is why they are the substitute and not a consolation.
 
-Fukuoka III remains covered by the **cryptanalysis** scoreboard, where instances are referenced by
-digest rather than carried, and that is the right home for it.
+Fukuoka III was covered by the **cryptanalysis** scoreboard, where instances are referenced by
+digest rather than carried; that scoreboard moved out in #668.
 
 ---
 
@@ -516,8 +500,6 @@ rung whose field varies appears twice and a registry rung once (§4b):
 ```
 # zeebra cross-library corpus, characteristics [32003, 2147483647] order grevlex
 # name family rung equivalence dimension variables characteristic digest
-anemoi64-cico-n1-fcico anemoi easy sole-comparand zero-dimensional 2 18446744073709551263 c053c6ff0186e3b4…
-anemoi64-cico-n2-fcico anemoi intermediate sole-comparand zero-dimensional 4 18446744073709551263 e3a6312e85c486b0…
 cyclic-10 cyclic challenging comparand-file zero-dimensional 10 2147483647 df450bfc1886aa26…
 cyclic-10 cyclic challenging comparand-file zero-dimensional 10 32003 538964ac3a891da6…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 2147483647 e1d8d59448b3d648…
@@ -560,13 +542,11 @@ mq-random-14 mq-random challenging live-oracle zero-dimensional 14 2147483647 02
 mq-random-14 mq-random challenging live-oracle zero-dimensional 14 32003 4e440cfac8426226…
 mq-random-6 mq-random easy live-oracle zero-dimensional 6 2147483647 d98e5e5bf82b4618…
 mq-random-6 mq-random easy live-oracle zero-dimensional 6 32003 bbfecd7f5522e203…
-poseidon-t2-rf2-rp0-planted poseidon easy known-solution zero-dimensional 5 2130706433 f4cf6699cee835a6…
-poseidon-t2-rf2-rp2-planted poseidon intermediate known-solution zero-dimensional 7 2130706433 3b3bfb037ceb32de…
-poseidon-t2-rf4-rp0-planted poseidon challenging known-solution zero-dimensional 9 2130706433 95cec79371a8751a…
 ```
 
-**Twenty-six rungs across six families, forty-seven identities.** Twenty-one rungs carry two (the
-two published characteristics) and five carry one (the registry rows, whose field is their own). `test_the_manifest_lists_every_rung_with_its_digest` checks the row count against
+**Twenty-one rungs across four families, forty-two identities**, each rung carrying two (the two
+published characteristics). Before #668 the ladder also held five registry rows with one identity
+each, whose field was their own; they are preserved at commit 9532a9a2. `test_the_manifest_lists_every_rung_with_its_digest` checks the row count against
 `digests.len()` summed over the ladder, so the manifest and the frozen table cannot disagree about
 how many problems the corpus holds, and asserts every digest in it is distinct. Digests are
 abbreviated above; the manifest carries all 64 hex digits.
@@ -654,8 +634,10 @@ budget: `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`.
 
 > **Zeebra's ceiling, and #489's sweep showed the difference.** At a 300 s wall Groebner.jl reaches
 > `cyclic-9` in 61.5 s and msolve in 162.6 s — so the rung is out of reach for this configuration's
-> budget and not for the hardware. Groebner.jl spends **1 596 MB** doing it, five times the 320 MB
-> Zeebra's entry budget allows. §9c.3. The whole Katsura ladder is
+> budget and not for the hardware. Groebner.jl records **1 596 MiB** peak process RSS; this is
+> a different metric from Zeebra's matrix-entry budget (§9c.3).
+
+The whole Katsura ladder is
 reachable to `katsura-11` — four rungs above the old ceiling, at roughly 10x per rung — so the
 expectation in #424 that "this issue may well resolve as the ceiling is here" was right about the
 *shape* and wrong about the *place*: Katsura did not run out, Cyclic did.
@@ -789,7 +771,7 @@ Measured, the same engine on the same rung either side of the wall:
 So Singular's runtime **straddles** the 60 s wall on this rung, and which side it lands on is a
 property of the box rather than of the engine. A 60 s budget there is a coin flip, not a policy —
 and on `lex-basis-by-conversion` it is not even close: Singular needs 92 s and wall-stopped in the
-first pass. **The budget for `katsura-11` is 300 s**, and the retained rows are the 300 s ones.
+first pass. **The budget for `katsura-11` is 300 s**, and §9c.1 summarizes the 300 s rows. The history retains both passes.
 
 The three decisions §9a records stand for the other seven rungs. What was wrong was generalizing a
 Zeebra-side margin to engines whose costs this document had never measured.
@@ -802,8 +784,8 @@ caveat is that it is measured for Zeebra. At a 300 s wall, two comparands reach 
 | `cyclic-9`, `reduced-grobner-basis` | outcome | peak RSS |
 |---|---|---:|
 | zeebra | refused at **20 001 315** live entries | — |
-| **groebner.jl** | **completes, 61 534.5 ms** | **1 596.0 MB** |
-| **msolve** | **completes, 162 577.0 ms** | 748.1 MB |
+| **groebner.jl** | **completes, 61 534.5 ms** | **1 596.0 MiB** |
+| **msolve** | **completes, 162 577.0 ms** | 748.1 MiB |
 | singular | 300 s wall stop | — |
 | sagebrush | 300 s wall stop | — |
 
@@ -812,13 +794,12 @@ it is out of reach for Zeebra's live-entry budget, and the refusal is correct as
 rather than as a statement about the problem. §9's ceiling claim should be read as "the ceiling of
 Zeebra's default configuration", which is what it measured.
 
-**And Groebner.jl needs 1 596 MB to do it** — five times Zeebra's 320 MB entry budget. So the
-question #490 asks, whether 320 MB is the right ceiling for a 503 GB machine, now has a comparand's
-answer on a rung the budget actually refuses: the engine that reaches `cyclic-9` does so by
-spending memory Zeebra's default forbids. That is evidence for raising it rather than against, and
-it is the first such evidence from outside this crate.
+**Groebner.jl records 1 596 MiB peak process RSS.** That includes the Julia runtime and other
+allocations; Zeebra's roughly 320 MB entry budget accounts only for matrix entries. These metrics
+do not establish how much memory Zeebra would need to finish this rung. #490 still needs a
+Zeebra budget sweep before choosing a higher default.
 
-`cyclic-10` is out of reach for **all five** engines at 300 s, which is consistent with the only
+`cyclic-10` is out of reach for **all five** engines on the reduced-basis task at 300 s, which is consistent with the only
 published figure for it — Magma 2.11-8 at 12.3 hours on a 2004 Sunfire, which
 `classical-benchmarks.md` §4 forbids comparing against and which is quoted here only as an order of
 magnitude.
@@ -827,16 +808,17 @@ magnitude.
 
 * **Not a ratio against Steel's figures**, on any rung. `classical-benchmarks.md` §4's prohibition
   is untouched; the `GF(2)` Cyclic rows are a separate matter and are #427's.
-* **Not reps.** One row per (rung, task, engine). `katsura-11`'s two passes are the only rung
-  measured twice, and the 54 073 / 60 598 ms spread on Singular is the reason to treat single rows
-  on the slow rungs as approximate.
+* **Not fixed-budget repetitions.** The initial 80 rows cover every (rung, task, engine) at
+  60 s. Twenty additional rows repeat both tasks for `katsura-11` and the reduced-basis task for
+  `cyclic-9` and `cyclic-10` at 300 s. All attempts are retained. The 54 073 / 60 598 ms spread
+  on Singular is a reason to treat single rows on the slow rungs as approximate.
 * **Not the `GF(32003)` identity.** §9a decided the reference prime only, and that stands: the
   entry-count question it flagged — whether `cyclic-9` fits the same budget at a 16-bit prime — is
   now *more* interesting given that two engines reach the rung, and is still unmeasured.
 
 ## 10. Adding a family
 
-1. Generate it from an existing `benchmark_systems` or `research` generator — never a second
+1. Generate it from an existing `benchmark_systems` generator — never a second
    definition, which would drift. `corpus::text_instance` renders through
    `differential::polynomial_to_string`, the renderer whose output Zeebra's own parser and
    Singular both accept.

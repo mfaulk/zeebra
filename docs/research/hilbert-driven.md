@@ -6,7 +6,7 @@ recovered from git rather than recorded at the time ([§10](external-comparison-
 Reference for M22-C (#74). Every figure comes from
 
 ```sh
-tools/fetch-mq-challenge.sh
+# the Fukuoka MQ files were fetched with tools/fetch-mq-challenge.sh, moved out in #668
 cargo run --release --example hilbert_driven -- <instance>     # one instance per process
 ```
 
@@ -215,7 +215,6 @@ over a fixed number is that it needs no tuning.
 
 ```sh
 cargo run --release --example hilbert_driven -- list
-cargo run --release --example hilbert_driven -- mq3-n10
 cargo test --lib hilbert
 ```
 

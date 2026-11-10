@@ -131,8 +131,8 @@ pub enum HypothesisGap {
     /// The top-form basis did not complete inside the budget, so the condition is **unknown**.
     ///
     /// Distinct from [`HypothesisGap::SolutionsAtInfinity`] on purpose: a budget being crossed is
-    /// not a mathematical property of the ideal, and `docs/research/anemoi.md` §8a.5 records what
-    /// conflating the two cost.
+    /// not a mathematical property of the ideal, and conflating the two once cost a wrong verdict
+    /// on a cipher-derived family (#668 moved that record out; it is at commit `9532a9a2`).
     AtInfinityRefused {
         /// What F4 refused with.
         error: F4Error,

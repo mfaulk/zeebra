@@ -888,8 +888,7 @@ impl ExternalSolver for SagebrushSolver {
             }
             Task::OneFiniteFieldSolution
             | Task::AllFiniteFieldSolutions
-            | Task::UnivariateEliminant
-            | Task::CryptanalyticWitness => {
+            | Task::UnivariateEliminant => {
                 return Support::No(Unsupported::Task { task });
             }
         }

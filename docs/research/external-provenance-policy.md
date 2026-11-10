@@ -72,10 +72,10 @@ actually is, which is only sometimes a root licence file.
 | FLINT | `flintlib/flint` | `f5c2181a` | **LGPL-3.0-or-later** | `README.md:71-72`; `COPYING.LESSER` (LGPL-3 verbatim) | linking only |
 | FFLAS-FFPACK | `linbox-team/fflas-ffpack` | `06aec3f8` | **LGPL-2.1-or-later** | `README.md:16`; `fflas-ffpack/ffpack/ffpack_ludivine.inl:10-12` | linking only |
 | LinBox | `linbox-team/linbox` | `60d7d0bc` | **LGPL-2.1-or-later** | `linbox/algorithms/wiedemann.h:42-45` (`README.md` has **no** licence section) | linking only |
-| Fukuoka MQ Challenge data | — (not a repository) | — | **"All Rights Reserved", no stated licence** | `README.md:122-124`, and `tools/fetch-mq-challenge.sh` exists so the files are fetched and never redistributed | **no grant** |
+| Fukuoka MQ Challenge data | — (not a repository) | — | **"All Rights Reserved", no stated licence** | `README.md:122-124`, and `tools/fetch-mq-challenge.sh` (moved out in #668) exists so the files are fetched and never redistributed | **no grant** |
 
 The fourth class is not empty, and its occupant is already handled correctly: the MQ Challenge
-instances are fetched at the user's request by `tools/fetch-mq-challenge.sh` and the test that uses
+instances are fetched at the user's request by `tools/fetch-mq-challenge.sh` (moved out in #668) and the test that uses
 them is `#[ignore]`d, so the repository distributes nothing it has no grant for. That is the
 template for any future no-grant input.
 

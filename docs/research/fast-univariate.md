@@ -24,7 +24,7 @@ on the development workstation (64 cores, 300 GB RAM; the measurements are singl
 sweeps shown used `budget=1.0`, one second of wall clock per measurement. The release profile is
 the one in `Cargo.toml` — `lto = "fat"`, `codegen-units = 1` — with `-C target-cpu=x86-64-v3` from
 `.cargo/config.toml`. Figures added by #162 stage 1 were taken on the same workstation, pinned to
-cores 0–7 with `taskset` per `tools/scoreboard.sh`, with the before and after binaries built from
+cores 0–7 with `taskset` per `tools/scoreboard.sh` (moved out in #668), with the before and after binaries built from
 one tree and run interleaved.
 
 **Figures marked superseded are kept rather than overwritten.** Where a later issue re-measures a
@@ -353,7 +353,7 @@ and per `UnivariatePolynomial::new` copy.
 **Protocol.** Two instances built from one tree — `origin/main` at `418d080` and the same tree with
 the kernel replaced — run interleaved as `before, after, before, after`, each `cargo run --release
 --example univariate_scaling` with `budget=1.0`, pinned with `taskset --cpu-list 0-7` per
-`tools/scoreboard.sh`, `RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`. Release profile,
+`tools/scoreboard.sh` (moved out in #668), `RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`. Release profile,
 `-C target-cpu=x86-64-v3` from `.cargo/config.toml`. Each cell below is the **minimum of the two
 rounds**, the convention `examples/batch_inversion.rs` already uses: on a shared workstation the
 minimum is the least contaminated estimate. `mul`, `div`, `lagrange` and `roots` reached identical
@@ -1017,7 +1017,7 @@ operator, which is still an independent check but is no longer the same implemen
 
 **The blast radius does not reach the Gröbner core.** F4, Buchberger and FGLM are `SparseMultiPoly`
 throughout; the only `Mul` sites under `grobner::` are `Monomial * Monomial` in `f4::symbolic` and
-multivariate products in tests, and `research::resultant`'s `&result * p` is multivariate too.
+multivariate products in tests, and `grobner::resultant`'s `&result * p` is multivariate too.
 Checked by grep rather than assumed, which is what #231 asked for. So #185's worry about small
 products dominating by count in F4 does not apply to this operator — though it did apply, in a
 different place, and §4.1.2's step two is where it showed up.
