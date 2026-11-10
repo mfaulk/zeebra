@@ -1,19 +1,15 @@
-//! Where F4's work goes, degree by degree, on the systems M22 is about.
+//! Where F4's work goes, degree by degree.
 //!
-//! M22-0. The whole-run counters in `F4Statistics` say a computation was expensive; they cannot say
-//! at which degree the matrices became unaffordable, nor how much of the work at that degree
-//! carried new algebraic information. This prints both, for one Fukuoka MQ instance and for the
-//! controlled Poseidon family, and it is the baseline every later M22 workstream is measured
-//! against.
+//! The whole-run counters in `F4Statistics` say a computation was expensive; they cannot say at
+//! which degree the matrices became unaffordable, nor how much of the work at that degree carried
+//! new algebraic information. This prints both, for Katsura, Cyclic and a planted quadratic system.
 //!
 //! ```text
-//! tools/fetch-mq-challenge.sh         # for the MQ sections; the rest runs without it
 //! cargo run --release --example f4_degrees
 //! ```
 //!
-//! Set `ZEEBRA_MQ_DIR` to read the instances from elsewhere. Every table states its exact
-//! configuration, because a degree profile taken under different options is a different
-//! measurement.
+//! Every table states its exact configuration, because a degree profile taken under different
+//! options is a different measurement.
 //!
 //! # What the columns mean
 //!
@@ -23,30 +19,20 @@
 //! that added nothing. `new` is basis elements extracted, `<d` how many of those have degree below
 //! the degree they were found at.
 
-use std::{path::PathBuf, time::Instant};
+use std::time::Instant;
 
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::{
-        benchmark_systems::katsura,
+        benchmark_systems::{cyclic, katsura, planted},
         classify_ideal,
         f4::f4_reported,
-        research::{
-            CicoInstance, MqInstance, Poseidon, PoseidonParameters, Specialization, KOALABEAR_PRIME,
-        },
         DegreeProfile, F4Options, F4Statistics, IdealClass,
     },
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
-/// GF(31), the Fukuoka type III and VI coefficient field.
-type Q = PrimeFieldElement64<31>;
-
-/// KoalaBear, the field the 2026 Poseidon initiative's challenges are over.
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
-
-/// The bounty's first input constant, reused so the reduced instances share it.
-const C1: u64 = 0xC0_9DE4;
+type P = PrimeFieldElement64<2_147_483_647>;
 
 /// The one configuration every table in this program uses.
 ///
@@ -61,18 +47,6 @@ fn options() -> F4Options {
         max_live_bytes: 400_000_000,
         ..F4Options::default()
     }
-}
-
-fn directory() -> PathBuf {
-    std::env::var("ZEEBRA_MQ_DIR")
-        .unwrap_or_else(|_| "research/instances/mq".to_string())
-        .into()
-}
-
-/// Read an instance, or `None` if the data is not present.
-fn load(stem: &str) -> Option<MqInstance> {
-    let text = std::fs::read_to_string(directory().join(stem)).ok()?;
-    MqInstance::parse(&text).ok()
 }
 
 /// What one run of F4 established, whether or not it finished.
@@ -218,96 +192,16 @@ fn summarize(run: &Run) {
     println!();
 }
 
-/// A planted reduced CICO instance at the given parameters.
-fn cico(t: usize, r_f: usize, r_p: usize) -> (CicoInstance<K>, Vec<K>) {
-    let poseidon = Poseidon::<K>::new(PoseidonParameters {
-        prime: KOALABEAR_PRIME,
-        alpha: 3,
-        t,
-        r_f,
-        r_p,
-    })
-    .expect("R_F is even");
-    let free: Vec<K> = (0..t - 1).map(|i| K::new(1_000 + i as u64)).collect();
-    let instance = CicoInstance::planted(
-        poseidon,
-        1,
-        &[K::new(C1)],
-        &free,
-        Some(PoseidonParameters::bounty_cico()),
-    )
-    .expect("the right widths");
-    assert!(
-        instance.is_solution(&free).expect("the right width"),
-        "the plant does not solve its own instance"
-    );
-    (instance, free)
-}
-
-/// The `t = 3` system, and the same system with one free input fixed to its planted value.
-///
-/// §5.5 of the plan: the two nine-variable Poseidon benchmarks M21 measured **do not have the same
-/// algebraic dimension**, so comparing them as though the difference were state width alone would
-/// be wrong. `N - E = t - 2k`, which is 1 at `t = 3, k = 1` and 0 at `t = 2, k = 1`.
-fn controlled_poseidon() -> Vec<Run> {
+/// Generic systems of increasing size, all over GF(2^31 - 1) under grevlex.
+fn generic_systems() -> Vec<Run> {
     let order = MonomialOrder::GradedReverseLexicographic;
-    let mut runs = Vec::new();
-
-    // t = 3, R_F = 2, R_P = 1: 9 variables, 8 equations. Planted, so consistent, and with one more
-    // variable than equations — positive-dimensional unless something unexpected happens.
-    let (instance, free) = cico(3, 2, 1);
-    let system = instance.system::<9>().expect("nine variables");
-    runs.push(run("t=3 R_F=2 R_P=1, as generated", &system, order));
-
-    // The same system with free input 0 fixed to the planted value. `Specialization::apply`
-    // substitutes *and* appends the pinning equation, so the fixed coordinate is part of the answer
-    // rather than a free one that happens not to appear. Nine variables still, nine equations now.
-    //
-    // Fixing one variable does **not** prove the result zero-dimensional, which is why the run
-    // reports `classify_ideal` of the basis it computed rather than asserting a dimension here.
-    let fixed = Specialization::<9, K>::new(&[(0, free[0])]).expect("one assignment");
-    let sliced = fixed.apply(&system);
-    runs.push(run(
-        "t=3 R_F=2 R_P=1, free input 0 pinned to its planted value",
-        &sliced,
-        order,
-    ));
-
-    // t = 2, R_F = 4: nine variables, nine equations — the square instance M21 solved in 401 ms.
-    let (instance, _) = cico(2, 4, 0);
-    let system = instance.system::<9>().expect("nine variables");
-    runs.push(run("t=2 R_F=4 R_P=0", &system, order));
-
-    runs
-}
-
-/// Round count varying with the state width held fixed at `t = 2`.
-fn poseidon_rounds() -> Vec<Run> {
-    let order = MonomialOrder::GradedReverseLexicographic;
-    let mut runs = Vec::new();
-
-    let (instance, _) = cico(2, 2, 0);
-    runs.push(run(
-        "t=2 R_F=2 R_P=0",
-        &instance.system::<5>().expect("five variables"),
-        order,
-    ));
-
-    let (instance, _) = cico(2, 2, 2);
-    runs.push(run(
-        "t=2 R_F=2 R_P=2",
-        &instance.system::<7>().expect("seven variables"),
-        order,
-    ));
-
-    let (instance, _) = cico(2, 4, 0);
-    runs.push(run(
-        "t=2 R_F=4 R_P=0",
-        &instance.system::<9>().expect("nine variables"),
-        order,
-    ));
-
-    runs
+    let point: Vec<P> = (0..8).map(|i| P::new(3 + 2 * i)).collect();
+    vec![
+        run("katsura-6", &katsura::<6, P>(), order),
+        run("cyclic-5", &cyclic::<5, P>(), order),
+        run("cyclic-6", &cyclic::<6, P>(), order),
+        run("planted-8", &planted::<8, P>(&point), order),
+    ]
 }
 
 fn comparison_row(run: &Run) {
@@ -351,76 +245,6 @@ fn truncate(s: &str, width: usize) -> String {
     }
 }
 
-/// The Fukuoka sections, or a note that the data is absent.
-fn fukuoka() {
-    let order = MonomialOrder::GradedReverseLexicographic;
-
-    println!("## Fukuoka MQ Challenge, type III over GF(31)");
-    println!();
-    let Some(instance) = load("ToyExample-type3-n10-seed0") else {
-        println!(
-            "`{}` is not present. Run `tools/fetch-mq-challenge.sh` to fetch the toy examples; \
-             they are not redistributed here.",
-            directory().join("ToyExample-type3-n10-seed0").display()
-        );
-        println!();
-        return;
-    };
-    println!(
-        "{} — overdetermined, `m = 2n`, so the encryption family.",
-        instance
-    );
-    println!();
-    let system = instance
-        .system::<10, Q>()
-        .expect("ten variables over GF(31)");
-    summarize(&run("type III n=10 seed 0", &system, order));
-
-    // n = 15 next. It may not finish under the column budget, which is itself the measurement the
-    // plan asks for: the first infeasible instance of the family, with the limiting stage named.
-    println!("### The next size up");
-    println!();
-    match load("ToyExample-type3-n15-seed0") {
-        Some(instance) => {
-            let system = instance.system::<15, Q>().expect("fifteen variables");
-            summarize(&run("type III n=15 seed 0", &system, order));
-        }
-        None => println!("`ToyExample-type3-n15-seed0` is not present.\n"),
-    }
-
-    // Type VI is the signature family: n ~ 1.5m, so underdetermined and positive-dimensional as
-    // published. Any specialization is recorded explicitly, because a specialized type VI instance
-    // is a different mathematical problem from the one the challenge poses.
-    println!("## Fukuoka MQ Challenge, type VI over GF(31) — underdetermined");
-    println!();
-    match load("ToyExample-type6-n10-seed0") {
-        Some(instance) => {
-            println!(
-                "{} — `n - m = {}`, so positive-dimensional as published.",
-                instance,
-                instance.variables - instance.polynomials
-            );
-            println!();
-            let system = instance.system::<10, Q>().expect("ten variables");
-            summarize(&run("type VI n=10 seed 0, as published", &system, order));
-
-            // Specialize n - m variables at seed 1 to reach a square system. The slice is a
-            // different problem, and it is labelled as one.
-            let count = instance.variables - instance.polynomials;
-            let specialization =
-                Specialization::<10, Q>::seeded(&(0..count).collect::<Vec<_>>(), 1)
-                    .expect("distinct indices");
-            let sliced = specialization.apply(&system);
-            summarize(&run(
-                &format!("type VI n=10 seed 0, specialized: {}", specialization),
-                &sliced,
-                order,
-            ));
-        }
-        None => println!("`ToyExample-type6-n10-seed0` is not present.\n"),
-    }
-}
-
 fn main() {
     println!("# F4 degree by degree");
     println!();
@@ -430,10 +254,10 @@ fn main() {
     // 16-byte entry every row here uses the cap is 320 MB and the 400 MB never applies (#469).
     println!(
         "Configuration: `F4Options::recommended()` with `profile_degrees` and `measure_stages` \
-         set, `max_matrix_columns = {}`, {}. Order: grevlex throughout \
-         except where stated. Reproduce with `cargo run --release --example f4_degrees`.",
+         set, `max_matrix_columns = {}`, {}. Order: grevlex throughout. \
+         Reproduce with `cargo run --release --example f4_degrees`.",
         options().max_matrix_columns,
-        options().live_budget_policy::<Q>()
+        options().live_budget_policy::<P>()
     );
     println!();
     println!(
@@ -449,46 +273,19 @@ fn main() {
     println!();
     summarize(&run(
         "katsura-5",
-        &katsura::<5, PrimeFieldElement64<2_147_483_647>>(),
+        &katsura::<5, P>(),
         MonomialOrder::GradedReverseLexicographic,
     ));
 
-    fukuoka();
-
-    println!("## Controlled Poseidon: dimension, not state width");
+    println!("## Generic systems");
     println!();
-    println!(
-        "`N - E = t - 2k`, so at `k = 1` the `t = 3` instance has one more variable than equation \
-         and the `t = 2` instance is square. The two nine-variable benchmarks M21 reported are \
-         therefore **not the same kind of system**, and the middle row below is the one that makes \
-         the comparison controlled: it is the `t = 3` system with a single free input pinned, so \
-         the equation count matches while the round structure does not change."
-    );
-    println!();
-    let controlled = controlled_poseidon();
+    let generic = generic_systems();
     comparison_header();
-    for row in &controlled {
+    for row in &generic {
         comparison_row(row);
     }
     println!();
-    for row in &controlled {
-        summarize(row);
-    }
-
-    println!("## Round count at fixed state width");
-    println!();
-    println!(
-        "`t = 2` throughout, so every row is square and the only thing varying is how many rounds \
-         the permutation has — and therefore how many S-box variables."
-    );
-    println!();
-    let rounds = poseidon_rounds();
-    comparison_header();
-    for row in &rounds {
-        comparison_row(row);
-    }
-    println!();
-    for row in &rounds {
+    for row in &generic {
         summarize(row);
     }
 }

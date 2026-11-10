@@ -1,108 +1,13 @@
-//! The cross-library corpus: the same ideal, named the same way, for every engine.
-//!
-//! A cross-library comparison is meaningful only on **the same mathematical input**, and the two
-//! families everyone benchmarks on both have a naming hazard that produces a different ideal
-//! without producing an error. Both are resolved here by construction rather than by convention,
-//! and the resolutions are pinned by tests against another engine's own distributed input files.
-//!
-//! # Hazard 1: Katsura indexing
-//!
-//! The literature's "Katsura-n" has **n + 1 variables** `u_0 … u_n`, so the name and the variable
-//! count differ by one — and benchmark suites split on which number they use. Zeebra's
-//! [`katsura`](crate::grobner::benchmark_systems::katsura) is const-generic in the **variable
-//! count**: `katsura::<6>` is six variables, which the literature calls Katsura-5.
-//!
-//! **Resolved empirically.** msolve's distributed `input_files/kat6-31.ms` declares six variables
-//! `x1 … x6` and six equations, and is `katsura::<6>` generator for generator —
-//! `test_katsura_6_is_msolves_kat6` pins it against msolve's own literal. So msolve names by
-//! variable count and agrees with Zeebra's type parameter. **Every instance here is therefore
-//! named by variable count**, and the literature's `n` appears nowhere: an instance called
-//! `katsura-6` has six variables in every engine, and the digest is the real arbiter either way.
-//!
-//! # Hazard 2: affine versus homogenized Cyclic
-//!
-//! The cyclic-n roots system comes in two forms. The **affine** one closes with
-//! `x_1 ⋯ x_n − 1`, which is inhomogeneous and zero-dimensional for squarefree n. The
-//! **homogenized** one replaces that with `x_1 ⋯ x_n − h^n` in n + 1 variables, or drops the
-//! constant entirely; it is positive-dimensional, its Gröbner basis is a different object, and its
-//! cost is not comparable. Benchmark tables rarely say which they used.
-//!
-//! **Resolved empirically.** msolve's `input_files/cyclic5-16.ms` is the affine form, identical to
-//! [`cyclic`](crate::grobner::benchmark_systems::cyclic)`::<5>`, pinned by
-//! `test_cyclic_5_is_msolves_cyclic5`. The corpus is affine throughout. A homogenized instance
-//! would be a **different problem** with a different digest, and
-//! [`Instance::transformation`](super::Instance) is where that would be recorded.
-//!
-//! # Not every square system is zero-dimensional
-//!
-//! `cyclic::<4>` is **positive-dimensional** — its grevlex leading-term ideal contains no power of
-//! the last variable. It is in the corpus deliberately, as the easy rung that exercises the
-//! positive-dimensional path, and its entry says so. A task like
-//! [`Task::LexBasisByConversion`](super::Task) does not apply to it, which is a fact about the
-//! ideal and not a failure of any engine.
-//!
-//! # Hazard 3: a declared field that was not the generated one
-//!
-//! An instance carries a [`FieldSpec`] and a system, and nothing in the text ties them together:
-//! coefficients render as **residues**, so `−1` over `2^31 − 1` is the numeral `2147483646`, which
-//! is a perfectly well-formed element of a smaller prime field and a different one. A
-//! `characteristic` that reached only the label therefore produced a valid input file describing a
-//! different ideal from the one named, with a digest and a name both claiming otherwise (#425).
-//!
-//! **Resolved by construction.** The const-generic families are generated over the declared field
-//! via `over_prime!`, whose arms are [`GENERATED_CHARACTERISTICS`]; a prime with no compiled field
-//! yields `None`. `test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic` is
-//! the property, asserted on the rendered text rather than on the polynomials.
-//!
-//! # Where the ceiling is, and which stage sets it
-//!
-//! Measured, at [`REFERENCE_CHARACTERISTIC`] under grevlex at `F4Options::default()`, and the
-//! answer is not where the family index is largest:
-//!
-//! | rung | basis | `D` | conversion |
-//! |---|---:|---:|---:|
-//! | `katsura-8` | 0.22 s | 128 | 13 ms |
-//! | `katsura-9` | 2.1 s | 256 | 84 ms |
-//! | `katsura-10` | 21.8 s | 512 | 0.62 s |
-//! | `katsura-11` | 277 s | 1024 | 5.2 s |
-//! | `cyclic-7` | 1.4 s | 924 | 0.16 s |
-//! | `cyclic-8` | 21.3 s | — (positive-dimensional) | n/a |
-//! | `cyclic-9` | **refuses after 10.6 s** | — | — |
-//! | `cyclic-10` | **refuses after 24.3 s** | — | — |
-//!
-//! **The ceiling is `cyclic-9`, and the stage that sets it is the F4 basis**, which crosses the
-//! live-entry budget — `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`. The whole Katsura
-//! ladder is reachable to `katsura-11`, four rungs above the old ceiling, at roughly 10x per rung.
-//!
-//! That the refusal is a **resource** stop and not a wall-clock one is the point rather than a
-//! detail: an entry count crosses at the same counter on any machine, so the ceiling can be written
-//! down, where a time stop would make it a fact about how busy the box was.
-//! `test_the_ceiling_is_cyclic_9_and_the_basis_stage_sets_it` asserts all of it.
-//!
-//! A refusal is a **result**, so `cyclic-9` and `cyclic-10` are on the ladder rather than left off.
-//! Their dimension class comes from Backelin's theorem rather than from a computation, and
-//! `cyclic-10`'s `D = 34940` is Steel's published value this rung exists to one day be checked
-//! against. The timings above are from the development workstation with other agents at work on it;
-//! they bound reachability, and no cross-engine ratio is taken from them.
-//!
-//! # The ladder
-//!
-//! Rungs are chosen to be easy, intermediate and genuinely challenging rather than uniformly
-//! large: a family represented only by instances every engine times out on measures nothing, and a
-//! family represented only by instances every engine finishes in a millisecond measures startup
-//! cost. [`ladder`] is that selection, and [`manifest`] freezes each rung's digest.
+//! Frozen corpus digests bind a variable count, coefficient field and transformation to the
+//! generated system text. The Cyclic generator uses the affine formulation.
 
 use crate::{
     fields::{PrimeFieldElement64, Zp2, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         differential::{polynomial_to_string, GeneratedSystem, SystemShape},
-        research::{
-            challenge, dispatch_anemoi_cico, dispatch_cico, AnemoiCicoVisitor, CicoVisitor,
-            ANEMOI_64_PRIME, KOALABEAR_PRIME,
-        },
     },
-    FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
+    FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
 use super::{FieldSpec, Instance};
@@ -223,6 +128,14 @@ pub const PUBLISHED_CHARACTERISTICS: [u64; 3] = [
 /// `2^31 − 1` and declared mod this prime.
 pub const ALTERNATE_CHARACTERISTIC: u64 = 1_073_741_827;
 
+/// KoalaBear, `2^31 - 2^24 + 1`: a 31-bit prime with two-adicity 24, below every comparand's
+/// ceiling, so a system over it can be checked four ways.
+pub const KOALABEAR_CHARACTERISTIC: u64 = 2_130_706_433;
+
+/// `2^64 - 353`: a prime just below `2^64`, where only Groebner.jl among the external engines
+/// reaches. The widest prime field the Zeebra adapter compiles at 64-bit storage.
+pub const WIDE_64_CHARACTERISTIC: u64 = 18_446_744_073_709_551_263;
+
 /// The primes the const-generic families have a compiled field for.
 ///
 /// Katsura, Cyclic and planted MQ are const-generic in the field, so a prime known only at run
@@ -232,7 +145,7 @@ pub const ALTERNATE_CHARACTERISTIC: u64 = 1_073_741_827;
 ///
 /// Random MQ is not listed here because it does not need to be: its generator reduces at run time
 /// through [`CaseField`](crate::grobner::differential::CaseField), so every prime is available to
-/// it. Poseidon and Anemoi carry the registry's own field and ignore the argument entirely.
+/// it.
 pub const GENERATED_CHARACTERISTICS: [u64; 4] = [
     BINARY_CHARACTERISTIC,
     SMALL_PRIME_CHARACTERISTIC,
@@ -360,9 +273,9 @@ pub struct CorpusEntry {
     /// which means every figure taken against the old digest is a figure about a different
     /// problem — so the test failing is the point of the field.
     ///
-    /// Two entries for a family whose field varies, and **one** for a registry row: Poseidon and
-    /// Anemoi derive their round constants from the prime, so they ignore the requested
-    /// characteristic and have one identity whatever is asked (§5 of
+    /// Two entries for a family whose field varies, and **one** for a family defined over a single
+    /// field — a system whose constants are derived from its prime ignores the requested
+    /// characteristic and has one identity whatever is asked (§5 of
     /// `docs/research/cross-library-corpus.md`). Keying on the declared rather than the requested
     /// characteristic is what makes that fall out instead of needing a special case.
     pub digests: &'static [(u64, &'static str)],
@@ -489,8 +402,8 @@ impl CorpusEntry {
 
     /// The frozen digest for the instance this rung builds at `characteristic`.
     ///
-    /// `characteristic` is the one the built instance **declares**, which for a registry row is the
-    /// registry's own prime and not the one that was asked for.
+    /// `characteristic` is the one the built instance **declares**, which for a single-field family
+    /// is that family's own prime and not the one that was asked for.
     ///
     /// # Errors
     /// `None` where the corpus does not publish the rung at that field — which is the gate on
@@ -535,14 +448,6 @@ pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option
         "mq-planted-6" => planted_mq_instance::<6>(characteristic, order),
         "mq-planted-10" => planted_mq_instance::<10>(characteristic, order),
         "mq-planted-14" => planted_mq_instance::<14>(characteristic, order),
-        // Poseidon and Anemoi carry the registry's own field, not `characteristic`: their round
-        // constants are derived from the prime, so the same row over another prime is another
-        // problem. The argument is unused for them by design, and the digest records the field
-        // that was actually used.
-        "poseidon-t2-rf2-rp0-planted"
-        | "poseidon-t2-rf2-rp2-planted"
-        | "poseidon-t2-rf4-rp0-planted" => poseidon_instance(name, order),
-        "anemoi64-cico-n1-fcico" | "anemoi64-cico-n2-fcico" => anemoi_instance(name, order),
         _ => None,
     }
 }
@@ -637,8 +542,7 @@ pub enum Equivalence {
     ///
     /// Stronger than it sounds for cross-library purposes, and in one respect stronger than a
     /// digest: an engine whose parser read the text differently will not vanish at the point, and
-    /// that is detectable without the engine computing anything. Planted MQ and the planted
-    /// Poseidon rows.
+    /// that is detectable without the engine computing anything. Planted MQ.
     KnownSolution,
 
     /// Checked against live Singular's invariants, which needs an installation.
@@ -743,9 +647,8 @@ pub mod ceilings {
 /// The capability boundary, as a function rather than a table in a document. Derived entirely from
 /// [`ceilings`], so a corrected ceiling corrects every statement that depends on it.
 ///
-/// This is the fact that makes Anemoi's row a consequence rather than a special case: its field is
-/// `2^64 - 353`, which only Groebner.jl reaches, so it has one engine and no corroborator — while
-/// the band below `2^62` has two and the band below `2^31` has four.
+/// A field such as `2^64 - 353`, which only Groebner.jl reaches, therefore has one engine and no
+/// corroborator — while the band below `2^62` has two and the band below `2^31` has four.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Corroboration {
     /// Four engines. Only the basis task below `2^31` reaches this.
@@ -841,27 +744,10 @@ fn ceiling_for(engine: &str, task: super::Task) -> Option<u64> {
 /// Every engine the corpus compares against.
 pub const ENGINES: [&str; 4] = ["msolve", "singular", "sagebrush", "groebner.jl"];
 
-/// The corroboration available for `task` at `characteristic`.
-///
-/// Task-aware, because the rosters are. The case that matters most for #263: the **conversion**
-/// task, where Zeebra's only measured cross-library deficit lies, is missing **msolve** (no lex
-/// order) and **Groebner.jl** (no FGLM in 0.10.11) at every field — so it has two engines below
-/// `2^31` where the basis task has four, and none at all above, where the basis task has two.
-/// The **lowest** characteristic at which `engine` performs `task`, where it has a floor.
-///
-/// **Ceilings were not the whole story, and characteristic two is what showed it.** Until #427 this
-/// module reasoned about upper bounds alone, so `GF(2)` was reported as the widest band on the
-/// board — four engines for the basis and two for the eliminant — when the truth is that msolve's
-/// eliminant does not terminate there at all. An absent floor means `MIN_CHARACTERISTIC`, i.e. the
-/// engine has no restriction beyond being a prime field.
-///
-/// Only one engine has a floor above that. Singular, Groebner.jl and Sagebrush were each run at
-/// `GF(2)` on `cyclic-5` and all three answered correctly — `dim 0`, `D = 70`, a 20-element
-/// grevlex basis, agreeing with each other and with Zeebra.
+/// Minimum characteristic supported by the engine's adapter for this task.
 fn floor_for(engine: &str, task: super::Task) -> u64 {
     use super::Task::*;
     match (engine, task) {
-        // msolve's eliminant alone. Its basis path is unaffected and reaches `cyclic-9` at `GF(2)`.
         ("msolve", UnivariateEliminant) => {
             crate::grobner::external::msolve::MIN_CHARACTERISTIC_ELIMINANT
         }
@@ -869,6 +755,7 @@ fn floor_for(engine: &str, task: super::Task) -> u64 {
     }
 }
 
+/// Counts the external adapters that support this task at the given prime characteristic.
 pub fn corroboration_for(task: super::Task, characteristic: u64) -> Corroboration {
     let engines = ENGINES
         .iter()
@@ -888,7 +775,7 @@ pub fn corroboration(characteristic: u64) -> Corroboration {
     corroboration_for(super::Task::ReducedGrobnerBasis, characteristic)
 }
 
-/// The seeded point the planted family plants, and the planted Poseidon rows echo.
+/// The seeded point the planted family plants.
 ///
 /// Derived from the instance's variable count by a fixed rule rather than drawn from an RNG, so
 /// the corpus needs no seed to reproduce it and the digest is stable without one. Values are small
@@ -964,122 +851,17 @@ pub fn planted_mq_instance<const N: usize>(
     })
 }
 
-/// Render a const-generic system at an unknown dimension to `(variables, generators)`.
-///
-/// The visitor both CICO dispatchers want. `self` is consumed, so the order is carried in.
-struct AsText {
-    order: MonomialOrder,
-}
-
-impl AsText {
-    fn render<const N: usize, F: FiniteField>(
-        &self,
-        system: &[MultivariatePolynomial<N, F>],
-    ) -> (Vec<String>, Vec<String>) {
-        let names: Vec<String> = (1..=N).map(|i| format!("x{}", i)).collect();
-        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-        let generators = system
-            .iter()
-            .map(|polynomial| polynomial_to_string(polynomial, &refs, self.order))
-            .collect();
-        (names, generators)
-    }
-}
-
-impl<F: KnownOrder> CicoVisitor<F> for AsText {
-    type Output = (Vec<String>, Vec<String>);
-
-    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Self::Output {
-        self.render(system)
-    }
-}
-
-impl<F: KnownOrder> AnemoiCicoVisitor<F> for AsText {
-    type Output = (Vec<String>, Vec<String>);
-
-    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Self::Output {
-        self.render(system)
-    }
-}
-
-/// A registered Poseidon CICO instance, as a corpus instance.
-///
-/// **The field is the registry's, not the corpus's.** Poseidon's round constants come out of a
-/// seeded LFSR keyed on the prime, so a Poseidon system over a different prime is a different
-/// problem — the characteristic cannot be varied the way it can for Katsura. KoalaBear
-/// (`2^31 - 2^24 + 1 = 2130706433`) happens to be **below every comparand's ceiling**, so these
-/// rows are comparable; that is luck rather than design, and it does not extend to Anemoi.
-///
-/// # Errors
-/// `None` if `id` is not a registered Poseidon CICO row, or is at a dimension the dispatcher does
-/// not compile.
-pub fn poseidon_instance(id: &str, order: MonomialOrder) -> Option<Instance> {
-    type K = PrimeFieldElement64<KOALABEAR_PRIME>;
-    let manifest = challenge(id)?;
-    let (variables, generators) = dispatch_cico::<K, _>(&manifest, AsText { order }).ok()?;
-    Some(
-        Instance::new(
-            id.to_string(),
-            "poseidon",
-            FieldSpec::prime(KOALABEAR_PRIME).named("KoalaBear"),
-            variables,
-            generators,
-            order,
-        )
-        .transformed(format!(
-            "CICO constraints from registry row {} (digest {})",
-            id,
-            manifest.short_digest()
-        )),
-    )
-}
-
-/// A registered Anemoi CICO instance, as a corpus instance.
-///
-/// Over `2^64 - 353`. **Groebner.jl reaches this field** — its ceiling is `typemax(UInt64)` and it
-/// was measured computing correctly at this prime — so the family is representable, and the limit
-/// is **corroboration**: Sagebrush stops at `2^62` and msolve and Singular at `2^31`, leaving one
-/// external engine and nothing to check it against. [`Equivalence::SoleComparand`] records that,
-/// and [`corroboration`] derives it from the engine ceilings rather than asserting it here.
-///
-/// A timing is therefore publishable **with the fact stated**, which is a different disposition
-/// from the 254/255-bit fields, where no engine reaches at all.
-///
-/// # Errors
-/// `None` if `id` is not a registered Anemoi CICO row, or is at a dimension the dispatcher does
-/// not compile.
-pub fn anemoi_instance(id: &str, order: MonomialOrder) -> Option<Instance> {
-    type A = PrimeFieldElement64<ANEMOI_64_PRIME>;
-    let manifest = challenge(id)?;
-    let instance = manifest.anemoi_cico_instance::<A>().ok()?;
-    let (variables, generators) = dispatch_anemoi_cico::<A, _>(&instance, AsText { order }).ok()?;
-    Some(
-        Instance::new(
-            id.to_string(),
-            "anemoi",
-            FieldSpec::prime(ANEMOI_64_PRIME).named("2^64 - 353"),
-            variables,
-            generators,
-            order,
-        )
-        .transformed(format!(
-            "CICO constraints from registry row {} (digest {})",
-            id,
-            manifest.short_digest()
-        )),
-    )
-}
-
 /// The corpus ladder: every rung, with its frozen digest.
 ///
-/// A constant function rather than a data file, for the same reason
-/// [`research::registry`](crate::grobner::research::registry) is one: the systems are generated by
-/// code, so the authority on what they are is the code, and the digests here are the pin that says
-/// the code has not changed under the figures.
+/// A constant function rather than a data file: the systems are generated by code, so the
+/// authority on what they are is the code, and the digests here are the pin that says the code has
+/// not changed under the figures.
 ///
-/// **Katsura and Cyclic only, for now.** Poseidon and Anemoi instances already exist in the
-/// cryptanalysis registry and need a conversion to this `Instance` form; Fukuoka MQ instances are
-/// not redistributable and must be referenced from `ZEEBRA_MQ_DIR` rather than generated;
+/// **Katsura, Cyclic and the MQ families.** A caller with systems of its own builds
+/// [`CorpusEntry`] values for them and hands them to
+/// [`CompetitiveBoard::with_corpus`](super::CompetitiveBoard::with_corpus); this list is the
+/// public, reproducible benchmark set. Fukuoka MQ instances are not redistributable and must be
+/// referenced from `ZEEBRA_MQ_DIR` rather than generated;
 /// characteristic-two workloads need the extension-field convention settled first, since two
 /// engines' default `GF(2^8)` need not be the same ring. Each is listed in
 /// `docs/research/cross-library-corpus.md` with what remains to do, rather than half-added here.
@@ -1556,78 +1338,6 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 ),
             ],
         },
-        CorpusEntry {
-            name: "poseidon-t2-rf2-rp0-planted",
-            family: "poseidon",
-            rung: Rung::Easy,
-            zero_dimensional: true,
-            quotient_dimension: Some(9),
-            equivalence: Equivalence::KnownSolution,
-            digests: &[(
-                KOALABEAR_PRIME,
-                "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
-            )],
-        },
-        CorpusEntry {
-            name: "poseidon-t2-rf2-rp2-planted",
-            family: "poseidon",
-            rung: Rung::Intermediate,
-            zero_dimensional: true,
-            quotient_dimension: Some(81),
-            equivalence: Equivalence::KnownSolution,
-            digests: &[(
-                KOALABEAR_PRIME,
-                "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
-            )],
-        },
-        CorpusEntry {
-            name: "poseidon-t2-rf4-rp0-planted",
-            family: "poseidon",
-            rung: Rung::Challenging,
-            zero_dimensional: true,
-            quotient_dimension: Some(81),
-            equivalence: Equivalence::KnownSolution,
-            digests: &[(
-                KOALABEAR_PRIME,
-                "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
-            )],
-        },
-        CorpusEntry {
-            name: "anemoi64-cico-n1-fcico",
-            family: "anemoi",
-            rung: Rung::Easy,
-            zero_dimensional: true,
-            // Over 2^64 - 353. **Groebner.jl can represent and compute this ring** — its
-            // ceiling is typemax(UInt64) and it was measured correct at this very prime. What is
-            // missing is a *second* external engine: Sagebrush stops at 2^62 and msolve and
-            // Singular at 2^31, so there is one comparand and nothing to triangulate against.
-            quotient_dimension: Some(5),
-            equivalence: Equivalence::SoleComparand {
-                tool: "Groebner.jl",
-                reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
-                         2^31, so Groebner.jl is the only external engine that reaches it",
-            },
-            digests: &[(
-                ANEMOI_64_PRIME,
-                "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
-            )],
-        },
-        CorpusEntry {
-            name: "anemoi64-cico-n2-fcico",
-            family: "anemoi",
-            rung: Rung::Intermediate,
-            zero_dimensional: true,
-            quotient_dimension: Some(25),
-            equivalence: Equivalence::SoleComparand {
-                tool: "Groebner.jl",
-                reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
-                         2^31, so Groebner.jl is the only external engine that reaches it",
-            },
-            digests: &[(
-                ANEMOI_64_PRIME,
-                "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
-            )],
-        },
     ]
 }
 
@@ -1639,9 +1349,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
 /// [`Instance::canonical`](super::Instance::canonical) is line-oriented.
 ///
 /// The characteristic is a **column** rather than a document per field, so one sorted table carries
-/// the whole corpus and a reader can see at a glance which rungs have two identities and which have
-/// one. Rows are deduplicated by their own text, which is what keeps a Poseidon or Anemoi rung — the
-/// same instance whatever is asked for — to a single line.
+/// the whole corpus. Each Cyclic rung has three identities and the other rungs have two.
 pub fn manifest() -> String {
     let mut lines: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for characteristic in PUBLISHED_CHARACTERISTICS {
@@ -1691,15 +1399,15 @@ pub fn manifest() -> String {
 mod tests {
     use super::{
         ceilings, corroboration, corroboration_for, instance, ladder, manifest, CorpusEntry,
-        Corroboration, Equivalence, Rung, ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC,
-        SMALL_PRIME_CHARACTERISTIC,
+        Corroboration, Rung, ALTERNATE_CHARACTERISTIC, KOALABEAR_CHARACTERISTIC,
+        REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC, WIDE_64_CHARACTERISTIC,
     };
     use crate::{
         fields::Zp2147483647,
         grobner::{
             benchmark_systems::{cyclic, katsura},
             external::Task,
-            research::{satisfies, ANEMOI_64_PRIME, KOALABEAR_PRIME},
+            transform::satisfies,
         },
         MonomialOrder, MultivariatePolynomial, One, Zero,
     };
@@ -1810,11 +1518,7 @@ mod tests {
     /// Every ladder entry builds, has a distinct digest, and the generated families are named by
     /// their variable count.
     ///
-    /// The naming rule is what closes the Katsura hazard, so it is asserted rather than trusted —
-    /// but it applies only to the families this module *generates*. Poseidon and Anemoi rows carry
-    /// their **registry id**, which is their identity elsewhere in the crate and must not be
-    /// renamed to suit a convention local to the corpus; their variable count is a consequence of
-    /// the round count and is recorded in the manifest instead.
+    /// The naming rule is what closes the Katsura hazard, so it is asserted rather than trusted.
     #[test]
     fn test_every_ladder_entry_builds_and_the_generated_families_are_named_by_variable_count() {
         let mut digests: BTreeSet<String> = BTreeSet::new();
@@ -1828,13 +1532,6 @@ mod tests {
                 entry.name
             );
 
-            if matches!(entry.family, "poseidon" | "anemoi") {
-                assert_eq!(
-                    built.name, entry.name,
-                    "a registry row must keep its registry id"
-                );
-                continue;
-            }
             let expected: usize = entry
                 .name
                 .rsplit('-')
@@ -1943,9 +1640,9 @@ mod tests {
     /// A characteristic with no compiled field makes a const-generic family refuse, not mislabel.
     ///
     /// `None` is already [`instance`]'s idiom for a size nobody compiled, and a prime nobody
-    /// compiled is the same kind of absence. The three dispositions in the corpus differ for
+    /// compiled is the same kind of absence. The dispositions in the corpus differ for
     /// stated reasons, so each is pinned: const-generic families refuse, the runtime-field MQ
-    /// generator accepts any prime, and a registry row keeps its own field.
+    /// generator accepts any prime.
     #[test]
     fn test_an_uncompiled_characteristic_is_refused_rather_than_mislabeled() {
         for name in ["katsura-4", "cyclic-5", "mq-planted-6"] {
@@ -1958,10 +1655,6 @@ mod tests {
         assert!(
             instance("mq-random-6", 101, GREVLEX).is_some(),
             "the random MQ generator reduces at run time, so every prime is available to it"
-        );
-        assert!(
-            instance("poseidon-t2-rf2-rp0-planted", 101, GREVLEX).is_some(),
-            "a registry row carries its own field and ignores the argument"
         );
     }
 
@@ -2011,7 +1704,7 @@ mod tests {
     /// represented only by millisecond instances measures startup cost.
     #[test]
     fn test_the_ladder_spans_its_difficulties() {
-        for family in ["katsura", "cyclic", "mq-random", "mq-planted", "poseidon"] {
+        for family in ["katsura", "cyclic", "mq-random", "mq-planted"] {
             let rungs: BTreeSet<Rung> = ladder()
                 .into_iter()
                 .filter(|entry| entry.family == family)
@@ -2561,12 +2254,11 @@ mod tests {
         );
     }
 
-    /// Every family licenses a timing, and only the corroborated ones claim corroboration.
+    /// Every public family licenses a timing and is corroborated.
     ///
-    /// The gate, and the distinction it now draws. Anemoi is over `2^64 - 353`, which
-    /// **Groebner.jl does reach** — so the family is representable and its timing is publishable.
-    /// What it lacks is a *second* external engine, so its agreement cannot be triangulated. Those
-    /// two limits have different fixes, which is why they are different variants.
+    /// Every rung sits at or below `2^31`, where four engines reach. A family over `2^64 - 353`
+    /// would still license a timing — Groebner.jl reaches it — but could not be triangulated, which
+    /// is the distinction the two predicates draw.
     #[test]
     fn test_every_family_licenses_a_timing_and_only_some_are_corroborated() {
         for entry in ladder() {
@@ -2575,18 +2267,11 @@ mod tests {
                 "{} should license a timing",
                 entry.name
             );
-            match entry.family {
-                "anemoi" => assert!(
-                    !entry.equivalence.is_corroborated(),
-                    "{} has one external engine, so nothing can triangulate it",
-                    entry.name
-                ),
-                _ => assert!(
-                    entry.equivalence.is_corroborated(),
-                    "{} should be corroborated",
-                    entry.name
-                ),
-            }
+            assert!(
+                entry.equivalence.is_corroborated(),
+                "{} should be corroborated",
+                entry.name
+            );
         }
 
         // The two field facts the table above rests on. `const` assertions rather than runtime
@@ -2594,15 +2279,15 @@ mod tests {
         // the build rather than wait for this test to be run.
         const {
             assert!(
-                KOALABEAR_PRIME < REFERENCE_CHARACTERISTIC,
-                "KoalaBear must sit below the comparands' ceiling for the Poseidon rows to be \
+                KOALABEAR_CHARACTERISTIC < REFERENCE_CHARACTERISTIC,
+                "KoalaBear must sit below the comparands' ceiling for a system over it to be \
                  comparable at all"
             )
         };
         const {
             assert!(
-                ANEMOI_64_PRIME > REFERENCE_CHARACTERISTIC,
-                "the Anemoi rows' weaker corroboration rests on their prime being above the \
+                WIDE_64_CHARACTERISTIC > REFERENCE_CHARACTERISTIC,
+                "the wide field's weaker corroboration rests on its prime being above the \
                  four-way band"
             )
         };
@@ -2618,7 +2303,10 @@ mod tests {
     #[test]
     fn test_the_corroboration_bands_follow_from_the_engine_ceilings() {
         // Four-way: every engine reaches it.
-        assert_eq!(corroboration(KOALABEAR_PRIME), Corroboration::FourWay);
+        assert_eq!(
+            corroboration(KOALABEAR_CHARACTERISTIC),
+            Corroboration::FourWay
+        );
         assert_eq!(
             corroboration(REFERENCE_CHARACTERISTIC),
             Corroboration::FourWay
@@ -2633,12 +2321,15 @@ mod tests {
             Corroboration::TwoWay
         );
 
-        // Sole engine: Groebner.jl alone. Goldilocks and Anemoi's 2^64 - 353 are both here.
+        // Sole engine: Groebner.jl alone. Goldilocks and 2^64 - 353 are both here.
         assert_eq!(
             corroboration(ceilings::SAGEBRUSH),
             Corroboration::SoleEngine
         );
-        assert_eq!(corroboration(ANEMOI_64_PRIME), Corroboration::SoleEngine);
+        assert_eq!(
+            corroboration(WIDE_64_CHARACTERISTIC),
+            Corroboration::SoleEngine
+        );
         assert_eq!(
             corroboration(0xFFFF_FFFF_0000_0001),
             Corroboration::SoleEngine,
@@ -2648,10 +2339,10 @@ mod tests {
         // Triangulable only where at least two external engines reach the field.
         assert!(corroboration(REFERENCE_CHARACTERISTIC).can_triangulate());
         assert!(corroboration(1 << 40).can_triangulate());
-        assert!(!corroboration(ANEMOI_64_PRIME).can_triangulate());
+        assert!(!corroboration(WIDE_64_CHARACTERISTIC).can_triangulate());
 
         assert_eq!(corroboration(REFERENCE_CHARACTERISTIC).engines(), 4);
-        assert_eq!(corroboration(ANEMOI_64_PRIME).engines(), 1);
+        assert_eq!(corroboration(WIDE_64_CHARACTERISTIC).engines(), 1);
     }
 
     /// Corroboration is **task-specific**, and only the basis task is wide.
@@ -2659,7 +2350,7 @@ mod tests {
     /// The case that matters most for #263: the conversion stage is where Zeebra's only measured
     /// cross-library deficit lies, and it has **two** external engines below `2^31` and **none**
     /// above. Reading a basis band as a conversion band would overstate what can check a future
-    /// Anemoi conversion row by four engines to zero.
+    /// conversion row at 2^64 - 353 by four engines to zero.
     ///
     /// The roster this pins, each from the engine's own `supports`:
     ///
@@ -2694,14 +2385,14 @@ mod tests {
         );
         assert!(!corroboration_for(Task::LexBasisByConversion, 1 << 40).can_triangulate());
 
-        // At Anemoi's field the basis is sole-engine and the conversion has nothing — which is a
+        // At 2^64 - 353 the basis is sole-engine and the conversion has nothing — which is a
         // stronger statement than the band alone, and the reason the two are separate functions.
         assert_eq!(
-            corroboration_for(Task::ReducedGrobnerBasis, ANEMOI_64_PRIME),
+            corroboration_for(Task::ReducedGrobnerBasis, WIDE_64_CHARACTERISTIC),
             Corroboration::SoleEngine
         );
         assert_eq!(
-            corroboration_for(Task::LexBasisByConversion, ANEMOI_64_PRIME),
+            corroboration_for(Task::LexBasisByConversion, WIDE_64_CHARACTERISTIC),
             Corroboration::None
         );
 
@@ -2720,11 +2411,7 @@ mod tests {
         );
 
         // Nothing offers the solution tasks at any field — the unanimous gap #263 reports.
-        for task in [
-            Task::OneFiniteFieldSolution,
-            Task::AllFiniteFieldSolutions,
-            Task::CryptanalyticWitness,
-        ] {
+        for task in [Task::OneFiniteFieldSolution, Task::AllFiniteFieldSolutions] {
             assert_eq!(
                 corroboration_for(task, REFERENCE_CHARACTERISTIC),
                 Corroboration::None,
@@ -2734,57 +2421,24 @@ mod tests {
         }
     }
 
-    /// Anemoi's recorded reason names **corroboration**, not representability.
+    /// The four public families, each with its evidence recorded.
     ///
-    /// A wording correction with teeth: the two limits have different fixes. Representability
-    /// needs a new tool; corroboration needs a second tool at the same field. A reader deciding
-    /// whether to trust an Anemoi row has to be told which one applies.
+    /// M25 counted six, two of them cipher systems that now belong to their callers; a caller's
+    /// rungs reach the board through `CompetitiveBoard::with_corpus` instead. `sole-comparand` is
+    /// therefore exercised by the board's tests rather than by a ladder rung.
     #[test]
-    fn test_anemois_reason_names_corroboration_and_not_representability() {
-        let anemoi: Vec<CorpusEntry> = ladder()
-            .into_iter()
-            .filter(|entry| entry.family == "anemoi")
-            .collect();
-        assert!(!anemoi.is_empty());
-        for entry in anemoi {
-            match entry.equivalence {
-                Equivalence::SoleComparand { tool, reason } => {
-                    assert_eq!(tool, "Groebner.jl", "the one engine that reaches the field");
-                    assert!(
-                        reason.contains("only external engine"),
-                        "the reason must say one engine reaches it, not that none does: {}",
-                        reason
-                    );
-                }
-                other => panic!(
-                    "{} should be SoleComparand, not {:?} — Groebner.jl reaches 2^64 - 353",
-                    entry.name, other
-                ),
-            }
-        }
-    }
-
-    /// Six families, which is the milestone's minimum, each with its evidence recorded.
-    #[test]
-    fn test_the_corpus_covers_six_families_each_with_recorded_evidence() {
+    fn test_the_corpus_covers_four_families_each_with_recorded_evidence() {
         let families: BTreeSet<&str> = ladder().iter().map(|entry| entry.family).collect();
-        assert!(
-            families.len() >= 6,
-            "the corpus has {} families, below the minimum of six: {:?}",
-            families.len(),
-            families
+        assert_eq!(
+            families,
+            BTreeSet::from(["cyclic", "katsura", "mq-planted", "mq-random"]),
         );
         // Each kind of evidence is actually exercised, so none of the vocabulary is dead.
         let kinds: BTreeSet<&str> = ladder()
             .iter()
             .map(|entry| entry.equivalence.tag())
             .collect();
-        for expected in [
-            "comparand-file",
-            "known-solution",
-            "live-oracle",
-            "sole-comparand",
-        ] {
+        for expected in ["comparand-file", "known-solution", "live-oracle"] {
             assert!(kinds.contains(expected), "no family uses {}", expected);
         }
         // `no-comparand` is deliberately unused by the ladder: it is for Zeebra's 254/255-bit
@@ -2793,52 +2447,6 @@ mod tests {
             !kinds.contains("no-comparand"),
             "a ladder rung claims no comparand; check it is not really a sole-comparand row"
         );
-    }
-
-    /// A Poseidon rung is built from the registry at the registry's own field, not the corpus's.
-    ///
-    /// Poseidon's round constants come out of a seeded LFSR keyed on the prime, so the same row
-    /// over another prime is another problem. The `characteristic` argument is therefore ignored
-    /// for these rows, and this pins that rather than leaving it to a doc comment.
-    #[test]
-    fn test_a_poseidon_rung_keeps_the_registrys_field_whatever_is_asked_for() {
-        let asked = instance("poseidon-t2-rf2-rp0-planted", 65521, GREVLEX).expect("builds");
-        assert_eq!(asked.field.characteristic, KOALABEAR_PRIME);
-        assert_eq!(asked.field.name, "KoalaBear");
-
-        let other = instance(
-            "poseidon-t2-rf2-rp0-planted",
-            REFERENCE_CHARACTERISTIC,
-            GREVLEX,
-        )
-        .expect("builds");
-        assert_eq!(
-            asked.digest(),
-            other.digest(),
-            "the characteristic argument must not change a registry row's identity"
-        );
-
-        // And the transformation names the registry row it came from, so the provenance is in the
-        // instance rather than only in this module.
-        assert!(
-            asked
-                .transformation
-                .as_deref()
-                .unwrap_or_default()
-                .contains("poseidon-t2-rf2-rp0-planted"),
-            "{:?}",
-            asked.transformation
-        );
-    }
-
-    /// An Anemoi rung is built from the registry over `2^64 - 353`.
-    #[test]
-    fn test_an_anemoi_rung_is_built_over_the_published_prime() {
-        let built =
-            instance("anemoi64-cico-n1-fcico", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
-        assert_eq!(built.field.characteristic, ANEMOI_64_PRIME);
-        assert_eq!(built.family, "anemoi");
-        assert!(!built.system.is_empty());
     }
 
     /// A random MQ rung is reproducible from its name alone, and is genuinely quadratic.
@@ -2942,10 +2550,6 @@ mod tests {
                         .into_iter()
                         .collect()
                 }
-                // A registry row derives its constants from its own prime, so it has one identity
-                // whatever is asked for.
-                "poseidon" => [KOALABEAR_PRIME].into_iter().collect(),
-                "anemoi" => [ANEMOI_64_PRIME].into_iter().collect(),
                 other => panic!("{} has no recorded publication policy", other),
             };
             let frozen: BTreeSet<u64> = entry.digests.iter().map(|(field, _)| *field).collect();
@@ -3114,37 +2718,6 @@ mod tests {
         }
     }
 
-    /// A registry rung has **one** identity across both published characteristics.
-    ///
-    /// Poseidon's and Anemoi's round constants are derived from the prime, so asking for another
-    /// one does not produce another instance — and the single-entry `digests` list is a consequence
-    /// of keying on the declared characteristic rather than a special case for them.
-    #[test]
-    fn test_a_registry_rung_has_one_identity_at_both_published_characteristics() {
-        for name in ["poseidon-t2-rf2-rp0-planted", "anemoi64-cico-n1-fcico"] {
-            let digests: BTreeSet<String> = super::PUBLISHED_CHARACTERISTICS
-                .iter()
-                .map(|characteristic| {
-                    instance(name, *characteristic, GREVLEX)
-                        .expect("builds")
-                        .digest()
-                })
-                .collect();
-            assert_eq!(digests.len(), 1, "{} changed identity with the field", name);
-            let entry = ladder()
-                .into_iter()
-                .find(|entry| entry.name == name)
-                .expect("in the ladder");
-            assert_eq!(entry.digests.len(), 1, "{} should carry one digest", name);
-        }
-        // And a family whose field does vary carries two, which is the contrast.
-        let katsura = ladder()
-            .into_iter()
-            .find(|entry| entry.name == "katsura-4")
-            .expect("in the ladder");
-        assert_eq!(katsura.digests.len(), 2);
-    }
-
     /// `GF(32003)` is a published characteristic, and its rungs are a different ideal.
     ///
     /// The corpus-identity half of #426: a small-prime row is not the same problem measured under
@@ -3216,7 +2789,7 @@ mod tests {
         assert_eq!(
             corroboration_for(Task::UnivariateEliminant, super::BINARY_CHARACTERISTIC),
             Corroboration::SoleEngine,
-            "msolve's genericity retry does not terminate at GF(2)"
+            "msolve's adapter declines eliminants at GF(2)"
         );
         assert!(
             !corroboration_for(Task::UnivariateEliminant, super::BINARY_CHARACTERISTIC)
@@ -3328,7 +2901,7 @@ mod tests {
                 why
             );
         }
-        // Above Sagebrush's FGLM cap nothing converts, which is why an Anemoi conversion row has
+        // Above Sagebrush's FGLM cap nothing converts, which is why a conversion row there has
         // no comparand rather than one.
         assert!(
             converts(1 << 40).is_empty(),
@@ -3339,7 +2912,7 @@ mod tests {
     /// The manifest is line-oriented ASCII, one line per rung per identity, with its digest.
     ///
     /// The row count is the sum over rungs of how many identities each has — two for a family whose
-    /// field varies and one for a registry row — which is exactly `digests.len()` summed, so the
+    /// field varies and one for a single-field row — which is exactly `digests.len()` summed, so the
     /// manifest and the frozen table cannot disagree about how many problems the corpus holds.
     #[test]
     fn test_the_manifest_lists_every_rung_with_its_digest() {

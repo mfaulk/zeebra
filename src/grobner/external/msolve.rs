@@ -201,34 +201,10 @@ const MAX_STAGES: usize = 64;
 /// and not a basis over `GF(p)`.
 pub const MIN_CHARACTERISTIC: u64 = 2;
 
-/// The smallest characteristic at which msolve's **eliminant** can recover from a non-generic
-/// staircase: `3`.
+/// Minimum characteristic supported by this adapter for msolve's eliminant task.
 ///
-/// **A floor on the same task [`MAX_CHARACTERISTIC_ELIMINANT`] puts a ceiling on, and for the same
-/// kind of reason — above the ceiling and below this floor, msolve does not fail, it does not
-/// return.** `-g 2` is unaffected at every `p >= MIN_CHARACTERISTIC`: measured, msolve computes the
-/// `GF(2)` Cyclic bases this repository publishes, agreeing element-for-element with Singular,
-/// Groebner.jl, Sagebrush and Zeebra at `cyclic-5` through `cyclic-9`.
-///
-/// The parametrization path is different. Sparse-FGLM needs the ideal in shape position, and when
-/// the staircase is not generic enough msolve's remedy (`-c 2`, the default) is to permute the
-/// variables and then **adjoin a random linear form**. Over `GF(2)` there is no randomness to
-/// draw on: every nonzero coefficient is 1, so the candidate forms are a fixed finite set, and a
-/// retry redraws from candidates that have already failed. The loop has no exit —
-/// `msolve.c:2446`'s `goto restart` — and prints a `TIMINGS` block per attempt. **Measured on
-/// `cyclic-5` over `GF(2)`: 74 140 blocks and 156 MB of verbose output in 60 seconds, with the F4
-/// basis itself complete in under 0.01 s.** Run with `-c 0` the same input quits in 0.01 s with
-/// "Computation failed", which is the refusal this constant turns into a [`Support::No`] before any
-/// subprocess starts.
-///
-/// **This is a necessary and not a sufficient condition, and the evidence that no clean bound
-/// exists is recorded rather than smoothed over.** At `p >= 3` the retry is probabilistic in the
-/// prime and the instance: on `cyclic-5` the eliminant returns in 0.02 s at `p = 7, 13, 17, 251`
-/// and `32003`, and **does not return at `p = 3, 5` or `11`**. So a characteristic above this floor
-/// is not a promise of termination — the wall limit remains the backstop there — while a
-/// characteristic below it is a promise of non-termination, which is what may be declared.
-/// Declaring only the ceiling is what would let a sweep record a `GF(2)` eliminant row as a
-/// wall-clock *timing lower bound* for a computation that was never going to finish.
+/// At characteristic two, msolve's sparse-FGLM genericity retry looped on Cyclic-5.
+/// The Gröbner basis task uses `-g 2` and bypasses that path.
 pub const MIN_CHARACTERISTIC_ELIMINANT: u64 = 3;
 
 /// The monomial order `-g` computes in, and the only one msolve offers.
@@ -1106,10 +1082,6 @@ impl ExternalSolver for MsolveSolver {
             Task::OneFiniteFieldSolution | Task::AllFiniteFieldSolutions => {
                 return Support::No(Unsupported::Task { task })
             }
-
-            // A cryptanalytic witness is checked against a primitive, not against a basis, and
-            // belongs to the cryptanalysis scoreboard rather than the competitive board.
-            Task::CryptanalyticWitness => return Support::No(Unsupported::Task { task }),
         }
 
         // msolve's input format carries a single integer characteristic on line 2
@@ -1149,19 +1121,13 @@ impl ExternalSolver for MsolveSolver {
                 ),
             });
         }
-        // The eliminant's **floor**, which the basis path does not share. Refused here rather than
-        // discovered by running, because what msolve does below it is retry a genericity remedy
-        // that cannot succeed over a field with no randomness in it — see
-        // [`MIN_CHARACTERISTIC_ELIMINANT`]. Without this the sweep's wall limit would turn a
-        // non-terminating run into a timing lower bound for a row that has no answer.
         if task == Task::UnivariateEliminant
             && instance.field.characteristic < MIN_CHARACTERISTIC_ELIMINANT
         {
             return Support::No(Unsupported::Representation {
                 detail: format!(
-                    "msolve's sparse-FGLM needs a separating linear form and at characteristic {} \
-                     its genericity retry has none to draw: the loop does not terminate, where \
-                     `-g 2` at the same field does",
+                    "the msolve adapter declines eliminants at characteristic {}: \
+                     sparse-FGLM genericity retries can loop indefinitely",
                     instance.field.characteristic
                 ),
             });
@@ -1900,20 +1866,13 @@ rational param(cpu)             0.75 sec
 
     /// The corpus rungs that can have no Zeebra oracle, and why.
     ///
-    /// **Not a coverage gap — a correct residue.** Poseidon carries KoalaBear and Anemoi
-    /// `2^64 - 353`, and neither shares [`Reference`]'s type, so each needs a second *field type*
-    /// rather than a second match arm. Every rung at the reference field now has an oracle
-    /// whatever its family, because the dispatch is on [`COMPILED_WIDTHS`].
+    /// Empty: every rung is at the reference field, and every rung there has an oracle whatever
+    /// its family, because the dispatch is on [`COMPILED_WIDTHS`]. A rung added at another field
+    /// would belong here — it needs a second *field type* rather than a second match arm.
     ///
     /// Asserted two-sidedly, so a rung that silently *gained* coverage is caught as well as one
     /// that lost it (#338's contribution, kept).
-    const WITHOUT_A_COMPILED_PAIR: &[&str] = &[
-        "poseidon-t2-rf2-rp0-planted",
-        "poseidon-t2-rf2-rp2-planted",
-        "poseidon-t2-rf4-rp0-planted",
-        "anemoi64-cico-n1-fcico",
-        "anemoi64-cico-n2-fcico",
-    ];
+    const WITHOUT_A_COMPILED_PAIR: &[&str] = &[];
 
     /// Every rung at the reference field has an oracle; only the other-field ones do not.
     ///
@@ -1953,28 +1912,6 @@ rational param(cpu)             0.75 sec
         assert_eq!(
             without, expected,
             "a corpus rung gained or lost a compiled Zeebra side; see #333"
-        );
-    }
-
-    /// The rungs with no oracle are exactly the ones carrying their own field, not their own name.
-    ///
-    /// Poseidon is over KoalaBear and Anemoi over `2^64 - 353`; neither shares [`Reference`]'s
-    /// type, so each needs a second field type rather than a second match arm. That residue is
-    /// correct rather than a coverage gap, and this test is what says so.
-    #[test]
-    fn test_the_rungs_without_an_oracle_are_the_ones_at_another_field() {
-        for name in WITHOUT_A_COMPILED_PAIR {
-            let instance = corpus_instance(name, P31);
-            assert_ne!(
-                instance.field.characteristic, P31,
-                "{}: it is at the reference field, so it should have an oracle",
-                name
-            );
-        }
-        assert_eq!(
-            WITHOUT_A_COMPILED_PAIR.len(),
-            5,
-            "three Poseidon rungs and two Anemoi rungs"
         );
     }
 
@@ -2714,7 +2651,6 @@ rational param(cpu)             0.75 sec
             Task::LexBasisByConversion,
             Task::OneFiniteFieldSolution,
             Task::AllFiniteFieldSolutions,
-            Task::CryptanalyticWitness,
         ] {
             match solver.supports(&pair(P30), task) {
                 Support::No(Unsupported::Task { task: reported }) => assert_eq!(reported, task),

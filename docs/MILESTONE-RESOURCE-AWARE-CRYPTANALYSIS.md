@@ -1,11 +1,12 @@
-# Milestone: Resource-Aware Solving and Cryptanalysis Research Infrastructure
+# Milestone: Resource-Aware Solving and Experiment Infrastructure
 
 **Measured at:** publication bound `70fd8c8c`…`cb02bc27` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
 
 **Status:** M21-0, M21-A, M21-B, M21-C, M21-D, M21-E and M21-I landed. M20-C landed as a
 prerequisite (see §2). Every measurement in this document is reproducible from a committed
-example; §12 is the milestone report.
+example — except those whose Poseidon and Fukuoka examples moved out in #668; §12 is the milestone
+report.
 **Prerequisites:** M20 merged, including M20-C's byte-accounted limits.
 **Objective:** turn the existing F4/FGLM algorithms into a solving system that chooses a route on
 stated grounds, reports what limited it when it fails, and can be evaluated on independently
@@ -637,7 +638,7 @@ and redistribution terms.
 > versions by"), a **modulus or irreducible polynomial** (absent from both manifests, and a real
 > ambiguity over an extension field), and a **variable count** distinct from the names (derivable
 > from `variables.len()`). The implemented schema — two manifests, not one, plus the measurement
-> side and `cost_model::FigureBasis` — is written out field by field in
+> side and `cost_model::FigureBasis` (moved out in #668) — is written out field by field in
 > [`docs/research/benchmark-schema.md`](research/benchmark-schema.md), with what it deliberately
 > refuses and why.
 
@@ -783,7 +784,7 @@ option types should be avoided; M21-C owns them for the duration.
 - [x] Every mathematical claim is tagged `Proved` or `Observed`; a quotient dimension read from one
       computation is an observation
 - [x] Redistribution terms are a required field, and the Fukuoka data is **not committed** — "All
-      Rights Reserved" with no stated licence, fetched by `tools/fetch-mq-challenge.sh` and pinned
+      Rights Reserved" with no stated licence, fetched by `tools/fetch-mq-challenge.sh` (moved out in #668) and pinned
       by SHA-256
 - [x] The GF(31) importer needs no new arithmetic; the 32-bit prime field (#62) landed as an
       independent optimization, worth nothing measurable on the backend these routes use, and
@@ -810,7 +811,7 @@ option types should be avoided; M21-C owns them for the duration.
       vectors, whole output state, both permutation variants, on a nonzero input — because one
       published vector anchors one configuration and the round schedule changes with `R_F`/`R_P`
 - [x] Field identity, constant count, `k <= t` and the exact dimension are enforced at
-      construction rather than by convention; see `docs/research/poseidon.md` §2.1
+      construction rather than by convention; see docs/research/poseidon.md §2.1 (moved out in #668)
 - [x] Field, round counts, state width, round constants, MDS matrix and S-box exponent are all
       parameters
 - [x] Generated equations verified by substituting intermediate states from a real permutation
@@ -906,11 +907,11 @@ solved end to end on data this project did not generate — M21-E's acceptance c
 rather than synthetic input, and M21-A's second family put to use rather than merely parsed.
 
 It is a *toy* example. `n = 10` is 45 variables short of the smallest unsolved challenge and
-nothing here is a competitive result; see `docs/research/fukuoka-mq.md` §4.
+nothing here is a competitive result; see docs/research/fukuoka-mq.md §4 (moved out in #668).
 
 ## 10.4 Reduced-round Poseidon, measured
 
-`cargo run --release --example poseidon_cico`. Parameters from `poseidon-tools` at commit
+The `poseidon_cico` example (moved out in #668). Parameters from `poseidon-tools` at commit
 `60075da7`, which the port reproduces: the reference's README records
 `permutation([0]*16)[0] = 1393439926` at `t=16, R_F=8, R_P=20`, and that one number exercises the
 Grain LFSR's bit layout, its rejection sampling, all 448 round constants, the Cauchy MDS and the
@@ -942,18 +943,12 @@ the same reason.
 
 ### What it is not
 
-The bounty is `t = 16, R_F = 6, R_P = 8`: **104 S-box variables**, 118 in total, 106 equations.
-The frontier is nine variables at `t = 2`. The gap is not incremental, and **no result on a reduced
-instance says anything about the full one** — which is why `CicoInstance::reduced_from` carries the
-parameters an instance reduced from, making omission a deliberate act rather than an oversight.
-
-The relaxed CICO verifier is **not** modelled, per §7.3: `(y − c) & mask == 0` is a condition on a
-field element's canonical integer representative and is not a polynomial identity. Formulating it
-is open, and `docs/research/poseidon.md` §6 says so.
+*This subsection (the gap to the Poseidon bounty parameters) was moved out with the cryptanalysis
+research in #668; it is preserved at commit 9532a9a2.*
 
 ## 10.5 Integration
 
-`cargo run --release --example cryptanalysis_experiment`, and `-- --json` for the records. Three
+The `cryptanalysis_experiment` example (moved out in #668), with `--json` for the records. Three
 categories in one run, each verified **independently of the solver** and by a different means:
 
 | category | instances | independent verification |
@@ -1144,17 +1139,8 @@ The cost is bounded and visible: `SolvePlan::discarded_elapsed` on planted-12 is
 
 ### 3. Which real challenge instances can zeebra solve?
 
-| instance | result |
-|---|---|
-| Fukuoka MQ type III, `n = 10`, seed 0 | **solved, 111 ms**, the published point recovered, `D = 1` |
-| Fukuoka MQ type VI, `n = 10`, seed 0 | **solved via specialization**, 7 of 8 slices giving verified witnesses |
-| Poseidon CICO, `t = 2`, `R_F = 4` | **solved, 371 ms**, verified through the permutation |
-| Poseidon CICO, `t = 2`, `R_F = 2`, `R_P = 2` | solved, 164 ms |
-| Poseidon CICO, `t = 2`, `R_F = 2` | solved, 0.9 ms |
-
-All five are toy or reduced instances. **None is a competitive result**, and the gap to the
-unsolved challenges is not incremental: Fukuoka's smallest is `n = 55`, and the Poseidon bounty is
-`t = 16` with 104 S-box variables.
+*This answer (per-challenge results on Fukuoka and Poseidon instances) was moved out with the
+cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ### 4. Which cannot be solved, and what fails?
 
@@ -1175,7 +1161,7 @@ The Fukuoka row is left as this milestone recorded it, and it is no longer the c
 extended `SUPPORTED_DIMENSIONS` to `[10, 15, 20, 24]` and ran the smallest real challenge in an
 importable type — type VI `m = 16`, so `n = 24`. It stops on live-entry growth too, at degree 6 with
 a 13 602 x 19 132 matrix. Measured after this milestone and recorded where it was measured:
-`docs/research/fukuoka-mq.md` §4.4.
+docs/research/fukuoka-mq.md §4.4 (moved out in #668).
 
 No complexity lower bound is inferred from any of these. A single failed execution bounds nothing.
 

@@ -1,13 +1,7 @@
 # Controlled cryptanalytic experiments: dimension, variable order, affine elimination
 
-Reference for M22-E (#74, #79, #81). Every figure comes from
-
-```sh
-tools/fetch-mq-challenge.sh
-cargo run --release --example cryptanalysis_ladder
-```
-
-under `F4Options::recommended()` with `profile_degrees`, `max_matrix_columns = 60_000`,
+Reference for M22-E (#74, #79, #81). Every figure comes from the `cryptanalysis_ladder` example
+(moved out in #668), run under `F4Options::recommended()` with `profile_degrees`, `max_matrix_columns = 60_000`,
 `max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), grevlex throughout. Solving uses `SolvePolicy::AutoWithFallback`, which
 is what M21-D's measurements selected — a bare `SolveOptions::default()` is `DirectLexF4`, and that
 route crosses both the row and the column budget on every Poseidon system here.
@@ -22,45 +16,7 @@ pass. Every recovered Fukuoka witness is evaluated against the published coeffic
 
 ## 1. The ladder: `N − E = t − 2k`
 
-| instance | vars | eqs | planted | deg | cols | MB | ms | dimension |
-|---|---:|---:|---|---:|---:|---:|---:|---|
-| `t=2 R_F=2 R_P=0` | 5 | 5 | yes | 4 | 71 | 0.0 | 0.6 | zero |
-| `t=2 R_F=2 R_P=2` | 7 | 7 | yes | 6 | 925 | 1.7 | 143 | zero |
-| `t=2 R_F=4 R_P=0` | 9 | 9 | yes | 5 | 1 341 | 3.8 | 356 | zero |
-| `t=3 R_F=2 R_P=1`, as generated | 9 | **8** | yes | **11** | **42 229** | **155.3** | 18 167 | column budget crossed |
-| `t=3 R_F=2 R_P=1`, input 0 pinned at the plant | 9 | 9 | yes | 5 | 393 | 0.2 | **13.5** | zero |
-| `t=3 R_F=2 R_P=1`, input 0 pinned off-plant | 9 | 9 | no | 5 | 393 | 0.2 | 14.0 | zero |
-
-At `k = 1` the `t = 2` rows are square and the `t = 3` row has one variable more than equation, so
-**the two nine-variable instances M21 compared are not the same kind of system** and that comparison
-is confounded. The fifth row removes the confound: it is the same `t = 3` system with one free input
-pinned, which matches the equation count without touching the round structure.
-
-Pinned, it is **the easiest of the three nine-variable systems** — 13.5 ms at degree 5 and 0.2 MB,
-against the square `t = 2` instance's 356 ms and 3.8 MB — where unpinned it crossed the column
-budget at degree 11 and 155 MB. So M21's nine-variable frontier is a fact about the
-**underdetermined direction**, not about state width: one free coordinate takes the computation from
-degree 5 to degree 11 and from 0.2 MB to 155 MB.
-
-Three cautions, each of which the program enforces rather than merely states:
-
-- The dimension is read from `classify_ideal` of the **computed basis**, not inferred from the
-  variable and equation counts. Fixing one variable does not by itself prove zero-dimensionality.
-- The fifth row is pinned to a *planted* value, so a solution is known to exist on that slice. The
-  sixth is the same transformation at a different value and is a genuine search. A dead slice there
-  would be a correct fact about the slice and would say nothing about the instance.
-- Both are planted instances. **Comparing either against an arbitrary-target CICO challenge would be
-  comparing different distributions** — M21 already measured that an arbitrary target at
-  `t=2, R_F=2` has no base-field solution at all.
-
-The last two rows have identical matrix shapes (393 columns, 0.2 MB, a 46-element basis), so the
-Gröbner structure of the slice does not depend on the value pinned. That is what makes the planted
-and off-plant rows comparable as *computations* even though they answer different questions.
-
-Both were solved and both witnesses verified through the permutation. The off-plant slice returned
-**a different preimage** — not the plant, since the plant is not on that slice — which is the
-outcome that distinguishes a live search from a lucky one: the slice at an arbitrary value still had
-a solution, and it was found and checked without the answer being known in advance.
+*§1 (the planted Poseidon CICO ladder and its dimension confound) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 2. Variable order
 
@@ -133,54 +89,20 @@ dropping it would turn an unsatisfiable system into a satisfiable one.
 
 ## 4. Fukuoka MQ
 
-| instance | vars | eqs | deg | cols | MB | ms | dimension |
-|---|---:|---:|---:|---:|---:|---:|---|
-| type III `n=10` seed 0 | 10 | 20 | 4 | 859 | 2.7 | 113 | zero |
-| type VI `n=10` seed 0, as published | 10 | **7** | 9 | **38 456** | **84.7** | 2 705 | column budget crossed |
-| type VI `n=10`, 3 variables fixed at the published answer | 10 | 10 | 9 | 4 315 | 4.0 | 461 | zero |
-| type VI `n=10`, 3 variables fixed at seed 1 | 10 | 10 | 9 | 4 319 | 4.0 | 463 | zero |
-
-Type III `n=10` recovered **the published answer** — the solver was not told it — and both type VI
-slices produced witnesses that satisfy the *original* published coefficient vectors, so the
-specialization is inverted rather than assumed. The seeded slice being alive is a fact about that
-slice; M21 measured that others are dead.
-
-Type III is the overdetermined encryption family and is the main MQ target. Type VI is the signature
-family — `n ≈ 1.5m`, so underdetermined and positive-dimensional as published, and it crosses the
-column budget at degree 8 while still selecting pairs at degree 9.
-
-**A specialized type VI instance is a different problem**, and the distinction matters for M22
-specifically: it is not an overdetermined semiregular system, so nothing in #74's justification for
-HDF4 transfers to it. The two specialized rows differ only in the values fixed, and the matrix
-shapes are within 0.1% of each other — so again the Gröbner structure of a slice does not depend on
-the slice, which is what makes the planted and seeded rows comparable as computations.
-
-The specialization does **not** lower the degree here: all three type VI rows reach degree 9. What it
-lowers is the width at each degree, 38 456 columns to 4 315. That is the opposite of the Poseidon
-`t = 3` case in §1, where pinning took the degree from 11 to 5 — so "specialize to make it feasible"
-has at least two distinct mechanisms, and which one applies is a property of the system.
+*§4 (the Fukuoka MQ challenge instances) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 5. What this decided
 
-| question | answer |
-|---|---|
-| Is M21's nine-variable Poseidon frontier about state width? | **No.** It is about dimension; pinned, the `t = 3` system is the easiest of the three. |
-| Does variable order matter? | **Yes, substantially** — 1.6x to 1.7x and up to 2.1x less peak memory from `last-round-first`, on identical mathematical systems. |
-| Does affine elimination matter? | Substitution is worth ~1.34x; projection is what restores zero-dimensionality and makes the result solvable. |
-| Do the Fukuoka type VI specializations behave like the Poseidon ones? | **No.** Poseidon pinning lowers the *degree*; type VI specialization lowers the *width* at a fixed degree. |
-| Any full-round claim? | None. Nine variables against 118. |
-
-For M22-I, the consequence is that **variable order has to be held fixed across the ablation**, and
-at the generated layout — otherwise a 1.7x ordering effect would be attributed to whichever F4
-strategy happened to be varied alongside it.
+*§5 (the M22-E decision table, which answers §1's and §4's challenge questions) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 6. Reproducing
 
 ```sh
-cargo run --release --example cryptanalysis_ladder
-cargo test --lib grobner::research::reorder
-cargo test --lib grobner::research::linear
+cargo test --lib grobner::transform::reorder
+cargo test --lib grobner::transform::affine
 ```
+
+The `cryptanalysis_ladder` example that produced the tables was moved out in #668.
 
 The tests assert what the tables assume: only a bijection is accepted as a variable order; `forward`
 and `recover` are mutually inverse; a relabelled planted system's solution maps back to the original

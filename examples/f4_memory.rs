@@ -1,8 +1,8 @@
 //! Where an F4 computation's memory goes, attributed to named structures by measurement.
 //!
 //! `examples/f4_profile.rs` says where the *time* goes. This says where the bytes go, and it
-//! exists because the answer turned out not to be the matrix: on `fukuoka-mq-III-n20-seed0` the
-//! entry budget accounts for 195 MB of a 14.75 GB peak — 1.3% — and
+//! exists because the answer turned out not to be the matrix: on an `n = 20` MQ run the entry
+//! budget accounted for 195 MB of a 14.75 GB peak — 1.3% — and
 //! `docs/research/f4-resource-scaling.md` §5 could not say where the rest was.
 //!
 //! Two instruments, reported side by side, because neither alone would settle it:
@@ -24,11 +24,7 @@
 //! ```text
 //! cargo run --release --example f4_memory                      # the benchmark systems
 //! cargo run --release --example f4_memory -- katsura-7         # one of them
-//! cargo run --release --example f4_memory -- mq <instance>     # a registered MQ instance
 //! ```
-//!
-//! `ZEEBRA_MAX_ENTRIES` sets the live-entry cap, as `examples/scoreboard.rs` reads it, so a rung of
-//! that ladder can be reproduced here with the attribution attached.
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -37,16 +33,14 @@ use std::{
 };
 
 use zeebra::{
-    fields::{Zp2147483647, Zp31},
+    fields::Zp2147483647,
     grobner::{
         benchmark_systems::{cyclic, katsura},
         f4::{
             macaulay::MacaulayMatrix,
-            symbolic::{symbolic_preprocessing_with, MonicBasis, ReducerCache},
+            symbolic::{symbolic_preprocessing_with, MonicBasis, MonomialHandle, ReducerCache},
         },
-        f4_observed_reported,
-        research::mq::MqInstance,
-        BatchObserver, CriticalPair, F4Options, F4Statistics,
+        f4_observed_reported, BatchObserver, CriticalPair, F4Options, F4Statistics,
     },
     util::{isa_floor, peak_resident_bytes},
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
@@ -120,7 +114,8 @@ struct BatchProbe {
     basis_elements: usize,
     basis_terms: usize,
 
-    /// Peak live heap of symbolic preprocessing, including the queue and the two monomial sets.
+    /// Peak live heap of symbolic preprocessing, including the queue, the two monomial structures
+    /// and the per-term handles #621 added.
     symbolic_peak: usize,
 
     /// Rows the closure needed, or the row budget if it refused.
@@ -294,11 +289,35 @@ fn attribution<const N: usize>(
             ),
         });
         sites.push(Site {
-            name: "  of which: examined + covered sets",
-            bytes: worst.divisor_queries * (monomial_bytes + 1) * 2,
+            name: "  of which: examined map + covered set",
+            bytes: worst.divisor_queries * (2 * monomial_bytes + size_of::<MonomialHandle>() + 2),
             method: format!(
-                "{} distinct monomials x ({} + 1) B x 2 sets",
+                "{} distinct monomials x ({} + {} + 1) B map + ({} + 1) B set",
+                worst.divisor_queries,
+                monomial_bytes,
+                size_of::<MonomialHandle>(),
+                monomial_bytes
+            ),
+        });
+        sites.push(Site {
+            name: "  of which: monomial arena",
+            bytes: worst.divisor_queries * monomial_bytes,
+            method: format!(
+                "{} distinct monomials x {} B, the column set handed to construction",
                 worst.divisor_queries, monomial_bytes
+            ),
+        });
+        // #621's memory price, which is the thing that issue said to establish before implementing:
+        // one handle per matrix entry, live from preprocessing until `release_monomials`. Compare it
+        // against the entry row below — it is a quarter of it, because a handle is four bytes and a
+        // `(usize, F)` entry is at least sixteen.
+        sites.push(Site {
+            name: "  of which: per-term handles (#621)",
+            bytes: worst.entries * size_of::<MonomialHandle>(),
+            method: format!(
+                "{} row terms x {} B, released with the arena after construction",
+                worst.entries,
+                size_of::<MonomialHandle>()
             ),
         });
         sites.push(Site {
@@ -525,24 +544,6 @@ fn pair_bytes<const N: usize>() -> usize {
     size_of::<CriticalPair<N>>() + 2 * size_of::<usize>()
 }
 
-/// A registered MQ instance by its scoreboard name, if its file is on disk.
-///
-/// Maps `fukuoka-mq-III-n20-seed0` to the published `ToyExample-type3-n20-seed0`, as
-/// `examples/scoreboard.rs` does. The files are not redistributable and are not in the repository.
-fn read_mq(name: &str) -> Option<MqInstance> {
-    let directory = std::env::var("ZEEBRA_MQ_DIR").unwrap_or("research/instances/mq".to_string());
-    let file = name
-        .strip_prefix("fukuoka-mq-")
-        .map(|rest| {
-            rest.replacen("III-", "type3-", 1)
-                .replacen("VI-", "type6-", 1)
-        })
-        .map(|rest| format!("ToyExample-{}", rest))
-        .unwrap_or_else(|| name.to_string());
-    let text = std::fs::read_to_string(std::path::Path::new(&directory).join(file)).ok()?;
-    MqInstance::parse(&text).ok()
-}
-
 fn main() {
     // The build, not the CPU: `RUSTFLAGS` REPLACES `target.*.rustflags`, so an artifact can
     // silently lose the repository's `-C target-cpu=x86-64-v3` floor. A figure that does not say
@@ -550,55 +551,8 @@ fn main() {
     println!("# F4 memory attribution\n\n- built for {}", isa_floor());
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let entries: usize = std::env::var("ZEEBRA_MAX_ENTRIES")
-        .ok()
-        .and_then(|n| n.parse().ok())
-        .unwrap_or(20_000_000);
-
-    if arguments.first().map(String::as_str) == Some("mq") {
-        let Some(name) = arguments.get(1) else {
-            eprintln!("usage: f4_memory mq <instance>");
-            return;
-        };
-        // The frontier budget `examples/scoreboard.rs` runs the ladder under: ten times the
-        // columns, a byte cap set high enough that the entry count binds, and a batch cap.
-        // `ZEEBRA_WALL_SECONDS` becomes a *cooperative* budget rather than a supervisor, which is
-        // what makes an uncapped rung measurable: it stops between batches and returns, so the
-        // attribution describes whole batches and the statistics survive. §6a's uncapped rungs
-        // were abandoned in a worker thread and could report neither.
-        let options = F4Options {
-            max_matrix_columns: 200_000,
-            max_live_nonzeros: entries,
-            max_live_bytes: 64_000_000_000,
-            max_batches: Some(10_000),
-            max_wall_time: std::env::var("ZEEBRA_WALL_SECONDS")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .map(Duration::from_secs),
-            ..F4Options::default()
-        };
-        let Some(instance) = read_mq(name) else {
-            eprintln!(
-                "{} is not on disk under {}; run tools/fetch-mq-challenge.sh",
-                name,
-                std::env::var("ZEEBRA_MQ_DIR").unwrap_or("research/instances/mq".to_string())
-            );
-            return;
-        };
-        match instance.system::<20, Zp31>() {
-            Ok(system) => report(
-                name,
-                &system,
-                MonomialOrder::GradedReverseLexicographic,
-                &options,
-            ),
-            Err(error) => eprintln!("{}: {} (this example compiles N = 20 only)", name, error),
-        }
-        return;
-    }
-
-    // The benchmark systems, which finish, so the attribution can be read on a run that is not
-    // about a refusal. Small enough for a developer loop and for CI.
+    // Systems that finish, so the attribution can be read on a run that is not about a refusal.
+    // Small enough for a developer loop and for CI.
     let options = F4Options::default();
     let wanted = arguments.first().map(String::as_str);
     if wanted.is_none() || wanted == Some("katsura-6") {

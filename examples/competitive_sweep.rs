@@ -30,8 +30,7 @@
 //! makes a peak-RSS figure attributable to it. This is the mode `tools/benchlock.sh` should wrap,
 //! and the only one whose rows belong in `research/competitive/`.
 //!
-//! The split is the same discipline `tools/scoreboard.sh`'s ladder tier already applies, and the
-//! reasoning is `docs/research/external-comparison-protocol.md` §4.
+//! The reasoning is `docs/research/external-comparison-protocol.md` §4.
 //!
 //! # What this program does not do
 //!
@@ -41,15 +40,18 @@
 
 use std::{fs, path::Path, time::Duration};
 
-use zeebra::grobner::{
-    external::{
-        corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
-        CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance, Limits,
-        Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
-        SingularSolver, Task, ZeebraSolver,
+use zeebra::{
+    grobner::{
+        external::{
+            corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
+            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance,
+            Limits, Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
+            SingularSolver, Task, ZeebraSolver,
+        },
+        record::Environment,
+        F4Options, InterreductionRoute,
     },
-    research::{Environment, Json},
-    F4Options, InterreductionRoute,
+    util::Json,
 };
 
 const ROOT: &str = "research/competitive";
@@ -148,10 +150,15 @@ fn main() {
         std::process::exit(2);
     }
 
-    let rows: Vec<String> = match &only_row {
-        Some(name) => vec![name.clone()],
-        None => ladder().into_iter().map(|e| e.name.to_string()).collect(),
-    };
+    let rows = sweep_rows(characteristic, only_row.as_deref());
+    if rows.is_empty() {
+        eprintln!(
+            "No published corpus rung matches {} over GF({})",
+            only_row.as_deref().unwrap_or("the ladder"),
+            characteristic
+        );
+        std::process::exit(2);
+    }
     let tasks: Vec<Task> = match &only_task {
         Some(tag) => vec![Task::from_tag(tag).unwrap_or_else(|| {
             panic!(
@@ -203,33 +210,13 @@ fn main() {
     let mut board = CompetitiveBoard::new();
     let limits = Limits::wall(wall).with_workers(1);
 
-    for name in &rows {
-        // Poseidon and Anemoi rows override the characteristic with the registry's own field,
-        // because their round constants are derived from the prime.
-        let built = match instance(
+    for name in rows {
+        let built = instance(
             name,
             characteristic,
             zeebra::MonomialOrder::GradedReverseLexicographic,
-        ) {
-            Some(built) => built,
-            None => {
-                eprintln!("- {} is not in the corpus ladder", name);
-                continue;
-            }
-        };
-        // A rung that ignored the request is the *same instance* as at the other published
-        // characteristic, with the same digest. Running it again would append a duplicate row
-        // rather than a second data point, so it is skipped and says so.
-        if built.field.characteristic != characteristic
-            && characteristic != REFERENCE_CHARACTERISTIC
-        {
-            eprintln!(
-                "- {} keeps its registry field GF({}) whatever is asked, so it is already covered \
-                 by the GF({}) sweep",
-                built.name, built.field.characteristic, REFERENCE_CHARACTERISTIC
-            );
-            continue;
-        }
+        )
+        .expect("published rungs have a corpus instance");
 
         for task in &tasks {
             // Refused rather than asked and timed out. See `MSOLVE_ELIMINANT_CEILING`: above it
@@ -282,6 +269,39 @@ fn main() {
         return;
     }
     append(&board);
+}
+
+fn sweep_rows(characteristic: u64, only_row: Option<&str>) -> Vec<&'static str> {
+    ladder()
+        .into_iter()
+        .filter(|entry| only_row.is_none_or(|name| entry.name == name))
+        .filter(|entry| entry.digest_at(characteristic).is_some())
+        .map(|entry| entry.name)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sweep_rows;
+    use zeebra::grobner::external::corpus::BINARY_CHARACTERISTIC;
+
+    // The binary sweep lists seven Cyclic rungs and refuses an unpublished Katsura row.
+    #[test]
+    fn test_binary_sweep_only_selects_published_rows() {
+        assert_eq!(
+            sweep_rows(BINARY_CHARACTERISTIC, None),
+            [
+                "cyclic-4",
+                "cyclic-5",
+                "cyclic-6",
+                "cyclic-7",
+                "cyclic-8",
+                "cyclic-9",
+                "cyclic-10"
+            ]
+        );
+        assert!(sweep_rows(BINARY_CHARACTERISTIC, Some("katsura-4")).is_empty());
+    }
 }
 
 /// Run one (instance, task) across every engine, recording every outcome.

@@ -1859,6 +1859,19 @@ What is left:
   shifted monomial and discards the handle. #621 is the follow-up and states what must be measured
   before anything is implemented.
 
+  **The handle is now carried out of preprocessing, and construction stops being a stage (#621)**,
+  at base `19ff732c` with the source blobs `research/msolve-implementation.md` §4.1 names. The
+  interner assigns each distinct monomial an index as a side effect of the deduplication test it was
+  already making, `Preprocessed` carries the index of every row term, and the scatter reads a column
+  by indexed load — forming no monomial and probing no hash, so the shift goes with the lookup.
+  Construction is **3.5x–6.7x** cheaper measured one process one build with the matrices asserted
+  equal, the scatter 11x–16x, and the stage is now **0.68 ms of katsura-6 lex's 10.00 ms (6.8%)**
+  against 48% when the diagnosis above was written, and 0.51 ms of katsura-7 grlex's 34.53 ms
+  (1.5%). The whole computation is 1.07x–1.33x faster. The memory price #621 required first is one
+  four-byte handle per matrix entry — a quarter of the entries of the same matrix, released with the
+  arena before elimination under #536's discipline — and the entries-to-columns ratio its kill
+  criterion rested on is 8.59–39.83 against a threshold of 2.0.
+
   **The sort, which #330 made slower, is now unstable (#583).** The handout left the sort a vector
   drained from a hash set rather than one in first-appearance order, and an adaptive merge sort had
   nothing left to adapt to. pdqsort does not want runs: at base `87e11e72` with the source blobs
@@ -1867,8 +1880,13 @@ What is left:
   rather than because it is visible. Handing the discovery order over as well — this issue's named
   fix — is declined for the reasons that section gives under #583.
 
-Both are consequences of succeeding elsewhere, which is the normal shape of a performance
+Both were consequences of succeeding elsewhere, which is the normal shape of a performance
 milestone and the reason the stage breakdown was built in M16-0 rather than inferred at the end.
+**One of the two is now closed.** Construction fell 48% → 33% (#330) → 6.8% (#621) of katsura-6 lex
+and is no longer among the stages worth looking at on any instance in the corpus. Interreduction
+remains, at 71% of katsura-7 grlex once construction stopped padding the denominator, and symbolic
+preprocessing has taken construction's place at 59% of katsura-6 lex — the same movement one stage
+further along, and the stage the handles #621 reads came out of.
 
 ### 8.6 Correctness
 

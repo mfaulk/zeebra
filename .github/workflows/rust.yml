@@ -126,14 +126,6 @@ jobs:
       # and sits on the critical path of every pull request. They reuse the build the steps above
       # already paid for, so running them after a merge — where latency blocks nothing — costs
       # almost nothing, and `workflow_dispatch` runs them against a branch on demand.
-      # The scoreboard's correctness-smoke tier, which M23's execution policy wants on every
-      # change. The four surrogate rows take under a second in release and exercise the whole
-      # staged pipeline end to end — registry, generator, F4, conversion, univariate search, and
-      # the independent verifier that runs the permutation. The lib tests cover the honesty rules;
-      # this covers the wiring between them. Nothing is written without `--write`.
-      - name: Scoreboard smoke tier
-        run: cargo run --profile ci-release --example scoreboard
-
       - name: Gröbner engines agree on the slow systems
         if: github.event_name != 'pull_request'
         run: |
@@ -180,8 +172,8 @@ jobs:
     # And on a pull request this job costs **no wall clock**, only job-minutes: **4m17s and
     # 5m14s** on the two runs that enabled it, against `Tests (release)`'s 25–27 minutes on the
     # same run, so it finishes well inside the critical path. (The ~8.4 minutes this comment used
-    # to cite is a cold-cache push run; a PR run hits `Swatinem/rust-cache`.) See README's
-    # "Testing the merged result" for the job-minute accounting.
+    # to cite is a cold-cache push run; a PR run hits `Swatinem/rust-cache`.) See
+    # `docs/guide/development.md`, "Testing the merged result", for the job-minute accounting.
     #
     # It still takes **no measurements** — `--test` runs each case once and samples nothing — so
     # nothing here produces a figure, which a shared runner could not produce comparably anyway.
@@ -251,6 +243,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      # The crate as a consumer gets it with `default-features = false`. Every other job builds
+      # the default, which is how `f4::matrix_corpus` came to import from the feature-gated
+      # `external::corpus` and leave the library uncompilable without the feature, unnoticed.
+      # Targets that drive the harness declare `required-features` and are skipped here.
+      - name: Lint without default features
+        if: ${{ !cancelled() }}
+        run: cargo clippy --all-targets --no-default-features -- -D warnings
+
+      - name: Package
+        if: ${{ !cancelled() }}
+        run: cargo package --locked
+
   # The agent claim tooling is shell, so it is invisible to every job above. Its pure half —
   # marker parsing, race resolution, lease arithmetic — is what stops two agents working the
   # same issue, and a regression there is silent at the point of use.
@@ -302,8 +306,8 @@ jobs:
   # base before every merge. Measured, that is not affordable here: the release job is 806 s mean
   # over the last 25 successful runs (983 s worst), so a serialized merge queue admits 4.5 merges an
   # hour against a peak of 14 observed on 2026-11-06 and 58 merges that day — 13.0 h of CI inside a
-  # 24 h day, and 59 % of consecutive merges were less than one release job apart. See the README
-  # section "Testing the merged result".
+  # 24 h day, and 59 % of consecutive merges were less than one release job apart. See
+  # `docs/guide/development.md`, "Testing the merged result".
   #
   # So this reports instead of gating. It is **advisory by construction**: a stale-and-overlapping
   # result is a workflow warning and the job still succeeds, because making it a required check

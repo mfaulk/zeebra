@@ -16,37 +16,29 @@
 //! only figure a production decision may use — §11.1's "complete end-to-end computation time".
 //!
 //! ```text
-//! tools/fetch-mq-challenge.sh
 //! cargo run --release --example m22_ablation
 //! cargo run --release --example m22_ablation -- list
 //! cargo run --release --example m22_ablation -- katsura-7
 //! ```
 //!
-//! Variable order is held fixed at the generated layout throughout. M22-E measured it at 1.6x–1.7x
-//! on the Poseidon systems, which would otherwise be attributed to whichever F4 strategy happened
-//! to vary alongside it.
+//! Variable order is held fixed at the generated layout throughout, so its effect is not
+//! attributed to whichever F4 strategy happened to vary alongside it.
 
-use std::{path::PathBuf, time::Instant};
+use std::time::Instant;
 
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
-        certify_f4_output, classify_ideal, f4_reported,
-        research::{
-            CicoInstance, MqInstance, Poseidon, PoseidonParameters, Specialization, KOALABEAR_PRIME,
-        },
-        F4Options, F4Statistics, HilbertSelection, IdealClass, PairSchedule,
+        certify_f4_output, classify_ideal, f4_reported, F4Options, F4Statistics, HilbertSelection,
+        IdealClass, PairSchedule,
     },
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
-type Q = PrimeFieldElement64<31>;
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
 type P = PrimeFieldElement64<2_147_483_647>;
 
 const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
-const C1: u64 = 0xC0_9DE4;
 
 /// The ablation matrix.
 ///
@@ -308,49 +300,6 @@ fn ablate<const N: usize, F: FiniteField>(
     println!();
 }
 
-fn mq_directory() -> PathBuf {
-    std::env::var("ZEEBRA_MQ_DIR")
-        .unwrap_or_else(|_| "research/instances/mq".to_string())
-        .into()
-}
-
-fn load_mq(stem: &str) -> Option<(MqInstance, Vec<u64>)> {
-    let text = std::fs::read_to_string(mq_directory().join(stem)).ok()?;
-    let instance = MqInstance::parse(&text).ok()?;
-    // A missing answer file is ordinary: not every instance publishes one. A present one that does
-    // not parse is not ordinary at all — it is the check the import is verified against, so it is
-    // loud rather than an empty vector (#415).
-    let answer = match std::fs::read_to_string(mq_directory().join(format!("{}-answer", stem))) {
-        Ok(text) => instance
-            .parse_answer(&text)
-            .unwrap_or_else(|e| panic!("{}-answer: {}", stem, e)),
-        Err(_) => Vec::new(),
-    };
-    Some((instance, answer))
-}
-
-fn cico<const N: usize>(t: usize, r_f: usize, r_p: usize) -> Vec<MultivariatePolynomial<N, K>> {
-    let poseidon = Poseidon::<K>::new(PoseidonParameters {
-        prime: KOALABEAR_PRIME,
-        alpha: 3,
-        t,
-        r_f,
-        r_p,
-    })
-    .expect("R_F is even");
-    let free: Vec<K> = (0..t - 1).map(|i| K::new(1_000 + i as u64)).collect();
-    CicoInstance::planted(
-        poseidon,
-        1,
-        &[K::new(C1)],
-        &free,
-        Some(PoseidonParameters::bounty_cico()),
-    )
-    .expect("the right widths")
-    .system::<N>()
-    .expect("the right dimension")
-}
-
 /// A nonradical ideal: `<x^2, y^2>` has the origin as its only point, with multiplicity.
 fn nonradical() -> Vec<MultivariatePolynomial<3, P>> {
     ["x^2", "y^2", "z^2 - z"]
@@ -377,11 +326,6 @@ fn instances() -> Vec<&'static str> {
         "planted-6",
         "nonradical",
         "positive-dimensional",
-        "poseidon-t2-rf2-rp2",
-        "poseidon-t2-rf4",
-        "poseidon-t3-pinned",
-        "mq3-n10",
-        "mq6-n10-specialized",
     ]
 }
 
@@ -420,52 +364,6 @@ fn run_instance(name: &str) {
             "`z` appears in no generator, so the ideal is positive-dimensional and every \
              configuration has to terminate on it anyway.",
         ),
-        "poseidon-t2-rf2-rp2" => ablate("poseidon t=2 R_F=2 R_P=2", &cico::<7>(2, 2, 2), ""),
-        "poseidon-t2-rf4" => ablate("poseidon t=2 R_F=4", &cico::<9>(2, 4, 0), ""),
-        "poseidon-t3-pinned" => {
-            let system = cico::<9>(3, 2, 1);
-            let pinned = Specialization::<9, K>::new(&[(0, K::new(1_000))]).expect("one");
-            ablate(
-                "poseidon t=3, input pinned",
-                &pinned.apply(&system),
-                "M22-E's controlled row: the `t = 3` system with one free input pinned, which \
-                 matches the equation count without touching the round structure.",
-            )
-        }
-        "mq3-n10" => match load_mq("ToyExample-type3-n10-seed0") {
-            Some((instance, _)) => ablate(
-                "Fukuoka III n=10 seed 0",
-                &instance.system::<10, Q>().expect("ten variables"),
-                "The main overdetermined MQ benchmark, and the instance where capping pays.",
-            ),
-            None => {
-                println!("`mq3-n10`: instance data absent; run `tools/fetch-mq-challenge.sh`.\n")
-            }
-        },
-        "mq6-n10-specialized" => match load_mq("ToyExample-type6-n10-seed0") {
-            Some((instance, answer)) => {
-                let system = instance.system::<10, Q>().expect("ten variables");
-                let surplus = instance.variables - instance.polynomials;
-                if answer.len() < surplus {
-                    println!("`mq6-n10-specialized`: no published answer to specialize at.\n");
-                    return;
-                }
-                let assignments: Vec<(usize, Q)> =
-                    (0..surplus).map(|i| (i, Q::new(answer[i]))).collect();
-                let at_answer =
-                    Specialization::<10, Q>::new(&assignments).expect("distinct indices");
-                ablate(
-                    "Fukuoka VI n=10, specialized",
-                    &at_answer.apply(&system),
-                    "A *different problem* from the published type VI instance, which is \
-                     underdetermined — and not an overdetermined semiregular system, so nothing \
-                     in HDF4's justification transfers to it.",
-                )
-            }
-            None => println!(
-                "`mq6-n10-specialized`: instance data absent; run `tools/fetch-mq-challenge.sh`.\n"
-            ),
-        },
         other => println!("unknown instance `{}`; `-- list` names them.\n", other),
     }
 }
@@ -485,9 +383,8 @@ fn main() {
     println!(
         "Configuration: `F4Options::recommended()` as the baseline, with `profile_degrees`, \
          `max_matrix_columns = 60_000`, `max_live_bytes = 400 MB`, `max_batches = 20_000`, grevlex \
-         throughout. Variable order is the generated layout on every row — M22-E measured it at \
-         1.6x-1.7x, which would otherwise be attributed to whichever F4 strategy varied alongside \
-         it. Reproduce with `cargo run --release --example m22_ablation`."
+         throughout. Variable order is the generated layout on every row, so its effect is not \
+         attributed to whichever F4 strategy varied alongside it. Reproduce with `cargo run --release --example m22_ablation`."
     );
     println!();
     println!(

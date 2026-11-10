@@ -82,7 +82,7 @@ contribution, independent of the order elimination took them in.
 | structured CICO | Poseidon `t=3 R_F=2 R_P=1`, pinned | 9 | 9 | **46.0%** (183/398) | 38 over 7/11 |
 | structured CICO | Poseidon `t=3 R_F=2 R_P=1`, as generated | 9 | 8 | **57.5%** (2849/4954) | 164 over 12/20 |
 
-The MQ rows need `tools/fetch-mq-challenge.sh`; the rest run without it.
+The MQ rows need `tools/fetch-mq-challenge.sh` (moved out in #668); the rest run without it.
 
 Three readings:
 
@@ -519,7 +519,6 @@ cargo run --release --example f4_degrees        # the ceiling, per instance
 cargo run --release --example f4_statistics     # Buchberger's zero reductions, for contrast
 cargo run --release --example pair_criteria     # what each existing criterion discards
 cargo run --release --example pair_criteria -- buchberger
-tools/fetch-mq-challenge.sh                     # needed for the Fukuoka rows only
 ```
 
 `f4_statistics` pins itself to `F4Options::baseline()` and asserts the two engines agree wherever both

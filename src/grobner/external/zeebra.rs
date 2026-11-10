@@ -62,8 +62,8 @@ use super::{
         RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
     },
     corpus::{
-        ALTERNATE_CHARACTERISTIC, BINARY_CHARACTERISTIC, REFERENCE_CHARACTERISTIC,
-        SMALL_PRIME_CHARACTERISTIC,
+        ALTERNATE_CHARACTERISTIC, BINARY_CHARACTERISTIC, KOALABEAR_CHARACTERISTIC,
+        REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC, WIDE_64_CHARACTERISTIC,
     },
     process::{CpuBasis, RssBasis},
 };
@@ -82,7 +82,6 @@ use crate::{
         differential::polynomial_to_string,
         f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions, QuotientBasis},
-        research::{ANEMOI_64_PRIME, KOALABEAR_PRIME},
         F4Error, F4Options, IdealClass, InterreductionRoute,
     },
     util::peak_resident_bytes,
@@ -129,7 +128,7 @@ impl ZeebraSolver {
     ///
     /// Only then is a memory figure reported. `VmHWM` is process-wide, so in a process that ran
     /// several rows the figure is a ceiling over all of them and over whatever built their inputs
-    /// — the same hazard `measured_peak_rows_in_process` records on the cryptanalysis board. Here
+    /// — a ceiling, not a per-row figure. Here
     /// the sweep harness runs one process per measured row and sets this; a multi-row exploratory
     /// run does not, and its rows carry no memory figure at all.
     pub fn measuring_one_row(mut self) -> Self {
@@ -175,18 +174,13 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
         // Montgomery field — so a small-prime row measures the narrow arithmetic regime rather
         // than the 64-bit path at a small modulus.
         SMALL_PRIME_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10, 11, 14],
-        // **Cyclic's widths only.** `GF(2)` is published for the Cyclic family alone
-        // (`corpus::BINARY_CHARACTERISTIC`), because at characteristic two Katsura's and planted
-        // MQ's invariants are not the generic ones — so compiling their widths here would
-        // monomorphize F4 and FGLM at a field no row of theirs may be quoted at, which is the cost
-        // without the reason. Zeebra is in this band rather than absent from it because the
-        // characteristic-two roster is the point of #427, and an engine missing from its own
-        // comparison measures nothing.
+        // The binary corpus publishes only the Cyclic family.
         BINARY_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10],
-        // The three planted Poseidon rows.
-        KOALABEAR_PRIME => &[5, 7, 9],
-        // Anemoi FCICO at N = 1 and 2.
-        ANEMOI_64_PRIME => &[2, 4],
+        // KoalaBear and 2^64 - 353 at the widths their callers' systems have been measured at.
+        // A caller needing another width adds it here; see #668.
+        KOALABEAR_CHARACTERISTIC => &[5, 7, 9],
+        WIDE_64_CHARACTERISTIC => &[2, 4],
+
         _ => &[],
     }
 }
@@ -590,8 +584,8 @@ impl ZeebraSolver {
                 11,
                 14
             ),
-            KOALABEAR_PRIME => dispatch!(
-                PrimeFieldElement64<KOALABEAR_PRIME>,
+            KOALABEAR_CHARACTERISTIC => dispatch!(
+                PrimeFieldElement64<KOALABEAR_CHARACTERISTIC>,
                 instance,
                 task,
                 &self.f4_options,
@@ -600,8 +594,8 @@ impl ZeebraSolver {
                 7,
                 9
             ),
-            ANEMOI_64_PRIME => dispatch!(
-                PrimeFieldElement64<ANEMOI_64_PRIME>,
+            WIDE_64_CHARACTERISTIC => dispatch!(
+                PrimeFieldElement64<WIDE_64_CHARACTERISTIC>,
                 instance,
                 task,
                 &self.f4_options,
@@ -681,12 +675,6 @@ impl ExternalSolver for ZeebraSolver {
             // parametrization and not an enumeration (`msolve.rs` §3.5), and Singular's `solve`
             // is numerical. A column with one operand is not a comparison.
             Task::OneFiniteFieldSolution | Task::AllFiniteFieldSolutions => {
-                return Support::No(Unsupported::Task { task });
-            }
-            // Not a Gröbner task and not this board's: a witness's correctness check is against
-            // the primitive rather than against a basis, and it lives in the cryptanalysis
-            // scoreboard. Refused here for where it belongs, not for want of a comparand.
-            Task::CryptanalyticWitness => {
                 return Support::No(Unsupported::Task { task });
             }
         }
@@ -889,11 +877,7 @@ mod tests {
     fn test_the_remaining_refusals_are_the_three_that_have_a_reason() {
         let katsura = instance("katsura-4", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
         let solver = ZeebraSolver::new();
-        for task in [
-            Task::OneFiniteFieldSolution,
-            Task::AllFiniteFieldSolutions,
-            Task::CryptanalyticWitness,
-        ] {
+        for task in [Task::OneFiniteFieldSolution, Task::AllFiniteFieldSolutions] {
             assert_eq!(
                 solver.supports(&katsura, task),
                 Support::No(Unsupported::Task { task }),
@@ -1384,9 +1368,9 @@ mod tests {
     /// Every corpus field compiles the dimensions its own families need, and no others.
     ///
     /// Derived from the ladder rather than written out, so a rung added at a new width fails here
-    /// until the adapter compiles it — which is the coupling the hard-coded list used to hide. The
-    /// registry fields are excluded because their widths follow from a round count rather than from
-    /// a rung name.
+    /// until the adapter compiles it — which is the coupling the hard-coded list used to hide.
+    /// KoalaBear and `2^64 - 353` carry no ladder rung; their widths are the ones callers' systems
+    /// have been measured at.
     #[test]
     fn test_each_field_compiles_the_dimensions_its_families_need() {
         use std::collections::BTreeSet;

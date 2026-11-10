@@ -1,8 +1,8 @@
 //! What the pair-elimination criteria prune from a **certification** pass, and what that saves.
 //!
 //! Certification checks Buchberger's criterion over every pair of the returned basis, which is
-//! `|G|²/2` normal forms and on the Poseidon instances costs 34x–67x the solve
-//! (`docs/research/hilbert-driven.md` §5). Only some criteria transfer to a static basis — the
+//! `|G|²/2` normal forms and can cost many times the solve (`docs/research/hilbert-driven.md`
+//! §5). Only some criteria transfer to a static basis — the
 //! product criterion and Gebauer–Möller's lcm-divisibility criteria do, the history-dependent
 //! chain criterion does not — so the share that transfers is measured here before it is believed.
 //!
@@ -32,17 +32,14 @@ use zeebra::{
         benchmark_systems::{cyclic, katsura},
         certify_f4_output,
         pairs::{are_relatively_prime, divides, leading_monomials},
-        research::{CicoInstance, Poseidon, PoseidonParameters, KOALABEAR_PRIME},
         s_polynomial, CriterionCounts, PairCriteria, PairQueue,
     },
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
 type P = PrimeFieldElement64<2_147_483_647>;
 
 const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
-const C1: u64 = 0xC0_9DE4;
 
 /// Gebauer–Möller's static pair set, which is the configuration certification can use: the
 /// lcm-divisibility criteria plus the product criterion, and no chain criterion.
@@ -178,36 +175,8 @@ fn buchberger_criterion_over_every_pair<const N: usize, F: FiniteField>(
     true
 }
 
-fn cico<const N: usize>(t: usize, r_f: usize, r_p: usize) -> Vec<MultivariatePolynomial<N, K>> {
-    let poseidon = Poseidon::<K>::new(PoseidonParameters {
-        prime: KOALABEAR_PRIME,
-        alpha: 3,
-        t,
-        r_f,
-        r_p,
-    })
-    .expect("R_F is even");
-    let free: Vec<K> = (0..t - 1).map(|i| K::new(1_000 + i as u64)).collect();
-    CicoInstance::planted(
-        poseidon,
-        1,
-        &[K::new(C1)],
-        &free,
-        Some(PoseidonParameters::bounty_cico()),
-    )
-    .expect("the right widths")
-    .system::<N>()
-    .expect("the right dimension")
-}
-
 fn instances() -> Vec<&'static str> {
-    vec![
-        "katsura-5",
-        "katsura-6",
-        "cyclic-5",
-        "poseidon-t2-rf2-rp2",
-        "poseidon-t2-rf4",
-    ]
+    vec!["katsura-5", "katsura-6", "cyclic-5", "cyclic-6"]
 }
 
 fn run(name: &str, time_it: bool) {
@@ -215,8 +184,7 @@ fn run(name: &str, time_it: bool) {
         "katsura-5" => measure(name, &katsura::<5, P>(), time_it),
         "katsura-6" => measure(name, &katsura::<6, P>(), time_it),
         "cyclic-5" => measure(name, &cyclic::<5, P>(), time_it),
-        "poseidon-t2-rf2-rp2" => measure(name, &cico::<7>(2, 2, 2), time_it),
-        "poseidon-t2-rf4" => measure(name, &cico::<9>(2, 4, 0), time_it),
+        "cyclic-6" => measure(name, &cyclic::<6, P>(), time_it),
         other => println!("unknown instance `{}`; `-- list` names them.", other),
     }
 }

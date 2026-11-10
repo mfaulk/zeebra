@@ -347,7 +347,7 @@ square-and-multiply over the same exponent. #160 is the one-line-per-field subst
 
 `cargo bench --bench field_arithmetic -- field/inverse`, release profile (`lto = "fat"`,
 `codegen-units = 1`) with `.cargo/config.toml`'s `-C target-cpu=x86-64-v3`, pinned with
-`taskset --cpu-list 0-7` as `tools/scoreboard.sh` does, 256 operations per iteration divided out.
+`taskset --cpu-list 0-7` as `tools/scoreboard.sh` (moved out in #668) did, 256 operations per iteration divided out.
 Two binaries built from the same tree and alternated — before, after, before, after, before,
 after — so a thermal or scheduling drift hits both sides; the figure is the median of the three
 repetitions. `before` is `origin/main` at 418d080, and `git diff 418d080..26a6c19` is empty under

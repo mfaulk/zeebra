@@ -142,7 +142,7 @@ variant, which the page dates and scopes:
 > polynomial systems with rather dense inputs; this is a common case for attacking certain types of
 > cryptosystem and includes the HFE and MQQ cryptosystems and also Minrank systems.
 
-That is the "dense F4" of `minrank.md` §5.4 named and dated by its vendor, and it is #441's subject.
+That is the "dense F4" of `minrank.md` §5.4 (moved out in #668) named and dated by its vendor, and it is #441's subject.
 The page also gives the HFE-80 matrix shape — "the largest matrix is 293,287×1,666,981 and many rows
 have hundreds of thousands of non-zero entries" — which is a structural datum of the kind #225 and
 #218 want, on the system #198 tracks.
@@ -395,7 +395,7 @@ Checking Steel's 4 needed a quantity the crate could not compute. `IdealClass` i
 "positive-dimensional" was the most that could be said about any of the degenerate rungs below.
 `fglm::krull_dimension` is the addition: for a monomial ideal, `dim R/J` is the size of the largest
 set of variables containing no leading monomial's support, which is a branch-and-bound over subsets
-that collapses after `N` checks whenever the ideal is zero-dimensional. It agrees with Singular's
+that removes variables only from supports still contained in the candidate set. It agrees with Singular's
 `dim` and Groebner.jl's `Groebner.dimension` wherever both were run.
 
 ### 10.2 The invariants, and which engines agree on each
@@ -461,7 +461,7 @@ that false.
 | engine | basis at `GF(2)` | eliminant at `GF(2)` | conversion at `GF(2)` |
 |---|---|---|---|
 | Zeebra | yes — now compiled, Cyclic widths 4–10 | yes | yes |
-| msolve 0.11.0 | **yes**, verified to `cyclic-9` | **no — does not terminate** | n/a (no lex order at any field) |
+| msolve 0.11.0 | **yes**, verified through `cyclic-10` | unsupported by the adapter | n/a (no lex order at any field) |
 | Singular | yes, `dim`/`vdim` correct | yes | yes |
 | Groebner.jl | yes, and reports the Krull dimension | n/a (no FGLM in 0.10.11) | n/a |
 | Sagebrush | yes, both the `f4` and `fglm` routes | n/a (no eliminant) | yes |
@@ -474,29 +474,11 @@ confirming `dim 0` and `vdim 70` after the conversion. So
 `corroboration_for(LexBasisByConversion, 2)` is `TwoWay` and that is a measured statement rather
 than an arithmetic consequence of the ceilings.
 
-**msolve's eliminant is the one restriction, and it is a non-termination rather than a refusal.**
-Its sparse-FGLM needs the ideal in shape position; when the staircase is not generic enough its
-default remedy (`-c 2`) permutes the variables and then adjoins a *random* linear form. Over `GF(2)`
-there is no randomness to draw on — every nonzero coefficient is 1 — so the retry redraws from
-candidates that have already failed, and the loop has no exit. Measured on `cyclic-5` over `GF(2)`:
-74 140 `TIMINGS` blocks and 156 MB of verbose output in one minute, with the F4 basis itself
-complete almost immediately. The same input under `-c 0` quits at once with "Computation failed",
-which is the honest answer the default mode never reaches.
-
-This is the mirror image of msolve's *upper* eliminant bound, where above `1515531529` the
-sparse-FGLM failure is likewise laundered into an unbounded retry. So `msolve.rs` now declares
-`MIN_CHARACTERISTIC_ELIMINANT` beside `MAX_CHARACTERISTIC_ELIMINANT`, and `supports` refuses the
-task at `GF(2)` with a reason before any subprocess starts. Without that the sweep's wall limit
-would have recorded a **timing lower bound** for a computation that was never going to finish —
-`Unsupported`, not `StoppedByLimit`, is the difference.
-
-**The floor is declared as a necessary and not a sufficient condition, and the evidence for that is
-recorded rather than smoothed over.** At `p ≥ 3` the retry is probabilistic in both the prime and
-the instance: on `cyclic-5` the eliminant returns at `p = 7, 13, 17, 251` and `32003`, and **does
-not return at `p = 3, 5` or `11`**. A prime above the floor is therefore no promise of termination
-and the wall limit remains the backstop there; a prime below it is a promise of non-termination,
-which is the only part that may be declared as a bound. Inventing a clean "small primes fail" cutoff
-would have been wrong at `p = 11`.
+The msolve adapter declines eliminants at `GF(2)`. On `cyclic-5`, msolve's default genericity
+retry repeatedly attempted sparse-FGLM after F4 had completed. With retries disabled
+(`-c 0`), the same input exited with “Computation failed.” The adapter reports this restriction
+before launching a subprocess. Above the floor, termination still depends on the prime and the
+instance, so the wall limit applies.
 
 ### 10.5 `cyclic-10` against Steel's Krull dimension 4: **confirmed**
 
