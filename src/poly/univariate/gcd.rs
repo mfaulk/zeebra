@@ -1,39 +1,9 @@
-//! Greatest common divisor and least common multiple of two univariate polynomials over a field F.
-//!
-//! The greatest common divisor of two polynomials f(x) and g(x) over a field F, denoted gcd(f, g),
-//! is a highest-degree polynomial d(x) that divides both f(x) and g(x). The gcd is unique up to
-//! multiplication by a nonzero constant in F. Typically, gcd(f, g) is defined to be the unique
-//! monic polynomial d(x) such that d(x) divides both f(x) and g(x). The least common multiple is
-//! normalized the same way, and is `f * g / gcd(f, g)`.
-//!
-//! The Euclidean algorithm below is classical, so it is `O(d^2)` in the division it drives.
-//! Half-GCD would be `O(M(d) log d)` and is not written: `M` at the `Mul` operator is still
-//! schoolbook, which makes the recursive algorithm the slower one. See §4.5 of
-//! `docs/research/fast-univariate.md`.
+//! Half-GCD is exposed for benchmarking while the default GCD uses classical Euclid.
 
 use crate::{FiniteField, Polynomial, UnivariatePolynomial};
 
-/// The monic greatest common divisor of two polynomials.
-///
-/// Classical Euclid below [`HALF_GCD_BASE_CASE`] and the fast Euclidean algorithm above it; the
-/// threshold is measured rather than chosen, see `docs/research/fast-univariate.md` §4.5. Both
-/// routes return the same value, so which one ran is not observable except in the time.
+/// The monic greatest common divisor of two polynomials, computed by classical Euclid.
 pub fn gcd<F: FiniteField>(
-    a: &UnivariatePolynomial<F>,
-    b: &UnivariatePolynomial<F>,
-) -> UnivariatePolynomial<F> {
-    if signed_degree(a).min(signed_degree(b)) > HALF_GCD_BASE_CASE {
-        return gcd_half_unstable(a, b);
-    }
-    gcd_classical_unstable(a, b)
-}
-
-/// [`gcd`] by classical Euclid, whatever the degree.
-///
-/// `unstable` because it is here to be *measured against*, not called: it is the slower route above
-/// the threshold by construction, and it is the reference the fast route is differentially tested
-/// against. `examples/gcd_crossover.rs` is the one caller that wants it.
-pub fn gcd_classical_unstable<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
@@ -49,6 +19,14 @@ pub fn gcd_classical_unstable<F: FiniteField>(
 
     // "The" GCD is chosen to be monic (i.e. the leading coefficient is 1).
     make_monic(&f)
+}
+
+/// Explicit classical route for comparison with [`gcd_half_unstable`].
+pub fn gcd_classical_unstable<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
+    gcd(a, b)
 }
 
 /// The monic least common multiple of two polynomials, or zero if either is zero.
@@ -259,13 +237,8 @@ fn drop_low<F: FiniteField>(p: &UnivariatePolynomial<F>, shift: usize) -> Univar
     UnivariatePolynomial::new(&coefficients[shift..])
 }
 
-/// Degree below which the recursion stops paying for itself and classical Euclid takes over.
-///
-/// Measured, not chosen: see `docs/research/fast-univariate.md` §4.5. The recursion's constant is
-/// several polynomial multiplications and two matrix products per level, against one long division
-/// per step for the classical route, so the crossover is well above the degree at which the
-/// asymptotics cross.
-pub const HALF_GCD_BASE_CASE: i64 = 64;
+// Cutoff for the experimental algorithm's classical base case and tail.
+const HALF_GCD_BASE_CASE: i64 = 64;
 
 /// The transition matrix that drops `budget` degrees from `a`, or as many as the sequence allows.
 ///
@@ -279,13 +252,11 @@ pub const HALF_GCD_BASE_CASE: i64 = 64;
 /// — that is, `M` takes the sequence to the **last** pair whose first entry has not yet dropped
 /// `budget` degrees. `budget = deg a` runs to the end and makes `c` the GCD up to a unit.
 ///
-/// The recursion is the standard one and the only subtle line is the truncation. A remainder `r_j`
-/// reached after quotients `q_0 … q_{j-1}` satisfies `deg r_j = deg a - sum deg q_i`, and the
-/// matrix accumulating those steps has entries of degree at most `sum deg q_i = deg a - deg r_j`.
-/// So reducing by `half` degrees needs a matrix of degree at most `half`, and a product of two
-/// degree-`half` matrices with the operands is determined by the operands' top `2*half + 1`
-/// coefficients. Hence `shift = deg a - 2*half`: the recursion runs on operands of degree `2*half`
-/// rather than `deg a`, which is what makes the cost `O(M(d) log d)` instead of `O(d^2)`.
+/// To recover the first half of the quotient sequence, truncate both inputs by the
+/// same number of low coefficients. At a degree drop of at most `half`, the
+/// transition entries have degree at most `half`. Thus a discarded coefficient
+/// can affect a remainder only below the retained degree boundary if we keep the
+/// top `2 * half + 1` coefficients. Apply the resulting transition to the full inputs.
 fn transition_for<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
@@ -294,13 +265,7 @@ fn transition_for<F: FiniteField>(
     let degree = signed_degree(a);
     let target = degree - budget;
 
-    // Nothing to do: `b` is already past the boundary, so `(a, b)` is itself the last pair.
-    //
-    // The condition is on `b`'s degree alone and **not** also on the budget: a budget of zero
-    // still has a step to take when `deg b >= deg a`, because the contract asks for the last pair
-    // above the boundary rather than for a given number of steps. Guarding on `budget <= 0` here
-    // returned the identity for `a = b = 1`, where the sequence does advance to `(1, 0)` —
-    // `test_the_transition_contract_holds_exhaustively_over_gf2` is what found that.
+    // A zero budget still takes a step when a and b have the same degree.
     if signed_degree(b) < target {
         return Transition::identity();
     }
@@ -360,14 +325,10 @@ fn classical_transition<F: FiniteField>(
     matrix
 }
 
-/// [`gcd`] through the fast Euclidean algorithm, whatever the degree.
+/// Computes the monic GCD using recursive half-GCD and a classical tail.
 ///
-/// Each round halves the degree with one [`transition_for`] call and then takes a single division
-/// step, which is what guarantees progress: `transition_for` leaves `deg d` below half of `deg c`
-/// but says nothing about `deg c`, so without the step a round could return the pair it was given.
-///
-/// `unstable` for the same reason as [`gcd_classical_unstable`]: below the threshold this is the
-/// slower route, and the choice between them belongs to [`gcd`].
+/// This experimental route is exposed for benchmarking. The pinned sweep through
+/// degree 4096 favored [`gcd`] on all three measured fields.
 pub fn gcd_half_unstable<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
@@ -674,19 +635,11 @@ mod tests {
         }
     }
 
-    /// Half-GCD, against the classical algorithm it has to agree with exactly.
-    ///
-    /// The recursion is intricate and its failure mode is a silently wrong answer at some
-    /// particular parity or quotient-degree pattern, so the tests here are an **enumeration**
-    /// rather than a sample: over GF(2) and GF(3) every polynomial pair up to a small degree is
-    /// tried, which is a proof by exhaustion at that size and is what catches an off-by-one in the
-    /// truncation shift. The randomized tests above the base case are what catch an error that
-    /// only the recursion reaches.
     mod half {
         use super::*;
-        use crate::fields::{PrimeFieldElement64, Zp13};
+        use crate::fields::{Bn254Fr, KoalaBear, PrimeFieldElement64, Zp18446744069414584321};
         use crate::poly::univariate::gcd::{
-            classical_transition, gcd_half_unstable, signed_degree, transition_for,
+            gcd_classical_unstable, gcd_half_unstable, signed_degree, transition_for,
             HALF_GCD_BASE_CASE,
         };
         use rand::{prelude::StdRng, SeedableRng};
@@ -727,9 +680,13 @@ mod tests {
         ) {
             let fast = transition_for(a, b, budget);
             let target = signed_degree(a) - budget;
-            let slow = classical_transition(a, b, target);
             let (fc, fd) = fast.apply(a, b);
-            let (sc, sd) = slow.apply(a, b);
+            let (mut sc, mut sd) = (a.clone(), b.clone());
+            while signed_degree(&sd) >= target {
+                let remainder = &sc % &sd;
+                sc = sd;
+                sd = remainder;
+            }
             assert_eq!(
                 (&fc, &fd),
                 (&sc, &sd),
@@ -751,7 +708,7 @@ mod tests {
             }
         }
 
-        /// Exhaustively over GF(2): every pair of degree at most 5 agrees with classical Euclid.
+        // Every pair of degree at most five over GF(2) agrees with classical Euclid.
         #[test]
         fn test_half_gcd_agrees_exhaustively_over_gf2() {
             let polynomials = all_polynomials::<Gf2>(5, 2);
@@ -760,7 +717,7 @@ mod tests {
                 for b in &polynomials {
                     assert_eq!(
                         gcd_half_unstable(a, b),
-                        gcd(a, b),
+                        gcd_classical_unstable(a, b),
                         "half-GCD disagrees on a = {a}, b = {b}"
                     );
                     checked += 1;
@@ -769,7 +726,7 @@ mod tests {
             assert_eq!(checked, 64 * 64, "every pair of the enumeration was tried");
         }
 
-        /// Exhaustively over GF(3): a field where a leading coefficient can be a non-unit scale.
+        // Every pair of degree at most three over GF(3) agrees with classical Euclid.
         #[test]
         fn test_half_gcd_agrees_exhaustively_over_gf3() {
             let polynomials = all_polynomials::<Gf3>(3, 3);
@@ -777,18 +734,14 @@ mod tests {
                 for b in &polynomials {
                     assert_eq!(
                         gcd_half_unstable(a, b),
-                        gcd(a, b),
+                        gcd_classical_unstable(a, b),
                         "half-GCD disagrees on a = {a}, b = {b}"
                     );
                 }
             }
         }
 
-        /// The transition matrix's contract holds exhaustively over GF(2) at every budget.
-        ///
-        /// This is the assertion that localizes a truncation error: `gcd_by_half` could agree with
-        /// classical Euclid while `transition_for` landed on the wrong pair, because the progress
-        /// step and the classical tail would hide it.
+        // The transition reaches the last pair above the degree boundary for every small GF(2) pair.
         #[test]
         fn test_the_transition_contract_holds_exhaustively_over_gf2() {
             let polynomials = all_polynomials::<Gf2>(5, 2);
@@ -804,13 +757,15 @@ mod tests {
             }
         }
 
-        /// Above the base case, where the recursion actually recurses, on three fields.
-        ///
-        /// The exhaustive tests are all below `HALF_GCD_BASE_CASE`, so they exercise only the
-        /// classical base case and the plumbing around it. These degrees are what reach the
-        /// recursive calls and the truncation.
+        // Recursive half-GCD agrees with Euclid across three coefficient widths and degree gaps.
         #[test]
         fn test_half_gcd_agrees_above_the_base_case() {
+            check_recursive_pairs::<KoalaBear>();
+            check_recursive_pairs::<Zp18446744069414584321>();
+            check_recursive_pairs::<Bn254Fr>();
+        }
+
+        fn check_recursive_pairs<F: FiniteField>() {
             let mut rng = StdRng::seed_from_u64(0x194);
             for degree in [
                 HALF_GCD_BASE_CASE + 1,
@@ -820,28 +775,29 @@ mod tests {
                 4 * HALF_GCD_BASE_CASE + 3,
             ] {
                 for offset in [0, 1, 7] {
-                    let a = UnivariatePolynomial::<Zp13>::rand(degree as u64, &mut rng);
-                    let b = UnivariatePolynomial::<Zp13>::rand((degree - offset) as u64, &mut rng);
+                    let a = UnivariatePolynomial::<F>::rand(degree as u64, &mut rng);
+                    let b = UnivariatePolynomial::<F>::rand((degree - offset) as u64, &mut rng);
+                    assert_transition_contract(&a, &b, degree / 2);
                     assert_eq!(
                         gcd_half_unstable(&a, &b),
-                        gcd(&a, &b),
+                        gcd_classical_unstable(&a, &b),
                         "half-GCD disagrees at degree {degree} against {}",
                         degree - offset
                     );
                     // And with a planted common factor, so the answer is not almost always one.
-                    let shared = UnivariatePolynomial::<Zp13>::rand(11, &mut rng);
+                    let shared = UnivariatePolynomial::<F>::rand(11, &mut rng);
                     let f = &a * &shared;
                     let g = &b * &shared;
                     assert_eq!(
                         gcd_half_unstable(&f, &g),
-                        gcd(&f, &g),
+                        gcd_classical_unstable(&f, &g),
                         "half-GCD disagrees with a planted factor at degree {degree}"
                     );
                 }
             }
         }
 
-        /// The degenerate quotient sequences #194 names, each one deliberately.
+        // Half-GCD matches Euclid for zero, constant, equal, divisible, and repeated-factor inputs.
         #[test]
         fn test_half_gcd_handles_the_degenerate_sequences() {
             let mut rng = StdRng::seed_from_u64(0x194_dead);
@@ -851,22 +807,31 @@ mod tests {
             let one = UnivariatePolynomial::<Zp13>::one();
 
             // Zero and constant arguments.
-            assert_eq!(gcd_half_unstable(&a, &zero), gcd(&a, &zero));
-            assert_eq!(gcd_half_unstable(&zero, &a), gcd(&zero, &a));
+            assert_eq!(
+                gcd_half_unstable(&a, &zero),
+                gcd_classical_unstable(&a, &zero)
+            );
+            assert_eq!(
+                gcd_half_unstable(&zero, &a),
+                gcd_classical_unstable(&zero, &a)
+            );
             assert_eq!(gcd_half_unstable(&zero, &zero), zero);
             assert_eq!(gcd_half_unstable(&a, &one), one);
 
             // Equal arguments, and one a multiple of the other: the quotient sequence is one step.
-            assert_eq!(gcd_half_unstable(&a, &a), gcd(&a, &a));
+            assert_eq!(gcd_half_unstable(&a, &a), gcd_classical_unstable(&a, &a));
             let multiple = &a * &UnivariatePolynomial::<Zp13>::rand(17, &mut rng);
-            assert_eq!(gcd_half_unstable(&multiple, &a), gcd(&multiple, &a));
+            assert_eq!(
+                gcd_half_unstable(&multiple, &a),
+                gcd_classical_unstable(&multiple, &a)
+            );
 
             // A repeated factor, which makes the sequence degenerate late rather than early.
             let factor = UnivariatePolynomial::<Zp13>::rand(9, &mut rng);
             let squared = &factor * &factor;
-            let f = &squared * &UnivariatePolynomial::<Zp13>::rand(50, &mut rng);
-            let g = &squared * &UnivariatePolynomial::<Zp13>::rand(53, &mut rng);
-            assert_eq!(gcd_half_unstable(&f, &g), gcd(&f, &g));
+            let f = &squared * &UnivariatePolynomial::<Zp13>::rand(big as u64, &mut rng);
+            let g = &squared * &UnivariatePolynomial::<Zp13>::rand(big as u64 + 3, &mut rng);
+            assert_eq!(gcd_half_unstable(&f, &g), gcd_classical_unstable(&f, &g));
 
             // Odd and even degrees straddling the base case, where the halving's parity changes.
             for degree in (HALF_GCD_BASE_CASE - 2)..=(HALF_GCD_BASE_CASE + 2) {

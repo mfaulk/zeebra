@@ -20,7 +20,7 @@ pub use univariate::{
     interpolate_quadratic_unstable, karatsuba_base_case_unstable, karatsuba_unstable,
     newton_crossover_unstable, newton_floor_unstable, newton_is_cheaper_at_unstable,
     newton_is_cheaper_unstable, product_of_factors_unstable, subproduct_evaluate_unstable,
-    subproduct_interpolate_unstable, tree_crossover_unstable, HALF_GCD_BASE_CASE,
+    subproduct_interpolate_unstable, tree_crossover_unstable,
 };
 pub use univariate::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
