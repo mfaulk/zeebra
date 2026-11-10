@@ -38,7 +38,6 @@ every record:
 | One finite-field solution | `one-finite-field-solution` | one point in `F^n` satisfying the system | can stop at the first solution found, so strictly cheaper than enumerating |
 | All finite-field solutions | `all-finite-field-solutions` | every point in `F^n` | |
 | Univariate eliminant | `univariate-eliminant` | a generator of the elimination ideal in the last variable | obtainable without the rest of the basis by some routes |
-| Cryptanalytic witness | `cryptanalytic-witness` | a CICO preimage or collision, checked against the primitive | the only task whose correctness check is not algebraic; **belongs to the cryptanalysis scoreboard, not here** |
 
 **Rules.**
 

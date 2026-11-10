@@ -143,10 +143,8 @@ impl<const N: usize, F: FiniteField> AffineElimination<N, F> {
     ///
     /// # Errors
     /// [`LinearError::WrongProjectedDimension`] unless `M` is exactly the number of survivors.
-    /// Exact rather than "at least", for the reason
-    /// [`CicoInstance::system`](super::poseidon::CicoInstance::system) is exact: a variable that
-    /// appears in no generator is unconstrained, so a too-large `M` silently makes the ideal
-    /// positive-dimensional.
+    /// Exact rather than "at least": a variable that appears in no generator is unconstrained, so a
+    /// too-large `M` silently makes the ideal positive-dimensional.
     ///
     /// # Panics
     /// If a generator mentions an eliminated variable, which the sweep makes impossible.
