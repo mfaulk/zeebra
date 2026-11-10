@@ -84,6 +84,9 @@ let system = vec![
 let basis = f4(&system, MonomialOrder::GradedReverseLexicographic).unwrap();
 ```
 
+`cargo run --release --example quickstart` walks through field elements, polynomial arithmetic, a
+Gröbner basis, solving, and an explicit resource limit in one program.
+
 Every Rust example in this file and in [`docs/guide/`](docs/guide) is compiled and run by
 `cargo test --doc`, so none of them can drift from the API.
 
@@ -105,7 +108,7 @@ cargo run --release --example f4_profile      # cost attributed per stage
 cargo run --release --example solve_one       # a system in, verified solutions out
 ```
 
-[`docs/guide/benchmarking.md`](docs/guide/benchmarking.md) is the full list — around seventy
+[`docs/guide/benchmarking.md`](docs/guide/benchmarking.md) is the full list — around fifty
 instrumented examples — along with the measurement rules this repository follows: a benchmark lock
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.

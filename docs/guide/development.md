@@ -14,7 +14,9 @@ Development checks, matching what CI enforces:
 ```sh
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --all-targets --no-default-features -- -D warnings
 cargo test --doc
+cargo package --locked            # what crates.io would receive, built in isolation
 ```
 
 The shell tooling under `scripts/agent/` and `tools/` is invisible to every Rust job, so CI's
@@ -185,7 +187,14 @@ with every measurement recorded before this profile existed.
 
 A fourth job checks formatting and runs clippy. Both are in one job because `cargo fmt --all
 --check` takes a tenth of a second and needs no cache, so on its own it was almost entirely runner
-start-up.
+start-up. It runs clippy twice: with all features, and with **no default features**, which is
+the crate a consumer gets with `default-features = false`. Every other job builds the default
+feature set, which is how the library once stopped compiling without `external-runners` and
+nothing noticed; targets that drive the external engines declare `required-features` in
+`Cargo.toml` and are skipped by that build. The same job runs `cargo package --locked`, which
+assembles the crate from the files `Cargo.toml`'s `exclude` leaves in and compiles it in
+isolation, so a guide page the doctests include, or any other file the build needs, cannot be
+left out of the package unnoticed.
 
 Each pull request and each branch has one run in flight at a time; a new push cancels the one
 before it. A stack of dependent pull requests is merged one commit at a time, so pushing a stack
