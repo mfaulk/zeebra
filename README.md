@@ -150,6 +150,10 @@ ways that matter:
   differentially tested against Singular, and a cross-library corpus of standard families — Katsura,
   Cyclic, random MQ — is checked for ideal equivalence before any comparison is run.
 
+The [competitive board](research/competitive/COMPETITIVE.md) retains cross-engine attempts,
+including resource refusals. The [upper-rung sweep](docs/research/cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected)
+records the per-rung budgets and limitations of its single-run comparisons.
+
 ## Contributing and documentation
 
 - [`docs/guide/development.md`](docs/guide/development.md) — building, the full test matrix, what CI

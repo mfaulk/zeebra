@@ -2,6 +2,7 @@
 
 **Measured at:** publication bound `f94b3df0` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+The upper-rung sweep in §9c was measured at `19ff732c`.
 
 Policy and status for #261. The corpus itself is `src/grobner/external/corpus.rs`; its digest
 manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is_frozen`.
@@ -629,7 +630,14 @@ whatever the box is doing, which is the property §9 is built on, and it is why 
 default change that moved every reachable rung by 4x to 8x.
 
 **The ceiling is `cyclic-9`, and the stage that sets it is the F4 basis**, crossing the live-entry
-budget: `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`. The whole Katsura ladder is
+budget: `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`.
+
+> **Zeebra's ceiling, and #489's sweep showed the difference.** At a 300 s wall Groebner.jl reaches
+> `cyclic-9` in 61.5 s and msolve in 162.6 s — so the rung is out of reach for this configuration's
+> budget and not for the hardware. Groebner.jl records **1 596 MiB** peak process RSS; this is
+> a different metric from Zeebra's matrix-entry budget (§9c.3).
+
+The whole Katsura ladder is
 reachable to `katsura-11` — four rungs above the old ceiling, at roughly 10x per rung — so the
 expectation in #424 that "this issue may well resolve as the ceiling is here" was right about the
 *shape* and wrong about the *place*: Katsura did not run out, Cyclic did.
@@ -697,7 +705,7 @@ entry count is a function of the field's representation width. At a 16-bit prime
 fit the same 20 000 000-entry budget. That is a real and unmeasured question, and it is the one
 reason to revisit this decision — not a suspicion that the timings would differ.
 
-### 9b. What #489 still needs, and why it is not here
+### 9b. What #489 needed, and why it was not taken at first — superseded by §9c
 
 **The sweep itself.** The three decisions above are what #489 asked to settle first; the rows are not
 taken, because this box could not produce an honest one. Over the hour the sweep was attempted the
@@ -712,6 +720,101 @@ killed for this rather than committed.
 
 So the sweep is a quiet-box task and the budget above is what it should use. Nothing about it is
 uncertain any more except when the machine is free.
+
+> **Taken in §9c**, on a box whose one-minute load ran 4 to 26. 100 rows, and the budget above was
+> right for seven of the eight rungs and **wrong for `katsura-11`** — §9a checked Zeebra's
+> reachability rather than the comparands', and Singular's runtime there straddles the 60 s wall.
+> §9c.2 is the correction.
+
+### 9c. #489: the sweep taken, and two things it corrected
+
+**100 rows at `19ff732c`**, all eight upper rungs across both tasks and five engines, one row per
+process under `tools/benchlock.sh` at `taskset -c 0-7`, `ZEEBRA_MACHINE=workstation`,
+`ZEEBRA_AFFINITY=0-7`. Taken on a quiet box — the one-minute load average ran **4 to 26** across the
+run, against the 592–1 261 §9b recorded when the attempt was abandoned.
+
+#### 9c.1 The rows
+
+Reduced Gröbner basis, the column every engine offers:
+
+| rung | zeebra | singular | msolve | groebner.jl | sagebrush |
+|---|---:|---:|---:|---:|---:|
+| `katsura-8` | 54.0 ms | 138.3 | 20.5 | 4.8 | 20.5 |
+| `katsura-9` | 445.8 ms | 871.1 | 50.8 | 45.4 | 91.4 |
+| `katsura-10` | 3 739.0 ms | 6 787.6 | 263.4 | 89.5 | 856.8 |
+| `katsura-11` | **35 359.5 ms** | **60 597.9** | 2 120.3 | 518.5 | 2 777.2 |
+| `cyclic-7` | 660.2 ms | 1 137.2 | 101.5 | 47.2 | 172.4 |
+| `cyclic-8` | 27 658.5 ms | 30 847.0 | 1 286.0 | 699.5 | 3 942.8 |
+| `cyclic-9` | **refused** | 300 s wall | **162 577.0** | **61 534.5** | 300 s wall |
+| `cyclic-10` | **refused** | 300 s wall | 300 s wall | 300 s wall | 300 s wall |
+
+`katsura-11` and the two cyclic refusals are at a 300 s wall; everything else at the 60 s §9a
+decided. **Zeebra leads Singular on every rung it completes** — 1.11x to 2.56x, and 1.71x at
+`katsura-11` — which is the shape #575's defaults produced and the first time the upper rungs have
+had a cross-engine row at all. On `lex-basis-by-conversion`, where only Singular and Sagebrush
+compete, `katsura-11` is **40 819 ms against Singular's 92 033 ms, 2.25x ahead**.
+
+#### 9c.2 §9a's budget decision was wrong, and the sweep is what showed it
+
+§9a decided "the board's standard 60 s wall, unchanged, for all eight rungs", on the grounds that
+the slowest reachable rung is `katsura-11` at 33.6 s and so "clears that wall by 1.8x". **That
+reasoning checked Zeebra's reachability and not the comparands'**, which is the error: the board's
+wall applies to every engine, and Singular is the binding one.
+
+Measured, the same engine on the same rung either side of the wall:
+
+| `katsura-11`, `reduced-grobner-basis` | singular |
+|---|---:|
+| first pass, 60 s wall | 54 073 ms *(cleared by 11%)* |
+| second pass, 300 s wall | **60 598 ms** *(would have stopped)* |
+
+So Singular's runtime **straddles** the 60 s wall on this rung, and which side it lands on is a
+property of the box rather than of the engine. A 60 s budget there is a coin flip, not a policy —
+and on `lex-basis-by-conversion` it is not even close: Singular needs 92 s and wall-stopped in the
+first pass. **The budget for `katsura-11` is 300 s**, and §9c.1 summarizes the 300 s rows. The history retains both passes.
+
+The three decisions §9a records stand for the other seven rungs. What was wrong was generalizing a
+Zeebra-side margin to engines whose costs this document had never measured.
+
+#### 9c.3 `cyclic-9` is reachable, and the ceiling is Zeebra's rather than the problem's
+
+§9 states "**The ceiling is `cyclic-9`**, and the stage that sets it is the F4 basis", and §9's own
+caveat is that it is measured for Zeebra. At a 300 s wall, two comparands reach it:
+
+| `cyclic-9`, `reduced-grobner-basis` | outcome | peak RSS |
+|---|---|---:|
+| zeebra | refused at **20 001 315** live entries | — |
+| **groebner.jl** | **completes, 61 534.5 ms** | **1 596.0 MiB** |
+| **msolve** | **completes, 162 577.0 ms** | 748.1 MiB |
+| singular | 300 s wall stop | — |
+| sagebrush | 300 s wall stop | — |
+
+That is the most useful row the sweep produced. The rung is **not** out of reach for the hardware;
+it is out of reach for Zeebra's live-entry budget, and the refusal is correct as a budget decision
+rather than as a statement about the problem. §9's ceiling claim should be read as "the ceiling of
+Zeebra's default configuration", which is what it measured.
+
+**Groebner.jl records 1 596 MiB peak process RSS.** That includes the Julia runtime and other
+allocations; Zeebra's roughly 320 MB entry budget accounts only for matrix entries. These metrics
+do not establish how much memory Zeebra would need to finish this rung. #490 still needs a
+Zeebra budget sweep before choosing a higher default.
+
+`cyclic-10` is out of reach for **all five** engines on the reduced-basis task at 300 s, which is consistent with the only
+published figure for it — Magma 2.11-8 at 12.3 hours on a 2004 Sunfire, which
+`classical-benchmarks.md` §4 forbids comparing against and which is quoted here only as an order of
+magnitude.
+
+#### 9c.4 What these rows are not
+
+* **Not a ratio against Steel's figures**, on any rung. `classical-benchmarks.md` §4's prohibition
+  is untouched; the `GF(2)` Cyclic rows are a separate matter and are #427's.
+* **Not fixed-budget repetitions.** The initial 80 rows cover every (rung, task, engine) at
+  60 s. Twenty additional rows repeat both tasks for `katsura-11` and the reduced-basis task for
+  `cyclic-9` and `cyclic-10` at 300 s. All attempts are retained. The 54 073 / 60 598 ms spread
+  on Singular is a reason to treat single rows on the slow rungs as approximate.
+* **Not the `GF(32003)` identity.** §9a decided the reference prime only, and that stands: the
+  entry-count question it flagged — whether `cyclic-9` fits the same budget at a 16-bit prime — is
+  now *more* interesting given that two engines reach the rung, and is still unmeasured.
 
 ## 10. Adding a family
 
