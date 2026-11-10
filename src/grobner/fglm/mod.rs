@@ -41,6 +41,6 @@ pub use options::{
     RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES,
 };
 pub use quotient_algebra::{QuotientAlgebra, QuotientStatistics};
-pub use quotient_basis::{classify_ideal, IdealClass, QuotientBasis};
+pub use quotient_basis::{classify_ideal, krull_dimension, IdealClass, QuotientBasis};
 pub use shape::{separating_variables, shape_lex_basis, shape_report, ShapeError, ShapeReport};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};

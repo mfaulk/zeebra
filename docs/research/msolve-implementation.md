@@ -1,11 +1,12 @@
 # msolve 0.11.0: what it actually does, and which of it Zeebra may reimplement
 
 **Measured at:** `dbab79eb`, reproduced at `3139025d`; §4.1's scatter split is stamped base
-`a756eb95` and its column-sort A/B base `87e11e72`, and §4 H2's divisor-search projection base
-`ced9cb51` plus blob `7781cc636114` (`git hash-object examples/f4_profile.rs`), each
+`a756eb95`, its column-sort A/B base `87e11e72`, its handle-scatter A/B base `19ff732c`, and
+§4 H2's divisor-search projection base `ced9cb51` plus blob `7781cc636114`
+(`git hash-object examples/f4_profile.rs`), each
 per #505 (see the subsections for the rest of the blobs). The only Zeebra timings published here are
-§4.1's settlement of H1, that split, that A/B, and H2's projection. Every other figure is read from
-msolve's source or quoted from a cited paper.
+§4.1's settlement of H1, that split, those two A/Bs, and H2's projection. Every other figure is read
+from msolve's source or quoted from a cited paper.
 
 Source-grounded study for #264, a child of epic #256. The companion documents are
 `docs/research/external-comparands.md` (how msolve is provisioned and invoked) and
@@ -968,6 +969,113 @@ discipline #536 imposed on the interned set. #621, the live follow-up, will want
 carry a per-row-*term* handle rather than a per-column one, which a first-appearance vector would be
 redundant with. The regression #583 recorded therefore stands recorded, with its cause known and the
 free half of its fix taken — which is the resting state the issue itself named.
+
+#### Settled (#621): the handle is carried out of preprocessing, and construction stops being a stage
+
+H1 is now closed in Zeebra's favour, by the route #582 named rather than the one H1 originally
+proposed. The duplication is gone: symbolic preprocessing's queue has to decide, for every shifted
+row monomial, whether it has met that monomial before, and it used to do so with a `MonomialSet` and
+discard everything but the yes-or-no. The interner is now a `MonomialMap<N, u32>` over a
+first-appearance arena, so the test it was already making *assigns* each distinct monomial an index,
+and `Preprocessed` carries the index of every row term in one flat `Vec<u32>` — row-major, each
+row's run located by the term count of the basis element the row names, so no offsets are stored.
+Construction sorts `(monomial, handle)` pairs, inverts the permutation into a `Vec<u32>` keyed by
+handle, and the scatter reads a column by indexed load.
+
+The shifted monomial is then never formed at all, so the **shift** #582 priced at 0.03–0.33 ms goes
+with the lookup: the multiplier does not touch the coefficient, and the coefficient is the only
+thing the row still needs from the basis element. That is why the saving below is larger than the
+lookup share alone.
+
+**#621 stated what had to be established first, and in what order.** All three held.
+
+1. **Entries to columns, which is the upper bound on the win.** Summed over the batches of a
+   `recommended` trace, `nonzeros / columns` is **8.59 to 39.83** on the corpus — 20.34 on
+   katsura-6 lex and 39.83 on katsura-7 grlex, the two instances the criterion named. The criterion
+   was "under 2.0 on those two and the restructuring buys nothing". It did not fire, by an order of
+   magnitude. The ratio is reported as a column of the A/B's own table rather than derived
+   elsewhere, so it cannot drift from the times beside it.
+2. **The memory cost, against the entry footprint.** A handle is four bytes and a matrix entry is
+   `size_of::<(usize, F)>()`, which is sixteen for the benchmark prime and cannot be less than
+   sixteen for any field — so the handles are **a quarter of the entries of the same matrix**,
+   by construction and not by instance. `examples/f4_memory katsura-7` now prints both rows from one
+   run: 10 546 row terms × 4 B against `max_live_nonzeros` 17 421 × 16 B. The criterion was "if it
+   exceeds the entry footprint of the matrices themselves, close"; it is 25% of it. They are
+   released with the arena by `Preprocessed::release_monomials` at the point #536 fixed, before
+   elimination, so they are not live where the dense buffer is. Construction's own transient in fact
+   *falls*: the `MonomialMap<N, usize>` of one hash entry per column is now a `Vec<u32>` of four
+   bytes per column.
+3. **That the indirection does not eat the saving.** It does not, and the A/B is below.
+
+`examples/f4_profile handles` is the harness: one process, one build, both arms reading the same
+`Preprocessed` built once per batch outside the timing, arm order rotated per repetition and each
+arm min-reduced over its own runs, seven repetitions, **every pair of matrices asserted equal**.
+`taskset --cpu-list 2`, under `tools/benchlock.sh`, with the load read **with the lock held** (#599):
+`1m=8.90 5m=23.85 15m=142.67`. The fifteen-minute figure is recorded because it was not quiet — this
+box runs many agents, and three earlier windows were discarded by an in-lock gate that saw
+`1m=2026` behind a quiet pre-lock reading.
+
+Stamped **base commit `19ff732c`** — an ancestor of `main` — plus the **blobs** of the files the
+binary's measured path came from (#505): `src/grobner/f4/symbolic.rs` at `a63ca68c2b4f`,
+`src/grobner/f4/macaulay.rs` at `468955ae8623`, `examples/f4_profile.rs` at `2650735bde05`, and
+`examples/f4_memory.rs` at `1a756add10dc` for the memory rows above.
+
+| system | order | route | entries/col | construction | collect | sort | map | scatter | speedup |
+|---|---|---|---|---|---|---|---|---|---|
+| cyclic-5 | lex | hashing | 11.51 | 0.57 ms | 0.00 | 0.07 | 0.02 | 0.46 | — |
+| cyclic-5 | lex | **handles** | 11.51 | **0.13 ms** | 0.00 | 0.07 | 0.00 | **0.04** | **4.19x** |
+| katsura-5 | lex | hashing | 8.59 | 0.14 ms | 0.00 | 0.01 | 0.01 | 0.11 | — |
+| katsura-5 | lex | **handles** | 8.59 | **0.03 ms** | 0.00 | 0.01 | 0.00 | **0.01** | **4.88x** |
+| katsura-6 | lex | hashing | 20.34 | 3.95 ms | 0.01 | 0.27 | 0.09 | 3.54 | — |
+| katsura-6 | lex | **handles** | 20.34 | **0.59 ms** | 0.02 | 0.29 | 0.02 | **0.22** | **6.68x** |
+| katsura-6 | grevlex | hashing | 13.04 | 0.46 ms | 0.00 | 0.06 | 0.01 | 0.37 | — |
+| katsura-6 | grevlex | **handles** | 13.04 | **0.13 ms** | 0.00 | 0.07 | 0.00 | **0.04** | **3.46x** |
+| katsura-7 | grlex | hashing | 39.83 | 2.95 ms | 0.01 | 0.22 | 0.03 | 2.66 | — |
+| katsura-7 | grlex | **handles** | 39.83 | **0.47 ms** | 0.04 | 0.20 | 0.02 | **0.18** | **6.29x** |
+| katsura-7 | grevlex | hashing | 21.45 | 2.68 ms | 0.01 | 0.34 | 0.05 | 2.23 | — |
+| katsura-7 | grevlex | **handles** | 21.45 | **0.65 ms** | 0.05 | 0.31 | 0.03 | **0.19** | **4.16x** |
+
+**The hashing arm is the control, and it reproduces #582 across two harnesses and two sessions.**
+Its scatter is 3.54 ms on katsura-6 lex against #582's 3.59, 2.66 on katsura-7 grlex against 2.64,
+0.46 on cyclic-5 lex against 0.49 and 0.37 on katsura-6 grevlex against 0.40 — each within 2–6% of a
+figure taken at a different commit by a different arm. So the two columns beside each other are
+measuring what they say they are.
+
+Reading the split: **the scatter falls 11x to 16x** (3.54 → 0.22, 2.66 → 0.18, 0.46 → 0.04), which
+is the whole of what #582 located, shift included. `map` falls 2x to 5x, which is the `Vec<u32>`
+against the `MonomialMap`. `collect` rises by 0.01–0.04 ms, the price of pairing each monomial with
+its handle before the sort, and `sort` is flat to within the measurement — the comparator reads the
+monomial and ignores the handle, so a 28-byte pair sorts like a 24-byte monomial. Construction as a
+whole is **3.5x to 6.7x** cheaper.
+
+**End to end**, derived the way #330's share was — the post-change stage table plus the A/B's
+construction delta, because the two arms cannot both be the shipping stage in one run:
+
+| system | order | construction, was | is | saved | whole computation |
+|---|---|---|---|---|---|
+| cyclic-5 | lex | 0.60 ms | 0.14 ms | 0.46 ms | **1.28x** |
+| katsura-5 | lex | 0.14 ms | 0.03 ms | 0.11 ms | **1.21x** |
+| katsura-6 | lex | 3.91 ms | 0.59 ms | 3.32 ms | **1.33x** |
+| katsura-6 | grevlex | 0.48 ms | 0.13 ms | 0.35 ms | **1.14x** |
+| katsura-7 | grlex | 3.03 ms | 0.47 ms | 2.56 ms | **1.07x** |
+| katsura-7 | grevlex | 2.77 ms | 0.64 ms | 2.13 ms | **1.10x** |
+
+**What this closes.** Construction was 48% of katsura-6 lex when H1 was written and 33% after #330;
+it is now **0.68 ms of a 10.00 ms computation, 6.8%**, and 0.51 ms of katsura-7 grlex's 34.53 ms,
+**1.5%**. It is no longer among the stages worth looking at on any instance in the corpus, which is
+what H1 set out to establish and the reason to stop here rather than to look for the next 0.2 ms.
+The two stages that are left are the ones §8.5 already named: final interreduction at 71% of
+katsura-7 grlex, and symbolic preprocessing itself at 59% of katsura-6 lex — the latter now the
+*largest* stage there, and the one the handles came out of.
+
+**Licensing: unchanged.** The write-back-after-sort design is described in GBLA (Boyer, Eder,
+Faugère, Lachartre, Martani, ISSAC 2016) and in Faugère (1999) §2.1; what is implemented here is
+interning-with-an-index, which is the published idea and not msolve's code. msolve was read for
+understanding only, per `docs/research/external-provenance-policy.md` §6. The one thing Zeebra does
+differently is worth recording: msolve writes the rank into the hash entry and reads it back through
+the row's array of entry indices, while Zeebra keeps the handles in a flat per-batch vector and
+inverts the sort's permutation into an array. Both avoid the second hash; Zeebra's version never
+mutates the interner after the closure, so the arena can be released as a unit.
 
 ### H2 — A divmask would cut the reducer search, and Zeebra has no equivalent
 

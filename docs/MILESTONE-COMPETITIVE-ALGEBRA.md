@@ -17,7 +17,7 @@ running on this machine.**
 
 Every external figure this repository has ever quoted was measured on someone else's hardware. The
 Anemoi calibration is the sharpest case. At `N = 5` Zeebra's FGLM conversion finished 479x faster
-than the published Magma figure, and [`anemoi.md`](research/anemoi.md) §8a.1 declined to say whether
+than the published Magma figure, and anemoi.md (moved out in #668) §8a.1 declined to say whether
 that is faster arithmetic, a better algorithm, or a different computation. That refusal was correct:
 with a 2014 Xeon E5-2630 v3 on one side and a 2022 Threadripper PRO 5995WX on the other, **the
 measurement cannot distinguish those three.** No amount of care in reading the number fixes that. A
@@ -207,9 +207,9 @@ contention magnets, and the assignment that resolves them:
 
 | area | contending issues | owner |
 |---|---|---|
-| `src/grobner/research/challenge.rs` | #283/#286 add registry rows; #261/#293 want Katsura and Cyclic registered | **#283/#286 only.** The competitive board gets its own identity type rather than sharing the challenge registry. |
-| `examples/scoreboard.rs` | #288, #290, #295 (records) and #284 (time budget) | **#288/#290/#295.** #284 is split: its *library* half (the cooperative check and the new error variant) is separate from its *harness* half (the wiring), and the library half lands first. |
-| `src/grobner/research/resultant.rs` | #285, #289, #296 and — apparently — #243 | **#285/#289/#296 only.** #243 needs **no** change here: fixing `Mul` fixes `cico_bivariate`'s `power` closure for free, because that closure is already `result = &result * p`. |
+| `src/grobner/research/challenge.rs` (moved out in #668) | #283/#286 add registry rows; #261/#293 want Katsura and Cyclic registered | **#283/#286 only.** The competitive board gets its own identity type rather than sharing the challenge registry. |
+| `examples/scoreboard.rs` (moved out in #668) | #288, #290, #295 (records) and #284 (time budget) | **#288/#290/#295.** #284 is split: its *library* half (the cooperative check and the new error variant) is separate from its *harness* half (the wiring), and the library half lands first. |
+| `src/grobner/research/resultant.rs` (now `src/grobner/resultant.rs`) | #285, #289, #296 and — apparently — #243 | **#285/#289/#296 only.** #243 needs **no** change here: fixing `Mul` fixes `cico_bivariate`'s `power` closure for free, because that closure is already `result = &result * p`. |
 | `src/poly/multivariate/**` | #243 and #164 | **#243 only.** #164 is explicitly not implemented here — see §8.1. |
 | `src/grobner/f4/**` | #237, #284 | one owner for both. |
 | `README.md` `### Status` | everyone | the integration owner. Every agent rebases before touching it; it is this repository's most frequent conflict. |
@@ -322,11 +322,11 @@ One writer per checkout, each on a real `git worktree` and its own branch.
 | agent | worktree | branch | issues | primary files |
 |---|---|---|---|---|
 | TOOLCHAIN | `zb-m25-ext` | `build/m25-external-toolchain` | #259 (prereq) | `tools/external/**`, `docs/research/external-comparands.md` |
-| RUNNER | `zb-m25-runner` | `feat/m25-external-runner` | #257 #258 #288 #290 #293 #295, #284 harness | `scoreboard.rs`, `record.rs`, `examples/scoreboard.rs`, `differential/**`, new runner module |
+| RUNNER | `zb-m25-runner` | `feat/m25-external-runner` | #257 #258 #288 #290 #293 #295, #284 harness | `scoreboard.rs` and `examples/scoreboard.rs` (both moved out in #668), `record.rs` (now `grobner::record`), `differential/**`, new runner module |
 | POLY | `zb-m25-poly` | `perf/243-collecting-multiply` | #243 | `src/poly/multivariate/**`, `benches/sparse_polynomial.rs` |
-| ANEMOI | `zb-m25-anemoi` | `research/m25-anemoi-attribution` | #283 #286 #224 | `anemoi.rs`, `anemoi_cico.rs`, `challenge.rs`, `examples/anemoi_ladder.rs` |
+| ANEMOI | `zb-m25-anemoi` | `research/m25-anemoi-attribution` | #283 #286 #224 | `anemoi.rs`, `anemoi_cico.rs`, `challenge.rs`, `examples/anemoi_ladder.rs` (all moved out in #668) |
 | F4MEM | `zb-m25-f4mem` | `perf/237-f4-memory-attribution` | #237, #284 library | `src/grobner/f4/**`, `pairs.rs`, `buchberger.rs` |
-| RESULTANT | `zb-m25-resultant` | `perf/m25-resultant-models` | #289 #285 #296 | `research/resultant.rs`, `examples/resultant_cico.rs` |
+| RESULTANT | `zb-m25-resultant` | `perf/m25-resultant-models` | #289 #285 #296 | `research/resultant.rs` (now `grobner/resultant.rs`), `examples/resultant_cico.rs` (moved out in #668) |
 | RESEARCH | `zb-m25-research` | `research/m25-algorithm-gates` | #202 #287 #297 | new `docs/research/*.md` only |
 | integration | `lucky-prancing-shamir` | — | #292 #294 #299 | this document, `README.md`, scoreboard regeneration |
 
@@ -369,7 +369,7 @@ are resolved in writing before any timing is published:
   (`benchmark_systems.rs:10-15`), so it is not a zero-dimensional-solving row at all.
 
 The Fukuoka MQ instances are **"All Rights Reserved", no stated licence** — fetched by
-`tools/fetch-mq-challenge.sh` and never redistributed.
+`tools/fetch-mq-challenge.sh` (moved out in #668) and never redistributed.
 
 ### 7.4 Stage-level attribution, and what it may be called
 
@@ -418,125 +418,22 @@ pre-optimization profile (§1.1).
 
 ### 8.3 Gate M25-B — Anemoi `N = 6`
 
-In order, each step recorded: measure `N = 5`'s operator and conversion footprint; identify every
-major retained structure; extrapolate `N = 6` from **measured** storage growth, not from the `D³`
-*time* model; state a wall budget and an RSS ceiling; record the go/no-go against a criterion written
-first. Then, and only then: register `N = 6` deliberately with the frozen identities preserved,
-verify the quotient dimension is **15 625**, attempt FCICO, attempt PCICO only if the measured FCICO
-cost supports it, and validate any witness **through the permutation**.
-
-**A completed `N = 6` conversion is not evidence that Zeebra outperforms a maintained Magma
-installation.** No comparable measurement exists. It is a produced figure.
+*This gate (the Anemoi `N = 6` frontier attempt) was moved out with the cryptanalysis research in
+#668; it is preserved at commit 9532a9a2.*
 
 ### 8.4 Gate M25-C — the next Poseidon rung
 
-Decided from the measured cost model, not from round count. Before any attempt: predict construction
-time and memory, predict determinant count and cost, account for verification, state a maximum wall
-time and RSS ceiling, record whether the computation is bounded and realistic, and decide go/no-go
-first. An improved six-round run is a valid result even if no harder instance is reached. **The next
-rung is not launched because more memory became available.**
+*This gate (cost projections and go/no-go for the next Poseidon round count) was moved out with the
+cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 #### 8.4.1 The decision, taken against #289's fit: `rf4-rp2` is costed, bounded, and **not
 authorized**
 
-The gate ran as written, and this subsection is its output. Everything below supersedes the
-two-point extrapolation this section originally carried, which put `rf4-rp2` at ≈1.4 h on the
-strength of a 2.70 s core-time; #289's calibration measures that figure at **3.148 s**.
-
-`rf4-rp2` is the right candidate. It is a registered faithful reduction whose best recorded result is
-`stopped: max_live_nonzeros at degree 4`, so a witness there would be a frontier extension rather
-than a cheaper version of something already done; and at six rounds it shares `rf2-rp4`'s Sylvester
-order 1 458 and resultant degree 729, so the only thing that grows is the sample count — 6 562 to
-**59 050**, exactly `3^(2·4+2) + 1`.
-
-Costed, each line labelled:
-
-| stage | cost | basis |
-|---|---:|---|
-| symbolic build | **48.4 min**, **310.4 MiB** peak RSS | measured, §6.12 — **was 53.09 GiB before #243**; identical for every six-round row |
-| 59 050 order-1458 determinants, 32 workers | **1.79 h** | model (`RowCost::of`, 10% conservative by construction) |
-| the same, from measured core-times alone | **1.61 h** | 59 050 × 3.148 s / 32, measured per-determinant |
-| off-domain validation, 8 points | **< 1%** of the row | measured, now on the parallel path (#285) |
-| root finding at degree 59 049 | **not estimated** | §6.3 measured 70x for a 9x degree step (729 → 6 561); extrapolating that again is not defensible |
-| **total** | **≈ 2.6 h**, **≈ 0.3 GB** | build + determinants, root finding unpriced |
-
-**Against the §9 ceiling of ~2 h wall and ~64 GB peak RSS, this fails on time — and on time alone.
-That verdict was correct when taken and §8.4.2 records that it no longer holds.**
-
-That last clause is a correction to this section's own first draft, which also called the row "close
-on memory, 57 GB against a 64 GB ceiling, 89% of it". **#243 landed between the costing and this
-sentence and made the build's peak 175–179x smaller**, so the memory term is now 0.5% of the ceiling
-rather than 89% of it. The arithmetic that refuses the row did not change; the reason it is refused
-narrowed from two resources to one.
-
-Which makes the point §13.7 draws from this harder to miss: **memory was never what blocked this
-row.** It only looked like a binding constraint while it was the quantity that had been mis-estimated
-by 838x, and the moment it was measured and then fixed, the constraint that remained was the one
-nobody had been arguing about.
+*Moved out with §8.4 in #668; preserved at commit 9532a9a2.*
 
 #### 8.4.2 Then the time term moved as well, and `rf4-rp2` is inside the ceiling
 
-#243 did not only bound the build's memory. The same change made the build **9.0x faster** — the
-recorded 48.37 min against **5.4 min**, taken **on the lock** after a 2 698 s wait, cross-checking a
-second run at 5.6 min. (It was the *peak* that was taken off-lock, which
-`f4-resource-scaling.md:277` authorizes for peaks and not for timings.) So this is a protocol figure,
-not an indication:
-
-| build figure | + 1.79 h (model) | + 1.61 h (measured core-times) |
-|---|---:|---:|
-| 48.37 min — the original costing | 2.60 h | 2.42 h |
-| **5.4 min — after #243, on-lock** | **1.88 h** | **1.70 h** |
-
-**Both are inside the ~2 h ceiling.** The refusal in §8.4.1 was right on the figures it had and is
-superseded by the figures it does not.
-
-**One term is still unpriced, and it is the whole of what stands between this row and a go.** Root
-finding at degree 59 049. §6.3 measured 4.07 s at degree 6 561 against 59.5 ms at 729 — **70x for a
-9x degree step** — and 6 561 → 59 049 is another 9x step, so the same scaling puts it near **285 s**,
-which would take the row to ≈1.78–1.96 h. Inside the ceiling, but inside it by minutes, on a term
-extrapolated from two points.
-
-**So the decision recorded here is: `rf4-rp2` is costed, bounded, realistic, and now within the
-standing ceiling — and the go/no-go is the owner's, pending one measurement of root finding at
-degree 59 049.** It is not launched by this milestone, and the reason is not caution for its own
-sake: §8.4 requires the cost to be stated and the decision taken *before* execution, and a row whose
-margin is minutes against a ceiling cannot be authorized on an extrapolated term. Pricing root
-finding is a single short run (#351 is the issue for exactly that measurement at a related degree).
-
-A verified witness there would be the **Stretch** criterion this milestone did not meet — which is
-precisely why it needs the measurement rather than the benefit of the doubt.
-
-So the decision is **no-go pending explicit owner authorization**, and that is a completed research
-decision rather than an unfinished attempt. Three things follow from recording it this way:
-
-1. **The run is bounded and realistic, which is a different statement from authorized.** `rf4-rp2`
-   is not out of reach — it is roughly a workday's third of a machine, and nothing in the cost model
-   is extrapolated beyond the order it was fitted at. What it is not is inside a ceiling chosen for
-   unattended work. An owner who wants it can authorize ~3 h and 64 GB and expect it to land.
-2. **#243 changes the memory, not the time.** A collecting multiply bounds the build's 57 GB by its
-   output, which removes the memory half of this gate almost entirely — but the build's 48.4 min is
-   arithmetic the collecting multiply still has to do, so the total stays ≈2.6 h. Memory was never
-   what blocked this row; it only looked like the binding constraint because it was the number that
-   had been wrong by 838x.
-3. **`rf6-rp0` is not close.** 531 442 samples is **16.15 h** on 32 workers by the model, **14.5 h**
-   from measured core-times. Eight rounds is worse by three orders: `rf4-rp4` at order 13 122 is
-   **490.5 d** on 32 workers, and that figure is extrapolated three times past the largest order
-   measured. Neither is a candidate for any ceiling, and neither becomes one through a constant
-   factor — which is what makes #297's axes 3–5 the only directions that matter, and #297's axis 1
-   close to zero-sum against a sweep already 92–95% efficient.
-
-**What would change this decision.** Not more memory, and not a faster determinant by a constant:
-`rf4-rp2` needs a factor of ~1.3 to fit the existing ceiling, which a 10%-conservative model and an
-unpriced root-finding term could swallow entirely. The honest routes are an owner authorization at
-~3 h, or an asymptotic improvement from #297.
-
-Two figures in the calibration are **unexplained and bound every ratio quoted against the older
-records**, and they are the reason this decision is stated with its basis rather than as a number.
-Determinant measurements taken now are **~1.2x slower** than the same measurements on record —
-same registered row, same code path, same lock, months and a commit range apart (#318). And the
-width penalty measures **31–44%** at 32 workers where §6.6 recorded **4–9%** (#319). Both were
-treated as findings rather than repaired. A factor computed between a figure from §6.5 and a figure
-taken today carries a ~20% systematic that is a property of neither implementation.
+*Moved out with §8.4 in #668; preserved at commit 9532a9a2.*
 
 ### 8.5 Gate M25-D — each research item separately
 
@@ -565,10 +462,8 @@ fix, expected far less after); #237's 14 GB rungs; #289's determinant sweep thro
 decision: `rf4-rp2`, `rf6-rp0`, any eight-round row, and PCICO `N = 6` before FCICO `N = 6` is
 measured.
 
-Resolved during the milestone, with the arithmetic in §8.4.1: **`rf4-rp2` remains unauthorized** at
-≈2.6 h against the ~2 h ceiling, and it is the *time* that fails, not the memory — a result that
-only became visible once #289 measured the per-determinant cost at 3.148 s rather than the 2.70 s on
-record. `rf6-rp0` (16.15 h) and every eight-round row (≥490 d) are not near any ceiling.
+*The resolution of the next Poseidon row's authorization was moved out with the cryptanalysis
+research in #668; it is preserved at commit 9532a9a2.*
 
 ---
 
@@ -636,12 +531,10 @@ recommended unless new evidence emerges**.
 | #193, #194 | fast division by Newton inversion; half-GCD | — | blocked on each other and the FFT crossover | blocked | #193 before #194 | M26+ |
 | #224 | sparse-FGLM and order-conversion alternatives | Medium | large, but a recorded no-go | not recommended unless new evidence | overturning one of §8.5's three measurements | M26+ |
 | #218–#221 | Boolean solving readiness, SAT4CryptoBench, SAT as backend, LowMC | Medium | the first same-machine external baseline outside Gröbner | research needed | #218 before #219 | M26 |
-| #195–#196, #205–#207 | MinRank and rank-based cryptanalysis; Boolean cryptanalysis | Medium | new challenge families | research needed | — | M26+ |
-| #197–#199 | Fukuoka MQ I–V; HFE Challenge 1; classical collections | Medium | published external timings exist | ready | #261 | M26 |
-| #203, #204 | Feistel-MiMC and Rescue-Prime; Poseidon zero-test | Medium | more registered rows | research needed | ℓ>1 blocked by a u64-only primitive-root search | M26+ |
-| #643, #644 | register the Anemoi `ACICO` rows; `ACICO` at `ℓ > 1` | Medium, Low | #201 landed the model and left the rows | ready; #644 blocked | #644 needs the `ℓ > 1` linear layers | M26+ |
 | #69, #86–#89, #225 | GPU suitability, sparse matvec, out-of-core, hardware cost | Low | unquantified | not recommended unless new evidence | a named kernel, workload, predicted benefit and benchmark | M27+ |
-| #200 | prize-status ledger | Medium | one presently claimable award | owner action | — | — |
+
+*Five rows of challenge-family and prize planning (#195–#207, #643/#644) were moved out with the
+cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 
 **Independently parallelizable, and not an M25 completion dependency:** #264/#265/#266 source studies;
 #218/#219 Boolean importers; #193/#194 univariate work (independent files); #205–#207 MinRank
@@ -659,30 +552,9 @@ tools/external/provision.sh          # pinned GMP, MPFR, FLINT, msolve, Julia + 
 tools/external/smoke/smoke.sh        # one shared system through every available tool
 ```
 
-Measured figures, under the protocol of §7.2:
-
-```sh
-# the six-round symbolic build, #243's before/after
-ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=40 \
-tools/benchlock.sh m25 env CARGO_TARGET_DIR="$PWD/target" RUSTC_WRAPPER="" \
-  timeout --signal=INT --kill-after=60s 7200 \
-  taskset --cpu-list 40 ./target/release/examples/resultant_cico \
-    --row poseidon31-cico-t16-rf2-rp4 --build-only
-
-# the Anemoi ladder, one registered row
-ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=0-7 \
-tools/benchlock.sh m25 env CARGO_TARGET_DIR="$PWD/target" RUSTC_WRAPPER="" \
-  timeout --signal=INT --kill-after=60s 1200 \
-  taskset --cpu-list 0-7 cargo run --release --example anemoi_ladder row anemoi64-cico-n5-fcico
-
-# the F4 live-entry ladder, #237. Background the binary directly: taskset execs and keeps
-# the pid, timeout forks and does not. Reading timeout's pid once reported 2 MB for a 14 GB run.
-tools/fetch-mq-challenge.sh
-cargo build --release --example scoreboard
-ZEEBRA_MAX_ENTRIES=20000000 ZEEBRA_AFFINITY=0-7 \
-  taskset --cpu-list 0-7 target/release/examples/scoreboard mq fukuoka-mq-III-n20-seed0 --seeds 1 &
-grep VmHWM /proc/$!/status
-```
+Measured figures were taken under the protocol of §7.2 with the `resultant_cico`, `anemoi_ladder`
+and `scoreboard` examples and `tools/fetch-mq-challenge.sh`, all moved out in #668; the commands are
+preserved at commit 9532a9a2.
 
 Development checks, matching CI:
 
@@ -865,13 +737,8 @@ uncounted.
 
 ### 13.2 Cryptanalytic position
 
-**Unchanged from M24 on official problems.** The hardest official problem solved remains Fukuoka MQ
-III `n = 15`. No official challenge was attempted in M25, and nothing here is a prize claim.
-
-**Faithful reductions: unchanged, and refused deliberately.** `rf4-rp2` was costed against the
-calibrated model and **not authorized** — §8.4.1. At ≈2.6 h against a ~2 h ceiling it fails on
-**time**, not memory, which only became visible once #289 measured the per-determinant cost at
-3.148 s rather than the 2.70 s on record. `rf6-rp0` is 16.15 h and every eight-round row is ≥490 d.
+*Two paragraphs — status on official challenge problems and the costed next Poseidon row — were
+moved out with the cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 
 **External calibration: extended from ten registered rows to thirty.** The Anemoi ladder now carries
 `N = 1..5` in both models at **three characteristics** — 65537, 2^32−209, 2^64−353 — with the 29
@@ -943,7 +810,7 @@ PCICO completed, kept because it is what produced the Magma row-count observatio
 - **PCICO is recorded as _not a result_.** It reached 3 177 s of its 5 400 s budget at a flat 4.53 GB
   and was killed by **none of its guards** — see §13.6a item 7.
 
-The authorization is recorded in `anemoi.md` §8a.5 as the **integration agent's** under §9's
+The authorization is recorded in anemoi.md §8a.5 (moved out in #668) as the **integration agent's** under §9's
 approximate threshold, **not** the repository owner's, together with the note that the reproduction
 category was decisive and the same cost would not have been authorized for a produce-only run.
 
@@ -955,8 +822,6 @@ conversion figures are unaffected, because #305 is an F4 change.
 
 | | M24 | M25 |
 |---|---|---|
-| hardest **official** problem solved | Fukuoka MQ III `n = 15` | unchanged |
-| **faithful reduction**, resultant route | 6 rounds, `rf2-rp4`, verified | unchanged — `rf4-rp2` costed and **refused** on time |
 | external comparand **on this machine** | none | **four engines**, pinned, one contract |
 | registered Anemoi rows | 10, one prime | **30**, three primes |
 | F4 peak RSS, `fukuoka-mq-III-n20-seed0` deg 5 | 13 996 MB | **1 496.5 MB** — 9.4x |
@@ -964,6 +829,9 @@ conversion figures are unaffected, because #305 is an F4 change.
 | determinant cost law | 2 points, cubic asserted | **5 orders**, 2.9953 ± 0.0285 fitted |
 | off-domain validation at six rounds | 19.97 s, 3.12% of the row | **2.82 s, 0.51%** |
 | scoreboards | 1 | **3** |
+
+*Two rows — the hardest official problem and the faithful-reduction round count — were moved out
+with the cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 
 ### 13.4 Performance improvements
 
@@ -1018,16 +886,8 @@ memory", and a budget that bounds one structure cannot bound the other.
 | **#287 hybrid / k=3 CICO** | **negative result**, on counting rather than cost | `⟨f,g⟩ ∩ F_p[x] = (0)` for `k = 3`: with two constraints and three parameters the variety is a **curve**, so there is **no univariate polynomial in the ideal** and every root-finding stage in the crate has **no input** — a structural impossibility, not a bad constant. The hybrid is capped by a verification-to-construction ratio of **7 × 10⁻⁸** (µs against 15.2 s), making its largest conceivable saving one part in 1.4 × 10⁷, so `W(b) = W(0)` for every `b`. And the per-family floor is **12.2 s against 15.2 s measured** — the `k = 1` route's last axis is worth 1.25x against a nine-order gap. The product is **not invariant across `k`; it is minimised at `k = c = 2`, where the resultant route already sits.** |
 | **#297 structured Sylvester** | **build axis 4 only** (Euclidean remainder sequence); axis 5 ruled out | **1 692x measured** at order 1 458 — the Euclidean route 1.343 ms against dense LU's 2.272 s, the latter cross-checking #312's independent 2.404 s single-worker figure to **5.5%** on a different binary and core. The new evidence that reopens a 2023 rejection: scoping moved from order 18 to order 1 458, taking the operation-count gap from **48x to 3 888x** and the stage from milliseconds to 67% of an unrunnable row. Axis 5's crossover sits at **`R > 8.7`** once LU's 2.20 ns multiply-subtract is charged against the remainder sequence's 5.05 ns multiply-add, which rules out the new subsystem. |
 
-**And axis 4 does not raise the reachable round count — that claim is withdrawn.** The "~99% of the
-route is determinants" figure is a **four-round** number, from `rf2-rp2` at order 162 on one core.
-At six rounds the resultant degree grows with the sample count, so root finding grows quadratically
-in `S` while the determinant stage grows linearly: `rf6-rp0` is **67% determinants**, and *after*
-axis 4 it is **78% root finding**. So axis 4 is 1 692x on the stage and **~3x on the row** —
-`rf6-rp0`'s determinants fall from 14.5 h to ~31 s and a **5.63 h root-finding tail** then dominates.
-Reaching `R = 7` needs axis 4 **and** #243 **and** a sub-quadratic root finder **and** a
-sub-quadratic interpolation: four walls, three of them serial quadratic stages with known fast
-algorithms the crate has not wired in. That is a better position than needing new mathematics, and
-it is **not** the position the stage figure alone describes.
+*A paragraph withdrawing axis 4's round-count claim, with its per-round cost projections, was moved
+out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 The Amdahl screen's **asymmetry** is why one table closes two issues and vindicates a third: **a
 ceiling bounds the conceivable, not the achievable.** That is decisive where even the free case is
@@ -1182,9 +1042,11 @@ M25's own predictions, scored:
 | predicted | prediction | observed | attribution |
 |---|---|---|---|
 | #243's transient | 56.6 GB | **57.0 GB** | within 1% — the one large memory prediction in this family that held, because it was arithmetic over a measured term count |
-| `rf4-rp2` total | ≈1.4 h (two-point) | **≈2.6 h** (calibrated) | the per-determinant anchor was 1.2x stale and the width penalty 4x understated. §13.6 items 6 |
 | Anemoi `N = 6` footprint | 3.64 GiB dense blocks | **4.53 GB RSS** | #286's memory projection was **correct** and predicted the **wrong blocker** — F4 binds, not FGLM (#323) |
 | #305's new binding site | *not predicted* | basis held twice, 60.4% | removing 88% of a peak promotes something else, and nothing had predicted what |
+
+*One row — the next Poseidon row's total cost — was moved out with the cryptanalysis research in
+#668; it is preserved at commit 9532a9a2.*
 
 The sharpest entry is #323: a projection can be numerically right and operationally useless. **FGLM
 checks its budgets from `D` before any allocation, so it fails in milliseconds and is cheap to
@@ -1344,8 +1206,7 @@ blind.
 **Ranked alternatives.** *Structure-exploiting algorithms* (#306 → #202) — the Griffin instance is
 now pinned including the attack's input parametrization, and the capability is costed; the obstacle
 is that it buys one family. *Harder resultants* (#297) — the only remaining asymptotic axis, but the
-baseline is now measurably clean, so there is no implementation slack to recover and `rf4-rp2` needs
-only ~1.3x while eight rounds needs three orders. *Boolean/SAT* (#218–#221) — the first same-machine
+baseline is now measurably clean, so there is no implementation slack to recover. *Boolean/SAT* (#218–#221) — the first same-machine
 external baseline outside Gröbner, and #272 notes `GF(2)` is profilable today. *Kernel
 specialization* — **not recommended**; that is what the Amdahl screen settled.
 

@@ -3,7 +3,7 @@
 //! ```text
 //! cargo run --release --example determinant_width                       # the default sweep
 //! cargo run --release --example determinant_width -- --kernel euclidean --order 1458
-//! cargo run --release --example determinant_width -- --pair row         # the rf4-rp2 pair
+//! cargo run --release --example determinant_width -- --pair triangular
 //! cargo run --release --example determinant_width -- --width 1 --width 32
 //! cargo run --release --example determinant_width -- --count-allocations
 //! ```
@@ -13,7 +13,7 @@
 //! That example's variable is the matrix **order** and it takes one worker count per invocation,
 //! so a width penalty assembled from it is a comparison across processes. #412's subject is the
 //! width itself: the 3.21x penalty on record was `1.109 ms` from one run of `determinant_sweep`
-//! divided into `3.563 ms` from the authorized `rf4-rp2` row, two different binaries, two
+//! divided into `3.563 ms` from a separately recorded 32-worker run — two different binaries, two
 //! different sessions, and two different **pairs**. A quantity that is a ratio of two numbers
 //! taken apart is not measured until both ends come out of one process.
 //!
@@ -35,12 +35,10 @@
 //!
 //! **The kernel, from the pair.** `--pair synthetic` is `determinant_sweep`'s — degree 1 in the
 //! surviving variable, so specializing costs one multiply-add per coefficient. `--pair triangular`
-//! is random of total degree `order / 2`, which is the shape a CICO row has. `--pair row` is the
-//! registered `rf4-rp2` row's own two outputs, at the cost of a 5.66 min symbolic build. On the
-//! last two the specialization is `(order / 2)²` Horner steps against the remainder sequence's
-//! `(order / 2)² / 2`, and it is **inside** the per-determinant timer — so running all three at
-//! the same widths says whether the recorded penalty is a property of the width or of the two ends
-//! having been taken over different pairs.
+//! is random of total degree `order / 2`, the shape of a bivariate straight-line program's outputs.
+//! There the specialization is `(order / 2)²` Horner steps against the remainder sequence's
+//! `(order / 2)² / 2`, and it is **inside** the per-determinant timer — so running both at the same
+//! widths says whether a penalty is a property of the width or of the pair.
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -52,15 +50,13 @@ use rand::{prelude::StdRng, SeedableRng};
 
 use zeebra::{
     fields::PrimeFieldElement64,
-    grobner::research::{
-        challenge, cico_bivariate, random_bivariate, time_sylvester_determinants,
-        ChallengeManifest, DeterminantKernel, Specialization, KOALABEAR_PRIME,
-    },
+    grobner::resultant::{random_bivariate, time_sylvester_determinants, DeterminantKernel},
     resultant_from_coefficients, FiniteField, Monomial, MultivariatePolynomial, One, Polynomial,
     UnivariatePolynomial, Zero,
 };
 
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
+/// KoalaBear, `2^31 - 2^24 + 1`, at 64-bit storage.
+type K = PrimeFieldElement64<2_130_706_433>;
 
 /// Allocation calls since the counter was armed, and whether it is armed.
 ///
@@ -97,11 +93,8 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static ALLOCATOR: Counting = Counting;
 
-/// The widths swept by default: every power of two out to the 32 the row ran at.
+/// The widths swept by default: every power of two out to 32.
 const WIDTHS: [usize; 6] = [1, 2, 4, 8, 16, 32];
-
-/// The row whose penalty is on record, and the only six-round row authorized to run (#367).
-const ROW: &str = "poseidon31-cico-t16-rf4-rp2";
 
 /// Which pair the determinants are taken over.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -109,16 +102,10 @@ enum Pair {
     /// `determinant_sweep`'s: degree 1 in the surviving variable, `order / 2` in the eliminated
     /// one, so the matrix order is the only thing that varies and specialization is nearly free.
     Synthetic,
-    /// Total degree `order / 2`, so the support is the triangle `i + j <= order / 2`.
-    ///
-    /// The **shape the registered rows actually have**: a CICO row of `R` rounds is a straight-line
-    /// program of total degree `3^R` in its two free inputs, so its coefficient of `y^j` is a
-    /// polynomial in `x` of degree `3^R − j`. This pair reproduces that at any order without the
-    /// symbolic build, which is 5.66 min at order 1 458.
+    /// Total degree `order / 2`, so the support is the triangle `i + j <= order / 2` and the
+    /// coefficient of `y^j` is a polynomial in `x` of degree `order / 2 − j` — the shape of a
+    /// straight-line program's two outputs in two free inputs.
     Triangular,
-    /// The registered row's two bivariate outputs, which is what the recorded 3.563 ms was taken
-    /// over.
-    Row,
 }
 
 /// The value of a `--flag <value>` argument, if it was given and parses.
@@ -213,7 +200,7 @@ fn subjects() -> Vec<Subject> {
 
 /// `f`'s coefficients in variable `eliminate`, as univariate polynomials in the other variable.
 ///
-/// `coefficients_in` in `src/grobner/research/resultant.rs` is private, and this is that function:
+/// `coefficients_in` in `src/grobner/resultant.rs` is private, and this is that function:
 /// the split the Euclidean kernel takes once per row, so the example can time the per-sample half
 /// of it separately from the remainder sequence.
 fn coefficients_in(
@@ -389,7 +376,7 @@ fn synthetic_pair(
     (f, g)
 }
 
-/// A pair of total degree `order / 2` with triangular support, which is a CICO row's shape.
+/// A pair of total degree `order / 2` with triangular support.
 fn triangular_pair(
     order: usize,
     seed: u64,
@@ -420,23 +407,6 @@ fn triangular_pair(
     let f = one();
     let g = one();
     (f, g)
-}
-
-/// The registered row's two bivariate outputs, built exactly as `resultant_cico` builds them.
-fn row_pair(
-    manifest: &ChallengeManifest,
-    seed: u64,
-) -> (MultivariatePolynomial<2, K>, MultivariatePolynomial<2, K>) {
-    let instance = manifest.cico_instance::<K>().expect("a registered problem");
-    let free = instance.free_inputs();
-    let variables: Vec<usize> = (2..free).collect();
-    let specialization =
-        Specialization::<46, K>::seeded(&variables, seed).expect("distinct indices");
-    let fixed: Vec<K> = (2..free)
-        .map(|i| specialization.value_of(i).expect("fixed"))
-        .collect();
-    let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
-    (outputs[0].clone(), outputs[1].clone())
 }
 
 /// One width's measurement of one subject.
@@ -637,8 +607,7 @@ fn main() {
     let pair_kind = match flag_string("--pair").as_deref() {
         None | Some("synthetic") => Pair::Synthetic,
         Some("triangular") => Pair::Triangular,
-        Some("row") => Pair::Row,
-        Some(other) => panic!("--pair takes synthetic, triangular or row, not {other}"),
+        Some(other) => panic!("--pair takes synthetic or triangular, not {other}"),
     };
     let widths = {
         let named = flag_values("--width");
@@ -673,26 +642,11 @@ fn main() {
         Pair::Triangular => {
             println!(
                 "Pair: **triangular**, Sylvester order {order} — random of total degree {}, so the \
-                 coefficient of `y^j` has degree {} − j in the surviving variable. This is the \
-                 **shape a CICO row has**, reproduced without the symbolic build.\n",
+                 coefficient of `y^j` has degree {} − j in the surviving variable.\n",
                 order / 2,
                 order / 2
             );
             Some(triangular_pair(order, 0x7_41a ^ order as u64))
-        }
-        Pair::Row => {
-            let manifest = challenge(ROW).expect("a registered row");
-            let at = Instant::now();
-            let pair = row_pair(&manifest, 0x5eed);
-            println!(
-                "Pair: **the registered `{ROW}` row**, built in {} — degrees {} and {} in the \
-                 surviving variable, which is the pair the recorded 3.563 ms 32-worker figure was \
-                 taken over. The build is per-row work and is outside every timer below.\n",
-                human(at.elapsed().as_secs_f64()),
-                degree_in(&pair.0, 0),
-                degree_in(&pair.1, 0),
-            );
-            Some(pair)
         }
     };
 

@@ -3,12 +3,11 @@
 Reference for M22-B (#74, #81). Every figure comes from
 
 ```sh
-tools/fetch-mq-challenge.sh
 cargo run --release --example hilbert_study
 ```
 
 under `F4Options::recommended()` with `profile_degrees`, grevlex throughout, degrees compared over
-`0..=12`.
+`0..=12`. The Fukuoka rows also needed `tools/fetch-mq-challenge.sh`, which was moved out in #668.
 
 **M22-B is diagnostic.** Nothing in this workstream discards work, and nothing correctness-critical
 consults a prediction. The question is whether the prediction is accurate enough, and early enough,

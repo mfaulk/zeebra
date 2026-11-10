@@ -11,6 +11,11 @@ cited beside it, and that document declares its own era. The one new result, §4
 Anemoi, is an algebraic fact (a minimal-polynomial degree against a quotient dimension) and carries
 no clock. The audit that re-read every figure below is pinned to `741c85d9`.
 
+`anemoi.md` and `additional-benchmarks.md`, cited throughout, were moved out with the cryptanalysis
+research in #668; they are preserved at commit 9532a9a2, and the section numbers cited below refer to
+that commit. The same holds for the `anemoi_ladder` example and the `anemoi_shape_position` test §4
+names.
+
 **The verdict, up front.**
 
 | # | alternative | verdict | the figure that settles it |
@@ -162,8 +167,8 @@ mean (`competitive-baseline.md` §2, `anemoi.md` §8a.7):
 the katsura family, nothing else in the benchmark corpus, and 76 of 120 differential fixtures.
 `fglm::shape` had never been pointed at a cryptanalytic system.
 
-It is now, by `examples/anemoi_ladder.rs shape` and by
-`tests/anemoi_shape_position.rs`, which pins the low rungs in the suite. The probe is
+It is now, by the `anemoi_ladder` example's `shape` subcommand and by the `anemoi_shape_position`
+test, which pinned the low rungs in the suite (both moved out in #668). The probe is
 **machine-independent** for the same reason the `dimensions` subcommand is: what it reports is the
 degree of the lex-last variable's minimal polynomial against `dim F_p[x]/I`, and shape position is
 exactly their equality. No environment is pinned and no clock is read.
@@ -173,8 +178,7 @@ variable count is `2N` for `FCICO` and `N + 1` for `PCICO`. Where a variable ind
 written `x_{n-1}` with `n` the variable count, which is what `shape_lex_basis` uses.
 
 **24 rows — `N = 1..4`, three characteristics (`65537`, `2^32 − 209`, `2^64 − 353`), both models — and
-every one is in shape position.** `cargo run --release --example anemoi_ladder shape n3`, one filter
-per rung:
+every one is in shape position.** One `anemoi_ladder shape` filter per rung:
 
 | rung | `D` | variables | deg of `x_{n-1}` | separating variables | shape basis equals the classical conversion's |
 |---|---:|---|---:|---|---|
@@ -200,7 +204,7 @@ Two things are stronger than #224 asked for:
 The equality in the last column is the correctness statement and is asserted rather than reported:
 the reduced lex basis is unique, so a shape basis that differs from the classical conversion's is
 simply wrong. That is how `examples/fglm_ablation.rs` validates every other FGLM strategy.
-`tests/anemoi_shape_position.rs` pins the `N = 1, 2` rows in the suite, where the whole probe costs
+`anemoi_shape_position` pinned the `N = 1, 2` rows in the suite, where the whole probe costs
 0.06 s.
 
 **Three things follow, and one of them does not.**

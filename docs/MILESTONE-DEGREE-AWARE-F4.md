@@ -1,4 +1,4 @@
-# M22 — Degree-Aware F4 and Cryptanalytic Matrix-Growth Control
+# M22 — Degree-Aware F4 and Matrix-Growth Control
 
 **Measured at:** publication bound `20e87e24` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
@@ -13,8 +13,9 @@ engines. The answer is **mostly no, in an informative way, with one clear win th
 direction the plan did not single out** — and with two of M21's conclusions corrected, plus two of
 M22's own after review (§6).
 
-Everything below is reproducible from this repository; §11 lists the commands. The Fukuoka instance
-files are not redistributed and are fetched by `tools/fetch-mq-challenge.sh`.
+Everything below is reproducible from this repository except §1.6–§1.7, whose
+`cryptanalysis_ladder` example moved out in #668; §11 lists the commands. The Fukuoka instance
+files are not redistributed and were fetched by `tools/fetch-mq-challenge.sh` (moved out in #668).
 
 **No correctness contract was weakened.** Every strategy this milestone added returns the identical
 reduced Gröbner basis, which is asserted over the correctness corpus under every monomial order and
@@ -244,7 +245,7 @@ The ordering M22's measurements support:
 | M22-0 | #106 | per-degree instrumentation and rank attribution; controlled Poseidon baseline |
 | M22-A | #107 | `PairSchedule`, and batch sizing measured apart from it |
 | M22-B | #108 | `grobner::hilbert` — exact Hilbert functions and the semiregular prediction |
-| M22-E | #111 | `research::reorder` and `research::linear`, both invertible; the controlled ladder |
+| M22-E | #111 | `research::reorder` and `research::linear` (now `grobner::transform::{reorder, affine}`), both invertible; the controlled ladder |
 | M22-C | #113 | `HilbertSelection`, and certification with explicit provenance |
 | M22-D | #114 | mutant and degree-regression instrumentation; no mode |
 | M22-I | this | the ablation, the Singular sweep over every strategy, this report |
@@ -499,12 +500,8 @@ overstated it severalfold. The published tables are from the corrected build.
 - **Two instances is not a curve.** The variable-order result is two Poseidon systems at one state
   width; the batch-cap result is two Fukuoka type III instances. Both are consistent and neither is
   a scaling law.
-- **No full-round Poseidon claim.** The 2026 initiative's CICO instance is `t = 16, R_F = 6, R_P = 8`
-  — 104 S-box variables plus fourteen free inputs — and the largest instance here has nine
-  variables. `CicoInstance::reduced_from` carries what each instance was reduced from so this cannot
-  be lost.
-- **The bounty's relaxed CICO verifier is still not modelled**: its condition is on the low bits of a
-  canonical integer representative, which is not a polynomial identity over the field.
+- *Two limitations about full-round Poseidon and bounty verifiers were moved out with the
+  cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 - **The semiregular model was validated on top forms**, which is a different ideal from the
   inhomogeneous system it is derived from. Every table that uses it says so.
 - **`F4Options::max_live_bytes` is a budget on matrix entries, not on the process.** It does not
@@ -567,13 +564,12 @@ fetched by a script and every test that needs it is `#[ignore]`d.
 ## 11. Reproducing
 
 ```sh
-tools/fetch-mq-challenge.sh                           # Fukuoka toy examples, not redistributed
+# Fukuoka toy examples, not redistributed: fetched by tools/fetch-mq-challenge.sh (moved out in #668)
 
 cargo run --release --example f4_degrees               # §1.1, §1.5, §1.7, §1.8
 cargo run --release --example f4_schedule              # §1.2
 cargo run --release --example hilbert_study            # §1.3
-cargo run --release --example hilbert_driven -- mq3-n10  # §1.4
-cargo run --release --example cryptanalysis_ladder     # §1.6, §1.7
+cargo run --release --example hilbert_driven -- list    # §1.4's MQ rows were removed in #668
 cargo run --release --example m22_ablation             # §3
 
 cargo test --lib                                       # §9

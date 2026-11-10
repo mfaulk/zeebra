@@ -61,7 +61,10 @@ use super::{
         Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
         RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
     },
-    corpus::{ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC},
+    corpus::{
+        ALTERNATE_CHARACTERISTIC, BINARY_CHARACTERISTIC, KOALABEAR_CHARACTERISTIC,
+        REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC, WIDE_64_CHARACTERISTIC,
+    },
     process::{CpuBasis, RssBasis},
 };
 /// The quotient dimension this adapter will enumerate to **report an invariant**.
@@ -74,12 +77,11 @@ use super::{
 const INVARIANT_DIMENSION_CEILING: usize = 1 << 20;
 
 use crate::{
-    fields::{PrimeFieldElement64, Zp32003},
+    fields::{PrimeFieldElement64, Zp2, Zp32003},
     grobner::{
         differential::polynomial_to_string,
         f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions, QuotientBasis},
-        research::{ANEMOI_64_PRIME, KOALABEAR_PRIME},
         F4Error, F4Options, IdealClass, InterreductionRoute,
     },
     util::peak_resident_bytes,
@@ -126,7 +128,7 @@ impl ZeebraSolver {
     ///
     /// Only then is a memory figure reported. `VmHWM` is process-wide, so in a process that ran
     /// several rows the figure is a ceiling over all of them and over whatever built their inputs
-    /// — the same hazard `measured_peak_rows_in_process` records on the cryptanalysis board. Here
+    /// — a ceiling, not a per-row figure. Here
     /// the sweep harness runs one process per measured row and sets this; a multi-row exploratory
     /// run does not, and its rows carry no memory figure at all.
     pub fn measuring_one_row(mut self) -> Self {
@@ -172,10 +174,13 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
         // Montgomery field — so a small-prime row measures the narrow arithmetic regime rather
         // than the 64-bit path at a small modulus.
         SMALL_PRIME_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10, 11, 14],
-        // The three planted Poseidon rows.
-        KOALABEAR_PRIME => &[5, 7, 9],
-        // Anemoi FCICO at N = 1 and 2.
-        ANEMOI_64_PRIME => &[2, 4],
+        // The binary corpus publishes only the Cyclic family.
+        BINARY_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10],
+        // KoalaBear and 2^64 - 353 at the widths their callers' systems have been measured at.
+        // A caller needing another width adds it here; see #668.
+        KOALABEAR_CHARACTERISTIC => &[5, 7, 9],
+        WIDE_64_CHARACTERISTIC => &[2, 4],
+
         _ => &[],
     }
 }
@@ -517,6 +522,20 @@ impl ZeebraSolver {
     /// Parse and solve, dispatching on the characteristic and then the variable count.
     fn dispatch(&self, instance: &Instance, task: Task) -> Result<Solved, RunFailure> {
         match instance.field.characteristic {
+            BINARY_CHARACTERISTIC => dispatch!(
+                Zp2,
+                instance,
+                task,
+                &self.f4_options,
+                &self.fglm_options,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10
+            ),
             SMALL_PRIME_CHARACTERISTIC => dispatch!(
                 Zp32003,
                 instance,
@@ -565,8 +584,8 @@ impl ZeebraSolver {
                 11,
                 14
             ),
-            KOALABEAR_PRIME => dispatch!(
-                PrimeFieldElement64<KOALABEAR_PRIME>,
+            KOALABEAR_CHARACTERISTIC => dispatch!(
+                PrimeFieldElement64<KOALABEAR_CHARACTERISTIC>,
                 instance,
                 task,
                 &self.f4_options,
@@ -575,8 +594,8 @@ impl ZeebraSolver {
                 7,
                 9
             ),
-            ANEMOI_64_PRIME => dispatch!(
-                PrimeFieldElement64<ANEMOI_64_PRIME>,
+            WIDE_64_CHARACTERISTIC => dispatch!(
+                PrimeFieldElement64<WIDE_64_CHARACTERISTIC>,
                 instance,
                 task,
                 &self.f4_options,
@@ -656,12 +675,6 @@ impl ExternalSolver for ZeebraSolver {
             // parametrization and not an enumeration (`msolve.rs` §3.5), and Singular's `solve`
             // is numerical. A column with one operand is not a comparison.
             Task::OneFiniteFieldSolution | Task::AllFiniteFieldSolutions => {
-                return Support::No(Unsupported::Task { task });
-            }
-            // Not a Gröbner task and not this board's: a witness's correctness check is against
-            // the primitive rather than against a basis, and it lives in the cryptanalysis
-            // scoreboard. Refused here for where it belongs, not for want of a comparand.
-            Task::CryptanalyticWitness => {
                 return Support::No(Unsupported::Task { task });
             }
         }
@@ -754,6 +767,40 @@ mod tests {
         Limits::wall(Duration::from_secs(60))
     }
 
+    /// Zeebra answers a `GF(2)` Cyclic rung, and refuses a width it does not compile there as an
+    /// **adapter** limit rather than an engine one.
+    #[test]
+    fn test_zeebra_answers_a_gf2_cyclic_rung_and_names_its_adapter_limit() {
+        use crate::grobner::external::corpus::BINARY_CHARACTERISTIC;
+
+        let cyclic = instance("cyclic-5", BINARY_CHARACTERISTIC, GREVLEX).expect("builds");
+        assert_eq!(cyclic.field.characteristic, 2);
+        let mut solver = ZeebraSolver::new();
+        assert!(matches!(
+            solver.supports(&cyclic, Task::ReducedGrobnerBasis),
+            Support::Yes
+        ));
+        let report = solver.run(&cyclic, Task::ReducedGrobnerBasis, &limits());
+        let answer = match &report.status {
+            RunStatus::Complete(answer) => answer,
+            other => panic!("expected Complete, got {:?}", other),
+        };
+        // The 70 points survive the reduction mod 2, and four external engines agree.
+        assert_eq!(answer.invariants.quotient_dimension, Some(70));
+
+        // `katsura-11` has no compiled GF(2) instantiation, because GF(2) is published for Cyclic
+        // alone. The refusal must say it is this file's limit and not Zeebra's.
+        let katsura = instance("katsura-11", BINARY_CHARACTERISTIC, GREVLEX).expect("builds");
+        match solver.supports(&katsura, Task::ReducedGrobnerBasis) {
+            Support::No(Unsupported::Representation { detail }) => assert!(
+                detail.contains("adapter monomorphization limit"),
+                "{}",
+                detail
+            ),
+            other => panic!("expected an adapter-limit refusal, got {:?}", other),
+        }
+    }
+
     /// Zeebra answers a corpus rung with a basis and the invariants a cross-check compares.
     #[test]
     fn test_zeebra_answers_a_corpus_rung_with_invariants() {
@@ -830,11 +877,7 @@ mod tests {
     fn test_the_remaining_refusals_are_the_three_that_have_a_reason() {
         let katsura = instance("katsura-4", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
         let solver = ZeebraSolver::new();
-        for task in [
-            Task::OneFiniteFieldSolution,
-            Task::AllFiniteFieldSolutions,
-            Task::CryptanalyticWitness,
-        ] {
+        for task in [Task::OneFiniteFieldSolution, Task::AllFiniteFieldSolutions] {
             assert_eq!(
                 solver.supports(&katsura, task),
                 Support::No(Unsupported::Task { task }),
@@ -1325,9 +1368,9 @@ mod tests {
     /// Every corpus field compiles the dimensions its own families need, and no others.
     ///
     /// Derived from the ladder rather than written out, so a rung added at a new width fails here
-    /// until the adapter compiles it — which is the coupling the hard-coded list used to hide. The
-    /// registry fields are excluded because their widths follow from a round count rather than from
-    /// a rung name.
+    /// until the adapter compiles it — which is the coupling the hard-coded list used to hide.
+    /// KoalaBear and `2^64 - 353` carry no ladder rung; their widths are the ones callers' systems
+    /// have been measured at.
     #[test]
     fn test_each_field_compiles_the_dimensions_its_families_need() {
         use std::collections::BTreeSet;

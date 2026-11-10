@@ -515,7 +515,8 @@ pub type Bn254Fr = PrimeFieldElement256<Bn254FrModulus>;
 /// The replacement for the deprecated
 /// [`Zp221360928884514619393`](crate::fields::Zp221360928884514619393), which is the same field
 /// over a `u128` that reduces by software long division. Same modulus, same arithmetic, and
-/// multiplication and inversion are faster by the factors recorded in the README's field table.
+/// multiplication and inversion are faster by the factors recorded in
+/// `docs/guide/finite-fields.md`'s field table.
 pub type Proth68Fr = PrimeFieldElement256<Proth68FrModulus>;
 
 /// The BLS12-381 curve's scalar field, of 255-bit prime order.

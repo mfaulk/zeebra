@@ -1,4 +1,4 @@
-//! The two multivariate GCD routes, measured against each other.
+//! The three multivariate GCD routes, measured against each other.
 //!
 //! Issue #407. #128 landed the primitive PRS and published **no timings at all**; Collins'
 //! subresultant PRS then became the default on correctness evidence and an asserted operation
@@ -15,9 +15,14 @@
 //!   GCDs for the whole computation. Coefficients then grow, bounded by Hadamard rather than
 //!   unboundedly, and in a *sparse* representation growth costs terms as well as bits.
 //!
-//! So the subresultant route trades recursion for size, and whether that pays is a measurement on
-//! the shape of the input. This sweep varies the three things that should decide it: the arity, the
-//! shared factor's size, and the cofactors' size.
+//! - **Brown's modular route** (#434) does no Euclidean step at all: it fixes the other variables
+//!   at field elements, solves the univariate problems and interpolates the answer back, so neither
+//!   coefficient growth nor a content recursion arises. It is the only route that can **refuse** —
+//!   prime fields only, and more elements than the degree it interpolates over.
+//!
+//! So the two sequences trade recursion for size and Brown's declines the trade, and whether either
+//! pays is a measurement on the shape of the input. This sweep varies the three things that should
+//! decide it: the arity, the shared factor's size, and the cofactors' size.
 //!
 //! Every timed result goes through `std::hint::black_box`, and the two routes are asserted equal at
 //! every shape before the clock starts — a comparison of routes that disagree is worthless.
@@ -27,17 +32,26 @@
 //! cargo run --release --example gcd_routes -- bn254
 //! ```
 
-use std::time::{Duration, Instant};
+use std::{
+    cell::RefCell,
+    time::{Duration, Instant},
+};
 
 use rand::{prelude::StdRng, Rng, SeedableRng};
 use zeebra::{
     fields::{Bn254Fr, KoalaBear, PrimeFieldElement64},
     util::peak_resident_bytes,
-    FiniteField, GcdRoute, Monomial, MonomialOrder, MultivariatePolynomial,
+    FiniteField, GcdRoute, KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
 /// Goldilocks, `2^64 - 2^32 + 1`.
 type Goldilocks = PrimeFieldElement64<18_446_744_069_414_584_321>;
+
+thread_local! {
+    /// The first refusal Brown's route gave on this field, so the reason is reported once rather
+    /// than once a shape — and so a column of blanks is never left unexplained.
+    static REFUSAL: RefCell<Option<String>> = const { RefCell::new(None) };
+}
 
 /// Each arm's time is its fastest over at most this many interleaved repetitions, or fewer when
 /// one pass already costs more than `PAIR_BUDGET`.
@@ -75,6 +89,8 @@ struct Shape {
 struct Row {
     primitive: Duration,
     subresultant: Duration,
+    /// `None` where Brown's route refused this shape over this field, with the reason printed once.
+    brown: Option<Duration>,
     repetitions: usize,
 }
 
@@ -166,7 +182,7 @@ fn planted<const N: usize, F: FiniteField>(
 }
 
 /// Both routes at one shape, interleaved, each reported as its fastest pass.
-fn pair<const N: usize, F: FiniteField>(
+fn pair<const N: usize, F: KnownOrder>(
     f: &MultivariatePolynomial<N, F>,
     g: &MultivariatePolynomial<N, F>,
 ) -> Row {
@@ -177,10 +193,32 @@ fn pair<const N: usize, F: FiniteField>(
         "the two GCD routes disagree, so a timing comparison between them means nothing"
     );
 
-    let mut best = (Duration::MAX, Duration::MAX);
+    // Brown's route can refuse, so whether it is timed at all is decided before the clock starts —
+    // and when it answers, it must agree, or there is nothing to compare.
+    let brown_applies = match f.try_gcd_by(g, GcdRoute::Brown) {
+        Ok(value) => {
+            assert_eq!(
+                value, subresultant,
+                "Brown's route disagrees with the references, so timing it means nothing"
+            );
+            true
+        }
+        Err(refusal) => {
+            REFUSAL.with(|slot| {
+                if slot.borrow().is_none() {
+                    *slot.borrow_mut() = Some(refusal.to_string());
+                }
+            });
+            false
+        }
+    };
+
+    let mut best = (Duration::MAX, Duration::MAX, Duration::MAX);
     let mut spent = Duration::ZERO;
     let mut taken = 0;
     while taken < MAX_REPETITIONS && spent < PAIR_BUDGET {
+        // Interleaved, arm by arm within one repetition, so a drift in the box's speed falls on
+        // all three rather than on whichever ran last.
         let start = Instant::now();
         let value = f.gcd_by(g, GcdRoute::PrimitivePrs);
         let primitive_time = start.elapsed();
@@ -191,29 +229,56 @@ fn pair<const N: usize, F: FiniteField>(
         let subresultant_time = start.elapsed();
         std::hint::black_box(&value);
 
+        let brown_time = if brown_applies {
+            let start = Instant::now();
+            let value = f.try_gcd_by(g, GcdRoute::Brown);
+            let elapsed = start.elapsed();
+            std::hint::black_box(&value);
+            elapsed
+        } else {
+            Duration::ZERO
+        };
+
         best.0 = best.0.min(primitive_time);
         best.1 = best.1.min(subresultant_time);
-        spent += primitive_time + subresultant_time;
+        if brown_applies {
+            best.2 = best.2.min(brown_time);
+        }
+        spent += primitive_time + subresultant_time + brown_time;
         taken += 1;
     }
     Row {
         primitive: best.0,
         subresultant: best.1,
+        brown: brown_applies.then_some(best.2),
         repetitions: taken,
     }
 }
 
 /// One arity's sweep over every shape.
-fn sweep<const N: usize, F: FiniteField>(seed: u64) -> (usize, usize) {
+fn sweep<const N: usize, F: KnownOrder>(seed: u64) -> (usize, usize) {
     println!(
-        "\n| {:>7} | {:>7} | {:>5} | {:>7} | {:>7} | {:>13} | {:>13} | {:>9} | {:>5} |",
-        "vars", "shared", "exp", "cofact", "f terms", "primitive/s", "subres/s", "speedup", "reps"
+        "\n| {:>7} | {:>7} | {:>5} | {:>7} | {:>7} | {:>13} | {:>13} | {:>13} | {:>9} | {:>9} | {:>5} |",
+        "vars",
+        "shared",
+        "exp",
+        "cofact",
+        "f terms",
+        "primitive/s",
+        "subres/s",
+        "brown/s",
+        "sub/prim",
+        "sub/brown",
+        "reps"
     );
-    println!("{}", rule(&[9, 9, 7, 9, 9, 15, 15, 11, 7]));
+    println!("{}", rule(&[9, 9, 7, 9, 9, 15, 15, 15, 11, 11, 7]));
 
     let mut rng = StdRng::seed_from_u64(seed);
     let mut subresultant_wins = 0;
     let mut primitive_wins = 0;
+    let mut brown_wins = 0;
+    let mut brown_losses = 0;
+    let mut brown_refusals = 0;
 
     let limit = if N >= 4 {
         WIDE_ARITY_SHAPES.min(SHAPES.len())
@@ -244,8 +309,16 @@ fn sweep<const N: usize, F: FiniteField>(seed: u64) -> (usize, usize) {
             primitive_wins += 1;
         }
 
+        let brown_cell = match row.brown {
+            Some(brown) => format!("{:>13.8}", brown.as_secs_f64()),
+            None => format!("{:>13}", "refused"),
+        };
+        let brown_ratio = match row.brown {
+            Some(brown) => format!("{:>9.2}", brown.as_secs_f64() / subresultant.as_secs_f64()),
+            None => format!("{:>9}", "-"),
+        };
         println!(
-            "| {:>7} | {:>7} | {:>5} | {:>7} | {:>7} | {:>13.8} | {:>13.8} | {:>9.2} | {:>5} |",
+            "| {:>7} | {:>7} | {:>5} | {:>7} | {:>7} | {:>13.8} | {:>13.8} | {} | {:>9.2} | {} | {:>5} |",
             N,
             shape.shared_terms,
             shape.max_exponent,
@@ -253,17 +326,52 @@ fn sweep<const N: usize, F: FiniteField>(seed: u64) -> (usize, usize) {
             f.terms().len(),
             primitive.as_secs_f64(),
             subresultant.as_secs_f64(),
+            brown_cell,
             speedup,
+            brown_ratio,
             row.repetitions,
+        );
+        if let Some(brown) = row.brown {
+            let ratio = brown.as_secs_f64() / subresultant.as_secs_f64();
+            if ratio > 1.1 {
+                brown_losses += 1;
+            } else if ratio < 1.0 / 1.1 {
+                brown_wins += 1;
+            }
+        } else {
+            brown_refusals += 1;
+        }
+    }
+    if brown_refusals > 0 {
+        let reason = REFUSAL
+            .with(|slot| slot.borrow().clone())
+            .unwrap_or_else(|| "no reason recorded".to_string());
+        println!(
+            "- Brown's route refused {brown_refusals} of {limit} shapes at {N} variables: {reason}"
+        );
+    }
+    if brown_wins + brown_losses > 0 {
+        println!(
+            "- where it answered, Brown's route beat the default on {brown_wins} shapes by more \
+             than 10% and lost on {brown_losses}"
         );
     }
     (subresultant_wins, primitive_wins)
 }
 
+/// The one-minute load average, or zero where `/proc` does not carry one.
+fn one_minute_load() -> f64 {
+    std::fs::read_to_string("/proc/loadavg")
+        .ok()
+        .and_then(|line| line.split_whitespace().next()?.parse().ok())
+        .unwrap_or(0.0)
+}
+
 /// One field, every arity.
-fn measure_field<F: FiniteField>(name: &str, seed: u64) {
+fn measure_field<F: KnownOrder>(name: &str, seed: u64) {
     println!("\n\n## {name}");
     println!("\n- an element is {} bytes", std::mem::size_of::<F>());
+    REFUSAL.with(|slot| *slot.borrow_mut() = None);
     let mut subresultant = 0;
     let mut primitive = 0;
     for (arity, result) in [
@@ -297,13 +405,29 @@ fn measure_field<F: FiniteField>(name: &str, seed: u64) {
 fn main() {
     let which = std::env::args().nth(1).unwrap_or_else(|| "all".into());
 
-    println!("# The multivariate GCD routes: primitive PRS against Collins' subresultant PRS");
+    println!("# The multivariate GCD routes: two remainder sequences against Brown's modular");
     println!("\nISA: {}", zeebra::util::isa_floor());
-    println!("\nIssue #407. #128 published no timings, so this is the first figure for either.");
     println!(
-        "\n- each timed figure is the fastest of up to {MAX_REPETITIONS} interleaved repetitions"
+        "\nIssues #407 and #434. #128 published no timings, so the per-route absolute figures here \
+         began with #407 and the Brown's column with #434."
     );
-    println!("- the two routes are asserted equal at every shape before the clock starts");
+    println!(
+        "\n- one-minute load at the start of this run: **{:.2}**. There is no gate: the quantity \
+         this sweep reports is a **ratio** between routes timed arm-by-arm inside one repetition, \
+         and a ratio taken that way survives ambient contention — `graeffe-root-finding.md` §6.3.2 \
+         is where that was measured rather than assumed. The absolute seconds columns do **not** \
+         survive it, and two runs at different loads should be compared by their ratios only.",
+        one_minute_load()
+    );
+    println!(
+        "- each timed figure is the fastest of up to {MAX_REPETITIONS} interleaved repetitions"
+    );
+    println!("- all three routes are asserted equal at every shape before the clock starts");
+    println!(
+        "- Brown's route can **refuse** — it needs a prime field with more elements than the \
+         degree it interpolates over — and where it does, the cell reads `refused` and the reason \
+         is printed once per field rather than once per shape"
+    );
     println!("- `f terms` is the term count of the product actually handed to the GCD");
     println!(
         "- the monomial order throughout is {}",

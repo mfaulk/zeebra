@@ -26,7 +26,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{HashSet, VecDeque},
+    collections::{hash_map::Entry, HashSet, VecDeque},
 };
 
 use crate::{
@@ -34,7 +34,7 @@ use crate::{
         f4::{divmask::DivmaskCalibration, options::ReducerSelection},
         pairs::CriticalPair,
     },
-    poly::MonomialOrder,
+    poly::{MonomialMap, MonomialOrder},
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
@@ -755,6 +755,15 @@ pub struct PreprocessedRow<const N: usize> {
     pub kind: RowKind,
 }
 
+/// A monomial's position in [`Preprocessed::monomials`].
+///
+/// `u32` rather than `usize` because there is one of these per matrix *entry* and entries outnumber
+/// columns by the average column density — 11.5x to 39.8x on the corpus (#621) — so the width is
+/// the dominant term in what the handles cost. A batch with more than `u32::MAX` distinct monomials
+/// would need 96 GB for the arena alone, so the narrowing is not a limit anything can reach; the
+/// conversion in [`enqueue`] is checked rather than wrapping all the same, once per column.
+pub type MonomialHandle = u32;
+
 /// The rows a batch of critical pairs reduces to, and the leading monomials they already cover.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Preprocessed<const N: usize> {
@@ -767,7 +776,8 @@ pub struct Preprocessed<const N: usize> {
     /// relation the batch already represented, and only a pivot outside it is new.
     pub leading_monomials: MonomialSet<N>,
 
-    /// Every distinct monomial appearing in any row — which is exactly the matrix's column set.
+    /// Every distinct monomial appearing in any row — which is exactly the matrix's column set —
+    /// in the order the closure first met it, so a monomial's index is its [`MonomialHandle`].
     ///
     /// Preprocessing has to intern these anyway to deduplicate its own work queue, so handing the
     /// set on saves [`MacaulayMatrix::build`](super::macaulay::MacaulayMatrix::build) hashing
@@ -775,22 +785,36 @@ pub struct Preprocessed<const N: usize> {
     /// implementation: the queue is fed from row terms and nothing else, and every row's terms are
     /// fed to it, so the set of monomials examined and the set of columns are the same set.
     /// `macaulay.rs`'s `test_preprocessing_interns_exactly_the_column_set` is what keeps that true.
-    pub monomials: MonomialSet<N>,
+    pub monomials: Vec<Monomial<N>>,
+
+    /// The handle of every row term: row by row in `rows` order, and within a row in the basis
+    /// element's own descending term order.
+    ///
+    /// This is what #621 is: the column of an entry is discovered here, once, and the scatter reads
+    /// it through the handle instead of rederiving `monomial * multiplier` and hashing it again.
+    /// A row's terms are a *contiguous* run of this vector, `basis.element(row.basis_index).terms`
+    /// long, which is why no per-row offset is stored — the layout is implied by the rows and the
+    /// basis, and `MacaulayMatrix::build_measured` walks the two together.
+    pub term_handles: Vec<MonomialHandle>,
 
     /// What finding those rows cost.
     pub counts: SymbolicCounts,
 }
 
 impl<const N: usize> Preprocessed<N> {
-    /// Drop [`Preprocessed::monomials`], which nothing needs once the matrix has its columns.
+    /// Drop what interning produced — [`Preprocessed::monomials`] and
+    /// [`Preprocessed::term_handles`] — which nothing needs once the matrix has its columns.
     ///
-    /// Called by the reduction step the moment construction returns. Without it the set would stay
+    /// Called by the reduction step the moment construction returns. Without it they would stay
     /// live for the rest of the batch — through elimination, where the dense backend's buffer is —
     /// and the handout would have traded a hash pass for a working-set increase. #536 is the
-    /// precedent for not leaving that to be argued about: the set is released at the point the
-    /// old code freed its own copy, so the peak is no worse than before the handout.
+    /// precedent for not leaving that to be argued about: both are released at the point the
+    /// old code freed its own copy, so the peak is no worse than before the handout. The handles
+    /// make that discipline matter more, not less: the arena is `num_columns` monomials and the
+    /// handles are `num_nonzeros` words, which is the larger of the two by the column density.
     pub fn release_monomials(&mut self) {
-        self.monomials = MonomialSet::default();
+        self.monomials = Vec::new();
+        self.term_handles = Vec::new();
     }
 
     /// The leading monomial of the row at `index`.
@@ -1009,12 +1033,24 @@ fn close_over_rows<const N: usize, F: FiniteField>(
     selection: ReducerSelection,
     cache: &mut ReducerCache<N>,
 ) -> Result<Preprocessed<N>, RowBudgetExceeded> {
-    let mut examined: MonomialSet<N> = MonomialSet::default();
+    // The interner the queue deduplicates through. It assigns each distinct monomial a handle as a
+    // side effect of the test it was already making, which is the whole of #621: `term_handles`
+    // records what the test already found, so the row scatter has a column to read rather than a
+    // monomial to rederive and hash again.
+    let mut examined: MonomialMap<N, MonomialHandle> = MonomialMap::default();
+    let mut monomials: Vec<Monomial<N>> = Vec::new();
+    let mut term_handles: Vec<MonomialHandle> = Vec::new();
     let mut pending: VecDeque<Monomial<N>> = VecDeque::new();
 
     for row in &rows {
         for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
-            enqueue(monomial, &mut pending, &mut examined, &mut counts);
+            term_handles.push(enqueue(
+                monomial,
+                &mut pending,
+                &mut examined,
+                &mut monomials,
+                &mut counts,
+            ));
         }
     }
     counts.max_pending_monomials = counts.max_pending_monomials.max(pending.len());
@@ -1043,8 +1079,18 @@ fn close_over_rows<const N: usize, F: FiniteField>(
         }
 
         covered.insert(monomial);
+        // The handles of this row's terms are appended before the row is, so `term_handles` stays
+        // in `rows` order and a row's run of it is found by walking the two together. The row
+        // budget was checked above, so there is no path that appends handles for a row that is
+        // never pushed.
         for (shifted, _) in basis.shifted_terms(basis_index, &multiplier) {
-            enqueue(shifted, &mut pending, &mut examined, &mut counts);
+            term_handles.push(enqueue(
+                shifted,
+                &mut pending,
+                &mut examined,
+                &mut monomials,
+                &mut counts,
+            ));
         }
         // Sampled here rather than after a pop, because the queue grows only in `enqueue` and
         // every push of an iteration happens in the run just above: this is the exact high-water
@@ -1061,26 +1107,43 @@ fn close_over_rows<const N: usize, F: FiniteField>(
     Ok(Preprocessed {
         rows,
         leading_monomials: covered,
-        monomials: examined,
+        monomials,
+        term_handles,
         counts,
     })
 }
 
-/// Offer `monomial` to the pending queue, admitting it only if `examined` had not seen it.
+/// Offer `monomial` to the pending queue, admitting it only if `examined` had not seen it, and
+/// return its handle either way.
 ///
-/// Counts the offer either way, so `monomials_enqueued` keeps the pre-deduplication meaning the
+/// Counts the offer either way too, so `monomials_enqueued` keeps the pre-deduplication meaning the
 /// recorded memory figures were taken against. See the argument at the call site in
 /// [`symbolic_preprocessing_with`] for why admitting here rather than on pop leaves the closure,
 /// the rows and their order unchanged.
+///
+/// The handle costs nothing that the deduplication test was not already paying: one hash of the
+/// monomial, one probe. `entry` rather than `insert` only so the occupied case can report the
+/// handle it finds.
 fn enqueue<const N: usize>(
     monomial: Monomial<N>,
     pending: &mut VecDeque<Monomial<N>>,
-    examined: &mut MonomialSet<N>,
+    examined: &mut MonomialMap<N, MonomialHandle>,
+    monomials: &mut Vec<Monomial<N>>,
     counts: &mut SymbolicCounts,
-) {
+) -> MonomialHandle {
     counts.monomials_enqueued += 1;
-    if examined.insert(monomial) {
-        pending.push_back(monomial);
+    match examined.entry(monomial) {
+        Entry::Occupied(seen) => *seen.get(),
+        Entry::Vacant(slot) => {
+            // Checked once per *column* rather than per entry, so the cost is nil, and a wrap here
+            // would be a silently wrong matrix rather than a refusal.
+            let handle = MonomialHandle::try_from(monomials.len())
+                .expect("a batch holds fewer distinct monomials than a handle can name");
+            monomials.push(monomial);
+            slot.insert(handle);
+            pending.push_back(monomial);
+            handle
+        }
     }
 }
 
@@ -1092,6 +1155,11 @@ fn enqueue<const N: usize>(
 /// argument at the push site, and the half that matters, because two different closures can reach
 /// the same reduced basis by different matrices. A reimplementation rather than a runtime flag,
 /// because a flag would let the unbounded discipline reach a caller.
+///
+/// Pop-time deduplication has no handle to hand out when a term is pushed, so the arena and the
+/// per-term handles are recovered in a second pass once the closure is complete. That keeps
+/// [`Preprocessed`]'s layout invariant total — a caller could build a matrix from this — at a cost
+/// that does not matter in a route only the test suite calls.
 #[cfg(test)]
 pub(crate) fn symbolic_preprocessing_pop_deduplicated<const N: usize, F: FiniteField>(
     basis: &MonicBasis<N, F>,
@@ -1162,10 +1230,27 @@ pub(crate) fn symbolic_preprocessing_pop_deduplicated<const N: usize, F: FiniteF
         });
     }
 
+    // The second pass. It visits the rows in order and each row's terms in order, which is exactly
+    // the sequence the push-time discipline interns in, so the arena it builds is the same one.
+    let mut handle_of: MonomialMap<N, MonomialHandle> = MonomialMap::default();
+    let mut monomials: Vec<Monomial<N>> = Vec::new();
+    let mut term_handles: Vec<MonomialHandle> = Vec::new();
+    for row in &rows {
+        for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
+            let next = MonomialHandle::try_from(monomials.len()).expect("a handle names it");
+            let handle = *handle_of.entry(monomial).or_insert(next);
+            if handle == next {
+                monomials.push(monomial);
+            }
+            term_handles.push(handle);
+        }
+    }
+
     Ok(Preprocessed {
         rows,
         leading_monomials: covered,
-        monomials: examined,
+        monomials,
+        term_handles,
         counts,
     })
 }

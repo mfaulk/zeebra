@@ -157,14 +157,6 @@ pub enum Task {
     /// For a zero-dimensional ideal in shape position this is the univariate polynomial a lex
     /// basis ends with, but a tool may produce it without producing the rest of the basis.
     UnivariateEliminant,
-
-    /// A witness for a cryptanalytic statement — a CICO preimage, a collision — verified against
-    /// the primitive rather than against a basis.
-    ///
-    /// The only task whose correctness check is not algebraic, and the only one whose value is a
-    /// *claim about a cipher*. It lives in the existing cryptanalysis scoreboard and not in the
-    /// competitive board.
-    CryptanalyticWitness,
 }
 
 impl Task {
@@ -179,12 +171,11 @@ impl Task {
             Self::OneFiniteFieldSolution => "one-finite-field-solution",
             Self::AllFiniteFieldSolutions => "all-finite-field-solutions",
             Self::UnivariateEliminant => "univariate-eliminant",
-            Self::CryptanalyticWitness => "cryptanalytic-witness",
         }
     }
 
     /// Every task, for a renderer that must enumerate columns.
-    pub fn all() -> [Task; 7] {
+    pub fn all() -> [Task; 6] {
         [
             Self::ReducedGrobnerBasis,
             Self::LexBasis,
@@ -192,7 +183,6 @@ impl Task {
             Self::OneFiniteFieldSolution,
             Self::AllFiniteFieldSolutions,
             Self::UnivariateEliminant,
-            Self::CryptanalyticWitness,
         ]
     }
 
@@ -299,7 +289,7 @@ impl Display for FieldSpec {
 /// accept.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Instance {
-    /// A stable identifier, for example `katsura-8` or `anemoi-2-cico-r6`.
+    /// A stable identifier, for example `katsura-8` or `mq-random-10`.
     pub name: String,
 
     /// The family this instance belongs to, for grouping a board: `katsura`, `cyclic`, `mq`.
@@ -360,8 +350,7 @@ impl Instance {
     ///
     /// Line-oriented and ASCII so that the digest can be reproduced by hand or in another
     /// language, which is the property that lets an external tool's own harness agree on an
-    /// instance's identity. Follows
-    /// [`ChallengeManifest::canonical`](crate::grobner::research::ChallengeManifest) in shape.
+    /// instance's identity.
     ///
     /// The name is **not** covered: renaming an instance must not make it a different problem,
     /// and two differently-named identical systems must collide so that the collision is visible.

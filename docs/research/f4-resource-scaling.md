@@ -53,11 +53,11 @@ nothing, and — separately — **the budget is not what bounds the memory.**
 M23's full-width frontier ran at 20 000 000 live entries, 200 000 columns, and a wall clock that
 never bound. Under it, fourteen of eighteen full-width Poseidon rows crossed the entry cap at
 **degree 4 or 5**, and `fukuoka-mq-III-n20-seed0` crossed it at degree 5 after 67.5 s
-([`fukuoka-mq.md`](fukuoka-mq.md) §4.1). Those are modest budgets against a 503 GB workstation, and
-`MILESTONE-CRYPTANALYSIS-SCOREBOARD.md` §5b.2 had just moved the binding bound from columns to
+(`fukuoka-mq.md` §4.1 (moved out in #668)). Those are modest budgets against a 503 GB workstation, and
+`MILESTONE-CRYPTANALYSIS-SCOREBOARD.md` §5b.2 (moved out in #668) had just moved the binding bound from columns to
 entries — so the entry cap was the right axis to sweep and nobody had swept it.
 
-The knobs already existed. `examples/scoreboard.rs` reads `ZEEBRA_MAX_ENTRIES` and
+The knobs already existed. `examples/scoreboard.rs` (moved out in #668) reads `ZEEBRA_MAX_ENTRIES` and
 `ZEEBRA_WALL_SECONDS`, and the comment at the call site states their purpose in exactly these
 terms. So this is a measurement campaign and not a build, and **no default was changed by it** —
 every M23 figure still reproduces from the default configuration.
@@ -183,7 +183,7 @@ shape of the omission**, neither of which the caveat carries:
   takes is reached on the path that *refuses* rather than the path that proceeds.
 
 **The cost of the unquantified caveat, recorded because it was paid.**
-`MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §9.1 sized this very ladder as "0.32 / 1.6 / 6.4 /
+`MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §9.1 (moved out in #668) sized this very ladder as "0.32 / 1.6 / 6.4 /
 16 GB of entry storage" at 16 bytes an entry — written by someone who had read the README paragraph
 above. A caveat a careful reader discounts anyway is a caveat that needs a figure next to it, and
 adding this one to README is the cheapest item in #237.
@@ -299,10 +299,10 @@ three orders of magnitude and every scheduling strategy was worth 7%–14.5%.
 ## 8. Reproducing
 
 ```sh
-tools/fetch-mq-challenge.sh
-
-ZEEBRA_MAX_ENTRIES=20000000 ZEEBRA_WALL_SECONDS=900 \
-  tools/scoreboard.sh mq fukuoka-mq-III-n20-seed0 --seeds 1
+# This run used tools/fetch-mq-challenge.sh and tools/scoreboard.sh, both moved out in #668;
+# it reproduces at commit 9532a9a2:
+#   ZEEBRA_MAX_ENTRIES=20000000 ZEEBRA_WALL_SECONDS=900 \
+#     tools/scoreboard.sh mq fukuoka-mq-III-n20-seed0 --seeds 1
 ```
 
 Vary `ZEEBRA_MAX_ENTRIES` for the other rungs. For the peak-RSS column, background the binary
@@ -353,6 +353,11 @@ is `(usize, Zp31)` = **16 B**.
 | pair criteria sets | 0.3 | 0.00% | 19 422 keys x 16 B |
 | unnamed remainder | ~515 | 3.7% | allocator slack and completed batches' column structures |
 | **measured `VmHWM`** | **13 996** | 100% | the example's own `util::peak_resident_bytes`, read after F4 returned |
+
+The row names are the ones the harness printed at the stamp above. `examined` is a map rather than a
+set since #621, so a run today prints it, the monomial arena and the per-term handles as three rows
+in place of the one; the quantity is the same structure and the 0.04% is unaffected at this scale,
+because a handle is four bytes against `Monomial<20>`'s eighty.
 
 **Two readings of `VmHWM`, 4 MB apart, and which is which.** The shares above are against the
 example's own in-process read, 13 996 MB, taken after F4 returns — that is the figure the
@@ -476,7 +481,7 @@ supervisor remains the right backstop.
 ### 9.6 Reproducing §9
 
 ```sh
-tools/fetch-mq-challenge.sh
+# the Fukuoka MQ files were fetched with tools/fetch-mq-challenge.sh, moved out in #668
 cargo build --release --example f4_memory
 
 ZEEBRA_MAX_ENTRIES=20000000 taskset --cpu-list 0-7 \
@@ -663,7 +668,7 @@ wrong for a reason worth recording: what the change removes is not hash work but
 `push_back`/`pop_front` pairs and the first-touch page faults on 20 GB of `VecDeque` the allocator
 reserved and never needed.
 
-`examples/scoreboard`, two interleaved repetitions, both variants built from this one tree into
+`examples/scoreboard` (moved out in #668), two interleaved repetitions, both variants built from this one tree into
 private target directories, pinned to cores 0-7, under `tools/benchlock.sh` so nothing else ran:
 
 | rung | | rep 1 | rep 2 | mean | peak RSS, `/usr/bin/time -f %M` |
@@ -696,7 +701,7 @@ allocating stages twice per batch and §9.6 is explicit that they are not result
 ### 10.6 Reproducing §10
 
 ```sh
-tools/fetch-mq-challenge.sh
+# the Fukuoka MQ files were fetched with tools/fetch-mq-challenge.sh, moved out in #668
 cargo build --release --example f4_memory
 
 ZEEBRA_MAX_ENTRIES=20000000 taskset --cpu-list 0-7 \
@@ -829,7 +834,7 @@ M27-A owns — at 60.5% of peak, the basis held twice is what makes a larger mat
 memory even where it is affordable in time.
 
 **Magma V2.19-9 solved this instance in 259.27 s** on a 1 TB machine in 2015
-(`fukuoka-mq.md:644`). That licenses **no ratio** — `classical-benchmarks.md:160` forbids a
+(`fukuoka-mq.md:644` (moved out in #668)). That licenses **no ratio** — `classical-benchmarks.md:160` forbids a
 wall-clock comparison against a figure of that age, and Magma is not installed here. What it
 establishes is that the target exists: this instance is solvable by an F4 on one machine. It is not
 a budget for this machine, and §9 says so explicitly.
@@ -837,22 +842,19 @@ a budget for this machine, and §9 says so explicitly.
 ### 11.5 Reproducing §11
 
 ```sh
-tools/fetch-mq-challenge.sh && tools/fetch-mq-challenge.sh --verify
+# the Fukuoka MQ files were fetched with tools/fetch-mq-challenge.sh, moved out in #668 (with --verify)
 
 # §11.1, the attribution at both rungs. f4_memory reads VmHWM itself, so no pid hazard.
 export CARGO_TARGET_DIR="$PWD/target-rediagnosis" RUSTC_WRAPPER=""
-cargo build --release --example f4_memory --example scoreboard
+cargo build --release --example f4_memory
 cargo build -v --release --example f4_memory | grep target-cpu   # must show x86-64-v3
 for rung in 20000000 10000000; do
   ZEEBRA_MAX_ENTRIES=$rung ZEEBRA_WALL_SECONDS=1800 taskset --cpu-list 0-7 \
     ./target-rediagnosis/release/examples/f4_memory mq fukuoka-mq-III-n20-seed0
 done
 
-# §11.2's third row, the authorized run: one instance, --write, never --all, externally guarded.
-tools/rss-guard.sh f4_memory fukuoka-mq-III-n20-seed0 $((32 * 1024 * 1024)) --poll 10 --wait 2400 &
-ZEEBRA_MACHINE=fedora ZEEBRA_AFFINITY=0-7 ZEEBRA_WALL_SECONDS=1620 ZEEBRA_MAX_ENTRIES=40000000 \
-  tools/benchlock.sh zb-453 timeout --signal=INT --kill-after=60s 1800 taskset --cpu-list 0-7 \
-  ./target-rediagnosis/release/examples/scoreboard mq fukuoka-mq-III-n20-seed0 --write
+# §11.2's third row, the authorized run, used examples/scoreboard.rs (moved out in #668); it
+# reproduces at commit 9532a9a2.
 ```
 
 `end=exited` in `$HOME/.zeebra/benchlock.log` is what asserts the run completed; `status=0` does not

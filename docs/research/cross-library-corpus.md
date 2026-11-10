@@ -2,9 +2,17 @@
 
 **Measured at:** publication bound `f94b3df0` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+The upper-rung sweep in §9c was measured at `19ff732c`.
 
 Policy and status for #261. The corpus itself is `src/grobner/external/corpus.rs`; its digest
 manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is_frozen`.
+
+> **Since #668** the public ladder is four families — Katsura, Cyclic, random MQ and planted MQ.
+> The Poseidon and Anemoi rungs described below left with the cryptanalysis research; a caller
+> supplies rungs like them through `CompetitiveBoard::with_corpus`. The sections about them are
+> kept as the record of what was measured; their equivalence-class rows in §5 and their manifest
+> rows in §8 were removed, and are preserved at commit 9532a9a2.
+> `research/competitive/CURATION.md` records what was removed from the board's history.
 
 A cross-library comparison measures nothing unless every engine was given **the same ideal**. The
 two families everyone benchmarks on each have a naming convention that produces a *different* ideal
@@ -68,11 +76,6 @@ So msolve names by variable count and agrees with Zeebra's type parameter. **Eve
 module generates is named by variable count, and the literature's `n` appears nowhere in it.** A
 test asserts that each such entry's trailing number equals its built variable count, so a future
 entry cannot reintroduce the ambiguity by being named carelessly.
-
-The two families taken from the cryptanalysis registry — Poseidon and Anemoi — keep their
-**registry id** instead. That id is their identity everywhere else in the crate, and renaming it to
-suit a convention local to the corpus would be the worse trade; their variable count is a
-consequence of the round count and is carried in the manifest.
 
 Groebner.jl exposes no `katsuran` in the provisioned version (checked: `names(Groebner, all=true)`
 contains no Katsura or Cyclic generator), so its adapter must be given the system as text from this
@@ -149,9 +152,8 @@ nobody wrote down.
 |---|---|---|
 | Katsura, Cyclic, planted MQ | `None` | const-generic in the field; a prime nobody compiled is a field nobody has |
 | random MQ | builds | its generator reduces at run time through `CaseField`, so every prime is available |
-| Poseidon, Anemoi | builds, at the **registry's** field | round constants are keyed on the prime, so the argument is ignored by design (§5) |
 
-`test_an_uncompiled_characteristic_is_refused_rather_than_mislabeled` pins all three dispositions,
+`test_an_uncompiled_characteristic_is_refused_rather_than_mislabeled` pins these dispositions,
 and `test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic` asserts the
 property on the **rendered text** rather than on the polynomials in memory — which is the bytes
 every engine is handed.
@@ -189,19 +191,13 @@ So the corpus has **three tiers**, and `CorpusEntry::digest_at` is the boundary:
 
 | tier | constant | frozen digest | may a figure be published? |
 |---|---|---|---|
-| published | `PUBLISHED_CHARACTERISTICS` = `[32003, 2^31 − 1]` | yes, one per rung | **yes** |
+| published | `PUBLISHED_CHARACTERISTICS` = `[2, 32003, 2^31 − 1]` | yes, per rung (§6a) | **yes** |
 | generated | `GENERATED_CHARACTERISTICS`, which adds `2^30 + 3` | no | no — the instance is honest, its identity is not pinned |
 | neither | — | n/a | `corpus::instance` returns `None` |
 
 `CorpusEntry::digests` is therefore `&[(characteristic, digest)]`, keyed on the characteristic the
-built instance **declares**. Two consequences fall out instead of needing special cases:
-
-- A family whose field varies carries **two** digests.
-- A registry row carries **one**. Poseidon's and Anemoi's round constants are derived from the
-  prime, so asking for another one does not produce another instance (§5) — keying on the declared
-  rather than the requested characteristic is what makes that automatic.
-  `test_a_registry_rung_has_one_identity_at_both_published_characteristics` asserts both halves,
-  and the sweep skips such a rung at the small prime rather than appending a duplicate row.
+built instance **declares**. Every rung carries two digests for the larger primes. Each Cyclic rung
+also carries a `GF(2)` digest (§6a).
 
 **Why `32003` and not some other small prime.** Three reasons.
 
@@ -348,8 +344,6 @@ though — fail-closed, because here the refusal is visible.
 | Cyclic (affine) | `cyclic-4 … 10` | msolve 0.11.0 `input_files/cyclic5-16.ms`, generator for generator | **yes** |
 | Random MQ | `mq-random-6,10,14` | live Singular invariants; seeded, reproducible from the name | **yes** |
 | Planted MQ | `mq-planted-6,10,14` | the planted point satisfies the **rendered text** | **yes** |
-| Poseidon | `poseidon-t2-rf2-rp0/rp2-planted`, `poseidon-t2-rf4-rp0-planted` | planted target, from the cryptanalysis registry | **yes** |
-| Anemoi | `anemoi64-cico-n1/n2-fcico` | **Groebner.jl only** — see below | **yes, uncorroborated** |
 | Zero-dimensional FGLM workloads | Katsura, Cyclic, both MQ families | as above | **yes**, as `lex-basis-by-conversion` |
 | Fukuoka MQ Type III | — | **excluded by licence**, not by effort — see below | n/a |
 | Characteristic two | — | **blocked on a convention** — see §6 | no |
@@ -363,39 +357,17 @@ pinned against msolve's own bytes at `N = 6` and `N = 5`. What the upper rungs a
 `cyclic-7` against Backelin–Fröberg, and the dimension class at `cyclic-8` and `cyclic-9` against
 Backelin's theorem. That is a second, independent anchor, and it is the one the upper rungs rest on.
 
-**Six families**, which is the milestone's minimum, and
-`test_the_corpus_covers_six_families_each_with_recorded_evidence` asserts both the count and that
-each of the four kinds of evidence is actually used — so none of the vocabulary is dead.
+**Four families.** M25 counted six, the milestone's minimum; the two cipher-derived families
+(Poseidon and Anemoi) left in #668, and their rows were removed from the table above.
+`test_the_corpus_covers_four_families_each_with_recorded_evidence` asserts the families and that
+each kind of evidence the ladder uses is actually used — so none of that vocabulary is dead;
+`sole-comparand` is now exercised by the board's tests rather than by a ladder rung.
 
 ### Anemoi's limit is corroboration, not representability
 
-**Groebner.jl reaches Anemoi's field.** Its ceiling is `typemax(UInt64)` and it was measured
-computing correctly at `2^31 − 1`, `2^32 − 5`, Goldilocks, `2^64 − 353` and `2^64 − 59`. Anemoi's
-published parameters are over `2^64 − 353`, so the family **is** representable and a timing against
-Groebner.jl **is** publishable.
-
-What is missing is a *second* external engine. Sagebrush stops at `2^62` (its own gate,
-`lib.rs:1552`) and msolve and Singular at `2^31`, so at Anemoi's field there is exactly one
-external engine and nothing to check it against. Agreement is two-way — Zeebra against
-Groebner.jl — and **cannot be triangulated**: a disagreement says one of the two is wrong without
-saying which, where a three-way disagreement usually names the odd one out.
-
-That is recorded as `Equivalence::SoleComparand`, and it is **derived** from §5a's bands rather
-than asserted about this family, so the row is a consequence of a general fact.
-
-An earlier draft of this document said no engine could represent the field. That was wrong, and
-wrong in the direction that matters: it would have told a reader to wait for a new tool when what
-is actually needed is a second one at the same field.
-
-The Poseidon contrast still holds and is still luck. Poseidon's rows are over KoalaBear,
-`2^31 − 2^24 + 1 = 2130706433`, which happens to sit **below every** comparand's ceiling, so those
-rows are four-way corroborated. Nothing was designed for that and it does not generalize.
-
-Note that for both, the corpus uses the **registry's** field and ignores the `characteristic`
-argument. Poseidon's round constants come out of a seeded LFSR keyed on the prime and Anemoi's
-depend on the smallest primitive root, so the same row over another prime is **another problem** —
-the characteristic cannot be varied the way it can for Katsura.
-`test_a_poseidon_rung_keeps_the_registrys_field_whatever_is_asked_for` pins that.
+*This subsection (the Anemoi family's sole-comparand equivalence, the Poseidon contrast, and the
+registry-field rule for both) was moved out with the cryptanalysis research in #668; it is preserved
+at commit 9532a9a2.*
 
 ## 5a. The corroboration bands
 
@@ -419,7 +391,7 @@ a conversion row by four engines to zero.
 |---|---|---|---|---|---|
 | basis | all four | — | four-way | four-way | two-way |
 | **conversion** | Singular, Sagebrush | msolve has no lex order; Groebner.jl 0.10.11 has no FGLM | **two-way** | **two-way** | **none** |
-| eliminant | msolve, Singular | neither Sagebrush nor Groebner.jl has the task | **two-way** | sole engine above `1515531529` | none |
+| eliminant | msolve, Singular | neither Sagebrush nor Groebner.jl has the task | **two-way** | sole engine at `p = 2` and at or above `1515531529` | none |
 
 Two notes a reader needs before using the eliminant row. msolve's eliminant bound is `1515531529`,
 below a tenth of its basis bound, which is what makes `32003` and `2^31 − 1` land in different cells.
@@ -450,7 +422,7 @@ have nothing.
 
 The instances are **"All Rights Reserved, no stated licence"** and must never be redistributed
 (`docs/research/external-provenance-policy.md`). They are fetched locally by
-`tools/fetch-mq-challenge.sh` into `ZEEBRA_MQ_DIR` and referenced by digest.
+`tools/fetch-mq-challenge.sh` (moved out in #668) into `ZEEBRA_MQ_DIR` and referenced by digest.
 
 That is not a scheduling problem, it is structural: **a corpus entry cannot carry their system
 text**, which is what every other entry here is. An entry would have to name the file and its
@@ -459,27 +431,77 @@ families and would not be reproducible for anyone who has not fetched the files.
 families in the corpus — random and planted — cover the same shape of problem with instances that
 are freely reproducible from a seed, which is why they are the substitute and not a consolation.
 
-Fukuoka III remains covered by the **cryptanalysis** scoreboard, where instances are referenced by
-digest rather than carried, and that is the right home for it.
+Fukuoka III was covered by the **cryptanalysis** scoreboard, where instances are referenced by
+digest rather than carried; that scoreboard moved out in #668.
 
 ---
 
-## 6. Characteristic two is blocked on a convention, not on effort
+## 6. Characteristic two: `GF(2)` is a published identity, `GF(2^k)` is still blocked
 
-`GF(2^k)` for `k > 1` is **not** in the corpus, and the reason is the one `FieldSpec` already
-encodes: two engines' default `GF(2^8)` need not be the same ring. Different Conway or defining
-polynomials give isomorphic but not identical representations, so a basis compared element by
-element across them disagrees for no mathematical reason, and an invariant like the leading
-monomials can genuinely differ.
+### 6a. `GF(2)` is the corpus's third published characteristic, for Cyclic only (#427)
+
+`corpus::BINARY_CHARACTERISTIC` is `2`, and the Cyclic rungs `cyclic-4` … `cyclic-10` each carry a
+frozen digest there alongside their `GF(32003)` and `2^31 − 1` ones. It is the **cheapest reachable
+external anchor** on Steel's page: his `GF(32003)` Cyclic 7 and Cyclic 8 carry `(Hom)` and are the
+homogenized system, a different ideal, while the `GF(2)` block carries no such mark and so names the
+affine system `benchmark_systems::cyclic` generates (`classical-benchmarks.md` §4).
+
+**Publication is now per rung, not per characteristic**, and that change is #427's finding rather
+than its convenience. A characteristic may only be published at where the rung's *invariants* are
+true, and characteristic two is the first one where they are not simply the generic ones:
+
+| rung | `2^31 − 1` / `32003` | `GF(2)` |
+|---|---|---|
+| `cyclic-4` | positive-dimensional, Krull 1 | **same** — Krull 1 |
+| `cyclic-5` | zero-dim, `D = 70` | **same** — zero-dim, `D = 70` |
+| `cyclic-6` | zero-dim, `D = 156` | **Krull dimension 2** |
+| `cyclic-7` | zero-dim, `D = 924` (proved) | zero-dim, **`D = 728`** |
+| `cyclic-8` | positive-dimensional, Krull 1 | **Krull dimension 3** |
+| `cyclic-9` | positive-dimensional (Backelin) | **Krull dimension 2** |
+| `cyclic-10` | zero-dimensional | **Krull dimension 4** |
+
+So **Backelin's squarefree criterion is a characteristic-zero statement**: it predicts `cyclic-6`
+zero-dimensional, and mod 2 it is not. `test_backelins_criterion_does_not_survive_the_reduction_mod_two`
+is that assertion, and `corpus::DEGENERACIES` is where the per-characteristic invariants live —
+sparse, because characteristic two and Cyclic are the whole of it. `CorpusEntry::zero_dimensional_at`
+and `quotient_dimension_at` are the accessors a row must go through.
+
+Katsura, random MQ and planted MQ are therefore **generated** at `GF(2)` and **not published**
+there — the middle tier of §4's table, honest instances whose identity is not frozen and from which
+no figure may be quoted. `competitive_sweep --characteristic 2 --list` shows the seven published
+rungs and their tasks. Katsura's generators carry coefficient 2, and `planted_point`'s `3 + 2i`
+collapses to all-ones mod 2, which destroys the coordinate distinctness the planted family's oracle
+depends on. `test_characteristic_two_is_published_for_cyclic_alone` pins the split.
+
+**No published row adjoins the field equations.** `x^2 − x` is available over `GF(2)` and *changes
+the ideal* — the README's phrasing is that field equations "make a quotient dimension count
+base-field points" — and Steel's rows do not have them, so neither do these. A row that did would
+carry `Instance::transformation`, which is inside the digest, so the two could never be confused for
+one another; `test_no_published_row_carries_a_field_equation_transformation` is the guard. The
+`D = 728` above is therefore a count over the algebraic closure with multiplicity, **not** a count of
+`GF(2)`-points.
+
+### 6b. `GF(2^k)` for `k > 1` is still blocked on a convention, not on effort
+
+The reason is the one `FieldSpec` already encodes: two engines' default `GF(2^8)` need not be the
+same ring. Different Conway or defining polynomials give isomorphic but not identical
+representations, so a basis compared element by element across them disagrees for no mathematical
+reason, and an invariant like the leading monomials can genuinely differ. #197 settled Zeebra's own
+side of this by test — `Gf256` is the AES modulus and `Gf256Mq` the Fukuoka one, isomorphic and
+explicitly not interchangeable — but that settles one engine, not a convention.
 
 So an entry needs, for each engine: the defining polynomial it uses by default, how to override it,
 and a verified statement that the override took. `FieldSpec::extension` requires the defining
-polynomial for exactly this reason, and `SingularSolver::supports` currently returns
+polynomial for exactly this reason, and `SingularSolver::supports` returns
 `Unsupported::ExtensionField` rather than guessing — which is the right behaviour until the
 convention is established the way `tools/reference_bases.sing` establishes Singular's ordering and
 printing conventions.
 
-`GF(2)` itself is not affected: it is a prime field and `Zp2` already exercises it.
+One concrete hazard is already on record from #262: a digest taken over Macaulay-matrix **entries
+alone** could not tell `GF(2)` from `GF(2^8)` on Cyclic, because Cyclic's `±1` coefficients make
+those matrices equal entry for entry. The corpus is not exposed to it — `Instance::canonical`
+includes `FieldSpec::canonical`, so the characteristic and extension degree are inside the identity
+digest, and `test_two_fields_with_identical_entries_digest_differently` pins the matrix-corpus side.
 
 ---
 
@@ -511,25 +533,30 @@ part of the digest, so no frozen value moved.
 ## 8. The manifest
 
 `corpus::manifest()` emits line-oriented ASCII, sorted, one row per rung **per identity** — so a
-rung whose field varies appears twice and a registry rung once (§4b):
+Cyclic rung appears three times and every other rung appears twice (§6a):
 
 ```
-# zeebra cross-library corpus, characteristics [32003, 2147483647] order grevlex
+# zeebra cross-library corpus, characteristics [2, 32003, 2147483647] order grevlex
 # name family rung equivalence dimension variables characteristic digest
-anemoi64-cico-n1-fcico anemoi easy sole-comparand zero-dimensional 2 18446744073709551263 c053c6ff0186e3b4…
-anemoi64-cico-n2-fcico anemoi intermediate sole-comparand zero-dimensional 4 18446744073709551263 e3a6312e85c486b0…
+cyclic-10 cyclic challenging comparand-file positive-dimensional 10 2 c20a7428b05e1e2a…
 cyclic-10 cyclic challenging comparand-file zero-dimensional 10 2147483647 df450bfc1886aa26…
 cyclic-10 cyclic challenging comparand-file zero-dimensional 10 32003 538964ac3a891da6…
+cyclic-4 cyclic easy comparand-file positive-dimensional 4 2 77f83e03b9305310…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 2147483647 e1d8d59448b3d648…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 32003 e5a49df27c74d4d7…
+cyclic-5 cyclic easy comparand-file zero-dimensional 5 2 ae8c4aa8ce0ceb59…
 cyclic-5 cyclic easy comparand-file zero-dimensional 5 2147483647 3274d14b224664ae…
 cyclic-5 cyclic easy comparand-file zero-dimensional 5 32003 e80b7d8a6432b7d3…
+cyclic-6 cyclic intermediate comparand-file positive-dimensional 6 2 82d27add6e12d56b…
 cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 2147483647 ed89afe173d16024…
 cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 32003 bf3bb57af08fcc94…
+cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 2 5bf1687f10275fc8…
 cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 2147483647 30ce3b4f54c7b30e…
 cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 32003 18746449c45766c3…
+cyclic-8 cyclic challenging comparand-file positive-dimensional 8 2 50d21276dfc6b696…
 cyclic-8 cyclic challenging comparand-file positive-dimensional 8 2147483647 a5eda0f9e2642ffe…
 cyclic-8 cyclic challenging comparand-file positive-dimensional 8 32003 e2f6be738bd1f215…
+cyclic-9 cyclic challenging comparand-file positive-dimensional 9 2 682c5c189e244f84…
 cyclic-9 cyclic challenging comparand-file positive-dimensional 9 2147483647 ff4c2030a8f74d29…
 cyclic-9 cyclic challenging comparand-file positive-dimensional 9 32003 ccffb9b3e5ca7b82…
 katsura-10 katsura challenging comparand-file zero-dimensional 10 2147483647 67d6a96fadd21cc7…
@@ -560,19 +587,21 @@ mq-random-14 mq-random challenging live-oracle zero-dimensional 14 2147483647 02
 mq-random-14 mq-random challenging live-oracle zero-dimensional 14 32003 4e440cfac8426226…
 mq-random-6 mq-random easy live-oracle zero-dimensional 6 2147483647 d98e5e5bf82b4618…
 mq-random-6 mq-random easy live-oracle zero-dimensional 6 32003 bbfecd7f5522e203…
-poseidon-t2-rf2-rp0-planted poseidon easy known-solution zero-dimensional 5 2130706433 f4cf6699cee835a6…
-poseidon-t2-rf2-rp2-planted poseidon intermediate known-solution zero-dimensional 7 2130706433 3b3bfb037ceb32de…
-poseidon-t2-rf4-rp0-planted poseidon challenging known-solution zero-dimensional 9 2130706433 95cec79371a8751a…
 ```
 
-**Twenty-six rungs across six families, forty-seven identities.** Twenty-one rungs carry two (the
-two published characteristics) and five carry one (the registry rows, whose field is their own). `test_the_manifest_lists_every_rung_with_its_digest` checks the row count against
+**Twenty-one rungs across four families, forty-nine identities.** Seven Cyclic rungs carry three
+identities each. Fourteen Katsura and MQ rungs carry two each. Before #668 the ladder also held five
+registry rows, preserved at commit 9532a9a2. `test_the_manifest_lists_every_rung_with_its_digest`
+checks the row count against
 `digests.len()` summed over the ladder, so the manifest and the frozen table cannot disagree about
 how many problems the corpus holds, and asserts every digest in it is distinct. Digests are
 abbreviated above; the manifest carries all 64 hex digits.
 
 The characteristic is a **column** rather than a document per field, so one sorted table carries the
-whole corpus and a reader can see at a glance which rungs have two identities and which have one.
+whole corpus and a reader can see at a glance how many identities each rung has. The `2` rows are
+the Cyclic family's `GF(2)` identities, and their `dimension` column is the one at *that*
+characteristic rather than the generic one — which is why `cyclic-6` reads positive-dimensional
+there and zero-dimensional at both larger primes (§6a).
 
 Line-oriented and ASCII so another language's harness can read it and a digest can be reproduced by
 hand — the same property that makes `Instance::canonical` reproducible outside Rust.
@@ -650,7 +679,14 @@ whatever the box is doing, which is the property §9 is built on, and it is why 
 default change that moved every reachable rung by 4x to 8x.
 
 **The ceiling is `cyclic-9`, and the stage that sets it is the F4 basis**, crossing the live-entry
-budget: `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`. The whole Katsura ladder is
+budget: `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`.
+
+> **Zeebra's ceiling, and #489's sweep showed the difference.** At a 300 s wall Groebner.jl reaches
+> `cyclic-9` in 61.5 s and msolve in 162.6 s — so the rung is out of reach for this configuration's
+> budget and not for the hardware. Groebner.jl records **1 596 MiB** peak process RSS; this is
+> a different metric from Zeebra's matrix-entry budget (§9c.3).
+
+The whole Katsura ladder is
 reachable to `katsura-11` — four rungs above the old ceiling, at roughly 10x per rung — so the
 expectation in #424 that "this issue may well resolve as the ceiling is here" was right about the
 *shape* and wrong about the *place*: Katsura did not run out, Cyclic did.
@@ -718,7 +754,7 @@ entry count is a function of the field's representation width. At a 16-bit prime
 fit the same 20 000 000-entry budget. That is a real and unmeasured question, and it is the one
 reason to revisit this decision — not a suspicion that the timings would differ.
 
-### 9b. What #489 still needs, and why it is not here
+### 9b. What #489 needed, and why it was not taken at first — superseded by §9c
 
 **The sweep itself.** The three decisions above are what #489 asked to settle first; the rows are not
 taken, because this box could not produce an honest one. Over the hour the sweep was attempted the
@@ -734,9 +770,104 @@ killed for this rather than committed.
 So the sweep is a quiet-box task and the budget above is what it should use. Nothing about it is
 uncertain any more except when the machine is free.
 
+> **Taken in §9c**, on a box whose one-minute load ran 4 to 26. 100 rows, and the budget above was
+> right for seven of the eight rungs and **wrong for `katsura-11`** — §9a checked Zeebra's
+> reachability rather than the comparands', and Singular's runtime there straddles the 60 s wall.
+> §9c.2 is the correction.
+
+### 9c. #489: the sweep taken, and two things it corrected
+
+**100 rows at `19ff732c`**, all eight upper rungs across both tasks and five engines, one row per
+process under `tools/benchlock.sh` at `taskset -c 0-7`, `ZEEBRA_MACHINE=workstation`,
+`ZEEBRA_AFFINITY=0-7`. Taken on a quiet box — the one-minute load average ran **4 to 26** across the
+run, against the 592–1 261 §9b recorded when the attempt was abandoned.
+
+#### 9c.1 The rows
+
+Reduced Gröbner basis, the column every engine offers:
+
+| rung | zeebra | singular | msolve | groebner.jl | sagebrush |
+|---|---:|---:|---:|---:|---:|
+| `katsura-8` | 54.0 ms | 138.3 | 20.5 | 4.8 | 20.5 |
+| `katsura-9` | 445.8 ms | 871.1 | 50.8 | 45.4 | 91.4 |
+| `katsura-10` | 3 739.0 ms | 6 787.6 | 263.4 | 89.5 | 856.8 |
+| `katsura-11` | **35 359.5 ms** | **60 597.9** | 2 120.3 | 518.5 | 2 777.2 |
+| `cyclic-7` | 660.2 ms | 1 137.2 | 101.5 | 47.2 | 172.4 |
+| `cyclic-8` | 27 658.5 ms | 30 847.0 | 1 286.0 | 699.5 | 3 942.8 |
+| `cyclic-9` | **refused** | 300 s wall | **162 577.0** | **61 534.5** | 300 s wall |
+| `cyclic-10` | **refused** | 300 s wall | 300 s wall | 300 s wall | 300 s wall |
+
+`katsura-11` and the two cyclic refusals are at a 300 s wall; everything else at the 60 s §9a
+decided. **Zeebra leads Singular on every rung it completes** — 1.11x to 2.56x, and 1.71x at
+`katsura-11` — which is the shape #575's defaults produced and the first time the upper rungs have
+had a cross-engine row at all. On `lex-basis-by-conversion`, where only Singular and Sagebrush
+compete, `katsura-11` is **40 819 ms against Singular's 92 033 ms, 2.25x ahead**.
+
+#### 9c.2 §9a's budget decision was wrong, and the sweep is what showed it
+
+§9a decided "the board's standard 60 s wall, unchanged, for all eight rungs", on the grounds that
+the slowest reachable rung is `katsura-11` at 33.6 s and so "clears that wall by 1.8x". **That
+reasoning checked Zeebra's reachability and not the comparands'**, which is the error: the board's
+wall applies to every engine, and Singular is the binding one.
+
+Measured, the same engine on the same rung either side of the wall:
+
+| `katsura-11`, `reduced-grobner-basis` | singular |
+|---|---:|
+| first pass, 60 s wall | 54 073 ms *(cleared by 11%)* |
+| second pass, 300 s wall | **60 598 ms** *(would have stopped)* |
+
+So Singular's runtime **straddles** the 60 s wall on this rung, and which side it lands on is a
+property of the box rather than of the engine. A 60 s budget there is a coin flip, not a policy —
+and on `lex-basis-by-conversion` it is not even close: Singular needs 92 s and wall-stopped in the
+first pass. **The budget for `katsura-11` is 300 s**, and §9c.1 summarizes the 300 s rows. The history retains both passes.
+
+The three decisions §9a records stand for the other seven rungs. What was wrong was generalizing a
+Zeebra-side margin to engines whose costs this document had never measured.
+
+#### 9c.3 `cyclic-9` is reachable, and the ceiling is Zeebra's rather than the problem's
+
+§9 states "**The ceiling is `cyclic-9`**, and the stage that sets it is the F4 basis", and §9's own
+caveat is that it is measured for Zeebra. At a 300 s wall, two comparands reach it:
+
+| `cyclic-9`, `reduced-grobner-basis` | outcome | peak RSS |
+|---|---|---:|
+| zeebra | refused at **20 001 315** live entries | — |
+| **groebner.jl** | **completes, 61 534.5 ms** | **1 596.0 MiB** |
+| **msolve** | **completes, 162 577.0 ms** | 748.1 MiB |
+| singular | 300 s wall stop | — |
+| sagebrush | 300 s wall stop | — |
+
+That is the most useful row the sweep produced. The rung is **not** out of reach for the hardware;
+it is out of reach for Zeebra's live-entry budget, and the refusal is correct as a budget decision
+rather than as a statement about the problem. §9's ceiling claim should be read as "the ceiling of
+Zeebra's default configuration", which is what it measured.
+
+**Groebner.jl records 1 596 MiB peak process RSS.** That includes the Julia runtime and other
+allocations; Zeebra's roughly 320 MB entry budget accounts only for matrix entries. These metrics
+do not establish how much memory Zeebra would need to finish this rung. #490 still needs a
+Zeebra budget sweep before choosing a higher default.
+
+`cyclic-10` is out of reach for **all five** engines on the reduced-basis task at 300 s, which is consistent with the only
+published figure for it — Magma 2.11-8 at 12.3 hours on a 2004 Sunfire, which
+`classical-benchmarks.md` §4 forbids comparing against and which is quoted here only as an order of
+magnitude.
+
+#### 9c.4 What these rows are not
+
+* **Not a ratio against Steel's figures**, on any rung. `classical-benchmarks.md` §4's prohibition
+  is untouched; the `GF(2)` Cyclic rows are a separate matter and are #427's.
+* **Not fixed-budget repetitions.** The initial 80 rows cover every (rung, task, engine) at
+  60 s. Twenty additional rows repeat both tasks for `katsura-11` and the reduced-basis task for
+  `cyclic-9` and `cyclic-10` at 300 s. All attempts are retained. The 54 073 / 60 598 ms spread
+  on Singular is a reason to treat single rows on the slow rungs as approximate.
+* **Not the `GF(32003)` identity.** §9a decided the reference prime only, and that stands: the
+  entry-count question it flagged — whether `cyclic-9` fits the same budget at a 16-bit prime — is
+  now *more* interesting given that two engines reach the rung, and is still unmeasured.
+
 ## 10. Adding a family
 
-1. Generate it from an existing `benchmark_systems` or `research` generator — never a second
+1. Generate it from an existing `benchmark_systems` generator — never a second
    definition, which would drift. `corpus::text_instance` renders through
    `differential::polynomial_to_string`, the renderer whose output Zeebra's own parser and
    Singular both accept.

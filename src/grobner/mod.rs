@@ -10,12 +10,14 @@ pub mod field_equations;
 pub mod hilbert;
 pub mod pairs;
 pub mod planning;
+pub mod record;
 pub mod reference;
-pub mod research;
+pub mod resultant;
 mod s_polynomial;
 pub mod shape_certificate;
 mod solve;
 mod solve_zero_dimensional;
+pub mod transform;
 // Singular's weighted bases, committed as literals. Test data only: nothing on a shipping path
 // reads it, and `weighted_reference_bases::tests` is the differential check #624 asked for.
 #[cfg(test)]
@@ -36,10 +38,10 @@ pub use f4::{
 };
 pub use fglm::{
     classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
-    largest_quotient_dimension_within, BorderIndex, BorderStatistics, ColumnTarget, FglmError,
-    FglmMemory, FglmOptions, FglmStageTimings, FglmStatistics, IdealClass, MultiplicationOperator,
-    OperatorConstruction, OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics,
-    RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES,
+    krull_dimension, largest_quotient_dimension_within, BorderIndex, BorderStatistics,
+    ColumnTarget, FglmError, FglmMemory, FglmOptions, FglmStageTimings, FglmStatistics, IdealClass,
+    MultiplicationOperator, OperatorConstruction, OperatorStorage, QuotientAlgebra, QuotientBasis,
+    QuotientStatistics, RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES,
 };
 pub use field_equations::{
     field_equations, rational_points_by_enumeration, with_field_equations, FieldEquationError,

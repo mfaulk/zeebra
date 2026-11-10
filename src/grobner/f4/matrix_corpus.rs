@@ -766,11 +766,13 @@ macro_rules! corpus {
     };
 }
 
-/// The characteristic every F4 figure in this repository is taken at.
+/// The characteristic every F4 figure in this repository is taken at: `2^31 - 1`.
 ///
-/// Re-exported here from the instance registry rather than restated, so a corpus entry's field and
-/// a board row's field cannot drift apart.
-use crate::grobner::external::corpus::REFERENCE_CHARACTERISTIC;
+/// Restated rather than imported from `external::corpus`, because that module sits behind the
+/// `external-runners` feature and this one does not. `test_the_reference_prime_is_the_boards`
+/// pins the two equal whenever the harness is compiled, so a corpus entry's field and a board
+/// row's field still cannot drift apart.
+const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 use BatchSelector::Largest;
 use MonomialOrder::GradedReverseLexicographic as Grevlex;
 use MonomialOrder::Lexicographic as Lex;
@@ -1048,6 +1050,16 @@ mod tests {
         assert_ne!(over_gf2.fingerprint.digest, over_gf256.fingerprint.digest);
     }
 
+    /// The matrix corpus's reference prime is the competitive board's.
+    #[test]
+    #[cfg(feature = "external-runners")]
+    fn test_the_reference_prime_is_the_boards() {
+        assert_eq!(
+            super::REFERENCE_CHARACTERISTIC,
+            crate::grobner::external::corpus::REFERENCE_CHARACTERISTIC
+        );
+    }
+
     /// The corpus's `mq-random-n` system is the instance registry's, not a lookalike.
     ///
     /// Pinned by comparing the generated system's rendered text against what
@@ -1055,6 +1067,7 @@ mod tests {
     /// external engines and never materializes a system at a const `N`, so the two routes are
     /// genuinely separate code and this is the only thing that keeps them the same ideal.
     #[test]
+    #[cfg(feature = "external-runners")]
     fn test_the_corpus_mq_system_is_the_boards() {
         use crate::grobner::external::corpus::{random_mq_instance, REFERENCE_CHARACTERISTIC};
 
@@ -1077,11 +1090,9 @@ mod tests {
     /// the same name.
     #[test]
     fn test_the_mq_conversion_keeps_every_term() {
-        use crate::grobner::external::corpus::REFERENCE_CHARACTERISTIC;
-
-        let generated = super::generated_mq::<10>(REFERENCE_CHARACTERISTIC);
+        let generated = super::generated_mq::<10>(super::REFERENCE_CHARACTERISTIC);
         let system: Vec<_> =
-            super::mq_random::<10, crate::fields::Zp2147483647>(REFERENCE_CHARACTERISTIC);
+            super::mq_random::<10, crate::fields::Zp2147483647>(super::REFERENCE_CHARACTERISTIC);
 
         assert_eq!(system.len(), generated.polynomials.len());
         for (polynomial, terms) in system.iter().zip(generated.polynomials.iter()) {

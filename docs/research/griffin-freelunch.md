@@ -34,113 +34,7 @@ is gate 3, not gate 1 or 2 — which is the opposite of what #202 expected.
 
 ## 1. Gate 1: the system vanishes at the published witnesses, and the bypass line falls out
 
-`tools/check-griffin-reconstruction.py` already reproduced the five published witnesses through the
-*permutation* (`docs/research/additional-benchmarks.md` §2). That is not the same as reproducing the
-*system*, and M25-D extends the tool to the second thing:
-
-```
-tools/check-griffin-reconstruction.py --witness-system
-tools/check-griffin-reconstruction.py --build-system 5
-```
-
-### 1.1 The modelling equations, checked at all five witnesses — PASS
-
-The FreeLunch modelling introduces one variable `x_i` per round for the `α`-th root taken on branch
-0, with `p_i = x_i^α − L_i(z_{i−1})`, and takes `g` to be the first output coordinate. Eq. (4) of
-the paper makes `G_i` agree with the round function exactly on the locus `x_i^α = L_i(z_{i−1})`, so
-the check is field arithmetic only: run the permutation, record the roots it actually takes, and
-confirm every `p_i` and `g` vanish there. **Measured**, five of five:
-
-| rounds | `x_0` | permutation | `[input]_0 = 0` | every `p_i = 0` | `g = 0` |
-|---|---|---|---|---|---|
-| 5 | 3490692521816093 | ✓ | ✓ | ✓ | ✓ |
-| 5 | 20508905520120247 | ✓ | ✓ | ✓ | ✓ |
-| 6 | 15940424764849354 | ✓ | ✓ | ✓ | ✓ |
-| 6 | 13453267118668680 | ✓ | ✓ | ✓ | ✓ |
-| 7 | 471901030567494 | ✓ | ✓ | ✓ | ✓ |
-
-### 1.2 A result the paper does not publish: the Appendix B bypass line, recovered out of sample
-
-Printing the roots exposes something the published data was not advertised as containing. The first
-three `α`-th roots are **the same three constants at every witness and every round count**, so they
-do not depend on `x_0` at all:
-
-```
-x_1 = 0
-x_2 = 7898304148958718
-x_3 = 17258885674050987
-```
-
-That is exactly Appendix B's three-round bypass for `t ≥ 12`: an affine input
-`z_0(x_0) = a·x_0 + b` chosen so the `x^{1/α}` input is a known constant for three rounds. The
-paper describes how `a` and `b` are determined but **does not publish them**, and the construction
-has free choices in it (an arbitrary nonzero `a_1`, a root choice for `c_3(a_0) = 0`), so they are
-not recomputable from the text.
-
-They are recoverable from the witnesses. Two points determine an affine line. Parametrising by input
-word 1 — i.e. fixing `a_1 = 1, b_1 = 0`, which is a choice of coordinate on the line and not an
-assumption — the two `r = 5` witnesses give
-
-```
-a = [0, 1, 15574108527865654, 12833345532195127, 4498928985879348, 4105373726431084,
-     19825928247982741, 22768475630095724, 26722396606122532, 12957014625648710,
-     1575165728387576, 12645338513655545]
-b = [0, 0, 3315691270431207, 25091762789629580, 10771750388583441, 26319868554931350,
-     1195670321669144, 25057749274895288, 12201570747891186, 15179492140873806,
-     10205561023577940, 20355927499979202]
-```
-
-**The confirmation is out of sample, which is what makes this a recovery rather than a consistency
-check.** The fit uses two points and has two degrees of freedom per coordinate, so it is
-*unfalsifiable* on those two: any two witnesses lie on some line. The claim rests on the three
-witnesses that were **not** used to build it:
-
-| witness | used in the fit | lies on the recovered line |
-|---|---|---|
-| `r = 5`, `x_0 = 3490692521816093` | yes (fit point) | — |
-| `r = 5`, `x_0 = 20508905520120247` | yes (fit point) | — |
-| `r = 6`, `x_0 = 15940424764849354` | **no** | ✓ |
-| `r = 6`, `x_0 = 13453267118668680` | **no** | ✓ |
-| `r = 7`, `x_0 = 471901030567494` | **no** | ✓ |
-
-Each out-of-sample test is 11 independent coordinate agreements: solving
-`x_0 = (w_j − b_j)·a_j^{-1}` in each of the 10 branches with `a_j ≠ 0` must give one common value,
-and branch 0 must satisfy `w_0 = b_0 = 0` separately. So the evidence is 3 witnesses × 11
-coordinates = **33 agreements over a 55-bit field against a 2-parameter fit**, and the two round
-counts tested were not the round count fitted. The probability of that by chance is `p^{-30}`-ish.
-Anyone can re-derive it: the arithmetic is in §9's `--witness-system`.
-
-`a_0 = b_0 = 0`, which is Appendix B's `l_0(a) = l_0(b) = 0` constraint, and branch 0 is the only
-`x_0`-independent branch of the input.
-
-So the Griffin FreeLunch instance is now pinned **including the attack's input parametrisation**,
-not only the permutation. `docs/research/additional-benchmarks.md` §4's note that "the published
-witness is a 12-coordinate permutation input, while the polynomial system's variables are `x₀ … x_r`
-— those are different coordinate systems" is now resolved constructively: the map between them is
-this line, and `x_0 = [input]_1`.
-
-### 1.3 The system itself, built and checked — PASS
-
-`--build-system R` builds the FreeLunch system over the recovered line, reducing modulo the `p_i`
-as Appendix A prescribes, and derives the monomial order by Construction 1 rather than quoting it.
-A variable is introduced only for a round whose root actually depends on `x_0`; the bypass is
-**detected**, not assumed. All figures **measured** in CPython on this box:
-
-| `r` | vars | sysGen | `α_0 = deg_{x_0} g` | `D_H` | `D_I` | paper's `(6α+3)(α(2α+1))^{r−3}` | monomials in `g` |
-|---|---|---|---|---|---|---|---|
-| 3 | 1 | 0.00 s | 21 | 1 | 21 | 21 | 22 |
-| 4 | 2 | 0.07 s | 147 | 3 | 441 | 441 | 255 |
-| 5 | 3 | 15.0–16.8 s | 1029 | 9 | 9261 | 9261 | 4734 |
-
-`D_I` reproduces the paper's closed form at every rung. Two further checks, both **measured**:
-
-- **Faithfulness against the permutation oracle**: 8 random `x_0` on the line, every `p_i` vanishes
-  and symbolic `g` equals the numeric `[output]_0`. PASS at `r = 3, 4, 5`.
-- **The published witnesses are roots of this very system**: at `r = 5`, the whole system vanishes
-  at both published witnesses. PASS.
-
-Gate 1 is passed, and it is passed on the *system*, which is more than #202's acceptance criterion
-asked for.
+*The opening of §1 and §1.1–§1.3 (the Griffin system's reconstruction, its check at the published witnesses, and the recovered Appendix B bypass line) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ### 1.4 Proposition 6's hypothesis holds locally, which answers #202's question 2
 
@@ -246,82 +140,11 @@ A weighted order alone is not sufficient for the method, though. §4 explains wh
 `match` arms rather than a signature change. See §10.1. The second consumer collected: #201 ran
 `ACICO` at `α ∈ {5, 7, 11}` over WDRL with no further order work, reproducing eprint 2025/814's
 Proposition 3 leading monomials and Proposition 4's `(α + 2)^N` on nine rows
-(`docs/research/anemoi.md` §10.4).
+(`docs/research/anemoi.md` §10.4, moved out in #668).
 
 ## 3. Gate 2b: the grevlex comparand, measured
 
-The paper asserts that the same system in grevlex "well exceeds the security level" and Griffin's
-own designers estimated the same. #202's question 6 says a measured wall beats a quotation. Here it
-is.
-
-### 3.1 Two engines, same machine
-
-Neither is Zeebra's F4. Running Zeebra's F4 would require a Griffin generator in `src/`, which
-M25-D's analysis does not authorise (§8), so this is a third-party stand-in for the grevlex route
-and is labelled as one everywhere.
-
-**Both engines' prime fields stop below `2^31`** — msolve says so explicitly
-(`Warning: characteristic must be 0 or < 2^31`, **measured** by feeding it the real field) — so the
-comparand runs over Zeebra's own 31-bit prime `2147483647` with the Griffin coefficients reduced
-into it. That is a **surrogate**: grevlex's degree of regularity and matrix dimensions are set by
-the monomial support, which reduction preserves, but the field is not Griffin's, and no third-party
-engine available here can take the real field at all. Recording that limit is part of the result.
-
-The comparand is also **generous to grevlex**: the system fed in is the FreeLunch-*reduced* system
-over the three-round bypass line, the smallest and best-behaved presentation there is. Without the
-bypass the naive system has `r + 1` variables and `D_I = 21^r` and grevlex is strictly worse.
-
-| `r` | vars | `D_I` | **msolve 0.11.0** `-g 2`, 1 thread | peak RSS | **Singular 4.x** `groebner` | peak RSS | `vdim` |
-|---|---|---|---|---|---|---|---|
-| 3 | 1 | 21 | 0.00 s | 5 MB | 0 ms | — | 21 |
-| 4 | 2 | 441 | 0.01 s | 5 MB | 11 ms | — | 441 |
-| 5 | 3 | 9 261 | **13.9 s** | **255 MB** | **199.4 s** | **483 MB** | 9 261 |
-
-All **measured** on this box, single-threaded, degrevlex, reduced basis in both cases.
-`vdim` agrees with `D_I` at every rung, which is an independent confirmation of §1.3's symbolic
-construction by a second engine. msolve returns 470 basis elements against Singular's 463.
-
-**The two engines differ by 14× at `r = 5`, which is why one of them was not enough.** An earlier
-draft of this section quoted Singular alone and reported a 277x gap; msolve's 13.9 s shows that
-figure was mostly a statement about Singular. The honest comparand is the faster engine, and the
-correction is recorded rather than quietly applied.
-
-### 3.2 What the number is, and what it is not
-
-Against FreeLunch's Table 3 at `r = 5` — `sysGen 0.17 + matGen 0.02 + polyDet 0.53 = 0.72 s`, 14 MB,
-on one core of an AMD EPYC 7352 @ 2.3 GHz — msolve's 13.9 s / 255 MB is **roughly one order of
-magnitude in time and in memory**.
-
-That comparison is asymmetric in **four** ways at once, and it is quoted to one significant figure
-for exactly that reason:
-
-1. **Different machines.** Their EPYC 7352 core against this workstation's.
-2. **Different fields.** Their 55-bit `p` against this surrogate's 31-bit `q`. Narrower field
-   arithmetic favours the surrogate, so the gap is if anything understated.
-3. **Different implementations.** msolve's F4 against SageMath/Magma/NTL/FLINT/PML.
-4. **Different objects.** A full reduced degrevlex Gröbner basis against a single univariate
-   polynomial in the ideal. These are not two algorithms for one task.
-
-So: a recorded outcome against a competitor figure, **not a speedup**, and "about an order of
-magnitude" rather than a ratio. It is still the first number this repository has for a claim the
-literature only gestures at.
-
-### 3.3 The per-round scaling is NOT determined by this data
-
-`0.00 → 0.01 → 13.9 s` is a factor of ~1 400 from `r = 4` to `r = 5` under msolve and ~18 000 under
-Singular. **Both ratios are unusable**: the `r = 3` and `r = 4` points are at or below the engines'
-timing floor, and the two engines disagree by an order of magnitude on the one ratio they can both
-form. Extrapolating a round-count wall from them would be exactly the complexity-formula reasoning
-`docs/research/elimination-beyond-grobner.md` retracted two conclusions for.
-
-What can be said without extrapolation: at `r = 5`, where FreeLunch spends 0.72 s, a
-state-of-the-art grevlex engine spends 13.9 s on a *smaller* object than the attack needs, from the
-most favourable presentation of the system that exists. The `r = 6` rung would settle the scaling and
-is **open** — it needs the `r = 6` system, which §11 records as beyond this tool's CPython reach.
-
-Griffin's designers' claim that grevlex "well exceeds the security level" at the suggested round
-count is therefore **neither confirmed nor refuted here**. It is made checkable: §9 reproduces the
-system, and one `r = 6` build away from an answer.
+*§3 (the degrevlex comparand measured on the Griffin system, and its per-round scaling) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 4. Gate 3: what Zeebra would still have to build, and what it would not
 
@@ -358,7 +181,7 @@ one does not.
 
 **Zeebra already has every piece of this, and has measured them.** `Matrix::determinant`
 (`src/linalg/matrix/mod.rs:359-387` → `src/linalg/crout.rs:135`, Crout LU with partial pivoting) is
-the scalar determinant, and `src/grobner/research/resultant.rs:376-403` already runs exactly this
+the scalar determinant, and `src/grobner/resultant.rs` (`sample_determinants`) already runs exactly this
 shape of computation — a large sweep of independent scalar determinants over an evaluation domain,
 followed by interpolation — in parallel at **92–95% efficiency to 32 cores** (measured,
 `docs/research/resultant-elimination.md` §6.6). `polyDet` and the resultant route's determinant
@@ -451,7 +274,7 @@ most favourable presentation of the system, with the per-round scaling left open
 
 **What in Zeebra is still load-bearing?** Narrower than #202 hoped:
 
-- `src/linalg/` and `src/grobner/research/resultant.rs`'s parallel evaluation sweep — these carry
+- `src/linalg/` and `src/grobner/resultant.rs`'s parallel evaluation sweep — these carry
   `polyDet` directly (§4.1), and that is a real and somewhat surprising asset.
 - `src/fields/prime_field_64.rs` — the 55-bit prime needs no new arithmetic.
 - Fast univariate root finding — `uniSol`, on a degree-`D_I` polynomial, which the paper calls
@@ -462,86 +285,15 @@ most favourable presentation of the system, with the per-round scaling left open
 
 ## 7. Issues this suggests, and one it argues against
 
-**Argue against filing:** a polynomial-matrix determinant issue. §4.1 shows `polyDet` at `D_H ≤ 81`
-is an evaluation sweep over code Zeebra has and has parallelised, not a new subsystem. Filing
-"implement a polynomial-matrix determinant" would commit Zeebra to #132 + #128 + #126 for a stage
-that is not the bottleneck at any rung of this ladder. If a future instance needs `D_H` in the
-thousands the decision changes — and the evidence that would change it is a target whose `D_H` makes
-`D_H^{4−ω}` exceed the fast algorithm's log factors, which is roughly `D_H > 10^3`.
-
-**Filed as #306:** the weighted-order capability of §2.3, costed at about
-two days and dominated by `MonomialOrder`'s signature change rather than by the comparison, shared
-with #201. Plus the second half of the same capability, which #202 does not currently name: a
-**normal form against an externally supplied Gröbner basis** in that order (§4.2). The order alone
-buys nothing; the pair is what `sysGen` and `matGen` need.
-
-**Worth filing, if anyone wants the instance:** "Register Griffin `r ∈ {3,4,5,6,7}` with the five
-published witnesses and the recovered bypass line." §1.2's `(a, b)` makes
-`CicoTarget::PlantedFrom { inputs, free }` instantiable at `k = 1` with `x_0 = [input]_1`, and §1.3
-gives three self-checking rungs. This is cheap and it is the only fully witnessed CICO family in the
-corpus. It is a registry entry, not an attack.
+*§7 (follow-up issues, including registering Griffin as a challenge) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 8. Verdict
 
-**No-go for M25. Capability deferred to #306. Do not file a polynomial-matrix determinant issue.**
-
-Scored against §0's gates:
-
-- **Gate 1, faithfulness: PASS**, and overachieved. The system vanishes at both `r = 5` witnesses,
-  `D_I` reproduces the paper's closed form at `r = 3, 4, 5`, Proposition 6's hypothesis -- the one
-  2025/2040 flags -- is verified locally on those three rungs, and the unpublished Appendix B bypass line is recovered and
-  confirmed 3 of 3 on witnesses not used to build it.
-- **Gate 2, expressibility: FAIL as asked, but cheaply.** `≺_G` is a weighted graded lex with
-  reversed variables and integer weights `(1, 7, 49)` at `r = 5`; `MonomialOrder` has no weighted
-  variant and cannot express it. The fix is small in algorithm and medium in blast radius (§2.3).
-  This is #202's question 1 answered negative, which #202 accepts as a deliverable.
-- **Gate 3, worth: FAIL, and this is the decisive one.** The capability is affordable and the
-  blocker is not where #202 expected it, but building the pair (weighted order + external-basis
-  normal form) buys Zeebra **no mathematical ground**. It would let Zeebra recompute, on an
-  instance whose witnesses are already published, a result the literature already has — and
-  full-round Griffin was broken independently in eprint **2026/1281** (*Resultants Meet Resultant*,
-  CICO-2, resultant-based, finishing with Villard's algorithm), so even the security statement is
-  superseded. Per the M25 gate separating mathematical progress from implementation performance,
-  this is at best the second kind, on an instance already solved.
-
-The three numbers that decided it: `D_H ≤ 81` (so `polyDet` is not a missing subsystem and the
-expected blocker evaporates); **13.9 s** measured for msolve's degrevlex basis at `r = 5` against
-FreeLunch's **0.72 s** on a smaller object (so the architectural claim is real at about an order of
-magnitude, with its four asymmetries stated and its scaling open);
-and `matGen` at `3 361 s` / `27.6 GB` at `r = 7` *in the authors' own optimised implementation*
-(so the stage Zeebra would have to build from nothing is the one that already dominates for the
-people who built it).
-
-What M25-D keeps from this: the bypass line, the witness-level system validation, the exactly
-specified order, and the finding that Zeebra's parallel determinant sweep — built for the resultant
-route — is structurally the right engine for `polyDet`. That last one is the transferable result,
-and §4.1 and `docs/research/structured-sylvester.md` are where it goes.
+*§8 (the go/no-go verdict on the Griffin attack) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 9. Reproduce
 
-```bash
-# the permutation, and the (delta, mu) convention the witnesses select
-tools/check-griffin-reconstruction.py
-
-# the modelling equations at all five witnesses, and the Appendix B bypass line
-tools/check-griffin-reconstruction.py --witness-system
-
-# the system at r rounds, its order by Construction 1, D_I, and the witness check
-tools/check-griffin-reconstruction.py --build-system 5
-
-# the degrevlex comparand (Singular, surrogate prime 2^31-1)
-tools/check-griffin-reconstruction.py --build-system 5 --singular /tmp/griffin-r5.sing
-timeout --signal=INT --kill-after=30s 480 Singular -q /tmp/griffin-r5.sing
-
-# regenerate the checked-in fixtures the Rust-side checks of section 10.3 read
-tools/check-griffin-reconstruction.py --build-system 4 --fixture research/griffin/freelunch-r4.txt
-tools/check-griffin-reconstruction.py --build-system 5 --fixture research/griffin/freelunch-r5.txt
-cargo test -p zeebra griffin
-```
-
-Standard library only, no new Rust, nothing under `src/` touched. `r = 5` takes about 17 s to build
-and the degrevlex comparand about 200 s; `r = 6` exceeds CPython's practical reach in this tool
-(§11).
+*§9 (reproduction commands for the Griffin reconstruction tool and fixtures) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 10. What #306 landed, and the one thing §2.3 got wrong
 
@@ -587,7 +339,7 @@ what makes a weighted instance unconstructible from a textual contract.
 > `grobner::weighted_reference_bases` is the differential test, on two systems chosen so that
 > every pair of tie-breaks differs on one of them. Swapping any two labels fails it.
 >
-> **Not on the Griffin system itself.** `research/griffin/freelunch-r4.txt` is at
+> **Not on the Griffin system itself.** `research/griffin/freelunch-r4.txt` (moved out in #668) is at
 > 28407454060060787 and Singular's prime fields stop below `2^31`, so that system cannot be posed
 > to Singular at any spelling. What is pinned is the convention, at a surrogate prime, under the
 > Griffin weight vector — the same argument §9.1 of `docs/MILESTONE-FGLM-SOLVING.md` makes for the
@@ -625,8 +377,8 @@ everything.
 
 So choosing grevlex's tie-break by mistake does not fail — it returns a different leading ideal from
 the same polynomials. `research/griffin/freelunch-r{4,5}.txt` are the systems this document's
-§1.3 built, checked in by `tools/check-griffin-reconstruction.py --build-system R --fixture PATH`,
-and `src/grobner/research/griffin.rs` reads them back and asserts, under the derived weight vector:
+§1.3 built, checked in by `tools/check-griffin-reconstruction.py`, and `src/grobner/research/griffin.rs`
+reads them back and asserts, under the derived weight vector (all three moved out in #668):
 
 | check | `r = 4` | `r = 5` |
 |---|---|---|
@@ -642,29 +394,6 @@ The `D_I` column is a fourth independent route to the same number: the paper's c
 order makes **four** of those tests fail, including both `D_I` checks — which is the only reason to
 trust the tie-break at all.
 
-What this does **not** change is §8's verdict. The capability existing does not make the attack
-worth building: `matGen` at `r = 7` is still 3 361 s and 27.6 GB in the authors' own
-implementation, full-round Griffin is still broken independently in eprint 2026/1281, and the
-instance's witnesses are still published. #306 delivers the capability and the published-witness
-regression tests; `sysGen`, `matGen`, `polyDet` and `uniSol` remain unbuilt and unscheduled.
-
 ## 11. Marked unverified, and open
 
-- **`r = 6` and `r = 7` were not built symbolically here.** The reduced state carries up to
-  `α_0 · D_H` monomials, so `r = 6` is 194 508 and `r = 7` is 4 084 182, and CPython dict-based
-  multivariate multiplication does not reach them in a bounded run. `α_0` and `D_H` for those rungs
-  in §4.1 and §4.2 are **derived** from the paper's closed form, which §1.3 confirms **measured** at
-  `r = 3, 4, 5`. A Kronecker-substitution representation (dense in `x_0`, sparse in the tail,
-  packed into Python integers) would likely reach `r = 6`; it was not written.
-- **The degrevlex comparand is Singular on a surrogate prime**, not Zeebra's F4 on `p`. Both labels
-  are on every number in §3. Measuring Zeebra's F4 would need a Griffin generator in `src/`, which
-  §8's verdict does not authorise.
-- **The `polyDet` projections in §4.1 are extrapolated** from one measured determinant point by an
-  `n³` law, exclude interpolation, and ignore the concavity the M25 brief records in the measured
-  determinant curve. They support "within reach", not a timing.
-- **Appendix A's claim that the reduced system is the *unique* reduced Gröbner basis** was not
-  checked. §1.3 confirms the leading monomials and the faithfulness, which is what gate 1 needs;
-  uniqueness is not load-bearing for any conclusion here.
-- **Attribution of FreeLunch's stage timings is theirs, not observed.** `sysGen`/`matGen`/`polyDet`
-  splits in §4 are the paper's Table 3; the stages are not independently observable from here, so
-  any attribution of *where their time goes* is a **hypothesis**.
+*§11 (open items on the Griffin reconstruction, the comparand and the `polyDet` projections) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*

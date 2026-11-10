@@ -38,7 +38,6 @@ every record:
 | One finite-field solution | `one-finite-field-solution` | one point in `F^n` satisfying the system | can stop at the first solution found, so strictly cheaper than enumerating |
 | All finite-field solutions | `all-finite-field-solutions` | every point in `F^n` | |
 | Univariate eliminant | `univariate-eliminant` | a generator of the elimination ideal in the last variable | obtainable without the rest of the basis by some routes |
-| Cryptanalytic witness | `cryptanalytic-witness` | a CICO preimage or collision, checked against the primitive | the only task whose correctness check is not algebraic; **belongs to the cryptanalysis scoreboard, not here** |
 
 **Rules.**
 
@@ -53,7 +52,7 @@ every record:
 ### The conflation that is easiest to commit
 
 Zeebra's own pipeline computes a grevlex basis, converts to lex, and then searches for a root, and
-it times the three stages separately (`examples/scoreboard.rs` does this deliberately). msolve's
+it times the three stages separately (`examples/scoreboard.rs` (moved out in #668) does this deliberately). msolve's
 default mode produces a rational parametrization. Groebner.jl's `groebner` produces a basis. These
 are **not** the same task, and a table that put msolve's end-to-end time against Zeebra's F4 stage
 would be comparing a solve against a basis computation. Each library's invocation must be chosen so
@@ -390,7 +389,7 @@ For Zeebra's own rows the analogous question is which row a process peak belongs
 process-wide, so a process that ran seven rows reports one figure covering all seven. Records
 therefore carry `measured_peak_rows_in_process`: `Some(1)` means the figure is that row's, anything
 larger means it is a ceiling over that many. `RunRecord::measured_peak_is_attributable()` is the
-check, and `tools/scoreboard.sh`'s ladder tier runs one process per row so that the answer is one.
+check, and `tools/scoreboard.sh`'s ladder tier (moved out in #668) runs one process per row so that the answer is one.
 An absent count is **not** attributable — records written before the field existed cannot have the
 number recovered.
 
@@ -428,14 +427,14 @@ verified.** See `docs/research/cross-library-corpus.md`, where the per-family st
 ## 6. Where the rows live: a separate board, and why the data model says so
 
 **Decision: a new board at `research/competitive/`, carrying `library` as a first-class dimension.
-The cryptanalysis scoreboard at `research/scoreboard/` is not extended.**
+The cryptanalysis scoreboard at `research/scoreboard/` (moved out in #668) is not extended.**
 
 The milestone instructs that the cryptanalysis scoreboard must not be overloaded with different
 semantics. That instruction is not the argument; it happens to coincide with what the existing data
 model already says. Six reasons, each from the code:
 
 1. **Identity is validated against a cryptanalysis registry.** `Scoreboard::add` refuses any run
-   whose `challenge` is not in `research::registry()` and whose digest does not match the current
+   whose `challenge` is not in `research::registry()` (moved out in #668) and whose digest does not match the current
    `ChallengeManifest` (`ScoreboardError::UnknownChallenge`, `StaleIdentity`). That check is the
    scoreboard's main value, and it is a check against a registry of *published cryptanalytic
    problems*. Katsura, Cyclic and random MQ are not that. Registering them would mean giving each a
@@ -471,7 +470,7 @@ model already says. Six reasons, each from the code:
    in would change the answer to that question without changing the question.
 
 What the new board **does** reuse, because these are the conventions that make the existing one
-trustworthy: hand-rolled JSON through `research::record::Json` (no serde in this subsystem), a
+trustworthy: hand-rolled JSON through `util::Json` (formerly `research::record::Json`; no serde in this subsystem), a
 generated Markdown renderer so the human-readable table cannot drift from the data, identity frozen
 by digest, unsuccessful runs recorded rather than dropped, and an append-only history with its
 contract written into the file.
@@ -593,7 +592,7 @@ the only thing any adapter does: it writes an input file, spawns a process, and 
 Groebner.jl and Singular are GPL and are **algorithmic reference only** — no source may be copied
 into Zeebra. Sagebrush is MIT OR Apache-2.0 and reuse is permitted. Fukuoka MQ Challenge instances
 are "All Rights Reserved, no stated licence" and **must never be redistributed**; they are fetched
-locally by `tools/fetch-mq-challenge.sh` into `ZEEBRA_MQ_DIR` and referenced by digest. See
+locally by `tools/fetch-mq-challenge.sh` (moved out in #668) into `ZEEBRA_MQ_DIR` and referenced by digest. See
 `docs/research/external-provenance-policy.md`, which is the authority.
 
 ---
@@ -617,7 +616,7 @@ If a row cannot be reproduced from those six, the row is the defect, not the rep
 ## 10. The commit, and what a publication bound is
 
 A figure states the commit it was taken at. `Environment::commit` has held the field since the
-scoreboard existed and `examples/scoreboard.rs` fills it from `git rev-parse`, so this was never a
+scoreboard existed and `examples/scoreboard.rs` (moved out in #668) fills it from `git rev-parse`, so this was never a
 missing capability — the gap was in the prose documents, which recorded the machine, the pinning,
 the build flags and the lock, and never the commit (#335). What that cost is exact: #318 found a
 figure on record 1.2x faster than the same measurement taken months later, and the one experiment

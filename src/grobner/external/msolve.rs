@@ -201,6 +201,12 @@ const MAX_STAGES: usize = 64;
 /// and not a basis over `GF(p)`.
 pub const MIN_CHARACTERISTIC: u64 = 2;
 
+/// Minimum characteristic supported by this adapter for msolve's eliminant task.
+///
+/// At characteristic two, msolve's sparse-FGLM genericity retry looped on Cyclic-5.
+/// The Gröbner basis task uses `-g 2` and bypasses that path.
+pub const MIN_CHARACTERISTIC_ELIMINANT: u64 = 3;
+
 /// The monomial order `-g` computes in, and the only one msolve offers.
 ///
 /// `main.c:104-109` documents `-g` as printing a reduced basis "for first prime characteristic
@@ -1076,10 +1082,6 @@ impl ExternalSolver for MsolveSolver {
             Task::OneFiniteFieldSolution | Task::AllFiniteFieldSolutions => {
                 return Support::No(Unsupported::Task { task })
             }
-
-            // A cryptanalytic witness is checked against a primitive, not against a basis, and
-            // belongs to the cryptanalysis scoreboard rather than the competitive board.
-            Task::CryptanalyticWitness => return Support::No(Unsupported::Task { task }),
         }
 
         // msolve's input format carries a single integer characteristic on line 2
@@ -1115,6 +1117,17 @@ impl ExternalSolver for MsolveSolver {
                 detail: format!(
                     "characteristic {} is not a prime field for msolve: 0 on line 2 of its input \
                      file means Q",
+                    instance.field.characteristic
+                ),
+            });
+        }
+        if task == Task::UnivariateEliminant
+            && instance.field.characteristic < MIN_CHARACTERISTIC_ELIMINANT
+        {
+            return Support::No(Unsupported::Representation {
+                detail: format!(
+                    "the msolve adapter declines eliminants at characteristic {}: \
+                     sparse-FGLM genericity retries can loop indefinitely",
                     instance.field.characteristic
                 ),
             });
@@ -1853,20 +1866,13 @@ rational param(cpu)             0.75 sec
 
     /// The corpus rungs that can have no Zeebra oracle, and why.
     ///
-    /// **Not a coverage gap — a correct residue.** Poseidon carries KoalaBear and Anemoi
-    /// `2^64 - 353`, and neither shares [`Reference`]'s type, so each needs a second *field type*
-    /// rather than a second match arm. Every rung at the reference field now has an oracle
-    /// whatever its family, because the dispatch is on [`COMPILED_WIDTHS`].
+    /// Empty: every rung is at the reference field, and every rung there has an oracle whatever
+    /// its family, because the dispatch is on [`COMPILED_WIDTHS`]. A rung added at another field
+    /// would belong here — it needs a second *field type* rather than a second match arm.
     ///
     /// Asserted two-sidedly, so a rung that silently *gained* coverage is caught as well as one
     /// that lost it (#338's contribution, kept).
-    const WITHOUT_A_COMPILED_PAIR: &[&str] = &[
-        "poseidon-t2-rf2-rp0-planted",
-        "poseidon-t2-rf2-rp2-planted",
-        "poseidon-t2-rf4-rp0-planted",
-        "anemoi64-cico-n1-fcico",
-        "anemoi64-cico-n2-fcico",
-    ];
+    const WITHOUT_A_COMPILED_PAIR: &[&str] = &[];
 
     /// Every rung at the reference field has an oracle; only the other-field ones do not.
     ///
@@ -1906,28 +1912,6 @@ rational param(cpu)             0.75 sec
         assert_eq!(
             without, expected,
             "a corpus rung gained or lost a compiled Zeebra side; see #333"
-        );
-    }
-
-    /// The rungs with no oracle are exactly the ones carrying their own field, not their own name.
-    ///
-    /// Poseidon is over KoalaBear and Anemoi over `2^64 - 353`; neither shares [`Reference`]'s
-    /// type, so each needs a second field type rather than a second match arm. That residue is
-    /// correct rather than a coverage gap, and this test is what says so.
-    #[test]
-    fn test_the_rungs_without_an_oracle_are_the_ones_at_another_field() {
-        for name in WITHOUT_A_COMPILED_PAIR {
-            let instance = corpus_instance(name, P31);
-            assert_ne!(
-                instance.field.characteristic, P31,
-                "{}: it is at the reference field, so it should have an oracle",
-                name
-            );
-        }
-        assert_eq!(
-            WITHOUT_A_COMPILED_PAIR.len(),
-            5,
-            "three Poseidon rungs and two Anemoi rungs"
         );
     }
 
@@ -2667,7 +2651,6 @@ rational param(cpu)             0.75 sec
             Task::LexBasisByConversion,
             Task::OneFiniteFieldSolution,
             Task::AllFiniteFieldSolutions,
-            Task::CryptanalyticWitness,
         ] {
             match solver.supports(&pair(P30), task) {
                 Support::No(Unsupported::Task { task: reported }) => assert_eq!(reported, task),
@@ -2883,10 +2866,17 @@ rational param(cpu)             0.75 sec
         assert!(line.contains("-t 8"), "{}", line);
         assert!(line.contains("-g 2"), "{}", line);
 
-        // The eliminant uses the default mode, so it must *not* pass `-g`.
+        // The eliminant uses the default mode, so it must *not* pass `-g`. Asserted over the
+        // command line's **tokens**: the recorded line embeds the temporary input and output paths,
+        // and a substring test for `-g` matches any checkout directory that happens to contain one
+        // — which made this assertion a fact about where the repository was cloned.
         let eliminant = solver.run(&pair(P30), Task::UnivariateEliminant, &limits);
         let line = eliminant.command_line.expect("a recorded command line");
-        assert!(!line.contains("-g"), "{}", line);
+        assert!(
+            !line.split_whitespace().any(|token| token == "-g"),
+            "{}",
+            line
+        );
         assert!(line.contains("-t 8"), "{}", line);
     }
 

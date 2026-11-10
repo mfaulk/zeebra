@@ -178,8 +178,8 @@ impl<const N: usize, F: FiniteField> ops::Mul<&SparseMultiPoly<N, F>> for &Spars
     ///
     /// On the operator rather than behind an opt-in, because every form of multiplication in the
     /// crate funnels through here — `impl_mul_variants!`, `MulAssign`, `div_rem`'s `&q * divisor`,
-    /// and the repeated-multiplication S-box in `grobner::research::resultant` — so a caller that
-    /// had to opt in would be a caller that did not. Bit-identical to the materialising loop it
+    /// and a straight-line program's repeated-multiplication S-box — so a caller that had to opt in
+    /// would be a caller that did not. Bit-identical to the materialising loop it
     /// replaces at every size; below the dispatch threshold it *is* that loop.
     fn mul(self, other: &SparseMultiPoly<N, F>) -> Self::Output {
         sparse_multivariate_multiply::multiply(self, other)
