@@ -47,8 +47,9 @@ pub use identities::{One, Zero};
 #[doc(hidden)]
 pub use poly::{
     div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
-    from_zeros_crossover_unstable, interpolate_quadratic_unstable, karatsuba_base_case_unstable,
-    karatsuba_unstable, multiply_multivariate_unstable, multivariate_multiply_route_unstable,
+    from_zeros_crossover_unstable, gcd_classical_unstable, gcd_half_unstable,
+    interpolate_quadratic_unstable, karatsuba_base_case_unstable, karatsuba_unstable,
+    multiply_multivariate_unstable, multivariate_multiply_route_unstable,
     newton_crossover_unstable, newton_floor_unstable, newton_is_cheaper_at_unstable,
     newton_is_cheaper_unstable, product_of_factors_unstable, subproduct_evaluate_unstable,
     subproduct_interpolate_unstable, tree_crossover_unstable, MultiplyRoute,

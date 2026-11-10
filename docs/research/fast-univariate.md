@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change.
+`66acfed2` plus that change. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -13,7 +13,7 @@ Both routes into #68 end in the same place: one univariate polynomial of very la
 large prime field, whose roots are wanted. This records what Zeebra's univariate layer can actually
 do there — measured, not estimated — and what it would need to go further.
 
-Every number below comes from
+The original scaling sweep comes from
 
 ```text
 cargo run --release --example univariate_scaling
@@ -1351,7 +1351,7 @@ stage at the same size) — which together give 91x. The measurement is 1.4x abo
 residue is inversions again: the equal-degree splitter and the gcd both invert, and inversion is
 relatively dearer over the wide field than multiplication is.
 
-### 4.5 Division: sub-quadratic since #193, and the GCD that is now unblocked
+### 4.5 Fast division and experimental half-GCD
 
 **Closed by #193.** `div_with_remainder` dispatches between long division and Newton inversion of
 the reversed divisor on a measured crossover, and the `div` row of §3 is superseded: its exponent
@@ -1366,7 +1366,7 @@ division exponent moves the binding stage directly, and it did.
 | long division | `d^2` | `d^2` | 1.95 – 2.03 |
 | Newton inversion of `rev(g)` | `O(M(d))` | `O(d^1.585)` | **1.56 – 1.61** |
 | classical Euclid | `O(d^2)` | `O(d^2)` | not separately measured |
-| half-GCD (#194) | `O(M(d) log d)` | `O(d^1.585 log d)` | **unblocked, unwritten** |
+| half-GCD (#194) | `O(M(d) log d)` | `O(d^1.585 log d)` | [crossover sweep](#194-experimental-half-gcd) |
 
 The exponent column is `examples/division_crossover.rs`'s fitted slope over the top half of its
 balanced sweep, which is the figure that compares the two routes at the same sizes; §3's per-row
@@ -1466,14 +1466,65 @@ Euclidean loop wants the remainder anyway.
 
 #### What is left
 
-- **#194, half-GCD**, is unblocked by this section's argument and by this issue's product: it needs
-  both a sub-quadratic `M` to be worth writing and a fast division to recurse on, and both now
-  exist. `d^1.585 log d` against Euclid's `d^2` is a real crossing rather than the
-  `d^2 log d`-against-`d^2` non-crossing it was.
 - **#527**, the floor on the precision. The rule carries `k > t` as well as the inequality, and
   that floor is the one part of it no measurement here covers. The model puts the true floor near
   `t/68`, which would widen the Newton band by nearly two decades in `k` — in exactly the regime
   where it measured fastest.
+
+#### #194: experimental half-GCD
+
+The recursive route builds a unimodular transition matrix from truncated Euclidean remainder
+sequences. Differential tests check the resulting monic GCD against classical Euclid, and
+transition tests check where the matrix lands in the remainder sequence.
+
+The degree-64 base case belongs to the experimental algorithm. The public `gcd` uses
+classical Euclid at every degree. On the pinned sweep, every input pair that entered the
+half-GCD path was slower through degree 4096.
+
+```sh
+cargo build --release --example gcd_crossover
+tools/benchlock.sh gcd-crossover taskset -c 10 target/release/examples/gcd_crossover
+```
+
+The optional argument selects `koalabear`, `goldilocks`, or `bn254`. The example verifies
+that both routes return one for the seeded degree-`d` and degree-`d - 1` inputs before
+timing them. It alternates the arm order and reports each arm's minimum over up to five
+repetitions per pair.
+
+| Degree | KoalaBear | Goldilocks | BN254 Fr |
+|-------:|----------:|-----------:|---------:|
+| 96 | 0.456 | 0.437 | 0.540 |
+| 256 | 0.352 | 0.391 | 0.450 |
+| 1024 | 0.370 | 0.451 | 0.498 |
+| 4096 | 0.492 | 0.712 | 0.792 |
+
+Entries are classical time divided by half-GCD time. At degrees 32 through 65 the
+experimental route used its classical tail, and the timings agreed within 1%.
+The two routes drew closer at the largest degrees measured.
+
+The run used Rust 1.99.1 and the release profile on logical CPU 10 of an AMD Ryzen
+Threadripper PRO 5995WX, with the repository's x86-64-v3 flags. The benchmark lock
+recorded one-minute load of 7.55 at the start and 3.77 at the end.
+
+For the caller comparison, run `gcd_crossover callers` on the same core with binaries
+built from `abba625c` (classical `gcd`) and `cbc0fa5b` (the draft's degree-64 dispatch).
+Use the example source from `abba625c` for both builds. Each polynomial contains
+`d - 2` distinct linear factors and one irreducible quadratic. The example checks the
+returned roots and factors and seeds each stage independently. Five paired repetitions
+alternated binary order under the same benchmark lock.
+
+| Field | Degree | `roots` | `factorize` |
+|:------|-------:|--------:|------------:|
+| KoalaBear | 64 | 1.008 | 0.993 |
+| KoalaBear | 256 | 0.964 | 0.961 |
+| KoalaBear | 1024 | 0.952 | 0.956 |
+| BN254 Fr | 64 | 0.998 | 0.997 |
+| BN254 Fr | 256 | 0.997 | 0.994 |
+
+Entries are the minimum classical time divided by the minimum draft-dispatch time.
+Degree 64 uses classical Euclid in both builds and serves as a control. The measured
+KoalaBear callers took about 4–5% longer with the draft dispatch above the control.
+BN254 Fr was within 1% at both tested degrees.
 
 #### #527: the floor was mine and it was 16x-32x too high
 
@@ -1643,7 +1694,7 @@ two of the three official 2026 CICO-2 solutions. Three things change for this se
 
 - the transform ceiling is set by the **smooth part** of `q - 1`, not the two-adicity alone, so
   KoalaBear reaches `2^24 · 127` with a mixed-radix FFT rather than stopping at `2^24`;
-- **half-gcd** is a fourth gap, since `gcd.rs` is plain Euclid — but the published univariate route
+- **half-GCD** is available experimentally (§4.5). The published univariate route
   needs neither it nor Newton division nor a subproduct tree;
 - the `R_P = 8` challenge was solved by interpolation plus Graeffe root finding at degree `3^13`,
   which needs a `2^22` transform — **inside** the ceiling this document measured. That named an
