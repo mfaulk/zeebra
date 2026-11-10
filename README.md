@@ -113,6 +113,11 @@ instrumented examples — along with the measurement rules this repository follo
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.
 
+Univariate `gcd` uses classical Euclid. Run `cargo run --release --example gcd_crossover`
+to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254. The
+[half-GCD measurements](docs/research/fast-univariate.md#194-experimental-half-gcd)
+include the commands for a pinned run.
+
 ## What is in the box
 
 | Area | Guide |
