@@ -4013,6 +4013,7 @@ fn test_an_explicit_route_overrides_the_order() {
 /// debug build, and `docs/research/f4-resource-scaling.md` §14 carries the figure.
 #[test]
 #[ignore]
+#[cfg(feature = "external-runners")]
 fn test_mq_random_10_no_longer_approaches_the_live_entry_cap() {
     use crate::grobner::external::corpus::{instance, REFERENCE_CHARACTERISTIC};
     type G = Zp2147483647;

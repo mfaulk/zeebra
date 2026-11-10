@@ -394,7 +394,7 @@ mod tests {
     };
     use crate::{
         fields::Zp2147483647,
-        grobner::{external::corpus, fglm::BorderBatchSize, FglmMemory},
+        grobner::{fglm::BorderBatchSize, FglmMemory},
     };
 
     /// The default is the recommended configuration, not a third thing to keep in step.
@@ -622,13 +622,14 @@ mod tests {
     /// is about: a corpus figure corrected here and not there would leave the cap argument above
     /// reasoning from the stale one.
     #[test]
+    #[cfg(feature = "external-runners")]
     fn test_every_planted_rung_has_a_declared_quotient_dimension() {
         let declared: Vec<&str> = PLANTED_QUOTIENT_DIMENSIONS
             .iter()
             .map(|(name, _)| *name)
             .collect();
-        let ladder = corpus::ladder();
-        let planted: Vec<&corpus::CorpusEntry> = ladder
+        let ladder = crate::grobner::external::corpus::ladder();
+        let planted: Vec<&crate::grobner::external::corpus::CorpusEntry> = ladder
             .iter()
             .filter(|entry| entry.family == "mq-planted")
             .collect();
@@ -659,6 +660,7 @@ mod tests {
     ///
     /// **Named individually rather than exempted by family**, which is the whole point: a rung
     /// added without a dimension fails the test below instead of joining a silent exemption.
+    #[cfg(feature = "external-runners")]
     const UNDECLARED_ZERO_DIMENSIONAL: &[&str] = &["mq-random-14"];
 
     /// Every zero-dimensional rung on the **whole** ladder declares a quotient dimension.
@@ -674,10 +676,11 @@ mod tests {
     /// figure on one of those rungs is a figure about something else. `cyclic-4`, `cyclic-8` and
     /// `cyclic-9` are the rungs this holds for.
     #[test]
+    #[cfg(feature = "external-runners")]
     fn test_every_zero_dimensional_rung_declares_a_quotient_dimension() {
         let mut undeclared: Vec<&str> = Vec::new();
         let mut positive_dimensional = 0usize;
-        for entry in corpus::ladder() {
+        for entry in crate::grobner::external::corpus::ladder() {
             match (entry.zero_dimensional, entry.quotient_dimension) {
                 (true, Some(dimension)) => assert!(
                     dimension > 0,

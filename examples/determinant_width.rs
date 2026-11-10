@@ -50,15 +50,13 @@ use rand::{prelude::StdRng, SeedableRng};
 
 use zeebra::{
     fields::PrimeFieldElement64,
-    grobner::{
-        external::corpus::KOALABEAR_CHARACTERISTIC,
-        resultant::{random_bivariate, time_sylvester_determinants, DeterminantKernel},
-    },
+    grobner::resultant::{random_bivariate, time_sylvester_determinants, DeterminantKernel},
     resultant_from_coefficients, FiniteField, Monomial, MultivariatePolynomial, One, Polynomial,
     UnivariatePolynomial, Zero,
 };
 
-type K = PrimeFieldElement64<KOALABEAR_CHARACTERISTIC>;
+/// KoalaBear, `2^31 - 2^24 + 1`, at 64-bit storage.
+type K = PrimeFieldElement64<2_130_706_433>;
 
 /// Allocation calls since the counter was armed, and whether it is armed.
 ///
