@@ -136,7 +136,7 @@ variant, which the page dates and scopes:
 > polynomial systems with rather dense inputs; this is a common case for attacking certain types of
 > cryptosystem and includes the HFE and MQQ cryptosystems and also Minrank systems.
 
-That is the "dense F4" of `minrank.md` §5.4 named and dated by its vendor, and it is #441's subject.
+That is the "dense F4" of `minrank.md` §5.4 (moved out in #668) named and dated by its vendor, and it is #441's subject.
 The page also gives the HFE-80 matrix shape — "the largest matrix is 293,287×1,666,981 and many rows
 have hundreds of thousands of non-zero entries" — which is a structural datum of the kind #225 and
 #218 want, on the system #198 tracks.

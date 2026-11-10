@@ -103,30 +103,6 @@ cargo test --release --lib -- --ignored --exact \
     grobner::differential::tests::test_a_live_sweep_against_singular_agrees
 ```
 
-One more needs data this repository does not redistribute. The Fukuoka MQ Challenge files are
-"All Rights Reserved" with no stated licence, so the test against a genuine instance is opt-in for
-the same reason:
-
-```sh
-tools/fetch-mq-challenge.sh
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_a_published_instance_is_reproduced
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_real_n24_challenges_import
-# the three #197 added: the modulus oracle, the GF(2) families, and the two real m = 16 instances
-# checked against the answer vectors their 2015 solver published
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_published_gf2_instances_import
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_real_m16_challenges_vanish_at_their_published_answers
-```
-
-The second covers the two *real* challenge files at `m = 16` — type VI over GF(31) and type V over
-GF(2^8), both `n = 24` — and asserts the import rather than a solve: header, shape, 325
-coefficients per polynomial, the compiled dimension reached through `dispatch`, and the AES modulus
-refused in favour of the challenge's `0x11D`.
 
 Two other `#[ignore]`d tests are unimplemented placeholders — a `BigUInt` sampling distribution
 check and a rare division branch — and they panic if run. A bare `cargo test -- --ignored`
@@ -289,7 +265,7 @@ command either exercises the comparand or says it could not. It is 246 tests in 
 a debug build is enough, because every msolve comparison runs on a corpus rung at or below seven
 variables, which `DEFAULT_ORACLE_WIDTH_CEILING` is what bounds; `cyclic-7`, added in #424, is almost
 all of those thirty seconds and the rungs above it print `NO ORACLE` rather than being run. So this
-is still cheap to run before merging anything that changes the corpus, the challenge registry, or
+is still cheap to run before merging anything that changes the corpus or
 either engine's side of the comparison. The test that #339 is named for lives here:
 `grobner::external::msolve::tests`, driven from `corpus::ladder()`.
 
@@ -476,8 +452,7 @@ Two things to know if a cache is enabled anyway:
 - **A stale cached `libzeebra` rlib does not look like a cache problem.** It surfaces as an example
   or binary failing to compile against `pub use` items that are plainly present in the source. The
   same symptom comes from sharing one `CARGO_TARGET_DIR` between two checkouts, which is why
-  `tools/scoreboard.sh` forces a private target directory and an empty wrapper for anything
-  measured.
+  anything measured runs with a private target directory and an empty wrapper.
 
 
 ## Parallel Development

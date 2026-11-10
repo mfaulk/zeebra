@@ -41,7 +41,7 @@
 //
 // == What cannot be verified this way, and why
 //
-// **Not `research/griffin/freelunch-r4.txt` itself.** Its prime is 28407454060060787, and
+// **Not the FreeLunch round-4 system itself.** Its prime is 28407454060060787, and
 // Singular's `ring R = p,...` requires p < 2^31 -- the same ceiling `reference_bases.sing` records
 // and `differential/singular.rs` documents. So the Griffin system cannot be posed to Singular at
 // its own field at all, and what is verified here is the *convention*, at a surrogate prime, with
@@ -101,7 +101,7 @@ proc emit(string name, string tie, ideal I)
 "//! for why `LastVariableFirst` is a reversed labelling rather than an ordering name.";
 "//!";
 "//! Every row is over `GF(" + string(32003) + ")` in three variables under the Griffin weight vector";
-"//! `(1, 7, 49)`. The prime is a surrogate: `research/griffin/freelunch-r4.txt` is at";
+"//! `(1, 7, 49)`. The prime is a surrogate: the FreeLunch round-4 system is at";
 "//! 28407454060060787, above the `2^31` ceiling Singular's prime fields stop at, so the Griffin";
 "//! system itself cannot be posed to Singular at all and what is pinned here is the convention.";
 "";

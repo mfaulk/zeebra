@@ -16,17 +16,15 @@
 //!   configuration and not of the ideal.
 //!
 //! ```text
-//! tools/fetch-mq-challenge.sh                      # for the Fukuoka sections
 //! cargo run --release --example hilbert_study
 //! ```
 //!
 //! # Inhomogeneous input
 //!
-//! The Fukuoka and Poseidon systems are not homogeneous, so the model does not apply to them as
-//! given. What is studied instead is the system of **top forms** — each generator's highest-degree
-//! homogeneous component — which is the object the MQ literature's semiregularity assumption is
-//! about. That is a *different ideal*: `top_forms` of `x^2 + y` is `x^2`, whose variety is a line
-//! where the original's is a parabola. Every table below says which system it is about.
+//! The model is a statement about homogeneous ideals. For an inhomogeneous system — the katsura
+//! calibration row — the observed column is the Hilbert function of the computed basis's
+//! leading-term ideal, a legitimate monomial-ideal invariant but **not** a graded dimension of the
+//! ideal, and every table says which it is.
 
 use std::time::Instant;
 
@@ -38,21 +36,17 @@ use zeebra::{
         benchmark_systems::katsura,
         classify_ideal, f4_with_options,
         hilbert::{
-            is_homogeneous, leading_generators_by_degree, monomials_of_degree, top_forms,
-            HilbertComparison, HilbertSeries, SemiregularSeries,
+            is_homogeneous, leading_generators_by_degree, monomials_of_degree, HilbertComparison,
+            HilbertSeries, SemiregularSeries,
         },
-        research::{CicoInstance, MqInstance, Poseidon, PoseidonParameters, KOALABEAR_PRIME},
         F4Options, IdealClass,
     },
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
-type Q = PrimeFieldElement64<31>;
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
 type P = PrimeFieldElement64<2_147_483_647>;
 
 const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
-const C1: u64 = 0xC0_9DE4;
 
 /// Degrees to compare over. Beyond the top degree of the quotient both sides are zero, so this is
 /// chosen to reach past every instance's finish rather than to bound the computation.
@@ -269,40 +263,6 @@ fn study<const N: usize, F: FiniteField>(
     println!();
 }
 
-fn mq_directory() -> std::path::PathBuf {
-    std::env::var("ZEEBRA_MQ_DIR")
-        .unwrap_or_else(|_| "research/instances/mq".to_string())
-        .into()
-}
-
-fn load_mq(stem: &str) -> Option<MqInstance> {
-    let text = std::fs::read_to_string(mq_directory().join(stem)).ok()?;
-    MqInstance::parse(&text).ok()
-}
-
-/// A planted reduced CICO system.
-fn cico<const N: usize>(t: usize, r_f: usize, r_p: usize) -> Vec<MultivariatePolynomial<N, K>> {
-    let poseidon = Poseidon::<K>::new(PoseidonParameters {
-        prime: KOALABEAR_PRIME,
-        alpha: 3,
-        t,
-        r_f,
-        r_p,
-    })
-    .expect("R_F is even");
-    let free: Vec<K> = (0..t - 1).map(|i| K::new(1_000 + i as u64)).collect();
-    CicoInstance::planted(
-        poseidon,
-        1,
-        &[K::new(C1)],
-        &free,
-        Some(PoseidonParameters::bounty_cico()),
-    )
-    .expect("the right widths")
-    .system::<N>()
-    .expect("the right dimension")
-}
-
 /// §1: the textbook cases, where the formula is a theorem.
 fn textbook() {
     println!("## 1. Where the formula is a theorem");
@@ -427,102 +387,9 @@ fn counterexamples() {
     );
 }
 
-/// §4: Fukuoka type III, through its top forms.
-fn fukuoka() {
-    println!("## 4. Fukuoka MQ Challenge, type III over GF(31)");
-    println!();
-    println!(
-        "**Through top forms.** The published instances carry linear and constant terms, so they \
-         are not homogeneous and the model does not apply to them as given. The rows below are \
-         about the homogeneous quadratic parts — the system the MQ literature's semiregularity \
-         assumption is a statement about — and that is a *different ideal* from the one the \
-         challenge poses."
-    );
-    println!();
-
-    for (stem, label) in [
-        ("ToyExample-type3-n10-seed0", "type III n=10 seed 0"),
-        ("ToyExample-type3-n15-seed0", "type III n=15 seed 0"),
-    ] {
-        let Some(instance) = load_mq(stem) else {
-            println!(
-                "`{}` is not present; run `tools/fetch-mq-challenge.sh`.\n",
-                stem
-            );
-            continue;
-        };
-        match instance.variables {
-            10 => {
-                let system = instance.system::<10, Q>().expect("ten variables");
-                let forms = top_forms(&system);
-                study::<10, Q>(
-                    &format!("{} — top forms", label),
-                    &forms,
-                    "20 homogeneous quadratics in 10 variables.",
-                );
-            }
-            15 => {
-                let system = instance.system::<15, Q>().expect("fifteen variables");
-                let forms = top_forms(&system);
-                study::<15, Q>(
-                    &format!("{} — top forms", label),
-                    &forms,
-                    "30 homogeneous quadratics in 15 variables.",
-                );
-            }
-            other => println!("{}: {} variables is not compiled in.\n", label, other),
-        }
-    }
-
-    // And the inhomogeneous original, to show what the observed column means there.
-    if let Some(instance) = load_mq("ToyExample-type3-n10-seed0") {
-        let system = instance.system::<10, Q>().expect("ten variables");
-        study::<10, Q>(
-            "type III n=10 seed 0 — the published inhomogeneous system",
-            &system,
-            "Shown so the two can be compared. The observed column here is the Hilbert function \
-             of the leading-term ideal of the *inhomogeneous* system's basis, which is a \
-             legitimate monomial-ideal invariant and **not** a graded dimension of this ideal. \
-             The predicted column is the same quadratic model, and it has no claim on this row.",
-        );
-    }
-}
-
-/// §5: reduced-round Poseidon, through its top forms, with the limitation stated.
-fn poseidon() {
-    println!("## 5. Reduced-round Poseidon CICO over KoalaBear");
-    println!();
-    println!(
-        "**The weakest section, and deliberately included.** These systems are cubic (`alpha = 3`) \
-         and inhomogeneous, their generators are highly structured, and the semiregularity model \
-         has no standing on them at all. The rows are here to show what the model does on exactly \
-         the systems M22 cares about, which is the question §7 of the plan asks."
-    );
-    println!();
-
-    study::<5, K>(
-        "t=2 R_F=2 R_P=0 — top forms",
-        &top_forms(&cico::<5>(2, 2, 0)),
-        "Five variables. The top form of each S-box equation `v - s^3` is `s^3`, so the top-form \
-         system is a system of cubes of linear forms plus one linear output constraint — which is \
-         *not* the CICO system in any useful sense.",
-    );
-    study::<7, K>(
-        "t=2 R_F=2 R_P=2 — top forms",
-        &top_forms(&cico::<7>(2, 2, 2)),
-        "Seven variables.",
-    );
-    study::<9, K>(
-        "t=2 R_F=4 R_P=0 — the published inhomogeneous system",
-        &cico::<9>(2, 4, 0),
-        "Shown as it is generated, so the observed column can be compared against §4's \
-         inhomogeneous row. The predicted column is the cubic model and has no claim on it.",
-    );
-}
-
-/// §6: the question the plan asks — does the prediction say when a degree is exhausted?
+/// §4: the question the plan asks — does the prediction say when a degree is exhausted?
 fn the_main_question() {
-    println!("## 6. The question");
+    println!("## 4. The question");
     println!();
     println!(
         "§7.5 of the plan: *does the Hilbert model reliably identify degrees at which additional \
@@ -609,7 +476,5 @@ fn main() {
     textbook();
     generic_mq();
     counterexamples();
-    fukuoka();
-    poseidon();
     the_main_question();
 }

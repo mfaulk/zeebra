@@ -19,9 +19,9 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::Zp2147483647,
     grobner::{
-        analyze,
-        research::{solve_slice, SliceOutcome, Specialization},
-        solve_one, PlannedSolveOptions, SolveError, SolvePolicy,
+        analyze, solve_one,
+        transform::{solve_slice, SliceOutcome, Specialization},
+        PlannedSolveOptions, SolveError, SolvePolicy,
     },
     MultivariatePolynomial, Zero,
 };

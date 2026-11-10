@@ -30,8 +30,7 @@
 //! makes a peak-RSS figure attributable to it. This is the mode `tools/benchlock.sh` should wrap,
 //! and the only one whose rows belong in `research/competitive/`.
 //!
-//! The split is the same discipline `tools/scoreboard.sh`'s ladder tier already applies, and the
-//! reasoning is `docs/research/external-comparison-protocol.md` §4.
+//! The reasoning is `docs/research/external-comparison-protocol.md` §4.
 //!
 //! # What this program does not do
 //!
@@ -41,15 +40,18 @@
 
 use std::{fs, path::Path, time::Duration};
 
-use zeebra::grobner::{
-    external::{
-        corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
-        CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance, Limits,
-        Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
-        SingularSolver, Task, ZeebraSolver,
+use zeebra::{
+    grobner::{
+        external::{
+            corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
+            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance,
+            Limits, Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
+            SingularSolver, Task, ZeebraSolver,
+        },
+        record::Environment,
+        F4Options, InterreductionRoute,
     },
-    research::{Environment, Json},
-    F4Options, InterreductionRoute,
+    util::Json,
 };
 
 const ROOT: &str = "research/competitive";
@@ -204,8 +206,6 @@ fn main() {
     let limits = Limits::wall(wall).with_workers(1);
 
     for name in &rows {
-        // Poseidon and Anemoi rows override the characteristic with the registry's own field,
-        // because their round constants are derived from the prime.
         let built = match instance(
             name,
             characteristic,

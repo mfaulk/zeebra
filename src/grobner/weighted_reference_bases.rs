@@ -12,7 +12,7 @@
 //! for why `LastVariableFirst` is a reversed labelling rather than an ordering name.
 //!
 //! Every row is over `GF(32003)` in three variables under the Griffin weight vector
-//! `(1, 7, 49)`. The prime is a surrogate: `research/griffin/freelunch-r4.txt` is at
+//! `(1, 7, 49)`. The prime is a surrogate: the FreeLunch round-4 system is at
 //! 28407454060060787, above the `2^31` ceiling Singular's prime fields stop at, so the Griffin
 //! system itself cannot be posed to Singular at all and what is pinned here is the convention.
 

@@ -27,7 +27,7 @@
 //! cargo run --release --example graeffe_root -- deflate degrees=729,6561,59049  # #351
 //! ```
 //!
-//! Pin the run, as `tools/scoreboard.sh` does, and give it a private target directory:
+//! Pin the run and give it a private target directory:
 //!
 //! ```text
 //! RUSTC_WRAPPER="" CARGO_TARGET_DIR=/path/to/target \

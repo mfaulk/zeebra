@@ -120,8 +120,10 @@ scoreboard population; merge-result CI.
 | Boolean/SAT comparison (#218–#221) | The first same-machine external baseline outside Gröbner, and genuinely attractive, but it needs characteristic-two formulation work and a fair SAT comparison first |
 | MinRank | No smallest credible target is defined and the formulation cost is unestimated |
 | An F4 matrix microbenchmark corpus (#262) | Rule 2 makes it valuable only if #349 implicates elimination. Gated on #349, not scheduled |
-| `rf6-rp0`, any eight-round row | 16.15 h and ≥490.5 d respectively. Not near any ceiling, and not reachable by a constant factor |
 | Increasing the round count | #350 does not do this and M26 does not claim it |
+
+*The row naming larger round counts' cost projections was moved out with the cryptanalysis research in
+#668; it is preserved at commit 9532a9a2.*
 
 ---
 
@@ -175,7 +177,7 @@ returned `stale`, and no open PR referenced it. The row was claiming work nobody
 
 M25 named `src/grobner/f4/`, `src/linalg/` and `src/fields/`. M26 adds two:
 
-- `src/grobner/research/resultant.rs` — M26-A only.
+- `src/grobner/research/resultant.rs` (now `src/grobner/resultant.rs`) — M26-A only.
 - the FGLM conversion path — M26-B only.
 
 `src/grobner/f4/` is touched by **both** M26-C (#304, #322) and, conditionally, #268 and #330. Those
@@ -298,8 +300,8 @@ writers.
 
 | agent | worktree | branch | issues | primary files |
 |---|---|---|---|---|
-| RESULTANT | `zb-m26-resultant` | `feat/m26-euclidean-resultant` | #350 #351 #297 #367 | `src/grobner/research/resultant.rs`, `univariate_cico.rs`, `examples/resultant_cico.rs`, `docs/research/structured-sylvester.md` |
-| FGLM | `zb-m26-fglm` | `feat/m26-krylov-conversion` | #58 #224 #323 #368 | the FGLM conversion path, `src/linalg/**` Krylov additions, `docs/research/anemoi.md` |
+| RESULTANT | `zb-m26-resultant` | `feat/m26-euclidean-resultant` | #350 #351 #297 #367 | `src/grobner/research/resultant.rs` (now `src/grobner/resultant.rs`), `univariate_cico.rs` and `examples/resultant_cico.rs` (both moved out in #668), `docs/research/structured-sylvester.md` |
+| FGLM | `zb-m26-fglm` | `feat/m26-krylov-conversion` | #58 #224 #323 #368 | the FGLM conversion path, `src/linalg/**` Krylov additions, docs/research/anemoi.md (moved out in #668) |
 | F4 | `zb-m26-f4` | `perf/m26-f4-foundations` | #304 #322, then #268 #330 | `src/grobner/f4/**` |
 | PROFILE | `zb-m26-profile` | `perf/m26-stage-profile` | #349 #348 #318 #319 | profiling harness, `docs/research/f4-resource-scaling.md` |
 | integration | orchestrator checkout | — | #256 #339 #369 #370 | **this document**, `README.md`, scoreboard regeneration, runner contracts |
@@ -446,8 +448,9 @@ measurement; #350's differential and benchmark suite at orders through 1 458; M2
 rung profile.
 
 **Not authorized without a fresh decision:** `rf4-rp2` (#367) — carried from M25 §9 unchanged, now at
-**1.70–1.88 h against the ~2 h ceiling** with root finding still the unpriced term. `rf6-rp0`
-(16.15 h), every eight-round row (`rf4-rp4` ≥490.5 d), and any Anemoi rung past `N = 6`.
+**1.70–1.88 h against the ~2 h ceiling** with root finding still the unpriced term. *The cost
+projections for larger round counts and Anemoi rungs were moved out in #668; they are preserved at
+commit 9532a9a2.*
 
 **The standing ceiling is not raised for M26.** #367's route to authorization is a measured re-costing
 plus an owner decision, not a larger ceiling.
@@ -463,14 +466,13 @@ supports continuing; #304's duplicated basis storage removed with measured peak 
 Scoreboard A holding retained records for ≥3 libraries beyond Zeebra, or a documented per-library
 blocker; #318/#319 resolved or explicitly bounded; the board and documentation truthful.
 
-**Strong.** The minimum, plus a verified witness on a harder Poseidon **parameter combination**
-(#367), or a recorded refusal naming the measured term that refused it; **and** a meaningful
-end-to-end conversion improvement against the M25 baseline — 3–5x is substantial; **and** #322
-resolved such that the Anemoi `N = 6` entry-budget refusal is understood and the next rung is costed.
+**Strong.** The minimum, plus a meaningful end-to-end conversion improvement against the M25
+baseline — 3–5x is substantial; **and** #322 resolved such that the Anemoi `N = 6` entry-budget
+refusal is understood. *The criteria on harder Poseidon parameters and the next Anemoi rung were moved
+out in #668; they are preserved at commit 9532a9a2.*
 
 **Stretch.** Conversion within roughly **2x of msolve** on a representative nontrivial workload, at
-equivalent concurrency, with measured memory and no startup-floor distortion; **or** a verified
-cryptanalytic result beyond M25's measured frontier; **or** a clear same-machine lead on a
+equivalent concurrency, with measured memory and no startup-floor distortion; **or** a clear same-machine lead on a
 representative computer algebra task, full correct computation, task-equivalent.
 
 **A kernel-level win alone does not satisfy the stretch criterion.** 1 692x on a stage is not a
@@ -482,10 +484,8 @@ stretch result; ~3x on the row, delivered end to end and verified, is a Strong o
 
 - That 1 692x on the determinant stage is 1 692x on anything a user runs. It is **~3x on the row**,
   and after axis 4 the route is 78% root finding.
-- That a harder parameter combination is a larger round count. The cryptanalysis scoreboard records
-  these separately. Both are legitimate; they are different mathematical achievements.
-- That closing the conversion gap extends the Anemoi frontier, while #323 stands and F4's entry budget
-  is the first gate.
+- *Two non-claims about round counts and the Anemoi frontier were moved out in #668; they are
+  preserved at commit 9532a9a2.*
 - That sparse-FGLM would be 30x faster. The three engines reach a lex basis by three different
   algorithms; `MILESTONE-FGLM-SCALABILITY.md` §8.5's measurements against that claim stand unrefuted.
 - That a memory reduction is a frontier extension, unless the resource stop actually moved.
@@ -503,8 +503,9 @@ stretch result; ~3x on the row, delivered end to end and verified, is a Strong o
 | MinRank | No smallest credible target; formulation cost unestimated | A named instance with a published comparand |
 | F4 matrix corpus (#262) | Rule 2 | #349 implicating elimination |
 | GPU / out-of-core (#69, #86–#89, #225) | No named kernel, workload, predicted benefit, benchmark. #305 removed the main argument | All four, per §3 |
-| `rf6-rp0` and eight-round rows | 16.15 h / ≥490.5 d. Not reachable by a constant | Sub-quadratic root finding **and** sub-quadratic interpolation **and** #243-class build work — four walls, three of them serial quadratic stages |
-| Poseidon Initiative Attack Reward Program | Requires a public ePrint paper by end of 2026 and an improvement to published attacks. **A faster implementation of an established algorithm does not qualify** | A genuinely better attack formulation or elimination strategy, evaluated on its own merits. Tracked separately from M26's engineering criteria and **not** a dependency of any of them |
+
+*Two rows — larger round counts and an attack reward programme — were moved out with the cryptanalysis
+research in #668; they are preserved at commit 9532a9a2.*
 
 ---
 
@@ -536,14 +537,13 @@ cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- koalabear degrees=6561,19683
 
 # the conversion split M26-B stage 1 must reproduce on a second Anemoi rung
+# (the Anemoi ladder example moved out in #668)
 cargo run --release --example fglm_profile -- katsura-7
-cargo run --release --example anemoi_ladder
 
 # the competitive board (#369). `competitive` only renders accumulated history
-# and takes no measurements; tools/scoreboard.sh takes them, by tier
+# and takes no measurements; tools/scoreboard.sh took them, by tier (moved out in #668)
 cargo run --release --example competitive                 # render to stdout
 cargo run --release --example competitive -- --write      # update research/competitive/
-ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... ./tools/scoreboard.sh stable --write
 
 # the agent tooling's own tests
 bash scripts/agent/test/zb-claim-test.sh

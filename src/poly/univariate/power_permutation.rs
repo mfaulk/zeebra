@@ -8,9 +8,8 @@
 //! the enumeration of admissible exponents, and the inverse map are all the same piece of
 //! arithmetic modulo `q - 1`.
 //!
-//! This is the whole of what the hash work needs: Poseidon's S-box is `x^alpha`, and
-//! `grobner::research::poseidon` carries `alpha` as a parameter whose admissibility nothing
-//! checked. Which exponents a field admits is also what a parameter sweep over `alpha` has to
+//! This is the whole of what the hash work needs: Poseidon's S-box is `x^alpha`, and a model of it
+//! carries `alpha` as a parameter whose admissibility needs checking. Which exponents a field admits is also what a parameter sweep over `alpha` has to
 //! know before it starts.
 //!
 //! # What is deliberately not here

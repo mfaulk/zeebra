@@ -3,12 +3,11 @@
 Reference for M22-D (#74). Figures from
 
 ```sh
-tools/fetch-mq-challenge.sh
 cargo run --release --example f4_degrees
 ```
 
 under `F4Options::recommended()` with `profile_degrees` and `measure_stages` set, grevlex
-throughout.
+throughout. The Fukuoka rows also needed `tools/fetch-mq-challenge.sh`, which was moved out in #668.
 
 ## 1. What a mutant is here, precisely
 

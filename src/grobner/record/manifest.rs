@@ -17,8 +17,8 @@
 //!
 //! [`Provenance::redistribution`] is not paperwork. The Fukuoka files are
 //! "COPYRIGHT © 2015 FUKUOKA MQ CHALLENGE All Right Reserved" with no stated licence, so they are
-//! **not committed to this repository**; `tools/fetch-mq-challenge.sh` fetches them and the
-//! checksum here is what pins the bytes a result was computed against. A corpus that silently
+//! **not committed to this repository**; an importer fetches them, and the checksum here is what
+//! pins the bytes a result was computed against. A corpus that silently
 //! redistributed them would be a licensing problem *and* an unpinned one.
 
 use std::fmt::{Display, Formatter};

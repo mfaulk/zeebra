@@ -22,17 +22,13 @@ A running record of what Zeebra implements. The short version is in the [README]
 - [x] 254- and 255-bit prime fields, with F4, FGLM and solving over them end to end
 - [x] Two-adic roots of unity without factoring `q - 1`, so the NTT runs over the wide fields
 - [x] Batch inversion by Montgomery's trick: the inverse NTT now costs what the forward one does
-- [x] A frozen registry of public cryptanalysis challenges, and a scoreboard that refuses to
-      compare two different problems
-- [x] A verified CICO witness at Poseidon-31's official state width `t = 16`, for a registered
-      reduced-round instance
 - [x] Graeffe-transform root finding: one root at degree `3^13` over KoalaBear in 3.1 s, against an
       extrapolated 57 hours for the quadratic finder
 - [x] Lenstra's elliptic curve method, with an explicit effort budget that can report the cofactors
       it could not split
-- [x] The resultant route's Sylvester determinants in parallel: 92–95% efficiency out to 32 cores,
-      the four-round CICO row from 49.7 s to 2.16 s, with the concurrency recorded on the
-      scoreboard and a cross-concurrency comparison refused rather than quoted
+- [x] The bivariate resultant's Sylvester determinants in parallel: 92–95% efficiency out to 32
+      cores, with the resultant byte-identical at every worker count and the concurrency recorded in
+      every `Environment`
 - [x] The whole solving pipeline in characteristic two, over GF(2) and GF(2^8), and field equations
       `x^q - x` that make a quotient dimension count base-field points
 - [x] Text input and exhaustive enumeration over an extension field, on a settled split between the
@@ -50,8 +46,8 @@ A running record of what Zeebra implements. The short version is in the [README]
 - [x] Multivariate `Add`, `Sub` and `scale` collecting into an operand's own map, so a sum that
       cancels to one term out of 11 476 a side allocates nothing at all where materializing held
       594 KB, and an owned accumulator grows in place
-- [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
-      is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
+- [x] A cross-library corpus whose ideal equivalence is checked before any timing is published —
+      Katsura, Cyclic, random MQ and planted MQ, extensible by a caller's own rungs — with the Katsura indexing and affine-versus-homogenized Cyclic conventions
       resolved against msolve's own distributed input files — now at **two** reference
       characteristics, `2^31 − 1` and `GF(32003)`, each rung frozen at each, because a rung at
       another prime is another ideal and not the same one under a parameter
@@ -64,22 +60,15 @@ A running record of what Zeebra implements. The short version is in the [README]
 - [x] Symbolic preprocessing's monomial queue deduplicated on push rather than on pop:
       `fukuoka-mq-III-n20-seed0`'s peak RSS 9.1x lower and its runtime 10% shorter, with the
       symbolic closure checked unchanged batch by batch rather than inferred from the basis
-- [x] The published 2 400x Anemoi conversion gap attributed by measuring the same system at three
-      characteristics: this crate's conversion/basis ratio is flat to 12% across a 47-bit range of
+- [x] A published 2 400x conversion gap on a cipher-derived system attributed by measuring the same
+      system at three characteristics: this crate's conversion/basis ratio is flat to 12% across a 47-bit range of
       primes where the reference's moves 7.3x, so the gap is the reference's field arithmetic — and
       msolve on this machine is 35x faster than either
-- [x] Anemoi CICO at six rounds, `D = 15 625`: a witness verified through the permutation in
-      1.180 h, reproducing a published 11 775 s conversion, with the pre-recorded cost model landing
-      within 4% on the conversion and 1.5% on the operator count
 - [x] The Sylvester determinant's cost law measured over five matrix orders instead of two: cubic to
       within the measurement above L2 — `2.9953 ± 0.0285`, worst residual 3.7% — and no cache
       cliff, since order 4 374's 153 MB matrix exceeds L3 and still fits the law. The budget guard
       takes the larger of the fitted and cubic laws, because a model that under-predicts authorizes
       a run nobody costed
-- [x] A cost-and-resource-model register in which prediction error is *derived* from the predicted
-      and measured columns rather than authored, every figure labelled measured / fitted / predicted
-      / extrapolated, and rows append-only — so a re-measurement sits beside the estimate it
-      corrects instead of erasing how wrong it was
 - [x] Two measured same-machine losses in different subsystems, which is what the comparison was
       for: order conversion ~30x behind msolve, and the basis stage 4.11x behind Singular on random
       MQ — the corpus family closest in shape to a cryptanalytic system
@@ -115,6 +104,10 @@ A running record of what Zeebra implements. The short version is in the [README]
       equal exhaustively and the saving stated as an operation count rather than a timing
 - [x] Reed-Solomon codes over an FFT domain: encoding, erasure recovery, and a Euclidean
       decoder that verifies its correction rather than returning the nearest codeword
-- [x] A prize ledger that keeps *claimable* apart from *solved*: five dated states per programme,
-      and a test that refuses a registered reward figure carrying no claimability state and no read
-      date — the three unsolved Poseidon rows stay unsolved and their rewards expired in 2025
+- [x] General-purpose system transforms — affine elimination, specialization with slice solving
+      that keeps a slice's emptiness apart from the system's, and reversible variable reordering —
+      and generic experiment records, under `grobner::transform` and `grobner::record`
+
+The cryptanalysis research that used to live in `grobner::research` — cipher models, CICO
+formulations, a challenge registry and scoreboard, attack cost models — left the crate in #668.
+Its entries above are removed; the history is in git at `9532a9a2`.

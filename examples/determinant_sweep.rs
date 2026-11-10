@@ -12,14 +12,12 @@
 //! cargo run --release --example determinant_sweep -- --cost-only      # print the budget, run nothing
 //! ```
 //!
-//! # Why this is not a subcommand of `resultant_cico`
+//! # Why random pairs
 //!
-//! That example's subject is the **registered** CICO ladder, and every figure it prints is tied to
-//! a named challenge, a sample count derived from that row's round numbers, and a budget guard that
-//! refuses a row. A determinant cost law is a property of the kernel and of this machine's cache
-//! hierarchy, not of any row: measuring it on a registered row would confound the exponent with
-//! that row's particular degrees, and the orders worth measuring (4 374) are ones no affordable row
-//! reaches. So the sweep runs on **random bivariate pairs** of named degree, and lives apart.
+//! A determinant cost law is a property of the kernel and of this machine's cache hierarchy, not of
+//! any particular system: measuring it on one structured instance would confound the exponent with
+//! that instance's degrees, and the orders worth measuring (4 374) are ones few real instances
+//! reach affordably. So the sweep runs on **random bivariate pairs** of named degree.
 //!
 //! # What is measured, and what is derived
 //!
@@ -48,15 +46,16 @@ use rand::{prelude::StdRng, SeedableRng};
 
 use zeebra::{
     fields::PrimeFieldElement64,
-    grobner::research::{
+    grobner::resultant::{
         fit_power_law, random_bivariate, time_sylvester_determinants, DeterminantBatch,
-        DeterminantKernel, PowerLawFit, KOALABEAR_PRIME,
+        DeterminantKernel, PowerLawFit,
     },
     util::peak_resident_bytes,
     FiniteField,
 };
 
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
+/// KoalaBear, `2^31 - 2^24 + 1`, at 64-bit storage.
+type K = PrimeFieldElement64<2_130_706_433>;
 
 /// The orders swept by default: `2 · 3^r` for `r = 2, 4, 5, 6, 7`.
 ///

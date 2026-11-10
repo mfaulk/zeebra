@@ -4,10 +4,11 @@ Reference for M22-A (#74), extended by #253 with a third selection axis — term
 subsection and in §6. Every figure in §§1–5 comes from
 
 ```sh
-tools/fetch-mq-challenge.sh
 cargo run --release --example f4_schedule
-cargo run --release --example f4_schedule -- mq3-n15     # one instance per process
+cargo run --release --example f4_schedule -- cyclic-6    # one instance per process
 ```
+
+The Fukuoka rows also needed `tools/fetch-mq-challenge.sh`, which was moved out in #668.
 
 under `F4Options::recommended()` with `profile_degrees` set, `max_matrix_columns = 60_000`,
 `max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), `max_batches = 20_000`, grevlex throughout. **Every row in every table
@@ -429,7 +430,7 @@ default, rather than a global one, is the shape any future proposal here would h
 ```sh
 cargo run --release --example f4_schedule -- list
 cargo run --release --example f4_schedule                 # every instance, both sweeps
-cargo run --release --example f4_schedule -- mq3-n15      # one instance per process
+cargo run --release --example f4_schedule -- cyclic-6     # one instance per process
 cargo run --release --example f4_selection                # §6, every reducer policy
 cargo test --lib schedule                                 # the safety properties
 cargo test --lib length_schedule                          # the pair-length comparators

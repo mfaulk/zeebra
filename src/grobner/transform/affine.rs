@@ -24,8 +24,7 @@
 //!   That is maintained by back-substituting each new expression into the ones already recorded, so
 //!   no recorded expression ever mentions a variable that was eliminated later.
 //! - [`AffineElimination::reconstruct`] evaluates those expressions, and the caller then checks the
-//!   result against the **original** generators. `examples/cryptanalysis_ladder.rs` additionally
-//!   re-runs the Poseidon permutation, which is independent of every step here.
+//!   result against the **original** generators.
 //!
 //! An elimination with no reconstruction would be a different mathematical problem reported as the
 //! original one, which is the failure mode this whole `research` module exists to prevent.

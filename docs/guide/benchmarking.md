@@ -25,8 +25,7 @@ post-#161 revisions in [`docs/research/graeffe-root-finding.md`](../research/gra
 
 The lock handles contention and nothing else. Also needed, per invocation:
 
-- `CARGO_TARGET_DIR` inside the caller's own worktree and `RUSTC_WRAPPER=""`, as in
-  `tools/scoreboard.sh`. The default target directory is keyed by package and profile rather than
+- `CARGO_TARGET_DIR` inside the caller's own worktree and `RUSTC_WRAPPER=""`. The default target directory is keyed by package and profile rather than
   by checkout, so two worktrees overwrite each other's `libzeebra.rlib` and an example links
   against a library built from other source; the symptom is a missing export that is plainly
   present.
@@ -158,7 +157,7 @@ CI's `agent-scripts` job.
 ## Which commit a figure came from
 
 A measurement published under `docs/` states the commit it was taken at. The field has always
-existed — `Environment::commit`, filled from `git rev-parse` by `examples/scoreboard.rs` — and the
+existed — `Environment::commit` (`grobner::record`), filled from `git rev-parse` — and the
 gap was the prose, which recorded the machine, the pinning, the build flags and the lock and never
 the commit (#335). The cost was concrete: #318 found a figure on record 1.2x faster than the same
 measurement taken later, and "re-measure at the old commit" could not be *set up* from what was
@@ -283,7 +282,6 @@ cargo run --release --example f4_degrees           # F4, work and useful work pe
 cargo run --release --example f4_schedule          # critical-pair order, and batch size, apart
 cargo run --release --example f4_schedule -- list  # the instances available
 cargo run --release --example hilbert_study         # the semiregular model against the measurement
-cargo run --release --example cryptanalysis_ladder  # Poseidon and MQ, with every transform inverted
 cargo run --release --example hilbert_driven        # a predicted cap against a cap chosen without one
 cargo run --release --example hilbert_driven -- list
 cargo run --release --example m22_ablation          # every M22 strategy, one table per instance
@@ -299,11 +297,6 @@ cargo run --release --example accumulator_span     # whether a vectorizable inne
 cargo run --release --example accumulator_span -- list
 cargo run --release --example boolean_density      # what a GF(2) entry costs, at two field widths
 cargo run --release --example boolean_density -- 6 8
-cargo run --release --example xl_dimensions        # XL's matrix at the degree it needs, against F4's
-cargo run --release --example xl_dimensions -- 38  # the published record's instance
-cargo run --release --example crossbred_dimensions # crossbred's admissible parameters and its
-                                                   # total work across every guess, against F4's
-cargo run --release --example crossbred_dimensions -- 10 15 20
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -330,10 +323,6 @@ cargo run --release --example solve_auto           # four policies against an of
 cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
 cargo run --release --example field_width          # what a 4-byte field element is worth, per
 cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
-cargo run --release --example mq_challenge         # import and solve a Fukuoka MQ instance
-cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
-cargo run --release --example feistel_mimc_cico    # Feistel-MiMC CICO: the round ladder, and the
-                                                   # per-round and univariate models side by side
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
 cargo run --release --example ntt_access           # #591: is the NTT access-bound or
@@ -357,14 +346,8 @@ cargo run --release --example graeffe_root         # Graeffe root finding, stage
 cargo run --release --example graeffe_root -- deflate   # all roots by deflation, #351
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
-cargo run --release --example graeffe_cico         # the univariate CICO route, and the family economics
-cargo run --release --example graeffe_cico -- --families 3000 --budget 25
-cargo run --release --example graeffe_cico -- --help
 cargo run --release --example batch_inversion      # batch inversion: routine, integration,
 cargo run --release --example batch_inversion -- f4   # and the F4 headroom left alone
-cargo run --release --example scoreboard           # registered problems, one record each, staged
-tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
-tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
 cargo run --release --example competitive          # render research/competitive/ from its history
 cargo run --release --example competitive -- --write   # and update COMPETITIVE.md in place
 cargo run --release --example competitive_sweep -- --list   # corpus x engines x tasks, exploratory
@@ -394,22 +377,12 @@ cargo run --release --example interreduction_repeats -- katsura-6 --order lex
                                                    # the same on the one path the division route
                                                    #   still ships on under the default
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
-cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
-                                                   #   (two four-round rows, predicted sample count)
-cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the determinant scaling study
-cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
-cargo run --release --example resultant_cico -- --kernel euclidean --root-finder deflation \
-    --row poseidon31-cico-t16-rf4-rp2 --max-samples 59050   # the six-round row, #367
 cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
 cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
-cargo run --release --example determinant_era      # one determinant, timed the same way at two
-                                                   #   commits and three widths (#318, #319)
-cargo run --release --example determinant_era -- --workers 1,8,32 --determinants 13123
 cargo run --release --example determinant_width    # the width sweep 1..32 and the kernel split,
                                                    #   every arm in one process (#412)
-cargo run --release --example determinant_width -- --pair row --samples 1024
                                                    # the same against the rf4-rp2 row's own pair,
                                                    #   after a 5.66 min symbolic build
 cargo run --release --example determinant_width -- --count-allocations   # calls per determinant
@@ -513,10 +486,8 @@ output a projection rather than a measurement. The answer is a null result: the 
 turned out not to be the matrix. It runs a tracking `#[global_allocator]` beside the solver's own
 counters, measures each batch's symbolic preprocessing and matrix construction on the batches F4
 really selected — including the batch that is **refused**, which no `F4Statistics` field describes —
-and prints each named structure's share against the measured peak. `ZEEBRA_MAX_ENTRIES` and
-`ZEEBRA_WALL_SECONDS` set the entry cap and `max_wall_time`, so a rung of the
-`docs/research/f4-resource-scaling.md` ladder reproduces here with the attribution attached. Pass
-`mq <instance>` for a registered MQ instance, whose files `tools/fetch-mq-challenge.sh` fetches.
+and prints each named structure's share against the measured peak, on katsura-6, katsura-7 and
+cyclic-6.
 
 `interreduce_working_set` is that question for the *final interreduction*, which `f4_memory`'s
 per-batch probe does not reach. It runs **one rung and one arm per process**, because peak resident
@@ -543,16 +514,12 @@ not to build the cache, for the reasons in `docs/research/interreduction-cost.md
 selected and discarded, the split of matrix rows into reducer scaffolding and pair halves, **the
 rank the pair rows added on top of the reducer block**, the pair rows that added nothing, the
 largest matrix, the elements extracted, and how many of those came out below the degree that found
-them. It covers katsura-5 for calibration, the Fukuoka type III and VI toy instances, and the
-controlled Poseidon family — where the `t = 3` and `t = 2` nine-variable instances **do not have
-the same algebraic dimension** (`N - E = t - 2k`), so the `t = 3` system is also run with one free
-input pinned, which matches the equation counts without changing the round structure. Needs
-`tools/fetch-mq-challenge.sh` for the MQ sections; the rest runs without it.
+them. It covers katsura-5 for calibration, then katsura-6, cyclic-5, cyclic-6 and a planted
+eight-variable system.
 
 `m22_ablation` is M22-I's: the whole M22 strategy matrix on one table per instance, over the
 corpus of §11.2 — katsura-5/6/7, cyclic-5/6, a planted system, a nonradical ideal, a
-positive-dimensional one, the Fukuoka type III and specialized type VI instances, and three Poseidon
-systems. Every row's basis is **asserted** equal to the baseline's and certified, since a differing
+positive-dimensional one. Every row's basis is **asserted** equal to the baseline's and certified, since a differing
 basis is a defect and a column reporting one would bury it. `total ms` is solve plus certification,
 which is the only figure a default decision may use. Variable order is held fixed at the generated
 layout throughout — M22-E measured it at 1.6x–1.7x, which would otherwise be attributed to whichever
@@ -618,31 +585,6 @@ already cheaper in memory — by entry count, not entry size. It also runs all t
 backends over characteristic-two matrices and asserts they agree, which
 [`docs/research/boolean-solving.md`](../research/boolean-solving.md) §15 explains had never been
 checked.
-
-`xl_dimensions` prices XL's matrix without building one, which is what #76's go/no-go asks for — "a
-result obtainable from construction alone, without a solver". XL's shape at a degree is three
-binomial coefficients and a term count, so every figure is an exact integer that reproduces
-bit-for-bit and needs no benchmark lock; the operating degree comes from the semiregular model's
-degree of regularity and is labelled a prediction. It is **self-validating against the published
-record-holder**: predicting the degree for type III `n = 38` from the model and then counting columns
-combinatorially reproduces eprint 2026/2641's reported `N = 45 379 620` exactly, and the term count
-reproduces the published `n = 10` file's 66 coefficients. The finding is a crossover —
-XL's matrix is *smaller* than F4's measured peak at `n = 10` and `n = 15`, 1.34x at `n = 20`, 22.3x
-at `n = 24`, and 850 GiB at `n = 38`. See
-[`docs/research/xl-block-wiedemann.md`](../research/xl-block-wiedemann.md).
-
-`crossbred_dimensions` does the same job for the crossbred family (#75), and for the same reason:
-whether a triple `(D, d, k)` works at all is a coefficient of a bivariate series and the matrix
-shapes are monomial counts, so the answer is reachable from construction without a solver. It is
-validated against every published parameter choice the four sources carry — Joux-Vitse's Table 1
-column for column, Vidal-Delaplace-Ionica's Tables 1, 2 and 6, and Baena et al.'s Example 2 — and
-refuses to print a figure if any of them fails. The accounting reports **`q^(n-k)` as its own
-term**, because crossbred's cost is the sum over all guesses and not the size of the reduced
-system. The finding is a no-go on reachable instances: on Fukuoka type III at `n = 15` the
-cheapest admissible triple needs 30.6 hours against F4's measured 7.8 seconds, under a rate
-assumption chosen to favour crossbred throughout. The one interesting row is `n = 20`, where
-crossbred's preprocessing matrix is a tenth of F4's peak and F4 does not finish at all — a memory
-wall traded for a time wall. See [`docs/research/crossbred.md`](../research/crossbred.md).
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,
@@ -723,19 +665,18 @@ echelonization, and a deferral for order conversion that M25's competitive basel
 reopened as staged work. Read it before proposing either.
 [`docs/research/order-conversion.md`](../research/order-conversion.md) is the survey of what else
 there is: eight alternatives to the classical conversion, each with a verdict and the measured figure
-that settles it, and the reaffirmed-but-narrowed §8.5 no-go. Its §4 is the first shape-position
-result on a cryptanalytic family — Anemoi `FCICO` and `PCICO` are in shape position at every rung
-tested, by `cargo run --release --example anemoi_ladder shape` and `tests/anemoi_shape_position.rs`,
-both machine-independent because a minimal-polynomial degree is not a timing.
+that settles it, and the reaffirmed-but-narrowed §8.5 no-go. Its §4 records shape position measured on a cipher-derived family — machine-independent,
+because a minimal-polynomial degree is not a timing.
 
 `grobner::shape_position_hypotheses` is the cheap syntactic half of the same question, from Campa and
 Roy's Theorem 8 (eprint 2025/814): zero-dimensionality, a pure-power leader for every variable, and a
 finite `deg_≺`-top-form quotient, each decided from the basis for the price of a Hilbert series
 rather than a quotient algebra. It is **not** called a certificate of shape position, because those
 hypotheses do not imply it — `test_the_published_hypotheses_are_not_sufficient` exhibits an ideal
-that discharges every one of them and is not in shape position, and
-[`docs/research/anemoi.md`](../research/anemoi.md) §10.5 is the full reading, including the
-hypothesis Theorem 8's proof invokes and its statement omits. The missing condition is exactly
+that discharges every one of them and is not in shape position. The full reading, including the
+hypothesis Theorem 8's proof invokes and its statement omits, is in `docs/research/anemoi.md`
+§10.5, which moved out with the cryptanalysis research in #668 and is preserved at commit
+`9532a9a2`. The missing condition is exactly
 `shape_report`'s `minimal_polynomial_degree == dimension`, so the two together are what settles a
 family and the module's docs say which half is a deduction and which a computation.
 
@@ -770,8 +711,7 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](../MILESTONE-LARGE-PRIME-FIELDS.md),
 [`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](../MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md),
 [`docs/MILESTONE-DEGREE-AWARE-F4.md`](../MILESTONE-DEGREE-AWARE-F4.md),
-[`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](../MILESTONE-CRYPTANALYSIS-SCOREBOARD.md),
-[`docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](../MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md), and
+and
 [`docs/MILESTONE-COMPETITIVE-ALGEBRA.md`](../MILESTONE-COMPETITIVE-ALGEBRA.md).
 [`docs/MILESTONE-ALGORITHMIC-ELIMINATION.md`](../MILESTONE-ALGORITHMIC-ELIMINATION.md) is the
 current plan rather than a record of measurements taken, and
@@ -779,13 +719,8 @@ current plan rather than a record of measurements taken, and
 one. That plan opens by recording that the one before it is unfinished, because its own scope
 depends on measurements M26 has not yet reported.
 
-The last of those reproduced a published cryptanalytic attack end to end, extended the verified resultant
-frontier from four rounds to **six** with a witness checked through the permutation, and calibrated
-against an external solver on identical problems — where the published Anemoi conversion wall
-**does not reproduce**: 46 s here against 6.13 h reported, and a within-run conversion/basis ratio
-of 1.71 against 2 367.
+M25 calibrated Zeebra against external solvers on identical problems; where a published conversion wall was checked it **did not reproduce**: 46 s here against 6.13 h reported, and a within-run conversion/basis ratio of 1.71 against 2 367.
 
 That milestone's §10.1 is worth reading on its own. It scores the plan's own predictions and finds
 that every one about a stage already measured held, while three of four about quantities nobody had
-measured were wrong by more than an order of magnitude — one by 838x. The cost-model table exists so
-that is visible rather than quietly absorbed.
+measured were wrong by more than an order of magnitude — one by 838x.

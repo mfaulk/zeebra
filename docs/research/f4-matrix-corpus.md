@@ -456,7 +456,7 @@ which GBLA's own SMS export is the smaller first step.
 
 **No Fukuoka MQ instance.** Types II and V are the published GF(2^8) MQ systems and the natural
 wide-characteristic-two entries, but they come from `research/instances/`, which
-`tools/fetch-mq-challenge.sh` downloads and `.gitignore` excludes — so an entry built on them could
+`tools/fetch-mq-challenge.sh` (moved out in #668) downloads and `.gitignore` excludes — so an entry built on them could
 not be captured on a machine that had not fetched them, and `walk_corpus` would fail rather than
 skip. The GF(2^8) coverage here is cyclic instead.
 
