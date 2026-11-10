@@ -724,3 +724,21 @@ M25 calibrated Zeebra against external solvers on identical problems; where a pu
 That milestone's §10.1 is worth reading on its own. It scores the plan's own predictions and finds
 that every one about a stage already measured held, while three of four about quantities nobody had
 measured were wrong by more than an order of magnitude — one by 838x.
+
+### Monomial order width
+
+Build before acquiring the benchmark lock. Choose a CPU in the current affinity mask and check
+the machine load and runnable count while holding the lock.
+
+```sh
+env -u RUSTFLAGS RUSTC_WRAPPER="" CARGO_TARGET_DIR=target-width \
+  cargo build --release --example monomial_order_width
+tools/benchlock.sh monomial-order-width bash -c \
+  'cat /proc/loadavg && taskset --cpu-list 2 target-width/release/examples/monomial_order_width'
+```
+
+The harness compares production with four-variant and three-variant versions of the same built-in
+comparators. It times forced per-comparison dispatch and replays the unstable sort over recommended
+F4 column snapshots. It checks the dispatch checksums and sorted columns across arms.
+Run `cargo test --example monomial_order_width` for the fixed checksum and layout check that also
+runs in CI. See the [measurement and scope](../research/monomial-order-width.md).

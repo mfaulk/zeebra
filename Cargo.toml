@@ -108,6 +108,10 @@ required-features = ["external-runners"]
 name = "interreduction_routes"
 required-features = ["external-runners"]
 
+[[example]]
+name = "monomial_order_width"
+test = true
+
 [[test]]
 name = "external_comparands"
 required-features = ["external-runners"]
