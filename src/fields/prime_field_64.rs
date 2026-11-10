@@ -14,6 +14,7 @@ use std::{
     ops,
 };
 
+#[cfg(any(test, feature = "proptest"))]
 use proptest::prelude::{any, Arbitrary, BoxedStrategy, Strategy};
 use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -383,7 +384,7 @@ impl<const P: u64> ops::Div<Self> for &PrimeFieldElement64<P> {
 
 impl_div_variants!([const P: u64], PrimeFieldElement64<P>);
 
-/// impl Arbitrary
+#[cfg(any(test, feature = "proptest"))]
 impl<const P: u64> Arbitrary for PrimeFieldElement64<P> {
     type Parameters = ();
 

@@ -114,3 +114,58 @@ fn test_normal_form_errors_can_be_matched_downstream() {
         other => panic!("an empty basis has no divisors, got {other:?}"),
     }
 }
+
+/// The integers mod 4: a ring that is not a field, defined outside the crate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Z4(u8);
+
+impl std::fmt::Display for Z4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::ops::Add for Z4 {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Z4((self.0 + rhs.0) % 4)
+    }
+}
+
+impl std::ops::AddAssign for Z4 {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
+impl std::ops::Mul for Z4 {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self {
+        Z4((self.0 * rhs.0) % 4)
+    }
+}
+
+impl std::ops::MulAssign for Z4 {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
+    }
+}
+
+impl Zero for Z4 {
+    const ZERO: Self = Z4(0);
+}
+
+impl One for Z4 {
+    const ONE: Self = Z4(1);
+}
+
+impl zeebra::Ring for Z4 {}
+
+/// A downstream type implements `Ring` without any proptest trait, and generic linear algebra accepts it.
+#[test]
+fn test_downstream_ring_needs_no_proptest() {
+    let v = zeebra::linalg::Vector::new(&[Z4(1), Z4(2), Z4(3)]);
+    let doubled = &v + &v;
+    assert_eq!(doubled.elements(), &vec![Z4(2), Z4(0), Z4(2)]);
+    assert_eq!((v * Z4(2)).elements(), &vec![Z4(2), Z4(0), Z4(2)]);
+}

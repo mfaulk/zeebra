@@ -1,6 +1,7 @@
 //! A term (monomial) of a multivariate polynomial.
 
 use crate::FiniteField;
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::Arbitrary,
     collection::vec,
@@ -113,7 +114,7 @@ impl<const N: usize> Distribution<Monomial<N>> for Standard {
     }
 }
 
-/// Arbitrary
+#[cfg(any(test, feature = "proptest"))]
 impl<const N: usize> Arbitrary for Monomial<N> {
     type Parameters = ();
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {

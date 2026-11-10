@@ -24,6 +24,7 @@ use std::{
     ops,
 };
 
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{arbitrary::Arbitrary, prelude::BoxedStrategy, strategy::Strategy};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -311,7 +312,7 @@ impl<const P: u64> Display for BinaryFieldElement<P> {
     }
 }
 
-// impl Arbitrary
+#[cfg(any(test, feature = "proptest"))]
 impl<const P: u64> Arbitrary for BinaryFieldElement<P> {
     type Parameters = ();
 

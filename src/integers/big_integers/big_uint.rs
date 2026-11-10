@@ -9,6 +9,7 @@ use crate::integers::{
     ux64::Ux64,
     FromDecStrErr,
 };
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::{any, Arbitrary},
     collection::vec,
@@ -354,6 +355,7 @@ impl Shr<usize> for &BigUInt {
     }
 }
 
+#[cfg(any(test, feature = "proptest"))]
 impl Arbitrary for BigUInt {
     type Parameters = ();
 

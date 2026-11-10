@@ -251,6 +251,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: cargo clippy --all-targets --no-default-features -- -D warnings
 
+      # proptest and its 17 transitive crates belong behind the `proptest` feature (#676). A
+      # stray un-gated `use proptest` would fail the lint above. A dependency entry that loses its
+      # `optional = true` would not, so this step checks the graph a default consumer gets.
+      - name: proptest stays out of the default dependency graph
+        if: ${{ !cancelled() }}
+        run: |
+          if cargo tree --locked -e normal --prefix none | grep -q '^proptest '; then
+            echo "proptest is a normal dependency of a default build; gate it behind the feature" >&2
+            exit 1
+          fi
+
       - name: Package
         if: ${{ !cancelled() }}
         run: cargo package --locked

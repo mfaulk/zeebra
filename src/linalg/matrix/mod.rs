@@ -6,6 +6,7 @@ use crate::{
     linalg::matrix::iterating::{ColumnIterator, ColumnsIterator, RowIterator, RowsIterator},
     FiniteField, Ring,
 };
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::any,
     collection::vec,
@@ -436,7 +437,8 @@ impl From<(usize, usize)> for MatrixParams {
 }
 
 /// Implement Arbitrary
-impl<T: Ring + 'static> Arbitrary for Matrix<T> {
+#[cfg(any(test, feature = "proptest"))]
+impl<T: Ring + Arbitrary + 'static> Arbitrary for Matrix<T> {
     type Parameters = MatrixParams;
 
     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {

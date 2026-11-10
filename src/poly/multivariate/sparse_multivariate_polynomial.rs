@@ -13,6 +13,7 @@ use crate::{
     FiniteField,
 };
 use pest::error::Error;
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::any,
     collection::vec,
@@ -275,6 +276,7 @@ impl<const N: usize, F: FiniteField> Hash for SparseMultiPoly<N, F> {
     }
 }
 
+#[cfg(any(test, feature = "proptest"))]
 #[derive(Debug, Clone)]
 pub struct ArbParams {
     /// How many (monomial, coefficient) pairs to draw. Duplicate monomials are combined and zero
@@ -282,6 +284,7 @@ pub struct ArbParams {
     pub num_terms: usize,
 }
 
+#[cfg(any(test, feature = "proptest"))]
 impl Default for ArbParams {
     fn default() -> Self {
         // Must be nonzero: drawing no pairs would make `any::<SparseMultiPoly>()` generate
@@ -290,8 +293,8 @@ impl Default for ArbParams {
     }
 }
 
-/// Arbitrary
-impl<const N: usize, F: FiniteField + 'static> Arbitrary for SparseMultiPoly<N, F> {
+#[cfg(any(test, feature = "proptest"))]
+impl<const N: usize, F: FiniteField + Arbitrary + 'static> Arbitrary for SparseMultiPoly<N, F> {
     type Parameters = ArbParams;
 
     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {

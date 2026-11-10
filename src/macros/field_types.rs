@@ -2,7 +2,7 @@
 ///
 /// Coverage was uneven by accident: a trait law tested for `PrimeFieldElement64` was usually not
 /// tested for `BinaryFieldElement` unless someone remembered to copy the test. The body is written
-/// once, generic over `F: KnownOrder`, and expands to one `#[test]` per field named after that
+/// once, generic over `F: KnownOrder + Arbitrary`, and expands to one `#[test]` per field named after that
 /// field, so a failure says which one.
 ///
 /// The list spans every implementation family — the four prime field widths, a binary field and an
@@ -27,7 +27,7 @@ macro_rules! for_each_field {
             #[allow(unused_imports)]
             use super::*;
 
-            fn body<$type_parameter: $crate::KnownOrder>() $body
+            fn body<$type_parameter: $crate::KnownOrder + ::proptest::arbitrary::Arbitrary>() $body
 
             $crate::for_each_field_test!(body, zp31, $crate::fields::Zp31);
             $crate::for_each_field_test!(body, koala_bear, $crate::fields::KoalaBear);
@@ -55,7 +55,7 @@ macro_rules! for_each_field {
 ///
 /// The second list [`for_each_field!`]'s documentation refers to: a body that walks every element
 /// cannot run over a 254-bit field, and a body that tests a trait law can. Same expansion, same
-/// `F: KnownOrder` bound, fewer fields — all of order below 2^16.
+/// `F: KnownOrder + Arbitrary` bound, fewer fields — all of order below 2^16.
 #[macro_export]
 macro_rules! for_each_small_field {
     (fn $name:ident<$type_parameter:ident>() $body:block) => {
@@ -63,7 +63,7 @@ macro_rules! for_each_small_field {
             #[allow(unused_imports)]
             use super::*;
 
-            fn body<$type_parameter: $crate::KnownOrder>() $body
+            fn body<$type_parameter: $crate::KnownOrder + ::proptest::arbitrary::Arbitrary>() $body
 
             $crate::for_each_field_test!(body, zp13, $crate::fields::Zp13);
             $crate::for_each_field_test!(body, zp31, $crate::fields::Zp31);

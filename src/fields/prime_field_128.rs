@@ -12,6 +12,7 @@ use std::{
     ops,
 };
 
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::Arbitrary,
     prelude::{any, BoxedStrategy, Strategy},
@@ -281,7 +282,7 @@ impl<const P: u128> ops::Div<Self> for &PrimeFieldElement128<P> {
 
 impl_div_variants!([const P: u128], PrimeFieldElement128<P>);
 
-/// impl Arbitrary
+#[cfg(any(test, feature = "proptest"))]
 impl<const P: u128> Arbitrary for PrimeFieldElement128<P> {
     type Parameters = ();
 

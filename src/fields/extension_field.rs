@@ -13,6 +13,7 @@ use std::{
     ops,
 };
 
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     prelude::Arbitrary,
     strategy::{BoxedStrategy, Strategy},
@@ -572,7 +573,7 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ops::Div<Self
 
 impl_div_variants!([const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>], ExtensionFieldElement<P, N, M>);
 
-// impl Arbitrary
+#[cfg(any(test, feature = "proptest"))]
 impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Arbitrary
     for ExtensionFieldElement<P, N, M>
 {

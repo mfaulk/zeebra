@@ -1,6 +1,7 @@
 //! Dense Vector
 
 use crate::Ring;
+#[cfg(any(test, feature = "proptest"))]
 use proptest::{
     arbitrary::{any, Arbitrary},
     collection::vec,
@@ -128,7 +129,8 @@ impl From<usize> for VectorParams {
     }
 }
 
-impl<T: Ring + 'static> Arbitrary for Vector<T> {
+#[cfg(any(test, feature = "proptest"))]
+impl<T: Ring + Arbitrary + 'static> Arbitrary for Vector<T> {
     type Parameters = VectorParams;
     fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
         vec(any::<T>(), params.size)
