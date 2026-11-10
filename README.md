@@ -113,6 +113,10 @@ instrumented examples — along with the measurement rules this repository follo
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.
 
+For the monomial-order dispatch and F4 column-sort replay, build with
+`cargo build --release --example monomial_order_width` and follow the pinned run command in the
+[benchmarking guide](docs/guide/benchmarking.md#monomial-order-width).
+
 Univariate `gcd` uses classical Euclid. Run `cargo run --release --example gcd_crossover`
 to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254. The
 [half-GCD measurements](docs/research/fast-univariate.md#194-experimental-half-gcd)
