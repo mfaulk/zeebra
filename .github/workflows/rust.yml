@@ -243,6 +243,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      # The crate as a consumer gets it with `default-features = false`. Every other job builds
+      # the default, which is how `f4::matrix_corpus` came to import from the feature-gated
+      # `external::corpus` and leave the library uncompilable without the feature, unnoticed.
+      # Targets that drive the harness declare `required-features` and are skipped here.
+      - name: Lint without default features
+        if: ${{ !cancelled() }}
+        run: cargo clippy --all-targets --no-default-features -- -D warnings
+
+      - name: Package
+        if: ${{ !cancelled() }}
+        run: cargo package --locked
+
   # The agent claim tooling is shell, so it is invisible to every job above. Its pure half —
   # marker parsing, race resolution, lease arithmetic — is what stops two agents working the
   # same issue, and a regression there is silent at the point of use.

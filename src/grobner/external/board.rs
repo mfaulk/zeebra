@@ -3029,49 +3029,6 @@ mod tests {
         ));
     }
 
-    /// Every committed competitive row records a stamp a later reader can still resolve.
-    ///
-    /// #505: three of the four cohorts in `research/competitive/results/history.json` — 315 of 387
-    /// rows, including every five-library figure M27-A is organized around — record branch commits
-    /// from PR #435 that did not survive its merge. The letter of #335 was met and its purpose was
-    /// not: "re-measure at `7adb29e`" is not an instruction anyone can carry out. A merge base is
-    /// an ancestor of `main` and stays one, so `base_commit` plus the delta's `patch_id` is a stamp
-    /// that cannot dangle.
-    #[test]
-    fn test_every_committed_competitive_row_carries_a_resolvable_stamp() {
-        let history = Json::parse(include_str!(
-            "../../../research/competitive/results/history.json"
-        ))
-        .expect("committed history.json parses");
-        let rows = history.get("rows").expect("a rows array").items();
-        assert!(!rows.is_empty(), "the committed history is not empty");
-
-        let unresolvable: Vec<String> = rows
-            .iter()
-            .filter_map(|row| {
-                let environment = super::environment_from_json(row.get("environment")?);
-                (!environment.stamp_is_resolvable()).then(|| {
-                    format!(
-                        "{} at {:?} (base {:?}, patch {:?})",
-                        row.get("problem")
-                            .and_then(Json::as_str)
-                            .unwrap_or("<no problem>"),
-                        environment.commit,
-                        environment.base_commit,
-                        environment.patch_id,
-                    )
-                })
-            })
-            .collect();
-        assert!(
-            unresolvable.is_empty(),
-            "{} of {} rows record a commit nothing can resolve: {:?}",
-            unresolvable.len(),
-            rows.len(),
-            &unresolvable[..unresolvable.len().min(4)]
-        );
-    }
-
     /// Durations and byte counts render in readable units, and absence renders as an em dash.
     #[test]
     fn test_cells_render_in_readable_units() {

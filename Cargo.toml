@@ -3,13 +3,34 @@
 
 [package]
 name = "zeebra"
-description = "Computational algebra for Zero-Knowledge Proofs"
+description = "Computational algebra over finite fields for cryptography: fields, polynomials, NTT, linear algebra, Gröbner bases (F4, FGLM) and polynomial system solving"
 repository = "https://github.com/mfaulk/zeebra"
+homepage = "https://github.com/mfaulk/zeebra"
+documentation = "https://docs.rs/zeebra"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 readme = "README.md"
-keywords = ["zkp", "zero-knowledge", "algebra", "cryptography"]
+keywords = ["algebra", "grobner", "finite-field", "polynomial", "zero-knowledge"]
+categories = ["mathematics", "cryptography", "science"]
+# What a consumer does not need: this repository's measurement records and research notes, its
+# agent and CI tooling, editor settings, and the check on committed records (whose data is excluded
+# with it). `docs/guide/` stays: `src/lib.rs` compiles every guide page as a doctest.
+exclude = [
+    "/.cargo",
+    "/.config",
+    "/.github",
+    "/.idea",
+    "/CLAUDE.md",
+    "/clippy.toml",
+    "/docs/MILESTONE-*.md",
+    "/docs/research",
+    "/research",
+    "/scripts",
+    "/tests/committed_records.rs",
+    "/tools",
+    "/zeebra.jpg",
+]
 
 
 [lib]
@@ -58,6 +79,41 @@ proptest = "1.3.1"
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_arrays = "0.1.0"
+
+# Targets that drive the external-engine harness, which `external-runners` gates. Declared so that
+# `cargo build --all-targets --no-default-features` skips them rather than failing; CI checks that
+# build, because nothing else would notice the library itself stop compiling without the feature.
+[[example]]
+name = "competitive"
+required-features = ["external-runners"]
+
+[[example]]
+name = "competitive_sweep"
+required-features = ["external-runners"]
+
+[[example]]
+name = "f4_profile"
+required-features = ["external-runners"]
+
+[[example]]
+name = "interreduce_working_set"
+required-features = ["external-runners"]
+
+[[example]]
+name = "interreduction_repeats"
+required-features = ["external-runners"]
+
+[[example]]
+name = "interreduction_routes"
+required-features = ["external-runners"]
+
+[[test]]
+name = "external_comparands"
+required-features = ["external-runners"]
+
+[[test]]
+name = "committed_records"
+required-features = ["external-runners"]
 
 [dev-dependencies]
 # `ark-ff` is a *test oracle only*, in the role Singular already plays for Gröbner bases: the
