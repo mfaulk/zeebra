@@ -121,6 +121,10 @@ name = "monomial_order_width"
 test = true
 
 [[example]]
+name = "monomial_packing"
+test = true
+
+[[example]]
 name = "determinant_width"
 test = true
 

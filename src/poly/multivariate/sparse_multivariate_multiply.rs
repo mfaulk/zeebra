@@ -349,10 +349,10 @@ fn multiply_dense_triangle<const N: usize, F: FiniteField>(
     let mut slots = vec![F::zero(); triangle_len(degree) as usize];
 
     for (monomial_a, coefficient_a) in a.terms.iter() {
-        let (left_x, left_y) = (monomial_a.exponents[0], monomial_a.exponents[1]);
+        let (left_x, left_y) = (monomial_a.exponents()[0], monomial_a.exponents()[1]);
         for (monomial_b, coefficient_b) in b.terms.iter() {
-            let x = left_x + monomial_b.exponents[0];
-            let y = left_y + monomial_b.exponents[1];
+            let x = left_x + monomial_b.exponents()[0];
+            let y = left_y + monomial_b.exponents()[1];
             slots[triangle_index(x, y)] += *coefficient_a * *coefficient_b;
         }
     }
@@ -445,7 +445,7 @@ fn variable_degrees<const N: usize, F: FiniteField>(p: &SparseMultiPoly<N, F>) -
     let mut degrees = [0u32; N];
     for monomial in p.terms.keys() {
         for i in 0..N {
-            degrees[i] = degrees[i].max(monomial.exponents[i]);
+            degrees[i] = degrees[i].max(monomial.exponents()[i]);
         }
     }
     degrees
@@ -480,7 +480,7 @@ fn multiply_dense_simplex<const N: usize, F: FiniteField>(
     for (monomial_a, coefficient_a) in a.terms.iter() {
         for (monomial_b, coefficient_b) in b.terms.iter() {
             for i in 0..N {
-                exponents[i] = monomial_a.exponents[i] + monomial_b.exponents[i];
+                exponents[i] = monomial_a.exponents()[i] + monomial_b.exponents()[i];
             }
             slots[index.rank(&exponents)] += *coefficient_a * *coefficient_b;
         }
@@ -509,9 +509,10 @@ fn multiply_dense_box<const N: usize, F: FiniteField>(
     let mut slots = vec![F::zero(); index.cells()];
 
     for (monomial_a, coefficient_a) in a.terms.iter() {
-        let base = index.rank(&monomial_a.exponents);
+        let base = index.rank(monomial_a.exponent_array());
         for (monomial_b, coefficient_b) in b.terms.iter() {
-            slots[base + index.rank(&monomial_b.exponents)] += *coefficient_a * *coefficient_b;
+            slots[base + index.rank(monomial_b.exponent_array())] +=
+                *coefficient_a * *coefficient_b;
         }
     }
 

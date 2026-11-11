@@ -1,5 +1,3 @@
-//! Arithmetic operations on monomials.
-
 use crate::impl_mul_variants;
 use crate::Monomial;
 use std::ops;
@@ -16,8 +14,8 @@ impl<const N: usize> ops::Mul<&Monomial<N>> for &Monomial<N> {
             // silently compute in the wrong ring — and release is where this is called millions of
             // times. The carry test costs a compare per variable against an add that is already
             // there.
-            exponents[i] = self.exponents[i]
-                .checked_add(rhs.exponents[i])
+            exponents[i] = self.exponents()[i]
+                .checked_add(rhs.exponents()[i])
                 .expect("monomial exponent overflow");
         }
 
@@ -31,10 +29,10 @@ impl<const N: usize> Monomial<N> {
     pub fn checked_div(&self, rhs: &Self) -> Option<Self> {
         let mut exponents = [0u32; N];
         for i in 0..N {
-            if self.exponents[i] < rhs.exponents[i] {
+            if self.exponents()[i] < rhs.exponents()[i] {
                 return None;
             }
-            exponents[i] = self.exponents[i] - rhs.exponents[i];
+            exponents[i] = self.exponents()[i] - rhs.exponents()[i];
         }
 
         Some(Self::new(&exponents))
