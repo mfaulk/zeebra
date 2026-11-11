@@ -5,6 +5,14 @@ All notable changes to this crate are recorded here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): while the version is `0.y.z`, a
 change to `y` may break the public API.
 
+## [Unreleased]
+
+### Added
+
+- Certified scalar Wiedemann order conversion with explicit strategy selection, bounded projection
+  retries, classical fallback, workspace budgets and route statistics; a reproducible comparison
+  example with optional exact msolve eliminant checks.
+
 ## [0.1.0] - 2026-11-10
 
 The first release on crates.io. Before it, the crate was used only as a git dependency, and the

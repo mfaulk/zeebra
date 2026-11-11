@@ -314,6 +314,7 @@ cargo run --release --example fglm_border          # what deduplicating the bord
 cargo run --release --example fglm_parallel -- per-batch   # is the border reduction worth
 cargo run --release --example fglm_parallel -- sweep       # parallelizing? one table each
 cargo run --release --example fglm_storage         # operator representations, stored and applied
+cargo run --release --example wiedemann_conversion # certified scalar route versus classical
 cargo run --release --example fglm_shape           # shape position, and what that route would save
 cargo run --release --example fglm_ablation        # every strategy combination, one table
 cargo run --release --example fglm_ablation -- list
@@ -646,7 +647,14 @@ worker is the fastest row on every system in the corpus. §6.8 of
 decision; `BorderReduction::Grouped` is the decomposition without the threads, kept because the
 carry's cost is a measurement.
 
-`fglm_shape` is M18-4's research spike, measured. `grobner::fglm::shape` detects **shape
+`wiedemann_conversion` alternates classical and adaptive conversion on identical prepared bases,
+asserts exact basis equality, and prints the chosen route, projection attempts, fallback reason,
+operator-construction time, dependence time and output digest. Its process peak spans all repeats;
+use separate `--route classical` and `--route adaptive` processes for per-route memory.
+`--msolve PATH` checks the eliminant through the existing bounded adapter. See the
+[conversion guide](grobner-bases.md#certified-scalar-wiedemann) for input format and limits.
+
+`fglm_shape` is M18-4's dense research spike, measured. `grobner::fglm::shape` detects **shape
 position** — whether a single variable's powers `1, t, ..., t^{D-1}` are a basis of `R/I` — and
 where the last variable qualifies it produces the lex basis `p(t), x_0 - h_0(t), ...` from that
 variable's Krylov sequence, with no monomial walk and without retaining the accepted quotient

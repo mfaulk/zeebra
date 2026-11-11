@@ -135,6 +135,12 @@ to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254
 [half-GCD measurements](docs/research/fast-univariate.md#194-experimental-half-gcd)
 include the commands for a pinned run.
 
+The FGLM converter uses certified scalar Wiedemann adaptively for large sparse shape-position
+quotients. `FglmOptions::conversion_strategy` selects `Adaptive` by default; choose `Classical`
+to retain the lex walk. Statistics record the route and fallback reason;
+failed projections never return an unchecked basis. The [conversion guide](docs/guide/grobner-bases.md#certified-scalar-wiedemann)
+describes budgets and the comparison example.
+
 ### Cargo features
 
 | Feature | Default | What it adds |

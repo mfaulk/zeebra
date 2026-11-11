@@ -75,6 +75,22 @@ pub enum OperatorStorage {
     Dense,
 }
 
+/// How to convert after constructing the quotient algebra.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ConversionStrategy {
+    /// The classical lex walk with dense incremental dependence tests.
+    Classical,
+    /// Try certified scalar Wiedemann on sparse quotients of dimension at least 128.
+    ///
+    /// Other cases, exhausted projections and failed certification use the classical walk.
+    #[default]
+    Adaptive,
+    /// Try up to three scalar projections regardless of size or density, then fall back.
+    ///
+    /// Useful for ablations and small-field validation; every returned fast basis is certified.
+    Wiedemann,
+}
+
 /// Limits on what an FGLM computation may build, and which strategies to use.
 ///
 /// Separate from [`F4Options`](crate::grobner::F4Options) rather than merged into it: the source
@@ -91,10 +107,15 @@ pub enum OperatorStorage {
 /// what survives a new field.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FglmOptions {
+    /// Conversion selection; the chosen route and any fallback are recorded in the statistics.
+    pub conversion_strategy: ConversionStrategy,
+
     /// Standard monomials enumerated before the computation is abandoned.
     ///
     /// This is `D`, which controls everything else: the operators hold up to `N * D` columns and
     /// the conversion's dense blocks are `D^2 + D (D + 1)` field elements.
+    /// The adaptive route does not raise this conservative enumeration tripwire; a caller
+    /// deliberately converting larger quotients must lift it explicitly.
     pub max_quotient_dimension: usize,
 
     /// Multiplication-operator entries stored, summed over all `N` operators.
@@ -133,6 +154,10 @@ pub struct FglmOptions {
     /// for a term that rounds to nothing against the limit's own quantity would cost more in
     /// comparability than it bought in accuracy. §8.7 of
     /// `docs/MILESTONE-FGLM-SCALABILITY.md` states the choice and its arithmetic.
+    ///
+    /// A Wiedemann attempt instead checks its conservative linear workspace allowance against
+    /// this limit before allocating. The fallback still checks the classical quadratic blocks.
+    /// Neither route includes the returned polynomial maps or allocator overhead.
     pub max_span_entries: usize,
 
     /// Bytes those dense blocks may occupy at full rank.
@@ -145,6 +170,7 @@ pub struct FglmOptions {
     /// 254-bit one**, so a cell budget alone admits 4x the memory over BN254. Both are enforced,
     /// and the bytes are checked against the same `D^2 + D (D + 1)` figure, from `D`, before
     /// anything is allocated.
+    /// Wiedemann checks the byte cost of its linear allowance against this same limit.
     pub max_span_bytes: usize,
 
     /// Whether to fill in [`FglmStageTimings`](super::FglmStatistics).
@@ -293,6 +319,7 @@ impl FglmOptions {
     /// M17 configuration, kept so that figure stays reproducible.
     pub fn recommended() -> Self {
         Self {
+            conversion_strategy: ConversionStrategy::Adaptive,
             max_quotient_dimension: RECOMMENDED_MAX_QUOTIENT_DIMENSION,
             max_operator_entries: 20_000_000,
             max_span_entries: RECOMMENDED_MAX_SPAN_ENTRIES,
@@ -310,12 +337,14 @@ impl FglmOptions {
     /// Exists for tests and for measurement, where a limit that fires is a failed measurement
     /// rather than a protected one. Not a sensible default, which is why it is not the default.
     ///
+    /// Its conversion strategy is classical.
     /// Its **strategies are the reference ones**, not the recommended ones, so that a measurement
     /// which lifts the limits does not silently also change the strategy. A caller who wants the
     /// recommended strategies without the budgets writes
     /// `FglmOptions::unbounded().with_operator_construction(..).with_operator_storage(..)`.
     pub fn unbounded() -> Self {
         Self {
+            conversion_strategy: ConversionStrategy::Classical,
             max_quotient_dimension: usize::MAX,
             max_operator_entries: usize::MAX,
             max_span_entries: usize::MAX,
@@ -340,6 +369,7 @@ impl FglmOptions {
     /// than inherited.
     pub fn baseline() -> Self {
         Self {
+            conversion_strategy: ConversionStrategy::Classical,
             max_quotient_dimension: 4_096,
             max_operator_entries: 20_000_000,
             max_span_entries: 20_000_000,
