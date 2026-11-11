@@ -254,3 +254,9 @@ would justify revisiting the decision.
 - [CLAUDE.md](CLAUDE.md) — repository conventions, including how concurrent coding agents claim work
 
 Licensed under the [MIT licence](LICENSE-MIT).
+
+Measure an F4 entry-budget limit with `cargo run --release --example f4_live_budget --
+mq-random-10 20000000 reduced`. The example also accepts caller-supplied polynomial systems and
+reports outcomes, exact basis digests, completed-batch entry peaks and process RSS separately.
+See [the live-budget protocol](research/live-entry-budget/README.md) for bounded runs and input
+provenance.
