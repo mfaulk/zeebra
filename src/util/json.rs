@@ -1,18 +1,5 @@
-//! A JSON value type, writer and reader that need no dependency.
-//!
-//! `serde` is already a dependency and `serde_json` is not. Pulling one in for a few hundred bytes
-//! of output would be the wrong trade for this crate — the measurement in
-//! `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.4 was that the shipped dependency count did not move
-//! when the wide fields were implemented rather than adapted, and this is the same choice at a
-//! much smaller scale. [`Json`] is about eighty lines, emits exactly the subset these records need,
-//! and escapes strings to RFC 8259.
-//! It serializes the experiment records in [`grobner::record`](crate::grobner::record) and the
-//! external-engine board.
-//!
-//! What it deliberately does **not** do: floats. Every number here is an integer — nanoseconds,
-//! bytes, counts — because a float in a record is a reproducibility problem (formatting differs,
-//! `0.1` does not round-trip) and nothing here needs one. A duration is nanoseconds; a ratio is
-//! two integers.
+//! Integer-only JSON for reproducible experiment records, preserving object insertion order.
+//! Floating-point values are rejected; durations and sizes are stored as integer counts.
 
 use std::{
     fmt::{Display, Formatter, Write as _},
@@ -360,16 +347,24 @@ impl Json {
                         reason: "unescaped control character",
                     })
                 }
+                byte if byte.is_ascii() => {
+                    out.push(char::from(byte));
+                    *at += 1;
+                }
                 _ => {
-                    // Multi-byte UTF-8 passes through whole: find the character's length from the
-                    // string slice rather than byte by byte.
-                    let rest = std::str::from_utf8(&bytes[*at..]).map_err(|_| JsonError {
+                    // Checking the whole suffix here makes record parsing quadratic.
+                    let width = byte.leading_ones() as usize;
+                    let invalid = || JsonError {
                         at: *at,
                         reason: "invalid UTF-8",
-                    })?;
-                    let c = rest.chars().next().expect("nonempty");
-                    out.push(c);
-                    *at += c.len_utf8();
+                    };
+                    if !(2..=4).contains(&width) {
+                        return Err(invalid());
+                    }
+                    let scalar = bytes.get(*at..*at + width).ok_or_else(invalid)?;
+                    let scalar = std::str::from_utf8(scalar).map_err(|_| invalid())?;
+                    out.push_str(scalar);
+                    *at += width;
                 }
             }
         }
@@ -528,6 +523,37 @@ mod tests {
             Json::parse(&Json::parse(&text).expect("valid").to_json()),
             Ok(value)
         );
+    }
+
+    // Decoding a string consumes its own UTF-8 bytes without inspecting the following value.
+    #[test]
+    fn test_string_decoding_does_not_validate_the_document_suffix() {
+        for text in ["ascii", "Gröbner 🦓 ∎"] {
+            let encoded = format!("\"{text}\"");
+            let mut bytes = encoded.as_bytes().to_vec();
+            bytes.push(0xff);
+            let mut at = 0;
+            assert_eq!(Json::parse_string(&bytes, &mut at), Ok(text.to_string()));
+            assert_eq!(at, encoded.len());
+        }
+    }
+
+    // Invalid or truncated UTF-8 scalars are rejected at their starting byte.
+    #[test]
+    fn test_string_decoding_rejects_invalid_scalars() {
+        for bytes in [
+            &b"\"\x80\""[..],
+            &b"\"\xc0\x80\""[..],
+            &b"\"\xc2"[..],
+            &b"\"\xe0\x80\x80\""[..],
+            &b"\"\xed\xa0\x80\""[..],
+            &b"\"\xf4\x90\x80\x80\""[..],
+            &b"\"\xff\""[..],
+        ] {
+            let error = Json::parse_string(bytes, &mut 0).unwrap_err();
+            assert_eq!(error.at, 1);
+            assert_eq!(error.reason, "invalid UTF-8");
+        }
     }
 
     /// Accessors reach into a parsed value.
