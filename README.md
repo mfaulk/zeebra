@@ -139,7 +139,8 @@ The FGLM converter uses certified scalar Wiedemann adaptively for large sparse s
 quotients. `FglmOptions::conversion_strategy` selects `Adaptive` by default; choose `Classical`
 to retain the lex walk. Statistics record the route and fallback reason;
 failed projections never return an unchecked basis. The [conversion guide](docs/guide/grobner-bases.md#certified-scalar-wiedemann)
-describes budgets and the comparison example.
+describes budgets and the comparison example. [Paired measurements](docs/research/certified-wiedemann.md)
+record the public benchmark inputs and the limits on the performance claims.
 
 ### Cargo features
 

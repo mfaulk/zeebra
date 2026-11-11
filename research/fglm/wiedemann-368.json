@@ -1,0 +1,259 @@
+{
+  "schema": 1,
+  "base_commit": "4bcf3923105d52ffc756afb6698ca6cf64dbf072",
+  "patch_id": "621e87a0747fa855372cfc7c68accc4b8e76a7df",
+  "machine": "5995wx",
+  "affinity": "2",
+  "workers": 1,
+  "characteristic": 65537,
+  "degree": 5,
+  "profile": "release, fat LTO, codegen-units=1, x86-64-v3",
+  "virtual_address_limit_bytes": 17179869184,
+  "msolve_version": "0.11.0",
+  "kernel_blob": "ee053e08b46030edeea05a3ef2ae3e2b1617eba4",
+  "certificate_blob": "3fa6c40ac97db59a6e84478c63deca839b6aed51",
+  "instrument_blob": "f21946de4dfa2d2543d965bf5a90e08ebd420a11",
+  "runs": [
+    {
+      "variables": 4,
+      "source_sha256": "a08dfb77a33b12092bd8246cd84eafb63ada50dbc52feafbe81206d11971b76e",
+      "samples": [
+        {
+          "repeat": 1,
+          "strategy": "Classical",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 625,
+          "operator_entries": 656,
+          "wall_ms": 57.141623,
+          "operator_ms": 0.491511,
+          "dependence_ms": 56.431738,
+          "workspace_cells": 0,
+          "basis_sha256": "311495fb0d861ada053cde348235ef9703e71523c53057433645fb705e21a021"
+        },
+        {
+          "repeat": 1,
+          "strategy": "Adaptive",
+          "selected": "Wiedemann",
+          "attempts": 1,
+          "dimension": 625,
+          "operator_entries": 656,
+          "wall_ms": 12.640791,
+          "operator_ms": 0.394187,
+          "dependence_ms": 12.132589,
+          "workspace_cells": 50080,
+          "basis_sha256": "311495fb0d861ada053cde348235ef9703e71523c53057433645fb705e21a021"
+        },
+        {
+          "repeat": 2,
+          "strategy": "Adaptive",
+          "selected": "Wiedemann",
+          "attempts": 1,
+          "dimension": 625,
+          "operator_entries": 656,
+          "wall_ms": 12.732696,
+          "operator_ms": 0.388857,
+          "dependence_ms": 12.23848,
+          "workspace_cells": 50080,
+          "basis_sha256": "311495fb0d861ada053cde348235ef9703e71523c53057433645fb705e21a021"
+        },
+        {
+          "repeat": 2,
+          "strategy": "Classical",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 625,
+          "operator_entries": 656,
+          "wall_ms": 54.137641,
+          "operator_ms": 0.381352,
+          "dependence_ms": 53.621122,
+          "workspace_cells": 0,
+          "basis_sha256": "311495fb0d861ada053cde348235ef9703e71523c53057433645fb705e21a021"
+        },
+        {
+          "repeat": 3,
+          "strategy": "Classical",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 625,
+          "operator_entries": 656,
+          "wall_ms": 53.893628,
+          "operator_ms": 0.39075,
+          "dependence_ms": 53.36635,
+          "workspace_cells": 0,
+          "basis_sha256": "311495fb0d861ada053cde348235ef9703e71523c53057433645fb705e21a021"
+        },
+        {
+          "repeat": 3,
+          "strategy": "Adaptive",
+          "selected": "Wiedemann",
+          "attempts": 1,
+          "dimension": 625,
+          "operator_entries": 656,
+          "wall_ms": 12.427558,
+          "operator_ms": 0.382825,
+          "dependence_ms": 11.940345,
+          "workspace_cells": 50080,
+          "basis_sha256": "311495fb0d861ada053cde348235ef9703e71523c53057433645fb705e21a021"
+        }
+      ],
+      "peak_rss_bytes": 11067392,
+      "msolve_wall_ms": 11.595531,
+      "msolve_peak_rss_bytes": 5013504
+    },
+    {
+      "variables": 5,
+      "source_sha256": "ce36204a4bee3a3b958f9bf346005c3ead6d8eb91031b3691d511791c41d4653",
+      "samples": [
+        {
+          "repeat": 1,
+          "strategy": "Classical",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 6211.163508,
+          "operator_ms": 3.57308,
+          "dependence_ms": 6205.635143,
+          "workspace_cells": 0,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        },
+        {
+          "repeat": 1,
+          "strategy": "Adaptive",
+          "selected": "Wiedemann",
+          "attempts": 1,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 254.445427,
+          "operator_ms": 3.105524,
+          "dependence_ms": 250.442732,
+          "workspace_cells": 262584,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        },
+        {
+          "repeat": 2,
+          "strategy": "Adaptive",
+          "selected": "Wiedemann",
+          "attempts": 1,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 251.912577,
+          "operator_ms": 3.078413,
+          "dependence_ms": 247.944378,
+          "workspace_cells": 262584,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        },
+        {
+          "repeat": 2,
+          "strategy": "Classical",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 5984.119833,
+          "operator_ms": 3.024721,
+          "dependence_ms": 5979.708164,
+          "workspace_cells": 0,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        },
+        {
+          "repeat": 3,
+          "strategy": "Classical",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 5834.979099,
+          "operator_ms": 2.712861,
+          "dependence_ms": 5830.952699,
+          "workspace_cells": 0,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        },
+        {
+          "repeat": 3,
+          "strategy": "Adaptive",
+          "selected": "Wiedemann",
+          "attempts": 1,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 230.573604,
+          "operator_ms": 2.701479,
+          "dependence_ms": 227.065828,
+          "workspace_cells": 262584,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        }
+      ],
+      "peak_rss_bytes": 162660352,
+      "msolve_wall_ms": 476.578066,
+      "msolve_peak_rss_bytes": 19050496
+    },
+    {
+      "variables": 5,
+      "source_sha256": "ce36204a4bee3a3b958f9bf346005c3ead6d8eb91031b3691d511791c41d4653",
+      "samples": [
+        {
+          "repeat": 1,
+          "strategy": "Classical",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 5935.387094,
+          "operator_ms": 3.369064,
+          "dependence_ms": 5930.26084,
+          "workspace_cells": 0,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        }
+      ],
+      "peak_rss_bytes": 161603584,
+      "msolve_wall_ms": null,
+      "msolve_peak_rss_bytes": null
+    },
+    {
+      "variables": 5,
+      "source_sha256": "ce36204a4bee3a3b958f9bf346005c3ead6d8eb91031b3691d511791c41d4653",
+      "samples": [
+        {
+          "repeat": 1,
+          "strategy": "Adaptive",
+          "selected": "Wiedemann",
+          "attempts": 1,
+          "dimension": 3125,
+          "operator_entries": 3906,
+          "wall_ms": 228.916724,
+          "operator_ms": 3.199102,
+          "dependence_ms": 224.627518,
+          "workspace_cells": 262584,
+          "basis_sha256": "169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064"
+        }
+      ],
+      "peak_rss_bytes": 5660672,
+      "msolve_wall_ms": null,
+      "msolve_peak_rss_bytes": null
+    },
+    {
+      "variables": 1,
+      "source_sha256": "26c0c49bddbed4eab18b0f4a0b4ef010ede13e248468d5d35a908f5fba7064ee",
+      "samples": [
+        {
+          "repeat": 1,
+          "strategy": "Adaptive",
+          "selected": "Classical",
+          "attempts": 0,
+          "dimension": 5,
+          "operator_entries": 2,
+          "wall_ms": 0.010961,
+          "operator_ms": 0.004048,
+          "dependence_ms": 0.003617,
+          "workspace_cells": 0,
+          "basis_sha256": "26c0c49bddbed4eab18b0f4a0b4ef010ede13e248468d5d35a908f5fba7064ee"
+        }
+      ],
+      "peak_rss_bytes": 3735552,
+      "msolve_wall_ms": 11.60529,
+      "msolve_peak_rss_bytes": 5103616
+    }
+  ],
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+}
