@@ -43,6 +43,11 @@ per-stage timing and memory instrumentation. The zero-dimensional pipeline is di
 against Singular, and timed against Singular, msolve, Groebner.jl and Sagebrush on a shared corpus
 whose ideals are checked for equivalence before any timing is published.
 
+The competitive sweep includes a univariate-eliminant task at published primes within msolve's
+supported range. List it with `cargo run --release --example competitive_sweep -- --characteristic 32003 --list`. Eliminant ratios require matching reported degrees and agreement on all shared
+invariants; unsupported engines remain visible as capability rows. See the
+[external-engine guide](docs/guide/external-engines.md) for measured runs and board regeneration.
+
 ## Quickstart
 
 Zeebra builds on stable Rust 1.91 or newer. No nightly toolchain, no feature gates, no system

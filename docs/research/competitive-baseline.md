@@ -67,6 +67,13 @@ The rows are a cipher-derived system (Anemoi CICO). That family left the public 
 (`research/competitive/CURATION.md`); the figures stay here as a measurement of order conversion
 against msolve, not as a statement about the cipher.
 
+**Historical, outside the public corpus.** These are one-off measurements, not regenerable rows
+in the current competitive board. The [public eliminant comparison](eliminant-comparison.md)
+retains same-task measurements at `GF(32003)` for #456/#482. Those measure a complete eliminant,
+not the isolated conversion stage of this removed cipher instance. They do not establish that the
+historical ~30x conversion deficit reproduces on public systems, or mark #369's original
+acceptance item 2 met. Keep this figure scoped to the measured family and field.
+
 | row | msolve | Zeebra | wall ratio | msolve RSS | Zeebra RSS |
 |---|---:|---:|---:|---:|---:|
 | Anemoi `n5-fcico` | **1.81 s** | **63.71 s** | **35x** | 32 MB | 330 MB |

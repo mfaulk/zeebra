@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "contract": "every cross-library row ever recorded, APPEND-ONLY and in the order recorded, INCLUDING the runs that produced no answer. A row whose outcome is unsupported, stopped-by-limit or failed carries NO publishable time: see docs/research/external-comparison-protocol.md section 3. Ratios are valid only between rows agreeing on problem_digest, task, limits, machine and build, with both outcomes answered and their invariants agreed.",
-  "row_count": 550,
+  "row_count": 610,
   "rows": [
     {
       "schema": 1,
@@ -85328,6 +85328,4172 @@
       "peak_rss_bytes": 5216083968,
       "peak_rss_basis": "unavailable",
       "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2748888-cyclic-10/sagebrush/cyclic-10-2.ms --order degrevlex --route f4"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "c5fb073f5c9aceaab7d83d9c24de42c24eaa083777748dda50104b24347e2682",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4^8"
+        ],
+        "basis_cardinality": 4,
+        "eliminant_degree": 8
+      },
+      "wall_nanos": 189019,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 6164480,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 143452
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 45567
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-4 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "c5fb073f5c9aceaab7d83d9c24de42c24eaa083777748dda50104b24347e2682",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4^8"
+        ],
+        "basis_cardinality": 4,
+        "eliminant_degree": 8
+      },
+      "wall_nanos": 37708544,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20717568,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "c5fb073f5c9aceaab7d83d9c24de42c24eaa083777748dda50104b24347e2682",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "eliminant_degree": 8
+      },
+      "wall_nanos": 11611076,
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 5124096,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-240078-katsura-4/msolve/msolve-240078-2.ms -o /tmp/zeebra-competitive-240078-katsura-4/msolve/msolve-240078-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "c5fb073f5c9aceaab7d83d9c24de42c24eaa083777748dda50104b24347e2682",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "c5fb073f5c9aceaab7d83d9c24de42c24eaa083777748dda50104b24347e2682",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "8be0a39d2d8c64ffe73333c312ba3838bc7eef73d714b42c80d8aaec1dfea969",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5^16"
+        ],
+        "basis_cardinality": 5,
+        "eliminant_degree": 16
+      },
+      "wall_nanos": 582944,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 6418432,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 444231
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 138713
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-5 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "8be0a39d2d8c64ffe73333c312ba3838bc7eef73d714b42c80d8aaec1dfea969",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5^16"
+        ],
+        "basis_cardinality": 5,
+        "eliminant_degree": 16
+      },
+      "wall_nanos": 37230095,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20623360,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "8be0a39d2d8c64ffe73333c312ba3838bc7eef73d714b42c80d8aaec1dfea969",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16,
+        "eliminant_degree": 16
+      },
+      "wall_nanos": 11596555,
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 5795840,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-241654-katsura-5/msolve/msolve-241654-2.ms -o /tmp/zeebra-competitive-241654-katsura-5/msolve/msolve-241654-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "8be0a39d2d8c64ffe73333c312ba3838bc7eef73d714b42c80d8aaec1dfea969",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "8be0a39d2d8c64ffe73333c312ba3838bc7eef73d714b42c80d8aaec1dfea969",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "a7bd9edf654af9e9361f99ffd699974e5f5d9e352c42492097e200662262b33f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 32,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6^32"
+        ],
+        "basis_cardinality": 6,
+        "eliminant_degree": 32
+      },
+      "wall_nanos": 1833903,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 7311360,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 1466878
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 367025
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-6 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "a7bd9edf654af9e9361f99ffd699974e5f5d9e352c42492097e200662262b33f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 32,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6^32"
+        ],
+        "basis_cardinality": 6,
+        "eliminant_degree": 32
+      },
+      "wall_nanos": 47917188,
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20832256,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 13000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "a7bd9edf654af9e9361f99ffd699974e5f5d9e352c42492097e200662262b33f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 32,
+        "eliminant_degree": 32
+      },
+      "wall_nanos": 11592678,
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 5210112,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-241817-katsura-6/msolve/msolve-241817-2.ms -o /tmp/zeebra-competitive-241817-katsura-6/msolve/msolve-241817-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "a7bd9edf654af9e9361f99ffd699974e5f5d9e352c42492097e200662262b33f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "a7bd9edf654af9e9361f99ffd699974e5f5d9e352c42492097e200662262b33f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "c56bf75048b0fbae11fba90e894ad33b8404481f17c49d2cdb482925dcfeca9d",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7^64"
+        ],
+        "basis_cardinality": 7,
+        "eliminant_degree": 64
+      },
+      "wall_nanos": 8822312,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 7716864,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 7455705
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 1366607
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-7 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "c56bf75048b0fbae11fba90e894ad33b8404481f17c49d2cdb482925dcfeca9d",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7^64"
+        ],
+        "basis_cardinality": 7,
+        "eliminant_degree": 64
+      },
+      "wall_nanos": 238226126,
+      "cpu_nanos": 210000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 22196224,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 199000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "c56bf75048b0fbae11fba90e894ad33b8404481f17c49d2cdb482925dcfeca9d",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "eliminant_degree": 64
+      },
+      "wall_nanos": 11585845,
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 5660672,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-241978-katsura-7/msolve/msolve-241978-2.ms -o /tmp/zeebra-competitive-241978-katsura-7/msolve/msolve-241978-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "c56bf75048b0fbae11fba90e894ad33b8404481f17c49d2cdb482925dcfeca9d",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "c56bf75048b0fbae11fba90e894ad33b8404481f17c49d2cdb482925dcfeca9d",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e5a49df27c74d4d71ef13c67b3681ae76f0af89b8cb96432e05fedda71e0c80f",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "univariate-eliminant needs a finite quotient algebra, and this ideal is positive-dimensional",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 5521408,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 107003
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-4 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e5a49df27c74d4d71ef13c67b3681ae76f0af89b8cb96432e05fedda71e0c80f",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "univariate-eliminant needs a finite quotient algebra, and this ideal is positive-dimensional",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e5a49df27c74d4d71ef13c67b3681ae76f0af89b8cb96432e05fedda71e0c80f",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "failed",
+      "outcome_detail": "the tool reported an error: msolve reports infinitely many solutions ([1, nvars, -1, []]), so the ideal is not zero-dimensional and has no univariate eliminant",
+      "invariants": {},
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 4907008,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-242183-cyclic-4/msolve/msolve-242183-2.ms -o /tmp/zeebra-competitive-242183-cyclic-4/msolve/msolve-242183-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e5a49df27c74d4d71ef13c67b3681ae76f0af89b8cb96432e05fedda71e0c80f",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e5a49df27c74d4d71ef13c67b3681ae76f0af89b8cb96432e05fedda71e0c80f",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 70,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5^5",
+          "x2^2",
+          "x3*x4",
+          "x3*x5^5",
+          "x3^3",
+          "x4^2*x5^5",
+          "x4^7",
+          "x5^15"
+        ],
+        "basis_cardinality": 11,
+        "eliminant_degree": 15
+      },
+      "wall_nanos": 1260386,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 6602752,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 844459
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 415927
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-5 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 70,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5^5",
+          "x2^2",
+          "x3*x4",
+          "x3*x5^5",
+          "x3^3",
+          "x4^2*x5^5",
+          "x4^7",
+          "x5^15"
+        ],
+        "basis_cardinality": 11,
+        "eliminant_degree": 15
+      },
+      "wall_nanos": 37232380,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20541440,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 3000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "failed",
+      "outcome_detail": "the tool reported an error: the tool disagrees with itself: msolve added the variable(s) A carrying a random linear form, so its eliminant is of an augmented ideal (input order x1, x2, x3, x4, x5, msolve's order x1, x2, x3, x4, x5, A). msolve said: \"Ideal not in generic position, parametrizations are not correct\". Run with -c 0 to make msolve refuse instead of substituting a problem.",
+      "invariants": {},
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 14921728,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#6",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#6",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#7",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#7",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#8",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#8",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#5",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-242402-cyclic-5/msolve/msolve-242402-2.ms -o /tmp/zeebra-competitive-242402-cyclic-5/msolve/msolve-242402-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "bf3bb57af08fcc94d7f5c8bf01b6f4a90557dad0a41c7ce12464ea90ad93a895",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 156,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5",
+          "x2*x6^6",
+          "x2^2",
+          "x3*x4",
+          "x3*x5",
+          "x3*x6^6",
+          "x3^3",
+          "x4*x5",
+          "x4*x6^6",
+          "x4^3",
+          "x5^2*x6^12",
+          "x5^3*x6^6",
+          "x5^6",
+          "x6^48"
+        ],
+        "basis_cardinality": 17,
+        "eliminant_degree": 48
+      },
+      "wall_nanos": 7470615,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 7876608,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 5984992
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 1485623
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-6 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "bf3bb57af08fcc94d7f5c8bf01b6f4a90557dad0a41c7ce12464ea90ad93a895",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 156,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5",
+          "x2*x6^6",
+          "x2^2",
+          "x3*x4",
+          "x3*x5",
+          "x3*x6^6",
+          "x3^3",
+          "x4*x5",
+          "x4*x6^6",
+          "x4^3",
+          "x5^2*x6^12",
+          "x5^3*x6^6",
+          "x5^6",
+          "x6^48"
+        ],
+        "basis_cardinality": 17,
+        "eliminant_degree": 48
+      },
+      "wall_nanos": 104331323,
+      "cpu_nanos": 70000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 21061632,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 64000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "bf3bb57af08fcc94d7f5c8bf01b6f4a90557dad0a41c7ce12464ea90ad93a895",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "failed",
+      "outcome_detail": "the tool reported an error: the tool disagrees with itself: msolve added the variable(s) A carrying a random linear form, so its eliminant is of an augmented ideal (input order x1, x2, x3, x4, x5, x6, msolve's order x1, x2, x3, x4, x5, x6, A). msolve said: \"Ideal not in generic position, parametrizations are not correct\". Run with -c 0 to make msolve refuse instead of substituting a problem.",
+      "invariants": {},
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 18612224,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#6",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#6",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#7",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#7",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#8",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#8",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(cpu)#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(elapsed)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/overall(cpu)#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/select#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb#5",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-242570-cyclic-6/msolve/msolve-242570-2.ms -o /tmp/zeebra-competitive-242570-cyclic-6/msolve/msolve-242570-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "bf3bb57af08fcc94d7f5c8bf01b6f4a90557dad0a41c7ce12464ea90ad93a895",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "bf3bb57af08fcc94d7f5c8bf01b6f4a90557dad0a41c7ce12464ea90ad93a895",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-7",
+      "problem_digest": "18746449c45766c3ba73ab0417c2ea1bbe7f7842d88d8a1a55068c71e9aaa736",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 924,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5",
+          "x2*x6^3",
+          "x2*x7^7",
+          "x2^2",
+          "x3*x4",
+          "x3*x5",
+          "x3*x6*x7^14",
+          "x3*x6^2",
+          "x3*x7^21",
+          "x3^2*x6",
+          "x3^2*x7^7",
+          "x3^3",
+          "x4*x5*x6",
+          "x4*x5*x7^7",
+          "x4*x5^3",
+          "x4*x6^2*x7^7",
+          "x4*x6^3",
+          "x4*x7^21",
+          "x4^2*x5",
+          "x4^2*x6",
+          "x4^2*x7^7",
+          "x4^3",
+          "x5*x6^2*x7^7",
+          "x5*x6^3",
+          "x5*x7^21",
+          "x5^2*x6",
+          "x5^2*x7^7",
+          "x5^5",
+          "x6^2*x7^91",
+          "x6^23",
+          "x6^4*x7^7",
+          "x7^203"
+        ],
+        "basis_cardinality": 35,
+        "eliminant_degree": 203
+      },
+      "wall_nanos": 552387125,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 25268224,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 505613442
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 46773683
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-7 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-7",
+      "problem_digest": "18746449c45766c3ba73ab0417c2ea1bbe7f7842d88d8a1a55068c71e9aaa736",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 924,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5",
+          "x2*x6^3",
+          "x2*x7^7",
+          "x2^2",
+          "x3*x4",
+          "x3*x5",
+          "x3*x6*x7^14",
+          "x3*x6^2",
+          "x3*x7^21",
+          "x3^2*x6",
+          "x3^2*x7^7",
+          "x3^3",
+          "x4*x5*x6",
+          "x4*x5*x7^7",
+          "x4*x5^3",
+          "x4*x6^2*x7^7",
+          "x4*x6^3",
+          "x4*x7^21",
+          "x4^2*x5",
+          "x4^2*x6",
+          "x4^2*x7^7",
+          "x4^3",
+          "x5*x6^2*x7^7",
+          "x5*x6^3",
+          "x5*x7^21",
+          "x5^2*x6",
+          "x5^2*x7^7",
+          "x5^5",
+          "x6^2*x7^91",
+          "x6^23",
+          "x6^4*x7^7",
+          "x7^203"
+        ],
+        "basis_cardinality": 35,
+        "eliminant_degree": 203
+      },
+      "wall_nanos": 17300961933,
+      "cpu_nanos": 17060000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 36012032,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 17045000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-7",
+      "problem_digest": "18746449c45766c3ba73ab0417c2ea1bbe7f7842d88d8a1a55068c71e9aaa736",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "failed",
+      "outcome_detail": "the tool reported an error: the tool disagrees with itself: msolve added the variable(s) A carrying a random linear form, so its eliminant is of an augmented ideal (input order x1, x2, x3, x4, x5, x6, x7, msolve's order x1, x2, x3, x4, x5, x6, x7, A). msolve said: \"Ideal not in generic position, parametrizations are not correct\". Run with -c 0 to make msolve refuse instead of substituting a problem.",
+      "invariants": {},
+      "cpu_nanos": 990000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 31682560,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 30000000
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#2",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#2",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 110000000
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 110000000
+        },
+        {
+          "name": "f4/overall(elapsed)#2",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/overall(cpu)#2",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/select#2",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/symbolic prep.#2",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/update#2",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/convert#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#2",
+          "elapsed_nanos": 30000000
+        },
+        {
+          "name": "f4/reduce gb#2",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#3",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#3",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#4",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#4",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#2",
+          "elapsed_nanos": 110000000
+        },
+        {
+          "name": "rational-param/rational param(cpu)#2",
+          "elapsed_nanos": 110000000
+        },
+        {
+          "name": "f4/overall(elapsed)#3",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/overall(cpu)#3",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/select#3",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/symbolic prep.#3",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/update#3",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/convert#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#3",
+          "elapsed_nanos": 30000000
+        },
+        {
+          "name": "f4/reduce gb#3",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#5",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#5",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#6",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#6",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#3",
+          "elapsed_nanos": 110000000
+        },
+        {
+          "name": "rational-param/rational param(cpu)#3",
+          "elapsed_nanos": 110000000
+        },
+        {
+          "name": "f4/overall(elapsed)#4",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/overall(cpu)#4",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/select#4",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/symbolic prep.#4",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/update#4",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/convert#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#4",
+          "elapsed_nanos": 30000000
+        },
+        {
+          "name": "f4/reduce gb#4",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#7",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#7",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)#8",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)#8",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "rational-param/rational param(elapsed)#4",
+          "elapsed_nanos": 100000000
+        },
+        {
+          "name": "rational-param/rational param(cpu)#4",
+          "elapsed_nanos": 100000000
+        },
+        {
+          "name": "f4/overall(elapsed)#5",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/overall(cpu)#5",
+          "elapsed_nanos": 70000000
+        },
+        {
+          "name": "f4/select#5",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/symbolic prep.#5",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/update#5",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/convert#5",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra#5",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/reduce gb#5",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-242749-cyclic-7/msolve/msolve-242749-2.ms -o /tmp/zeebra-competitive-242749-cyclic-7/msolve/msolve-242749-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-7",
+      "problem_digest": "18746449c45766c3ba73ab0417c2ea1bbe7f7842d88d8a1a55068c71e9aaa736",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-7",
+      "problem_digest": "18746449c45766c3ba73ab0417c2ea1bbe7f7842d88d8a1a55068c71e9aaa736",
+      "family": "cyclic",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4^8"
+        ],
+        "basis_cardinality": 4,
+        "eliminant_degree": 8
+      },
+      "wall_nanos": 192814,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 6193152,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 143401
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 49413
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-4 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4^8"
+        ],
+        "basis_cardinality": 4,
+        "eliminant_degree": 8
+      },
+      "wall_nanos": 31759258,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 19161088,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "characteristic 2147483647 is at or above the tool's bound of 1515531529",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-8",
+      "problem_digest": "94d8b158719bdb10bdaba9d1c8dcece9a00cf8949b3627586e16979741891fb7",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 8,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 128,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8^128"
+        ],
+        "basis_cardinality": 8,
+        "eliminant_degree": 128
+      },
+      "wall_nanos": 49995914,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 9605120,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 44607352
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 5388562
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-8 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-8",
+      "problem_digest": "94d8b158719bdb10bdaba9d1c8dcece9a00cf8949b3627586e16979741891fb7",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 8,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 128,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8^128"
+        ],
+        "basis_cardinality": 8,
+        "eliminant_degree": 128
+      },
+      "wall_nanos": 4074070995,
+      "cpu_nanos": 4000000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 29315072,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 3986000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-8",
+      "problem_digest": "94d8b158719bdb10bdaba9d1c8dcece9a00cf8949b3627586e16979741891fb7",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 8,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 128,
+        "eliminant_degree": 128
+      },
+      "wall_nanos": 11590784,
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 5427200,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 10000000
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-243527-katsura-8/msolve/msolve-243527-2.ms -o /tmp/zeebra-competitive-243527-katsura-8/msolve/msolve-243527-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-8",
+      "problem_digest": "94d8b158719bdb10bdaba9d1c8dcece9a00cf8949b3627586e16979741891fb7",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 8,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-8",
+      "problem_digest": "94d8b158719bdb10bdaba9d1c8dcece9a00cf8949b3627586e16979741891fb7",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 8,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-9",
+      "problem_digest": "4010a392ecf953ea7b835cffba98bf9aeebcbe1ec0fc27d2572d25334a278d4f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 256,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8",
+          "x9^256"
+        ],
+        "basis_cardinality": 9,
+        "eliminant_degree": 256
+      },
+      "wall_nanos": 379431871,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 20115456,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 337178386
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 42253485
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-9 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-9",
+      "problem_digest": "4010a392ecf953ea7b835cffba98bf9aeebcbe1ec0fc27d2572d25334a278d4f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 256,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8",
+          "x9^256"
+        ],
+        "basis_cardinality": 9,
+        "eliminant_degree": 256
+      },
+      "wall_nanos": 118968547167,
+      "cpu_nanos": 117450000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 67506176,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 117440000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-9",
+      "problem_digest": "4010a392ecf953ea7b835cffba98bf9aeebcbe1ec0fc27d2572d25334a278d4f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 256,
+        "eliminant_degree": 256
+      },
+      "wall_nanos": 41869999,
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 7806976,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 30000000
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 30000000
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 40000000
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 30000000
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-243811-katsura-9/msolve/msolve-243811-2.ms -o /tmp/zeebra-competitive-243811-katsura-9/msolve/msolve-243811-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-9",
+      "problem_digest": "4010a392ecf953ea7b835cffba98bf9aeebcbe1ec0fc27d2572d25334a278d4f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-9",
+      "problem_digest": "4010a392ecf953ea7b835cffba98bf9aeebcbe1ec0fc27d2572d25334a278d4f",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-10",
+      "problem_digest": "c55e1bb74cf3e35c564555da504edc9f2ea37ff46d0930dc09a9fa75d2400d98",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 512,
+        "leading_monomials": [
+          "x1",
+          "x10^512",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8",
+          "x9"
+        ],
+        "basis_cardinality": 10,
+        "eliminant_degree": 512
+      },
+      "wall_nanos": 3010902133,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 68976640,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 2718891581
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 292010552
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-10 --task univariate-eliminant"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-10",
+      "problem_digest": "c55e1bb74cf3e35c564555da504edc9f2ea37ff46d0930dc09a9fa75d2400d98",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "stopped-by-limit",
+      "outcome_detail": "stopped at the tool's own cap: stopped at a 120s wall-clock limit",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-10",
+      "problem_digest": "c55e1bb74cf3e35c564555da504edc9f2ea37ff46d0930dc09a9fa75d2400d98",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 512,
+        "eliminant_degree": 512
+      },
+      "wall_nanos": 213419732,
+      "cpu_nanos": 190000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 10805248,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "f4/overall(elapsed)",
+          "elapsed_nanos": 190000000
+        },
+        {
+          "name": "f4/overall(cpu)",
+          "elapsed_nanos": 190000000
+        },
+        {
+          "name": "f4/select",
+          "elapsed_nanos": 20000000
+        },
+        {
+          "name": "f4/symbolic prep.",
+          "elapsed_nanos": 30000000
+        },
+        {
+          "name": "f4/update",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "f4/convert",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "f4/linear algebra",
+          "elapsed_nanos": 130000000
+        },
+        {
+          "name": "f4/reduce gb",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "sparse-fglm/overall(elapsed)",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "sparse-fglm/overall(cpu)",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "rational-param/rational param(elapsed)",
+          "elapsed_nanos": 210000000
+        },
+        {
+          "name": "rational-param/rational param(cpu)",
+          "elapsed_nanos": 200000000
+        }
+      ],
+      "reproduce": "msolve -f /tmp/zeebra-competitive-245569-katsura-10/msolve/msolve-245569-2.ms -o /tmp/zeebra-competitive-245569-katsura-10/msolve/msolve-245569-2.out -v 1 -t 1"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-10",
+      "problem_digest": "c55e1bb74cf3e35c564555da504edc9f2ea37ff46d0930dc09a9fa75d2400d98",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "groebner.jl",
+      "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-10",
+      "problem_digest": "c55e1bb74cf3e35c564555da504edc9f2ea37ff46d0930dc09a9fa75d2400d98",
+      "family": "katsura",
+      "task": "univariate-eliminant",
+      "field": {
+        "name": "GF(32003)",
+        "characteristic": 32003,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "sagebrush",
+      "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))",
+      "environment": {
+        "commit": "cbcdf5a0",
+        "base_commit": "ff757b7f",
+        "patch_id": "7c8391ccc17bd5e301607d35d12d8411cdb2aa53",
+        "machine": "fedora",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 2",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "120 s wall, 1 worker, one row per process"
+      },
+      "limits": {
+        "wall_nanos": 120000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "the tool does not offer univariate-eliminant",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
     }
   ]
 }

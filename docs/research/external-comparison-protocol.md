@@ -58,6 +58,32 @@ are **not** the same task, and a table that put msolve's end-to-end time against
 would be comparing a solve against a basis computation. Each library's invocation must be chosen so
 that the output is the task's output, and the chosen flags recorded (§2, *operation requested*).
 
+### Eliminants are the available second objective (#456)
+
+None of the four external adapters offers `one-finite-field-solution` or
+`all-finite-field-solutions`: their `ExternalSolver::supports` implementations in
+`src/grobner/external/{msolve,singular,groebner_jl,sagebrush}.rs` return `Unsupported::Task`.
+msolve's finite-field output is a rational parametrization, and its real-root solver does not
+enumerate finite-field points (`msolve.rs`, `MsolveSolver::supports`). Adding root finding in an
+adapter would change whose work is timed. These columns therefore cannot supply a comparison.
+
+`univariate-eliminant` is supported by Zeebra, Singular and msolve. Groebner.jl and Sagebrush's
+adapters refuse it; a Sagebrush lex basis is not substituted for an eliminant. msolve also refuses
+characteristics outside `[3, 1515531529)` before spawning its computation, and rejects an output
+that changes the variables or parametrizes in a nonidentity linear form (`msolve.rs`,
+`eliminant_answer`). A genericity failure is not a timing of the requested projection.
+
+The default sweep asks for this task at the published `GF(32003)` and `GF(2^30 + 3)` identities.
+Explicit task requests retain each engine's capability refusal at other published fields.
+The board requires nonempty invariant overlap, agreement on every shared invariant, and an
+eliminant degree on both operands before a ratio is publishable. Its measurement table prints the
+degree; its engine-internal statistic charges basis construction and conversion. Existing startup
+floor and stage-resolution gates apply unchanged.
+
+The live `test_real_small_prime_eliminants_agree_as_polynomials` checks the complete polynomial
+across Zeebra, Singular and msolve at `GF(32003)` before those engines are used for a measurement.
+Equal degrees are a required timing invariant, not a proof that two polynomials are identical.
+
 ---
 
 ## 2. The fields every measurement must record, and how each is obtained

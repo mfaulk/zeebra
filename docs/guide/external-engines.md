@@ -138,10 +138,32 @@ The eliminant is served as the *projection* it is — `I ∩ k[x_n]` is generate
 a reduced lex basis involving no other variable — so it adds no algorithm; it was previously refused
 alongside the solution tasks under a reason that was true for them and false for it, which left the
 one task with two external engines and no in-crate operand (#465). Note the field that comparison
-lives at: msolve's eliminant bound is below 2^31 − 1, so it is the corpus's `2^30 + 3` and not the
-reference prime, and `ZeebraSolver` compiles the ladder's dimensions at both for that reason.
+lives at: msolve's eliminant bound is below 2^31 − 1, so use the corpus's `GF(32003)` or
+`GF(2^30 + 3)` identity rather than the reference prime.
 `msolve::tests::test_a_real_msolve_and_zeebra_return_the_same_eliminant` compares the two
 engines' eliminants as **polynomials** rather than as text.
+
+The default sweep adds `univariate-eliminant` at those two published primes. An explicit
+`--task univariate-eliminant` also works at the other published fields: every adapter checks its
+own capability before execution, and msolve records `unsupported` outside its safe range without
+starting the solver. Groebner.jl and Sagebrush currently refuse this task; Sagebrush's FGLM route
+returns a lex basis, which its adapter does not substitute for an eliminant.
+
+```sh
+. tools/external/env.sh
+cargo run --release --example competitive_sweep -- --characteristic 32003 --list
+ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=2 \
+  tools/benchlock.sh eliminant taskset -c 2 \
+  cargo run --release --example competitive_sweep -- \
+  --characteristic 32003 --row katsura-6 --task univariate-eliminant --measure --write
+cargo run --release --example competitive -- --write
+```
+
+Use one `--row` and one `--task` per measured process. The generated measurement table includes
+the eliminant degree. Both wall and engine-internal ratios require that degree on both operands,
+nonempty invariant overlap, and no disagreement on shared invariants. Engine-internal eliminant
+times include basis construction **and** conversion. The startup-floor and resolution gates still
+apply; small answered rows need not yield a publishable ratio.
 
 `SingularSolver` is the reference adapter and `MsolveSolver` the one with the most to say:
 
