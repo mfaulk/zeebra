@@ -1,10 +1,10 @@
 # F4 live-entry budget study (#659, #490)
 
 `examples/f4_live_budget.rs` measures one F4 computation per process. Arguments are a built-in
-case (`mq-random-10`, `katsura-11`, `cyclic-9`) or an input path, an entry allowance (`default` or
-an integer), and a row form (`reduced` or `echelon`). Input files list comma-separated variable
+case (`mq-random-10`, `katsura-11`, `cyclic-9`) or an input path, an entry allowance (`default`, an integer, or `unbounded`), and a row form (`reduced` or `echelon`). Input files list comma-separated variable
 names, the prime, then comma-separated polynomials. Only the field/arity pairs matched in the
-example are compiled. This is an opt-in diagnostic, not a general system-file API.
+example are compiled. `unbounded` also lifts row and column limits but retains the cooperative
+wall budget; run it only with external time and memory ceilings. This is an opt-in diagnostic, not a general system-file API.
 
 Use a private target directory and `TMPDIR` under `/buildcache`, `RUSTC_WRAPPER=''`, and the release
 profile with repository ISA flags. Build before acquiring `tools/benchlock.sh`. Set

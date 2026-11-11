@@ -44,8 +44,15 @@ fn run<const N: usize, F: KnownOrder>(name: &str, text: &str, entries: &str, red
         .map(|p| MultivariatePolynomial::parse(p, variables).expect("polynomial parses"))
         .collect();
     let mut options = F4Options::default();
-    if entries != "default" {
-        options = options.with_live_entries::<F>(entries.parse().expect("entry count"));
+    match entries {
+        "default" => {}
+        "unbounded" => {
+            options.max_matrix_rows = usize::MAX;
+            options.max_matrix_columns = usize::MAX;
+            options.max_live_nonzeros = usize::MAX;
+            options.max_live_bytes = usize::MAX;
+        }
+        count => options = options.with_live_entries::<F>(count.parse().expect("entry count")),
     }
     options.reduce_batch_rows = reduced;
     options.max_wall_time = Some(Duration::from_secs(
@@ -82,8 +89,10 @@ fn run<const N: usize, F: KnownOrder>(name: &str, text: &str, entries: &str, red
             "release; x86-64-v3; fat LTO; codegen-units=1".into()
         },
         policy: format!(
-            "{}; reduced batch rows={reduced}; wall={:?}",
+            "{}; reduced batch rows={reduced}; rows={}; columns={}; wall={:?}",
             options.live_budget_policy::<F>(),
+            options.max_matrix_rows,
+            options.max_matrix_columns,
             options.max_wall_time
         ),
         ..Environment::from_git()
@@ -161,7 +170,7 @@ fn builtin_input(name: &str) -> Option<String> {
 
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    assert_eq!(args.len(), 3, "usage: f4_live_budget <mq-random-10|katsura-11|cyclic-9|input.system> <entries|default> <reduced|echelon>");
+    assert_eq!(args.len(), 3, "usage: f4_live_budget <mq-random-10|katsura-11|cyclic-9|input.system> <entries|default|unbounded> <reduced|echelon>");
     let reduced = match args[2].as_str() {
         "reduced" => true,
         "echelon" => false,
