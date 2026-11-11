@@ -105,6 +105,12 @@ jobs:
         run: cargo test --profile ci-release --no-run --timings
       - name: Test (release)
         run: cargo nextest run --profile ci --cargo-profile ci-release
+      # This workload regressed when reduced batch rows raised the live-entry demand.
+      # Run it on PRs too; the debug build keeps it ignored for cost.
+      - name: Reduced batch live-budget regression
+        run: |
+          cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
+            -E 'test(=grobner::f4::tests::test_reduced_batches_complete_the_measured_live_budget_regression)'
       - name: Doc tests (release)
         if: github.event_name != 'pull_request'
         run: cargo test --profile ci-release --doc -- --test-threads=4

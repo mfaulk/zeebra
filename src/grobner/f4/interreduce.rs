@@ -1,41 +1,6 @@
-//! Final interreduction as one Macaulay matrix, rather than as one division per basis element.
-//!
-//! # Why this exists
-//!
-//! `docs/research/groebner-jl-gap.md` §3 measured Zeebra's final interreduction at **13 871x**
-//! Groebner.jl's on `mq-random-10`, where the next worst stage is 97.1x. A spread of 8x among the
-//! other three stages is an implementation constant; a 1 400x outlier among them is not an
-//! implementation of the same thing. §4 says what the difference is:
-//!
-//! > It is not a faster interreduction. **It is linear algebra where Zeebra does division.**
-//!
-//! Groebner.jl's `f4_autoreduce!` builds one matrix whose rows are the non-redundant basis
-//! elements, lets symbolic preprocessing supply the reducers those rows need, marks every column as
-//! an unknown pivot so that all of them are eliminated against, and reduces once —
-//! **250 x 604, 1.74 ms, 2.0% of its whole run.** Zeebra's [`reduce_grobner_basis_until`] instead
-//! performs one `normal_form` per element, each with its own intermediate growth, and spends four
-//! fifths of the computation there.
-//!
-//! Every component of the replacement already existed: [`MacaulayMatrix`] builds the matrix,
-//! [`symbolic`](super::symbolic) finds the reducers, [`reduced_row_echelon_tracked`] eliminates, and
-//! `minimize_grobner_basis` produces the row set. What was missing was the assembly.
-//!
-//! # Why the answer cannot change
-//!
-//! `buchberger.rs` already writes the argument out: a reduced Gröbner basis is **determined by its
-//! leading monomials**, so the route to it cannot change it. Concretely, for a minimized basis
-//! `g_1..g_n`:
-//!
-//! - The seed rows have distinct leading monomials, so each is a pivot —
-//!   [`interreduction_rows`](super::symbolic::interreduction_rows) proves this from minimality.
-//! - The closure gives every *reducible* monomial in the matrix a row that leads with it, so the
-//!   pivot columns are exactly the reducible monomials.
-//! - Reduced row echelon form leaves one nonzero per pivot column. So the row led by `lm(g_i)` has
-//!   no monomial divisible by any `lm(g_j)` — which is the defining property of the reduced basis
-//!   element with that leading monomial, and there is only one such polynomial.
-//!
-//! So this is a different computation of the same unique object, and the test that matters is exact
-//! equality against the division route rather than a tolerance.
+//! Minimal basis leaders are distinct pivots; symbolic closure supplies every reducible
+//! monomial. RREF therefore leaves each seed row with its unique reduced tail. Exact agreement
+//! with division follows from uniqueness of the reduced Gröbner basis under a fixed order.
 
 use crate::{
     grobner::buchberger::InterreductionStopped,
@@ -66,7 +31,7 @@ pub(crate) enum MatrixInterreductionRefused {
     ///
     /// Separate from [`MatrixInterreductionRefused::Nonzeros`] because the two are different
     /// quantities against the same limit, and #536 is the gap between them: on `katsura-11` the
-    /// matrix is built at 11 311 802 entries — inside the 20 000 000-entry allowance — and reduced
+    /// matrix is built at 11 311 802 entries — inside the historical 20 000 000-entry allowance — and reduced
     /// at a high-water of **103 865 277**, 5.19x the allowance. A refusal that reported only
     /// "nonzeros" would hide which of the two crossed, which is the mistake #322 is a record of.
     LiveEntries { nonzeros: usize },
@@ -263,7 +228,7 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
     // number by a factor this stage does not control: back-substitution clears every pivot column
     // out of every row that holds one, so the live entry count during this call is a function of
     // the fill-in and not of the shape. Measured on `katsura-11` under grevlex, a 104 403 x 105 427
-    // matrix is built at 11 311 802 entries — inside the default 20 000 000 allowance, which is why
+    // matrix is built at 11 311 802 entries — inside the then-default 20 000 000 allowance, which is why
     // #507 found every budget satisfied — and reduced at a high-water of 103 865 277 live entries,
     // **5.19x the allowance**, in a run peaking at 13 144.3 MB against the division route's
     // 533.0 MB.

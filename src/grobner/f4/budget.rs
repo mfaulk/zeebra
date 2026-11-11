@@ -1,25 +1,6 @@
-//! What an F4 configuration's budgets allow, and how close a run came to them.
-//!
-//! FGLM's budgets are functions of the quotient dimension, so `planning::policy` checks every one
-//! of them before allocating anything. F4's row and column counts are discovered by symbolic
-//! preprocessing, so no pre-flight can do that here — and #468's finding is that the cost of the
-//! asymmetry was not the refusals themselves but learning the budgets *one refusal at a time*:
-//! Anemoi `N = 6` crossed three of the four relevant budgets, and the second was found by reading
-//! the source rather than by being told.
-//!
-//! Two mechanisms, neither of which pretends to be FGLM's pre-flight:
-//!
-//! - [`BudgetReport`], from the options alone, answers "what are my actual limits over this
-//!   field" — including which of the coupled live pair binds, which is the question #322 was filed
-//!   about. It cannot say whether a given system will cross them.
-//! - [`BudgetApproach`], from the statistics a finished *or refused* run returns, answers "how
-//!   close did it get", so a run that was going to be refused at batch 41 can say that batch 39
-//!   was already at 98% of its allowance. It needs no new traversal: every observed maximum it
-//!   divides by is a counter [`F4Statistics`] already keeps.
-//!
-//! [`F4Options::max_pairs_per_batch`] is deliberately absent from both. It shapes the work rather
-//! than refusing it — a capped batch leaves the rest pending — so there is no crossing to report
-//! and no [`F4Error`](super::F4Error) variant that names it.
+//! Live entry and byte limits are coupled; report the binding allowance in its own unit.
+//! Pressure uses observed maxima and cannot predict a system's eventual demand. Pair batch
+//! caps shape the work rather than refusing it, so they have no budget-crossing report.
 
 use std::fmt::{self, Display, Formatter};
 
@@ -210,8 +191,8 @@ impl F4Options {
     /// cheap answer and this does not pretend to give one. For how close a run actually came, see
     /// [`F4Statistics::budget_pressure`].
     ///
-    /// Generic over `F` because the live pair's coupling is: `320_000_000 / 16` is exactly
-    /// `20_000_000`, so at [`recommended`](Self::recommended) the two budgets are the same number
+    /// Generic over `F` because the live pair's coupling is: `512_000_000 / 16` is exactly
+    /// `32_000_000`, so at [`recommended`](Self::recommended) the two budgets are the same number
     /// over a 64-bit field and `max_live_bytes` binds alone over a 254-bit one.
     pub fn budget_report<F: FiniteField>(&self) -> BudgetReport {
         let bytes_per_entry = Self::bytes_per_entry::<F>();
@@ -408,25 +389,22 @@ mod tests {
         );
     }
 
-    /// At `recommended` over a 16-byte entry the two live budgets are equal, so the older one is
-    /// reported as binding and the byte budget as slack — the coupling #322 had to read the source
-    /// to discover.
+    // The narrow-field report identifies the entry budget when the coupled limits agree.
     #[test]
     fn test_the_report_says_which_live_budget_binds_over_a_narrow_field() {
         let report = F4Options::recommended().budget_report::<Zp13>();
         assert_eq!(report.bytes_per_entry(), 16);
-        assert_eq!(report.live_entry_allowance(), 20_000_000);
+        assert_eq!(report.live_entry_allowance(), 32_000_000);
         assert!(report.line("max_live_nonzeros").expect("the line").binding);
         assert!(!report.line("max_live_bytes").expect("the line").binding);
     }
 
-    /// Over a 254-bit field an entry costs 40 bytes, so the byte budget binds at a quarter of the
-    /// entry budget and the report says so without a run.
+    // The wide-field report identifies the byte budget at the same payload allowance.
     #[test]
     fn test_the_report_says_which_live_budget_binds_over_a_wide_field() {
         let report = F4Options::recommended().budget_report::<Bn254Fr>();
         assert_eq!(report.bytes_per_entry(), 40);
-        assert_eq!(report.live_entry_allowance(), 320_000_000 / 40);
+        assert_eq!(report.live_entry_allowance(), 512_000_000 / 40);
         assert!(!report.line("max_live_nonzeros").expect("the line").binding);
         assert!(report.line("max_live_bytes").expect("the line").binding);
     }
@@ -492,17 +470,16 @@ mod tests {
         statistics
     }
 
-    /// A run that came within 1% of the live budget says so, ranked above the budgets it had
-    /// headroom on — the "batch 39 was at 98%" the issue asked for.
+    // Near-limit pressure ranks the live entry budget above low-utilization matrix bounds.
     #[test]
     fn test_budget_pressure_ranks_the_budget_that_was_nearly_crossed_first() {
         let options = F4Options::recommended();
-        let statistics = statistics_at(100, 100, 19_800_000);
+        let statistics = statistics_at(100, 100, 31_680_000);
 
         let pressure = statistics.budget_pressure(&options);
         assert_eq!(pressure[0].budget, "max_live_nonzeros");
-        assert_eq!(pressure[0].observed, 19_800_000);
-        assert_eq!(pressure[0].allowance, 20_000_000);
+        assert_eq!(pressure[0].observed, 31_680_000);
+        assert_eq!(pressure[0].allowance, 32_000_000);
         assert!((pressure[0].utilisation() - 0.99).abs() < 1e-9);
 
         // Still reported, and below it: 100 of 200 000 rows is 0.05%.
@@ -513,12 +490,11 @@ mod tests {
         assert!(rows.utilisation() < pressure[0].utilisation());
     }
 
-    /// `near_budget` reports only what crossed the threshold, so a caller can warn without
-    /// re-deriving the ratios.
+    // Near-budget filtering reports only allowances at or above the requested threshold.
     #[test]
     fn test_near_budget_filters_on_the_threshold() {
         let options = F4Options::recommended();
-        let statistics = statistics_at(100, 100, 19_800_000);
+        let statistics = statistics_at(100, 100, 31_680_000);
 
         let near: Vec<&str> = statistics
             .near_budget(&options, 0.9)
@@ -529,8 +505,7 @@ mod tests {
         assert!(statistics.near_budget(&options, 0.999).is_empty());
     }
 
-    /// Pressure on the live pair is reported in the unit of whichever budget bound, so the figure
-    /// and the name agree — bytes when `max_live_bytes` binds.
+    // Live pressure uses byte units when raising only the entry limit leaves bytes binding.
     #[test]
     fn test_pressure_on_the_live_pair_is_reported_in_the_binding_budget_s_unit() {
         let options = F4Options {
@@ -546,7 +521,7 @@ mod tests {
             .expect("bytes bind once the entry budget is lifted alone");
         assert_eq!(live.unit, "bytes");
         assert_eq!(live.observed, 19_000_000 * 16);
-        assert_eq!(live.allowance, 320_000_000);
+        assert_eq!(live.allowance, 512_000_000);
     }
 
     /// A run that built no matrix has nothing to report, rather than reporting zero pressure

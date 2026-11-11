@@ -459,3 +459,9 @@ precisely the newest issues, which are the follow-ups agents file for each other
 walks `pageInfo.hasNextPage`, and a walk it cannot finish — no cursor to resume from, or more than
 `ZB_ORIENT_MAX_PAGES` pages (default 20) — is status **2**, never a short list. Silent truncation
 was the bug, so the only safe way to be incomplete is loudly.
+
+The release job also runs the ignored reduced-batch resource regression on every Rust PR. It
+checks the measured 109-element basis under the recommended live budget and confirms that an
+explicit historical 20-million-entry cap still refuses. The debug suite leaves that workload
+ignored for cost; run it locally with the command in
+[`src/grobner/f4/test-data/README.md`](../../src/grobner/f4/test-data/README.md).

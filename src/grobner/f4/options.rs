@@ -1,14 +1,5 @@
-//! What an F4 computation is allowed to do, and how it reports running out of room.
-//!
-//! An F4 matrix can be far larger than its inputs suggest, and elimination can make it denser
-//! still. Those are the two ways an F4 computation dies, so both are budgeted: exceeding a budget
-//! is an [`F4Error`], never a basis that looks complete and is not.
-//!
-//! Beyond the budgets, [`F4Options`] is also where every optimization is selected. There is one
-//! field per independent strategy rather than a single "fast" switch, because the question each
-//! one has to answer is whether *it* pays, and a combined switch cannot be ablated. Every
-//! strategy is required to return the identical basis: a reduced Gröbner basis is unique for a
-//! given ideal and order, so an option that changes the answer is a defect, not a trade-off.
+//! Budgets bound matrix payload rather than process RSS. A refusal returns no partial basis;
+//! changing a strategy must preserve the reduced basis under the same ideal and monomial order.
 
 use std::{
     fmt::{Display, Formatter},
@@ -311,9 +302,8 @@ pub struct F4Options {
     /// This is a budget on the entries of **one batch's matrix**, not a ceiling on the process, and
     /// the gap between those is measured at 75x rather than being a rounding note. See
     /// [`max_live_bytes`](Self::max_live_bytes) for the full list of what no budget here bounds —
-    /// notably symbolic preprocessing's monomial queue and the `O(|G|²)` pair queue, neither of
-    /// which the row and column budgets bound either. Treat it as the knob that keeps matrix growth
-    /// recoverable, not as a memory limit.
+    /// notably the basis term vectors, pair queue, scratch storage and allocator overhead.
+    /// Treat it as a recoverability valve, not as a memory limit.
     ///
     /// **Not the effective limit on its own.** That is
     /// [`live_entry_allowance`](Self::live_entry_allowance), the `min` of this and what
@@ -331,8 +321,8 @@ pub struct F4Options {
     /// the older limit counted would make every figure recorded against it ambiguous. Both are
     /// enforced, and [`live_entry_allowance`](Self::live_entry_allowance) is the smaller of the two.
     ///
-    /// **So the two knobs interact, and at [`recommended`](Self::recommended) they are numerically
-    /// identical over a 16-byte entry** — `320_000_000 / 16` is exactly `20_000_000`. Assigning
+    /// **At [`recommended`](Self::recommended) they are numerically identical over a 16-byte
+    /// entry** — `512_000_000 / 16` is exactly `32_000_000`. Assigning
     /// either alone therefore leaves the other binding at precisely the old value;
     /// [`with_live_budget`](Self::with_live_budget) sets both from one number (#322).
     ///
@@ -617,19 +607,20 @@ impl F4Options {
     /// the ordering against `Structured + ALL` alone flips between runs. It is still selected,
     /// because on the instances where elimination dominates it is worth 1.9x on its own.
     ///
-    /// # The two live budgets this inherits are numerically identical over a 16-byte entry
+    /// # Live budgets after reduced batch rows (#659, #490)
     ///
-    /// `max_live_nonzeros` is 20 000 000 and `max_live_bytes` is 320 000 000, and
-    /// `320_000_000 / 16` is **exactly** 20 000 000. Over every `PrimeFieldElement64`
-    /// instantiation — most of the corpus — the two knobs are therefore the same number by
-    /// construction, and since
-    /// [`live_entry_allowance`](Self::live_entry_allowance) is their `min`, **raising either one
-    /// alone has no effect whatsoever**. Use [`with_live_budget`](Self::with_live_budget) or
-    /// [`with_live_entries`](Self::with_live_entries), which set the pair together. The run #322
-    /// was filed from lifted `max_live_nonzeros` to 200 000 000, met the identical refusal, and
-    /// had to read the source to find out why.
+    /// 32 million entries and 512 million bytes leave 33% headroom above the measured
+    /// 24,011,204-entry reduced-row peak; the historical 20-million cap refused that computation.
+    /// See `docs/research/f4-live-budget.md` for the bounded sweep and remaining refusals.
+    /// [`baseline`](Self::baseline) retains 20 million entries and 320 million bytes.
+    ///
+    /// The two recommended limits agree over a 16-byte entry. Raising either alone leaves the
+    /// other binding; [`with_live_budget`](Self::with_live_budget) and
+    /// [`with_live_entries`](Self::with_live_entries) set both. These are payload limits, not RSS.
     pub fn recommended() -> Self {
         Self {
+            max_live_nonzeros: 32_000_000,
+            max_live_bytes: 512_000_000,
             elimination: Backend::Adaptive,
             reduction: ReductionStrategy::Structured,
             criteria: PairCriteria::ALL,
@@ -725,8 +716,8 @@ impl F4Options {
     /// The live-memory allowance that binds over `F`, as prose for a provenance record.
     ///
     /// **A record has to quote the budget that bound, not whichever of the pair was written down.**
-    /// The effective limit is the `min` of the two (#322), so a run configured with
-    /// `max_live_bytes: 400_000_000` and `max_live_nonzeros` left at 20 000 000 is bounded at 320 MB
+    /// The effective limit is the `min` of the two (#322). Historically,
+    /// `max_live_bytes: 400_000_000` with a 20-million entry cap bound at 320 MB
     /// over a 16-byte entry and the 400 MB is slack that never binds. A scoreboard row that
     /// recorded the slack figure overstated its own budget by 25%, and a reader reconciling a
     /// `stopped_at_limit` against it got the wrong number to compare with (#469).
@@ -768,21 +759,11 @@ impl F4Options {
 }
 
 impl Default for F4Options {
-    /// Limits high enough not to interfere with a computation that was going to finish, and low
-    /// enough to fail before exhausting a workstation, with every strategy the measurements
-    /// justified.
+    /// The recommended strategies and measured reduced-row budget policy.
     ///
-    /// `max_live_nonzeros` of 20 million is about 320 MB at 16 bytes per entry, and
-    /// `max_live_bytes` is that same 320 MB stated in the unit that is allocated. The two bind
-    /// together over a 64-bit prime field, which is the width every figure in M16 was measured at,
-    /// and the byte budget binds first over anything wider: at BN254's 40 bytes an entry it admits
-    /// 8 million entries rather than 20. That is the point of having it — the same default now
-    /// describes the same memory at every field width instead of 2.5x more of it over a wide one.
-    ///
-    /// This is [`F4Options::recommended`], **not** [`F4Options::baseline`]. The two were identical
-    /// until the ablation was run: an optimization milestone should not move its own default as a
-    /// side effect of landing an optimization, because then nothing has a fixed reference. The
-    /// default moved once, at the end, on the evidence.
+    /// 32 million entries and 512 million bytes bind together over 16-byte entries. Over
+    /// BN254's 40-byte entries, the byte limit admits 12.8 million. This does not bound process
+    /// RSS. [`F4Options::baseline`] retains the earlier budgets and strategies for ablations.
     fn default() -> Self {
         Self::recommended()
     }
@@ -1059,6 +1040,17 @@ mod tests {
         assert!(options.max_live_bytes > 0);
     }
 
+    // Recommended budgets leave at least 25% room above the measured reduced-row envelope.
+    #[test]
+    fn test_recommended_live_budget_covers_the_measured_reduced_row_envelope() {
+        let options = F4Options::recommended();
+        let measured_peak = 24_011_204usize;
+        assert!(options.live_entry_allowance::<Narrow>() >= measured_peak * 5 / 4);
+        assert_eq!(options.max_live_bytes, options.max_live_nonzeros * 16);
+        assert_eq!(F4Options::baseline().max_live_nonzeros, 20_000_000);
+        assert_eq!(F4Options::baseline().max_live_bytes, 320_000_000);
+    }
+
     /// The default is the recommended configuration, and the baseline remains reachable.
     ///
     /// Both halves matter. A caller who passes nothing gets what the measurements chose; a caller
@@ -1083,11 +1075,8 @@ mod tests {
         assert_eq!(options.reducer_cache, CacheMode::Off);
         // The shipping path still contains no timing.
         assert!(!options.measure_stages);
-        // And only the strategies differ from the baseline; the budgets are untouched.
-        assert_eq!(
-            options.max_live_nonzeros,
-            F4Options::baseline().max_live_nonzeros
-        );
+        // The recommended live allowance also covers the measured reduced-row envelope.
+        assert_eq!(options.max_live_nonzeros, 32_000_000);
         assert_eq!(
             options.max_matrix_rows,
             F4Options::baseline().max_matrix_rows
@@ -1204,20 +1193,14 @@ mod tests {
             options.max_live_bytes,
             options.max_live_nonzeros * F4Options::bytes_per_entry::<Narrow>()
         );
-        assert_eq!(options.live_entry_allowance::<Narrow>(), 20_000_000);
+        assert_eq!(options.live_entry_allowance::<Narrow>(), 32_000_000);
         assert!(
             !options.bytes_bind_first::<Narrow>(),
             "with the two budgets equal the older one must be the one reported"
         );
     }
 
-    /// Raising the entry budget alone changes the allowance by nothing, and the error says so.
-    ///
-    /// The trap #322 was filed for. `recommended()`'s two budgets are numerically identical over a
-    /// 16-byte entry, so the effective limit is the `min` and lifting one knob leaves the other
-    /// binding at exactly the old value. What made it cost a run is that the refusal has to name
-    /// the budget that *bound* and not the one the caller just raised, or the message points away
-    /// from the cause.
+    // Raising only entries leaves the byte allowance binding and names that limit in the error.
     #[test]
     fn test_raising_the_entry_budget_alone_moves_nothing_and_the_error_names_the_byte_budget() {
         let default = F4Options::default();
@@ -1228,14 +1211,14 @@ mod tests {
         assert_eq!(
             lifted.live_entry_allowance::<Narrow>(),
             default.live_entry_allowance::<Narrow>(),
-            "a 10x lift of one knob must not change the effective limit when the other binds"
+            "lifting one knob must not change the effective limit when the other binds"
         );
         assert!(lifted.bytes_bind_first::<Narrow>());
         assert_eq!(
-            lifted.entry_budget_error::<Narrow>(20_000_112),
+            lifted.entry_budget_error::<Narrow>(default.max_live_nonzeros + 112),
             F4Error::TooManyLiveBytes {
-                bytes: 20_000_112 * 16,
-                limit: 320_000_000
+                bytes: (default.max_live_nonzeros + 112) * 16,
+                limit: 512_000_000
             },
             "the refusal must not name the 200000000 the caller set and the run never met"
         );
@@ -1275,10 +1258,9 @@ mod tests {
     #[test]
     fn test_the_byte_budget_binds_first_over_a_wide_field() {
         let options = F4Options::default();
-        assert_eq!(options.live_entry_allowance::<Bn254Fr>(), 8_000_000);
+        assert_eq!(options.live_entry_allowance::<Bn254Fr>(), 12_800_000);
         assert!(options.bytes_bind_first::<Bn254Fr>());
-        // The entry budget alone would have admitted 800 MB here against the 320 MB it describes
-        // over a 64-bit field. The byte budget is what makes the default mean one quantity.
+        // The byte budget keeps the allowed payload constant across field widths.
         assert_eq!(
             options.live_entry_allowance::<Bn254Fr>() * F4Options::bytes_per_entry::<Bn254Fr>(),
             options.max_live_bytes
@@ -1313,16 +1295,12 @@ mod tests {
         assert_eq!(starved.live_entry_allowance::<Narrow>(), 0);
     }
 
-    /// The policy prose states the allowance that binds, and names the budget it came from.
-    ///
-    /// The #469 configuration is the case: `max_live_bytes: 400_000_000` with `max_live_nonzeros`
-    /// left at the default is **320 MB** over a 16-byte entry, and a record that quoted the
-    /// 400 MB overstated its own budget by 25%.
+    // Policy text quotes the binding allowance for historical narrow and current wide-field limits.
     #[test]
     fn test_the_policy_prose_states_the_budget_that_binds() {
         let scoreboard = F4Options {
             max_live_bytes: 400_000_000,
-            ..F4Options::default()
+            ..F4Options::baseline()
         };
         assert_eq!(F4Options::bytes_per_entry::<Narrow>(), 16);
         assert_eq!(

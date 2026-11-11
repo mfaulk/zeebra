@@ -1,13 +1,5 @@
-//! End-to-end tests for the complete F4 algorithm.
-//!
-//! A reduced Gröbner basis is unique for a given ideal and monomial order, and both engines return
-//! theirs sorted by leading monomial, so agreement with `buchberger` is exact equality of
-//! sequences — not of sets, and not up to scalars. That makes the existing Buchberger
-//! implementation, itself checked against the naive reference and against Groebner.jl, a complete
-//! oracle for F4 wherever both can run.
-//!
-//! The properties are also checked against the definition, so systems nobody has a reference basis
-//! for are covered too.
+//! Reduced bases are unique for a fixed ideal and order, so independent engines must agree
+//! exactly. Definition checks also cover systems too large for the reference engines.
 
 use std::collections::HashSet;
 
@@ -4115,4 +4107,43 @@ fn test_public_mq_refusal_reports_full_construction_demand() {
             }
         );
     }
+}
+
+// The default completes the reduced-row regression and preserves an explicit historical cap.
+#[test]
+#[ignore = "large resource regression; CI runs this explicitly in ci-release"]
+fn test_reduced_batches_complete_the_measured_live_budget_regression() {
+    type G = PrimeFieldElement64<65537>;
+    let text = include_str!("test-data/anemoi17-cico-n5-fcico.system");
+    let mut lines = text.lines();
+    let names: Vec<_> = lines.next().unwrap().split(',').collect();
+    let variables: [&str; 10] = names.try_into().unwrap();
+    assert_eq!(lines.next(), Some("65537"));
+    let polynomials = lines.collect::<Vec<_>>().join("\n");
+    let system: Vec<MultivariatePolynomial<10, G>> = polynomials
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|p| MultivariatePolynomial::parse(p, variables).unwrap())
+        .collect();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (basis, stats) = f4_reported(&system, order, &F4Options::default());
+    let basis = basis.expect("the default must admit the measured reduced-row workload");
+    assert_eq!(basis.len(), 109);
+    assert_eq!(stats.max_live_nonzeros, 22_530_520);
+    let mut canonical: Vec<_> = basis.iter().map(ToString::to_string).collect();
+    canonical.sort();
+    assert_eq!(
+        crate::util::sha256_hex(canonical.join("\n").as_bytes()),
+        "0e3f388bb4c88285a2f6f77c4b4b7d31d86d7ed315cfdd9359cf073b1e342512"
+    );
+    let options = F4Options::default().with_live_entries::<G>(20_000_000);
+    let (result, _) = f4_reported(&system, order, &options);
+    assert!(matches!(
+        result,
+        Err(F4Error::TooManyNonzeros {
+            limit: 20_000_000,
+            ..
+        })
+    ));
 }

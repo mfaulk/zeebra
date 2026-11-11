@@ -92,6 +92,10 @@ serde_arrays = "0.1.0"
 # the all-target no-default-feature check skips them rather than failing. CI runs that check
 # because default-feature builds cannot detect accidental imports from a gated module.
 [[example]]
+name = "f4_live_budget"
+test = true
+
+[[example]]
 name = "competitive"
 required-features = ["external-runners"]
 
