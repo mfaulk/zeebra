@@ -1654,7 +1654,7 @@ fn engine_verdict_cell(ratio: &EngineRatio) -> String {
 /// | `singular` | `solve` | `source-basis` + `solve` | — |
 /// | `groebner.jl` | `solve` | n/a (no FGLM) | `process-wall` and `process-cpu`, which are the quantity this statistic exists to exclude — Julia's compiler |
 /// | `sagebrush` | `solve` | `solve` | — |
-/// | `msolve` | `f4: overall(elapsed)` | `f4:` + `sparse-fglm: overall(elapsed)` | every named sub-stage, which would double-count its own total |
+/// | `msolve` | `f4/overall(elapsed)` | `f4/overall(elapsed)` + `sparse-fglm/overall(elapsed)` | every named sub-stage, which would double-count its own total |
 ///
 /// msolve is the one library whose labels are its **own** rather than translated — deliberately,
 /// because the correspondence with Zeebra's stage names is a finding that belongs in
@@ -1675,9 +1675,9 @@ fn engine_internal_time(
         ("singular", _) => &["solve"],
         ("groebner.jl" | "sagebrush", _) => &["solve"],
         ("msolve", super::Task::LexBasisByConversion | super::Task::UnivariateEliminant) => {
-            &["f4: overall(elapsed)", "sparse-fglm: overall(elapsed)"]
+            &["f4/overall(elapsed)", "sparse-fglm/overall(elapsed)"]
         }
-        ("msolve", _) => &["f4: overall(elapsed)"],
+        ("msolve", _) => &["f4/overall(elapsed)"],
         _ => return None,
     };
     let mut total = Duration::ZERO;
@@ -1864,8 +1864,8 @@ mod tests {
             "msolve",
             1000,
             &[
-                ("f4: overall(elapsed)", Duration::from_millis(400)),
-                ("sparse-fglm: overall(elapsed)", Duration::from_millis(300)),
+                ("f4/overall(elapsed)", Duration::from_millis(400)),
+                ("sparse-fglm/overall(elapsed)", Duration::from_millis(300)),
             ],
         );
         ours.task = Task::UnivariateEliminant;
@@ -1888,6 +1888,25 @@ mod tests {
         }
     }
 
+    // Real msolve stage labels contribute both F4 and sparse-FGLM to the eliminant total.
+    #[test]
+    fn test_eliminant_ratio_reads_recorded_msolve_stage_names() {
+        let stages = [
+            (
+                "f4/overall(elapsed)".to_string(),
+                Duration::from_millis(190),
+            ),
+            (
+                "sparse-fglm/overall(elapsed)".to_string(),
+                Duration::from_millis(10),
+            ),
+        ];
+        assert_eq!(
+            super::engine_internal_time("msolve", Task::UnivariateEliminant, &stages),
+            Some(Duration::from_millis(200))
+        );
+    }
+
     // Eliminant engine timings include basis construction and order conversion on both sides.
     #[test]
     fn test_eliminant_engine_ratio_includes_conversion() {
@@ -1900,12 +1919,9 @@ mod tests {
             Some(Duration::from_millis(900))
         );
         let stages = [
+            ("f4/overall(elapsed)".to_string(), Duration::from_millis(40)),
             (
-                "f4: overall(elapsed)".to_string(),
-                Duration::from_millis(40),
-            ),
-            (
-                "sparse-fglm: overall(elapsed)".to_string(),
+                "sparse-fglm/overall(elapsed)".to_string(),
                 Duration::from_millis(30),
             ),
         ];
