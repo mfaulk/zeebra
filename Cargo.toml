@@ -9,6 +9,8 @@ homepage = "https://github.com/mfaulk/zeebra"
 documentation = "https://docs.rs/zeebra"
 version = "0.1.0"
 edition = "2021"
+# Measured: 1.90 lacks the stabilized `carrying_add`/`borrowing_sub`. CI's `msrv` job holds it.
+rust-version = "1.91"
 license = "MIT"
 readme = "README.md"
 keywords = ["algebra", "grobner", "finite-field", "polynomial", "zero-knowledge"]
