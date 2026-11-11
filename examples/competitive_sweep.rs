@@ -1,42 +1,6 @@
-//! The competitive sweep: corpus × engines × tasks into the competitive board.
-//!
-//! ```text
-//! cargo run --release --example competitive_sweep                    # every rung, exploratory
-//! cargo run --release --example competitive_sweep -- --list          # what would run
-//! cargo run --release --example competitive_sweep -- \
-//!     --engines zeebra,singular --write                              # populate the board in parts
-//! cargo run --release --example competitive_sweep -- \
-//!     --characteristic 32003 --list                                   # the small-prime identity
-//! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
-//!     --row katsura-6 --task reduced-grobner-basis --measure --write
-//! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
-//!     --row mq-random-10 --task reduced-grobner-basis \
-//!     --interreduction division --measure --write     # the pre-#478 route, as a board row
-//! ```
-//!
-//! `--interreduction by-order|division|matrix` and `--reduce-batch-rows on|off` override F4's two
-//! interreduction-related strategy flags for the Zeebra side only; absent, the row is taken at
-//! whatever `F4Options::default()` says. Both values are recorded in the row's `library_version`,
-//! because the commit does not determine them and two rows that differ only in them agree on every
-//! field a ratio is checked against (#507).
-//!
-//! # Two modes, and only one of them produces a publishable figure
-//!
-//! **Exploratory** (the default) runs many rows in one process. It is for discovering which rows
-//! finish and which refuse, and it reports **no memory figure at all** — `VmHWM` is process-wide,
-//! so in a multi-row process it is a ceiling over every row and over whatever built their inputs.
-//!
-//! **Measured** (`--row <name> --measure`) runs exactly one row in its own process, which is what
-//! makes a peak-RSS figure attributable to it. This is the mode `tools/benchlock.sh` should wrap,
-//! and the only one whose rows belong in `research/competitive/`.
-//!
-//! The reasoning is `docs/research/external-comparison-protocol.md` §4.
-//!
-//! # What this program does not do
-//!
-//! It takes no ratios. `CompetitiveBoard::speedups` is the only place a ratio is computed, and
-//! `examples/competitive` renders them. A sweep that also ranked would be a sweep that could
-//! publish a ratio between two rows taken under different limits.
+//! Measured sweeps require one row and task per process so peak RSS belongs to that computation.
+//! Exploratory sweeps report no memory; only the board applies comparison and publication gates.
+//! See `docs/guide/external-engines.md` for commands and the field-dependent task defaults.
 
 use std::{fs, path::Path, time::Duration};
 
@@ -44,6 +8,7 @@ use zeebra::{
     grobner::{
         external::{
             corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
+            msolve::{MAX_CHARACTERISTIC_ELIMINANT, MIN_CHARACTERISTIC_ELIMINANT},
             CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance,
             Limits, Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
             SingularSolver, Task, ZeebraSolver,
@@ -64,24 +29,14 @@ const ROOT: &str = "research/competitive";
 /// finding, not a nuisance, and the report says so.
 const TASKS: [Task; 2] = [Task::ReducedGrobnerBasis, Task::LexBasisByConversion];
 
-/// The highest characteristic at which msolve's univariate eliminant is safe to ask for.
-///
-/// **A non-termination bound, not a performance one.** msolve's sparse-FGLM refuses
-/// `p >= 1518500213` (`fglm_core.c:1385`), but the `NULL` it returns is laundered into the
-/// genericity signal (`msolve.c:1740-1752`), which reaches a `goto restart` loop with no exit:
-/// `add_linear_form_to_input_system` has no failure path and `undo_variable_order_change`
-/// permanently returns 0 once a linear form exists. Measured on katsura-5 over `GF(2^31 − 1)`:
-/// **25 353 retries and 1.37 M lines of output in 8 s, never exiting.**
-///
-/// The documented ceiling is `1515531529` (`linalg-fglm.c:38`) rather than msolve's own guard,
-/// because the 2 968 684-wide window between them runs with no accumulation guarantee.
-///
-/// This matters here because `corpus::REFERENCE_CHARACTERISTIC` is `2^31 − 1`, which is **above**
-/// it. So msolve is a *basis* comparand on the corpus field and **not an eliminant one**, and a
-/// sweep that asked anyway would hang a worker until the wall limit killed it — producing a
-/// `StoppedByLimit` row, which is timing-adjacent and wrong. The honest outcome is `Unsupported`,
-/// and the cheapest way to guarantee it is never to ask.
-const MSOLVE_ELIMINANT_CEILING: u64 = 1_515_531_529;
+// Default comparisons need an msolve operand; explicit tasks retain every adapter refusal.
+fn sweep_tasks(characteristic: u64) -> Vec<Task> {
+    let mut tasks = TASKS.to_vec();
+    if (MIN_CHARACTERISTIC_ELIMINANT..MAX_CHARACTERISTIC_ELIMINANT).contains(&characteristic) {
+        tasks.push(Task::UnivariateEliminant);
+    }
+    tasks
+}
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -167,7 +122,7 @@ fn main() {
                 Task::all().map(|t| t.tag())
             )
         })],
-        None => TASKS.to_vec(),
+        None => sweep_tasks(characteristic),
     };
 
     if flag("--list") {
@@ -219,22 +174,8 @@ fn main() {
         .expect("published rungs have a corpus instance");
 
         for task in &tasks {
-            // Refused rather than asked and timed out. See `MSOLVE_ELIMINANT_CEILING`: above it
-            // msolve does not terminate, so the row would read as a limit stop where the truth is
-            // a capability gap.
-            if *task == Task::UnivariateEliminant
-                && built.field.characteristic > MSOLVE_ELIMINANT_CEILING
-            {
-                eprintln!(
-                    "- {} {}: skipped, GF({}) is above msolve's eliminant ceiling of {} where it \
-                     does not terminate; this is Unsupported, not a limit stop",
-                    built.name,
-                    task.tag(),
-                    built.field.characteristic,
-                    MSOLVE_ELIMINANT_CEILING
-                );
-                continue;
-            }
+            // Each adapter checks its own capability before execution, including msolve's
+            // non-termination bounds. Keep its refusal without skipping other engines' answers.
             run_one(
                 &mut board,
                 &built,
@@ -546,6 +487,20 @@ fn detect_environment(wall: Duration, measure: bool) -> Environment {
 mod tests {
     use super::sweep_rows;
     use zeebra::grobner::external::corpus::BINARY_CHARACTERISTIC;
+
+    // The default small-prime sweep includes the eliminant comparison task.
+    #[test]
+    fn test_small_prime_sweep_includes_eliminants() {
+        assert!(super::sweep_tasks(32003).contains(&super::Task::UnivariateEliminant));
+    }
+
+    // Default sweeps omit eliminants where msolve cannot safely compute them.
+    #[test]
+    fn test_default_tasks_respect_eliminant_characteristic_bounds() {
+        for characteristic in [2, super::REFERENCE_CHARACTERISTIC] {
+            assert!(!super::sweep_tasks(characteristic).contains(&super::Task::UnivariateEliminant));
+        }
+    }
 
     // The binary sweep lists seven Cyclic rungs and refuses an unpublished Katsura row.
     #[test]

@@ -156,10 +156,10 @@ impl SingularSolver {
                 script.push_str("printf(\"@solve_ms %s\", timer - t0);\n");
                 script.push_str(&basis_report("Glex"));
                 script.push_str("vd = vdim(Glex);\nprintf(\"@vdim %s\", vd);\n");
-                // The eliminant in the last variable is the lex basis element that survives
-                // setting every other variable's degree aside. Reported separately so that an
-                // adapter consumer does not have to re-derive which generator it is.
-                script.push_str("printf(\"@eliminant %s\", Glex[ncols(Glex)]);\n");
+                // Singular prints the smallest lex leader first. For a zero-dimensional ideal
+                // that is the last-variable projection; the final element generally involves x1.
+                script.push_str("printf(\"@eliminant %s\", Glex[1]);\n");
+                script.push_str("printf(\"@eliminant_degree %s\", deg(Glex[1]));\n");
             }
             Task::OneFiniteFieldSolution | Task::AllFiniteFieldSolutions => {
                 // `supports` refuses these, so reaching here is a harness bug rather than a run.
@@ -204,6 +204,12 @@ impl SingularSolver {
 
         let mut answer = Answer::from_invariants(invariants).with_basis(basis);
         if task == Task::UnivariateEliminant {
+            let degree = integer("@eliminant_degree")?;
+            answer.invariants.eliminant_degree =
+                Some(usize::try_from(degree).map_err(|_| RunFailure::Unparsable {
+                    marker: "@eliminant_degree".to_string(),
+                    value: degree.to_string(),
+                })?);
             if let Some(eliminant) = marker(output, "@eliminant") {
                 answer = answer.with_eliminant(eliminant);
             }
@@ -412,7 +418,7 @@ impl ExternalSolver for SingularSolver {
         // milestone has caught that shape. Zeebra's own adapter already reports it correctly, so
         // the two engines were disagreeing about the *category* of the same mathematical truth
         // (`cyclic-4`, the corpus's positive-dimensional rung).
-        if task == Task::LexBasisByConversion {
+        if matches!(task, Task::LexBasisByConversion | Task::UnivariateEliminant) {
             if let Some(vdim) = marker(&output, "@vdim").and_then(|v| v.parse::<i64>().ok()) {
                 if vdim < 0 {
                     return finish(
@@ -710,6 +716,115 @@ mod tests {
     #[test]
     fn test_indentation_shifts_every_line() {
         assert_eq!(indent("a\nb\n"), "  a\n  b\n");
+    }
+
+    // Eliminant answers retain the degree needed to verify cross-engine timing comparisons.
+    #[test]
+    fn test_eliminant_degree_is_required_and_parsed() {
+        let solver = solver("Singular", "eliminant-degree");
+        let output = "@gbsize 1\n@gb x1^4-1\n@lead x1^4\n@vdim 4\n@eliminant x1^4-1\n@eliminant_degree 4\n@done\n";
+        let answer = solver.answer(output, Task::UnivariateEliminant).unwrap();
+        assert_eq!(answer.invariants.eliminant_degree, Some(4));
+        for degree in ["", "@eliminant_degree invalid\n", "@eliminant_degree -1\n"] {
+            let missing = output.replace("@eliminant_degree 4\n", degree);
+            assert!(solver.answer(&missing, Task::UnivariateEliminant).is_err());
+        }
+    }
+
+    // Singular's eliminant is univariate in the last variable, not its last printed basis element.
+    #[test]
+    fn test_real_eliminant_is_the_last_variable_projection() {
+        let mut solver = solver("Singular", "projection");
+        if solver.probe_version().is_err() {
+            eprintln!("NOT CHECKED: Singular is unavailable");
+            return;
+        }
+        let mut input = instance(32003, MonomialOrder::GradedReverseLexicographic);
+        input.system = vec!["x1-x2".to_string(), "x2^4-1".to_string()];
+        let report = solver.run(
+            &input,
+            Task::UnivariateEliminant,
+            &Limits::wall(Duration::from_secs(10)),
+        );
+        let answer = report.status.answer().expect("Singular answers");
+        assert_eq!(answer.invariants.eliminant_degree, Some(4));
+        assert_eq!(answer.eliminant.as_deref(), Some("x2^4-1"));
+    }
+
+    // A positive-dimensional ideal cannot be reported as this adapter's zero-dimensional eliminant.
+    #[test]
+    fn test_real_positive_dimensional_eliminant_is_unsupported() {
+        let mut solver = solver("Singular", "positive-projection");
+        if solver.probe_version().is_err() {
+            eprintln!("NOT CHECKED: Singular is unavailable");
+            return;
+        }
+        let mut input = instance(32003, MonomialOrder::GradedReverseLexicographic);
+        input.system = vec!["x1".to_string()];
+        let report = solver.run(
+            &input,
+            Task::UnivariateEliminant,
+            &Limits::wall(Duration::from_secs(10)),
+        );
+        assert!(matches!(
+            report.status,
+            RunStatus::Unsupported(Unsupported::PositiveDimensional { .. })
+        ));
+    }
+
+    // Three engines return the same eliminant polynomial on the published GF(32003) Katsura ideal.
+    #[test]
+    fn test_real_small_prime_eliminants_agree_as_polynomials() {
+        use crate::{
+            fields::Zp32003,
+            grobner::external::{corpus, MsolveSolver},
+            MultivariatePolynomial,
+        };
+
+        let mut singular = solver("Singular", "small-prime-projection");
+        let mut msolve = MsolveSolver::new(
+            std::env::var("ZEEBRA_MSOLVE").unwrap_or_else(|_| "msolve".to_string()),
+            scratch_root("small-prime-msolve"),
+        );
+        if msolve.probe_version().is_err() {
+            assert!(
+                std::env::var_os("ZEEBRA_REQUIRE_MSOLVE").is_none(),
+                "msolve coverage is required"
+            );
+            eprintln!("NOT CHECKED: msolve is unavailable");
+            return;
+        }
+        if singular.probe_version().is_err() {
+            eprintln!("NOT CHECKED: Singular is unavailable");
+            return;
+        }
+        let input = corpus::instance(
+            "katsura-4",
+            32003,
+            MonomialOrder::GradedReverseLexicographic,
+        )
+        .unwrap();
+        let limits = Limits::wall(Duration::from_secs(10));
+        let ours = crate::grobner::external::ZeebraSolver::new().run(
+            &input,
+            Task::UnivariateEliminant,
+            &limits,
+        );
+        let ours = ours.status.answer().expect("Zeebra answers");
+        let names: Vec<&str> = input.variables.iter().map(String::as_str).collect();
+        let names: [&str; 4] = names.try_into().unwrap();
+        let parse = |text: &str| MultivariatePolynomial::<4, Zp32003>::parse(text, names).unwrap();
+        for engine in [&mut singular as &mut dyn ExternalSolver, &mut msolve] {
+            let report = engine.run(&input, Task::UnivariateEliminant, &limits);
+            let answer = report.status.answer().expect("external engine answers");
+            assert_eq!(answer.invariants.eliminant_degree, Some(8));
+            assert!(ours.invariants.overlap(&answer.invariants) > 0);
+            assert!(ours.invariants.agree(&answer.invariants).is_empty());
+            assert_eq!(
+                parse(ours.eliminant.as_deref().unwrap()),
+                parse(answer.eliminant.as_deref().unwrap())
+            );
+        }
     }
 
     /// Markers parse into invariants, with a reported `vdim` of -1 read as no finite dimension.

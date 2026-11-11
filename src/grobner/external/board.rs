@@ -343,6 +343,17 @@ impl CompetitiveRecord {
             && self.environment.policy == other.environment.policy
     }
 
+    fn agreed_timing_invariants(&self, other: &Self) -> usize {
+        if !self.invariants.agree(&other.invariants).is_empty()
+            || (self.task == super::Task::UnivariateEliminant
+                && (self.invariants.eliminant_degree.is_none()
+                    || other.invariants.eliminant_degree.is_none()))
+        {
+            return 0;
+        }
+        self.invariants.overlap(&other.invariants)
+    }
+
     /// The row as JSON.
     ///
     /// Absent optional figures are **omitted**, never `null`: "not measured" is not zero, and a key
@@ -993,9 +1004,8 @@ impl CompetitiveBoard {
     /// a failure has no time, and the board shows
     /// [`Outcome::instead_of_a_time`] in that cell rather than a number.
     ///
-    /// The invariant agreement is reported through [`Speedup::shared_invariants`] rather than
-    /// filtered on, so that a renderer can present a ratio between two unchecked answers *as*
-    /// unchecked instead of silently dropping it — a dropped row is a gap a reader cannot see.
+    /// Failed or missing invariant checks leave `shared_invariants` at zero, so the renderer
+    /// retains the pair while refusing publication. Eliminants require a degree on both sides.
     pub fn speedups(&self, baseline: &str) -> Vec<Speedup> {
         let mut found = Vec::new();
         let baseline_floor = self.startup_floor(baseline);
@@ -1024,7 +1034,7 @@ impl CompetitiveBoard {
                     baseline: baseline.to_string(),
                     subject: subject.library.clone(),
                     ratio: theirs.as_secs_f64() / ours.as_secs_f64(),
-                    shared_invariants: reference.invariants.overlap(&subject.invariants),
+                    shared_invariants: reference.agreed_timing_invariants(subject),
                     // The minimum over both operands: a ratio is startup-dominated if *either*
                     // side is sitting at its own floor, and in practice it is the subprocess
                     // comparand rather than the in-process baseline.
@@ -1114,7 +1124,7 @@ impl CompetitiveBoard {
                         (Some(a), Some(b)) => a.total_cmp(b),
                     })
                     .flatten(),
-                    shared_invariants: reference.invariants.overlap(&subject.invariants),
+                    shared_invariants: reference.agreed_timing_invariants(subject),
                     equivalence: provenance.get(subject.problem.as_str()).copied(),
                 });
             }
@@ -1212,14 +1222,14 @@ impl CompetitiveBoard {
             let _ = writeln!(out, "## {}\n", family);
             let _ = writeln!(
                 out,
-                "| problem | task | field | library | commit | outcome | wall | cpu | peak RSS | stages | verification |"
+                "| problem | task | field | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |"
             );
-            let _ = writeln!(out, "|---|---|---|---|---|---|---:|---:|---:|---|---|");
+            let _ = writeln!(out, "|---|---|---|---|---|---|---:|---:|---:|---|---:|---|");
             for rows in problems.values() {
                 for row in rows {
                     let _ = writeln!(
                         out,
-                        "| `{}` `{}` | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} |",
+                        "| `{}` `{}` | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} |",
                         row.problem,
                         &row.problem_digest[..row.problem_digest.len().min(12)],
                         row.task,
@@ -1231,6 +1241,9 @@ impl CompetitiveBoard {
                         duration_cell(row.cpu),
                         bytes_cell(row.peak_rss_bytes),
                         stages_cell(&row.stages),
+                        row.invariants
+                            .eliminant_degree
+                            .map_or_else(|| "—".to_string(), |degree| degree.to_string()),
                         verification_cell(row),
                     );
                 }
@@ -1459,7 +1472,8 @@ fn verdict_cell(speedup: &Speedup) -> String {
         );
     }
     if speedup.shared_invariants == 0 {
-        return "**NOT PUBLISHABLE: no invariant was checked**".to_string();
+        return "**NOT PUBLISHABLE: invariants disagree or a required invariant is missing**"
+            .to_string();
     }
     let mut cell = if speedup.has_authoritative_comparand() {
         format!("{} invariants agreed", speedup.shared_invariants)
@@ -1596,7 +1610,8 @@ fn engine_verdict_cell(ratio: &EngineRatio) -> String {
         };
     }
     if ratio.shared_invariants == 0 {
-        return "**NOT PUBLISHABLE: no invariant was checked**".to_string();
+        return "**NOT PUBLISHABLE: invariants disagree or a required invariant is missing**"
+            .to_string();
     }
     let mut cell = if ratio.has_authoritative_comparand() {
         format!("{} invariants agreed", ratio.shared_invariants)
@@ -1652,12 +1667,14 @@ fn engine_internal_time(
     stages: &[(String, Duration)],
 ) -> Option<Duration> {
     let wanted: &[&str] = match (library, task) {
-        ("zeebra", super::Task::LexBasisByConversion) => &["basis", "conversion"],
+        ("zeebra", super::Task::LexBasisByConversion | super::Task::UnivariateEliminant) => {
+            &["basis", "conversion"]
+        }
         ("zeebra", _) => &["basis"],
         ("singular", super::Task::LexBasisByConversion) => &["source-basis", "solve"],
         ("singular", _) => &["solve"],
         ("groebner.jl" | "sagebrush", _) => &["solve"],
-        ("msolve", super::Task::LexBasisByConversion) => {
+        ("msolve", super::Task::LexBasisByConversion | super::Task::UnivariateEliminant) => {
             &["f4: overall(elapsed)", "sparse-fglm: overall(elapsed)"]
         }
         ("msolve", _) => &["f4: overall(elapsed)"],
@@ -1830,6 +1847,72 @@ mod tests {
             build: "release, target-cpu=x86-64-v3".to_string(),
             policy: "600 s wall, 1 worker".to_string(),
         }
+    }
+
+    // Eliminant ratios require matching degrees and agreement on every shared invariant.
+    #[test]
+    fn test_eliminant_ratios_require_agreed_degrees() {
+        let mut ours = staged_row(
+            "zeebra",
+            1000,
+            &[
+                ("basis", Duration::from_millis(500)),
+                ("conversion", Duration::from_millis(400)),
+            ],
+        );
+        let mut theirs = staged_row(
+            "msolve",
+            1000,
+            &[
+                ("f4: overall(elapsed)", Duration::from_millis(400)),
+                ("sparse-fglm: overall(elapsed)", Duration::from_millis(300)),
+            ],
+        );
+        ours.task = Task::UnivariateEliminant;
+        theirs.task = Task::UnivariateEliminant;
+        for (our_degree, their_degree, their_dimension, accepted) in [
+            (Some(4), Some(4), Some(4), true),
+            (None, Some(4), Some(4), false),
+            (Some(4), None, Some(4), false),
+            (Some(4), Some(5), Some(4), false),
+            (Some(4), Some(4), Some(5), false),
+        ] {
+            ours.invariants.eliminant_degree = our_degree;
+            theirs.invariants.eliminant_degree = their_degree;
+            theirs.invariants.quotient_dimension = their_dimension;
+            let mut board = CompetitiveBoard::new();
+            board.add(ours.clone());
+            board.add(theirs.clone());
+            assert_eq!(board.speedups("zeebra")[0].is_publishable(), accepted);
+            assert_eq!(board.engine_ratios("zeebra")[0].is_publishable(), accepted);
+        }
+    }
+
+    // Eliminant engine timings include basis construction and order conversion on both sides.
+    #[test]
+    fn test_eliminant_engine_ratio_includes_conversion() {
+        let stages = [
+            ("basis".to_string(), Duration::from_millis(500)),
+            ("conversion".to_string(), Duration::from_millis(400)),
+        ];
+        assert_eq!(
+            super::engine_internal_time("zeebra", Task::UnivariateEliminant, &stages),
+            Some(Duration::from_millis(900))
+        );
+        let stages = [
+            (
+                "f4: overall(elapsed)".to_string(),
+                Duration::from_millis(40),
+            ),
+            (
+                "sparse-fglm: overall(elapsed)".to_string(),
+                Duration::from_millis(30),
+            ),
+        ];
+        assert_eq!(
+            super::engine_internal_time("msolve", Task::UnivariateEliminant, &stages),
+            Some(Duration::from_millis(70))
+        );
     }
 
     fn instance() -> Instance {
