@@ -110,6 +110,20 @@ fn run<const N: usize, F: KnownOrder>(name: &str, text: &str, entries: &str, red
                 "completed_peak_live_entries",
                 Json::size(statistics.max_live_nonzeros)
             ),
+            (
+                "interreduction_peak_entries",
+                statistics
+                    .interreduction_matrix
+                    .as_ref()
+                    .map_or(Json::Null, |s| Json::size(s.peak_nonzeros))
+            ),
+            (
+                "interreduction_fell_back",
+                statistics
+                    .interreduction_matrix
+                    .as_ref()
+                    .map_or(Json::Null, |s| Json::Bool(s.fell_back))
+            ),
             ("max_rows", Json::size(statistics.max_matrix_rows)),
             ("max_columns", Json::size(statistics.max_matrix_columns)),
             (
@@ -121,16 +135,9 @@ fn run<const N: usize, F: KnownOrder>(name: &str, text: &str, entries: &str, red
     );
 }
 
-fn main() {
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    assert_eq!(args.len(), 3, "usage: f4_live_budget <mq-random-10|katsura-11|cyclic-9|input.system> <entries|default> <reduced|echelon>");
-    let reduced = match args[2].as_str() {
-        "reduced" => true,
-        "echelon" => false,
-        _ => panic!("unknown row form"),
-    };
-    let text = match args[0].as_str() {
-        "katsura-11" => input(&katsura::<12, PrimeFieldElement64<2147483647>>()),
+fn builtin_input(name: &str) -> Option<String> {
+    Some(match name {
+        "katsura-11" => input(&katsura::<11, PrimeFieldElement64<2147483647>>()),
         "cyclic-9" => input(&cyclic::<9, PrimeFieldElement64<2147483647>>()),
         "mq-random-10" => {
             let generated = GeneratedSystem::generate(
@@ -148,8 +155,20 @@ fn main() {
                 generated.render().join(",\n")
             )
         }
-        path => std::fs::read_to_string(path).expect("input readable"),
+        _ => return None,
+    })
+}
+
+fn main() {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    assert_eq!(args.len(), 3, "usage: f4_live_budget <mq-random-10|katsura-11|cyclic-9|input.system> <entries|default> <reduced|echelon>");
+    let reduced = match args[2].as_str() {
+        "reduced" => true,
+        "echelon" => false,
+        _ => panic!("unknown row form"),
     };
+    let text = builtin_input(&args[0])
+        .unwrap_or_else(|| std::fs::read_to_string(&args[0]).expect("input readable"));
     let mut lines = text.lines();
     let n = lines.next().unwrap().split(',').count();
     let prime: u64 = lines.next().unwrap().parse().expect("prime header");
@@ -167,7 +186,44 @@ fn main() {
         (80, 2130706433) => call!(80, 2130706433),
         (9, 2147483647) => call!(9, 2147483647),
         (10, 2147483647) => call!(10, 2147483647),
-        (12, 2147483647) => call!(12, 2147483647),
+        (11, 2147483647) => call!(11, 2147483647),
         _ => panic!("uncompiled field/arity {prime}/{n}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::builtin_input;
+
+    // Built-in controls use the corpus variable counts and reference characteristic.
+    #[test]
+    fn test_builtin_controls_match_corpus_dimensions() {
+        for (name, arity) in [("katsura-11", 11), ("cyclic-9", 9), ("mq-random-10", 10)] {
+            let text = builtin_input(name).unwrap();
+            let mut lines = text.lines();
+            assert_eq!(lines.next().unwrap().split(',').count(), arity);
+            assert_eq!(lines.next(), Some("2147483647"));
+        }
+        assert!(builtin_input("unknown").is_none());
+    }
+
+    // The seeded MQ control matches the canonical competitive-corpus generators exactly.
+    #[test]
+    #[cfg(feature = "external-runners")]
+    fn test_mq_control_matches_competitive_corpus() {
+        let corpus = zeebra::grobner::external::corpus::instance(
+            "mq-random-10",
+            2147483647,
+            zeebra::MonomialOrder::GradedReverseLexicographic,
+        )
+        .unwrap();
+        assert_eq!(
+            builtin_input("mq-random-10").unwrap(),
+            format!(
+                "{}\n2147483647\n{}",
+                corpus.variables.join(","),
+                corpus.system.join(",\n")
+            )
+        );
     }
 }

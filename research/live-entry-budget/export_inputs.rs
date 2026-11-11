@@ -30,7 +30,8 @@ fn emit<const N: usize, F: KnownOrder>(name: &str, system: Vec<MultivariatePolyn
         output.push_str(",\n");
     }
     std::fs::write(
-        std::path::Path::new(&std::env::args().nth(1).expect("output directory")).join(format!("{name}.system")),
+        std::path::Path::new(&std::env::args().nth(1).expect("output directory"))
+            .join(format!("{name}.system")),
         output,
     )
     .unwrap();

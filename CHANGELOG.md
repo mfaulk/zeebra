@@ -13,6 +13,12 @@ change to `y` may break the public API.
   retries, classical fallback, workspace budgets and route statistics; a reproducible comparison
   example with optional exact msolve eliminant checks.
 
+### Changed
+
+- F4's recommended/default live allowance is 32 million entries and 512 MB, sized from measured
+  reduced-row peaks (#659, #490). `baseline()` retains 20 million entries and 320 MB; explicit
+  caller budgets remain enforced. The allowance bounds matrix payload, not process RSS.
+
 ## [0.1.0] - 2026-11-10
 
 The first release on crates.io. Before it, the crate was used only as a git dependency, and the

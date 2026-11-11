@@ -255,6 +255,11 @@ would justify revisiting the decision.
 
 Licensed under the [MIT licence](LICENSE-MIT).
 
+F4 defaults to 32 million live entries and 512 MB of matrix payload, sized from measured
+reduced-row peaks. `baseline()` retains 20 million entries and 320 MB. These are matrix limits;
+process RSS also includes basis storage, queues and scratch. See the
+[budget decision](docs/research/f4-live-budget.md) for the measurements and remaining refusals.
+
 Measure an F4 entry-budget limit with `cargo run --release --example f4_live_budget --
 mq-random-10 20000000 reduced`. The example also accepts caller-supplied polynomial systems and
 reports outcomes, exact basis digests, completed-batch entry peaks and process RSS separately.

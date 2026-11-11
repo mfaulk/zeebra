@@ -41,6 +41,11 @@ Generator source SHA-256:
 
 The public MQ control uses `GeneratedSystem::generate`, seed 10, ten variables, degree at most two
 and at most forty terms per equation, matching `external::corpus::random_mq_instance(10, 10, …)`.
-Katsura-11 uses twelve variables. All public controls use the corpus reference prime 2147483647
+Katsura-11 uses eleven variables, matching the corpus's naming convention. All public controls use the corpus reference prime 2147483647
 in its 64-bit representation; the private-generator controls likewise preserve their original
 64-bit field representation. Every record pins its exact input text by SHA-256.
+
+An initial Katsura pilot used twelve variables under an eleven-variable label. It was excluded;
+published Katsura comparisons use the corpus's eleven-variable input. The example's automated
+control-arity test guards that boundary, and its MQ test checks the generators against the actual
+competitive corpus.
