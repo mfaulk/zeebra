@@ -21,6 +21,8 @@ struct Args {
     operator_entries: usize,
     operator_bytes: usize,
     border_entries: usize,
+    border_columns: usize,
+    border_rows: usize,
 }
 
 impl Args {
@@ -38,11 +40,13 @@ impl Args {
             operator_entries: 20_000_000,
             operator_bytes: 320_000_000,
             border_entries: 20_000_000,
+            border_columns: 200_000,
+            border_rows: 200_000,
         };
         let mut input = env::args().skip(1);
         while let Some(flag) = input.next() {
             if flag == "--help" {
-                println!("wiedemann_conversion [--variables N] [--degree D] [--repeats N] [--route compare|classical|adaptive|wiedemann] [--input FILE] [--msolve PATH] [--max-dimension N] [--span-cells N] [--span-bytes N] [--operator-entries N] [--operator-bytes N] [--border-entries N]");
+                println!("wiedemann_conversion [--variables N] [--degree D] [--repeats N] [--route compare|classical|adaptive|wiedemann] [--input FILE] [--msolve PATH] [--max-dimension N] [--span-cells N] [--span-bytes N] [--operator-entries N] [--operator-bytes N] [--border-entries N] [--border-columns N] [--border-rows N]");
                 println!("Input: variable names, characteristic 65537, then comma-separated polynomials forming a grevlex Groebner basis. Without a file, generate x_i^d-x_(i+1), last^d-x_0-1.");
                 std::process::exit(0);
             }
@@ -60,6 +64,10 @@ impl Args {
                 "--operator-entries" => {
                     args.operator_entries = value.parse().expect("operator entry budget")
                 }
+                "--border-columns" => {
+                    args.border_columns = value.parse().expect("border column budget")
+                }
+                "--border-rows" => args.border_rows = value.parse().expect("border row budget"),
                 "--border-entries" => {
                     args.border_entries = value.parse().expect("border entry budget")
                 }
@@ -146,6 +154,8 @@ fn run<const N: usize>(args: &Args, input: Option<&str>) {
                 max_operator_bytes: args.operator_bytes,
                 border_batch: zeebra::grobner::fglm::BorderBatch {
                     max_nonzeros: args.border_entries,
+                    max_columns: args.border_columns,
+                    max_reducer_rows: args.border_rows,
                     ..zeebra::grobner::fglm::BorderBatch::recommended()
                 },
                 measure_stages: true,

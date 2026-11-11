@@ -368,3 +368,8 @@ against msolve on those same generators. Zeebra computes the full certified lex 
 projecting its eliminant; msolve's process wall includes its own basis pass. The example reports
 raw durations and does not claim a startup-floor-qualified speedup. Set `ZEEBRA_MACHINE` and
 `ZEEBRA_AFFINITY`, build first, then use `tools/benchlock.sh` and `taskset` for measurements.
+
+The measurement example exposes explicit overrides through `--max-dimension`, `--span-cells`,
+`--span-bytes`, `--operator-entries`, `--operator-bytes`, `--border-entries`, `--border-columns`,
+and `--border-rows`. These change only that invocation; keep an external wall/RSS backstop when
+raising them. A border-construction refusal precedes conversion and needs its own budget decision.

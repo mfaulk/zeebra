@@ -179,8 +179,8 @@ pub fn separating_variables<const N: usize, F: FiniteField>(
 /// the wrong one: `p(t)` has degree `D` in a single variable, which under grevlex is as far from
 /// the staircase as a monomial gets. Tried, it did not finish on cyclic-6 within ten minutes —
 /// avoiding exactly that reduction is why one converts bases at all. Evaluating at the operators
-/// is `D` operator applications per relation and is independent of the echelon form that produced
-/// the coefficients, so it is both cheaper and a real second opinion. The unit tests additionally
+/// shares one sequence of powers across relations and is independent of the echelon form that
+/// produced the coefficients, so it is both cheaper and a real second opinion. The unit tests additionally
 /// reduce modulo the source basis on small systems, where it is affordable.
 ///
 /// # Errors

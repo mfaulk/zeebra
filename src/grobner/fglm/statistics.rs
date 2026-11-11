@@ -191,11 +191,11 @@ pub struct FglmMemory {
 }
 
 impl FglmMemory {
-    /// Every byte figure above added together.
+    /// Operators plus the larger of classical blocks and the linear workspace allowance.
     ///
-    /// **An estimate of what this crate stores, not a measurement of the process.** It ignores
-    /// allocator overhead, the source basis, every temporary, and F4's own peak while computing
-    /// the input. [`peak_resident_bytes`](crate::util::peak_resident_bytes) measures the process;
+    /// **An estimate, not process RSS.** The routes' workspaces are not live together. This excludes
+    /// allocator overhead, source/output polynomial maps, the classical working registers and
+    /// F4's peak while producing the input. [`peak_resident_bytes`](crate::util::peak_resident_bytes) measures the process;
     /// the two are reported side by side and are not interchangeable.
     pub fn estimated_bytes(&self) -> usize {
         self.operator_bytes + self.dense_block_bytes.max(self.krylov_workspace_bytes)
