@@ -34,6 +34,7 @@ bash tools/test/rss-guard-test.sh
 bash tools/test/merge-base-age-test.sh
 bash tools/test/benchlock-test.sh
 bash tools/test/check-measurement-provenance-test.sh
+bash tools/test/ci-scope-test.sh
 bash tools/check-measurement-provenance.sh      # the documents, not the script
 ```
 
@@ -114,115 +115,73 @@ check and a rare division branch — and they panic if run. A bare `cargo test -
 therefore reports those two as failures; the commands above select the tests that are meant to
 pass.
 
-CI runs the suite twice: once in debug, and once in release in a separate job. Both configurations
-are checked because a release build takes different paths — `debug-assertions` and
-`overflow-checks` are off, so every
-`debug_assert`-guarded invariant goes unchecked and integer arithmetic wraps instead of panicking.
+## CI coverage and runtime
 
-The debug run checks more than the release one in a second way. F4 validates its whole engine state
-once per batch under `cfg(debug_assertions)`: `MonicBasis::check` recomputes every element's leading
-monomial, monicity and term ordering and compares them to what is stored, and `PairQueue::check`
-recomputes each pending and deferred pair's lcm, degree and multipliers from the leading monomials
-it names, confirms the live count against the heap, and confirms the pending and deferred sets are
-disjoint. A failure names the field and the index. None of it is compiled in release, so **a
-`--release` or `--profile ci-release` run does not perform these checks** — which is a reason to run
-the debug suite and not only the fast one.
+`Classify changes` reads the full PR diff with NUL-separated paths. `tools/ci-scope.sh` uses a
+conservative allowlist; unknown paths, code, config, scripts and measurement JSON require the full
+suite. Empty or malformed input also selects the full suite, and a failed git read fails CI.
+Pushes to `main`, scheduled runs and manual dispatch always use the full suite.
 
-Release is also the configuration every benchmark uses, so
+| Change on a pull request | Checks |
+|---|---|
+| Code, config, workflows, scripts, records, or any unknown path | Debug and optimized tests, debug doctests, Clippy, Rustdoc, package, MSRV, benchmark smoke and shell/provenance checks |
+| `README.md` or Markdown under `docs/guide/`, with only other allowed prose changes | Debug doctests, guide-inclusion test, formatting, Rustdoc, shell/provenance checks |
+| Only Markdown under `docs/` outside the guides, under `research/`, or root `CHANGELOG.md` / `CLAUDE.md` | Shell/provenance checks and merge-staleness notice |
 
-```sh
-cargo test --release
-```
+`CI complete` always runs and fails if any dependency failed or was cancelled. Intentionally
+skipped jobs are accepted. It is suitable as a required branch-protection check; changing repository
+branch-protection settings is a separate action. Existing job names remain stable.
 
-is worth running locally before claiming a measurement.
+The full suite runs under Nextest in debug and under `ci-release` in a separate job. Both matter:
+release arithmetic has `debug-assertions` and `overflow-checks` disabled. The PR profile uses
+`opt-level = 2`, `lto = "off"` and 16 codegen units. Outside PRs, the release and smoke jobs override
+it with `CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3` and `CARGO_PROFILE_CI_RELEASE_LTO=thin`, retaining the
+previous optimizer coverage. In debug, F4 additionally
+recomputes basis leaders, monicity and ordering and validates the critical-pair queue each batch;
+optimized tests do not run those checks.
 
-The two Gröbner engine-agreement tests above run in that release job, but on pushes to main and on
-manual dispatch only, not on pull requests. They take 145s on a shared runner — a quarter of the
-job's wall clock, on the critical path of every pull request — and they reuse the build the steps
-before them already paid for, so running them after a merge costs almost nothing.
-
-A third job runs the benchmarks, on pull requests as well since #586: compilation was always
-covered, but a benchmark that compiles and then *panics* was not, and such a commit is
-unmeasurable without cherry-picking the fix onto it. The benchmark
-targets are declared `test = false`, which keeps them out of `cargo test`: a `[[bench]]` target
-defaults to `test = true`, so a bare `cargo test` linked all eight criterion binaries under fat
-LTO and executed all 455 cases. That took 168s of the 180s a warm `cargo test --release` spent,
-against 2.4s for the 968 tests and 8.9s for the doc examples. Smoke-testing the benchmarks is
-still worth doing — it catches one that panics rather than merely failing to compile — so it moved
-to its own job rather than being dropped:
+On code PRs, Nextest builds the test binaries it runs. Clippy checks all targets with all features
+and again without default features, and the benchmark job links and executes Criterion targets.
+The debug job does not additionally link every standalone example on PRs. Full runs outside PRs
+retain `cargo build --all-targets --timings`, catching example-only linker errors after merge or on
+manual dispatch. Debug doctests run on code and guide/README PRs; optimized doctests and the named
+ignored engine/corpus tests run on main, schedules and manual dispatch. This trades immediate
+example-link and optimized-doctest feedback for shorter PR latency without dropping those checks.
 
 ```sh
+cargo nextest run --profile ci
+cargo test --profile ci-release --no-run --timings
+cargo nextest run --profile ci --cargo-profile ci-release
+cargo test --doc -- --test-threads=4
+# Match the optimized checks outside PRs:
+CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3 CARGO_PROFILE_CI_RELEASE_LTO=thin \
+  cargo test --profile ci-release --doc -- --test-threads=4
+cargo build --all-targets --timings                       # full runs outside PRs
 cargo bench --profile ci-release -- --test
+bash tools/test/ci-scope-test.sh
 ```
 
-`cargo bench -- --test` and not `cargo test --benches`. The reason is the profile and not, as this
-paragraph used to say, that `test = false` makes the latter select nothing: #586 measured that, and
-`test = false` governs what a bare `cargo test` picks up rather than what an explicit `--benches`
-selects, so `cargo test --benches` does build and run every case — in the **dev** profile, which
-made it 382.0s against 26.3s. A benchmark that stops *compiling* still breaks the
-`cargo build --all-targets` step in the pull-request jobs.
+Release compilation and execution are separate steps. Cargo's HTML build-timing reports are
+uploaded as `release-build-timings`; full non-PR builds also upload `debug-build-timings`. Compare
+compiler time plus test time when tuning a CI profile. Shared runners provide CI latency evidence,
+not publishable algebra benchmark measurements. Local `cargo bench` and `cargo test --release`
+still use the production release profile, with fat LTO and one codegen unit.
 
-The library and the `zeebra-differential` binary are declared `bench = false`, the mirror of the
-`test = false` above. `bench` also defaults to true, so this command used to select ten targets
-rather than eight: the lib was built as a bench target and `--test` ran the whole unit suite here,
-in one process under the built-in harness, duplicating the nextest jobs with worse isolation. That
-broke `util::peak_memory`, whose subject is `VmHWM` — a process-wide high-water mark that, in a
-process shared with ~1400 other tests, sits far enough above live RSS that a 32 MB ballast cannot
-raise it. The binary has no tests at all, so its entry was a whole-crate link for nothing.
-`bench = false` does not affect `cargo test`, which still runs both.
+Benchmark smoke execution remains on code PRs because compilation alone missed a setup panic in
+#586. `cargo bench --profile ci-release -- --test` executes each case once and takes no samples;
+`cargo test --benches` instead uses the unoptimized dev profile. `test = false` excludes benches
+from a plain `cargo test`, while `bench = false` on the library and binary prevents duplicate unit
+runs in the benchmark job. The isolated Nextest tests are important for process-wide peak-memory
+checks; a shared-process benchmark harness cannot substitute for them.
 
-`--profile ci-release` because this job takes no measurements. A bare `cargo bench` resolves
-`[profile.bench]`, which inherits `release`, and links all ten criterion binaries under fat LTO
-at one codegen unit — settings that exist to make a measurement reproducible. Cold, for one bench
-target, that is 193s against 34s under `ci-release`. The trade is that no CI job compiles the
-fat-LTO profile any more, so a failure that appears only at one codegen unit surfaces on the
-machine taking the measurement instead; a local `cargo bench` is unchanged.
+The lint job also checks that the optional `proptest` dependency stays out of a default consumer's
+normal dependency graph, builds Rustdoc with warnings denied, and runs `cargo package --locked`
+to validate the packaged source in isolation. The MSRV job checks only the library at Rust 1.91.0;
+tests, benches and dev-dependencies may use newer Rust. Raising that MSRV belongs in `CHANGELOG.md`.
 
-The release job builds under `[profile.ci-release]` rather than `release`. It inherits `release`,
-so `debug-assertions` and `overflow-checks` are off and the job tests exactly what it did before,
-but it drops the single codegen unit that makes a `release` build expensive — `Swatinem/rust-cache`
-caches dependencies and never the crate under test, so `zeebra` is relinked from scratch on every
-run, which was ~318s of a 321s step. Cargo.toml records the four configurations measured and why
-this one was chosen; it is a compromise, because the codegen setting that makes the build cheap
-also slows the two engine-agreement tests. Reported numbers are unaffected — a local `cargo bench`
-resolves `[profile.bench]`, which still inherits `release`, so every measurement stays comparable
-with every measurement recorded before this profile existed.
-
-A fourth job checks formatting and runs clippy. Both are in one job because `cargo fmt --all
---check` takes a tenth of a second and needs no cache, so on its own it was almost entirely runner
-start-up. It runs clippy twice: with all features, and with **no default features**, which is
-the crate a consumer gets with `default-features = false`. Every other job builds the default
-feature set, which is how the library once stopped compiling without `external-runners` and
-nothing noticed; targets that drive the external engines declare `required-features` in
-`Cargo.toml` and are skipped by that build. The job then checks that proptest is absent from the
-dependency graph of a default build. The `Arbitrary` impls sit behind the `proptest` feature,
-compiled under `cfg(any(test, feature = "proptest"))`, so the unit suite keeps them through the
-dev-dependency. A generic test helper that draws `any::<F>()` must bound `F: Arbitrary` itself,
-because `Ring` no longer implies it. The same job runs `cargo package --locked`, which
-assembles the crate from the files `Cargo.toml`'s `exclude` leaves in and compiles it in
-isolation, so a guide page the doctests include, or any other file the build needs, cannot be
-left out of the package unnoticed. It also builds the rustdoc with `-D warnings` and all
-features, as docs.rs renders it, so a broken intra-doc link fails the job instead of becoming a
-dead link in the published docs.
-
-The `msrv` job checks the library on Rust 1.91.0, the `rust-version` declared in `Cargo.toml`.
-That number was measured, not chosen: 1.90 lacks the stabilized `carrying_add` and
-`borrowing_sub`. Only the library is checked, because tests, benches and dev-dependencies may use
-a newer toolchain without breaking a consumer. Raising the MSRV is a change to record in
-`CHANGELOG.md`.
-
-Each pull request and each branch has one run in flight at a time; a new push cancels the one
-before it. A stack of dependent pull requests is merged one commit at a time, so pushing a stack
-sends a burst of pushes seconds apart — eight merges in 90 seconds spent 135 job-minutes, most of
-it on commits that were superseded before the first job finished, and queued 40 jobs against a
-20-job ceiling. Cancellation applies on `main` too, so an intermediate merge commit there can go
-untested; every commit in a stack is green as a pull request before it is merged, and the tip of
-the burst is tested in full.
-
-The suite is not sharded across parallel jobs. Warm the 968 tests take under 3s and the two slow
-`#[ignore]`d systems dominate everything else, with all but 0.3s of that being a single test that
-no partitioning can divide; a shard would pay a checkout, a toolchain, a cache restore and a
-release build to split seconds of test execution.
+Each PR and branch has one run per event in flight; a newer push cancels its predecessor. Main
+still receives push checks and the daily retest. The suite is not sharded: duplicate compilation
+would be the dominant cost, so splitting test execution is not the first optimization to apply.
 
 ## Testing the merged result
 
@@ -243,13 +202,13 @@ that early return say `NOT CHECKED` on stderr; #339 is about the class.
 
 GitHub's **"Require branches to be up to date"** closes the gap exactly: it re-runs the suite
 against the new base before each merge. It is not used here, and the cost is the reason rather than
-an assertion. The release job is **806 s mean over the last 25 successful runs**, worst case 983 s,
-and it is the critical path — the debug job is 318 s. A serialized merge queue therefore admits
+an assertion. At the original 2026-11-07 decision, the release job averaged **806 s over 25
+successful runs**, worst case 983 s, and the debug job took 318 s. That historical configuration
+would admit
 **4.5 merges an hour**. Against that, the week to 2026-11-07 merged 155 pull requests, **58 of them
 on 2026-11-06 alone**, peaking at **14 in one hour**; the median gap between consecutive merges was
 686 s, and **59 % of consecutive merges were less than one release job apart**. Re-running before
-each of that day's 58 merges is **13.0 hours of CI inside a 24-hour day**. The setting would not
-have slowed that day down, it would have made it impossible.
+each of that day's 58 merges is **13.0 hours of CI inside a 24-hour day**. These figures explain the original decision; they are not a current latency estimate.
 
 What is used instead is two cheaper things, neither of which subsumes the gate:
 
@@ -271,8 +230,8 @@ What is used instead is two cheaper things, neither of which subsumes the gate:
   merge, so they catch the combination after the fact. What they do not catch is a red `main` that
   nobody pushes to afterwards, or drift from resolving the toolchain to `stable`, which moves and
   has delivered a new clippy lint mid-project before. The `schedule` trigger bounds both to a day,
-  for one run of **20.7 to 25.9 job-minutes** — measured across the last six successful push runs
-  on `main`, which have the same job set a scheduled run gets.
+  with the full check set. Its current cost is visible in Actions; the earlier 20.7–25.9
+  job-minute estimate predates the expanded suite and is not a current budget.
 
 Neither covers the second half of the failure, which is that CI skipped the broken test entirely.
 Provisioning the external comparands in ordinary CI is deliberately not done — building GMP, MPFR,
@@ -293,32 +252,16 @@ is still cheap to run before merging anything that changes the corpus or
 either engine's side of the comparison. The test that #339 is named for lives here:
 `grobner::external::msolve::tests`, driven from `corpus::ladder()`.
 
-## What a pull request validates in `benches/`, and what it used to not
+## What a pull request validates in `benches/`
 
-Both halves, since #586. The `Benchmarks run` job is no longer gated to `push`:
+Code PRs get both all-target Clippy checks and actual benchmark smoke execution. These catch
+different failures: a missing import fails compilation, but the impossible random-polynomial setup
+in #586 compiled and then panicked. The smoke job runs on every code PR, so a benchmark remains
+runnable when its commit becomes a measurement baseline. Documentation-only PRs skip it according
+to the allowlist above; a changed benchmark source always selects the full suite.
 
-| | covered on a pull request | by what |
-|---|---|---|
-| a benchmark that stops **compiling** | yes, always was | `cargo build --all-targets` and `cargo clippy --all-targets`, which build `benches/` because `test = false` keeps them out of the *test* run and not out of the build |
-| a benchmark that compiles and then **panics in setup** | **yes, since #586** | `Benchmarks run` — `cargo bench --profile ci-release -- --test` |
-| a benchmark **figure** | **no, deliberately** | nothing. `--test` runs each case once and samples nothing; a shared runner's numbers are not comparable to a `tools/benchlock.sh`-serialized workstation's, so CI never produces one |
-
-The second row was the gap, and it had cost twice. `14f69182` asked `random_poly` for 48 distinct
-monomials where 25 exist at N = 2, its own assert fired, and the branch was green through review
-and merge with `main` going red on the push run afterwards. Worse, every commit in such a window is
-**unmeasurable** without cherry-picking the fix onto it, which is how #363's A/B could not be taken
-against the tree it was meant to measure — a red job after a merge is an inconvenience, a
-historical commit whose benchmarks cannot run is a hole in the record.
-
-The job was verified non-vacuous by reinstating that exact defect: `cargo build --all-targets`
-exits **0** with it present and `cargo bench --profile ci-release -- --test` exits **101**, naming
-the assert. So the compile coverage alone would not have caught it.
-
-It costs job-minutes and **no wall clock**: **4m17s and 5m14s** on the two runs that enabled it,
-against `Tests (release)`'s 25–27 minutes on the same run, so it finishes well inside the critical
-path. A pull request's job set is now the push set apart from one step (`Gröbner engines agree on
-the slow systems`, still `push`-only), which is what makes the 20.7–25.9 figure above the right
-baseline for a PR run too — this job is already inside it.
+CI never publishes benchmark figures: `--test` executes each case once without sampling. Real
+measurements still use the production profile, a quiet machine and `tools/benchlock.sh`.
 
 ## Build configuration
 

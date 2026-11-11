@@ -89,8 +89,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_arrays = "0.1.0"
 
 # Targets that drive the external-engine harness, which `external-runners` gates. Declared so that
-# `cargo build --all-targets --no-default-features` skips them rather than failing; CI checks that
-# build, because nothing else would notice the library itself stop compiling without the feature.
+# the all-target no-default-feature check skips them rather than failing. CI runs that check
+# because default-feature builds cannot detect accidental imports from a gated module.
 [[example]]
 name = "competitive"
 required-features = ["external-runners"]
@@ -147,19 +147,9 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # The crate's own property tests; the `Arbitrary` impls they use are compiled under `cfg(test)`.
 proptest = "1.3.1"
 
-# `test = false` on every benchmark, for CI wall-clock. A `[[bench]]` target defaults to `test =
-# true`, so a bare `cargo test` builds each criterion binary and runs it with `--test`, which
-# executes every benchmark once. That smoke test is worth having — it catches a benchmark that
-# panics rather than merely failing to compile — but it is not a test of the library, and it
-# dominated the suite. Measured warm in release: `cargo test --release` took 180s before this
-# change and 11.6s after, against 2.4s for the 968 tests and 8.9s for the 13 doc examples. The
-# ~168s was the eight benchmarks, split between linking them under `lto = "fat"` with
-# `codegen-units = 1` — eight whole-crate LTO links — and executing 455 cases. It is now a
-# separate CI job running `cargo bench --profile ci-release -- --test` on pushes to main, off the
-# pull-request path; that job takes no measurements, so it has no use for the fat-LTO links above.
-#
-# `--all-targets` still builds these, so a benchmark that stops compiling still breaks every job
-# that uses it; `test = false` governs only whether `cargo test` runs them.
+# Criterion smoke tests run separately on code PRs and full runs. Keep them out of a plain
+# `cargo test`, and use `cargo bench --profile ci-release -- --test` to execute setup once
+# without taking measurements. Clippy still checks all targets on code PRs.
 
 [[bench]]
 name = "field_arithmetic"
@@ -239,39 +229,11 @@ test = false
 lto = "fat"
 codegen-units = 1
 
-# The profile CI tests in, and nothing else. The release job exists because `debug-assertions`
-# and `overflow-checks` are off in release, so arithmetic wraps instead of panicking and every
-# `debug_assert`-guarded invariant goes unchecked; those come from `release` and are inherited
-# here, so what that job tests is unchanged. Fat LTO and a single codegen unit are not — they buy
-# inlining and reproducible measurements, and the job takes no measurements.
-#
-# They are most of its wall clock. `Swatinem/rust-cache` caches dependencies and never the crate
-# under test, so `zeebra` is relinked from scratch on every run: of the 321s the release test
-# step took, ~318s was that link.
-#
-# The settings below are a measured compromise, not an obvious choice, because the two costs pull
-# against each other. Dropping `codegen-units = 1` is what makes the build cheap, and it is also
-# what slows the two `#[ignore]`d engine-agreement tests down -- they are the one place where the
-# per-field-operation call overhead that LTO exists to remove actually shows up. Cold
-# `cargo test --no-run`, then those two tests, measured locally:
-#
-#     lto = "fat",  codegen-units = 1    392s    41.6s     <- `release`
-#     lto = false,  codegen-units = 1    248s    45.6s
-#     lto = false,  codegen-units = 16    48.8s  120.0s
-#     lto = "thin", codegen-units = 16    48.9s  107.6s    <- here
-#
-# So the inlining that those tests depend on comes from the single codegen unit and not from LTO:
-# this is one crate, and the field arithmetic being inlined is inside it, so there is little for
-# a cross-crate link step to do. Thin LTO is kept anyway because it costs nothing against `lto =
-# false` at 16 units and still recovers ~12s. The sum is what CI pays per run, and it is lowest
-# here -- 157s against 434s for `release`.
-#
-# Measurements deliberately do not use this. `cargo bench` resolves `[profile.bench]`, which
-# inherits `release`, so every number this project reports still comes from a fat-LTO build at one
-# codegen unit, and stays comparable with every number recorded before this profile existed. The
-# CI smoke job overrides it with `--profile ci-release` precisely because it reports no numbers:
-# it runs each case once under `--test` and records nothing.
+# Fast PR tests retain release arithmetic semantics but avoid whole-program optimization.
+# The workflow restores opt-level 3 and Thin LTO on main, scheduled and manual runs.
+# Production `release` and `bench` profiles remain unchanged; CI takes no algebra measurements.
 [profile.ci-release]
 inherits = "release"
-lto = "thin"
+opt-level = 2
+lto = "off"
 codegen-units = 16
