@@ -57,7 +57,7 @@
 //!    passed to `groebner`.** A lex basis read through a degrevlex ring gives a correct basis and
 //!    wrong leading monomials, and nothing errors (`external-comparands.md` §4.2). The script
 //!    therefore builds the ring with `internal_ordering` *equal* to the order being computed —
-//!    see [`internal_ordering`] and [`groebner_ordering`], which are a pair and must stay one.
+//!    see `internal_ordering` and `groebner_ordering`, which are a pair and must stay one.
 //! 2. **`JULIA_DEPOT_PATH` must name the provisioned depot** or the child tries to resolve
 //!    packages and fails on a machine with no network. It is set on every invocation.
 //!

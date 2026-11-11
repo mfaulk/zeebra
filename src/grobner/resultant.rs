@@ -27,7 +27,7 @@
 //! 2.272 s on one pinned core (`docs/research/structured-sylvester.md` §5.5).
 //!
 //! The case analysis M23-E declined to write is real, and it is in
-//! [`formal_sylvester_determinant`]. Specializing `f` at a point where its leading coefficient in
+//! `formal_sylvester_determinant`. Specializing `f` at a point where its leading coefficient in
 //! `y` vanishes drops its degree, and the specialized resultant is then **not** the specialization
 //! of the resultant: the Sylvester order stays fixed at the generic degrees while the actual degrees
 //! fall, and the two differ by a factor that is not even the same on both sides. Three corrections
@@ -73,7 +73,7 @@
 //! The determinants are written **into their own index** rather than collected in completion order.
 //! The interpolation that consumes them is a function of the sample *sequence*, so a resultant whose
 //! coefficients depended on thread scheduling would not be reproducible — and a
-//! figure that is not reproducible is not a figure. See [`sample_determinants`] for why a static
+//! figure that is not reproducible is not a figure. See `sample_determinants` for why a static
 //! split is the right shape here where the differential sweep's dynamic handout was not.
 
 use std::{
@@ -1142,7 +1142,7 @@ impl DeterminantBatch {
 /// `at.len()` Sylvester determinants of `f` and `g`, timed, over `concurrency` workers.
 ///
 /// The measurement entry point for the determinant kernel, sharing the sample loop
-/// [`sample_determinants`] with every resultant route so that what is timed here is what a row
+/// `sample_determinants` with every resultant route so that what is timed here is what a row
 /// pays. The coefficient extraction is done once and is **not** inside the timer: it is per-row
 /// work, not per-determinant work.
 ///

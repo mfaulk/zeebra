@@ -137,7 +137,7 @@ impl<F: FiniteField> IncrementalSpan<F> {
     /// Whether `v` lies in the span, and the coefficients either way.
     ///
     /// The value-returning form, for a caller that wants owned vectors back. The walk uses
-    /// [`Self::reduce_in_place`] instead, which allocates nothing of its own.
+    /// `Self::reduce_in_place` instead, which allocates nothing of its own.
     ///
     /// The registers' buffers leave with the value rather than being copied out of, so this costs
     /// what it cost before the registers existed — one allocation per call — and no more.

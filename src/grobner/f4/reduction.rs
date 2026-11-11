@@ -132,7 +132,7 @@ pub struct BuiltMatrix<const N: usize, F: FiniteField> {
 /// matrix through it builds the matrix F4 builds — not a reconstruction that agrees today and
 /// drifts when an option, a default or the reducer policy moves. `matrix_corpus.rs` asserts the
 /// agreement against matrices captured out of a live run through
-/// [`BatchObserver::matrix`](super::observer::BatchObserver::matrix), so a divergence fails a test
+/// [`BatchObserver::matrix`], so a divergence fails a test
 /// rather than quietly producing a number about the wrong matrix.
 ///
 /// `cache` is the cross-batch state, and passing a fresh one is not neutral: under a

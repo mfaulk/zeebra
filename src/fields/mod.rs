@@ -38,20 +38,20 @@ pub use sqrt::legendre_symbol;
 // Named here rather than left to callers because `for_each_field!` expands to these paths, and a
 // test body generic over the field has to be able to say which fields it means.
 
-/// GF(2^8) = GF(2)[x] / (x^8 + x^4 + x^3 + x + 1), the AES modulus.
+/// GF(2^8) = GF(2)\[x\] / (x^8 + x^4 + x^3 + x + 1), the AES modulus.
 pub type Gf256 = BinaryFieldElement<X8_X4_X3_X_1>;
 
-/// GF(2^8) = GF(2)[x] / (x^8 + x^4 + x^3 + x^2 + 1), the Fukuoka MQ Challenge modulus.
+/// GF(2^8) = GF(2)\[x\] / (x^8 + x^4 + x^3 + x^2 + 1), the Fukuoka MQ Challenge modulus.
 ///
 /// Isomorphic to [`Gf256`] and **not interchangeable with it**: the two reduce modulo different
 /// polynomials, so the same pair of bytes has two different products. A type alias rather than a
 /// comment because the distinction has to be stated at the point where an instance names its field.
 pub type Gf256Mq = BinaryFieldElement<X8_X4_X3_X2_1>;
 
-/// GF(2^5) = GF(2)[x] / (x^5 + x^2 + 1).
+/// GF(2^5) = GF(2)\[x\] / (x^5 + x^2 + 1).
 pub type Gf32 = BinaryFieldElement<X5_X2_1>;
 
-/// GF(13^4) = GF(13)[x] / (x^4 + x^3 + 1), an extension of odd characteristic.
+/// GF(13^4) = GF(13)\[x\] / (x^4 + x^3 + 1), an extension of odd characteristic.
 pub type Gf13Pow4 = ExtensionFieldElement<13, 4, Modulus13Pow4>;
 
 // === 32-bit prime fields ===

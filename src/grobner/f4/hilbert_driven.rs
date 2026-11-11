@@ -17,7 +17,7 @@
 //! # The two halves are not the same kind of claim
 //!
 //! `dim L_d` is **exact**: it is the Hilbert function of the current leading-term ideal, computed by
-//! [`HilbertSeries`](crate::grobner::hilbert::HilbertSeries)'s closed-form recursion from the
+//! [`HilbertSeries`]'s closed-form recursion from the
 //! monomials in hand. `predicted dim I_d` is a **prediction**, and M22-B measured it exact on
 //! random and genuine overdetermined MQ systems and wrong on every structured one — in the
 //! dangerous direction on the inhomogeneous ones. So `N_d` inherits the prediction's error, and no

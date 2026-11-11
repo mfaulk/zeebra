@@ -29,7 +29,7 @@ use crate::{
     FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
 };
 
-/// The product degree at and above which the transform beats [`multiply_dense`], measured per
+/// The product degree at and above which the transform beats `multiply_dense`, measured per
 /// element width.
 ///
 /// **The comparand is Karatsuba, not schoolbook** (#185). That is the whole content of these
@@ -153,7 +153,7 @@ pub fn multiply_over_domain<F: FiniteField>(
 ///
 /// Fails if the field's two-adicity is below `log2` of the points the product needs, where no
 /// power-of-two domain of that size exists — a fact about the field, so a value rather than a
-/// panic. [`multiply`] falls back to [`multiply_dense`] on exactly that failure.
+/// panic. [`multiply`] falls back to `multiply_dense` on exactly that failure.
 pub fn try_multiply_via_fft<F: KnownOrder, R: RngCore + CryptoRng>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
@@ -176,7 +176,7 @@ pub fn try_multiply_via_fft<F: KnownOrder, R: RngCore + CryptoRng>(
 /// The product of `a` and `b`, by whichever route is faster for their degree.
 ///
 /// Three routes, by measured threshold: schoolbook, then Karatsuba, then the transform. The first
-/// two are [`multiply_dense`]'s own choice on `karatsuba_base_case`; this function chooses between
+/// two are `multiply_dense`'s own choice on `karatsuba_base_case`; this function chooses between
 /// that and the transform on [`fft_multiplication_crossover`]. A field that cannot host a domain
 /// that large falls back to `multiply_dense` rather than to schoolbook. Always returns the same
 /// polynomial as `a * b`.

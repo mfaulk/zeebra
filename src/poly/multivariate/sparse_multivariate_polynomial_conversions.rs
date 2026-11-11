@@ -5,14 +5,14 @@ use crate::{
     FiniteField, Monomial,
 };
 
-/// From<FiniteField>
+/// `From<FiniteField>`
 impl<const N: usize, F: FiniteField> From<F> for SparseMultiPoly<N, F> {
     fn from(f: F) -> Self {
         Self::new(&[Term::new(f, Monomial::one())])
     }
 }
 
-/// From<Monomial>
+/// `From<Monomial>`
 impl<const N: usize, F: FiniteField> From<Monomial<N>> for SparseMultiPoly<N, F> {
     fn from(monomial: Monomial<N>) -> Self {
         Self {

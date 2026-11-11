@@ -539,7 +539,7 @@ pub trait KnownOrder: FiniteField {
     /// A square root of this element, or `None` if it is not a square.
     ///
     /// Tonelli-Shanks, over every field in the crate including characteristic two; see
-    /// [`sqrt`](super::sqrt). On [`KnownOrder`] rather than [`FiniteField`] because the exponents
+    /// `sqrt`. On [`KnownOrder`] rather than [`FiniteField`] because the exponents
     /// it raises to are read off `q - 1`.
     ///
     /// Of the two roots `+-r` it is unspecified which is returned. The rng is drawn from only

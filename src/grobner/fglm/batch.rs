@@ -149,7 +149,7 @@ pub struct BorderBatch {
 /// an answer. Both variants are the *same arithmetic* in two decompositions, and both return the
 /// remainders in target order.
 ///
-/// What a split costs is the `dirty_from` carry. [`reduce_targets`] keeps the previous target's
+/// What a split costs is the `dirty_from` carry. `reduce_targets` keeps the previous target's
 /// leading column and zeroes only `[previous start, width)` before the next, and the border
 /// descends so that region shrinks across a batch. A group's first target has no predecessor and
 /// starts from a freshly zeroed buffer of the closure's full width, so `G` groups pay about `G`
@@ -277,7 +277,7 @@ pub struct BorderBatchStatistics {
     /// The `dirty_from` carry stated in the one unit the decompositions can be compared in. A
     /// freshly allocated buffer is already zero, so a group of targets pays the closure's full
     /// width once at its start and then only `[previous start, width)` per target — and
-    /// [`BorderBatch::reduction_groups`] groups pay about `G` widths where one pays one. Counted
+    /// `BorderBatch::reduction_groups` groups pay about `G` widths where one pays one. Counted
     /// always, like the other counters here, because one `usize` add per target is nothing beside
     /// the column scan it accompanies.
     pub buffer_cells_zeroed: usize,
@@ -723,7 +723,7 @@ pub(super) fn accumulate(total: &mut BorderBatchStatistics, batch: &BorderBatchS
 /// within-process digest and not a stable wire format.
 ///
 /// # Errors
-/// As [`closure`], and [`FglmError`] from enumerating the standard monomials.
+/// As `closure`, and [`FglmError`] from enumerating the standard monomials.
 pub fn measure_border_reduction<const N: usize, F: FiniteField + Send + Sync>(
     source_basis: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,

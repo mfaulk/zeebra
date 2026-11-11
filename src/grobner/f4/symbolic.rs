@@ -761,7 +761,7 @@ pub struct PreprocessedRow<const N: usize> {
 /// columns by the average column density — 11.5x to 39.8x on the corpus (#621) — so the width is
 /// the dominant term in what the handles cost. A batch with more than `u32::MAX` distinct monomials
 /// would need 96 GB for the arena alone, so the narrowing is not a limit anything can reach; the
-/// conversion in [`enqueue`] is checked rather than wrapping all the same, once per column.
+/// conversion in `enqueue` is checked rather than wrapping all the same, once per column.
 pub type MonomialHandle = u32;
 
 /// The rows a batch of critical pairs reduces to, and the leading monomials they already cover.

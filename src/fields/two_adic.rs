@@ -5,7 +5,7 @@
 //! `k <= s` and for no larger k. For any non-square z, `z^m` generates that subgroup, so finding
 //! one needs s and m — both read off `q - 1` by shifting — and no factorization of m.
 //!
-//! That is the point. [`KnownOrder::primitive_element`](super::KnownOrder::primitive_element)
+//! That is the point. [`KnownOrder::primitive_element`]
 //! factors `q - 1`, which for a 254-bit field is not a computation to start by accident, and is
 //! why `PrimeFieldElement256` had no root of unity at all and so no NTT.
 

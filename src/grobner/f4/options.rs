@@ -149,9 +149,9 @@ pub enum ReductionStrategy {
 /// under grevlex that takes 9.18x the entries the matrix was built with and 5.19x the allowance
 /// that admitted the construction. Until the budget looked at that number, the route could take a
 /// 533.0 MB computation to 13 144.3 MB with every limit satisfied. So a rung whose interreduction
-/// working set exceeds [`live_entry_allowance`](Self::live_entry_allowance) now **falls back by
+/// working set exceeds [`live_entry_allowance`](F4Options::live_entry_allowance) now **falls back by
 /// default**, and running it by matrix is a matter of raising the allowance deliberately — see
-/// [`with_live_budget`](Self::with_live_budget).
+/// [`with_live_budget`](F4Options::with_live_budget).
 ///
 /// Note what that does to the ladder table above: it was taken **before** #536, so every rung in it
 /// ran the route to completion. Which of them still do is #575's first question.
@@ -524,7 +524,7 @@ pub struct F4Options {
     /// Groebner.jl's carries, and attributed it here.
     ///
     /// It cannot change the answer either, for the same reason
-    /// [`Self::interreduce_by_matrix`] cannot: a reduced Gröbner basis is determined by its
+    /// [`InterreductionRoute::Matrix`] cannot: a reduced Gröbner basis is determined by its
     /// leading monomials.
     ///
     /// # What it costs
@@ -532,7 +532,7 @@ pub struct F4Options {
     /// A second sweep over every batch matrix, where the flag above pays one over a single much
     /// smaller matrix at the end. Back-substitution is quadratic in the rows whatever the sparsity
     /// (#168), the batch stage is already 13.90% of `mq-random-10`, and
-    /// [`super::BlockPlan::InterreducedBlock`] was measured and **rejected** for filling in the
+    /// [`super::structured::BlockPlan::InterreducedBlock`] was measured and **rejected** for filling in the
     /// reducer block — which is the same fill-in paid before the elimination instead of after it.
     /// So the prior is unfavourable and the measurement is the point.
     ///

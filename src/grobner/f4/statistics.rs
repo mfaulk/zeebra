@@ -104,7 +104,7 @@ pub struct StageTimings {
     /// matrices nor in the answer but in the reduction between them.
     pub interreduction: Duration,
 
-    /// [`minimize_grobner_basis`]'s half of `interreduction`: monic scaling, deduplication, the
+    /// `minimize_grobner_basis`'s half of `interreduction`: monic scaling, deduplication, the
     /// divisibility prune, and the ascending sort.
     ///
     /// Split out because #436 measured the two halves at **0.06% / 99.94%** on `mq-random-10` and

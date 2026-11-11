@@ -1,6 +1,6 @@
 //! Critical pairs, and the queue that decides which to process next.
 //!
-//! Shared by [`super::buchberger`], which takes one pair at a time, and [`super::f4`], which takes
+//! Shared by [`super::buchberger`], which takes one pair at a time, and [`super::f4`](mod@super::f4), which takes
 //! a whole batch. Both want the same thing from the queue: the lowest-degree pairs first, and a
 //! total order on ties so that the computation is reproducible.
 //!
@@ -539,7 +539,7 @@ pub struct PairQueueFootprint {
 }
 
 impl PairQueueFootprint {
-    /// Entries in the two lazy-deletion sets, each a [`PairKey`].
+    /// Entries in the two lazy-deletion sets, each a `PairKey`.
     pub fn criteria_keys(&self) -> usize {
         self.removed + self.handled
     }
@@ -1193,7 +1193,7 @@ impl<const N: usize> PairQueue<N> {
     /// Move every pending pair of `degree` into the deferred set, and return how many.
     ///
     /// For a selection strategy that has decided it has taken enough of this degree and wants to
-    /// move on. The pairs are **not** recorded as handled — see [`PairQueue::deferred`] — and they
+    /// move on. The pairs are **not** recorded as handled — see `PairQueue::deferred` — and they
     /// remain visible to Gebauer–Möller, so the pair set is minimized exactly as it would have
     /// been had they stayed pending.
     pub fn defer_degree(&mut self, degree: u64) -> usize {

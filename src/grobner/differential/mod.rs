@@ -26,7 +26,7 @@
 //! # An oracle that did not answer is not agreement
 //! Singular exits 0 after a script error. A timeout, a missing binary, a characteristic outside
 //! Singular's range, or an answer Singular contradicts itself on each produce an
-//! [`OracleError`](singular::OracleError), which [`SweepReport::clean`](sweep::SweepReport::clean)
+//! [`OracleError`], which [`SweepReport::clean`](sweep::SweepReport::clean)
 //! counts as a failure of the sweep.
 
 pub mod check;

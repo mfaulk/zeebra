@@ -9,8 +9,8 @@
 //!
 //! # References
 //! * `docs/research/graeffe-root-finding.md` — the transcription this follows, with the papers.
-//! * [P937] Sanso-Vitto, ePrint 2025/937, §4-§5 (Algorithm 2, the single-root variant).
-//! * [PC] Zhao-Sanso-Vitto-Ding, ePrint 2025/1916, §3 (Definition 2, Lemmas 1 and 2,
+//! * \[P937\] Sanso-Vitto, ePrint 2025/937, §4-§5 (Algorithm 2, the single-root variant).
+//! * \[PC\] Zhao-Sanso-Vitto-Ding, ePrint 2025/1916, §3 (Definition 2, Lemmas 1 and 2,
 //!   Algorithms 2 and 3).
 
 use std::time::{Duration, Instant};
@@ -93,7 +93,7 @@ pub struct GraeffeStats {
     pub stored_coefficients: usize,
     /// The degree of the fully transformed polynomial, after reduction.
     pub final_degree: u32,
-    /// The orders of the odd-order forward steps taken, in the order taken — [PC] Algorithm 3.
+    /// The orders of the odd-order forward steps taken, in the order taken — \[PC\] Algorithm 3.
     ///
     /// Empty when the order-2 phase already left an enumerable subgroup, which is the KoalaBear
     /// case and every field whose odd part is small. Non-empty is the Goldilocks case: each entry
@@ -126,13 +126,13 @@ pub struct GraeffeStats {
 ///
 /// which is **three transforms of size `>= deg f + 1`, not of size `2 deg f + 1`**: `f_e` and
 /// `f_o` have half the degree, so their squares and the whole result fit in a domain one power of
-/// two below what an ordinary product of two degree-`d` polynomials would need. [P937] §5.3
+/// two below what an ordinary product of two degree-`d` polynomials would need. \[P937\] §5.3
 /// records this as a correction the authors make to their own first implementation, which followed
 /// Definition 2 literally and paid double.
 ///
-/// The leading `(-1)^d` is [P937] §5.3's normalization and is not cosmetic: `f(x) f(-x)` carries
+/// The leading `(-1)^d` is \[P937\] §5.3's normalization and is not cosmetic: `f(x) f(-x)` carries
 /// `(-1)^d` from the `d` sign flips, so without it a monic `f` transforms to a polynomial with
-/// leading coefficient `-1` at odd degree, and [PC] Lemma 2's `GT_2 . GT_2 = GT_4` holds only up
+/// leading coefficient `-1` at odd degree, and \[PC\] Lemma 2's `GT_2 . GT_2 = GT_4` holds only up
 /// to a unit. With it, `f = prod (x - r_i)` transforms to exactly `prod (x - r_i^2)`.
 ///
 /// # Memory
@@ -218,11 +218,11 @@ pub fn graeffe_2<F: KnownOrder, R: RngCore + CryptoRng>(
     Ok(graeffe_2_over_domain(f, &domain))
 }
 
-/// The order-`l` Graeffe transform of `f`, by [PC] §3.2's product of scaled copies.
+/// The order-`l` Graeffe transform of `f`, by \[PC\] §3.2's product of scaled copies.
 ///
-/// [PC] Definition 2 directly: `GT_l(f)(x^l) = prod_t f(x w_l^t)`, so the `l` scaled copies are
+/// \[PC\] Definition 2 directly: `GT_l(f)(x^l) = prod_t f(x w_l^t)`, so the `l` scaled copies are
 /// multiplied together and every `l`-th coefficient of the degree-`l d` product is read off. The
-/// intermediate product is `l` times the size of the output, which is why [PC] applies orders
+/// intermediate product is `l` times the size of the output, which is why \[PC\] applies orders
 /// above 2 only to small-degree polynomials in the final steps.
 ///
 /// `l` need not be prime. The normalization matches [`graeffe_2`]'s: `prod_t (x w_l^t - r)` is
@@ -303,11 +303,11 @@ pub fn graeffe_l<F: KnownOrder, R: RngCore + CryptoRng>(
 
 /// A root of `f` in F, or `None` if it has none.
 ///
-/// [P937] Algorithm 2 — the single-root variant the authors implemented — with [P937] §5.3's
-/// progressive degree reduction and [PC] Algorithm 2's gcd-based descent in place of Algorithm 2's
+/// \[P937\] Algorithm 2 — the single-root variant the authors implemented — with \[P937\] §5.3's
+/// progressive degree reduction and \[PC\] Algorithm 2's gcd-based descent in place of Algorithm 2's
 /// `k` square roots and `r`-way scan. Why the descent rather than the scan: the scan is `O(r)`
 /// candidate tests with `r = 2^two_adicity`, which is `2^24` over KoalaBear and `2^32` over
-/// Goldilocks, and is only cheap in the setting [P937] §5.2 assumes — where the test is one
+/// Goldilocks, and is only cheap in the setting \[P937\] §5.2 assumes — where the test is one
 /// permutation call. For a standalone root finder the gcd descent costs `k` folds instead, each
 /// linear in the degree it folds.
 ///
@@ -319,15 +319,15 @@ pub fn graeffe_l<F: KnownOrder, R: RngCore + CryptoRng>(
 ///    order-`beta_i` subgroup, so the reduction loses none of them and caps the degree at
 ///    `beta_i - 1`. Once `beta_i` falls below the degree it **halves every step**, so the sum of
 ///    transform sizes is `ceil(log2((q - 1) / d)) + 2` times the largest rather than `k` times it
-///    — a real saving, but one that is only large when `(q - 1) / d` is small. [P937] §5.3.
-/// 2. **Odd-order forward steps**, [PC] Algorithm 3 — #593. The order-2 phase leaves the roots
+///    — a real saving, but one that is only large when `(q - 1) / d` is small. \[P937\] §5.3.
+/// 2. **Odd-order forward steps**, \[PC\] Algorithm 3 — #593. The order-2 phase leaves the roots
 ///    in the subgroup of order `s`, the odd part of `q - 1`, and when `s` is large that subgroup
 ///    cannot be enumerated: over Goldilocks `s = 2^32 - 1` exceeds any degree of interest, so the
 ///    search below degraded to the quadratic route the method exists to replace — 99.6% of the
 ///    call at degree 4 096, measured in `docs/research/graeffe-root-finding.md` §6.5. An order-`q`
 ///    step maps the order-`s` subgroup onto the order-`s/q` one, so steps at the small prime
 ///    factors of `s` shrink the search geometrically. Over Goldilocks that is `3 * 5 * 17 * 257`,
-///    leaving **65 537**, which is enumerable. [`plan_odd_steps`] chooses them, and chooses
+///    leaving **65 537**, which is enumerable. `plan_odd_steps` chooses them, and chooses
 ///    **none** unless they get the residual below the crossover — a step that leaves the search on
 ///    the gcd route anyway is a transform paid for nothing.
 /// 3. **Subgroup search.** Found by enumeration when the residual order is small and by [`roots`]
@@ -335,10 +335,10 @@ pub fn graeffe_l<F: KnownOrder, R: RngCore + CryptoRng>(
 ///    property of the degree as well as the order: enumerating costs `s (d + 1)` against the gcd
 ///    route's `log q (d + 1)^2`, so over Goldilocks the odd steps pay from about `d = 1 024` and
 ///    not below it.
-/// 4. **Descent.** The odd steps come off first, by [`un_power`]'s `gcd(g, x^q - mu)` — [PC]
-///    Algorithm 3 lines 10-14, and multi-valued, so [`descend_mixed`] branches over the preimages.
+/// 4. **Descent.** The odd steps come off first, by `un_power`'s `gcd(g, x^q - mu)` — \[PC\]
+///    Algorithm 3 lines 10-14, and multi-valued, so `descend_mixed` branches over the preimages.
 ///    Then the squares: `mu_k = alpha^(2^k)` is known; `mu_{i-1}` is the common root of
-///    `G_{2^(i-1)}` and `x^2 - mu_i`, which is [PC] Algorithm 2 line 8 at `q_i = 2`. **The un-squaring
+///    `G_{2^(i-1)}` and `x^2 - mu_i`, which is \[PC\] Algorithm 2 line 8 at `q_i = 2`. **The un-squaring
 ///    ambiguity is decided by the polynomial, not guessed**: reducing `G_{2^(i-1)}` modulo
 ///    `x^2 - mu_i` leaves `a x + b`, and `-b/a` is the one of the two square roots of `mu_i` that
 ///    `G_{2^(i-1)}` vanishes at. Both square roots lie in the right subgroup, so either, when both
@@ -460,7 +460,7 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
     // === forward: k order-2 steps, each followed by the reduction that caps the degree ===
 
     // `beta_0 = q - 1`. The fold is a no-op at every degree this is called at, and is here so the
-    // induction the descent relies on starts where [PC] Algorithm 2 line 1 puts it.
+    // induction the descent relies on starts where \[PC\] Algorithm 2 line 1 puts it.
     //
     // Every `G_(2^i)` is moved into `retained` rather than cloned into it, and the next step reads
     // the vector's last element. One full-degree copy per step would otherwise be live alongside
@@ -509,7 +509,7 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
         stats.max_transform_size = stats.max_transform_size.max(points);
         stats.total_transform_elements += 3 * points;
     }
-    // === forward: odd-order steps, [PC] Algorithm 3 ===
+    // === forward: odd-order steps, \[PC\] Algorithm 3 ===
     //
     // The order-2 phase above leaves every base-field root in the subgroup of order `odd_part`.
     // Where that is small the search below enumerates it and this phase is empty; where it is not,
@@ -580,7 +580,7 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
     stats.subgroup_time = subgroup_start.elapsed();
     stats.candidates = candidates.len();
 
-    // === the descent, [PC] Algorithm 2 lines 7-9 ===
+    // === the descent, \[PC\] Algorithm 2 lines 7-9 ===
 
     let descent_start = Instant::now();
     for candidate in candidates {
@@ -611,7 +611,7 @@ fn scale_variable<F: FiniteField>(f: &UnivariatePolynomial<F>, c: &F) -> Univari
 /// `f mod (x^beta - 1)`, by folding coefficient `i` onto `i mod beta`, or `None` if the caller
 /// should keep `f` as it stands.
 ///
-/// `max(deg f + 1 - beta, 0)` additions and no division, which is [P937] §5.2's point about
+/// `max(deg f + 1 - beta, 0)` additions and no division, which is \[P937\] §5.2's point about
 /// Algorithm 2 line 6. A `beta` of `None` is a modulus too wide to index with, where the fold is
 /// likewise a no-op.
 ///
@@ -718,7 +718,7 @@ fn subgroup_roots<F: KnownOrder, R: RngCore + CryptoRng>(
 /// above `bound` is one whose transform would cost more than the subgroup search it saves. So the
 /// bound is the point and a general factorization would be work thrown away. Over Goldilocks
 /// `s = 2^32 - 1` this returns `[3, 5, 17, 257]` and leaves 65 537 behind — that last factor is
-/// prime and above the bound, which is exactly the residue [PC] Algorithm 3 enumerates.
+/// prime and above the bound, which is exactly the residue \[PC\] Algorithm 3 enumerates.
 fn small_odd_factors(mut s: u128, bound: u64) -> Vec<u64> {
     let mut factors = Vec::new();
     let mut candidate: u128 = 3;
@@ -795,7 +795,7 @@ fn plan_odd_steps<F: KnownOrder>(subgroup_order: u128, degree: u32) -> (Vec<u64>
     (steps, residual)
 }
 
-/// The roots of `g` that are `q`-th roots of `mu`: `gcd(g, x^q - mu)` — [PC] Algorithm 3 lines 10-14.
+/// The roots of `g` that are `q`-th roots of `mu`: `gcd(g, x^q - mu)` — \[PC\] Algorithm 3 lines 10-14.
 ///
 /// The order-2 descent has a shortcut — reduce `g` modulo `x^2 - mu` in one pass, since `x^2 = mu`
 /// — and that shortcut is what [`un_square`] is. It does not generalize: at order `q` the quotient
@@ -872,7 +872,7 @@ fn descend_mixed<F: KnownOrder, R: RngCore + CryptoRng>(
 ///
 /// `retained[j]` is `G_{2^(j+1)}` reduced and `base` is `G_{2^0}`, which is `f` itself unless the
 /// `beta_0` fold materialized one — `base` is not kept in `retained` so that the common case holds
-/// no copy of the input. The loop runs from the top down. [PC] Algorithm 2 line 8 at `q_i = 2`.
+/// no copy of the input. The loop runs from the top down. \[PC\] Algorithm 2 line 8 at `q_i = 2`.
 fn descend<F: KnownOrder, R: RngCore + CryptoRng>(
     base: &UnivariatePolynomial<F>,
     retained: &[UnivariatePolynomial<F>],
@@ -892,7 +892,7 @@ fn descend<F: KnownOrder, R: RngCore + CryptoRng>(
 
 /// The common root of `g` and `x^2 - mu`, or `None` if they share none.
 ///
-/// `gcd(g, x^2 - mu)` without running a gcd, which is [PC]'s own advice on Algorithm 2 line 8:
+/// `gcd(g, x^2 - mu)` without running a gcd, which is \[PC\]'s own advice on Algorithm 2 line 8:
 /// reduce `g` modulo `x^2 - mu` — one pass over the coefficients, since `x^2 = mu` — to get
 /// `a x + b`, whose root `-b / a` is the one of `mu`'s two square roots that `g` vanishes at. So
 /// **the sign is decided by the polynomial**; there is nothing to guess and no convention to carry
@@ -1026,7 +1026,7 @@ mod tests {
         );
     }
 
-    /// Two order-2 steps are one order-4 step, which is [PC] Lemma 2.
+    /// Two order-2 steps are one order-4 step, which is \[PC\] Lemma 2.
     #[test]
     fn test_two_order_two_steps_are_one_order_four_step() {
         let mut rng = StdRng::seed_from_u64(3);
@@ -1040,7 +1040,7 @@ mod tests {
         }
     }
 
-    /// `GT_l` preserves the degree, which is [PC] Lemma 1.
+    /// `GT_l` preserves the degree, which is \[PC\] Lemma 1.
     #[test]
     fn test_the_transform_preserves_the_degree() {
         let mut rng = StdRng::seed_from_u64(4);
@@ -1061,7 +1061,7 @@ mod tests {
         }
     }
 
-    /// The three-NTT form agrees with [PC] Definition 2's product of scaled copies.
+    /// The three-NTT form agrees with \[PC\] Definition 2's product of scaled copies.
     #[test]
     fn test_the_three_transform_form_agrees_with_the_product_definition() {
         let mut rng = StdRng::seed_from_u64(5);
@@ -1421,7 +1421,7 @@ mod tests {
     }
 
     /// Over Goldilocks the two-adic reduction never bites, and the odd-order steps are what make
-    /// the subgroup enumerable — #593, [PC] Algorithm 3.
+    /// the subgroup enumerable — #593, \[PC\] Algorithm 3.
     ///
     /// The odd part of `q - 1` is `2^32 - 1 = 3 * 5 * 17 * 257 * 65537`, above any degree of
     /// interest, so all 32 order-2 steps run at the input degree and leave a subgroup of

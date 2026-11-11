@@ -27,7 +27,7 @@ use crate::poly::univariate::Polynomial;
 /// Interpolate n points into a polynomial of degree n-1.
 ///
 /// `O(n^2)` field operations and `O(n)` memory below the subproduct tree's measured crossover,
-/// `O(M(n) log n)` above it — see [`super::subproduct_tree`], which is #162 stage 2.
+/// `O(M(n) log n)` above it — see `super::subproduct_tree`, which is #162 stage 2.
 ///
 /// # Arguments
 /// * `points` - Collection of (x,y) points.

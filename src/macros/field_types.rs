@@ -19,7 +19,7 @@
 /// });
 /// ```
 ///
-/// Use [`for_each_small_field!`] instead for a body that enumerates the field.
+/// Use [`for_each_small_field!`](crate::for_each_small_field) instead for a body that enumerates the field.
 #[macro_export]
 macro_rules! for_each_field {
     (fn $name:ident<$type_parameter:ident>() $body:block) => {

@@ -29,7 +29,7 @@
 //! ```
 //!
 //! So the output file's variable list is the only reliable signal, and it is the one
-//! [`parse_parametrization`] checks: the list must equal the instance's variables **as an ordered
+//! `parse_parametrization` checks: the list must equal the instance's variables **as an ordered
 //! sequence**. Any permutation or addition means msolve answered a different question, and this
 //! adapter reports [`RunFailure::SelfInconsistent`] carrying msolve's own words rather than
 //! [`RunStatus::Complete`]. A silent success here would be the worst outcome available to the
@@ -39,7 +39,7 @@
 //! `streams.h:24-26` defines `OUTSTREAM stdout`, `VERBSTREAM stderr` and `ERRSTREAM stderr`, and
 //! every genericity message is written to `VERBSTREAM`; measured, `-v 1` puts **zero** bytes on
 //! stdout. It makes no difference to this adapter, because
-//! [`Supervisor`](super::process::Supervisor) merges both streams into one log, but it does matter
+//! [`Supervisor`] merges both streams into one log, but it does matter
 //! to anyone driving msolve by hand with `2>/dev/null`.
 //!
 //! ## 2. msolve's sparse-FGLM refuses a prime and then retries forever

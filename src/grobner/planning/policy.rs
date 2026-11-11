@@ -27,7 +27,7 @@
 //! # What the planner may know, and when
 //!
 //! Two phases, with the knowledge boundary explicit. Before a Gröbner basis it knows only
-//! [`SystemShape`] — counts and structure, **no dimension claim**, because cyclic-4 is four
+//! [`SystemShape`](super::analysis::SystemShape) — counts and structure, **no dimension claim**, because cyclic-4 is four
 //! equations in four variables and positive-dimensional. After a basis it can classify the ideal
 //! and *count* `D`, and only then is the conversion's feasibility a fact rather than a guess. The
 //! planner contains no cost model, no learned predictor, and no benchmark names.

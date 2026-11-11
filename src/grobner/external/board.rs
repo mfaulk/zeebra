@@ -1734,7 +1734,7 @@ pub struct EngineRatio {
     /// The refusal condition this statistic needs and the wall-clock one does not. Singular prints
     /// whole milliseconds, so a `0.0 ms` stage is not a fast engine and a `1 ms` stage carries
     /// ±50%. `None` when a library's resolution is not declared, which cannot happen for a row this
-    /// type was built from — [`engine_internal_time`] and [`stage_resolution`] cover the same five
+    /// type was built from — `engine_internal_time` and `stage_resolution` cover the same five
     /// libraries — and is read as a refusal if it ever does.
     pub resolution_multiple: Option<f64>,
 
