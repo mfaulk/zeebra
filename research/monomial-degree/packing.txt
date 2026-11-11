@@ -1,0 +1,9 @@
+N=5 lex packing_ms=0.012 production_ms=6.887 packed_ms=3.211 ratio=2.145
+N=5 grlex packing_ms=0.005 production_ms=6.096 packed_ms=2.822 ratio=2.160
+N=5 grevlex packing_ms=0.006 production_ms=6.861 packed_ms=2.827 ratio=2.427
+N=7 lex packing_ms=0.015 production_ms=5.999 packed_ms=2.823 ratio=2.126
+N=7 grlex packing_ms=0.006 production_ms=6.385 packed_ms=2.818 ratio=2.266
+N=7 grevlex packing_ms=0.007 production_ms=7.714 packed_ms=2.817 ratio=2.738
+N=8 lex unsupported; full comparison required
+N=8 grlex unsupported; full comparison required
+N=8 grevlex unsupported; full comparison required

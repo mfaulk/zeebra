@@ -38,7 +38,7 @@ def main():
         "elimination_ms", "interreduction_ms", "peak_rss_bytes", "basis_sha256",
     ]
     with (args.output / "samples.csv").open("w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=fields)
+        writer = csv.DictWriter(output, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         for case in ("katsura-5-lex", "katsura-6-lex", "katsura-7-grlex", "katsura-7-grevlex"):
             expected = None

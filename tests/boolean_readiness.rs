@@ -245,14 +245,21 @@ fn gf2_by_either_route_is_one_field_at_twice_the_storage() {
     assert_eq!(size_of::<Gf2Binary>(), 8);
 }
 
-// Small-field sparse entries cost 16 bytes and eight-variable monomials include a cached degree.
+/// A GF(2) coefficient occupies 16 bytes in a sparse entry and 4 in a bare element.
+///
+/// #218's question 3, as the part that is a fact about layout rather than a measurement: the
+/// `(index, coefficient)` pair a sparse row stores is padded to the index's alignment, so one bit
+/// of information costs 16 bytes — the same as a GF(2^8) coefficient, and the same as a 32-bit
+/// prime-field one. No arithmetic change narrows that; only a different representation does.
 #[test]
 fn a_gf2_coefficient_costs_the_same_sparse_entry_as_any_other() {
     assert_eq!(size_of::<(usize, Zp2)>(), 16);
     assert_eq!(size_of::<(usize, Gf256)>(), 16);
     assert_eq!(size_of::<(usize, Gf2Binary)>(), 16);
 
-    assert_eq!(size_of::<Monomial<8>>(), 40);
+    // And a monomial is an exponent array, four bytes per variable, where a Boolean monomial is a
+    // bit per variable: 32 bytes for what eight bits describe.
+    assert_eq!(size_of::<Monomial<8>>(), 32);
 }
 
 /// Univariate root finding works over GF(2^8), which exercises the trace-based splitter at m > 1.

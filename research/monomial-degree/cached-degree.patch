@@ -1,0 +1,134 @@
+diff --git a/src/poly/multivariate/monomial.rs b/src/poly/multivariate/monomial.rs
+index 068ad6be..bd5a90b9 100644
+--- a/src/poly/multivariate/monomial.rs
++++ b/src/poly/multivariate/monomial.rs
+@@ -1,2 +0,0 @@
+-//! A term (monomial) of a multivariate polynomial.
+-
+@@ -11 +9 @@ use rand::{distributions::Standard, prelude::Distribution, Rng};
+-use serde::{Deserialize, Serialize};
++use serde::{Deserialize, Deserializer, Serialize};
+@@ -12,0 +11 @@ use std::fmt::{Display, Formatter};
++use std::hash::{Hash, Hasher};
+@@ -15 +14 @@ use std::fmt::{Display, Formatter};
+-#[derive(Eq, PartialEq, Copy, Clone, Debug, Deserialize, Hash, Serialize, Ord, PartialOrd)]
++#[derive(Eq, PartialEq, Copy, Clone, Debug, Serialize, Ord, PartialOrd)]
+@@ -17 +15,0 @@ pub struct Monomial<const N: usize> {
+-    // Exponent of each variable
+@@ -19 +17,24 @@ pub struct Monomial<const N: usize> {
+-    pub(crate) exponents: [u32; N],
++    exponents: [u32; N],
++    // Redundant state stays private, off the wire and out of the hash. Exponents must remain
++    // first in the declaration so derived Ord retains its lexicographic contract.
++    #[serde(skip)]
++    total_degree: u64,
++}
++
++impl<'de, const N: usize> Deserialize<'de> for Monomial<N> {
++    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
++        #[derive(Deserialize)]
++        #[serde(rename = "Monomial")]
++        struct Wire<const N: usize> {
++            #[serde(with = "serde_arrays")]
++            exponents: [u32; N],
++        }
++        let wire = Wire::<N>::deserialize(deserializer)?;
++        Ok(Self::new(&wire.exponents))
++    }
++}
++
++impl<const N: usize> Hash for Monomial<N> {
++    fn hash<H: Hasher>(&self, state: &mut H) {
++        self.exponents.hash(state);
++    }
+@@ -28 +49,4 @@ impl<const N: usize> Monomial<N> {
+-        Self { exponents: e }
++        Self {
++            exponents: e,
++            total_degree: e.iter().map(|&e| u64::from(e)).sum(),
++        }
+@@ -35 +59 @@ impl<const N: usize> Monomial<N> {
+-        Self { exponents }
++        Self::new(&exponents)
+@@ -40 +64 @@ impl<const N: usize> Monomial<N> {
+-        Self { exponents: [0; N] }
++        Self::new(&[0; N])
+@@ -52,0 +77,4 @@ impl<const N: usize> Monomial<N> {
++    pub(super) fn exponent_array(&self) -> &[u32; N] {
++        &self.exponents
++    }
++
+@@ -55,2 +83 @@ impl<const N: usize> Monomial<N> {
+-        // Cast to u64 before summing to avoid overflow.
+-        self.exponents.iter().map(|e| *e as u64).sum()
++        self.total_degree
+@@ -124,8 +151 @@ impl<const N: usize> Arbitrary for Monomial<N> {
+-            // Map the generated vector to a Monomial
+-            .prop_map(|vec| {
+-                let mut array = [0; N];
+-                for (i, &item) in vec.iter().enumerate() {
+-                    array[i] = item;
+-                }
+-                Monomial { exponents: array }
+-            })
++            .prop_map(|exponents| Self::new(&exponents))
+diff --git a/src/poly/multivariate/monomial_arithmetic.rs b/src/poly/multivariate/monomial_arithmetic.rs
+index 3d9f22cf..fb8f4c64 100644
+--- a/src/poly/multivariate/monomial_arithmetic.rs
++++ b/src/poly/multivariate/monomial_arithmetic.rs
+@@ -1,2 +0,0 @@
+-//! Arithmetic operations on monomials.
+-
+@@ -19,2 +17,2 @@ impl<const N: usize> ops::Mul<&Monomial<N>> for &Monomial<N> {
+-            exponents[i] = self.exponents[i]
+-                .checked_add(rhs.exponents[i])
++            exponents[i] = self.exponents()[i]
++                .checked_add(rhs.exponents()[i])
+@@ -34 +32 @@ impl<const N: usize> Monomial<N> {
+-            if self.exponents[i] < rhs.exponents[i] {
++            if self.exponents()[i] < rhs.exponents()[i] {
+@@ -37 +35 @@ impl<const N: usize> Monomial<N> {
+-            exponents[i] = self.exponents[i] - rhs.exponents[i];
++            exponents[i] = self.exponents()[i] - rhs.exponents()[i];
+diff --git a/src/poly/multivariate/sparse_multivariate_multiply.rs b/src/poly/multivariate/sparse_multivariate_multiply.rs
+index 85aa3b99..725a376d 100644
+--- a/src/poly/multivariate/sparse_multivariate_multiply.rs
++++ b/src/poly/multivariate/sparse_multivariate_multiply.rs
+@@ -352 +352 @@ fn multiply_dense_triangle<const N: usize, F: FiniteField>(
+-        let (left_x, left_y) = (monomial_a.exponents[0], monomial_a.exponents[1]);
++        let (left_x, left_y) = (monomial_a.exponents()[0], monomial_a.exponents()[1]);
+@@ -354,2 +354,2 @@ fn multiply_dense_triangle<const N: usize, F: FiniteField>(
+-            let x = left_x + monomial_b.exponents[0];
+-            let y = left_y + monomial_b.exponents[1];
++            let x = left_x + monomial_b.exponents()[0];
++            let y = left_y + monomial_b.exponents()[1];
+@@ -448 +448 @@ fn variable_degrees<const N: usize, F: FiniteField>(p: &SparseMultiPoly<N, F>) -
+-            degrees[i] = degrees[i].max(monomial.exponents[i]);
++            degrees[i] = degrees[i].max(monomial.exponents()[i]);
+@@ -483 +483 @@ fn multiply_dense_simplex<const N: usize, F: FiniteField>(
+-                exponents[i] = monomial_a.exponents[i] + monomial_b.exponents[i];
++                exponents[i] = monomial_a.exponents()[i] + monomial_b.exponents()[i];
+@@ -512 +512 @@ fn multiply_dense_box<const N: usize, F: FiniteField>(
+-        let base = index.rank(&monomial_a.exponents);
++        let base = index.rank(monomial_a.exponent_array());
+@@ -514 +514,2 @@ fn multiply_dense_box<const N: usize, F: FiniteField>(
+-            slots[base + index.rank(&monomial_b.exponents)] += *coefficient_a * *coefficient_b;
++            slots[base + index.rank(monomial_b.exponent_array())] +=
++                *coefficient_a * *coefficient_b;
+diff --git a/tests/boolean_readiness.rs b/tests/boolean_readiness.rs
+index 4b6ec0d8..64edc9b2 100644
+--- a/tests/boolean_readiness.rs
++++ b/tests/boolean_readiness.rs
+@@ -248,6 +248 @@ fn gf2_by_either_route_is_one_field_at_twice_the_storage() {
+-/// A GF(2) coefficient occupies 16 bytes in a sparse entry and 4 in a bare element.
+-///
+-/// #218's question 3, as the part that is a fact about layout rather than a measurement: the
+-/// `(index, coefficient)` pair a sparse row stores is padded to the index's alignment, so one bit
+-/// of information costs 16 bytes — the same as a GF(2^8) coefficient, and the same as a 32-bit
+-/// prime-field one. No arithmetic change narrows that; only a different representation does.
++// Small-field sparse entries cost 16 bytes and eight-variable monomials include a cached degree.
+@@ -260,3 +255 @@ fn a_gf2_coefficient_costs_the_same_sparse_entry_as_any_other() {
+-    // And a monomial is an exponent array, four bytes per variable, where a Boolean monomial is a
+-    // bit per variable: 32 bytes for what eight bits describe.
+-    assert_eq!(size_of::<Monomial<8>>(), 32);
++    assert_eq!(size_of::<Monomial<8>>(), 40);

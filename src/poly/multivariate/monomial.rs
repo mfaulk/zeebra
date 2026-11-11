@@ -1,3 +1,5 @@
+//! A term (monomial) of a multivariate polynomial.
+
 use crate::FiniteField;
 #[cfg(any(test, feature = "proptest"))]
 use proptest::{
@@ -6,38 +8,15 @@ use proptest::{
     prelude::{BoxedStrategy, Strategy},
 };
 use rand::{distributions::Standard, prelude::Distribution, Rng};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
 
 /// A monomial x^e = x_0^e_0 * x_1^e_1 * ... * x_{n-1}^e_{n-1} in N variables.
-#[derive(Eq, PartialEq, Copy, Clone, Debug, Serialize, Ord, PartialOrd)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Deserialize, Hash, Serialize, Ord, PartialOrd)]
 pub struct Monomial<const N: usize> {
+    // Exponent of each variable
     #[serde(with = "serde_arrays")]
-    exponents: [u32; N],
-    // Redundant state stays private, off the wire and out of the hash. Exponents must remain
-    // first in the declaration so derived Ord retains its lexicographic contract.
-    #[serde(skip)]
-    total_degree: u64,
-}
-
-impl<'de, const N: usize> Deserialize<'de> for Monomial<N> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(rename = "Monomial")]
-        struct Wire<const N: usize> {
-            #[serde(with = "serde_arrays")]
-            exponents: [u32; N],
-        }
-        let wire = Wire::<N>::deserialize(deserializer)?;
-        Ok(Self::new(&wire.exponents))
-    }
-}
-
-impl<const N: usize> Hash for Monomial<N> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.exponents.hash(state);
-    }
+    pub(crate) exponents: [u32; N],
 }
 
 impl<const N: usize> Monomial<N> {
@@ -46,22 +25,19 @@ impl<const N: usize> Monomial<N> {
         assert_eq!(exponents.len(), N);
         let mut e = [0; N];
         e.copy_from_slice(exponents);
-        Self {
-            exponents: e,
-            total_degree: e.iter().map(|&e| u64::from(e)).sum(),
-        }
+        Self { exponents: e }
     }
 
     /// A monomial in N variables, with a single variable raised to a given exponent.
     pub fn univariate(index: usize, exponent: u32) -> Self {
         let mut exponents = [0; N];
         exponents[index] = exponent;
-        Self::new(&exponents)
+        Self { exponents }
     }
 
     /// x^0 = 1
     pub fn one() -> Self {
-        Self::new(&[0; N])
+        Self { exponents: [0; N] }
     }
 
     /// True if x = x^0 = 1.
@@ -74,13 +50,10 @@ impl<const N: usize> Monomial<N> {
         &self.exponents
     }
 
-    pub(super) fn exponent_array(&self) -> &[u32; N] {
-        &self.exponents
-    }
-
     /// The total degree (sum of exponents).
     pub fn degree(&self) -> u64 {
-        self.total_degree
+        // Cast to u64 before summing to avoid overflow.
+        self.exponents.iter().map(|e| *e as u64).sum()
     }
 
     /// Evaluate the monomial at the vector x.
@@ -148,7 +121,14 @@ impl<const N: usize> Arbitrary for Monomial<N> {
         // Exponents are kept small: multiplying monomials adds exponents, so full-range u32
         // values would overflow in any product rather than exercising the operation.
         vec(0u32..=16, N)
-            .prop_map(|exponents| Self::new(&exponents))
+            // Map the generated vector to a Monomial
+            .prop_map(|vec| {
+                let mut array = [0; N];
+                for (i, &item) in vec.iter().enumerate() {
+                    array[i] = item;
+                }
+                Monomial { exponents: array }
+            })
             .boxed()
     }
 
