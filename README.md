@@ -213,6 +213,8 @@ including resource refusals. Affine Cyclic-7 and Cyclic-8 already provide reacha
 comparisons; the [Cyclic family decision](docs/research/classical-benchmarks.md#61-429-the-affine-ladder-makes-a-homogenized-comparison-family-unnecessary)
 records why the corpus keeps this formulation. The [upper-rung sweep](docs/research/cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected)
 records the per-rung budgets and limitations of its single-run comparisons.
+The [matched-ISA Sagebrush re-take](docs/research/sagebrush-matched-isa.md) records
+the original public-algebra cells with both engines built at the same ISA floor.
 
 The [dense-F4 anchors](docs/research/classical-benchmarks.md#24-441-the-dense-f4-ladder-and-the-conversion-stage-caution)
 record Steel's published configurations and MinRank stage split, with a density candidate based on

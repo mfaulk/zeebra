@@ -13,14 +13,15 @@ The adapter is `src/grobner/external/sagebrush.rs`; the driver it goes through i
 `tools/external/sagebrush-driver`; what it is like to provision is
 `docs/research/external-comparands.md` §5.
 
-**Every timing quoted in this note was taken against a baseline `x86-64` build of the driver**, and
-should be read as a lower bound on the comparand. #385 found that the provisioning built it outside
-Zeebra's worktree, where it inherited no ISA floor and no LTO, and resolved it by matching Zeebra's
-`x86-64-v3` floor at fat LTO. The one place that interacts with the analysis below is §8.2's note
-that `reduce_auto` dispatches on `is_x86_feature_detected!("avx2")` at *runtime*: that kernel was
-already taking its AVX2 path, so what the raised floor changes is the surrounding code — the scalar
-arithmetic, the packing, the heap traffic — and not Sagebrush's own hand-dispatched elimination.
-Re-measuring the board at the matched floor is #520.
+**The original timings in this source study used a baseline `x86-64` driver.**
+#385 matched Zeebra's `x86-64-v3` floor, fat LTO and one codegen unit; the
+[#520 cohort re-take](sagebrush-matched-isa.md) records the original public-algebra
+cells at that build. Historical timings below retain their original context.
+`reduce_auto` dispatches on `is_x86_feature_detected!("avx2")` at runtime, so
+elimination already took its AVX2 arm before #385. The raised compile-time floor
+can change surrounding scalar arithmetic, packing and heap code; a whole-run
+change does not identify which part changed. The scalar-arithmetic reuse
+assessment is §8.3 (the issue's §8.5 reference actually names `sigf4.rs`).
 
 ---
 
@@ -556,6 +557,12 @@ bottleneck.
   Zeebra's existing reduction exploits, so a generic reciprocal is unlikely to beat it.
 * **Verdict: no**, and for a reason that is a fact about Zeebra's fields rather than about this
   code.
+
+The [matched-ISA check](sagebrush-matched-isa.md#isa-only-results), measured at
+Zeebra `c033f027`, leaves that assessment unchanged. Holding the driver source,
+compiler, dependency lock and fat-LTO profile fixed, its four whole-driver
+ISA-only comparisons stay within the 20% noise band. This does not measure
+scalar multiply in isolation or supply a new reason to adopt `nmod.rs`.
 
 ### 8.4 `f4q.rs` — the per-matrix multi-modular tracer (913 lines)
 
