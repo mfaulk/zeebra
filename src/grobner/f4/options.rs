@@ -840,17 +840,17 @@ pub enum F4Error {
 
     /// Construction or elimination needed more live nonzero entries than allowed.
     ///
-    /// `nonzeros` is the live count when the limit was crossed. Unlike the two above it is
-    /// informative: the overshoot is bounded by a single row, because the count is tested after
-    /// every row written and after every row operation.
+    /// During construction, `nonzeros` is the exact entry demand of the complete matrix,
+    /// counted before allocating its coefficient rows. During elimination it is the live count
+    /// at the first crossing, a lower bound on the eventual peak, not a prediction of fill-in.
     TooManyNonzeros { nonzeros: usize, limit: usize },
 
     /// Construction or elimination needed more bytes of live entries than allowed.
     ///
     /// Reported in place of `TooManyNonzeros` exactly when
     /// [`F4Options::max_live_bytes`] is the budget that binds for the field in use, so the two are
-    /// never both plausible for one failure. `bytes` is the live count when the limit was crossed,
-    /// times `size_of::<(usize, F)>()`.
+    /// never both plausible for one failure. `bytes` is the exact construction demand or the
+    /// live count at an elimination crossing, times `size_of::<(usize, F)>()` (saturating).
     TooManyLiveBytes { bytes: usize, limit: usize },
 
     /// The computation did not finish within the allowed number of batches.

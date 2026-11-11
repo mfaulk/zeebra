@@ -164,10 +164,8 @@ fn build_batch_matrix_in<const N: usize, F: FiniteField>(
     clock: &mut StageClock,
     stages: &mut StageTimings,
 ) -> Result<BuiltMatrix<N, F>, F4Error> {
-    // Every budget is enforced while the thing it bounds is being built, not after it exists.
-    // Symbolic preprocessing discovers rows one at a time and matrix construction writes entries
-    // one row at a time, so both can refuse to continue; checking afterwards would mean paying the
-    // allocation in order to find out it was not allowed.
+    // Preprocessing bounds rows as it discovers them; construction checks the completed
+    // symbolic layout before allocating coefficient rows.
     let mut preprocessed = symbolic_preprocessing_with(
         basis,
         pairs,

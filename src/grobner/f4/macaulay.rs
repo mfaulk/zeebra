@@ -25,8 +25,8 @@ pub enum BuildBudgetExceeded {
     /// The batch's rows held more distinct monomials than the column budget allowed.
     Columns { limit: usize },
 
-    /// The rows held more entries than the entry budget allowed. `nonzeros` is the count when the
-    /// limit was crossed, so the overshoot is bounded by one row.
+    /// The complete construction needs `nonzeros` entries, more than the entry budget allows.
+    /// This count is exact; elimination may subsequently need more entries.
     Nonzeros { nonzeros: usize, limit: usize },
 }
 
@@ -161,20 +161,10 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
 
     /// As [`MacaulayMatrix::build`], abandoned if the matrix would exceed either budget.
     ///
-    /// The entry budget is checked *while* the rows are written, not after: counting stops as soon
-    /// as too many entries have been written, so the rows are never fully materialized before the
-    /// limit is noticed. The point of a budget is to refuse the allocation, which a check
-    /// afterwards cannot do.
-    ///
-    /// The column budget is a length check rather than an incremental one, and still refuses
-    /// before this function allocates anything: the monomial set it reads was interned by symbolic
-    /// preprocessing under [`RowBudgetExceeded`](super::symbolic::RowBudgetExceeded)'s own bound,
-    /// so there is nothing left here for an incremental check to refuse. Which count crosses the
-    /// line is unchanged — the old loop errored exactly when the distinct monomials exceeded
-    /// `max_columns`, and so does this.
-    ///
-    /// Neither error says how large the matrix would have been: establishing that is the work
-    /// being refused.
+    /// Both budgets are checked before allocating columns or coefficient rows. Symbolic
+    /// preprocessing already records every column and one handle per row term, so the complete
+    /// construction demand is available without materializing the matrix. This does not predict
+    /// fill-in during elimination or bound symbolic preprocessing's own allocations.
     pub fn build_within(
         basis: &MonicBasis<N, F>,
         preprocessed: &Preprocessed<N>,
@@ -225,6 +215,13 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         if preprocessed.monomials.len() > max_columns {
             return Err(BuildBudgetExceeded::Columns { limit: max_columns });
         }
+        let nonzeros = preprocessed.term_handles.len();
+        if nonzeros > max_nonzeros {
+            return Err(BuildBudgetExceeded::Nonzeros {
+                nonzeros,
+                limit: max_nonzeros,
+            });
+        }
         let mut sorted: Vec<(Monomial<N>, MonomialHandle)> = preprocessed
             .monomials
             .iter()
@@ -261,20 +258,10 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         }
         timings.map = clock.lap();
 
-        // Entries written so far, so a matrix that is small in each dimension but dense cannot
-        // slip past the row and column budgets.
-        let mut nonzeros = 0usize;
         let mut sparse_rows: Vec<SparseRow<F>> = Vec::with_capacity(preprocessed.rows.len());
         let mut handles: &[MonomialHandle] = &preprocessed.term_handles;
         for row in &preprocessed.rows {
             let terms = &basis.element(row.basis_index).terms;
-            nonzeros += terms.len();
-            if nonzeros > max_nonzeros {
-                return Err(BuildBudgetExceeded::Nonzeros {
-                    nonzeros,
-                    limit: max_nonzeros,
-                });
-            }
             // A row's handles are the next run of `term_handles`, one per term of the basis
             // element. `split_at` is what asserts the layout: a `Preprocessed` from another basis
             // runs the vector short and panics here instead of building the wrong matrix.
@@ -1241,12 +1228,7 @@ mod tests {
         assert_eq!(split, ConstructionTimings::default());
     }
 
-    /// The column and entry budgets are exact at their boundaries, and stop mid-construction.
-    ///
-    /// Succeeding at exactly what the matrix needs and failing one below it is what shows the
-    /// checks happen while the monomial set and the rows are being assembled. A check afterwards
-    /// would have to materialize the whole matrix to discover it was not allowed, which is the
-    /// allocation the budget exists to refuse.
+    // Construction succeeds at the exact column and entry demand and refuses one below it.
     #[test]
     fn test_build_budgets_are_exact() {
         for order in ALL_ORDERS {
@@ -1276,8 +1258,7 @@ mod tests {
                 order.name()
             );
 
-            // The entry budget reports the count that crossed it, which overshoots by at most the
-            // entries of a single row.
+            // The construction demand is exact even when the matrix is refused.
             match MacaulayMatrix::<3, F>::build_within(
                 &basis,
                 &preprocessed,
@@ -1310,6 +1291,27 @@ mod tests {
                     order.name(),
                     other
                 ),
+            }
+        }
+    }
+
+    // A refused construction reports the full entry demand independently of the entry allowance.
+    #[test]
+    fn test_refused_construction_reports_full_entry_demand() {
+        for order in ALL_ORDERS {
+            let (basis, preprocessed) = batch(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"], order);
+            let full = MacaulayMatrix::build(&basis, &preprocessed, order);
+            assert!(full.nonzeros() > 4);
+            for limit in [0, 1, full.nonzeros() / 2, full.nonzeros() - 1] {
+                assert_eq!(
+                    MacaulayMatrix::build_within(&basis, &preprocessed, order, usize::MAX, limit),
+                    Err(BuildBudgetExceeded::Nonzeros {
+                        nonzeros: full.nonzeros(),
+                        limit,
+                    }),
+                    "{} with allowance {limit}",
+                    order.name()
+                );
             }
         }
     }

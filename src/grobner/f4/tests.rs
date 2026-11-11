@@ -4049,3 +4049,70 @@ fn test_mq_random_10_no_longer_approaches_the_live_entry_cap() {
         );
     }
 }
+
+// Public random MQ construction reports the same exact demand through entry and byte budgets.
+#[test]
+#[cfg(feature = "external-runners")]
+fn test_public_mq_refusal_reports_full_construction_demand() {
+    use crate::grobner::{external::corpus::random_mq_instance, f4::build_batch_matrix};
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let instance = random_mq_instance(20, 0, 2147483647, order);
+    let variables = std::array::from_fn(|i| instance.variables[i].as_str());
+    let system: Vec<MultivariatePolynomial<20, Zp2147483647>> = instance
+        .system
+        .iter()
+        .map(|p| MultivariatePolynomial::parse(p, variables).unwrap())
+        .collect();
+    let basis = MonicBasis::new(&system, order);
+    let pairs = [CriticalPair::new(&system, 0, 1, order)];
+    let options = F4Options::default();
+    let full = build_batch_matrix(
+        &basis,
+        &pairs,
+        order,
+        &options,
+        &mut ReducerCache::new(options.reducer_cache),
+    )
+    .unwrap();
+    let demand = full.matrix.nonzeros();
+    assert!(demand > 4);
+    for limit in [1, demand / 2, demand - 1] {
+        let capped = options.clone().with_live_entries::<Zp2147483647>(limit);
+        let error = build_batch_matrix(
+            &basis,
+            &pairs,
+            order,
+            &capped,
+            &mut ReducerCache::new(capped.reducer_cache),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            F4Error::TooManyNonzeros {
+                nonzeros: demand,
+                limit
+            }
+        );
+        let byte_limit = limit * F4Options::bytes_per_entry::<Zp2147483647>();
+        let capped = F4Options {
+            max_live_bytes: byte_limit,
+            ..options.clone()
+        };
+        let error = build_batch_matrix(
+            &basis,
+            &pairs,
+            order,
+            &capped,
+            &mut ReducerCache::new(capped.reducer_cache),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            F4Error::TooManyLiveBytes {
+                bytes: demand * F4Options::bytes_per_entry::<Zp2147483647>(),
+                limit: byte_limit
+            }
+        );
+    }
+}

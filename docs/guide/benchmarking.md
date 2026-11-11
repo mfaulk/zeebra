@@ -487,7 +487,9 @@ turned out not to be the matrix. It runs a tracking `#[global_allocator]` beside
 counters, measures each batch's symbolic preprocessing and matrix construction on the batches F4
 really selected — including the batch that is **refused**, which no `F4Statistics` field describes —
 and prints each named structure's share against the measured peak, on katsura-6, katsura-7 and
-cyclic-6.
+cyclic-6. After symbolic preprocessing succeeds, a construction refusal also prints the exact
+row, column and entry demand, the entry allowance and its excess. These are construction counts;
+they do not predict elimination fill-in or the process's peak RSS.
 
 `interreduce_working_set` is that question for the *final interreduction*, which `f4_memory`'s
 per-batch probe does not reach. It runs **one rung and one arm per process**, because peak resident
