@@ -17,22 +17,27 @@ re-invented: base commit `aa7cff8a`, an ancestor of `main`, plus the blobs
 instrument) and `b634dc281275` (`git hash-object src/grobner/research/resultant.rs`, the
 measured source, since moved to `src/grobner/resultant.rs`).
 
+§11's matched-concurrency measurement carries its own base and source-blob stamp. Earlier figures
+remain historical; they are not used as the denominator of that comparison. Cryptanalysis-only
+paths and registered witness fixtures mentioned in the historical sections were moved out in #668
+and remain available at commit `9532a9a2`.
+
 M25-D deliverable 3. `docs/research/resultant-elimination.md` §6.7 ranks "the determinant's
 per-sample cost" first among what is left and calls it "the only axis left with an asymptotic
 improvement in it". This document separates that into five distinct things, prices each against the
 **measured** determinant cost law of #312, and recommends building exactly one of them.
 
-**Build axis 4, the Euclidean/subresultant route. Do not build axes 1, 2, 3 or 5.** The prototype
-that axis 4's analysis authorised exists and is tested, on branch
-`research/m25-euclidean-resultant` — held out of this change for the process reason in §5.4, not
-for a defect.
+**Decision for #297: adopt axis 4, the Euclidean/subresultant route; decline axes 1, 2 and 3;
+defer axis 5.** Axis 4 shipped in #350 (`0c6bbb13`); §5.4 records the earlier prototype hold,
+and §5.6 records the shipped implementation. The dense kernel remains the differential oracle.
+Axis 5's separate deferred subsystem is tracked in [#689](https://github.com/mfaulk/zeebra/issues/689).
+§11 closes the acceptance criteria against the current implementation and a matched parallel run.
 
-**And the headline is not the one the determinant stage suggests.** Axis 4 is a **measured 1 692×**
-improvement to the determinant stage (§5.5) and only a **~3× improvement to the row**, because
-once the determinants go, root finding at degree `5.3 × 10^5` and a 57 GB symbolic build are what
-is left. §7 is that accounting and it is the most useful part of this document. The verdict in §8 is still *build* —
-1 692× on the largest stage for ~200 lines is not a close call — but the claim "this raises the
-reachable round count" **does not survive the accounting**, and saying so is the point.
+**The historical stage ratio is not a row ratio.** §5.5 measured **1 692×** on the determinant
+stage; §7 modelled only **~3×** on the row, with root finding and the then-unfixed symbolic build
+left behind. #243 subsequently removed that build transient (§9). The current paired measurement
+is in §11, and it also measures only the determinant stage. The claim that axis 4 alone raises
+the reachable round count **does not survive the accounting**.
 
 ## 0. The criterion, stated before the numbers
 
@@ -875,8 +880,7 @@ multiplication, order bases, and Villard's or LNZ's algorithm — PML is a libra
 `docs/research/elimination-beyond-grobner.md` §5 already lists "Sylvester/Villard machinery" as
 absent and §6.3 argues against building it.
 
-**Verdict: do not build; file as a future issue with the crossover as its trigger** (§9), per §0
-gate 3.
+**Verdict: defer to #689, with the crossover as a trigger to re-cost** (§9), per §0 gate 3.
 
 ### 6.1 Half-GCD is not a new finding here
 
@@ -1006,10 +1010,10 @@ natural successor to this document.
 | 1 — SIMD / threading constants | `O(n³)`, 3–5× (blocking half dead: #312 found no cache anomaly) | high; `src/linalg/` contention | implementation performance, near zero-sum against the sweep | **do not build**; axis 4 deletes the work |
 | 2 — reuse across evaluations | no improvement available | — | nothing | **nothing to build** |
 | 3 — displacement / Sylvester structure | `O(n²)` | high; generators + breakdown handling | same as axis 4 | **do not build**; identical complexity, strictly more work |
-| 4 — **subresultant / Euclidean** | **`O(n²)`; `3^R` saved** | **low; ~200 lines, written and tested, on its own branch** | **1 692× measured on the stage, 3× on the row** | **BUILD** |
-| 5 — polynomial-matrix determinant | `Õ(N^ω D)` | **new major subsystem** | overtakes axis 4 past `R ≈ 8.7` once Euclid's measured per-operation penalty is charged | **do not build; file with a trigger** |
+| 4 — **subresultant / Euclidean** | **`O(n²)`; `3^R` saved** | **low; shipped in #350** | **historically 1 692× measured on the stage, ~3× modelled on the row** | **ADOPTED** |
+| 5 — polynomial-matrix determinant | `Õ(N^ω D)` | **new major subsystem** | historical crossover model `R ≈ 8.7`, including Euclid's measured per-operation penalty | **DEFERRED: #689** |
 
-**Build axis 4**, scored against §0:
+The original **build axis 4** recommendation, scored against §0:
 
 1. **Beats the measured baseline**: **1 692× measured** at order 1 458 against a baseline #312
    measured as cleanly cubic with no slack to recover, growing 3.5× per 3× in `n`. The operation
@@ -1020,8 +1024,8 @@ natural successor to this document.
    (§7.1), not a new reachable size. At seven rounds it removes the largest of **four** walls and is
    **necessary but not sufficient** (§7.2). The claim "it raises the reachable round count" is
    **withdrawn**; the accounting does not support it.
-3. **No new subsystem**: two functions and four tests, which exist on
-   `research/m25-euclidean-resultant` (§5.4).
+3. **No new subsystem**: the prototype's two functions and four tests (§5.4) led to the shipped
+   `src/poly/univariate/resultant.rs` and `DeterminantKernel::Euclidean` in #350 (§5.6).
 4. **The rejection is reconsidered on named evidence**: order 18 → 1 458, gap 48× → 3 888×, the stage
    from milliseconds to 67% of a row that cannot be run — and the trap that motivated the rejection
    closed in `O(1)` per sample (§5.3), which the 2023 decision did not have.
@@ -1035,25 +1039,24 @@ three rungs.
 
 ## 9. Issues this suggests
 
-**File, High.** *"Land the Euclidean resultant and integrate it into the bivariate elimination
-route"* — take `research/m25-euclidean-resultant`'s module (§5.4), then consume
-`resultant_at_formal_degrees` in `src/grobner/resultant.rs`'s sample loop behind a flag, so
-the dense determinant stays as the differential reference, **gated on §5.3's leading-coefficient
-check**. Deliverable: `rf4-rp2` and `rf6-rp0` run. It is the only item in M25-D the arithmetic says
-build, and it unblocks the two rows the milestone wants.
+**Delivered, #350.** The Euclidean resultant is in `src/poly/univariate/resultant.rs`, consumed
+through `DeterminantKernel::Euclidean` in `src/grobner/resultant.rs`. Formal-degree corrections
+preserve specialization semantics; dense off-domain checks remain independent. #367 owned the
+subsequent `rf4-rp2` decision; neither a kernel ratio nor this issue authorizes the `rf6-rp0` run.
 
-**File, High.** *"Price root finding at degree 5·10^5: `roots()` against deflate-and-repeat
-`graeffe_root`"* — §7.4. After axis 4 this is **78% of `rf6-rp0`**, it is a measurement rather than a
-build, and both candidates already exist in the crate.
+**Delivered, #351.** The root-finding sweep supersedes §7.4's measurement request. Its cost-model
+integration is in the historical §6.14 of `resultant-elimination.md`, preserved at commit
+`9532a9a2` after #668 moved the cryptanalysis research out. The **78%** is §7.1's old model,
+not a newly measured share.
 
-**Already filed, and now top of the ranked list: #243.** §7.3 raises its priority — after axis 4 it
-is the binding constraint at six rounds and a 1 TB wall at seven, and #237's independent finding in
-F4 points the same way.
+**Delivered, #243.** The collecting multiply replaced §7.3's transient allocation; the before/after
+record is `resultant-elimination.md` §6.12. Keep the old projection as historical accounting,
+not as the current implementation's memory demand.
 
-**File as a future milestone, Low.** *"Polynomial-matrix determinant: Villard / Labahn–Neiger–Zhou
-over `F_p[x]`"* — axis 5, with the crossover at `R ≈ 8.7` (§6) recorded as the trigger, in the style of
-#58's deferred Wiedemann/Krylov entry. The evidence that would change it is a target whose
-`N`-to-`D` ratio is not pinned at `N = 2D`.
+**Deferred separately, Low: [#689](https://github.com/mfaulk/zeebra/issues/689).** Polynomial-matrix
+determinants are a new subsystem, with the historical crossover at `R ≈ 8.7` (§6) as a trigger to
+re-cost, not a measured advantage. A target whose `N`-to-`D` ratio differs from `N = 2D` would also
+reopen the decision. Refit against current kernels before scheduling a prototype.
 
 **Argue against filing:** anything on axes 1, 2 or 3. Axis 1's work is deleted by axis 4 and its
 blocking half is refuted by #312; axis 2 has no content; axis 3 is axis 4 with more machinery.
@@ -1074,11 +1077,13 @@ blocking half is refuted by #312; axis 2 has no content; axis 3 is axis 4 with m
   deliberately lives outside the worktree. `RUSTFLAGS` was never set — the flag was lost by *where*
   the build ran. All quoted figures are from the corrected build, and the cross-check against #312's
   independent order-1 458 figure (2.272 s against 2.404 s, 5.5%) is what makes that claim checkable.
-- **Whether the specialization trap fires at all on the registered rows is unchecked** (§5.3). It
-  needs `lc_y` of `cico_bivariate`'s outputs, in a file another agent owns this milestone.
+- **The historical claim about registered-row leading coefficients remains unmeasured here.**
+  Correctness no longer depends on it: #350 handles degree drops explicitly (§5.6.1), and the
+  comparison regression includes simultaneous leading-coefficient vanishing. Registered witness
+  fixtures moved out in #668; they are not silently counted as current tests.
 - **The root-finding exponent 1.933 is fitted on two points** (§7). Every root-finding figure in §7.1
   and §7.2 inherits that, including the 5.63 h that §8 leans on. It is the weakest number in this
-  document and the one most worth re-measuring — which is why §9 files it as its own issue.
+  historical model; #351's subsequent sweep supersedes the measurement request (§9).
 - **The interpolation `O(S²)` law is derived, not fitted**, from one measured anchor at `S = 730`
   extrapolated across three orders of magnitude in `S`.
 - **The `R = 7` build transient of ~1 TB is extrapolated** across one rung, from a mechanism that
@@ -1095,3 +1100,85 @@ blocking half is refuted by #312; axis 2 has no content; axis 3 is axis 4 with m
 - **#312's fitted exponent is 2.9953 ± 0.0285, below 3.** Projections here use the cubic law, matching
   `determinant_core_ms`'s deliberate choice of the larger of the two, so the determinant figures are
   if anything slight over-estimates — which flatters axis 4 by at most a few percent.
+
+## 11. #297 completion: the decision and the parallel baseline
+
+The decision is **adopt the shipped Euclidean route**. No additional solver kernel is justified
+by this investigation. Axes 1–3 remain declined; axis 5 is deferred to #689, with a named trigger
+and a requirement to re-cost against current code. The prototype was justified in §5.1–§5.3
+before implementation (§5.4); #350 is its completed production integration (§5.6).
+
+| #297 criterion | disposition |
+|---|---|
+| Five axes assessed separately, including complexity and constants | §§2–6; §8 collects the decisions. Axis 1's constant is a hypothesis, axis 2 has no proposed improvement, axis 3 adds machinery for the same quadratic class as axis 4, and axis 5's crossover is a model. |
+| Compare against the parallel baseline at 32 workers | The matched run below compares the shipped kernels on the same pair and sample sequence at 32 workers, in one binary and one lock window. |
+| Explicit recommendation | Adopt axis 4; decline 1–3; defer 5. |
+| New major subsystem gets a separate issue | #689, Low priority, records the polynomial-matrix subsystem and its reopening conditions. |
+| Prototype justified before it exists and measured on identical inputs | §§5.1–5.5 record the prototype's justification and paired measurements; the new mode checks equality at every sample on every draw. |
+| Measured, fitted and extrapolated quantities distinguished | The run below is measured kernel-stage time; §§1, 6 and 7 retain their labelled fits and extrapolations. No old timing is divided into a new one. |
+
+Current correctness coverage includes the formal-degree correction sweep in
+`src/poly/univariate/resultant.rs`, dense/Euclidean agreement at every point of a small field and
+on random pairs in `src/grobner/resultant.rs`, and resultant coefficient equality at concurrency
+1, 8 and 32. The new example regression checks ordered samples against direct dense determinants
+in both timing orders, including a point where both leading coefficients vanish. `test = true`
+on the example brings that regression into the existing CI test jobs; no new workflow is needed.
+
+The registered permutation witnesses were moved out in #668; this change adds no permutation
+implementation and claims no new witness verification or frontier extension. Those historical
+results remain in the pre-move record. The whole-route costs in §7 are also historical models,
+not timings of this comparison. The new instrument excludes interpolation and root finding.
+
+### 11.1 Matched 32-worker measurement
+
+**Measured at:** base `d1cbbce3`, instrument blob `94d9d9e6dbec`
+(`examples/determinant_width.rs`), bivariate sampler blob `ab0982588ff8`
+(`src/grobner/resultant.rs`), remainder kernel blob `490e793ec208`
+(`src/poly/univariate/resultant.rs`). Taken 2026-11-11 at 15:33–15:34 UTC on the Threadripper PRO 5995WX,
+`ZEEBRA_MACHINE=5995wx`, `ZEEBRA_AFFINITY=0-31`. Topology was checked: CPUs 0–31 are distinct physical
+cores. Release build with the repository's `-C target-cpu=x86-64-v3`, fat LTO and one codegen unit;
+`RUSTC_WRAPPER=''`, temporary files and artifacts on `/buildcache`.
+
+Reproduce from the repository root after applying this change:
+
+```sh
+mkdir -p /buildcache/cargo-target/zeebra-297/tmp
+CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-297 \
+TMPDIR=/buildcache/cargo-target/zeebra-297/tmp RUSTC_WRAPPER='' \
+  cargo build --release --example determinant_width -j 16
+(
+  ulimit -v 16777216
+  ZEEBRA_MACHINE=5995wx ZEEBRA_AFFINITY=0-31 \
+    tools/benchlock.sh sylvester-297-final timeout 600 /usr/bin/time -v \
+    taskset --cpu-list 0-31 \
+    /buildcache/cargo-target/zeebra-297/release/examples/determinant_width \
+    --compare-kernels --order 1458 --pair triangular --width 32 --samples 128 --repeats 3
+)
+```
+
+The cap is 16 GiB of virtual address space for this run; measured peak RSS is reported separately below.
+The pair is deterministic, seed `0x741a ^ 1458`, two random total-degree-729 polynomials over
+KoalaBear at 64-bit storage. It models triangular support and is not a registered CICO pair.
+Each draw evaluates the same 128 points, `7..=134`, through the shipped parallel sample loop.
+
+All times below are **measured wall seconds per sample**, including specialization and worker
+creation. Every sample was equal between the two kernels on all three draws.
+
+| draw | first kernel | dense, 32 workers | Euclidean, 32 workers |
+|---:|---|---:|---:|
+| 1 | dense | 0.092571609 | 0.000135173 |
+| 2 | Euclidean | 0.096029297 | 0.000121403 |
+| 3 | dense | 0.094415558 | 0.000125124 |
+| median | — | **0.094415558** | **0.000125124** |
+
+The ratio of medians is **754.58x on the determinant stage at matched 32-worker concurrency**.
+Draw spread `(max-min)/median` is **3.66% dense, 11.01% Euclidean**; three draws do not support a
+precise universal factor. No historical timing enters this ratio. It also must not be compared
+directly to §5.6's single-worker synthetic-pair ratio: the pair and concurrency both differ.
+
+The lock recorded `START load=2.34`, `END status=0 end=exited elapsed=36s load=15.72`.
+The end load includes this run's own 32 workers. GNU time measured **36.35 s elapsed**, **2 403 420
+KiB peak RSS** (about **2.29 GiB**, whole comparison process, dominated by the dense arm), and no
+swaps. The run completed inside both caps. This measures neither a per-kernel memory ratio nor
+whole-route solving time. It confirms that the adopted Euclidean kernel beats the already-parallel
+dense baseline on these identical inputs; it adds no round-count or witness claim.
