@@ -195,6 +195,13 @@ The [competitive board](research/competitive/COMPETITIVE.md) retains cross-engin
 including resource refusals. The [upper-rung sweep](docs/research/cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected)
 records the per-rung budgets and limitations of its single-run comparisons.
 
+The [M26 integration report](docs/MILESTONE-ALGORITHMIC-ELIMINATION.md#14-integration-report-2026-11-11)
+scores the shipped Euclidean resultant, root-finding measurements and retained engine records.
+M26's minimum remains incomplete: the full Wiedemann characterization and conversion are open,
+and an isolated before/after RSS measurement for the basis-storage change is missing. Later M27
+F4 defaults close the measured Singular gap on the reported MQ cohort; the report identifies that
+cohort separately from the historical M26 baseline.
+
 ## Contributing and documentation
 
 - [`docs/guide/development.md`](docs/guide/development.md) — building, the full test matrix, what CI

@@ -3,7 +3,9 @@
 **Measured at:** publication bound `91d32ece` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
 
-**Status:** planned.
+**Status:** integration report published, 2026-11-11; minimum and strong criteria not fully met.
+[§14](#14-integration-report-2026-11-11) scores the outstanding work explicitly; #368 remains open.
+Sections 1–12 preserve the plan and its historical baselines, rather than describing current defaults.
 **Prerequisite:** M25, complete and merged — `MILESTONE-COMPETITIVE-ALGEBRA.md`, including its §13
 report.
 **Board:** [Zeebra, project #7](https://github.com/users/mfaulk/projects/7), label `M26`.
@@ -21,6 +23,7 @@ competitive gap, chosen by a measurement rather than by plausibility.**
 | date | change |
 |---|---|
 | 2026-11-07 | Written from M25 §13.8/§13.9 and the post-report issues #349–#351. |
+| 2026-11-11 | #370: integrate the acceptance report, regenerate Scoreboard A, and reconcile current status after #668 moved cryptanalysis research out. |
 
 ---
 
@@ -217,10 +220,11 @@ Three things make the figure admissible rather than an artefact:
    **1 930x → 1 692x**. Both runs are kept. This is M25's measurement-integrity defect #8 and the
    only one of the six with no trigger to avoid.
 
-**What exists and what does not.** The prototype was a throwaway crate outside `src/`, and
+**At planning time.** The prototype was a throwaway crate outside `src/`, and
 `research/m25-euclidean-resultant` carries **documentation commits only** — it is merged, and there is
 no remainder-sequence implementation in `src/`. **M26-A is an implementation, not an integration**,
 and the recommendation that described it as the latter was wrong about the state of the tree.
+**Subsequently shipped in #350**; see [§14.4](#144-performance-improvements-and-research-findings).
 
 **The correctness problem is the whole of the work.** Specialization points where leading coefficients
 vanish and the univariate degrees drop. The prototype carries a formal-degree correction; it has never
@@ -511,45 +515,186 @@ research in #668; they are preserved at commit 9532a9a2.*
 
 ## 13. Reproducing
 
-```bash
-# the claim queue, before picking anything up
-./scripts/agent/zb-claim.sh orient
+Run from the repository root. These commands use current paths; historical cryptanalysis commands
+are available at `9532a9a2` and belong to the separate research repository after #668.
 
-# the existing F4 stage profiler, which is where #349 starts
+```sh
+# Current configuration names and the competitive MQ stage profiler.
 cargo run --release --example f4_profile -- list
-cargo run --release --example f4_profile -- baseline
+cargo run --release --example f4_profile -- mq
+
+# Matched kernels through the shipped sampler; the complete pinned protocol is
+# structured-sylvester.md §11.1. This small invocation is a correctness smoke run.
+cargo run --release --example determinant_width -- --compare-kernels --order 18 --width 1 --samples 8 --repeats 1
+
+# Both all-roots algorithms on identical inputs; assertions check agreement.
+cargo run --release --example graeffe_root -- deflate degrees=729
+
+# Render existing records only: this takes no new measurements.
+cargo run --example competitive -- --write
+cargo test --test committed_records
+bash tools/check-measurement-provenance.sh
 ```
 
-**#349 is work, not a command.** `f4_profile` takes a *configuration* name and profiles the built-in
-benchmark systems; `mq-random-10` is an **external corpus** instance
-(`src/grobner/external/corpus.rs:152`, `random_mq_instance(10, 10, …)`) and the profiler has no path
-to it. Reaching the losing instance's stage split is the deliverable.
+The renderer does not read `ZEEBRA_MACHINE` or `ZEEBRA_AFFINITY`: it preserves each record's
+stored environment. Set both when **taking new measurements**, as described in the
+[external-engine guide](guide/external-engines.md#other-external-engines-for-comparison).
+The `--write` path rewrites both `research/competitive/COMPETITIVE.md` and its source history;
+review both diffs. Do not take new timings alongside builds. The
+[benchmarking guide](guide/benchmarking.md) specifies the lock, pinning and resource guards.
 
-```bash
-# the dense Sylvester baseline #350 must beat, and the measurement #318/#319
-# are about. On the lock, one pinned core, build flags verified not assumed
-./tools/benchlock.sh -- taskset -c 0 \
-  cargo run --release --example determinant_sweep -- --order 1458 --determinants 128
-cargo run --release --example determinant_sweep -- --concurrency 32   # the width penalty, #319
+## 14. Integration report, 2026-11-11
 
-# root finding's comparand (#351) — one usable root is not all roots
-cargo run --release --example graeffe_root -- list
-cargo run --release --example graeffe_root -- koalabear degrees=6561,19683
+**Evidence snapshot:** `4bcf3923`, including #297's final decision and matched-concurrency run.
+**Measured at:** not measured here. This report integrates named measurements below and regenerates
+Scoreboard A from the committed history at that snapshot. No timing, RSS or witness was newly
+measured for #370. Historical figures in §§1–12 retain their original publication-bound provenance.
 
-# the conversion split M26-B stage 1 must reproduce on a second Anemoi rung
-# (the Anemoi ladder example moved out in #668)
-cargo run --release --example fglm_profile -- katsura-7
+**Verdict:** the minimum and strong tiers are **not met in full**. The Euclidean kernel, deciding
+F4 profile, root-finding measurement, budget diagnostics and external-engine records landed.
+M26-B's complete characterization and certified scalar-Wiedemann conversion did not. A later,
+explicitly identified M27 cohort demonstrates the competitive-task alternative of the stretch
+criterion; that does not make the unmet minimum true or establish a conversion improvement.
 
-# the competitive board (#369). `competitive` only renders accumulated history
-# and takes no measurements; tools/scoreboard.sh took them, by tier (moved out in #668)
-cargo run --release --example competitive                 # render to stdout
-cargo run --release --example competitive -- --write      # update research/competitive/
+### 14.1 Acceptance, criterion by criterion
 
-# the agent tooling's own tests
-bash scripts/agent/test/zb-claim-test.sh
-bash tools/test/rss-guard-test.sh
-```
+Scored against §10 as retained after #668, rather than silently restoring the moved cryptanalysis
+requirements. Closed issue state alone is not evidence that every measurement clause was satisfied.
 
-`ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` must be set or the records key wrong, and `--all` is never
-passed. Commands are as of writing; `docs/guide/benchmarking.md` is authoritative for example
-invocations.
+| tier | criterion | result | deciding evidence or missing artifact |
+|---|---|---|---|
+| Minimum | Euclidean remainder sequence in `src/`, independently validated including specialization points | **met** | #350; `src/poly/univariate/resultant.rs`, `src/grobner/resultant.rs`, and the differential unit tests in those modules; [structured Sylvester §5.6 and §11](research/structured-sylvester.md#11-297-completion-the-decision-and-the-parallel-baseline). Dense determinants remain the independent oracle. |
+| Minimum | #349 profile completed and acted on | **met** | [§8.1.1](#811-answered-and-the-gate-as-written-was-slightly-wrong) records the result and rejects #268/#330 for this gap; #304 removed duplicate storage, then #436/#452 located the time cost in division. Later algorithm changes are identified in §14.4. |
+| Minimum | #351 root-finding cost measured | **met** | [Graeffe §9.7](research/graeffe-root-finding.md#97-351-all-roots-by-deflation-measured-against-the-gcd-finder): matching all-roots sets, a measured curve through the target degree, and registered-row root counts. Large unmeasured degrees remain extrapolations. |
+| Minimum | M26-B stage 1 characterization recorded, positive or negative | **not met in full** | [Order conversion §4](research/order-conversion.md#4-new-shape-position-holds-on-anemoi-fcico-and-pcico) and [#368's handoff](https://github.com/mfaulk/zeebra/issues/368#issuecomment-6730764149) establish the split and small-rung shape position. Target-rung shape position and operator sparsity are still missing; the gate has not produced a complete positive or negative deliverable. |
+| Minimum | #304 duplicated storage removed **with measured peak RSS before and after** | **not met in full** | `92a262d7` removes the extra copies and records exact-basis checks. Its commit and [M27 baseline §2.1](research/m27-baseline.md#21-what-the-re-measurement-settles) establish that this is a memory change, not the claimed time remedy. [PR #437](https://github.com/mfaulk/zeebra/pull/437) explicitly says the large-basis run was not taken; no isolated before/after peak-RSS pair is retained; later matrix-route RSS is a different experiment. |
+| Minimum | Retained records for at least three external libraries, or per-library blockers | **met** | Four external libraries in §14.2, with unsupported, stopped and failed rows retained. #369's population work is merged. |
+| Minimum | #318/#319 resolved or explicitly bounded | **met** | [Resultant elimination §6.13](research/resultant-elimination.md#613-318-and-319-resolved-and-they-are-two-different-things): session drift remains bounded; the loaded width penalty disappears on the quiet box. Ratios in §14.4 use paired measurements. |
+| Minimum | Board and documentation truthful | **met for this snapshot** | Board regenerated from its stored history; this report and README distinguish open work and historical defaults. Environment omissions and historical failures are retained in §14.2. |
+| Strong | Minimum plus meaningful end-to-end conversion improvement against M25 | **not met** | #368 is open; `shape.rs` still uses dense incremental dependence. No certified scalar-Wiedemann route with measured end-to-end improvement has shipped. The determinant-stage result does not satisfy this criterion. |
+| Strong | #322 resolved and the entry-budget refusal understood | **met for diagnostics** | `F4Options::live_entry_allowance`, `with_live_entries`, `with_live_budget` and binding-budget errors expose the coupled limits. This does not assert a new Anemoi completion or a justified higher default; #490's remaining remeasurements are separate. |
+| Stretch, alternative 1 | Conversion within roughly twice msolve, matched concurrency/memory and above startup floor | **not met** | No qualifying post-Wiedemann conversion cohort exists. The historical conversion deficit remains motivation, not a measured speedup. |
+| Stretch, alternative 2 | Clear same-machine lead on a full, correct, task-equivalent computer-algebra computation | **met by later M27 work, not an M26-only claim** | #575's cohort at `3d0e3759`, [interreduction §3h](research/interreduction-cost.md#3h-575-the-2x2-over-both-flags-and-both-defaults-move), compares complete reduced bases against Singular with checked invariants; §14.4 gives the paired figures and memory cost. No kernel-only result is used to satisfy this alternative. |
+
+The unfilled RSS clause is an evidence limitation, not a claim that the storage change failed.
+The unfilled characterization clause is not a negative finding: the available split supports
+continuing, but does not finish the sparsity gate. #368 retains its staged implementation scope.
+
+### 14.2 Competitive position and regenerated Scoreboard A
+
+Source: [`history.json`](../research/competitive/results/history.json), rendered by
+`examples/competitive.rs` into [`COMPETITIVE.md`](../research/competitive/COMPETITIVE.md).
+Counts are record counts, including repeated attempts, not distinct solved problems.
+
+| library | attempts | complete | unsupported | stopped by limit | failed |
+|---|---:|---:|---:|---:|---:|
+| Zeebra | 140 | 119 | 6 | 15 | 0 |
+| Singular | 140 | 120 | 5 | 14 | 1 |
+| msolve | 110 | 62 | 39 | 5 | 4 |
+| Groebner.jl | 110 | 55 | 50 | 5 | 0 |
+| Sagebrush | 110 | 84 | 15 | 10 | 1 |
+| **total** | **610** | **440** | **115** | **49** | **6** |
+
+Environment keys are preserved verbatim. **545** records have `ZEEBRA_MACHINE=workstation` and
+`ZEEBRA_AFFINITY=0-7`; **60** have `fedora` and `2`; **5** have `fedora` and affinity **unset**.
+Affinity is stored in `environment.cpu`, not as a separate JSON key. The hardware string is
+Threadripper PRO 5995WX. Do not pool these environments, different commits, policies, tasks or
+problem digests to construct a headline. The unset cohort is incomplete evidence, not permission
+to infer pinning from the workstation's identity.
+
+The regenerated process-wall summary has **1 034 candidate pairs**: **143** startup-floor
+disqualifications and **891** publishable pairs, including **82** inside the noise band,
+**223** against a non-authoritative comparand, and **587** on which a conclusion may rest.
+These categories overlap; they are not a partition to sum. No pair lacks checked invariants or
+recorded ideal equivalence. These are historical record pairings, not independent repeated experiments.
+The engine-internal section is a different objective from process-wall comparison and is never
+substituted for it. Historical Sagebrush rows without the matched ISA remain explicitly
+non-authoritative; old capability misclassifications remain history rather than being hand-edited.
+The historical msolve conversion deficit is still cited evidence in the research notes, not a newly
+retained certified-Wiedemann comparison. This report does not claim that all of #369's original
+per-deficit record requirements are thereby fulfilled.
+
+### 14.3 Cryptanalytic position and computational frontier against M25
+
+#668 moved cryptanalysis-specific instruments, witness records and reports out of this repository;
+`9532a9a2` preserves their last pre-move tree. The report's active scope is the library and
+competitive board, as clarified on [#370](https://github.com/mfaulk/zeebra/issues/370#issuecomment-6755545653).
+No new cryptanalytic witness is claimed by this integration.
+
+The historical harder Poseidon parameter-combination result belongs to #367 and the moved
+research. It is not a larger round count. Likewise, fixing the entry-budget diagnostic or shrinking
+retained memory does not demonstrate a larger solvable Anemoi rung. Against M25, the supported
+library capability advanced through the shipped Euclidean resultant, all-roots deflation and more
+competitive F4 defaults; the competitive corpus now retains larger-rung attempts and their
+resource refusals. Those changes do not establish a new cryptanalytic frontier here.
+
+### 14.4 Performance improvements and research findings
+
+**The determinant:** [structured Sylvester §11.1](research/structured-sylvester.md#111-matched-32-worker-measurement)
+records the current paired kernel comparison at base `d1cbbce3`, with source blobs named beside it,
+`ZEEBRA_MACHINE=5995wx`, `ZEEBRA_AFFINITY=0-31`, release/v3, matched workers and identical samples.
+The **754.58x** ratio of medians is determinant-stage performance only. The input is the named
+synthetic triangular pair; it is not a registered CICO solve. The dense arm remains the correctness
+oracle, including degree drops, and the full comparison's RSS is not a per-kernel memory ratio.
+
+**The F4 gap:** #349 correctly found interreduction, but removing storage duplication did not remove
+its time cost. The later M27 mechanism is fewer reducible candidate tails plus matrix
+interreduction, rather than a faster copy. In #575's `3d0e3759` cohort,
+`ZEEBRA_MACHINE=workstation`, `ZEEBRA_AFFINITY=0-7`, one worker, one row per process:
+
+| full reduced-basis task | old default | shipped pair of flags | Singular | improvement against old default | lead over Singular |
+|---|---:|---:|---:|---:|---:|
+| `mq-random-10` | 27 536.2 ms | 4 695.7 ms | 7 371.9 ms | 5.86x | 1.57x |
+| `katsura-11` | 241 042.6 ms | 29 769.4 ms | 53 591.9 ms | 8.10x | 1.80x |
+
+These are the measured means and ratios from [interreduction §3h](research/interreduction-cost.md#3h-575-the-2x2-over-both-flags-and-both-defaults-move),
+not ratios against M25's different-session wall times. MQ has repeated arms; Katsura has one attempt
+per arm and is correspondingly weaker evidence. Both are above startup floors and compute the same
+reduced-basis objective. **Memory costs rise:** MQ peak RSS is 418.8 MB against 162.1 MB and Katsura
+667.0 MB against 538.9 MB. Faster defaults are not a memory reduction. Groebner.jl and msolve still
+lead on MQ in this cohort; beating Singular is not an all-engine lead.
+
+**Root finding:** #351 bridges one-root search to all-roots enumeration by checked deflation.
+[Graeffe §9.7](research/graeffe-root-finding.md#97-351-all-roots-by-deflation-measured-against-the-gcd-finder)
+is the named measurement, with its publication-bound header; it measures agreement, candidate
+counts and the degree curve. The advantage depends on few base-field roots and field two-adicity.
+It is not a field-independent or root-count-independent replacement for `roots()`.
+
+### 14.5 Negative results and cost-model accuracy
+
+- #268/#330 did not explain the measured MQ gap. The gate's first branch bundled interreduction
+  with construction even though they implicated different issues; §8.1.1 records that defect.
+- #304's stage share was incorrectly treated as evidence about a storage optimization's time
+  benefit. The later measurements in `m27-baseline.md` §2.1 retract that attribution.
+- The matrix-route estimate assumed competing engines built comparable matrices. They did not;
+  [interreduction §3a.1](research/interreduction-cost.md#3a1-the-estimate-was-wrong-by-24x-and-the-reason-is-the-better-finding)
+  measures the discrepancy. A kernel constant cannot price an unmeasured closure.
+- #319's loaded width penalty was ambient contention, not an intrinsic kernel penalty. #318's
+  old-binary rerun still leaves a session effect; `resultant-elimination.md` §6.13 bounds it rather
+  than inventing a source regression. `benchlock` records load and does not exclude builds.
+- [Structured Sylvester §11](research/structured-sylvester.md#11-297-completion-the-decision-and-the-parallel-baseline)
+  adopts the quadratic route and declines or defers the other axes individually. The historical
+  whole-row projection is not promoted to a measured whole-row improvement by a kernel benchmark.
+- M26-B remains unfinished, not disproved. Small-rung shape position is computational evidence;
+  it is not a theorem that supplies target-rung sparsity or certifies an unimplemented algorithm.
+
+### 14.6 M27 recommendation and remaining work
+
+**First, finish #368's measured gate at the target rung:** report operator sparsity, operator
+construction separately from conversion, shape-position evidence and the stage split under a
+bounded run. Reuse the existing operators and certification machinery. Build scalar Wiedemann only
+if that gate continues to support it; retain classical fallback and explicit route reporting.
+This remains the unclosed algorithmic deficit that motivated M26.
+
+**The contest is the remaining basis gap against Groebner.jl/msolve, not the old Singular gap.**
+M27's F4 defaults already change the latter. Use a same-session, task-equivalent profile to choose
+between further F4 work and conversion work; the old interreduction share cannot justify another
+normal-form rewrite after the default route changed. #659's batch-row working-set finding and
+#640's matrix-corpus coverage gap constrain further F4 investment. #317's comparison gate is not
+an end-to-end result, and #490's default budget is not justified by a near-miss count.
+
+For closure bookkeeping, #368 stays open. #268 remains an open broader representation study, but
+was not funded as the explanation of this MQ gap. #256 and the M26 epic cover more than this report
+and are not declared complete by it. The isolated #304 peak-RSS pair is explicitly missing evidence;
+#370 supplies this report, board regeneration and README reconciliation without claiming that all
+M26 implementation or measurement work has finished.
