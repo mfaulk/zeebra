@@ -51,10 +51,15 @@ isolation for concurrent writers. Rules:
 - Read-only fan-out (search, audit) parallelizes safely; **writes do not**.
 - After any parallel run, `git status` the orchestrator checkout and confirm no
   agent touched files outside its scope.
-- Give each agent a **private `CARGO_TARGET_DIR`** — `target-<issue>` inside its
-  own worktree, with `RUSTC_WRAPPER=""` — so concurrent builds neither clobber
-  each other nor link against a stale rlib. `.gitignore` covers `/target-*`,
-  but prefer an explicit file list to `git add -A` regardless.
+- Give each agent a **private `CARGO_TARGET_DIR`** —
+  `/buildcache/cargo-target/zeebra-<issue>`, with `RUSTC_WRAPPER=""` — so
+  concurrent builds neither clobber each other nor link against a stale rlib.
+  **Never put target dirs or `TMPDIR` under `$HOME` or the worktree:** that is
+  the btrfs system drive, and heavy link output there exhausts btrfs metadata
+  reservations and stalls every writer on the machine (desktop included). The
+  `/buildcache` drive is XFS on a separate SSD and is pruned automatically.
+  `.gitignore` still covers `/target-*`; prefer an explicit file list to
+  `git add -A` regardless.
 
 `cargo test --doc` is the one suite that fails for reasons that are not the
 diff. `/tmp` here is a 252 G tmpfs, its pages are RAM, and when it is near full
@@ -63,6 +68,12 @@ the linker dies on its mapped temporaries — dozens of doctests failing at
 breakage fails the same test every time. Check `df -h /tmp` and `uptime`, then
 re-run with `TMPDIR` off tmpfs; one session went from 32/70 failing to 67/67
 passing on that alone. Do not retry in a loop, which only adds load.
+
+Use `TMPDIR=$CARGO_TARGET_DIR/tmp` (create it first), which keeps it on
+`/buildcache`, not `~/.cache`. Also cap doctest concurrency: `-j` does not
+bound it, and rustdoc compiles and links every doctest at once (67 concurrent
+`rust-lld`s, about 1,000 threads). Run
+`cargo test --doc -j24 -- --test-threads=16`.
 
 All agents commit as the same git user, so the assignee cannot tell them apart.
 The distinguishing identity is **worktree + branch**:
