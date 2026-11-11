@@ -1,39 +1,5 @@
-//! Shape position: when the lex basis can be read off one variable's Krylov sequence.
-//!
-//! **A feasibility study with a verified prototype, not a production converter.** M18-4's research
-//! spike, and §8 of `docs/MILESTONE-FGLM-SCALABILITY.md` has the measurements and the go/no-go.
-//!
-//! # The idea
-//! Classical FGLM walks the monomials in lex order, asks of each whether its class is in the span
-//! of those accepted, and emits a relation when it is not. The walk is why it keeps every accepted
-//! quotient vector: a candidate's class is `x_i` times an accepted one.
-//!
-//! If a single variable `t` *generates* the quotient algebra — if `1, t, ..., t^{D-1}` is a basis of
-//! `A`, which is what **shape position** means — none of that is needed. The lex basis is then
-//!
-//! ```text
-//! p(t) = 0,   x_0 - h_0(t) = 0,   ...,   x_{N-2} - h_{N-2}(t) = 0
-//! ```
-//!
-//! and every one of those `N` polynomials is one linear solve against the same `D x D` matrix,
-//! whose columns are the powers of `t`. There is no frontier, no monomial ordering question, and
-//! nothing to retain but the echelon form itself — the Krylov vectors are consumed as they are
-//! produced, so the accepted-vector block classical FGLM carries does not exist here.
-//!
-//! # What this is not
-//! It is not sparse FGLM. Faugère and Mou's algorithms replace the dense dependence test with a
-//! *scalar* Krylov sequence `l(t^k)` of length `2D` for a linear form `l`, and recover the minimal
-//! polynomial from it by Berlekamp–Massey in `O(D)` memory. That is where the asymptotic win is,
-//! and Zeebra has no Berlekamp–Massey. This prototype keeps the dense echelon form, so it is
-//! `O(D^2)` memory like the classical algorithm — just a smaller constant and a simpler shape.
-//! §8.5 of the milestone document is the recommendation that follows.
-//!
-//! # Nothing probabilistic is exposed
-//! [`shape_lex_basis`] verifies its own output before returning it, deterministically. See there.
-//!
-//! # References
-//! * Faugère, J.-C., Mou, C. (2017). *Sparse FGLM algorithms.* J. Symbolic Computation 80,
-//!   538–569.
+//! Dense Krylov diagnostics for shape position, including nonradical quotients.
+//! Scalar Wiedemann conversion uses the same independent operator-evaluation certificate.
 
 use std::fmt::{Display, Formatter};
 
@@ -213,8 +179,8 @@ pub fn separating_variables<const N: usize, F: FiniteField>(
 /// the wrong one: `p(t)` has degree `D` in a single variable, which under grevlex is as far from
 /// the staircase as a monomial gets. Tried, it did not finish on cyclic-6 within ten minutes —
 /// avoiding exactly that reduction is why one converts bases at all. Evaluating at the operators
-/// is `D` operator applications per relation and is independent of the echelon form that produced
-/// the coefficients, so it is both cheaper and a real second opinion. The unit tests additionally
+/// shares one sequence of powers across relations and is independent of the echelon form that
+/// produced the coefficients, so it is both cheaper and a real second opinion. The unit tests additionally
 /// reduce modulo the source basis on small systems, where it is affordable.
 ///
 /// # Errors
@@ -290,12 +256,10 @@ pub fn shape_lex_basis<const N: usize, F: FiniteField>(
     }
 
     // Fact 1 of the two above. Fact 2 holds by construction and is argued, not computed.
-    for polynomial in &basis {
-        if !vanishes_in_algebra(algebra, polynomial, last) {
-            return Err(ShapeError::Unverified {
-                detail: format!("{} is not in the ideal", polynomial),
-            });
-        }
+    if !shape_relations_vanish(algebra, &basis, last) {
+        return Err(ShapeError::Unverified {
+            detail: "a reconstructed relation is not in the ideal".to_string(),
+        });
     }
 
     // Descending by lex leading monomial, the convention both Gröbner engines return.
@@ -308,61 +272,62 @@ pub fn shape_lex_basis<const N: usize, F: FiniteField>(
     Ok(basis)
 }
 
-/// Whether a shape relation's class in the quotient algebra is zero, i.e. whether it is in `I`.
+/// Evaluate shape relations independently, sharing only the sequence of quotient powers.
 ///
-/// Evaluates the polynomial at the operators rather than reducing it: every term is `c * t^k` or
-/// the single leading `x_i`, so one sweep up the powers of `t` accumulates all of them in `D`
-/// operator applications. Independent of the echelon form that produced the coefficients, which is
-/// what makes it a check rather than a restatement.
-///
-/// # Panics
-/// If a term is neither a power of `t` nor a single other variable, which the construction above
-/// cannot produce.
-fn vanishes_in_algebra<const N: usize, F: FiniteField>(
+/// The input terms must be powers of `t` or single other variables. No reconstruction data or
+/// projection enters this check. Sharing the powers avoids repeating the same matvec per relation.
+pub(super) fn shape_relations_vanish<const N: usize, F: FiniteField>(
     algebra: &QuotientAlgebra<N, F>,
-    polynomial: &MultivariatePolynomial<N, F>,
+    polynomials: &[MultivariatePolynomial<N, F>],
     t: usize,
 ) -> bool {
-    let dimension = algebra.dimension();
-    let mut total = vec![F::zero(); dimension];
-
-    // The terms that are not powers of `t`: at most the one leading `x_i`.
-    let mut powers: Vec<(usize, F)> = Vec::new();
-    for (monomial, coefficient) in polynomial.terms() {
-        let exponents = monomial.exponents();
-        let other: Vec<usize> = (0..N).filter(|i| *i != t && exponents[*i] != 0).collect();
-        match other.as_slice() {
-            [] => powers.push((exponents[t] as usize, *coefficient)),
-            [variable] => {
-                assert_eq!(
-                    exponents[*variable], 1,
-                    "a shape relation's non-leading terms are powers of t"
-                );
-                assert_eq!(exponents[t], 0, "a shape relation has no mixed term");
-                let class = algebra.multiply_by_variable(*variable, &algebra.one());
-                for (slot, value) in total.iter_mut().zip(&class) {
-                    *slot += *coefficient * *value;
+    let mut totals = vec![vec![F::zero(); algebra.dimension()]; polynomials.len()];
+    let mut powers = vec![Vec::new(); polynomials.len()];
+    let mut highest = 0;
+    for ((polynomial, total), powers) in polynomials.iter().zip(&mut totals).zip(&mut powers) {
+        for (monomial, coefficient) in polynomial.terms() {
+            let exponents = monomial.exponents();
+            let other: Vec<usize> = (0..N).filter(|i| *i != t && exponents[*i] != 0).collect();
+            match other.as_slice() {
+                [] => {
+                    let degree = exponents[t] as usize;
+                    powers.push((degree, *coefficient));
+                    highest = highest.max(degree);
                 }
+                [variable] => {
+                    assert_eq!(
+                        exponents[*variable], 1,
+                        "shape relation has a nonlinear other variable"
+                    );
+                    assert_eq!(exponents[t], 0, "a shape relation has no mixed term");
+                    let class = algebra.multiply_by_variable(*variable, &algebra.one());
+                    for (slot, value) in total.iter_mut().zip(&class) {
+                        *slot += *coefficient * *value;
+                    }
+                }
+                _ => panic!("a shape relation has no term in two variables"),
             }
-            _ => panic!("a shape relation has no term in two variables"),
         }
+        powers.sort_unstable_by_key(|(degree, _)| *degree);
     }
-
-    // One sweep up the powers of `t`, accumulating every term that needs each.
-    let highest = powers.iter().map(|(k, _)| *k).max().unwrap_or(0);
     let mut power = algebra.one();
+    let mut positions = vec![0; polynomials.len()];
     for k in 0..=highest {
-        for (_, coefficient) in powers.iter().filter(|(exponent, _)| *exponent == k) {
-            for (slot, value) in total.iter_mut().zip(&power) {
-                *slot += *coefficient * *value;
+        for ((terms, position), total) in powers.iter().zip(&mut positions).zip(&mut totals) {
+            if let Some((degree, coefficient)) = terms.get(*position) {
+                if *degree == k {
+                    for (slot, value) in total.iter_mut().zip(&power) {
+                        *slot += *coefficient * *value;
+                    }
+                    *position += 1;
+                }
             }
         }
         if k < highest {
             power = algebra.multiply_by_variable(t, &power);
         }
     }
-
-    total.iter().all(|value| value.is_zero())
+    totals.iter().flatten().all(|value| value.is_zero())
 }
 
 /// `leading - sum_k coefficients[k] * t^k`, monic in `leading`.

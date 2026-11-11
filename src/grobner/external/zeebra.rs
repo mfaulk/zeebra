@@ -360,6 +360,15 @@ fn solve<const N: usize, F: FiniteField>(
 
             match converted {
                 Ok((lex, statistics)) => {
+                    stages.push((
+                        format!(
+                            "conversion: route={:?}, projections={}, fallback={:?}",
+                            statistics.conversion_route,
+                            statistics.wiedemann_attempts,
+                            statistics.wiedemann_fallback
+                        ),
+                        std::time::Duration::ZERO,
+                    ));
                     // The lex basis's own leading monomials, which is what another engine asked
                     // for the same task would report. Not the source basis's.
                     let lex_leading: Vec<String> = lex
@@ -640,15 +649,21 @@ impl ExternalSolver for ZeebraSolver {
         // with batches left reduced the autoreduce matrix falls to a few hundred columns, so the
         // route's cost is a different quantity. A row naming one flag and not the other would be a
         // row whose configuration cannot be reconstructed.
+        let conversion = match self.fglm_options.conversion_strategy {
+            crate::grobner::fglm::ConversionStrategy::Classical => "classical",
+            crate::grobner::fglm::ConversionStrategy::Adaptive => "adaptive",
+            crate::grobner::fglm::ConversionStrategy::Wiedemann => "wiedemann",
+        };
         Ok(
             ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION")).with_build(format!(
-                "in-process, same build as the harness; interreduction={}, batch-rows={}",
+                "in-process, same build as the harness; interreduction={}, batch-rows={}, fglm={}",
                 route,
                 if self.f4_options.reduce_batch_rows {
                     "reduced"
                 } else {
                     "echelon"
-                }
+                },
+                conversion
             )),
         )
     }
@@ -1077,6 +1092,10 @@ mod tests {
                     reduce_batch_rows,
                     ..F4Options::default()
                 })
+                .with_fglm_options(crate::grobner::FglmOptions {
+                    conversion_strategy: crate::grobner::fglm::ConversionStrategy::Classical,
+                    ..crate::grobner::FglmOptions::default()
+                })
                 .probe_version()
                 .expect("in-process")
         };
@@ -1091,7 +1110,7 @@ mod tests {
                 Some(
                     format!(
                         "in-process, same build as the harness; \
-                         interreduction={expected}, batch-rows=echelon"
+                         interreduction={expected}, batch-rows=echelon, fglm=classical"
                     )
                     .as_str()
                 )
@@ -1104,7 +1123,7 @@ mod tests {
             probe(InterreductionRoute::Division, true).build.as_deref(),
             Some(
                 "in-process, same build as the harness; \
-                 interreduction=division, batch-rows=reduced"
+                 interreduction=division, batch-rows=reduced, fglm=classical"
             )
         );
 
@@ -1112,6 +1131,26 @@ mod tests {
             probe(InterreductionRoute::Division, false).to_string(),
             probe(InterreductionRoute::Matrix, false).to_string()
         );
+    }
+
+    // The version records the conversion strategy independently of the F4 configuration.
+    #[test]
+    fn test_the_version_probe_records_the_conversion_strategy() {
+        use crate::grobner::fglm::{ConversionStrategy, FglmOptions};
+        for (strategy, expected) in [
+            (ConversionStrategy::Classical, "classical"),
+            (ConversionStrategy::Adaptive, "adaptive"),
+            (ConversionStrategy::Wiedemann, "wiedemann"),
+        ] {
+            let version = ZeebraSolver::new()
+                .with_fglm_options(FglmOptions {
+                    conversion_strategy: strategy,
+                    ..FglmOptions::default()
+                })
+                .probe_version()
+                .unwrap();
+            assert!(version.build.unwrap().contains(&format!("fglm={expected}")));
+        }
     }
 
     /// No memory figure unless the caller declares this process is doing one row.

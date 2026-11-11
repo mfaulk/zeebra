@@ -1,5 +1,11 @@
 # Wiedemann and Krylov methods: won't-do for F4, superseded deferral for FGLM
 
+**Implementation update (#368):** the library now provides certified scalar Wiedemann conversion
+with explicit adaptive selection and classical fallback. See
+[`certified-wiedemann.md`](certified-wiedemann.md) for the algorithm, public paired measurements
+and limits. The discussion below preserves the earlier decision and its historical measurements.
+
+
 Decision record for [#58](https://github.com/mfaulk/zeebra/issues/58), in the style of
 `docs/research/elimination-beyond-grobner.md`. It exists because black-box linear algebra is the
 obvious thing to propose at every milestone and **the answer is different for the two places this

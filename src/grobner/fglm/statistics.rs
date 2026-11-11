@@ -1,10 +1,4 @@
-//! Counters and timings describing the work an FGLM conversion performed.
-//!
-//! The M17 statistics attributed the cost between the frontier, the operators, and the dependence
-//! test. That was enough to find the bottleneck — operator construction is 95% of katsura-7's
-//! conversion — and not enough to say what inside it to attack. These add the structure of the
-//! border, which is where the duplicated work lives, and a stage breakdown that separates monomial
-//! lookup from reduction from coordinate-vector assembly.
+//! Operator storage, dependence workspace and process RSS are different quantities.
 
 use std::{mem::size_of, time::Duration};
 
@@ -105,7 +99,7 @@ pub struct FglmStageTimings {
     /// rather than field arithmetic — and the two are addressed by different changes.
     pub column_assembly: Duration,
 
-    /// The lex walk: the frontier, the operator applications, and the dependence test.
+    /// The lex walk, or scalar sequence/reconstruction and its deterministic certificate.
     pub dependence: Duration,
 }
 
@@ -184,17 +178,27 @@ pub struct FglmMemory {
 
     /// Bytes of the dense blocks above, at `size_of::<F>()` a cell.
     pub dense_block_bytes: usize,
+
+    /// Conservative field-cell workspace allowance checked before a Wiedemann attempt.
+    ///
+    /// Zero if no attempt was admitted; excludes output polynomial maps and allocator overhead.
+    /// The workspace is released before classical fallback allocates its blocks.
+    pub krylov_workspace_cells: usize,
+
+    /// Conservative bytes including index storage, at `(size_of::<F>() + size_of::<usize>())`
+    /// per allowance cell.
+    pub krylov_workspace_bytes: usize,
 }
 
 impl FglmMemory {
-    /// Every byte figure above added together.
+    /// Operators plus the larger of classical blocks and the linear workspace allowance.
     ///
-    /// **An estimate of what this crate stores, not a measurement of the process.** It ignores
-    /// allocator overhead, the source basis, every temporary, and F4's own peak while computing
-    /// the input. [`peak_resident_bytes`](crate::util::peak_resident_bytes) measures the process;
+    /// **An estimate, not process RSS.** The routes' workspaces are not live together. This excludes
+    /// allocator overhead, source/output polynomial maps, the classical working registers and
+    /// F4's peak while producing the input. [`peak_resident_bytes`](crate::util::peak_resident_bytes) measures the process;
     /// the two are reported side by side and are not interchangeable.
     pub fn estimated_bytes(&self) -> usize {
-        self.operator_bytes + self.dense_block_bytes
+        self.operator_bytes + self.dense_block_bytes.max(self.krylov_workspace_bytes)
     }
 
     /// The dense cells a conversion of this dimension needs at full rank, and their bytes.
@@ -230,6 +234,15 @@ impl FglmMemory {
 /// cost between the frontier, the operators, and the dependence test.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct FglmStatistics {
+    /// The route that produced the returned basis; candidates counters describe only a lex walk.
+    pub conversion_route: super::ConversionRoute,
+
+    /// Scalar projections attempted, at most three.
+    pub wiedemann_attempts: usize,
+
+    /// Why selection or certification used the classical walk, if applicable.
+    pub wiedemann_fallback: Option<super::WiedemannFallback>,
+
     /// `D = dim_F(R/I)`, and therefore also the number of target standard monomials.
     pub quotient_dimension: usize,
 
@@ -254,7 +267,7 @@ pub struct FglmStatistics {
     /// relations or has a bug.
     pub candidates_pruned: usize,
 
-    /// Candidates whose quotient vector extended the span. Equals `quotient_dimension` on success.
+    /// Classical candidates extending the span; equals the dimension on that route, zero on Wiedemann.
     pub candidates_independent: usize,
 
     /// Candidates whose quotient vector was dependent, each producing one relation.

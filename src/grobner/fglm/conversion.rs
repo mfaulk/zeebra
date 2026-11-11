@@ -126,6 +126,13 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     statistics.memory.operator_bytes = algebra.operator_bytes();
     statistics.memory.dense_columns = algebra.dense_columns();
 
+    let walk = StageClock::new(options.measure_stages);
+    if let Some(basis) = super::wiedemann::try_conversion(&algebra, options, &mut statistics) {
+        statistics.target_basis_elements = basis.len();
+        statistics.timings.dependence = walk.elapsed();
+        return Ok((basis, statistics));
+    }
+
     // Every dense cell the dependence machinery needs at full rank: the span's two triangular
     // blocks — the rows' pivot-offset coordinates and their combinations — and the accepted
     // quotient vectors the walk retains. Checked before allocating, since the size is a function
@@ -167,7 +174,6 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
         });
     }
 
-    let walk = StageClock::new(options.measure_stages);
     let mut span = IncrementalSpan::new(dimension);
     let mut accepted_monomials: Vec<Monomial<N>> = Vec::new();
     let mut accepted_vectors: Vec<Vec<F>> = Vec::new();

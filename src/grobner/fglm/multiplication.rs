@@ -183,6 +183,30 @@ impl<F: FiniteField> MultiplicationOperator<F> {
         result
     }
 
+    /// Apply the transpose without materializing a dense matrix.
+    pub(super) fn apply_transpose(&self, v: &[F]) -> Vec<F> {
+        assert_eq!(
+            v.len(),
+            self.dimension(),
+            "coordinate vector has wrong dimension"
+        );
+        self.columns
+            .iter()
+            .map(|column| match column {
+                Column::Standard(k) => v[*k],
+                Column::Sparse(entries) => entries
+                    .iter()
+                    .map(|(k, value)| v[*k] * *value)
+                    .fold(F::zero(), |a, b| a + b),
+                Column::Dense(values) => v
+                    .iter()
+                    .zip(values)
+                    .map(|(a, b)| *a * *b)
+                    .fold(F::zero(), |a, b| a + b),
+            })
+            .collect()
+    }
+
     /// Column `j` as a dense coordinate vector: the matrix view.
     ///
     /// # Panics
@@ -544,5 +568,42 @@ mod tests {
         let mut unit = OperatorBuilder::<F>::new(4, OperatorStorage::Adaptive);
         unit.push_standard(2);
         assert_eq!(unit.finish().stored_bytes(), 4 * size_of::<Column<F>>());
+    }
+    // Transposition preserves the dot-product duality for standard, zero, sparse and dense columns.
+    #[test]
+    fn test_transpose_duality_in_every_storage() {
+        let u = [F::new(2), F::new(3), F::new(5), F::new(7)];
+        let v = [F::new(11), F::new(13), F::new(17), F::new(19)];
+        for storage in STORAGES {
+            let op = operator(4, &mixed_columns(), storage);
+            let left: F = u
+                .iter()
+                .zip(op.apply(&v))
+                .map(|(a, b)| *a * b)
+                .fold(F::zero(), |a, b| a + b);
+            let right: F = op
+                .apply_transpose(&u)
+                .iter()
+                .zip(v)
+                .map(|(a, b)| *a * b)
+                .fold(F::zero(), |a, b| a + b);
+            assert_eq!(left, right);
+            for j in 0..4 {
+                let expected: F = op
+                    .column(j)
+                    .iter()
+                    .zip(u)
+                    .map(|(a, b)| *a * b)
+                    .fold(F::zero(), |a, b| a + b);
+                assert_eq!(op.apply_transpose(&u)[j], expected);
+            }
+        }
+    }
+
+    // Transposed application rejects a coordinate vector from a different space.
+    #[test]
+    #[should_panic(expected = "coordinate vector")]
+    fn test_transpose_rejects_wrong_dimension() {
+        operator(4, &mixed_columns(), OperatorStorage::Adaptive).apply_transpose(&[]);
     }
 }

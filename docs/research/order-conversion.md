@@ -1,5 +1,11 @@
 # Order conversion: eight alternatives, and a no-go narrowed rather than reversed
 
+**Implementation update (#368):** the library now provides certified scalar Wiedemann conversion
+with explicit adaptive selection and classical fallback. See
+[`certified-wiedemann.md`](certified-wiedemann.md) for the algorithm, public paired measurements
+and limits. The discussion below preserves the earlier decision and its historical measurements.
+
+
 Decision record for [#224](https://github.com/mfaulk/zeebra/issues/224) (D5), in the style of
 [`wiedemann-krylov.md`](wiedemann-krylov.md). #224 asked what the alternatives to this crate's FGLM
 conversion are, what each would cost **here**, and whether

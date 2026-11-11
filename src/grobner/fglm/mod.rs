@@ -19,6 +19,7 @@ mod quotient_algebra;
 mod quotient_basis;
 pub mod shape;
 mod statistics;
+mod wiedemann;
 
 /// Lexicographic bases from Singular, for the differential tests. Test-only: it is reference data,
 /// not library code.
@@ -37,10 +38,12 @@ pub use errors::FglmError;
 pub use incremental_span::{Dependence, IncrementalSpan};
 pub use multiplication::MultiplicationOperator;
 pub use options::{
-    largest_quotient_dimension_within, FglmOptions, OperatorConstruction, OperatorStorage,
-    RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES,
+    largest_quotient_dimension_within, ConversionStrategy, FglmOptions, OperatorConstruction,
+    OperatorStorage, RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES,
 };
 pub use quotient_algebra::{QuotientAlgebra, QuotientStatistics};
 pub use quotient_basis::{classify_ideal, krull_dimension, IdealClass, QuotientBasis};
 pub use shape::{separating_variables, shape_lex_basis, shape_report, ShapeError, ShapeReport};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};
+
+pub use wiedemann::{ConversionRoute, WiedemannFallback};

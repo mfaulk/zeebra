@@ -318,3 +318,58 @@ needs 380 kB.
 `max_operator_bytes` is a second budget beside `max_operator_entries`, not a redefinition of it:
 entries are mathematical nonzeros and bytes are allocations, and the two diverge once a column is
 held densely.
+
+
+### Certified scalar Wiedemann
+
+`FglmOptions::conversion_strategy` selects `Classical`, `Adaptive` (recommended default), or `Wiedemann` (force an
+attempt). Adaptive selection tries quotients of dimension at least 128 when the last variable's
+operator scans at most one quarter of the cells of a dense matrix. Three reproducibly seeded
+projections bound the work before classical fallback. This heuristic does not assert shape position.
+
+```rust
+use zeebra::{fields::Zp13, grobner::{f4, fglm::{
+    fglm_to_lex_with_options, ConversionStrategy, FglmOptions,
+}}, MonomialOrder, MultivariatePolynomial};
+let order = MonomialOrder::GradedReverseLexicographic;
+let source: Vec<MultivariatePolynomial<2, Zp13>> = ["x-y^2", "y^7-1"].iter()
+    .map(|p| MultivariatePolynomial::parse(p, ["x", "y"]).unwrap()).collect();
+let source = f4(&source, order).unwrap();
+let options = FglmOptions { conversion_strategy: ConversionStrategy::Wiedemann,
+    ..FglmOptions::recommended() };
+let (lex, stats) = fglm_to_lex_with_options(&source, order, &options).unwrap();
+assert_eq!(lex.len(), 2);
+assert!(stats.wiedemann_attempts > 0);
+```
+
+A full-degree scalar recurrence supplies candidates, including multiplicities for nonradical
+ideals. Every relation is evaluated independently in the quotient algebra before the fast route
+returns it. Membership and the shape leading monomials prove that the result is the reduced lex
+basis. Lower-degree recurrences, failed certification or insufficient workspace select the
+classical walk; `conversion_route`, `wiedemann_attempts`, and `wiedemann_fallback` report the choice.
+A projection failure does not prove that the variable is nonseparating.
+
+Both routes enforce `max_span_entries` and `max_span_bytes` before allocating their dependence
+workspace. Wiedemann checks a conservative linear allowance, recorded as
+`memory.krylov_workspace_cells` and `memory.krylov_workspace_bytes`; classical fallback checks the
+original quadratic blocks after the fast workspace is released. Operator budgets and the quotient
+dimension cap apply to both. These are representation budgets, not process-RSS ceilings; output
+polynomial maps and allocator overhead are excluded.
+
+`cargo run --release --example wiedemann_conversion -- --variables 4 --degree 5` compares alternating
+classical and adaptive runs on a deterministic shape-position family. It asserts equal bases and
+reports operator construction separately. `--route adaptive` runs only that policy in a fresh
+process for attributable peak RSS. `--input FILE` reads a **precomputed grevlex basis**: variable
+names on line one, characteristic `65537` on line two, then comma-separated polynomials. The input
+precondition is the same as `fglm_to_lex_with_options`; the file path is not a claim of validation.
+
+With the `external-runners` feature, `--msolve PATH` additionally checks exact eliminant equality
+against msolve on those same generators. Zeebra computes the full certified lex basis before
+projecting its eliminant; msolve's process wall includes its own basis pass. The example reports
+raw durations and does not claim a startup-floor-qualified speedup. Set `ZEEBRA_MACHINE` and
+`ZEEBRA_AFFINITY`, build first, then use `tools/benchlock.sh` and `taskset` for measurements.
+
+The measurement example exposes explicit overrides through `--max-dimension`, `--span-cells`,
+`--span-bytes`, `--operator-entries`, `--operator-bytes`, `--border-entries`, `--border-columns`,
+and `--border-rows`. These change only that invocation; keep an external wall/RSS backstop when
+raising them. A border-construction refusal precedes conversion and needs its own budget decision.
