@@ -216,6 +216,10 @@ cohort separately from the historical M26 baseline.
 
 ## Contributing and documentation
 
+The [M27 algorithm decision](docs/research/m27-algorithm-decision.md) records why an additional
+solver prototype is deferred, the capabilities already implemented, and the measurements that
+would justify revisiting the decision.
+
 - [`docs/guide/development.md`](docs/guide/development.md) — building, the test matrix, CI's shorter
   documentation path, build-timing artifacts, and the build configuration
 - [`docs/guide/benchmarking.md`](docs/guide/benchmarking.md) — benchmark suites, instrumented
