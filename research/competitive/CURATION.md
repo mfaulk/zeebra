@@ -23,3 +23,11 @@ Every row in that file, the removed ones included, still names the commit it was
 
 PR #665 subsequently appended 100 upper-rung sweep attempts, measured at `19ff732c`,
 bringing the retained history to 550 rows without restoring the 70 removed cipher rows.
+
+Issue #520's matched-ISA re-take appends 104 attempts at `c033f027`: Zeebra and
+Sagebrush at each of the original 52 public-algebra cells. The preceding 610
+records remain unchanged, giving 714 retained attempts. Sagebrush completes 46
+cells, stops at the wall limit on four and refuses two positive-dimensional
+conversions; Zeebra completes 44, reaches resource caps on six and refuses two
+conversions. The [measurement note](../../docs/research/sagebrush-matched-isa.md)
+records per-cell historical movement and a separate controlled ISA comparison.

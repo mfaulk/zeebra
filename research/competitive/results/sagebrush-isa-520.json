@@ -1,0 +1,259 @@
+{
+  "commit": "c033f027",
+  "machine": "fedora",
+  "affinity": "2",
+  "workers": 1,
+  "profile": "release, fat LTO, codegen-units=1",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "driver_lock_sha256": "40bcc1c3160cfe5584ae99a45ad314d6f41746e120779c5c11f28757d8b64a76",
+  "binaries": {
+    "baseline": {
+      "path": "/buildcache/cargo-target/zeebra-520/sagebrush-baseline/release/sagebrush-gb-driver",
+      "sha256": "a16bbd843468c004aaf324e63c0c52304fe7829877ead60bf8777c1bc63728ae"
+    },
+    "matched": {
+      "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/sagebrush-gb-driver",
+      "sha256": "83cfc6a292432a364d032ba83c4bd2051ff552bd59c58dc37d78976416cfdab9"
+    }
+  },
+  "cells": [
+    {
+      "problem": "mq-random-10",
+      "characteristic": 2147483647,
+      "task": "reduced-grobner-basis",
+      "route": "f4",
+      "order": "degrevlex",
+      "input": "x1,x2,x3,x4,x5,x6,x7,x8,x9,x10\n2147483647\n1928879449*x7+2053109152+104304469*x3^2+1870721330*x1*x4+748564639*x1,\n64820724*x7+352239287+523147416*x3+1500922762*x4*x9+1597195935*x4+1606575599*x2*x3+1360805815*x1*x2+112428712*x3*x4+1538082790*x1+761685338*x6*x7+538123258*x4*x8+505101932*x5+1553103065*x2*x6+1364137242*x6*x10,\n872386891*x1*x5+1499650646*x4+1445760603+1060359103*x3+1081892677*x8*x10+619222243*x1*x4,\n369758379*x10+467795970*x8+195927697*x6*x10+1251838704+186672088*x5+1843786809*x4+117039923*x5*x10,\n518799975+1265569644*x6+1505579546*x9+1611874242*x10,\n952871117+439683606*x1*x9+808021758*x2*x4+761617125*x7*x10+1317887431*x5+1119058612*x1*x4+652473826*x10+1856319920*x9*x10+613100748*x2*x10+496103032*x2,\n953251626*x9+905910885+738096544*x10+1163179939*x1+512089342*x10^2+1879186963*x3*x8+1767868589*x2+708069093*x1*x5+1992401914*x5*x9+876862853*x3*x9+1981043334*x1*x4+2001701597*x5*x6+365050710*x6+1104706149*x3*x10,\n1213704002+281881910*x1*x10+1537653538*x3*x6+1556255992*x1*x9+967800974*x7*x9+692389276*x10+127165083*x1+914138037*x3*x9+1756574646*x1*x4+22019036*x5*x10,\n1021436613*x3*x8+232550218*x8*x9+2099676329*x3*x9+1138567750+2114455762*x5+348274215*x8+180208052*x6*x8+1984851133*x4+308546086*x4*x10+1254013064*x10+1091201026*x2*x5+1105649437*x3*x7+1267085135*x3*x10+1745447376*x3^2+52751734*x6,\n1303200963+1341500912*x5+1939571850*x9+1224760601*x7+1863809719*x6+1165942190*x1*x4+2108692469*x3*x5+974911096*x2*x7+629669878*x2*x4+1276370279*x6*x9\n",
+      "problem_digest": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+      "runs": [
+        {
+          "repeat": 0,
+          "arm": "baseline",
+          "wall_nanos": 304258614,
+          "solve_nanos": 278846000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "ae1747387f170c18604cbaa2f10263143f290913726968de3788e1c8d771c314"
+        },
+        {
+          "repeat": 0,
+          "arm": "matched",
+          "wall_nanos": 302296308,
+          "solve_nanos": 276177000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "ae1747387f170c18604cbaa2f10263143f290913726968de3788e1c8d771c314"
+        },
+        {
+          "repeat": 1,
+          "arm": "matched",
+          "wall_nanos": 301215773,
+          "solve_nanos": 276894000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "ae1747387f170c18604cbaa2f10263143f290913726968de3788e1c8d771c314"
+        },
+        {
+          "repeat": 1,
+          "arm": "baseline",
+          "wall_nanos": 296421967,
+          "solve_nanos": 270562000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "ae1747387f170c18604cbaa2f10263143f290913726968de3788e1c8d771c314"
+        },
+        {
+          "repeat": 2,
+          "arm": "baseline",
+          "wall_nanos": 299890704,
+          "solve_nanos": 273692000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "ae1747387f170c18604cbaa2f10263143f290913726968de3788e1c8d771c314"
+        },
+        {
+          "repeat": 2,
+          "arm": "matched",
+          "wall_nanos": 306016612,
+          "solve_nanos": 282537000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "ae1747387f170c18604cbaa2f10263143f290913726968de3788e1c8d771c314"
+        }
+      ]
+    },
+    {
+      "problem": "mq-planted-14",
+      "characteristic": 2147483647,
+      "task": "lex-basis-by-conversion",
+      "route": "fglm",
+      "order": "lex",
+      "input": "x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14\n2147483647\nx1^2+x2^2+2147483613,\nx1*x2+2147483632,\nx3^2+x4^2+2147483517,\nx3*x4+2147483584,\nx5^2+x6^2+2147483357,\nx5*x6+2147483504,\nx7^2+x8^2+2147483133,\nx7*x8+2147483392,\nx9^2+x10^2+2147482845,\nx9*x10+2147483248,\nx11^2+x12^2+2147482493,\nx11*x12+2147483072,\nx13^2+x14^2+2147482077,\nx13*x14+2147482864\n",
+      "problem_digest": "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+      "runs": [
+        {
+          "repeat": 0,
+          "arm": "baseline",
+          "wall_nanos": 6467032564,
+          "solve_nanos": 6294776000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "d096b6bf67a1af7df0fbc9548ad7a06c6b498d85dda8ca3f0bf7542b66ba25ac"
+        },
+        {
+          "repeat": 0,
+          "arm": "matched",
+          "wall_nanos": 5722451456,
+          "solve_nanos": 5545872000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "d096b6bf67a1af7df0fbc9548ad7a06c6b498d85dda8ca3f0bf7542b66ba25ac"
+        },
+        {
+          "repeat": 1,
+          "arm": "matched",
+          "wall_nanos": 5686884118,
+          "solve_nanos": 5515205000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "d096b6bf67a1af7df0fbc9548ad7a06c6b498d85dda8ca3f0bf7542b66ba25ac"
+        },
+        {
+          "repeat": 1,
+          "arm": "baseline",
+          "wall_nanos": 6498230670,
+          "solve_nanos": 6324327000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "d096b6bf67a1af7df0fbc9548ad7a06c6b498d85dda8ca3f0bf7542b66ba25ac"
+        },
+        {
+          "repeat": 2,
+          "arm": "baseline",
+          "wall_nanos": 6481911544,
+          "solve_nanos": 6310149000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "d096b6bf67a1af7df0fbc9548ad7a06c6b498d85dda8ca3f0bf7542b66ba25ac"
+        },
+        {
+          "repeat": 2,
+          "arm": "matched",
+          "wall_nanos": 5678919079,
+          "solve_nanos": 5506230000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "d096b6bf67a1af7df0fbc9548ad7a06c6b498d85dda8ca3f0bf7542b66ba25ac"
+        }
+      ]
+    },
+    {
+      "problem": "mq-random-10",
+      "characteristic": 32003,
+      "task": "reduced-grobner-basis",
+      "route": "f4",
+      "order": "degrevlex",
+      "input": "x1,x2,x3,x4,x5,x6,x7,x8,x9,x10\n32003\n25831*x7+20840+11357*x3^2+10780*x1*x4+10863*x1,\n5694*x7+6521+4304*x3+1764*x4*x9+15761*x4+22149*x2*x3+9619*x1*x2+27426*x3*x4+9372*x1+14556*x6*x7+1486*x4*x8+3864*x5+30815*x2*x6+26634*x6*x10,\n20937*x1*x5+9593*x4+22271+18689*x3+19351*x8*x10+8715*x1*x4,\n3447*x10+22428*x8+17253*x6*x10+22431+4646*x5+12123*x4+16305*x5*x10,\n13035+294*x6+2396*x9+7614*x10,\n24386+20146*x1*x9+11390*x2*x4+4807*x7*x10+6682*x5+754*x1*x4+24104*x10+31408*x9*x10+7198*x2*x10+22426*x2,\n21681*x9+25416+25874*x10+10479*x1+14316*x10^2+24196*x3*x8+7895*x2+15817*x1*x5+132*x5*x9+22387*x3*x9+22760*x1*x4+27247*x5*x6+29318*x6+6251*x3*x10,\n22460+19100*x1*x10+30400*x3*x6+12744*x1*x9+7410*x7*x9+10212*x10+11627*x1+20889*x3*x9+18118*x1*x4+29976*x5*x10,\n30548*x3*x8+15438*x8*x9+25779*x3*x9+28129+29283*x5+26931*x8+17286*x6*x8+1665*x4+13768*x4*x10+2346*x10+21728*x2*x5+31795*x3*x7+1765*x3*x10+22566*x3^2+11204*x6,\n23304+19934*x5+5730*x9+939*x7+12225*x6+2192*x1*x4+1555*x3*x5+23110*x2*x7+19214*x2*x4+11409*x6*x9\n",
+      "problem_digest": "16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f",
+      "runs": [
+        {
+          "repeat": 0,
+          "arm": "baseline",
+          "wall_nanos": 301067552,
+          "solve_nanos": 276708000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "2336f3fc5a7d55224195cb39f8e0b2593d1b73f3d67e01a32cdb06f0e02ab4ad"
+        },
+        {
+          "repeat": 0,
+          "arm": "matched",
+          "wall_nanos": 304720868,
+          "solve_nanos": 281583000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "2336f3fc5a7d55224195cb39f8e0b2593d1b73f3d67e01a32cdb06f0e02ab4ad"
+        },
+        {
+          "repeat": 1,
+          "arm": "matched",
+          "wall_nanos": 303109558,
+          "solve_nanos": 280902000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "2336f3fc5a7d55224195cb39f8e0b2593d1b73f3d67e01a32cdb06f0e02ab4ad"
+        },
+        {
+          "repeat": 1,
+          "arm": "baseline",
+          "wall_nanos": 308524550,
+          "solve_nanos": 283470000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "2336f3fc5a7d55224195cb39f8e0b2593d1b73f3d67e01a32cdb06f0e02ab4ad"
+        },
+        {
+          "repeat": 2,
+          "arm": "baseline",
+          "wall_nanos": 304577738,
+          "solve_nanos": 280991000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "2336f3fc5a7d55224195cb39f8e0b2593d1b73f3d67e01a32cdb06f0e02ab4ad"
+        },
+        {
+          "repeat": 2,
+          "arm": "matched",
+          "wall_nanos": 307647970,
+          "solve_nanos": 284109000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "2336f3fc5a7d55224195cb39f8e0b2593d1b73f3d67e01a32cdb06f0e02ab4ad"
+        }
+      ]
+    },
+    {
+      "problem": "mq-planted-14",
+      "characteristic": 32003,
+      "task": "lex-basis-by-conversion",
+      "route": "fglm",
+      "order": "lex",
+      "input": "x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14\n32003\nx1^2+x2^2+31969,\nx1*x2+31988,\nx3^2+x4^2+31873,\nx3*x4+31940,\nx5^2+x6^2+31713,\nx5*x6+31860,\nx7^2+x8^2+31489,\nx7*x8+31748,\nx9^2+x10^2+31201,\nx9*x10+31604,\nx11^2+x12^2+30849,\nx11*x12+31428,\nx13^2+x14^2+30433,\nx13*x14+31220\n",
+      "problem_digest": "132bc0b85ac22d67b2f6b25e913b901060e7acf53abfafde8747515437574946",
+      "runs": [
+        {
+          "repeat": 0,
+          "arm": "baseline",
+          "wall_nanos": 6469488274,
+          "solve_nanos": 6297471000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "5eb16f395fcb7e091a8bad89a9bef0fc213bc6b1aee72b3c144bf2ee9171c0c1"
+        },
+        {
+          "repeat": 0,
+          "arm": "matched",
+          "wall_nanos": 5675631495,
+          "solve_nanos": 5504257000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "5eb16f395fcb7e091a8bad89a9bef0fc213bc6b1aee72b3c144bf2ee9171c0c1"
+        },
+        {
+          "repeat": 1,
+          "arm": "matched",
+          "wall_nanos": 5686576567,
+          "solve_nanos": 5502126000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "5eb16f395fcb7e091a8bad89a9bef0fc213bc6b1aee72b3c144bf2ee9171c0c1"
+        },
+        {
+          "repeat": 1,
+          "arm": "baseline",
+          "wall_nanos": 6472281352,
+          "solve_nanos": 6300485000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "5eb16f395fcb7e091a8bad89a9bef0fc213bc6b1aee72b3c144bf2ee9171c0c1"
+        },
+        {
+          "repeat": 2,
+          "arm": "baseline",
+          "wall_nanos": 6477106556,
+          "solve_nanos": 6300861000,
+          "isa": "baseline x86-64, NO AVX2 \u2014 this build is below Zeebra's floor; re-run provision.sh",
+          "normalized_output_sha256": "5eb16f395fcb7e091a8bad89a9bef0fc213bc6b1aee72b3c144bf2ee9171c0c1"
+        },
+        {
+          "repeat": 2,
+          "arm": "matched",
+          "wall_nanos": 5680664283,
+          "solve_nanos": 5508146000,
+          "isa": "x86-64-v3 or better (AVX2)",
+          "normalized_output_sha256": "5eb16f395fcb7e091a8bad89a9bef0fc213bc6b1aee72b3c144bf2ee9171c0c1"
+        }
+      ]
+    }
+  ],
+  "board_matched_binary_sha256": "560d5916fea499e8e1aebfb0b2ce870c7719d4aed0557c984f591bda1d7dd099",
+  "cargo_incremental": "1"
+}
