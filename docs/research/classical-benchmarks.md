@@ -1,8 +1,11 @@
 # Classical benchmarks: the invariants are externally anchored, the timings are not
 
 **Measured at:** publication bound `f94b3df0` for Zeebra's own figures in §5; every external timing
-is quoted from its source — §2.1 and §2.2 from Steel's 2004 page, §2.3 from Magma's V2.27 topic page
-([the protocol's §10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+is quoted from its source — §2.1 and §2.2 from Steel's 2004 page, §2.3 from Magma's V2.27 topic page,
+and §2.4 from Steel's dense-F4 page. **§2.4 was checked at `ea05f8e9` on 2026-11-11; its
+2013–2015 figures were not measured here.** The source hash and HTTP results are retained in
+[`steel-dense-f4-provenance.json`](../../research/anchors/steel-dense-f4-provenance.json); see
+[the protocol's §10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is).
 **§6.1's decision uses the retained affine-Cyclic cohort at `19ff732c`**, from
 `research/competitive/results/history.json`; it takes no new measurements.
 **§10's `GF(2)` values are invariants rather than timings** — Krull dimensions, quotient dimensions
@@ -129,8 +132,8 @@ from 2004. Every figure is given twice, 1 core and 4:
 **What is and is not usable here.** There are **no Katsura rows**, no per-version columns, no
 repetition count, no memory figures for the finite-field rows, no input files and no build
 description beyond the CPU — so §4's three reasons still forbid a timing comparison, and this page
-does not change the verdict of §4 or §7 for Zeebra's own numbers. What it does change is the *era*
-of the only Magma anchor on record: Cyclic-9 over GF(32003) went from 1 453.6 s on a 2.087 GHz
+does not change the verdict of §4 or §7 for Zeebra's own numbers. It adds a newer *era*
+to the Magma anchors on record: Cyclic-9 over GF(32003) went from 1 453.6 s on a 2.087 GHz
 Athlon under V2.11-8 to **29.3 s on one core** under V2.27, a factor of 49.6 that is twenty-two
 years, two machines and sixteen versions wide and is attributable to none of them individually.
 
@@ -158,6 +161,73 @@ have hundreds of thousands of non-zero entries" — which is a structural datum 
 - **Macaulay 2 is not a priority** (owner, 2026-11-08). The roster stays the four provisioned
   engines — Singular, msolve, Groebner.jl, Sagebrush. §2.1's Macaulay 2 0.9.2 column is a
   Buchberger-era 2004 figure and nothing here depends on refreshing it.
+
+### 2.4 #441: the dense-F4 ladder and the conversion-stage caution
+
+[Steel's dense-F4 page](https://magma.maths.usyd.edu.au/users/allan/densef4/), checked at
+`ea05f8e9`, supplies these six rows with standard-F4 baselines. Entries are
+**seconds [GB peak memory]**; `D` is the largest F4 degree, not an input degree. All are over `GF(2)`.
+
+| system | variables | D | V2.19 standard | V2.20 dense | dense + GPU | dense + RH | dense + RH + GPU | published combined time ratio |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| MQQ160 | 160 | 3 | 123.6 [2.6] | 48.2 [1.5] | 36.9 [1.5] | 10.8 [1.5] | 10.0 [1.5] | 12.4x, combined |
+| HFE40_96 | 40 | 4 | 23.1 [0.25] | 9.7 [0.18] | 6.9 [0.18] | 6.3 [0.16] | 4.8 [0.16] | 4.8x, combined |
+| HFE80_100 | 80 | 4 | 3477.1 [13.7] | 447.4 [5.7] | 220.7 [5.7] | 180.4 [2.2] | 86.0 [2.2] | 40.4x, combined |
+| HFE140_100 | 140 | 4 | 217984.6 [384] | 17715.4 [142] | 5853.9 [142] | 4196.8 [26] | 1246.2 [26] | 174.9x, combined |
+| HFE50_288 | 50 | 5 | 25571.9 [27.0] | 9332.9 [22.9] | 2165.4 [20.7] | 2488.9 [15.0] | 830.4 [13.5] | 30.8x, combined |
+| HFE60_288 | 60 | 5 | 154219.2 [111.8] | 46371.0 [81.0] | 9737.0 [75.9] | 11570.3 [43.6] | 3218.6 [43.6] | 47.9x, combined |
+
+The hardware note assigns these rows to one Xeon E5-1650 core, 3.2 GHz/64 GB, except HFE60_288
+on E5-2687W, 3.1 GHz/384 GB. GPU columns use Tesla C2075 (448 CUDA cores); RH is the reduction
+heuristic. **Unresolved source inconsistency:** HFE140_100 reports 384 GB while its nominal host
+has 64 GB. Do not silently assign it to the larger host or infer a matched memory cap.
+
+**Attribution correction to #441:** the page does separate configurations. Every final-column
+ratio combines dense F4, RH and GPU; none is a dense-kernel-only gain. The other columns preserve
+the published ablations. They still lack same-machine Zeebra operands and pinned shared inputs,
+so §4 excludes them from both scoreboards. No kernel project follows from these anchors.
+
+The direct MinRank C run, `(n,k,r)=(11,9,8)` over `GF(65521)`, reports **7.0 h dense F4 +
+23.2 h Wiedemann**, one E5-2687W core/C2075 (August 2014); July 2015 reports **15.1 h total**
+with K40. Thus the later stage cost about 3.31 times the basis stage in that run, a calculation
+from published times rather than a forecast for Zeebra's FGLM. The prior specialization campaign
+and its estimated-versus-computed qualification remain separate (#382); no input fixture is added.
+
+The access split remains **200** for HTTP/HTTPS `/users/allan/densef4/`, **401** for
+`/magma/info/topic_gb` and `/magma/handbook/groebner_bases`. The V2.26 release-note PDF remains
+200. The [request record](../../research/anchors/steel-dense-f4-provenance.json) pins retrieval
+time, checkout commit, response sizes and hashes; no copyrighted page is vendored. These are
+historical published calibration points, not local measurements or reproducible solver fixtures.
+
+#### Density feature handed to #273
+
+Steel's stated target is approximately `(1 - 1/q) * m` terms per polynomial, where **q is field
+cardinality**, and **m is the union of monomials occurring in the input**. This is not the count of
+all possible monomials below a degree bound. The following is a **candidate diagnostic**, not
+Magma's undocumented selection threshold or a measured Zeebra policy:
+
+- Form the union of input supports; report each nonzero generator's support size relative to `m`.
+- Retain `q` and the reference occupancy `1 - 1/q`; compare the distribution to that reference.
+  Over `GF(2)` the reference is 1/2; over `GF(65521)` it is 65520/65521. An extension such as
+  `GF(2^8)` uses `q = 256`, not characteristic 2. These fractions follow from the candidate formula.
+- Empty support has no occupancy ratio. Report zero generators separately, and preserve the existing
+  constant-contradiction diagnosis. This feature proves neither dimension nor completeness.
+
+At `ea05f8e9`, `SystemShape::interaction_density` in
+[`analysis.rs`](../../src/grobner/planning/analysis.rs) counts variable pairs, and
+`mean_terms_per_generator` is an absolute count: neither implements this feature. A future extension
+should preserve `analyze<F: FiniteField>` for custom fields; an optional `KnownOrder` companion or
+explicit field order can supply `q` via
+[`KnownOrder::order_limbs`](../../src/fields/finite_field.rs), with explicit handling when it does
+not fit a machine integer. Do not replace unknown `q` by the characteristic or silently round it.
+Account for the support union's construction time and retained memory before calling the feature cheap.
+No route or elimination backend should change until #273 validates the diagnostic against measured
+time/memory objectives on its required corpus.
+
+The RH columns also do not relax Zeebra's exact-basis contract: source-described heuristic success
+is not an independently verified complete basis. Checking a recovered point only proves that point.
+An adoption proposal would need a separate completeness argument and oracle, rather than treating
+these historical ratios as permission to change correctness guarantees.
 
 ## 3. Zeebra's invariants, measured
 
@@ -400,8 +470,8 @@ against his historical wall-clock figures is authorized by it.
 | collection | verdict |
 |---|---|
 | **Steel's Magma GB timings page** | **accept, for invariants only — and the grade has now been exercised.** Cyclic-10's dimension 34940 and the GF(2) Cyclic rows are checkable values, and §10.5 checked one: the GF(2) Cyclic-10 Krull dimension of **4 is confirmed**. 34940 is still unverified here. The HFE rows go to #198, where they are much more valuable. |
-| **Magma's `info/topic_gb` page** (subscriber-side, §2.3) | **accept as a modern difficulty scale, reject as a comparand.** Its V2.27 figures on an i7-7700 are the only post-2004 Magma timings on record here and they come in 1-core and 4-core pairs, which is a usable published scaling figure. No instances, no repetitions, no build description, and no Katsura rows, so §4 still forbids a ratio against Zeebra. |
-| **Steel's *Dense Variant of the F4 Algorithm* page** (`/users/allan/densef4/`) | **defer to #218 and #225.** It is about representation, which is #218's open question, and the HFE-80 matrices it discusses are "moderately dense" over GF(2) — the datum #225 wants at 64×64 block granularity. Not a benchmark source. |
+| **Magma's `info/topic_gb` page** (subscriber-side, §2.3) | **accept as a modern difficulty scale, reject as a comparand.** Its V2.27 figures on an i7-7700 come in 1-core and 4-core pairs, which is a usable published scaling figure. No instances, no repetitions, no build description, and no Katsura rows, so §4 still forbids a ratio against Zeebra. |
+| **Steel's *Dense Variant of the F4 Algorithm* page** (`/users/allan/densef4/`) | **accept as historical calibration, reject as a comparand (§2.4, #441).** It publishes separate dense-only, GPU, RH and combined configurations; combined ratios cannot be attributed to one kernel. The cardinality-aware input-occupancy feature belongs to #273; neither a dense-F4 kernel nor a scoreboard row is authorized by these external figures. |
 | **SymbolicData** | **not assessed.** Deliberately: §3 found that the anchor Zeebra needs is an invariant, and a fourth catalogue of systems does not supply one. Reopen only if a specific instance with a published `dim R/I` is wanted. |
 | **msolve's published benchmarks** | **the right follow-up if a *modern* timing comparand is ever wanted**, which §4 argues is the only way to get one. Not pursued here; it would be its own issue, and it should be measured on one machine rather than quoted. |
 
