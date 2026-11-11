@@ -5,7 +5,7 @@ All notable changes to this crate are recorded here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html): while the version is `0.y.z`, a
 change to `y` may break the public API.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-11-10
 
 The first release on crates.io. Before it, the crate was used only as a git dependency, and the
 breaking changes below matter only to anyone who built against a git revision.
