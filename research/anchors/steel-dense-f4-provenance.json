@@ -1,0 +1,37 @@
+{
+  "recorded_at": "2026-11-11T19:53:00.084685+00:00",
+  "checkout_commit": "ea05f8e9aa7df70dddf6d74db63ceb7c64868b42",
+  "issue": 441,
+  "kind": "external published anchors; no local performance measurement",
+  "requests": [
+    {
+      "url": "http://magma.maths.usyd.edu.au/users/allan/densef4/",
+      "status": 200,
+      "final_url": "http://magma.maths.usyd.edu.au/users/allan/densef4/",
+      "bytes": 16854,
+      "sha256": "7eb1b3566bcb002f2ead1bc8626116a10123a30c646002d7f6f6bcfbf6fd4c71"
+    },
+    {
+      "url": "https://magma.maths.usyd.edu.au/users/allan/densef4/",
+      "status": 200,
+      "final_url": "https://magma.maths.usyd.edu.au/users/allan/densef4/",
+      "bytes": 16854,
+      "sha256": "7eb1b3566bcb002f2ead1bc8626116a10123a30c646002d7f6f6bcfbf6fd4c71"
+    },
+    {
+      "url": "https://magma.maths.usyd.edu.au/magma/info/topic_gb",
+      "status": 401
+    },
+    {
+      "url": "https://magma.maths.usyd.edu.au/magma/handbook/groebner_bases",
+      "status": 401
+    },
+    {
+      "url": "https://magma.maths.usyd.edu.au/magma/releasenotes/pdf/relv226.pdf",
+      "status": 200,
+      "final_url": "https://magma.maths.usyd.edu.au/magma/releasenotes/pdf/relv226.pdf",
+      "bytes": 288068,
+      "sha256": "bb80a6c8a11f02d4e664f0b65e918789ec53fde7dbd1ea7acd3676834fabaf24"
+    }
+  ]
+}

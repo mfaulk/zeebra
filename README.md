@@ -214,6 +214,11 @@ comparisons; the [Cyclic family decision](docs/research/classical-benchmarks.md#
 records why the corpus keeps this formulation. The [upper-rung sweep](docs/research/cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected)
 records the per-rung budgets and limitations of its single-run comparisons.
 
+The [dense-F4 anchors](docs/research/classical-benchmarks.md#24-441-the-dense-f4-ladder-and-the-conversion-stage-caution)
+record Steel's published configurations and MinRank stage split, with a density candidate based on
+field cardinality for future planner work. These historical figures provide context; they are not
+same-machine comparisons against Zeebra.
+
 The [M26 integration report](docs/MILESTONE-ALGORITHMIC-ELIMINATION.md#14-integration-report-2026-11-11)
 scores the shipped Euclidean resultant, root-finding measurements and retained engine records.
 It records the state at its evidence snapshot; subsequent certified scalar conversion is described
