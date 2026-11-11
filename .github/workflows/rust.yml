@@ -3,227 +3,151 @@ name: CI
 on:
   push:
     branches: [ "main" ]
-  # Every pull request, not only those targeting main: a stack of dependent pull requests has
-  # each one based on the previous, and a base-branch filter would leave all but the first
-  # unchecked.
   pull_request:
-  # So the benchmark job, which pull requests skip, can be run against a branch on demand.
   workflow_dispatch:
-  # A daily re-test of `main` as it actually is, which is the cheap half of #339's fix. A pull
-  # request is tested as a merge into `main` *as of when the run was queued*, and nothing re-runs
-  # when `main` advances — so two changes that are each green can be red once both have landed, and
-  # #311 and #324 were. Push runs on `main` catch most of that within minutes, but not a red `main`
-  # that nobody pushes to afterwards, and not the drift that comes from resolving the toolchain to
-  # `stable`, which moves. This bounds how long either can go unnoticed to a day, for one run of
-  # 20.7-25.9 job-minutes — measured over the last six successful push runs on `main`, which have
-  # the same job set a scheduled run gets. It is not a substitute for the notice below: this finds
-  # a semantic conflict after the merge, that one warns before it.
   schedule:
     - cron: '17 9 * * *'
 
-# One run per pull request and per branch, and the newest wins. A stack of dependent pull requests
-# is merged one commit at a time, so pushing a stack sends a burst of pushes seconds apart: eight
-# merges landed within 90 seconds on 2026-11-05 and spent 135 job-minutes, ~118 of it on commits
-# that were superseded before the first job finished. The runs also queued 40 jobs against the
-# 20-job concurrency ceiling and delayed every pull request behind them.
-#
-# `cancel-in-progress` applies to `main` as well as to pull requests, which does mean an
-# intermediate merge commit can go untested there. Every commit in a stack is already green as a
-# pull request before it is merged, and the tip of the burst is tested in full, so what that loses
-# is a check that had already passed once. The event name is part of the group so an on-demand
-# `workflow_dispatch` against a branch cannot cancel that branch's pull-request run.
+# A new run supersedes an older run of the same event, PR or branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
-  # `-C target-cpu` is repeated here on purpose. `.cargo/config.toml` sets it for local builds,
-  # but the RUSTFLAGS environment variable REPLACES `target.*.rustflags` rather than adding to
-  # it — cargo takes the first source it finds and does not merge them. Setting only `-D
-  # warnings` here would therefore drop the ISA floor silently, and CI would build at the
-  # baseline x86-64 level while every local build used v3. The two must be kept in step.
+  # Environment flags replace .cargo/config.toml's flags, so repeat the ISA floor.
   RUSTFLAGS: -D warnings -C target-cpu=x86-64-v3
 
-# The test suite runs under cargo-nextest rather than the built-in harness: a process per test
-# instead of a thread per test, so a test that aborts or segfaults is reported as that one test
-# failing instead of taking the whole binary's results with it. `--profile ci` comes from
-# `.config/nextest.toml` and sets `fail-fast = false`, so a run reports every failure.
-#
-# Nextest does not run doc examples — it has no way to, as rustdoc owns that path. Every job
-# that wants them therefore keeps a separate `cargo test --doc` step, which is the only
-# remaining use of the built-in harness. Dropping it would silently un-cover the thirteen
-# examples that `[lib] doctest = true` exists to run.
-#
-# The suite is not sharded, and `--partition` is deliberately absent. Measured warm in release:
-# 968 tests in 2.4s, 13 doc examples in 8.9s, and the two `#[ignore]`d systems in 43.7s — of
-# which 43.4s is a single test that no partitioning can divide. A shard costs a checkout, a
-# toolchain, a cache restore, and a release build under `lto = "fat"` with `codegen-units = 1`,
-# which is minutes, to split seconds of test execution. If the suite ever grows a long tail of
-# individually slow tests, add `--partition count:${{ matrix.shard }}/N` to the nextest step
-# over a `matrix.shard` of `[1, 2, ... N]`; until then it would make every job slower.
-
 jobs:
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.scope.outputs.rust }}
+      docs: ${{ steps.scope.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Determine required checks
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == pull_request ]]; then
+            git diff --no-renames --name-only -z "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/ci-paths"
+            bash tools/ci-scope.sh < "$RUNNER_TEMP/ci-paths" >> "$GITHUB_OUTPUT"
+          else
+            printf 'rust=true\ndocs=true\n' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate classification outputs
+        env:
+          RUST_CHECKS: ${{ steps.scope.outputs.rust }}
+          DOC_CHECKS: ${{ steps.scope.outputs.docs }}
+        run: |
+          case "$RUST_CHECKS/$DOC_CHECKS" in
+            true/true|false/true|false/false) ;;
+            *) echo "Invalid CI scope outputs" >&2; exit 1 ;;
+          esac
+
   test:
     name: Build and test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: taiki-e/install-action@nextest
-
+        if: needs.changes.outputs.rust == 'true'
       - uses: Swatinem/rust-cache@v2
-
-      # `--all-targets` covers the benchmarks, which `test = false` keeps out of the test run
-      # but which still have to compile.
-      - name: Build
-        run: cargo build --all-targets --verbose
-
+      # Nextest builds test binaries; Clippy checks examples and benchmarks on PRs.
+      # Main, scheduled and manual runs also link every standalone target.
+      - name: Build all targets
+        if: github.event_name != 'pull_request'
+        run: cargo build --all-targets --timings
       - name: Test
+        if: needs.changes.outputs.rust == 'true'
         run: cargo nextest run --profile ci
-
+      - name: Check guide inclusion
+        if: needs.changes.outputs.rust != 'true'
+        run: cargo test --test documentation
       - name: Doc tests
-        run: cargo test --doc --verbose
+        run: cargo test --doc -- --test-threads=4
+      - name: Upload build timings
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-build-timings
+          path: target/cargo-timings/
+          if-no-files-found: ignore
 
   release-tests:
     name: Tests (release)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
+    # Keep the previous optimizer coverage on full runs outside PRs.
+    env:
+      CARGO_PROFILE_CI_RELEASE_LTO: ${{ github.event_name == 'pull_request' && 'off' || 'thin' }}
+      CARGO_PROFILE_CI_RELEASE_OPT_LEVEL: ${{ github.event_name == 'pull_request' && '2' || '3' }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: taiki-e/install-action@nextest
-
       - uses: Swatinem/rust-cache@v2
-
-      # The whole suite in release, not only the slow tests. `debug-assertions` and
-      # `overflow-checks` are off there, so a release build takes different paths through
-      # arithmetic and through every `debug_assert`-guarded invariant: monomial multiplication
-      # used to wrap rather than panic on exponent overflow, which the debug job could not see.
-      #
-      # `ci-release` rather than `release`: it inherits both of those settings, so this tests the
-      # same thing, and relaxes the codegen settings that had `zeebra` relinked from scratch for
-      # ~318s per run. That trade is not free — it makes the two engine-agreement tests below
-      # slower — so Cargo.toml records the configurations measured and the totals that chose this
-      # one. The benchmark job still builds with fat LTO at one codegen unit.
+      # Separate build/execution so the logs distinguish compiler time from test time.
+      - name: Build release tests
+        run: cargo test --profile ci-release --no-run --timings
       - name: Test (release)
         run: cargo nextest run --profile ci --cargo-profile ci-release
-
       - name: Doc tests (release)
-        run: cargo test --profile ci-release --doc --verbose
-
-      # The `#[ignore]`d tests that are real but slow, named individually: a bare
-      # `--run-ignored=only` would also pick up the two `unimplemented!()` placeholders, which
-      # panic by design. `test(=...)` is an exact match, so a renamed test fails the filter
-      # rather than silently matching nothing. Release mode is required — the naive reference
-      # engine is impractical in a debug build.
-      #
-      # Pushes to main and manual runs only, for the same reason as the benchmark job below:
-      # these two tests take 145s on a shared runner, which is a quarter of this job's wall clock
-      # and sits on the critical path of every pull request. They reuse the build the steps above
-      # already paid for, so running them after a merge — where latency blocks nothing — costs
-      # almost nothing, and `workflow_dispatch` runs them against a branch on demand.
+        if: github.event_name != 'pull_request'
+        run: cargo test --profile ci-release --doc -- --test-threads=4
       - name: Gröbner engines agree on the slow systems
         if: github.event_name != 'pull_request'
         run: |
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems) + test(=grobner::f4::tests::test_f4_on_larger_systems)'
-
-      # The F4 matrix corpus, captured whole: every entry's digest against its pinned one, every
-      # entry's regime band against its measured scaffolding share, and every entry rebuilt from
-      # its own inputs and asserted equal to the matrix the live run handed to elimination (#262).
-      # 15.3s in release and impractical in debug, which is why it is `#[ignore]`d rather than
-      # part of the fast suite.
-      #
-      # Pull requests are covered too, by a different route: `bench-smoke` below runs
-      # `benches/f4_matrix_corpus.rs`, which drives the same `walk_corpus` and so verifies every
-      # digest on every pull request. What this step adds is the regime bands and the rebuild
-      # assertion.
       - name: The F4 matrix corpus is as pinned
         if: github.event_name != 'pull_request'
         run: |
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::f4::matrix_corpus::tests::test_every_entry_is_pinned_and_in_its_regime)'
+      - name: Upload build timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-timings
+          path: target/cargo-timings/
+          if-no-files-found: ignore
 
   bench-smoke:
     name: Benchmarks run
-    # Runs on pull requests too, since #586. It used to be `push` and `workflow_dispatch` only, on
-    # the grounds that Criterion's `--test` mode over all 493 cases is several minutes on a shared
-    # runner and latency after a merge blocks nothing. That reasoning weighed the wrong cost.
-    #
-    # What a pull request did and did not cover:
-    #
-    #   * **Compilation** was covered, and still is — `cargo build --all-targets` and
-    #     `cargo clippy --all-targets` both build `benches/`, which `test = false` keeps out of the
-    #     test run but not out of the build.
-    #   * **A benchmark that compiles and then panics** was not. `14f69182` is the case: a
-    #     `random_poly::<N>(48, 4, …)` asked for 48 distinct monomials where 25 exist at N = 2, its
-    #     own assert fired, and the branch was **green through review and merge** with `main` going
-    #     red on the push run afterwards.
-    #
-    # The second cost is the one that mattered: every commit in such a window is **unmeasurable**
-    # without cherry-picking the fix onto it, which is how #363's A/B could not be taken against
-    # the tree it was meant to measure. A red job after a merge is an inconvenience; a historical
-    # commit whose own benchmarks cannot run is a hole in the record.
-    #
-    # And on a pull request this job costs **no wall clock**, only job-minutes: **4m17s and
-    # 5m14s** on the two runs that enabled it, against `Tests (release)`'s 25–27 minutes on the
-    # same run, so it finishes well inside the critical path. (The ~8.4 minutes this comment used
-    # to cite is a cold-cache push run; a PR run hits `Swatinem/rust-cache`.) See
-    # `docs/guide/development.md`, "Testing the merged result", for the job-minute accounting.
-    #
-    # It still takes **no measurements** — `--test` runs each case once and samples nothing — so
-    # nothing here produces a figure, which a shared runner could not produce comparably anyway.
-    # That line is the reason this is a smoke job and not a benchmark run, and it does not move.
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
+    # Keep the previous optimizer coverage on full runs outside PRs.
+    env:
+      CARGO_PROFILE_CI_RELEASE_LTO: ${{ github.event_name == 'pull_request' && 'off' || 'thin' }}
+      CARGO_PROFILE_CI_RELEASE_OPT_LEVEL: ${{ github.event_name == 'pull_request' && '2' || '3' }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
-
-      # `cargo bench -- --test`, not `cargo test --benches`. The reason recorded here used to be
-      # that `test = false` made the latter "select nothing and pass vacuously"; that is **wrong**,
-      # and #586 measured it. `test = false` governs what a bare `cargo test` picks up, not what an
-      # explicit `--benches` selects, so `cargo test --benches` does build and run all 493 cases.
-      #
-      # The real reason is the profile. `cargo test --benches` resolves the **dev** profile, so the
-      # smoke run is unoptimized. Warm, on the same tree and machine:
-      #
-      #   cargo bench --profile ci-release -- --test     26.3 s
-      #   cargo test --benches                          382.0 s     14.5x
-      #
-      # This runs each case once and takes no measurements.
-      #
-      # It selects exactly the ten criterion targets, and nothing else. Back when there were eight
-      # of them it selected ten, for an unrelated reason: `bench` defaults to true, so the lib and
-      # the one `src/bin` were bench targets too and `--test` ran
-      # their unit tests here, in one process, under the built-in harness — duplicating the
-      # nextest jobs above with worse isolation, and failing a `VmHWM` test that depends on it.
-      # Both now carry `bench = false`; see #170 and the comments in `Cargo.toml`.
-      #
-      # `--profile ci-release` for exactly that reason. A bare `cargo bench` resolves
-      # `[profile.bench]`, which inherits `release`, so it links all ten criterion binaries
-      # under fat LTO at one codegen unit — the settings that exist to make a *measurement*
-      # reproducible, which this job does not take. Cold, for one bench target: 193s under
-      # `bench`, 34s under `ci-release`. The build is most of this job's 8.4 minutes.
-      #
-      # The cost is that no CI job compiles the fat-LTO profile any more, so a failure that only
-      # appears at one codegen unit — a link error, or an ICE in the LTO pass — surfaces on the
-      # machine taking the measurement rather than here. Accepted: every reported number comes
-      # from a local `cargo bench`, which still resolves `[profile.bench]` and is unaffected.
+      # Compilation alone misses setup panics (#586). Keep execution on code PRs.
+      # This smoke test samples nothing and publishes no performance figures.
       - name: Benchmarks execute without panicking
         run: cargo bench --profile ci-release -- --test
 
-  # One job rather than two. `cargo fmt --all --check` takes 0.1s and needs no cache, so as its
-  # own job it was almost entirely runner start-up, a checkout and a toolchain install — and it
-  # held one of the five concurrency slots a run occupies.
   lint:
     name: Format and lint
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -240,7 +164,7 @@ jobs:
       # `!cancelled()` rather than the default: formatting and linting are independent, and a
       # misplaced brace should not hide every clippy finding behind a second round trip.
       - name: Lint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       # The crate as a consumer gets it with `default-features = false`. Every other job builds
@@ -248,14 +172,14 @@ jobs:
       # `external::corpus` and leave the library uncompilable without the feature, unnoticed.
       # Targets that drive the harness declare `required-features` and are skipped here.
       - name: Lint without default features
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
         run: cargo clippy --all-targets --no-default-features -- -D warnings
 
       # proptest and its 17 transitive crates belong behind the `proptest` feature (#676). A
       # stray un-gated `use proptest` would fail the lint above. A dependency entry that loses its
       # `optional = true` would not, so this step checks the graph a default consumer gets.
       - name: proptest stays out of the default dependency graph
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
         run: |
           if cargo tree --locked -e normal --prefix none | grep -q '^proptest '; then
             echo "proptest is a normal dependency of a default build; gate it behind the feature" >&2
@@ -271,13 +195,15 @@ jobs:
         run: cargo doc --no-deps --all-features --locked
 
       - name: Package
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
         run: cargo package --locked
 
   # `rust-version` in Cargo.toml is a promise to consumers; this is what keeps it true. Library
   # only: dev-dependencies and benches may use a newer toolchain without breaking a consumer.
   msrv:
     name: Minimum supported Rust version
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -289,15 +215,6 @@ jobs:
       - name: Check the library on the declared MSRV
         run: cargo check --lib --all-features --locked
 
-  # The agent claim tooling is shell, so it is invisible to every job above. Its pure half —
-  # marker parsing, race resolution, lease arithmetic — is what stops two agents working the
-  # same issue, and a regression there is silent at the point of use.
-  #
-  # Everything under tools/ is shell for the same reason and was invisible for the same reason:
-  # the step below used to be an explicit two-glob list, so `tools/benchlock.sh` — which five
-  # merged measurement protocols cite — and `tools/external/provision.sh` were never checked.
-  # The globs now cover both directories. They are globs rather than a file list so that the
-  # next script added under tools/ is checked without anyone remembering to add it here.
   agent-scripts:
     name: Agent coordination scripts
     runs-on: ubuntu-latest
@@ -320,6 +237,7 @@ jobs:
           bash tools/test/merge-base-age-test.sh
           bash tools/test/benchlock-test.sh
           bash tools/test/check-measurement-provenance-test.sh
+          bash tools/test/ci-scope-test.sh
 
       # Every document that publishes a measurement says which commit it came from (#335). Separate
       # from the unit tests above because this one reads the repository's own documents: a finding
@@ -328,25 +246,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash tools/check-measurement-provenance.sh
 
-  # How stale the base of this run's merge is, and whether the gap touches the same files the pull
-  # request does (#339).
-  #
-  # A `pull_request` run does test a merged result — `actions/checkout` resolves
-  # `refs/pull/N/merge`, logging `HEAD is now at <sha> Merge <head> into <base>`. What no event
-  # recomputes is that merge when `<base>` advances. Both #311 and #324 were green against their own
-  # snapshot of `main` and the combination panicked, with no textual conflict for git to refuse.
-  #
-  # GitHub's "Require branches to be up to date" closes that by re-running the suite against the new
-  # base before every merge. Measured, that is not affordable here: the release job is 806 s mean
-  # over the last 25 successful runs (983 s worst), so a serialized merge queue admits 4.5 merges an
-  # hour against a peak of 14 observed on 2026-11-06 and 58 merges that day — 13.0 h of CI inside a
-  # 24 h day, and 59 % of consecutive merges were less than one release job apart. See
-  # `docs/guide/development.md`, "Testing the merged result".
-  #
-  # So this reports instead of gating. It is **advisory by construction**: a stale-and-overlapping
-  # result is a workflow warning and the job still succeeds, because making it a required check
-  # would be the gate again with extra steps. A failed *read* does fail the job — a staleness check
-  # that cannot read the repository must not look like a clean one (CLAUDE.md §0).
   merge-staleness:
     name: Merge base staleness
     if: github.event_name == 'pull_request'
@@ -381,3 +280,22 @@ jobs:
               exit 1
               ;;
           esac
+
+  complete:
+    name: CI complete
+    needs: [changes, test, release-tests, bench-smoke, lint, msrv, agent-scripts, merge-staleness]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful or intentionally skipped checks
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+          SCOPE_RESULT: ${{ needs.changes.result }}
+        run: |
+          [[ "$SCOPE_RESULT" == success ]] || exit 1
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "CI dependency ended with $result" >&2; exit 1 ;;
+            esac
+          done

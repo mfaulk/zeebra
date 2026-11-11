@@ -214,8 +214,8 @@ cohort separately from the historical M26 baseline.
 
 ## Contributing and documentation
 
-- [`docs/guide/development.md`](docs/guide/development.md) — building, the full test matrix, what CI
-  enforces, and the build configuration
+- [`docs/guide/development.md`](docs/guide/development.md) — building, the test matrix, CI's shorter
+  documentation path, build-timing artifacts, and the build configuration
 - [`docs/guide/benchmarking.md`](docs/guide/benchmarking.md) — benchmark suites, instrumented
   examples, and the rules for publishing a measurement
 - [`docs/guide/external-engines.md`](docs/guide/external-engines.md) — differential testing against
