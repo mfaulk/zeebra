@@ -158,9 +158,8 @@ assert_eq!(plan.attempts.len(), 1);              // the opening route worked
 println!("{}", plan);                            // every decision, with its reason and its cost
 ```
 
-**The conservative opening is grevlex-then-FGLM**, which contradicts `DirectLexF4` being the
-`#[default]` strategy described as "the conservative choice". The argument is not that conversion
-usually wins — it loses on the whole planted family — but that **its refusals are cheap by
+**The conservative opening is grevlex-then-FGLM**, while the explicit solver's default strategy
+is `DirectLexF4`. Conversion loses on the measured planted family, but **its refusals are cheap by
 construction**: FGLM's binding budget is the span's `D² + D(D+1)` cells, computed from `D` and
 checked before anything is allocated, while F4's is discovered during elimination and so costs the
 whole elimination up to the crossing. Measured: katsura-7's direct attempt burns 28.3 s and 1.3 GB
@@ -175,13 +174,40 @@ exists, `D` is *counted* and the span requirement is a function of `D` alone, so
 `PlanBudget` is shared across attempts, and holds only quantities that are *spent* —
 `max_elapsed` and `max_total_batches`. A peak is not consumed by an attempt, so the entry and byte
 budgets stay per-attempt in `SolveOptions`. `SolvePlan` keeps the same split: `total_batches()`
-sums, `peak_estimated_bytes()` maxes. `max_elapsed` is checked *between* attempts, since F4 has no
-cooperative time check, so it bounds whether a second route starts rather than how long the first
-runs.
+sums, `peak_estimated_bytes()` maxes. `max_elapsed` is checked *between* attempts, so it bounds
+whether a second route starts rather than how long the first runs. Separately,
+`SolveOptions::f4.max_wall_time` supplies F4's cooperative time limit for each basis computation.
 
 An `Err` from the planner means **inconclusive**, never "no solution".
 `cargo run --release --example solve_auto` compares all four policies against an offline
 best-of-two the planner was not allowed to see.
+
+To classify before paying for lex elimination, select `SolvePolicy::ClassifyThenDirectLex`:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{fields::Zp2147483647, grobner::{benchmark_systems::cyclic,
+    solve_one_planned, PlannedSolveOptions, SolveError, SolvePolicy}};
+
+let options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+let (outcome, plan) = solve_one_planned(
+    &cyclic::<4, Zp2147483647>(), &mut StdRng::seed_from_u64(417), &options,
+);
+assert_eq!(outcome, Err(SolveError::PositiveDimensional));
+assert!(plan.attempts[0].statistics.f4.is_none()); // no lex elimination
+assert!(plan.attempts[0].statistics.diagnosis.is_some()); // grevlex work retained
+```
+
+A complete grevlex basis licenses the dimension decision. If that computation crosses a budget,
+the resource error remains inconclusive and lex does not start. Otherwise a finite ideal proceeds
+to direct lex F4 without FGLM. The grevlex basis is dropped before lex runs; `diagnosis` keeps its
+statistics even on failure. `total_batches()` adds both stages, `peak_estimated_bytes()` takes their
+maximum, and the shared and per-attempt batch allowances cover their sum. The F4 matrix limits and
+`max_wall_time` apply to each basis computation separately; `PlanBudget::max_elapsed` still gates
+attempts rather than interrupting stages within one attempt.
+
+This policy is opt-in: finite systems pay for an extra basis, and no automatic speedup is assumed.
+The [comparison runner and measurements](../research/classify-before-lex.md) show both sides.
 
 ### Underdetermined systems, and what a slice establishes
 

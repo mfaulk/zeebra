@@ -78,6 +78,13 @@ for point in solve(&system, &mut rng) {
 }
 ```
 
+For workloads that may be positive-dimensional, opt into
+`PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex)` with
+`grobner::solve_one_planned`. It classifies a grevlex basis before direct lex elimination and
+charges both computations to the batch allowance. Finite systems pay for the extra basis; see the
+[solver guide](docs/guide/solving-systems.md) and the
+[classification comparison](docs/research/classify-before-lex.md).
+
 A Gröbner basis directly, by F4:
 
 ```rust

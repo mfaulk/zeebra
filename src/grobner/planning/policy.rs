@@ -1,36 +1,7 @@
-//! Choosing a route, on stated grounds, with one bounded fallback.
-//!
-//! Opt-in. [`SolvePolicy::Explicit`] is what `solve_one_with_options` already does, and the
-//! explicit entry points are untouched; nothing here changes their behaviour.
-//!
-//! # The policy, and the measurement behind it
-//!
-//! The conservative opening is **grevlex-then-FGLM**, which contradicts
-//! [`SolveStrategy::DirectLexF4`] being the `#[default]` described as "the conservative choice".
-//! The argument is not that conversion usually wins — it does not, losing on the whole planted
-//! family — but that **its refusals are cheap by construction**:
-//!
-//! | | binding budget | checked | cost of a refusal |
-//! |---|---|---|---|
-//! | direct lex F4 | live matrix entries | after every row operation | the whole elimination so far, plus a grevlex basis to say what it means |
-//! | grevlex + FGLM | the span's `2D² + D(D+1)/2` cells | from `D`, before allocating | one quotient-basis enumeration |
-//!
-//! Measured on the corpus: katsura-7's direct attempt burns 28.3 s and 1.3 GB before refusing,
-//! planted-12's conversion refuses after 36 ms. Direct-first costs 28.3 s on katsura-7;
-//! grevlex-first costs 37 ms on planted-12 and 47 ms on katsura-7. The conservative question is
-//! not "which route usually wins" but **"which route's failure is affordable"**.
-//!
-//! Ten systems from two synthetic families are not evidence about cryptographic instances, and
-//! M21-I re-measures this before the order is called settled. §4.3 of
-//! `docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md` says so at length.
-//!
-//! # What the planner may know, and when
-//!
-//! Two phases, with the knowledge boundary explicit. Before a Gröbner basis it knows only
-//! [`SystemShape`](super::analysis::SystemShape) — counts and structure, **no dimension claim**, because cyclic-4 is four
-//! equations in four variables and positive-dimensional. After a basis it can classify the ideal
-//! and *count* `D`, and only then is the conversion's feasibility a fact rather than a guess. The
-//! planner contains no cost model, no learned predictor, and no benchmark names.
+//! Dimension claims require a complete Gröbner basis; input counts cannot prove them.
+//! The conservative policy opens with grevlex/FGLM because conversion can be refused from a
+//! counted quotient dimension before allocating its dense blocks. Classify-then-lex instead
+//! pays for a grevlex basis on every input to avoid lex work on positive-dimensional ideals.
 
 use std::time::{Duration, Instant};
 
@@ -65,6 +36,13 @@ pub enum SolvePolicy {
     /// "choose one route and stand by it" is the contract.
     #[default]
     ConservativeAuto,
+
+    /// Classify a grevlex basis before attempting direct lex F4, without FGLM.
+    ///
+    /// Positive-dimensional ideals stop before lex elimination. Finite ideals pay for both
+    /// bases, so this is opt-in. Both computations share the attempt's batch allowance;
+    /// their statistics are retained separately in `diagnosis` and `f4`.
+    ClassifyThenDirectLex,
 
     /// As [`Self::ConservativeAuto`], plus one alternative attempt from the shared budget.
     AutoWithFallback,
@@ -203,6 +181,7 @@ pub fn solve_one_planned<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     let started = Instant::now();
     let (first, second) = match options.policy {
         SolvePolicy::Explicit(strategy) => (strategy, None),
+        SolvePolicy::ClassifyThenDirectLex => (SolveStrategy::DirectLexF4, None),
         // Step 2. Grevlex opens, for the reason in the module docs.
         SolvePolicy::ConservativeAuto => (SolveStrategy::GrevlexF4ThenFglm, None),
         SolvePolicy::AutoWithFallback => (
@@ -212,6 +191,7 @@ pub fn solve_one_planned<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     };
     let opening = match options.policy {
         SolvePolicy::Explicit(_) => Choice::Explicit,
+        SolvePolicy::ClassifyThenDirectLex => Choice::ClassifyBeforeLex,
         _ => Choice::ConservativeOpening,
     };
 
@@ -283,7 +263,32 @@ fn run<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
         .any(|a| a.strategy == SolveStrategy::GrevlexF4ThenFglm);
 
     let at = Instant::now();
-    let (outcome, statistics) = attempt(system, strategy, batches, diagnose, rng, options);
+    let (outcome, statistics) = if options.policy == SolvePolicy::ClassifyThenDirectLex {
+        let mut f4_options = options.attempt.f4.clone();
+        f4_options.max_batches = batches;
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (basis, diagnosis) = f4_reported(system, order, &f4_options);
+        let classified = basis.map_err(SolveError::Grobner).and_then(|basis| {
+            if classify_ideal(&basis, order).is_finite_dimensional() {
+                Ok(())
+            } else {
+                Err(SolveError::PositiveDimensional)
+            }
+        });
+        let (outcome, mut statistics) = match classified {
+            Ok(()) => {
+                let remaining = batches.map(|limit| limit.saturating_sub(diagnosis.batches));
+                // The completed classification already settles dimension; a lex refusal needs
+                // no second grevlex computation. Drop that basis before allocating lex matrices.
+                attempt(system, strategy, remaining, false, rng, options)
+            }
+            Err(error) => (Err(error), crate::grobner::SolveStatistics::default()),
+        };
+        statistics.diagnosis = Some(diagnosis);
+        (outcome, statistics)
+    } else {
+        attempt(system, strategy, batches, diagnose, rng, options)
+    };
     plan.attempts.push(Attempt {
         strategy,
         choice,
@@ -470,6 +475,153 @@ mod tests {
 
     fn point(n: usize) -> Vec<F> {
         (0..n).map(|i| F::new(2 * i as u64 + 3)).collect()
+    }
+
+    // Preclassification proves positive dimension without starting a lex computation.
+    #[test]
+    fn test_classify_before_lex_refuses_positive_dimension_early() {
+        let options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+        let (outcome, plan) =
+            solve_one_planned(&cyclic::<4, F>(), &mut StdRng::seed_from_u64(417), &options);
+        assert_eq!(outcome, Err(SolveError::PositiveDimensional));
+        assert_eq!(plan.attempts.len(), 1);
+        let attempt = &plan.attempts[0];
+        assert!(attempt.statistics.f4.is_none(), "lex must not run");
+        assert!(attempt.statistics.fglm.is_none());
+        assert!(attempt.statistics.diagnosis.is_some());
+        assert_eq!(attempt.choice, Choice::ClassifyBeforeLex);
+        assert!(plan.to_string().contains("Preclassification:"));
+        assert_eq!(
+            plan.total_batches(),
+            attempt.statistics.diagnosis.as_ref().unwrap().batches
+        );
+    }
+
+    // A finite ideal still reaches direct lex, with both stages charged to the plan.
+    #[test]
+    fn test_classify_before_lex_solves_and_accounts_for_both_bases() {
+        let system = planted::<4, F>(&point(4));
+        let options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+        let (outcome, plan) = solve_one_planned(&system, &mut StdRng::seed_from_u64(417), &options);
+        let found = outcome.unwrap().point().unwrap();
+        assert!(system.iter().all(|p| p.eval(&found).is_zero()));
+        let stats = &plan.attempts[0].statistics;
+        assert!(stats.fglm.is_none());
+        assert_eq!(
+            plan.total_batches(),
+            stats.f4.as_ref().unwrap().batches + stats.diagnosis.as_ref().unwrap().batches
+        );
+        assert_eq!(
+            plan.peak_estimated_bytes(),
+            stats
+                .f4
+                .as_ref()
+                .unwrap()
+                .max_estimated_bytes
+                .max(stats.diagnosis.as_ref().unwrap().max_estimated_bytes)
+        );
+    }
+
+    // An incomplete grevlex computation stays a resource error and never starts lex.
+    #[test]
+    fn test_classify_before_lex_keeps_unproved_dimension_inconclusive() {
+        let mut options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+        options.attempt.f4.max_batches = Some(0);
+        let (outcome, plan) =
+            solve_one_planned(&cyclic::<4, F>(), &mut StdRng::seed_from_u64(417), &options);
+        assert!(outcome.unwrap_err().is_resource_failure());
+        assert!(plan.attempts[0].statistics.f4.is_none());
+        assert_eq!(plan.total_batches(), 0);
+    }
+
+    // The shared batch cap includes preclassification and the later lex computation.
+    #[test]
+    fn test_classify_before_lex_shares_batches_across_stages() {
+        let system = katsura::<4, F>();
+        let (_, classification) = crate::grobner::f4_reported(
+            &system,
+            crate::MonomialOrder::GradedReverseLexicographic,
+            &F4Options::default(),
+        );
+        for limit in [0, 1, classification.batches] {
+            let mut options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+            options.budget.max_total_batches = Some(limit);
+            let (outcome, plan) =
+                solve_one_planned(&system, &mut StdRng::seed_from_u64(417), &options);
+            assert!(outcome.unwrap_err().is_resource_failure());
+            assert!(plan.total_batches() <= limit);
+            if limit == classification.batches {
+                let stats = &plan.attempts[0].statistics;
+                assert_eq!(stats.diagnosis.as_ref().unwrap().batches, limit);
+                assert_eq!(stats.f4.as_ref().expect("lex was reached").batches, 0);
+            }
+        }
+    }
+
+    // Per-attempt batch caps also cover the sum of preclassification and lex batches.
+    #[test]
+    fn test_classify_before_lex_respects_per_attempt_batch_cap() {
+        let system = katsura::<4, F>();
+        let (_, classification) = crate::grobner::f4_reported(
+            &system,
+            crate::MonomialOrder::GradedReverseLexicographic,
+            &F4Options::default(),
+        );
+        let mut options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+        options.attempt.f4.max_batches = Some(classification.batches);
+        let (outcome, plan) = solve_one_planned(&system, &mut StdRng::seed_from_u64(417), &options);
+        assert!(outcome.unwrap_err().is_resource_failure());
+        assert_eq!(plan.total_batches(), classification.batches);
+        assert_eq!(
+            plan.attempts[0]
+                .statistics
+                .f4
+                .as_ref()
+                .expect("lex was reached")
+                .batches,
+            0
+        );
+    }
+
+    // A finite ideal's lex resource failure retains the original preclassification counters.
+    #[test]
+    fn test_classify_before_lex_does_not_repeat_a_completed_dimension_check() {
+        let mut options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+        options.attempt.f4.max_matrix_rows = 1000;
+        options.attempt.f4.max_matrix_columns = 1000;
+        let system = cyclic::<6, F>();
+        let (outcome, plan) = solve_one_planned(&system, &mut StdRng::seed_from_u64(417), &options);
+        assert!(outcome.unwrap_err().is_resource_failure());
+        let stats = &plan.attempts[0].statistics;
+        assert!(stats.f4.is_some());
+        let (_, expected) = crate::grobner::f4_reported(
+            &system,
+            crate::MonomialOrder::GradedReverseLexicographic,
+            &options.attempt.f4,
+        );
+        let diagnosis = stats.diagnosis.as_ref().unwrap();
+        assert_eq!(diagnosis.batches, expected.batches);
+        assert_eq!(diagnosis.max_live_nonzeros, expected.max_live_nonzeros);
+    }
+
+    // Preclassification preserves inconsistency and absence of base-field roots as distinct answers.
+    #[test]
+    fn test_classify_before_lex_preserves_negative_outcomes() {
+        let options = PlannedSolveOptions::with_policy(SolvePolicy::ClassifyThenDirectLex);
+        for (system, expected) in [
+            (
+                parse::<2>(&["x - 1", "x - 2"], ["x", "y"]),
+                SolveOutcome::Inconsistent,
+            ),
+            (
+                parse::<2>(&["x^2 + 1", "y"], ["x", "y"]),
+                SolveOutcome::NoBaseFieldPoint,
+            ),
+        ] {
+            let (outcome, _) =
+                solve_one_planned(&system, &mut StdRng::seed_from_u64(417), &options);
+            assert_eq!(outcome, Ok(expected));
+        }
     }
 
     /// One policy and one budget solve both ends of the corpus. M21-D's acceptance criterion.

@@ -1,9 +1,4 @@
-//! What the planner did, and why.
-//!
-//! Deliberately free of type parameters. A plan is something to print, compare across runs, and
-//! eventually serialize into an experiment record, and none of that wants to be generic over `N`
-//! and `F` — so an outcome appears here as its *class* and the point itself stays in the
-//! `Result` the planner returns beside it.
+//! Plans keep failed work as well as successful attempts, without carrying field type parameters.
 
 use std::{fmt::Display, time::Duration};
 
@@ -27,6 +22,9 @@ pub enum OutcomeClass {
 pub enum Choice {
     /// What the caller asked for, under [`SolvePolicy::Explicit`](super::SolvePolicy::Explicit).
     Explicit,
+
+    /// The caller requested grevlex classification before direct lex elimination.
+    ClassifyBeforeLex,
 
     /// The conservative policy's opening move.
     ///
@@ -59,6 +57,9 @@ impl Display for Choice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Explicit => write!(f, "the caller asked for it"),
+            Self::ClassifyBeforeLex => {
+                write!(f, "classify a grevlex basis before direct lex elimination")
+            }
             Self::ConservativeOpening => {
                 write!(
                     f,
@@ -251,12 +252,20 @@ impl Display for SolvePlan {
                 )?;
             }
             if let Some(stats) = attempt.statistics.diagnosis.as_ref() {
-                writeln!(
+                if attempt.choice == Choice::ClassifyBeforeLex {
+                    writeln!(
+                        f,
+                        "  Preclassification: grevlex F4 used {} batches",
+                        stats.batches
+                    )?;
+                } else {
+                    writeln!(
                     f,
                     "  Diagnosis: a grevlex basis in {} batches, to tell a crossed budget from a \
                      positive-dimensional ideal",
                     stats.batches
                 )?;
+                }
             }
             if let Some(stats) = attempt.statistics.fglm.as_ref() {
                 writeln!(
