@@ -31,7 +31,9 @@ algorithm and Faugère's F4 compute bases under lexicographic, graded, graded-re
 orders; FGLM converts a cheap basis into the lexicographic one that solves by back-substitution;
 resultants offer a second, independent elimination route; and univariate root finding and
 factorization finish the job. The solver returns *verified field points*. Every stage carries an explicit resource budget for managing 
-the cost of solving systems at the frontier of feasibility.
+the cost of solving systems at the frontier of feasibility. F4 construction refusals report the complete
+matrix's entry demand before allocating coefficient rows; elimination refusals report the live count
+at the crossing, which is a lower bound on the eventual peak.
 
 Nuts and bolts: Zeebra's coefficient domains run to 256-bit prime fields
 in Montgomery and CIOS form (BN254 and BLS12-381 scalar fields, Proth primes, Mersenne-31, 64-bit

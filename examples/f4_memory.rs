@@ -1,30 +1,10 @@
-//! Where an F4 computation's memory goes, attributed to named structures by measurement.
+//! Attributes F4 memory with a process-wide tracking allocator and per-structure counters.
 //!
-//! `examples/f4_profile.rs` says where the *time* goes. This says where the bytes go, and it
-//! exists because the answer turned out not to be the matrix: on an `n = 20` MQ run the entry
-//! budget accounted for 195 MB of a 14.75 GB peak — 1.3% — and
-//! `docs/research/f4-resource-scaling.md` §5 could not say where the rest was.
+//! The observer replays preprocessing and construction before each live batch, including refused
+//! batches. This doubles those stages' work; run this single-threaded so unrelated allocations
+//! cannot contaminate the stage peaks. Construction demand excludes elimination fill-in.
 //!
-//! Two instruments, reported side by side, because neither alone would settle it:
-//!
-//! - a tracking `#[global_allocator]`, which gives the **peak live heap of a named stage** exactly,
-//!   including the temporaries no counter knows about. `util::peak_resident_bytes` cannot do this:
-//!   it is a process high-water mark, so it cannot say which stage raised it.
-//! - the solver's own counters times `size_of`, which gives **a named structure's** share. The
-//!   allocator cannot do this: it sees bytes, not which `Vec` they went to.
-//!
-//! The stages are measured on the real batches rather than on a reimplemented main loop: a
-//! [`BatchObserver`] receives each batch as F4 selected it, and re-runs symbolic preprocessing and
-//! matrix construction under the allocator before the library does them for real. That costs the
-//! stages twice over in time and nothing in peak memory, since each copy is dropped before the
-//! next allocation. **The last batch observed is the one that crosses the budget**, which is the
-//! batch the attribution is about and the one no `F4Statistics` field describes — `reduce_batch_in`
-//! has nothing to attach a refused batch's counters to.
-//!
-//! ```text
-//! cargo run --release --example f4_memory                      # the benchmark systems
-//! cargo run --release --example f4_memory -- katsura-7         # one of them
-//! ```
+//! Run `cargo run --release --example f4_memory -- katsura-7` for one system.
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -131,7 +111,7 @@ struct BatchProbe {
     /// Peak live heap of matrix construction, with the preprocessing result still live.
     construction_peak: usize,
 
-    /// Columns and entries the matrix reached, or zero if construction refused.
+    /// Exact construction demand after preprocessing, including refused matrices.
     columns: usize,
     entries: usize,
 
@@ -211,6 +191,8 @@ impl<const N: usize, F: FiniteField> BatchObserver<N, F> for StageProbe<N> {
             }
         };
         probe.rows = preprocessed.rows.len();
+        probe.columns = preprocessed.monomials.len();
+        probe.entries = preprocessed.term_handles.len();
         probe.monomials_enqueued = preprocessed.counts.monomials_enqueued;
         probe.max_pending_monomials = preprocessed.counts.max_pending_monomials;
         probe.divisor_queries = preprocessed.counts.divisor_queries;
@@ -229,13 +211,8 @@ impl<const N: usize, F: FiniteField> BatchObserver<N, F> for StageProbe<N> {
         probe.construction_peak = construction_peak;
         match matrix {
             Ok(matrix) => {
-                probe.columns = matrix.num_columns();
-                probe.entries = matrix
-                    .matrix()
-                    .rows()
-                    .iter()
-                    .map(|row| row.nonzeros())
-                    .sum();
+                assert_eq!(probe.columns, matrix.num_columns());
+                assert_eq!(probe.entries, matrix.nonzeros());
             }
             Err(_) => {
                 probe.refused = Some("entries or columns");
@@ -482,6 +459,17 @@ fn report<const N: usize, F: FiniteField>(
                 None => String::new(),
             }
         );
+    }
+
+    if let Some(refused) = probe.batches.iter().find(|batch| batch.refused.is_some()) {
+        if refused.refused != Some("max_matrix_rows") {
+            let allowance = options.live_entry_allowance::<F>();
+            println!(
+                "- refused construction demand: {} rows, {} columns, {} entries; allowance {}, excess {} (exact construction count; elimination peak unknown)",
+                refused.rows, refused.columns, refused.entries, allowance,
+                refused.entries.saturating_sub(allowance)
+            );
+        }
     }
 
     let sites = attribution::<N>(

@@ -814,6 +814,16 @@ is the size of the degree-5 matrix, and no authorized budget reaches it.**
 
 ### 11.4 The cost of a completion, and its dominant term is unmeasured by construction
 
+**Current diagnostic (#557):** the table below retains the historical run's lower bound; it is
+not a measurement of the current default. Construction now checks the complete symbolic term-handle
+count before allocating coefficient rows, so its entry refusal reports the exact construction
+demand rather than the budget plus one row. Elimination refusals still report a crossing count,
+not a final peak. The regression reproduces construction refusals on public random MQ with 20
+variables, seed 0, degree at most 2 and at most 80 terms per equation, over GF(2147483647):
+`cargo test --lib test_public_mq_refusal_reports_full_construction_demand`.
+It compares the same batch's fully materialized matrix against several entry and byte budgets;
+it does not attempt a full solve or establish the old degree-5 batch's elimination peak.
+
 | term | value | measured? |
 | --- | ---: | --- |
 | everything before the degree-5 batch | ~66 s | **measured**, and stable across both budgets |
