@@ -1,0 +1,10 @@
+{
+  "completed": true,
+  "machine": "threadripper-5995wx",
+  "affinity": "8",
+  "repetitions": 31,
+  "binaries": {
+    "before": "e8c41e6e1b8552093bbd5ead1e84d46bb572260f0b2b7c7258648ff62bd20480",
+    "after": "f855b73eb2cf5a567e67aa9303561850bdac1c1e431ff5694607bd777e9f7181"
+  }
+}

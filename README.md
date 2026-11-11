@@ -125,6 +125,14 @@ For the monomial-order dispatch and F4 column-sort replay, build with
 `cargo build --release --example monomial_order_width` and follow the pinned run command in the
 [benchmarking guide](docs/guide/benchmarking.md#monomial-order-width).
 
+`cargo run --release --example monomial_degree_profile -- katsura-7-grevlex` reports F4
+stage times and process peak RSS, and writes the full basis to stdout for comparison across
+representations. `cargo run --release --example monomial_packing` compares the production
+comparator with experimental order-specific byte-packed keys; unsupported widths or degrees
+retain the full comparison. These are measurement tools, not a packed public monomial type.
+The [cached-degree study](docs/research/monomial-degree.md) records the rejected cache prototype,
+exact basis checks and measured stage/RSS results.
+
 Compare dense and Euclidean Sylvester kernels at the same worker count with
 `cargo run --release --example determinant_width -- --compare-kernels --order 162 --width 32`.
 The comparison checks every sample and reports a determinant-stage ratio; it excludes interpolation

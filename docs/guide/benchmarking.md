@@ -5,6 +5,12 @@ follows before publishing a number.
 
 ## Measuring on a busy machine
 
+For the cached monomial degree and packed order-key experiments, see the
+[stage gate and reproduction commands](../research/monomial-degree.md). Build
+`monomial_degree_profile` for a single-fixture stage/RSS report with the full basis on stdout,
+or `monomial_packing` for the comparison-loop experiment. The cache was rejected for production;
+the retained patch reproduces the measured cached arm without changing the public representation.
+
 `tools/benchlock.sh` runs one command at a time, machine-wide, and records that it did:
 
 ```sh
