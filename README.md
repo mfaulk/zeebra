@@ -199,7 +199,9 @@ record a Krull dimension of 4 for Cyclic-10. Use
 List the published `GF(2)` systems with `cargo run --release --example competitive_sweep -- --characteristic 2 --list`.
 
 The [competitive board](research/competitive/COMPETITIVE.md) retains cross-engine attempts,
-including resource refusals. The [upper-rung sweep](docs/research/cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected)
+including resource refusals. Affine Cyclic-7 and Cyclic-8 already provide reachable same-machine
+comparisons; the [Cyclic family decision](docs/research/classical-benchmarks.md#61-429-the-affine-ladder-makes-a-homogenized-comparison-family-unnecessary)
+records why the corpus keeps this formulation. The [upper-rung sweep](docs/research/cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected)
 records the per-rung budgets and limitations of its single-run comparisons.
 
 The [M26 integration report](docs/MILESTONE-ALGORITHMIC-ELIMINATION.md#14-integration-report-2026-11-11)

@@ -3,6 +3,8 @@
 **Measured at:** publication bound `f94b3df0` for Zeebra's own figures in §5; every external timing
 is quoted from its source — §2.1 and §2.2 from Steel's 2004 page, §2.3 from Magma's V2.27 topic page
 ([the protocol's §10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**§6.1's decision uses the retained affine-Cyclic cohort at `19ff732c`**, from
+`research/competitive/results/history.json`; it takes no new measurements.
 **§10's `GF(2)` values are invariants rather than timings** — Krull dimensions, quotient dimensions
 and basis sizes, none of which depends on the machine or the clock — measured at `590eee15` across
 Zeebra, msolve 0.11.0, Singular, Groebner.jl and Sagebrush. §10 publishes **no** wall-clock figure,
@@ -318,9 +320,10 @@ the finding in the direction of making the epic look unnecessary, and the epic i
   **Done (#261):** resolved empirically against msolve's own `kat6-31.ms` and documented in
   `cross-library-corpus.md` §2, with a test asserting every generated rung is named by its variable
   count — so a future rung cannot reintroduce the ambiguity by being named carelessly.
-- **Do not add a homogenized Cyclic generator for comparability.** It would make Cyclic 7/8 (Hom)
-  comparable in kind, and both are still 2004 Athlon figures on a different machine — §4 item 3
-  applies regardless. Not worth it for that reason alone.
+- **Keep the affine Cyclic family; do not add a homogenized family for the current benchmark
+  objective.** #429 revisited this after the same-machine harness landed. The affine upper-rung
+  sweep now supplies the reachable cross-engine comparison it requested; §6.1 records the decision
+  and its evidence. The restriction on comparing against the 2004 timings remains independent.
 - **`GF(32003)` is a one-line `PrimeFieldElement32<32003>`** if the `GF(2)` and `GF(32003)` columns
   are ever wanted; nothing here needs it. **Done (#426):** `fields::Zp32003` is that line, and the
   field is now the corpus's *second reference characteristic* rather than a sweep parameter — the
@@ -333,6 +336,62 @@ the finding in the direction of making the epic look unnecessary, and the epic i
   difficulty scale, and say which machine and core count it is. The 2004 column stays for the
   invariants it carries (Cyclic-10's 34940, the GF(2) dimension) and for nothing else. Magma cannot
   be measured here at all — no licence (§2.3) — so this is the whole of what is available.
+
+### 6.1 #429: the affine ladder makes a homogenized comparison family unnecessary
+
+**Decision: decline the additional family for this objective.** #429 asked whether homogenized
+Cyclic was needed to obtain a reachable same-machine Cyclic comparison, and explicitly allowed a
+second decline if #424 reached affine `cyclic-7` or `cyclic-8`. #424 added both; #489 then measured
+both across Zeebra and all four provisioned external engines. The issue's claimed `cyclic-6`
+ceiling no longer describes the corpus.
+
+The deciding evidence is the retained `19ff732c` cohort, summarized in
+[cross-library-corpus.md §9c](cross-library-corpus.md#9c-489-the-sweep-taken-and-two-things-it-corrected).
+These are existing observations, not a new run at this document's current commit:
+
+| affine rung | Zeebra | Singular | msolve | Groebner.jl |
+|---|---:|---:|---:|---:|
+| `cyclic-7` | 660.2 ms | 1137.2 ms | 101.5 ms | 47.2 ms |
+| `cyclic-8` | 27658.5 ms | 30847.0 ms | 1286.0 ms | 699.5 ms |
+
+Every row is `reduced-grobner-basis`, grevlex, `GF(2147483647)`, one worker, with a 60 s wall
+limit. The cohort records `ZEEBRA_MACHINE=workstation`, `ZEEBRA_AFFINITY=0-7`, a Threadripper PRO
+5995WX, and a release build; §9c records the bench lock and `taskset -c 0-7`. The values above are
+the history's `wall_nanos` converted to milliseconds, using the harness's per-engine timing
+contracts. Each is a single observation; they establish reachability and a useful spread between
+engines, not repeated-run dispersion or a current-default speedup claim. Sagebrush also completes
+both rungs in this cohort, but its results are not used as a speedup denominator (the competitive
+board's authority restriction still applies).
+
+The identity checks matter as much as the completion:
+
+- `cyclic-7` has digest
+  `30ce3b4f54c7b30ef818a8750b4e61e51f3f8a1a6e4e49e384fbb5096c6eec17`.
+  All five retained basis rows agree on 209 basis elements and the leading-monomial set; all four
+  engines that report a quotient dimension give 924.
+- `cyclic-8` has digest
+  `a5eda0f9e2642ffef042af19ca84e3b1b4997c3e3ce33e994172de3c8fdc0a96`.
+  All five agree on 372 basis elements and the leading-monomial set. The corpus records it as
+  positive-dimensional; the conversion task is unsupported because no finite quotient exists.
+
+These invariant agreements are cross-engine corroboration, not by themselves a proof of ideal
+equality. The affine formulation is anchored separately by
+`corpus::test_cyclic_5_is_msolves_cyclic5_and_is_affine`, which compares the generator with msolve's
+distributed input, and the upper rungs use that same generator.
+
+The existing family therefore answers #429's same-machine performance question without a second
+ideal, a second digest namespace or additional equivalence work. Keep `cyclic-N` unambiguously
+**affine**. A homogenized version would be a different ideal with an extra homogenizing variable;
+its positive-dimensional quotient would not supply the missing finite-quotient conversion task.
+The old rationale in §6 was incomplete because it addressed only historical comparability; the
+completed affine cohort is the reason for the present decline.
+
+Reconsider only for an objective the affine ladder cannot answer, such as studying homogenization's
+effect on F4 itself. That would need an explicit distinct name (for example `cyclic-hom-N`, with
+`N` defined as the original affine variable count), its own field-specific identities and equivalence
+evidence, and a budgeted paired protocol. This decision establishes neither the exact formulation
+of Steel's Hom inputs nor the performance of a homogenized Zeebra implementation. No comparison
+against his historical wall-clock figures is authorized by it.
 
 ## 7. Other collections, assessed against #65's bar
 
