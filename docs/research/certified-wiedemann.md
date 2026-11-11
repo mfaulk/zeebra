@@ -123,6 +123,10 @@ certification still dominated avoidable work. Sharing quotient powers removes th
 matvecs without weakening the certificate; the current measurements use that implementation.
 A reconstruction's scalar recurrence alone is not a certificate, even at full degree.
 
+A nonseparating coordinate can incur three full scalar sequences before falling back, so adaptive
+selection is not guaranteed faster on every sparse ideal. The density/size heuristic does not
+replace a shape-position characterization, and low-degree coordinates remain a tuning opportunity.
+
 Operator construction is unchanged and can refuse before either conversion route runs. Raising a
 span budget cannot resolve a border reducer-entry stop; the example exposes that budget separately
 for deliberate bounded measurements. A faster conversion does not resolve an earlier F4 refusal.
