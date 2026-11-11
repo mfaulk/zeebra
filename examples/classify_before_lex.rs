@@ -33,6 +33,8 @@ fn measure<const N: usize, F: KnownOrder>(
         _ => None,
     };
     let mut record = ExperimentRecord::new(name, format!("{policy:?}")).with_plan(&plan);
+    record.outcome = plan.outcome();
+    record.failure = outcome.as_ref().err().map(ToString::to_string);
     record.elapsed = elapsed;
     record.verified = verified;
     record.verification = "points evaluated against every original generator".into();
