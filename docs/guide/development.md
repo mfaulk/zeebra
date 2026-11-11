@@ -17,6 +17,8 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy --all-targets --no-default-features -- -D warnings
 cargo tree --locked -e normal --prefix none | grep '^proptest '   # must print nothing
 cargo test --doc
+RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features --locked
+cargo +1.91.0 check --lib --all-features --locked   # the declared MSRV
 cargo package --locked            # what crates.io would receive, built in isolation
 ```
 
@@ -199,7 +201,15 @@ dev-dependency. A generic test helper that draws `any::<F>()` must bound `F: Arb
 because `Ring` no longer implies it. The same job runs `cargo package --locked`, which
 assembles the crate from the files `Cargo.toml`'s `exclude` leaves in and compiles it in
 isolation, so a guide page the doctests include, or any other file the build needs, cannot be
-left out of the package unnoticed.
+left out of the package unnoticed. It also builds the rustdoc with `-D warnings` and all
+features, as docs.rs renders it, so a broken intra-doc link fails the job instead of becoming a
+dead link in the published docs.
+
+The `msrv` job checks the library on Rust 1.91.0, the `rust-version` declared in `Cargo.toml`.
+That number was measured, not chosen: 1.90 lacks the stabilized `carrying_add` and
+`borrowing_sub`. Only the library is checked, because tests, benches and dev-dependencies may use
+a newer toolchain without breaking a consumer. Raising the MSRV is a change to record in
+`CHANGELOG.md`.
 
 Each pull request and each branch has one run in flight at a time; a new push cancels the one
 before it. A stack of dependent pull requests is merged one commit at a time, so pushing a stack
