@@ -120,6 +120,10 @@ required-features = ["external-runners"]
 name = "monomial_order_width"
 test = true
 
+[[example]]
+name = "determinant_width"
+test = true
+
 [[test]]
 name = "external_comparands"
 required-features = ["external-runners"]

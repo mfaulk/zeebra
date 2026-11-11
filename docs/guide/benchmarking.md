@@ -383,9 +383,9 @@ cargo run --release --example determinant_sweep -- --cost-only   # what the swee
 cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
 cargo run --release --example determinant_width    # the width sweep 1..32 and the kernel split,
                                                    #   every arm in one process (#412)
-                                                   # the same against the rf4-rp2 row's own pair,
-                                                   #   after a 5.66 min symbolic build
 cargo run --release --example determinant_width -- --count-allocations   # calls per determinant
+cargo run --release --example determinant_width -- --compare-kernels --order 162 --width 32
+                                                   # dense and Euclidean, same samples and width
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
 cargo run --release --example f4_profile -- divmask       # #331: the divisor-mask counters
@@ -724,6 +724,34 @@ M25 calibrated Zeebra against external solvers on identical problems; where a pu
 That milestone's §10.1 is worth reading on its own. It scores the plan's own predictions and finds
 that every one about a stage already measured held, while three of four about quantities nobody had
 measured were wrong by more than an order of magnitude — one by 838x.
+
+### Sylvester kernel comparison
+
+`determinant_width --compare-kernels` times dense and Euclidean kernels in alternating order,
+asserts identical sample vectors on every draw, and prints each draw plus the ratio of the two
+medians. `--width` is repeatable; `--samples` is rounded up to a multiple of each width so every
+requested worker receives work. Both kernels use the same fixed-seed pair and consecutive sample
+points. `--pair synthetic` (default) has degree one in the surviving variable; `--pair triangular`
+includes quadratic specialization work. Neither is a registered cryptanalytic instance.
+
+Build before taking the benchmark lock, then pin to 32 physical cores (verify the topology on
+your machine). On the development workstation:
+
+```sh
+cargo build --release --example determinant_width
+ZEEBRA_MACHINE=5995wx ZEEBRA_AFFINITY=0-31 \
+  tools/benchlock.sh sylvester-297 timeout 600 taskset --cpu-list 0-31 \
+  target/release/examples/determinant_width --compare-kernels \
+  --order 1458 --width 32 --samples 128 --repeats 3
+```
+
+If you set `CARGO_TARGET_DIR`, replace `target/release` with that directory's `release` path.
+Use `--order 162 --samples 32 --repeats 1` for a quick check. `--compare-kernels` cannot be combined
+with `--kernel` or `--count-allocations`; order must be positive and even. Initial load above eight
+refuses the run. Retain all draws and examine their spread and the benchmark-lock load log before
+publishing; a short Euclidean batch can be dominated by thread creation. The ratio includes sample
+specialization and thread creation but excludes coefficient extraction, interpolation, root finding
+and verification. It is a kernel-stage comparison and cannot be quoted as a solver speedup.
 
 ### Monomial order width
 

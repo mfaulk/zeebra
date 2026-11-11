@@ -123,6 +123,13 @@ For the monomial-order dispatch and F4 column-sort replay, build with
 `cargo build --release --example monomial_order_width` and follow the pinned run command in the
 [benchmarking guide](docs/guide/benchmarking.md#monomial-order-width).
 
+Compare dense and Euclidean Sylvester kernels at the same worker count with
+`cargo run --release --example determinant_width -- --compare-kernels --order 162 --width 32`.
+The comparison checks every sample and reports a determinant-stage ratio; it excludes interpolation
+and root finding. See the [five-axis decision](docs/research/structured-sylvester.md) for the
+algorithm choice and the [measurement protocol](docs/guide/benchmarking.md#sylvester-kernel-comparison)
+for pinned runs.
+
 Univariate `gcd` uses classical Euclid. Run `cargo run --release --example gcd_crossover`
 to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254. The
 [half-GCD measurements](docs/research/fast-univariate.md#194-experimental-half-gcd)

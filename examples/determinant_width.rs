@@ -1,44 +1,6 @@
-//! M26 #412: where the Euclidean determinant kernel's width penalty comes from.
-//!
-//! ```text
-//! cargo run --release --example determinant_width                       # the default sweep
-//! cargo run --release --example determinant_width -- --kernel euclidean --order 1458
-//! cargo run --release --example determinant_width -- --pair triangular
-//! cargo run --release --example determinant_width -- --width 1 --width 32
-//! cargo run --release --example determinant_width -- --count-allocations
-//! ```
-//!
-//! # Why this exists apart from `determinant_sweep`
-//!
-//! That example's variable is the matrix **order** and it takes one worker count per invocation,
-//! so a width penalty assembled from it is a comparison across processes. #412's subject is the
-//! width itself: the 3.21x penalty on record was `1.109 ms` from one run of `determinant_sweep`
-//! divided into `3.563 ms` from a separately recorded 32-worker run — two different binaries, two
-//! different sessions, and two different **pairs**. A quantity that is a ratio of two numbers
-//! taken apart is not measured until both ends come out of one process.
-//!
-//! So every point here is taken in one process, in one lock window, against one pair, and the
-//! penalty is reported against this run's own single-worker point and never against a recorded one.
-//!
-//! # What the sweep separates
-//!
-//! **The machine, from memory, from the allocator.** `--kernel clock` is a control: a dependent
-//! chain of field multiply-adds sized to the Euclidean kernel's own operation count, holding
-//! nothing but registers. It allocates nothing and touches no memory, so whatever penalty it shows
-//! at width is the all-core clock and the scheduler and nothing else.
-//!
-//! **The kernel's two halves, from each other.** `--kernel specialize` times only
-//! `fc[j].eval(x)` and `gc[j].eval(x)`, and `--kernel remainder` times only the remainder sequence
-//! over vectors specialized in advance, outside the timer. Every per-step allocation the issue's
-//! candidate mechanism names happens in the second; a width penalty that sits in the first cannot
-//! be the allocator.
-//!
-//! **The kernel, from the pair.** `--pair synthetic` is `determinant_sweep`'s — degree 1 in the
-//! surviving variable, so specializing costs one multiply-add per coefficient. `--pair triangular`
-//! is random of total degree `order / 2`, the shape of a bivariate straight-line program's outputs.
-//! There the specialization is `(order / 2)²` Horner steps against the remainder sequence's
-//! `(order / 2)² / 2`, and it is **inside** the per-determinant timer — so running both at the same
-//! widths says whether a penalty is a property of the width or of the pair.
+//! Width attribution and matched-concurrency kernel comparisons must share a process, polynomial
+//! pair and sample sequence: mixing those produced the false 3.21x width penalty in #412.
+//! `--compare-kernels` alternates timing order and checks every sample before reporting a ratio.
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -50,7 +12,9 @@ use rand::{prelude::StdRng, SeedableRng};
 
 use zeebra::{
     fields::PrimeFieldElement64,
-    grobner::resultant::{random_bivariate, time_sylvester_determinants, DeterminantKernel},
+    grobner::resultant::{
+        random_bivariate, time_sylvester_determinants, DeterminantBatch, DeterminantKernel,
+    },
     resultant_from_coefficients, FiniteField, Monomial, MultivariatePolynomial, One, Polynomial,
     UnivariatePolynomial, Zero,
 };
@@ -578,6 +542,77 @@ fn report(subject: Subject, points: &[Point]) {
     }
 }
 
+fn compare_draw(
+    f: &MultivariatePolynomial<2, K>,
+    g: &MultivariatePolynomial<2, K>,
+    at: &[K],
+    workers: usize,
+    dense_first: bool,
+) -> (Vec<K>, DeterminantBatch, DeterminantBatch) {
+    let run = |kernel| time_sylvester_determinants(f, g, 1, at, workers, kernel).unwrap();
+    let dense;
+    let euclidean;
+    if dense_first {
+        dense = run(DeterminantKernel::Dense);
+        euclidean = run(DeterminantKernel::Euclidean);
+    } else {
+        euclidean = run(DeterminantKernel::Euclidean);
+        dense = run(DeterminantKernel::Dense);
+    }
+    assert_eq!(dense.0, euclidean.0, "kernels disagree at matched samples");
+    (dense.0, dense.1, euclidean.1)
+}
+
+fn compare_kernels(
+    pair: &(MultivariatePolynomial<2, K>, MultivariatePolynomial<2, K>),
+    samples: usize,
+    widths: &[usize],
+    repeats: usize,
+) {
+    println!("## Dense versus Euclidean at matched concurrency\n");
+    println!(
+        "Same pair and samples in every draw; timing order alternates. Ratios compare medians \
+         within this run. Times exclude coefficient extraction, interpolation and root finding; \
+         thread creation is included. Small batches can be dominated by thread creation.\n"
+    );
+    for &width in widths {
+        println!(
+            "| workers | samples | draw | first | dense wall/sample (s) | Euclidean wall/sample (s) |"
+        );
+        println!("|---:|---:|---:|---|---:|---:|");
+        assert!(width > 0, "a comparison needs at least one worker");
+        // A multiple of width makes every static block nonempty and uses exactly width workers.
+        let count = samples
+            .max(width)
+            .div_ceil(width)
+            .checked_mul(width)
+            .unwrap();
+        let at: Vec<K> = (0..count).map(|i| K::new(i as u64 + 7)).collect();
+        let mut dense_times = Vec::new();
+        let mut euclidean_times = Vec::new();
+        for draw in 0..repeats {
+            let dense_first = draw % 2 == 0;
+            let (_, dense, euclidean) = compare_draw(&pair.0, &pair.1, &at, width, dense_first);
+            dense_times.push(dense.wall_per_determinant());
+            euclidean_times.push(euclidean.wall_per_determinant());
+            println!(
+                "| {width} | {count} | {} | {} | {:.9} | {:.9} |",
+                draw + 1,
+                if dense_first { "dense" } else { "Euclidean" },
+                dense.wall_per_determinant(),
+                euclidean.wall_per_determinant(),
+            );
+        }
+        println!(
+            "\n{width} workers, {count} samples: dense median {}, Euclidean median {}, \
+             **{:.2}x** determinant-stage ratio; all samples equal in all {repeats} draws.\n",
+            human(median(&dense_times)),
+            human(median(&euclidean_times)),
+            median(&dense_times) / median(&euclidean_times),
+        );
+    }
+}
+
 /// One-minute load average above which a width arm is not publishable.
 ///
 /// The orchestration standard on this box: six agents, release builds at `-j128`, and a one-minute
@@ -604,6 +639,15 @@ fn main() {
     let repeats = flag_value("--repeats").unwrap_or(3).max(1);
     let order = flag_value("--order").unwrap_or(1_458);
     let samples = flag_value("--samples").unwrap_or(64);
+    let compare = flag("--compare-kernels");
+    assert!(
+        !compare || (!flag("--count-allocations") && flag_string("--kernel").is_none()),
+        "--compare-kernels cannot be combined with --count-allocations or --kernel"
+    );
+    assert!(
+        order >= 2 && order.is_multiple_of(2),
+        "--order must be positive and even"
+    );
     let pair_kind = match flag_string("--pair").as_deref() {
         None | Some("synthetic") => Pair::Synthetic,
         Some("triangular") => Pair::Triangular,
@@ -618,11 +662,15 @@ fn main() {
         }
     };
 
-    println!("# M26 #412: the Euclidean kernel's width penalty, swept\n");
+    println!("# Sylvester determinant measurement\n");
     println!(
-        "Every point below comes out of **this** process, so each penalty is against this run's \
-         own single-worker point and not against a figure from another binary. {} draw{} per \
-         width, {} sample{} a draw.\n",
+        "Machine: {}; affinity: {}.\n",
+        std::env::var("ZEEBRA_MACHINE").unwrap_or_else(|_| "unspecified".into()),
+        std::env::var("ZEEBRA_AFFINITY").unwrap_or_else(|_| "unspecified".into()),
+    );
+    println!(
+        "Every point below comes out of **this** process on the same pair. {} draw{} per \
+         width, {} requested sample{} a draw.\n",
         repeats,
         if repeats == 1 { "" } else { "s" },
         samples,
@@ -687,6 +735,11 @@ fn main() {
              {start_load:.2}. Requeue."
         );
         std::process::exit(3);
+    }
+
+    if compare {
+        compare_kernels(pair.as_ref().unwrap(), samples, &widths, repeats);
+        return;
     }
 
     for subject in subjects() {
@@ -763,4 +816,34 @@ fn degree_in(p: &MultivariatePolynomial<2, K>, index: usize) -> u32 {
 /// The Sylvester order the pair produces when the second variable is eliminated.
 fn sylvester_order(f: &MultivariatePolynomial<2, K>, g: &MultivariatePolynomial<2, K>) -> u32 {
     degree_in(f, 1) + degree_in(g, 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The comparison retains every sample in order, including formal-degree specialization points.
+    #[test]
+    fn comparison_checks_specialization_points_at_matched_widths() {
+        let f = MultivariatePolynomial::parse("x*y^2 + y + 1", ["x", "y"]).unwrap();
+        let g = MultivariatePolynomial::parse("x*y^2 + 2*y + 3", ["x", "y"]).unwrap();
+        let at: Vec<K> = (0..8).map(K::new).collect();
+        let expected: Vec<K> = at
+            .iter()
+            .map(|x| zeebra::grobner::resultant::sylvester_determinant_at(&f, &g, 1, *x).unwrap())
+            .collect();
+        for workers in [1, 2, 8] {
+            for dense_first in [true, false] {
+                let (values, dense, euclidean) = compare_draw(&f, &g, &at, workers, dense_first);
+                assert_eq!(values, expected);
+                for batch in [dense, euclidean] {
+                    assert_eq!(batch.concurrency, workers);
+                    assert_eq!(batch.determinants, at.len());
+                    assert_eq!(batch.matrix_order, 4);
+                }
+                assert_eq!(dense.kernel, DeterminantKernel::Dense);
+                assert_eq!(euclidean.kernel, DeterminantKernel::Euclidean);
+            }
+        }
+    }
 }
