@@ -1200,13 +1200,7 @@ mod tests {
         );
     }
 
-    /// Raising the entry budget alone changes the allowance by nothing, and the error says so.
-    ///
-    /// The trap #322 was filed for. `recommended()`'s two budgets are numerically identical over a
-    /// 16-byte entry, so the effective limit is the `min` and lifting one knob leaves the other
-    /// binding at exactly the old value. What made it cost a run is that the refusal has to name
-    /// the budget that *bound* and not the one the caller just raised, or the message points away
-    /// from the cause.
+    // Raising only entries leaves the byte allowance binding and names that limit in the error.
     #[test]
     fn test_raising_the_entry_budget_alone_moves_nothing_and_the_error_names_the_byte_budget() {
         let default = F4Options::default();
@@ -1301,11 +1295,7 @@ mod tests {
         assert_eq!(starved.live_entry_allowance::<Narrow>(), 0);
     }
 
-    /// The policy prose states the allowance that binds, and names the budget it came from.
-    ///
-    /// The #469 configuration is the case: `max_live_bytes: 400_000_000` with `max_live_nonzeros`
-    /// left at the historical baseline is **320 MB** over a 16-byte entry, and a record that quoted the
-    /// 400 MB overstated its own budget by 25%.
+    // Policy text quotes the binding allowance for historical narrow and current wide-field limits.
     #[test]
     fn test_the_policy_prose_states_the_budget_that_binds() {
         let scoreboard = F4Options {

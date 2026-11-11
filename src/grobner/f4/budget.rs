@@ -389,9 +389,7 @@ mod tests {
         );
     }
 
-    /// At `recommended` over a 16-byte entry the two live budgets are equal, so the older one is
-    /// reported as binding and the byte budget as slack — the coupling #322 had to read the source
-    /// to discover.
+    // The narrow-field report identifies the entry budget when the coupled limits agree.
     #[test]
     fn test_the_report_says_which_live_budget_binds_over_a_narrow_field() {
         let report = F4Options::recommended().budget_report::<Zp13>();
@@ -401,8 +399,7 @@ mod tests {
         assert!(!report.line("max_live_bytes").expect("the line").binding);
     }
 
-    /// Over a 254-bit field an entry costs 40 bytes, so the byte budget binds at two fifths of the
-    /// entry budget and the report says so without a run.
+    // The wide-field report identifies the byte budget at the same payload allowance.
     #[test]
     fn test_the_report_says_which_live_budget_binds_over_a_wide_field() {
         let report = F4Options::recommended().budget_report::<Bn254Fr>();
@@ -473,8 +470,7 @@ mod tests {
         statistics
     }
 
-    /// A run that came within 1% of the live budget says so, ranked above the budgets it had
-    /// headroom on — the "batch 39 was at 98%" the issue asked for.
+    // Near-limit pressure ranks the live entry budget above low-utilization matrix bounds.
     #[test]
     fn test_budget_pressure_ranks_the_budget_that_was_nearly_crossed_first() {
         let options = F4Options::recommended();
@@ -494,8 +490,7 @@ mod tests {
         assert!(rows.utilisation() < pressure[0].utilisation());
     }
 
-    /// `near_budget` reports only what crossed the threshold, so a caller can warn without
-    /// re-deriving the ratios.
+    // Near-budget filtering reports only allowances at or above the requested threshold.
     #[test]
     fn test_near_budget_filters_on_the_threshold() {
         let options = F4Options::recommended();
@@ -510,8 +505,7 @@ mod tests {
         assert!(statistics.near_budget(&options, 0.999).is_empty());
     }
 
-    /// Pressure on the live pair is reported in the unit of whichever budget bound, so the figure
-    /// and the name agree — bytes when `max_live_bytes` binds.
+    // Live pressure uses byte units when raising only the entry limit leaves bytes binding.
     #[test]
     fn test_pressure_on_the_live_pair_is_reported_in_the_binding_budget_s_unit() {
         let options = F4Options {

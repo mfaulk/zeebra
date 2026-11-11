@@ -10,6 +10,11 @@ measured at the tree that section's own change introduces, on branch
 `perf/554-sparse-row-buffer` (#554): in both the figures and the code that produces them land in one
 commit, so the publication bound is that commit and its merge.
 
+**Current policy update (#659, #490):** the recommended/default allowance is now 32 million entries
+and 512 million bytes. Historical sections retain their original budgets. The
+[measured decision and new-default re-sweep](f4-live-budget.md) records the paired inputs, completed
+peaks and remaining refusals; §14's unmeasured-work list describes its original snapshot.
+
 Deliverable for M24-D (#215). One question, which no amount of argument could settle: when a
 registered problem stops at `max_live_nonzeros`, is it **out of reach** or merely **out of this
 budget**?
@@ -1405,3 +1410,17 @@ not be comparable with them.
 **So the budget does not move here**, and the reason is now a better one than #469's: not that
 changing it would reprice old figures, but that two of the three workloads said to need it have not
 been measured since the change that moved the third by 5.1x.
+
+## 15. The reduced-row default is sized from peaks (#659, #490)
+
+The [budget decision](f4-live-budget.md) supersedes §14.3's open measurement status without
+rewriting its historical figures. The origin of the old cap remains as §14.1 records. The current
+MQ control still completes well below it. Both Anemoi regression targets now have completed raised-
+allowance reference runs, and a new-default re-sweep preserves their exact reduced bases. The
+full-width Poseidon and Cyclic-9 refusals are retained separately from completed peaks.
+
+`recommended()` and `default()` now select 32 million entries and 512 million bytes; `baseline()`
+retains 20 million entries and 320 million bytes. Explicit limits remain enforced, and every new
+measurement records the actual policy. These are matrix-payload limits; the study reports process
+RSS separately. Historical recommended configurations remain reproducible by explicitly selecting
+their live allowance and strategy settings.

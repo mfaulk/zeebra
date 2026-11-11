@@ -1,0 +1,22 @@
+{
+  "input": "poseidon31-cico-t16-rf4-rp2",
+  "probe_commit": "3bf5c35bc9dcb2d86ca5e046bf2cc6f04cefb664",
+  "machine": "fedora",
+  "affinity": "2",
+  "address_space_limit_bytes": 17179869184,
+  "cooperative_wall_seconds": 600,
+  "external_wall_seconds": 660,
+  "exit_status": 134,
+  "peak_resident_bytes": 16164347904,
+  "rss_basis": "GNU time child maximum RSS",
+  "supervisor_stop": "address-space allocation refusal",
+  "stderr": "memory allocation of 316224 bytes failed\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+  "external_measurement": "Command terminated by signal 6\nmax_rss_kb=15785496\nelapsed_seconds=174.03\nexit_status=0\n",
+  "probe": null,
+  "base_commit": "6aaea833faee691f83ac773817a45f1f77f73897",
+  "patch_id": "203731efe29b02e19d3619212b15eab2be2ee4bb",
+  "input_sha256": "b435bc497770a9e4b35044f984a7a0ac43af2147f1a6c5db296730136c5e9f08",
+  "build": "release; x86-64-v3; fat LTO; codegen-units=1; no default features",
+  "verified_kernel_address_space_limit": "Max address space         17179869184          17179869184          bytes     ",
+  "supervisor_elapsed_nanos": 174095466621
+}
