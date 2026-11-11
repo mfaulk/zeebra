@@ -1,6 +1,6 @@
 //! Solving a slice, lifting the result, and saying exactly what that does and does not establish.
 //!
-//! The half of M21-E that is about epistemics rather than algebra. [`specialize`] is a
+//! The half of M21-E that is about epistemics rather than algebra. [`specialize`](super::specialization::specialize) is a
 //! substitution; this is where the answer gets a truth value.
 
 use std::fmt::{Display, Formatter};

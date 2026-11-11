@@ -1,4 +1,4 @@
-//! The machine-readable record of one experiment, serialized through [`Json`](crate::util::Json).
+//! The machine-readable record of one experiment, serialized through [`Json`].
 //!
 //! # What a record is, and is not
 //!

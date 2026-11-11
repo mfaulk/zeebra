@@ -112,7 +112,7 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ExtensionFiel
     /// An element of GF(P^N).
     ///
     /// # Arguments
-    /// * `coefficients` - coefficients[i] is c_i in the polynomial `sum c_i x^i`. Each is reduced
+    /// * `coefficients` - coefficients\[i\] is c_i in the polynomial `sum c_i x^i`. Each is reduced
     ///   mod P so that equal elements share one representation.
     pub fn new(coefficients: [u64; N]) -> Self {
         let mut reduced = coefficients;

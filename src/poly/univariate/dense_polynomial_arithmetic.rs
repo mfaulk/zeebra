@@ -87,7 +87,7 @@ impl<F: FiniteField> ops::Mul<&DensePolynomial<F>> for &DensePolynomial<F> {
     /// `roots` — the binding univariate stage — 1.28x to 1.61x faster for this one line.
     ///
     /// Bit-identical to the schoolbook loop it replaces at every size, and below the base case it
-    /// *is* that loop, reached through [`multiply_dense`]: the recursion takes its schoolbook
+    /// *is* that loop, reached through `multiply_dense`: the recursion takes its schoolbook
     /// branch. So this is not a different answer anywhere, and no caller has to opt in.
     ///
     /// Needs nothing of the field but a ring, which is why it can live on the operator where the

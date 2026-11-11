@@ -403,7 +403,7 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// [`normal_form_counted`](Self::normal_form_counted) accumulating into a caller's counters,
     /// so that a *sequence* of reductions can be described by one record.
     ///
-    /// The [`CrossCallRepeats`] tracker is the reason this exists: it is the only counter here
+    /// The `CrossCallRepeats` tracker is the reason this exists: it is the only counter here
     /// that cannot be summed after the fact, because what it measures is a relation **between**
     /// calls. #569 asks how much of the final interreduction's work recurs across basis elements,
     /// and that question is unanswerable from per-call counts however they are folded together.

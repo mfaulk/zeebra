@@ -131,7 +131,7 @@ impl<F: FiniteField> DenseAccumulator<F> {
 
     /// Scale so the leading coefficient is one, reporting whether an inverse was needed.
     ///
-    /// Scaling is unconditional, as in [`crate::linalg::dense::rows`]: zero times anything is
+    /// Scaling is unconditional, as in `crate::linalg::dense::rows`: zero times anything is
     /// zero, so testing for a zero cell decided nothing and only kept the loop from being widened.
     /// `inverse` is nonzero and a field has no zero divisors, so scaling cannot change which cells
     /// are zero and `nonzeros` is unaffected.

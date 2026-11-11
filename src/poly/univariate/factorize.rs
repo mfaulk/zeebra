@@ -138,7 +138,7 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
 /// True if `f` is irreducible over F.
 ///
 /// Rabin's test: a monic polynomial of degree n is irreducible exactly when `x^(q^n) = x` in
-/// F[x]/(f) and `gcd(x^(q^(n/p)) - x, f) = 1` for every prime p dividing n. The first condition
+/// F\[x\]/(f) and `gcd(x^(q^(n/p)) - x, f) = 1` for every prime p dividing n. The first condition
 /// says every irreducible factor has degree dividing n; the second rules out a proper divisor.
 ///
 /// # Panics

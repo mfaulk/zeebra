@@ -57,7 +57,7 @@ pub const SMALL_PRIME_CHARACTERISTIC: u64 = 32_003;
 /// **It is the one field where Steel's Cyclic rows are Zeebra's ideal.** His `GF(32003)` Cyclic 7
 /// and Cyclic 8 carry `(Hom)`, the homogenized system, which is a different ideal; the `GF(2)`
 /// block carries no such mark, so `docs/research/classical-benchmarks.md` §4 reads it as the affine
-/// formulation [`cyclic`](crate::grobner::benchmark_systems::cyclic) generates. It is also the
+/// formulation [`cyclic`] generates. It is also the
 /// field Zeebra most recently gained end-to-end support for, and nothing external measured it.
 ///
 /// **Why Cyclic only, and why that is a finding rather than a shortcut.** A characteristic the
@@ -68,7 +68,7 @@ pub const SMALL_PRIME_CHARACTERISTIC: u64 = 32_003;
 /// Backelin's squarefree criterion — which `test_a_cyclic_rung_is_zero_dimensional_exactly_where_n_is_squarefree`
 /// asserts — is a statement about characteristic zero and does not survive the reduction. Katsura
 /// and planted MQ are worse off still: Katsura's generators carry coefficient 2, and
-/// [`planted_point`]'s `3 + 2i` collapses to all-ones mod 2, which destroys the distinctness the
+/// `planted_point`'s `3 + 2i` collapses to all-ones mod 2, which destroys the distinctness the
 /// planted family's oracle depends on. Those families are therefore **generated** at `GF(2)` and
 /// not **published** there — the middle tier of [`PUBLISHED_CHARACTERISTICS`]' table, honest
 /// instances whose identity is not frozen and from which no figure may be quoted.
@@ -830,7 +830,7 @@ pub fn random_mq_instance(
 ///
 /// Zero-dimensional by construction and the planted point is among the solutions, so **every
 /// engine must find it** — an oracle no digest provides. See
-/// [`planted`](crate::grobner::benchmark_systems::planted) on why the equations are nonlinear: a
+/// [`planted`] on why the equations are nonlinear: a
 /// system of `x_i - a_i` is already a Gröbner basis under every order and measures nothing.
 /// # Errors
 /// As [`katsura_instance`].

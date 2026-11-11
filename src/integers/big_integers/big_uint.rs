@@ -57,7 +57,7 @@ impl BigUInt {
         Self::new(&[low, hi])
     }
 
-    /// Randomly sample a value in the range [low,high].
+    /// Randomly sample a value in the range \[low,high\].
     pub fn sample_inclusive<R: Rng>(low: &BigUInt, high: &BigUInt, rng: &mut R) -> Self {
         assert!(low <= high);
         let width = high - low;

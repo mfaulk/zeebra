@@ -22,8 +22,8 @@ use crate::{
     FiniteField, Monomial,
 };
 
-/// Which route a product takes. Selected by [`route`]; a caller that wants a specific one for
-/// measurement goes through [`multiply_by`].
+/// Which route a product takes. Selected by `route`; a caller that wants a specific one for
+/// measurement goes through `multiply_by`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum MultiplyRoute {
     /// Materialise every product in one `Vec`, then collect like terms. The pre-#243 behaviour,
@@ -50,14 +50,14 @@ pub enum MultiplyRoute {
     /// round-trip, measured at 1.4x its time.
     Chunked { rows: usize },
     /// Accumulate into a flat `Vec<F>` indexed by the bivariate total-degree triangle, so the inner
-    /// loop hashes nothing. `N == 2` and a dense output only — see [`dense_triangle_profitable`].
+    /// loop hashes nothing. `N == 2` and a dense output only — see `dense_triangle_profitable`.
     DenseTriangle,
     /// [`MultiplyRoute::DenseTriangle`] generalised to any `N`: a flat `Vec<F>` indexed by the
     /// total-degree simplex, `C(d + N, N)` cells. The tightest dense layout, and the one #362 names.
     ///
     /// Its rank is not separable, so it costs `2(N - 1)` table lookups and as many adds per product
     /// where the triangle costs three integer operations — which is why generalising the *layout*
-    /// does not generalise the *win*. See [`dense_simplex_profitable`].
+    /// does not generalise the *win*. See `dense_simplex_profitable`.
     DenseSimplex,
     /// A flat `Vec<F>` indexed by a mixed-radix box over the per-variable degree bounds,
     /// `∏(d_i + 1)` cells.
@@ -65,7 +65,7 @@ pub enum MultiplyRoute {
     /// The index is separable, so the left operand's index hoists out of the inner loop and the
     /// per-product cost is one add at every arity — the triangle's property, kept. It pays about
     /// `N!` in cells for an operand pair dense in the total-degree sense, which is what
-    /// [`dense_box_profitable`] and [`DENSE_TRIANGLE_BYTE_CAP`] govern.
+    /// `dense_box_profitable` and `DENSE_TRIANGLE_BYTE_CAP` govern.
     DenseBox,
 }
 

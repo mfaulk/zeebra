@@ -262,9 +262,32 @@ jobs:
             exit 1
           fi
 
+      # docs.rs renders these pages for every published version, so a broken intra-doc link is a
+      # dead link in the published docs. All features, matching `package.metadata.docs.rs`.
+      - name: Rustdoc
+        if: ${{ !cancelled() }}
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --all-features --locked
+
       - name: Package
         if: ${{ !cancelled() }}
         run: cargo package --locked
+
+  # `rust-version` in Cargo.toml is a promise to consumers; this is what keeps it true. Library
+  # only: dev-dependencies and benches may use a newer toolchain without breaking a consumer.
+  msrv:
+    name: Minimum supported Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.91.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check the library on the declared MSRV
+        run: cargo check --lib --all-features --locked
 
   # The agent claim tooling is shell, so it is invisible to every job above. Its pure half —
   # marker parsing, race resolution, lease arithmetic — is what stops two agents working the

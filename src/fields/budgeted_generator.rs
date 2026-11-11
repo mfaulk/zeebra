@@ -44,7 +44,7 @@ pub enum GeneratorSearchError {
         /// The cofactors [`factor_with_budget`] could not split, in increasing order.
         unfactored: Vec<BigUInt>,
     },
-    /// `q - 1` was factored, but no generator turned up in [`MAX_CANDIDATES`] draws.
+    /// `q - 1` was factored, but no generator turned up in `MAX_CANDIDATES` draws.
     SearchExhausted {
         /// How many candidates were tested.
         candidates: usize,

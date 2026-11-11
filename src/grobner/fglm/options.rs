@@ -32,7 +32,7 @@ pub enum OperatorConstruction {
     ///
     /// **The targets do not reduce one another.** Each has its own normal form, so the pivots are
     /// fixed before any target is touched and no target becomes one. See
-    /// [`batch`](super::batch) and [`BorderBatch`](super::BorderBatch) for the limits.
+    /// `batch` and [`BorderBatch`](super::BorderBatch) for the limits.
     ///
     /// The default since M18-5, whose ablation measured it at least as fast as [`Self::PerColumn`]
     /// on every system in the corpus at [`BorderBatch::recommended`]'s batch size.

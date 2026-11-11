@@ -1,6 +1,6 @@
 ![Zeebra](./zeebra.jpg "Zeebra is ZEro knowledge algeBRA")
 
-# Zeebra is ZEro-knowledge algEBRA
+# Zeebra — High-performance computational algebra over finite fields
 [![CI](https://github.com/mfaulk/zeebra/actions/workflows/rust.yml/badge.svg)](https://github.com/mfaulk/zeebra/actions/workflows/rust.yml)
 
 **Zeebra is a computational algebra library, in Rust, for developing and analyzing advanced
@@ -45,7 +45,8 @@ whose ideals are checked for equivalence before any timing is published.
 
 ## Quickstart
 
-Zeebra builds on stable Rust. No nightly toolchain, no feature gates, no system libraries.
+Zeebra builds on stable Rust 1.91 or newer. No nightly toolchain, no feature gates, no system
+libraries.
 
 ```sh
 cargo build
@@ -192,6 +193,7 @@ records the per-rung budgets and limitations of its single-run comparisons.
   Singular, and the contract for driving external engines
 - [`docs/`](docs) — milestone records and [`docs/research/`](docs/research) notes, where the design
   decisions and their measurements are argued out
+- [`CHANGELOG.md`](CHANGELOG.md) — release notes, including breaking changes
 - [CLAUDE.md](CLAUDE.md) — repository conventions, including how concurrent coding agents claim work
 
 Licensed under the [MIT licence](LICENSE-MIT).

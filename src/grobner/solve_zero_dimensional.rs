@@ -218,7 +218,7 @@ pub enum SolveError {
     /// the field and is bounded by the field's order rather than by the solution count.
     ///
     /// Reported by both strategies, and since #376 from a grevlex basis computed for the purpose
-    /// when the direct route's own lex basis never materialized — see [`explain_lex_failure`].
+    /// when the direct route's own lex basis never materialized — see `explain_lex_failure`.
     /// Nothing a budget can be raised to will help; for a system over a small field the usual
     /// remedy is [`with_field_equations`](super::with_field_equations).
     PositiveDimensional,
@@ -328,7 +328,7 @@ impl From<FglmError> for SolveError {
     /// There was one, and it was dead: `lex_basis` classifies the source basis itself before
     /// converting, so the conversion is never reached with a positive-dimensional ideal and never
     /// reports one. The conversion is on the grevlex route only, and that route always has a basis
-    /// to classify; the direct route reaches the same variant through [`explain_lex_failure`] when
+    /// to classify; the direct route reaches the same variant through `explain_lex_failure` when
     /// it has none.
     fn from(e: FglmError) -> Self {
         Self::Fglm(e)

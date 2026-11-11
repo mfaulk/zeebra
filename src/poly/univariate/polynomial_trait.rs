@@ -28,7 +28,7 @@ where
     /// Lift the field element to the constant polynomial p(x) = c.
     fn lift(c: &F) -> Self;
 
-    /// The polynomial's coefficients[i] = a_i
+    /// The polynomial's coefficients\[i\] = a_i
     fn coefficients(&self) -> &[F];
 
     /// Returns the total degree of the polynomial

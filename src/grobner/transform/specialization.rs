@@ -9,14 +9,14 @@
 //! # Two rules, and they are the whole module
 //!
 //! 1. **A candidate is verified against every original generator**, after lifting. Not against the
-//!    specialized system, not against any basis derived from it. [`SliceOutcome::Witness`] is
+//!    specialized system, not against any basis derived from it. [`SliceOutcome::Witness`](super::slices::SliceOutcome::Witness) is
 //!    constructed only after that check.
 //!
 //! 2. **An empty slice proves nothing about the original system.** A hyperplane section of a
 //!    nonempty variety can be empty over `F_q` while the variety is not, and a *sequence* of empty
 //!    slices is still not a proof — only `q^|S|` of them would be, which is not a computation.
-//!    [`SliceOutcome`] is shaped so that this is hard to misread: see
-//!    [`SliceOutcome::is_evidence_about_the_original_system`].
+//!    [`SliceOutcome`](super::slices::SliceOutcome) is shaped so that this is hard to misread: see
+//!    [`SliceOutcome::is_evidence_about_the_original_system`](super::slices::SliceOutcome::is_evidence_about_the_original_system).
 //!
 //! The second rule is the one that gets broken. `solve_one` on a slice returning "no solution" is
 //! a fact about the slice, and reporting it as a fact about the system would be a wrong answer

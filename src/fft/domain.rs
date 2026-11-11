@@ -59,7 +59,7 @@ impl std::error::Error for DomainError {}
 ///
 /// Optionally carries the convolution domain Bluestein's algorithm needs, which is what lets
 /// [`evaluate`](super::evaluate) reach the quasi-linear route at a prime size without a
-/// `KnownOrder` bound of its own — see [`Self::with_bluestein`].
+/// `KnownOrder` bound of its own — see [`Self::with_bluestein_domain`].
 #[derive(Clone, Debug)]
 pub struct FFTDomain<F: FiniteField> {
     /// Powers of the generator: 1, g, g^2, ...
@@ -91,7 +91,7 @@ impl<F: FiniteField> FFTDomain<F> {
     /// An FFT domain.
     ///
     /// Any size: a transform whose size is not a power of two goes through the prime-factor
-    /// decomposition rather than the radix-2 kernel. See [`prime_factor`](super::prime_factor).
+    /// decomposition rather than the radix-2 kernel. See `prime_factor`.
     ///
     /// # Arguments
     /// * `powers` - Powers of the generator `g` : 1, g, g^2, ...
@@ -171,7 +171,7 @@ impl<F: FiniteField> FFTDomain<F> {
     /// # Panics
     /// Panics on an odd size, where the two halves would not be the same length. This is the
     /// radix-2 decomposition; an odd factor is handled by
-    /// [`prime_factor`](super::prime_factor) instead.
+    /// `prime_factor` instead.
     pub fn split(&self) -> (FFTDomain<F>, FFTDomain<F>) {
         assert!(
             self.size().is_multiple_of(2),

@@ -38,7 +38,7 @@ pub enum CaseField {
         characteristic: u64,
     },
 
-    /// GF(2^m) = GF(2)[x] / (modulus), with `modulus` the bit pattern of the irreducible
+    /// GF(2^m) = GF(2)\[x\] / (modulus), with `modulus` the bit pattern of the irreducible
     /// polynomial — so `283` is `x^8+x^4+x^3+x+1` and `m` is read off its degree.
     Binary {
         /// The irreducible polynomial, as a bit pattern. Monic of degree `m`, so at least 4.
@@ -151,7 +151,7 @@ impl CaseField {
     /// A name for this field that is safe in an identifier, a file name and a fixture name.
     ///
     /// [`Display`] writes `2^8/283`, which reads well in a report and badly in a path. This is the
-    /// same text with the separator replaced, and [`CaseField::from_str`] accepts both.
+    /// same text with the separator replaced, and [`CaseField::from_str`](std::str::FromStr::from_str) accepts both.
     pub fn slug(&self) -> String {
         self.to_string().replace('/', "_")
     }

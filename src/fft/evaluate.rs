@@ -1,7 +1,7 @@
 //! The Finite Field Fast Fourier Transform
 //!
-//! (See https://www.csee.umbc.edu/~phatak/691a/fft-lnotes/fftnotes.pdf)
-//! (See https://www.csa.iisc.ac.in/~chandan/courses/CNT/notes/lec6.pdf)
+//! (See <https://www.csee.umbc.edu/~phatak/691a/fft-lnotes/fftnotes.pdf>)
+//! (See <https://www.csa.iisc.ac.in/~chandan/courses/CNT/notes/lec6.pdf>)
 //!
 //! A Fourier Transform is a sequence of n points constituting the evaluation of a polynomial
 //! with coefficients {a_0, ..., a_{n-1}} at the points {w^0, ..., w^{n-1}} where w is a primitive
@@ -54,7 +54,7 @@ use crate::{
 /// Panics if `p` has degree `n` or more. That is a genuinely over-degree input: `n` evaluations
 /// cannot determine it, so silently transforming a truncation would be worse than refusing. Also
 /// panics if `w` is not the powers of a primitive `n`th root of unity — see
-/// [`transform_in_place`].
+/// `transform_in_place`.
 ///
 /// **A panic rather than a [`DomainError`](super::DomainError)-style typed failure, deliberately.**
 /// #120 drew the line where that type's own documentation draws it: a fact about the field or about

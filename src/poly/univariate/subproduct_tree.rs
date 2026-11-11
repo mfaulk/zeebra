@@ -239,7 +239,7 @@ pub(crate) fn derivative<F: FiniteField>(
 /// This is what `fft::evaluate` cannot do: the transform's domain must be the geometric
 /// `1, w, w^2, ...`, and an evaluation–interpolation resultant (#82) needs an arbitrary set.
 ///
-/// Dispatches on the same measured crossover [`interpolate`] uses, since the cost that decides it
+/// Dispatches on the same measured crossover `interpolate` uses, since the cost that decides it
 /// is the tree's; below it, Horner at each point.
 ///
 /// # Panics

@@ -13,7 +13,7 @@
 //! # Nothing here is a reconstruction
 //!
 //! The matrices are **captured out of a live run** through
-//! [`BatchObserver::matrix`](super::observer::BatchObserver::matrix), which hands over the object
+//! [`BatchObserver::matrix`], which hands over the object
 //! F4 is about to eliminate. They are not rebuilt from a recipe and they are not regenerated from
 //! remembered dimensions. This is deliberate, and it is the reason the module exists in this shape
 //! rather than as a file format:
