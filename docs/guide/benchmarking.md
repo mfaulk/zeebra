@@ -786,3 +786,13 @@ comparators. It times forced per-comparison dispatch and replays the unstable so
 F4 column snapshots. It checks the dispatch checksums and sorted columns across arms.
 Run `cargo test --example monomial_order_width` for the fixed checksum and layout check that also
 runs in CI. See the [measurement and scope](../research/monomial-order-width.md).
+
+### Classification before direct lex
+
+Build `cargo build --release --example classify_before_lex`. The runner accepts one of
+`planted-8`, `katsura-5`, `katsura-6-minus-one`, or `cyclic-4-gf2`, followed by `direct` or
+`classify`. Each invocation emits one JSON record with the environment, outcome, plan, batch
+counts, elapsed time, and process peak RSS. Run one invocation per process under the benchmark
+lock so the high-water mark belongs to that row. Both policies use the same 1000-row/1000-column
+F4 limits, RNG seed 417, and other default budgets. See
+[the measurement protocol](../research/classify-before-lex.md) for pinned commands and results.

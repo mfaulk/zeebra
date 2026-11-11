@@ -1,0 +1,1902 @@
+[
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 529371,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 498643,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 2,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3534848,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 direct"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Elapsed: 498.643\u00b5s\n  Result: Point\n\nTotal: 498.643\u00b5s over 1 attempt(s), 0ns of it discarded; 2 batches, 1016 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 497211,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 472835,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 2,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3543040,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 direct"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Elapsed: 472.835\u00b5s\n  Result: Point\n\nTotal: 472.835\u00b5s over 1 attempt(s), 0ns of it discarded; 2 batches, 1016 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 439212,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 417590,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 2,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3727360,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 direct"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Elapsed: 417.59\u00b5s\n  Result: Point\n\nTotal: 417.59\u00b5s over 1 attempt(s), 0ns of it discarded; 2 batches, 1016 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 704182,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 672602,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 2,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3715072,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 direct"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Elapsed: 672.602\u00b5s\n  Result: Point\n\nTotal: 672.602\u00b5s over 1 attempt(s), 0ns of it discarded; 2 batches, 1016 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 502992,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 471942,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 2,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3530752,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 direct"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Elapsed: 471.942\u00b5s\n  Result: Point\n\nTotal: 471.942\u00b5s over 1 attempt(s), 0ns of it discarded; 2 batches, 1016 peak bytes",
+    "repeat": 5
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 540413,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 517889,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 4,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3596288,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 classify"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Preclassification: grevlex F4 used 2 batches\n  Elapsed: 517.889\u00b5s\n  Result: Point\n\nTotal: 517.889\u00b5s over 1 attempt(s), 0ns of it discarded; 4 batches, 1016 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 541755,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 521116,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 4,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3723264,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 classify"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Preclassification: grevlex F4 used 2 batches\n  Elapsed: 521.116\u00b5s\n  Result: Point\n\nTotal: 521.116\u00b5s over 1 attempt(s), 0ns of it discarded; 4 batches, 1016 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 468817,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 450772,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 4,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3702784,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 classify"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Preclassification: grevlex F4 used 2 batches\n  Elapsed: 450.772\u00b5s\n  Result: Point\n\nTotal: 450.772\u00b5s over 1 attempt(s), 0ns of it discarded; 4 batches, 1016 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 539721,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 515836,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 4,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3661824,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 classify"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Preclassification: grevlex F4 used 2 batches\n  Elapsed: 515.836\u00b5s\n  Result: Point\n\nTotal: 515.836\u00b5s over 1 attempt(s), 0ns of it discarded; 4 batches, 1016 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "planted-8",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 548798,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 525525,
+          "grobner": {
+            "batches": 2,
+            "max_matrix_rows": 20,
+            "max_matrix_columns": 21,
+            "peak_live_entries": 53,
+            "estimated_peak_bytes": 848
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 4,
+      "estimated_peak_bytes": 1016,
+      "measured_peak_resident_bytes": 3592192,
+      "reproduce": "cargo run --release --example classify_before_lex -- planted-8 classify"
+    },
+    "plan": "Structure: 8 variables, 8 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 2 batches, largest matrix 20x21, 53 peak entries (848 bytes)\n  Preclassification: grevlex F4 used 2 batches\n  Elapsed: 525.525\u00b5s\n  Result: Point\n\nTotal: 525.525\u00b5s over 1 attempt(s), 0ns of it discarded; 4 batches, 1016 peak bytes",
+    "repeat": 5
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 938776,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 913899,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 20,
+      "estimated_peak_bytes": 8872,
+      "measured_peak_resident_bytes": 4177920,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 direct"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Elapsed: 913.899\u00b5s\n  Result: Point\n\nTotal: 913.899\u00b5s over 1 attempt(s), 0ns of it discarded; 20 batches, 8872 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 909962,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 884935,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 20,
+      "estimated_peak_bytes": 8872,
+      "measured_peak_resident_bytes": 4366336,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 direct"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Elapsed: 884.935\u00b5s\n  Result: Point\n\nTotal: 884.935\u00b5s over 1 attempt(s), 0ns of it discarded; 20 batches, 8872 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 766560,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 745471,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 20,
+      "estimated_peak_bytes": 8872,
+      "measured_peak_resident_bytes": 4165632,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 direct"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Elapsed: 745.471\u00b5s\n  Result: Point\n\nTotal: 745.471\u00b5s over 1 attempt(s), 0ns of it discarded; 20 batches, 8872 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 755098,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 734580,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 20,
+      "estimated_peak_bytes": 8872,
+      "measured_peak_resident_bytes": 4218880,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 direct"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Elapsed: 734.58\u00b5s\n  Result: Point\n\nTotal: 734.58\u00b5s over 1 attempt(s), 0ns of it discarded; 20 batches, 8872 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 860709,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 838146,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 20,
+      "estimated_peak_bytes": 8872,
+      "measured_peak_resident_bytes": 4276224,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 direct"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Elapsed: 838.146\u00b5s\n  Result: Point\n\nTotal: 838.146\u00b5s over 1 attempt(s), 0ns of it discarded; 20 batches, 8872 peak bytes",
+    "repeat": 5
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1240026,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 1214438,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 25,
+      "estimated_peak_bytes": 12640,
+      "measured_peak_resident_bytes": 4370432,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 classify"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.214438ms\n  Result: Point\n\nTotal: 1.214438ms over 1 attempt(s), 0ns of it discarded; 25 batches, 12640 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1364501,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 1332170,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 25,
+      "estimated_peak_bytes": 12640,
+      "measured_peak_resident_bytes": 4362240,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 classify"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.33217ms\n  Result: Point\n\nTotal: 1.33217ms over 1 attempt(s), 0ns of it discarded; 25 batches, 12640 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1440055,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 1404297,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 25,
+      "estimated_peak_bytes": 12640,
+      "measured_peak_resident_bytes": 4247552,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 classify"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.404297ms\n  Result: Point\n\nTotal: 1.404297ms over 1 attempt(s), 0ns of it discarded; 25 batches, 12640 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1093890,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 1069534,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 25,
+      "estimated_peak_bytes": 12640,
+      "measured_peak_resident_bytes": 4235264,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 classify"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.069534ms\n  Result: Point\n\nTotal: 1.069534ms over 1 attempt(s), 0ns of it discarded; 25 batches, 12640 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-5",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": "point",
+      "failure": null,
+      "verified": true,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1389639,
+      "discarded_nanos": 0,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": "point",
+          "failure": null,
+          "elapsed_nanos": 1353161,
+          "grobner": {
+            "batches": 20,
+            "max_matrix_rows": 25,
+            "max_matrix_columns": 43,
+            "peak_live_entries": 533,
+            "estimated_peak_bytes": 8528
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 25,
+      "estimated_peak_bytes": 12640,
+      "measured_peak_resident_bytes": 4194304,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-5 classify"
+    },
+    "plan": "Structure: 5 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Gr\u00f6bner: 20 batches, largest matrix 25x43, 533 peak entries (8528 bytes)\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.353161ms\n  Result: Point\n\nTotal: 1.353161ms over 1 attempt(s), 0ns of it discarded; 25 batches, 12640 peak bytes",
+    "repeat": 5
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 12425930,
+      "discarded_nanos": 12400151,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 12400151,
+          "grobner": {
+            "batches": 11,
+            "max_matrix_rows": 669,
+            "max_matrix_columns": 997,
+            "peak_live_entries": 69935,
+            "estimated_peak_bytes": 1118960
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 16,
+      "estimated_peak_bytes": 1126680,
+      "measured_peak_resident_bytes": 5345280,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one direct"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 11 batches, largest matrix 669x997, 69935 peak entries (1118960 bytes)\n  Diagnosis: a grevlex basis in 5 batches, to tell a crossed budget from a positive-dimensional ideal\n  Elapsed: 12.400151ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 12.400151ms over 1 attempt(s), 12.400151ms of it discarded; 16 batches, 1126680 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 12545095,
+      "discarded_nanos": 12510701,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 12510701,
+          "grobner": {
+            "batches": 11,
+            "max_matrix_rows": 669,
+            "max_matrix_columns": 997,
+            "peak_live_entries": 69935,
+            "estimated_peak_bytes": 1118960
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 16,
+      "estimated_peak_bytes": 1126680,
+      "measured_peak_resident_bytes": 5345280,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one direct"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 11 batches, largest matrix 669x997, 69935 peak entries (1118960 bytes)\n  Diagnosis: a grevlex basis in 5 batches, to tell a crossed budget from a positive-dimensional ideal\n  Elapsed: 12.510701ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 12.510701ms over 1 attempt(s), 12.510701ms of it discarded; 16 batches, 1126680 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 12313187,
+      "discarded_nanos": 12287418,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 12287418,
+          "grobner": {
+            "batches": 11,
+            "max_matrix_rows": 669,
+            "max_matrix_columns": 997,
+            "peak_live_entries": 69935,
+            "estimated_peak_bytes": 1118960
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 16,
+      "estimated_peak_bytes": 1126680,
+      "measured_peak_resident_bytes": 5771264,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one direct"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 11 batches, largest matrix 669x997, 69935 peak entries (1118960 bytes)\n  Diagnosis: a grevlex basis in 5 batches, to tell a crossed budget from a positive-dimensional ideal\n  Elapsed: 12.287418ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 12.287418ms over 1 attempt(s), 12.287418ms of it discarded; 16 batches, 1126680 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 12010423,
+      "discarded_nanos": 11980658,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 11980658,
+          "grobner": {
+            "batches": 11,
+            "max_matrix_rows": 669,
+            "max_matrix_columns": 997,
+            "peak_live_entries": 69935,
+            "estimated_peak_bytes": 1118960
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 16,
+      "estimated_peak_bytes": 1126680,
+      "measured_peak_resident_bytes": 5345280,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one direct"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 11 batches, largest matrix 669x997, 69935 peak entries (1118960 bytes)\n  Diagnosis: a grevlex basis in 5 batches, to tell a crossed budget from a positive-dimensional ideal\n  Elapsed: 11.980658ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 11.980658ms over 1 attempt(s), 11.980658ms of it discarded; 16 batches, 1126680 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 11983913,
+      "discarded_nanos": 11952213,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 11952213,
+          "grobner": {
+            "batches": 11,
+            "max_matrix_rows": 669,
+            "max_matrix_columns": 997,
+            "peak_live_entries": 69935,
+            "estimated_peak_bytes": 1118960
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 16,
+      "estimated_peak_bytes": 1126680,
+      "measured_peak_resident_bytes": 5337088,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one direct"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 11 batches, largest matrix 669x997, 69935 peak entries (1118960 bytes)\n  Diagnosis: a grevlex basis in 5 batches, to tell a crossed budget from a positive-dimensional ideal\n  Elapsed: 11.952213ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 11.952213ms over 1 attempt(s), 11.952213ms of it discarded; 16 batches, 1126680 peak bytes",
+    "repeat": 5
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1632759,
+      "discarded_nanos": 1593195,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 1593195,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 5,
+      "estimated_peak_bytes": 63128,
+      "measured_peak_resident_bytes": 4583424,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one classify"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.593195ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 1.593195ms over 1 attempt(s), 1.593195ms of it discarded; 5 batches, 63128 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1261406,
+      "discarded_nanos": 1235627,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 1235627,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 5,
+      "estimated_peak_bytes": 63128,
+      "measured_peak_resident_bytes": 4632576,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one classify"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.235627ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 1.235627ms over 1 attempt(s), 1.235627ms of it discarded; 5 batches, 63128 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1222914,
+      "discarded_nanos": 1201212,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 1201212,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 5,
+      "estimated_peak_bytes": 63128,
+      "measured_peak_resident_bytes": 4460544,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one classify"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.201212ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 1.201212ms over 1 attempt(s), 1.201212ms of it discarded; 5 batches, 63128 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1335076,
+      "discarded_nanos": 1308556,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 1308556,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 5,
+      "estimated_peak_bytes": 63128,
+      "measured_peak_resident_bytes": 4431872,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one classify"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.308556ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 1.308556ms over 1 attempt(s), 1.308556ms of it discarded; 5 batches, 63128 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "katsura-6-minus-one",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 1392936,
+      "discarded_nanos": 1365073,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 1365073,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 5,
+      "estimated_peak_bytes": 63128,
+      "measured_peak_resident_bytes": 4349952,
+      "reproduce": "cargo run --release --example classify_before_lex -- katsura-6-minus-one classify"
+    },
+    "plan": "Structure: 6 variables, 5 generators, max degree 2\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 5 batches\n  Elapsed: 1.365073ms\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 1.365073ms over 1 attempt(s), 1.365073ms of it discarded; 5 batches, 63128 peak bytes",
+    "repeat": 5
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 107393,
+      "discarded_nanos": 85172,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 85172,
+          "grobner": {
+            "batches": 8,
+            "max_matrix_rows": 12,
+            "max_matrix_columns": 18,
+            "peak_live_entries": 50,
+            "estimated_peak_bytes": 800
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 8,
+      "estimated_peak_bytes": 872,
+      "measured_peak_resident_bytes": 3702784,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 direct"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 8 batches, largest matrix 12x18, 50 peak entries (800 bytes)\n  Elapsed: 85.172\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 85.172\u00b5s over 1 attempt(s), 85.172\u00b5s of it discarded; 8 batches, 872 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 157157,
+      "discarded_nanos": 120518,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 120518,
+          "grobner": {
+            "batches": 8,
+            "max_matrix_rows": 12,
+            "max_matrix_columns": 18,
+            "peak_live_entries": 50,
+            "estimated_peak_bytes": 800
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 8,
+      "estimated_peak_bytes": 872,
+      "measured_peak_resident_bytes": 3600384,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 direct"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 8 batches, largest matrix 12x18, 50 peak entries (800 bytes)\n  Elapsed: 120.518\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 120.518\u00b5s over 1 attempt(s), 120.518\u00b5s of it discarded; 8 batches, 872 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 107663,
+      "discarded_nanos": 82607,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 82607,
+          "grobner": {
+            "batches": 8,
+            "max_matrix_rows": 12,
+            "max_matrix_columns": 18,
+            "peak_live_entries": 50,
+            "estimated_peak_bytes": 800
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 8,
+      "estimated_peak_bytes": 872,
+      "measured_peak_resident_bytes": 3379200,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 direct"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 8 batches, largest matrix 12x18, 50 peak entries (800 bytes)\n  Elapsed: 82.607\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 82.607\u00b5s over 1 attempt(s), 82.607\u00b5s of it discarded; 8 batches, 872 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 111061,
+      "discarded_nanos": 83027,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 83027,
+          "grobner": {
+            "batches": 8,
+            "max_matrix_rows": 12,
+            "max_matrix_columns": 18,
+            "peak_live_entries": 50,
+            "estimated_peak_bytes": 800
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 8,
+      "estimated_peak_bytes": 872,
+      "measured_peak_resident_bytes": 3555328,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 direct"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 8 batches, largest matrix 12x18, 50 peak entries (800 bytes)\n  Elapsed: 83.027\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 83.027\u00b5s over 1 attempt(s), 83.027\u00b5s of it discarded; 8 batches, 872 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "Explicit(DirectLexF4)",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 156226,
+      "discarded_nanos": 121760,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "the caller asked for it",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 121760,
+          "grobner": {
+            "batches": 8,
+            "max_matrix_rows": 12,
+            "max_matrix_columns": 18,
+            "peak_live_entries": 50,
+            "estimated_peak_bytes": 800
+          },
+          "conversion": null
+        }
+      ],
+      "batches": 8,
+      "estimated_peak_bytes": 872,
+      "measured_peak_resident_bytes": 3522560,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 direct"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: the caller asked for it\n  Gr\u00f6bner: 8 batches, largest matrix 12x18, 50 peak entries (800 bytes)\n  Elapsed: 121.76\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 121.76\u00b5s over 1 attempt(s), 121.76\u00b5s of it discarded; 8 batches, 872 peak bytes",
+    "repeat": 5
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 101873,
+      "discarded_nanos": 74131,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 74131,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 6,
+      "estimated_peak_bytes": 832,
+      "measured_peak_resident_bytes": 3596288,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 classify"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 6 batches\n  Elapsed: 74.131\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 74.131\u00b5s over 1 attempt(s), 74.131\u00b5s of it discarded; 6 batches, 832 peak bytes",
+    "repeat": 1
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 104558,
+      "discarded_nanos": 83268,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 83268,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 6,
+      "estimated_peak_bytes": 832,
+      "measured_peak_resident_bytes": 3731456,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 classify"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 6 batches\n  Elapsed: 83.268\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 83.268\u00b5s over 1 attempt(s), 83.268\u00b5s of it discarded; 6 batches, 832 peak bytes",
+    "repeat": 2
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 141958,
+      "discarded_nanos": 104538,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 104538,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 6,
+      "estimated_peak_bytes": 832,
+      "measured_peak_resident_bytes": 3489792,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 classify"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 6 batches\n  Elapsed: 104.538\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 104.538\u00b5s over 1 attempt(s), 104.538\u00b5s of it discarded; 6 batches, 832 peak bytes",
+    "repeat": 3
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 86775,
+      "discarded_nanos": 64532,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 64532,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 6,
+      "estimated_peak_bytes": 832,
+      "measured_peak_resident_bytes": 3485696,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 classify"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 6 batches\n  Elapsed: 64.532\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 64.532\u00b5s over 1 attempt(s), 64.532\u00b5s of it discarded; 6 batches, 832 peak bytes",
+    "repeat": 4
+  },
+  {
+    "environment": {
+      "commit": "78172295",
+      "base_commit": "ffdb08fd",
+      "patch_id": "9029ae90f4118b97e852de0db79e8c9c23698b2b",
+      "machine": "fedora",
+      "cpu": "2",
+      "concurrency": 1,
+      "build": "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1",
+      "policy": "1000 rows, 1000 columns; other F4 limits default"
+    },
+    "record": {
+      "schema": 1,
+      "instance": "cyclic-4-gf2",
+      "manifest_sha256": null,
+      "configuration": "ClassifyThenDirectLex",
+      "outcome": null,
+      "failure": "the system is not zero-dimensional, so its solution set is not finite",
+      "verified": null,
+      "verification": "points evaluated against every original generator",
+      "transformations": [],
+      "elapsed_nanos": 94539,
+      "discarded_nanos": 73048,
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "strategy": "DirectLexF4",
+          "reason": "classify a grevlex basis before direct lex elimination",
+          "outcome": null,
+          "failure": "the system is not zero-dimensional, so its solution set is not finite",
+          "elapsed_nanos": 73048,
+          "grobner": null,
+          "conversion": null
+        }
+      ],
+      "batches": 6,
+      "estimated_peak_bytes": 832,
+      "measured_peak_resident_bytes": 3637248,
+      "reproduce": "cargo run --release --example classify_before_lex -- cyclic-4-gf2 classify"
+    },
+    "plan": "Structure: 4 variables, 4 generators, max degree 4\n\nAttempt 1: DirectLexF4\n  Chosen because: classify a grevlex basis before direct lex elimination\n  Preclassification: grevlex F4 used 6 batches\n  Elapsed: 73.048\u00b5s\n  Result: inconclusive \u2014 the system is not zero-dimensional, so its solution set is not finite\n\nTotal: 73.048\u00b5s over 1 attempt(s), 73.048\u00b5s of it discarded; 6 batches, 832 peak bytes",
+    "repeat": 5
+  }
+]

@@ -1,33 +1,7 @@
-//! Solving a zero-dimensional polynomial system over its base field, under explicit budgets.
-//!
-//! Separate from [`solve`](super::solve) rather than replacing it. That function handles
-//! positive-dimensional systems by enumerating the field, which is the only way to list a solution
-//! set that grows with the field, and it panics when the field is too large for that to be
-//! possible. These entry points refuse such systems outright and in exchange never enumerate, never
-//! panic on an ordinary input, and report every failure as a `Result`.
-//!
-//! # No variable is ever free, and that is a theorem
-//!
-//! `solve`'s field enumeration exists because a variable can be left unconstrained by the basis.
-//! For a **zero-dimensional** ideal that cannot happen, which is what lets this module drop the
-//! enumeration entirely:
-//!
-//! Zero-dimensionality gives `x_k^d` in `LT(I)` for some `d >= 1`, so some basis element `g` has
-//! `LM(g) = x_k^d` — a pure power of `x_k`, since the leading monomials generate `LT(I)` and a
-//! pure power in that monomial ideal must be divisible by one of them. Under lex every monomial of
-//! `g` is at most `x_k^d`, and a monomial at most `x_k^d` has exponent zero in `x_0 .. x_{k-1}`:
-//! otherwise lex would compare that earlier variable first and make it larger. So `g` lies in
-//! `F[x_k, ..., x_{N-1}]`, and substituting the already-assigned `x_{k+1} .. x_{N-1}` leaves a
-//! polynomial in `x_k` alone. Its `x_k^d` coefficient is `g`'s leading coefficient, which is 1
-//! because the basis is reduced, and substitution cannot touch it. So the constraint is a univariate
-//! polynomial of degree exactly `d >= 1`.
-//!
-//! Hence `candidate_values` never returns `None` here, there is no field-order limit, and
-//! `MAX_FIELD_ORDER` has no analogue in this module.
-//!
-//! # References
-//! * Cox, Little, O'Shea, *Ideals, Varieties, and Algorithms*, Ch. 2 §2.2 and Ch. 5, for the
-//!   finiteness theorem and the elimination property of lex.
+//! Zero-dimensionality guarantees a pure-power leader for every variable. Under lex,
+//! substituting later variables therefore leaves a nonconstant univariate constraint for each
+//! search step; no variable requires field enumeration. This invariant depends on classifying
+//! a complete Gröbner basis before search (Cox–Little–O'Shea, Ch. 2 §2.2 and Ch. 5).
 
 use std::fmt::{Display, Formatter};
 
@@ -139,13 +113,12 @@ pub struct SolveStatistics {
     /// What the conversion did, or `None` under [`SolveStrategy::DirectLexF4`].
     pub fglm: Option<FglmStatistics>,
 
-    /// What the dimension diagnosis cost, or `None` if none was needed.
+    /// What a separate grevlex dimension check cost, even if it crossed a budget.
     ///
-    /// Present only on a [`SolveStrategy::DirectLexF4`] attempt whose F4 run crossed a resource
-    /// limit: there is then no lex basis to classify, so the route computes a *grevlex* one to
-    /// find out whether the ideal was positive-dimensional all along (#376). Separate from
-    /// [`Self::f4`] rather than folded into it, because the two are different computations under
-    /// different orders and a sum would report a batch count no single basis ever had.
+    /// Used after a direct-lex resource refusal, or before lex under
+    /// [`SolvePolicy::ClassifyThenDirectLex`](super::SolvePolicy::ClassifyThenDirectLex).
+    /// Separate from `f4` so each basis computation keeps its own counters; batch counts add
+    /// and byte estimates take the maximum across the two stages.
     pub diagnosis: Option<F4Statistics>,
 }
 
@@ -165,8 +138,7 @@ impl SolveStatistics {
     pub fn estimated_peak_bytes(&self) -> usize {
         let grobner = self.f4.as_ref().map_or(0, |s| s.max_estimated_bytes);
         let conversion = self.fglm.as_ref().map_or(0, |s| s.estimated_bytes());
-        // The diagnosis is a third stage under the same rule: it starts after the failed lex
-        // attempt's matrices are freed, so it enters the maximum and not a sum.
+        // The separate dimension check also runs without the other stages' matrices.
         let diagnosis = self.diagnosis.as_ref().map_or(0, |s| s.max_estimated_bytes);
         grobner.max(conversion).max(diagnosis)
     }
