@@ -64,8 +64,8 @@ basis and excluded here. Made rows use separate column/coefficient vectors. Work
 include dense/band arrays, row-building vectors and marks. Transient row copies are separate.
 `peak_stored_sparse_entries` counts stored lengths, including stale scratch; it is not a live
 mathematical-nonzero count. Snapshots are at reducer construction, row-copy/keep boundaries and
-return, so these are **row-boundary lower bounds** on the complete allocated working set. Band
-results temporarily held outside the reducer, basis/shared coefficients, monomial tables, row
+return, so these are **row-boundary lower bounds** on the complete allocated working set. Band/final-interreduction result collections held outside the reducer,
+basis/shared coefficients, monomial tables, row
 headers, pivot maps, allocator overhead and input-echelon sparse merges are excluded. Reserved
 capacity is not RSS; in particular upstream's large virtual column reservation is often much
 larger than resident pages. #268 owns fuller allocation attribution.
