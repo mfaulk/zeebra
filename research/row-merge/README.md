@@ -85,3 +85,8 @@ MQ10 anatomy, whereas both two-sided candidates regressed small-field Sparse eli
 including 120 solves, 150 matrix runs, eight diagnostic replays, and 12 hardware-counter runs.
 Every result matched, but Noon-6 and small-field Sparse controls still regressed. These negative
 controls are kept separately from the final prefix-only results.
+
+`--only LABEL` selects one exact label for focused repeats, for example
+`--phase matrices --only katsura-7/grevlex/m31/default/sparse --repeats 15`. A label absent from
+the selected phase is an error. Keep changes of CPU affinity in a separate cohort and report
+its boundary explicitly rather than pooling it with the original sample.

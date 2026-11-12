@@ -118,6 +118,13 @@ def cells(phase):
             yield label + '/work', 'row_merge_study', ['--matrix', label, '--mode', 'work'], None
 
 
+def selected_cells(phase, only):
+    result = [row for row in cells(phase) if only is None or row[0] == only]
+    if not result:
+        raise ValueError('the requested control does not exist in this phase')
+    return result
+
+
 def attempt(command, stem, perf=None):
     if perf:
         command = [str(perf), 'stat', '--no-big-num', '-x', ';', '-e', ','.join(EVENTS),
@@ -159,6 +166,7 @@ def main():
     parser.add_argument('--candidate', type=Path)
     parser.add_argument('--phase', choices=('all', 'solves', 'matrices', 'work', 'counters'), default='all')
     parser.add_argument('--perf', type=Path, help='perf executable; required only for --phase counters')
+    parser.add_argument('--only', help='select one exact cohort label for a focused repeat')
     parser.add_argument('--repeats', type=int, default=5)
     parser.add_argument('--scratch', type=Path)
     parser.add_argument('--output', type=Path)
@@ -172,6 +180,10 @@ def main():
         parser.error('measurement requires baseline, candidate, scratch, output and positive repeats')
     if bool(args.perf) != (args.phase == 'counters'):
         parser.error('--phase counters requires --perf; native phases do not use perf')
+    try:
+        selected = selected_cells(args.phase, args.only)
+    except ValueError as error:
+        parser.error(str(error))
     affinity = ','.join(str(c) for c in sorted(os.sched_getaffinity(0)))
     if not os.environ.get('ZEEBRA_MACHINE') or os.environ.get('ZEEBRA_AFFINITY') != affinity:
         parser.error('set ZEEBRA_MACHINE and explicit actual ZEEBRA_AFFINITY; run under benchlock')
@@ -185,12 +197,12 @@ def main():
     args.scratch.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     cohort = dict(schema=1, builds=builds, machine=os.environ['ZEEBRA_MACHINE'], affinity=affinity,
-                  workers=1, phase=args.phase, policy='fresh process/cell; alternating arms; 185s/2GiB tree guard; retain every failure',
+                  workers=1, phase=args.phase, selection=args.only, policy='fresh process/cell; alternating arms; 185s/2GiB tree guard; retain every failure',
                   perf_version=subprocess.check_output([str(args.perf), '--version'], text=True).strip() if args.perf else None,
                   runner_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(), attempts=[])
     failures = 0
     for repeat in range(args.repeats):
-        for label, binary, arguments, refkey in cells(args.phase):
+        for label, binary, arguments, refkey in selected:
             for arm in (('baseline', 'candidate') if repeat % 2 == 0 else ('candidate', 'baseline')):
                 result = attempt([str(getattr(args, arm) / binary), *arguments], args.scratch / str(len(cohort['attempts'])), args.perf)
                 result.update(repeat=repeat, label=label, arm=arm, binary=binary)

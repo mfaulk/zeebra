@@ -30,6 +30,13 @@ class Acceptance(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 study.check_matrix(row, dict(row, **{key: 'changed'}))
 
+    # A mistyped focused control fails instead of publishing an empty successful cohort.
+    def test_named_control_cannot_select_nothing(self):
+        label = 'katsura-7/grevlex/m31/default/sparse'
+        self.assertEqual([row[0] for row in study.selected_cells('matrices', label)], [label])
+        with self.assertRaises(ValueError):
+            study.selected_cells('matrices', 'not-a-registered-control')
+
     # Hardware evidence rejects missing, uncounted or multiplexed events instead of treating them as measurements.
     def test_hardware_counter_acceptance(self):
         raw = '\n'.join(f'100;;{event};1000;100.00;;' for event in study.EVENTS)
