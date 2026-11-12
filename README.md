@@ -328,3 +328,7 @@ counters model logical tuple work, not hardware bandwidth. `--mode solve --row c
 Sparse row subtraction merges only the target tail starting at the pivot's leading column;
 untouched prefixes stay in place, and the merged tail is copied back. Caller-owned scratch and each row's own growth policy are
 preserved to avoid propagating a large pivot's buffer capacity across the matrix.
+
+The [elimination-kernel report](docs/research/elimination-kernels.md) records the verified
+prefix-merge results, three-field backend measurements, and the distinction between logical tuple
+traffic and physical memory bandwidth.

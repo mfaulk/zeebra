@@ -1,5 +1,10 @@
 # Sparse row-merge experiment
 
+The [elimination-kernel report](../../docs/research/elimination-kernels.md) records the final
+32.8%/33.6% MQ10 improvement, complete-basis checks, matrix/backend points, memory boundaries
+and limitations. Final binaries are frozen at `dd36652e`; the main cohorts and focused repeats
+retain 410 successful attempts under `results/native-*` and `results/focused-*`.
+
 `examples/row_merge_study.rs` captures pinned matrices before timing the production forward and
 backward elimination stages. Capture cost is outside those stage timers but inside the guarded
 process. `--mode work` repeats back-substitution with counters and asserts exact equality with
@@ -43,9 +48,9 @@ ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=0,1,2,3 \
 
 Use `--phase matrices --repeats 3` for eight small matrices with three backends each plus the large
 MQ10 Adaptive case; `--phase work --repeats 1` collects diagnostic counts. Every process has a
-185-second/2-GiB tree watchdog; source F4 captures and public/classical solves additionally have a 60-second solver
-limit; MQ10 uses its existing shipped-default instrument with the outer watchdog. Matrix entry allowances remain those of the pinned preset. Native matrix measurements
-exclude capture; RSS covers capture, replay and output. Explicit dense-buffer size is reported
+185-second/2-GiB tree watchdog. Source F4 captures and public/classical solves additionally have a
+60-second solver limit; MQ10 uses its existing shipped-default instrument with the outer watchdog.
+Matrix entry allowances remain those of the pinned preset. Native matrix measurements exclude capture; RSS covers capture, replay and output. Explicit dense-buffer size is reported
 separately from sparse tuple payload. These are neither identical memory boundaries nor measured
 DRAM traffic. Do not infer physical bandwidth from logical tuple counts.
 
@@ -67,24 +72,21 @@ with at least 99% running time for each event; unavailable or multiplexed events
 These whole-child observations include parsing and output and are not pooled with unprofiled F4
 elapsed times. No memory-controller counters or physical DRAM bandwidth are measured.
 
-The `results/first-*` cohorts retain the initial unconditional window implementation at
-`220a99f1`: all 120 full bases and 150 matrix RREFs matched, but the small-field Sparse forward
-backend and some public controls regressed. The refinement preserves direct copying when the
-pivot covers the whole target and avoids searching bounds already established by endpoint checks.
+The `results/first-*` cohorts retain the unconditional two-sided window at `220a99f1`: all 120
+full bases and 150 matrix RREFs matched, but some public and small-field Sparse controls regressed.
+`results/window-refined-*` retain its full-span-fast-path refinement at `cc993a00`, including
+120 solves, 150 matrix runs, eight diagnostic replays, and 12 hardware-counter runs. Every result
+matched, but Noon-6 and several Sparse controls still regressed. These rejected candidates are
+kept separately from the final prefix-only results.
+
+The final kernel skips only the untouched prefix, then truncates and copies back the merged tail.
+The diagnostic `overlap_terms`/`output_window_terms` still describe the potential two-sided span;
+actual final merge work includes the suffix, so use `own_terms - prefix_terms` and
+`output_terms - prefix_terms` when modeling its traffic. Suffix visits were negligible in the
+MQ10 anatomy; the second search and splice machinery were unnecessary.
+
 `baseline-work.json.gz` is an instrument sanity check with both arm labels using the **same**
 `cc6916fc` baseline executable; those duplicate timings are not independent candidate evidence.
-
-The final candidate narrows the operation to **prefix skipping**, then truncates and directly
-copies back the merged tail. It avoids the second bound search and `Vec::splice`. The diagnostic
-`overlap_terms`/`output_window_terms` still describe the potential two-sided span; actual final
-merge work includes the suffix, so use `own_terms - prefix_terms` and
-`output_terms - prefix_terms` when modeling its traffic. Suffix entries were negligible in the
-MQ10 anatomy, whereas both two-sided candidates regressed small-field Sparse elimination.
-
-`results/window-refined-*` retain the second, full-span-fast-path prototype at `cc993a00`,
-including 120 solves, 150 matrix runs, eight diagnostic replays, and 12 hardware-counter runs.
-Every result matched, but Noon-6 and small-field Sparse controls still regressed. These negative
-controls are kept separately from the final prefix-only results.
 
 `--only LABEL` selects one exact label for focused repeats, for example
 `--phase matrices --only katsura-7/grevlex/m31/default/sparse --repeats 15`. A label absent from
