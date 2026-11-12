@@ -319,7 +319,7 @@ The [verified public corpus](research/public-corpus/README.md) adds Eco, Noonbur
 families, with three offline CI fixtures and three opt-in performance rungs. Run
 `cargo run --release --example public_corpus -- --list` to inspect their exact inputs.
 
-The `row_merge_study` example replays pinned F4 matrices through Sparse, Dense and Adaptive
+The [row-merge experiment](research/row-merge/README.md) uses `row_merge_study` to replay pinned F4 matrices through Sparse, Dense and Adaptive
 forward elimination followed by production back-substitution. Use `--matrix LABEL --backend
 sparse|dense|adaptive`; `--mode work` additionally verifies a diagnostic replay and separates row
 work targeting inherited reducer-pivot columns from newly discovered pivots. The diagnostic
