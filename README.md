@@ -325,3 +325,6 @@ sparse|dense|adaptive`; `--mode work` additionally verifies a diagnostic replay 
 work targeting inherited reducer-pivot columns from newly discovered pivots. The diagnostic
 counters model logical tuple work, not hardware bandwidth. `--mode solve --row cyclic-5 --modulus
 32003` runs a classical full-basis control with shipped options and a 60-second solver limit.
+Sparse row subtraction merges only the target span covered by the pivot's first and last columns;
+untouched prefixes stay in place. Caller-owned scratch and each row's own growth policy are
+preserved to avoid propagating a large pivot's buffer capacity across the matrix.

@@ -1,12 +1,4 @@
-//! A sparse row of a finite-field matrix.
-//!
-//! The representation is a vector of `(column, coefficient)` pairs sorted by column, with no
-//! duplicates and no zero coefficients, so an empty row is the zero vector. Every operation here
-//! preserves that, and `debug_assert` checks it.
-//!
-//! A sorted vector rather than a `HashMap` per row: elimination subtracts one whole row from
-//! another, which two sorted vectors do in a single linear pass over sequential memory, and the
-//! leading column — the operation Gröbner reduction asks for most — is the first element.
+//! Sorted, unique, nonzero sparse entries; every row operation preserves this invariant.
 
 use crate::FiniteField;
 
@@ -168,42 +160,26 @@ impl<F: FiniteField> SparseRow<F> {
         true
     }
 
-    /// `self -= factor * other`, using `scratch` as the merge buffer.
+    /// `self -= factor * other`, merging only the target span covered by `other` into `scratch`.
     ///
-    /// Both rows are sorted by column, so this is a two-pointer merge: linear in the two lengths,
-    /// writing sequentially into a buffer the caller reuses across operations rather than
-    /// allocating one per row operation. Columns that cancel are dropped, which is what keeps the
-    /// representation canonical and lets `is_zero` be a length test.
-    ///
-    /// # Why the result is copied back rather than swapped in (#554)
-    ///
-    /// `scratch` stays the caller's. The merge result is copied into the row's own buffer, which
-    /// costs one sequential `memcpy` of the merged length over a `std::mem::swap`.
-    ///
-    /// The swap is what the 11.44x of `docs/research/f4-resource-scaling.md` §12 was, and the
-    /// mechanism is not that the reservation is too large — the merge genuinely may need
-    /// `self.len() + other.len()` slots. It is that handing the reserved buffer to the row leaves
-    /// `scratch` holding the row's *old* one, so `scratch` has to regrow at the next merge, and its
-    /// high-water capacity is then installed in whichever row is merged next however short that
-    /// merge is. One long merge early in a pass therefore sizes every later row's buffer: on
-    /// `mq-random-10` 37.4 MB of payload was held in 678.8 MB of capacity. Copying back keeps one
-    /// grown buffer instead of one per row, and bounds a row's capacity by `Vec`'s own doubling
-    /// against its own high-water length rather than by the longest pivot in the pass.
-    ///
-    /// The copy is not a cost: it replaces an allocation it was already paying, and §13 measures the
-    /// interreduction stage **1.9% to 6.6% faster** than the swap on all four rungs it was taken on,
-    /// at 2.3x to 4.8x less resident memory.
+    /// Untouched prefixes stay in place; suffixes move only when the merged span changes length.
+    /// Scratch remains caller-owned: swapping it into rows spreads its high-water capacity across
+    /// the matrix (#554). Each row instead grows only its own buffer.
     pub fn subtract_scaled(&mut self, other: &Self, factor: &F, scratch: &mut Vec<(usize, F)>) {
         if factor.is_zero() || other.is_zero() {
             return;
         }
 
+        let first = other.entries[0].0;
+        let last = other.entries[other.entries.len() - 1].0;
+        let lo = self.entries.partition_point(|(column, _)| *column < first);
+        let hi = self.entries.partition_point(|(column, _)| *column <= last);
         scratch.clear();
-        scratch.reserve(self.entries.len() + other.entries.len());
+        scratch.reserve(hi - lo + other.entries.len());
 
-        let mut i = 0;
+        let mut i = lo;
         let mut j = 0;
-        while i < self.entries.len() && j < other.entries.len() {
+        while i < hi && j < other.entries.len() {
             let (own_column, own_coefficient) = self.entries[i];
             let (other_column, other_coefficient) = other.entries[j];
             if own_column < other_column {
@@ -221,13 +197,12 @@ impl<F: FiniteField> SparseRow<F> {
                 j += 1;
             }
         }
-        scratch.extend_from_slice(&self.entries[i..]);
+        scratch.extend_from_slice(&self.entries[i..hi]);
         for (column, coefficient) in &other.entries[j..] {
             scratch.push((*column, F::zero() - *factor * *coefficient));
         }
 
-        self.entries.clear();
-        self.entries.extend_from_slice(scratch);
+        drop(self.entries.splice(lo..hi, scratch.iter().copied()));
         debug_assert!(self.is_canonical(), "{:?} is not canonical", self.entries);
     }
 
@@ -450,6 +425,66 @@ mod tests {
         let other = SparseRow::new(&[(1, F::new(2)), (9, F::new(1))]);
         row.subtract_scaled(&other, &F::new(2), &mut scratch);
         assert_eq!(row.entries(), &[(5, F::new(7)), (9, F::new(11))]);
+    }
+
+    // A narrow pivot leaves a long prefix and suffix intact without sizing scratch for the whole target.
+    #[test]
+    fn narrow_merge_bounds_scratch_to_the_overlap() {
+        let mut row = SparseRow::new(&(0..1024).map(|i| (i, F::ONE)).collect::<Vec<_>>());
+        let capacity = row.capacity();
+        let pivot = SparseRow::new(&[(512, F::ONE)]);
+        let mut scratch = Vec::new();
+        row.subtract_scaled(&pivot, &F::ONE, &mut scratch);
+        assert_eq!(row.nonzeros(), 1023);
+        assert!(row.coefficient(512).is_zero());
+        assert!(row.entries().iter().all(|(_, v)| *v == F::ONE));
+        assert_eq!(row.capacity(), capacity);
+        assert!(
+            scratch.capacity() <= 8,
+            "untouched target terms entered scratch: {}",
+            scratch.capacity()
+        );
+    }
+
+    // Merge windows handle disjoint supports and the largest column index without overflow.
+    #[test]
+    fn merge_window_handles_empty_and_extreme_supports() {
+        let mut scratch = Vec::new();
+        for (own, other, expected) in [
+            (
+                vec![],
+                vec![(usize::MAX, F::ONE)],
+                vec![(usize::MAX, F::new(12))],
+            ),
+            (
+                vec![(0, F::ONE)],
+                vec![(usize::MAX, F::ONE)],
+                vec![(0, F::ONE), (usize::MAX, F::new(12))],
+            ),
+            (
+                vec![(usize::MAX, F::ONE)],
+                vec![(0, F::ONE)],
+                vec![(0, F::new(12)), (usize::MAX, F::ONE)],
+            ),
+            (
+                vec![(usize::MAX, F::ONE)],
+                vec![(usize::MAX, F::ONE)],
+                vec![],
+            ),
+        ] {
+            let mut row = SparseRow::new(&own);
+            row.subtract_scaled(&SparseRow::new(&other), &F::ONE, &mut scratch);
+            assert_eq!(row.entries(), expected);
+        }
+    }
+
+    // The same merge arithmetic matches dense subtraction for binary extensions and wide prime elements.
+    #[test]
+    fn merge_matches_dense_for_extension_and_wide_fields() {
+        merge_agrees_with_a_dense_reference::<crate::fields::Gf256>(16);
+        merge_agrees_with_a_dense_reference::<crate::fields::Gf13Pow4>(17);
+        merge_agrees_with_a_dense_reference::<crate::fields::Bn254Fr>(18);
+        merge_agrees_with_a_dense_reference::<crate::fields::Mersenne31>(19);
     }
 
     /// Subtracting by a zero factor, or subtracting the zero row, changes nothing.
