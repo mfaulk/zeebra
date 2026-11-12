@@ -1,14 +1,4 @@
-//! A dense scratch row the matrix stays sparse around.
-//!
-//! The sparse elimination's inner operation is a sorted merge of two rows into a buffer, which
-//! reads and rewrites every entry of the row being reduced however few entries the pivot has. A
-//! dense accumulator replaces it with a scatter: the row is expanded once, every pivot is applied
-//! in time proportional to the *pivot's* support, and the row is gathered back once. The matrix
-//! itself is never densified, so the cost is one buffer of `num_columns` cells for the whole
-//! elimination rather than `num_rows * num_columns`.
-//!
-//! The invariant that makes the gather cheap: every cell outside `[lead, tail)` is zero. `lead` is
-//! a lower bound on the first nonzero column, `tail` an upper bound on one past the last.
+//! Dense scratch preserves zero cells outside `[lead, tail)`; the matrix and pivots stay sparse.
 
 use crate::{
     linalg::{
@@ -54,6 +44,11 @@ impl<F: FiniteField> DenseAccumulator<F> {
     /// If the accumulator is not the zero row, which would silently add the two.
     pub fn load(&mut self, row: &SparseRow<F>) {
         assert_eq!(self.nonzeros, 0, "the accumulator still holds a row");
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::counters(|work| {
+            work.rows_loaded += 1;
+            work.dense_load_entries += row.nonzeros();
+        });
         for (column, coefficient) in row.entries() {
             self.cells[*column] = *coefficient;
         }
@@ -64,6 +59,12 @@ impl<F: FiniteField> DenseAccumulator<F> {
 
     /// Gather the row back out, leaving the accumulator zero.
     pub fn take(&mut self) -> SparseRow<F> {
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::counters(|work| {
+            work.dense_gather_cells += self.tail.saturating_sub(self.lead);
+            work.dense_gather_entries += self.nonzeros;
+            work.rows_zero += usize::from(self.nonzeros == 0);
+        });
         let mut entries: Vec<(usize, F)> = Vec::with_capacity(self.nonzeros);
         for column in self.lead..self.tail {
             let cell = std::mem::replace(&mut self.cells[column], F::zero());
@@ -91,6 +92,8 @@ impl<F: FiniteField> DenseAccumulator<F> {
         while self.cells[column].is_zero() {
             column += 1;
         }
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::counters(|work| work.dense_scan_cells += column - self.lead + 1);
         self.lead = column;
         Some(column)
     }
@@ -111,6 +114,8 @@ impl<F: FiniteField> DenseAccumulator<F> {
         if factor.is_zero() || row.is_zero() {
             return;
         }
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::pivot(row.nonzeros());
         for (column, coefficient) in row.entries() {
             // A field has no zero divisors and a sparse row stores no zero coefficient, so the
             // scaled entry is nonzero and the inner loop needs no test for it.
@@ -144,6 +149,8 @@ impl<F: FiniteField> DenseAccumulator<F> {
         }
         // One inverse for the row, not one division per cell.
         let inverse = coefficient.inverse();
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::counters(|work| work.normalized_cells += self.tail - self.lead);
         for column in self.lead..self.tail {
             self.cells[column] *= inverse;
         }
@@ -220,11 +227,29 @@ fn eliminate_from<F: FiniteField>(
     accumulator: &mut DenseAccumulator<F>,
     max_nonzeros: usize,
 ) -> Result<(), usize> {
+    #[cfg(feature = "research-work")]
+    let mut allocated = if crate::linalg::work::enabled() {
+        matrix.entry_capacity()
+    } else {
+        0
+    };
+    #[cfg(feature = "research-work")]
+    crate::linalg::work::memory(
+        *resident,
+        allocated,
+        accumulator.cells.capacity() * std::mem::size_of::<F>(),
+        0,
+        std::mem::size_of::<(usize, F)>(),
+    );
     for index in first..matrix.num_rows() {
         // Taken out so the pivot rows, which are still in the matrix, can be read while this one
         // is rewritten. A pivot's index is always one already processed, so never this one.
         let row = std::mem::take(&mut matrix.rows_mut()[index]);
         *resident -= row.nonzeros();
+        #[cfg(feature = "research-work")]
+        let (original_entries, original_capacity) = (row.nonzeros(), row.capacity());
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::target(index);
         accumulator.load(&row);
 
         while let Some(column) = accumulator.leading_column() {
@@ -255,6 +280,18 @@ fn eliminate_from<F: FiniteField>(
         }
 
         let row = accumulator.take();
+        #[cfg(feature = "research-work")]
+        {
+            // The loaded input row still owns its buffer until this iteration ends.
+            crate::linalg::work::memory(
+                *resident + original_entries + row.nonzeros(),
+                allocated + row.capacity(),
+                accumulator.cells.capacity() * std::mem::size_of::<F>(),
+                0,
+                std::mem::size_of::<(usize, F)>(),
+            );
+            allocated = allocated.saturating_sub(original_capacity) + row.capacity();
+        }
         if row.is_zero() {
             statistics.zero_rows += 1;
         }

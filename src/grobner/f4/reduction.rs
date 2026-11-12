@@ -1,24 +1,4 @@
-//! The F4 reduction step: a batch of critical pairs in, new basis elements out.
-//!
-//! Symbolic preprocessing, matrix construction, elimination, and then the step that makes F4 F4:
-//!
-//! > A nonzero row of the reduced matrix is a **new** relation exactly when its leading monomial
-//! > is not the leading monomial of any row that went in.
-//!
-//! That is Faugère's `F+ = {f in F~ : LM(f) not in LM(F)}`. Rows whose leading monomial was
-//! already there carry relations the batch already represented; only a pivot in a column that no
-//! input row led with is information the basis did not have.
-//!
-//! The closure invariant from [`super::symbolic`] is what makes this sound. Every column monomial
-//! divisible by some `LM(g)` is the leading monomial of some row, hence excluded — so a candidate's
-//! leading monomial is never top-reducible by the current basis. Candidate extraction does not have
-//! to test for that; it gets it from the preprocessing being complete, and the tests assert the
-//! consequence rather than trusting it.
-//!
-//! Batch reduction legitimately produces different polynomials from reducing the same pairs one at
-//! a time, because a batch can use relations discovered from its other pairs. The requirement is
-//! not that the polynomials match but that the ideal is unchanged and the selected pairs end up
-//! resolved, which is what the tests check.
+//! Candidates have leading monomials absent from the input leading set; complete symbolic closure makes them top-irreducible.
 
 use std::mem::size_of;
 
@@ -278,9 +258,29 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     } else {
         RowForm::Echelon
     };
+    #[cfg(feature = "research-work")]
+    if crate::linalg::work::enabled() {
+        crate::linalg::work::begin_batch(
+            crate::linalg::work::MatrixWork {
+                degree: pairs.iter().map(|pair| pair.degree).max().unwrap_or(0),
+                pairs: pairs.len(),
+                rows,
+                columns,
+                reducer_rows,
+                initial_entries: matrix.nonzeros(),
+                peak_sparse_live_entries: matrix.nonzeros(),
+                peak_sparse_capacity_entries: matrix.matrix().entry_capacity(),
+                sparse_entry_bytes: size_of::<(usize, F)>(),
+                ..Default::default()
+            },
+            structured,
+        );
+    }
     let block = eliminate_to(plan, form, options.elimination, &mut matrix, allowance)
         .map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
     let elimination = block.statistics;
+    #[cfg(feature = "research-work")]
+    crate::linalg::work::finish_batch(&elimination);
     stages.elimination = clock.lap();
 
     // A pivot in a column no input row led with is a relation the basis did not have.

@@ -1,4 +1,4 @@
-//! One digest-pinned MQ10 computation per process; optional stage clocks preserve default strategies.
+//! One digest-pinned MQ10 computation; stage clocks and passive work counters are independent controls.
 use std::time::Instant;
 use zeebra::{
     fields::{Zp2147483647, Zp32003},
@@ -60,7 +60,7 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
     ])
 }
 
-fn run<F: FiniteField>(modulus: u64, measured: bool) {
+fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool) {
     let order = MonomialOrder::GradedReverseLexicographic;
     let input = corpus::instance("mq-random-10", modulus, order).expect("published MQ10");
     let entry = corpus::ladder()
@@ -79,9 +79,24 @@ fn run<F: FiniteField>(modulus: u64, measured: bool) {
         ..F4Options::default()
     };
     let started = Instant::now();
-    let (basis, stats) =
-        f4_with_options(&system, order, &options).expect("MQ10 fits the shipped budget");
+    let solve = || f4_with_options(&system, order, &options).expect("MQ10 fits the shipped budget");
+    #[cfg(feature = "research-work")]
+    let ((basis, stats), work) = if measure_work {
+        let (result, report) = zeebra::linalg::work::measure(solve);
+        (result, Some(report))
+    } else {
+        (solve(), None)
+    };
+    #[cfg(not(feature = "research-work"))]
+    let (basis, stats) = {
+        assert!(!measure_work, "--work requires --features research-work");
+        solve()
+    };
     let elapsed = started.elapsed();
+    #[cfg(feature = "research-work")]
+    let work = work.map_or(Json::Null, |report| report.json());
+    #[cfg(not(feature = "research-work"))]
+    let work = Json::Null;
     let mut basis: Vec<_> = basis
         .iter()
         .map(|p| polynomial_to_string(p, &names, order))
@@ -93,6 +108,7 @@ fn run<F: FiniteField>(modulus: u64, measured: bool) {
             ("modulus", Json::int(modulus)),
             ("digest", Json::string(input.digest())),
             ("measured", Json::Bool(measured)),
+            ("work", work),
             ("field_type", Json::string(std::any::type_name::<F>())),
             ("options", Json::string(format!("{options:?}"))),
             ("f4_call_ns", Json::nanos(elapsed)),
@@ -116,17 +132,24 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work]")
         .parse()
         .unwrap();
     assert!(
-        args.len() <= 2 && args.get(1).is_none_or(|s| s == "--stages"),
+        args.len() <= 3
+            && args[1..].iter().all(|s| s == "--stages" || s == "--work")
+            && args[1..]
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                == args.len() - 1,
         "unexpected argument"
     );
-    let measured = args.len() == 2;
+    let measured = args.iter().any(|s| s == "--stages");
+    let measure_work = args.iter().any(|s| s == "--work");
     match modulus {
-        32003 => run::<Zp32003>(modulus, measured),
-        2147483647 => run::<Zp2147483647>(modulus, measured),
+        32003 => run::<Zp32003>(modulus, measured, measure_work),
+        2147483647 => run::<Zp2147483647>(modulus, measured, measure_work),
         _ => panic!("supported moduli: 32003, 2147483647"),
     }
 }

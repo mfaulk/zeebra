@@ -1,5 +1,3 @@
-//! Linear Algebra
-
 mod crout;
 pub mod dense;
 pub mod echelon;
@@ -11,6 +9,8 @@ mod vector;
 mod vector_indexing;
 mod vector_ops;
 mod vector_scalar_ops;
+#[cfg(feature = "research-work")]
+pub mod work;
 
 pub use crout::{crout_lu, crout_lu_pivoting};
 pub use dense::{DenseAccumulator, DenseRows};
