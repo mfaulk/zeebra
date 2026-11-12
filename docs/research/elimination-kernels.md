@@ -1,4 +1,4 @@
-# Elimination kernels: skip the untouched sparse prefix
+# Elimination kernels: sparse prefixes and bounded specialization
 
 **Measured at:** `cc6916fc` (baseline) and `dd36652e` (final prefix-only kernel).
 Earlier prototypes: `220a99f1` and `cc993a00`. Build metadata inside each artifact records full
@@ -18,7 +18,8 @@ This implements the focused sparse-row/back-substitution arm of #269. The
 [current-default profile](mq10-current-profile.md) selected this hotspot. The new
 [verified public families](public-polynomial-corpus.md) supply additional controls: their negative
 results on earlier prototypes helped reject unnecessary second-bound searches and splicing.
-Broader #269 work on controlled density curves and coefficient-specific kernels remains open.
+The subsequent H13 remainder below supplies nested density curves and a bounded scalar
+coefficient-specific prototype, with its own decision and remaining limits.
 
 ## Protocol and retained evidence
 
@@ -208,7 +209,8 @@ cohorts is pooled into the final medians.
 
 Red-Green tests first exposed full-target scratch reservation, then checked prefix retention,
 maximum-column/disjoint/empty supports, dense-reference arithmetic over prime and extension
-fields, and existing #554 capacity safeguards. All 2,821 active tests pass, including required
+fields, and existing #554 capacity safeguards. At the prefix campaign pin, all 2,821 active tests
+passed, including required
 msolve coverage. All-target/all-feature and no-default-feature Clippy pass. Focused rust-analyzer
 inference reports zero unknown expression types in the modified subtraction methods. CI runs
 the example replay test and the Python acceptance tests, including coefficient/input/RREF drift,
@@ -218,7 +220,265 @@ source headers and published-fixture paths were reviewed.
 [#149](https://github.com/mfaulk/zeebra/issues/149) is already closed with the negative AVX2
 shipping decision in [#541](https://github.com/mfaulk/zeebra/pull/541), recorded in the
 [SIMD milestone](../MILESTONE-SIMD-PARALLELISM.md). This generic merge does not change that decision.
-Controlled density sweeps, a separate delayed-reduction/per-bitwidth experiment, and physical
-bandwidth measurement remain broader #269 follow-ups. The current result establishes one safe,
+Those density, specialization and bandwidth questions were outside the prefix-only campaign;
+the H13 remainder below now measures nested density points, one delayed pilot and read-side fills.
+Physical controller bandwidth remains unavailable. The current result establishes one safe,
 measured improvement to the identified production hotspot across complete independently checked
 solves; it does not claim those other research questions are settled.
+
+
+## H13 remainder: density curves and the scalar delayed-reduction gate
+
+**Measured at:** `6578c0ab93f1ac59e56da62dcbefa51385be38d6`, baseline versus the isolated
+`delayed.patch` overlay SHA-256 `e057dd71136cfb39de009bbb215eac1fb833686b435e64a7fc966d8f93a5bc0e`.
+The successful region-counter instrument includes the acknowledgement-only fix at `ab74fdca`;
+its unchanged pilot library comes from `6578c0ab`. Every cohort retains source/compiler/binary
+identities. Measurements: 2026-11-12 UTC, same 5995WX, rustc 1.99.1, fat LTO, one codegen unit,
+x86-64-v3, system allocator, **CPU 3 only**, one solver worker. Do not pool these with the earlier
+CPUs 0–3 prefix campaign. Parent Cargo config also selects mold; actual counter rebuild flags
+are retained in its build metadata.
+
+**Decision: retain production Adaptive and the prefix merge; do not ship this delayed pilot.**
+Delayed reduction wins its arithmetic test and MQ10/32003, but regresses Noon-6 and does not give
+a broad full-solve or capacity win. This closes the bounded scalar feasibility arm negatively,
+not by pretending its arithmetic win is a full-pipeline win. No production API, backend selection,
+field representation, intrinsic path, dependency or default budget changes in this study.
+
+### Scope, correctness and retained attempts
+
+The [runner and reproduction instructions](../../research/elimination-kernels/README.md) retain
+**714 successful attempts**: seven arithmetic comparisons, 540 density replays, 30 paired pilot
+matrix replays, 120 full solves, three acknowledged region-counter runs, six conversion diagnostics
+and eight work diagnostics. All complete bases, matrix RREFs, ranks and structural work counters
+agree at their matched inputs. The 120 bases use the same independent references as the earlier
+prefix campaign; public Eco, Noonburg and Reimer plus MQ, Cyclic and Katsura cover six families.
+Entry allowances and exact mid-operation stop counts are unchanged.
+
+Three additional [counter attempts](../../research/elimination-kernels/results/region-rejected.json.gz)
+were rejected after a NUL-framed perf acknowledgement triggered an instrument panic. Their positive
+raw counters do **not** make them accepted measurements. The failure exposed a test gap; a new
+Red-Green regression covers buffered `ack\n\0ack\n` responses. Fixed runs use separate artifacts.
+The [lock log](../../research/elimination-kernels/results/benchlock.log) preserves the first campaign's
+nonzero exit and subsequent successful counter, diagnostic and work windows. No builds or tests
+ran during these measurement windows.
+
+All attempts run in fresh processes under the existing 185-second/2-GiB process-tree watchdog;
+source captures and classical/public solves also have 60-second solver limits. The 540 density
+replays rotate backend order between repetitions; paired pilot/full solves alternate arm order.
+Every table reports native medians of five repetitions unless stated otherwise. Peak RSS is the
+maximum self high-water snapshot in those repetitions, **including capture for matrix rows**.
+Explicit buffers, live entries and RSS are separate quantities. No resource refusal was removed.
+
+Raw data, complete paired summaries and all 36 density points are retained as
+[compressed cohorts](../../research/elimination-kernels/results),
+[summary.json](../../research/elimination-kernels/summary.json) and
+[curves.csv](../../research/elimination-kernels/curves.csv). Regenerate the latter two with
+`python3 research/elimination-kernels/summarize.py`; it also rechecks complete bases, structural
+counters, curve identities and cell coverage before writing tables.
+
+### Three fields, three shapes: the controlled density curves
+
+K7 is Katsura-7 grevlex batch 4, C6 is Cyclic-6 grevlex batch 7, and K6lex is Katsura-6 lex
+**baseline-preset** batch 21. M31/p64 captures must match H6's pinned fingerprints. BN254 uses the
+same three family/order/batch selectors; these additional source fingerprints are retained and
+checked across repeats. All use the current structured reducer-first split on replay.
+
+Each source gets nested deterministic masks retaining 1/8, 2/8, 4/8 or 8/8 of tail entries, with
+leading entries always preserved. Eight eighths is the original capture. The other points are
+**synthetic derivatives of real captured supports**, not native F4 batches or equivalent ideals.
+The reducer block stays valid. Rank, fill-in and initial density can change across masks; the
+CSV reports them. The comparison at one mask holds the complete input constant across backends.
+
+Entries in each cell below run from 1/8 to 8/8. Ratios use median **forward** time to isolate backend
+work; the common production back-substitution follows and verifies exact canonical RREFs. Values
+below one are faster than Sparse. Full elimination times and peak RSS are in the CSV.
+
+| Field/shape | Initial density %, 1/8 → 8/8 | Dense/Sparse forward | Adaptive/Sparse forward |
+|---|---|---|---|
+| m31/k7 | 1.23 / 2.18 / 4.15 / 7.92 | 1.36 / 0.93 / 0.76 / 0.74 | 0.40 / 0.35 / 0.32 / 0.31 |
+| m31/c6 | 3.44 / 6.41 / 12.12 / 23.46 | 0.79 / 0.89 / 0.54 / 0.58 | 0.56 / 0.53 / 0.48 / 0.55 |
+| m31/k6lex | 0.53 / 0.96 / 1.81 / 3.51 | 2.21 / 1.54 / 1.17 / 1.45 | 0.36 / 0.31 / 0.28 / 0.41 |
+| p64/k7 | 1.23 / 2.18 / 4.15 / 7.92 | 2.81 / 2.20 / 1.63 / 1.58 | 0.49 / 0.37 / 0.29 / 0.32 |
+| p64/c6 | 3.44 / 6.41 / 12.12 / 23.46 | 1.53 / 1.29 / 1.12 / 1.33 | 0.58 / 0.52 / 0.48 / 0.52 |
+| p64/k6lex | 0.53 / 0.96 / 1.81 / 3.51 | 4.75 / 3.60 / 2.80 / 3.48 | 0.37 / 0.30 / 0.27 / 0.38 |
+| bn254/k7 | 1.23 / 2.18 / 4.15 / 7.92 | 3.87 / 3.46 / 3.06 / 3.03 | 0.84 / 0.78 / 0.72 / 0.70 |
+| bn254/c6 | 3.44 / 6.41 / 12.12 / 23.46 | 1.74 / 1.60 / 1.36 / 1.43 | 0.89 / 0.84 / 0.75 / 0.82 |
+| bn254/k6lex | 0.53 / 0.96 / 1.81 / 3.51 | 9.45 / 7.69 / 5.84 / 5.39 | 0.71 / 0.68 / 0.67 / 0.74 |
+
+M31 K7's point estimate crosses Sparse between 1.23% and 2.18% density; the latter is close to
+parity, so this is a bracket, not a tuned threshold. M31 C6 favors Dense throughout the sampled
+range, while M31 K6lex does not. All p64/BN254 Dense points lose to Sparse. Adaptive wins every
+sampled forward point. **There is no field-independent density threshold to install.** Wider
+coefficients make touching empty dense cells more expensive, but these measurements do not
+isolate storage width from field arithmetic. They also do not reach arbitrary dense matrices.
+
+The opt-in large corpus now contains a 24.8-million-entry capture (#640 is closed). This campaign
+still deliberately stays in the smaller three-shape and MQ10 regimes; it makes no large-matrix
+blocking, cache-scaling or GPU claim. A full dense copy of that larger shape would not fit the
+pilot's process ceiling.
+
+### What delayed reduction actually buys, with representation controlled
+
+The existing field-width study established 32-bit versus 64-bit arithmetic differences, and #149
+already settled the eight-lane AVX2 shipping question. The remaining bounded question from #269's
+later evidence is scalar delayed reduction at **GF(32003)**. That selects the one prototype here;
+it is not a general bitwidth backend replacement.
+
+The prototype uses split u16 pivot coefficients and u64 nonnegative working sums. Its canonical
+control uses **identical storage and traversal** but reduces after each update. All three arms
+include exact modular-zero support bookkeeping and assert identical final coefficients. Seven
+fresh processes, 4,194,304 updates each, 4,096 columns, fixed factor:
+
+| Arithmetic arm | Median ns/update |
+|---|---:|
+| Generic GF(32003) DenseAccumulator | 1.575 |
+| Split pilot, canonical after every update | 1.611 |
+| Split pilot, delayed reduction | 1.138 |
+
+The delayed schedule saves about 28% against generic and 29% against its same-storage canonical
+control. The latter is the evidence for delayed arithmetic; a comparison of different coefficient
+representations alone would confound it. These working sets fit cache and are not a bandwidth test.
+No new handwritten SIMD arm is justified by these results.
+
+After a fold every cell is at most `p-1`; one update adds at most `(p-1)^2`. Therefore the exact
+safe update count is `floor((u64::MAX-(p-1))/(p-1)^2)`:
+
+| Prime | Updates before a mandatory full-row fold |
+|---|---:|
+| 32003 | 18,012,146,920 |
+| 2^31−1 | 4 |
+| 2^64−59 | 0 |
+
+This is why the prototype stops at the small prime. The last row needs a wider accumulator;
+the middle cannot inherit the small-prime schedule. Fold-boundary tests use u128 arithmetic,
+force short fold intervals and exercise maximal factors, cancellation, reactivated columns,
+word boundaries and scratch reuse. Known 128/256-bit, binary and extension types explicitly use
+the generic fallback. The overlay is never part of the committed library API.
+
+### Conversion-inclusive matrix and full-solve gate
+
+Captured GF(32003) elimination, including pivot conversion/cache building and row conversion,
+followed by unchanged sparse back-substitution:
+
+| Shape | Elimination ms B → C | Median paired C/B | Peak RSS MiB B → C |
+|---|---:|---:|---:|
+| k7 | 1.536 → 1.432 | 0.896 | 4.53 → 4.45 |
+| c6 | 0.600 → 0.554 | 0.921 | 3.92 → 4.08 |
+| k6lex | 9.554 → 7.868 | 0.821 | 7.47 → 7.40 |
+
+Separate one-pair diagnostics report the selected replay's conversion **plus normalization** and
+additional pivot-cache capacities; earlier capture-batch diagnostic lines are not summed into the
+replay. These instrumented timings are not pooled with the native medians:
+
+| Shape | Conversion/normalization µs | Additional cache capacity bytes | Pilot cell payload bytes |
+|---|---:|---:|---:|
+| k7 | 168.705 | 106,688 | 2,952 |
+| c6 | 48.770 | 57,682 | 1,400 |
+| k6lex | 579.835 | 359,432 | 7,560 |
+
+The cache duplicates coefficients/columns still owned by the sparse matrix. Its bytes are outside
+the existing F4 entry-byte accounting, although the process guard covers them. The u64 working
+buffer also doubles the generic small-prime cell width. These are reasons not to present this
+feasibility build as a production memory-capacity improvement. RSS alone can hide an allocation
+whose lifetime does not coincide with the process high-water peak.
+
+The full F4 call, same shipping strategies on both arms, with parsing/reference comparison outside
+the timer. All public-family controls here are GF(32003). The middle column below reports the
+median of **paired** C/B ratios and its observed range; it need not equal the ratio of medians.
+Sub-millisecond controls remain correctness/sanity checks with substantial cold-process noise.
+
+| Full solve | F4 ms B → C | Paired C/B median (range) | Peak RSS MiB B → C |
+|---|---:|---:|---:|
+| public-eco-4 | 0.091 → 0.092 | 1.013 (0.952–1.212) | 3.46 → 3.49 |
+| public-noon-3 | 0.153 → 0.165 | 1.089 (0.956–2.282) | 3.60 → 3.66 |
+| public-reimer-3 | 0.197 → 0.205 | 1.062 (0.954–1.137) | 3.60 → 3.69 |
+| public-eco-8 | 11.639 → 11.635 | 0.994 (0.979–1.016) | 4.79 → 5.00 |
+| public-noon-6 | 49.870 → 53.288 | 1.068 (1.040–1.085) | 15.00 → 14.87 |
+| public-reimer-5 | 17.843 → 17.185 | 0.971 (0.950–1.111) | 5.16 → 5.26 |
+| mq10/32003 | 3041.540 → 2768.770 | 0.912 (0.903–0.913) | 134.95 → 134.29 |
+| cyclic-5/32003 | 0.969 → 0.993 | 1.007 (0.930–1.066) | 4.22 → 4.16 |
+| katsura-4/32003 | 0.143 → 0.154 | 1.041 (1.033–1.192) | 4.07 → 4.02 |
+| mq10/2147483647 | 3208.772 → 3322.047 | 1.034 (1.028–1.055) | 135.37 → 135.50 |
+| cyclic-5/2147483647 | 0.992 → 0.987 | 0.995 (0.811–1.125) | 4.18 → 4.15 |
+| katsura-4/2147483647 | 0.144 → 0.142 | 1.025 (0.412–2.302) | 4.02 → 4.12 |
+
+MQ10/32003 improves consistently by about 9%, while **every Noon-6 pair regresses** (4–8.5%).
+Eco-8 is effectively unchanged and Reimer-5's range crosses parity. The 31-bit MQ10 fallback
+also regresses 2.8–5.5% in this build despite using the generic algorithm; code-generation/layout
+and machine effects are not separated here. No claim attributes that control's change to delayed
+field arithmetic. This candidate fails the no-material-regression gate and does not justify broad
+production dispatch or extending the prototype to other widths. The earlier prefix-only merge
+remains the stronger, already shipped result.
+
+### Logical intensity and acknowledged hardware region
+
+The fresh work replay reproduces the earlier pinned MQ10 back-substitution anatomy exactly:
+**508,566,282 algorithmic field operations / 21,067,458,864 modeled tuple bytes =
+0.0241399 field operations per logical byte**. This is multiplication plus subtraction per pivot
+term, with the prefix-only copy model defined above. It is not hardware arithmetic intensity in
+FLOPs/DRAM-byte; one field operation expands into several integer instructions.
+
+Perf 7.3.3 user-mode counters are enabled by an acknowledged FIFO immediately before forward
+elimination and disabled after back-substitution. Capture, input/RREF hashing, basis work and
+output are excluded. The three corrected runs have complete inputs/RREFs, no resource stops,
+positive cycle/instruction counts and at least 99% event running time. They use the acknowledgement
+fix at `ab74fdca`, linked to the unchanged pilot library from `6578c0ab`; its 31-bit field takes the
+generic fallback. The direct-rustc rebuild flags and library SHA are in the cohort metadata (`TARGET` denotes
+the private build directory).
+This distinct counter build is not pooled into baseline/candidate native medians.
+
+| Region observation | Median, three runs |
+|---|---:|
+| Complete elimination | 1776.516 ms |
+| User cycles | 7.312 billion |
+| User instructions | 28.427 billion |
+| Local DRAM-or-IO data-cache fills | 1,908,555 |
+| Remote DRAM-or-IO data-cache fills | 0 |
+| Read-side fill estimate, 64-byte lines / elapsed | 0.0688 GB/s |
+
+The line size is verified from this host's cache sysfs. The events count demand/prefetch data fills
+from the documented source, not all physical bus traffic. They exclude writebacks, coherence
+traffic and other cores. Low read-side traffic is consistent with the hot work being cached,
+arithmetic or control work; it does not prove which of those limits execution or rule out a cache
+bandwidth bottleneck. The logical intensity above describes **back-substitution only**, while the
+hardware region includes both forward and backward elimination; do not divide those quantities
+together to invent a physical roofline point.
+
+**Physical memory-controller bandwidth remains unmeasured.** The
+[capability record](../../research/elimination-kernels/results/environment.json) retains both failed
+AMD Data Fabric probes: the default user-only form is unsupported, and the kernel-inclusive form
+is denied with `perf_event_paranoid=2`. No system policy was changed. This is an outstanding strict
+#269 acceptance item, not evidence that total DRAM bandwidth is 0.069 GB/s or that all elimination
+regimes are ALU-bound.
+
+### Existing decisions and what this result does not reopen
+
+- **#149 stays closed:** #541's negative AVX2 shipping decision applies. An isolated contiguous
+  eight-lane win does not replace Adaptive's indexed scatter; no new intrinsic path is shipped.
+- **#168 is already fixed:** current back-substitution builds `PivotColumnRows` and visits rows
+  holding each pivot column. F4 now calls that pass through its reduced-batch strategy; the old
+  issue's statement that F4 never calls it no longer describes this pin. #712's untouched-prefix
+  improvement targets the remaining merge work, not the retired all-rows probe loop.
+- **#169 is already fixed:** `Matrix::Mul` has a 2×8 register tile. The measured F4 paths here use
+  sparse rows/DenseRows/DenseAccumulator, not dense matrix multiplication, so that ticket supplies
+  no additional kernel speedup for these F4 shapes.
+- **Faugère–Lachartre is a shared block-elimination principle, not a free replacement.** The
+  shipping reducer-first triangular block already supplies known pivots for lower-row elimination.
+  `InterreducedBlock` explicitly makes the reducer block an identity first and was rejected for
+  fill-in. GBLA/Sagebrush's schedules/storage are not identical to the shipped streaming scatter;
+  revisiting them requires a measured distinction, not renaming `structured.rs`. The source study's
+  old universal 7–22% stage ceiling also must not be carried to MQ10's newer profile.
+
+Bitmap scans, source-row coefficient reuse and multi-row bands remain distinct hypotheses from
+#269's later source-study comments. They were not folded into this arithmetic pilot. This report
+settles the bounded density/one-prototype experiments; it leaves physical controller bandwidth
+and extrapolation to the large capture explicit. Tests cover the prototype and protocol bugs,
+CI runs those offline tests and the isolated overlay, and README/reproduction commands point to
+the retained source pins. No corpus-only result is used as production adoption evidence.
+
+Local verification for this remainder: nine example tests, seven Python acceptance/integrity tests,
+188 linear-algebra tests, and the overlay's explicit field-selection test pass. Clippy passes for
+all targets with all features and without default features. Formatting, measurement provenance,
+artifact hashes, derived-summary regeneration and package inclusion of the example/support source
+were checked. The independent full-basis corpus controls above supply the prototype's end-to-end
+validation; this PR changes no production library code.

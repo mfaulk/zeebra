@@ -332,3 +332,14 @@ preserved to avoid propagating a large pivot's buffer capacity across the matrix
 The [elimination-kernel report](docs/research/elimination-kernels.md) records the verified
 prefix-merge results, three-field backend measurements, and the distinction between logical tuple
 traffic and physical memory bandwidth.
+
+The [remaining H13 kernel study](research/elimination-kernels/README.md) provides nested density
+masks on captured matrices and an isolated scalar GF(32003) delayed-reduction pilot. Run
+`cargo run --release --example elimination_kernel_study -- m31 k7 8 adaptive` for the unmodified
+Katsura-7 capture, or `-- --arithmetic` for the exact arithmetic feasibility check. The pilot overlay
+is used only in disposable research builds; the shipping backend and field API are unchanged.
+
+The [measured H13 decision](docs/research/elimination-kernels.md#h13-remainder-density-curves-and-the-scalar-delayed-reduction-gate)
+retains the three-field density curves, full-solve controls and the negative delayed-pilot shipping
+decision. Regenerate its checked CSV and paired summaries with
+`python3 research/elimination-kernels/summarize.py`.
