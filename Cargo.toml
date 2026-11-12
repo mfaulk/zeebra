@@ -257,3 +257,7 @@ required-features = ["external-runners"]
 [[example]]
 name = "sylvester_comparison"
 required-features = ["external-runners"]
+
+[[example]]
+name = "mq10_profile"
+required-features = ["external-runners"]

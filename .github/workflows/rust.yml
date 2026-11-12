@@ -76,6 +76,10 @@ jobs:
       - name: Check guide inclusion
         if: needs.changes.outputs.rust != 'true'
         run: cargo test --test documentation
+      - name: MQ10 profiling instrument tests
+        run: |
+          cargo test --example mq10_profile
+          python3 tools/test/mq10-profile-test.py
       - name: Doc tests
         run: cargo test --doc -- --test-threads=4
       - name: Upload build timings
