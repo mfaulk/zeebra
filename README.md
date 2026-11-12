@@ -338,3 +338,8 @@ masks on captured matrices and an isolated scalar GF(32003) delayed-reduction pi
 `cargo run --release --example elimination_kernel_study -- m31 k7 8 adaptive` for the unmodified
 Katsura-7 capture, or `-- --arithmetic` for the exact arithmetic feasibility check. The pilot overlay
 is used only in disposable research builds; the shipping backend and field API are unchanged.
+
+The [measured H13 decision](docs/research/elimination-kernels.md#h13-remainder-density-curves-and-the-scalar-delayed-reduction-gate)
+retains the three-field density curves, full-solve controls and the negative delayed-pilot shipping
+decision. Regenerate its checked CSV and paired summaries with
+`python3 research/elimination-kernels/summarize.py`.

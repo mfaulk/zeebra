@@ -1,0 +1,12 @@
+{
+  "arithmetic.json.gz": "3a599c55f24fea5564a807f019b9fd3564b3662615d8353ffaf8fe7c57be4bc1",
+  "benchlock.log": "0db84f5c4ec04ff818d8617afcde96dae528ecd59f3f2788a8018ecb351f1377",
+  "curves.json.gz": "c01ea9e12c2f8939a388446f6c4dc1d2d2326eaebd7abd064d43484726f8b4bd",
+  "diagnostic.json.gz": "e3e8ba242c3ab87c200da8246e771ef1d842320b8c09113bae3f4ad7ce0b06f1",
+  "environment.json": "166e625b09f8c5c23e9a196a2a67dba7f7106fedfd5f1a9df3f0bd112d569c7c",
+  "pilot.json.gz": "aa131d03cfd9aa98af8624442b8c2bee154c7ad9afd41a32c0675da4842970de",
+  "region-fixed.json.gz": "41272a5bda71db0c98b1364cd110510048a13a8ad90131dbfb055f6e04626838",
+  "region-rejected.json.gz": "1cd4f8673a4f964affac58c9a6b4fc5eda3ef59199b2836248895c017a87b2b5",
+  "solves.json.gz": "0e7b90783c979a5ba51d012a188bec7666e151a0b4e465b7b6d4d557763634b9",
+  "work.json.gz": "a6fe5fc39097e3b64a3929616cb15d4e605402492d2e58886cd8c9abf5f98319"
+}

@@ -98,3 +98,33 @@ disable them after back-substitution. Capture, hashing and output are excluded. 
 say `counter_scope=elimination-region`; missing or multiplexed counters fail acceptance. Converting
 fill counts to 64-byte line traffic describes the core's read-side fill events, including prefetch;
 it excludes writebacks, coherence traffic and other cores. It is not memory-controller bandwidth.
+
+## Retained result and source pins
+
+[The report](../../docs/research/elimination-kernels.md#h13-remainder-density-curves-and-the-scalar-delayed-reduction-gate)
+records a negative shipping decision: isolated delayed arithmetic improves, but Noon-6 regresses
+and the full-solve gain is not broad. Production dispatch stays unchanged. The raw native cohorts
+use `6578c0ab` and the exact patch; the successful region instrument adds the acknowledgement-only
+fix at `ab74fdca`. Its direct rustc rebuild reused the unchanged optimized pilot library; flags and
+library hash are recorded in that cohort. `TARGET` in those flags means the private build directory.
+The three earlier acknowledgement failures remain in `results/region-rejected.json.gz` and are
+excluded from accepted counter medians. Source pins and build boundaries must travel with timings.
+
+`results/` retains 714 accepted attempts plus the three rejected counter attempts. Regenerate
+`summary.json` and the 36-point `curves.csv`, and recheck bases/work/curve identities, with:
+
+```sh
+python3 research/elimination-kernels/summarize.py
+```
+
+The primary density table reports **forward** backend ratios; the CSV additionally reports full
+elimination medians, fill/rank and maximum RSS. Diagnostic conversion lines include earlier capture
+batches; only the last line belongs to the selected replay. Conversion includes normalization.
+Physical memory-controller bandwidth remains unavailable; the accepted core-fill measurements are
+a narrower read-side observation. Capability failures and the benchmark-lock windows are retained.
+
+Patch files preserve context whitespace; `.gitattributes` exempts only these patch files from
+blank-at-end-of-line checking. Ordinary source files still use the repository's whitespace checks.
+
+CI verifies the raw artifact SHA256 inventory, regenerates the CSV/summary and checks that neither
+derived file changes. It runs no timings or privileged hardware counters.

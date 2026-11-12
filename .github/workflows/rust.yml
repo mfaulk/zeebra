@@ -82,6 +82,8 @@ jobs:
           cargo test --example public_corpus
           cargo test --example elimination_kernel_study
           python3 tools/test/elimination-kernel-study-test.py
+          python3 research/elimination-kernels/summarize.py
+          git diff --exit-code -- research/elimination-kernels/summary.json research/elimination-kernels/curves.csv
           cargo test --example row_merge_study
           python3 tools/test/row-merge-study-test.py
           python3 tools/test/mq10-profile-test.py
