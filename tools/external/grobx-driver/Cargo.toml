@@ -1,0 +1,18 @@
+[package]
+name = "grobx-driver"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "GPL-3.0-only"
+
+[workspace]
+
+[dependencies]
+grobx = { git = "https://github.com/code1-de/grobx", rev = "1854835dbc25f24dc9a9ba017024d5030e99da1c" }
+grobx-checker = { git = "https://github.com/code1-de/grobx", rev = "1854835dbc25f24dc9a9ba017024d5030e99da1c" }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
