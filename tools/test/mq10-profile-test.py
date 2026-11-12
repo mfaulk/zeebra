@@ -3,6 +3,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
 
 spec = importlib.util.spec_from_file_location('mq10_profile', Path(__file__).resolve().parents[1] / 'external/mq10-profile.py')
 module = importlib.util.module_from_spec(spec)
@@ -27,6 +28,19 @@ class AnswerTests(unittest.TestCase):
         for key, value in [('digest', 'other'), ('modulus', 17)]:
             with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'input identity'):
                 module.check_answer(dict(reference, **{key: value}), reference)
+
+
+class GuardTests(unittest.TestCase):
+    # A profiler wrapper cannot hide the measured child's memory from the resource guard.
+    def test_descendant_high_water_is_included(self):
+        with tempfile.TemporaryDirectory() as directory:
+            proc = Path(directory)
+            for pid, hwm, children in [(1, 3, '2'), (2, 100, '')]:
+                path = proc / str(pid)
+                (path / 'task' / str(pid)).mkdir(parents=True)
+                (path / 'status').write_text(f'VmHWM: {hwm} kB\n')
+                (path / 'task' / str(pid) / 'children').write_text(children)
+            self.assertEqual(module.tree_hwm(1, proc), 103 * 1024)
 
 
 if __name__ == '__main__':
