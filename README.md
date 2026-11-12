@@ -304,3 +304,8 @@ mq-random-10 20000000 reduced`. The example also accepts caller-supplied polynom
 reports outcomes, exact basis digests, completed-batch entry peaks and process RSS separately.
 See [the live-budget protocol](research/live-entry-budget/README.md) for bounded runs and input
 provenance.
+
+A completed external process can have unavailable RSS if it exits before sampling. The supervisor
+preserves its exit result and leaves the peak unavailable; adapters with child self-high-water
+reports validate those reports against the requested memory cap. See the
+[external-engine guide](docs/guide/external-engines.md#completed-processes-and-rss-evidence).

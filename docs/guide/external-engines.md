@@ -102,6 +102,21 @@ cargo test --release --lib -- --ignored --exact \
 ```
 
 
+## Completed processes and RSS evidence
+
+A child can exit after the supervisor checks its status but before `/proc` supplies its first RSS
+sample. The supervisor rechecks completion in this window and preserves the actual exit status,
+matching the existing path for a child that completes before the first status check. The peak
+stays unavailable rather than becoming zero. Missing RSS while the child is still live remains
+a conservative harness error when a cap is required; observed cap crossings and wall limits still
+kill and reap the child.
+
+An unavailable peak does not establish that a completed process stayed inside its memory cap.
+Adapters with a child self-high-water protocol must validate that snapshot and reject a result
+above its requested cap. Other consumers must retain missing evidence explicitly. This change
+neither repairs historical measurements nor turns a nonzero exit into success. The Linux
+regression uses a release barrier and a zombie-state observation to force the exit window.
+
 ## Other external engines, for comparison
 
 Singular is the oracle above because it is the one this repository has always had installed.
