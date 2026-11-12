@@ -125,3 +125,6 @@ Every attempt is retained, including unsupported inputs, resource refusals and f
 The campaign records canonical inputs, complete answers, tool/build identities, stage/work counts
 for Zeebra, wall time and attributable memory observations. No campaign is appended to the
 competitive history automatically. Tiny smoke cases remain subject to process-startup floors.
+
+The [selection and verification report](../../docs/research/public-polynomial-corpus.md) records
+the frozen 54-attempt campaign, matrix regimes, and measured five-second smoke execution budget.
