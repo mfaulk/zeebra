@@ -1724,7 +1724,7 @@ fn engine_internal_time(
         ("zeebra", _) => &["basis"],
         ("singular", super::Task::LexBasisByConversion) => &["source-basis", "solve"],
         ("singular", _) => &["solve"],
-        ("groebner.jl" | "sagebrush" | "groebner-rs" | "sylvester", _) => &["solve"],
+        ("groebner.jl" | "sagebrush" | "groebner-rs" | "grobx" | "sylvester", _) => &["solve"],
         ("msolve", super::Task::LexBasisByConversion | super::Task::UnivariateEliminant) => {
             &["f4/overall(elapsed)", "sparse-fglm/overall(elapsed)"]
         }
@@ -1764,7 +1764,7 @@ fn stage_resolution(library: &str) -> Option<Duration> {
     Some(match library {
         "singular" => Duration::from_millis(1),
         "msolve" => Duration::from_millis(10),
-        "sagebrush" | "groebner.jl" | "zeebra" | "groebner-rs" | "sylvester" => {
+        "sagebrush" | "groebner.jl" | "zeebra" | "groebner-rs" | "grobx" | "sylvester" => {
             Duration::from_micros(1)
         }
         _ => return None,

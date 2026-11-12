@@ -7,6 +7,7 @@ from pathlib import Path
 import signal
 import subprocess
 import time
+from proof_artifacts import pack_attempts, write_cohort
 
 
 def run(binary, directory, index, row, modulus, workers, engine, wall=60, rss=2048):
@@ -72,11 +73,16 @@ def main():
     attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-6', 2147483647, 1, 'sylvester', wall=0))
     attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-4', 32003, 4, 'sylvester-certified'))
     attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-4', 32003, 4, 'zeebra'))
+    for _ in range(3):
+        attempts.append(run(args.binary, args.scratch, len(attempts), 'mq-random-10', 32003, 4, 'sylvester'))
+        attempts.append(run(args.binary, args.scratch, len(attempts), 'mq-random-10', 32003, 4, 'zeebra'))
+    attempts.append(run(args.binary, args.scratch, len(attempts), 'groebner-rs-wide-control', 18446744073709551557, 1, 'sylvester'))
     rows = [attempt['rows'][0] for attempt in attempts]
     cohort = {key: value for key, value in attempts[0].items() if key not in ('rows', 'artifacts')}
     cohort.update(row_count=len(rows), rows=rows, attempts=attempts)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(cohort, indent=2, ensure_ascii=False) + '\n')
+    pack_attempts(attempts, args.output)
+    write_cohort(args.output, cohort)
     if args.append_history:
         path = Path('research/competitive/results/history.json')
         history = json.loads(path.read_text())

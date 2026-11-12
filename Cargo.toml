@@ -251,5 +251,9 @@ name = "groebner_comparison"
 required-features = ["external-runners"]
 
 [[example]]
+name = "grobx_comparison"
+required-features = ["external-runners"]
+
+[[example]]
 name = "sylvester_comparison"
 required-features = ["external-runners"]

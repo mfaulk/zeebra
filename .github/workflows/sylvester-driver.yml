@@ -1,10 +1,10 @@
 name: Pinned sylvester driver
 on:
   pull_request:
-    paths: ['tools/external/sylvester-driver/**', 'tools/external/provision-sylvester.sh', 'tools/external/sylvester-cohort.py', '.github/workflows/sylvester-driver.yml']
+    paths: ['tools/external/sylvester-driver/**', 'tools/external/provision-sylvester.sh', 'tools/external/sylvester-cohort.py', 'tools/external/proof_artifacts.py', 'tools/test/proof-artifacts-test.py', '.github/workflows/sylvester-driver.yml']
   push:
     branches: [main]
-    paths: ['tools/external/sylvester-driver/**', 'tools/external/provision-sylvester.sh', 'tools/external/sylvester-cohort.py', '.github/workflows/sylvester-driver.yml']
+    paths: ['tools/external/sylvester-driver/**', 'tools/external/provision-sylvester.sh', 'tools/external/sylvester-cohort.py', 'tools/external/proof_artifacts.py', 'tools/test/proof-artifacts-test.py', '.github/workflows/sylvester-driver.yml']
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -16,6 +16,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/external/sylvester-driver
+      - run: python3 tools/test/proof-artifacts-test.py
       - run: python3 -m py_compile tools/external/sylvester-cohort.py
       - run: bash -n tools/external/provision-sylvester.sh
       - run: cargo test --locked --manifest-path tools/external/sylvester-driver/Cargo.toml
