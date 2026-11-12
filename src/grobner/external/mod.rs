@@ -24,6 +24,8 @@ pub mod sagebrush;
 #[cfg(feature = "external-runners")]
 pub mod singular;
 #[cfg(feature = "external-runners")]
+pub mod sylvester;
+#[cfg(feature = "external-runners")]
 pub mod zeebra;
 
 #[cfg(feature = "external-runners")]
@@ -58,5 +60,7 @@ pub use process::{
 pub use sagebrush::SagebrushSolver;
 #[cfg(feature = "external-runners")]
 pub use singular::SingularSolver;
+#[cfg(feature = "external-runners")]
+pub use sylvester::SylvesterSolver;
 #[cfg(feature = "external-runners")]
 pub use zeebra::ZeebraSolver;

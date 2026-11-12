@@ -240,6 +240,14 @@ records the per-rung budgets and limitations of its single-run comparisons.
 The [matched-ISA Sagebrush re-take](docs/research/sagebrush-matched-isa.md) records
 the original public-algebra cells with both engines built at the same ISA floor.
 
+The optional [sylvester F4 comparand](tools/external/sylvester-driver/README.md) supplies raw
+reduced bases and independently verified v2 trace certificates through a pinned subprocess.
+Provision it with `tools/external/provision-sylvester.sh`; certified records use a separate
+objective and include proof production and checking. See the
+[adapter guide](docs/guide/external-engines.md#sylvester) and
+[retained results](docs/research/sylvester-comparand.md), including the extended certification
+work-cap refusal.
+
 The [dense-F4 anchors](docs/research/classical-benchmarks.md#24-441-the-dense-f4-ladder-and-the-conversion-stage-caution)
 record Steel's published configurations and MinRank stage split, with a density candidate based on
 field cardinality for future planner work. These historical figures provide context; they are not
@@ -301,3 +309,8 @@ provenance.
 
 The [current-default MQ10 profiling report](docs/research/mq10-current-profile.md) gives the
 matched stage/control campaign and instruction-profile reproduction commands.
+
+A completed external process can have unavailable RSS if it exits before sampling. The supervisor
+preserves its exit result and leaves the peak unavailable; adapters with child self-high-water
+reports validate those reports against the requested memory cap. See the
+[external-engine guide](docs/guide/external-engines.md#completed-processes-and-rss-evidence).

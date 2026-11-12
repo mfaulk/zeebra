@@ -1,0 +1,17 @@
+[package]
+name = "sylvester-driver"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[workspace]
+
+[dependencies]
+sylvester = { git = "https://github.com/t0rsion/sylvester", rev = "ea34ddf3c9b9a275265576cd881c39c0c473e9f9" }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

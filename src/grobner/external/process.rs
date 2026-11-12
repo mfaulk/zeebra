@@ -443,12 +443,24 @@ impl Supervisor {
     /// file is created (and truncated) by this call, and on return it holds whatever the child
     /// wrote, including on a timeout — a partial log is evidence and is not discarded.
     ///
+    /// A completed child may have no RSS sample; that remains unavailable, never zero. Adapters
+    /// with a child self-high-water protocol must validate that evidence against the requested cap.
+    ///
     /// # Errors
     /// [`SpawnError::Unavailable`] if the binary could not be started, which is the case an
     /// adapter must turn into a skipped-and-reported run rather than a failure of the solver.
     /// [`SpawnError::Harness`] if the supervisor's own work — the scratch directory, the output
     /// file, reaping the child — failed. Never the tool's doing, and never the tool's row.
     pub fn run(&self, invocation: &Invocation) -> Result<ProcessMeasurement, SpawnError> {
+        self.run_with_before_poll(invocation, |_| {})
+    }
+
+    // A test can release an exiting child precisely between status and RSS observations.
+    fn run_with_before_poll(
+        &self,
+        invocation: &Invocation,
+        mut before_poll: impl FnMut(u32),
+    ) -> Result<ProcessMeasurement, SpawnError> {
         if let Some(absent) = invocation.unavailable() {
             return Err(absent);
         }
@@ -497,6 +509,7 @@ impl Supervisor {
             }
             // Sampled before the deadline check so that a run which times out still carries the
             // readings taken while it was alive.
+            before_poll(pid);
             watcher.poll();
             if let Some(limit) = self.max_rss_bytes {
                 match watcher.rss().0 {
@@ -507,6 +520,16 @@ impl Supervisor {
                         break None;
                     }
                     None => {
+                        // Exit can clear /proc memory fields after the first status check.
+                        match child.try_wait() {
+                            Ok(Some(status)) => break Some(status),
+                            Ok(None) => {}
+                            Err(error) => {
+                                return Err(SpawnError::Harness {
+                                    detail: error.to_string(),
+                                })
+                            }
+                        }
                         let _ = child.kill();
                         let _ = child.wait();
                         return Err(SpawnError::Harness {
@@ -933,6 +956,68 @@ mod tests {
         assert_eq!(measurement.exit_code, Some(3));
         assert!(!measurement.succeeded());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // A child exiting between status and its first RSS sample is reaped as complete with unavailable RSS.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_exit_before_the_first_rss_sample_is_not_a_harness_failure() {
+        let dir = scratch("exit-before-rss");
+        let release = dir.join("release");
+        let output = dir.join("out");
+        let invocation = Invocation::new("/bin/sh", &dir, &output)
+            .arg("-c")
+            .arg(r#"while [ ! -e "$ZEEBRA_TEST_RELEASE" ]; do sleep 0.001; done; printf done"#)
+            .env("ZEEBRA_TEST_RELEASE", release.to_string_lossy());
+        let mut sampled_after_exit = false;
+        let result = Supervisor::new(Duration::from_secs(10))
+            .with_max_rss_bytes(Some(1024 * 1024 * 1024))
+            .run_with_before_poll(&invocation, |pid| {
+                std::fs::write(&release, b"go").unwrap();
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                loop {
+                    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).unwrap();
+                    if status
+                        .lines()
+                        .any(|line| line.starts_with("State:") && line.contains('Z'))
+                    {
+                        sampled_after_exit = true;
+                        break;
+                    }
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "child did not exit after release"
+                    );
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            });
+        assert!(
+            sampled_after_exit,
+            "the regression must exercise the observation window"
+        );
+        let measurement = result.expect("the child completed before RSS could be observed");
+        assert!(measurement.succeeded(), "{measurement:?}");
+        assert_eq!(measurement.peak_rss_bytes, None);
+        assert_eq!(measurement.rss_basis, RssBasis::Unavailable);
+        assert_eq!(read_output(&output), "done");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    // A live child with no observable RSS is still killed and reported as a harness failure.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_a_live_unobservable_child_still_refuses_an_rss_cap() {
+        let dir = scratch("unobservable-live");
+        let invocation = Invocation::new("/bin/sleep", &dir, dir.join("out")).arg("30");
+        let result = Supervisor::new(Duration::from_secs(10))
+            .with_rss_policy(RssPolicy::None)
+            .with_max_rss_bytes(Some(1024 * 1024 * 1024))
+            .run(&invocation);
+        assert!(
+            matches!(result, Err(SpawnError::Harness { .. })),
+            "{result:?}"
+        );
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     // A direct child crossing its RSS cap is killed and reported as a memory stop.
