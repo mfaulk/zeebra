@@ -66,3 +66,10 @@ requires positive counts for `cycles:u`, `instructions:u`, `cache-references:u`,
 with at least 99% running time for each event; unavailable or multiplexed events fail explicitly.
 These whole-child observations include parsing and output and are not pooled with unprofiled F4
 elapsed times. No memory-controller counters or physical DRAM bandwidth are measured.
+
+The `results/first-*` cohorts retain the initial unconditional window implementation at
+`220a99f1`: all 120 full bases and 150 matrix RREFs matched, but the small-field Sparse forward
+backend and some public controls regressed. The refinement preserves direct copying when the
+pivot covers the whole target and avoids searching bounds already established by endpoint checks.
+`baseline-work.json.gz` is an instrument sanity check with both arm labels using the **same**
+`cc6916fc` baseline executable; those duplicate timings are not independent candidate evidence.
