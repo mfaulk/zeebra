@@ -575,11 +575,15 @@ impl ExternalSolver for GrobxSolver {
                     self.work_dir.join("independent-singular"),
                     limits.wall,
                 )?;
+                let oracle_version = oracle.probe_version()?;
                 let report = oracle.run(instance, task, limits);
                 match report.status.answer() {
-                    Some(reference) => {
-                        verified(answer, reference, instance.field.characteristic, "singular")
-                    }
+                    Some(reference) => verified(
+                        answer,
+                        reference,
+                        instance.field.characteristic,
+                        &oracle_version.to_string(),
+                    ),
                     None => Err(RunFailure::Incomplete {
                         detail: format!("independent Singular unavailable: {:?}", report.status),
                     }),
