@@ -291,6 +291,21 @@ fn arithmetic() {
             .collect::<Vec<_>>(),
     );
     assert_eq!(actual, expected);
+    let mut canonical_pilot = delayed::Delayed::<32003, false>::new(WIDTH);
+    canonical_pilot.load(columns.iter().zip(&values).map(|(&c, &v)| (c, v as u64)));
+    let start = Instant::now();
+    for _ in 0..PASSES {
+        canonical_pilot.subtract(black_box(&columns), black_box(&values), black_box(1234));
+    }
+    let canonical_pilot_time = start.elapsed();
+    let actual = SparseRow::<Zp32003>::new(
+        &canonical_pilot
+            .take()
+            .into_iter()
+            .map(|(c, v)| (c, Zp32003::new(v)))
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(actual, expected);
     println!(
         "{}",
         Json::object([
@@ -298,6 +313,7 @@ fn arithmetic() {
             ("entries", Json::size(WIDTH * PASSES)),
             ("generic_ns", Json::nanos(generic_time)),
             ("delayed_ns", Json::nanos(delayed_time)),
+            ("canonical_pilot_ns", Json::nanos(canonical_pilot_time)),
             (
                 "p15_headroom",
                 Json::int(delayed::Delayed::<32003>::headroom())

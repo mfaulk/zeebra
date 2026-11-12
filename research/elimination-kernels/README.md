@@ -14,7 +14,9 @@ at one mask using the complete canonical RREF, rank, zero rows and work counters
 bases across masks or treat a masked matrix as a full-solve performance result.
 
 `--arithmetic` compares the generic GF(32003) accumulator with the scalar delayed pilot over the
-same row, fixed factor and passes, asserting every final coefficient equal. Its logical update
+same row, fixed factor and passes, asserting every final coefficient equal. A second pilot arm
+uses identical split storage with canonical reduction after each update, isolating the reduction
+schedule from representation and conversion. Its logical update
 throughput includes exact modular-zero bookkeeping. It does not measure physical DRAM bandwidth.
 
 ## Isolated pilot

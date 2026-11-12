@@ -1,6 +1,6 @@
 // Canonical residues are recovered before pivot decisions and support-count changes.
 #[derive(Clone, Debug)]
-pub struct Delayed<const P: u64> {
+pub struct Delayed<const P: u64, const DELAY: bool = true> {
     cells: Vec<u64>,
     nonzeros: usize,
     lead: usize,
@@ -10,7 +10,7 @@ pub struct Delayed<const P: u64> {
     interval: u64,
 }
 
-impl<const P: u64> Delayed<P> {
+impl<const P: u64, const DELAY: bool> Delayed<P, DELAY> {
     pub const fn headroom() -> u64 {
         ((u64::MAX as u128 - (P - 1) as u128) / ((P - 1) as u128 * (P - 1) as u128)) as u64
     }
@@ -73,6 +73,7 @@ impl<const P: u64> Delayed<P> {
             debug_assert!(coefficient > 0 && (coefficient as u64) < P);
             let before = self.cells[column];
             let after = before + negative * coefficient as u64;
+            let after = if DELAY { after } else { after % P };
             self.cells[column] = after;
             self.nonzeros += usize::from(before.is_multiple_of(P));
             self.nonzeros -= usize::from(after.is_multiple_of(P));
