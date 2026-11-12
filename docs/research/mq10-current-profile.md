@@ -1,7 +1,9 @@
 # Current-default MQ10 profile (#709)
 
 **Measured at:** `5409f2bf`, 2026-11-12, after merging #705, #707 and #708
-(`main` at `832a53d1`). Production F4 code is unchanged.
+(`main` at `832a53d1`). Native cycle sampling uses `a7a11368`; only the campaign
+runner and report changed, and the Rust executable has the same SHA-256. Production F4 code
+is unchanged.
 
 This experiment profiles the same public digest-pinned instances used by the grobx and sylvester
 comparands, at GF(32003) and GF(2147483647), with the field representations used by `ZeebraSolver`.
@@ -97,6 +99,85 @@ peak. Fewer live entries and a more compact representation are therefore concret
 investigations. These counters do not attribute the rest of RSS to a particular allocation site,
 or establish the other engines' live-entry counts.
 
+## Inside elimination: native samples confirm sparse row work
+
+The [two complete Callgrind runs](../../research/competitive/results/mq10-profile-callgrind.json.gz)
+use Valgrind 3.28.0, with cache and branch simulation disabled. Both pass the same full-basis check
+and reproduce the native structural counters. Their complete instruction profiles are compressed
+sidecars named in the cohort; reconstruct them with `gzip -dc` and use `callgrind_annotate`.
+Grouping self events across source-file attribution gives:
+
+| simulated instruction events | GF(32003) | GF(2147483647) |
+|---|---:|---:|
+| whole process, Ir | 94,107,979,750 | 98,847,585,283 |
+| `SparseRow::subtract_scaled`, self including inlined code | 55.72% | 55.97% |
+| libc copy implementation, self | 22.33% | 21.26% |
+| dense `accumulator::eliminate_from`, self including inlined code | 18.89% | 19.85% |
+| `back_substitute_pivots_tracked`, inclusive | 79.58% | 78.69% |
+
+The inclusive row overlaps its callees and must not be added to self rows. Its 11 calls are ten
+batch reductions plus final matrix interreduction. In GF(32003), the call graph attributes
+2,058,440 sparse subtractions to this path, including final interreduction; the batch-only counter
+above is 2,058,159. Thus the large sparse-subtraction share has a concrete caller, not just a
+function name matching the suspected stage.
+
+Callgrind emits a `brk segment overflow` warning, retained in each attempt's stderr, but both
+processes complete and verify. Its simulated instruction proportions are not hardware cycle or
+wall-time proportions, and its allocator/emulation environment differs. A separate native pass
+is necessary before calling the copy routine the dominant native cost.
+
+[Native cycle cohort](../../research/competitive/results/mq10-profile-perf.json.gz): five fresh
+runs per field, all complete and full-basis checked. The exact same Rust executable runs under
+`perf record -e cycles:u -F 997`, without stack capture. The tool is Fedora
+`perf 7.3.3-200.fc44.x86_64`, executable SHA-256
+`f4c9471ef6cb61cfbf1ec55d9580f64ea303a8f482cd4c75992dd32395f58d94`, downloaded and extracted
+under `/buildcache` without changing system packages. Stack capture was unavailable under the
+existing machine policy; flat user-cycle sampling works, and no policy setting was changed.
+The cohort retains every complete text report and compressed `perf.data` sidecar.
+Re-symbolizing raw samples requires the matching executable and DSOs; the retained text reports
+remain usable without those local binaries.
+
+| native self-cycle share, median of five | GF(32003) | GF(2147483647) |
+|---|---:|---:|
+| `SparseRow::subtract_scaled` | 53.32% | 57.35% |
+| dense `accumulator::eliminate_from` | 25.56% | 24.18% |
+| libc `memmove` | 8.53% | 7.07% |
+| `back_substitute_pivots_tracked`, self | 6.94% | 6.53% |
+| unresolved zero-address samples | 1.27% | 1.19% |
+
+No report loses samples; each run contains about four thousand cycle samples. The sparse-row
+share ranges 53.19–54.29% and 56.94–57.68%; dense accumulation ranges 25.33–25.69% and
+24.17–24.36%. Unknown samples stay in the denominator. These are whole-process sampled-cycle
+shares with no native call chains; the separate exact Callgrind call graph supplies caller
+attribution. They do not constitute a native elapsed-time split between forward and backward
+passes. Native source annotation places samples in the two-pointer merge, vector writes and
+inlined field arithmetic in [`row.rs`](../../src/linalg/sparse/row.rs), rather than identifying
+only the final copy-back call.
+
+The native result corroborates the row-kernel bottleneck while materially reducing the copy
+share from Callgrind's 21–22% to 7–9%. A pure copy optimization cannot recover the whole gap.
+Neither dataset establishes a cache-miss rate, a DRAM bandwidth limit, or the cause of another
+engine's advantage.
+
+## What this prioritizes
+
+The next focused experiment belongs in the F4 elimination work ([#269](https://github.com/mfaulk/zeebra/issues/269)): price the sparse
+back-substitution work by target-row role and terms touched, then try reducing repeated full-row
+merge work. Bulk handling of unaffected prefixes, a different accumulator for long rows, or
+avoiding unnecessary reducer-row work are hypotheses to test, not measured improvements.
+Any alternative must retain the full-basis checks and the row-capacity invariant from #554:
+swapping the largest scratch buffer into every row previously inflated resident memory.
+
+The representation work ([#268](https://github.com/mfaulk/zeebra/issues/268)) now has an explicit memory target: about 60 MiB of live entry
+payload, in 16-byte entries at both field widths. Reducing the live matrix size is also relevant;
+we have not measured how many rows or entries the other engines keep live. The next comparison
+needs those counters before attributing the order-of-magnitude gap to a particular algorithm.
+
+Final interreduction, symbolic divisor searches and column construction have small ceilings on
+these cells. This report measures no optimization and changes no shipped default; its result is
+which current work a proposed optimization must remove, and which performance claims remain
+unmeasured.
+
 ## Reproduce
 
 Build and test before acquiring the benchmark lock. Use a private target/scratch directory on
@@ -127,11 +208,24 @@ ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=0,1,2,3 \
   --output "$CARGO_TARGET_DIR/mq10-profile-callgrind.json.gz"
 ```
 
-Keep outputs outside the checkout until both campaigns finish, then copy the two cohorts and
-Callgrind sidecars into `research/competitive/results/`; the runner refuses a dirty source tree.
+For optional native sampling, install your distribution's `perf` tool and pass its absolute
+executable path. This records flat user-cycle samples and avoids build-ID cache writes:
+
+```sh
+DEBUGINFOD_URLS= ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=0,1,2,3 \
+  tools/benchlock.sh mq10-perf taskset -c 0-3 \
+  python3 tools/external/mq10-profile.py --perf "$(command -v perf)" \
+  --binary "$CARGO_TARGET_DIR/release/examples/mq10_profile" \
+  --scratch "$CARGO_TARGET_DIR/perf" \
+  --output "$CARGO_TARGET_DIR/mq10-profile-perf.json.gz"
+```
+
+Keep outputs outside the checkout until the campaigns finish, then copy the cohorts and
+profiler sidecars into `research/competitive/results/`; the runner refuses a dirty source tree.
 
 The native guard allows 120 seconds and 2 GiB per process. Callgrind gets 1800 seconds and 4 GiB.
-A guard stop or nonzero exit is retained and fails the campaign. The binary hash, compiler, source
+The guard sums the profiler and descendant process high waters conservatively, so a wrapper
+cannot hide the measured child. A guard stop or nonzero exit is retained and fails the campaign. The binary hash, compiler, source
 commit, options, field type, actual CPU affinity and complete statistics are recorded. The build
 uses release fat LTO, one codegen unit and x86-64-v3, with line tables for instruction attribution.
 No profiling row enters the competitive board, and no cross-engine ratio pools it with old runs.
