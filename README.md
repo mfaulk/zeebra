@@ -259,6 +259,12 @@ unfinished studies, and recommends bounded current-default profiling before furt
 Regenerate the retained competitive board without measuring with
 `cargo run --release --example competitive -- --write`.
 
+A pinned [grobx subprocess comparand](tools/external/grobx-driver/README.md) checks full reduced
+bases against Singular, or an exact independent cofactor checker at wide primes. Provision it with
+`tools/external/provision-grobx.sh`; raw computation and exact-certified computation have separate
+IDs and resource keys. The [external-engine guide](docs/guide/external-engines.md#grobx)
+documents the bounded comparison and the revision's serial worker contract.
+
 ## Contributing and documentation
 
 The [M27 algorithm decision](docs/research/m27-algorithm-decision.md) records why an additional
