@@ -27,6 +27,8 @@ change to `y` may break the public API.
 
 ### Changed
 
+- External measurement APIs add RSS snapshot/provenance fields and a recorded-stop outcome;
+  exhaustive outcome/RSS matches and external record struct literals must accommodate them.
 - F4's recommended/default live allowance is 32 million entries and 512 MB, sized from measured
   reduced-row peaks (#659, #490). `baseline()` retains 20 million entries and 320 MB; explicit
   caller budgets remain enforced. The allowance bounds matrix payload, not process RSS.

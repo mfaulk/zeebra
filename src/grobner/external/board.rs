@@ -69,6 +69,9 @@ pub enum Outcome {
     /// A declared limit stopped it. The wall time **is** the limit.
     StoppedByLimit(LimitStop),
 
+    /// A stored resource stop whose original prose is retained without inventing a limit type.
+    RecordedStop { detail: String },
+
     /// The library cannot accept this input or task. **There is no time.**
     Unsupported(Unsupported),
 
@@ -86,7 +89,7 @@ impl Outcome {
         match self {
             Self::Complete => "complete",
             Self::Verified => "verified",
-            Self::StoppedByLimit(_) => "stopped-by-limit",
+            Self::StoppedByLimit(_) | Self::RecordedStop { .. } => "stopped-by-limit",
             Self::Unsupported(_) => "unsupported",
             Self::Failed(_) => "failed",
         }
@@ -115,6 +118,11 @@ impl Outcome {
         match self {
             Self::Complete | Self::Verified => None,
             Self::StoppedByLimit(stop) => Some(stop.to_string()),
+            Self::RecordedStop { detail } => Some(if detail.is_empty() {
+                "stopped-by-limit".into()
+            } else {
+                detail.clone()
+            }),
             Self::Unsupported(reason) => Some(prefixed("unsupported", reason.to_string())),
             Self::Failed(failure) => Some(prefixed("failed", failure.to_string())),
         }
@@ -130,6 +138,7 @@ impl Outcome {
         match self {
             Self::Complete | Self::Verified => None,
             Self::StoppedByLimit(stop) => Some(stop.to_string()),
+            Self::RecordedStop { detail } => Some(detail.clone()),
             Self::Unsupported(reason) => Some(reason.to_string()),
             Self::Failed(failure) => Some(failure.to_string()),
         }
@@ -583,12 +592,18 @@ impl CompetitiveRecord {
                 .unwrap_or_default(),
         );
         // The reason text is not re-parsed into its variant: it was rendered for a human, and a
-        // round trip through prose would invent a structure the file does not have. `Representation`
-        // and `ToolCap` carry it verbatim, which is honest about what was stored.
+        // round trip through prose would invent a structure the file does not have. A recorded
+        // stop keeps the original text; other reasons retain their bare representation.
         let outcome = match string("outcome")?.as_str() {
             "complete" => Outcome::Complete,
             "verified" => Outcome::Verified,
-            "stopped-by-limit" => Outcome::StoppedByLimit(LimitStop::ToolCap { detail }),
+            "stopped-by-limit" => Outcome::RecordedStop {
+                detail: value
+                    .get("outcome_detail")
+                    .and_then(Json::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+            },
             "unsupported" => Outcome::Unsupported(Unsupported::Representation { detail }),
             "failed" => Outcome::Failed(RunFailure::Reported { message: detail }),
             _ => return Err(BoardError::MalformedRow { field: "outcome" }),
@@ -2045,6 +2060,26 @@ mod tests {
         )
         .with_version(ToolVersion::new(library, "1.0"));
         CompetitiveRecord::of(&report, &instance, &environment())
+    }
+
+    // Regeneration retains wall and memory stop text without reclassifying either as a tool cap.
+    #[test]
+    fn test_resource_stop_details_round_trip() {
+        for stop in [
+            LimitStop::Memory {
+                limit: 0,
+                observed: Some(4096),
+            },
+            LimitStop::WallClock {
+                limit: Duration::ZERO,
+                elapsed: Duration::from_millis(1),
+            },
+        ] {
+            let record = row("groebner-rs", RunStatus::StoppedByLimit(stop), 0);
+            let saved = record.to_json();
+            let loaded = CompetitiveRecord::from_json(&saved).unwrap().to_json();
+            assert_eq!(saved.get("outcome_detail"), loaded.get("outcome_detail"));
+        }
     }
 
     // Regenerating the history preserves the recorded RSS measurement provenance.
