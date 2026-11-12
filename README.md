@@ -120,6 +120,8 @@ counters are reported by examples rather than benchmarks:
 ```sh
 cargo run --release --example f4_statistics   # pairs, reductions, zero reductions, basis size
 cargo run --release --example f4_profile      # cost attributed per stage
+cargo run --release --example mq10_profile -- 32003 --stages  # current-default MQ10, JSON
+cargo run --release --example mq10_profile -- 2147483647     # clocks disabled control
 cargo run --release --example solve_one       # a system in, verified solutions out
 ```
 
@@ -296,3 +298,6 @@ mq-random-10 20000000 reduced`. The example also accepts caller-supplied polynom
 reports outcomes, exact basis digests, completed-batch entry peaks and process RSS separately.
 See [the live-budget protocol](research/live-entry-budget/README.md) for bounded runs and input
 provenance.
+
+The [current-default MQ10 profiling report](docs/research/mq10-current-profile.md) gives the
+matched stage/control campaign and instruction-profile reproduction commands.
