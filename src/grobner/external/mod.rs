@@ -20,6 +20,8 @@ pub mod groebner_rs;
 pub mod msolve;
 pub mod process;
 #[cfg(feature = "external-runners")]
+pub mod public_corpus;
+#[cfg(feature = "external-runners")]
 pub mod sagebrush;
 #[cfg(feature = "external-runners")]
 pub mod singular;

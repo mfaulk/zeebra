@@ -314,3 +314,7 @@ A completed external process can have unavailable RSS if it exits before samplin
 preserves its exit result and leaves the peak unavailable; adapters with child self-high-water
 reports validate those reports against the requested memory cap. See the
 [external-engine guide](docs/guide/external-engines.md#completed-processes-and-rss-evidence).
+
+The [verified public corpus](research/public-corpus/README.md) adds Eco, Noonburg and Reimer
+families, with three offline CI fixtures and three opt-in performance rungs. Run
+`cargo run --release --example public_corpus -- --list` to inspect their exact inputs.

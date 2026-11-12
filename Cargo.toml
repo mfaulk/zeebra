@@ -261,3 +261,7 @@ required-features = ["external-runners"]
 [[example]]
 name = "mq10_profile"
 required-features = ["external-runners"]
+
+[[example]]
+name = "public_corpus"
+required-features = ["external-runners"]

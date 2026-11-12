@@ -80,6 +80,7 @@ jobs:
         run: |
           cargo test --example mq10_profile
           python3 tools/test/mq10-profile-test.py
+          python3 tools/test/public-corpus-test.py
       - name: Doc tests
         run: cargo test --doc -- --test-threads=4
       - name: Upload build timings
