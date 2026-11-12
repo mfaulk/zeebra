@@ -1,6 +1,6 @@
 # Public polynomial corpus: selection and verification
 
-Measured source: `7cca5d7a4e723df51cf27a0e7b5eff14d059800f` (clean tracked tree).
+**Measured at:** `7cca5d7a4e723df51cf27a0e7b5eff14d059800f` (clean tracked tree).
 The [inventory and definitions](../../research/public-corpus/README.md) document the pinned
 upstream survey, original mathematical references, variable order, coefficient transformations,
 and exclusions. This study adds six opt-in `Instance` values from three independently generated

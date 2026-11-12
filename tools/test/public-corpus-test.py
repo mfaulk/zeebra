@@ -26,8 +26,7 @@ class RegenerationTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.previous = module.ROOT
         module.ROOT = Path(self.tmp.name)
-        (module.ROOT / 'research/public-corpus/references').mkdir(parents=True)
-        (module.ROOT / 'src/grobner/external').mkdir(parents=True)
+        (module.ROOT / 'src/grobner/external/public_corpus_references').mkdir(parents=True)
 
     def tearDown(self):
         module.ROOT = self.previous
@@ -39,7 +38,7 @@ class RegenerationTests(unittest.TestCase):
         data[-1]['report']['version'] = 'unknown oracle'
         with self.assertRaises(ValueError):
             module.regenerate(data)
-        self.assertEqual(list((module.ROOT / 'research/public-corpus/references').iterdir()), [])
+        self.assertEqual(list((module.ROOT / 'src/grobner/external/public_corpus_references').iterdir()), [])
 
     # Changing the declared field or canonical digest is rejected before a reference is committed.
     def test_wrong_identity_is_rejected(self):
@@ -56,7 +55,7 @@ class RegenerationTests(unittest.TestCase):
         text = (module.ROOT / 'src/grobner/external/public_corpus_cases.rs').read_text()
         self.assertIn(data[0]['report']['digest'], text)
         self.assertIn(hashlib.sha256(b'x1\n').hexdigest(), text)
-        self.assertEqual(len(list((module.ROOT / 'research/public-corpus/references').iterdir())), 6)
+        self.assertEqual(len(list((module.ROOT / 'src/grobner/external/public_corpus_references').iterdir())), 6)
 
 
 if __name__ == '__main__':

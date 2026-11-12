@@ -17,7 +17,7 @@ is copied. The existing competitive ladder and its historical identities are unc
 
 Dimensions in this table are exact Singular build 44105 observations at this field, not claims
 about real roots or all characteristics. Each complete reduced basis is committed under
-[`references/`](references/), along with an input digest and raw-reference SHA-256 in
+[`public_corpus_references/`](../../src/grobner/external/public_corpus_references/), so they are included in published Cargo packages, along with an input digest and raw-reference SHA-256 in
 [`public_corpus_cases.rs`](../../src/grobner/external/public_corpus_cases.rs).
 Ordinary unit tests recompute the three smoke bases and compare every monic coefficient, without
 requiring an external executable. The larger cases are explicitly ignored unless requested.
