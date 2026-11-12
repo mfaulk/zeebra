@@ -310,6 +310,11 @@ provenance.
 The [current-default MQ10 profiling report](docs/research/mq10-current-profile.md) gives the
 matched stage/control campaign and instruction-profile reproduction commands.
 
+The [grobx trajectory study](docs/research/grobx-trajectory.md) separates algebraic
+work, coefficient traffic and live matrix storage, including abandoned signature
+runs. Its [reproduction guide](research/grobx-trajectory/README.md) documents optional
+passive counters and matched full-basis-verified controls; solver defaults are unchanged.
+
 A completed external process can have unavailable RSS if it exits before sampling. The supervisor
 preserves its exit result and leaves the peak unavailable; adapters with child self-high-water
 reports validate those reports against the requested memory cap. See the

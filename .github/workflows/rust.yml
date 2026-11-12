@@ -87,6 +87,10 @@ jobs:
           cargo test --example row_merge_study
           python3 tools/test/row-merge-study-test.py
           python3 tools/test/mq10-profile-test.py
+          python3 tools/test/grobx-trajectory-test.py
+          python3 tools/test/grobx-work-study-test.py
+          cargo test --features research-work --lib linalg::work
+          cargo test --features research-work --example mq10_profile
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks
         run: |

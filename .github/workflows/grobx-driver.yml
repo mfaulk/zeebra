@@ -17,6 +17,7 @@ jobs:
         with:
           workspaces: tools/external/grobx-driver
       - run: python3 tools/test/proof-artifacts-test.py
+      - run: python3 tools/external/grobx-driver/research/test_instrument.py
       - run: python3 -m py_compile tools/external/grobx-cohort.py
       - run: bash -n tools/external/provision-grobx.sh
       - run: cargo test --locked --manifest-path tools/external/grobx-driver/Cargo.toml
