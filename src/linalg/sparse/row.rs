@@ -172,8 +172,24 @@ impl<F: FiniteField> SparseRow<F> {
 
         let first = other.entries[0].0;
         let last = other.entries[other.entries.len() - 1].0;
-        let lo = self.entries.partition_point(|(column, _)| *column < first);
-        let hi = self.entries.partition_point(|(column, _)| *column <= last);
+        let lo = if self
+            .entries
+            .first()
+            .is_some_and(|(column, _)| *column < first)
+        {
+            self.entries.partition_point(|(column, _)| *column < first)
+        } else {
+            0
+        };
+        let hi = if self
+            .entries
+            .last()
+            .is_some_and(|(column, _)| *column > last)
+        {
+            lo + self.entries[lo..].partition_point(|(column, _)| *column <= last)
+        } else {
+            self.entries.len()
+        };
         scratch.clear();
         scratch.reserve(hi - lo + other.entries.len());
 
@@ -202,7 +218,12 @@ impl<F: FiniteField> SparseRow<F> {
             scratch.push((*column, F::zero() - *factor * *coefficient));
         }
 
-        drop(self.entries.splice(lo..hi, scratch.iter().copied()));
+        if lo == 0 && hi == self.entries.len() {
+            self.entries.clear();
+            self.entries.extend_from_slice(scratch);
+        } else {
+            drop(self.entries.splice(lo..hi, scratch.iter().copied()));
+        }
         debug_assert!(self.is_canonical(), "{:?} is not canonical", self.entries);
     }
 
