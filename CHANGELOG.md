@@ -11,6 +11,8 @@ change to `y` may break the public API.
 
 - A pinned standalone sdiehl/groebner F4 comparand with full independent reduced-basis checking,
   explicit Rayon worker counts, wide-prime controls and recorded build identities (#678).
+- Completed driver runs report child kernel RSS snapshots, and competitive history regeneration
+  preserves the original RSS measurement provenance.
 - Optional sampled child RSS enforcement in the subprocess supervisor, with memory stops
   distinguished from wall limits and solver failures.
 

@@ -80,7 +80,7 @@ fn strings(json: &Json, key: &str) -> Result<Vec<String>, RunFailure> {
         .collect()
 }
 fn identity(json: &Json) -> Result<String, RunFailure> {
-    if number(json, "contract")? != 1 || text(json, "revision")? != PINNED_REVISION {
+    if number(json, "contract")? != 2 || text(json, "revision")? != PINNED_REVISION {
         return Err(invalid("unrecognized driver contract or upstream revision"));
     }
     if text(json, "isa")? != "x86-64-v3" {
@@ -211,10 +211,15 @@ impl GroebnerRsSolver {
                 code: process.exit_code,
             });
         }
-        identity(
-            &Json::parse(&std::fs::read_to_string(output)?).map_err(|e| invalid(e.to_string()))?,
-        )?;
-        Ok(Measurement::of_process(&process))
+        let json =
+            Json::parse(&std::fs::read_to_string(output)?).map_err(|e| invalid(e.to_string()))?;
+        identity(&json)?;
+        let mut measurement = Measurement::of_process(&process);
+        if cfg!(target_os = "linux") {
+            measurement.peak_rss_bytes = Some(number(&json, "kernel_peak_rss_bytes")?);
+            measurement.rss_basis = super::RssBasis::ChildSelfHighWater;
+        }
+        Ok(measurement)
     }
     fn paths(&mut self) -> (PathBuf, PathBuf) {
         self.runs += 1;
@@ -372,6 +377,21 @@ impl ExternalSolver for GroebnerRsSolver {
                 return Err(invalid("driver build changed between probe and solve"));
             }
             let (answer, stages) = parse_answer(&json, instance, limits.workers)?;
+            if cfg!(target_os = "linux") {
+                let snapshot = number(&json, "kernel_peak_rss_bytes")?;
+                if snapshot == 0 {
+                    return Err(invalid("missing child kernel high-water snapshot"));
+                }
+                let peak = snapshot.max(measurement.peak_rss_bytes.unwrap_or(0));
+                measurement.peak_rss_bytes = Some(peak);
+                measurement.rss_basis = super::RssBasis::ChildSelfHighWater;
+                if limits.max_rss_bytes.is_some_and(|limit| peak > limit) {
+                    return Ok(RunStatus::StoppedByLimit(LimitStop::Memory {
+                        limit: limits.max_rss_bytes.unwrap(),
+                        observed: Some(peak),
+                    }));
+                }
+            }
             measurement.stages = stages;
             measurement
                 .stages
@@ -427,7 +447,7 @@ mod tests {
         )
     }
     fn output() -> Json {
-        Json::parse(r#"{"contract":1,"revision":"c3e1d630fba9b2155a4c389d9022f13e0ba09218","build":"locked-test-build","build_metadata":"PROFILE=release;OPT_LEVEL=3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;","isa":"x86-64-v3","variables":["x10","x1"],"modulus":32003,"order":"grevlex","workers":1,"generators":["x10+32002","x1+32001"],"basis":["x10+32002","x1+32001"],"leading":["x10","x1"],"parse_ns":1,"solve_ns":2,"serialization_ns":3}"#).unwrap()
+        Json::parse(r#"{"contract":2,"revision":"c3e1d630fba9b2155a4c389d9022f13e0ba09218","build":"locked-test-build","build_metadata":"PROFILE=release;OPT_LEVEL=3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;","isa":"x86-64-v3","variables":["x10","x1"],"modulus":32003,"order":"grevlex","workers":1,"generators":["x10+32002","x1+32001"],"basis":["x10+32002","x1+32001"],"leading":["x10","x1"],"parse_ns":1,"solve_ns":2,"serialization_ns":3}"#).unwrap()
     }
     // A provisioned driver agrees on all smoke fields and reports both wall and RSS stops.
     #[test]

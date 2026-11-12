@@ -231,6 +231,10 @@ pub struct CompetitiveRecord {
     /// How `peak_rss_bytes` was obtained. **Read before comparing two figures.**
     pub rss_basis: super::RssBasis,
 
+    /// Original serialized provenance, preserved even when its prose is not a known variant.
+    /// Clear this when deliberately changing the typed basis of a loaded record.
+    pub rss_basis_description: Option<String>,
+
     /// Stage timings the library itself reported, with its own names.
     pub stages: Vec<(String, Duration)>,
 
@@ -300,6 +304,7 @@ impl CompetitiveRecord {
             cpu_basis: report.measurement.cpu_basis,
             peak_rss_bytes: report.measurement.peak_rss_bytes,
             rss_basis: report.measurement.rss_basis,
+            rss_basis_description: None,
             stages: report.measurement.stages.clone(),
             reproduce: report.command_line.clone().unwrap_or_default(),
         }
@@ -447,7 +452,14 @@ impl CompetitiveRecord {
             fields.push(("peak_rss_bytes", Json::int(bytes)));
             // The basis travels with the figure or not at all: a byte count whose provenance is
             // unstated is the thing this board is most able to get wrong.
-            fields.push(("peak_rss_basis", Json::string(self.rss_basis.to_string())));
+            fields.push((
+                "peak_rss_basis",
+                Json::string(
+                    self.rss_basis_description
+                        .clone()
+                        .unwrap_or_else(|| self.rss_basis.to_string()),
+                ),
+            ));
         }
         if !self.stages.is_empty() {
             fields.push((
@@ -634,9 +646,23 @@ impl CompetitiveRecord {
                 .get("peak_rss_bytes")
                 .and_then(Json::as_int)
                 .map(|b| b as u64),
-            // Not round-tripped into its variant for the same reason as `outcome`: the stored form
-            // is prose. A consumer comparing two figures reads `peak_rss_basis` from the file.
-            rss_basis: super::RssBasis::Unavailable,
+            rss_basis: match value.get("peak_rss_basis").and_then(Json::as_str) {
+                Some("direct-child VmHWM (exact)") => super::RssBasis::DirectChildHighWater,
+                Some("child-self VmHWM after serialization (kernel snapshot)") => {
+                    super::RssBasis::ChildSelfHighWater
+                }
+                Some("harness-process VmHWM (exact, one row per process)") => {
+                    super::RssBasis::SelfHighWater
+                }
+                Some("peak bytes allocated by a tracking allocator (not resident)") => {
+                    super::RssBasis::AllocatorTracked
+                }
+                _ => super::RssBasis::Unavailable,
+            },
+            rss_basis_description: value
+                .get("peak_rss_basis")
+                .and_then(Json::as_str)
+                .map(str::to_owned),
             stages: value
                 .get("stages")
                 .map(|stages| {
@@ -1244,7 +1270,11 @@ impl CompetitiveBoard {
                         row.outcome.cell(),
                         duration_cell(row.wall),
                         duration_cell(row.cpu),
-                        bytes_cell(row.peak_rss_bytes),
+                        match row.rss_basis {
+                            super::RssBasis::DirectChildHighWater if row.peak_rss_bytes.is_some()=>format!("{} (last live poll)",bytes_cell(row.peak_rss_bytes)),
+                            super::RssBasis::ChildSelfHighWater if row.peak_rss_bytes.is_some()=>format!("{} (child snapshot)",bytes_cell(row.peak_rss_bytes)),
+                            _=>bytes_cell(row.peak_rss_bytes),
+                        },
                         stages_cell(&row.stages),
                         row.invariants
                             .eliminant_degree
@@ -2015,6 +2045,17 @@ mod tests {
         )
         .with_version(ToolVersion::new(library, "1.0"));
         CompetitiveRecord::of(&report, &instance, &environment())
+    }
+
+    // Regenerating the history preserves the recorded RSS measurement provenance.
+    #[test]
+    fn test_rss_provenance_round_trips() {
+        let mut row = staged_row("groebner-rs", 90, &[("solve", Duration::from_millis(20))]);
+        row.peak_rss_bytes = Some(4 * 1024 * 1024);
+        row.rss_basis = crate::grobner::external::RssBasis::DirectChildHighWater;
+        let saved = row.to_json();
+        let loaded = CompetitiveRecord::from_json(&saved).unwrap().to_json();
+        assert_eq!(saved.get("peak_rss_basis"), loaded.get("peak_rss_basis"));
     }
 
     // Per-attempt display labels the worker count so distinct concurrency cohorts stay visible.

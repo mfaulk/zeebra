@@ -470,9 +470,17 @@ ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=0-3 tools/benchlock.sh groebner-rs-coh
   taskset -c 0-3 python3 tools/external/groebner-cohort.py \
   --binary "$CARGO_TARGET_DIR/release/examples/groebner_comparison" \
   --scratch "$TMPDIR/groebner-cohort" \
-  --output research/competitive/results/groebner-rs-678.json
+  --output research/competitive/results/groebner-rs-678-v2.json
 ```
 
 `--append-history` explicitly appends those attempts to the main history; it preserves preceding
 records. Regenerate the display with `"$CARGO_TARGET_DIR/release/examples/competitive" --write`.
 The dedicated driver CI workflow tests its locked workspace separately from root-crate CI.
+
+Completed Linux driver runs supplement supervisor RSS polling with a post-serialization kernel
+high-water snapshot from inside the child (`RssBasis::ChildSelfHighWater`). Fast processes can
+otherwise exit between polls. Snapshot provenance survives history regeneration; the original
+serialized provenance is retained even when it is not a known enum variant. A snapshot beyond the
+requested RSS cap cannot produce an admitted timing result. Final output/exit allocations follow
+the snapshot, so this is an observation of the completed computational phase, not `wait4` exit
+resource usage. The generated board marks old polled observations and child snapshots separately.

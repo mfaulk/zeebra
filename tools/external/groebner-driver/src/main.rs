@@ -2,10 +2,22 @@
 use serde_json::{Value, json};
 const REVISION: &str = "c3e1d630fba9b2155a4c389d9022f13e0ba09218";
 fn identity() -> Value {
-    json!({"contract":1,"revision":REVISION,"build":env!("GROEBNER_DRIVER_ID"),"build_metadata":env!("GROEBNER_DRIVER_BUILD"),
+    json!({"contract":2,"revision":REVISION,"build":env!("GROEBNER_DRIVER_ID"),"build_metadata":env!("GROEBNER_DRIVER_BUILD"),
         "algorithm":"groebner_basis_f4(canonicalize=true); randomized modular row combinations",
         "allocator":"system", "features":"parallel; no mimalloc",
         "isa":if cfg!(all(target_feature="avx2",target_feature="bmi2",target_feature="fma")) {"x86-64-v3"} else {"other"}})
+}
+fn kernel_peak_rss() -> Option<u64> {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|status| {
+            status.lines().find_map(|line| {
+                line.strip_prefix("VmHWM:")
+                    .and_then(|v| v.split_whitespace().next())
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .and_then(|kb| kb.checked_mul(1024))
+            })
+        })
 }
 fn solve(input: &Value) -> Result<Value, String> {
     use groebner::{MonomialOrder, PolynomialRing, Zp, groebner_basis_f4};
@@ -90,8 +102,9 @@ fn solve(input: &Value) -> Result<Value, String> {
     result["parse_ns"] = json!(parse_ns);
     result["solve_ns"] = json!(solve_ns);
     // Includes rendering and a full JSON encoding; stdout transfer remains process wall time.
-    let _ = serde_json::to_vec(&result).map_err(|e| e.to_string())?;
+    std::hint::black_box(serde_json::to_vec(&result).map_err(|e| e.to_string())?);
     result["serialization_ns"] = json!(start.elapsed().as_nanos() as u64);
+    result["kernel_peak_rss_bytes"] = json!(kernel_peak_rss());
     Ok(result)
 }
 fn main() -> Result<(), String> {
@@ -99,7 +112,10 @@ fn main() -> Result<(), String> {
         .nth(1)
         .ok_or("expected input path or --version")?;
     let result = if arg == "--version" || arg == "--startup" {
-        identity()
+        let mut result = identity();
+        std::hint::black_box(serde_json::to_vec(&result).map_err(|e| e.to_string())?);
+        result["kernel_peak_rss_bytes"] = json!(kernel_peak_rss());
+        result
     } else {
         let text = std::fs::read_to_string(arg).map_err(|e| e.to_string())?;
         solve(&serde_json::from_str(&text).map_err(|e| e.to_string())?)?
@@ -124,6 +140,8 @@ mod tests {
         assert_eq!(output["workers"], 1);
         assert_eq!(output["basis"].as_array().unwrap().len(), 2);
         assert!(output["generators"][0].as_str().unwrap().contains("x10"));
+        #[cfg(target_os = "linux")]
+        assert!(output["kernel_peak_rss_bytes"].as_u64().unwrap() > 1024 * 1024);
     }
     // Unknown variables and unsupported monomial orders are refused before computation.
     #[test]

@@ -63,9 +63,14 @@ const DEFAULT_USER_HZ: u64 = 100;
 pub enum RssBasis {
     /// `VmHWM` of the supervisor's direct child, polled from `/proc/<pid>/status`.
     ///
-    /// Kernel-maintained, so exact for a solver that runs as a single process — which is what the
-    /// contract requires adapters to arrange.
+    /// Each reading is exact at its observation time. A process may exit between polls, so the
+    /// last reading can miss a late peak, especially for a short-lived child.
     DirectChildHighWater,
+
+    /// The child reads its own kernel `VmHWM` after computation and serialization preparation.
+    /// Covers that phase even when the process finishes between supervisor polls; final exit
+    /// and stdout-transfer allocations occur after this snapshot.
+    ChildSelfHighWater,
 
     /// The maximum over polls of the summed `VmRSS` of the direct child and every descendant.
     ///
@@ -106,6 +111,9 @@ impl Display for RssBasis {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DirectChildHighWater => write!(f, "direct-child VmHWM (exact)"),
+            Self::ChildSelfHighWater => {
+                write!(f, "child-self VmHWM after serialization (kernel snapshot)")
+            }
             Self::ProcessTreeSampled { interval, samples } => write!(
                 f,
                 "process-tree VmRSS sampled every {:?} over {} polls (lower bound)",
