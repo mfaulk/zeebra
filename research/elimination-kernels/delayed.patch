@@ -1,45 +1,44 @@
 diff --git a/src/fields/finite_field.rs b/src/fields/finite_field.rs
-index 776df060..cb637b3e 100644
+index 776df060..f6818f33 100644
 --- a/src/fields/finite_field.rs
 +++ b/src/fields/finite_field.rs
-@@ -130,6 +130,13 @@ where
-     /// (a bit pattern, or an array of coefficients) rather than an integer. Inherent methods win
+@@ -131,6 +131,12 @@ where
      /// method resolution, so `BinaryFieldElement::<P>::new(5)` is the bit pattern `0b101` while
      /// `<BinaryFieldElement<P> as FiniteField>::new(5)` is `5 mod 2 = 1`.
+     fn new(val: u64) -> Self;
 +    fn h13_modulus() -> Option<u64> {
 +        None
 +    }
 +    fn h13_canonical(&self) -> u64 {
 +        panic!("unsupported pilot field")
 +    }
-+
-     fn new(val: u64) -> Self;
  
      /// Parse a field element from the text [`Display`] writes for it.
-diff --git a/src/fields/prime_field_64.rs b/src/fields/prime_field_64.rs
-index 0f3e81fb..394301c7 100644
---- a/src/fields/prime_field_64.rs
-+++ b/src/fields/prime_field_64.rs
-@@ -206,6 +206,17 @@ impl<const P: u64> One for PrimeFieldElement64<P> {
- impl<const P: u64> Ring for PrimeFieldElement64<P> {}
+     ///
+diff --git a/src/fields/prime_field_32.rs b/src/fields/prime_field_32.rs
+index f842a091..5e0df203 100644
+--- a/src/fields/prime_field_32.rs
++++ b/src/fields/prime_field_32.rs
+@@ -250,6 +250,17 @@ impl<const P: u32> One for PrimeFieldElement32<P> {
+ impl<const P: u32> Ring for PrimeFieldElement32<P> {}
  
- impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
+ impl<const P: u32> FiniteField for PrimeFieldElement32<P> {
 +    fn h13_modulus() -> Option<u64> {
 +        if P == 32003 {
-+            Some(P)
++            Some(P as u64)
 +        } else {
 +            None
 +        }
 +    }
 +    fn h13_canonical(&self) -> u64 {
-+        self.value()
++        self.value() as u64
 +    }
 +
      fn new(val: u64) -> Self {
-         Self {
-             value: montgomery::to_internal::<P>(val % P),
+         // The argument is a `u64` because the trait says so; a value above P reduces, as it does
+         // for every other prime field here.
 diff --git a/src/linalg/dense/accumulator.rs b/src/linalg/dense/accumulator.rs
-index 42d855a3..6d79104a 100644
+index 42d855a3..3505593a 100644
 --- a/src/linalg/dense/accumulator.rs
 +++ b/src/linalg/dense/accumulator.rs
 @@ -18,6 +18,112 @@ use crate::{
@@ -172,3 +171,27 @@ index 42d855a3..6d79104a 100644
      for index in first..matrix.num_rows() {
          // Taken out so the pivot rows, which are still in the matrix, can be read while this one
          // is rewritten. A pivot's index is always one already processed, so never this one.
+@@ -270,6 +386,23 @@ mod tests {
+     use super::DenseAccumulator;
+     use crate::{fields::Zp13, linalg::sparse::SparseRow, FiniteField, One};
+ 
++    // Only the shipped small-prime type selects the delayed arm; wide, binary and extension controls fall back.
++    #[test]
++    #[allow(deprecated)]
++    fn h13_pilot_selection_is_explicit() {
++        use crate::fields::{
++            Bn254Fr, Gf13Pow4, Gf256, Mersenne31, Zp18446744073709551557, Zp221360928884514619393,
++            Zp32003,
++        };
++        assert_eq!(Zp32003::h13_modulus(), Some(32003));
++        assert_eq!(Zp32003::new(32002).h13_canonical(), 32002);
++        assert_eq!(Mersenne31::h13_modulus(), None);
++        assert_eq!(Bn254Fr::h13_modulus(), None);
++        assert_eq!(Gf256::h13_modulus(), None);
++        assert_eq!(Gf13Pow4::h13_modulus(), None);
++        assert_eq!(Zp18446744073709551557::h13_modulus(), None);
++        assert_eq!(Zp221360928884514619393::h13_modulus(), None);
++    }
+     type F = Zp13;
+ 
+     fn row(entries: &[(usize, u64)]) -> SparseRow<F> {

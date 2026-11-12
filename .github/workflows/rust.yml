@@ -86,6 +86,12 @@ jobs:
           python3 tools/test/row-merge-study-test.py
           python3 tools/test/mq10-profile-test.py
           python3 tools/test/public-corpus-test.py
+      - name: Isolated delayed-reduction pilot checks
+        run: |
+          git apply research/elimination-kernels/delayed.patch
+          trap 'git apply -R research/elimination-kernels/delayed.patch' EXIT
+          cargo test --example elimination_kernel_study
+          cargo test --lib h13_pilot_selection_is_explicit
       - name: Doc tests
         run: cargo test --doc -- --test-threads=4
       - name: Upload build timings

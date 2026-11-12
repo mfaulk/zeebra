@@ -20,7 +20,7 @@ throughput includes exact modular-zero bookkeeping. It does not measure physical
 ## Isolated pilot
 
 `delayed.patch` changes **only a disposable build**: it adds private research conversion hooks to
-`FiniteField`, implements them only for `PrimeFieldElement64<32003>`, and intercepts Adaptive
+`FiniteField`, implements them only for `PrimeFieldElement32<32003>`, and intercepts Adaptive
 elimination there. Other primes and binary/extension/wide fields use the original generic path.
 The committed library API and production dispatch are unchanged. `examples/support/h13_delayed.rs`
 contains the one scalar prototype shared by the arithmetic instrument and overlay.
@@ -88,3 +88,11 @@ python3 tools/test/elimination-kernel-study-test.py
 
 Physical DRAM counters require a working memory-controller event. A failed or unavailable event
 must remain a limitation; logical byte counts and cache misses do not substitute for bandwidth.
+
+`--phase region --perf /path/to/perf --repeats 3` measures user-mode cycles, instructions and
+local/remote DRAM-or-IO data-cache fills on the pinned `p31 mq10 8 adaptive` matrix. Perf starts
+disabled; acknowledged control FIFOs enable events immediately before forward elimination and
+disable them after back-substitution. Capture, hashing and output are excluded. The report must
+say `counter_scope=elimination-region`; missing or multiplexed counters fail acceptance. Converting
+fill counts to 64-byte line traffic describes the core's read-side fill events, including prefetch;
+it excludes writebacks, coherence traffic and other cores. It is not memory-controller bandwidth.

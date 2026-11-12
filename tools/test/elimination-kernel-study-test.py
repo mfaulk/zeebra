@@ -35,6 +35,14 @@ class Acceptance(unittest.TestCase):
                 kernels.check_rss(report)
         kernels.check_rss({'peak_rss_bytes': 1000})
 
+    # Zero remote fills are valid, but absent events or a multiplexed region cannot be accepted.
+    def test_region_events(self):
+        raw = '\n'.join(f'{0 if "remote" in event else 100};;{event};1000;100.00;;' for event in kernels.EVENTS)
+        self.assertEqual(kernels.read_events(raw)[kernels.EVENTS[-1]], 0)
+        for invalid in ('', raw.replace(';100.00;', ';50.00;', 1), raw.replace('100;;cycles:u', '0;;cycles:u')):
+            with self.subTest(raw=invalid), self.assertRaises(ValueError):
+                kernels.read_events(invalid)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -3,7 +3,7 @@ mod delayed;
 
 use std::time::{Duration, Instant};
 use zeebra::{
-    fields::{Bn254Fr, Mersenne31, Zp18446744073709551557, Zp32003},
+    fields::{Bn254Fr, Mersenne31, Zp18446744073709551557, Zp2147483647, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, katsura},
         f4::{
@@ -19,6 +19,51 @@ use zeebra::{
     util::{peak_resident_bytes, Json, Sha256},
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
+
+fn counter_command(
+    output: &mut impl std::io::Write,
+    input: &mut impl std::io::BufRead,
+    command: &str,
+) -> std::io::Result<()> {
+    writeln!(output, "{command}")?;
+    output.flush()?;
+    let mut acknowledgement = String::new();
+    input.read_line(&mut acknowledgement)?;
+    if acknowledgement.trim() != "ack" {
+        return Err(std::io::Error::other(
+            "perf control acknowledgement missing",
+        ));
+    }
+    Ok(())
+}
+
+struct Counters {
+    command: std::fs::File,
+    ack: std::io::BufReader<std::fs::File>,
+}
+impl Counters {
+    fn open() -> Option<Self> {
+        match (
+            std::env::var_os("ZEEBRA_PERF_CTL"),
+            std::env::var_os("ZEEBRA_PERF_ACK"),
+        ) {
+            (None, None) => None,
+            (Some(ctl), Some(ack)) => Some(Self {
+                command: std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(ctl)
+                    .expect("perf control FIFO"),
+                ack: std::io::BufReader::new(
+                    std::fs::File::open(ack).expect("perf acknowledgement FIFO"),
+                ),
+            }),
+            _ => panic!("both perf FIFO paths are required"),
+        }
+    }
+    fn send(&mut self, message: &str) {
+        counter_command(&mut self.command, &mut self.ack, message).expect("perf region handshake");
+    }
+}
 
 fn hash<F: FiniteField>(matrix: &SparseMatrix<F>) -> String {
     let mut h = Sha256::new();
@@ -69,6 +114,11 @@ fn run<const N: usize, F: FiniteField>(
     backend: Backend,
 ) {
     let (order, preset, batch) = match shape {
+        "mq10" => (
+            MonomialOrder::GradedReverseLexicographic,
+            F4Options::default(),
+            7,
+        ),
         "k7" => (
             MonomialOrder::GradedReverseLexicographic,
             F4Options::default(),
@@ -111,6 +161,13 @@ fn run<const N: usize, F: FiniteField>(
         let spec = corpus().into_iter().find(|s| s.label == label).unwrap();
         assert_eq!(captured.fingerprint, spec.fingerprint);
     }
+    if field == "p31" {
+        let spec = corpus()
+            .into_iter()
+            .find(|s| s.label == "mq-random-10/grevlex/p31x64/default")
+            .unwrap();
+        assert_eq!(captured.fingerprint, spec.fingerprint);
+    }
     let fingerprint = format!("{:?}", captured.fingerprint);
     *captured.matrix.matrix_mut() = thin(captured.matrix.matrix(), eighths);
     let input_hash = hash(captured.matrix.matrix());
@@ -118,6 +175,10 @@ fn run<const N: usize, F: FiniteField>(
     let width = captured.matrix.num_columns();
     let height = captured.matrix.num_rows();
     let allowance = options.live_entry_allowance::<F>();
+    let mut counters = Counters::open();
+    if let Some(counters) = &mut counters {
+        counters.send("enable");
+    }
     let start = Instant::now();
     let mut outcome = structured::eliminate(
         BlockPlan::ReducersFirstBlock,
@@ -135,9 +196,20 @@ fn run<const N: usize, F: FiniteField>(
     )
     .unwrap();
     let backward = start.elapsed();
+    if let Some(counters) = &mut counters {
+        counters.send("disable");
+    }
     println!(
         "{}",
         Json::object([
+            (
+                "counter_scope",
+                Json::string(if counters.is_some() {
+                    "elimination-region"
+                } else {
+                    "none"
+                })
+            ),
             ("field", Json::string(field)),
             ("shape", Json::string(shape)),
             ("eighths", Json::int(eighths)),
@@ -259,6 +331,40 @@ fn main() {
         "adaptive" => Backend::Adaptive,
         _ => panic!("backend"),
     };
+    if field == "p31" {
+        assert_eq!(shape, "mq10");
+        use zeebra::grobner::differential::{CaseField, GeneratedSystem, SystemShape};
+        let generated = GeneratedSystem::generate(
+            10,
+            SystemShape {
+                variables: 10,
+                max_degree: 2,
+                max_terms: 40,
+            },
+            CaseField::prime(2147483647),
+        );
+        let system: Vec<MultivariatePolynomial<10, Zp2147483647>> = generated
+            .polynomials
+            .iter()
+            .map(|terms| {
+                MultivariatePolynomial::new(
+                    &terms
+                        .iter()
+                        .map(|term| {
+                            let mut exponents = [0; 10];
+                            exponents.copy_from_slice(&term.exponents);
+                            (
+                                zeebra::Monomial::new(&exponents),
+                                Zp2147483647::new(term.coefficient),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect();
+        run(field, shape, &system, eighths, backend);
+        return;
+    }
     macro_rules! dispatch {
         ($f:ty) => {
             match shape {
@@ -341,6 +447,7 @@ mod tests {
     }
     // Adaptive and sparse elimination agree exactly and refuse fill-in at the same operation, including generic fallbacks.
     #[test]
+    #[allow(deprecated)]
     fn exact_results_and_mid_operation_limits() {
         fn check<F: FiniteField>() {
             let input = SparseMatrix::new(
@@ -365,7 +472,18 @@ mod tests {
         check::<Mersenne31>();
         check::<Zp18446744073709551557>();
         check::<Bn254Fr>();
+        check::<zeebra::fields::Zp221360928884514619393>();
         check::<zeebra::fields::Gf256>();
         check::<zeebra::fields::Gf13Pow4>();
+    }
+    // Region counters require an acknowledged command and reject a closed or invalid acknowledgement stream.
+    #[test]
+    fn counter_control_requires_acknowledgement() {
+        use std::io::Cursor;
+        let mut output = Vec::new();
+        counter_command(&mut output, &mut Cursor::new(b"ack\n"), "enable").unwrap();
+        assert_eq!(output, b"enable\n");
+        assert!(counter_command(&mut output, &mut Cursor::new(b""), "disable").is_err());
+        assert!(counter_command(&mut output, &mut Cursor::new(b"wrong\n"), "disable").is_err());
     }
 }
