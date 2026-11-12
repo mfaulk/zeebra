@@ -29,7 +29,7 @@ fn counter_command(
     output.flush()?;
     let mut acknowledgement = String::new();
     input.read_line(&mut acknowledgement)?;
-    if acknowledgement.trim() != "ack" {
+    if acknowledgement.trim_matches(|c: char| c.is_whitespace() || c == '\0') != "ack" {
         return Err(std::io::Error::other(
             "perf control acknowledgement missing",
         ));
@@ -501,5 +501,14 @@ mod tests {
         assert_eq!(output, b"enable\n");
         assert!(counter_command(&mut output, &mut Cursor::new(b""), "disable").is_err());
         assert!(counter_command(&mut output, &mut Cursor::new(b"wrong\n"), "disable").is_err());
+    }
+    // Perf's NUL-terminated acknowledgements may share a buffered read across two commands.
+    #[test]
+    fn counter_control_accepts_nul_framing() {
+        let mut output = Vec::new();
+        let mut input = std::io::Cursor::new(b"ack\n\0ack\n\0");
+        counter_command(&mut output, &mut input, "enable").unwrap();
+        counter_command(&mut output, &mut input, "disable").unwrap();
+        assert_eq!(output, b"enable\ndisable\n");
     }
 }
