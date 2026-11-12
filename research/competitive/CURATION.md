@@ -31,3 +31,11 @@ cells, stops at the wall limit on four and refuses two positive-dimensional
 conversions; Zeebra completes 44, reaches resource caps on six and refuses two
 conversions. The [measurement note](../../docs/research/sagebrush-matched-isa.md)
 records per-cell historical movement and a separate controlled ISA comparison.
+
+Issue #678 appends two 98-attempt cohorts, at `5b3e6061` and `4a3c5b67`, bringing the history to
+910 attempts while preserving the preceding 714 records. Both include complete checked basis
+artifacts in `results/groebner-rs-678.json` and `results/groebner-rs-678-v2.json`. The initial
+cohort’s supervisor RSS observations can describe startup only; it remains diagnostic evidence,
+and the corrected cohort uses an explicitly labeled child kernel snapshot. History regeneration
+now preserves RSS provenance and resource-stop text. The [comparison note](../../docs/research/groebner-rs-comparand.md)
+records the operating conditions, source identities, admission rules and limitations.

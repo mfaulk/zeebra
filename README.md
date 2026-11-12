@@ -128,7 +128,9 @@ F4 comparand without adding root runtime dependencies. Provision it with
 `tools/external/provision-groebner-rs.sh`; the adapter checks the engine's ring and complete reduced
 basis independently before retaining a timing result. See the
 [external-engine guide](docs/guide/external-engines.md#pinned-rust-f4-comparand) for the focused
-comparison, supported tasks and resource policy.
+comparison, supported tasks and resource policy. The
+[initial comparison](docs/research/groebner-rs-comparand.md) retains both measurement cohorts and
+the corrected memory provenance.
 
 [`docs/guide/benchmarking.md`](docs/guide/benchmarking.md) is the full list — around fifty
 instrumented examples — along with the measurement rules this repository follows: a benchmark lock

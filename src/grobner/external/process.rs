@@ -57,7 +57,7 @@ const DEFAULT_USER_HZ: u64 = 100;
 
 /// How the peak resident set size in a [`ProcessMeasurement`] was obtained.
 ///
-/// Recorded alongside the figure because the two available methods are not the same kind of
+/// Recorded alongside the figure because the available methods are not the same kind of
 /// quantity, and a resource *bound* must never be read as a resource *measurement*.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RssBasis {
@@ -69,7 +69,8 @@ pub enum RssBasis {
 
     /// The child reads its own kernel `VmHWM` after computation and serialization preparation.
     /// Covers that phase even when the process finishes between supervisor polls; final exit
-    /// and stdout-transfer allocations occur after this snapshot.
+    /// and stdout-transfer allocations occur after this snapshot. Later supervisor observations
+    /// may raise the reported maximum.
     ChildSelfHighWater,
 
     /// The maximum over polls of the summed `VmRSS` of the direct child and every descendant.
@@ -81,7 +82,7 @@ pub enum RssBasis {
 
     /// Peak bytes **allocated**, from a tracking allocator inside the measured process.
     ///
-    /// **Not resident memory, and not comparable with either variant above.** A reservation the
+    /// **Not resident memory, and not comparable with the RSS variants.** A reservation the
     /// process never writes to is counted here and is absent from `VmHWM`, and the gap is not
     /// slack spread thinly: on the Fukuoka III `n = 20` row (#237) F4's pair queue reached 2^28
     /// slots in a **single** 20 480 MiB allocation of which about 60% was never written, giving
