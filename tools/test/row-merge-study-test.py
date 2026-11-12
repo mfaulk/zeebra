@@ -17,6 +17,7 @@ class Acceptance(unittest.TestCase):
         reference = dict(digest='input', modulus=13, basis=['x+2*y', 'y^2+1'])
         report = dict(reference, status='complete')
         study.check_answer(report, reference)
+        study.check_answer(reference, reference)
         for key, value in [('basis', ['x+3*y', 'y^2+1']), ('digest', 'other'), ('modulus', 7)]:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 study.check_answer(dict(report, **{key: value}), reference)

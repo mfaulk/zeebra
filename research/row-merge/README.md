@@ -41,10 +41,10 @@ ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=0,1,2,3 \
   --scratch "$CARGO_TARGET_DIR/solves" --output "$CARGO_TARGET_DIR/solves.json.gz"
 ```
 
-Use `--phase matrices --repeats 3` for eight small matrix/backend crossover cases plus the large
+Use `--phase matrices --repeats 3` for eight small matrices with three backends each plus the large
 MQ10 Adaptive case; `--phase work --repeats 1` collects diagnostic counts. Every process has a
-185-second/2-GiB tree watchdog; source F4 captures/solves additionally have a 60-second solver
-limit. Matrix entry allowances remain those of the pinned preset. Native matrix measurements
+185-second/2-GiB tree watchdog; source F4 captures and public/classical solves additionally have a 60-second solver
+limit; MQ10 uses its existing shipped-default instrument with the outer watchdog. Matrix entry allowances remain those of the pinned preset. Native matrix measurements
 exclude capture; RSS covers capture, replay and output. Explicit dense-buffer size is reported
 separately from sparse tuple payload. These are neither identical memory boundaries nor measured
 DRAM traffic. Do not infer physical bandwidth from logical tuple counts.
