@@ -318,3 +318,17 @@ reports validate those reports against the requested memory cap. See the
 The [verified public corpus](research/public-corpus/README.md) adds Eco, Noonburg and Reimer
 families, with three offline CI fixtures and three opt-in performance rungs. Run
 `cargo run --release --example public_corpus -- --list` to inspect their exact inputs.
+
+The [row-merge experiment](research/row-merge/README.md) uses `row_merge_study` to replay pinned F4 matrices through Sparse, Dense and Adaptive
+forward elimination followed by production back-substitution. Use `--matrix LABEL --backend
+sparse|dense|adaptive`; `--mode work` additionally verifies a diagnostic replay and separates row
+work targeting inherited reducer-pivot columns from newly discovered pivots. The diagnostic
+counters model logical tuple work, not hardware bandwidth. `--mode solve --row cyclic-5 --modulus
+32003` runs a classical full-basis control with shipped options and a 60-second solver limit.
+Sparse row subtraction merges only the target tail starting at the pivot's leading column;
+untouched prefixes stay in place, and the merged tail is copied back. Caller-owned scratch and each row's own growth policy are
+preserved to avoid propagating a large pivot's buffer capacity across the matrix.
+
+The [elimination-kernel report](docs/research/elimination-kernels.md) records the verified
+prefix-merge results, three-field backend measurements, and the distinction between logical tuple
+traffic and physical memory bandwidth.
