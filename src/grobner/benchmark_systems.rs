@@ -1,18 +1,5 @@
-//! Standard polynomial system families, for benchmarking and for cross-checking implementations.
-//!
-//! These are the families conventionally used to compare Gröbner basis engines. Having them in
-//! the library rather than in `benches/` lets the benchmarks and the tests that compare the
-//! optimized engine against the reference one work from a single definition.
-//!
-//! Each family is stated explicitly below so a reader can check the formulation rather than trust
-//! it.
-//!
-//! **Not every instance is zero-dimensional.** Katsura-n is, and so is cyclic-n for squarefree n,
-//! but **cyclic-4 is positive-dimensional** — its grevlex leading-term ideal contains no power of
-//! the last variable. This matters to anything that assumes a finite quotient algebra, such as
-//! FGLM: see `docs/MILESTONE-FGLM-SOLVING.md` §10 for the classification of every instance here,
-//! measured from the leading monomials of a computed basis. A square system is not
-//! zero-dimensional merely for being square.
+//! Canonical mathematical benchmark families shared by tests, solvers and measurements.
+//! Dimension and degeneracy depend on the family and field; a square system need not be finite.
 
 use crate::{FiniteField, Monomial, MultivariatePolynomial};
 
@@ -164,6 +151,149 @@ pub fn planted<const N: usize, F: FiniteField>(point: &[F]) -> Vec<MultivariateP
     }
 
     system
+}
+
+/// Morgan's Eco system in N variables; equations are ordered by increasing lag.
+pub fn eco<const N: usize, F: FiniteField>() -> Vec<MultivariatePolynomial<N, F>> {
+    assert!(N >= 2, "Eco needs at least two variables");
+    let mut system = Vec::with_capacity(N);
+    for lag in 1..N {
+        let mut exponent = [0; N];
+        exponent[lag - 1] = 1;
+        exponent[N - 1] = 1;
+        let mut terms = vec![
+            (Monomial::new(&exponent), F::one()),
+            (Monomial::one(), -F::new(lag as u64)),
+        ];
+        for j in 0..N - lag - 1 {
+            let mut exponent = [0; N];
+            exponent[j] += 1;
+            exponent[j + lag] += 1;
+            exponent[N - 1] += 1;
+            terms.push((Monomial::new(&exponent), F::one()));
+        }
+        system.push(MultivariatePolynomial::new(&terms));
+    }
+    let mut terms = vec![(Monomial::one(), F::one())];
+    for j in 0..N - 1 {
+        let mut exponent = [0; N];
+        exponent[j] = 1;
+        terms.push((Monomial::new(&exponent), F::one()));
+    }
+    system.push(MultivariatePolynomial::new(&terms));
+    system
+}
+
+/// Noonburg's system with parameter 11/10, with every equation multiplied by 10.
+/// Panics when N < 2 or the field characteristic divides 10.
+pub fn noon<const N: usize, F: FiniteField>() -> Vec<MultivariatePolynomial<N, F>> {
+    assert!(N >= 2, "Noon needs at least two variables");
+    assert!(!F::new(10).is_zero(), "Noon characteristic divides 10");
+    (0..N)
+        .map(|i| {
+            let mut linear = [0; N];
+            linear[i] = 1;
+            let mut terms = vec![
+                (Monomial::one(), F::new(10)),
+                (Monomial::new(&linear), -F::new(11)),
+            ];
+            for j in 0..N {
+                if j != i {
+                    let mut exponent = [0; N];
+                    exponent[i] = 1;
+                    exponent[j] = 2;
+                    terms.push((Monomial::new(&exponent), F::new(10)));
+                }
+            }
+            MultivariatePolynomial::new(&terms)
+        })
+        .collect()
+}
+
+/// Reimer's alternating power sums, with degrees 2 through N + 1.
+pub fn reimer<const N: usize, F: FiniteField>() -> Vec<MultivariatePolynomial<N, F>> {
+    assert!(N >= 2, "Reimer needs at least two variables");
+    (2..=N.checked_add(1).expect("Reimer degree overflow"))
+        .map(|degree| {
+            let degree = u32::try_from(degree).expect("Reimer degree exceeds u32");
+            let mut terms = vec![(Monomial::one(), -F::one())];
+            for j in 0..N {
+                let mut exponent = [0; N];
+                exponent[j] = degree;
+                terms.push((
+                    Monomial::new(&exponent),
+                    if j % 2 == 0 { F::new(2) } else { -F::new(2) },
+                ));
+            }
+            MultivariatePolynomial::new(&terms)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod public_family_tests {
+    use super::{eco, noon, reimer};
+    use crate::{
+        fields::{Zp13, Zp2},
+        MultivariatePolynomial,
+    };
+
+    fn parsed<const N: usize>(
+        text: &[&str],
+        names: [&str; N],
+    ) -> Vec<MultivariatePolynomial<N, Zp13>> {
+        text.iter()
+            .map(|s| MultivariatePolynomial::parse(s, names).unwrap())
+            .collect()
+    }
+
+    // Eco's lag equations and closing affine equation match the published three-variable definition.
+    #[test]
+    fn eco_three_matches_the_independent_definition() {
+        assert_eq!(
+            eco::<3, Zp13>(),
+            parsed(&["x*y*z+x*z-1", "y*z-2", "x+y+1"], ["x", "y", "z"])
+        );
+    }
+
+    // Multiplication by 10 clears Noon's rational parameter without changing the ideal at p=13.
+    #[test]
+    fn noon_three_matches_the_independent_definition() {
+        assert_eq!(
+            noon::<3, Zp13>(),
+            parsed(
+                &[
+                    "10*x*y^2+10*x*z^2-11*x+10",
+                    "10*x^2*y+10*y*z^2-11*y+10",
+                    "10*x^2*z+10*y^2*z-11*z+10"
+                ],
+                ["x", "y", "z"]
+            )
+        );
+    }
+
+    // Reimer uses alternating signs and increasing powers rather than elementary symmetric sums.
+    #[test]
+    fn reimer_three_matches_the_independent_definition() {
+        assert_eq!(
+            reimer::<3, Zp13>(),
+            parsed(
+                &[
+                    "2*x^2-2*y^2+2*z^2-1",
+                    "2*x^3-2*y^3+2*z^3-1",
+                    "2*x^4-2*y^4+2*z^4-1"
+                ],
+                ["x", "y", "z"]
+            )
+        );
+    }
+
+    // The rational Noon model is rejected where clearing its denominator is not invertible.
+    #[test]
+    #[should_panic(expected = "characteristic divides 10")]
+    fn noon_rejects_a_denominator_divisor() {
+        noon::<3, Zp2>();
+    }
 }
 
 #[cfg(test)]
