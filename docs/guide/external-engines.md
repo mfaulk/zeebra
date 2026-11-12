@@ -484,3 +484,71 @@ serialized provenance is retained even when it is not a known enum variant. A sn
 requested RSS cap cannot produce an admitted timing result. Final output/exit allocations follow
 the snapshot, so this is an observation of the completed computational phase, not `wait4` exit
 resource usage. The generated board marks old polled observations and child snapshots separately.
+
+
+## grobx
+
+The optional `GrobxSolver` adapter drives a separately built GPL-3.0-only executable at
+`1854835dbc25f24dc9a9ba017024d5030e99da1c`. It supports prime fields below 2^64, grevlex/lex
+reduced bases and lex-basis tasks. It refuses graded lex, weighted/block orders, extension fields,
+conversion/eliminant/solution tasks and multiworker requests. The pinned engine computes serially
+despite its thread allowance parameter. No GPL engine code enters the root dependency graph.
+
+```sh
+tools/external/provision-grobx.sh
+. tools/external/env.sh
+cargo build --release --example grobx_comparison
+```
+
+`ZEEBRA_GROBX_DRIVER` selects the executable. The [driver contract](../../tools/external/grobx-driver/README.md)
+pins source, lockfile, toolchain, allocator and build flags. Engine and independent-checker parsers
+echo each ordered generator; the adapter compares exact scalar-normalized polynomials without
+prefix matching. Computation receives the original generator text unchanged. Small-field full
+bases must agree with Singular; wide raw bases require a separate exact cofactor-certified run and
+full coefficient agreement. Missing independent evidence is inconclusive, never an answered timing.
+Verification is separately timed after the measured child exits; its resource limits also apply.
+
+`grobx` denotes raw reduced-basis computation. `grobx-certified` includes tracking, certificate text
+and exact independent checking, with `objective=exact-certified-basis` in its resource key. This
+prevents comparisons with Zeebra's raw basis or its different certification trust boundary. The
+engine-internal ratio selector accepts only raw `solve`; the certified whole-call stage remains
+visible as `certified-total`. Complete reports, engine trajectories, certificate text and child
+self high-water RSS remain in retained artifacts. Whole process wall includes startup and output;
+startup-dominated cells cannot establish an engine speedup.
+
+For one bounded row, set a private `CARGO_TARGET_DIR` and `TMPDIR` on the build-cache drive, then:
+
+```sh
+ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=2 \
+  tools/benchlock.sh grobx-one taskset -c 2 \
+  "$CARGO_TARGET_DIR/release/examples/grobx_comparison" \
+  --engine grobx --row katsura-4 --modulus 32003 --workers 1 \
+  --wall 60 --rss-mib 2048 --output /buildcache/cargo-target/grobx-row.json
+```
+
+Use `--engine grobx-certified` for the stronger objective or `--engine zeebra` for current defaults.
+`--row groebner-rs-wide-control` reuses the existing digest-pinned wide control; it is an arithmetic
+check, not a claim about large matrices. `tools/external/grobx-cohort.py` alternates the three arms
+for three repetitions and supervises the complete harness process group, including verification:
+
+```sh
+ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=2 \
+  tools/benchlock.sh grobx-cohort taskset -c 2 python3 tools/external/grobx-cohort.py \
+  --binary "$CARGO_TARGET_DIR/release/examples/grobx_comparison" \
+  --scratch /buildcache/cargo-target/grobx-cohort \
+  --output research/competitive/results/grobx-683.json.gz
+cargo run --release --example competitive -- --write
+```
+
+The cohort needs `--append-history` to extend history; it never replaces old rows. Its parent
+watchdog allows 185 s and 2 GiB per attempt, while each child phase has its own 60 s/2 GiB cap.
+Builds and tests precede acquiring the benchmark lock. The ignored
+`grobner::external::grobx::tests::test_live_grobx_exact_evidence_and_stops` checks zero, unit,
+positive-dimensional, wide-field, duplicate/zero-generator, deadline and memory cases; it requires
+Singular and the pinned driver. Driver workspace CI runs separately from ordinary crate builds.
+
+Large proof literals are retained once as content-addressed gzip sidecars. The cohort itself may
+use `.json.gz`; `tools/external/proof_artifacts.py COHORT INDEX` reconstructs the original child
+JSON response byte for byte and verifies the proof SHA-256. This preserves full certificates
+without repeating them in every response. `--small-controls-only` restricts a follow-up cohort to
+Katsura-4 at 32003 and the two registered wide controls; it does not pool different affinities.
