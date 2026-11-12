@@ -407,6 +407,62 @@ independent: with batches left reduced the autoreduce matrix is 252 x 606 rather
 nothing — #536's budget refuses its pass and it falls back — while the pair is **8.10x**. So
 neither flag could have been decided without the other.
 
+## sylvester
+
+`SylvesterSolver` drives sylvester 0.4.0 at `ea34ddf3c9b9a275265576cd881c39c0c473e9f9`
+through a standalone MIT/Apache dependency workspace. The adapter accepts only reduced grevlex
+bases over prime fields below 2^31. It forces F4, checks the actual ring and ordered generator
+echoes, and requires full coefficient-for-coefficient agreement with Singular. Unsupported
+wide/extension fields, orders and tasks remain capability outcomes.
+
+```sh
+tools/external/provision-sylvester.sh
+. tools/external/env.sh
+cargo build --release --example sylvester_comparison
+```
+
+Set `ZEEBRA_SYLVESTER_DRIVER` to override `sylvester-driver` on PATH. Build and scratch directories
+belong on the build-cache drive. The [driver README](../../tools/external/sylvester-driver/README.md)
+defines the locked toolchain/build/allocator identity, ring echoes, timing boundaries and tests.
+`--engine sylvester` measures raw F4; `--engine sylvester-certified` charges trace production,
+certificate writing, the independent verifier and a second replay binding accepted bytes to the
+requested input/basis. The integrated certification API does not expose a separate writer timer;
+its combined cost is reported explicitly. Hex certificate bytes and their size are retained.
+
+Raw F4 may use multiple workers and reports its actual pool. Trace recording is serial;
+certified multiworker requests are refused. Certified limits include
+`objective=exact-certified-basis`, so no raw-basis ratio can absorb the extra proof obligation.
+Only raw `solve` enters the engine-internal ratio selector. Unsupported, exhausted and rejected
+configurations remain records, and a verifier exhaustion is not a mathematical rejection.
+
+One process per digest/engine, 60 s and 2 GiB per child phase:
+
+```sh
+ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=2 \
+  tools/benchlock.sh sylvester-one taskset -c 2 \
+  "$CARGO_TARGET_DIR/release/examples/sylvester_comparison" \
+  --engine sylvester --row katsura-4 --modulus 32003 --workers 1 \
+  --wall 60 --rss-mib 2048 --output /buildcache/cargo-target/sylvester-row.json
+```
+
+Build first, then run the three-repetition alternating cohort under the measurement lock:
+
+```sh
+ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=2 \
+  tools/benchlock.sh sylvester-cohort taskset -c 2 python3 tools/external/sylvester-cohort.py \
+  --binary "$CARGO_TARGET_DIR/release/examples/sylvester_comparison" \
+  --scratch /buildcache/cargo-target/sylvester-cohort \
+  --output research/competitive/results/sylvester-684.json
+```
+
+Use `--append-history` to extend history, then regenerate with
+`cargo run --release --example competitive -- --write`. The parent watchdog covers the complete
+harness process group (185 s/2 GiB); each measured child and independent reference has a separate
+60 s budget. The retained cohort includes serial-certification/multiworker refusals and deliberate
+wall/RSS stops. Loader/startup observations and polling quantization still constrain wall ratios.
+The ignored `grobner::external::sylvester::tests::test_live_sylvester_exact_evidence_and_stops`
+requires the provisioned driver and Singular; normal adapter tests need no upstream executable.
+
 ## Pinned Rust F4 comparand
 
 `GroebnerRsSolver` runs sdiehl/groebner 0.6.0 at

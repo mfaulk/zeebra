@@ -238,6 +238,12 @@ records the per-rung budgets and limitations of its single-run comparisons.
 The [matched-ISA Sagebrush re-take](docs/research/sagebrush-matched-isa.md) records
 the original public-algebra cells with both engines built at the same ISA floor.
 
+The optional [sylvester F4 comparand](tools/external/sylvester-driver/README.md) supplies raw
+reduced bases and independently verified v2 trace certificates through a pinned subprocess.
+Provision it with `tools/external/provision-sylvester.sh`; certified records use a separate
+objective and include proof production and checking. See the
+[adapter guide](docs/guide/external-engines.md#sylvester).
+
 The [dense-F4 anchors](docs/research/classical-benchmarks.md#24-441-the-dense-f4-ladder-and-the-conversion-stage-caution)
 record Steel's published configurations and MinRank stage split, with a density candidate based on
 field cardinality for future planner work. These historical figures provide context; they are not
