@@ -19,6 +19,7 @@ MATRICES = ('katsura-7/grevlex/m31/default', 'cyclic-6/grevlex/m31/default',
             'cyclic-6/grevlex/p64/default', 'katsura-6/lex/p64/baseline',
             'katsura-6/grevlex/bn254/default', 'cyclic-5/grevlex/bn254/baseline')
 MQ = 'mq-random-10/grevlex/p31x64/default'
+EVENTS = ('cycles:u', 'instructions:u', 'cache-references:u', 'cache-misses:u')
 spec = importlib.util.spec_from_file_location('guard', ROOT / 'tools/external/mq10-profile.py')
 guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
@@ -42,6 +43,24 @@ def check_matrix(report, reference):
     for key in ('fingerprint', 'rank', 'rref_hash'):
         if report[key] != reference[key]:
             raise ValueError('matrix differs: ' + key)
+
+
+def check_counters(raw):
+    result = {}
+    for line in raw.splitlines():
+        parts = line.split(';')
+        if len(parts) < 5 or parts[2] not in EVENTS:
+            continue
+        try:
+            value, running = int(parts[0]), float(parts[4])
+        except ValueError as error:
+            raise ValueError('hardware event was not counted') from error
+        if value <= 0 or not 99 <= running <= 100:
+            raise ValueError('hardware event was zero or multiplexed')
+        result[parts[2]] = value
+    if set(result) != set(EVENTS):
+        raise ValueError('hardware event set is incomplete')
+    return result
 
 
 def check_binary(path, digest):
@@ -77,6 +96,10 @@ def references():
 
 
 def cells(phase):
+    if phase == 'counters':
+        for p in (32003, 2147483647):
+            yield f'mq10/{p}', 'mq10_profile', [str(p), '--stages'], ('mq-random-10', p)
+        return
     if phase in ('all', 'solves'):
         for name in ('public-eco-4', 'public-noon-3', 'public-reimer-3',
                      'public-eco-8', 'public-noon-6', 'public-reimer-5'):
@@ -95,7 +118,10 @@ def cells(phase):
             yield label + '/work', 'row_merge_study', ['--matrix', label, '--mode', 'work'], None
 
 
-def attempt(command, stem):
+def attempt(command, stem, perf=None):
+    if perf:
+        command = [str(perf), 'stat', '--no-big-num', '-x', ';', '-e', ','.join(EVENTS),
+                   '-o', str(stem.with_suffix('.perf-stat')), '--', *command]
     started, peak, stop = time.monotonic_ns(), 0, None
     with stem.with_suffix('.stdout').open('w') as out, stem.with_suffix('.stderr').open('w') as err:
         process = subprocess.Popen(command, stdout=out, stderr=err, start_new_session=True)
@@ -109,6 +135,8 @@ def attempt(command, stem):
             time.sleep(0.002)
     result = dict(exit=process.returncode, stop=stop, process_wall_ns=time.monotonic_ns()-started,
                   observed_tree_peak_bytes=peak, stderr=stem.with_suffix('.stderr').read_text())
+    if perf and stem.with_suffix('.perf-stat').exists():
+        result['perf_stat'] = stem.with_suffix('.perf-stat').read_text()
     raw = stem.with_suffix('.stdout').read_text()
     try:
         result['report'] = json.loads(raw)
@@ -119,7 +147,7 @@ def attempt(command, stem):
 
 def write(path, data):
     temp = path.with_suffix('.tmp')
-    temp.write_bytes(gzip.compress(json.dumps(data, separators=(',', ':')).encode(), mtime=0))
+    temp.write_bytes(gzip.compress(json.dumps(data, separators=(',', ':')).encode(), compresslevel=1, mtime=0))
     temp.replace(path)
 
 
@@ -129,7 +157,8 @@ def main():
     parser.add_argument('--target', type=Path, help='private CARGO_TARGET_DIR used by the completed release build')
     parser.add_argument('--baseline', type=Path)
     parser.add_argument('--candidate', type=Path)
-    parser.add_argument('--phase', choices=('all', 'solves', 'matrices', 'work'), default='all')
+    parser.add_argument('--phase', choices=('all', 'solves', 'matrices', 'work', 'counters'), default='all')
+    parser.add_argument('--perf', type=Path, help='perf executable; required only for --phase counters')
     parser.add_argument('--repeats', type=int, default=5)
     parser.add_argument('--scratch', type=Path)
     parser.add_argument('--output', type=Path)
@@ -141,6 +170,8 @@ def main():
         return
     if not all((args.baseline, args.candidate, args.scratch, args.output)) or args.repeats < 1:
         parser.error('measurement requires baseline, candidate, scratch, output and positive repeats')
+    if bool(args.perf) != (args.phase == 'counters'):
+        parser.error('--phase counters requires --perf; native phases do not use perf')
     affinity = ','.join(str(c) for c in sorted(os.sched_getaffinity(0)))
     if not os.environ.get('ZEEBRA_MACHINE') or os.environ.get('ZEEBRA_AFFINITY') != affinity:
         parser.error('set ZEEBRA_MACHINE and explicit actual ZEEBRA_AFFINITY; run under benchlock')
@@ -155,17 +186,20 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     cohort = dict(schema=1, builds=builds, machine=os.environ['ZEEBRA_MACHINE'], affinity=affinity,
                   workers=1, phase=args.phase, policy='fresh process/cell; alternating arms; 185s/2GiB tree guard; retain every failure',
+                  perf_version=subprocess.check_output([str(args.perf), '--version'], text=True).strip() if args.perf else None,
                   runner_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(), attempts=[])
     failures = 0
     for repeat in range(args.repeats):
         for label, binary, arguments, refkey in cells(args.phase):
             for arm in (('baseline', 'candidate') if repeat % 2 == 0 else ('candidate', 'baseline')):
-                result = attempt([str(getattr(args, arm) / binary), *arguments], args.scratch / str(len(cohort['attempts'])))
+                result = attempt([str(getattr(args, arm) / binary), *arguments], args.scratch / str(len(cohort['attempts'])), args.perf)
                 result.update(repeat=repeat, label=label, arm=arm, binary=binary)
                 try:
                     if result['exit'] or result['stop'] or 'report' not in result:
                         raise ValueError('guarded process failed')
                     report = result['report']
+                    if args.perf:
+                        result['hardware_counters'] = check_counters(result.get('perf_stat', ''))
                     if refkey:
                         check_answer(report, refs[refkey])
                     elif binary == 'public_corpus':

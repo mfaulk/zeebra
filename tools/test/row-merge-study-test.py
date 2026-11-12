@@ -30,6 +30,14 @@ class Acceptance(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 study.check_matrix(row, dict(row, **{key: 'changed'}))
 
+    # Hardware evidence rejects missing, uncounted or multiplexed events instead of treating them as measurements.
+    def test_hardware_counter_acceptance(self):
+        raw = '\n'.join(f'100;;{event};1000;100.00;;' for event in study.EVENTS)
+        self.assertEqual(set(study.check_counters(raw)), set(study.EVENTS))
+        for invalid in ('', raw.replace('100;;', '<not counted>;;', 1), raw.replace(';100.00;', ';50.00;', 1)):
+            with self.subTest(raw=invalid), self.assertRaises(ValueError):
+                study.check_counters(invalid)
+
     # Snapshot metadata cannot silently refer to an executable changed after the build.
     def test_snapshot_hash(self):
         with tempfile.TemporaryDirectory() as tmp:

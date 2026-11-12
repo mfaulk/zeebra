@@ -59,3 +59,10 @@ Offline checks:
 cargo test --example row_merge_study
 python3 tools/test/row-merge-study-test.py
 ```
+
+For separate user-mode hardware observations, use `--phase counters --repeats 3 --perf /path/to/perf`.
+This runs only the two MQ10 full solves under `perf stat` and retains raw event output. Acceptance
+requires positive counts for `cycles:u`, `instructions:u`, `cache-references:u`, and `cache-misses:u`,
+with at least 99% running time for each event; unavailable or multiplexed events fail explicitly.
+These whole-child observations include parsing and output and are not pooled with unprofiled F4
+elapsed times. No memory-controller counters or physical DRAM bandwidth are measured.
