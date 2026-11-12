@@ -318,3 +318,10 @@ reports validate those reports against the requested memory cap. See the
 The [verified public corpus](research/public-corpus/README.md) adds Eco, Noonburg and Reimer
 families, with three offline CI fixtures and three opt-in performance rungs. Run
 `cargo run --release --example public_corpus -- --list` to inspect their exact inputs.
+
+The `row_merge_study` example replays pinned F4 matrices through Sparse, Dense and Adaptive
+forward elimination followed by production back-substitution. Use `--matrix LABEL --backend
+sparse|dense|adaptive`; `--mode work` additionally verifies a diagnostic replay and separates row
+work targeting inherited reducer-pivot columns from newly discovered pivots. The diagnostic
+counters model logical tuple work, not hardware bandwidth. `--mode solve --row cyclic-5 --modulus
+32003` runs a classical full-basis control with shipped options and a 60-second solver limit.

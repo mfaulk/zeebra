@@ -265,3 +265,7 @@ required-features = ["external-runners"]
 [[example]]
 name = "public_corpus"
 required-features = ["external-runners"]
+
+[[example]]
+name = "row_merge_study"
+required-features = ["external-runners"]
