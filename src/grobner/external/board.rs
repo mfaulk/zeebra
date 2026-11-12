@@ -69,6 +69,9 @@ pub enum Outcome {
     /// A declared limit stopped it. The wall time **is** the limit.
     StoppedByLimit(LimitStop),
 
+    /// A stored resource stop whose original prose is retained without inventing a limit type.
+    RecordedStop { detail: String },
+
     /// The library cannot accept this input or task. **There is no time.**
     Unsupported(Unsupported),
 
@@ -86,7 +89,7 @@ impl Outcome {
         match self {
             Self::Complete => "complete",
             Self::Verified => "verified",
-            Self::StoppedByLimit(_) => "stopped-by-limit",
+            Self::StoppedByLimit(_) | Self::RecordedStop { .. } => "stopped-by-limit",
             Self::Unsupported(_) => "unsupported",
             Self::Failed(_) => "failed",
         }
@@ -115,6 +118,11 @@ impl Outcome {
         match self {
             Self::Complete | Self::Verified => None,
             Self::StoppedByLimit(stop) => Some(stop.to_string()),
+            Self::RecordedStop { detail } => Some(if detail.is_empty() {
+                "stopped-by-limit".into()
+            } else {
+                detail.clone()
+            }),
             Self::Unsupported(reason) => Some(prefixed("unsupported", reason.to_string())),
             Self::Failed(failure) => Some(prefixed("failed", failure.to_string())),
         }
@@ -130,6 +138,7 @@ impl Outcome {
         match self {
             Self::Complete | Self::Verified => None,
             Self::StoppedByLimit(stop) => Some(stop.to_string()),
+            Self::RecordedStop { detail } => Some(detail.clone()),
             Self::Unsupported(reason) => Some(reason.to_string()),
             Self::Failed(failure) => Some(failure.to_string()),
         }
@@ -188,7 +197,7 @@ pub struct CompetitiveRecord {
     /// How many variables.
     pub variable_count: usize,
 
-    /// The library's id: `zeebra`, `singular`, `msolve`, `groebner.jl`, `sagebrush`.
+    /// The library's id: `zeebra`, `singular`, `msolve`, `groebner.jl`, `sagebrush`, `groebner-rs`.
     pub library: String,
 
     /// The library's version, as it reported it when probed.
@@ -230,6 +239,10 @@ pub struct CompetitiveRecord {
 
     /// How `peak_rss_bytes` was obtained. **Read before comparing two figures.**
     pub rss_basis: super::RssBasis,
+
+    /// Original serialized provenance, preserved even when its prose is not a known variant.
+    /// Clear this when deliberately changing the typed basis of a loaded record.
+    pub rss_basis_description: Option<String>,
 
     /// Stage timings the library itself reported, with its own names.
     pub stages: Vec<(String, Duration)>,
@@ -300,6 +313,7 @@ impl CompetitiveRecord {
             cpu_basis: report.measurement.cpu_basis,
             peak_rss_bytes: report.measurement.peak_rss_bytes,
             rss_basis: report.measurement.rss_basis,
+            rss_basis_description: None,
             stages: report.measurement.stages.clone(),
             reproduce: report.command_line.clone().unwrap_or_default(),
         }
@@ -447,7 +461,14 @@ impl CompetitiveRecord {
             fields.push(("peak_rss_bytes", Json::int(bytes)));
             // The basis travels with the figure or not at all: a byte count whose provenance is
             // unstated is the thing this board is most able to get wrong.
-            fields.push(("peak_rss_basis", Json::string(self.rss_basis.to_string())));
+            fields.push((
+                "peak_rss_basis",
+                Json::string(
+                    self.rss_basis_description
+                        .clone()
+                        .unwrap_or_else(|| self.rss_basis.to_string()),
+                ),
+            ));
         }
         if !self.stages.is_empty() {
             fields.push((
@@ -571,12 +592,18 @@ impl CompetitiveRecord {
                 .unwrap_or_default(),
         );
         // The reason text is not re-parsed into its variant: it was rendered for a human, and a
-        // round trip through prose would invent a structure the file does not have. `Representation`
-        // and `ToolCap` carry it verbatim, which is honest about what was stored.
+        // round trip through prose would invent a structure the file does not have. A recorded
+        // stop keeps the original text; other reasons retain their bare representation.
         let outcome = match string("outcome")?.as_str() {
             "complete" => Outcome::Complete,
             "verified" => Outcome::Verified,
-            "stopped-by-limit" => Outcome::StoppedByLimit(LimitStop::ToolCap { detail }),
+            "stopped-by-limit" => Outcome::RecordedStop {
+                detail: value
+                    .get("outcome_detail")
+                    .and_then(Json::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+            },
             "unsupported" => Outcome::Unsupported(Unsupported::Representation { detail }),
             "failed" => Outcome::Failed(RunFailure::Reported { message: detail }),
             _ => return Err(BoardError::MalformedRow { field: "outcome" }),
@@ -634,9 +661,23 @@ impl CompetitiveRecord {
                 .get("peak_rss_bytes")
                 .and_then(Json::as_int)
                 .map(|b| b as u64),
-            // Not round-tripped into its variant for the same reason as `outcome`: the stored form
-            // is prose. A consumer comparing two figures reads `peak_rss_basis` from the file.
-            rss_basis: super::RssBasis::Unavailable,
+            rss_basis: match value.get("peak_rss_basis").and_then(Json::as_str) {
+                Some("direct-child VmHWM (exact)") => super::RssBasis::DirectChildHighWater,
+                Some("child-self VmHWM after serialization (kernel snapshot)") => {
+                    super::RssBasis::ChildSelfHighWater
+                }
+                Some("harness-process VmHWM (exact, one row per process)") => {
+                    super::RssBasis::SelfHighWater
+                }
+                Some("peak bytes allocated by a tracking allocator (not resident)") => {
+                    super::RssBasis::AllocatorTracked
+                }
+                _ => super::RssBasis::Unavailable,
+            },
+            rss_basis_description: value
+                .get("peak_rss_basis")
+                .and_then(Json::as_str)
+                .map(str::to_owned),
             stages: value
                 .get("stages")
                 .map(|stages| {
@@ -949,6 +990,7 @@ impl CompetitiveBoard {
     fn provenance(&self) -> BTreeMap<&'static str, Equivalence> {
         ladder()
             .into_iter()
+            .chain(std::iter::once(super::groebner_rs::control_entry()))
             .chain(self.corpus.iter().cloned())
             .map(|entry| (entry.name, entry.equivalence))
             .collect()
@@ -1222,24 +1264,32 @@ impl CompetitiveBoard {
             let _ = writeln!(out, "## {}\n", family);
             let _ = writeln!(
                 out,
-                "| problem | task | field | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |"
+                "| problem | task | field | workers | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |"
             );
-            let _ = writeln!(out, "|---|---|---|---|---|---|---:|---:|---:|---|---:|---|");
+            let _ = writeln!(
+                out,
+                "|---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---|"
+            );
             for rows in problems.values() {
                 for row in rows {
                     let _ = writeln!(
                         out,
-                        "| `{}` `{}` | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} |",
+                        "| `{}` `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} |",
                         row.problem,
                         &row.problem_digest[..row.problem_digest.len().min(12)],
                         row.task,
                         row.field,
+                        row.limits.workers,
                         library_cell(row),
                         row.environment.commit,
                         row.outcome.cell(),
                         duration_cell(row.wall),
                         duration_cell(row.cpu),
-                        bytes_cell(row.peak_rss_bytes),
+                        match row.rss_basis {
+                            super::RssBasis::DirectChildHighWater if row.peak_rss_bytes.is_some()=>format!("{} (last live poll)",bytes_cell(row.peak_rss_bytes)),
+                            super::RssBasis::ChildSelfHighWater if row.peak_rss_bytes.is_some()=>format!("{} (child snapshot)",bytes_cell(row.peak_rss_bytes)),
+                            _=>bytes_cell(row.peak_rss_bytes),
+                        },
                         stages_cell(&row.stages),
                         row.invariants
                             .eliminant_degree
@@ -1654,6 +1704,7 @@ fn engine_verdict_cell(ratio: &EngineRatio) -> String {
 /// | `singular` | `solve` | `source-basis` + `solve` | — |
 /// | `groebner.jl` | `solve` | n/a (no FGLM) | `process-wall` and `process-cpu`, which are the quantity this statistic exists to exclude — Julia's compiler |
 /// | `sagebrush` | `solve` | `solve` | — |
+/// | `groebner-rs` | `solve` | unsupported | parse, serialization and independent verification |
 /// | `msolve` | `f4/overall(elapsed)` | `f4/overall(elapsed)` + `sparse-fglm/overall(elapsed)` | every named sub-stage, which would double-count its own total |
 ///
 /// msolve is the one library whose labels are its **own** rather than translated — deliberately,
@@ -1673,7 +1724,7 @@ fn engine_internal_time(
         ("zeebra", _) => &["basis"],
         ("singular", super::Task::LexBasisByConversion) => &["source-basis", "solve"],
         ("singular", _) => &["solve"],
-        ("groebner.jl" | "sagebrush", _) => &["solve"],
+        ("groebner.jl" | "sagebrush" | "groebner-rs", _) => &["solve"],
         ("msolve", super::Task::LexBasisByConversion | super::Task::UnivariateEliminant) => {
             &["f4/overall(elapsed)", "sparse-fglm/overall(elapsed)"]
         }
@@ -1704,6 +1755,7 @@ fn engine_internal_time(
 /// | `sagebrush` | `%.6f` seconds | 1 µs | `sagebrush.rs`, `#seconds:` |
 /// | `groebner.jl` | Julia's own `@elapsed` | 1 µs | `groebner_jl.rs` |
 /// | `zeebra` | an `Instant` difference | 1 µs | `zeebra.rs` |
+/// | `groebner-rs` | integer nanoseconds | conservative 1 µs | `groebner_rs.rs` |
 ///
 /// 1 µs is a floor on the claim rather than a measured jitter: every one of those three reports
 /// more digits than that, and no ratio on this board is within three orders of magnitude of it, so
@@ -1712,7 +1764,7 @@ fn stage_resolution(library: &str) -> Option<Duration> {
     Some(match library {
         "singular" => Duration::from_millis(1),
         "msolve" => Duration::from_millis(10),
-        "sagebrush" | "groebner.jl" | "zeebra" => Duration::from_micros(1),
+        "sagebrush" | "groebner.jl" | "zeebra" | "groebner-rs" => Duration::from_micros(1),
         _ => return None,
     })
 }
@@ -2008,6 +2060,80 @@ mod tests {
         )
         .with_version(ToolVersion::new(library, "1.0"));
         CompetitiveRecord::of(&report, &instance, &environment())
+    }
+
+    // Regeneration retains wall and memory stop text without reclassifying either as a tool cap.
+    #[test]
+    fn test_resource_stop_details_round_trip() {
+        for stop in [
+            LimitStop::Memory {
+                limit: 0,
+                observed: Some(4096),
+            },
+            LimitStop::WallClock {
+                limit: Duration::ZERO,
+                elapsed: Duration::from_millis(1),
+            },
+        ] {
+            let record = row("groebner-rs", RunStatus::StoppedByLimit(stop), 0);
+            let saved = record.to_json();
+            let loaded = CompetitiveRecord::from_json(&saved).unwrap().to_json();
+            assert_eq!(saved.get("outcome_detail"), loaded.get("outcome_detail"));
+        }
+    }
+
+    // Regenerating the history preserves the recorded RSS measurement provenance.
+    #[test]
+    fn test_rss_provenance_round_trips() {
+        let mut row = staged_row("groebner-rs", 90, &[("solve", Duration::from_millis(20))]);
+        row.peak_rss_bytes = Some(4 * 1024 * 1024);
+        row.rss_basis = crate::grobner::external::RssBasis::DirectChildHighWater;
+        let saved = row.to_json();
+        let loaded = CompetitiveRecord::from_json(&saved).unwrap().to_json();
+        assert_eq!(saved.get("peak_rss_basis"), loaded.get("peak_rss_basis"));
+    }
+
+    // Per-attempt display labels the worker count so distinct concurrency cohorts stay visible.
+    #[test]
+    fn test_the_board_displays_worker_counts() {
+        let mut subject = staged_row("groebner-rs", 90, &[("solve", Duration::from_millis(20))]);
+        subject.limits.workers = 4;
+        let mut board = CompetitiveBoard::new();
+        board.add(subject);
+        let display = board.to_markdown();
+        assert!(display.contains("| field | workers | library |"));
+        assert!(display.contains("| 4 | groebner-rs"));
+    }
+
+    // The new engine uses solve stages only and cannot ratio across workers, ISA cohorts or caps.
+    #[test]
+    fn test_groebner_rs_ratios_require_matching_metadata() {
+        let reference = staged_row("zeebra", 100, &[("basis", Duration::from_millis(40))]);
+        let subject = staged_row(
+            "groebner-rs",
+            90,
+            &[
+                ("parse", Duration::from_millis(10)),
+                ("solve", Duration::from_millis(20)),
+            ],
+        );
+        let mut board = CompetitiveBoard::new();
+        board.add(reference.clone());
+        board.add(subject.clone());
+        assert_eq!(board.engine_ratios("zeebra").len(), 1);
+        for mutation in 0..3 {
+            let mut changed = subject.clone();
+            match mutation {
+                0 => changed.limits.workers = 4,
+                1 => changed.environment.build = "different ISA".into(),
+                _ => changed.limits.max_rss_bytes = Some(1),
+            }
+            let mut board = CompetitiveBoard::new();
+            board.add(reference.clone());
+            board.add(changed);
+            assert!(board.engine_ratios("zeebra").is_empty());
+            assert!(board.speedups("zeebra").is_empty());
+        }
     }
 
     /// The engine-internal ratio uses each library's own stage, not the wall.

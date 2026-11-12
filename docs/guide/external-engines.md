@@ -1,7 +1,7 @@
 # External engines: differential testing and comparison
 
 Differential testing against Singular, and the contract for driving Singular, msolve, Groebner.jl
-and Sagebrush as comparands.
+Sagebrush and the pinned sdiehl/groebner driver as comparands.
 
 ## Differential testing against Singular
 
@@ -114,7 +114,7 @@ tools/external/provision.sh          # ~5 min cold, 0.2 s warm; no root needed
 tools/external/smoke/smoke.sh        # all four on one system; non-zero exit on disagreement
 ```
 
-**The roster stops there, and Magma is the reason to say so** (#430). Magma is the fastest engine in
+**Magma remains outside the provisioned roster** (#430). Magma is the fastest engine in
 every column of the published comparisons and it cannot be provisioned: it is commercial and there
 is no licence here, so every Magma figure in this repository is read from a page or a paper and
 quoted, never measured — `docs/research/classical-benchmarks.md` §2.3 is the current one, V2.27 on an
@@ -406,3 +406,81 @@ independent: with batches left reduced the autoreduce matrix is 252 x 606 rather
 **418.8 MB** where the route alone cost 602.9 MB. On `katsura-11` the route *alone* is now worth
 nothing — #536's budget refuses its pass and it falls back — while the pair is **8.10x**. So
 neither flag could have been decided without the other.
+
+## Pinned Rust F4 comparand
+
+`GroebnerRsSolver` runs sdiehl/groebner 0.6.0 at
+`c3e1d630fba9b2155a4c389d9022f13e0ba09218` through a separate locked workspace. Its
+[driver README](../../tools/external/groebner-driver/README.md) specifies the JSON protocol,
+toolchain, features, allocator, ISA and build identity. No upstream source is ported and no root
+runtime dependency is added.
+
+```sh
+tools/external/provision-groebner-rs.sh
+. tools/external/env.sh
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-groebner-comparison
+export TMPDIR="$CARGO_TARGET_DIR/tmp"
+mkdir -p "$TMPDIR"
+RUSTC_WRAPPER='' cargo +1.99.1 build --release --example groebner_comparison
+```
+
+`ZEEBRA_GROEBNER_RS_DRIVER` overrides the executable; the default is `groebner-rs-driver` on PATH.
+The adapter supports direct reduced bases under grevlex, grlex and lex, and direct `LexBasis` under
+lex. It explicitly refuses conversion, solution and eliminant tasks, extension fields and other
+orders. The driver reads the complete declared ordered variable list and full unsigned modulus,
+echoes engine-parsed generators, and reports actual Rayon pool workers. Every returned basis must
+match a complete independent Zeebra reduced basis, including every coefficient and exponent.
+Missing trusted instantiations or failed checks cannot supply timing ratios. Verification is a
+separate harness stage; it is excluded from child wall/CPU/RSS and `solve` time. Quotient dimension
+is inferred from the matching trusted basis, rather than claimed as a separate engine report.
+
+Use the one-row runner under the measurement lock, timeout and RSS guard from the benchmarking
+guide, with `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` set:
+
+```sh
+"$CARGO_TARGET_DIR/release/examples/groebner_comparison"   --engine groebner-rs --row katsura-4 --modulus 32003 --workers 1   --wall 30 --rss-mib 1024 --output /buildcache/cargo-target/groebner-row.json
+```
+
+Repeat with `--engine zeebra` under identical conditions, interleaving repetitions. The runner
+retains all outcomes, the full basis and raw driver JSON, revision and build identities, digest,
+resource limits and a separately observed driver loader-only startup floor. `--list` prints the frozen
+input digest without solving. For published fields use the existing Cyclic, Katsura and random-MQ
+rungs at 32003 and 2147483647. `--row groebner-rs-wide-control` registers a focused two-variable
+known-root system at 18446744073709551263 and 18446744073709551557, with pinned digests; it does
+not expand the public ladder. The Zeebra adapter adds only a two-variable instantiation for the
+second prime. `--workers 4` forms a separate cohort; the configured serial Zeebra F4 records a
+capability refusal instead of pretending to supply four workers.
+
+On Linux, `Supervisor::with_max_rss_bytes` polls the direct child's RSS and kills/reaps it on a
+crossing, reporting `LimitStop::Memory`. It refuses enforcement if no process RSS reading is
+available. This is a sampled ceiling and can overshoot between polls. The same wall/RSS guard
+must bound the one-row parent process for an in-process Zeebra row. Incompatible worker, resource,
+source revision, machine or build metadata prevents board ratios. The standard `competitive_sweep`
+also accepts `--engines groebner-rs`; large sweeps remain subject to the same per-row checks.
+
+The checked-in cohort runner repeats the eight controls three times, reversing engine order on
+alternate repetitions, and retains two diagnostic resource stops. It requires Linux `/proc` and
+checks that actual affinity matches the declared affinity. It bounds each parent process at
+1 GiB RSS and 95 seconds, in addition to the solver's declared caps. Build both tools before
+entering the measurement window:
+
+```sh
+RUSTC_WRAPPER='' cargo +1.99.1 build --release --example groebner_comparison --example competitive
+ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=0-3 tools/benchlock.sh groebner-rs-cohort \
+  taskset -c 0-3 python3 tools/external/groebner-cohort.py \
+  --binary "$CARGO_TARGET_DIR/release/examples/groebner_comparison" \
+  --scratch "$TMPDIR/groebner-cohort" \
+  --output research/competitive/results/groebner-rs-678-v2.json
+```
+
+`--append-history` explicitly appends those attempts to the main history; it preserves preceding
+records. Regenerate the display with `"$CARGO_TARGET_DIR/release/examples/competitive" --write`.
+The dedicated driver CI workflow tests its locked workspace separately from root-crate CI.
+
+Completed Linux driver runs supplement supervisor RSS polling with a post-serialization kernel
+high-water snapshot from inside the child (`RssBasis::ChildSelfHighWater`). Fast processes can
+otherwise exit between polls. Snapshot provenance survives history regeneration; the original
+serialized provenance is retained even when it is not a known enum variant. A snapshot beyond the
+requested RSS cap cannot produce an admitted timing result. Final output/exit allocations follow
+the snapshot, so this is an observation of the completed computational phase, not `wait4` exit
+resource usage. The generated board marks old polled observations and child snapshots separately.

@@ -60,6 +60,8 @@ pub mod corpus;
 #[cfg(feature = "external-runners")]
 pub mod groebner_jl;
 #[cfg(feature = "external-runners")]
+pub mod groebner_rs;
+#[cfg(feature = "external-runners")]
 pub mod msolve;
 pub mod process;
 #[cfg(feature = "external-runners")]
@@ -87,6 +89,8 @@ pub use corpus::{
 };
 #[cfg(feature = "external-runners")]
 pub use groebner_jl::GroebnerJlSolver;
+#[cfg(feature = "external-runners")]
+pub use groebner_rs::GroebnerRsSolver;
 #[cfg(feature = "external-runners")]
 pub use msolve::MsolveSolver;
 pub use process::{

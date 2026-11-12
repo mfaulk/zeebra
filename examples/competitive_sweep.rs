@@ -9,9 +9,9 @@ use zeebra::{
         external::{
             corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
             msolve::{MAX_CHARACTERISTIC_ELIMINANT, MIN_CHARACTERISTIC_ELIMINANT},
-            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance,
-            Limits, Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
-            SingularSolver, Task, ZeebraSolver,
+            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver,
+            GroebnerRsSolver, Instance, Limits, Measurement, MsolveSolver, RunFailure, RunReport,
+            RunStatus, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
         },
         record::Environment,
         F4Options, InterreductionRoute,
@@ -295,6 +295,21 @@ fn run_one(
             Err(failure) => unreachable_engine(
                 board,
                 "groebner.jl",
+                built,
+                task,
+                limits,
+                environment,
+                failure,
+            ),
+        }
+    }
+
+    if wanted("groebner-rs") {
+        match GroebnerRsSolver::from_env(scratch.join("groebner-rs")) {
+            Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+            Err(failure) => unreachable_engine(
+                board,
+                "groebner-rs",
                 built,
                 task,
                 limits,

@@ -180,6 +180,7 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
         // A caller needing another width adds it here; see #668.
         KOALABEAR_CHARACTERISTIC => &[5, 7, 9],
         WIDE_64_CHARACTERISTIC => &[2, 4],
+        18_446_744_073_709_551_557 => &[2],
 
         _ => &[],
     }
@@ -602,6 +603,14 @@ impl ZeebraSolver {
                 5,
                 7,
                 9
+            ),
+            18_446_744_073_709_551_557 => dispatch!(
+                crate::fields::Zp18446744073709551557,
+                instance,
+                task,
+                &self.f4_options,
+                &self.fglm_options,
+                2
             ),
             WIDE_64_CHARACTERISTIC => dispatch!(
                 PrimeFieldElement64<WIDE_64_CHARACTERISTIC>,

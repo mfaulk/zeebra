@@ -57,15 +57,21 @@ const DEFAULT_USER_HZ: u64 = 100;
 
 /// How the peak resident set size in a [`ProcessMeasurement`] was obtained.
 ///
-/// Recorded alongside the figure because the two available methods are not the same kind of
+/// Recorded alongside the figure because the available methods are not the same kind of
 /// quantity, and a resource *bound* must never be read as a resource *measurement*.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RssBasis {
     /// `VmHWM` of the supervisor's direct child, polled from `/proc/<pid>/status`.
     ///
-    /// Kernel-maintained, so exact for a solver that runs as a single process — which is what the
-    /// contract requires adapters to arrange.
+    /// Each reading is exact at its observation time. A process may exit between polls, so the
+    /// last reading can miss a late peak, especially for a short-lived child.
     DirectChildHighWater,
+
+    /// The child reads its own kernel `VmHWM` after computation and serialization preparation.
+    /// Covers that phase even when the process finishes between supervisor polls; final exit
+    /// and stdout-transfer allocations occur after this snapshot. Later supervisor observations
+    /// may raise the reported maximum.
+    ChildSelfHighWater,
 
     /// The maximum over polls of the summed `VmRSS` of the direct child and every descendant.
     ///
@@ -76,7 +82,7 @@ pub enum RssBasis {
 
     /// Peak bytes **allocated**, from a tracking allocator inside the measured process.
     ///
-    /// **Not resident memory, and not comparable with either variant above.** A reservation the
+    /// **Not resident memory, and not comparable with the RSS variants.** A reservation the
     /// process never writes to is counted here and is absent from `VmHWM`, and the gap is not
     /// slack spread thinly: on the Fukuoka III `n = 20` row (#237) F4's pair queue reached 2^28
     /// slots in a **single** 20 480 MiB allocation of which about 60% was never written, giving
@@ -106,6 +112,9 @@ impl Display for RssBasis {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DirectChildHighWater => write!(f, "direct-child VmHWM (exact)"),
+            Self::ChildSelfHighWater => {
+                write!(f, "child-self VmHWM after serialization (kernel snapshot)")
+            }
             Self::ProcessTreeSampled { interval, samples } => write!(
                 f,
                 "process-tree VmRSS sampled every {:?} over {} polls (lower bound)",
@@ -178,12 +187,15 @@ pub struct ProcessMeasurement {
     /// **Not a failure of the solver and not a speed result.** A timed-out run has a wall time
     /// equal to the limit and says nothing about how much longer it needed.
     pub timed_out: bool,
+
+    /// True when a sampled RSS reading crossed the requested ceiling and the child was killed.
+    pub memory_limited: bool,
 }
 
 impl ProcessMeasurement {
     /// True if the child exited 0 and was not killed.
     pub fn succeeded(&self) -> bool {
-        !self.timed_out && self.exit_code == Some(0)
+        !self.timed_out && !self.memory_limited && self.exit_code == Some(0)
     }
 }
 
@@ -379,6 +391,7 @@ fn shell_quote(word: &str) -> String {
 /// Spawns one external process at a time under a wall-clock limit, and measures it.
 #[derive(Clone, Debug)]
 pub struct Supervisor {
+    max_rss_bytes: Option<u64>,
     wall_limit: Duration,
     poll_interval: Duration,
     rss_policy: RssPolicy,
@@ -389,9 +402,17 @@ impl Supervisor {
     pub fn new(wall_limit: Duration) -> Self {
         Self {
             wall_limit,
+            max_rss_bytes: None,
             poll_interval: Duration::from_millis(10),
             rss_policy: RssPolicy::DirectChild,
         }
+    }
+
+    /// Enforce a sampled RSS ceiling, killing and reaping the direct child on crossing.
+    /// Requires readable process RSS; the ceiling can be exceeded between poll ticks.
+    pub fn with_max_rss_bytes(mut self, limit: Option<u64>) -> Self {
+        self.max_rss_bytes = limit;
+        self
     }
 
     /// Change the poll interval.
@@ -463,6 +484,7 @@ impl Supervisor {
         let mut watcher = Watcher::new(pid, self.rss_policy, self.poll_interval);
         let deadline = started + self.wall_limit;
         let mut timed_out = false;
+        let mut memory_limited = false;
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break Some(status),
@@ -476,6 +498,24 @@ impl Supervisor {
             // Sampled before the deadline check so that a run which times out still carries the
             // readings taken while it was alive.
             watcher.poll();
+            if let Some(limit) = self.max_rss_bytes {
+                match watcher.rss().0 {
+                    Some(peak) if peak > limit => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        memory_limited = true;
+                        break None;
+                    }
+                    None => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(SpawnError::Harness {
+                            detail: "cannot enforce RSS cap without a process RSS reading".into(),
+                        });
+                    }
+                    _ => {}
+                }
+            }
             if Instant::now() >= deadline {
                 // Killed and reaped. Leaving it would accumulate one zombie per timeout across a
                 // sweep, and an unreaped child keeps its output file open.
@@ -499,6 +539,7 @@ impl Supervisor {
             rss_basis,
             exit_code: status.and_then(|status| status.code()),
             timed_out,
+            memory_limited,
         })
     }
 }
@@ -892,6 +933,23 @@ mod tests {
         assert_eq!(measurement.exit_code, Some(3));
         assert!(!measurement.succeeded());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // A direct child crossing its RSS cap is killed and reported as a memory stop.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_an_rss_limit_kills_the_child() {
+        let dir = scratch("rss-limit");
+        let invocation = Invocation::new("/bin/sleep", &dir, dir.join("out")).arg("30");
+        let result = Supervisor::new(Duration::from_secs(10))
+            .with_max_rss_bytes(Some(1))
+            .run(&invocation)
+            .unwrap();
+        assert!(result.memory_limited);
+        assert!(!result.timed_out);
+        assert!(!result.succeeded());
+        assert!(result.peak_rss_bytes.unwrap() > 1);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// A run that outlives its limit is killed, flagged `timed_out`, and has no exit code.
