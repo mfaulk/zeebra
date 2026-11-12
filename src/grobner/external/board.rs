@@ -188,7 +188,7 @@ pub struct CompetitiveRecord {
     /// How many variables.
     pub variable_count: usize,
 
-    /// The library's id: `zeebra`, `singular`, `msolve`, `groebner.jl`, `sagebrush`.
+    /// The library's id: `zeebra`, `singular`, `msolve`, `groebner.jl`, `sagebrush`, `groebner-rs`.
     pub library: String,
 
     /// The library's version, as it reported it when probed.
@@ -949,6 +949,7 @@ impl CompetitiveBoard {
     fn provenance(&self) -> BTreeMap<&'static str, Equivalence> {
         ladder()
             .into_iter()
+            .chain(std::iter::once(super::groebner_rs::control_entry()))
             .chain(self.corpus.iter().cloned())
             .map(|entry| (entry.name, entry.equivalence))
             .collect()
@@ -1222,18 +1223,22 @@ impl CompetitiveBoard {
             let _ = writeln!(out, "## {}\n", family);
             let _ = writeln!(
                 out,
-                "| problem | task | field | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |"
+                "| problem | task | field | workers | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |"
             );
-            let _ = writeln!(out, "|---|---|---|---|---|---|---:|---:|---:|---|---:|---|");
+            let _ = writeln!(
+                out,
+                "|---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---|"
+            );
             for rows in problems.values() {
                 for row in rows {
                     let _ = writeln!(
                         out,
-                        "| `{}` `{}` | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} |",
+                        "| `{}` `{}` | {} | {} | {} | {} | `{}` | {} | {} | {} | {} | {} | {} | {} |",
                         row.problem,
                         &row.problem_digest[..row.problem_digest.len().min(12)],
                         row.task,
                         row.field,
+                        row.limits.workers,
                         library_cell(row),
                         row.environment.commit,
                         row.outcome.cell(),
@@ -1654,6 +1659,7 @@ fn engine_verdict_cell(ratio: &EngineRatio) -> String {
 /// | `singular` | `solve` | `source-basis` + `solve` | — |
 /// | `groebner.jl` | `solve` | n/a (no FGLM) | `process-wall` and `process-cpu`, which are the quantity this statistic exists to exclude — Julia's compiler |
 /// | `sagebrush` | `solve` | `solve` | — |
+/// | `groebner-rs` | `solve` | unsupported | parse, serialization and independent verification |
 /// | `msolve` | `f4/overall(elapsed)` | `f4/overall(elapsed)` + `sparse-fglm/overall(elapsed)` | every named sub-stage, which would double-count its own total |
 ///
 /// msolve is the one library whose labels are its **own** rather than translated — deliberately,
@@ -1673,7 +1679,7 @@ fn engine_internal_time(
         ("zeebra", _) => &["basis"],
         ("singular", super::Task::LexBasisByConversion) => &["source-basis", "solve"],
         ("singular", _) => &["solve"],
-        ("groebner.jl" | "sagebrush", _) => &["solve"],
+        ("groebner.jl" | "sagebrush" | "groebner-rs", _) => &["solve"],
         ("msolve", super::Task::LexBasisByConversion | super::Task::UnivariateEliminant) => {
             &["f4/overall(elapsed)", "sparse-fglm/overall(elapsed)"]
         }
@@ -1704,6 +1710,7 @@ fn engine_internal_time(
 /// | `sagebrush` | `%.6f` seconds | 1 µs | `sagebrush.rs`, `#seconds:` |
 /// | `groebner.jl` | Julia's own `@elapsed` | 1 µs | `groebner_jl.rs` |
 /// | `zeebra` | an `Instant` difference | 1 µs | `zeebra.rs` |
+/// | `groebner-rs` | integer nanoseconds | conservative 1 µs | `groebner_rs.rs` |
 ///
 /// 1 µs is a floor on the claim rather than a measured jitter: every one of those three reports
 /// more digits than that, and no ratio on this board is within three orders of magnitude of it, so
@@ -1712,7 +1719,7 @@ fn stage_resolution(library: &str) -> Option<Duration> {
     Some(match library {
         "singular" => Duration::from_millis(1),
         "msolve" => Duration::from_millis(10),
-        "sagebrush" | "groebner.jl" | "zeebra" => Duration::from_micros(1),
+        "sagebrush" | "groebner.jl" | "zeebra" | "groebner-rs" => Duration::from_micros(1),
         _ => return None,
     })
 }
@@ -2008,6 +2015,49 @@ mod tests {
         )
         .with_version(ToolVersion::new(library, "1.0"));
         CompetitiveRecord::of(&report, &instance, &environment())
+    }
+
+    // Per-attempt display labels the worker count so distinct concurrency cohorts stay visible.
+    #[test]
+    fn test_the_board_displays_worker_counts() {
+        let mut subject = staged_row("groebner-rs", 90, &[("solve", Duration::from_millis(20))]);
+        subject.limits.workers = 4;
+        let mut board = CompetitiveBoard::new();
+        board.add(subject);
+        let display = board.to_markdown();
+        assert!(display.contains("| field | workers | library |"));
+        assert!(display.contains("| 4 | groebner-rs"));
+    }
+
+    // The new engine uses solve stages only and cannot ratio across workers, ISA cohorts or caps.
+    #[test]
+    fn test_groebner_rs_ratios_require_matching_metadata() {
+        let reference = staged_row("zeebra", 100, &[("basis", Duration::from_millis(40))]);
+        let subject = staged_row(
+            "groebner-rs",
+            90,
+            &[
+                ("parse", Duration::from_millis(10)),
+                ("solve", Duration::from_millis(20)),
+            ],
+        );
+        let mut board = CompetitiveBoard::new();
+        board.add(reference.clone());
+        board.add(subject.clone());
+        assert_eq!(board.engine_ratios("zeebra").len(), 1);
+        for mutation in 0..3 {
+            let mut changed = subject.clone();
+            match mutation {
+                0 => changed.limits.workers = 4,
+                1 => changed.environment.build = "different ISA".into(),
+                _ => changed.limits.max_rss_bytes = Some(1),
+            }
+            let mut board = CompetitiveBoard::new();
+            board.add(reference.clone());
+            board.add(changed);
+            assert!(board.engine_ratios("zeebra").is_empty());
+            assert!(board.speedups("zeebra").is_empty());
+        }
     }
 
     /// The engine-internal ratio uses each library's own stage, not the wall.

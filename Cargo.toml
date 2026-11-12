@@ -245,3 +245,7 @@ inherits = "release"
 opt-level = 2
 lto = "off"
 codegen-units = 16
+
+[[example]]
+name = "groebner_comparison"
+required-features = ["external-runners"]

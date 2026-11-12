@@ -178,12 +178,15 @@ pub struct ProcessMeasurement {
     /// **Not a failure of the solver and not a speed result.** A timed-out run has a wall time
     /// equal to the limit and says nothing about how much longer it needed.
     pub timed_out: bool,
+
+    /// True when a sampled RSS reading crossed the requested ceiling and the child was killed.
+    pub memory_limited: bool,
 }
 
 impl ProcessMeasurement {
     /// True if the child exited 0 and was not killed.
     pub fn succeeded(&self) -> bool {
-        !self.timed_out && self.exit_code == Some(0)
+        !self.timed_out && !self.memory_limited && self.exit_code == Some(0)
     }
 }
 
@@ -379,6 +382,7 @@ fn shell_quote(word: &str) -> String {
 /// Spawns one external process at a time under a wall-clock limit, and measures it.
 #[derive(Clone, Debug)]
 pub struct Supervisor {
+    max_rss_bytes: Option<u64>,
     wall_limit: Duration,
     poll_interval: Duration,
     rss_policy: RssPolicy,
@@ -389,9 +393,17 @@ impl Supervisor {
     pub fn new(wall_limit: Duration) -> Self {
         Self {
             wall_limit,
+            max_rss_bytes: None,
             poll_interval: Duration::from_millis(10),
             rss_policy: RssPolicy::DirectChild,
         }
+    }
+
+    /// Enforce a sampled RSS ceiling, killing and reaping the direct child on crossing.
+    /// Requires readable process RSS; the ceiling can be exceeded between poll ticks.
+    pub fn with_max_rss_bytes(mut self, limit: Option<u64>) -> Self {
+        self.max_rss_bytes = limit;
+        self
     }
 
     /// Change the poll interval.
@@ -463,6 +475,7 @@ impl Supervisor {
         let mut watcher = Watcher::new(pid, self.rss_policy, self.poll_interval);
         let deadline = started + self.wall_limit;
         let mut timed_out = false;
+        let mut memory_limited = false;
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break Some(status),
@@ -476,6 +489,24 @@ impl Supervisor {
             // Sampled before the deadline check so that a run which times out still carries the
             // readings taken while it was alive.
             watcher.poll();
+            if let Some(limit) = self.max_rss_bytes {
+                match watcher.rss().0 {
+                    Some(peak) if peak > limit => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        memory_limited = true;
+                        break None;
+                    }
+                    None => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(SpawnError::Harness {
+                            detail: "cannot enforce RSS cap without a process RSS reading".into(),
+                        });
+                    }
+                    _ => {}
+                }
+            }
             if Instant::now() >= deadline {
                 // Killed and reaped. Leaving it would accumulate one zombie per timeout across a
                 // sweep, and an unreaped child keeps its output file open.
@@ -499,6 +530,7 @@ impl Supervisor {
             rss_basis,
             exit_code: status.and_then(|status| status.code()),
             timed_out,
+            memory_limited,
         })
     }
 }
@@ -892,6 +924,23 @@ mod tests {
         assert_eq!(measurement.exit_code, Some(3));
         assert!(!measurement.succeeded());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // A direct child crossing its RSS cap is killed and reported as a memory stop.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_an_rss_limit_kills_the_child() {
+        let dir = scratch("rss-limit");
+        let invocation = Invocation::new("/bin/sleep", &dir, dir.join("out")).arg("30");
+        let result = Supervisor::new(Duration::from_secs(10))
+            .with_max_rss_bytes(Some(1))
+            .run(&invocation)
+            .unwrap();
+        assert!(result.memory_limited);
+        assert!(!result.timed_out);
+        assert!(!result.succeeded());
+        assert!(result.peak_rss_bytes.unwrap() > 1);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// A run that outlives its limit is killed, flagged `timed_out`, and has no exit code.

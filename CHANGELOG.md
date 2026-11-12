@@ -9,6 +9,11 @@ change to `y` may break the public API.
 
 ### Added
 
+- A pinned standalone sdiehl/groebner F4 comparand with full independent reduced-basis checking,
+  explicit Rayon worker counts, wide-prime controls and recorded build identities (#678).
+- Optional sampled child RSS enforcement in the subprocess supervisor, with memory stops
+  distinguished from wall limits and solver failures.
+
 - Opt-in large F4 matrix captures with pinned fingerprints, explicit budgets and prefix selection
   that stops before eliminating the selected matrix (#640). The large entry uses an explicit
   64-million-entry / 1.024 GB allowance without changing ordinary defaults. Observers can request this stop with

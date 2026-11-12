@@ -1,0 +1,17 @@
+[package]
+name = "groebner-rs-driver"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+groebner = { git = "https://github.com/sdiehl/groebner", rev = "c3e1d630fba9b2155a4c389d9022f13e0ba09218" }
+rayon = "1.11"
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
