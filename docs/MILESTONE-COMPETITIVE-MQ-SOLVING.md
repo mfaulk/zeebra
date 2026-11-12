@@ -3,9 +3,11 @@
 **Measured at:** publication bound `2205c7db`…`5e1b8ea9` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
 
-**Status:** planned.
-**Prerequisite:** M26, **not yet complete** — see §0, which is why this plan opens with a
-reconciliation workstream rather than with a target.
+**Status:** integration report published in [§15](#15-integration-report-2026-11-11); retained
+library-scope Minimum and Strong met. Broader studies remain open.
+**Prerequisite at planning:** M26 was incomplete (historical §0). Its
+[integration report](MILESTONE-ALGORITHMIC-ELIMINATION.md#14-integration-report-2026-11-11)
+now exists; §15 scores M27 independently against its retained criteria.
 **Plan written against:** commit `d9121c0` (`merge: render the scoreboard without measuring, and
 record the rf4-rp2 witness`), rebased onto `74cb43a` after #435 and #448 merged mid-planning.
 **Board:** [Zeebra, project #7](https://github.com/users/mfaulk/projects/7), label `M27`.
@@ -25,6 +27,7 @@ because the arithmetic now says the comparand was the wrong one.
 
 | date | change |
 |---|---|
+| 2026-11-11 | #458 integrates retained results in §15, scores §10 after #668, regenerates the board, and records the M28 recommendation. Earlier sections retain the planning and intermediate evidence. |
 | 2026-11-07 | Written at `d9121c0` from M26's landed work, #447's cross-engine screen, and `f4-resource-scaling.md` §10.4. M26's §13 report does not exist yet; §0 records what that costs this plan. |
 | 2026-11-07 | **#452 and #471 implemented** (PRs #476, #478). #452's counters settle #440's four-way verdict as **copy-bound** — 1.17 billion terms rewritten at 64.2x amplification, where swell is only 8.8x and 22.6 M divisor tests cannot be 35 s — and correct §4's inference, which had read Groebner.jl's 604 as a term count when it is a column count. #471 then measured **4.18x end to end** with bases asserted equal, clearing §10's Strong criterion. Two findings M27-0 must carry: the §3 baseline does not reproduce (four stages within 4.4%, interreduction 54% higher, so the share is 86.7% and the ceiling 7.52x), and the §4 cost estimate was 24x out because Zeebra's autoreduce matrix has **405x** the cells Groebner.jl's does — now #477. |
 | 2026-11-07 | **#447 answered** (`a1867a7`, `docs/research/groebner-jl-gap.md`) **and M27-A's shape changed with it.** The counts agree — both engines reach 10 batches, 11 matrices, 247 basis elements and quotient dimension 354 — so gate 0's "Zeebra does asymptotically more work" branch is **dead**, and the 344x decomposes into **4.89x** randomized linear algebra (declined by policy), **5.03x** interreduction done as 247 divisions where Groebner.jl uses one Macaulay matrix, and **14.0x** a per-operation constant uniform to 11.6x-25.5x across every other stage. Final interreduction is **13 871x** behind; the next worst stage is 97.1x. So M27-A's first item is no longer a faster `normal_form` but **matrix-based interreduction** (§5.2a), and the JIT caveat is settled at ~2%. |
@@ -33,6 +36,9 @@ because the arithmetic now says the comparand was the wrong one.
 ---
 
 ## 0. M26 is unfinished, and this plan is written around that
+
+**Planning snapshot:** the statements below describe `d9121c0`, not the report snapshot.
+For current results and remaining work, see §15.
 
 M26's plan document still reads `**Status:** planned.` It has no report section, no criterion-by-criterion
 scoring, and four commits, all dated 2026-11-07. Thirteen of the M26 epic's twenty sub-issues are
@@ -1025,8 +1031,8 @@ parity is reachable by implementation at all.
   and 2 together could reach and **4.89x behind Groebner.jl's randomized figure is the floor** this
   milestone can aim at without changing its correctness regime.
 - That an Amdahl ceiling computed against one comparand bounds the gap against another.
-- That Groebner.jl's ratios are precise, while whether Julia's JIT lands inside its inner timer is
-  unestablished. Direction and order of magnitude only.
+- That Groebner.jl's JIT explains the historical gap. #447 settled its variation at about 2%;
+  comparisons still require matched task, invariants and timing regime.
 - That a slice result is a result about the instance it was sliced from.
 - That crossing a larger degree is nearer a solution.
 - That a memory reduction is a frontier extension unless the resource stop actually moved.
@@ -1060,6 +1066,9 @@ research in #668; they are preserved at commit 9532a9a2.*
 ---
 
 ## 13. Deferred work and the M28 register
+
+**Historical register at planning.** Conversion now ships, weighted orders exist, and challenge
+instruments moved in #668. §15.6 scores these hypotheses and supplies the current recommendation.
 
 | item | why not in M27 | what would schedule it |
 |---|---|---|
@@ -1166,3 +1175,194 @@ Before any figure enters a report or a record:
       locally with `ZEEBRA_REQUIRE_MSOLVE=1`.
 - [ ] Rebased onto current `origin/main` with CI re-run before merge, per the merge-staleness
       warning, which is advisory and does not block.
+
+## 15. Integration report, 2026-11-11
+
+**Evidence snapshot:** `ad175ffc`, including the certified scalar-Wiedemann converter, #456's
+eliminant sweep and #678's groebner-rs comparand. **Measured at:** not measured here. This report
+integrates the named measurements below and regenerates the competitive board from its retained
+history; it takes no new timings, RSS samples or witness measurements. Historical §§0–14 describe
+the planning state and intermediate decisions, not the current defaults.
+
+**Verdict:** the **Minimum and Strong criteria retained in §10 after #668 are met**. The
+competitive-lead alternative of Stretch is met on the named full reduced-basis workloads below;
+it is not an all-engine lead. The other retained Stretch alternative, improved practical scaling
+of a complete MQ solve, is **not established**. The broad representation, planner and Magma studies
+remain open. Completing this report does not complete those studies or restore moved challenge
+requirements to this repository.
+
+### 15.1 Acceptance, criterion by criterion
+
+| tier | criterion from §10 | result | deciding evidence |
+|---|---|---|---|
+| Minimum 1 | Baseline frozen with commits, machine and affinity | **met** | [M27 baseline](research/m27-baseline.md), frozen at `1985504`, re-verified at `53fbf50`; §2 names `ZEEBRA_MACHINE=workstation`, `ZEEBRA_AFFINITY=0-7`. Publication-bound historical figures and incomplete environment records remain qualified. |
+| Minimum 2 | #447 work counts and JIT question settled | **met** | [Groebner.jl gap](research/groebner-jl-gap.md), `a1867a7`; matching batches, matrices, basis size and quotient dimension reject the extra-work explanation at that observation point. The approximately 2% JIT variation does not explain the gap. |
+| Minimum 3 | Exact-basis matrix interreduction, stage share remeasured, and #440 counters | **met** | [Baseline §2.4](research/m27-baseline.md#24-the-interreduction-ab-at-53fbf50-and-it-comes-in-at-363x-rather-than-418x): exact basis equality, 3.63x complete basis computation, stage share 80.05% to 28.38%. [Interreduction §3](research/interreduction-cost.md#3-the-counts-and-the-verdict-rewrite-bound-not-swell-bound) records the copy-bound verdict; §§3g–3i adjudicate the other mechanisms. |
+| Minimum 4–5 | Challenge barrier and GF(2^8) importer | **moved out of scope** | #668 moved these criteria and instruments; the prior tree is `9532a9a2`. No current-library claim is substituted for them. |
+| Minimum 6 | Correct field generation and second reference field | **met** | #425/#426; `src/grobner/external/corpus.rs` generates and identifies `GF(32003)` separately. The retained history includes this characteristic, including #456's eliminant task. |
+| Minimum 7 | #428 floor-free statistic or resolution-based refusal | **met** | `CompetitiveBoard::engine_internal_ratios` in `src/grobner/external/board.rs`; a separate engine-internal section, invariant/equivalence gates and a per-library resolution screen. It never replaces process-wall ratios. |
+| Minimum 8 | #318/#319 resolved or bounded; truthful board and documentation | **met with disclosed historical limits** | [Resultant elimination §6.13](research/resultant-elimination.md#613-318-and-319-resolved-and-they-are-two-different-things) distinguishes quiet-box width effects from residual session drift. §15.2 retains failures, missing affinity and non-authoritative rows. This report updates current status without rewriting historical measurements. |
+| Strong 1 | At least 2x complete MQ basis computation, exact output, stage share measured | **met** | The baseline's paired 3.63x A/B above clears the threshold without dividing different sessions. The later shipped-default cohort independently measures 5.86x (§15.3); these are different experiments. |
+| Strong 2 | Complete a published Fukuoka instance | **moved out of scope** | #668; no witness or frontier completion is claimed here. |
+| Strong 3 | Narrow a competitive gap above startup floor, equivalent task and agreed invariants | **met** | #575's `3d0e3759` reduced-basis cohort (§15.3), with checked invariants and process-wall comparisons against Singular. |
+| Strong 4 | M27-D prototype selected or explicit justified refusal | **met by refusal** | [Algorithm decision](research/m27-algorithm-decision.md), reviewed at `800b75df`: defer an additional prototype; §5 names the bounded measurements that could reopen it. |
+| Stretch 1 | Competitive parity or lead on a substantial complete task | **met on named workloads** | #575's complete reduced bases on `mq-random-10` and `katsura-11`, against Singular in the same cohort. Katsura's single attempts and load excursions limit its strength; the repeated MQ result stands independently. |
+| Stretch 2 | Changed practical resource scaling end to end on real MQ solves | **not established** | Basis improvements and certified conversion measurements do not include complete point recovery and verification on such a solve. No kernel or conversion ratio fills that gap. |
+| Stretch, moved alternatives | Challenge frontier or published attack | **moved out of scope** | #668; not scored as current-library achievements. |
+
+### 15.2 Competitive position and board regeneration
+
+Regenerate without measuring:
+
+```sh
+cargo run --release --example competitive -- --write
+```
+
+At the evidence snapshot, this reproduces the committed Markdown and JSON without changes. The
+source is [`history.json`](../research/competitive/results/history.json); the rendered artifact is
+[`COMPETITIVE.md`](../research/competitive/COMPETITIVE.md). There is no `scoreboard` example after
+#668. #458's older command for that moved instrument does not apply to this checkout.
+
+| library | attempts | complete | verified | unsupported | stopped by limit | failed |
+|---|---:|---:|---:|---:|---:|---:|
+| Zeebra | 288 | 211 | 0 | 56 | 21 | 0 |
+| Singular | 140 | 120 | 0 | 5 | 14 | 1 |
+| msolve | 110 | 62 | 0 | 39 | 5 | 4 |
+| Groebner.jl | 110 | 55 | 0 | 50 | 5 | 0 |
+| Sagebrush | 162 | 130 | 0 | 17 | 14 | 1 |
+| groebner-rs | 100 | 0 | 96 | 0 | 4 | 0 |
+| **total** | **910** | **578** | **96** | **167** | **63** | **6** |
+
+These are retained attempts, including repeated arms and intentional refusal controls, not counts
+of distinct solved instances. `verified` is the stored outcome of the independently checked
+submitted groebner-rs bases; it is kept separate from `complete` rather than rewriting history.
+The tasks comprise 582 reduced-basis, 268 lex-by-conversion and 60 eliminant attempts.
+
+Environment cohorts are kept separate: 545 rows use `ZEEBRA_MACHINE=workstation`, affinity `0-7`;
+164 use `fedora`, affinity `2`; 196 use `trpro-5995wx`, affinity `0-3`; five historical `fedora`
+rows have affinity **unset**. Affinity is recorded in `environment.cpu`. Missing affinity is
+incomplete evidence, not implicit pinning. Policy, digest, field, worker count, task and provenance
+must agree before a ratio is considered. Startup floors, stage resolution, invariant overlap,
+equivalence and ISA authority still gate conclusions; historical Sagebrush rows remain visible
+beside the matched-ISA re-take. No aggregate win count across these cohorts is an engine ranking.
+
+#456's second task is now executable at supported primes and retained: of 60 eliminant attempts,
+Zeebra completes 11, Singular 10 and msolve 7. Unsupported adapters, positive-dimensional inputs,
+a Singular limit stop and four historical msolve failures remain in the history. This adds a
+comparison objective; it does not establish parity with msolve. #678 adds a pinned MIT Rust
+comparand with verified basis submissions, rather than relabeling a solution as a basis.
+
+### 15.3 Performance and memory: what shipped
+
+The final F4 decision is [interreduction §3h](research/interreduction-cost.md#3h-575-the-2x2-over-both-flags-and-both-defaults-move),
+cohort `3d0e3759`, `ZEEBRA_MACHINE=workstation`, `ZEEBRA_AFFINITY=0-7`, one worker, under
+`benchlock`, one row per process. Both flags are crossed in one cohort; no ratio below spans
+historical sessions. Recommended options now use `reduce_batch_rows: true` and
+`interreduction: InterreductionRoute::ByOrder`. Baseline options retain the earlier settings.
+
+| full reduced-basis task | old default | shipped pair | Singular | paired improvement | lead over Singular |
+|---|---:|---:|---:|---:|---:|
+| `mq-random-10` | 27 536.2 ms | 4 695.7 ms | 7 371.9 ms | 5.86x | 1.57x |
+| `katsura-11` | 241 042.6 ms | 29 769.4 ms | 53 591.9 ms | 8.10x | 1.80x |
+
+MQ uses three attempts per Zeebra arm; Katsura uses one and saw load excursions, so **Katsura is
+the first result to repeat** before extending its quantitative claim. On the MQ cohort, msolve
+and Groebner.jl remain faster. Removing the Singular deficit does not remove the remaining gaps.
+
+Memory rises against the old defaults: MQ mean per-process peak RSS is **418.8 MiB versus
+162.1 MiB**; Katsura is **667.0 MiB versus 538.9 MiB**. The source study labels these binary-scaled
+values MB. Against matrix interreduction with unreduced batch rows, the pair reduces memory;
+against the old default it increases it. #536's construction budgets and #554's retained-basis
+removal made the route bounded enough to ship. Matrix-entry budgets are not whole-process RSS
+limits. Lex still selects division; the graded-order win is not a universal interreduction rule.
+
+A later capability is [certified scalar Wiedemann conversion](research/certified-wiedemann.md),
+measured at base `4bcf3923` plus patch `621e87a0747fa855372cfc7c68accc4b8e76a7df`,
+`ZEEBRA_MACHINE=5995wx`, `ZEEBRA_AFFINITY=2`, one worker. On its public sparse shape-position
+family, the paired conversion ratios are **4.28x at quotient dimension 625** and **23.75x at
+3 125**, including operator construction and independent certification. At 3 125, separate-route
+processes measure **161 603 584 bytes** classical peak RSS and **5 660 672 bytes** adaptive.
+These are conversion measurements, excluding basis computation and point recovery. They do not
+establish whole-solver scaling or a universal route crossover. Adaptive attempts retain classical
+fallback for nonseparating coordinates, exhausted projections, certificate failures or workspace
+refusal. The M26 report's missing-converter statement describes its earlier snapshot.
+
+### 15.4 New capabilities, frontier and remaining barriers
+
+The corpus now has the second reference prime, extended affine Katsura/Cyclic ladders and
+`GF(2)` Cyclic invariant checks. The eliminant sweep provides a second externally checked task;
+the board has resolution-aware internal-time comparisons, enforced equivalence gates, matched-ISA
+Sagebrush evidence and a verified groebner-rs adapter. F4 exposes per-batch degrees and budget
+refusals through diagnostics. These are library and comparison capabilities.
+
+Cryptanalytic position by `Official`, `FaithfulReduction` and `Engineering` class is **outside
+this report's active scope after #668**. No class totals, witness, named slice or seed completion
+is asserted. The previous research tree is `9532a9a2`. A larger corpus rung or faster basis does
+not itself advance any of those classes. Against M26, the demonstrated change is competitive basis
+performance and certified conversion, not a new challenge frontier.
+
+A next larger instance may still refuse in F4 construction before conversion. #557's exact demand
+diagnostic and [F4 resource scaling](research/f4-resource-scaling.md) identify that boundary; a
+faster converter cannot remove it. The [algorithm decision](research/m27-algorithm-decision.md)
+also identifies a planner boundary: `solve_one_planned` still preflights classical dense blocks,
+so adaptive conversion workspace alone does not prove the planned entry point reaches the fast
+route. #273's multi-family objective validation, #268's sparse-many-variable crossover and #439's
+broader engine study remain unfinished. They are not silently closed by the milestone's goals.
+
+### 15.5 Negative results and prediction accuracy
+
+- **Matching batch counts did not imply matching intermediate objects.** #447 rejected extra work
+  at its observed counts, but #477 found reducible tails accruing debt to final interreduction.
+  The proposed matrix pass was estimated near 170 ms and first measured 4 094 ms, about 24x out;
+  the autoreduction matrices differed by 405x in cells. Later quieter A/Bs measured a smaller
+  stage cost. The estimate failed because the object being priced was wrong.
+- **A stage share did not prescribe the storage remedy.** #304's copy removal did not remove
+  interreduction time. The baseline records that correction; the isolated old storage before/after
+  RSS pair remains missing. It cannot be supplied by a different route's memory measurement.
+- **The headline matrix speedup was session-sensitive.** The baseline carries forward its paired
+  3.63x, not the loaded cohort's 4.18x. Its approximately 7 999 ms projected matrix total was later
+  measured at 8 333.1 ms, 4.2% out, in a new cohort. This is a checked prediction, not permission
+  to divide an old denominator into a new result.
+- **The flags interact.** Matrix routing alone was nearly worthless on budget-refused Katsura-11;
+  reducing batch rows made its closure affordable. Neither independent flag predicts the pair.
+- **Cached public monomial degree was rejected.** [#317's retained experiment](research/monomial-degree.md)
+  found no material stage-level improvement under its gate. The initial §13 claim that agreeing
+  counts would make monomial representation the highest-leverage change did not survive testing.
+  #268's sparse-support experiment remains a distinct open question.
+- **Repeated division work did not justify caching.** [Interreduction §3i](research/interreduction-cost.md#3i-569-candidate-2-counted--9857-of-the-steps-repeat-and-it-is-the-cheap-half-that-does)
+  confirms repetition, but the shipping MQ route executes zero such division steps. A high repeat
+  percentage is not a measured product opportunity.
+- **M27-D's refusal is the deliverable.** No current-default whole-solver profile prices a useful
+  XL, Hilbert or ordering prototype on the target. Existing Wiedemann conversion is not an XL
+  solver. A storage model and a historical basis-only gain do not price verified point recovery.
+
+### 15.6 M28 recommendation and the original hypotheses
+
+**Run first:** repeat the weak Katsura measurement and collect a bounded current-default profile
+on public MQ, including basis, operator construction, conversion, point recovery, verification and
+attributable process RSS. Build before measurement, use a single recorded environment, retain
+refusals, and charge fallback work. Reuse the [#457 pilot limits](research/m27-algorithm-decision.md#5-what-would-change-the-decision)
+rather than authorizing a larger campaign from this report. This resolves whether remaining F4
+construction or conversion/planner integration actually limits the complete solve.
+
+The competing investment is #273: adaptive conversion has measured benefits on one family, while
+its planned entry point can reject on dense preflight. Compare complete routes and objectives
+before changing that policy. #268's representation experiment competes only after a current
+profile identifies the memory traffic it could remove; the old 80.4% stage share cannot fund it.
+Variable ordering remains the cheapest bounded candidate to measure if the full-route profile
+supports it. XL requires construction, recurrence and verified recovery costs, not only columns.
+
+| initial §13 hypothesis | score at this snapshot | consequence |
+|---|---|---|
+| 1: agreeing work counts make monomial representation the top lever | **premise confirmed; remedy rejected as a general conclusion** | Batch-tail reduction and matrix interreduction shipped; #317's cache failed its stage gate. Re-profile before another representation change. |
+| 2: disagreeing counts fund pair handling/HDF4 | **antecedent false** | #447 observed agreement; no funding follows from this branch. |
+| 3–4: challenge barrier and XL hypothesis | **moved out of scope** | Preserved at `9532a9a2`; no library-only result answers the moved campaign question. |
+| 5: historical ordering gains justify a default | **not established** | #457 requires current public-family whole-route evidence; keep a measured pilot separate from a default change. |
+
+Project #7 was read directly, with all 333 items returned at review: all 50 M27-labeled issues
+have project rows, and every closed one is Done. #458 is In Progress during this work; #450,
+#256, #268, #273 and #439 remain open. Parent relationships are preserved. The two original
+housekeeping notes are historical: #223 and #274 are already closed. No issue is closed merely
+because this report lists its result. Remaining uncertainty is explicit: multi-family conversion
+crossover, present full-solver bottlenecks, isolated old storage RSS and a new challenge frontier
+are not measured here.
