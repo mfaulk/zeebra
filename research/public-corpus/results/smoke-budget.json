@@ -1,0 +1,34 @@
+{
+  "source": "7cca5d7a4e723df51cf27a0e7b5eff14d059800f",
+  "binary_sha256": "0aed408f785df94ab0a0e91fdd26eb07102479ae7a0d79bf2b5748d18b18c45a",
+  "profile": "debug; unoptimized; x86-64-v3",
+  "affinity": "0,1,2,3",
+  "budget_seconds": 5,
+  "runs": [
+    {
+      "wall_ns": 30692366,
+      "max_rss_kib": 47272,
+      "stdout": "\nrunning 4 tests\ntest grobner::external::public_corpus::tests::frozen_public_identities_and_references ... ok\ntest grobner::external::public_corpus::tests::performance_bases_match_the_independent_oracle ... ignored, opt-in public performance tier; run with optimized code and a resource guard\ntest grobner::external::public_corpus::tests::references_reject_ring_identity_mismatches ... ok\ntest grobner::external::public_corpus::tests::smoke_bases_match_the_independent_oracle ... ok\n\ntest result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 2785 filtered out; finished in 0.03s\n\n"
+    },
+    {
+      "wall_ns": 29640485,
+      "max_rss_kib": 46220,
+      "stdout": "\nrunning 4 tests\ntest grobner::external::public_corpus::tests::frozen_public_identities_and_references ... ok\ntest grobner::external::public_corpus::tests::performance_bases_match_the_independent_oracle ... ignored, opt-in public performance tier; run with optimized code and a resource guard\ntest grobner::external::public_corpus::tests::references_reject_ring_identity_mismatches ... ok\ntest grobner::external::public_corpus::tests::smoke_bases_match_the_independent_oracle ... ok\n\ntest result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 2785 filtered out; finished in 0.02s\n\n"
+    },
+    {
+      "wall_ns": 29307696,
+      "max_rss_kib": 47216,
+      "stdout": "\nrunning 4 tests\ntest grobner::external::public_corpus::tests::frozen_public_identities_and_references ... ok\ntest grobner::external::public_corpus::tests::performance_bases_match_the_independent_oracle ... ignored, opt-in public performance tier; run with optimized code and a resource guard\ntest grobner::external::public_corpus::tests::references_reject_ring_identity_mismatches ... ok\ntest grobner::external::public_corpus::tests::smoke_bases_match_the_independent_oracle ... ok\n\ntest result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 2785 filtered out; finished in 0.03s\n\n"
+    },
+    {
+      "wall_ns": 29174764,
+      "max_rss_kib": 46204,
+      "stdout": "\nrunning 4 tests\ntest grobner::external::public_corpus::tests::frozen_public_identities_and_references ... ok\ntest grobner::external::public_corpus::tests::performance_bases_match_the_independent_oracle ... ignored, opt-in public performance tier; run with optimized code and a resource guard\ntest grobner::external::public_corpus::tests::references_reject_ring_identity_mismatches ... ok\ntest grobner::external::public_corpus::tests::smoke_bases_match_the_independent_oracle ... ok\n\ntest result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 2785 filtered out; finished in 0.02s\n\n"
+    },
+    {
+      "wall_ns": 29201435,
+      "max_rss_kib": 48284,
+      "stdout": "\nrunning 4 tests\ntest grobner::external::public_corpus::tests::frozen_public_identities_and_references ... ok\ntest grobner::external::public_corpus::tests::performance_bases_match_the_independent_oracle ... ignored, opt-in public performance tier; run with optimized code and a resource guard\ntest grobner::external::public_corpus::tests::references_reject_ring_identity_mismatches ... ok\ntest grobner::external::public_corpus::tests::smoke_bases_match_the_independent_oracle ... ok\n\ntest result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 2785 filtered out; finished in 0.02s\n\n"
+    }
+  ]
+}

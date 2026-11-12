@@ -36,9 +36,9 @@ def regenerate(attempts):
         if not r['basis'] or r['quotient_dimension'] is None:
             raise ValueError('selected public case needs a nonempty finite reference')
         basis = '\n'.join(sorted(r['basis'])) + '\n'
-        path = ROOT / 'research/public-corpus/references' / (r['name'] + '.basis')
+        path = ROOT / 'src/grobner/external/public_corpus_references' / (r['name'] + '.basis')
         pending.append((path, basis))
-        rows.append('    PublicCase { name: "%s", family: "%s", variables: %s, tier: Tier::%s, digests: &[(32003,"%s")], basis_sha256: "%s", quotient_dimension: %s, basis: include_str!("../../../research/public-corpus/references/%s.basis") },' %
+        rows.append('    PublicCase { name: "%s", family: "%s", variables: %s, tier: Tier::%s, digests: &[(32003,"%s")], basis_sha256: "%s", quotient_dimension: %s, basis: include_str!("public_corpus_references/%s.basis") },' %
                     (r['name'], r['family'], len(r['variables']), r['tier'], r['digest'], hashlib.sha256(basis.encode()).hexdigest(), r['quotient_dimension'], r['name']))
     for path, basis in pending:
         path.write_text(basis)

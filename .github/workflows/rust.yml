@@ -79,6 +79,7 @@ jobs:
       - name: MQ10 profiling instrument tests
         run: |
           cargo test --example mq10_profile
+          cargo test --example public_corpus
           python3 tools/test/mq10-profile-test.py
           python3 tools/test/public-corpus-test.py
       - name: Doc tests
