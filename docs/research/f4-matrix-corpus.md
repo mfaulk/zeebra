@@ -1,5 +1,8 @@
 # The F4 matrix corpus: real Macaulay matrices, pinned, and whether they predict
 
+**Measured at:** `395ba5e0` for the eighteen-entry capture costs in §4.2 (#640).
+The older kernel timings below retain their original provenance:
+
 **Measured at:** `680692f2`, on base `0882def9` — recorded at the time rather than recovered (#335).
 The branch was then rebased onto `ced9cb51`, which brings in #583's `sort_unstable_by` on the
 Macaulay columns (+108/-4 in `macaulay.rs`) and #490's live-entry budget. **Every pinned digest in
@@ -304,6 +307,54 @@ batch: `BatchSelector::Largest` is resolved in a first pass that records row cou
 else, so the second pass can clone one basis instead of all of them. That is the only reason the
 selector is two runs and not one, and it is what keeps capturing a late batch of a long run cheaper
 than the run itself.
+
+### 4.2 Whole-corpus capture cost after #640
+
+On 2026-11-11 at `395ba5e0`, one `check-all` process captured and verified the original seventeen
+entries followed by MQ14. This includes generator construction, all prefix work, the retained
+matrix/input copies and digest verification. It excludes compilation, rebuilding the captures and
+eliminating MQ14's selected matrix.
+
+| verified matrices | binary wall time | maximum process RSS | outcome |
+|---|---|---|---|
+| 18 (17 ordinary + 1 large) | 86.83 s | 1 208 264 KiB (1.15 GiB) | every fingerprint matched |
+
+AMD Threadripper PRO 5995WX, affinity `0-15`, `release`, fat LTO, one codegen unit,
+`--no-default-features`, repository `x86-64-v3` flags, `RUSTFLAGS` unset and `RUSTC_WRAPPER` empty.
+No compiler ran during capture. `tools/benchlock.sh` recorded load 1.16 at start and 1.14 at end;
+its window ended `status=0 end=exited`. A 660-second timeout, 16 GiB virtual-memory limit and
+16 GiB RSS guard bounded the run; the guard watched the binary and exited successfully. This is
+one capture-cost observation, not a kernel comparison or a new predictiveness experiment.
+
+To reproduce with a private target directory, build first:
+
+```sh
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-large-corpus
+export TMPDIR="$CARGO_TARGET_DIR/tmp"
+mkdir -p "$TMPDIR"
+env -u RUSTFLAGS RUSTC_WRAPPER='' cargo build --release --no-default-features --example f4_matrix_corpus
+```
+
+Then run the built binary under the lock and guards:
+
+```sh
+ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=0-15 tools/benchlock.sh f4-large-capture bash -c '
+  ulimit -v 16777216
+  tools/rss-guard.sh f4_matrix_corpus check-all 16777216 --poll 1 --wait 60 &
+  capture_guard_pid=$!
+  /usr/bin/time -v timeout 660 taskset -c 0-15 "$CARGO_TARGET_DIR/release/examples/f4_matrix_corpus" check-all
+  capture_run_status=$?
+  wait "$capture_guard_pid"
+  capture_guard_status=$?
+  if [ "$capture_run_status" != 0 ]; then exit "$capture_run_status"; fi
+  exit "$capture_guard_status"
+'
+```
+
+The separate ignored test `test_large_entry_is_pinned_and_rebuilds` also checks full matrix
+equality against a fresh construction from the captured inputs and verifies the declared regime.
+It is explicitly excluded from ordinary CI; use an optimized profile and the same memory guards
+when running it. The ordinary corpus test and benchmark smoke still visit only seventeen entries.
 
 ---
 
