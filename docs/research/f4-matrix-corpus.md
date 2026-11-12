@@ -141,7 +141,7 @@ checked is a coverage claim that is not true.
 
 ## 2. The corpus
 
-Seventeen matrices. Six field types across five distinct field orders, three scaffolding regimes,
+The default set has seventeen matrices. Six field types across five distinct field orders, three scaffolding regimes,
 both option presets, and shapes from 61x72 to 12554x12020. Every column but the last two is a
 **counter** rather than a timing, so none of it depends on the machine or the profile; `fill-in` is
 the live entry count at elimination's high-water and at its end, over the count as built, under the
@@ -204,6 +204,34 @@ digits, which would have made two entries on the per-field-width axis interchang
 axis the corpus exists to separate. The digest now carries the field's type name, and
 `test_two_fields_with_identical_entries_digest_differently` is the regression test.
 
+### 2.1 The opt-in large set (#640)
+
+| label | batch | rows | columns | reducer rows | nonzeros | digest |
+|---|---|---|---|---|---|---|
+| `mq-random-14/grevlex/p31x64/default-64m` | 6 | 75 091 | 76 194 | 67 411 | 24 843 682 | `b6b0c2aa13296fec` |
+
+`large_corpus()` and `walk_large_corpus()` use the same spec/dispatch generator and fingerprint
+check as the default set. They are separate entry points: neither `walk_corpus`, the normal
+benchmark nor CI smoke includes the large entry. `list-large` prints its metadata and budgets,
+`pin-large` derives the fingerprint, and `check-large` refuses a drifted capture. `check-all`
+verifies both sets in one process for a whole-corpus capture-cost measurement.
+
+The selected artifact is the matrix built by MQ14 batch 6 (zero-based), not a final
+interreduction matrix. `BatchSelector::Prefix(6)` executes earlier batches, clones the selected
+matrix and its basis/pairs, then requests an observer stop before elimination. F4 itself returns
+`StoppedByObserver`; only the capture wrapper converts that intentional stop into an artifact.
+`CapturedMatrix::completed` is false and `batches` is 7, the observed prefix length. Errors before
+the selected matrix remain errors. This avoids both a discovery run over the whole system and
+all work after the target, while retaining enough inputs to verify a fresh rebuild.
+
+The entry uses shipping strategies with an explicit 64 000 000-entry / 1 024 000 000-byte
+allowance. The shipping 32 000 000-entry cap stops an earlier elimination at 32 001 899 live
+entries, before the selected matrix can be captured. `OptionsPreset::RaisedDefault` records both
+caps; ordinary defaults remain 32 000 000 entries / 512 000 000 bytes. A successful capture does not imply elimination fits that cap.
+`ZEEBRA_F4_LARGE_CORPUS=1 cargo bench --bench f4_matrix_corpus` selects only the large set,
+skips dense elimination and uses one setup clone per iteration. Backend budget refusals are
+reported rather than timed. Use a timeout, process RSS guard and benchmark lock for explicit runs.
+
 ---
 
 ## 3. GBLA's published matrices: the catalogue survives, the data does not
@@ -232,14 +260,12 @@ recording because it is the only surviving measurement of what a published F4 ma
 
 Two observations.
 
-**The gap is size, not density.** GBLA's F4 and F5 matrices are 2.0%–7.8% dense as built, which is
-inside the range [§2](#2-the-corpus) spans (0.24%–23.5%); the densities are comparable. What is not
-comparable is scale. GBLA's largest is **86 490 x 102 700 with 184 million entries**; this corpus's
-largest is 12 554 x 12 020 with 783 737, which is **235x fewer entries**. Those are katsura at
-twelve to fifteen variables against six, seven and ten here. A kernel conclusion drawn on this
-corpus is therefore a conclusion at 10^5–10^6 entries and says nothing directly about 10^8, where
-blocking, cache residency and the cost of a column index all change. [§6](#6-what-this-leaves)
-records that as the corpus's main limitation rather than leaving it implicit.
+**The gap remains size, although #640 narrows it.** GBLA's F4 and F5 matrices are 2.0%–7.8%
+dense as built. Its largest is 86 490 x 102 700 with 184 million entries. The default set tops out
+at 783 737 entries; the opt-in MQ14 capture adds 24 843 682 entries, about 7.4 times smaller than
+that GBLA maximum. This reaches the 10^7-entry regime but still leaves 10^8 untested. The kernel
+rankings in §5 were measured on the original seventeen matrices; extending the corpus does not
+extend those measurements to the large entry.
 
 **The format is readable and not worth reading.** The `.gbm` reader is `draft/io.h`'s
 `readFileSplit`: a little-endian stream of a version word XOR'd with `1 << 31`, then `m`, `n`, `mod`,
@@ -259,27 +285,21 @@ it does not have to be re-derived.**
 
 Source only. No binary data is added to the repository.
 
-| file | lines | bytes |
-|---|---|---|
-| `src/grobner/f4/matrix_corpus.rs` | 1 262 | 50 KB |
-| `examples/f4_matrix_corpus.rs` | 339 | 13 KB |
-| `benches/f4_matrix_corpus.rs` | 141 | 6 KB |
-| `docs/research/f4-matrix-corpus.md` | this file | 18 KB |
-| edits to `observer.rs`, `reduction.rs`, `mod.rs`, `README.md`, `Cargo.toml` | +170 / -12 | — |
+The module, example and benchmark store generators and pinned fingerprints, with no serialized
+matrix format. The MQ14 entry alone holds 24 843 682 `(usize, Zp2147483647)` entries, so its
+coefficient payload allowance must account for 16 bytes per entry on this 64-bit target, before
+row vectors, column monomials, captured inputs and other process allocations. The live-entry cap
+is not an RSS cap.
 
-**87 KB of source and prose, and nothing else.** For comparison, the matrices this corpus names
-would be, written out: `mq-random-10`'s alone is 783 737 entries at a column index and a 4-byte
-residue, so around 9 MB before any encoding, and the seventeen together around 11 MB — in a format
-that would then have to be versioned for as long as the corpus existed, over a crate with no
-serialization derived on any matrix type and no JSON or binary codec among its dependencies.
+### 4.1 Historical small-set measurements
 
-Capturing the whole corpus takes **17.6 s** in a `ci-release` build, and
+The original seventeen-entry capture took **17.6 s** in a `ci-release` build, and
 `test_every_entry_is_pinned_and_in_its_regime` — which captures all seventeen *and* rebuilds each
-one from its own inputs — takes **15.3 s**. `cargo bench --bench f4_matrix_corpus -- --test`, which
-is what CI's benchmark smoke job runs on every pull request, takes about **80 s** of run time on top
+one from its own inputs — took **15.3 s**. `cargo bench --bench f4_matrix_corpus -- --test`, which
+is what CI's benchmark smoke job runs on every pull request, took about **80 s** of run time on top
 of its build; most of that is `mq-random-10`, which is also the entry the corpus most needs.
 
-Capturing the whole corpus costs one F4 run per entry, or two when the entry selects the largest
+Capturing a complete entry costs one F4 run, or two when the entry selects the largest
 batch: `BatchSelector::Largest` is resolved in a first pass that records row counts and nothing
 else, so the second pass can clone one basis instead of all of them. That is the only reason the
 selector is two runs and not one, and it is what keeps capturing a late batch of a long run cheaper
@@ -422,13 +442,10 @@ What that permits and what it does not:
 
 ## 6. What this leaves
 
-**The corpus is capped at 10^6 entries, and the regime that matters most is above it.** The largest
-entry is `mq-random-10` at 783 737 nonzeros. GBLA's published matrices reach 184 million
-([§3](#3-gblas-published-matrices-the-catalogue-survives-the-data-does-not)), and that is where
-blocking and cache residency decide a kernel. Going there means `mq-random-14` or `katsura-11`, which
-`docs/research/f4-resource-scaling.md` §12 and §13 show are already at the memory ceiling as whole
-runs — so a larger entry needs the capture to stream rather than hold the basis, which it does not
-do today. **Filed as #640, Priority High.**
+**The opt-in large entry reaches 10^7, while 10^8 remains uncovered.** #640 adds a live
+MQ14 batch through prefix capture, without completing the system or eliminating the selected
+matrix. The ordinary CI corpus remains at seventeen entries. Large captures are verified
+explicitly; the historical predictiveness experiment has not been repeated at that scale.
 
 **#269 (H13) is named for a stage share that moved.** Its title is "F4 elimination kernels — the
 65-88% stage". That number is §6.2's, under what is now `baseline()`. On the default it is 7–17% of

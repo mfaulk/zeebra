@@ -273,6 +273,16 @@ handed to elimination, not a reconstruction — and is pinned by digest, so a be
 report a figure about a matrix that moved. See
 [`docs/research/f4-matrix-corpus.md`](../research/f4-matrix-corpus.md).
 
+Large matrices are explicit opt-in: `f4_matrix_corpus -- list-large` prints their pinned
+metadata and budgets, `check-large` verifies their captures, and `check-all` verifies both sets. `BatchSelector::Prefix(k)`
+runs through construction of batch `k`, then stops before its elimination; it does not compute a
+complete basis. `CapturedMatrix::completed` distinguishes this from a full capture. Earlier
+resource errors still fail the capture. To benchmark only the large set, use
+`ZEEBRA_F4_LARGE_CORPUS=1 cargo bench --bench f4_matrix_corpus`. This skips the dense backend and
+holds at most one setup clone per iteration; sparse/adaptive arms that exceed the entry allowance
+are reported as refusals. Capture success does not promise that elimination fits the same budget. The ordinary `walk_corpus` and CI benchmark smoke exclude
+these entries. Use the benchmark lock, a process memory guard and a timeout when capturing them.
+
 Wall-clock time alone does not say *why* a Gröbner computation got faster. For the algorithmic
 counters — pairs considered, pairs eliminated by Buchberger's first criterion, reductions, zero
 reductions, basis size:

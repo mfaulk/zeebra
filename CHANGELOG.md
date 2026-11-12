@@ -9,6 +9,11 @@ change to `y` may break the public API.
 
 ### Added
 
+- Opt-in large F4 matrix captures with pinned fingerprints, explicit budgets and prefix selection
+  that stops before eliminating the selected matrix (#640). The large entry uses an explicit
+  64-million-entry / 1.024 GB allowance without changing ordinary defaults. Observers can request this stop with
+  `BatchObserver::should_stop`; F4 reports `F4Error::StoppedByObserver` rather than a partial basis.
+
 - Certified scalar Wiedemann order conversion with explicit strategy selection, bounded projection
   retries, classical fallback, workspace budgets and route statistics; a reproducible comparison
   example with optional exact msolve eliminant checks.

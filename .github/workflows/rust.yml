@@ -119,6 +119,7 @@ jobs:
         run: |
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems) + test(=grobner::f4::tests::test_f4_on_larger_systems)'
+      # The opt-in large corpus is excluded; its capture gate is run explicitly off CI.
       - name: The F4 matrix corpus is as pinned
         if: github.event_name != 'pull_request'
         run: |

@@ -790,7 +790,7 @@ pub enum StopKind {
     /// [`F4Options::max_wall_time`] elapsed. **Never rankable against a [`Self::Resource`] stop.**
     Time,
 
-    /// The options cannot be satisfied by any computation. A caller mistake, not an outcome.
+    /// Invalid options or an explicit observer stop, rather than a resource outcome.
     Caller,
 
     /// The computation finished and its basis failed [`F4Options::certify`]. Reaching this would be
@@ -801,6 +801,7 @@ pub enum StopKind {
 /// Why an F4 computation stopped without a basis.
 ///
 /// Most variants mean a limit in [`F4Options`] was crossed. The exceptions are
+/// [`F4Error::StoppedByObserver`], an explicit caller stop,
 /// [`F4Error::CertificationFailed`], which means the computation finished and its result failed an
 /// independent check, and [`F4Error::TimeBudgetExceeded`], which is a clock rather than a budget on
 /// the work — see [`StopKind`] for why those two have to be told apart. There is deliberately no
@@ -808,6 +809,9 @@ pub enum StopKind {
 /// basis.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum F4Error {
+    /// An observer requested a stop after construction and before elimination.
+    StoppedByObserver,
+
     /// Symbolic preprocessing needed more rows than allowed.
     ///
     /// Carries only the limit. The row count is not reported because preprocessing stops as soon
@@ -924,7 +928,7 @@ impl F4Error {
             Self::TimeBudgetExceeded { .. } | Self::InterreductionTimeBudgetExceeded { .. } => {
                 StopKind::Time
             }
-            Self::InvalidOptions { .. } => StopKind::Caller,
+            Self::InvalidOptions { .. } | Self::StoppedByObserver => StopKind::Caller,
             Self::CertificationFailed { .. } => StopKind::Certification,
         }
     }
@@ -945,6 +949,7 @@ impl F4Error {
                 "max_wall_time"
             }
             Self::InvalidOptions { .. } => "invalid_options",
+            Self::StoppedByObserver => "observer",
             Self::CertificationFailed { .. } => "certification",
         }
     }
@@ -953,6 +958,7 @@ impl F4Error {
 impl Display for F4Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::StoppedByObserver => write!(f, "observer stopped before batch elimination"),
             Self::TooManyRows { limit } => write!(
                 f,
                 "symbolic preprocessing needed more than the {} rows allowed",

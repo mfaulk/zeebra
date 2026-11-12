@@ -128,6 +128,12 @@ instrumented examples — along with the measurement rules this repository follo
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.
 
+The pinned F4 matrix corpus has a separate opt-in large set. Run
+`cargo run --release --example f4_matrix_corpus -- check-large` to capture and verify it;
+`check-all` verifies both sets; `list-large` shows the large dimensions and explicit live-entry budgets without computing a basis.
+The default corpus walk and benchmark smoke retain the bounded small set. See the
+[corpus report](docs/research/f4-matrix-corpus.md) for capture costs and limits.
+
 For the monomial-order dispatch and F4 column-sort replay, build with
 `cargo build --release --example monomial_order_width` and follow the pinned run command in the
 [benchmarking guide](docs/guide/benchmarking.md#monomial-order-width).
