@@ -463,6 +463,11 @@ wall/RSS stops. Loader/startup observations and polling quantization still const
 The ignored `grobner::external::sylvester::tests::test_live_sylvester_exact_evidence_and_stops`
 requires the provisioned driver and Singular; normal adapter tests need no upstream executable.
 
+An optional `--extended-certification` cohort runs only certified MQ10 at GF(32003), with a
+600 s child deadline and a 1265 s/2 GiB outer watchdog. Its distinct limits prohibit pooling it
+with the default 60 s cohort. Use a separate output/scratch path and retain either completion or
+exhaustion. Proof sidecars and compressed cohorts use the shared lossless reconstruction helper.
+
 ## Pinned Rust F4 comparand
 
 `GroebnerRsSolver` runs sdiehl/groebner 0.6.0 at

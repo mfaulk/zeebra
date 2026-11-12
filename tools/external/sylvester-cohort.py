@@ -27,7 +27,7 @@ def run(binary, directory, index, row, modulus, workers, engine, wall=60, rss=20
                         peak = max(peak, int(line.split()[1]) * 1024)
             except FileNotFoundError:
                 pass
-            if peak > 2 * 1024 * 1024 * 1024 or time.monotonic_ns() - started > 185_000_000_000:
+            if peak > 2 * 1024 * 1024 * 1024 or time.monotonic_ns() - started > (2 * wall + 65) * 1_000_000_000:
                 os.killpg(process.pid, signal.SIGKILL)
                 process.wait()
                 raise RuntimeError(f'parent guard stopped {command}; logs retained at {stem}')
@@ -50,6 +50,7 @@ def main():
     parser.add_argument('--scratch', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--append-history', action='store_true')
+    parser.add_argument('--extended-certification', action='store_true')
     args = parser.parse_args()
     if not os.environ.get('ZEEBRA_MACHINE') or not os.environ.get('ZEEBRA_AFFINITY'):
         parser.error('set ZEEBRA_MACHINE and ZEEBRA_AFFINITY and pin the launcher')
@@ -63,20 +64,23 @@ def main():
     cases = [(row, modulus) for modulus in (32003, 2147483647)
              for row in ('katsura-4', 'cyclic-5', 'mq-random-6', 'mq-random-10')]
     attempts = []
-    for repetition in range(3):
-        engines = ('zeebra', 'sylvester', 'sylvester-certified') if repetition % 2 == 0 else ('sylvester-certified', 'sylvester', 'zeebra')
-        for workers in (1,):
-            for row, modulus in cases:
-                for engine in engines:
-                    attempts.append(run(args.binary, args.scratch, len(attempts), row, modulus, workers, engine))
-    attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-6', 2147483647, 1, 'sylvester', rss=0))
-    attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-6', 2147483647, 1, 'sylvester', wall=0))
-    attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-4', 32003, 4, 'sylvester-certified'))
-    attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-4', 32003, 4, 'zeebra'))
-    for _ in range(3):
-        attempts.append(run(args.binary, args.scratch, len(attempts), 'mq-random-10', 32003, 4, 'sylvester'))
-        attempts.append(run(args.binary, args.scratch, len(attempts), 'mq-random-10', 32003, 4, 'zeebra'))
-    attempts.append(run(args.binary, args.scratch, len(attempts), 'groebner-rs-wide-control', 18446744073709551557, 1, 'sylvester'))
+    if args.extended_certification:
+        attempts.append(run(args.binary, args.scratch, 0, 'mq-random-10', 32003, 1, 'sylvester-certified', wall=600))
+    else:
+        for repetition in range(3):
+            engines = ('zeebra', 'sylvester', 'sylvester-certified') if repetition % 2 == 0 else ('sylvester-certified', 'sylvester', 'zeebra')
+            for workers in (1,):
+                for row, modulus in cases:
+                    for engine in engines:
+                        attempts.append(run(args.binary, args.scratch, len(attempts), row, modulus, workers, engine))
+        attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-6', 2147483647, 1, 'sylvester', rss=0))
+        attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-6', 2147483647, 1, 'sylvester', wall=0))
+        attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-4', 32003, 4, 'sylvester-certified'))
+        attempts.append(run(args.binary, args.scratch, len(attempts), 'katsura-4', 32003, 4, 'zeebra'))
+        for _ in range(3):
+            attempts.append(run(args.binary, args.scratch, len(attempts), 'mq-random-10', 32003, 4, 'sylvester'))
+            attempts.append(run(args.binary, args.scratch, len(attempts), 'mq-random-10', 32003, 4, 'zeebra'))
+        attempts.append(run(args.binary, args.scratch, len(attempts), 'groebner-rs-wide-control', 18446744073709551557, 1, 'sylvester'))
     rows = [attempt['rows'][0] for attempt in attempts]
     cohort = {key: value for key, value in attempts[0].items() if key not in ('rows', 'artifacts')}
     cohort.update(row_count=len(rows), rows=rows, attempts=attempts)
