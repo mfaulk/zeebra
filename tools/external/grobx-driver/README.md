@@ -54,3 +54,7 @@ the ignored live test requires this pinned driver and Singular.
 Large retained cofactor literals are stored losslessly in gzip sidecars by the cohort tool.
 `python3 tools/external/proof_artifacts.py COHORT.json.gz INDEX` restores the original response,
 checking its content hash; the cohort's prefix and suffix preserve the exact original JSON bytes.
+
+For the separately identified #713 passive-counter build, see
+[`research/README.md`](research/README.md). It preserves the stock provisioner and adapter contract;
+its opt-in diagnostics are research artifacts, not a replacement competitive-board engine.
