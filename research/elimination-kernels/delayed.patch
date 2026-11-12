@@ -1,0 +1,174 @@
+diff --git a/src/fields/finite_field.rs b/src/fields/finite_field.rs
+index 776df060..cb637b3e 100644
+--- a/src/fields/finite_field.rs
++++ b/src/fields/finite_field.rs
+@@ -130,6 +130,13 @@ where
+     /// (a bit pattern, or an array of coefficients) rather than an integer. Inherent methods win
+     /// method resolution, so `BinaryFieldElement::<P>::new(5)` is the bit pattern `0b101` while
+     /// `<BinaryFieldElement<P> as FiniteField>::new(5)` is `5 mod 2 = 1`.
++    fn h13_modulus() -> Option<u64> {
++        None
++    }
++    fn h13_canonical(&self) -> u64 {
++        panic!("unsupported pilot field")
++    }
++
+     fn new(val: u64) -> Self;
+ 
+     /// Parse a field element from the text [`Display`] writes for it.
+diff --git a/src/fields/prime_field_64.rs b/src/fields/prime_field_64.rs
+index 0f3e81fb..394301c7 100644
+--- a/src/fields/prime_field_64.rs
++++ b/src/fields/prime_field_64.rs
+@@ -206,6 +206,17 @@ impl<const P: u64> One for PrimeFieldElement64<P> {
+ impl<const P: u64> Ring for PrimeFieldElement64<P> {}
+ 
+ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
++    fn h13_modulus() -> Option<u64> {
++        if P == 32003 {
++            Some(P)
++        } else {
++            None
++        }
++    }
++    fn h13_canonical(&self) -> u64 {
++        self.value()
++    }
++
+     fn new(val: u64) -> Self {
+         Self {
+             value: montgomery::to_internal::<P>(val % P),
+diff --git a/src/linalg/dense/accumulator.rs b/src/linalg/dense/accumulator.rs
+index 42d855a3..6d79104a 100644
+--- a/src/linalg/dense/accumulator.rs
++++ b/src/linalg/dense/accumulator.rs
+@@ -18,6 +18,112 @@ use crate::{
+     FiniteField,
+ };
+ 
++#[path = "../../../examples/support/h13_delayed.rs"]
++mod h13;
++
++#[derive(Default)]
++struct NarrowPivot {
++    columns: Vec<usize>,
++    values: Vec<u16>,
++}
++impl NarrowPivot {
++    fn from_row<F: FiniteField>(row: &SparseRow<F>) -> Self {
++        Self {
++            columns: row.entries().iter().map(|(c, _)| *c).collect(),
++            values: row
++                .entries()
++                .iter()
++                .map(|(_, v)| v.h13_canonical() as u16)
++                .collect(),
++        }
++    }
++    fn bytes(&self) -> usize {
++        self.columns.capacity() * 8 + self.values.capacity() * 2
++    }
++}
++
++fn h13_eliminate<F: FiniteField>(
++    matrix: &mut SparseMatrix<F>,
++    first: usize,
++    pivots: &mut PivotIndex,
++    stats: &mut EliminationStatistics,
++    resident: &mut usize,
++    limit: usize,
++) -> Result<(), usize> {
++    let diagnostic = std::env::var_os("ZEEBRA_H13_METRICS").is_some();
++    let mut conversion = std::time::Duration::ZERO;
++    let start = diagnostic.then(std::time::Instant::now);
++    let mut cache: Vec<NarrowPivot> = (0..matrix.num_rows())
++        .map(|_| NarrowPivot::default())
++        .collect();
++    for (i, item) in cache.iter_mut().enumerate().take(first) {
++        *item = NarrowPivot::from_row(matrix.row(i));
++    }
++    if let Some(start) = start {
++        conversion += start.elapsed();
++    }
++    let mut accumulator = h13::Delayed::<32003>::new(matrix.num_columns());
++    for index in first..matrix.num_rows() {
++        let row = std::mem::take(&mut matrix.rows_mut()[index]);
++        *resident -= row.nonzeros();
++        let start = diagnostic.then(std::time::Instant::now);
++        accumulator.load(row.entries().iter().map(|(c, v)| (*c, v.h13_canonical())));
++        if let Some(start) = start {
++            conversion += start.elapsed();
++        }
++        let mut new_pivot = false;
++        while let Some((column, factor)) = accumulator.leading() {
++            if let Some(pivot) = pivots.pivot_of(column) {
++                accumulator.subtract(&cache[pivot].columns, &cache[pivot].values, factor);
++                stats.row_operations += 1;
++                let live = *resident + accumulator.nonzeros();
++                stats.peak_nonzeros = stats.peak_nonzeros.max(live);
++                if live > limit {
++                    return Err(live);
++                }
++            } else {
++                pivots.insert(column, index);
++                stats.rank += 1;
++                new_pivot = true;
++                break;
++            }
++        }
++        let start = diagnostic.then(std::time::Instant::now);
++        let entries: Vec<_> = accumulator
++            .take()
++            .into_iter()
++            .map(|(c, v)| (c, F::new(v)))
++            .collect();
++        let mut output = SparseRow::from_sorted_unchecked(entries);
++        if new_pivot {
++            if output.normalize() {
++                stats.pivot_inversions += 1;
++            }
++            cache[index] = NarrowPivot::from_row(&output);
++        }
++        if let Some(start) = start {
++            conversion += start.elapsed();
++        }
++        if output.is_zero() {
++            stats.zero_rows += 1;
++        }
++        *resident += output.nonzeros();
++        stats.peak_nonzeros = stats.peak_nonzeros.max(*resident);
++        matrix.rows_mut()[index] = output;
++    }
++    if diagnostic {
++        let cache_bytes = cache.capacity() * std::mem::size_of::<NarrowPivot>()
++            + cache.iter().map(NarrowPivot::bytes).sum::<usize>();
++        eprintln!(
++            "h13 conversion_ns={} pivot_cache_bytes={} accumulator_bytes={}",
++            conversion.as_nanos(),
++            cache_bytes,
++            matrix.num_columns() * 8
++        );
++    }
++    Ok(())
++}
++
+ /// A dense row used as the working register of a sparse elimination.
+ #[derive(Clone, Debug)]
+ pub struct DenseAccumulator<F: FiniteField> {
+@@ -220,6 +326,16 @@ fn eliminate_from<F: FiniteField>(
+     accumulator: &mut DenseAccumulator<F>,
+     max_nonzeros: usize,
+ ) -> Result<(), usize> {
++    if F::h13_modulus() == Some(32003) {
++        return h13_eliminate(
++            matrix,
++            first,
++            pivot_of_column,
++            statistics,
++            resident,
++            max_nonzeros,
++        );
++    }
+     for index in first..matrix.num_rows() {
+         // Taken out so the pivot rows, which are still in the matrix, can be read while this one
+         // is rewritten. A pivot's index is always one already processed, so never this one.

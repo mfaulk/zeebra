@@ -80,6 +80,8 @@ jobs:
         run: |
           cargo test --example mq10_profile
           cargo test --example public_corpus
+          cargo test --example elimination_kernel_study
+          python3 tools/test/elimination-kernel-study-test.py
           cargo test --example row_merge_study
           python3 tools/test/row-merge-study-test.py
           python3 tools/test/mq10-profile-test.py
