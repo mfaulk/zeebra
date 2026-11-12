@@ -242,7 +242,9 @@ The optional [sylvester F4 comparand](tools/external/sylvester-driver/README.md)
 reduced bases and independently verified v2 trace certificates through a pinned subprocess.
 Provision it with `tools/external/provision-sylvester.sh`; certified records use a separate
 objective and include proof production and checking. See the
-[adapter guide](docs/guide/external-engines.md#sylvester).
+[adapter guide](docs/guide/external-engines.md#sylvester) and
+[retained results](docs/research/sylvester-comparand.md), including the extended certification
+work-cap refusal.
 
 The [dense-F4 anchors](docs/research/classical-benchmarks.md#24-441-the-dense-f4-ladder-and-the-conversion-stage-caution)
 record Steel's published configurations and MinRank stage split, with a density candidate based on

@@ -80,3 +80,30 @@ Full v2 certificate bytes and their size are retained as lossless compressed pro
 reconstructs the original child JSON. No certificate or failed attempt is silently discarded.
 The [adapter guide](../guide/external-engines.md#sylvester) gives pinned provisioning and complete
 cohort commands. Build before locking; do not infer a task speedup from a kernel or startup cell.
+
+## Extended certification: the work cap, not the longer deadline
+
+**Measured at:** `ff09b144`, same production Rust/driver, machine and affinity. The separate
+[extended attempt](../../research/competitive/results/sylvester-684-extended.json.gz) uses
+`--extended-certification`, certified MQ10 at GF(32003), a 600 s child deadline, 2 GiB RSS cap and
+1265 s/2 GiB outer watchdog. It is one attempt and is not pooled with the 60 s cohort.
+
+The run stopped at the pinned verifier's **4 000 000 000 work-unit cap**, before its wall deadline.
+Its child self high-water snapshot is **309 518 336 bytes (295.18 MiB)**. This is a resource
+refusal, not rejection of a mathematical certificate and not a completed certification time.
+The integrated certification/binding pipeline does not identify which verification pass consumed
+that budget. Raising a wall limit alone cannot remove this work cap; no quota is increased here.
+
+This gives the next investigation a concrete barrier: characterize verifier work and certificate
+production before changing quotas or claiming raw/certified parity. The raw task, smaller certified
+controls and exact input/basis binding remain validated. The initial deadline stops are retained.
+
+Reproduce this distinct-budget experiment after building, with the same machine/affinity rules:
+
+```sh
+ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=0-3 \
+  tools/benchlock.sh sylvester-extended taskset -c 0-3 python3 tools/external/sylvester-cohort.py \
+  --binary "$CARGO_TARGET_DIR/release/examples/sylvester_comparison" \
+  --scratch /buildcache/cargo-target/sylvester-extended --extended-certification \
+  --output research/competitive/results/sylvester-684-extended.json.gz
+```
