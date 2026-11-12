@@ -248,6 +248,9 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     // off it, a capture clones the matrix, and a stage table whose elimination column included
     // that clone would say the measurement cost belongs to the thing being measured.
     observer.matrix(&matrix);
+    if observer.should_stop() {
+        return Err(F4Error::StoppedByObserver);
+    }
     clock.lap();
 
     let rows = matrix.num_rows();

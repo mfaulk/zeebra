@@ -1,62 +1,4 @@
-//! A pinned corpus of the Macaulay matrices F4 really builds, for benchmarking a kernel on.
-//!
-//! A kernel cannot be iterated on through whole F4 runs: the loop is seconds long and a change's
-//! effect on the kernel is confounded with its effect on matrix *shape*, because faster candidates
-//! change the pairs the next batch sees. A fixed set of matrices removes the confound. Synthetic
-//! sparse matrices do not substitute for it — an F4 matrix is wide, short-rowed, has a block that
-//! is unit upper triangular by construction, and carries between 32.5% and 99.7% scaffolding rows
-//! across the entries below, and no density sweep reproduces that.
-//!
-//! `docs/research/f4-matrix-corpus.md` is the corpus table, what it costs, and what it does not
-//! cover.
-//!
-//! # Nothing here is a reconstruction
-//!
-//! The matrices are **captured out of a live run** through
-//! [`BatchObserver::matrix`], which hands over the object
-//! F4 is about to eliminate. They are not rebuilt from a recipe and they are not regenerated from
-//! remembered dimensions. This is deliberate, and it is the reason the module exists in this shape
-//! rather than as a file format:
-//!
-//! - **#517** timed a generic template rather than the tile under study; array-indexed accumulators
-//!   cost ~20% against named slices for identical arithmetic, so the figures described the harness.
-//! - **#412** published a 3.21x "width penalty" that was a ratio between two different polynomial
-//!   pairs, one of them degree 1.
-//! - **#317**'s gate reported 3.32x on an order that never reads the quantity under test, because
-//!   the two arms were different call sites.
-//!
-//! Each of those is a measurement of the wrong artifact, and each would have been caught by
-//! asserting the artifact. So [`walk_corpus`] re-derives every matrix's
-//! [`MatrixFingerprint`] and refuses to hand it to a benchmark unless it equals the pinned one, and
-//! [`rebuild_matrix`] exists so that the *other* route — rebuilding from the batch inputs, which is
-//! what `benches/f4_stages.rs` does — can be asserted equal to the captured matrix rather than
-//! assumed equal to it. `test_rebuilding_from_the_inputs_reproduces_the_captured_matrix` is that
-//! assertion.
-//!
-//! # Which options a matrix came from is part of its identity
-//!
-//! [`F4Options::baseline`] and [`F4Options::default`] do not build the same matrices.
-//! `PairCriteria::ALL` discards pairs that `PRODUCT_ONLY` sends to a matrix, and
-//! `reduce_batch_rows` changes what later batches are selected from, so the two presets differ in
-//! matrix count, shape and density — not only in how fast the same matrix is eliminated. Every
-//! existing stage harness in this repository runs on `baseline()`, which means it measures matrices
-//! the shipping default never builds. [`MatrixSpec::options`] records the preset per entry and the
-//! corpus carries both, so that gap is visible instead of latent.
-//!
-//! # No bytes are committed
-//!
-//! The corpus is a generator plus pinned digests, which is what #262 asked for. Capturing it costs
-//! one F4 run per entry (two, when the entry selects the largest batch — see [`BatchSelector`]),
-//! and nothing is written to disk. `serde` is on the scalars and the polynomials but on none of the
-//! matrix types, and neither `serde_json` nor a binary codec is a dependency of this crate; a file
-//! format would have been the first of its kind here and would have had to be versioned forever.
-//!
-//! ```text
-//! cargo run --release --example f4_matrix_corpus -- list     # the corpus, as pinned
-//! cargo run --release --example f4_matrix_corpus -- check    # capture it and verify every digest
-//! cargo run --release --example f4_matrix_corpus -- pin      # re-derive the pinned table
-//! cargo run --release --example f4_matrix_corpus -- predict  # the predictiveness check
-//! ```
+//! Live F4 matrices pinned by canonical digests; capture preserves the exact pre-elimination input.
 
 use crate::{
     fields::{Bn254Fr, Gf256Mq, Mersenne31, Zp18446744073709551557, Zp2, Zp2147483647},
@@ -91,6 +33,9 @@ pub enum BatchSelector {
 
     /// The batch at this index, counting from zero in the order the run reduced them.
     Index(usize),
+
+    /// Capture this zero-based batch and stop before its elimination; no complete basis is computed.
+    Prefix(usize),
 }
 
 /// Which option preset built a matrix.
@@ -105,6 +50,9 @@ pub enum OptionsPreset {
 
     /// [`F4Options::default`], i.e. [`F4Options::recommended`] — what ships.
     Default,
+
+    /// Shipping strategies with explicit live-entry and byte caps for large captures.
+    RaisedDefault { entries: usize, bytes: usize },
 }
 
 impl OptionsPreset {
@@ -112,6 +60,11 @@ impl OptionsPreset {
         match self {
             Self::Baseline => F4Options::baseline(),
             Self::Default => F4Options::default(),
+            Self::RaisedDefault { entries, bytes } => F4Options {
+                max_live_nonzeros: entries,
+                max_live_bytes: bytes,
+                ..F4Options::default()
+            },
         }
     }
 
@@ -119,6 +72,7 @@ impl OptionsPreset {
         match self {
             Self::Baseline => "baseline",
             Self::Default => "default",
+            Self::RaisedDefault { .. } => "default-raised-budget",
         }
     }
 }
@@ -272,8 +226,11 @@ pub struct CapturedMatrix<const N: usize, F: FiniteField> {
     /// re-deriving the generators at the call site would be a second definition of the instance.
     pub generators: Vec<MultivariatePolynomial<N, F>>,
 
-    /// Batches the run reduced in total, which bounds [`BatchSelector::Index`].
+    /// Matrix hooks observed: the total for complete captures, or the prefix length otherwise.
     pub batches: usize,
+
+    /// Whether the source computation completed rather than stopping at a prefix.
+    pub completed: bool,
 
     /// What the matrix is.
     pub fingerprint: MatrixFingerprint,
@@ -285,7 +242,7 @@ pub enum CorpusError {
     /// The computation stopped before producing the matrix.
     Computation(F4Error),
 
-    /// [`BatchSelector::Index`] named a batch past the end of the run, or the run built none.
+    /// An index or prefix selector named a missing batch, or the run built none.
     NoSuchBatch {
         label: &'static str,
         wanted: usize,
@@ -518,6 +475,7 @@ impl<const N: usize, F: FiniteField> BatchObserver<N, F> for Shapes {
 /// Keeps one batch: its inputs, and the matrix F4 built from them.
 struct At<const N: usize, F: FiniteField> {
     wanted: usize,
+    stop_after_capture: bool,
     seen: usize,
     pending: Option<TracedBatch<N, F>>,
     held: Option<(TracedBatch<N, F>, MacaulayMatrix<N, F>)>,
@@ -545,16 +503,21 @@ impl<const N: usize, F: FiniteField> BatchObserver<N, F> for At<N, F> {
         }
         self.seen += 1;
     }
+
+    fn should_stop(&self) -> bool {
+        self.stop_after_capture && self.held.is_some()
+    }
 }
 
 /// Run F4 and keep the matrix the selector names, exactly as the run built it.
 ///
 /// [`BatchSelector::Largest`] costs two runs: the first records row counts only, which is what
-/// makes the second able to clone one basis instead of all of them.
+/// makes the second able to clone one basis instead of all of them. `Index` costs one complete
+/// run; `Prefix` stops immediately after constructing the selected matrix.
 ///
 /// # Errors
-/// [`CorpusError::Computation`] if the run stopped, [`CorpusError::NoSuchBatch`] if the selector
-/// names a batch the run did not build.
+/// [`CorpusError::Computation`] for any stop except the selected prefix stop;
+/// [`CorpusError::NoSuchBatch`] if the selector names a batch the run did not build.
 pub fn capture_matrix<const N: usize, F: FiniteField>(
     label: &'static str,
     generators: &[MultivariatePolynomial<N, F>],
@@ -562,42 +525,37 @@ pub fn capture_matrix<const N: usize, F: FiniteField>(
     options: &F4Options,
     selector: BatchSelector,
 ) -> Result<CapturedMatrix<N, F>, CorpusError> {
-    let mut shapes = Shapes { rows: Vec::new() };
-    super::f4_observed(generators, order, options, &mut shapes)?;
-    let batches = shapes.rows.len();
-
     let wanted = match selector {
-        BatchSelector::Index(index) => index,
-        // `position` of the maximum, i.e. the *first* batch attaining it, so a tie resolves the
-        // same way on every machine and the pinned index is reproducible.
-        BatchSelector::Largest => shapes
-            .rows
-            .iter()
-            .enumerate()
-            .max_by_key(|(index, rows)| (**rows, std::cmp::Reverse(*index)))
-            .map(|(index, _)| index)
-            .ok_or(CorpusError::NoSuchBatch {
-                label,
-                wanted: 0,
-                batches,
-            })?,
+        BatchSelector::Index(index) | BatchSelector::Prefix(index) => index,
+        BatchSelector::Largest => {
+            let mut shapes = Shapes { rows: Vec::new() };
+            super::f4_observed(generators, order, options, &mut shapes)?;
+            shapes
+                .rows
+                .iter()
+                .enumerate()
+                .max_by_key(|(index, rows)| (**rows, std::cmp::Reverse(*index)))
+                .map(|(index, _)| index)
+                .ok_or(CorpusError::NoSuchBatch {
+                    label,
+                    wanted: 0,
+                    batches: 0,
+                })?
+        }
     };
-
-    if wanted >= batches {
-        return Err(CorpusError::NoSuchBatch {
-            label,
-            wanted,
-            batches,
-        });
-    }
-
     let mut at = At {
         wanted,
+        stop_after_capture: matches!(selector, BatchSelector::Prefix(_)),
         seen: 0,
         pending: None,
         held: None,
     };
-    super::f4_observed(generators, order, options, &mut at)?;
+    let completed = match super::f4_observed(generators, order, options, &mut at) {
+        Ok(_) => true,
+        Err(F4Error::StoppedByObserver) if at.should_stop() => false,
+        Err(error) => return Err(error.into()),
+    };
+    let batches = at.seen;
 
     let (inputs, matrix) = at.held.ok_or(CorpusError::NoSuchBatch {
         label,
@@ -611,6 +569,7 @@ pub fn capture_matrix<const N: usize, F: FiniteField>(
         inputs,
         generators: generators.to_vec(),
         batches,
+        completed,
         fingerprint,
     })
 }
@@ -624,7 +583,7 @@ pub fn capture_matrix<const N: usize, F: FiniteField>(
 /// `F4Options::baseline()` with `ReducerSelection::FirstApplicable` and a disabled cache written
 /// out literally, none of which is what the shipping default does.
 ///
-/// The cache is fresh, which is only neutral because both presets have
+/// The cache is fresh, which is only neutral because the corpus presets have
 /// [`CacheMode::Off`](super::symbolic::CacheMode). Under a cache that is on, batch *k* replayed
 /// from empty need not be batch *k* of the run, and the assertion below is what would say so.
 ///
@@ -692,7 +651,7 @@ fn capture_checked<const N: usize, F: FiniteField>(
 /// Both [`corpus`] and [`walk_corpus`] come out of this invocation. A spec with no dispatch arm, or
 /// an arm with no spec, is not expressible.
 macro_rules! corpus {
-    ($(
+    ($metadata:ident, $walk:ident, $walk_with:ident; $(
         $label:literal : $system:expr,
         $family:literal, $variables:literal, $field:literal, $bits:literal,
         $order:expr, $preset:expr, $selector:expr, $regime:expr,
@@ -701,9 +660,8 @@ macro_rules! corpus {
     )*) => {
         /// Every entry's metadata and pinned fingerprint, in corpus order.
         ///
-        /// Metadata only: capturing the matrices costs an F4 run apiece, which [`walk_corpus`]
-        /// does and this does not.
-        pub fn corpus() -> Vec<MatrixSpec> {
+        /// Metadata only: no F4 computation is performed. The companion walk captures this set.
+        pub fn $metadata() -> Vec<MatrixSpec> {
             vec![$(
                 MatrixSpec {
                     label: $label,
@@ -735,21 +693,21 @@ macro_rules! corpus {
         /// # Errors
         /// The first [`CorpusError`] any entry produces, which stops the walk: a corpus that
         /// carried on past a drifted entry would publish a partial comparison as a whole one.
-        pub fn walk_corpus<V: CorpusVisitor>(visitor: &mut V) -> Result<(), CorpusError> {
-            walk_corpus_with(visitor, true)
+        pub fn $walk<V: CorpusVisitor>(visitor: &mut V) -> Result<(), CorpusError> {
+            $walk_with(visitor, true)
         }
 
-        /// As [`walk_corpus`], with the fingerprint check optional.
+        /// Capture this set with the fingerprint check optional.
         ///
         /// `verify = false` is for deriving the pinned table and nothing else.
         ///
         /// # Errors
-        /// As [`walk_corpus`].
-        pub fn walk_corpus_with<V: CorpusVisitor>(
+        /// The first capture or fingerprint error.
+        pub fn $walk_with<V: CorpusVisitor>(
             visitor: &mut V,
             verify: bool,
         ) -> Result<(), CorpusError> {
-            let specs = corpus();
+            let specs = $metadata();
             let mut index = 0usize;
             $(
                 {
@@ -779,7 +737,7 @@ use MonomialOrder::Lexicographic as Lex;
 use OptionsPreset::{Baseline, Default as Shipping};
 use Regime::{Mixed, PairHeavy, Scaffolded};
 
-corpus! {
+corpus! { corpus, walk_corpus, walk_corpus_with;
     // --- 31-bit prime, Mersenne31 in a 32-bit representation -------------------------------
     "katsura-7/grevlex/m31/default": katsura::<7, Mersenne31>(),
         "katsura", 7, "Mersenne31", 31, Grevlex, Shipping, Largest, Mixed,
@@ -844,6 +802,14 @@ corpus! {
         14, 61, 72, 55, 438, "5d08ac9dd7acb1ce";
 }
 
+// Large captures use the same spec/dispatch generator, but are never part of walk_corpus.
+corpus! { large_corpus, walk_large_corpus, walk_large_corpus_with;
+    "mq-random-14/grevlex/p31x64/default-64m": mq_random::<14, Zp2147483647>(REFERENCE_CHARACTERISTIC),
+        "mq-random", 14, "Zp2147483647", 31, Grevlex, OptionsPreset::RaisedDefault { entries: 64_000_000, bytes: 1_024_000_000 },
+        BatchSelector::Prefix(6), Scaffolded,
+        6, 75091, 76194, 67411, 24843682, "b6b0c2aa13296fec";
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -868,12 +834,124 @@ mod tests {
     type F = Mersenne31;
     const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
 
-    /// `BatchSelector::Largest` picks the batch whose row count the live run reports as its maximum.
-    ///
-    /// The cross-check that matters: `max_matrix_rows` is accumulated by the main loop from the
-    /// statistics each batch returns, and the capture comes out of the observer hook, so the two
-    /// are independent readings of the same matrix. A capture that took the wrong batch — or a hook
-    /// that fired after elimination had already changed the row count — would disagree here.
+    // The large capture is pinned, classified from its rows and identical to a fresh rebuild.
+    #[test]
+    #[ignore = "opt-in large capture; run with an optimized profile and a memory guard"]
+    fn test_large_entry_is_pinned_and_rebuilds() {
+        struct Check(usize);
+        impl CorpusVisitor for Check {
+            fn visit<const N: usize, F2: FiniteField>(
+                &mut self,
+                spec: &MatrixSpec,
+                captured: &CapturedMatrix<N, F2>,
+            ) {
+                self.0 += 1;
+                assert!(!captured.completed);
+                assert_eq!(captured.batches, spec.fingerprint.batch_index + 1);
+                assert!(captured.fingerprint.nonzeros > 10_000_000);
+                assert_eq!(
+                    Regime::of(captured.fingerprint.reducer_share()),
+                    spec.regime
+                );
+                assert_eq!(
+                    rebuild_matrix(captured, spec.order, &spec.options.options()).unwrap(),
+                    captured.matrix
+                );
+            }
+        }
+        let mut check = Check(0);
+        super::walk_large_corpus(&mut check).expect("large entry captures as pinned");
+        assert_eq!(check.0, super::large_corpus().len());
+    }
+
+    // The opt-in set exceeds ten million entries and cannot leak into the default smoke corpus.
+    #[test]
+    fn test_large_corpus_is_explicit_and_above_ten_million_entries() {
+        let small = corpus();
+        let large = super::large_corpus();
+        assert_eq!(small.len(), 17);
+        assert!(!large.is_empty());
+        for spec in large {
+            assert!(spec.fingerprint.nonzeros > 10_000_000);
+            assert!(!small.iter().any(|entry| entry.label == spec.label));
+            assert!(matches!(spec.selector, BatchSelector::Prefix(_)));
+            assert!(spec.options.options().max_live_nonzeros >= spec.fingerprint.nonzeros);
+        }
+    }
+
+    // Prefix capture preserves resource errors before the target and rejects missing batches.
+    #[test]
+    fn test_prefix_capture_does_not_hide_errors_or_missing_batches() {
+        let system = katsura::<4, F>();
+        let limited = F4Options {
+            max_matrix_rows: 1,
+            ..F4Options::default()
+        };
+        assert!(matches!(
+            capture_matrix(
+                "limited",
+                &system,
+                GREVLEX,
+                &limited,
+                BatchSelector::Prefix(0)
+            ),
+            Err(CorpusError::Computation(_))
+        ));
+        assert!(matches!(
+            capture_matrix(
+                "missing",
+                &system,
+                GREVLEX,
+                &F4Options::default(),
+                BatchSelector::Prefix(usize::MAX)
+            ),
+            Err(CorpusError::NoSuchBatch { .. })
+        ));
+    }
+
+    // Prefix capture stops before the selected batch is reduced or the batch limit is crossed.
+    #[test]
+    fn test_prefix_capture_stops_at_the_requested_matrix() {
+        let system = katsura::<4, F>();
+        let options = F4Options {
+            max_batches: Some(1),
+            ..F4Options::default()
+        };
+        let prefix = capture_matrix(
+            "prefix",
+            &system,
+            GREVLEX,
+            &options,
+            BatchSelector::Prefix(0),
+        )
+        .expect("first matrix captured before elimination");
+        let complete = capture_matrix(
+            "complete",
+            &system,
+            GREVLEX,
+            &F4Options::default(),
+            BatchSelector::Index(0),
+        )
+        .unwrap();
+        assert!(complete.completed);
+        assert_eq!(prefix.fingerprint, complete.fingerprint);
+        assert_eq!(prefix.batches, 1);
+        assert!(!prefix.completed);
+        assert_eq!(
+            prefix.matrix,
+            rebuild_matrix(&prefix, GREVLEX, &options).unwrap()
+        );
+        assert!(capture_matrix(
+            "complete",
+            &system,
+            GREVLEX,
+            &options,
+            BatchSelector::Index(0)
+        )
+        .is_err());
+    }
+
+    // Largest capture agrees with the maximum row count reported by the live run.
     #[test]
     fn test_the_largest_captured_matrix_is_the_largest_the_run_reports() {
         let system = katsura::<5, F>();
@@ -1060,22 +1138,18 @@ mod tests {
         );
     }
 
-    /// The corpus's `mq-random-n` system is the instance registry's, not a lookalike.
-    ///
-    /// Pinned by comparing the generated system's rendered text against what
-    /// `random_mq_instance` produces for the same name. The registry renders to text for the
-    /// external engines and never materializes a system at a const `N`, so the two routes are
-    /// genuinely separate code and this is the only thing that keeps them the same ideal.
+    // All MQ corpus generators reproduce the external registry system, including MQ14.
     #[test]
     #[cfg(feature = "external-runners")]
     fn test_the_corpus_mq_system_is_the_boards() {
         use crate::grobner::external::corpus::{random_mq_instance, REFERENCE_CHARACTERISTIC};
 
-        for n in [6usize, 10] {
+        for n in [6usize, 10, 14] {
             let board = random_mq_instance(n, n as u64, REFERENCE_CHARACTERISTIC, GREVLEX);
             let mine = match n {
                 6 => super::generated_mq::<6>(REFERENCE_CHARACTERISTIC),
                 10 => super::generated_mq::<10>(REFERENCE_CHARACTERISTIC),
+                14 => super::generated_mq::<14>(REFERENCE_CHARACTERISTIC),
                 _ => unreachable!(),
             };
             assert_eq!(mine.render(), board.system, "mq-random-{}", n);

@@ -1,25 +1,4 @@
-//! The F4 matrix corpus: what is in it, how it is pinned, and whether it predicts.
-//!
-//! `cargo run --release --example f4_matrix_corpus -- <mode>`
-//!
-//! - `list` — the corpus as pinned. Metadata only; captures nothing, so it is instant.
-//! - `check` — capture every entry and verify it against its pinned fingerprint. This is the gate:
-//!   it is what `walk_corpus` does, and it is also a test, so a matrix that moved fails CI.
-//! - `pin` — capture every entry and print the table rows to paste back into
-//!   `src/grobner/f4/matrix_corpus.rs`. The only mode that does not verify, because it exists to
-//!   derive what the others verify against.
-//! - `predict` — the predictiveness experiment #262 requires: does ranking two elimination kernels
-//!   on the corpus give the same answer as ranking them by whole-run wall clock?
-//!
-//! `predict` is the mode that decides whether the corpus is worth having. A microbenchmark that
-//! ranks kernels differently from the end-to-end run would be optimized at the expense of the thing
-//! that matters, which is an explicit non-goal of the milestone; so the two rankings are taken here
-//! and the disagreements are printed rather than averaged away.
-//!
-//! The two arms are `Backend::Sparse` and `Backend::Adaptive` — the sparse pivot loop against the
-//! dense row accumulator over sparse pivots. They are a real kernel A/B: same algorithm, same pivot
-//! rule, same row operation count, different inner loop. Nothing else moves between the arms, so
-//! the comparison is of eliminations and not of computations.
+//! Inspect, pin and verify live F4 matrix captures; large modes are explicit opt-in.
 
 use std::time::{Duration, Instant};
 
@@ -27,7 +6,10 @@ use zeebra::{
     grobner::{
         f4::{
             f4_with_options,
-            matrix_corpus::{corpus, walk_corpus_with, CapturedMatrix, CorpusVisitor, MatrixSpec},
+            matrix_corpus::{
+                corpus, large_corpus, walk_corpus_with, walk_large_corpus_with, CapturedMatrix,
+                CorpusVisitor, MatrixSpec,
+            },
             options::ReductionStrategy,
             rebuild_matrix,
             structured::{eliminate_to, BlockPlan, RowForm},
@@ -48,27 +30,50 @@ fn main() {
         .nth(1)
         .unwrap_or_else(|| "list".to_string());
     match mode.as_str() {
-        "list" => list(),
-        "check" => check(),
-        "pin" => pin(),
+        "list" => list(false),
+        "list-large" => list(true),
+        "check" => check(false),
+        "check-large" => check(true),
+        "check-all" => {
+            check(false);
+            check(true);
+        }
+        "pin" => pin(false),
+        "pin-large" => pin(true),
         "predict" => predict(),
         other => {
-            eprintln!("unknown mode {}; try list, check, pin or predict", other);
+            eprintln!(
+                "unknown mode {}; try list[-large], check[-large], pin[-large], check-all or predict",
+                other
+            );
             std::process::exit(64);
         }
     }
 }
 
+fn walk_selected<V: CorpusVisitor>(
+    visitor: &mut V,
+    large: bool,
+    verify: bool,
+) -> Result<(), zeebra::grobner::f4::matrix_corpus::CorpusError> {
+    if large {
+        walk_large_corpus_with(visitor, verify)
+    } else {
+        walk_corpus_with(visitor, verify)
+    }
+}
+
 /// The corpus as pinned, with the derived shares the regime bands are asserted against.
-fn list() {
+fn list(large: bool) {
     println!(
-        "| label | field | bits | preset | batch | rows | cols | red% | nz | density | regime | digest |"
+        "| label | field | bits | preset | batch | rows | cols | red% | nz | density | regime | digest | entry cap | byte cap | selector |"
     );
-    println!("|---|---|---|---|---|---|---|---|---|---|---|---|");
-    for spec in corpus() {
+    println!("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+    for spec in if large { large_corpus() } else { corpus() } {
+        let options = spec.options.options();
         let f = &spec.fingerprint;
         println!(
-            "| `{}` | {} | {} | {} | {} | {} | {} | {:.1} | {} | {:.4} | {} | `{}` |",
+            "| `{}` | {} | {} | {} | {} | {} | {} | {:.1} | {} | {:.4} | {} | `{}` | {} | {} | {:?} |",
             spec.label,
             spec.field,
             spec.field_bits,
@@ -80,13 +85,13 @@ fn list() {
             f.nonzeros,
             f.density(),
             spec.regime.name(),
-            f.digest
+            f.digest, options.max_live_nonzeros, options.max_live_bytes, spec.selector
         );
     }
 }
 
 /// Capture every entry, verify it, and say so.
-fn check() {
+fn check(large: bool) {
     struct Count {
         entries: usize,
     }
@@ -98,18 +103,19 @@ fn check() {
         ) {
             self.entries += 1;
             println!(
-                "ok  {:<42} {}x{} nz {} of {} batches",
+                "ok  {:<42} {}x{} nz {} observed_batches {} completed {}",
                 spec.label,
                 captured.fingerprint.rows,
                 captured.fingerprint.columns,
                 captured.fingerprint.nonzeros,
-                captured.batches
+                captured.batches,
+                captured.completed
             );
         }
     }
 
     let mut count = Count { entries: 0 };
-    match walk_corpus_with(&mut count, true) {
+    match walk_selected(&mut count, large, true) {
         Ok(()) => println!("\n{} entries, every one as pinned", count.entries),
         Err(error) => {
             eprintln!("\nCORPUS DRIFTED: {}", error);
@@ -119,7 +125,7 @@ fn check() {
 }
 
 /// Re-derive the pinned table.
-fn pin() {
+fn pin(large: bool) {
     struct Pin;
     impl CorpusVisitor for Pin {
         fn visit<const N: usize, F: FiniteField>(
@@ -144,13 +150,13 @@ fn pin() {
                 regime.name(),
             );
             println!(
-                "            nonzeros {}  batches {}",
-                f.nonzeros, captured.batches
+                "            nonzeros {}  batches {} completed {}",
+                f.nonzeros, captured.batches, captured.completed
             );
         }
     }
 
-    if let Err(error) = walk_corpus_with(&mut Pin, false) {
+    if let Err(error) = walk_selected(&mut Pin, large, false) {
         eprintln!("capture failed: {}", error);
         std::process::exit(1);
     }

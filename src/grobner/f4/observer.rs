@@ -1,17 +1,4 @@
-//! Watching an F4 computation go past, so that a stage can be measured on real input.
-//!
-//! Every optimization in this milestone starts with a measurement, and the input to that
-//! measurement is the batches F4 actually builds — not a synthetic approximation of them. An F4
-//! batch is determined by two things: the basis at the time, and the pairs selected. Hand both to
-//! an observer and a caller can replay any stage in isolation, benchmark it, or count what it did,
-//! without reimplementing the main loop.
-//!
-//! Reimplementing the main loop is the alternative this exists to prevent. Four workstreams each
-//! writing their own batch-generating driver would give four slightly different sequences of
-//! batches and four incomparable sets of numbers.
-//!
-//! The observation is free when nobody is observing: [`f4_observed`](super::f4_observed) is
-//! generic over the observer, and [`Ignore`]'s empty method inlines away.
+//! Observation hooks share the live F4 path; the default observer compiles away.
 
 use crate::{
     grobner::{
@@ -43,6 +30,12 @@ pub trait BatchObserver<const N: usize, F: FiniteField> {
     ///
     /// Defaulted to nothing, so an observer that only wants the inputs is unaffected.
     fn matrix(&mut self, _matrix: &MacaulayMatrix<N, F>) {}
+
+    /// Checked after `matrix`, before elimination. Returning true aborts with
+    /// [`F4Error::StoppedByObserver`], never a successful partial basis.
+    fn should_stop(&self) -> bool {
+        false
+    }
 }
 
 /// An observer that does nothing, for the ordinary path.
@@ -156,6 +149,35 @@ mod tests {
         MonomialOrder::GradedLexicographic,
         MonomialOrder::GradedReverseLexicographic,
     ];
+
+    // Observer cancellation returns a caller stop, never a successful partial basis.
+    #[test]
+    fn test_observer_stop_is_an_error_before_elimination() {
+        use super::{BatchObserver, CriticalPair, F4Error, MacaulayMatrix, MonicBasis};
+        struct Stop;
+        impl BatchObserver<4, F> for Stop {
+            fn batch(&mut self, _: &MonicBasis<4, F>, _: &[CriticalPair<4>]) {}
+            fn matrix(&mut self, matrix: &MacaulayMatrix<4, F>) {
+                assert!(matrix.nonzeros() > 0);
+            }
+            fn should_stop(&self) -> bool {
+                true
+            }
+        }
+        let error = crate::grobner::f4::f4_observed(
+            &katsura::<4, F>(),
+            MonomialOrder::GradedReverseLexicographic,
+            &F4Options::default(),
+            &mut Stop,
+        )
+        .unwrap_err();
+        assert_eq!(error, F4Error::StoppedByObserver);
+        assert_eq!(
+            error.stop_kind(),
+            crate::grobner::f4::options::StopKind::Caller
+        );
+        assert_eq!(error.limit_name(), "observer");
+    }
 
     /// Observing a computation does not change it: same basis, same statistics.
     #[test]

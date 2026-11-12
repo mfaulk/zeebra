@@ -187,7 +187,8 @@ pub fn f4_observed_reported<const N: usize, F: FiniteField, O: BatchObserver<N, 
 /// main loop.
 ///
 /// # Errors
-/// As [`f4_with_options`].
+/// As [`f4_with_options`], or [`F4Error::StoppedByObserver`] if the observer requests a stop
+/// after matrix construction. A stopped computation never returns a partial basis.
 pub fn f4_observed<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     generators: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
