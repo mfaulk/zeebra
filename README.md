@@ -251,6 +251,14 @@ before/after RSS measurement for the earlier basis-storage change remains missin
 F4 defaults close the measured Singular gap on the reported MQ cohort; the report identifies that
 cohort separately from the historical M26 baseline.
 
+The [M27 integration report](docs/MILESTONE-COMPETITIVE-MQ-SOLVING.md#15-integration-report-2026-11-11)
+scores the retained library-scope Minimum and Strong criteria as met. The paired F4 cohort measures
+5.86x faster complete MQ basis computation than the old defaults, with increased peak RSS;
+conversion gains are reported separately. It records the competitive limits, negative results and
+unfinished studies, and recommends bounded current-default profiling before further solver work.
+Regenerate the retained competitive board without measuring with
+`cargo run --release --example competitive -- --write`.
+
 ## Contributing and documentation
 
 The [M27 algorithm decision](docs/research/m27-algorithm-decision.md) records why an additional
