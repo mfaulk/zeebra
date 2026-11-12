@@ -73,3 +73,15 @@ backend and some public controls regressed. The refinement preserves direct copy
 pivot covers the whole target and avoids searching bounds already established by endpoint checks.
 `baseline-work.json.gz` is an instrument sanity check with both arm labels using the **same**
 `cc6916fc` baseline executable; those duplicate timings are not independent candidate evidence.
+
+The final candidate narrows the operation to **prefix skipping**, then truncates and directly
+copies back the merged tail. It avoids the second bound search and `Vec::splice`. The diagnostic
+`overlap_terms`/`output_window_terms` still describe the potential two-sided span; actual final
+merge work includes the suffix, so use `own_terms - prefix_terms` and
+`output_terms - prefix_terms` when modeling its traffic. Suffix entries were negligible in the
+MQ10 anatomy, whereas both two-sided candidates regressed small-field Sparse elimination.
+
+`results/window-refined-*` retain the second, full-span-fast-path prototype at `cc993a00`,
+including 120 solves, 150 matrix runs, eight diagnostic replays, and 12 hardware-counter runs.
+Every result matched, but Noon-6 and small-field Sparse controls still regressed. These negative
+controls are kept separately from the final prefix-only results.

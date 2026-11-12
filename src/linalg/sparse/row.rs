@@ -160,9 +160,9 @@ impl<F: FiniteField> SparseRow<F> {
         true
     }
 
-    /// `self -= factor * other`, merging only the target span covered by `other` into `scratch`.
+    /// `self -= factor * other`, merging the tail at `other`'s leading column into `scratch`.
     ///
-    /// Untouched prefixes stay in place; suffixes move only when the merged span changes length.
+    /// The untouched prefix stays in place; the merged tail is copied into the row's own buffer.
     /// Scratch remains caller-owned: swapping it into rows spreads its high-water capacity across
     /// the matrix (#554). Each row instead grows only its own buffer.
     pub fn subtract_scaled(&mut self, other: &Self, factor: &F, scratch: &mut Vec<(usize, F)>) {
@@ -171,7 +171,6 @@ impl<F: FiniteField> SparseRow<F> {
         }
 
         let first = other.entries[0].0;
-        let last = other.entries[other.entries.len() - 1].0;
         let lo = if self
             .entries
             .first()
@@ -181,21 +180,12 @@ impl<F: FiniteField> SparseRow<F> {
         } else {
             0
         };
-        let hi = if self
-            .entries
-            .last()
-            .is_some_and(|(column, _)| *column > last)
-        {
-            lo + self.entries[lo..].partition_point(|(column, _)| *column <= last)
-        } else {
-            self.entries.len()
-        };
         scratch.clear();
-        scratch.reserve(hi - lo + other.entries.len());
+        scratch.reserve(self.entries.len() - lo + other.entries.len());
 
         let mut i = lo;
         let mut j = 0;
-        while i < hi && j < other.entries.len() {
+        while i < self.entries.len() && j < other.entries.len() {
             let (own_column, own_coefficient) = self.entries[i];
             let (other_column, other_coefficient) = other.entries[j];
             if own_column < other_column {
@@ -213,17 +203,13 @@ impl<F: FiniteField> SparseRow<F> {
                 j += 1;
             }
         }
-        scratch.extend_from_slice(&self.entries[i..hi]);
+        scratch.extend_from_slice(&self.entries[i..]);
         for (column, coefficient) in &other.entries[j..] {
             scratch.push((*column, F::zero() - *factor * *coefficient));
         }
 
-        if lo == 0 && hi == self.entries.len() {
-            self.entries.clear();
-            self.entries.extend_from_slice(scratch);
-        } else {
-            drop(self.entries.splice(lo..hi, scratch.iter().copied()));
-        }
+        self.entries.truncate(lo);
+        self.entries.extend_from_slice(scratch);
         debug_assert!(self.is_canonical(), "{:?} is not canonical", self.entries);
     }
 
@@ -448,16 +434,16 @@ mod tests {
         assert_eq!(row.entries(), &[(5, F::new(7)), (9, F::new(11))]);
     }
 
-    // A narrow pivot leaves a long prefix and suffix intact without sizing scratch for the whole target.
+    // A tail merge leaves a long prefix intact without sizing scratch for the untouched entries.
     #[test]
-    fn narrow_merge_bounds_scratch_to_the_overlap() {
+    fn tail_merge_bounds_scratch_to_the_affected_entries() {
         let mut row = SparseRow::new(&(0..1024).map(|i| (i, F::ONE)).collect::<Vec<_>>());
         let capacity = row.capacity();
-        let pivot = SparseRow::new(&[(512, F::ONE)]);
+        let pivot = SparseRow::new(&[(1023, F::ONE)]);
         let mut scratch = Vec::new();
         row.subtract_scaled(&pivot, &F::ONE, &mut scratch);
         assert_eq!(row.nonzeros(), 1023);
-        assert!(row.coefficient(512).is_zero());
+        assert!(row.coefficient(1023).is_zero());
         assert!(row.entries().iter().all(|(_, v)| *v == F::ONE));
         assert_eq!(row.capacity(), capacity);
         assert!(
@@ -467,9 +453,9 @@ mod tests {
         );
     }
 
-    // Merge windows handle disjoint supports and the largest column index without overflow.
+    // Tail merges handle disjoint supports and the largest column index without overflow.
     #[test]
-    fn merge_window_handles_empty_and_extreme_supports() {
+    fn merge_tail_handles_empty_and_extreme_supports() {
         let mut scratch = Vec::new();
         for (own, other, expected) in [
             (
