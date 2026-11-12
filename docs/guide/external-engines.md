@@ -536,7 +536,7 @@ ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=2 \
   tools/benchlock.sh grobx-cohort taskset -c 2 python3 tools/external/grobx-cohort.py \
   --binary "$CARGO_TARGET_DIR/release/examples/grobx_comparison" \
   --scratch /buildcache/cargo-target/grobx-cohort \
-  --output research/competitive/results/grobx-683.json
+  --output research/competitive/results/grobx-683.json.gz
 cargo run --release --example competitive -- --write
 ```
 
@@ -546,3 +546,9 @@ Builds and tests precede acquiring the benchmark lock. The ignored
 `grobner::external::grobx::tests::test_live_grobx_exact_evidence_and_stops` checks zero, unit,
 positive-dimensional, wide-field, duplicate/zero-generator, deadline and memory cases; it requires
 Singular and the pinned driver. Driver workspace CI runs separately from ordinary crate builds.
+
+Large proof literals are retained once as content-addressed gzip sidecars. The cohort itself may
+use `.json.gz`; `tools/external/proof_artifacts.py COHORT INDEX` reconstructs the original child
+JSON response byte for byte and verifies the proof SHA-256. This preserves full certificates
+without repeating them in every response. `--small-controls-only` restricts a follow-up cohort to
+Katsura-4 at 32003 and the two registered wide controls; it does not pool different affinities.

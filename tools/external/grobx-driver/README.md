@@ -50,3 +50,7 @@ CARGO_TARGET_DIR=/buildcache/cargo-target/grobx-driver-tests \
 `.github/workflows/grobx-driver.yml` checks locked driver tests, Clippy and formatting separately;
 normal root builds never fetch upstream. Root adapter unit tests need no external executable;
 the ignored live test requires this pinned driver and Singular.
+
+Large retained cofactor literals are stored losslessly in gzip sidecars by the cohort tool.
+`python3 tools/external/proof_artifacts.py COHORT.json.gz INDEX` restores the original response,
+checking its content hash; the cohort's prefix and suffix preserve the exact original JSON bytes.

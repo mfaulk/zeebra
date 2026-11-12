@@ -7,6 +7,7 @@ from pathlib import Path
 import signal
 import subprocess
 import time
+from proof_artifacts import pack_attempts, write_cohort
 
 
 def run(binary, directory, index, row, modulus, workers, engine, wall=60, rss=2048):
@@ -49,6 +50,7 @@ def main():
     parser.add_argument('--scratch', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--append-history', action='store_true')
+    parser.add_argument('--small-controls-only', action='store_true')
     args = parser.parse_args()
     if not os.environ.get('ZEEBRA_MACHINE') or not os.environ.get('ZEEBRA_AFFINITY'):
         parser.error('set ZEEBRA_MACHINE and ZEEBRA_AFFINITY and pin the launcher')
@@ -63,6 +65,8 @@ def main():
              for row in ('katsura-4', 'cyclic-5', 'mq-random-6', 'mq-random-10')]
     cases += [('groebner-rs-wide-control', prime)
               for prime in (18446744073709551263, 18446744073709551557)]
+    if args.small_controls_only:
+        cases = [('katsura-4', 32003)] + cases[-2:]
     attempts = []
     for repetition in range(3):
         engines = ('zeebra', 'grobx', 'grobx-certified') if repetition % 2 == 0 else ('grobx-certified', 'grobx', 'zeebra')
@@ -76,7 +80,8 @@ def main():
     cohort = {key: value for key, value in attempts[0].items() if key not in ('rows', 'artifacts')}
     cohort.update(row_count=len(rows), rows=rows, attempts=attempts)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(cohort, indent=2, ensure_ascii=False) + '\n')
+    pack_attempts(attempts, args.output)
+    write_cohort(args.output, cohort)
     if args.append_history:
         path = Path('research/competitive/results/history.json')
         history = json.loads(path.read_text())
