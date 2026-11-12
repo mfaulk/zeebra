@@ -117,3 +117,18 @@ The initial failed tiny cells motivate an additional affinity/control observatio
 those failures or interpreting a missing RSS sample as a small engine memory footprint. The
 remaining performance question is a current-default stage profile explaining the raw MQ gap;
 the old interreduction share cannot answer it after the algorithm changed.
+
+## Small-control follow-up
+
+**Measured at:** `ee4905fa`, same pinned driver and production Rust, using
+`ZEEBRA_MACHINE=trpro-5995wx`, `ZEEBRA_AFFINITY=0-3`, **one worker**. Four allowed CPUs are an
+affinity set, not a four-worker computation. The [29-attempt follow-up](../../research/competitive/results/grobx-683-small.json.gz)
+uses `--small-controls-only`: Katsura-4 at 32003 and both wide controls, three alternating repeats,
+plus two deliberate stops, with the same child/parent caps.
+
+All nine Zeebra attempts completed; all nine raw and nine certified grobx attempts passed exact
+verification, including the independent two-inclusion cofactor checker at both wide primes. The
+two resource controls stopped. This supplies retained wide-field correctness evidence without
+removing the original single-core harness failures. The changed affinity is kept in a distinct
+cohort and does not explain the original observation by itself. No timing or memory ratio pools
+the cohorts, and these tiny cells do not clear the process startup floor.
