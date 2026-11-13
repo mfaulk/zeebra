@@ -27,6 +27,7 @@ pub mod integers;
 mod left_scalar_mul;
 pub mod linalg;
 mod poly;
+pub mod r1cs;
 mod rings;
 
 pub mod util;
