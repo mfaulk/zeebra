@@ -281,6 +281,35 @@ publication gates to those rows as to the ladder's. The Zeebra adapter also comp
 planted ladder. `mq-planted-wide-*` names fix their field independently of the requested
 characteristic; `digest_at` and the sweep publish them only at `2^64 - 353`.
 
+### Hard wide-field ladder
+
+The opt-in `wide_corpus` example covers Katsura, squarefree Cyclic (7 and 11), unplanted
+**dense** random MQ, Eco and Noonburg at `2^64 - 353`, Goldilocks (`2^64 - 2^32 + 1`),
+and BN254 r. The [catalog README](../../research/wide-corpus/README.md) gives exact identities,
+build/run commands and the measurement policy; the [board](../../research/wide-corpus/BOARD.md)
+retains successful full bases and resource stops. This catalog has its own decimal-characteristic
+identity format because `FieldSpec` and `ZeebraSolver::with_instantiation` accept only `u64`
+characteristics. BN254 runs directly through native F4 and is capability-only, without an external
+oracle or cross-engine ratio. Its field is never truncated to fit `FieldSpec`.
+
+Every 64-bit completed reduced basis is parsed and normalized in the declared field and compared
+coefficient for coefficient with all other completed answers. The independent live engines are
+Groebner.jl, groebner-rs and grobx. A limit stop does not supply oracle evidence. Startup controls
+are fresh Katsura-4 processes at each field; ratios require **both** wall operands at least twice
+the corresponding control. Native wall includes the complete runner; external wall is the
+supervised engine process, excluding version probing. Engine-internal timings remain separate.
+
+
+The frozen #738 campaign retains 141 attempts: 74 completions and 67 limit stops. All 70 shared
+64-bit answers agree on complete normalized bases. Dense MQ-11's fastest comparand takes 2.925 s
+at `2^64−353` and 3.326 s at Goldilocks; Zeebra times out on both. Every family has native wall
+comparisons above the startup floor, and the native comparands are faster on all eligible pairs
+in these single observations. Julia wall ratios remain withheld because its approximately 8-second
+process startup controls dominate the smaller shared completions. The corpus README records the
+measured controller and binary source stamps, exact ratios, uncorroborated single-engine outcomes,
+and the three successful BN254 capability rows. These hard-rung results do not support extending
+the easy planted-MQ speedup claim to the wider corpus.
+
 ### Wide planted MQ ladder
 
 `mq-planted-wide-6`, `mq-planted-wide-10`, and `mq-planted-wide-14` reuse the generic planted
