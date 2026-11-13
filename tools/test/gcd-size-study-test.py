@@ -13,10 +13,14 @@ class RecordTests(unittest.TestCase):
     # A digest-bound pair must return the same complete polynomial across routes and observer modes.
     def test_complete_answer_binding(self):
         answers = {}
-        raw = {'input': 'pair', 'input_sha256': study.digest(b'pair'), 'gcd': 'x',
+        raw = {'arity': 2, 'shape': 0, 'route': 'PrimitivePrs', 'input': 'pair', 'input_sha256': study.digest(b'pair'), 'gcd': 'x',
                'observed': False, 'profile': None, 'status': 'completed', 'peak_rss_bytes': 100}
         study.validate(raw, answers, ('field', 2, 0), False)
         study.validate(dict(raw), answers, ('field', 2, 0), False)
+        with self.assertRaisesRegex(ValueError, 'metadata'):
+            study.validate(dict(raw, arity=3), {}, ('field', 2, 0), False)
+        with self.assertRaisesRegex(ValueError, 'route'):
+            study.validate(raw, {}, ('field', 2, 0), False, 'brown')
         with self.assertRaisesRegex(ValueError, 'GCD'):
             study.validate(dict(raw, gcd='1'), answers, ('field', 2, 0), False)
         with self.assertRaisesRegex(ValueError, 'digest'):
@@ -24,7 +28,7 @@ class RecordTests(unittest.TestCase):
 
     # Refusal records bind the input and preserve a reason rather than inventing an answer.
     def test_refusals_remain_distinct_from_completed_answers(self):
-        raw = {'input': 'pair', 'input_sha256': study.digest(b'pair'), 'observed': False,
+        raw = {'arity': 2, 'shape': 0, 'route': 'PrimitivePrs', 'input': 'pair', 'input_sha256': study.digest(b'pair'), 'observed': False,
                'profile': None, 'status': 'refused', 'refusal': 'too few points'}
         answers = {}
         study.validate(raw, answers, ('field', 2, 0), False)
@@ -38,7 +42,7 @@ class RecordTests(unittest.TestCase):
         summary_spec = importlib.util.spec_from_file_location('gcd_size_summary', summary_path)
         summary = importlib.util.module_from_spec(summary_spec)
         summary_spec.loader.exec_module(summary)
-        raw = {'input': 'pair', 'input_sha256': study.digest(b'pair'), 'gcd': 'x',
+        raw = {'arity': 2, 'shape': 0, 'route': 'PrimitivePrs', 'input': 'pair', 'input_sha256': study.digest(b'pair'), 'gcd': 'x',
                'observed': False, 'profile': None, 'status': 'completed',
                'peak_rss_bytes': 100, 'elapsed_ns': 10}
         complete = dict(field='field', arity=2, shape=0, route='primitive', arm='stock',
@@ -55,7 +59,7 @@ class RecordTests(unittest.TestCase):
         profile = {name: {'observations': 1, 'max_terms': 2, 'max_coefficient_degree': 3}
                    for name in study.PHASES}
         profile['subresultant_bound_violations'] = 0
-        raw = {'input': 'pair', 'input_sha256': study.digest(b'pair'), 'gcd': 'x',
+        raw = {'arity': 2, 'shape': 0, 'route': 'PrimitivePrs', 'input': 'pair', 'input_sha256': study.digest(b'pair'), 'gcd': 'x',
                'observed': True, 'profile': profile, 'status': 'completed', 'peak_rss_bytes': 100}
         study.validate(raw, {}, ('field', 2, 0), True)
         with self.assertRaisesRegex(ValueError, 'profile'):

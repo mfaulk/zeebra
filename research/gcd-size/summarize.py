@@ -22,7 +22,7 @@ def summarize(cohort):
         groups.setdefault(key, []).append(attempt)
         if attempt['status'] in ('completed', 'refused'):
             raw = attempt['raw']
-            study.validate(raw, answers, key[:3], attempt['arm'] == 'on')
+            study.validate(raw, answers, key[:3], attempt['arm'] == 'on', attempt['route'])
             if raw.get('profile') is not None:
                 pkey = key[:4] + (key[-1],)
                 if profiles.setdefault(pkey, raw['profile']) != raw['profile']:

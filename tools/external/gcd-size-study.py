@@ -29,7 +29,11 @@ def sibling(name):
     return module
 
 
-def validate(raw, answers, case, observed):
+def validate(raw, answers, case, observed, route=None):
+    if raw.get('arity') != case[1] or raw.get('shape') != case[2]:
+        raise ValueError('case metadata changed')
+    if route is not None and raw.get('route') != {'primitive': 'PrimitivePrs', 'subresultant': 'SubresultantPrs', 'brown': 'Brown'}[route]:
+        raise ValueError('route metadata changed')
     if digest(raw['input'].encode()) != raw['input_sha256']:
         raise ValueError('input digest mismatch')
     if raw['observed'] != observed:
@@ -125,7 +129,7 @@ def main():
         if result['exit'] == 0 and result['stop'] is None:
             try:
                 raw = json.loads(result['stdout'])
-                validate(raw, answers, (field, arity, shape), arm == 'on')
+                validate(raw, answers, (field, arity, shape), arm == 'on', route)
                 result['raw'] = raw
                 result['peak_rss_bytes'] = max(result['observed_peak_rss_bytes'], raw['peak_rss_bytes'])
                 if result['peak_rss_bytes'] > 512 * 1024**2:
