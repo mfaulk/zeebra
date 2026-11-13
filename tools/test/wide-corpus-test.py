@@ -4,6 +4,9 @@ import unittest
 import tempfile
 import gzip
 import json
+import os
+import sys
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location('wide', Path(__file__).parents[1] / 'external/wide-corpus.py')
 wide = importlib.util.module_from_spec(spec)
@@ -101,6 +104,29 @@ class WideCorpusTests(unittest.TestCase):
         for key, value in [('binaries',{'z':'other'}), ('affinity','3'), ('machine','other'), ('policy','120s')]:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 wide.resume_cohort(previous, dict(previous, commit='new', **{key:value}), True)
+
+    # Interrupting the controller reaps its isolated solver process instead of leaving it running.
+    def test_interrupted_guard_reaps_solver(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stem = Path(directory) / 'attempt'
+            pidfile = Path(directory) / 'pid'
+            code = "import os,time;from pathlib import Path;Path("+repr(str(pidfile))+").write_text(str(os.getpid()));time.sleep(30)"
+            probe = wide.guard.tree_hwm
+            def interrupt(pid):
+                if pidfile.exists():
+                    raise KeyboardInterrupt()
+                return probe(pid)
+            with mock.patch.object(wide.guard, 'tree_hwm', side_effect=interrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    wide.guarded([sys.executable,'-c',code], stem, 5_000_000_000)
+            pid = int(pidfile.read_text())
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                pass
+            else:
+                os.kill(pid, 9)
+                self.fail('solver outlived interrupted controller')
 
     # A stopped attempt is retained without being treated as a completed oracle.
     def test_limit_is_not_an_oracle(self):

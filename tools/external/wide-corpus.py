@@ -277,7 +277,40 @@ def summary(cohort, target):
     target.write_text('\n'.join(lines))
 
 
+def guarded(command, stem, wall_ns):
+    started, peak, stop = time.monotonic_ns(), 0, None
+    with stem.with_suffix('.stdout').open('w') as out, stem.with_suffix('.stderr').open('w') as err:
+        process = subprocess.Popen(command, stdout=out, stderr=err, start_new_session=True)
+        try:
+            while process.poll() is None:
+                peak = max(peak, guard.tree_hwm(process.pid))
+                if peak > 2*1024**3 or time.monotonic_ns()-started > wall_ns:
+                    stop = 'rss-2GiB' if peak > 2*1024**3 else 'wall'
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.wait()
+                    break
+                time.sleep(0.005)
+        finally:
+            if process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+    elapsed = time.monotonic_ns()-started
+    return dict(exit=process.returncode, stop=stop, process_wall_ns=elapsed,
+                observed_tree_peak_bytes=peak, stderr=stem.with_suffix('.stderr').read_text(),
+                stdout=stem.with_suffix('.stdout').read_text())
+
+
 def main():
+    def interrupted(signum, _frame):
+        raise SystemExit(128+signum)
+    signal.signal(signal.SIGINT, interrupted)
+    signal.signal(signal.SIGTERM, interrupted)
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--binary', type=Path)
     p.add_argument('--freeze', action='store_true')
@@ -353,22 +386,12 @@ def main():
             else:
                 command = [str(args.binary), '--field', c['field'], '--row', c['name'], '--engine', engine]
             wall_ns = 60_000_000_000 if direct else 65_000_000_000
-            started, peak, stop = time.monotonic_ns(), 0, None
-            with stem.with_suffix('.stdout').open('w') as out, stem.with_suffix('.stderr').open('w') as err:
-                process = subprocess.Popen(command, stdout=out, stderr=err, start_new_session=True)
-                while process.poll() is None:
-                    peak = max(peak, guard.tree_hwm(process.pid))
-                    if peak > 2*1024**3 or time.monotonic_ns()-started > wall_ns:
-                        stop = 'rss-2GiB' if peak > 2*1024**3 else ('wall-60s-native' if direct else 'wall-65s-tree')
-                        os.killpg(process.pid, signal.SIGKILL)
-                        process.wait()
-                        break
-                    time.sleep(0.005)
-            a = dict(field=c['field'], name=c['name'], engine=engine, digest=c['digest'], controller_commit=controller_commit,
-                     exit=process.returncode, stop=stop, process_wall_ns=time.monotonic_ns()-started,
-                     observed_tree_peak_bytes=peak, stderr=stem.with_suffix('.stderr').read_text())
-            if process.returncode == 0:
-                raw = json.loads(stem.with_suffix('.stdout').read_text())
+            a = dict(field=c['field'], name=c['name'], engine=engine, digest=c['digest'],
+                     controller_commit=controller_commit, **guarded(command, stem, wall_ns))
+            if a['stop'] == 'wall':
+                a['stop'] = 'wall-60s-native' if direct else 'wall-65s-tree'
+            if a['exit'] == 0:
+                raw = json.loads(a.pop('stdout'))
                 if direct:
                     a['raw'] = raw
                     basis = validate_native(raw, request, engine)
@@ -383,16 +406,14 @@ def main():
                     a['report'] = raw
                 if a['report']['digest'] != c['digest']:
                     raise ValueError('runner changed input identity')
-            else:
-                a['stdout'] = stem.with_suffix('.stdout').read_text()
             enforce_peak(a)
             cohort['attempts'].append(a)
             write(args.output, cohort)
-            print(c['field'], c['name'], engine, stop or a.get('report', {}).get('status', 'runner-failure'), flush=True)
+            print(c['field'], c['name'], engine, a.get('stop') or a.get('report', {}).get('status', 'runner-failure'), flush=True)
             verify_bases([x for x in cohort['attempts'] if (x['field'], x['name']) == (c['field'], c['name'])])
             if a.get('report', {}).get('status') == 'failed':
                 raise RuntimeError('solver failure retained for diagnosis')
-            if process.returncode and not stop:
+            if a['exit'] and not a.get('stop'):
                 raise RuntimeError('unexpected runner failure; retained for diagnosis')
     summary(cohort, ROOT / 'research/wide-corpus/BOARD.md')
 

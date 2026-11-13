@@ -58,7 +58,8 @@ Measure a committed, clean instrument. One worker, one case/engine per fresh pro
 60 s / 2 GiB solver budgets. Direct native drivers have a 60 s / 2 GiB process-tree watchdog;
 the Zeebra/Julia runner has a 65 s / 2 GiB tree watchdog to allow harness overhead. Watchdog kills
 are recorded
-with their specific cause, never as engine completions. F4 also has a cooperative live-byte budget;
+with their specific cause, never as engine completions. Interrupting the controller reaps its
+isolated solver process and leaves the last atomic checkpoint intact. F4 also has a cooperative live-byte budget;
 the watchdog covers memory outside its matrices. The tree RSS observation sums process high waters
 and can conservatively stop earlier than a live-RSS sum. Sampling can miss short-lived peaks;
 retained kernel high-water snapshots also enforce the ceiling
