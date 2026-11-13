@@ -210,6 +210,7 @@ for validation, extraction of the retained basis, and current adapter/FGLM limit
 |---|---|---|
 | `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush and Singular as subprocesses. Uses only `std` and adds no dependency. |
 | `proptest` | off | `proptest::arbitrary::Arbitrary` for the public types: field elements, big integers, monomials, polynomials, vectors and matrices. Lets you property-test downstream code with `any::<T>()`. |
+| `research-work` | off | Research operation counters, serial row tracing, and the opt-in concurrent F4 pivot experiment. |
 
 ```toml
 zeebra = { version = "0.1", features = ["proptest"] }

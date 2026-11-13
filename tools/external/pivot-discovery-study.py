@@ -15,6 +15,19 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKERS = (1, 2, 4, 8, 16, 32, 64)
 
 
+def resume_keys(attempts, plan):
+    keys = [(a['repeat'], a['modulus'], a['arm']) for a in attempts]
+    if keys != plan[:len(keys)] or len(set(keys)) != len(keys) or any(a['status'] != 'verified' for a in attempts):
+        raise ValueError('resume requires an intact verified prefix, never a discarded or failed sample')
+    return set(keys)
+
+
+def arms_for(phase):
+    if phase == 'census': return ('stock', 'off', 'work', 'discovery')
+    return ('stock', 'off', 'work', *(f'{schedule}-{workers}-{counter}'
+        for schedule in ('dynamic', 'static') for workers in WORKERS for counter in ('off', 'on')))
+
+
 def physical_cpus(topology, available):
     found, result = set(), []
     for cpu, core, socket in sorted(topology, key=lambda row: (row[0] < 2, row[0])):
@@ -60,6 +73,7 @@ def main():
     parser.add_argument('--repeats', type=int, default=5)
     parser.add_argument('--max-load', type=float, default=4)
     parser.add_argument('--phase', choices=('census', 'parallel'), default='census')
+    parser.add_argument('--resume', action='store_true', help='continue only a verified prefix stopped by the load gate')
     args = parser.parse_args()
     affinity = ','.join(map(str, sorted(os.sched_getaffinity(0))))
     if not os.environ.get('ZEEBRA_MACHINE') or os.environ.get('ZEEBRA_AFFINITY') != affinity:
@@ -75,7 +89,7 @@ def main():
         parser.error('parallel campaign requires 64 distinct available physical cores')
     refs = study.references(ROOT / 'research/competitive/results/grobx-683.json.gz')
     binaries = {name: getattr(args, name).resolve() for name in ('stock', 'observed')}
-    cohort = dict(schema=1, issue=728,
+    cohort = dict(schema=1, issue=728, repetitions=args.repeats,
                   commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                   rustc=subprocess.check_output(['rustc', '-vV'], text=True),
                   lock_sha256=hashlib.sha256((ROOT / 'Cargo.lock').read_bytes()).hexdigest(),
@@ -91,13 +105,36 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     paths = {}
     matrices = {}
+    done, dispatch_done = set(), set()
+    if args.resume:
+        if args.phase != 'parallel': parser.error('resume currently supports the packed parallel campaign')
+        previous = sibling('proof_artifacts').load_cohort(args.output)
+        if (previous.get('refusal', {}).get('reason') not in ('load', 'load-before-dispatch')
+                or previous.get('repetitions', 5) != args.repeats or previous['phase'] != args.phase
+                or previous['binaries'] != cohort['binaries'] or previous['limits'] != cohort['limits']
+                or previous['affinity'] != affinity or previous['physical_cpus'] != cpus):
+            parser.error('resume requires the same frozen binaries, limits, affinity and topology after a load refusal')
+        arms = arms_for(args.phase)
+        plan = [(repeat, modulus, arm) for repeat in range(args.repeats) for modulus in study.MODULI
+                for arm in (arms if repeat % 2 == 0 else tuple(reversed(arms)))]
+        done = resume_keys(previous['attempts'], plan)
+        dispatch_done = {(a['repeat'], a['workers']) for a in previous['dispatch']}
+        previous.setdefault('resumptions', []).append(dict(runner_commit=cohort['commit'], previous_refusal=previous.pop('refusal')))
+        cohort = previous
+        for attempt in sibling('study_artifacts').iter_attempts(args.output):
+            raw = attempt['raw']
+            if attempt['arm'] in ('stock', 'off', 'work'):
+                paths.setdefault(attempt['modulus'], {key: value for key, value in raw['statistics'].items()
+                    if not key.endswith('_ns') and key != 'full_statistics'})
+            if attempt['arm'].endswith('-on'):
+                for batch in raw['parallel']['batches']:
+                    matrices[(attempt['modulus'], batch['batch_index'])] = batch['input_matrix_digest']
+        study.write(args.output, cohort)
     for repeat in range(args.repeats):
         for modulus in study.MODULI:
-            arms = ('stock', 'off', 'work', 'discovery')
-            if args.phase == 'parallel':
-                arms = ('stock', 'off', 'work', *(f'{schedule}-{workers}-{counter}'
-                    for schedule in ('dynamic', 'static') for workers in WORKERS for counter in ('off', 'on')))
+            arms = arms_for(args.phase)
             for arm in arms if repeat % 2 == 0 else reversed(arms):
+                if (repeat, modulus, arm) in done: continue
                 load = os.getloadavg()[0]
                 if load > args.max_load:
                     cohort['refusal'] = dict(reason='load', load=load, next=[repeat, modulus, arm])
@@ -178,6 +215,7 @@ def main():
                     raise RuntimeError('failed attempt retained: ' + result.get('failure', 'unknown'))
         if args.phase == 'parallel':
             for workers in WORKERS:
+                if (repeat, workers) in dispatch_done: continue
                 if os.getloadavg()[0] > args.max_load:
                     cohort['refusal'] = dict(reason='load-before-dispatch', repeat=repeat, workers=workers)
                     study.write(args.output, cohort)

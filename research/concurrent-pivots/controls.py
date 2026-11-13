@@ -57,6 +57,7 @@ def main():
     cohort = dict(schema=1, issue=728, commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                   binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                   singular_version=subprocess.check_output(['Singular', '--version'], text=True),
+                  topology=subprocess.check_output(['lscpu', '-e=CPU,CORE,SOCKET,NODE,CACHE,ONLINE'], text=True),
                   physical_cpus=cpus, limits=dict(wall_seconds=60, rss_bytes=2*1024**3, max_load=args.max_load),
                   policy='five controls per field/arm; one MQ14 refusal/frontier probe per field/arm, no speedup inferred from incomplete tasks',
                   references={}, attempts=[], probes=[])
@@ -111,6 +112,10 @@ def main():
                     if result['status'] != 'verified': raise RuntimeError('failed control retained')
     for modulus, digest in MQ14.items():
         for schedule, workers in [('serial', 1), ('dynamic', 4)]:
+            if os.getloadavg()[0] > args.max_load:
+                cohort['refusal'] = dict(reason='load-before-probe', modulus=modulus, schedule=schedule)
+                study.write(args.output, cohort)
+                raise RuntimeError('probe load gate refused; cohort retained')
             command = ['taskset', '-c', ','.join(map(str, cpus[:workers])), str(binary), str(modulus), '--stages', '--problem=mq-random-14']
             if schedule != 'serial': command += ['--workers=4', '--schedule=dynamic']
             result = study.guarded(command, args.scratch / f'mq14-{modulus}-{schedule}', 60, 2*1024**3)

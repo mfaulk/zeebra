@@ -11,6 +11,14 @@ SPEC.loader.exec_module(MODULE)
 
 
 class CensusTests(unittest.TestCase):
+    # Resuming preserves every verified prefix sample and refuses failed, duplicated or reordered samples.
+    def test_resume_requires_verified_prefix(self):
+        plan = [(0, 13, 'a'), (0, 13, 'b')]
+        attempt = dict(repeat=0, modulus=13, arm='a', status='verified')
+        self.assertEqual(MODULE.resume_keys([attempt], plan), {(0, 13, 'a')})
+        for attempts in [[dict(attempt, status='failed')], [attempt, attempt], [dict(attempt, arm='b')]]:
+            with self.assertRaises(ValueError): MODULE.resume_keys(attempts, plan)
+
     # Physical-core selection excludes SMT siblings and CPUs outside the inherited affinity.
     def test_physical_cpu_mapping(self):
         topology = [(0, 0, 0), (1, 1, 0), (2, 0, 0), (3, 1, 0), (4, 2, 0)]

@@ -1,0 +1,127 @@
+{
+  "census_commit": "65a0269951896c6e96b271aa848fa7e5bbb9946e",
+  "census": [
+    {
+      "modulus": 32003,
+      "arm": "discovery",
+      "process_wall_ms": {
+        "median": 3304.369315,
+        "minimum": 3300.07254,
+        "maximum": 3393.944053
+      },
+      "rss_mib": {
+        "median": 137.8671875,
+        "minimum": 137.71484375,
+        "maximum": 137.91015625
+      },
+      "forward_share": {
+        "median": 0.3792772066104538,
+        "minimum": 0.3750310480469377,
+        "maximum": 0.38107053149299464
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "off",
+      "process_wall_ms": {
+        "median": 3256.534079,
+        "minimum": 3225.501214,
+        "maximum": 3298.206156
+      },
+      "rss_mib": {
+        "median": 134.15234375,
+        "minimum": 134.1015625,
+        "maximum": 134.31640625
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "stock",
+      "process_wall_ms": {
+        "median": 3130.079453,
+        "minimum": 3106.487507,
+        "maximum": 3137.785644
+      },
+      "rss_mib": {
+        "median": 135.5,
+        "minimum": 135.484375,
+        "maximum": 135.60546875
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "work",
+      "process_wall_ms": {
+        "median": 3288.24154,
+        "minimum": 3268.822294,
+        "maximum": 3317.260079
+      },
+      "rss_mib": {
+        "median": 135.64453125,
+        "minimum": 135.55078125,
+        "maximum": 135.7109375
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "discovery",
+      "process_wall_ms": {
+        "median": 3569.372763,
+        "minimum": 3512.11143,
+        "maximum": 3600.864035
+      },
+      "rss_mib": {
+        "median": 137.1640625,
+        "minimum": 137.0390625,
+        "maximum": 137.25390625
+      },
+      "forward_share": {
+        "median": 0.38038333462575463,
+        "minimum": 0.3778186865080266,
+        "maximum": 0.38277287022471224
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "off",
+      "process_wall_ms": {
+        "median": 3510.717321,
+        "minimum": 3504.256199,
+        "maximum": 3597.264711
+      },
+      "rss_mib": {
+        "median": 136.0703125,
+        "minimum": 136.0546875,
+        "maximum": 136.13671875
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "stock",
+      "process_wall_ms": {
+        "median": 3462.924666,
+        "minimum": 3437.335899,
+        "maximum": 3501.916307
+      },
+      "rss_mib": {
+        "median": 136.42578125,
+        "minimum": 136.2109375,
+        "maximum": 136.46484375
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "work",
+      "process_wall_ms": {
+        "median": 3534.783304,
+        "minimum": 3485.274751,
+        "maximum": 3622.647577
+      },
+      "rss_mib": {
+        "median": 136.32421875,
+        "minimum": 136.234375,
+        "maximum": 136.359375
+      }
+    }
+  ]
+}

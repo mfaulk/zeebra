@@ -128,3 +128,47 @@ their parsed response key was renamed from `report` to `raw` outside timing.
 Keep interrupted
 cohorts separately and report why each stopped; never pool them into the final
 five-repetition summary.
+
+For a parallel campaign stopped by the ambient-load gate, rerun the identical
+command with `--resume` after the machine is quiet. This accepts only an intact
+verified prefix of the predeclared five-repetition plan, unchanged binaries,
+limits and physical affinity. It retains the refusal in `resumptions` and executes
+only missing samples; it cannot discard failures, duplicate a sample or select a
+new repetition count. The runner commit used for each resumption is recorded.
+
+## Controls, frontier probe and retained verification
+
+The same instrument accepts `--problem=cyclic-5`, `--problem=katsura-6` and
+`--problem=mq-random-14`; MQ10 remains the default. Katsura names here count
+variables, so `katsura-6` is the literature's Katsura-5. Run the classical controls
+and the fixed-budget frontier probe under a separate lock, after the main sweep:
+
+```sh
+tools/benchlock.sh concurrent-pivots-728-controls \
+  python3 research/concurrent-pivots/controls.py \
+    --binary /buildcache/cargo-target/zeebra-728-observed/release/examples/mq10_profile \
+    --scratch /buildcache/cargo-target/zeebra-728-controls \
+    --output /buildcache/cargo-target/zeebra-728-controls.json.gz
+```
+
+Each classical field/arm gets five fresh processes: serial control and both
+schedules at all seven worker counts. Cyclic uses the existing independent full
+reference. Katsura's complete reduced coefficient list is checked against a fresh
+Singular reduced basis of the independently written defining equations, outside
+solver timing; its script and full oracle output are retained and digest-bound.
+
+The public MQ14 probe is predeclared at 60 seconds/2 GiB per child, default F4
+entry/byte budgets, one serial and one dynamic four-worker attempt per field.
+It tests reachability/refusal only and cannot establish scaling or a speedup.
+Its exact input digests are `4e440cfac84262260736a2368f43c7a96181986ca5bc108517299520d56f8795`
+at 32003 and `029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d`
+at 2147483647. A completed probe still needs an independent reference before any
+performance adoption claim. Stops remain explicit unverified outcomes.
+
+`python3 research/concurrent-pivots/summarize.py` restores/hash-checks payloads,
+rechecks every complete answer and regenerates CSV/JSON summaries. CI runs this
+alongside the hand-matrix, forced-race and observation tests. Frozen source patches,
+source archive hashes, Cargo fingerprints and binary hashes live under `evidence/`;
+apply the named decompressed patch to its recorded base to recover the measured
+source after a squash. The prototype measurement source is distinct from the later
+feature-disabled lint cleanup, which changes no elimination algorithm.
