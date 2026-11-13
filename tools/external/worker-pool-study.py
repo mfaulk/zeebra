@@ -45,6 +45,20 @@ def validate(report, cell):
                 raise ValueError('scalar remainders differ or no work executed')
 
 
+def compiler_processes(proc=Path('/proc')):
+    active = []
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            name = (entry / 'comm').read_text().strip()
+            if name in {'cargo', 'rustc', 'clippy-driver', 'rust-lld', 'ld.lld', 'rust-analyzer'}:
+                active.append((entry.name, name))
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            continue
+    return active
+
+
 def cpu_order(topology, allowed):
     groups = {}
     for line in topology.splitlines():
@@ -171,6 +185,8 @@ def main():
     affinity = ','.join(map(str, sorted(os.sched_getaffinity(0))))
     if not os.environ.get('ZEEBRA_MACHINE') or os.environ.get('ZEEBRA_AFFINITY') != affinity:
         parser.error('set machine and actual parent affinity')
+    if compiler_processes():
+        parser.error('compiler activity is present; defer measurement')
     if os.getloadavg()[0] >= 8:
         parser.error('start load is at least eight; defer measurement')
     topology = subprocess.check_output(['lscpu', '-p=CPU,CORE,SOCKET,NODE'], text=True)

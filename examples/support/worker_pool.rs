@@ -203,14 +203,14 @@ mod tests {
         let cancel = Arc::new(AtomicBool::new(false));
         let token = cancel.clone();
         let count = Arc::new(AtomicUsize::new(0));
-        let tasks: Vec<Box<dyn FnOnce(&mut ()) + Send>> = (0..3)
+        let tasks: Vec<Job<()>> = (0..3)
             .map(|_| {
                 let count = count.clone();
                 let token = token.clone();
                 Box::new(move |_: &mut ()| {
                     count.fetch_add(1, Ordering::Relaxed);
                     token.store(true, Ordering::Release);
-                }) as Box<dyn FnOnce(&mut ()) + Send>
+                }) as Job<()>
             })
             .collect();
         assert_eq!(pool.run(tasks, cancel), Err(Failure::Cancelled));
