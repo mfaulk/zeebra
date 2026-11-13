@@ -205,6 +205,14 @@ zeebra = { version = "0.1", features = ["proptest"] }
 | Integers, perfect powers, Lenstra's elliptic curve method | [`number-theory.md`](docs/guide/number-theory.md) |
 | Reed–Solomon codes over an FFT domain | [`reed-solomon.md`](docs/guide/reed-solomon.md) |
 
+Submitted Gröbner bases can carry exact cofactor witnesses for reverse ideal inclusion.
+`grobner::verify_ideal_membership` checks individual identities;
+`grobner::certify_submitted_basis_with_witnesses` combines them with the existing basis checks.
+See the [witness contract and limits](docs/guide/grobner-bases.md#exact-submitted-basis-witnesses)
+and run `cargo run --release --example membership_witness`. Witness budgets do not bound the
+existing normal-form certification phase. A [small release sample](docs/research/membership-witnesses.md)
+records timing and process-memory context.
+
 ## How Zeebra relates to existing systems
 
 Gröbner basis computation already has excellent implementations. **Singular**, **Macaulay2** and

@@ -28,6 +28,7 @@ pub mod hilbert_driven;
 pub(crate) mod interreduce;
 pub mod macaulay;
 pub mod matrix_corpus;
+pub mod membership;
 pub mod observer;
 pub mod options;
 pub mod reduction;
@@ -48,6 +49,10 @@ pub use matrix_corpus::{
     capture_matrix, corpus, digest_of, fingerprint_of, rebuild_matrix, walk_corpus,
     walk_corpus_with, BatchSelector, CapturedMatrix, CorpusError, CorpusVisitor, Drift,
     MatrixFingerprint, MatrixSpec, OptionsPreset, Regime,
+};
+pub use membership::{
+    certify_submitted_basis_with_witnesses, verify_ideal_membership, MembershipLimits,
+    MembershipStatus, WitnessCertificationReport, WitnessError, WitnessLimit,
 };
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{

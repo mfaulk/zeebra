@@ -1,124 +1,12 @@
-//! Checking that a basis really is a reduced Gröbner basis of the ideal it was built from.
+//! Certification checks forward inclusion, Buchberger's criterion and reducedness.
 //!
-//! F4 as written returns a complete basis or an error, and that rests on the algorithm: every
-//! critical pair is processed or discarded by a criterion that is a theorem. M22-C adds a strategy
-//! that decides *in what order* pairs are processed on the strength of a **prediction**, and a
-//! prediction is not a theorem — so the plan's §8.3 asks for the result to be established
-//! independently rather than inferred from the strategy having run.
+//! F4 output assumes reverse inclusion from row derivation. Submitted bases require exact
+//! cofactor identities through [`super::membership::certify_submitted_basis_with_witnesses`]
+//! before both ideal inclusions are established. The legacy submitted entry point stays incomplete.
 //!
-//! # What has to be established, and what each check gives
-//!
-//! Write `F` for the input generators, `G` for the returned basis, and `I = <F>`.
-//!
-//! 1. **`G ⊆ I`.** Structural, and *not* checked here. Every F4 matrix row is a monomial multiple
-//!    of a current basis element, so every candidate is an `F`-combination by induction, and the
-//!    final interreduction only takes combinations of those. There is nothing a run could check
-//!    that would be more convincing than the construction; what the tests do instead is compare
-//!    against an independent Buchberger basis on systems small enough for one, which is
-//!    `test_certification_agrees_with_buchberger`.
-//! 2. **`F ⊆ <G>`** — every generator reduces to zero modulo `G`. With (1) this gives `I = <G>`.
-//! 3. **Buchberger's criterion** — every S-polynomial of a pair from `G` reduces to zero modulo
-//!    `G`. With `<G> = I` this gives that `G` is a Gröbner basis *of `I`*.
-//! 4. **Reducedness** — monic, no leading monomial divisible by another's, and each element its own
-//!    normal form modulo the rest. This is what makes the answer unique, hence comparable.
-//!
-//! (2) is the one that cannot be skipped, and the reason is worth stating: checking only (3) and
-//! (4) establishes that `G` is a reduced Gröbner basis of **some** ideal, which is exactly what a
-//! truncated computation also produces. `test_certification_detects_a_truncated_basis` drops each
-//! element of a correct basis in turn and every truncation is rejected.
-//!
-//! # What certification cannot catch, and what the API does about it
-//!
-//! The three runtime checks establish `I ⊆ <G>` and that `G` is a reduced Gröbner basis of `<G>`.
-//! They say **nothing about `<G> ⊆ I`** — and they cannot, because every generator of `I` reduces
-//! to zero in any ideal containing `I`. Two consequences, and the second is why this module has two
-//! entry points:
-//!
-//! - Appending `z − 7` to a correct basis of `<x² − y, xy − 1>` gives a reduced Gröbner basis of a
-//!   strictly larger ideal, and it passes all three checks.
-//! - More sharply: for `I = <x²>` the single-element basis `G = {x}` passes all three — `x²`
-//!   reduces to zero modulo `x`, a one-element basis has no S-polynomial, and `x` is monic and
-//!   reduced — yet `<x²> ≠ <x>`.
-//!
-//! What excludes both is the derivation invariant (1), which is structural rather than checkable:
-//! nothing in F4 can introduce a polynomial outside the ideal, because every matrix row is a
-//! monomial multiple of a current basis element. A check for (1) would need an independent basis of
-//! `I`, which is the thing being computed.
-//!
-//! So provenance is a **parameter**, not an assumption:
-//!
-//! - [`certify_f4_output`] is for a basis this crate's F4 produced from these generators. It
-//!   records that the derivation is assumed, and [`CertificationReport::is_complete`] can return
-//!   true.
-//! - [`certify_submitted_basis`] is for a basis from anywhere else. `is_complete` is then **always
-//!   false**, however the checks went, and [`CertificationReport::checks_passed`] is the meaningful
-//!   result.
-//!
-//! A caller who hands in an arbitrary basis therefore cannot get a completeness claim the checks do
-//! not support. The structural invariant is itself checked against an independent Buchberger basis
-//! in `test_certification_agrees_with_buchberger`.
-//!
-//! # Which pair criteria a verifier may apply, and which it may not
-//!
-//! (3) names `|G|(|G|−1)/2` pairs and most of them are redundant by the same theorems the engines
-//! prune with. Enabling one here is a different risk from enabling one in an engine: a criterion
-//! wrongly applied during a computation costs an incomplete basis, which this check would then
-//! catch, whereas one wrongly applied *here* is a **silent false pass** — it blesses a basis
-//! that is not a Gröbner basis, and nothing downstream looks again.
-//!
-//! What has to hold is this. Write `B` for the pairs actually reduced. Buchberger's criterion in
-//! its standard-representation form — Becker and Weispfenning, *Gröbner Bases*, Thm 5.48 — gives
-//! that `G` is a Gröbner basis of `<G>` as soon as **every** pair's S-polynomial has a standard
-//! representation modulo `G`. Reducing to zero produces one, so the pairs in `B` are discharged
-//! directly; a pruned pair has to be discharged by a theorem whose hypotheses are about `G` alone.
-//! Two qualify:
-//!
-//! - **The product criterion.** Relatively prime leading monomials, so `S(g_i, g_j)` reduces to
-//!   zero modulo `{g_i, g_j}` alone (Cox, Little and O'Shea, Sec 2.9, Prop 4). Unconditional: it
-//!   names no other pair, so it cannot take part in a circular justification, and it holds of the
-//!   two polynomials whatever else `G` contains.
-//! - **Gebauer–Möller's criteria B, M and F.** [`PairQueue::seeded_from_leads`] replays the
-//!   published `UPDATE` over `G` in index order. Its justification for dropping a pair descends in
-//!   (insertion stage, lcm under divisibility), and **both coordinates are functions of the leading
-//!   monomials and the index order**, which a verifier reconstructs exactly because it reconstructs
-//!   the pair set the same way. Nothing in it refers to a reduction having happened.
-//!
-//! One does not:
-//!
-//! - **The chain criterion as [`PairQueue::is_discarded`] applies it.** It justifies a discard by a
-//!   witness `k` whose pairs with `i` and `j` *have already been processed*, and a verification pass
-//!   has processed nothing. The hypothesis is not merely hard to establish, it is unavailable;
-//!   reading "handled" as "present in the basis" is the classic unsound shortcut and would mark
-//!   almost every pair prunable.
-//!
-//! The static-basis chain criterion that *would* be sound is the strict one: a witness `k` with
-//! `LM(g_k)` dividing `lcm(LM g_i, LM g_j)` and **both** `lcm(LM g_i, LM g_k)` and
-//! `lcm(LM g_k, LM g_j)` different from it. Both witness lcms then divide the pair's strictly, so a
-//! minimal counterexample — a discarded pair with no standard representation whose lcm is minimal
-//! among such — would have its two witness pairs discharged by the induction hypothesis, and the
-//! chain lemma (Cox, Little and O'Shea, Sec 2.9) would give it a standard representation after all.
-//!
-//! It is **not implemented**, because it is measurably empty here. `examples/certification_criteria`
-//! counts the pairs Gebauer–Möller keeps that have such a witness: **zero**, on katsura-5,
-//! katsura-6, cyclic-5 and both Poseidon instances, against 26 to 568 pairs kept. Structurally that
-//! is what one would expect — criterion B is that same strict test with the later-inserted element
-//! as the witness, and criterion M covers the witnesses from within one insertion stage — so what
-//! survives Gebauer–Möller is essentially the pairs every one of whose divisor witnesses has a leg
-//! with an lcm *equal* to the pair's own. That is exactly the case needing reduction history, which
-//! a verifier does not have. Pruning it is deferred rather than rejected: the number to re-measure
-//! before writing it is the `strict↑` column of that example.
-//!
-//! # Cost
-//!
-//! (3) was `|G|²/2` normal forms, each dividing against all of `G`: quadratic in the basis, 34x–67x
-//! the solve on the Poseidon instances of `docs/research/hilbert-driven.md` §5. The criteria above
-//! prune 66.7%–89.0% of those pairs on that corpus, and
-//! [`CertificationReport::s_polynomials_discarded`] reports the share alongside
-//! [`CertificationReport::s_polynomials_checked`] so that it is visible rather than inferred.
-//!
-//! What remains is still quadratic, so the check is still **reported separately** — the plan's §8.5
-//! requires a strategy that skips work to be compared on its total including the check, and a saving
-//! the check erases is not a saving.
+//! Product and Gebauer–Möller criteria depend only on leading monomials and are safe to replay.
+//! The engine's chain criterion relies on already processed pairs, unavailable to a verifier;
+//! enabling it here could silently accept a non-basis. Certification costs are reported separately.
 
 use std::time::{Duration, Instant};
 
@@ -145,7 +33,8 @@ const CERTIFICATION_CRITERIA: PairCriteria = PairCriteria {
 /// Where a basis came from, which decides what certifying it can establish.
 ///
 /// See the module documentation: the runtime checks give `I ⊆ <G>` and cannot give `<G> ⊆ I`, so the
-/// reverse containment has to come from provenance or not at all.
+/// legacy report obtains reverse containment only from provenance; the witness route returns
+/// a separate combined report.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Provenance {
     /// This crate's F4, run on these generators.
