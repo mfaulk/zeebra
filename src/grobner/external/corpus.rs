@@ -15,9 +15,8 @@ use super::{FieldSpec, Instance};
 /// The corpus's reference characteristic.
 ///
 /// `2^31 − 1`, chosen because **every engine in the comparison accepts it**: Singular and msolve
-/// both stop below `2^31`, so a corpus keyed on a wider prime would make most of the table
-/// `Unsupported` and measure nothing. Zeebra's own behaviour at Goldilocks and above is covered by
-/// its cryptanalysis scoreboard, where there is no comparand to lose.
+/// both stop below `2^31`. The separate wide planted family uses [`WIDE_64_CHARACTERISTIC`]
+/// and records its sole external comparand explicitly.
 pub const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 
 /// The corpus's **small-prime** reference characteristic: `GF(32003)`.
@@ -80,7 +79,7 @@ pub const SMALL_PRIME_CHARACTERISTIC: u64 = 32_003;
 /// [`Instance::transformation`](super::Instance::transformation), which is inside the digest.
 pub const BINARY_CHARACTERISTIC: u64 = 2;
 
-/// The characteristics the corpus **publishes** at: every rung has a frozen digest at each.
+/// The characteristics with at least one published rung; publication is pinned per rung.
 ///
 /// **A characteristic the corpus publishes at is part of its identity, not an argument to it**, and
 /// that is the decision this constant records. Varying the characteristic does not produce another
@@ -95,8 +94,8 @@ pub const BINARY_CHARACTERISTIC: u64 = 2;
 ///
 /// | tier | list | frozen digest | may a figure be published? |
 /// |---|---|---|---|
-/// | published | `PUBLISHED_CHARACTERISTICS` | yes, one per rung | **yes** |
-/// | generated | [`GENERATED_CHARACTERISTICS`] | no | no — the instance is honest, its identity is not pinned |
+/// | published | `PUBLISHED_CHARACTERISTICS` | yes, for that rung | **yes** |
+/// | generated | [`GENERATED_CHARACTERISTICS`] | no for that rung | no — the instance is honest, its identity is not pinned |
 /// | neither | — | n/a | `instance` returns `None` |
 ///
 /// [`ALTERNATE_CHARACTERISTIC`] is the middle tier: `msolve.rs`'s eliminant tests need an instance
@@ -108,10 +107,12 @@ pub const BINARY_CHARACTERISTIC: u64 = 2;
 /// and generated-only for the rest, because characteristic two is not a generic characteristic and
 /// Katsura's and planted MQ's invariants do not survive it. `test_the_publication_matrix_is_frozen`
 /// pins which rungs are published where, so a digest cannot be dropped and read as "not published".
-pub const PUBLISHED_CHARACTERISTICS: [u64; 3] = [
+/// [`WIDE_64_CHARACTERISTIC`] is published only for `mq-planted-wide`, whose field is fixed.
+pub const PUBLISHED_CHARACTERISTICS: [u64; 4] = [
     BINARY_CHARACTERISTIC,
     SMALL_PRIME_CHARACTERISTIC,
     REFERENCE_CHARACTERISTIC,
+    WIDE_64_CHARACTERISTIC,
 ];
 
 /// A second prime the const-generic families are compiled over: `2^30 + 3`.
@@ -420,8 +421,9 @@ impl CorpusEntry {
 ///
 /// # Errors
 /// `None` for a name not in [`ladder`], for a name whose variable count has no compiled
-/// instantiation, or — for the const-generic families — for a characteristic outside
-/// [`GENERATED_CHARACTERISTICS`]. The families are const-generic in both the size and the field, so
+/// instantiation, or — for the variable-field const-generic families — for a characteristic outside
+/// [`GENERATED_CHARACTERISTICS`]. `mq-planted-wide-*` always builds at [`WIDE_64_CHARACTERISTIC`],
+/// independently of the requested characteristic; [`CorpusEntry::digest_at`] gates publication. The families are const-generic in both the size and the field, so
 /// the available sizes are exactly those listed here — adding a rung means adding a match arm,
 /// which is deliberate: a size nobody wrote down is a size nobody checked the equivalence of.
 pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option<Instance> {
@@ -448,6 +450,9 @@ pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option
         "mq-planted-6" => planted_mq_instance::<6>(characteristic, order),
         "mq-planted-10" => planted_mq_instance::<10>(characteristic, order),
         "mq-planted-14" => planted_mq_instance::<14>(characteristic, order),
+        "mq-planted-wide-6" => Some(wide_planted_mq_instance::<6>(order)),
+        "mq-planted-wide-10" => Some(wide_planted_mq_instance::<10>(order)),
+        "mq-planted-wide-14" => Some(wide_planted_mq_instance::<14>(order)),
         _ => None,
     }
 }
@@ -849,6 +854,20 @@ pub fn planted_mq_instance<const N: usize>(
         )
         .transformed("planted at (3, 5, 7, ...), one value per variable".to_string())
     })
+}
+
+// This family fixes its field in the name; the requested characteristic never relabels it.
+fn wide_planted_mq_instance<const N: usize>(order: MonomialOrder) -> Instance {
+    type F = PrimeFieldElement64<WIDE_64_CHARACTERISTIC>;
+    let point = planted_point::<N, F>();
+    text_instance(
+        format!("mq-planted-wide-{N}"),
+        "mq-planted-wide",
+        &planted::<N, F>(&point),
+        WIDE_64_CHARACTERISTIC,
+        order,
+    )
+    .transformed("planted at (3, 5, 7, ...), one value per variable".to_string())
 }
 
 /// The corpus ladder: every rung, with its frozen digest.
@@ -1338,6 +1357,51 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 ),
             ],
         },
+        CorpusEntry {
+            name: "mq-planted-wide-6",
+            family: "mq-planted-wide",
+            rung: Rung::Easy,
+            zero_dimensional: true,
+            quotient_dimension: Some(64),
+            equivalence: Equivalence::SoleComparand {
+                tool: "Groebner.jl",
+                reason: "2^64 - 353 exceeds the other surveyed engines' prime-field bounds",
+            },
+            digests: &[(
+                WIDE_64_CHARACTERISTIC,
+                "2cb373f2d09cc2457ee21da5b7bcb1481f54388c32abdb3e04aeebafe465845f",
+            )],
+        },
+        CorpusEntry {
+            name: "mq-planted-wide-10",
+            family: "mq-planted-wide",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            quotient_dimension: Some(1024),
+            equivalence: Equivalence::SoleComparand {
+                tool: "Groebner.jl",
+                reason: "2^64 - 353 exceeds the other surveyed engines' prime-field bounds",
+            },
+            digests: &[(
+                WIDE_64_CHARACTERISTIC,
+                "eba454f0a0b05dd9655b7720d8f2b0bef090b8c610d277eaa79ccc2ddadd2243",
+            )],
+        },
+        CorpusEntry {
+            name: "mq-planted-wide-14",
+            family: "mq-planted-wide",
+            rung: Rung::Challenging,
+            zero_dimensional: true,
+            quotient_dimension: Some(16384),
+            equivalence: Equivalence::SoleComparand {
+                tool: "Groebner.jl",
+                reason: "2^64 - 353 exceeds the other surveyed engines' prime-field bounds",
+            },
+            digests: &[(
+                WIDE_64_CHARACTERISTIC,
+                "4076833387f44160cb5be92ad941c7ce9b875275903072b49b65be7452a70d9f",
+            )],
+        },
     ]
 }
 
@@ -1348,24 +1412,21 @@ pub fn ladder() -> Vec<CorpusEntry> {
 /// reproduced by hand — the same reason
 /// [`Instance::canonical`](super::Instance::canonical) is line-oriented.
 ///
-/// The characteristic is a **column** rather than a document per field, so one sorted table carries
-/// the whole corpus. Each Cyclic rung has three identities and the other rungs have two.
+/// The characteristic is a column rather than a document per field. Cyclic rungs have three
+/// identities, the narrow families two, and the fixed wide family one.
 pub fn manifest() -> String {
     let mut lines: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for characteristic in PUBLISHED_CHARACTERISTICS {
         for entry in ladder() {
+            if entry.digest_at(characteristic).is_none() {
+                continue;
+            }
             let built = instance(
                 entry.name,
                 characteristic,
                 MonomialOrder::GradedReverseLexicographic,
             )
-            .expect("every ladder entry is buildable at every published characteristic");
-            // Built-but-not-published is a real tier, not a gap: Katsura and planted MQ build
-            // honestly at `BINARY_CHARACTERISTIC` and are not frozen there, so they must not appear
-            // in a manifest whose whole purpose is to pin publishable identities.
-            if entry.digest_at(built.field.characteristic).is_none() {
-                continue;
-            }
+            .expect("every published identity is buildable");
             lines.insert(format!(
                 "{} {} {} {} {} {} {} {}",
                 entry.name,
@@ -2254,11 +2315,7 @@ mod tests {
         );
     }
 
-    /// Every public family licenses a timing and is corroborated.
-    ///
-    /// Every rung sits at or below `2^31`, where four engines reach. A family over `2^64 - 353`
-    /// would still license a timing — Groebner.jl reaches it — but could not be triangulated, which
-    /// is the distinction the two predicates draw.
+    /// Every family licenses a timing, but the wide planted family has only one external comparand.
     #[test]
     fn test_every_family_licenses_a_timing_and_only_some_are_corroborated() {
         for entry in ladder() {
@@ -2267,9 +2324,10 @@ mod tests {
                 "{} should license a timing",
                 entry.name
             );
-            assert!(
+            assert_eq!(
                 entry.equivalence.is_corroborated(),
-                "{} should be corroborated",
+                entry.family != "mq-planted-wide",
+                "{} has incorrect corroboration",
                 entry.name
             );
         }
@@ -2421,24 +2479,157 @@ mod tests {
         }
     }
 
-    /// The four public families, each with its evidence recorded.
-    ///
-    /// M25 counted six, two of them cipher systems that now belong to their callers; a caller's
-    /// rungs reach the board through `CompetitiveBoard::with_corpus` instead. `sole-comparand` is
-    /// therefore exercised by the board's tests rather than by a ladder rung.
+    /// Wide planted rungs freeze their field, digest, dimension and sole external comparand.
     #[test]
-    fn test_the_corpus_covers_four_families_each_with_recorded_evidence() {
+    fn test_wide_planted_rungs_have_frozen_sole_comparand_provenance() {
+        let wide: Vec<_> = ladder()
+            .into_iter()
+            .filter(|entry| entry.family == "mq-planted-wide")
+            .collect();
+        assert_eq!(wide.len(), 3);
+        for (entry, n) in wide.iter().zip([6, 10, 14]) {
+            assert_eq!(entry.name, format!("mq-planted-wide-{n}"));
+            assert_eq!(entry.quotient_dimension, Some(1 << n));
+            assert!(matches!(
+                entry.equivalence,
+                super::Equivalence::SoleComparand {
+                    tool: "Groebner.jl",
+                    ..
+                }
+            ));
+            assert_eq!(entry.digests.len(), 1);
+            let built = instance(entry.name, WIDE_64_CHARACTERISTIC, GREVLEX).expect("builds");
+            assert_eq!(built.field.characteristic, WIDE_64_CHARACTERISTIC);
+            assert_eq!(built.variable_count(), n);
+            assert_eq!(
+                entry.digest_at(WIDE_64_CHARACTERISTIC),
+                Some(built.digest().as_str())
+            );
+            assert_eq!(entry.digest_at(REFERENCE_CHARACTERISTIC), None);
+            use crate::grobner::external::{ExternalSolver, ZeebraSolver};
+            assert_eq!(
+                ZeebraSolver::new().supports(&built, Task::ReducedGrobnerBasis),
+                crate::grobner::external::Support::Yes
+            );
+        }
+        assert!(super::PUBLISHED_CHARACTERISTICS.contains(&WIDE_64_CHARACTERISTIC));
+    }
+
+    /// Every wide planted system vanishes at its declared nonzero planted point.
+    #[test]
+    fn test_wide_planted_systems_contain_the_declared_solution() {
+        fn check<const N: usize>() {
+            type Wide = crate::fields::PrimeFieldElement64<WIDE_64_CHARACTERISTIC>;
+            let built = instance(
+                &format!("mq-planted-wide-{N}"),
+                WIDE_64_CHARACTERISTIC,
+                GREVLEX,
+            )
+            .expect("builds");
+            let parsed: Vec<MultivariatePolynomial<N, Wide>> = built
+                .system
+                .iter()
+                .map(|text| MultivariatePolynomial::parse(text, names::<N>()).expect("parses"))
+                .collect();
+            assert!(satisfies(&parsed, &super::planted_point::<N, Wide>()));
+            assert!(!satisfies(&parsed, &[Wide::zero(); N]));
+            let requested_narrow = instance(&built.name, REFERENCE_CHARACTERISTIC, GREVLEX)
+                .expect("fixed-field family builds");
+            assert_eq!(requested_narrow, built);
+        }
+        check::<6>();
+        check::<10>();
+        check::<14>();
+    }
+
+    /// Live Groebner.jl and Zeebra return identical complete reduced bases on every wide rung.
+    #[test]
+    #[ignore = "requires provisioned Groebner.jl; run under the benchmark lock"]
+    fn test_wide_planted_live_groebner_jl_agrees_on_complete_bases() {
+        use crate::{
+            grobner::external::{ExternalSolver, GroebnerJlSolver, Limits, ZeebraSolver},
+            util::Json,
+        };
+        let scratch =
+            std::env::temp_dir().join(format!("wide-planted-live-{}", std::process::id()));
+        let mut julia = GroebnerJlSolver::from_env(&scratch).expect("provisioned Julia");
+        let version = julia.probe_version().expect("Julia version");
+        let limits = Limits::wall(std::time::Duration::from_secs(60))
+            .with_workers(1)
+            .with_max_rss_bytes(2 * 1024 * 1024 * 1024);
+        let mut artifacts = Vec::new();
+        for entry in ladder()
+            .into_iter()
+            .filter(|entry| entry.family == "mq-planted-wide")
+        {
+            let built = instance(entry.name, WIDE_64_CHARACTERISTIC, GREVLEX).expect("builds");
+            let ours = ZeebraSolver::new().run(&built, Task::ReducedGrobnerBasis, &limits);
+            let theirs = julia.run(&built, Task::ReducedGrobnerBasis, &limits);
+            let ours = ours.status.answer().expect("Zeebra basis completes");
+            let theirs = theirs.status.answer().expect("Groebner.jl basis completes");
+            let our_basis = ours.basis.as_ref().expect("complete Zeebra basis");
+            let their_basis = theirs.basis.as_ref().expect("complete Julia basis");
+            super::super::contract::generators_agree(
+                our_basis,
+                their_basis,
+                WIDE_64_CHARACTERISTIC,
+            )
+            .expect("every coefficient of the complete reduced bases agrees");
+            assert_eq!(
+                theirs.invariants.quotient_dimension,
+                entry.quotient_dimension.map(|d| d as usize)
+            );
+            assert!(ours.invariants.agree(&theirs.invariants).is_empty());
+            artifacts.push(Json::object([
+                ("problem", Json::string(entry.name)),
+                ("input_digest", Json::string(built.digest())),
+                (
+                    "input",
+                    Json::Array(built.system.iter().map(Json::string).collect()),
+                ),
+                (
+                    "zeebra_basis",
+                    Json::Array(our_basis.iter().map(Json::string).collect()),
+                ),
+                (
+                    "groebner_jl_basis",
+                    Json::Array(their_basis.iter().map(Json::string).collect()),
+                ),
+            ]));
+        }
+        println!("{}", Json::object([
+            ("verification", Json::string("complete monic reduced bases agree coefficient for coefficient; separate verification run, no timing claim")),
+            ("julia_version", Json::string(format!("{version:?}"))),
+            ("attempts", Json::Array(artifacts)),
+        ]).to_json());
+        std::fs::remove_dir_all(scratch).expect("remove scratch");
+    }
+
+    /// The five public families exercise every recorded kind of timing evidence.
+    #[test]
+    fn test_the_corpus_covers_five_families_each_with_recorded_evidence() {
         let families: BTreeSet<&str> = ladder().iter().map(|entry| entry.family).collect();
         assert_eq!(
             families,
-            BTreeSet::from(["cyclic", "katsura", "mq-planted", "mq-random"]),
+            BTreeSet::from([
+                "cyclic",
+                "katsura",
+                "mq-planted",
+                "mq-planted-wide",
+                "mq-random"
+            ]),
         );
         // Each kind of evidence is actually exercised, so none of the vocabulary is dead.
         let kinds: BTreeSet<&str> = ladder()
             .iter()
             .map(|entry| entry.equivalence.tag())
             .collect();
-        for expected in ["comparand-file", "known-solution", "live-oracle"] {
+        for expected in [
+            "comparand-file",
+            "known-solution",
+            "live-oracle",
+            "sole-comparand",
+        ] {
             assert!(kinds.contains(expected), "no family uses {}", expected);
         }
         // `no-comparand` is deliberately unused by the ladder: it is for Zeebra's 254/255-bit
@@ -2496,6 +2687,9 @@ mod tests {
         let mut drift: Vec<String> = Vec::new();
         for characteristic in super::PUBLISHED_CHARACTERISTICS {
             for entry in ladder() {
+                if entry.digest_at(characteristic).is_none() {
+                    continue;
+                }
                 let built = instance(entry.name, characteristic, GREVLEX).expect("builds");
                 let frozen = entry.digest_at(built.field.characteristic);
                 // A rung the corpus does not publish at this characteristic has nothing to drift
@@ -2545,6 +2739,7 @@ mod tests {
                 ]
                 .into_iter()
                 .collect(),
+                "mq-planted-wide" => [WIDE_64_CHARACTERISTIC].into_iter().collect(),
                 "katsura" | "mq-random" | "mq-planted" => {
                     [SMALL_PRIME_CHARACTERISTIC, REFERENCE_CHARACTERISTIC]
                         .into_iter()
@@ -2703,6 +2898,9 @@ mod tests {
     fn test_no_published_row_carries_a_field_equation_transformation() {
         for characteristic in super::PUBLISHED_CHARACTERISTICS {
             for entry in ladder() {
+                if entry.digest_at(characteristic).is_none() {
+                    continue;
+                }
                 let built = instance(entry.name, characteristic, GREVLEX).expect("builds");
                 if entry.digest_at(built.field.characteristic).is_none() {
                     continue;

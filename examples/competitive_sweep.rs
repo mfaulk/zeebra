@@ -517,6 +517,23 @@ mod tests {
         }
     }
 
+    // The wide sweep selects only the three frozen wide planted identities.
+    #[test]
+    fn test_wide_sweep_selects_only_published_wide_rungs() {
+        assert_eq!(
+            sweep_rows(
+                zeebra::grobner::external::corpus::WIDE_64_CHARACTERISTIC,
+                None
+            ),
+            [
+                "mq-planted-wide-6",
+                "mq-planted-wide-10",
+                "mq-planted-wide-14"
+            ]
+        );
+        assert!(sweep_rows(super::REFERENCE_CHARACTERISTIC, Some("mq-planted-wide-6")).is_empty());
+    }
+
     // The binary sweep lists seven Cyclic rungs and refuses an unpublished Katsura row.
     #[test]
     fn test_binary_sweep_only_selects_published_rows() {

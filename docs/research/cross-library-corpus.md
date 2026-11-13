@@ -7,7 +7,9 @@ The upper-rung sweep in §9c was measured at `19ff732c`.
 Policy and status for #261. The corpus itself is `src/grobner/external/corpus.rs`; its digest
 manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is_frozen`.
 
-> **Since #668** the public ladder is four families — Katsura, Cyclic, random MQ and planted MQ.
+> **Since #675** the public ladder is five families — Katsura, Cyclic, random MQ, planted MQ,
+> and the fixed-field wide planted MQ family. The last three rungs use `2^64 - 353` and
+> `SoleComparand { tool: "Groebner.jl" }`; see the [live run instructions](../guide/external-engines.md#wide-planted-mq-ladder).
 > The Poseidon and Anemoi rungs described below left with the cryptanalysis research; a caller
 > supplies rungs like them through `CompetitiveBoard::with_corpus`. The sections about them are
 > kept as the record of what was measured; their equivalence-class rows in §5 and their manifest
@@ -586,10 +588,14 @@ mq-random-10 mq-random intermediate live-oracle zero-dimensional 10 32003 16422d
 mq-random-14 mq-random challenging live-oracle zero-dimensional 14 2147483647 029def705543e29b…
 mq-random-14 mq-random challenging live-oracle zero-dimensional 14 32003 4e440cfac8426226…
 mq-random-6 mq-random easy live-oracle zero-dimensional 6 2147483647 d98e5e5bf82b4618…
+mq-planted-wide-6 mq-planted-wide easy sole-comparand zero-dimensional 6 18446744073709551263 2cb373f2d09cc245…
+mq-planted-wide-10 mq-planted-wide intermediate sole-comparand zero-dimensional 10 18446744073709551263 eba454f0a0b05dd9…
+mq-planted-wide-14 mq-planted-wide challenging sole-comparand zero-dimensional 14 18446744073709551263 4076833387f44160…
 mq-random-6 mq-random easy live-oracle zero-dimensional 6 32003 bbfecd7f5522e203…
 ```
 
-**Twenty-one rungs across four families, forty-nine identities.** Seven Cyclic rungs carry three
+**Twenty-four rungs across five families, fifty-two identities.** The three wide planted rungs
+have one identity each. Seven Cyclic rungs carry three
 identities each. Fourteen Katsura and MQ rungs carry two each. Before #668 the ladder also held five
 registry rows, preserved at commit 9532a9a2. `test_the_manifest_lists_every_rung_with_its_digest`
 checks the row count against

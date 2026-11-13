@@ -269,18 +269,57 @@ The msolve adapter's corpus agreement test builds **Zeebra's side by parsing the
 and dispatching on **variable count**, so a corpus family added at a width already present — 4, 5,
 6, 7, 10 or 14 — gets an oracle with no edit. It is also the stronger check: the bytes parsed are
 the bytes every engine is handed, so a round-trip failure in either direction shows up as a
-disagreement rather than as a silently different problem. Every rung is at the reference field,
-so every rung has one; a rung added at another field would need a second field *type* rather than a
-second match arm.
+disagreement rather than as a silently different problem. Every reference-field rung has an
+oracle; the wide planted family is explicitly excluded because it needs another field type.
 
-The ladder is the public benchmark set: Katsura, Cyclic, random MQ and planted MQ. A caller
+The ladder is the public benchmark set: Katsura, Cyclic, random MQ, planted MQ, and wide planted MQ. A caller
 benchmarking systems of its own builds `CorpusEntry` values for them — each with its recorded
 `Equivalence` — and passes them to `CompetitiveBoard::with_corpus`, which applies the same
 publication gates to those rows as to the ladder's. The Zeebra adapter also compiles KoalaBear
-(`corpus::KOALABEAR_CHARACTERISTIC`) and `2^64 - 353` (`corpus::WIDE_64_CHARACTERISTIC`) at a few
-widths, for systems that are not on the ladder.
+(`corpus::KOALABEAR_CHARACTERISTIC`) at caller widths and `2^64 - 353`
+(`corpus::WIDE_64_CHARACTERISTIC`) at widths 2, 4, 6, 10 and 14. The last three serve the wide
+planted ladder. `mq-planted-wide-*` names fix their field independently of the requested
+characteristic; `digest_at` and the sweep publish them only at `2^64 - 353`.
 
-That test is not `#[ignore]`d — it runs whenever msolve is installed — so by default it builds
+### Wide planted MQ ladder
+
+`mq-planted-wide-6`, `mq-planted-wide-10`, and `mq-planted-wide-14` reuse the generic planted
+quadratic construction, with quotient dimensions 64, 1,024, and 16,384. Each has one frozen digest
+at `18446744073709551263`. Their provenance is `SoleComparand { tool: "Groebner.jl" }`: a known
+planted point checks the input, but does not replace a complete-basis check or provide another
+external engine at this field. The measured [board](../../research/competitive/COMPETITIVE.md)
+and [verification evidence](../../research/competitive/results/wide-planted-675-verification.json)
+record the live comparison; these easy structured instances do not establish a general speedup.
+
+Build and test before acquiring the benchmark lock. Use private build and temporary directories
+on the build cache, then source `tools/external/env.sh` for the provisioned Julia binary and depot:
+
+```sh
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-wide
+export TMPDIR="$CARGO_TARGET_DIR/tmp"
+export RUSTC_WRAPPER=""
+mkdir -p "$TMPDIR"
+. tools/external/env.sh
+cargo test --lib grobner::external::corpus::tests
+cargo build --release --example competitive_sweep
+# Executes all three complete-basis comparisons; requires the provisioned Julia package.
+tools/benchlock.sh wide-planted-verify taskset -c 2 \
+  cargo test --lib test_wide_planted_live_groebner_jl_agrees_on_complete_bases \
+  -- --ignored --nocapture
+# Repeat for each wide rung; keep each measured row in its own process.
+ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=2 \
+  tools/benchlock.sh wide-planted taskset -c 2 \
+  "$CARGO_TARGET_DIR/release/examples/competitive_sweep" \
+  --characteristic 18446744073709551263 --row mq-planted-wide-6 \
+  --task reduced-grobner-basis --wall 60 --measure --write
+```
+
+The live test compares every coefficient of the complete monic reduced bases from Zeebra and
+Groebner.jl and emits their inputs, digests and bases as JSON. Verification is a separate run;
+its runtime is excluded from board solve times. The sweep retains unsupported-engine outcomes.
+Groebner.jl does not offer FGLM, so use `--task reduced-grobner-basis` for this comparison.
+
+The msolve corpus agreement test runs whenever msolve is installed, so by default it builds
 oracles only up to seven variables, which is 1.4 s for nine rungs where `mq-random-10` alone did
 not finish in ten minutes. **`ZEEBRA_FULL_CORPUS_ORACLE=1` lifts that ceiling** for a machine that
 wants the ten- and fourteen-variable rungs covered. Rungs left out are printed with the remedy,

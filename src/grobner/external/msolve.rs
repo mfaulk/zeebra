@@ -1864,15 +1864,12 @@ rational param(cpu)             0.75 sec
         )
     }
 
-    /// The corpus rungs that can have no Zeebra oracle, and why.
-    ///
-    /// Empty: every rung is at the reference field, and every rung there has an oracle whatever
-    /// its family, because the dispatch is on [`COMPILED_WIDTHS`]. A rung added at another field
-    /// would belong here — it needs a second *field type* rather than a second match arm.
-    ///
-    /// Asserted two-sidedly, so a rung that silently *gained* coverage is caught as well as one
-    /// that lost it (#338's contribution, kept).
-    const WITHOUT_A_COMPILED_PAIR: &[&str] = &[];
+    /// Fixed wide-field rungs are outside this reference-field oracle's compiled pairs.
+    const WITHOUT_A_COMPILED_PAIR: &[&str] = &[
+        "mq-planted-wide-6",
+        "mq-planted-wide-10",
+        "mq-planted-wide-14",
+    ];
 
     /// Every rung at the reference field has an oracle; only the other-field ones do not.
     ///
@@ -1883,7 +1880,7 @@ rational param(cpu)             0.75 sec
     /// with no oracle until someone wrote a match arm.
     ///
     /// Deliberately checks the *decision* and not the oracle: `has_compiled_pair` reads the
-    /// instance's characteristic and width, so this covers all twenty-six rungs without running
+    /// instance's characteristic and width, so this checks the whole ladder without running
     /// Zeebra's F4 on a fourteen-variable system.
     #[test]
     fn test_every_reference_field_rung_has_a_compiled_oracle() {

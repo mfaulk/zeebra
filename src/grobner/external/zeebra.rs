@@ -167,10 +167,10 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
         SMALL_PRIME_CHARACTERISTIC => &[3, 4, 5, 6, 7, 8, 9, 10, 11, 14],
         // The binary corpus publishes only the Cyclic family.
         BINARY_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10],
-        // KoalaBear and 2^64 - 353 at the widths their callers' systems have been measured at.
+        // KoalaBear caller widths and the wide planted ladder's widths.
         // Callers register other pairs with `with_instantiation`.
         KOALABEAR_CHARACTERISTIC => &[5, 7, 9],
-        WIDE_64_CHARACTERISTIC => &[2, 4],
+        WIDE_64_CHARACTERISTIC => &[2, 4, 6, 10, 14],
         18_446_744_073_709_551_557 => &[2],
 
         _ => &[],
@@ -624,7 +624,10 @@ impl ZeebraSolver {
                 &self.f4_options,
                 &self.fglm_options,
                 2,
-                4
+                4,
+                6,
+                10,
+                14
             ),
             _ => Err(RunFailure::Incomplete {
                 detail: "no compiled field, which `supports` should have refused".to_string(),
