@@ -1,8 +1,8 @@
 # Checked R1CS import
 
 `zeebra::r1cs` imports a narrow R1CS v1 profile over a caller-selected prime field.
-It preserves original sparse rows, row IDs, wire-to-label mapping, public/private input roles,
-and optional Circom symbols before producing any polynomials. The
+It preserves original sparse rows, row IDs, wire-to-label mapping, public-interface roles,
+declared private-input counts and optional Circom symbols before producing any polynomials. The
 [design gate and evidence](../research/bounded-r1cs.md) record the public fixture round-trip,
 independent reader and producer identities, exhaustive small-field checks, and bounded pilot.
 
@@ -60,9 +60,14 @@ coefficients strictly below the modulus. Nonminimal field widths, duplicate sect
 counts, duplicate/out-of-range labels, trailing bytes, and truncation fail explicitly.
 The API returns no partial model or partial expansion on failure.
 
-`wire_role` distinguishes the constant, public outputs, public inputs, private inputs, and
-remaining internal witness wires according to the header's ordered ranges. Wire zero's
-canonical label must be zero. Labels do not permute polynomial variables.
+`wire_role` identifies the constant and public output/input prefix. `Header.private_inputs`
+is the producer's declared count, which can include optimized-out signals. It does not identify
+retained private-input wires: pinned Circom 2.2.3 `--O2` keeps that original count while deleting
+inputs and renumbering later internal witnesses. Nonpublic wires therefore have
+`UnclassifiedWitness` role when the declared private count is nonzero, and `Internal` role
+when it is zero. Private declarations need not fit the retained nonpublic wire count. No role
+is inferred from label numbers or symbol names; exact private-wire identity needs additional
+producer metadata. Wire zero's canonical label must be zero. Labels do not permute variables.
 
 Attach optional UTF-8 Circom `.sym` records with `with_symbols(text)`. Labels and qualified
 names must be unique, and any label selected by the binary wire map must name that same wire.

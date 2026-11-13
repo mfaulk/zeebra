@@ -99,7 +99,7 @@ impl fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 
-/// Original header counts; public and private inputs precede internal wires.
+/// Original header counts; private declarations need not count retained witness wires.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Header {
     /// Canonical field width, in bytes, rounded up to a whole 64-bit limb.
@@ -110,7 +110,7 @@ pub struct Header {
     pub public_outputs: usize,
     /// Public input count, immediately after the public outputs.
     pub public_inputs: usize,
-    /// Private input count, immediately after the public inputs.
+    /// Private input count declared by the producer, including any optimized-out inputs.
     pub private_inputs: usize,
     /// Label identifiers are strictly below this bound.
     pub label_count: u64,
@@ -127,10 +127,10 @@ pub enum WireRole {
     PublicOutput,
     /// Public input.
     PublicInput,
-    /// Private input.
-    PrivateInput,
     /// Intermediate witness wire.
     Internal,
+    /// A retained witness whose private-input versus internal role is not encoded reliably.
+    UnclassifiedWitness,
 }
 
 /// One original sparse dot product, in strictly increasing wire order.
@@ -364,7 +364,7 @@ impl<F: KnownOrder> R1cs<F> {
         let label_count = header.u64()?;
         let constraint_count = header.u32()? as usize;
         header.finish()?;
-        let inputs = (public_outputs as u64) + (public_inputs as u64) + (private_inputs as u64);
+        let inputs = (public_outputs as u64) + (public_inputs as u64);
         if wire_count == 0 || inputs >= wire_count as u64 || label_count < wire_count as u64 {
             return Err(Error::InvalidHeader(
                 "wire, role or label counts are inconsistent",
@@ -476,7 +476,10 @@ impl<F: KnownOrder> R1cs<F> {
         &self.source_digest
     }
 
-    /// Classify an original wire; internal witness wires are not private-input declarations.
+    /// Classify the constant and public prefix; private declarations do not identify witness wires.
+    ///
+    /// A nonpublic wire is unclassified when private inputs were declared, because producers can
+    /// eliminate inputs without updating that count. It is internal when the declared count is zero.
     pub fn wire_role(&self, wire: u32) -> Option<WireRole> {
         let wire = wire as usize;
         if wire >= self.header.wire_count {
@@ -488,12 +491,10 @@ impl<F: KnownOrder> R1cs<F> {
             WireRole::PublicOutput
         } else if wire <= self.header.public_outputs + self.header.public_inputs {
             WireRole::PublicInput
-        } else if wire
-            <= self.header.public_outputs + self.header.public_inputs + self.header.private_inputs
-        {
-            WireRole::PrivateInput
-        } else {
+        } else if self.header.private_inputs == 0 {
             WireRole::Internal
+        } else {
+            WireRole::UnclassifiedWitness
         })
     }
 

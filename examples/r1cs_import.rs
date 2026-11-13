@@ -70,6 +70,27 @@ fn run<F: KnownOrder, const N: usize>(args: &Args) -> (Json, bool) {
                 .unwrap_or(Json::Null),
         ));
         report.push(("wires", Json::size(model.header().wire_count)));
+        report.push(("public_outputs", Json::size(model.header().public_outputs)));
+        report.push(("public_inputs", Json::size(model.header().public_inputs)));
+        report.push((
+            "declared_private_inputs",
+            Json::size(model.header().private_inputs),
+        ));
+        report.push((
+            "wire_roles",
+            Json::Array(
+                (0..model.header().wire_count)
+                    .map(|wire| {
+                        Json::string(format!(
+                            "{:?}",
+                            model
+                                .wire_role(wire as u32)
+                                .expect("original wire in range")
+                        ))
+                    })
+                    .collect(),
+            ),
+        ));
         report.push(("constraints", Json::size(model.header().constraint_count)));
         report.push((
             "wire_labels",

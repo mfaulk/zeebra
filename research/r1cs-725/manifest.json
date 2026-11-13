@@ -43,7 +43,15 @@
     "tests/fixtures/r1cs/multiplier.circom": "10ff7de73324f224dc02c9922a368f5108db984ea37cce9ae173daf771687ac1",
     "tests/fixtures/r1cs/multiplier.r1cs": "16ab9e569919f7d25f32321974db3b1803b469d4ab0c25769cc94cc3f0d324f7",
     "tests/fixtures/r1cs/multiplier.sym": "47148e1bdf0e96b72fb41c1626d38135d8b2dc26ec9f8703a46721182637862e",
-    "research/r1cs-725/producer-witness.json": "548bbae4a15f1fe1054f30f2915b89ad77d45b8c30531c933c25a8838185d002"
+    "research/r1cs-725/producer-witness.json": "548bbae4a15f1fe1054f30f2915b89ad77d45b8c30531c933c25a8838185d002",
+    "tests/fixtures/r1cs/roles.circom": "2064aea866141d9fcd45558a1b5665ae2eda9d1c513b374dbb6c94e007949efa",
+    "tests/fixtures/r1cs/roles-o0.r1cs": "0cf71c306a1064358949c03745655722a3362df6bfc7e1c3e8cbe8c9433982fe",
+    "tests/fixtures/r1cs/roles-o0.sym": "77e2b3c85961d4aa8386d620eb0246d38277d80d706fb3b81d62d5f03aa550d1",
+    "tests/fixtures/r1cs/roles-o2.r1cs": "aacf15751e7cd0a2d9ba0cac1fabc6ee778106254a85ed768ad92ab6bf17cd37",
+    "tests/fixtures/r1cs/roles-o2.sym": "c314ea98081e1b0a1c82b04d578f47ccf1269e5070f1be7d2e83ed0b8772d4cc",
+    "tests/fixtures/r1cs/roles-many.circom": "5389af16625ec082803df705513bf0ecab1dc1066afb765e91b78f464cec6e06",
+    "tests/fixtures/r1cs/roles-many-o2.r1cs": "50e4644ce4051b7b74e1f1ce35a1bcc6cfa97da0abbd223756cf3f32df9590b1",
+    "tests/fixtures/r1cs/roles-many-o2.sym": "81db7ca0653a9ae8736d2159b3e6b961893338493f1aae1d9c405e8f62221aff"
   },
   "pilot": {
     "source_commit": "f6df75c3ea9953f834b1741c2c8c50a0c20290f4",
@@ -80,5 +88,15 @@
   },
   "accessed_utc": "2026-11-13T04:09:54.756990+00:00",
   "node_version": "v22.22.2",
-  "npm_version": "10.9.7"
+  "npm_version": "10.9.7",
+  "role_conformance": {
+    "source_commit": "ad44e915a12bb047b05745c2884aad9cc8326bc6",
+    "producer_options": [
+      "--O0",
+      "--O2"
+    ],
+    "outputs": "role-conformance.json",
+    "finding": "nPrvInputs is original declared count, not retained witness count; generic nonpublic wire identity is unclassified when count is nonzero",
+    "kind": "functional conformance probes, separate from timing pilot"
+  }
 }

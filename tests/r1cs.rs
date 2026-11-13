@@ -91,7 +91,7 @@ fn test_reads_the_pinned_circom_fixture() {
     assert_eq!(model.wire_role(0), Some(WireRole::Constant));
     assert_eq!(model.wire_role(1), Some(WireRole::PublicOutput));
     assert_eq!(model.wire_role(2), Some(WireRole::PublicInput));
-    assert_eq!(model.wire_role(3), Some(WireRole::PrivateInput));
+    assert_eq!(model.wire_role(3), Some(WireRole::UnclassifiedWitness));
     assert_eq!(model.wire_role(4), None);
     assert_eq!(model.symbols()[1].name, "main.a");
     assert_eq!(
@@ -189,6 +189,53 @@ fn test_producer_witness_and_perturbation() {
         model.evaluate_assignment(&wires).unwrap()[0],
         expansion.polynomials[0].eval(&wires[1..])
     );
+}
+
+/// Optimized Circom files retain declared private counts without identifying retained private wires.
+#[test]
+fn test_optimized_private_inputs_do_not_relabel_internal_witnesses() {
+    for (bytes, symbols, wire_count, labels) in [
+        (
+            include_bytes!("fixtures/r1cs/roles-o0.r1cs").as_slice(),
+            include_str!("fixtures/r1cs/roles-o0.sym"),
+            5,
+            vec![0, 1, 2, 3, 4],
+        ),
+        (
+            include_bytes!("fixtures/r1cs/roles-o2.r1cs").as_slice(),
+            include_str!("fixtures/r1cs/roles-o2.sym"),
+            4,
+            vec![0, 1, 2, 4],
+        ),
+    ] {
+        let model = R1cs::<Bn254Fr>::parse(bytes, &ImportLimits::default())
+            .unwrap()
+            .with_symbols(symbols)
+            .unwrap();
+        assert_eq!(model.header().private_inputs, 2);
+        assert_eq!(model.header().wire_count, wire_count);
+        assert_eq!(model.wire_labels(), labels);
+        assert_eq!(model.wire_role(1), Some(WireRole::PublicOutput));
+        assert_eq!(model.wire_role(3), Some(WireRole::UnclassifiedWitness));
+    }
+}
+
+/// Declared private counts may exceed the number of retained nonpublic witness wires.
+#[test]
+fn test_optimized_declared_private_count_can_exceed_retained_wires() {
+    let model = R1cs::<Bn254Fr>::parse(
+        include_bytes!("fixtures/r1cs/roles-many-o2.r1cs"),
+        &ImportLimits::default(),
+    );
+    assert!(model.is_ok());
+    let model = model
+        .unwrap()
+        .with_symbols(include_str!("fixtures/r1cs/roles-many-o2.sym"))
+        .unwrap();
+    assert_eq!(model.header().private_inputs, 5);
+    assert_eq!(model.header().wire_count, 4);
+    assert_eq!(model.wire_labels(), &[0, 1, 2, 7]);
+    assert_eq!(model.wire_role(3), Some(WireRole::UnclassifiedWitness));
 }
 
 /// Section order does not change canonical identity or the polynomial system.
@@ -540,7 +587,7 @@ fn test_symbols_cannot_contradict_the_canonical_wire_map() {
     }
 }
 
-/// Nonidentity labels never permute polynomial variables, and trailing witnesses remain internal.
+/// Nonidentity labels never permute variables, and private declarations do not classify witnesses.
 #[test]
 fn test_nonidentity_labels_and_internal_wires() {
     let mut sections = parts(&encode(5, &[[vec![(1, 1)], vec![(2, 1)], vec![(3, 1)]]]));
@@ -550,7 +597,10 @@ fn test_nonidentity_labels_and_internal_wires() {
         .collect();
     let model = R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()).unwrap();
     assert_eq!(model.wire_labels(), &[0, 4, 3, 2, 1]);
-    assert_eq!(model.wire_role(4), Some(WireRole::Internal));
+    assert_eq!(model.wire_role(4), Some(WireRole::UnclassifiedWitness));
+    sections[0].1[24..28].copy_from_slice(&0u32.to_le_bytes());
+    let no_private = R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()).unwrap();
+    assert_eq!(no_private.wire_role(4), Some(WireRole::Internal));
     let expanded = model.expand::<4>().unwrap();
     assert_eq!(expanded.variable_to_wire, vec![1, 2, 3, 4]);
     assert!(expanded.polynomials[0]

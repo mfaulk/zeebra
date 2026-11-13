@@ -57,8 +57,9 @@ node research/r1cs-725/producer-witness.cjs "$scratch/multiplier_js" "$scratch/i
 
 The committed binary and symbols must retain the hashes in the manifest. The witness order is
 `[1,15,3,5]`, produced by Circom's generated witness calculator and retained separately in
-`producer-witness.json`. The circuit and both example input values are synthetic and public. `PrivateInput` describes
-the R1CS declaration of `b`; it does not identify confidential input data in this fixture.
+`producer-witness.json`. The circuit and both example input values are synthetic and public. The source declaration of `b` is private; its value here is public test data. The generic adapter
+retains the declared private count and marks nonpublic witness roles unclassified, because
+optimized producers need not identify retained private wires in their header.
 
 ## Run the bounded pilot
 
@@ -89,3 +90,11 @@ observation, with no baseline wall-clock ratio, throughput claim or production b
 The exact named baseline is the original sparse R1CS row evaluator; the independent oracle is
 the pinned external reader plus Circom's witness calculator. See the
 [decision and outcome table](../../docs/research/bounded-r1cs.md).
+
+## Reproduce optimized-role conformance
+
+Compile `tests/fixtures/r1cs/roles.circom` with the same pinned producer using `--r1cs --sym --O0`
+and `--r1cs --sym --O2` into separate directories; compile `roles-many.circom` with O2. Their
+complete external-reader outputs are retained in `role-conformance.json`. The `.sym` sidecars
+show removed labels directly. All original source fixtures are synthetic/public. This is a
+functional conformance audit, not part of the ten-instance timing cohort.
