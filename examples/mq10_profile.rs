@@ -234,9 +234,9 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         #[cfg(feature = "research-work")]
         if let Some(observer) = observer.as_mut() {
             return zeebra::grobner::f4::f4_observed(&system, order, &options, observer)
-                .expect("bounded concurrent MQ10");
+                .expect("bounded concurrent corpus computation failed");
         }
-        f4_with_options(&system, order, &options).expect("MQ10 fits the shipped budget")
+        f4_with_options(&system, order, &options).expect("corpus computation failed")
     };
     #[cfg(feature = "research-work")]
     let ((basis, stats), work) = if measure_work {
