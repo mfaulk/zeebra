@@ -1,0 +1,6 @@
+2026-11-13T09:36:39-05:00  QUEUED   symbolic-742    pid=1308534  timeout --signal=INT --kill-after=60s 600 taskset -c 4 /buildcache/cargo-target/zeebra-742/release/examples/symbolic_attribution
+2026-11-13T09:36:39-05:00  START    symbolic-742    pid=1308534  waited=0s load=2.61 timeout --signal=INT --kill-after=60s 600 taskset -c 4 /buildcache/cargo-target/zeebra-742/release/examples/symbolic_attribution
+2026-11-13T09:37:12-05:00  END      symbolic-742    pid=1308534  status=0 end=exited elapsed=33s load=2.11 timeout --signal=INT --kill-after=60s 600 taskset -c 4 /buildcache/cargo-target/zeebra-742/release/examples/symbolic_attribution
+2026-11-13T09:39:08-05:00  QUEUED   symbolic-742-sorted  pid=1332271  timeout --signal=INT --kill-after=60s 600 taskset -c 4 /buildcache/cargo-target/zeebra-742/release/examples/symbolic_attribution --sorted-input
+2026-11-13T09:39:08-05:00  START    symbolic-742-sorted  pid=1332271  waited=0s load=4.80 timeout --signal=INT --kill-after=60s 600 taskset -c 4 /buildcache/cargo-target/zeebra-742/release/examples/symbolic_attribution --sorted-input
+2026-11-13T09:39:20-05:00  END      symbolic-742-sorted  pid=1332271  status=0 end=exited elapsed=12s load=4.45 timeout --signal=INT --kill-after=60s 600 taskset -c 4 /buildcache/cargo-target/zeebra-742/release/examples/symbolic_attribution --sorted-input

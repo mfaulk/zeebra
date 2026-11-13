@@ -64,11 +64,10 @@ retitled; [§6](#6-what-this-leaves) files that.
 
 ## 1. What the corpus is, and what it is not
 
-A **generator plus pinned digests**. No matrix bytes are committed, which is what #262 asked for and
-is also forced: `serde` is derived on this crate's scalars and polynomials but on none of its matrix
-types, `bincode` is a dev-dependency, `serde_json` is not a dependency at all, and a committed
-binary corpus of the sizes involved would be tens of megabytes. The repository cost of this change
-is source only — see [§4](#4-what-it-costs).
+A **generator plus pinned digests**. No matrix bytes are committed, as #262 requested; the
+repository cost remains source only — see [§4](#4-what-it-costs). Optional local
+[native archives](../guide/f4-matrix-files.md) preserve captured matrices for offline replay without
+adding serialization dependencies or changing the generator-based corpus.
 
 Each entry names an instance, a monomial order, an option preset, and which batch to take. Running
 it produces a `MacaulayMatrix`, and the entry pins that matrix's batch index, dimensions, reducer
@@ -288,8 +287,8 @@ it does not have to be re-derived.**
 
 Source only. No binary data is added to the repository.
 
-The module, example and benchmark store generators and pinned fingerprints, with no serialized
-matrix format. The MQ14 entry alone holds 24 843 682 `(usize, Zp2147483647)` entries, so its
+The module, example and benchmark store generators and pinned fingerprints. Optional local
+archives now support offline replay; no matrix files are committed. The MQ14 entry alone holds 24 843 682 `(usize, Zp2147483647)` entries, so its
 coefficient payload allowance must account for 16 bytes per entry on this 64-bit target, before
 row vectors, column monomials, captured inputs and other process allocations. The live-entry cap
 is not an RSS cap.
@@ -511,16 +510,15 @@ elimination could cost; a packed representation would be a different kernel on t
 which is exactly the comparison this corpus makes cheap, and is H14's question rather than this
 issue's.
 
-**There is no file format, and that is a decision rather than an omission.** #262's deliverables ask
-for "a dump/load path for F4 matrices behind the observer hook, with a documented format"; its
-research questions and acceptance criteria ask for the opposite ("prefer a generator plus pinned
-parameters over committed binary matrices", "no large binaries added to the repository"). The
-generated route is what landed, for the reasons in [§1](#1-what-the-corpus-is-and-what-it-is-not)
-and because the one external comparand a format existed to read is gone
-([§3](#3-gblas-published-matrices-the-catalogue-survives-the-data-does-not)). **Filed as #646,
-Priority Low**, which also records when it should be reopened — an external comparand reappearing,
-an entry too expensive to regenerate, or wanting to hand a matrix to a tool outside this crate, for
-which GBLA's own SMS export is the smaller first step.
+**Offline replay and SMS export now address #646.** The generated corpus remains the source of
+truth, with no committed matrix blobs. `f4_matrix_files dump <label> <path>` captures one entry and
+writes a versioned native archive of its column labels, row origins and exact field coefficients.
+`replay` checks the pinned fingerprint before elimination and never invokes the system generator;
+`sms` writes prime-field coefficient triples for external tools. The
+[matrix-file guide](../guide/f4-matrix-files.md) documents commands, bounds, compatibility and SMS's
+missing modulus. This revisits the original generator-only decision because the opt-in large
+capture exists and kernel studies need offline input. It does not add a GBLA `.gbm` reader or
+claim that GBLA's missing matrices have reappeared.
 
 **No Fukuoka MQ instance.** Types II and V are the published GF(2^8) MQ systems and the natural
 wide-characteristic-two entries, but they come from `research/instances/`, which

@@ -24,6 +24,8 @@ pub mod integers;
 mod left_scalar_mul;
 pub mod linalg;
 mod poly;
+#[cfg(feature = "research-work")]
+pub use poly::gcd_profile;
 pub mod r1cs;
 mod rings;
 
@@ -78,6 +80,7 @@ pub use rings::Ring;
 #[doc = include_str!("../docs/guide/development.md")]
 #[doc = include_str!("../docs/guide/external-engines.md")]
 #[doc = include_str!("../docs/guide/f4.md")]
+#[doc = include_str!("../docs/guide/f4-matrix-files.md")]
 #[doc = include_str!("../docs/guide/finite-fields.md")]
 #[doc = include_str!("../docs/guide/grobner-bases.md")]
 #[doc = include_str!("../docs/guide/linear-algebra.md")]

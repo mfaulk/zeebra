@@ -1,6 +1,7 @@
 //! Live F4 matrices pinned by canonical digests; capture preserves the exact pre-elimination input.
 
 use crate::{
+    fields::KnownOrder,
     fields::{Bn254Fr, Gf256Mq, Mersenne31, Zp18446744073709551557, Zp2, Zp2147483647},
     grobner::{
         benchmark_systems::{cyclic, katsura},
@@ -619,6 +620,16 @@ pub trait CorpusVisitor {
     );
 }
 
+/// Dispatch one entry at its native arity and field without capturing a matrix.
+pub trait MatrixEntryVisitor {
+    /// `generators` is lazy: callers loading a cached matrix need not build a polynomial system.
+    fn visit<const N: usize, F: KnownOrder>(
+        &mut self,
+        spec: &MatrixSpec,
+        generators: fn() -> Vec<MultivariatePolynomial<N, F>>,
+    );
+}
+
 /// Capture one entry, refusing it unless it is what the corpus pins.
 ///
 /// `verify` is off in exactly one place: the `pin` mode of
@@ -651,7 +662,7 @@ fn capture_checked<const N: usize, F: FiniteField>(
 /// Both [`corpus`] and [`walk_corpus`] come out of this invocation. A spec with no dispatch arm, or
 /// an arm with no spec, is not expressible.
 macro_rules! corpus {
-    ($metadata:ident, $walk:ident, $walk_with:ident; $(
+    ($metadata:ident, $walk:ident, $walk_with:ident, $dispatch:ident; $(
         $label:literal : $system:expr,
         $family:literal, $variables:literal, $field:literal, $bits:literal,
         $order:expr, $preset:expr, $selector:expr, $regime:expr,
@@ -683,6 +694,17 @@ macro_rules! corpus {
                     },
                 },
             )*]
+        }
+
+        /// Dispatch a named entry without executing F4; return false for an unknown label.
+        pub fn $dispatch<V: MatrixEntryVisitor>(label: &str, visitor: &mut V) -> bool {
+            let specs = $metadata();
+            let Some(spec) = specs.iter().find(|spec| spec.label == label) else { return false; };
+            match label {
+                $( $label => visitor.visit(spec, || $system), )*
+                _ => unreachable!("every spec has a dispatch arm"),
+            }
+            true
         }
 
         /// Capture every entry and hand it to `visitor`, in corpus order.
@@ -737,7 +759,7 @@ use MonomialOrder::Lexicographic as Lex;
 use OptionsPreset::{Baseline, Default as Shipping};
 use Regime::{Mixed, PairHeavy, Scaffolded};
 
-corpus! { corpus, walk_corpus, walk_corpus_with;
+corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
     // --- 31-bit prime, Mersenne31 in a 32-bit representation -------------------------------
     "katsura-7/grevlex/m31/default": katsura::<7, Mersenne31>(),
         "katsura", 7, "Mersenne31", 31, Grevlex, Shipping, Largest, Mixed,
@@ -803,7 +825,7 @@ corpus! { corpus, walk_corpus, walk_corpus_with;
 }
 
 // Large captures use the same spec/dispatch generator, but are never part of walk_corpus.
-corpus! { large_corpus, walk_large_corpus, walk_large_corpus_with;
+corpus! { large_corpus, walk_large_corpus, walk_large_corpus_with, visit_large_corpus_entry;
     "mq-random-14/grevlex/p31x64/default-64m": mq_random::<14, Zp2147483647>(REFERENCE_CHARACTERISTIC),
         "mq-random", 14, "Zp2147483647", 31, Grevlex, OptionsPreset::RaisedDefault { entries: 64_000_000, bytes: 1_024_000_000 },
         BatchSelector::Prefix(6), Scaffolded,

@@ -1,6 +1,8 @@
 //! Multivariate polynomials over finite fields.
 
 mod dense_index;
+#[cfg(feature = "research-work")]
+pub mod gcd_profile;
 mod monomial;
 mod monomial_arithmetic;
 mod monomial_hash;

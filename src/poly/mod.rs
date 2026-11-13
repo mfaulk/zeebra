@@ -2,6 +2,8 @@
 
 mod multivariate;
 mod univariate;
+#[cfg(feature = "research-work")]
+pub use multivariate::gcd_profile;
 
 #[doc(hidden)]
 pub use multivariate::{

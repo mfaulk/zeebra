@@ -71,7 +71,8 @@ default = ["external-runners"]
 # promised.
 external-runners = []
 
-# Opt-in work diagnostics and owned FGLM executor measurements; production defaults stay unchanged.
+# Opt-in work/GCD-size diagnostics and owned FGLM executor measurements.
+# Production defaults stay unchanged; diagnostic scopes must also be explicitly enabled.
 research-work = []
 
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
@@ -96,6 +97,10 @@ serde_arrays = "0.1.0"
 # because default-feature builds cannot detect accidental imports from a gated module.
 [[example]]
 name = "f4_live_budget"
+test = true
+
+[[example]]
+name = "f4_matrix_files"
 test = true
 
 [[example]]
@@ -288,3 +293,8 @@ required-features = ["external-runners"]
 name = "worker_pool_study"
 test = true
 required-features = ["research-work"]
+
+[[example]]
+name = "symbolic_attribution"
+test = true
+required-features = ["external-runners", "research-work"]

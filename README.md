@@ -168,6 +168,11 @@ The pinned F4 matrix corpus has a separate opt-in large set. Run
 `check-all` verifies both sets; `list-large` shows the large dimensions and explicit live-entry budgets without computing a basis.
 The default corpus walk and benchmark smoke retain the bounded small set. See the
 [corpus report](docs/research/f4-matrix-corpus.md) for capture costs and limits.
+Native archives support offline elimination replay without regenerating F4:
+`cargo run --release --example f4_matrix_files -- dump cyclic-6/grevlex/m31/default /buildcache/cyclic-6.zbf4`,
+then replace `dump` with `replay` to load it or `sms` to export prime-field triples to stdout.
+The [matrix-file guide](docs/guide/f4-matrix-files.md) documents the versioned format,
+read limits, field identity checks and external-tool modulus requirements.
 
 The [multicore NTT caller study](docs/research/multicore-ntt.md) records the reachable
 callers, field/domain limits, and bounded Graeffe profiles. It defers threading
@@ -191,6 +196,12 @@ The comparison checks every sample and reports a determinant-stage ratio; it exc
 and root finding. See the [five-axis decision](docs/research/structured-sylvester.md) for the
 algorithm choice and the [measurement protocol](docs/guide/benchmarking.md#sylvester-kernel-comparison)
 for pinned runs.
+
+Inspect multivariate GCD intermediate support and coefficient degree with
+`cargo run --release --features research-work --example gcd_routes -- --case koalabear 4 4 primitive on`.
+Run expensive cases under an external timeout; the [GCD size study](docs/research/multivariate-gcd.md#7-intermediate-size-profiles-652)
+documents bounded campaigns, observer overhead and the distinction between scaled PRS entries,
+raw remainders, Brown images and interpolants.
 
 Univariate `gcd` uses classical Euclid. Run `cargo run --release --example gcd_crossover`
 to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254. The
@@ -216,13 +227,17 @@ for installation, worker cohorts, and supported fields/tasks.
 The [acceptance cohort](docs/research/giac-comparand.md) retains exact MQ/Cyclic
 agreement and the reproducible Katsura-11 resource limit.
 
+The [symbolic preprocessing attribution](research/symbolic-attribution/README.md) replays frozen
+MQ10 batches with reducer and pair-multiple controls. Run
+`cargo test --features research-work --example symbolic_attribution` for the instrument checks.
+
 ### Cargo features
 
 | Feature | Default | What it adds |
 |---|---|---|
 | `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush, Giac and Singular as subprocesses. Uses only `std` and adds no dependency. |
 | `proptest` | off | `proptest::arbitrary::Arbitrary` for the public types: field elements, big integers, monomials, polynomials, vectors and matrices. Lets you property-test downstream code with `any::<T>()`. |
-| `research-work` | off | Research operation counters, serial row tracing, and the opt-in concurrent F4 pivot experiment. |
+| `research-work` | off | Research operation counters, opt-in GCD size profiles, serial row tracing, and the opt-in concurrent F4 pivot experiment. |
 
 ```toml
 zeebra = { version = "0.1", features = ["proptest"] }
