@@ -98,7 +98,7 @@ def main():
         for row, polynomial in zip(rows, polys):
             assert sparse_residual(row, [1, *point], 7) == polynomial_residual(polynomial, point, 7)
             checks += 1
-    witness = [1, 15, 3, 5]
+    witness = list(map(int, json.loads((root / 'research/r1cs-725/producer-witness.json').read_text())['witness']))
     producer = models[1]
     p = int(producer['prime'])
     assert all(sparse_residual(row, witness, p) == 0 for row in producer['constraints'])
