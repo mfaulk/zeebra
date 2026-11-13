@@ -51,13 +51,16 @@ def main():
     args = parser.parse_args()
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         parser.error('commit instruments before measuring')
+    binary_source = subprocess.check_output(['git', 'rev-parse', 'ff15a0af'], cwd=ROOT, text=True).strip()
+    if subprocess.call(['git', 'diff', '--quiet', binary_source, '--', 'Cargo.toml', 'Cargo.lock', '.cargo', 'src', 'examples'], cwd=ROOT):
+        parser.error('build the frozen Rust sources at ff15a0af before this campaign')
     cpus = sorted(os.sched_getaffinity(0))
     if cpus != [0, 1, 2, 3] or os.environ.get('ZEEBRA_AFFINITY') != '0,1,2,3' or not os.environ.get('ZEEBRA_MACHINE'):
         parser.error('declare actual machine and CPU affinity 0,1,2,3')
     storage, guard = driver.load('study_artifacts'), driver.load('grobx-work-study')
     compiler = driver.load('worker-pool-study').compiler_processes
     identity = dict(commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-        binary_sha256=driver.sha(args.binary), phase=args.phase, affinity=cpus,
+        binary_sha256=driver.sha(args.binary), binary_source_commit=binary_source, phase=args.phase, affinity=cpus,
         machine=os.environ['ZEEBRA_MACHINE'], compiler_gate=True,
         cargo_lock_sha256=driver.sha(ROOT/'Cargo.lock'))
     cohort = dict(schema=1, identity=identity, attempts=[],
@@ -78,10 +81,10 @@ def main():
                 or seen != cells[:len(seen)] or len(cohort.get('excluded_attempts', [])) > 1):
             parser.error('resume requires identical inputs, verified prefix and environmental refusal')
         for a in cohort['attempts']:
-            if a['status'] != 'verified': parser.error('resume requires verified prefix')
-            trajectories.setdefault((a['problem'], a['modulus']), a['raw'])
+            if not driver.resumable_status(a['status'], args.phase): parser.error('resume requires accepted prefix')
+            if a['status'] == 'verified': trajectories.setdefault((a['problem'], a['modulus']), a['raw'])
         cohort.setdefault('resumptions', []).append(cohort.pop('refusal'))
-        cohort['attempts'] = [storage.pack_attempt(a, args.output) for a in cohort['attempts']]
+        cohort['attempts'] = [storage.pack_attempt(a, args.output) if a['status'] == 'verified' else a for a in cohort['attempts']]
     elif args.output.exists(): parser.error('retain existing output; use --resume or a new path')
     refs = driver.references()
     for repeat, problem, modulus, arm in cells[len(cohort['attempts']):]:

@@ -77,6 +77,11 @@ def check_trajectory(raw, reference):
             raise ValueError('forward trajectory differs: ' + key)
 
 
+def resumable_status(status, phase):
+    return status == 'verified' or (phase == 'probe' and status in (
+        'incomplete-unverified', 'completed-needs-independent-reference'))
+
+
 def environment_refusal(max_load, compilers):
     if compilers:
         return dict(reason='compiler', processes=compilers)
@@ -124,16 +129,16 @@ def main():
                 or len(cohort.get('excluded_attempts', [])) > 1):
             parser.error('resume requires identical source/binaries/limits, an environmental refusal and at most one excluded attempt')
         seen = [(a['repeat'], a['problem'], a['modulus'], a['arm']) for a in cohort['attempts']]
-        if seen != cells[:len(seen)] or any(a['status'] != 'verified' for a in cohort['attempts']):
+        if seen != cells[:len(seen)] or any(not resumable_status(a['status'], args.phase) for a in cohort['attempts']):
             parser.error('resume requires a verified plan prefix')
         cohort.setdefault('resumptions', []).append(cohort.pop('refusal'))
         # Repack loaded attempts so the final file retains content-addressed basis storage.
-        cohort['attempts'] = [storage.pack_attempt(a, args.output) for a in cohort['attempts']]
+        cohort['attempts'] = [storage.pack_attempt(a, args.output) if a['status'] == 'verified' else a for a in cohort['attempts']]
     elif args.output.exists():
         parser.error('output exists; retain it and use a new campaign path')
     refs, trajectories = references(), {}
     for a in storage.iter_attempts(args.output) if args.resume else ():
-        trajectories.setdefault((a['problem'], a['modulus']), a['raw'])
+        if a['status'] == 'verified': trajectories.setdefault((a['problem'], a['modulus']), a['raw'])
     for repeat, problem, modulus, arm in cells[len(cohort['attempts']):]:
         refusal = environment_refusal(args.max_load, load('worker-pool-study').compiler_processes())
         if refusal:

@@ -123,3 +123,8 @@ python3 tools/test/selective-backward-summary-test.py
 python3 tools/test/selective-backward-cross-test.py
 python3 research/selective-backward/summarize.py
 ```
+
+The combined executable's Rust source pin is `ff15a0af`. The controller records its own
+revision separately and rejects a different Cargo/library/example tree. Resume accepts
+retained resource-limited probe outcomes without reclassifying them as verified answers;
+failed or unverified native timing attempts still cannot resume.

@@ -37,6 +37,14 @@ class Acceptance(unittest.TestCase):
         with patch.object(study.os, 'getloadavg', return_value=(5, 0, 0)):
             self.assertEqual(study.environment_refusal(4, [])['reason'], 'load')
 
+    # Fixed-budget probe refusals may resume, while failed native timing attempts may not.
+    def test_resume_statuses(self):
+        self.assertTrue(study.resumable_status('verified', 'native'))
+        self.assertTrue(study.resumable_status('incomplete-unverified', 'probe'))
+        self.assertTrue(study.resumable_status('completed-needs-independent-reference', 'probe'))
+        self.assertFalse(study.resumable_status('incomplete-unverified', 'native'))
+        self.assertFalse(study.resumable_status('failed', 'probe'))
+
     # Native and observation-on measurements remain distinct cells in a fixed five-repeat plan.
     def test_plan(self):
         plan = list(study.plan('native'))
