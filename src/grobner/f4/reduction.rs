@@ -259,7 +259,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         RowForm::Echelon
     };
     #[cfg(feature = "research-work")]
-    if crate::linalg::work::enabled() {
+    let _work_batch = crate::linalg::work::enabled().then(|| {
         crate::linalg::work::begin_batch(
             crate::linalg::work::MatrixWork {
                 degree: pairs.iter().map(|pair| pair.degree).max().unwrap_or(0),
@@ -274,8 +274,8 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
                 ..Default::default()
             },
             structured,
-        );
-    }
+        )
+    });
     let block = eliminate_to(plan, form, options.elimination, &mut matrix, allowance)
         .map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
     let elimination = block.statistics;

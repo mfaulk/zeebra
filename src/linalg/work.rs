@@ -74,6 +74,8 @@ impl PhaseWork {
 /// One matrix's live payload/capacity peaks exclude basis, monomial tables and allocator overhead.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MatrixWork {
+    /// False for an interrupted/refused matrix; zero summary counts then mean unavailable.
+    pub completed: bool,
     pub degree: u64,
     pub pairs: usize,
     pub rows: usize,
@@ -96,6 +98,7 @@ pub struct MatrixWork {
 impl MatrixWork {
     pub fn json(&self) -> Json {
         Json::object([
+            ("completed", Json::Bool(self.completed)),
             ("degree", Json::int(self.degree)),
             ("pairs", Json::size(self.pairs)),
             ("rows", Json::size(self.rows)),
@@ -212,8 +215,24 @@ fn update(f: impl FnOnce(&mut MatrixWork, bool, Option<bool>)) {
     });
 }
 
-pub(crate) fn begin_batch(matrix: MatrixWork, structured: bool) {
-    ACTIVE.with(|active| {
+pub(crate) struct BatchScope(Option<usize>);
+
+impl Drop for BatchScope {
+    fn drop(&mut self) {
+        ACTIVE.with(|active| {
+            if let Some(state) = active.borrow_mut().as_mut() {
+                if self.0.is_some() && state.batch == self.0 {
+                    state.batch = None;
+                    state.backward = false;
+                    state.target = None;
+                }
+            }
+        });
+    }
+}
+
+pub(crate) fn begin_batch(matrix: MatrixWork, structured: bool) -> BatchScope {
+    let index = ACTIVE.with(|active| {
         if let Some(state) = active.borrow_mut().as_mut() {
             assert!(state.batch.is_none());
             state.batch = Some(state.report.batches.len());
@@ -221,12 +240,17 @@ pub(crate) fn begin_batch(matrix: MatrixWork, structured: bool) {
             state.structured = structured;
             state.backward = false;
             state.target = None;
+            state.batch
+        } else {
+            None
         }
     });
+    BatchScope(index)
 }
 
 pub(crate) fn finish_batch(statistics: &super::sparse::EliminationStatistics) {
     update(|matrix, _, _| {
+        matrix.completed = true;
         matrix.rank = statistics.rank;
         matrix.zero_rows = statistics.zero_rows;
         matrix.final_entries = statistics.final_nonzeros;
@@ -326,6 +350,7 @@ pub(crate) fn outside_summary(
         if let Some(state) = active.borrow_mut().as_mut() {
             if state.batch.is_none() {
                 let matrix = &mut state.report.outside_batch;
+                matrix.completed = true;
                 matrix.rows = rows;
                 matrix.columns = columns;
                 matrix.initial_entries = statistics.initial_nonzeros;
@@ -336,6 +361,26 @@ pub(crate) fn outside_summary(
             }
         }
     });
+}
+
+// Row-local storage is sampled before copyback while both the old target and merge output live.
+pub(crate) fn row_context(resident: usize, allocated: usize) {
+    ACTIVE.with(|active| {
+        if let Some(state) = active.borrow_mut().as_mut() {
+            state.resident = resident;
+            state.allocated = allocated;
+        }
+    });
+}
+
+pub(crate) fn sparse_storage(live: usize, capacity: usize, entry_bytes: usize) {
+    let (resident, allocated) = ACTIVE.with(|active| {
+        active
+            .borrow()
+            .as_ref()
+            .map_or((0, 0), |state| (state.resident, state.allocated))
+    });
+    memory(resident + live, allocated + capacity, 0, 0, entry_bytes);
 }
 
 #[cfg(test)]
@@ -433,6 +478,38 @@ mod tests {
         }
     }
 
+    // An elimination-budget refusal does not leave a failed batch active during a later solve in the same scope.
+    #[test]
+    fn refused_batch_does_not_contaminate_later_solve() {
+        use crate::{
+            grobner::{f4_with_options, F4Options},
+            MonomialOrder, MultivariatePolynomial,
+        };
+        let names = ["x", "y", "z"];
+        let system: Vec<MultivariatePolynomial<3, Zp13>> = ["x^2+y^2", "x^2+x*z+y*z+z^2"]
+            .iter()
+            .map(|text| MultivariatePolynomial::parse(text, names).unwrap())
+            .collect();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let bounded = F4Options {
+            max_live_nonzeros: 6,
+            ..F4Options::default()
+        };
+        let expected = f4_with_options(&system, order, &F4Options::default())
+            .unwrap()
+            .0;
+        let (basis, report) = measure(|| {
+            assert!(f4_with_options(&system, order, &bounded).is_err());
+            f4_with_options(&system, order, &F4Options::default())
+                .unwrap()
+                .0
+        });
+        assert_eq!(basis, expected);
+        assert_eq!(report.batches.len(), 2);
+        assert!(!report.batches[0].completed);
+        assert!(report.batches[1].completed);
+    }
+
     // An unwinding measurement restores the disabled state and does not contaminate the next scope.
     #[test]
     fn panic_restores_measurement_scope() {
@@ -442,24 +519,4 @@ mod tests {
         let (_, work) = measure(|| ());
         assert_eq!(work, super::WorkReport::default());
     }
-}
-
-// Row-local storage is sampled before copyback while both the old target and merge output live.
-pub(crate) fn row_context(resident: usize, allocated: usize) {
-    ACTIVE.with(|active| {
-        if let Some(state) = active.borrow_mut().as_mut() {
-            state.resident = resident;
-            state.allocated = allocated;
-        }
-    });
-}
-
-pub(crate) fn sparse_storage(live: usize, capacity: usize, entry_bytes: usize) {
-    let (resident, allocated) = ACTIVE.with(|active| {
-        active
-            .borrow()
-            .as_ref()
-            .map_or((0, 0), |state| (state.resident, state.allocated))
-    });
-    memory(resident + live, allocated + capacity, 0, 0, entry_bytes);
 }
