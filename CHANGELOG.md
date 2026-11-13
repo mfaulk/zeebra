@@ -9,6 +9,9 @@ change to `y` may break the public API.
 
 ### Added
 
+- Checked two-block product orders for direct F4 partial elimination, canonical order identities,
+  and a runnable suffix-basis extraction example (#680).
+
 - A pinned standalone sdiehl/groebner F4 comparand with full independent reduced-basis checking,
   explicit Rayon worker counts, wide-prime controls and recorded build identities (#678).
 - Completed driver runs report child kernel RSS snapshots, and competitive history regeneration
@@ -26,6 +29,9 @@ change to `y` may break the public API.
   example with optional exact msolve eliminant checks.
 
 ### Changed
+
+- `MonomialOrder` adds a `Block` variant; exhaustive downstream matches need a corresponding arm.
+  F4 rejects fixed-arity order/ring mismatches with `F4Error::InvalidOptions` before comparison.
 
 - External measurement APIs add RSS snapshot/provenance fields and a recorded-stop outcome;
   exhaustive outcome/RSS matches and external record struct literals must accommodate them.

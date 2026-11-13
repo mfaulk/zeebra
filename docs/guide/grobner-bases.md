@@ -1,11 +1,11 @@
 # Gröbner bases
 
-Buchberger's algorithm, monomial orders including a weighted family, reduction against a basis you
-supply, zero-dimensional classification, and FGLM order conversion.
+Buchberger's algorithm, monomial orders including weighted and block families, reduction against
+a basis you supply, zero-dimensional classification, and FGLM order conversion.
 
 `grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. The three
-standard orders and a weighted family are available, and `MonomialOrder` is exported from the crate
-root:
+standard orders, weighted orders and two-block product orders are available, and `MonomialOrder`
+is exported from the crate root:
 
 ```rust
 use zeebra::{fields::Zp13, grobner::buchberger, MonomialOrder, MultivariatePolynomial};
@@ -22,6 +22,61 @@ let basis = buchberger(&system, MonomialOrder::GradedReverseLexicographic);
 The returned basis is reduced and in a deterministic order, so it is reproducible across runs.
 Which order you pick matters: graded reverse lexicographic is usually cheapest, while lexicographic
 is what makes a system easy to solve by back-substitution and can be dramatically more expensive.
+
+## Two-block elimination orders
+
+Use `MonomialOrder::Block(BlockOrder::checked(arity, split, prefix, suffix)?)` to
+eliminate the variable prefix `[0, split)` while retaining lex, grlex or grevlex in
+the suffix. `BlockOrderKind` selects the order within each block. Both blocks must
+be nonempty, `split < arity`, and `arity <= u32::MAX`; construction returns
+`BlockOrderError` otherwise. This inline value remains `Copy` and allocates no
+process-lifetime storage.
+
+The prefix comparison dominates the suffix comparison. Each block order is total,
+multiplicative and a well-order; their lexicographic product preserves those
+properties. Every nonconstant prefix exceeds the constant prefix, even against
+arbitrarily large suffix exponents. Thus suffix-only basis elements generate the
+elimination ideal. Structural equality includes arity, split and both suborders.
+
+```rust
+use zeebra::{fields::Zp32003, grobner::f4, BlockOrder, BlockOrderKind,
+             MonomialOrder, MultivariatePolynomial};
+let variables = ["x", "y", "z"];
+let system = ["x-y^2", "x*z-1"].map(|text|
+    MultivariatePolynomial::<3, Zp32003>::parse(text, variables).unwrap());
+let blocks = BlockOrder::checked(3, 1, BlockOrderKind::Lexicographic,
+    BlockOrderKind::GradedReverseLexicographic).unwrap();
+let basis = f4(&system, MonomialOrder::Block(blocks)).unwrap();
+let retained: Vec<_> = basis.iter().filter(|p|
+    p.terms().iter().all(|(m, _)| m.exponents()[0] == 0)).collect();
+let expected = MultivariatePolynomial::<3, Zp32003>::parse("y^2*z-1", variables).unwrap();
+assert_eq!(retained, vec![&expected]);
+```
+
+Here substitution of `x=y²` into `xz-1` independently gives `y²z-1` in the
+retained ring. Run the same example with `cargo run --example block_elimination`.
+F4 rejects an order/ring arity mismatch with `F4Error::InvalidOptions` before any
+comparison, including for empty or unit input; direct `MonomialOrder::cmp` panics
+on a mismatch. Block degree comparisons sum in `u64` before comparing. The default
+`InterreductionRoute::ByOrder` uses division for block orders; the explicit `Matrix`
+override remains available, with its existing budgets.
+
+Canonical instance identities use `block:<arity>:<split>:<prefix>:<suffix>`, for
+example `block:3:1:lex:grevlex`. Every subprocess comparand adapter currently
+returns `Unsupported::Order` for block orders. The independent live Singular
+check uses the identical product order `(lp(1),dp(2))`, rather than coercing it to
+full lex or grevlex. Run `cargo test --test block_order live_singular -- --ignored`
+with Singular and GNU `timeout` installed; the test covers both block boundaries,
+all nine suborder pairs, both dimensions, and zero/unit ideals. It was verified
+with Singular 4.4.1 (44105), `/usr/bin/Singular` SHA-256
+`08a5400c9d29834271bd29e02a76d27dff5eff835d99063357a0afb73c29bbb4`.
+CI replays the independent reference bases without requiring Singular.
+
+FGLM's target remains lex only (`fglm_to_lex` / `fglm_to_lex_checked`); this API
+adds direct F4 elimination, without adding target-order conversion. Shape-position
+hypothesis certificates reject block orders as ungraded. General partitions,
+nested or weighted blocks remain outside this API. No performance gain is claimed;
+comparator timing would require a separate pinned measurement.
 
 ## Weighted monomial orders
 
@@ -71,15 +126,16 @@ let order = MonomialOrder::Weighted(&GRIFFIN_R5);
 assert_eq!(order.arity(), Some(3));
 ```
 
-The weight vector's arity must equal the number of variables. A mismatch panics rather than
-comparing a prefix, because a truncated weight vector is a consistent order on a *different* ring;
+The weight vector's arity must equal the number of variables. Direct comparison panics rather than
+comparing a prefix; F4 instead returns `F4Error::InvalidOptions` before comparison. A truncated
+weight vector is a consistent order on a *different* ring;
 `normal_form_modulo` below reports it as an error instead, so a caller that assembled the order and
 the system separately learns which is wrong.
 
-Weighted orders are refused by every external comparand adapter. No third-party engine here has a
-weighted spelling whose coefficient and ordering conventions have been verified the way the
-unweighted ones have, and substituting degrevlex would compare a correct basis against a different
-question.
+Weighted orders are refused by every subprocess comparand adapter. Singular spellings are
+verified by the weighted reference tests, but its adapter does not yet emit them; the other
+adapters have no verified weighted contract. Zeebra's own adapter accepts weighted orders.
+Substituting degrevlex would compare a correct basis against a different question.
 
 ## Reducing against a basis you already have
 

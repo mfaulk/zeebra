@@ -27,8 +27,9 @@ function iterated a few times, and its security claim is that the system of poly
 describing it cannot be solved in a feasible length of time. Deciding whether that is true, for a given design
 at a given number of rounds, is a computation: build the polynomial system, compute a Gröbner
 basis, and read the solutions off it. Zeebra implements that pipeline end to end. Buchberger's
-algorithm and Faugère's F4 compute bases under lexicographic, graded, graded-reverse and weighted
-orders; FGLM converts a cheap basis into the lexicographic one that solves by back-substitution;
+algorithm and Faugère's F4 compute bases under lexicographic, graded, graded-reverse, weighted
+and two-block elimination orders. FGLM converts a cheap basis into the lexicographic one that
+solves by back-substitution;
 resultants offer a second, independent elimination route; and univariate root finding and
 factorization finish the job. The solver returns *verified field points*. Every stage carries an explicit resource budget for managing 
 the cost of solving systems at the frontier of feasibility. F4 construction refusals report the complete
@@ -178,6 +179,11 @@ to retain the lex walk. Statistics record the route and fallback reason;
 failed projections never return an unchecked basis. The [conversion guide](docs/guide/grobner-bases.md#certified-scalar-wiedemann)
 describes budgets and the comparison example. [Paired measurements](docs/research/certified-wiedemann.md)
 record the public benchmark inputs and the limits on the performance claims.
+
+For partial elimination, run `cargo run --example block_elimination`. A checked
+`BlockOrder` makes the eliminated prefix dominant while allowing lex, grlex or
+grevlex within each block. See the [two-block order guide](docs/guide/grobner-bases.md#two-block-elimination-orders)
+for validation, extraction of the retained basis, and current adapter/FGLM limits.
 
 ### Cargo features
 

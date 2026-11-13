@@ -147,7 +147,7 @@ pub enum HypothesisGap {
     /// The order is not graded, so `deg_≺` — which Theorem 4's homogenization is taken with
     /// respect to — is undefined and "the top form" has no meaning.
     ///
-    /// Lexicographic order is the case. Refused rather than silently answered with the total
+    /// Lexicographic and block orders are refused rather than silently answered with the total
     /// degree, because the total-degree top form of a lex basis is a different ideal and a
     /// statement about it would say nothing about the one asked for.
     UngradedOrder {
@@ -175,7 +175,10 @@ pub fn shape_position_hypotheses<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     options: &F4Options,
 ) -> Result<ShapeHypotheses, HypothesisGap> {
-    if matches!(order, MonomialOrder::Lexicographic) {
+    if matches!(
+        order,
+        MonomialOrder::Lexicographic | MonomialOrder::Block(_)
+    ) {
         return Err(HypothesisGap::UngradedOrder { order });
     }
     let live: Vec<&MultivariatePolynomial<N, F>> = basis.iter().filter(|p| !p.is_zero()).collect();

@@ -116,7 +116,9 @@ fn triple(order: MonomialOrder) -> (NarrowOrder, WideOrder) {
             NarrowOrder::GradedReverseLexicographic,
             WideOrder::GradedReverseLexicographic,
         ),
-        MonomialOrder::Weighted(_) => panic!("this harness measures the three built-in orders"),
+        MonomialOrder::Weighted(_) | MonomialOrder::Block(_) => {
+            panic!("this harness measures the three built-in orders")
+        }
     }
 }
 

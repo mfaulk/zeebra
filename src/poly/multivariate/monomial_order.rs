@@ -1,19 +1,4 @@
-//! Monomial orderings on k[x_0, ..., x_{n-1}].
-//!
-//! Lexicographic order (lex)  first compares exponents of x1 in the monomials, and in case of
-//! equality compares exponents of x2, and so on.
-//!
-//! Graded lexicographic order (grlex) compares by total degree (sum of all exponents), and then
-//! "breaks ties" using lexicographic order.
-//!
-//! Graded reverse lexicographic order (grevlex) compares by total degree (sum of all exponents),
-//! and then "breaks ties" by looking at the right-most variable and favoring the monomial with the
-//! smaller exponent on that variable.
-//!
-//! A weighted order ([`WeightedOrder`]) replaces the total degree with a weighted degree
-//! `Σ w_i e_i`. Strictly positive weights are what make it admissible, and they are checked at
-//! construction: a zero weight leaves infinitely many monomials of the same weighted degree, so
-//! the grading would no longer well-order them and a reduction could fail to terminate.
+//! Orders carry their variable arity when required; comparison rejects a mismatched ring.
 
 use crate::Monomial;
 use std::{
@@ -40,6 +25,9 @@ pub enum MonomialOrder {
     /// [`MonomialOrder::weighted`] builds one from a runtime weight vector; a weight vector known
     /// at compile time can be a `static` and skip the interning entirely.
     Weighted(&'static WeightedOrder),
+
+    /// A validated product order with a dominant prefix of variables.
+    Block(BlockOrder),
 }
 
 impl MonomialOrder {
@@ -50,6 +38,7 @@ impl MonomialOrder {
             MonomialOrder::GradedLexicographic => grlex(a, b),
             MonomialOrder::GradedReverseLexicographic => grevlex(a, b),
             MonomialOrder::Weighted(weighted) => weighted.cmp(a, b),
+            MonomialOrder::Block(block) => block.cmp(a, b),
         }
     }
 
@@ -73,13 +62,14 @@ impl MonomialOrder {
         Ok(MonomialOrder::Weighted(Box::leak(Box::new(order))))
     }
 
-    /// The weight vector's arity, or `None` for an unweighted order.
+    /// The required variable arity, or `None` for a built-in order.
     ///
     /// Lets a caller reject an arity mismatch with an error of its own before [`Self::cmp`]
     /// panics on one; see [`WeightedOrder::cmp`] for why that panic is not negotiable.
     pub fn arity(&self) -> Option<usize> {
         match self {
             MonomialOrder::Weighted(weighted) => Some(weighted.weights().len()),
+            MonomialOrder::Block(block) => Some(block.arity()),
             _ => None,
         }
     }
@@ -97,8 +87,8 @@ impl MonomialOrder {
 
     /// Returns the monomial order's name.
     ///
-    /// Not injective: every weighted order answers `"weighted"`, because the name is
-    /// `&'static str` and a weight vector is not. Anything that has to *distinguish* orders —
+    /// Not injective: weighted and block orders answer `"weighted"` and `"block"`; the name is
+    /// `&'static str` and carries no parameters. Anything that has to *distinguish* orders —
     /// a digest, a record key, a cache — must not key on this.
     pub fn name(&self) -> &'static str {
         match self {
@@ -106,6 +96,7 @@ impl MonomialOrder {
             MonomialOrder::GradedLexicographic => "grlex",
             MonomialOrder::GradedReverseLexicographic => "grevlex",
             MonomialOrder::Weighted(_) => "weighted",
+            MonomialOrder::Block(_) => "block",
         }
     }
 
@@ -116,9 +107,129 @@ impl MonomialOrder {
             MonomialOrder::GradedLexicographic => "graded lexicographic",
             MonomialOrder::GradedReverseLexicographic => "graded reverse lexicographic",
             MonomialOrder::Weighted(_) => "weighted graded",
+            MonomialOrder::Block(_) => "two-block elimination",
         }
     }
 }
+
+/// The admissible order within one contiguous block.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockOrderKind {
+    /// Compare the first differing exponent, larger first.
+    Lexicographic,
+    /// Compare total degree, then lexicographically.
+    GradedLexicographic,
+    /// Compare total degree, then reverse lexicographically.
+    GradedReverseLexicographic,
+}
+
+impl BlockOrderKind {
+    fn cmp(self, a: &[u32], b: &[u32]) -> Ordering {
+        if self != Self::Lexicographic {
+            // BlockOrder caps arity at u32::MAX, so the sum of u32 exponents fits u64.
+            let degree = |xs: &[u32]| xs.iter().map(|&x| u64::from(x)).sum::<u64>();
+            let cmp = degree(a).cmp(&degree(b));
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+        }
+        if self == Self::GradedReverseLexicographic {
+            a.iter().rev().cmp(b.iter().rev()).reverse()
+        } else {
+            a.cmp(b)
+        }
+    }
+
+    /// The canonical suborder name used in instance identities.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Lexicographic => "lex",
+            Self::GradedLexicographic => "grlex",
+            Self::GradedReverseLexicographic => "grevlex",
+        }
+    }
+}
+
+/// Product order on `[0, split)` followed by `[split, arity)`.
+///
+/// Both nonempty blocks use admissible orders. Their lexicographic product is total,
+/// multiplicative and a well-order. A nonconstant prefix exceeds the constant prefix,
+/// independently of suffix exponents, giving the elimination property.
+/// The inline payload preserves the compact `Copy` order API without process-lifetime storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockOrder {
+    arity: u32,
+    split: u32,
+    prefix: BlockOrderKind,
+    suffix: BlockOrderKind,
+}
+
+impl BlockOrder {
+    /// Construct two nonempty blocks; arities above `u32::MAX` are unsupported.
+    pub fn checked(
+        arity: usize,
+        split: usize,
+        prefix: BlockOrderKind,
+        suffix: BlockOrderKind,
+    ) -> Result<Self, BlockOrderError> {
+        let arity = u32::try_from(arity).map_err(|_| BlockOrderError::ArityTooLarge)?;
+        if split == 0 || split >= arity as usize {
+            return Err(BlockOrderError::EmptyBlock);
+        }
+        Ok(Self {
+            arity,
+            split: split as u32,
+            prefix,
+            suffix,
+        })
+    }
+
+    /// Number of variables in the ring.
+    pub fn arity(self) -> usize {
+        self.arity as usize
+    }
+    /// Number of variables in the dominant eliminated prefix.
+    pub fn split(self) -> usize {
+        self.split as usize
+    }
+    /// Order within the prefix.
+    pub fn prefix(self) -> BlockOrderKind {
+        self.prefix
+    }
+    /// Order within the retained suffix.
+    pub fn suffix(self) -> BlockOrderKind {
+        self.suffix
+    }
+
+    fn cmp<const N: usize>(self, a: &Monomial<N>, b: &Monomial<N>) -> Ordering {
+        assert_eq!(N, self.arity(), "block order arity mismatch");
+        let split = self.split();
+        self.prefix
+            .cmp(&a.exponents()[..split], &b.exponents()[..split])
+            .then_with(|| {
+                self.suffix
+                    .cmp(&a.exponents()[split..], &b.exponents()[split..])
+            })
+    }
+}
+
+/// Invalid boundary or unsupported arity in a two-block order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockOrderError {
+    /// The split must lie strictly inside the variable list.
+    EmptyBlock,
+    /// The compact order representation supports at most `u32::MAX` variables.
+    ArityTooLarge,
+}
+impl Display for BlockOrderError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::EmptyBlock => "both order blocks must be nonempty",
+            Self::ArityTooLarge => "block order arity exceeds u32::MAX",
+        })
+    }
+}
+impl std::error::Error for BlockOrderError {}
 
 /// How a [`WeightedOrder`] ranks monomials of equal weighted degree.
 ///

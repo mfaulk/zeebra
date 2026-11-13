@@ -229,6 +229,11 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     observer: &mut O,
     statistics: &mut F4Statistics,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, F4Error> {
+    if order.arity().is_some_and(|arity| arity != N) {
+        return Err(F4Error::InvalidOptions {
+            reason: "monomial order arity differs from the polynomial ring",
+        });
+    }
     let total_clock = StageClock::new(options.measure_stages);
 
     // `Some` only when a time budget was asked for. An `Option<Instant>` rather than an always-on

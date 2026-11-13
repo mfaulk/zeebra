@@ -17,7 +17,10 @@ mod term_arithmetic;
 
 pub use monomial::Monomial;
 pub use monomial_hash::{BuildMonomialHasher, MonomialHasher, MonomialMap, MonomialSet};
-pub use monomial_order::{MonomialOrder, WeightedOrder, WeightedOrderError, WeightedTieBreak};
+pub use monomial_order::{
+    BlockOrder, BlockOrderError, BlockOrderKind, MonomialOrder, WeightedOrder, WeightedOrderError,
+    WeightedTieBreak,
+};
 pub use multivariate_gcd::{GcdError, GcdRoute, SquarefreeError};
 pub use sparse_multivariate_multiply::{
     multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,

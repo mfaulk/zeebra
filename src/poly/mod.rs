@@ -8,9 +8,10 @@ pub use multivariate::{
     multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
 };
 pub use multivariate::{
-    BuildMonomialHasher, CrossCallRepeats, GcdError, GcdRoute, Monomial, MonomialHasher,
-    MonomialMap, MonomialOrder, MonomialSet, MultivariatePolynomial, NormalFormCounts,
-    NormalFormError, SquarefreeError, WeightedOrder, WeightedOrderError, WeightedTieBreak,
+    BlockOrder, BlockOrderError, BlockOrderKind, BuildMonomialHasher, CrossCallRepeats, GcdError,
+    GcdRoute, Monomial, MonomialHasher, MonomialMap, MonomialOrder, MonomialSet,
+    MultivariatePolynomial, NormalFormCounts, NormalFormError, SquarefreeError, WeightedOrder,
+    WeightedOrderError, WeightedTieBreak,
 };
 pub(crate) use univariate::multiply_dense;
 #[doc(hidden)]

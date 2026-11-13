@@ -160,7 +160,9 @@ fn internal_ordering(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => ":lex",
         MonomialOrder::GradedLexicographic => ":deglex",
         MonomialOrder::GradedReverseLexicographic => ":degrevlex",
-        MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
+        MonomialOrder::Weighted(_) | MonomialOrder::Block(_) => {
+            unreachable!("{}", WEIGHTED_UNSUPPORTED)
+        }
     }
 }
 
@@ -170,7 +172,9 @@ fn groebner_ordering(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => "Groebner.Lex()",
         MonomialOrder::GradedLexicographic => "Groebner.DegLex()",
         MonomialOrder::GradedReverseLexicographic => "Groebner.DegRevLex()",
-        MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
+        MonomialOrder::Weighted(_) | MonomialOrder::Block(_) => {
+            unreachable!("{}", WEIGHTED_UNSUPPORTED)
+        }
     }
 }
 
@@ -600,9 +604,8 @@ impl ExternalSolver for GroebnerJlSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
-        // Weighted orders (#306) are refused rather than approximated: no adapter here has a
-        // verified spelling for one, and substituting an unweighted order would answer a
-        // different question with a basis that looks right.
+        // Weighted and block orders require script generation this adapter does not implement.
+        // Refuse them before any order can be silently approximated.
         if order_is_unsupported_externally(instance.order) {
             return Support::No(Unsupported::Order {
                 order: instance.order,
