@@ -3,6 +3,7 @@
 **Measured at:** publication bound `f94b3df0` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
 The upper-rung sweep in §9c was measured at `19ff732c`.
+The wide planted cohort was measured at `65f38d4a`; production source is unchanged from `b310c126`.
 
 Policy and status for #261. The corpus itself is `src/grobner/external/corpus.rs`; its digest
 manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is_frozen`.
@@ -15,6 +16,28 @@ manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is
 > kept as the record of what was measured; their equivalence-class rows in §5 and their manifest
 > rows in §8 were removed, and are preserved at commit 9532a9a2.
 > `research/competitive/CURATION.md` records what was removed from the board's history.
+
+The #675 wide-field extension adds three digest-pinned planted rungs with quotient dimensions
+64, 1,024 and 16,384. All four current wide-field engines return the same complete reduced bases
+(9, 15 and 21 polynomials): Zeebra, Groebner.jl, groebner-rs and grobx. The
+[verification artifact](../../research/competitive/results/wide-planted-675-verification.json)
+retains every input, basis, driver identity and driver proof output. A
+[separate failed capped attempt](../../research/competitive/results/wide-planted-675-capped-failure.json)
+records the supervisor's inability to enforce an optional RSS cap when a native child exits before
+its first sample; the successful native verification therefore omits that cap explicitly.
+
+The [bounded board cohort](../../research/competitive/results/wide-planted-675-board.json) appends
+21 outcomes to the preceding 1,115 unchanged history rows: 12 answers and 9 unsupported outcomes.
+One worker, affinity 2, a 60-second child wall and a 185-second outer timeout were declared;
+there is no optional RSS cap on the board sweep. The three rung processes ran under the shared
+benchmark lock, with one-minute load 2.84–7.83. These are coverage runs, one attempt per cell;
+all nine wall ratios are startup dominated under the board's guard, so no general performance
+claim follows. Independent full-basis checking was a separate run, excluded from raw solve cost.
+
+The original issue's sole-comparand condition is obsolete after #678 and #683. The new family uses
+`LiveOracle { tool: "Groebner.jl" }`; the older four-engine capability survey is explicitly scoped
+and is not evidence that groebner-rs or grobx lacks wide fields. See the
+[run instructions](../guide/external-engines.md#wide-planted-mq-ladder).
 
 A cross-library comparison measures nothing unless every engine was given **the same ideal**. The
 two families everyone benchmarks on each have a naming convention that produces a *different* ideal

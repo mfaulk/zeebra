@@ -551,7 +551,7 @@ pub enum Equivalence {
     /// that is detectable without the engine computing anything. Planted MQ.
     KnownSolution,
 
-    /// Checked against live Singular's invariants, which needs an installation.
+    /// Checked against a named live external engine, which needs an installation.
     ///
     /// For a family with neither a distributed file nor a known solution. The weakest of the three
     /// that still licenses a timing.

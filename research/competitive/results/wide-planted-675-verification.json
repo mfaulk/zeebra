@@ -1,0 +1,368 @@
+{
+  "driver_artifacts": [
+    {
+      "path": "grobx/1.out",
+      "content": "{\"allocator\":\"grobx::Allocator (mimalloc small blocks; system large blocks)\",\"build\":\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\",\"build_metadata\":\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"contract\":1,\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":6832128,\"revision\":\"1854835dbc25f24dc9a9ba017024d5030e99da1c\",\"version\":\"0.73.3\"}\n"
+    },
+    {
+      "path": "grobx/2.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"mode\": \"raw\",\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\"\n  ],\n  \"wall_ns\": 60000000000,\n  \"rss_bytes\": null\n}"
+    },
+    {
+      "path": "grobx/2.out",
+      "content": "{\"allocator\":\"grobx::Allocator (mimalloc small blocks; system large blocks)\",\"basis\":\"[x5*x6+18446744073709551120,\\nx5^2+x6^2+18446744073709550973,\\nx3*x4+18446744073709551200,\\nx3^2+x4^2+18446744073709551133,\\nx1*x2+18446744073709551248,\\nx1^2+x2^2+18446744073709551229,\\nx6^3+143*x5+18446744073709550973*x6,\\nx4^3+63*x3+18446744073709551133*x4,\\nx2^3+15*x1+18446744073709551229*x2]:\\n\",\"build\":\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\",\"build_metadata\":\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"certified\":null,\"checker_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\"],\"cofactors\":null,\"contract\":1,\"flaw\":null,\"generator_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\"],\"input\":{\"generators\":[\"x1^2+x2^2+18446744073709551229\",\"x1*x2+18446744073709551248\",\"x3^2+x4^2+18446744073709551133\",\"x3*x4+18446744073709551200\",\"x5^2+x6^2+18446744073709550973\",\"x5*x6+18446744073709551120\"],\"mode\":\"raw\",\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"rss_bytes\":null,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\"],\"wall_ns\":60000000000,\"workers\":1},\"input_sha256\":\"7f78d94bb900936a7c9a72b0f570ada8c9ba0821e285487016bc8b9188487bff\",\"input_text\":\"x1,x2,x3,x4,x5,x6\\n18446744073709551263\\nx1^2+x2^2+18446744073709551229,\\nx1*x2+18446744073709551248,\\nx3^2+x4^2+18446744073709551133,\\nx3*x4+18446744073709551200,\\nx5^2+x6^2+18446744073709550973,\\nx5*x6+18446744073709551120\\n\",\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":9494528,\"parse_ns\":224374,\"report\":\"0.000004 call entry=groebner order=grevlex seed=0 threads=1 signatures=on echelon=on cofactors=off checker=off deadline=60000 memory=none cancel=off trace=off cpu=AMD_Ryzen_Threadripper_PRO_5995WX_64-Cores\\n0.000013 read variables=6 characteristic=18446744073709551263 field=gf64\\n0.000030 run number=1 role=call engine=signature engine-by=signatures field=gf64 primes=18446744073709551263 width=8 order=grevlex cofactors=off reduce=tests handover=on why=start\\n0.000038 inputs generators=6 nonzero=6 terms=15 read=0.000005\\n0.000054 echelon generators=6 rows=6 columns=10 subtracted=0 time=0.000014\\n0.000128 round number=1 degree=3 pairs=3 rows=6 given=3 columns=12 entries=15 pivots=3 zero=0 zero-rows=0 reductions=3 subtracted=9 added=0 bands=no pending=3 dropped=0 select=0.000005 symbolic=0.000006 encode=0.000000 reduce=0.000015 backsub=0.000000 record=0.000000 decode=0.000000 update=0.000003\\n0.000129 handover round=1 outgrown=stay made=3 zero=0 divisible=0 widest=0 verdict=stay\\n0.000143 inter rows=9 given=9 columns=19 entries=24 subtracted=0 elements=9 symbolic=0.000002 encode=0.000000 reduce=0.000001 decode=0.000004\\n0.000147 ran number=1 outcome=basis rounds=1 reduced=3 zero=0 elements=9 time=0.000116 considered=36 equal=0 high=0 low=6 syzygy=18 koszul=9 queued=3 past-format=0\\n0.000150 text kind=basis bytes=291 time=0.000001\\n0.000153 end result=basis bytes=291 time=0.000152 process-rss-start=3604480 process-rss-peak=44154880 process-rss-grown=40550400\\n\",\"revision\":\"1854835dbc25f24dc9a9ba017024d5030e99da1c\",\"solve_ns\":159221,\"stopped\":null,\"version\":\"0.73.3\"}\n"
+    },
+    {
+      "path": "grobx/3.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"mode\": \"certified\",\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\"\n  ],\n  \"wall_ns\": 60000000000,\n  \"rss_bytes\": null\n}"
+    },
+    {
+      "path": "grobx/3.out",
+      "content": "{\"allocator\":\"grobx::Allocator (mimalloc small blocks; system large blocks)\",\"basis\":\"[x5*x6+18446744073709551120,\\nx5^2+x6^2+18446744073709550973,\\nx3*x4+18446744073709551200,\\nx3^2+x4^2+18446744073709551133,\\nx1*x2+18446744073709551248,\\nx1^2+x2^2+18446744073709551229,\\nx6^3+143*x5+18446744073709550973*x6,\\nx4^3+63*x3+18446744073709551133*x4,\\nx2^3+15*x1+18446744073709551229*x2]:\\n\",\"build\":\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\",\"build_metadata\":\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"certified\":true,\"checker_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\"],\"cofactors\":\"[[0,0,0,0,0,1],\\n[0,0,0,0,1,0],\\n[0,0,0,1,0,0],\\n[0,0,1,0,0,0],\\n[0,1,0,0,0,0],\\n[1,0,0,0,0,0],\\n[0,0,0,0,x6,18446744073709551262*x5],\\n[0,0,x4,18446744073709551262*x3,0,0],\\n[x2,18446744073709551262*x1,0,0,0,0]]:\\n\",\"contract\":1,\"flaw\":null,\"generator_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\"],\"input\":{\"generators\":[\"x1^2+x2^2+18446744073709551229\",\"x1*x2+18446744073709551248\",\"x3^2+x4^2+18446744073709551133\",\"x3*x4+18446744073709551200\",\"x5^2+x6^2+18446744073709550973\",\"x5*x6+18446744073709551120\"],\"mode\":\"certified\",\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"rss_bytes\":null,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\"],\"wall_ns\":60000000000,\"workers\":1},\"input_sha256\":\"7f78d94bb900936a7c9a72b0f570ada8c9ba0821e285487016bc8b9188487bff\",\"input_text\":\"x1,x2,x3,x4,x5,x6\\n18446744073709551263\\nx1^2+x2^2+18446744073709551229,\\nx1*x2+18446744073709551248,\\nx3^2+x4^2+18446744073709551133,\\nx3*x4+18446744073709551200,\\nx5^2+x6^2+18446744073709550973,\\nx5*x6+18446744073709551120\\n\",\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":9322496,\"parse_ns\":157768,\"report\":\"0.000003 call entry=groebner order=grevlex seed=0 threads=1 signatures=on echelon=on cofactors=on checker=exact deadline=60000 memory=none cancel=off trace=off cpu=AMD_Ryzen_Threadripper_PRO_5995WX_64-Cores\\n0.000010 read variables=6 characteristic=18446744073709551263 field=gf64\\n0.000019 run number=1 role=call engine=signature engine-by=signatures field=gf64 primes=18446744073709551263 width=8 order=grevlex cofactors=on reduce=rows reduce-by=cofactors handover=off why=start\\n0.000027 inputs generators=6 nonzero=6 terms=15 read=0.000003\\n0.000077 round number=1 degree=3 pairs=3 rows=6 given=3 columns=12 entries=15 pivots=3 zero=0 zero-rows=0 reductions=3 subtracted=9 added=0 bands=no pending=3 dropped=0 select=0.000000 symbolic=0.000004 encode=0.000003 reduce=0.000007 backsub=0.000000 record=0.000000 decode=0.000002 update=0.000002\\n0.000090 inter rows=9 given=9 columns=19 entries=24 subtracted=0 elements=9 symbolic=0.000001 encode=0.000000 reduce=0.000001 decode=0.000004\\n0.000091 ran number=1 outcome=basis rounds=1 reduced=3 zero=0 elements=9 time=0.000072 considered=36 equal=0 high=0 low=6 syzygy=18 koszul=9 queued=3 past-format=0\\n0.000096 text kind=basis bytes=291 time=0.000001\\n0.000109 text kind=cofactors bytes=206 time=0.000012\\n0.000142 check mode=exact verdict=certified time=0.000032\\n0.000152 end result=basis bytes=291 time=0.000143 process-rss-start=3604480 process-rss-peak=44154880 process-rss-grown=40550400\\n\",\"revision\":\"1854835dbc25f24dc9a9ba017024d5030e99da1c\",\"solve_ns\":153771,\"stopped\":null,\"version\":\"0.73.3\"}\n"
+    },
+    {
+      "path": "grobx/4.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\",\n    \"x7\",\n    \"x8\",\n    \"x9\",\n    \"x10\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"mode\": \"raw\",\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\",\n    \"x7^2+x8^2+18446744073709550749\",\n    \"x7*x8+18446744073709551008\",\n    \"x9^2+x10^2+18446744073709550461\",\n    \"x9*x10+18446744073709550864\"\n  ],\n  \"wall_ns\": 60000000000,\n  \"rss_bytes\": null\n}"
+    },
+    {
+      "path": "grobx/4.out",
+      "content": "{\"allocator\":\"grobx::Allocator (mimalloc small blocks; system large blocks)\",\"basis\":\"[x9*x10+18446744073709550864,\\nx9^2+x10^2+18446744073709550461,\\nx7*x8+18446744073709551008,\\nx7^2+x8^2+18446744073709550749,\\nx5*x6+18446744073709551120,\\nx5^2+x6^2+18446744073709550973,\\nx3*x4+18446744073709551200,\\nx3^2+x4^2+18446744073709551133,\\nx1*x2+18446744073709551248,\\nx1^2+x2^2+18446744073709551229,\\nx10^3+399*x9+18446744073709550461*x10,\\nx8^3+255*x7+18446744073709550749*x8,\\nx6^3+143*x5+18446744073709550973*x6,\\nx4^3+63*x3+18446744073709551133*x4,\\nx2^3+15*x1+18446744073709551229*x2]:\\n\",\"build\":\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\",\"build_metadata\":\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"certified\":null,\"checker_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\"],\"cofactors\":null,\"contract\":1,\"flaw\":null,\"generator_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\"],\"input\":{\"generators\":[\"x1^2+x2^2+18446744073709551229\",\"x1*x2+18446744073709551248\",\"x3^2+x4^2+18446744073709551133\",\"x3*x4+18446744073709551200\",\"x5^2+x6^2+18446744073709550973\",\"x5*x6+18446744073709551120\",\"x7^2+x8^2+18446744073709550749\",\"x7*x8+18446744073709551008\",\"x9^2+x10^2+18446744073709550461\",\"x9*x10+18446744073709550864\"],\"mode\":\"raw\",\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"rss_bytes\":null,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\",\"x7\",\"x8\",\"x9\",\"x10\"],\"wall_ns\":60000000000,\"workers\":1},\"input_sha256\":\"ce0c6c065d0d8f3ba6ea8601d02e220ec103f3d972763bac3fb3a2860c8e6454\",\"input_text\":\"x1,x2,x3,x4,x5,x6,x7,x8,x9,x10\\n18446744073709551263\\nx1^2+x2^2+18446744073709551229,\\nx1*x2+18446744073709551248,\\nx3^2+x4^2+18446744073709551133,\\nx3*x4+18446744073709551200,\\nx5^2+x6^2+18446744073709550973,\\nx5*x6+18446744073709551120,\\nx7^2+x8^2+18446744073709550749,\\nx7*x8+18446744073709551008,\\nx9^2+x10^2+18446744073709550461,\\nx9*x10+18446744073709550864\\n\",\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":9568256,\"parse_ns\":250173,\"report\":\"0.000004 call entry=groebner order=grevlex seed=0 threads=1 signatures=on echelon=on cofactors=off checker=off deadline=60000 memory=none cancel=off trace=off cpu=AMD_Ryzen_Threadripper_PRO_5995WX_64-Cores\\n0.000012 read variables=10 characteristic=18446744073709551263 field=gf64\\n0.000028 run number=1 role=call engine=signature engine-by=signatures field=gf64 primes=18446744073709551263 width=8 order=grevlex cofactors=off reduce=tests handover=on why=start\\n0.000036 inputs generators=10 nonzero=10 terms=25 read=0.000005\\n0.000063 echelon generators=10 rows=10 columns=16 subtracted=0 time=0.000025\\n0.000130 round number=1 degree=3 pairs=5 rows=10 given=5 columns=20 entries=25 pivots=5 zero=0 zero-rows=0 reductions=5 subtracted=15 added=0 bands=no pending=5 dropped=0 select=0.000006 symbolic=0.000006 encode=0.000000 reduce=0.000012 backsub=0.000000 record=0.000000 decode=0.000000 update=0.000007\\n0.000132 handover round=1 outgrown=stay made=5 zero=0 divisible=0 widest=0 verdict=stay\\n0.000148 inter rows=15 given=15 columns=31 entries=40 subtracted=0 elements=15 symbolic=0.000005 encode=0.000000 reduce=0.000002 decode=0.000003\\n0.000154 ran number=1 outcome=basis rounds=1 reduced=5 zero=0 elements=15 time=0.000125 considered=105 equal=0 high=0 low=20 syzygy=50 koszul=30 queued=5 past-format=0\\n0.000160 text kind=basis bytes=489 time=0.000004\\n0.000162 end result=basis bytes=489 time=0.000161 process-rss-start=3604480 process-rss-peak=48349184 process-rss-grown=44744704\\n\",\"revision\":\"1854835dbc25f24dc9a9ba017024d5030e99da1c\",\"solve_ns\":163790,\"stopped\":null,\"version\":\"0.73.3\"}\n"
+    },
+    {
+      "path": "grobx/5.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\",\n    \"x7\",\n    \"x8\",\n    \"x9\",\n    \"x10\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"mode\": \"certified\",\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\",\n    \"x7^2+x8^2+18446744073709550749\",\n    \"x7*x8+18446744073709551008\",\n    \"x9^2+x10^2+18446744073709550461\",\n    \"x9*x10+18446744073709550864\"\n  ],\n  \"wall_ns\": 60000000000,\n  \"rss_bytes\": null\n}"
+    },
+    {
+      "path": "grobx/5.out",
+      "content": "{\"allocator\":\"grobx::Allocator (mimalloc small blocks; system large blocks)\",\"basis\":\"[x9*x10+18446744073709550864,\\nx9^2+x10^2+18446744073709550461,\\nx7*x8+18446744073709551008,\\nx7^2+x8^2+18446744073709550749,\\nx5*x6+18446744073709551120,\\nx5^2+x6^2+18446744073709550973,\\nx3*x4+18446744073709551200,\\nx3^2+x4^2+18446744073709551133,\\nx1*x2+18446744073709551248,\\nx1^2+x2^2+18446744073709551229,\\nx10^3+399*x9+18446744073709550461*x10,\\nx8^3+255*x7+18446744073709550749*x8,\\nx6^3+143*x5+18446744073709550973*x6,\\nx4^3+63*x3+18446744073709551133*x4,\\nx2^3+15*x1+18446744073709551229*x2]:\\n\",\"build\":\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\",\"build_metadata\":\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"certified\":true,\"checker_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\"],\"cofactors\":\"[[0,0,0,0,0,0,0,0,0,1],\\n[0,0,0,0,0,0,0,0,1,0],\\n[0,0,0,0,0,0,0,1,0,0],\\n[0,0,0,0,0,0,1,0,0,0],\\n[0,0,0,0,0,1,0,0,0,0],\\n[0,0,0,0,1,0,0,0,0,0],\\n[0,0,0,1,0,0,0,0,0,0],\\n[0,0,1,0,0,0,0,0,0,0],\\n[0,1,0,0,0,0,0,0,0,0],\\n[1,0,0,0,0,0,0,0,0,0],\\n[0,0,0,0,0,0,0,0,x10,18446744073709551262*x9],\\n[0,0,0,0,0,0,x8,18446744073709551262*x7,0,0],\\n[0,0,0,0,x6,18446744073709551262*x5,0,0,0,0],\\n[0,0,x4,18446744073709551262*x3,0,0,0,0,0,0],\\n[x2,18446744073709551262*x1,0,0,0,0,0,0,0,0]]:\\n\",\"contract\":1,\"flaw\":null,\"generator_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\"],\"input\":{\"generators\":[\"x1^2+x2^2+18446744073709551229\",\"x1*x2+18446744073709551248\",\"x3^2+x4^2+18446744073709551133\",\"x3*x4+18446744073709551200\",\"x5^2+x6^2+18446744073709550973\",\"x5*x6+18446744073709551120\",\"x7^2+x8^2+18446744073709550749\",\"x7*x8+18446744073709551008\",\"x9^2+x10^2+18446744073709550461\",\"x9*x10+18446744073709550864\"],\"mode\":\"certified\",\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"rss_bytes\":null,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\",\"x7\",\"x8\",\"x9\",\"x10\"],\"wall_ns\":60000000000,\"workers\":1},\"input_sha256\":\"ce0c6c065d0d8f3ba6ea8601d02e220ec103f3d972763bac3fb3a2860c8e6454\",\"input_text\":\"x1,x2,x3,x4,x5,x6,x7,x8,x9,x10\\n18446744073709551263\\nx1^2+x2^2+18446744073709551229,\\nx1*x2+18446744073709551248,\\nx3^2+x4^2+18446744073709551133,\\nx3*x4+18446744073709551200,\\nx5^2+x6^2+18446744073709550973,\\nx5*x6+18446744073709551120,\\nx7^2+x8^2+18446744073709550749,\\nx7*x8+18446744073709551008,\\nx9^2+x10^2+18446744073709550461,\\nx9*x10+18446744073709550864\\n\",\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":9523200,\"parse_ns\":247318,\"report\":\"0.000006 call entry=groebner order=grevlex seed=0 threads=1 signatures=on echelon=on cofactors=on checker=exact deadline=60000 memory=none cancel=off trace=off cpu=AMD_Ryzen_Threadripper_PRO_5995WX_64-Cores\\n0.000014 read variables=10 characteristic=18446744073709551263 field=gf64\\n0.000025 run number=1 role=call engine=signature engine-by=signatures field=gf64 primes=18446744073709551263 width=8 order=grevlex cofactors=on reduce=rows reduce-by=cofactors handover=off why=start\\n0.000035 inputs generators=10 nonzero=10 terms=25 read=0.000006\\n0.000110 round number=1 degree=3 pairs=5 rows=10 given=5 columns=20 entries=25 pivots=5 zero=0 zero-rows=0 reductions=5 subtracted=15 added=0 bands=no pending=5 dropped=0 select=0.000004 symbolic=0.000005 encode=0.000003 reduce=0.000012 backsub=0.000000 record=0.000000 decode=0.000003 update=0.000008\\n0.000145 inter rows=15 given=15 columns=31 entries=40 subtracted=0 elements=15 symbolic=0.000017 encode=0.000003 reduce=0.000002 decode=0.000006\\n0.000147 ran number=1 outcome=basis rounds=1 reduced=5 zero=0 elements=15 time=0.000122 considered=105 equal=0 high=0 low=20 syzygy=50 koszul=30 queued=5 past-format=0\\n0.000155 text kind=basis bytes=489 time=0.000004\\n0.000167 text kind=cofactors bytes=463 time=0.000010\\n0.000217 check mode=exact verdict=certified time=0.000049\\n0.000224 end result=basis bytes=489 time=0.000222 process-rss-start=3604480 process-rss-peak=48349184 process-rss-grown=44744704\\n\",\"revision\":\"1854835dbc25f24dc9a9ba017024d5030e99da1c\",\"solve_ns\":225117,\"stopped\":null,\"version\":\"0.73.3\"}\n"
+    },
+    {
+      "path": "grobx/6.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\",\n    \"x7\",\n    \"x8\",\n    \"x9\",\n    \"x10\",\n    \"x11\",\n    \"x12\",\n    \"x13\",\n    \"x14\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"mode\": \"raw\",\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\",\n    \"x7^2+x8^2+18446744073709550749\",\n    \"x7*x8+18446744073709551008\",\n    \"x9^2+x10^2+18446744073709550461\",\n    \"x9*x10+18446744073709550864\",\n    \"x11^2+x12^2+18446744073709550109\",\n    \"x11*x12+18446744073709550688\",\n    \"x13^2+x14^2+18446744073709549693\",\n    \"x13*x14+18446744073709550480\"\n  ],\n  \"wall_ns\": 60000000000,\n  \"rss_bytes\": null\n}"
+    },
+    {
+      "path": "grobx/6.out",
+      "content": "{\"allocator\":\"grobx::Allocator (mimalloc small blocks; system large blocks)\",\"basis\":\"[x13*x14+18446744073709550480,\\nx13^2+x14^2+18446744073709549693,\\nx11*x12+18446744073709550688,\\nx11^2+x12^2+18446744073709550109,\\nx9*x10+18446744073709550864,\\nx9^2+x10^2+18446744073709550461,\\nx7*x8+18446744073709551008,\\nx7^2+x8^2+18446744073709550749,\\nx5*x6+18446744073709551120,\\nx5^2+x6^2+18446744073709550973,\\nx3*x4+18446744073709551200,\\nx3^2+x4^2+18446744073709551133,\\nx1*x2+18446744073709551248,\\nx1^2+x2^2+18446744073709551229,\\nx14^3+783*x13+18446744073709549693*x14,\\nx12^3+575*x11+18446744073709550109*x12,\\nx10^3+399*x9+18446744073709550461*x10,\\nx8^3+255*x7+18446744073709550749*x8,\\nx6^3+143*x5+18446744073709550973*x6,\\nx4^3+63*x3+18446744073709551133*x4,\\nx2^3+15*x1+18446744073709551229*x2]:\\n\",\"build\":\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\",\"build_metadata\":\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"certified\":null,\"checker_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\",\"[x11^2+x12^2+18446744073709550109]:\\n\",\"[x11*x12+18446744073709550688]:\\n\",\"[x13^2+x14^2+18446744073709549693]:\\n\",\"[x13*x14+18446744073709550480]:\\n\"],\"cofactors\":null,\"contract\":1,\"flaw\":null,\"generator_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\",\"[x11^2+x12^2+18446744073709550109]:\\n\",\"[x11*x12+18446744073709550688]:\\n\",\"[x13^2+x14^2+18446744073709549693]:\\n\",\"[x13*x14+18446744073709550480]:\\n\"],\"input\":{\"generators\":[\"x1^2+x2^2+18446744073709551229\",\"x1*x2+18446744073709551248\",\"x3^2+x4^2+18446744073709551133\",\"x3*x4+18446744073709551200\",\"x5^2+x6^2+18446744073709550973\",\"x5*x6+18446744073709551120\",\"x7^2+x8^2+18446744073709550749\",\"x7*x8+18446744073709551008\",\"x9^2+x10^2+18446744073709550461\",\"x9*x10+18446744073709550864\",\"x11^2+x12^2+18446744073709550109\",\"x11*x12+18446744073709550688\",\"x13^2+x14^2+18446744073709549693\",\"x13*x14+18446744073709550480\"],\"mode\":\"raw\",\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"rss_bytes\":null,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\",\"x7\",\"x8\",\"x9\",\"x10\",\"x11\",\"x12\",\"x13\",\"x14\"],\"wall_ns\":60000000000,\"workers\":1},\"input_sha256\":\"c91cf3c77fb25335ea9b8d0f8d01aec84a9d4c9e1c8402d5401fd776f420e3ec\",\"input_text\":\"x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14\\n18446744073709551263\\nx1^2+x2^2+18446744073709551229,\\nx1*x2+18446744073709551248,\\nx3^2+x4^2+18446744073709551133,\\nx3*x4+18446744073709551200,\\nx5^2+x6^2+18446744073709550973,\\nx5*x6+18446744073709551120,\\nx7^2+x8^2+18446744073709550749,\\nx7*x8+18446744073709551008,\\nx9^2+x10^2+18446744073709550461,\\nx9*x10+18446744073709550864,\\nx11^2+x12^2+18446744073709550109,\\nx11*x12+18446744073709550688,\\nx13^2+x14^2+18446744073709549693,\\nx13*x14+18446744073709550480\\n\",\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":9818112,\"parse_ns\":349562,\"report\":\"0.000005 call entry=groebner order=grevlex seed=0 threads=1 signatures=on echelon=on cofactors=off checker=off deadline=60000 memory=none cancel=off trace=off cpu=AMD_Ryzen_Threadripper_PRO_5995WX_64-Cores\\n0.000014 read variables=14 characteristic=18446744073709551263 field=gf64\\n0.000030 run number=1 role=call engine=signature engine-by=signatures field=gf64 primes=18446744073709551263 width=8 order=grevlex cofactors=off reduce=tests handover=on why=start\\n0.000042 inputs generators=14 nonzero=14 terms=35 read=0.000010\\n0.000072 echelon generators=14 rows=14 columns=22 subtracted=0 time=0.000029\\n0.000168 round number=1 degree=3 pairs=7 rows=14 given=7 columns=28 entries=35 pivots=7 zero=0 zero-rows=0 reductions=7 subtracted=21 added=0 bands=no pending=7 dropped=0 select=0.000006 symbolic=0.000009 encode=0.000000 reduce=0.000016 backsub=0.000000 record=0.000000 decode=0.000000 update=0.000016\\n0.000169 handover round=1 outgrown=stay made=7 zero=0 divisible=0 widest=0 verdict=stay\\n0.000207 inter rows=21 given=21 columns=43 entries=56 subtracted=0 elements=21 symbolic=0.000008 encode=0.000001 reduce=0.000002 decode=0.000016\\n0.000209 ran number=1 outcome=basis rounds=1 reduced=7 zero=0 elements=21 time=0.000178 considered=210 equal=0 high=0 low=42 syzygy=98 koszul=63 queued=7 past-format=0\\n0.000217 text kind=basis bytes=697 time=0.000006\\n0.000221 end result=basis bytes=697 time=0.000219 process-rss-start=3801088 process-rss-peak=81772544 process-rss-grown=77971456\\n\",\"revision\":\"1854835dbc25f24dc9a9ba017024d5030e99da1c\",\"solve_ns\":226138,\"stopped\":null,\"version\":\"0.73.3\"}\n"
+    },
+    {
+      "path": "grobx/7.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\",\n    \"x7\",\n    \"x8\",\n    \"x9\",\n    \"x10\",\n    \"x11\",\n    \"x12\",\n    \"x13\",\n    \"x14\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"mode\": \"certified\",\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\",\n    \"x7^2+x8^2+18446744073709550749\",\n    \"x7*x8+18446744073709551008\",\n    \"x9^2+x10^2+18446744073709550461\",\n    \"x9*x10+18446744073709550864\",\n    \"x11^2+x12^2+18446744073709550109\",\n    \"x11*x12+18446744073709550688\",\n    \"x13^2+x14^2+18446744073709549693\",\n    \"x13*x14+18446744073709550480\"\n  ],\n  \"wall_ns\": 60000000000,\n  \"rss_bytes\": null\n}"
+    },
+    {
+      "path": "grobx/7.out",
+      "content": "{\"allocator\":\"grobx::Allocator (mimalloc small blocks; system large blocks)\",\"basis\":\"[x13*x14+18446744073709550480,\\nx13^2+x14^2+18446744073709549693,\\nx11*x12+18446744073709550688,\\nx11^2+x12^2+18446744073709550109,\\nx9*x10+18446744073709550864,\\nx9^2+x10^2+18446744073709550461,\\nx7*x8+18446744073709551008,\\nx7^2+x8^2+18446744073709550749,\\nx5*x6+18446744073709551120,\\nx5^2+x6^2+18446744073709550973,\\nx3*x4+18446744073709551200,\\nx3^2+x4^2+18446744073709551133,\\nx1*x2+18446744073709551248,\\nx1^2+x2^2+18446744073709551229,\\nx14^3+783*x13+18446744073709549693*x14,\\nx12^3+575*x11+18446744073709550109*x12,\\nx10^3+399*x9+18446744073709550461*x10,\\nx8^3+255*x7+18446744073709550749*x8,\\nx6^3+143*x5+18446744073709550973*x6,\\nx4^3+63*x3+18446744073709551133*x4,\\nx2^3+15*x1+18446744073709551229*x2]:\\n\",\"build\":\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\",\"build_metadata\":\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"certified\":true,\"checker_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\",\"[x11^2+x12^2+18446744073709550109]:\\n\",\"[x11*x12+18446744073709550688]:\\n\",\"[x13^2+x14^2+18446744073709549693]:\\n\",\"[x13*x14+18446744073709550480]:\\n\"],\"cofactors\":\"[[0,0,0,0,0,0,0,0,0,0,0,0,0,1],\\n[0,0,0,0,0,0,0,0,0,0,0,0,1,0],\\n[0,0,0,0,0,0,0,0,0,0,0,1,0,0],\\n[0,0,0,0,0,0,0,0,0,0,1,0,0,0],\\n[0,0,0,0,0,0,0,0,0,1,0,0,0,0],\\n[0,0,0,0,0,0,0,0,1,0,0,0,0,0],\\n[0,0,0,0,0,0,0,1,0,0,0,0,0,0],\\n[0,0,0,0,0,0,1,0,0,0,0,0,0,0],\\n[0,0,0,0,0,1,0,0,0,0,0,0,0,0],\\n[0,0,0,0,1,0,0,0,0,0,0,0,0,0],\\n[0,0,0,1,0,0,0,0,0,0,0,0,0,0],\\n[0,0,1,0,0,0,0,0,0,0,0,0,0,0],\\n[0,1,0,0,0,0,0,0,0,0,0,0,0,0],\\n[1,0,0,0,0,0,0,0,0,0,0,0,0,0],\\n[0,0,0,0,0,0,0,0,0,0,0,0,x14,18446744073709551262*x13],\\n[0,0,0,0,0,0,0,0,0,0,x12,18446744073709551262*x11,0,0],\\n[0,0,0,0,0,0,0,0,x10,18446744073709551262*x9,0,0,0,0],\\n[0,0,0,0,0,0,x8,18446744073709551262*x7,0,0,0,0,0,0],\\n[0,0,0,0,x6,18446744073709551262*x5,0,0,0,0,0,0,0,0],\\n[0,0,x4,18446744073709551262*x3,0,0,0,0,0,0,0,0,0,0],\\n[x2,18446744073709551262*x1,0,0,0,0,0,0,0,0,0,0,0,0]]:\\n\",\"contract\":1,\"flaw\":null,\"generator_echoes\":[\"[x1^2+x2^2+18446744073709551229]:\\n\",\"[x1*x2+18446744073709551248]:\\n\",\"[x3^2+x4^2+18446744073709551133]:\\n\",\"[x3*x4+18446744073709551200]:\\n\",\"[x5^2+x6^2+18446744073709550973]:\\n\",\"[x5*x6+18446744073709551120]:\\n\",\"[x7^2+x8^2+18446744073709550749]:\\n\",\"[x7*x8+18446744073709551008]:\\n\",\"[x9^2+x10^2+18446744073709550461]:\\n\",\"[x9*x10+18446744073709550864]:\\n\",\"[x11^2+x12^2+18446744073709550109]:\\n\",\"[x11*x12+18446744073709550688]:\\n\",\"[x13^2+x14^2+18446744073709549693]:\\n\",\"[x13*x14+18446744073709550480]:\\n\"],\"input\":{\"generators\":[\"x1^2+x2^2+18446744073709551229\",\"x1*x2+18446744073709551248\",\"x3^2+x4^2+18446744073709551133\",\"x3*x4+18446744073709551200\",\"x5^2+x6^2+18446744073709550973\",\"x5*x6+18446744073709551120\",\"x7^2+x8^2+18446744073709550749\",\"x7*x8+18446744073709551008\",\"x9^2+x10^2+18446744073709550461\",\"x9*x10+18446744073709550864\",\"x11^2+x12^2+18446744073709550109\",\"x11*x12+18446744073709550688\",\"x13^2+x14^2+18446744073709549693\",\"x13*x14+18446744073709550480\"],\"mode\":\"certified\",\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"rss_bytes\":null,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\",\"x7\",\"x8\",\"x9\",\"x10\",\"x11\",\"x12\",\"x13\",\"x14\"],\"wall_ns\":60000000000,\"workers\":1},\"input_sha256\":\"c91cf3c77fb25335ea9b8d0f8d01aec84a9d4c9e1c8402d5401fd776f420e3ec\",\"input_text\":\"x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14\\n18446744073709551263\\nx1^2+x2^2+18446744073709551229,\\nx1*x2+18446744073709551248,\\nx3^2+x4^2+18446744073709551133,\\nx3*x4+18446744073709551200,\\nx5^2+x6^2+18446744073709550973,\\nx5*x6+18446744073709551120,\\nx7^2+x8^2+18446744073709550749,\\nx7*x8+18446744073709551008,\\nx9^2+x10^2+18446744073709550461,\\nx9*x10+18446744073709550864,\\nx11^2+x12^2+18446744073709550109,\\nx11*x12+18446744073709550688,\\nx13^2+x14^2+18446744073709549693,\\nx13*x14+18446744073709550480\\n\",\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":9740288,\"parse_ns\":282284,\"report\":\"0.000003 call entry=groebner order=grevlex seed=0 threads=1 signatures=on echelon=on cofactors=on checker=exact deadline=60000 memory=none cancel=off trace=off cpu=AMD_Ryzen_Threadripper_PRO_5995WX_64-Cores\\n0.000010 read variables=14 characteristic=18446744073709551263 field=gf64\\n0.000018 run number=1 role=call engine=signature engine-by=signatures field=gf64 primes=18446744073709551263 width=8 order=grevlex cofactors=on reduce=rows reduce-by=cofactors handover=off why=start\\n0.000037 inputs generators=14 nonzero=14 terms=35 read=0.000015\\n0.000126 round number=1 degree=3 pairs=7 rows=14 given=7 columns=28 entries=35 pivots=7 zero=0 zero-rows=0 reductions=7 subtracted=21 added=0 bands=no pending=7 dropped=0 select=0.000004 symbolic=0.000006 encode=0.000010 reduce=0.000013 backsub=0.000000 record=0.000000 decode=0.000003 update=0.000014\\n0.000162 inter rows=21 given=21 columns=43 entries=56 subtracted=0 elements=21 symbolic=0.000005 encode=0.000001 reduce=0.000004 decode=0.000018\\n0.000163 ran number=1 outcome=basis rounds=1 reduced=7 zero=0 elements=21 time=0.000145 considered=210 equal=0 high=0 low=42 syzygy=98 koszul=63 queued=7 past-format=0\\n0.000170 text kind=basis bytes=697 time=0.000004\\n0.000180 text kind=cofactors bytes=819 time=0.000010\\n0.000238 check mode=exact verdict=certified time=0.000057\\n0.000241 end result=basis bytes=697 time=0.000240 process-rss-start=3801088 process-rss-peak=81772544 process-rss-grown=77971456\\n\",\"revision\":\"1854835dbc25f24dc9a9ba017024d5030e99da1c\",\"solve_ns\":245435,\"stopped\":null,\"version\":\"0.73.3\"}\n"
+    },
+    {
+      "path": "mq-planted-wide-10-3.out",
+      "content": "@gensize 10\n@gen x1^2 + x2^2 + 18446744073709551229\n@gen x1*x2 + 18446744073709551248\n@gen x3^2 + x4^2 + 18446744073709551133\n@gen x3*x4 + 18446744073709551200\n@gen x5^2 + x6^2 + 18446744073709550973\n@gen x5*x6 + 18446744073709551120\n@gen x7^2 + x8^2 + 18446744073709550749\n@gen x7*x8 + 18446744073709551008\n@gen x9^2 + x10^2 + 18446744073709550461\n@gen x9*x10 + 18446744073709550864\n@solve_ns 899583\n@gbsize 15\n@gb x9*x10 + 18446744073709550864\n@lead x9*x10\n@gb x9^2 + x10^2 + 18446744073709550461\n@lead x9^2\n@gb x7*x8 + 18446744073709551008\n@lead x7*x8\n@gb x7^2 + x8^2 + 18446744073709550749\n@lead x7^2\n@gb x5*x6 + 18446744073709551120\n@lead x5*x6\n@gb x5^2 + x6^2 + 18446744073709550973\n@lead x5^2\n@gb x3*x4 + 18446744073709551200\n@lead x3*x4\n@gb x3^2 + x4^2 + 18446744073709551133\n@lead x3^2\n@gb x1*x2 + 18446744073709551248\n@lead x1*x2\n@gb x1^2 + x2^2 + 18446744073709551229\n@lead x1^2\n@gb x10^3 + 399*x9 + 18446744073709550461*x10\n@lead x10^3\n@gb x8^3 + 255*x7 + 18446744073709550749*x8\n@lead x8^3\n@gb x6^3 + 143*x5 + 18446744073709550973*x6\n@lead x6^3\n@gb x4^3 + 63*x3 + 18446744073709551133*x4\n@lead x4^3\n@gb x2^3 + 15*x1 + 18446744073709551229*x2\n@lead x2^3\n@dim 0\n@vdim 1024\n@done 1\n"
+    },
+    {
+      "path": "mq-planted-wide-14-4.out",
+      "content": "@gensize 14\n@gen x1^2 + x2^2 + 18446744073709551229\n@gen x1*x2 + 18446744073709551248\n@gen x3^2 + x4^2 + 18446744073709551133\n@gen x3*x4 + 18446744073709551200\n@gen x5^2 + x6^2 + 18446744073709550973\n@gen x5*x6 + 18446744073709551120\n@gen x7^2 + x8^2 + 18446744073709550749\n@gen x7*x8 + 18446744073709551008\n@gen x9^2 + x10^2 + 18446744073709550461\n@gen x9*x10 + 18446744073709550864\n@gen x11^2 + x12^2 + 18446744073709550109\n@gen x11*x12 + 18446744073709550688\n@gen x13^2 + x14^2 + 18446744073709549693\n@gen x13*x14 + 18446744073709550480\n@solve_ns 936453\n@gbsize 21\n@gb x13*x14 + 18446744073709550480\n@lead x13*x14\n@gb x13^2 + x14^2 + 18446744073709549693\n@lead x13^2\n@gb x11*x12 + 18446744073709550688\n@lead x11*x12\n@gb x11^2 + x12^2 + 18446744073709550109\n@lead x11^2\n@gb x9*x10 + 18446744073709550864\n@lead x9*x10\n@gb x9^2 + x10^2 + 18446744073709550461\n@lead x9^2\n@gb x7*x8 + 18446744073709551008\n@lead x7*x8\n@gb x7^2 + x8^2 + 18446744073709550749\n@lead x7^2\n@gb x5*x6 + 18446744073709551120\n@lead x5*x6\n@gb x5^2 + x6^2 + 18446744073709550973\n@lead x5^2\n@gb x3*x4 + 18446744073709551200\n@lead x3*x4\n@gb x3^2 + x4^2 + 18446744073709551133\n@lead x3^2\n@gb x1*x2 + 18446744073709551248\n@lead x1*x2\n@gb x1^2 + x2^2 + 18446744073709551229\n@lead x1^2\n@gb x14^3 + 783*x13 + 18446744073709549693*x14\n@lead x14^3\n@gb x12^3 + 575*x11 + 18446744073709550109*x12\n@lead x12^3\n@gb x10^3 + 399*x9 + 18446744073709550461*x10\n@lead x10^3\n@gb x8^3 + 255*x7 + 18446744073709550749*x8\n@lead x8^3\n@gb x6^3 + 143*x5 + 18446744073709550973*x6\n@lead x6^3\n@gb x4^3 + 63*x3 + 18446744073709551133*x4\n@lead x4^3\n@gb x2^3 + 15*x1 + 18446744073709551229*x2\n@lead x2^3\n@dim 0\n@vdim 16384\n@done 1\n"
+    },
+    {
+      "path": "mq-planted-wide-6-2.out",
+      "content": "@gensize 6\n@gen x1^2 + x2^2 + 18446744073709551229\n@gen x1*x2 + 18446744073709551248\n@gen x3^2 + x4^2 + 18446744073709551133\n@gen x3*x4 + 18446744073709551200\n@gen x5^2 + x6^2 + 18446744073709550973\n@gen x5*x6 + 18446744073709551120\n@solve_ns 774246\n@gbsize 9\n@gb x5*x6 + 18446744073709551120\n@lead x5*x6\n@gb x5^2 + x6^2 + 18446744073709550973\n@lead x5^2\n@gb x3*x4 + 18446744073709551200\n@lead x3*x4\n@gb x3^2 + x4^2 + 18446744073709551133\n@lead x3^2\n@gb x1*x2 + 18446744073709551248\n@lead x1*x2\n@gb x1^2 + x2^2 + 18446744073709551229\n@lead x1^2\n@gb x6^3 + 143*x5 + 18446744073709550973*x6\n@lead x6^3\n@gb x4^3 + 63*x3 + 18446744073709551133*x4\n@lead x4^3\n@gb x2^3 + 15*x1 + 18446744073709551229*x2\n@lead x2^3\n@dim 0\n@vdim 64\n@done 1\n"
+    },
+    {
+      "path": "rust/1.out",
+      "content": "{\"algorithm\":\"groebner_basis_f4(canonicalize=true); randomized modular row combinations\",\"allocator\":\"system\",\"build\":\"9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3\",\"build_metadata\":\"e30c7934926a354895481326507bb4c5e1cb9ff0333a91c865004c5f0cd011ed  Cargo.toml;ab8c959b4e84111efc810d555d6f3addd427aafbbc53a1e92c290651ff48cc1e  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;1dbfdeb37b3435b1637e6e8fc35cff94722501cee818fe46e7049de65dc453e8  src/main.rs;261e495702428f4ffbf5dc5fc8a87702d25ede048c0c854887916563087ed98c  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"contract\":2,\"features\":\"parallel; no mimalloc\",\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":2408448,\"revision\":\"c3e1d630fba9b2155a4c389d9022f13e0ba09218\"}\n"
+    },
+    {
+      "path": "rust/2.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\"\n  ]\n}"
+    },
+    {
+      "path": "rust/2.out",
+      "content": "{\"algorithm\":\"groebner_basis_f4(canonicalize=true); randomized modular row combinations\",\"allocator\":\"system\",\"basis\":[\"x2^3 + 15*x1 + 18446744073709551229*x2\",\"x4^3 + 63*x3 + 18446744073709551133*x4\",\"x6^3 + 143*x5 + 18446744073709550973*x6\",\"x1^2 + x2^2 + 18446744073709551229\",\"x1*x2 + 18446744073709551248\",\"x3^2 + x4^2 + 18446744073709551133\",\"x3*x4 + 18446744073709551200\",\"x5^2 + x6^2 + 18446744073709550973\",\"x5*x6 + 18446744073709551120\"],\"build\":\"9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3\",\"build_metadata\":\"e30c7934926a354895481326507bb4c5e1cb9ff0333a91c865004c5f0cd011ed  Cargo.toml;ab8c959b4e84111efc810d555d6f3addd427aafbbc53a1e92c290651ff48cc1e  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;1dbfdeb37b3435b1637e6e8fc35cff94722501cee818fe46e7049de65dc453e8  src/main.rs;261e495702428f4ffbf5dc5fc8a87702d25ede048c0c854887916563087ed98c  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"contract\":2,\"features\":\"parallel; no mimalloc\",\"generators\":[\"x1^2 + x2^2 + 18446744073709551229\",\"x1*x2 + 18446744073709551248\",\"x3^2 + x4^2 + 18446744073709551133\",\"x3*x4 + 18446744073709551200\",\"x5^2 + x6^2 + 18446744073709550973\",\"x5*x6 + 18446744073709551120\"],\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":3112960,\"leading\":[\"x2^3\",\"x4^3\",\"x6^3\",\"x1^2\",\"x1*x2\",\"x3^2\",\"x3*x4\",\"x5^2\",\"x5*x6\"],\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"parse_ns\":97965,\"revision\":\"c3e1d630fba9b2155a4c389d9022f13e0ba09218\",\"serialization_ns\":15870,\"solve_ns\":205459,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\"],\"workers\":1}\n"
+    },
+    {
+      "path": "rust/3.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\",\n    \"x7\",\n    \"x8\",\n    \"x9\",\n    \"x10\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\",\n    \"x7^2+x8^2+18446744073709550749\",\n    \"x7*x8+18446744073709551008\",\n    \"x9^2+x10^2+18446744073709550461\",\n    \"x9*x10+18446744073709550864\"\n  ]\n}"
+    },
+    {
+      "path": "rust/3.out",
+      "content": "{\"algorithm\":\"groebner_basis_f4(canonicalize=true); randomized modular row combinations\",\"allocator\":\"system\",\"basis\":[\"x2^3 + 15*x1 + 18446744073709551229*x2\",\"x4^3 + 63*x3 + 18446744073709551133*x4\",\"x6^3 + 143*x5 + 18446744073709550973*x6\",\"x8^3 + 255*x7 + 18446744073709550749*x8\",\"x10^3 + 399*x9 + 18446744073709550461*x10\",\"x1^2 + x2^2 + 18446744073709551229\",\"x1*x2 + 18446744073709551248\",\"x3^2 + x4^2 + 18446744073709551133\",\"x3*x4 + 18446744073709551200\",\"x5^2 + x6^2 + 18446744073709550973\",\"x5*x6 + 18446744073709551120\",\"x7^2 + x8^2 + 18446744073709550749\",\"x7*x8 + 18446744073709551008\",\"x9^2 + x10^2 + 18446744073709550461\",\"x9*x10 + 18446744073709550864\"],\"build\":\"9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3\",\"build_metadata\":\"e30c7934926a354895481326507bb4c5e1cb9ff0333a91c865004c5f0cd011ed  Cargo.toml;ab8c959b4e84111efc810d555d6f3addd427aafbbc53a1e92c290651ff48cc1e  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;1dbfdeb37b3435b1637e6e8fc35cff94722501cee818fe46e7049de65dc453e8  src/main.rs;261e495702428f4ffbf5dc5fc8a87702d25ede048c0c854887916563087ed98c  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"contract\":2,\"features\":\"parallel; no mimalloc\",\"generators\":[\"x1^2 + x2^2 + 18446744073709551229\",\"x1*x2 + 18446744073709551248\",\"x3^2 + x4^2 + 18446744073709551133\",\"x3*x4 + 18446744073709551200\",\"x5^2 + x6^2 + 18446744073709550973\",\"x5*x6 + 18446744073709551120\",\"x7^2 + x8^2 + 18446744073709550749\",\"x7*x8 + 18446744073709551008\",\"x9^2 + x10^2 + 18446744073709550461\",\"x9*x10 + 18446744073709550864\"],\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":3166208,\"leading\":[\"x2^3\",\"x4^3\",\"x6^3\",\"x8^3\",\"x10^3\",\"x1^2\",\"x1*x2\",\"x3^2\",\"x3*x4\",\"x5^2\",\"x5*x6\",\"x7^2\",\"x7*x8\",\"x9^2\",\"x9*x10\"],\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"parse_ns\":116130,\"revision\":\"c3e1d630fba9b2155a4c389d9022f13e0ba09218\",\"serialization_ns\":21020,\"solve_ns\":226509,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\",\"x7\",\"x8\",\"x9\",\"x10\"],\"workers\":1}\n"
+    },
+    {
+      "path": "rust/4.json",
+      "content": "{\n  \"variables\": [\n    \"x1\",\n    \"x2\",\n    \"x3\",\n    \"x4\",\n    \"x5\",\n    \"x6\",\n    \"x7\",\n    \"x8\",\n    \"x9\",\n    \"x10\",\n    \"x11\",\n    \"x12\",\n    \"x13\",\n    \"x14\"\n  ],\n  \"modulus\": 18446744073709551263,\n  \"order\": \"grevlex\",\n  \"workers\": 1,\n  \"generators\": [\n    \"x1^2+x2^2+18446744073709551229\",\n    \"x1*x2+18446744073709551248\",\n    \"x3^2+x4^2+18446744073709551133\",\n    \"x3*x4+18446744073709551200\",\n    \"x5^2+x6^2+18446744073709550973\",\n    \"x5*x6+18446744073709551120\",\n    \"x7^2+x8^2+18446744073709550749\",\n    \"x7*x8+18446744073709551008\",\n    \"x9^2+x10^2+18446744073709550461\",\n    \"x9*x10+18446744073709550864\",\n    \"x11^2+x12^2+18446744073709550109\",\n    \"x11*x12+18446744073709550688\",\n    \"x13^2+x14^2+18446744073709549693\",\n    \"x13*x14+18446744073709550480\"\n  ]\n}"
+    },
+    {
+      "path": "rust/4.out",
+      "content": "{\"algorithm\":\"groebner_basis_f4(canonicalize=true); randomized modular row combinations\",\"allocator\":\"system\",\"basis\":[\"x2^3 + 15*x1 + 18446744073709551229*x2\",\"x4^3 + 63*x3 + 18446744073709551133*x4\",\"x6^3 + 143*x5 + 18446744073709550973*x6\",\"x8^3 + 255*x7 + 18446744073709550749*x8\",\"x10^3 + 399*x9 + 18446744073709550461*x10\",\"x12^3 + 575*x11 + 18446744073709550109*x12\",\"x14^3 + 783*x13 + 18446744073709549693*x14\",\"x1^2 + x2^2 + 18446744073709551229\",\"x1*x2 + 18446744073709551248\",\"x3^2 + x4^2 + 18446744073709551133\",\"x3*x4 + 18446744073709551200\",\"x5^2 + x6^2 + 18446744073709550973\",\"x5*x6 + 18446744073709551120\",\"x7^2 + x8^2 + 18446744073709550749\",\"x7*x8 + 18446744073709551008\",\"x9^2 + x10^2 + 18446744073709550461\",\"x9*x10 + 18446744073709550864\",\"x11^2 + x12^2 + 18446744073709550109\",\"x11*x12 + 18446744073709550688\",\"x13^2 + x14^2 + 18446744073709549693\",\"x13*x14 + 18446744073709550480\"],\"build\":\"9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3\",\"build_metadata\":\"e30c7934926a354895481326507bb4c5e1cb9ff0333a91c865004c5f0cd011ed  Cargo.toml;ab8c959b4e84111efc810d555d6f3addd427aafbbc53a1e92c290651ff48cc1e  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;1dbfdeb37b3435b1637e6e8fc35cff94722501cee818fe46e7049de65dc453e8  src/main.rs;261e495702428f4ffbf5dc5fc8a87702d25ede048c0c854887916563087ed98c  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\",\"contract\":2,\"features\":\"parallel; no mimalloc\",\"generators\":[\"x1^2 + x2^2 + 18446744073709551229\",\"x1*x2 + 18446744073709551248\",\"x3^2 + x4^2 + 18446744073709551133\",\"x3*x4 + 18446744073709551200\",\"x5^2 + x6^2 + 18446744073709550973\",\"x5*x6 + 18446744073709551120\",\"x7^2 + x8^2 + 18446744073709550749\",\"x7*x8 + 18446744073709551008\",\"x9^2 + x10^2 + 18446744073709550461\",\"x9*x10 + 18446744073709550864\",\"x11^2 + x12^2 + 18446744073709550109\",\"x11*x12 + 18446744073709550688\",\"x13^2 + x14^2 + 18446744073709549693\",\"x13*x14 + 18446744073709550480\"],\"isa\":\"x86-64-v3\",\"kernel_peak_rss_bytes\":3276800,\"leading\":[\"x2^3\",\"x4^3\",\"x6^3\",\"x8^3\",\"x10^3\",\"x12^3\",\"x14^3\",\"x1^2\",\"x1*x2\",\"x3^2\",\"x3*x4\",\"x5^2\",\"x5*x6\",\"x7^2\",\"x7*x8\",\"x9^2\",\"x9*x10\",\"x11^2\",\"x11*x12\",\"x13^2\",\"x13*x14\"],\"modulus\":18446744073709551263,\"order\":\"grevlex\",\"parse_ns\":121721,\"revision\":\"c3e1d630fba9b2155a4c389d9022f13e0ba09218\",\"serialization_ns\":29356,\"solve_ns\":462966,\"variables\":[\"x1\",\"x2\",\"x3\",\"x4\",\"x5\",\"x6\",\"x7\",\"x8\",\"x9\",\"x10\",\"x11\",\"x12\",\"x13\",\"x14\"],\"workers\":1}\n"
+    },
+    {
+      "path": "version-1.out",
+      "content": "@groebner 0.10.11\n@julia 1.11.7\n@done 1\n"
+    }
+  ],
+  "limits": "60 s per child, one worker; Julia 2 GiB RSS cap; native drivers have no optional RSS cap because they can exit before the supervisor's first sample",
+  "verification": "complete monic reduced bases agree coefficient for coefficient; separate verification run, no timing claim",
+  "julia_version": "ToolVersion { tool: \"groebner.jl\", version: \"0.10.11\", build: Some(\"julia 1.11.7\"), raw: \"@groebner 0.10.11\\n@julia 1.11.7\\n@done 1\\n\" }",
+  "groebner_rs_version": "ToolVersion { tool: \"groebner-rs\", version: \"0.6.0\", build: Some(\"c3e1d630fba9b2155a4c389d9022f13e0ba09218;isa=x86-64-v3;parallel;allocator=system;9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3\"), raw: \"{\\\"algorithm\\\":\\\"groebner_basis_f4(canonicalize=true); randomized modular row combinations\\\",\\\"allocator\\\":\\\"system\\\",\\\"build\\\":\\\"9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3\\\",\\\"build_metadata\\\":\\\"e30c7934926a354895481326507bb4c5e1cb9ff0333a91c865004c5f0cd011ed  Cargo.toml;ab8c959b4e84111efc810d555d6f3addd427aafbbc53a1e92c290651ff48cc1e  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;1dbfdeb37b3435b1637e6e8fc35cff94722501cee818fe46e7049de65dc453e8  src/main.rs;261e495702428f4ffbf5dc5fc8a87702d25ede048c0c854887916563087ed98c  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\\\",\\\"contract\\\":2,\\\"features\\\":\\\"parallel; no mimalloc\\\",\\\"isa\\\":\\\"x86-64-v3\\\",\\\"kernel_peak_rss_bytes\\\":2408448,\\\"revision\\\":\\\"c3e1d630fba9b2155a4c389d9022f13e0ba09218\\\"}\\n\" }",
+  "grobx_version": "ToolVersion { tool: \"grobx\", version: \"0.73.3\", build: Some(\"1854835dbc25f24dc9a9ba017024d5030e99da1c;isa=x86-64-v3;allocator=grobx-small-blocks;9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\"), raw: \"{\\\"allocator\\\":\\\"grobx::Allocator (mimalloc small blocks; system large blocks)\\\",\\\"build\\\":\\\"9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8\\\",\\\"build_metadata\\\":\\\"3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;\\\",\\\"contract\\\":1,\\\"isa\\\":\\\"x86-64-v3\\\",\\\"kernel_peak_rss_bytes\\\":6832128,\\\"revision\\\":\\\"1854835dbc25f24dc9a9ba017024d5030e99da1c\\\",\\\"version\\\":\\\"0.73.3\\\"}\\n\" }",
+  "attempts": [
+    {
+      "problem": "mq-planted-wide-6",
+      "groebner_rs_basis": [
+        "x2^3 + 15*x1 + 18446744073709551229*x2",
+        "x4^3 + 63*x3 + 18446744073709551133*x4",
+        "x6^3 + 143*x5 + 18446744073709550973*x6",
+        "x1^2 + x2^2 + 18446744073709551229",
+        "x1*x2 + 18446744073709551248",
+        "x3^2 + x4^2 + 18446744073709551133",
+        "x3*x4 + 18446744073709551200",
+        "x5^2 + x6^2 + 18446744073709550973",
+        "x5*x6 + 18446744073709551120"
+      ],
+      "grobx_basis": [
+        "x5*x6+18446744073709551120",
+        "x5^2+x6^2+18446744073709550973",
+        "x3*x4+18446744073709551200",
+        "x3^2+x4^2+18446744073709551133",
+        "x1*x2+18446744073709551248",
+        "x1^2+x2^2+18446744073709551229",
+        "x6^3+143*x5+18446744073709550973*x6",
+        "x4^3+63*x3+18446744073709551133*x4",
+        "x2^3+15*x1+18446744073709551229*x2"
+      ],
+      "input_digest": "2cb373f2d09cc2457ee21da5b7bcb1481f54388c32abdb3e04aeebafe465845f",
+      "input": [
+        "x1^2+x2^2+18446744073709551229",
+        "x1*x2+18446744073709551248",
+        "x3^2+x4^2+18446744073709551133",
+        "x3*x4+18446744073709551200",
+        "x5^2+x6^2+18446744073709550973",
+        "x5*x6+18446744073709551120"
+      ],
+      "zeebra_basis": [
+        "x2^3+15*x1+18446744073709551229*x2",
+        "x4^3+63*x3+18446744073709551133*x4",
+        "x6^3+143*x5+18446744073709550973*x6",
+        "x1^2+x2^2+18446744073709551229",
+        "x1*x2+18446744073709551248",
+        "x3^2+x4^2+18446744073709551133",
+        "x3*x4+18446744073709551200",
+        "x5^2+x6^2+18446744073709550973",
+        "x5*x6+18446744073709551120"
+      ],
+      "groebner_jl_basis": [
+        "x5*x6 + 18446744073709551120",
+        "x5^2 + x6^2 + 18446744073709550973",
+        "x3*x4 + 18446744073709551200",
+        "x3^2 + x4^2 + 18446744073709551133",
+        "x1*x2 + 18446744073709551248",
+        "x1^2 + x2^2 + 18446744073709551229",
+        "x6^3 + 143*x5 + 18446744073709550973*x6",
+        "x4^3 + 63*x3 + 18446744073709551133*x4",
+        "x2^3 + 15*x1 + 18446744073709551229*x2"
+      ]
+    },
+    {
+      "problem": "mq-planted-wide-10",
+      "groebner_rs_basis": [
+        "x2^3 + 15*x1 + 18446744073709551229*x2",
+        "x4^3 + 63*x3 + 18446744073709551133*x4",
+        "x6^3 + 143*x5 + 18446744073709550973*x6",
+        "x8^3 + 255*x7 + 18446744073709550749*x8",
+        "x10^3 + 399*x9 + 18446744073709550461*x10",
+        "x1^2 + x2^2 + 18446744073709551229",
+        "x1*x2 + 18446744073709551248",
+        "x3^2 + x4^2 + 18446744073709551133",
+        "x3*x4 + 18446744073709551200",
+        "x5^2 + x6^2 + 18446744073709550973",
+        "x5*x6 + 18446744073709551120",
+        "x7^2 + x8^2 + 18446744073709550749",
+        "x7*x8 + 18446744073709551008",
+        "x9^2 + x10^2 + 18446744073709550461",
+        "x9*x10 + 18446744073709550864"
+      ],
+      "grobx_basis": [
+        "x9*x10+18446744073709550864",
+        "x9^2+x10^2+18446744073709550461",
+        "x7*x8+18446744073709551008",
+        "x7^2+x8^2+18446744073709550749",
+        "x5*x6+18446744073709551120",
+        "x5^2+x6^2+18446744073709550973",
+        "x3*x4+18446744073709551200",
+        "x3^2+x4^2+18446744073709551133",
+        "x1*x2+18446744073709551248",
+        "x1^2+x2^2+18446744073709551229",
+        "x10^3+399*x9+18446744073709550461*x10",
+        "x8^3+255*x7+18446744073709550749*x8",
+        "x6^3+143*x5+18446744073709550973*x6",
+        "x4^3+63*x3+18446744073709551133*x4",
+        "x2^3+15*x1+18446744073709551229*x2"
+      ],
+      "input_digest": "eba454f0a0b05dd9655b7720d8f2b0bef090b8c610d277eaa79ccc2ddadd2243",
+      "input": [
+        "x1^2+x2^2+18446744073709551229",
+        "x1*x2+18446744073709551248",
+        "x3^2+x4^2+18446744073709551133",
+        "x3*x4+18446744073709551200",
+        "x5^2+x6^2+18446744073709550973",
+        "x5*x6+18446744073709551120",
+        "x7^2+x8^2+18446744073709550749",
+        "x7*x8+18446744073709551008",
+        "x9^2+x10^2+18446744073709550461",
+        "x9*x10+18446744073709550864"
+      ],
+      "zeebra_basis": [
+        "x2^3+15*x1+18446744073709551229*x2",
+        "x4^3+63*x3+18446744073709551133*x4",
+        "x6^3+143*x5+18446744073709550973*x6",
+        "x8^3+255*x7+18446744073709550749*x8",
+        "x10^3+399*x9+18446744073709550461*x10",
+        "x1^2+x2^2+18446744073709551229",
+        "x1*x2+18446744073709551248",
+        "x3^2+x4^2+18446744073709551133",
+        "x3*x4+18446744073709551200",
+        "x5^2+x6^2+18446744073709550973",
+        "x5*x6+18446744073709551120",
+        "x7^2+x8^2+18446744073709550749",
+        "x7*x8+18446744073709551008",
+        "x9^2+x10^2+18446744073709550461",
+        "x9*x10+18446744073709550864"
+      ],
+      "groebner_jl_basis": [
+        "x9*x10 + 18446744073709550864",
+        "x9^2 + x10^2 + 18446744073709550461",
+        "x7*x8 + 18446744073709551008",
+        "x7^2 + x8^2 + 18446744073709550749",
+        "x5*x6 + 18446744073709551120",
+        "x5^2 + x6^2 + 18446744073709550973",
+        "x3*x4 + 18446744073709551200",
+        "x3^2 + x4^2 + 18446744073709551133",
+        "x1*x2 + 18446744073709551248",
+        "x1^2 + x2^2 + 18446744073709551229",
+        "x10^3 + 399*x9 + 18446744073709550461*x10",
+        "x8^3 + 255*x7 + 18446744073709550749*x8",
+        "x6^3 + 143*x5 + 18446744073709550973*x6",
+        "x4^3 + 63*x3 + 18446744073709551133*x4",
+        "x2^3 + 15*x1 + 18446744073709551229*x2"
+      ]
+    },
+    {
+      "problem": "mq-planted-wide-14",
+      "groebner_rs_basis": [
+        "x2^3 + 15*x1 + 18446744073709551229*x2",
+        "x4^3 + 63*x3 + 18446744073709551133*x4",
+        "x6^3 + 143*x5 + 18446744073709550973*x6",
+        "x8^3 + 255*x7 + 18446744073709550749*x8",
+        "x10^3 + 399*x9 + 18446744073709550461*x10",
+        "x12^3 + 575*x11 + 18446744073709550109*x12",
+        "x14^3 + 783*x13 + 18446744073709549693*x14",
+        "x1^2 + x2^2 + 18446744073709551229",
+        "x1*x2 + 18446744073709551248",
+        "x3^2 + x4^2 + 18446744073709551133",
+        "x3*x4 + 18446744073709551200",
+        "x5^2 + x6^2 + 18446744073709550973",
+        "x5*x6 + 18446744073709551120",
+        "x7^2 + x8^2 + 18446744073709550749",
+        "x7*x8 + 18446744073709551008",
+        "x9^2 + x10^2 + 18446744073709550461",
+        "x9*x10 + 18446744073709550864",
+        "x11^2 + x12^2 + 18446744073709550109",
+        "x11*x12 + 18446744073709550688",
+        "x13^2 + x14^2 + 18446744073709549693",
+        "x13*x14 + 18446744073709550480"
+      ],
+      "grobx_basis": [
+        "x13*x14+18446744073709550480",
+        "x13^2+x14^2+18446744073709549693",
+        "x11*x12+18446744073709550688",
+        "x11^2+x12^2+18446744073709550109",
+        "x9*x10+18446744073709550864",
+        "x9^2+x10^2+18446744073709550461",
+        "x7*x8+18446744073709551008",
+        "x7^2+x8^2+18446744073709550749",
+        "x5*x6+18446744073709551120",
+        "x5^2+x6^2+18446744073709550973",
+        "x3*x4+18446744073709551200",
+        "x3^2+x4^2+18446744073709551133",
+        "x1*x2+18446744073709551248",
+        "x1^2+x2^2+18446744073709551229",
+        "x14^3+783*x13+18446744073709549693*x14",
+        "x12^3+575*x11+18446744073709550109*x12",
+        "x10^3+399*x9+18446744073709550461*x10",
+        "x8^3+255*x7+18446744073709550749*x8",
+        "x6^3+143*x5+18446744073709550973*x6",
+        "x4^3+63*x3+18446744073709551133*x4",
+        "x2^3+15*x1+18446744073709551229*x2"
+      ],
+      "input_digest": "4076833387f44160cb5be92ad941c7ce9b875275903072b49b65be7452a70d9f",
+      "input": [
+        "x1^2+x2^2+18446744073709551229",
+        "x1*x2+18446744073709551248",
+        "x3^2+x4^2+18446744073709551133",
+        "x3*x4+18446744073709551200",
+        "x5^2+x6^2+18446744073709550973",
+        "x5*x6+18446744073709551120",
+        "x7^2+x8^2+18446744073709550749",
+        "x7*x8+18446744073709551008",
+        "x9^2+x10^2+18446744073709550461",
+        "x9*x10+18446744073709550864",
+        "x11^2+x12^2+18446744073709550109",
+        "x11*x12+18446744073709550688",
+        "x13^2+x14^2+18446744073709549693",
+        "x13*x14+18446744073709550480"
+      ],
+      "zeebra_basis": [
+        "x2^3+15*x1+18446744073709551229*x2",
+        "x4^3+63*x3+18446744073709551133*x4",
+        "x6^3+143*x5+18446744073709550973*x6",
+        "x8^3+255*x7+18446744073709550749*x8",
+        "x10^3+399*x9+18446744073709550461*x10",
+        "x12^3+575*x11+18446744073709550109*x12",
+        "x14^3+783*x13+18446744073709549693*x14",
+        "x1^2+x2^2+18446744073709551229",
+        "x1*x2+18446744073709551248",
+        "x3^2+x4^2+18446744073709551133",
+        "x3*x4+18446744073709551200",
+        "x5^2+x6^2+18446744073709550973",
+        "x5*x6+18446744073709551120",
+        "x7^2+x8^2+18446744073709550749",
+        "x7*x8+18446744073709551008",
+        "x9^2+x10^2+18446744073709550461",
+        "x9*x10+18446744073709550864",
+        "x11^2+x12^2+18446744073709550109",
+        "x11*x12+18446744073709550688",
+        "x13^2+x14^2+18446744073709549693",
+        "x13*x14+18446744073709550480"
+      ],
+      "groebner_jl_basis": [
+        "x13*x14 + 18446744073709550480",
+        "x13^2 + x14^2 + 18446744073709549693",
+        "x11*x12 + 18446744073709550688",
+        "x11^2 + x12^2 + 18446744073709550109",
+        "x9*x10 + 18446744073709550864",
+        "x9^2 + x10^2 + 18446744073709550461",
+        "x7*x8 + 18446744073709551008",
+        "x7^2 + x8^2 + 18446744073709550749",
+        "x5*x6 + 18446744073709551120",
+        "x5^2 + x6^2 + 18446744073709550973",
+        "x3*x4 + 18446744073709551200",
+        "x3^2 + x4^2 + 18446744073709551133",
+        "x1*x2 + 18446744073709551248",
+        "x1^2 + x2^2 + 18446744073709551229",
+        "x14^3 + 783*x13 + 18446744073709549693*x14",
+        "x12^3 + 575*x11 + 18446744073709550109*x12",
+        "x10^3 + 399*x9 + 18446744073709550461*x10",
+        "x8^3 + 255*x7 + 18446744073709550749*x8",
+        "x6^3 + 143*x5 + 18446744073709550973*x6",
+        "x4^3 + 63*x3 + 18446744073709551133*x4",
+        "x2^3 + 15*x1 + 18446744073709551229*x2"
+      ]
+    }
+  ],
+  "source_commit": "65f38d4af8b71a995c50db4f221fdd0406030604",
+  "production_source_unchanged_since": "b310c126",
+  "recorded_at": "2026-11-13T02:19:55.165834+00:00",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "profile": "dev; correctness verification only",
+  "affinity": "2",
+  "outer_timeout_seconds": 185,
+  "log_sha256": "b87baaf8e55fb5a8965c9d040256c0a29fb29ef3354d000c21c6f2caa66e6e19",
+  "test_binary_sha256": "cb460ac56f7d26b42aac943e16d13853c7da59b640f71cbe81f658c1b5d6400e"
+}
