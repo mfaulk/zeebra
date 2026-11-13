@@ -318,6 +318,13 @@ jobs:
           python3 research/ntt-caller-gate/summary.py > "$RUNNER_TEMP/ntt-caller-table.md"
           diff -u research/ntt-caller-gate/table.md "$RUNNER_TEMP/ntt-caller-table.md"
 
+      - name: Transform-tree estimate artifacts
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/transform-tree-gate -p 'test_*.py'
+          python3 research/transform-tree-gate/estimate.py > "$RUNNER_TEMP/transform-tree-table.md"
+          diff -u research/transform-tree-gate/table.md "$RUNNER_TEMP/transform-tree-table.md"
+
       # Every document that publishes a measurement says which commit it came from (#335). Separate
       # from the unit tests above because this one reads the repository's own documents: a finding
       # here is a document to fix, not a script that is broken.
