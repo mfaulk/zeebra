@@ -1,0 +1,1461 @@
+{
+  "sources": [
+    {
+      "name": "concurrent",
+      "path": "research/concurrent-pivots/parallel.json.gz",
+      "sha256": "bb3b210e86ae4da0fdf18600fb455c55c3ee724358f974ac9fd78b8d42edfeaf",
+      "source": "cf92a3cb64aaa56346b68c19b8db5dc99f5ae383",
+      "attempts": 310
+    },
+    {
+      "name": "selected-work",
+      "path": "research/selective-backward/cross-work.json.gz",
+      "sha256": "71737a18523b61118e0068a1bd18c7b82e9d55594b48cdb459b064b444dce024",
+      "source": "ff15a0afa463c31cbeee0dac7f9163e09d1c70c8",
+      "attempts": 12
+    },
+    {
+      "name": "selected-native",
+      "path": "research/selective-backward/cross-native.json.gz",
+      "sha256": "e7da65f67e622483825593850c5dfac487e046bd68bc0758734d864cccc46d75",
+      "source": "ff15a0afa463c31cbeee0dac7f9163e09d1c70c8",
+      "attempts": 140
+    }
+  ],
+  "diagnostics": [
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "dynamic-1-on",
+      "repetitions": 5,
+      "products": {
+        "median": 585166982,
+        "minimum": 585166982,
+        "maximum": 585166982
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 139515,
+        "minimum": 129574,
+        "maximum": 151055
+      },
+      "publication_worker_sum_ns": {
+        "median": 74105,
+        "minimum": 70096,
+        "maximum": 79088
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500607,
+        "minimum": 1500607,
+        "maximum": 1500607
+      },
+      "workspace_bytes": {
+        "median": 721200,
+        "minimum": 721200,
+        "maximum": 721200
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "dynamic-16-on",
+      "repetitions": 5,
+      "products": {
+        "median": 578354208,
+        "minimum": 577181738,
+        "maximum": 578623944
+      },
+      "lost_publications": {
+        "median": 569,
+        "minimum": 534,
+        "maximum": 604
+      },
+      "post_loss_products": {
+        "median": 34391960,
+        "minimum": 29124717,
+        "maximum": 34961066
+      },
+      "post_loss_product_fraction": {
+        "median": 0.059437498839488054,
+        "minimum": 0.05033498469519891,
+        "maximum": 0.060572023850137824
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 836347,
+        "minimum": 156903,
+        "maximum": 872865
+      },
+      "publication_worker_sum_ns": {
+        "median": 321507,
+        "minimum": 302396,
+        "maximum": 334947
+      },
+      "worker_duration_balance": {
+        "median": 0.9870287013748834,
+        "minimum": 0.9769514607970344,
+        "maximum": 0.9886456018768341
+      },
+      "peak_reserved_entries": {
+        "median": 1849752,
+        "minimum": 1846592,
+        "maximum": 1850170
+      },
+      "workspace_bytes": {
+        "median": 1442400,
+        "minimum": 1442400,
+        "maximum": 1442400
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "dynamic-4-on",
+      "repetitions": 5,
+      "products": {
+        "median": 584469781,
+        "minimum": 582955826,
+        "maximum": 584692303
+      },
+      "lost_publications": {
+        "median": 145,
+        "minimum": 136,
+        "maximum": 163
+      },
+      "post_loss_products": {
+        "median": 7252448,
+        "minimum": 2823367,
+        "maximum": 8250237
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0124056329959026,
+        "minimum": 0.00484319201228808,
+        "maximum": 0.014116316944419097
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 162348,
+        "minimum": 133777,
+        "maximum": 207029
+      },
+      "publication_worker_sum_ns": {
+        "median": 109770,
+        "minimum": 102139,
+        "maximum": 123677
+      },
+      "worker_duration_balance": {
+        "median": 0.9954028501229227,
+        "minimum": 0.9950964779595494,
+        "maximum": 0.9955887520007282
+      },
+      "peak_reserved_entries": {
+        "median": 1572392,
+        "minimum": 1569133,
+        "maximum": 1572401
+      },
+      "workspace_bytes": {
+        "median": 865440,
+        "minimum": 865440,
+        "maximum": 865440
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "dynamic-64-on",
+      "repetitions": 5,
+      "products": {
+        "median": 560401051,
+        "minimum": 558693581,
+        "maximum": 567203926
+      },
+      "lost_publications": {
+        "median": 928,
+        "minimum": 793,
+        "maximum": 981
+      },
+      "post_loss_products": {
+        "median": 75939650,
+        "minimum": 73319275,
+        "maximum": 81376916
+      },
+      "post_loss_product_fraction": {
+        "median": 0.13519372795514542,
+        "minimum": 0.12926439969669745,
+        "maximum": 0.1454623469440556
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 202121,
+        "minimum": 196808,
+        "maximum": 1257677
+      },
+      "publication_worker_sum_ns": {
+        "median": 484597,
+        "minimum": 479162,
+        "maximum": 694876
+      },
+      "worker_duration_balance": {
+        "median": 0.8744224960109657,
+        "minimum": 0.7806351094211827,
+        "maximum": 0.8920666304131255
+      },
+      "peak_reserved_entries": {
+        "median": 2953264,
+        "minimum": 2950651,
+        "maximum": 2976303
+      },
+      "workspace_bytes": {
+        "median": 3750240,
+        "minimum": 3750240,
+        "maximum": 3750240
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "static-1-on",
+      "repetitions": 5,
+      "products": {
+        "median": 585166982,
+        "minimum": 585166982,
+        "maximum": 585166982
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 136117,
+        "minimum": 131176,
+        "maximum": 140852
+      },
+      "publication_worker_sum_ns": {
+        "median": 74519,
+        "minimum": 68313,
+        "maximum": 95125
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500607,
+        "minimum": 1500607,
+        "maximum": 1500607
+      },
+      "workspace_bytes": {
+        "median": 721200,
+        "minimum": 721200,
+        "maximum": 721200
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "static-16-on",
+      "repetitions": 5,
+      "products": {
+        "median": 622277258,
+        "minimum": 618190316,
+        "maximum": 638019636
+      },
+      "lost_publications": {
+        "median": 168,
+        "minimum": 142,
+        "maximum": 173
+      },
+      "post_loss_products": {
+        "median": 2077138,
+        "minimum": 1273012,
+        "maximum": 3215371
+      },
+      "post_loss_product_fraction": {
+        "median": 0.003345675597054976,
+        "minimum": 0.0019952552055937036,
+        "maximum": 0.005201263942154668
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 342052,
+        "minimum": 163199,
+        "maximum": 722257
+      },
+      "publication_worker_sum_ns": {
+        "median": 287334,
+        "minimum": 234847,
+        "maximum": 305292
+      },
+      "worker_duration_balance": {
+        "median": 0.6356528784117447,
+        "minimum": 0.4789733960492395,
+        "maximum": 0.6515424797790437
+      },
+      "peak_reserved_entries": {
+        "median": 1835455,
+        "minimum": 1816179,
+        "maximum": 1845124
+      },
+      "workspace_bytes": {
+        "median": 1442400,
+        "minimum": 1442400,
+        "maximum": 1442400
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "static-4-on",
+      "repetitions": 5,
+      "products": {
+        "median": 604716731,
+        "minimum": 602520207,
+        "maximum": 605710606
+      },
+      "lost_publications": {
+        "median": 44,
+        "minimum": 34,
+        "maximum": 47
+      },
+      "post_loss_products": {
+        "median": 408155,
+        "minimum": 94050,
+        "maximum": 471527
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0006738448954945326,
+        "minimum": 0.00015536028131004368,
+        "maximum": 0.0007825911803817727
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 142376,
+        "minimum": 140561,
+        "maximum": 160196
+      },
+      "publication_worker_sum_ns": {
+        "median": 90305,
+        "minimum": 89124,
+        "maximum": 111632
+      },
+      "worker_duration_balance": {
+        "median": 0.6877599189791853,
+        "minimum": 0.672936504620534,
+        "maximum": 0.6965129847671483
+      },
+      "peak_reserved_entries": {
+        "median": 1550523,
+        "minimum": 1548338,
+        "maximum": 1559161
+      },
+      "workspace_bytes": {
+        "median": 865440,
+        "minimum": 865440,
+        "maximum": 865440
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 32003,
+      "arm": "static-64-on",
+      "repetitions": 5,
+      "products": {
+        "median": 584851720,
+        "minimum": 556255062,
+        "maximum": 594267523
+      },
+      "lost_publications": {
+        "median": 181,
+        "minimum": 172,
+        "maximum": 216
+      },
+      "post_loss_products": {
+        "median": 6702692,
+        "minimum": 4008997,
+        "maximum": 7368719
+      },
+      "post_loss_product_fraction": {
+        "median": 0.011460498055814899,
+        "minimum": 0.006746114914309392,
+        "maximum": 0.013247014730087976
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 232059,
+        "minimum": 219071,
+        "maximum": 1026558
+      },
+      "publication_worker_sum_ns": {
+        "median": 329956,
+        "minimum": 319925,
+        "maximum": 371303
+      },
+      "worker_duration_balance": {
+        "median": 0.4371320887853965,
+        "minimum": 0.42107143560046467,
+        "maximum": 0.4569209423439148
+      },
+      "peak_reserved_entries": {
+        "median": 2725320,
+        "minimum": 2621396,
+        "maximum": 2791083
+      },
+      "workspace_bytes": {
+        "median": 3750240,
+        "minimum": 3750240,
+        "maximum": 3750240
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "dynamic-1-on",
+      "repetitions": 5,
+      "products": {
+        "median": 585195178,
+        "minimum": 585195178,
+        "maximum": 585195178
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 136301,
+        "minimum": 129146,
+        "maximum": 144354
+      },
+      "publication_worker_sum_ns": {
+        "median": 71413,
+        "minimum": 66400,
+        "maximum": 100295
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500639,
+        "minimum": 1500639,
+        "maximum": 1500639
+      },
+      "workspace_bytes": {
+        "median": 769280,
+        "minimum": 769280,
+        "maximum": 769280
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "dynamic-16-on",
+      "repetitions": 5,
+      "products": {
+        "median": 576824272,
+        "minimum": 576067621,
+        "maximum": 580394192
+      },
+      "lost_publications": {
+        "median": 750,
+        "minimum": 683,
+        "maximum": 808
+      },
+      "post_loss_products": {
+        "median": 40254066,
+        "minimum": 38014434,
+        "maximum": 46828245
+      },
+      "post_loss_product_fraction": {
+        "median": 0.06982547106218977,
+        "minimum": 0.06576517914896156,
+        "maximum": 0.08068351759109264
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 368913,
+        "minimum": 162494,
+        "maximum": 762656
+      },
+      "publication_worker_sum_ns": {
+        "median": 386313,
+        "minimum": 328347,
+        "maximum": 436232
+      },
+      "worker_duration_balance": {
+        "median": 0.984927986917363,
+        "minimum": 0.9794183963088026,
+        "maximum": 0.9877615465493408
+      },
+      "peak_reserved_entries": {
+        "median": 1847605,
+        "minimum": 1846552,
+        "maximum": 1850769
+      },
+      "workspace_bytes": {
+        "median": 2211680,
+        "minimum": 2211680,
+        "maximum": 2211680
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "dynamic-4-on",
+      "repetitions": 5,
+      "products": {
+        "median": 584218535,
+        "minimum": 584165998,
+        "maximum": 584700622
+      },
+      "lost_publications": {
+        "median": 200,
+        "minimum": 190,
+        "maximum": 211
+      },
+      "post_loss_products": {
+        "median": 9300846,
+        "minimum": 5381911,
+        "maximum": 9913617
+      },
+      "post_loss_product_fraction": {
+        "median": 0.01592158056416012,
+        "minimum": 0.009212734478754104,
+        "maximum": 0.016955030706295365
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 144853,
+        "minimum": 134000,
+        "maximum": 208840
+      },
+      "publication_worker_sum_ns": {
+        "median": 117516,
+        "minimum": 109746,
+        "maximum": 123549
+      },
+      "worker_duration_balance": {
+        "median": 0.9953664870216729,
+        "minimum": 0.9952006260197646,
+        "maximum": 0.9960038591231062
+      },
+      "peak_reserved_entries": {
+        "median": 1572456,
+        "minimum": 1572426,
+        "maximum": 1572541
+      },
+      "workspace_bytes": {
+        "median": 1057760,
+        "minimum": 1057760,
+        "maximum": 1057760
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "dynamic-64-on",
+      "repetitions": 5,
+      "products": {
+        "median": 554372312,
+        "minimum": 550378032,
+        "maximum": 555437784
+      },
+      "lost_publications": {
+        "median": 1475,
+        "minimum": 1297,
+        "maximum": 1551
+      },
+      "post_loss_products": {
+        "median": 92012623,
+        "minimum": 87084120,
+        "maximum": 96857980
+      },
+      "post_loss_product_fraction": {
+        "median": 0.16580472142920424,
+        "minimum": 0.15678465259036103,
+        "maximum": 0.17598445862388634
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 1283807,
+        "minimum": 197743,
+        "maximum": 1372790
+      },
+      "publication_worker_sum_ns": {
+        "median": 602989,
+        "minimum": 577298,
+        "maximum": 802469
+      },
+      "worker_duration_balance": {
+        "median": 0.864836729462855,
+        "minimum": 0.8330242399947195,
+        "maximum": 0.8980138736040254
+      },
+      "peak_reserved_entries": {
+        "median": 2944929,
+        "minimum": 2939007,
+        "maximum": 2951173
+      },
+      "workspace_bytes": {
+        "median": 6827360,
+        "minimum": 6827360,
+        "maximum": 6827360
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "static-1-on",
+      "repetitions": 5,
+      "products": {
+        "median": 585195178,
+        "minimum": 585195178,
+        "maximum": 585195178
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 140332,
+        "minimum": 134768,
+        "maximum": 159978
+      },
+      "publication_worker_sum_ns": {
+        "median": 79764,
+        "minimum": 71207,
+        "maximum": 87114
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500639,
+        "minimum": 1500639,
+        "maximum": 1500639
+      },
+      "workspace_bytes": {
+        "median": 769280,
+        "minimum": 769280,
+        "maximum": 769280
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "static-16-on",
+      "repetitions": 5,
+      "products": {
+        "median": 614764387,
+        "minimum": 609380720,
+        "maximum": 630134174
+      },
+      "lost_publications": {
+        "median": 322,
+        "minimum": 300,
+        "maximum": 334
+      },
+      "post_loss_products": {
+        "median": 3603489,
+        "minimum": 2555879,
+        "maximum": 5119696
+      },
+      "post_loss_product_fraction": {
+        "median": 0.005718605891703312,
+        "minimum": 0.004157493592744499,
+        "maximum": 0.00835228787169884
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 360440,
+        "minimum": 159665,
+        "maximum": 687438
+      },
+      "publication_worker_sum_ns": {
+        "median": 290240,
+        "minimum": 272334,
+        "maximum": 353348
+      },
+      "worker_duration_balance": {
+        "median": 0.6325286143039013,
+        "minimum": 0.5990806377112032,
+        "maximum": 0.6526394115800295
+      },
+      "peak_reserved_entries": {
+        "median": 1817737,
+        "minimum": 1810237,
+        "maximum": 1853662
+      },
+      "workspace_bytes": {
+        "median": 2211680,
+        "minimum": 2211680,
+        "maximum": 2211680
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "static-4-on",
+      "repetitions": 5,
+      "products": {
+        "median": 602252358,
+        "minimum": 600736921,
+        "maximum": 604266810
+      },
+      "lost_publications": {
+        "median": 59,
+        "minimum": 56,
+        "maximum": 65
+      },
+      "post_loss_products": {
+        "median": 196876,
+        "minimum": 142425,
+        "maximum": 402862
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0003277241553129044,
+        "minimum": 0.00023569886289137742,
+        "maximum": 0.000668925566913264
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 150703,
+        "minimum": 138452,
+        "maximum": 318894
+      },
+      "publication_worker_sum_ns": {
+        "median": 109872,
+        "minimum": 94174,
+        "maximum": 120387
+      },
+      "worker_duration_balance": {
+        "median": 0.7028328266549209,
+        "minimum": 0.7018203754707291,
+        "maximum": 0.7061837551552558
+      },
+      "peak_reserved_entries": {
+        "median": 1554263,
+        "minimum": 1552706,
+        "maximum": 1561303
+      },
+      "workspace_bytes": {
+        "median": 1057760,
+        "minimum": 1057760,
+        "maximum": 1057760
+      }
+    },
+    {
+      "cohort": "concurrent",
+      "modulus": 2147483647,
+      "arm": "static-64-on",
+      "repetitions": 5,
+      "products": {
+        "median": 577246837,
+        "minimum": 560994793,
+        "maximum": 584860302
+      },
+      "lost_publications": {
+        "median": 527,
+        "minimum": 366,
+        "maximum": 628
+      },
+      "post_loss_products": {
+        "median": 12096368,
+        "minimum": 10028684,
+        "maximum": 12735979
+      },
+      "post_loss_product_fraction": {
+        "median": 0.020955278097088994,
+        "minimum": 0.017224835920238605,
+        "maximum": 0.022702490573740495
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 236446,
+        "minimum": 231331,
+        "maximum": 1028460
+      },
+      "publication_worker_sum_ns": {
+        "median": 383271,
+        "minimum": 358965,
+        "maximum": 527873
+      },
+      "worker_duration_balance": {
+        "median": 0.43145669570550327,
+        "minimum": 0.4248285962603387,
+        "maximum": 0.45185729605366753
+      },
+      "peak_reserved_entries": {
+        "median": 2795795,
+        "minimum": 2720347,
+        "maximum": 2879860
+      },
+      "workspace_bytes": {
+        "median": 6827360,
+        "minimum": 6827360,
+        "maximum": 6827360
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 32003,
+      "arm": "one-full",
+      "repetitions": 1,
+      "products": {
+        "median": 585166982,
+        "minimum": 585166982,
+        "maximum": 585166982
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 115873,
+        "minimum": 115873,
+        "maximum": 115873
+      },
+      "publication_worker_sum_ns": {
+        "median": 66197,
+        "minimum": 66197,
+        "maximum": 66197
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500607,
+        "minimum": 1500607,
+        "maximum": 1500607
+      },
+      "workspace_bytes": {
+        "median": 721200,
+        "minimum": 721200,
+        "maximum": 721200
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 32003,
+      "arm": "one-selected",
+      "repetitions": 1,
+      "products": {
+        "median": 585166982,
+        "minimum": 585166982,
+        "maximum": 585166982
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 117320,
+        "minimum": 117320,
+        "maximum": 117320
+      },
+      "publication_worker_sum_ns": {
+        "median": 67059,
+        "minimum": 67059,
+        "maximum": 67059
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500607,
+        "minimum": 1500607,
+        "maximum": 1500607
+      },
+      "workspace_bytes": {
+        "median": 721200,
+        "minimum": 721200,
+        "maximum": 721200
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 32003,
+      "arm": "parallel-full",
+      "repetitions": 1,
+      "products": {
+        "median": 583805903,
+        "minimum": 583805903,
+        "maximum": 583805903
+      },
+      "lost_publications": {
+        "median": 150,
+        "minimum": 150,
+        "maximum": 150
+      },
+      "post_loss_products": {
+        "median": 5345503,
+        "minimum": 5345503,
+        "maximum": 5345503
+      },
+      "post_loss_product_fraction": {
+        "median": 0.00915630173064557,
+        "minimum": 0.00915630173064557,
+        "maximum": 0.00915630173064557
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 129152,
+        "minimum": 129152,
+        "maximum": 129152
+      },
+      "publication_worker_sum_ns": {
+        "median": 98028,
+        "minimum": 98028,
+        "maximum": 98028
+      },
+      "worker_duration_balance": {
+        "median": 0.996393548892597,
+        "minimum": 0.996393548892597,
+        "maximum": 0.996393548892597
+      },
+      "peak_reserved_entries": {
+        "median": 1572425,
+        "minimum": 1572425,
+        "maximum": 1572425
+      },
+      "workspace_bytes": {
+        "median": 865440,
+        "minimum": 865440,
+        "maximum": 865440
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 32003,
+      "arm": "parallel-selected",
+      "repetitions": 1,
+      "products": {
+        "median": 584134280,
+        "minimum": 584134280,
+        "maximum": 584134280
+      },
+      "lost_publications": {
+        "median": 183,
+        "minimum": 183,
+        "maximum": 183
+      },
+      "post_loss_products": {
+        "median": 8415756,
+        "minimum": 8415756,
+        "maximum": 8415756
+      },
+      "post_loss_product_fraction": {
+        "median": 0.014407228420150244,
+        "minimum": 0.014407228420150244,
+        "maximum": 0.014407228420150244
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 136243,
+        "minimum": 136243,
+        "maximum": 136243
+      },
+      "publication_worker_sum_ns": {
+        "median": 116371,
+        "minimum": 116371,
+        "maximum": 116371
+      },
+      "worker_duration_balance": {
+        "median": 0.9965554682212605,
+        "minimum": 0.9965554682212605,
+        "maximum": 0.9965554682212605
+      },
+      "peak_reserved_entries": {
+        "median": 1571889,
+        "minimum": 1571889,
+        "maximum": 1571889
+      },
+      "workspace_bytes": {
+        "median": 865440,
+        "minimum": 865440,
+        "maximum": 865440
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 2147483647,
+      "arm": "one-full",
+      "repetitions": 1,
+      "products": {
+        "median": 585195178,
+        "minimum": 585195178,
+        "maximum": 585195178
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 116298,
+        "minimum": 116298,
+        "maximum": 116298
+      },
+      "publication_worker_sum_ns": {
+        "median": 63893,
+        "minimum": 63893,
+        "maximum": 63893
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500639,
+        "minimum": 1500639,
+        "maximum": 1500639
+      },
+      "workspace_bytes": {
+        "median": 769280,
+        "minimum": 769280,
+        "maximum": 769280
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 2147483647,
+      "arm": "one-selected",
+      "repetitions": 1,
+      "products": {
+        "median": 585195178,
+        "minimum": 585195178,
+        "maximum": 585195178
+      },
+      "lost_publications": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "post_loss_product_fraction": {
+        "median": 0.0,
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 123745,
+        "minimum": 123745,
+        "maximum": 123745
+      },
+      "publication_worker_sum_ns": {
+        "median": 74068,
+        "minimum": 74068,
+        "maximum": 74068
+      },
+      "worker_duration_balance": {
+        "median": 1.0,
+        "minimum": 1.0,
+        "maximum": 1.0
+      },
+      "peak_reserved_entries": {
+        "median": 1500639,
+        "minimum": 1500639,
+        "maximum": 1500639
+      },
+      "workspace_bytes": {
+        "median": 769280,
+        "minimum": 769280,
+        "maximum": 769280
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 2147483647,
+      "arm": "parallel-full",
+      "repetitions": 1,
+      "products": {
+        "median": 584495047,
+        "minimum": 584495047,
+        "maximum": 584495047
+      },
+      "lost_publications": {
+        "median": 205,
+        "minimum": 205,
+        "maximum": 205
+      },
+      "post_loss_products": {
+        "median": 10715725,
+        "minimum": 10715725,
+        "maximum": 10715725
+      },
+      "post_loss_product_fraction": {
+        "median": 0.01833330334448497,
+        "minimum": 0.01833330334448497,
+        "maximum": 0.01833330334448497
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 176188,
+        "minimum": 176188,
+        "maximum": 176188
+      },
+      "publication_worker_sum_ns": {
+        "median": 105548,
+        "minimum": 105548,
+        "maximum": 105548
+      },
+      "worker_duration_balance": {
+        "median": 0.995383637317641,
+        "minimum": 0.995383637317641,
+        "maximum": 0.995383637317641
+      },
+      "peak_reserved_entries": {
+        "median": 1572563,
+        "minimum": 1572563,
+        "maximum": 1572563
+      },
+      "workspace_bytes": {
+        "median": 1057760,
+        "minimum": 1057760,
+        "maximum": 1057760
+      }
+    },
+    {
+      "cohort": "selected-work",
+      "modulus": 2147483647,
+      "arm": "parallel-selected",
+      "repetitions": 1,
+      "products": {
+        "median": 584319879,
+        "minimum": 584319879,
+        "maximum": 584319879
+      },
+      "lost_publications": {
+        "median": 184,
+        "minimum": 184,
+        "maximum": 184
+      },
+      "post_loss_products": {
+        "median": 7231959,
+        "minimum": 7231959,
+        "maximum": 7231959
+      },
+      "post_loss_product_fraction": {
+        "median": 0.012376712242576296,
+        "minimum": 0.012376712242576296,
+        "maximum": 0.012376712242576296
+      },
+      "scheduling_worker_sum_ns": {
+        "median": 130325,
+        "minimum": 130325,
+        "maximum": 130325
+      },
+      "publication_worker_sum_ns": {
+        "median": 113489,
+        "minimum": 113489,
+        "maximum": 113489
+      },
+      "worker_duration_balance": {
+        "median": 0.9982511696372928,
+        "minimum": 0.9982511696372928,
+        "maximum": 0.9982511696372928
+      },
+      "peak_reserved_entries": {
+        "median": 1573215,
+        "minimum": 1573215,
+        "maximum": 1573215
+      },
+      "workspace_bytes": {
+        "median": 1057760,
+        "minimum": 1057760,
+        "maximum": 1057760
+      }
+    }
+  ],
+  "timing": [
+    {
+      "cohort": "selected-native",
+      "modulus": 32003,
+      "arm": "one-full",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 3206.212048,
+        "minimum": 2982.18447,
+        "maximum": 3266.249631
+      },
+      "forward_ms": {
+        "median": 1125.701757,
+        "minimum": 1050.057214,
+        "maximum": 1169.275369
+      },
+      "remove_all_forward_ceiling": {
+        "median": 1.5410700258824146,
+        "minimum": 1.527466035947666,
+        "maximum": 1.5608635561080453
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.28481896097813414,
+        "minimum": 0.2782964838969425,
+        "maximum": 0.28958566653554507
+      }
+    },
+    {
+      "cohort": "selected-native",
+      "modulus": 32003,
+      "arm": "one-selected",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 1305.472236,
+        "minimum": 1243.754261,
+        "maximum": 1325.801994
+      },
+      "forward_ms": {
+        "median": 1090.736647,
+        "minimum": 1042.416491,
+        "maximum": 1109.669281
+      },
+      "remove_all_forward_ceiling": {
+        "median": 6.114418409354495,
+        "minimum": 6.079440497401667,
+        "maximum": 6.177451260138621
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.11955256531555879,
+        "minimum": 0.11931452272084211,
+        "maximum": 0.11968720768579806
+      }
+    },
+    {
+      "cohort": "selected-native",
+      "modulus": 32003,
+      "arm": "parallel-full",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 2365.697089,
+        "minimum": 2246.39645,
+        "maximum": 2444.002356
+      },
+      "forward_ms": {
+        "median": 304.601833,
+        "minimum": 281.896174,
+        "maximum": 306.282362
+      },
+      "remove_all_forward_ceiling": {
+        "median": 1.145301010018538,
+        "minimum": 1.1432752478620454,
+        "maximum": 1.148385515840564
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.7882264616553021,
+        "minimum": 0.7739202235038033,
+        "maximum": 0.797957264022928
+      }
+    },
+    {
+      "cohort": "selected-native",
+      "modulus": 32003,
+      "arm": "parallel-selected",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 528.120646,
+        "minimum": 501.709354,
+        "maximum": 534.151875
+      },
+      "forward_ms": {
+        "median": 301.137642,
+        "minimum": 290.755497,
+        "maximum": 304.326681
+      },
+      "remove_all_forward_ceiling": {
+        "median": 2.328117211954586,
+        "minimum": 2.3239609258678295,
+        "maximum": 2.378289551728841
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.17529455916984188,
+        "minimum": 0.17255369517570981,
+        "maximum": 0.17553092998907957
+      }
+    },
+    {
+      "cohort": "selected-native",
+      "modulus": 2147483647,
+      "arm": "one-full",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 3299.864551,
+        "minimum": 3131.580727,
+        "maximum": 3426.968884
+      },
+      "forward_ms": {
+        "median": 1188.906855,
+        "minimum": 1120.65505,
+        "maximum": 1252.199961
+      },
+      "remove_all_forward_ceiling": {
+        "median": 1.5636779671254364,
+        "minimum": 1.5572831770052533,
+        "maximum": 1.5757852927531464
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.2774062600139679,
+        "minimum": 0.2736758497631035,
+        "maximum": 0.2794419859170759
+      }
+    },
+    {
+      "cohort": "selected-native",
+      "modulus": 2147483647,
+      "arm": "one-selected",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 1402.003919,
+        "minimum": 1335.115876,
+        "maximum": 1466.968249
+      },
+      "forward_ms": {
+        "median": 1176.414611,
+        "minimum": 1123.063419,
+        "maximum": 1235.673082
+      },
+      "remove_all_forward_ceiling": {
+        "median": 6.296158483087041,
+        "minimum": 6.214850922810579,
+        "maximum": 6.428026464359439
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.1188816101933777,
+        "minimum": 0.11842290207253088,
+        "maximum": 0.11917600358671507
+      }
+    },
+    {
+      "cohort": "selected-native",
+      "modulus": 2147483647,
+      "arm": "parallel-full",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 2473.221905,
+        "minimum": 2318.136388,
+        "maximum": 2579.808684
+      },
+      "forward_ms": {
+        "median": 325.200758,
+        "minimum": 301.086814,
+        "maximum": 332.464389
+      },
+      "remove_all_forward_ceiling": {
+        "median": 1.1492709043352447,
+        "minimum": 1.146411657803208,
+        "maximum": 1.1513955104465272
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.7699229193079177,
+        "minimum": 0.7605215683414859,
+        "maximum": 0.7830057216783252
+      }
+    },
+    {
+      "cohort": "selected-native",
+      "modulus": 2147483647,
+      "arm": "parallel-selected",
+      "repetitions": 5,
+      "process_ms": {
+        "median": 546.632503,
+        "minimum": 504.837487,
+        "maximum": 563.467945
+      },
+      "forward_ms": {
+        "median": 315.390938,
+        "minimum": 291.296203,
+        "maximum": 330.204072
+      },
+      "remove_all_forward_ceiling": {
+        "median": 2.364121248797961,
+        "minimum": 2.3432956548924637,
+        "maximum": 2.4155817090458753
+      },
+      "required_forward_saving_for_10pct": {
+        "median": 0.1733072665557539,
+        "minimum": 0.1706423369000731,
+        "maximum": 0.1744437753787013
+      }
+    }
+  ]
+}
