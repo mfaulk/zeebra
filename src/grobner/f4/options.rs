@@ -163,7 +163,9 @@ pub enum InterreductionRoute {
     #[default]
     Division,
 
-    /// One Macaulay matrix under a graded order, one division per basis element under lex.
+    /// One Macaulay matrix under a graded order, division under lex or block orders.
+    ///
+    /// Block-order matrix costs are unmeasured, so they retain the conservative division route.
     ///
     /// **The default since #575**, together with [`F4Options::reduce_batch_rows`] — measured ahead
     /// on every graded rung and behind on every lex one, which is what the order criterion exists
@@ -186,7 +188,10 @@ impl InterreductionRoute {
         match self {
             Self::Division => false,
             Self::Matrix => true,
-            Self::ByOrder => !matches!(order, MonomialOrder::Lexicographic),
+            Self::ByOrder => !matches!(
+                order,
+                MonomialOrder::Lexicographic | MonomialOrder::Block(_)
+            ),
         }
     }
 }

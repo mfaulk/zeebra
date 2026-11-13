@@ -20,7 +20,7 @@ fn key<const N: usize>(monomial: &Monomial<N>, order: MonomialOrder) -> Option<u
                 key = (key << 8) | u64::from(!u8::try_from(exponent).ok()?);
             }
         }
-        MonomialOrder::Weighted(_) => return None,
+        MonomialOrder::Weighted(_) | MonomialOrder::Block(_) => return None,
     }
     if order != MonomialOrder::Lexicographic {
         key |= monomial.degree() << 56;

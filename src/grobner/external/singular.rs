@@ -49,13 +49,11 @@ fn singular_order(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => "lp",
         MonomialOrder::GradedLexicographic => "Dp",
         MonomialOrder::GradedReverseLexicographic => "dp",
-        // #624 verified the spelling — `wp(w)` is the `ReverseLexicographic` tie-break, `Wp(w)`
-        // is `Lexicographic`, and `LastVariableFirst` is `Wp` on the reversed variable labelling
-        // with the weights reversed to match, which is a relabelling and so cannot be returned
-        // from a function that only names an order. Still unreachable because `supports` refuses
-        // a weighted instance for want of a textual contract (#625), and wiring the reversed
-        // labelling needs `fn script` to reverse the variable list too.
-        MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
+        // The adapter capability guard refuses these before script generation. Independent
+        // reference tests verify their spellings, but this adapter does not yet generate them.
+        MonomialOrder::Weighted(_) | MonomialOrder::Block(_) => {
+            unreachable!("{}", WEIGHTED_UNSUPPORTED)
+        }
     }
 }
 
