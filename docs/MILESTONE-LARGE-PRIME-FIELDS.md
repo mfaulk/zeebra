@@ -595,11 +595,12 @@ BN254 cells and did not move the site, and `#[inline]` on `pow` fixed `Monomial:
 BN254. The `#[inline]` was kept for what it did fix. The trade accepted is 1.10x at a
 solution-verification path over one field against 1.9x on the CICO path over the fields that
 matter and 1.09x to 1.46x at the same site over the other two; it is tracked rather than closed
-over.
+over. **Follow-up #632:** `Monomial::eval` now uses fixed addition chains for exponents 0–5,
+with the general `pow` path retained above that range. The historical table above is unchanged;
+the [evaluation study](research/monomial-evaluation.md) records the current comparison.
 
-**Not measured.** Where the crossover falls inside 8..2^30 bits, beyond the bracket above; and
-whether an addition chain for a *fixed* exponent — Poseidon's `alpha`, say — beats either walk,
-which is the same candidate §4.1.1 names for inversion.
+**Not measured here.** Where the crossover falls inside 8..2^30 bits, beyond the bracket above;
+fixed addition chains at call sites other than monomial evaluation, including Poseidon's `alpha`.
 
 ### 4.2 Against hand-written assembly
 

@@ -1,13 +1,5 @@
-//! Traits defining a finite field.
-//!
-//! A finite field is a field of finite order, i.e., number of elements. The order of a finite
-//! field is always a prime `p` or a prime power `p^k`.
-//!
-//! The order lives in [`KnownOrder`] rather than in [`FiniteField`], because a 254-bit prime
-//! field has no order that fits in a machine integer and nothing in the algebraic core — the
-//! polynomials, the linear algebra, F4, FGLM, Buchberger — ever asks for one. Only root finding,
-//! factorization and enumerating the field itself do. Requiring the order of every coefficient
-//! type would exclude the wide fields from algorithms that never use it.
+//! Field order is optional: [`KnownOrder`] supplies it to algorithms that need it, while
+//! [`FiniteField`] also admits wide fields whose order does not fit in a machine integer.
 
 use rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
@@ -163,17 +155,11 @@ where
 
     /// `self^b`. `0^0 = 1`.
     ///
-    /// Exponentiation by squaring, by delegation to [`Self::pow_limbs`] — the same algorithm as a
-    /// loop. The body was recursive until #181. The recursion cost about `2 log2(b)` non-inlined
-    /// frames, which is nothing against an expensive multiplication and half the call against a
-    /// cheap one: `PowerPermutation::invert` is **1.88x** at a 31-bit inverse exponent and
-    /// **1.96x** at a 64-bit one, and `Monomial::eval` is 1.09x to 1.46x over the two
-    /// single-limb fields. It is **1.10x slower** over BN254 `Fr`, for a reason that is code size
-    /// rather than arithmetic; `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2 has the table, the
-    /// mechanism and the two fixes that were measured and did not work.
-    /// `#[inline]` because the two-walk body is large enough that the compiler stopped
-    /// inlining it into `Monomial::eval`'s fold, which cost 1.16x there over BN254 `Fr`
-    /// with no change in the number of multiplications performed.
+    /// Exponentiation by squaring through [`Self::pow_limbs`].
+    ///
+    /// The inlining hint helps small-exponent callers, but does not guarantee inlining of both
+    /// walks. `Monomial::eval` uses fixed chains through degree five to avoid that dependency.
+    /// See `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2 for the measured alternatives.
     #[inline]
     fn pow(&self, b: u128) -> Self {
         self.pow_limbs(&[b as u64, (b >> 64) as u64])

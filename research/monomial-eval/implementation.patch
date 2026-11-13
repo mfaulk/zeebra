@@ -1,0 +1,136 @@
+diff --git a/src/fields/finite_field.rs b/src/fields/finite_field.rs
+index 776df060..07ba4a6f 100644
+--- a/src/fields/finite_field.rs
++++ b/src/fields/finite_field.rs
+@@ -1,13 +1,5 @@
+-//! Traits defining a finite field.
+-//!
+-//! A finite field is a field of finite order, i.e., number of elements. The order of a finite
+-//! field is always a prime `p` or a prime power `p^k`.
+-//!
+-//! The order lives in [`KnownOrder`] rather than in [`FiniteField`], because a 254-bit prime
+-//! field has no order that fits in a machine integer and nothing in the algebraic core — the
+-//! polynomials, the linear algebra, F4, FGLM, Buchberger — ever asks for one. Only root finding,
+-//! factorization and enumerating the field itself do. Requiring the order of every coefficient
+-//! type would exclude the wide fields from algorithms that never use it.
++//! Field order is optional: [`KnownOrder`] supplies it to algorithms that need it, while
++//! [`FiniteField`] also admits wide fields whose order does not fit in a machine integer.
+ 
+ use rand::{CryptoRng, RngCore};
+ use serde::{de::DeserializeOwned, Serialize};
+@@ -163,17 +155,11 @@ where
+ 
+     /// `self^b`. `0^0 = 1`.
+     ///
+-    /// Exponentiation by squaring, by delegation to [`Self::pow_limbs`] — the same algorithm as a
+-    /// loop. The body was recursive until #181. The recursion cost about `2 log2(b)` non-inlined
+-    /// frames, which is nothing against an expensive multiplication and half the call against a
+-    /// cheap one: `PowerPermutation::invert` is **1.88x** at a 31-bit inverse exponent and
+-    /// **1.96x** at a 64-bit one, and `Monomial::eval` is 1.09x to 1.46x over the two
+-    /// single-limb fields. It is **1.10x slower** over BN254 `Fr`, for a reason that is code size
+-    /// rather than arithmetic; `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2 has the table, the
+-    /// mechanism and the two fixes that were measured and did not work.
+-    /// `#[inline]` because the two-walk body is large enough that the compiler stopped
+-    /// inlining it into `Monomial::eval`'s fold, which cost 1.16x there over BN254 `Fr`
+-    /// with no change in the number of multiplications performed.
++    /// Exponentiation by squaring through [`Self::pow_limbs`].
++    ///
++    /// The inlining hint helps small-exponent callers, but does not guarantee inlining of both
++    /// walks. `Monomial::eval` uses fixed chains through degree five to avoid that dependency.
++    /// See `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2 for the measured alternatives.
+     #[inline]
+     fn pow(&self, b: u128) -> Self {
+         self.pow_limbs(&[b as u64, (b >> 64) as u64])
+diff --git a/src/poly/multivariate/monomial.rs b/src/poly/multivariate/monomial.rs
+index 068ad6be..43f9cb8e 100644
+--- a/src/poly/multivariate/monomial.rs
++++ b/src/poly/multivariate/monomial.rs
+@@ -1,5 +1,3 @@
+-//! A term (monomial) of a multivariate polynomial.
+-
+ use crate::FiniteField;
+ #[cfg(any(test, feature = "proptest"))]
+ use proptest::{
+@@ -59,10 +57,25 @@ impl<const N: usize> Monomial<N> {
+     /// Evaluate the monomial at the vector x.
+     pub fn eval<F: FiniteField>(&self, x: &[F]) -> F {
+         assert_eq!(x.len(), N);
+-        self.exponents
+-            .iter()
+-            .zip(x)
+-            .fold(F::one(), |acc, (e, x)| acc * x.pow(*e as u128))
++        self.exponents.iter().zip(x).fold(F::one(), |acc, (e, x)| {
++            // Fixed chains avoid pulling the general exponentiation walks into this loop.
++            let power = match e {
++                0 => F::one(),
++                1 => *x,
++                2 => *x * *x,
++                3 => (*x * *x) * *x,
++                4 => {
++                    let square = *x * *x;
++                    square * square
++                }
++                5 => {
++                    let square = *x * *x;
++                    (square * square) * *x
++                }
++                _ => x.pow(*e as u128),
++            };
++            acc * power
++        })
+     }
+ 
+     /// The least common multiple of two monomials.
+@@ -157,6 +170,52 @@ mod tests {
+         assert_eq!(Monomial::<3>::new(&[1, 4, 2]).degree(), 7)
+     }
+ 
++    /// Evaluation multiplies each variable's declared power over prime and extension fields.
++    #[test]
++    fn test_eval_small_exponents_across_fields() {
++        fn check<F: FiniteField>() {
++            use rand::{rngs::StdRng, SeedableRng};
++            let mut rng = StdRng::seed_from_u64(632);
++            for _ in 0..8 {
++                let random = std::array::from_fn(|_| F::random(&mut rng));
++                for point in [[F::zero(); 4], [F::one(); 4], random] {
++                    for exponent in 0..=8 {
++                        for position in 0..4 {
++                            let mut exponents = [3, 0, 5, 1];
++                            exponents[position] = exponent;
++                            let expected =
++                                point.iter().zip(exponents).fold(F::one(), |acc, (x, e)| {
++                                    acc * (0..e).fold(F::one(), |power, _| power * *x)
++                                });
++                            assert_eq!(Monomial::<4>::new(&exponents).eval(&point), expected);
++                        }
++                    }
++                }
++            }
++        }
++        check::<crate::fields::Mersenne31>();
++        check::<crate::fields::Zp18446744073709551557>();
++        check::<crate::fields::Bn254Fr>();
++        check::<crate::fields::Gf256>();
++        check::<crate::fields::Gf13Pow4>();
++    }
++
++    /// Zero-arity evaluation returns one and the full u32 exponent range remains supported.
++    #[test]
++    fn test_eval_empty_and_large_exponents() {
++        type F = crate::fields::Bn254Fr;
++        assert_eq!(Monomial::<0>::one().eval::<F>(&[]), F::one());
++        let point = [F::zero(), F::one() + F::one(), F::one()];
++        assert_eq!(
++            Monomial::<3>::new(&[0, u32::MAX, 5]).eval(&point),
++            point[1].pow(u32::MAX as u128)
++        );
++        assert_eq!(
++            Monomial::<3>::new(&[u32::MAX, 0, 0]).eval(&point),
++            F::zero()
++        );
++    }
++
+     #[test]
+     fn test_eval() {
+         type F = PrimeFieldElement64<7>;

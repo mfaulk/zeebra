@@ -1,0 +1,72 @@
+Gnuplot not found, using plotters backend
+Benchmarking power_permutation/p31_u32/invert/production/31
+Benchmarking power_permutation/p31_u32/invert/production/31: Warming up for 1.0000 s
+Benchmarking power_permutation/p31_u32/invert/production/31: Collecting 30 samples in estimated 1.0007 s (182k iterations)
+Benchmarking power_permutation/p31_u32/invert/production/31: Analyzing
+power_permutation/p31_u32/invert/production/31
+                        time:   [5.3463 µs 5.3930 µs 5.4526 µs]
+                        change: [+0.1325% +0.7927% +1.5534%] (p = 0.02 < 0.05)
+                        Change within noise threshold.
+Found 6 outliers among 30 measurements (20.00%)
+  2 (6.67%) high mild
+  4 (13.33%) high severe
+
+Benchmarking power_permutation/p64/invert/production/64
+Benchmarking power_permutation/p64/invert/production/64: Warming up for 1.0000 s
+Benchmarking power_permutation/p64/invert/production/64: Collecting 30 samples in estimated 1.0039 s (83k iterations)
+Benchmarking power_permutation/p64/invert/production/64: Analyzing
+power_permutation/p64/invert/production/64
+                        time:   [11.938 µs 11.941 µs 11.947 µs]
+                        change: [-4.2276% -2.5489% -1.0454%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 30 measurements (13.33%)
+  2 (6.67%) low mild
+  1 (3.33%) high mild
+  1 (3.33%) high severe
+
+Benchmarking small_exponent/p31_u32/eval/production/4
+Benchmarking small_exponent/p31_u32/eval/production/4: Warming up for 1.0000 s
+Benchmarking small_exponent/p31_u32/eval/production/4: Collecting 30 samples in estimated 1.0000 s (86M iterations)
+Benchmarking small_exponent/p31_u32/eval/production/4: Analyzing
+small_exponent/p31_u32/eval/production/4
+                        time:   [11.520 ns 11.567 ns 11.619 ns]
+                        change: [+0.9980% +1.6815% +2.3633%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+
+Benchmarking small_exponent/p64/eval/production/4
+Benchmarking small_exponent/p64/eval/production/4: Warming up for 1.0000 s
+Benchmarking small_exponent/p64/eval/production/4: Collecting 30 samples in estimated 1.0000 s (74M iterations)
+Benchmarking small_exponent/p64/eval/production/4: Analyzing
+small_exponent/p64/eval/production/4
+                        time:   [13.280 ns 13.407 ns 13.589 ns]
+                        change: [-0.7287% -0.2176% +0.4279%] (p = 0.54 > 0.05)
+                        No change in performance detected.
+Found 7 outliers among 30 measurements (23.33%)
+  2 (6.67%) low severe
+  1 (3.33%) low mild
+  2 (6.67%) high mild
+  2 (6.67%) high severe
+
+Benchmarking small_exponent/p254_bn254/eval/production/4
+Benchmarking small_exponent/p254_bn254/eval/production/4: Warming up for 1.0000 s
+Benchmarking small_exponent/p254_bn254/eval/production/4: Collecting 30 samples in estimated 1.0000 s (5.4M iterations)
+Benchmarking small_exponent/p254_bn254/eval/production/4: Analyzing
+small_exponent/p254_bn254/eval/production/4
+                        time:   [185.36 ns 186.40 ns 187.89 ns]
+                        change: [-1.0312% +0.1317% +1.1101%] (p = 0.83 > 0.05)
+                        No change in performance detected.
+Found 5 outliers among 30 measurements (16.67%)
+  1 (3.33%) low mild
+  4 (13.33%) high severe
+Benchmarking small_exponent/p254_bn254/substitute/production/64
+Benchmarking small_exponent/p254_bn254/substitute/production/64: Warming up for 1.0000 s
+Benchmarking small_exponent/p254_bn254/substitute/production/64: Collecting 30 samples in estimated 1.0020 s (221k iterations)
+Benchmarking small_exponent/p254_bn254/substitute/production/64: Analyzing
+small_exponent/p254_bn254/substitute/production/64
+                        time:   [4.4869 µs 4.4900 µs 4.4939 µs]
+                        change: [-0.5374% -0.2701% -0.0783%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 6 outliers among 30 measurements (20.00%)
+  2 (6.67%) low mild
+  4 (13.33%) high severe
+

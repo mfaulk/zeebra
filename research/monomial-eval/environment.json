@@ -1,0 +1,36 @@
+{
+  "base_commit": "467a20f8e92fd47f6c4d05da773b63dde4952329",
+  "implementation_patch_sha256": "aa1fb866854935173b42904db4d065b84bd8e871d643d7571f30c8ef846ac1a5",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+  "cargo_lock_sha256": "6b0fba412b786b5bb41ec1300a3082e30552a3b98b61bd57b56e11fb058bc406",
+  "cpu": "AMD Ryzen Threadripper PRO 5995WX",
+  "affinity": "0-7",
+  "target_cpu": "x86-64-v3",
+  "profile": {
+    "opt_level": 3,
+    "lto": "fat",
+    "codegen_units": 1,
+    "CARGO_INCREMENTAL": "1"
+  },
+  "benchmark_source": "unchanged benches/pow_strategy.rs at base commit",
+  "binaries": {
+    "before": "741ce2d0ee50b9b7ed1ab693e5ef1fd3d95d96dbf50dd9387d532d8705a99882",
+    "after": "a600b28983871a49fbe9beeec356ace086f23450b6bed491acaeb0f7b4fbf3cd",
+    "chains": "9ce2ab7ac4dc4fc301876499557409fe7824f288756b2ed0476eeed58dad2c14"
+  },
+  "inline_hint_binary_sha256": "10d34a1f5239d730569603aa7bb00ef210a4bd162055f5a67f949e8a1a6d8ceb",
+  "inline_hint_loop_sha256": "b67bd4b903ee0c24d8123df9effb2f97d0ab279b4b184b994f451693bfb85ac8",
+  "original_loop_sha256": "b67bd4b903ee0c24d8123df9effb2f97d0ab279b4b184b994f451693bfb85ac8",
+  "notes": [
+    "The hint-only production evaluation loop was byte-identical to baseline disassembly.",
+    "chains is exploratory: base plus the rejected eval inlining hint and prototype.patch. Its library evaluation code is unchanged from baseline.",
+    "Final before/after comparison uses identical original benchmark source. Source doc cleanup and cfg(test) additions do not change release arithmetic.",
+    "Unrelated builds continued; own supporting-binary compilation was pinned to CPUs16-23 during final measurements. Load averages are retained per pass; no idle-machine or end-to-end solver claim."
+  ],
+  "effective_rustflags": [
+    "-C",
+    "link-arg=-fuse-ld=mold",
+    "-C",
+    "target-cpu=x86-64-v3"
+  ]
+}
