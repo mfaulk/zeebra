@@ -1,8 +1,9 @@
 # Candidate-only production F4 backward reduction (#749)
 
 **Measured at:** Rust/build `a9f86ec00f8040618b26372073ba43ee5240f384`; controller `36f792a142efcaea6fee2252cf1800359972337d`.
-No library, Cargo or profiling-example content differs between the build and final publication
-commits; test/controller/report changes are pinned separately. Baseline: current-main
+The measurement controller has the same production-library, Cargo and profiling-example content
+as the build pin. Later publication changes only documentation/data and the `cfg(test)` resource
+regression; no production code or measured executable changes. Baseline: current-main
 `778e1dc94fbb963a9a1970dde526393ffbf5bdfe`, after #747/#746/#755 merged, with unchanged production
 full batch RREF. This report uses only its own matched cohort for numerical adoption claims.
 
@@ -158,6 +159,14 @@ positions, all 3×3 block suborders), all three weighted tie breaks, six fields 
 GF(2^8), 32-bit, 64-bit and BN254, every elimination backend and structured/unstructured reduction.
 Candidate outputs equal public full RREF; complete small bases equal independent Buchberger output.
 
+The explicit ignored `ci-release` live-budget regression initially exposed stale full-RREF peak
+and refusal expectations. Its correction preserves the exact 109-element basis and full coefficient
+SHA, verifies that the previous 20-million-entry cap now completes with the identical basis, and
+requires `TooManyNonzeros` with the exact limit and an over-limit demand at a genuinely binding
+cap below the current mathematical peak. The corrected test passes locally in `ci-release`;
+production code and measured binaries are unchanged. The test asserts the meaningful budget
+boundary rather than fixing a strategy-specific mathematical peak forever.
+
 No-selection, rank-deficiency/empty rows, reversed physical row order, tight-budget/fill-in fallback,
 whole-pass growth and overflow/total-workspace preflight are covered. Existing cancellation, budget,
 allocator-capacity and independent fixture regressions remain in the F4/library suite. Default and
@@ -184,7 +193,10 @@ It is not a general solver or field-width performance claim.
 
 Reproduce by building baseline `778e1dc9` and production `a9f86ec0`, using the controller at
 `36f792a1` and the [retained launch script](../../research/candidate-adoption/run-adoption.sh).
-Offline verification executes no solver:
+Run measurements from a clean checkout of controller `36f792a1`, whose production source matches
+the build pin. The later `cfg(test)` regression correction is intentionally outside the frozen
+build-tree comparison; it needs no solver remeasurement. Use the final publication checkout for
+offline verification, which executes no solver:
 
 ```sh
 python3 tools/test/selective-backward-study-test.py

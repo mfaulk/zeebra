@@ -38,6 +38,12 @@ five repeated ranges and sub-millisecond control uncertainty; RSS no more than 1
 explicit tradeoff is reviewed. Preserve every refusal, failure and environmental exclusion.
 No frontier or wide-field performance claim follows from this bounded campaign.
 
+For a fresh measurement, run the command below from a clean checkout of controller `36f792a1`
+(after building/copying the three frozen binary arms). The final publication includes a later
+`cfg(test)` budget-regression correction; use the frozen controller for the strict source-tree
+comparison, and the final checkout for offline `summary.py --check` validation. Use fresh output
+paths so the runner never overwrites retained evidence.
+
 ```sh
 ZEEBRA_MACHINE=5995wx ZEEBRA_AFFINITY=3 tools/benchlock.sh candidate-adoption \
   taskset -c 3 python3 tools/external/selective-backward-study.py \
@@ -54,3 +60,7 @@ diagnostics and stage-clock-disabled controls. The runner rejects
 research overrides presented as production, absent production metadata, mismatched complete bases,
 input/trajectory drift, binary changes, dirty sources and ambient compilation. The recorded Rust build pin is `a9f86ec0`; controller `36f792a1` records the exact binaries,
 input identities and complete accepted plans.
+
+The explicit release-CI resource regression retains its exact 109-element basis/hash, now admits
+the formerly binding 20-million-entry cap, and verifies refusal at a genuinely binding smaller cap.
+That is a deterministic regression check, not a new timing or wide-field frontier claim.
