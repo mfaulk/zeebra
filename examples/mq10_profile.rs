@@ -60,7 +60,7 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
     ])
 }
 
-fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool) {
+fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool, discovery: bool) {
     let order = MonomialOrder::GradedReverseLexicographic;
     let input = corpus::instance("mq-random-10", modulus, order).expect("published MQ10");
     let entry = corpus::ladder()
@@ -82,13 +82,18 @@ fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool) {
     let solve = || f4_with_options(&system, order, &options).expect("MQ10 fits the shipped budget");
     #[cfg(feature = "research-work")]
     let ((basis, stats), work) = if measure_work {
-        let (result, report) = zeebra::linalg::work::measure(solve);
+        let (result, report) = if discovery {
+            zeebra::linalg::work::measure_discovery(solve)
+        } else {
+            zeebra::linalg::work::measure(solve)
+        };
         (result, Some(report))
     } else {
         (solve(), None)
     };
     #[cfg(not(feature = "research-work"))]
     let (basis, stats) = {
+        assert!(!discovery, "--discovery requires --features research-work");
         assert!(!measure_work, "--work requires --features research-work");
         solve()
     };
@@ -132,12 +137,14 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages] [--work]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery]")
         .parse()
         .unwrap();
     assert!(
         args.len() <= 3
-            && args[1..].iter().all(|s| s == "--stages" || s == "--work")
+            && args[1..]
+                .iter()
+                .all(|s| s == "--stages" || s == "--work" || s == "--discovery")
             && args[1..]
                 .iter()
                 .collect::<std::collections::HashSet<_>>()
@@ -146,10 +153,15 @@ fn main() {
         "unexpected argument"
     );
     let measured = args.iter().any(|s| s == "--stages");
-    let measure_work = args.iter().any(|s| s == "--work");
+    let discovery = args.iter().any(|s| s == "--discovery");
+    assert!(
+        !(discovery && args.iter().any(|s| s == "--work")),
+        "choose --work or --discovery"
+    );
+    let measure_work = discovery || args.iter().any(|s| s == "--work");
     match modulus {
-        32003 => run::<Zp32003>(modulus, measured, measure_work),
-        2147483647 => run::<Zp2147483647>(modulus, measured, measure_work),
+        32003 => run::<Zp32003>(modulus, measured, measure_work, discovery),
+        2147483647 => run::<Zp2147483647>(modulus, measured, measure_work, discovery),
         _ => panic!("supported moduli: 32003, 2147483647"),
     }
 }

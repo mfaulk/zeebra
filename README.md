@@ -155,6 +155,11 @@ instrumented examples — along with the measurement rules this repository follo
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.
 
+The [concurrent-pivot feasibility study](research/concurrent-pivots/README.md) measures
+serial F4 candidate-row work and dependencies with
+`cargo run --release --features research-work --example mq10_profile -- 32003 --stages --discovery`.
+The observer is disabled in ordinary builds; its row clocks describe the measured serial trajectory.
+
 The pinned F4 matrix corpus has a separate opt-in large set. Run
 `cargo run --release --example f4_matrix_corpus -- check-large` to capture and verify it;
 `check-all` verifies both sets; `list-large` shows the large dimensions and explicit live-entry budgets without computing a basis.

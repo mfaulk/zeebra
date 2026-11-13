@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Measure serial residual discovery using the existing guarded MQ10/full-answer harness."""
+import argparse
+from collections import Counter
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import statistics
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def sibling(name):
+    spec = importlib.util.spec_from_file_location(name.replace('-', '_'), Path(__file__).with_name(name + '.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def census(rows):
+    if any(not row['completed'] for row in rows):
+        raise ValueError('incomplete discovery row')
+    costs = [row['elapsed_ns'] for row in rows]
+    claims = Counter(row['first_claim_column'] for row in rows if row['first_claim_column'] is not None)
+    finish = {}
+    for row in rows:
+        # This is a DAG of the serial control trajectory, not a bound on a different pivot schedule.
+        finish[row['row']] = row['elapsed_ns'] + max((finish[dep] for dep in row['dependencies']), default=0)
+    return dict(rows=len(rows), new_rank=sum(row['pivot_column'] is not None for row in rows),
+                zero_rows=sum(row['pivot_column'] is None for row in rows),
+                inherited_products=sum(row['inherited_products'] for row in rows),
+                discovered_products=sum(row['discovered_products'] for row in rows),
+                dependent_rows=sum(bool(row['dependencies']) for row in rows),
+                dependency_edges=sum(len(row['dependencies']) for row in rows),
+                duplicate_first_claims=sum(count - 1 for count in claims.values()),
+                largest_first_claim_group=max(claims.values(), default=0),
+                row_sum_ns=sum(costs), row_max_ns=max(costs, default=0),
+                row_median_ns=statistics.median(costs) if costs else 0,
+                serial_trajectory_dag_ns=max(finish.values(), default=0))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('stock', 'observed', 'scratch', 'output'):
+        parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--repeats', type=int, default=5)
+    parser.add_argument('--max-load', type=float, default=4)
+    args = parser.parse_args()
+    affinity = ','.join(map(str, sorted(os.sched_getaffinity(0))))
+    if not os.environ.get('ZEEBRA_MACHINE') or os.environ.get('ZEEBRA_AFFINITY') != affinity:
+        parser.error('declare ZEEBRA_MACHINE and exact inherited ZEEBRA_AFFINITY under benchlock')
+    if args.repeats < 1:
+        parser.error('repetitions must be positive')
+    if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
+        parser.error('commit instruments before measuring')
+    study = sibling('grobx-work-study')
+    refs = study.references(ROOT / 'research/competitive/results/grobx-683.json.gz')
+    binaries = {name: getattr(args, name).resolve() for name in ('stock', 'observed')}
+    cohort = dict(schema=1, issue=728,
+                  commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+                  rustc=subprocess.check_output(['rustc', '-vV'], text=True),
+                  lock_sha256=hashlib.sha256((ROOT / 'Cargo.lock').read_bytes()).hexdigest(),
+                  config=(ROOT / '.cargo/config.toml').read_text(),
+                  machine=os.environ['ZEEBRA_MACHINE'], affinity=affinity, workers=1,
+                  topology=subprocess.check_output(['lscpu', '-e=CPU,CORE,SOCKET,NODE,ONLINE'], text=True),
+                  build='release; fat LTO; one codegen unit; x86-64-v3; empty RUSTC_WRAPPER',
+                  binaries={key: dict(path=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+                            for key, path in binaries.items()},
+                  limits=dict(wall_seconds=60, rss_bytes=2 * 1024**3, max_load=args.max_load), attempts=[])
+    args.scratch.mkdir(parents=True, exist_ok=True)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    paths = {}
+    for repeat in range(args.repeats):
+        for modulus in study.MODULI:
+            arms = ('stock', 'off', 'work', 'discovery')
+            for arm in arms if repeat % 2 == 0 else reversed(arms):
+                load = os.getloadavg()[0]
+                if load > args.max_load:
+                    cohort['refusal'] = dict(reason='load', load=load, next=[repeat, modulus, arm])
+                    study.write(args.output, cohort)
+                    raise RuntimeError('load gate refused; partial cohort retained')
+                binary = binaries['stock' if arm == 'stock' else 'observed']
+                command = [str(binary), str(modulus), '--stages']
+                if arm in ('work', 'discovery'):
+                    command += ['--' + arm]
+                result = study.guarded(command, args.scratch / str(len(cohort['attempts'])), 60, 2 * 1024**3)
+                result.update(repeat=repeat, modulus=modulus, arm=arm, load_before=load,
+                              load_after=os.getloadavg()[0], status='failed')
+                try:
+                    if result['exit'] != 0 or result['stop'] is not None:
+                        raise ValueError('child failed or exceeded budget')
+                    report = json.loads(result['stdout'])
+                    sibling('mq10-profile').check_answer(report, refs[modulus])
+                    result['report'] = report
+                    result['peak_rss_bytes'] = max(result['observed_peak_rss_bytes'], report['peak_rss_bytes'] or 0)
+                    if not 0 < result['peak_rss_bytes'] <= 2 * 1024**3:
+                        raise ValueError('missing or over-budget peak RSS')
+                    path = {key: value for key, value in report['statistics'].items()
+                            if not key.endswith('_ns') and key != 'full_statistics'}
+                    if paths.setdefault(modulus, path) != path:
+                        raise ValueError('instrumentation changed F4 trajectory')
+                    if arm in ('work', 'discovery'):
+                        batches = report['work']['batches']
+                        if not batches or any(not batch['completed'] for batch in batches):
+                            raise ValueError('missing or incomplete matrix work')
+                        if arm == 'discovery':
+                            result['census'] = [census(batch['discovery']) for batch in batches]
+                            for batch, summary in zip(batches, result['census']):
+                                if summary['rows'] != batch['rows'] - batch['reducer_rows']:
+                                    raise ValueError('missing candidate rows')
+                                if summary['inherited_products'] + summary['discovered_products'] != batch['forward']['coefficient_products']:
+                                    raise ValueError('row and batch products disagree')
+                    elif report['work'] is not None:
+                        raise ValueError('disabled counters unexpectedly present')
+                    result.update(status='verified', verification='full-basis-match-to-independent-Singular-reference')
+                except (ValueError, KeyError, TypeError) as error:
+                    result['failure'] = str(error)
+                cohort['attempts'].append(result)
+                study.write(args.output, cohort)
+                print(repeat, modulus, arm, result['status'], flush=True)
+                if result['status'] != 'verified':
+                    raise RuntimeError('failed attempt retained: ' + result.get('failure', 'unknown'))
+
+
+if __name__ == '__main__':
+    main()
