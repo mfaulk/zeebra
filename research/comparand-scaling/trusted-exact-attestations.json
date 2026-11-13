@@ -1,0 +1,561 @@
+{
+  "schema": 1,
+  "kind": "independent trusted deterministic-engine agreement; not witness/cofactor certification",
+  "original_statuses_unchanged": true,
+  "inputs": [
+    {
+      "digest": "f2670d770ef9a866db0a407dbd1f05827563a9af3bc4485d51a99bb3eef307b6",
+      "field": "wide64",
+      "name": "katsura-4",
+      "reference": {
+        "cohort": "julia-wide.json.gz",
+        "engine": "groebner.jl",
+        "workers": 1,
+        "repeat": 0,
+        "script_sha256": "6c129f2e8ca18ddccd432384ecf3d9f815c1ca7641b441bbf07c24e6975e9596"
+      },
+      "checked": [
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "90e69d2eff6860a92593b587357824ee0a18d4f590496267e4e3641d4b4f96f6"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 0,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 0,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 0,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 0,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 0,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 1,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 1,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 1,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 1,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 1,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 1,
+          "basis_text_sha256": "90e69d2eff6860a92593b587357824ee0a18d4f590496267e4e3641d4b4f96f6"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 1,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 2,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 2,
+          "basis_text_sha256": "90e69d2eff6860a92593b587357824ee0a18d4f590496267e4e3641d4b4f96f6"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 2,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 2,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 2,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 2,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 2,
+          "basis_text_sha256": "6ad5c09172e1a70837eb030c076565bd171ee01428627eae57cc939a142f3151"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "985ba8dbb47204c4d247c53856be05c0609f47fb45c0ad88dba8799fb57c2623"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 8,
+          "repeat": 0,
+          "basis_text_sha256": "985ba8dbb47204c4d247c53856be05c0609f47fb45c0ad88dba8799fb57c2623"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 16,
+          "repeat": 0,
+          "basis_text_sha256": "985ba8dbb47204c4d247c53856be05c0609f47fb45c0ad88dba8799fb57c2623"
+        }
+      ]
+    },
+    {
+      "digest": "1da97cb3fe0eff34f224caaa8f029579d5f7252d910b78a3d5021baec41386bc",
+      "field": "wide64",
+      "name": "cyclic-7",
+      "reference": {
+        "cohort": "julia-wide.json.gz",
+        "engine": "groebner.jl",
+        "workers": 1,
+        "repeat": 0,
+        "script_sha256": "3eacb5b9d843d901f5b19cc3a28278d6e7025cf77efbf9ea992892a329dcbb7f"
+      },
+      "checked": [
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "10ad78f9d8bf9edd30b5bdb40dbdf525a9ced993690b4742b14a2a865afb9aac"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 0,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 0,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 0,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 0,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 0,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 1,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 1,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 1,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 1,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 1,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 1,
+          "basis_text_sha256": "10ad78f9d8bf9edd30b5bdb40dbdf525a9ced993690b4742b14a2a865afb9aac"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 1,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 2,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 2,
+          "basis_text_sha256": "10ad78f9d8bf9edd30b5bdb40dbdf525a9ced993690b4742b14a2a865afb9aac"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 2,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 2,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 2,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 2,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 2,
+          "basis_text_sha256": "e21e0150879a185485ac98ca8489cbe51e61181ec7dd33e2ddecc2b4511689be"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "1da61bc218510f9e1628dab5ae8815913a31e8eaa923d632b871e0ce57c3625a"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 8,
+          "repeat": 0,
+          "basis_text_sha256": "1da61bc218510f9e1628dab5ae8815913a31e8eaa923d632b871e0ce57c3625a"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 16,
+          "repeat": 0,
+          "basis_text_sha256": "1da61bc218510f9e1628dab5ae8815913a31e8eaa923d632b871e0ce57c3625a"
+        }
+      ]
+    },
+    {
+      "digest": "f6ea856abd1e8bf5e7ef04f0bae0426b8b69c12dc7e485a1ba7873eaa92a9e3a",
+      "field": "wide64",
+      "name": "mq-random-10",
+      "reference": {
+        "cohort": "julia-wide.json.gz",
+        "engine": "groebner.jl",
+        "workers": 1,
+        "repeat": 0,
+        "script_sha256": "ca05e89e229a4886a1cf2e6d2f765621d42deb6f870ab51b8cb1052d57be0c19"
+      },
+      "checked": [
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "26ee2b62aac40722535f0b95711fc27ff2372d5e82a165b7f0052bf1429e1d3b"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 0,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 0,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 0,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 0,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 0,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 1,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 1,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 1,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 1,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 1,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 1,
+          "basis_text_sha256": "26ee2b62aac40722535f0b95711fc27ff2372d5e82a165b7f0052bf1429e1d3b"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 1,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 1,
+          "repeat": 2,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "grobx",
+          "workers": 1,
+          "repeat": 2,
+          "basis_text_sha256": "26ee2b62aac40722535f0b95711fc27ff2372d5e82a165b7f0052bf1429e1d3b"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 2,
+          "repeat": 2,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 4,
+          "repeat": 2,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 8,
+          "repeat": 2,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 16,
+          "repeat": 2,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "native-resume-v1.json.gz",
+          "engine": "groebner-rs",
+          "workers": 32,
+          "repeat": 2,
+          "basis_text_sha256": "5a7e0729032f88674dcf193bdf85e218dab798521cc7119c140440cce7f1063e"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 1,
+          "repeat": 0,
+          "basis_text_sha256": "4f39599fbc88add4d6668cf602aa110ede38f24cd9cdc6adf1ab25ffd15d8d79"
+        },
+        {
+          "cohort": "julia-wide.json.gz",
+          "engine": "groebner.jl",
+          "workers": 8,
+          "repeat": 0,
+          "basis_text_sha256": "4f39599fbc88add4d6668cf602aa110ede38f24cd9cdc6adf1ab25ffd15d8d79"
+        }
+      ]
+    }
+  ],
+  "trusted_mode_audit": {
+    "package": "Groebner.jl 0.10.11",
+    "mode": "explicit linalg=:deterministic, finite-prime-field F4, reduced=true default; certify=false (no separate f4_isgroebner check requested)",
+    "source_files": {
+      "src/groebner/groebner.jl": "ed7d3c64983d6330b79298080e8f6703071d5713b1676e0d8eaf68e833984f6c",
+      "src/groebner/parameters.jl": "a7ce6de0f9015385c55d9f9e46377247f1b7b4342a245f01de7b047eb947d524",
+      "src/f4/f4.jl": "5644640e0b2c61039fe3fbe1823cf9187f298ab9d327557c138a1fe5b81f5b37",
+      "src/f4/linalg/linalg.jl": "7b4d4362e8c196dd3794311e437f95edd5591d9c194176aa8ff469024dd76d99",
+      "src/f4/linalg/backend.jl": "2767c90f94c022b08580763d2284f80d89f96624e881ce1c886e3f86af6206d4",
+      "src/f4/linalg/backend_threaded.jl": "9ecd129a088372c2f632b281c14b664ffe43f87a33bd39e1e6b4d14f18044936",
+      "src/utils/keywords.jl": "75705604896e255325ec615901ebc9eca191cd42643a9698072c25f3a2d295f0",
+      "Project.toml": "a9a261591bd99870cd33bdce30fd3e28fee310e300585c285e7078223c9e0311"
+    },
+    "statement": "Finite-field F4 reaches the explicit deterministic backend; threaded lower-row chunks cover every lower row. This is a trusted exact-engine oracle like Singular std, not an independently replayed ideal-membership witness."
+  }
+}

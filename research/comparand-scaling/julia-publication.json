@@ -1,0 +1,26 @@
+{
+  "julia-ordinary.json.gz": {
+    "original_header_sha256": "5926a8478e2069777421530f963a41a1c085451df5bb27b4711a807692516773",
+    "publication_manifest_sha256": "9c7c948464f3dfc3d2b96a416195c2ee0b5bc8724dab32aa270af92508b11d8c",
+    "rows": 108,
+    "controller": "55f513492f565f59aadd4d9b30b5f5a8b2039929"
+  },
+  "julia-rust-diagnostic.json.gz": {
+    "original_header_sha256": "95eef48634003a66c45132c86039a5c73da86a9b04fd173509b3389a8f2250cf",
+    "publication_manifest_sha256": "557722ad19be572d96d3f79d20923aaf72c1b1a8cb1306b8383ee67d3ff3ff41",
+    "rows": 1,
+    "controller": "55f513492f565f59aadd4d9b30b5f5a8b2039929"
+  },
+  "julia-julia-diagnostic.json.gz": {
+    "original_header_sha256": "a177fd22d103d375039309825f2a061dd5ccd06abc30eeddb18af59b83a89b05",
+    "publication_manifest_sha256": "08be44c31ece1642d69eb7ce3304286e57c14e0b9d923f9f6d694684232d7c06",
+    "rows": 3,
+    "controller": "55f513492f565f59aadd4d9b30b5f5a8b2039929"
+  },
+  "julia-wide.json.gz": {
+    "original_header_sha256": "48aabbee524de5c2aee745d89b3189d77501d5873bc95a86451f4e8c0882f720",
+    "publication_manifest_sha256": "176793ce9b0b6402ca5daa8123a651b48b92d1470ad056a04f41e5fe5fa3f44a",
+    "rows": 8,
+    "controller": "55f513492f565f59aadd4d9b30b5f5a8b2039929"
+  }
+}

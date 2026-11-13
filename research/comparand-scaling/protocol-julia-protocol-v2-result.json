@@ -1,0 +1,50 @@
+{
+  "command": [
+    "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "--startup-file=no",
+    "--history-file=no",
+    "-t1",
+    "--heap-size-hint=2147483648",
+    "/buildcache/cargo-target/zeebra-m28-739/julia-protocol-v2/control.jl"
+  ],
+  "cpus": [
+    0
+  ],
+  "process_wall_ns": 6736156870,
+  "process_cpu_ns": 6678953000,
+  "observed_tree_peak_bytes": 744931328,
+  "stop": null,
+  "exit": 0,
+  "interrupt_exit": null,
+  "output_bytes": 2610,
+  "stdout": "@version 0.10.11 Julia 1.11.7\n@gen x1^2 + 2*x2^2 + 2*x3^2 + 2*x4^2 + 32002*x1\n@gen 2*x1*x2 + 2*x2*x3 + 2*x3*x4 + 32002*x2\n@gen x2^2 + 2*x1*x3 + 2*x2*x4 + 32002*x3\n@gen x1 + 2*x2 + 2*x3 + 2*x4 + 32002\n@hot_begin 1928946:653,1928948:0,1928949:0\n@hot_end 1928946:659,1928948:0,1928949:0\n@compile_ns 0\n@recompile_ns 0\n@gc_ns 0\n@solve_ns 186032\n@workers 1\n@gb x1 + 2*x2 + 2*x3 + 2*x4 + 32002\n@gb x3^2 + 2*x2*x4 + 18292*x3*x4 + 27435*x4^2 + 27431*x2 + 13715*x3 + 22858*x4\n@gb x2*x3 + 32001*x2*x4 + 22856*x3*x4 + 18284*x4^2 + 2286*x2 + 9144*x3 + 4573*x4\n@gb x2^2 + 2*x2*x4 + 4573*x3*x4 + 22861*x4^2 + 22859*x2 + 27431*x3 + 13715*x4\n@gb x3*x4^2 + 3557*x4^3 + 30225*x2*x4 + 28842*x3*x4 + 5926*x4^2 + 21928*x2 + 25879*x3 + 11853*x4\n@gb x2*x4^2 + 21335*x4^3 + 28447*x2*x4 + 21928*x3*x4 + 3556*x4^2 + 31114*x2 + 20150*x3\n@gb x4^4 + 12535*x4^3 + 7471*x2*x4 + 6188*x3*x4 + 10117*x4^2 + 10521*x2 + 11393*x3 + 11829*x4\n@done 1\n",
+  "stderr": "",
+  "status": "complete",
+  "basis": [
+    "x1 + 2*x2 + 2*x3 + 2*x4 + 32002",
+    "x3^2 + 2*x2*x4 + 18292*x3*x4 + 27435*x4^2 + 27431*x2 + 13715*x3 + 22858*x4",
+    "x2*x3 + 32001*x2*x4 + 22856*x3*x4 + 18284*x4^2 + 2286*x2 + 9144*x3 + 4573*x4",
+    "x2^2 + 2*x2*x4 + 4573*x3*x4 + 22861*x4^2 + 22859*x2 + 27431*x3 + 13715*x4",
+    "x3*x4^2 + 3557*x4^3 + 30225*x2*x4 + 28842*x3*x4 + 5926*x4^2 + 21928*x2 + 25879*x3 + 11853*x4",
+    "x2*x4^2 + 21335*x4^3 + 28447*x2*x4 + 21928*x3*x4 + 3556*x4^2 + 31114*x2 + 20150*x3",
+    "x4^4 + 12535*x4^3 + 7471*x2*x4 + 6188*x3*x4 + 10117*x4^2 + 10521*x2 + 11393*x3 + 11829*x4"
+  ],
+  "engine_wall_ns": 186032,
+  "full_case_warmup": true,
+  "hot_boundary": "full-case-prewarmed diagnostic; two full solves in process",
+  "julia_telemetry": {
+    "compile": 0,
+    "recompile": 0,
+    "gc": 0
+  },
+  "hot_activity": {
+    "active_threads": 1,
+    "ticks": {
+      "1928946": 6
+    },
+    "interpretation": "observed lower bound; exited threads and sub-tick work are not counted",
+    "resolution_hz": 100
+  },
+  "concurrency_boundary": "hot groebner call; user+system CPU ticks per OS thread; may include JIT and GC; participant count does not prove simultaneous use",
+  "classification": "protocol validation only; excluded from performance cohorts"
+}

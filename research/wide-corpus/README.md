@@ -155,7 +155,9 @@ use full compression. Complete basis responses can exceed GitHub's single-file l
 with a manifest and writes content-addressed payload chunks under `campaign-payloads/`, each at
 most 16 MiB before compression. `load()` in the campaign tool checks every chunk's SHA-256 and
 length, reconstructs the original attempts, and verifies a lossless round trip. Native report copies
-share the raw response's basis and are restored from it; the raw JSON values are preserved exactly.
+share the raw response's basis and are restored from it; the raw JSON values are preserved exactly. Scaling-study flat basis copies and parsed native
+JSON are likewise restored from the exact stdout response. Existing `proof_artifacts.py` stores
+repeated native basis literals once by content hash across attempts; its SHA-256 is checked on replay.
 The summary command
 accepts both unpacked campaigns and this manifest. Raw native responses and full bases remain
 available; no coefficients are discarded. Commit the manifest and its payload directory together.

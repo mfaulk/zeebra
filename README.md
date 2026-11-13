@@ -379,6 +379,14 @@ pivot prototype and in-flight selective-reduction and corpus studies; experiment
 separate from shipping defaults. Minimum closure requires evidence and explicit decisions;
 stronger tiers require independently verified complete-task achievements.
 
+The [comparand scaling study](research/comparand-scaling/README.md) retains bounded fixed-core
+worker cohorts and distinguishes measured CPU activity from requested pool capacity. Export a
+published input without solving it with `cargo run --release --example competitive_sweep --
+--export-input --row mq-random-10 --characteristic 32003`. Research curves remain separate from
+production parallel support; ordinary Zeebra F4 is still serial.
+Pass `--retain-artifacts` to `competitive_sweep` when native Singular scripts and full outputs
+must survive successful runs; ordinary sweeps clean their private scratch as before.
+
 A pinned [grobx subprocess comparand](tools/external/grobx-driver/README.md) checks full reduced
 bases against Singular, or an exact independent cofactor checker at wide primes. Provision it with
 `tools/external/provision-grobx.sh`; raw computation and exact-certified computation have separate

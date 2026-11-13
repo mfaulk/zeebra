@@ -19,6 +19,33 @@ fn kernel_peak_rss() -> Option<u64> {
             })
         })
 }
+
+fn thread_ticks() -> Value {
+    let mut ticks = serde_json::Map::new();
+    if let Ok(tasks) = std::fs::read_dir("/proc/self/task") {
+        for task in tasks.flatten() {
+            let Ok(text) = std::fs::read_to_string(task.path().join("stat")) else {
+                continue;
+            };
+            let Some((_, fields)) = text.rsplit_once(") ") else {
+                continue;
+            };
+            let fields: Vec<_> = fields.split_whitespace().collect();
+            let (Some(user), Some(system)) = (fields.get(11), fields.get(12)) else {
+                continue;
+            };
+            let (Ok(user), Ok(system)) = (user.parse::<u64>(), system.parse::<u64>()) else {
+                continue;
+            };
+            ticks.insert(
+                task.file_name().to_string_lossy().into_owned(),
+                json!(user + system),
+            );
+        }
+    }
+    Value::Object(ticks)
+}
+
 fn solve(input: &Value) -> Result<Value, String> {
     use groebner::{MonomialOrder, PolynomialRing, Zp, groebner_basis_f4};
     let start = std::time::Instant::now();
@@ -67,6 +94,8 @@ fn solve(input: &Value) -> Result<Value, String> {
         .build()
         .map_err(|e| e.to_string())?;
     let parse_ns = start.elapsed().as_nanos() as u64;
+    let observe = std::env::var_os("ZEEBRA_RESEARCH_THREAD_TICKS").is_some();
+    let before = observe.then(thread_ticks);
     let start = std::time::Instant::now();
     let (basis, actual_workers) = pool.install(|| {
         (
@@ -76,6 +105,7 @@ fn solve(input: &Value) -> Result<Value, String> {
     });
     let basis = basis.map_err(|e| e.to_string())?;
     let solve_ns = start.elapsed().as_nanos() as u64;
+    let after = observe.then(thread_ticks);
     let start = std::time::Instant::now();
     let rendered = basis
         .iter()
@@ -105,6 +135,9 @@ fn solve(input: &Value) -> Result<Value, String> {
     std::hint::black_box(serde_json::to_vec(&result).map_err(|e| e.to_string())?);
     result["serialization_ns"] = json!(start.elapsed().as_nanos() as u64);
     result["kernel_peak_rss_bytes"] = json!(kernel_peak_rss());
+    if observe {
+        result["hot_thread_cpu_ticks"] = json!({"before":before,"after":after});
+    }
     Ok(result)
 }
 fn main() -> Result<(), String> {
@@ -129,6 +162,15 @@ fn main() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Linux diagnostic snapshots contain numeric CPU ticks for at least the calling OS thread.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn hot_snapshot_contains_os_cpu_ticks() {
+        let snapshot = thread_ticks();
+        let snapshot = snapshot.as_object().unwrap();
+        assert!(!snapshot.is_empty());
+        assert!(snapshot.values().all(|ticks| ticks.as_u64().is_some()));
+    }
     // The engine preserves ordered variable names and full unsigned 64-bit residues.
     #[test]
     fn echoes_the_engine_ring_at_wide_moduli() {

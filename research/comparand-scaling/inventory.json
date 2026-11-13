@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "cohorts": {
+    "native-resume-v1.json.gz": "3e058b702fb647f2dd928e982e9ab29aeb7d857a089864df19aaa54ca839adca",
+    "julia-ordinary.json.gz": "9c7c948464f3dfc3d2b96a416195c2ee0b5bc8724dab32aa270af92508b11d8c",
+    "julia-rust-diagnostic.json.gz": "557722ad19be572d96d3f79d20923aaf72c1b1a8cb1306b8383ee67d3ff3ff41",
+    "julia-julia-diagnostic.json.gz": "08be44c31ece1642d69eb7ce3304286e57c14e0b9d923f9f6d694684232d7c06",
+    "julia-wide.json.gz": "176793ce9b0b6402ca5daa8123a651b48b92d1470ad056a04f41e5fe5fa3f44a"
+  },
+  "artifacts": {
+    "references-v1.json.gz": "6f4e5ac452ea56a899eb3008b55adaad7db6d35551943ecab956809b313863ff",
+    "singular-reference31-v1.json.gz": "d52ca65cbdc2a088e42da3faeb58305cbfa614dc2e6740de09fd2b6d13c133c1",
+    "singular-references-v1.json.gz": "e5511fed0fed969d20caa7afc98c5465fba171dbd4fb3fb7478335b5d0e8040d",
+    "native-v1.json.gz": "974bd1640e8c8878d2db2bac37b9422daba16f7fac8572176d74fc290926ab39",
+    "benchlock.log": "7584582c56defcb99daf376155c589b0d5ed97ffc4eb663f6e7638633e4e4363",
+    "host-provenance.json": "bd1f6c40e58d26c317c773dba6294523b73c078bb2db7b47b0071a23f8988c31",
+    "protocol-zeebra-m28-739-protocol-retention-smoke-v3.json": "d1ce72a77c5082c198a2b3ecf3a66afe48de579799d2089e0e7d7fde37d3efeb",
+    "protocol-julia-protocol-v2-result.json": "44b784ce47eeb32bb22eb8acaba7b60c16c3dfecdd787bf15ffd1b21848ff27f",
+    "native-publication.json": "78eb01c62e8fc02e8c25d9c6c09c179ba63fcef7ae366a33de790d0c49e43fd1",
+    "julia-publication.json": "1d693e18bdb578534b9d306cfc1104bb38b7c64a222b0f511880bbd0606b3ce9",
+    "julia-input-scripts.json.gz": "5b987fdef708decb225776158b86a2cbaca28e3bd971fd71899adae9e89ad0e6",
+    "julia-stage-exits.txt": "f2bf58de8c380bc10cd7e3e601abf5ced0ff38823d615e90a1c810e7af912c7f",
+    "offline-validation-pause.json": "b477203f42447c72a17ea57d045f091bbc1558a4ce5ccc19ab87003b99f10403",
+    "rust-postprocessing-interruption.json.gz": "22248d64bd616970443e2fd2a96e3a54f5a2230bfcd1c4b577df7ee253611326",
+    "trusted-exact-attestations.json": "6077abf7f720e61837b3e56775780b4b21c28ab580ed7ffc565fc385b5051ddf"
+  },
+  "continuations": [
+    {
+      "prefix": "native-v1.json.gz",
+      "completed": "native-resume-v1.json.gz",
+      "prefix_rows": 222
+    }
+  ],
+  "qualification": "Published packing is lossless; original archive identities are retained in native-publication.json and julia-publication.json. Prefix is not counted twice."
+}

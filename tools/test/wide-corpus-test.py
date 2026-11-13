@@ -86,6 +86,46 @@ class WideCorpusTests(unittest.TestCase):
                 self.assertLess(stored, len(json.dumps(attempt)) - len(basis)//2)
                 self.assertEqual(wide.load(path), cohort)
 
+    # Scaling copies restore exactly while identical raw basis literals share one content-addressed payload.
+    def test_flat_native_basis_and_raw_stdout_share_payload(self):
+        basis=['x1+'+'+'.join(str(i)+'*x2' for i in range(1,1000))]
+        raw=dict(basis=basis,solve_ns=123)
+        attempt=dict(field='13',name='control',engine='groebner-rs',basis=basis,raw=raw,
+                     stdout=json.dumps(raw,separators=(',',':'))+'\n')
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'campaign.json.gz'
+            cohort=dict(attempts=[attempt,dict(attempt,workers=2)])
+            wide.pack(cohort,path,chunk_size=1024)
+            self.assertEqual(wide.load(path),cohort)
+            self.assertEqual(len(list((Path(directory)/'campaign-proofs').glob('*.gz'))),1)
+            manifest=json.loads(gzip.decompress(path.read_bytes()))
+            stored=sum(p['bytes'] for a in manifest['attempt_payloads'] for p in a['parts'])
+            self.assertLess(stored,len(json.dumps(attempt)))
+            payload=next((Path(directory)/'campaign-proofs').glob('*.gz'))
+            payload.write_bytes(gzip.compress(b'changed'))
+            with self.assertRaises(ValueError):wide.load(path)
+
+    # Native refusals without a basis retain their raw output without proof-payload assumptions.
+    def test_native_refusal_without_basis_roundtrips(self):
+        raw=dict(basis=None,stopped='wall')
+        attempt=dict(field='13',name='control',engine='grobx',raw=raw,stdout=json.dumps(raw))
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'campaign.json.gz';cohort=dict(attempts=[attempt])
+            wide.pack(cohort,path)
+            self.assertEqual(wide.load(path),cohort)
+
+    # Repeated textual native and Julia bases share payloads while exact original text is restored.
+    def test_text_basis_payloads_share_without_losing_original_output(self):
+        polynomial='x1+'+'+'.join(str(i)+'*x2' for i in range(1,1000))
+        for engine,extra in [('msolve',dict(basis_output='#header\n['+polynomial+']:\n')),
+                             ('groebner.jl',dict(stdout='@solve_ns 5\n@gb '+polynomial+'\n@done 1\n'))]:
+            with self.subTest(engine=engine),tempfile.TemporaryDirectory() as directory:
+                a=dict(field='13',name='control',engine=engine,basis=[polynomial],**extra)
+                cohort=dict(attempts=[a,dict(a,workers=8)])
+                path=Path(directory)/'campaign.json.gz';wide.pack(cohort,path,chunk_size=1024)
+                self.assertEqual(wide.load(path),cohort)
+                self.assertEqual(len(list((Path(directory)/'campaign-proofs').glob('*.gz'))),1)
+
     # Controller updates require explicit continuation and preserve the originating stamp of every attempt.
     def test_compatible_controller_continuation_preserves_provenance(self):
         previous = {'commit':'old', 'attempts':[{'name':'done'}], 'binaries':{'z':'hash'},
