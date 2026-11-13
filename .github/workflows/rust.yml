@@ -79,6 +79,8 @@ jobs:
       - name: MQ10 profiling instrument tests
         run: |
           cargo test --example mq10_profile
+          cargo test --example wide_corpus
+          python3 tools/test/wide-corpus-test.py
           cargo test --example public_corpus
           cargo test --example elimination_kernel_study
           python3 tools/test/elimination-kernel-study-test.py

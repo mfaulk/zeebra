@@ -1,0 +1,72 @@
+# Hard wide-field corpus (#738)
+
+This opt-in catalog freezes `wide64` (`18446744073709551263`), `goldilocks`
+(`18446744069414584321`) and `bn254` (BN254 scalar r, decimal in the catalog).
+Every entry in [cases.json](cases.json) retains the full generators, ordered variables,
+transformation, canonical bytes and SHA-256 digest. The `wide-corpus-v1` identity uses a decimal
+prime and grevlex; it is separate from the historical competitive `Instance::canonical` format.
+[BOARD.md](BOARD.md) is regenerated from [campaign.json.gz](campaign.json.gz).
+
+Katsura names count variables, so `katsura-9` is literature Katsura-8. Cyclic-7 and Cyclic-11
+are squarefree-size affine systems, without field equations or slicing. Eco and Noonburg use
+`grobner::benchmark_systems`' independently defined equations; Noonburg's parameter is 11/10,
+with each equation multiplied by 10. See the [public corpus definitions](../public-corpus/README.md).
+Random MQ uses n equations in n variables, **all** monomials of degree ≤2, each with a nonzero
+coefficient sampled from the full field using `StdRng` seed `0x73800000 + n`. No solution is
+planted. This is a distinct identity from the historical term-capped `mq-random-n` ladder.
+The catalog includes intermediate candidates and upper rungs intended to hit the resource boundary;
+size alone is not an observed completion or a performance claim.
+
+The live-oracle provenance is the campaign's complete normalized bases from Groebner.jl,
+groebner-rs and grobx, with versions and executable hashes. Every completed answer must agree
+coefficient for coefficient with every other completed answer on that identity. BN254 is a native
+Zeebra capability row with **no external oracle**: the current external contract stores its prime
+in `u64`. No ratio or correctness claim based on an independent engine is made for that field.
+
+Build and test outside the benchmark lock:
+
+```sh
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-738
+export TMPDIR="$CARGO_TARGET_DIR/tmp"
+export RUSTC_WRAPPER=""
+mkdir -p "$TMPDIR"
+. tools/external/env.sh
+cargo test --example wide_corpus
+python3 tools/test/wide-corpus-test.py
+cargo build --release --example wide_corpus
+"$CARGO_TARGET_DIR/release/examples/wide_corpus" --list
+```
+
+Measure a committed, clean instrument. One worker, one case/engine per fresh process, grevlex,
+60 s / 2 GiB solver budgets and a 65 s / 2 GiB process-tree watchdog. Watchdog kills are recorded
+with their specific cause, never as engine completions. F4 also has a cooperative live-byte budget;
+the watchdog covers memory outside its matrices. The tree RSS observation sums process high waters
+and can conservatively stop earlier than a live-RSS sum. Sampling can miss short-lived peaks.
+The Julia adapter also enforces its 2-GiB subprocess RSS ceiling. Native adapters omit that optional
+inner RSS cap because short controls can finish before its first poll; the outer tree watchdog
+still enforces the campaign ceiling, as in the planted-wide verification.
+The campaign resumes only when commit, binaries, machine, affinity and policy match.
+
+```sh
+ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=2 \
+  tools/benchlock.sh hard-wide-738 timeout --signal=INT --kill-after=60s 7200 \
+  taskset -c 2 python3 tools/external/wide-corpus.py \
+  --binary "$CARGO_TARGET_DIR/release/examples/wide_corpus" \
+  --scratch "$CARGO_TARGET_DIR/campaign" \
+  --output research/wide-corpus/campaign.json.gz
+python3 tools/external/wide-corpus.py --summarize research/wide-corpus/campaign.json.gz
+```
+
+Use `--fields wide64,goldilocks` or `--rows katsura-4,mq-random-12` for bounded subsets.
+Retain Katsura-4 for each engine/field if publishing ratios. The board requires both operands ≥2×
+that engine's measured startup control. Native wall is the complete runner process (including
+input/output); external wall is the adapter's supervised engine process, excluding version probes.
+Wrapper wall and F4-call timings are separately retained. A single observation does not establish
+a stable speedup. Rows with one completion have no independent live oracle, and stops do not
+become ratios. At least one external completion is needed for a verified Zeebra comparison.
+
+Intentional regeneration after changing a definition:
+`python3 tools/external/wide-corpus.py --binary "$CARGO_TARGET_DIR/release/examples/wide_corpus" --freeze`.
+Review the full catalog diff and remeasure; never update pins to accommodate stale evidence.
+CI runs the generator and gate tests plus offline catalog integrity checks; external solvers and
+long resource-boundary runs are opt-in and are not required on GitHub Actions.

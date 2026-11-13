@@ -60,6 +60,12 @@ The [wide-field run instructions](docs/guide/external-engines.md#wide-planted-mq
 live full-basis verification and recording results with live-oracle provenance. The sweep also
 accepts `--engines grobx` to select the pinned grobx driver.
 
+The [hard wide-field catalog](research/wide-corpus/README.md) adds unplanted dense MQ,
+Katsura, zero-dimensional Cyclic, Eco and Noonburg at `2^64 - 353`, Goldilocks,
+and BN254 r. List it with `cargo run --release --example wide_corpus -- --list`.
+Its separate [board](research/wide-corpus/BOARD.md) retains complete basis comparisons and
+60-second/2-GiB stops; BN254 rows are native Zeebra capabilities with no external oracle or ratio.
+
 ## Quickstart
 
 Zeebra builds on stable Rust 1.91 or newer. No nightly toolchain, no feature gates, no system

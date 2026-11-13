@@ -272,6 +272,11 @@ name = "msolve_gap"
 required-features = ["external-runners"]
 
 [[example]]
+name = "wide_corpus"
+test = true
+required-features = ["external-runners"]
+
+[[example]]
 name = "public_corpus"
 required-features = ["external-runners"]
 
