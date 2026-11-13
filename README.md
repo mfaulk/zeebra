@@ -480,3 +480,8 @@ are unchanged.
 
 The [persistent-worker study](research/worker-pool/README.md) provides an opt-in dispatch and FGLM
 border-reduction experiment under `research-work`; solver defaults remain unchanged.
+
+With `F4Options::measure_stages`, `StageTimings::forward` and `backward` refine production
+elimination time. The backward boundary includes candidate selection and full-RREF fallback;
+observer overrides leave these production refinements zero. Their sum is excluded from
+`StageTimings::sum()` because elimination already contains both phases.
