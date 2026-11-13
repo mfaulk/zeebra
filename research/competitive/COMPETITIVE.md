@@ -8,16 +8,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 | library | rows | answered |
 |---|---:|---:|
-| grobx | 43 | 30 |
+| grobx | 46 | 33 |
 | grobx-certified | 39 | 31 |
-| groebner-rs | 100 | 96 |
-| groebner.jl | 110 | 55 |
-| msolve | 110 | 62 |
-| sagebrush | 162 | 130 |
-| singular | 140 | 120 |
+| groebner-rs | 103 | 99 |
+| groebner.jl | 113 | 58 |
+| msolve | 113 | 62 |
+| sagebrush | 165 | 130 |
+| singular | 143 | 120 |
 | sylvester | 30 | 27 |
 | sylvester-certified | 26 | 18 |
-| zeebra | 355 | 274 |
+| zeebra | 358 | 277 |
 
 ## cyclic
 
@@ -726,6 +726,32 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-planted-6` `26932613e8ca` | lex-basis-by-conversion | GF(32003) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `c033f027` | complete | 0.4 ms | — | 6.4 MB | basis 0.1 ms; conversion 0.3 ms; conversion: route=Classical, projections=0, fallback=Some(SmallQuotient) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
 | `mq-planted-6` `26932613e8ca` | lex-basis-by-conversion | GF(32003) | 1 | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))) | `c033f027` | complete | 11.6 ms | 0.0 ms | 2.9 MB | solve 0.7 ms | — | unchecked |
 
+## mq-planted-wide
+
+| problem | task | field | workers | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |
+|---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---|
+| `mq-planted-wide-10` `eba454f0a0b0` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `65f38d4a` | complete | 0.1 ms | — | 6.4 MB | basis 0.1 ms; quotient-dimension (for the invariant) 0.9 ms | — | unchecked |
+| `mq-planted-wide-10` `eba454f0a0b0` | reduced-grobner-basis | GF(18446744073709551263) | 1 | singular (singular build 44105 (44105)) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 2147483648 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-10` `eba454f0a0b0` | reduced-grobner-basis | GF(18446744073709551263) | 1 | msolve (msolve 0.11.0) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 2147483648 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-10` `eba454f0a0b0` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `65f38d4a` | complete | 0.9 ms | — | 748.8 MB (last live poll) | solve 0.9 ms; process-wall 9.07 s; process-cpu 8.92 s | — | unchecked |
+| `mq-planted-wide-10` `eba454f0a0b0` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs 0.6.0 (c3e1d630fba9b2155a4c389d9022f13e0ba09218;isa=x86-64-v3;parallel;allocator=system;9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3)) | `65f38d4a` | verified | 11.0 ms | 0.0 ms | 3.1 MB (child snapshot) | parse 0.1 ms; solve 0.2 ms; serialization 0.0 ms; harness-output 0.1 ms; independent-verification 1.4 ms | — | zeebra (2 invariants) |
+| `mq-planted-wide-10` `eba454f0a0b0` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.73.3 (1854835dbc25f24dc9a9ba017024d5030e99da1c;isa=x86-64-v3;allocator=grobx-small-blocks;9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8)) | `65f38d4a` | verified | 11.1 ms | 0.0 ms | 9.0 MB (child snapshot) | parse 0.3 ms; solve 0.2 ms; independent-verification 11.9 ms | — | grobx-checker exact two-inclusion certificate (1 invariants) |
+| `mq-planted-wide-10` `eba454f0a0b0` | reduced-grobner-basis | GF(18446744073709551263) | 1 | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 4611686018427387904 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-14` `4076833387f4` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `65f38d4a` | complete | 0.2 ms | — | 26.8 MB | basis 0.2 ms; quotient-dimension (for the invariant) 34.1 ms | — | unchecked |
+| `mq-planted-wide-14` `4076833387f4` | reduced-grobner-basis | GF(18446744073709551263) | 1 | singular (singular build 44105 (44105)) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 2147483648 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-14` `4076833387f4` | reduced-grobner-basis | GF(18446744073709551263) | 1 | msolve (msolve 0.11.0) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 2147483648 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-14` `4076833387f4` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `65f38d4a` | complete | 0.9 ms | — | 751.4 MB (last live poll) | solve 0.9 ms; process-wall 26.16 s; process-cpu 25.85 s | — | unchecked |
+| `mq-planted-wide-14` `4076833387f4` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs 0.6.0 (c3e1d630fba9b2155a4c389d9022f13e0ba09218;isa=x86-64-v3;parallel;allocator=system;9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3)) | `65f38d4a` | verified | 11.1 ms | 0.0 ms | 3.1 MB (child snapshot) | parse 0.1 ms; solve 0.2 ms; serialization 0.0 ms; harness-output 0.1 ms; independent-verification 34.1 ms | — | zeebra (2 invariants) |
+| `mq-planted-wide-14` `4076833387f4` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.73.3 (1854835dbc25f24dc9a9ba017024d5030e99da1c;isa=x86-64-v3;allocator=grobx-small-blocks;9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8)) | `65f38d4a` | verified | 11.2 ms | 0.0 ms | 9.3 MB (child snapshot) | parse 0.3 ms; solve 0.2 ms; independent-verification 11.9 ms | — | grobx-checker exact two-inclusion certificate (1 invariants) |
+| `mq-planted-wide-14` `4076833387f4` | reduced-grobner-basis | GF(18446744073709551263) | 1 | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 4611686018427387904 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-6` `2cb373f2d09c` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `65f38d4a` | complete | 0.1 ms | — | 6.0 MB | basis 0.1 ms; quotient-dimension (for the invariant) 0.0 ms | — | unchecked |
+| `mq-planted-wide-6` `2cb373f2d09c` | reduced-grobner-basis | GF(18446744073709551263) | 1 | singular (singular build 44105 (44105)) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 2147483648 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-6` `2cb373f2d09c` | reduced-grobner-basis | GF(18446744073709551263) | 1 | msolve (msolve 0.11.0) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 2147483648 | — | — | — | — | — | unchecked |
+| `mq-planted-wide-6` `2cb373f2d09c` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `65f38d4a` | complete | 0.8 ms | — | 721.0 MB (last live poll) | solve 0.8 ms; process-wall 8.16 s; process-cpu 8.03 s | — | unchecked |
+| `mq-planted-wide-6` `2cb373f2d09c` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs 0.6.0 (c3e1d630fba9b2155a4c389d9022f13e0ba09218;isa=x86-64-v3;parallel;allocator=system;9c72be299136ca261791ce9d22a5b0744a17b15f38b4b9a964fad5ca8a8113e3)) | `65f38d4a` | verified | 11.1 ms | 0.0 ms | 3.1 MB (child snapshot) | parse 0.1 ms; solve 0.3 ms; serialization 0.0 ms; harness-output 0.1 ms; independent-verification 0.2 ms | — | zeebra (2 invariants) |
+| `mq-planted-wide-6` `2cb373f2d09c` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.73.3 (1854835dbc25f24dc9a9ba017024d5030e99da1c;isa=x86-64-v3;allocator=grobx-small-blocks;9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8)) | `65f38d4a` | verified | 11.6 ms | 0.0 ms | 8.9 MB (child snapshot) | parse 0.3 ms; solve 0.2 ms; independent-verification 11.8 ms | — | grobx-checker exact two-inclusion certificate (1 invariants) |
+| `mq-planted-wide-6` `2cb373f2d09c` | reduced-grobner-basis | GF(18446744073709551263) | 1 | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))) | `65f38d4a` | unsupported: characteristic 18446744073709551263 is at or above the tool's bound of 4611686018427387904 | — | — | — | — | — | unchecked |
+
 ## mq-random
 
 | problem | task | field | workers | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |
@@ -1165,7 +1191,7 @@ Computed only for rows agreeing on problem digest, task, limits, machine and bui
 
 The **provenance** column is the corpus's own record of how the problem's ideal equivalence was established, which is the gate on quoting a figure for it at all. A problem with no recorded equivalence, or one no external engine can represent, is **refused here rather than omitted**; a ratio resting on a single external engine is published with that fact stated, because nothing can triangulate it.
 
-**1384 pairs**: 0 refused for want of a recorded ideal equivalence, 449 disqualified by the startup floor, 0 with no checked invariant, 935 publishable — of which 0 resting on a sole comparand and therefore uncorroborated, 82 inside the 20% noise band, 231 against a comparand that is not authoritative, and 623 that a conclusion may rest on.
+**1393 pairs**: 0 refused for want of a recorded ideal equivalence, 458 disqualified by the startup floor, 0 with no checked invariant, 935 publishable — of which 0 resting on a sole comparand and therefore uncorroborated, 82 inside the 20% noise band, 231 against a comparand that is not authoritative, and 623 that a conclusion may rest on.
 
 | problem | task | library | ratio | provenance | checked |
 |---|---|---|---:|---|---|
@@ -2553,6 +2579,15 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-random-10` | reduced-grobner-basis | sylvester | 11.10x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | sylvester | 11.09x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | sylvester | 11.09x | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-6` | reduced-grobner-basis | groebner.jl | 0.12x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-6` | reduced-grobner-basis | groebner-rs | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-6` | reduced-grobner-basis | grobx | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-10` | reduced-grobner-basis | groebner.jl | 0.13x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `mq-planted-wide-10` | reduced-grobner-basis | groebner-rs | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-10` | reduced-grobner-basis | grobx | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-14` | reduced-grobner-basis | groebner.jl | 0.19x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `mq-planted-wide-14` | reduced-grobner-basis | groebner-rs | 0.02x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-14` | reduced-grobner-basis | grobx | 0.02x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 
 ## Engine-internal speedups over Zeebra
 
@@ -2562,7 +2597,7 @@ It exists because the startup-floor guard above correctly disqualifies every cla
 
 Stage selection per library, and what is excluded from each, is `engine_internal_time`; the granularities are `stage_resolution`. A library that reports no usable stage contributes no row, which is visible as an em dash in the measurement table's `stages` column.
 
-**1337 pairs**: 0 refused for want of a recorded ideal equivalence, 26 refused on stage resolution, 0 with no checked invariant, 1311 publishable as an engine-internal comparison.
+**1346 pairs**: 0 refused for want of a recorded ideal equivalence, 26 refused on stage resolution, 0 with no checked invariant, 1320 publishable as an engine-internal comparison.
 
 | problem | task | library | zeebra engine | their engine | ratio | provenance | checked |
 |---|---|---|---:|---:|---:|---|---|
@@ -3903,4 +3938,13 @@ Stage selection per library, and what is excluded from each, is `engine_internal
 | `mq-random-10` | reduced-grobner-basis | sylvester | 4.38 s | 386.4 ms | 11.33x ±<1% | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | sylvester | 4.38 s | 388.8 ms | 11.26x ±<1% | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | sylvester | 4.38 s | 384.2 ms | 11.40x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-6` | reduced-grobner-basis | groebner.jl | 0.1 ms | 0.8 ms | 0.12x ±1% | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-6` | reduced-grobner-basis | groebner-rs | 0.1 ms | 0.3 ms | 0.32x ±1% | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-6` | reduced-grobner-basis | grobx | 0.1 ms | 0.2 ms | 0.60x ±1% | live-oracle | 1 invariants agreed |
+| `mq-planted-wide-10` | reduced-grobner-basis | groebner.jl | 0.1 ms | 0.9 ms | 0.13x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-10` | reduced-grobner-basis | groebner-rs | 0.1 ms | 0.2 ms | 0.53x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-10` | reduced-grobner-basis | grobx | 0.1 ms | 0.2 ms | 0.65x ±<1% | live-oracle | 1 invariants agreed |
+| `mq-planted-wide-14` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.9 ms | 0.19x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-14` | reduced-grobner-basis | groebner-rs | 0.2 ms | 0.2 ms | 0.75x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-planted-wide-14` | reduced-grobner-basis | grobx | 0.2 ms | 0.2 ms | 0.87x ±<1% | live-oracle | 1 invariants agreed |
 

@@ -53,6 +53,13 @@ invariants; unsupported engines remain visible as capability rows. See the
 harnesses can add prime-field and variable-width pairs with
 `ZeebraSolver::with_instantiation::<N, F>()`; the guide includes a runnable registration example.
 
+The ladder also includes `mq-planted-wide-{6,10,14}` over `2^64 - 353`, checked against
+Groebner.jl, groebner-rs and grobx. List those frozen identities with
+`cargo run --release --example competitive_sweep -- --characteristic 18446744073709551263 --list`.
+The [wide-field run instructions](docs/guide/external-engines.md#wide-planted-mq-ladder) cover
+live full-basis verification and recording results with live-oracle provenance. The sweep also
+accepts `--engines grobx` to select the pinned grobx driver.
+
 ## Quickstart
 
 Zeebra builds on stable Rust 1.91 or newer. No nightly toolchain, no feature gates, no system

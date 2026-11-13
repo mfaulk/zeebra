@@ -39,3 +39,15 @@ cohort’s supervisor RSS observations can describe startup only; it remains dia
 and the corrected cohort uses an explicitly labeled child kernel snapshot. History regeneration
 now preserves RSS provenance and resource-stop text. The [comparison note](../../docs/research/groebner-rs-comparand.md)
 records the operating conditions, source identities, admission rules and limitations.
+
+
+Issue #675 adds a three-rung planted family at `2^64 - 353`, measured at `65f38d4a`
+(production source unchanged from `b310c126`). Its 21 recorded outcomes preserve the preceding
+1,115 rows exactly and bring the history to 1,136 rows. Zeebra, Groebner.jl, groebner-rs and grobx
+complete all three rungs; Singular, msolve and Sagebrush refuse the characteristic. The
+[cohort manifest](results/wide-planted-675-board.json),
+[complete-basis verification](results/wide-planted-675-verification.json) and
+[failed optional-RSS-cap attempt](results/wide-planted-675-capped-failure.json) retain all outcomes
+and their limits. The family uses live-oracle provenance because the requested sole-comparand
+condition predates the newer wide-field engines. These easy structured inputs establish coverage;
+the board rejects their wall ratios as startup dominated.

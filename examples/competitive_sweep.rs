@@ -9,7 +9,7 @@ use zeebra::{
         external::{
             corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
             msolve::{MAX_CHARACTERISTIC_ELIMINANT, MIN_CHARACTERISTIC_ELIMINANT},
-            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver,
+            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GrobxSolver, GroebnerJlSolver,
             GroebnerRsSolver, Instance, Limits, Measurement, MsolveSolver, RunFailure, RunReport,
             RunStatus, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
         },
@@ -260,7 +260,7 @@ fn run_one(
         board.add(CompetitiveRecord::of(&report, built, environment));
     }
 
-    // The four external engines. The scratch directory is per process and per row, which is what
+    // The external engines. The scratch directory is per process and per row, which is what
     // keeps two concurrent sweeps from handing one filename to two processes.
     //
     // Every engine is probed once per row rather than once per sweep. That costs a process per
@@ -316,6 +316,18 @@ fn run_one(
                 environment,
                 failure,
             ),
+        }
+    }
+
+    if wanted("grobx") {
+        match GrobxSolver::from_env(
+            scratch.join("grobx"),
+            zeebra::grobner::external::grobx::Mode::Raw,
+        ) {
+            Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+            Err(failure) => {
+                unreachable_engine(board, "grobx", built, task, limits, environment, failure)
+            }
         }
     }
 
@@ -515,6 +527,23 @@ mod tests {
         for characteristic in [2, super::REFERENCE_CHARACTERISTIC] {
             assert!(!super::sweep_tasks(characteristic).contains(&super::Task::UnivariateEliminant));
         }
+    }
+
+    // The wide sweep selects only the three frozen wide planted identities.
+    #[test]
+    fn test_wide_sweep_selects_only_published_wide_rungs() {
+        assert_eq!(
+            sweep_rows(
+                zeebra::grobner::external::corpus::WIDE_64_CHARACTERISTIC,
+                None
+            ),
+            [
+                "mq-planted-wide-6",
+                "mq-planted-wide-10",
+                "mq-planted-wide-14"
+            ]
+        );
+        assert!(sweep_rows(super::REFERENCE_CHARACTERISTIC, Some("mq-planted-wide-6")).is_empty());
     }
 
     // The binary sweep lists seven Cyclic rungs and refuses an unpublished Katsura row.
