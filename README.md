@@ -48,7 +48,9 @@ whose ideals are checked for equivalence before any timing is published.
 The competitive sweep includes a univariate-eliminant task at published primes within msolve's
 supported range. List it with `cargo run --release --example competitive_sweep -- --characteristic 32003 --list`. Eliminant ratios require matching reported degrees and agreement on all shared
 invariants; unsupported engines remain visible as capability rows. See the
-[external-engine guide](docs/guide/external-engines.md) for measured runs and board regeneration.
+[external-engine guide](docs/guide/external-engines.md) for measured runs and board regeneration. Caller-owned
+harnesses can add prime-field and variable-width pairs with
+`ZeebraSolver::with_instantiation::<N, F>()`; the guide includes a runnable registration example.
 
 ## Quickstart
 

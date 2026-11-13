@@ -287,6 +287,37 @@ wants the ten- and fourteen-variable rungs covered. Rungs left out are printed w
 never silently dropped. (`F4Options::max_wall_time` does not substitute for the ceiling: it is
 checked once per batch, so one long matrix reduction overruns it.)
 
+Callers can compile additional prime fields and variable counts in their own harness without
+changing that table:
+
+```rust
+use zeebra::{fields::Zp13, grobner::external::{
+    ExternalSolver, FieldSpec, Instance, Limits, RunStatus, Task, ZeebraSolver,
+}, MonomialOrder};
+use std::time::Duration;
+
+let input = Instance::new(
+    "caller-gf13", "caller", FieldSpec::prime(13),
+    vec!["x".into(), "y".into()],
+    vec!["x^2 - 1".into(), "y - x".into()],
+    MonomialOrder::GradedReverseLexicographic,
+);
+let mut solver = ZeebraSolver::new().with_instantiation::<2, Zp13>().unwrap();
+let report = solver.run(&input, Task::ReducedGrobnerBasis, &Limits::wall(Duration::from_secs(5)));
+assert!(matches!(report.status, RunStatus::Complete(_)));
+```
+
+`with_instantiation::<N, F>()` infers the characteristic from `F: KnownOrder`, rejects zero
+widths, extension fields and characteristics above `u64`, and retains the compiled defaults.
+Registrations match the exact characteristic and variable count; repeated registration of the
+same pair replaces its implementation. Task/order checks and F4/FGLM options apply to registered
+pairs too. Each pair monomorphizes the engine in the caller's build; no process-global registry
+or new dependency is used. Add the resulting `CompetitiveRecord` to a board as usual, and supply
+`CorpusEntry` provenance through `with_corpus` before publishing cross-engine ratios.
+Registered reports leave `command_line` unset because the stock `competitive_sweep` executable
+does not contain the caller's registration. Reproduce custom rows using that caller's harness
+and record its build and invocation (for example with `RunReport::with_command_line`).
+
 `GroebnerJlSolver` and `SagebrushSolver` are built the same way, and both read what
 `tools/external/env.sh` exports: `GroebnerJlSolver::from_env(work_dir)` and
 `SagebrushSolver::from_env(work_dir)`. Two things about them are worth knowing before reading
