@@ -353,6 +353,13 @@ unfinished studies, and recommends bounded current-default profiling before furt
 Regenerate the retained competitive board without measuring with
 `cargo run --release --example competitive -- --write`.
 
+The [M28 plan](docs/MILESTONE-MULTICORE-COMPETITIVENESS.md), tracked in
+[#750](https://github.com/mfaulk/zeebra/issues/750), prioritizes necessary F4 backward work,
+adaptive multicore integration and hard wide-prime-field comparisons. It reuses the concurrent
+pivot prototype and in-flight selective-reduction and corpus studies; experimental results remain
+separate from shipping defaults. Minimum closure requires evidence and explicit decisions;
+stronger tiers require independently verified complete-task achievements.
+
 A pinned [grobx subprocess comparand](tools/external/grobx-driver/README.md) checks full reduced
 bases against Singular, or an exact independent cofactor checker at wide primes. Provision it with
 `tools/external/provision-grobx.sh`; raw computation and exact-certified computation have separate
