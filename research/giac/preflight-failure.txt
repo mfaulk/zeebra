@@ -1,0 +1,6 @@
+2026-11-13: initial metadata preflight exited before any solver attempt.
+ldd /usr/bin/Singular returned 1: not a dynamic executable.
+The Fedora command is a shell wrapper ending in exec /usr/lib64/Singular/Singular.
+Rerun uses that native executable explicitly, with SINGULAR_DATA_DIR=/usr/share,
+and fingerprints its actual linked libraries. Empty scratch cohort-1 was preserved.
+The shared benchlock log retains this failed preflight window.

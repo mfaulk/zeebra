@@ -1,0 +1,200 @@
+{
+  "utc": "2026-11-13T06:30:47Z",
+  "load": [
+    0.5791015625,
+    1.29833984375,
+    1.51220703125
+  ],
+  "binary": "/buildcache/cargo-target/zeebra-740/release/examples/groebner_comparison",
+  "binary_sha256": "cb4292b5219c186e06c1bc80e468893d7a2d268b06eb61301506d51fe5ae844b",
+  "runtime_packages": [
+    {
+      "Package": "libcliquer1",
+      "Version": "1.21-3+b1",
+      "Filename": "pool/main/c/cliquer/libcliquer1_1.21-3+b1_amd64.deb",
+      "SHA256": "7858686f9e8a1931644e7bf58d68df85cbb95299c255466b3c6c65706bacc563"
+    },
+    {
+      "Package": "libfltk-gl1.3",
+      "Version": "1.3.8-5",
+      "Filename": "pool/main/f/fltk1.3/libfltk-gl1.3_1.3.8-5_amd64.deb",
+      "SHA256": "842762c82511d19e1cbd8010626afd3b3396c56a27ad583909145aecde69f4ea"
+    },
+    {
+      "Package": "libfltk1.3",
+      "Version": "1.3.8-5",
+      "Filename": "pool/main/f/fltk1.3/libfltk1.3_1.3.8-5_amd64.deb",
+      "SHA256": "703f71611b4a81e87453e1d82135c2428005734f1a4f9d4735176dff67d2a652"
+    },
+    {
+      "Package": "libgf2x3",
+      "Version": "1.3.0-2",
+      "Filename": "pool/main/g/gf2x/libgf2x3_1.3.0-2_amd64.deb",
+      "SHA256": "432d96c40aed60c25987fe1456eb5ea8b1cf6bc60032a90ab06325505786d1bd"
+    },
+    {
+      "Package": "libgmp10",
+      "Version": "2:6.2.1+dfsg1-1.1",
+      "Filename": "pool/main/g/gmp/libgmp10_6.2.1+dfsg1-1.1_amd64.deb",
+      "SHA256": "187aedef2ed763f425c1e523753b9719677633c7eede660401739e9c893482bd"
+    },
+    {
+      "Package": "libecm1",
+      "Version": "7.0.5+ds-1",
+      "Filename": "pool/main/g/gmp-ecm/libecm1_7.0.5+ds-1_amd64.deb",
+      "SHA256": "e70ed11412c03b5292b21195ebe41f4b59056d859eab3cc5f1aa5c53697eea40"
+    },
+    {
+      "Package": "libgsl27",
+      "Version": "2.7.1+dfsg-5+deb12u1",
+      "Filename": "pool/main/g/gsl/libgsl27_2.7.1+dfsg-5+deb12u1_amd64.deb",
+      "SHA256": "7a2ac4431a1bfa2e1776961d4f3d82d6b660fc3fa62e7bfbc4a14aaf013fa422"
+    },
+    {
+      "Package": "libgslcblas0",
+      "Version": "2.7.1+dfsg-5+deb12u1",
+      "Filename": "pool/main/g/gsl/libgslcblas0_2.7.1+dfsg-5+deb12u1_amd64.deb",
+      "SHA256": "46bd7671bbf548b0d13be8523a8ac7e453009fd2e7a480d07458aad99828f393"
+    },
+    {
+      "Package": "libmpfi0",
+      "Version": "1.5.3+ds-6+b1",
+      "Filename": "pool/main/m/mpfi/libmpfi0_1.5.3+ds-6+b1_amd64.deb",
+      "SHA256": "b04a66c5928737f0adc321d8e31596a7af4505c4bd1bca0664b588de9219dec7"
+    },
+    {
+      "Package": "libmpfr6",
+      "Version": "4.2.0-1",
+      "Filename": "pool/main/m/mpfr4/libmpfr6_4.2.0-1_amd64.deb",
+      "SHA256": "37b7a2b4e78890b6a074777f27b96c84f58e81558ba08410c2b6c0ca4a4ad77b"
+    },
+    {
+      "Package": "libnauty2",
+      "Version": "2.8.6+ds-2",
+      "Filename": "pool/main/n/nauty/libnauty2_2.8.6+ds-2_amd64.deb",
+      "SHA256": "38ab75377f7021941621af6e23c63146acb351523811973ffc7e23c7321d986e"
+    },
+    {
+      "Package": "libntl44",
+      "Version": "11.5.1-1+b2",
+      "Filename": "pool/main/n/ntl/libntl44_11.5.1-1+b2_amd64.deb",
+      "SHA256": "1ec859c23f8875141a2ddb4c7a81f0a1b837b64cd4cb822917b1e3f725c4540e"
+    },
+    {
+      "Package": "libpari-gmp-tls8",
+      "Version": "2.15.2-1",
+      "Filename": "pool/main/p/pari/libpari-gmp-tls8_2.15.2-1_amd64.deb",
+      "SHA256": "7ca79d18ca40588ebd4a4e88b52c2a5a076b049e6e10b88ab42f4a294ade79bd"
+    }
+  ],
+  "sources": {
+    "Cargo.toml": "67a6488710cfb48a998990f62edd8cde919f5b88be3762a0c29c0e13e3232ac2",
+    "Cargo.lock": "6b0fba412b786b5bb41ec1300a3082e30552a3b98b61bd57b56e11fb058bc406",
+    ".cargo/config.toml": "4149fbfd3f145b146c5dff23954d0def331ad72ca2d9d5d6b46976f8fe7786f7",
+    "src/grobner/external/giac.rs": "8582ac5859650943bbf3490f3695b045d4073b35ec5f52a30d3f73507ba9c3a6",
+    "src/grobner/external/singular.rs": "4b9e8195963566fb7c9aa2c42304e2f677e67d1dcbbd5c1c66c008213cae8b70",
+    "examples/groebner_comparison.rs": "a1a842ffad12711041cc5e622b4f8a4ebc4e19dc314fc7d75e1a8fb601ff92d7",
+    "tools/external/grobx-cohort.py": "f21d7a92745189037bfb0cf96f2503db91f385a440f4f6368bc6765b943ef347",
+    "research/giac/PLAN.md": "562c05fbe21efb7d828548864c8827f26956d862a70887792d97f7666b331924",
+    "research/giac/run.py": "1d97452fcb723b40fd468001861f2bcaf4243c1a18038167405829bc9be48588"
+  },
+  "source": "fa0790de2440ec94d0eeb00d6266f2d635a9e7c7\n",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+  "topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3\n  0    0      0    0 0:0:0:0\n  1    1      0    0 1:1:1:0\n  2    2      0    0 2:2:2:0\n  3    3      0    0 3:3:3:0\n  4    4      0    0 4:4:4:0\n  5    5      0    0 5:5:5:0\n  6    6      0    0 6:6:6:0\n  7    7      0    0 7:7:7:0\n  8    8      0    0 8:8:8:1\n  9    9      0    0 9:9:9:1\n 10   10      0    0 10:10:10:1\n 11   11      0    0 11:11:11:1\n 12   12      0    0 12:12:12:1\n 13   13      0    0 13:13:13:1\n 14   14      0    0 14:14:14:1\n 15   15      0    0 15:15:15:1\n 16   16      0    0 16:16:16:2\n 17   17      0    0 17:17:17:2\n 18   18      0    0 18:18:18:2\n 19   19      0    0 19:19:19:2\n 20   20      0    0 20:20:20:2\n 21   21      0    0 21:21:21:2\n 22   22      0    0 22:22:22:2\n 23   23      0    0 23:23:23:2\n 24   24      0    0 24:24:24:3\n 25   25      0    0 25:25:25:3\n 26   26      0    0 26:26:26:3\n 27   27      0    0 27:27:27:3\n 28   28      0    0 28:28:28:3\n 29   29      0    0 29:29:29:3\n 30   30      0    0 30:30:30:3\n 31   31      0    0 31:31:31:3\n 32   32      0    0 32:32:32:4\n 33   33      0    0 33:33:33:4\n 34   34      0    0 34:34:34:4\n 35   35      0    0 35:35:35:4\n 36   36      0    0 36:36:36:4\n 37   37      0    0 37:37:37:4\n 38   38      0    0 38:38:38:4\n 39   39      0    0 39:39:39:4\n 40   40      0    0 40:40:40:5\n 41   41      0    0 41:41:41:5\n 42   42      0    0 42:42:42:5\n 43   43      0    0 43:43:43:5\n 44   44      0    0 44:44:44:5\n 45   45      0    0 45:45:45:5\n 46   46      0    0 46:46:46:5\n 47   47      0    0 47:47:47:5\n 48   48      0    0 48:48:48:6\n 49   49      0    0 49:49:49:6\n 50   50      0    0 50:50:50:6\n 51   51      0    0 51:51:51:6\n 52   52      0    0 52:52:52:6\n 53   53      0    0 53:53:53:6\n 54   54      0    0 54:54:54:6\n 55   55      0    0 55:55:55:6\n 56   56      0    0 56:56:56:7\n 57   57      0    0 57:57:57:7\n 58   58      0    0 58:58:58:7\n 59   59      0    0 59:59:59:7\n 60   60      0    0 60:60:60:7\n 61   61      0    0 61:61:61:7\n 62   62      0    0 62:62:62:7\n 63   63      0    0 63:63:63:7\n 64    0      0    0 0:0:0:0\n 65    1      0    0 1:1:1:0\n 66    2      0    0 2:2:2:0\n 67    3      0    0 3:3:3:0\n 68    4      0    0 4:4:4:0\n 69    5      0    0 5:5:5:0\n 70    6      0    0 6:6:6:0\n 71    7      0    0 7:7:7:0\n 72    8      0    0 8:8:8:1\n 73    9      0    0 9:9:9:1\n 74   10      0    0 10:10:10:1\n 75   11      0    0 11:11:11:1\n 76   12      0    0 12:12:12:1\n 77   13      0    0 13:13:13:1\n 78   14      0    0 14:14:14:1\n 79   15      0    0 15:15:15:1\n 80   16      0    0 16:16:16:2\n 81   17      0    0 17:17:17:2\n 82   18      0    0 18:18:18:2\n 83   19      0    0 19:19:19:2\n 84   20      0    0 20:20:20:2\n 85   21      0    0 21:21:21:2\n 86   22      0    0 22:22:22:2\n 87   23      0    0 23:23:23:2\n 88   24      0    0 24:24:24:3\n 89   25      0    0 25:25:25:3\n 90   26      0    0 26:26:26:3\n 91   27      0    0 27:27:27:3\n 92   28      0    0 28:28:28:3\n 93   29      0    0 29:29:29:3\n 94   30      0    0 30:30:30:3\n 95   31      0    0 31:31:31:3\n 96   32      0    0 32:32:32:4\n 97   33      0    0 33:33:33:4\n 98   34      0    0 34:34:34:4\n 99   35      0    0 35:35:35:4\n100   36      0    0 36:36:36:4\n101   37      0    0 37:37:37:4\n102   38      0    0 38:38:38:4\n103   39      0    0 39:39:39:4\n104   40      0    0 40:40:40:5\n105   41      0    0 41:41:41:5\n106   42      0    0 42:42:42:5\n107   43      0    0 43:43:43:5\n108   44      0    0 44:44:44:5\n109   45      0    0 45:45:45:5\n110   46      0    0 46:46:46:5\n111   47      0    0 47:47:47:5\n112   48      0    0 48:48:48:6\n113   49      0    0 49:49:49:6\n114   50      0    0 50:50:50:6\n115   51      0    0 51:51:51:6\n116   52      0    0 52:52:52:6\n117   53      0    0 53:53:53:6\n118   54      0    0 54:54:54:6\n119   55      0    0 55:55:55:6\n120   56      0    0 56:56:56:7\n121   57      0    0 57:57:57:7\n122   58      0    0 58:58:58:7\n123   59      0    0 59:59:59:7\n124   60      0    0 60:60:60:7\n125   61      0    0 61:61:61:7\n126   62      0    0 62:62:62:7\n127   63      0    0 63:63:63:7\n",
+  "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  128\nOn-line CPU(s) list:                     0-127\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen Threadripper PRO 5995WX 64-Cores\nCPU family:                              25\nModel:                                   8\nThread(s) per core:                      2\nCore(s) per socket:                      64\nSocket(s):                               1\nStepping:                                2\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      34%\nCPU max MHz:                             4575.1641\nCPU min MHz:                             413.4190\nBogoMIPS:                                5389.84\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap\nVirtualization:                          AMD-V\nL1d cache:                               2 MiB (64 instances)\nL1i cache:                               2 MiB (64 instances)\nL2 cache:                                32 MiB (64 instances)\nL3 cache:                                256 MiB (8 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-127\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; Safe RET\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Mitigation; Clear CPU buffers\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB before exit to userspace\n",
+  "status": " M .github/workflows/rust.yml\n?? research/giac/\n",
+  "environment": {
+    "RUSTFLAGS": null,
+    "RUSTC_WRAPPER": "",
+    "CARGO_TARGET_DIR": "/buildcache/cargo-target/zeebra-740",
+    "TMPDIR": "/buildcache/cargo-target/zeebra-740/tmp",
+    "LD_LIBRARY_PATH": null,
+    "ZEEBRA_GIAC": "/buildcache/cargo-target/zeebra-740/giac/usr/bin/icas",
+    "ZEEBRA_GIAC_LIBRARY_PATH": "/buildcache/cargo-target/zeebra-740/giac/usr/lib:/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu",
+    "ZEEBRA_MACHINE": "zeebra-5995wx",
+    "ZEEBRA_SINGULAR": "/usr/lib64/Singular/Singular",
+    "SINGULAR_DATA_DIR": "/usr/share"
+  },
+  "giac_ldd": "\tlinux-vdso.so.1 (0x00007fdce80f5000)\n\tlibgiac.so.0 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/libgiac.so.0 (0x00007fdce6600000)\n\tlibxcas.so.0 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/libxcas.so.0 (0x00007fdce6200000)\n\tlibfltk.so.1.3 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libfltk.so.1.3 (0x00007fdce60cc000)\n\tlibfltk_gl.so.1.3 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libfltk_gl.so.1.3 (0x00007fdce8095000)\n\tlibreadline.so.8 => /lib64/libreadline.so.8 (0x00007fdce8015000)\n\tlibgsl.so.27 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgsl.so.27 (0x00007fdce5c00000)\n\tlibstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007fdce5800000)\n\tlibgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007fdce7fe6000)\n\tlibc.so.6 => /lib64/libc.so.6 (0x00007fdce5ed3000)\n\tlibntl.so.44 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libntl.so.44 (0x00007fdce5400000)\n\tlibpari-gmp-tls.so.8 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libpari-gmp-tls.so.8 (0x00007fdce4600000)\n\tlibnauty.so.2 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libnauty.so.2 (0x00007fdce6592000)\n\tlibsamplerate.so.0 => /lib64/libsamplerate.so.0 (0x00007fdce5291000)\n\tlibao.so.4 => /lib64/libao.so.4 (0x00007fdce7fda000)\n\tlibpng16.so.16 => /lib64/libpng16.so.16 (0x00007fdce7f9d000)\n\tlibecm.so.1 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libecm.so.1 (0x00007fdce5b73000)\n\tlibmpfi.so.0 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libmpfi.so.0 (0x00007fdce6579000)\n\tlibmpfr.so.6 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libmpfr.so.6 (0x00007fdce5ab9000)\n\tlibgmp.so.10 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgmp.so.10 (0x00007fdce577f000)\n\tlibm.so.6 => /lib64/libm.so.6 (0x00007fdce44e9000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007fdce80f7000)\n\tlibjpeg.so.62 => /lib64/libjpeg.so.62 (0x00007fdce56db000)\n\tlibz.so.1 => /lib64/libz.so.1 (0x00007fdce654f000)\n\tlibXrender.so.1 => /lib64/libXrender.so.1 (0x00007fdce7f8c000)\n\tlibXext.so.6 => /lib64/libXext.so.6 (0x00007fdce653b000)\n\tlibXft.so.2 => /lib64/libXft.so.2 (0x00007fdce6520000)\n\tlibfontconfig.so.1 => /lib64/libfontconfig.so.1 (0x00007fdce4496000)\n\tlibXinerama.so.1 => /lib64/libXinerama.so.1 (0x00007fdce7f88000)\n\tlibXfixes.so.3 => /lib64/libXfixes.so.3 (0x00007fdce56d3000)\n\tlibX11.so.6 => /lib64/libX11.so.6 (0x00007fdce4341000)\n\tlibGL.so.1 => /lib64/libGL.so.1 (0x00007fdce42ce000)\n\tlibXcursor.so.1 => /lib64/libXcursor.so.1 (0x00007fdce56c6000)\n\tlibtinfo.so.6 => /lib64/libtinfo.so.6 (0x00007fdce42a1000)\n\tlibgslcblas.so.0 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgslcblas.so.0 (0x00007fdce425f000)\n\tlibgf2x.so.3 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgf2x.so.3 (0x00007fdce56b5000)\n\tlibcliquer.so.1 => /buildcache/cargo-target/zeebra-740/giac/usr/lib/libcliquer.so.1 (0x00007fdce527f000)\n\tlibfreetype.so.6 => /lib64/libfreetype.so.6 (0x00007fdce4183000)\n\tlibxml2.so.2 => /lib64/libxml2.so.2 (0x00007fdce4014000)\n\tlibxcb.so.1 => /lib64/libxcb.so.1 (0x00007fdce3fea000)\n\tlibGLX.so.0 => /lib64/libGLX.so.0 (0x00007fdce3fb9000)\n\tlibGLdispatch.so.0 => /lib64/libGLdispatch.so.0 (0x00007fdce3f41000)\n\tlibbz2.so.1 => /lib64/libbz2.so.1 (0x00007fdce526b000)\n\tlibharfbuzz.so.0 => /lib64/libharfbuzz.so.0 (0x00007fdce3e05000)\n\tlibbrotlidec.so.1 => /lib64/libbrotlidec.so.1 (0x00007fdce3df6000)\n\tliblzma.so.5 => /lib64/liblzma.so.5 (0x00007fdce3dc0000)\n\tlibXau.so.6 => /lib64/libXau.so.6 (0x00007fdce5ece000)\n\tlibglib-2.0.so.0 => /lib64/libglib-2.0.so.0 (0x00007fdce3c5e000)\n\tlibgraphite2.so.3 => /lib64/libgraphite2.so.3 (0x00007fdce3c3e000)\n\tlibbrotlicommon.so.1 => /lib64/libbrotlicommon.so.1 (0x00007fdce3c1b000)\n\tlibpcre2-8.so.0 => /lib64/libpcre2-8.so.0 (0x00007fdce3b68000)\n",
+  "singular_ldd": "\tlinux-vdso.so.1 (0x00007f879506d000)\n\tlibSingular-4.4.1.so => /lib64/libSingular-4.4.1.so (0x00007f8794c00000)\n\tlibpolys-4.4.1.so => /lib64/libpolys-4.4.1.so (0x00007f8794aa7000)\n\tlibfactory-4.4.1.so => /lib64/libfactory-4.4.1.so (0x00007f8794800000)\n\tlibsingular_resources-4.4.1.so => /lib64/libsingular_resources-4.4.1.so (0x00007f8795037000)\n\tlibomalloc-0.9.6.so => /lib64/libomalloc-0.9.6.so (0x00007f879502c000)\n\tlibgmp.so.10 => /lib64/libgmp.so.10 (0x00007f8794f83000)\n\tlibc.so.6 => /lib64/libc.so.6 (0x00007f8794607000)\n\tlibccluster.so.1 => /lib64/libccluster.so.1 (0x00007f8794560000)\n\tlibflint.so.22 => /lib64/libflint.so.22 (0x00007f8793800000)\n\tlibreadline.so.8 => /lib64/libreadline.so.8 (0x00007f8794f22000)\n\tlibstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007f8793400000)\n\tlibm.so.6 => /lib64/libm.so.6 (0x00007f8794449000)\n\tlibgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007f8794ef3000)\n\tlibntl.so.45 => /lib64/libntl.so.45 (0x00007f8793000000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007f879506f000)\n\tlibflexiblas.so.3 => /lib64/libflexiblas.so.3 (0x00007f8792a00000)\n\tlibmpfr.so.6 => /lib64/libmpfr.so.6 (0x00007f879373f000)\n\tlibtinfo.so.6 => /lib64/libtinfo.so.6 (0x00007f8794a7a000)\n\tlibgf2x.so.3 => /lib64/libgf2x.so.3 (0x00007f8794a68000)\n\tlibgfortran.so.5 => /lib64/libgfortran.so.5 (0x00007f8792600000)\n\tlibquadmath.so.0 => /lib64/libquadmath.so.0 (0x00007f8794401000)\n",
+  "giac_binary_sha256": "ca29bb964382fcdfa206417570aed032e2fc3865e868355e91ef5326c89bdd5e",
+  "singular_binary_sha256": "f35112080f257b6b7886387bf5ad45f237290697ad55c17132ee804339f33b69",
+  "runtime_library_sha256": {
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/libcliquer.so.1": "844efb24c50e7f30051ce9896e892fb3fb9dfe6fc61e3cfe245c6a8b96fe2b04",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/libgiac.so.0": "fddc2809bf073e622c317e3257e4907b25e53d378df3a18c239cb941fd7ef6f2",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/libxcas.so.0": "a703a0fd3988a913b9d5bff5d8ed5e7a22c26284cc78d3162cd858bab28ec422",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libecm.so.1": "9f1f7fe5cd422c192a4b5a42c1831c949a947dc247d59f93af1ca61c6166209d",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libfltk.so.1.3": "5ef204651ff9f073afd70a4aabc5dfd80f189f9896281653e36aa4c4789b914d",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libfltk_gl.so.1.3": "08dfe29210274e8d7424b3b2393acaf62a221aacb08cafeaaddcc58259481d2f",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgf2x.so.3": "e7956bc61cd3646bb9084e730d467083e8b3613163c4f4831e67a64723ecfc74",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgmp.so.10": "7376c9af0afd6e7698a64ee19de3c8a0199418664974384c70435a51c7ff7f3f",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgsl.so.27": "5d02bd0b38d6e269ae673dcf70e7956ba09dd339ab0da5410e36b61deb010cbc",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libgslcblas.so.0": "76b62b786b68d4ac2db2d3e1d0e56e1c26a5a55f769ca8cffe0dcec8d1564c69",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libmpfi.so.0": "3a88e42c189530675ad8c8596e7d6a375c381ae58c8707faab0de85d74aa70a7",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libmpfr.so.6": "699a9c255a6509956ce5c642b6fb4a6dc70a670f8eba8a0925cfdc26fc9069fa",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libnauty.so.2": "1f9323c1b37a823e66985b09a0834ea68027bf8f5e3fccccffb3fdadf69c0daa",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libntl.so.44": "c92025b0e1b8f07fb0b2f8c536da82e3c9655163018743825dfbe68c450c5164",
+    "/buildcache/cargo-target/zeebra-740/giac/usr/lib/x86_64-linux-gnu/libpari-gmp-tls.so.8": "20108355fa2064a834d9f88c36202579813f8719118987ae68b1d8d5ddf50412",
+    "/lib64/libGL.so.1": "cc4380adee239f7d4e0b5674ffde3d3add2e030778fb48db290bd96eafaf50e5",
+    "/lib64/libGLX.so.0": "e2b8a09e81b686d1184fd7d60e69673bc7bfc7a89ce0ff1ba843a2450542e01b",
+    "/lib64/libGLdispatch.so.0": "3c53e14fb731128afe1fa1c88e94944fe9a60cbe170f2e08c1134b709d771ec7",
+    "/lib64/libSingular-4.4.1.so": "271e351dd7bd78687607ee317c8e907645de24fb88b1d30264d9447b0a8d73b1",
+    "/lib64/libX11.so.6": "95b9ecfbde1b73c7f7380ae643e8ade9555234607a47d7e131ae6365a9899244",
+    "/lib64/libXau.so.6": "78e2e7a514a6844530b099c7dfb184a9992f7b0681c30105281ddb8e48dc8a59",
+    "/lib64/libXcursor.so.1": "64b20bf5a9382108cdfd1be6cdc7f48b1847efec3687eafd87223e03d7e7e00c",
+    "/lib64/libXext.so.6": "09056dd620dc643dc1c2ed20041fa11de6a981dd0f618d6785124b4bdc607a1e",
+    "/lib64/libXfixes.so.3": "6160ee5edaa0aa4e96d263b16fcc41892567e82aca7e6d5bbb2a3d2e2bc4fa6f",
+    "/lib64/libXft.so.2": "acd4c412db6e9fe2bbfa79d0acdb4b7fed07363d96a85966503789f6fa2ab062",
+    "/lib64/libXinerama.so.1": "c26b04205179ad676e6167d3a400096de6fbe7df37b9ac413c0c392219eadfba",
+    "/lib64/libXrender.so.1": "4f7ea2102236e35b7844d83ba1bfc2ed6a74a62e6b51468e9801e3fa3b3ad31e",
+    "/lib64/libao.so.4": "0e94610a88fadf31512ada20ad0bcdf5e02a08956fc0001e01faede4b6137239",
+    "/lib64/libbrotlicommon.so.1": "d0501f380203f533498674319b3a6b7423d73291d275745d83f42e192b432b7b",
+    "/lib64/libbrotlidec.so.1": "21868d1903d40115e32d81cf2b1bb6995ce3d418e149793d88dbf4780542d987",
+    "/lib64/libbz2.so.1": "ef3c4ed7e70d03d7c406fb1cea9552e74d0b20006e7d8f66a60dc1a6009f4800",
+    "/lib64/libc.so.6": "a5c5ad9d59d3c69eda93aa8f82930ba06cc4e893a113e66c85ad6e96243d53c8",
+    "/lib64/libccluster.so.1": "5241c9222fd150f43e505c42819965068bcbe2e13305605efceaef289f154f0d",
+    "/lib64/libfactory-4.4.1.so": "e9073c42d532a57850e7c5e23c2f98e88af62ece3f13c90ba25c551f048c96e1",
+    "/lib64/libflexiblas.so.3": "94d9315da5914743107af2df4c407a410a5ada0fad715a4297f1028054750653",
+    "/lib64/libflint.so.22": "7d1cf5c296cfa604d88acf5f44d18cc65c05a4dcb69d1746e647b5ca037fa9dc",
+    "/lib64/libfontconfig.so.1": "ab67796a1071ee7fe53d89d4ece93a3805134d9c21931687a4f05fa5132036fd",
+    "/lib64/libfreetype.so.6": "8b3027d90bfcbdf021679e4ea72b8479d59b51bb3c4af4839fc4e32c51d07018",
+    "/lib64/libgcc_s.so.1": "5a52ae4a6f1b119aa092aa1483c967e19d9ba036b1b0c2133236a8a2ce826ebf",
+    "/lib64/libgf2x.so.3": "dd7b7ea8e1220d6ba4adbcd63344a4f982ab7877d120e614179b3c462aa1ad95",
+    "/lib64/libgfortran.so.5": "d4b3a93cbd67561c5febd49d7bd035796d3b2b03a8d659d7ddf869321173f186",
+    "/lib64/libglib-2.0.so.0": "e9a6099dac743c8f910fb201da63f45ad6d7b4025110409474ec2661e57fa91e",
+    "/lib64/libgmp.so.10": "47e2550d2f19c8c87886d82db6ed4896db9342e3f26f6d992911c4f037b6ef5d",
+    "/lib64/libgraphite2.so.3": "1e1e6f204c01d7e790d4d8fa55205ac030926863565327724ad1bea0b05071b8",
+    "/lib64/libharfbuzz.so.0": "1ad30cd84f030ac9aa2bda6edba150d612cab3534da0e42fd1102dffc286e5e5",
+    "/lib64/libjpeg.so.62": "beb79376b4544260da3c31603784c908b58bdb959cbe1d8c48075dfa7d5bc80c",
+    "/lib64/liblzma.so.5": "18b4994cd29a3e39f35ad719702925740703e76057fb2ce8c0eb7c7ce7a3acef",
+    "/lib64/libm.so.6": "16a03ce6d24c8a46742206d4a9c1d35bb6577ae2384f153dc6ef4a4b62b5357f",
+    "/lib64/libmpfr.so.6": "d9cd83626df4c3962e5ade80d901763a1952ef43a26a0403a28e6cbf27decfb2",
+    "/lib64/libntl.so.45": "28da69b269c3c236caeeff3634b247c79342bcf86c7ab1ca0077286024a6d679",
+    "/lib64/libomalloc-0.9.6.so": "a9d0e458129a96fc7937aaf09bf3c24d0475f1a70d85132a5a19ed31ab9ba0d1",
+    "/lib64/libpcre2-8.so.0": "2993edd0e39039306ea31368eff16879f03502c3938d4ea3e7ec6c7216d933f8",
+    "/lib64/libpng16.so.16": "536a1ed876bffe5a7e9204aae387d4da2d4a969bf716bbcf4a03c30a8dea0cde",
+    "/lib64/libpolys-4.4.1.so": "ea91a485fddd4ce7ad87613f5a306fde42e76c0fb24cf9aedebc6c33d188aac5",
+    "/lib64/libquadmath.so.0": "d871b1028e4efc3f201e728f50b5d9d652019f29899be53df8e647e8338891e9",
+    "/lib64/libreadline.so.8": "c269f96b057ad5dd84d94311fe7ddd2a3d640d0af6515c0e43f95ef9af4a9f12",
+    "/lib64/libsamplerate.so.0": "842508b79594caec711a0cfa8b2c341b22b432e5a2beded5083cd23dfd7adede",
+    "/lib64/libsingular_resources-4.4.1.so": "b125ba97f299b8ece8ee0bed1dbfb2b8570e674a5f37a300da29e99eeca4d5b2",
+    "/lib64/libstdc++.so.6": "49811507d8fc0283d8f8023546613774c673f876fe823b1b99d0c8d46039deda",
+    "/lib64/libtinfo.so.6": "b053da6b12bebc6e239835fbb646d46f26c97942b3098ac7b01604f8ce827679",
+    "/lib64/libxcb.so.1": "15fd80f8917a44ec68c17a322648a5c576c3fc3bc7745c691573bd6d24ade7eb",
+    "/lib64/libxml2.so.2": "8473a76caaed1e702f5c4f2dfac69b4aa92d2f18217edcf23c73214ea7750ab5",
+    "/lib64/libz.so.1": "bbde8faec092a7c67b8bd76bbba4a826e61b05c171b97004ce6b308c5a090351"
+  },
+  "inputs": {
+    "mq-random-10@32003": "mq-random-10 16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f",
+    "katsura-11@32003": "katsura-11 c6802b0391f8394f38f2d5807f3c0d197cae6a592a875c3b65c38b41f949b378",
+    "cyclic-5@32003": "cyclic-5 e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
+    "mq-random-10@2147483647": "mq-random-10 72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+    "katsura-11@2147483647": "katsura-11 03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13",
+    "cyclic-5@2147483647": "cyclic-5 3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037"
+  },
+  "load_final": [
+    1.1435546875,
+    1.29931640625,
+    1.3427734375
+  ]
+}

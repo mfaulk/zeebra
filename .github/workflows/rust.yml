@@ -277,6 +277,13 @@ jobs:
           bash tools/test/check-measurement-provenance-test.sh
           bash tools/test/ci-scope-test.sh
 
+      - name: Giac comparand artifacts
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/giac -p 'test_*.py'
+          python3 research/giac/summary.py > "$RUNNER_TEMP/giac-table.md"
+          diff -u research/giac/table.md "$RUNNER_TEMP/giac-table.md"
+
       - name: NTT caller gate artifacts
         if: ${{ !cancelled() }}
         run: |

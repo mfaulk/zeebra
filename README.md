@@ -206,6 +206,8 @@ Giac's modular grevlex route is available through `GiacSolver` and
 `competitive_sweep --engines giac`. Each completed basis is checked coefficient
 for coefficient with Singular. See the [Giac setup and limits](docs/guide/external-engines.md#giac-modular-grevlex-comparand)
 for installation, worker cohorts, and supported fields/tasks.
+The [acceptance cohort](docs/research/giac-comparand.md) retains exact MQ/Cyclic
+agreement and the reproducible Katsura-11 resource limit.
 
 ### Cargo features
 

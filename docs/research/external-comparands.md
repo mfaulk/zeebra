@@ -766,3 +766,7 @@ registers that route only. Live script checks establish the `threads` assignment
 printing. Unsupported tasks/fields stay capability rows. Each accepted answer
 also requires exact full reduced-basis equality with independent Singular.
 See the [usage guide](../guide/external-engines.md#giac-modular-grevlex-comparand).
+
+The [retained acceptance cohort](giac-comparand.md) records full MQ/Cyclic
+equivalence and the bounded Katsura-11 blocker, including source recovery and
+runtime dependency provenance.

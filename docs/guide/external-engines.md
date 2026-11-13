@@ -779,3 +779,7 @@ row and `--write` only when intentionally appending to competitive history.
 
 The configured serial Zeebra engine is refused in multiworker sweep cohorts,
 so a serial solve cannot be recorded under a parallel worker count.
+
+The [Giac acceptance study](../research/giac-comparand.md) retains the five-repeat
+MQ/Cyclic cohorts and the Katsura-11 60-second wall stops. These limit stops
+provide no completed answer or speedup denominator.
