@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import Mock, patch
 
 PATH = Path(__file__).resolve().parents[1] / 'external/worker-pool-study.py'
 spec = importlib.util.spec_from_file_location('study', PATH)
@@ -30,6 +31,19 @@ class Contract(unittest.TestCase):
             study.summarize({'attempts': []})
         with self.assertRaisesRegex(ValueError, 'missing or duplicated'):
             study.summarize({'end_load': [0], 'attempts': [], 'plan': {'phase': 'floor', 'workers': [1], 'systems': [], 'repeats': 1}})
+
+    # Interrupting supervision kills and reaps the owned process group before returning failure.
+    def test_interrupt_reaps_child(self):
+        child = Mock(pid=12345, returncode=-9)
+        child.communicate.side_effect = [KeyboardInterrupt(), (b'', b'')]
+        with patch.object(study.subprocess, 'Popen', return_value=child), patch.object(study.guard, 'tree_hwm', return_value=0), patch.object(study.os, 'killpg') as kill:
+            try:
+                row = study.attempt(Path('/binary'), ['floor', 'parked', '2', '0'], [0, 1])
+            except KeyboardInterrupt:
+                self.fail('supervisor abandoned its owned child')
+        self.assertEqual(row['outcome'], 'interrupted')
+        kill.assert_called_once_with(12345, study.signal.SIGKILL)
+        self.assertEqual(child.communicate.call_count, 2)
 
 if __name__ == '__main__':
     unittest.main()

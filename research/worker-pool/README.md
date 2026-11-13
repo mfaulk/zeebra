@@ -37,7 +37,8 @@ GF(2), and GF(2^8), and check cancellation, panic recovery, result completeness 
   cold and warm whole-border, closure and reduction times, cells zeroed and capacities. The second
   run is the warm primary; keep both. Scoped groups allocate fresh scratch; pools reuse it.
 - A 60-second/2-GiB descendant guard per child and an outer 900-second timeout bound the campaign.
-  Unsuccessful attempts remain in the cohort and stop it. The runner refuses active compilers before starting. Start load must be below eight inside
+  Each completed attempt is flushed to an append-only JSONL journal; the compressed cohort is
+  written once at completion or interruption. Unsuccessful attempts remain in the cohort and stop it. The runner refuses active compilers before starting. Start load must be below eight inside
   the lock; every attempt records load, CPU time, full process wall and process peak RSS.
 - Treat median warm dispatch at least 4x below scoped dispatch at 2/8/32 workers as a material
   infrastructure result. This is not a solver speedup. For a border follow-up, require at least

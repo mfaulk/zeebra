@@ -73,7 +73,7 @@ def cpu_order(topology, allowed):
 
 def save(path, record):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(path, 'wt') as stream:
+    with gzip.open(path, 'wt', compresslevel=1) as stream:
         json.dump(record, stream)
 
 
@@ -85,17 +85,25 @@ def attempt(binary, cell, cpus):
     # communicate drains output while enforcing time; the existing guard samples process-tree RSS.
     peak = 0
     outcome = 'complete'
-    while True:
-        peak = max(peak, guard.tree_hwm(process.pid))
-        try:
-            stdout, stderr = process.communicate(timeout=0.005)
-            break
-        except subprocess.TimeoutExpired:
-            if time.monotonic_ns() - at > 60_000_000_000 or peak > 2 * 1024**3:
-                outcome = 'wall-budget' if time.monotonic_ns() - at > 60_000_000_000 else 'rss-budget'
-                os.killpg(process.pid, signal.SIGKILL)
-                stdout, stderr = process.communicate()
+    try:
+        while True:
+            peak = max(peak, guard.tree_hwm(process.pid))
+            try:
+                stdout, stderr = process.communicate(timeout=0.005)
                 break
+            except subprocess.TimeoutExpired:
+                if time.monotonic_ns() - at > 60_000_000_000 or peak > 2 * 1024**3:
+                    outcome = 'wall-budget' if time.monotonic_ns() - at > 60_000_000_000 else 'rss-budget'
+                    os.killpg(process.pid, signal.SIGKILL)
+                    stdout, stderr = process.communicate()
+                    break
+    except KeyboardInterrupt:
+        outcome = 'interrupted'
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        stdout, stderr = process.communicate()
     elapsed = time.monotonic_ns() - at
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
     row = dict(cell=cell, cpus=cpus, outcome=outcome, exit=process.returncode,
@@ -200,25 +208,35 @@ def main():
                   rustc=subprocess.check_output(['rustc', '-Vv'], text=True), topology=topology,
                   environment={k: os.environ.get(k) for k in ['ZEEBRA_MACHINE', 'ZEEBRA_AFFINITY', 'RUSTFLAGS', 'CARGO_TARGET_DIR', 'TMPDIR']},
                   command=list(os.sys.argv), start_load=os.getloadavg(), attempts=[])
-    for repeat in range(args.repeats):
-        for phase in (['floor', 'border'] if args.phase == 'all' else [args.phase]):
-            cases = [[str(work)] for work in [0, 256, 65536]] if phase == 'floor' else [[system, size] for system in args.systems.split(',') for size in ['64', 'all']]
-            for case in cases:
-                for width in workers:
-                    backends = ['scoped', 'parked', 'rayon']
-                    backends = backends[repeat % 3:] + backends[:repeat % 3]
-                    for backend in backends:
-                        row = attempt(args.binary, [phase, backend, str(width), *case], cpus[:width])
-                        row['repeat'] = repeat
-                        record['attempts'].append(row)
-                        save(args.output, record)
-                        print(len(record['attempts']), row['cell'], row['outcome'], flush=True)
-                        if row['outcome'] != 'complete':
-                            raise SystemExit('retained unsuccessful attempt; stop campaign')
-    if sha(args.binary) != record['binary_sha256']:
-        raise SystemExit('binary changed during campaign')
-    record['end_load'] = os.getloadavg()
+    def interrupted(_signum, _frame):
+        raise KeyboardInterrupt
+    for sig in [signal.SIGTERM, signal.SIGHUP]:
+        signal.signal(sig, interrupted)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     save(args.output, record)
+    try:
+        with Path(str(args.output) + '.journal.jsonl').open('w') as journal:
+            for repeat in range(args.repeats):
+                for phase in (['floor', 'border'] if args.phase == 'all' else [args.phase]):
+                    cases = [[str(work)] for work in [0, 256, 65536]] if phase == 'floor' else [[system, size] for system in args.systems.split(',') for size in ['64', 'all']]
+                    for case in cases:
+                        for width in workers:
+                            backends = ['scoped', 'parked', 'rayon']
+                            backends = backends[repeat % 3:] + backends[:repeat % 3]
+                            for backend in backends:
+                                row = attempt(args.binary, [phase, backend, str(width), *case], cpus[:width])
+                                row['repeat'] = repeat
+                                record['attempts'].append(row)
+                                journal.write(json.dumps(row) + '\n')
+                                journal.flush()
+                                print(len(record['attempts']), row['cell'], row['outcome'], flush=True)
+                                if row['outcome'] != 'complete':
+                                    raise SystemExit('retained unsuccessful attempt; stop campaign')
+            if sha(args.binary) != record['binary_sha256']:
+                raise SystemExit('binary changed during campaign')
+            record['end_load'] = os.getloadavg()
+    finally:
+        save(args.output, record)
 
 
 if __name__ == '__main__':
