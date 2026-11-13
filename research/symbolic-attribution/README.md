@@ -16,10 +16,12 @@ tools/benchlock.sh symbolic-742 timeout --signal=INT --kill-after=60s 600 \
   taskset -c 4 "$CARGO_TARGET_DIR/release/examples/symbolic_attribution" > research/symbolic-attribution/replay.tsv
 ```
 
-The six arms are first-applicable (baseline), unique pair multiples (`dedup`),
+The arms are first-applicable (baseline), unique pair multiples (`dedup`),
 first-applicable among minimal leading monomials (`active`), both filters
 (`active-dedup`), last-applicable (`newest`), and fewest terms with an earlier-index
-tie break (`sparse`). `excluded` counts elements removed from the reducer search,
+tie break (`sparse`), and increasing initial-generator leading monomial order
+(`input-order`), alone and combined with the filters. Only the original input
+prefix is reordered; appended elements retain Zeebra order. `excluded` counts elements removed from the reducer search,
 not from the frozen basis or pair seeds. Equal leads keep the earlier element.
 
 Forward counts use the production structured Adaptive elimination and passive

@@ -24,6 +24,7 @@ enum Choice {
     First,
     Newest,
     Sparse,
+    InputOrder(usize),
 }
 
 fn eligible<const N: usize>(basis: &MonicBasis<N, F>, active: bool) -> Vec<usize> {
@@ -70,7 +71,16 @@ fn replay<const N: usize>(
             }
         }
     }
-    let candidates = eligible(basis, active);
+    let mut candidates = eligible(basis, active);
+    if let Choice::InputOrder(input_count) = choice {
+        let initial = candidates.partition_point(|&i| i < input_count);
+        candidates[..initial].sort_by(|&i, &j| {
+            basis.order().cmp(
+                &basis.element(i).leading_monomial,
+                &basis.element(j).leading_monomial,
+            )
+        });
+    }
     let mut monomials = Vec::new();
     let mut handles = HashMap::new();
     let mut term_handles = Vec::new();
@@ -101,7 +111,7 @@ fn replay<const N: usize>(
                 .filter(|&i| m.checked_div(&basis.element(i).leading_monomial).is_some())
         };
         let selected = match choice {
-            Choice::First => divisors().next(),
+            Choice::First | Choice::InputOrder(_) => divisors().next(),
             Choice::Newest => divisors().next_back(),
             Choice::Sparse => divisors().min_by_key(|&i| (basis.element(i).terms.len(), i)),
         };
@@ -155,6 +165,24 @@ fn main() {
             ("active-dedup", Choice::First, true, true),
             ("newest", Choice::Newest, false, false),
             ("sparse", Choice::Sparse, false, false),
+            (
+                "input-order",
+                Choice::InputOrder(system.len()),
+                false,
+                false,
+            ),
+            (
+                "input-order-dedup",
+                Choice::InputOrder(system.len()),
+                false,
+                true,
+            ),
+            (
+                "input-order-active-dedup",
+                Choice::InputOrder(system.len()),
+                true,
+                true,
+            ),
         ] {
             let pre = replay(&batch.basis, &batch.pairs, choice, active, dedup);
             if name == "baseline" {
@@ -237,6 +265,25 @@ mod tests {
         assert_eq!(full.rows.len() - unique.rows.len(), 2);
         assert_eq!(full.monomials, unique.monomials);
         assert_eq!(full.leading_monomials, unique.leading_monomials);
+    }
+
+    // Sorting only input reducers by increasing lead changes the reducer selected for x squared.
+    #[test]
+    fn input_order_searches_smallest_initial_lead_first() {
+        let (basis, pairs) = fixture();
+        let rows = replay(&basis, &pairs, Choice::InputOrder(4), false, false);
+        let square = MultivariatePolynomial::<3, F>::parse("x^2", ["x", "y", "z"])
+            .unwrap()
+            .leading_monomial(basis.order());
+        let row = rows
+            .rows
+            .iter()
+            .find(|row| {
+                matches!(row.kind, RowKind::Reducer)
+                    && basis.element(row.basis_index).leading_monomial * &row.multiplier == square
+            })
+            .unwrap();
+        assert_eq!(row.basis_index, 3);
     }
 
     // Active filtering excludes divisible old leads and keeps the earlier of equal leads.
