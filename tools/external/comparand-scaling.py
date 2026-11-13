@@ -197,6 +197,8 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
     refusal = capability(engine, workers, case['modulus'])
     if refusal:
         return dict(status='unsupported', detail=refusal)
+    if engine=='zeebra':
+        return dict(status='not-measured',detail='current serial whole-route baseline is owned by #751; no parallel shipping route')
     request = dict(variables=case['variables'], modulus=case['modulus'], order='grevlex',
                    generators=case['generators'], workers=workers)
     if engine in ('groebner-rs', 'grobx', 'grobx-certified'):
@@ -237,6 +239,12 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
                         or hashlib.sha256(raw.get('input_text','').encode()).hexdigest()!=raw.get('input_sha256')):
                     raise ValueError('grobx exact certificate absent or rejected')
                 basis=wide.grobx_work.basis_list(raw['basis'])
+                echoes=raw.get('generator_echoes',[])
+                if len(echoes)!=len(case['generators']):
+                    raise ValueError('certified driver changed generator count')
+                for original,echo in zip(case['generators'],echoes):
+                    polys=wide.grobx_work.basis_list(echo)
+                    verify_basis(polys,[original],case)
             else:
                 basis = wide.validate_native(raw, request, engine)
             attempt.update(raw=raw, basis=basis, engine_wall_ns=raw.get('solve_ns'))
@@ -339,7 +347,7 @@ def main():
     parser.add_argument('--scratch',type=Path)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--rows',default='katsura-4,mq-random-10,katsura-11,cyclic-7,cyclic-10,katsura-9')
-    parser.add_argument('--engines',default='msolve,groebner.jl,groebner-rs,grobx')
+    parser.add_argument('--engines',default='msolve,groebner.jl,groebner-rs,grobx,zeebra')
     parser.add_argument('--fields',default='32003,2147483647,wide64,goldilocks')
     parser.add_argument('--references',type=Path,help='previous exact-reference cohort; hashes and full evidence retained')
     parser.add_argument('--certify',action='store_true',help='one bounded independent grobx exact/cofactor reference per input')
@@ -371,7 +379,7 @@ def main():
         engines=['grobx']
         workers=[1]
         args.repeats=1
-    binaries={engine:dict(path=shutil.which({'groebner.jl':'julia','groebner-rs':os.environ.get('ZEEBRA_GROEBNER_RS_DRIVER','groebner-rs-driver'),'grobx':'grobx-driver'}.get(engine,engine))) for engine in engines}
+    binaries={engine:dict(path=shutil.which({'groebner.jl':'julia','groebner-rs':os.environ.get('ZEEBRA_GROEBNER_RS_DRIVER','groebner-rs-driver'),'grobx':'grobx-driver'}.get(engine,engine))) for engine in engines if engine!='zeebra'}
     for engine,b in binaries.items():
         if not b['path']:parser.error('unprovisioned '+engine)
         b['sha256']=hashlib.sha256(Path(b['path']).read_bytes()).hexdigest()
@@ -388,14 +396,18 @@ def main():
         started_at=datetime.now(timezone.utc).isoformat(),machine=os.environ.get('ZEEBRA_MACHINE'),
         cpu=platform.processor(),platform=platform.platform(),physical_cpus=cpus,binaries=binaries,
         rustc=subprocess.check_output(['rustc','-vV'],text=True),policy=vars(args)|{'binary':str(args.binary),'scratch':str(args.scratch),'output':str(args.output)},
-        references=refs,cases=cases,attempts=[], input_exporter=dict(path=str(args.binary),sha256=hashlib.sha256(args.binary.read_bytes()).hexdigest()))
+        references=refs,cases=cases,attempts=[], input_exporter=dict(path=str(args.binary),sha256=hashlib.sha256(args.binary.read_bytes()).hexdigest(),
+            source_commit='e131a0829a94d9d4bfeff1bc2404c56f2a175e1e',build='debug; input-only; outside every timed region'),
+        effective_environment=dict(GROEBNER_NO_THREADED='0',OPENBLAS_NUM_THREADS='1',OMP_DYNAMIC='FALSE',
+                                   ZEEBRA_RESEARCH_THREAD_TICKS='removed from timing arms; explicitly enabled only in diagnostics'))
     if args.references:
         cohort['policy']['references']=str(args.references)
     for engine,b in binaries.items():
         if engine in ('groebner-rs','grobx'):
             b['version']=json.loads(subprocess.check_output([b['path'],'--version'],text=True))
         elif engine=='msolve':
-            b['version']=subprocess.run([b['path'],'--version'],text=True,capture_output=True).stdout
+            version=subprocess.run([b['path'],'-V'],text=True,capture_output=True,check=True)
+            b['version']=version.stdout+version.stderr
     julia_source=Path(os.environ.get('JULIA_DEPOT_PATH',''))/'packages/Groebner/Aqs1M'
     manifest=Path(os.environ.get('JULIA_DEPOT_PATH',''))/'environments/v1.12/Manifest.toml'
     if not manifest.exists():

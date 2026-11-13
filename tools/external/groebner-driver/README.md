@@ -24,6 +24,16 @@ polynomial strings in `generators`. Output is JSON containing the parsed ring, g
 from engine polynomials, the full canonicalized basis and leading monomials, actual pool workers,
 upstream revision, allocator/features, compile-time ISA and a build identity hashing the driver,
 manifest, lockfile, toolchain file and effective compiler/profile settings, plus `rustc -Vv`.
+The `workers` response describes Rayon pool capacity, not observed simultaneous CPU use.
+
+For separate Linux research diagnostics, setting `ZEEBRA_RESEARCH_THREAD_TICKS=1` adds
+`hot_thread_cpu_ticks` with per-OS-thread user-plus-system CPU ticks before and after the F4 call.
+Pool construction precedes these snapshots and output serialization follows them. Positive deltas
+show observed CPU-active participants, a lower bound because exited threads and sub-tick work can
+be missed; they do not prove that every participant ran simultaneously. Snapshot work surrounds
+the timed call, so its CPU deltas are not an exact solve-only CPU timer. Ordinary driver output
+omits this diagnostic field. Timing campaigns explicitly remove the variable and keep diagnostics
+separate; see the [scaling study](../../../research/comparand-scaling/README.md).
 
 `parse_ns` includes ring/polynomial parsing, generator echo construction and pool initialization.
 Input file reading and JSON decoding precede that timer and remain in child wall time. `solve_ns`
