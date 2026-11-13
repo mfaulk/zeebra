@@ -32,7 +32,9 @@ heuristic is bundled into this prototype.
 For the recorded serial campaign, create a checkout at controller `c148058b`; its Rust/Cargo
 files are byte-identical to the `0ed4fe33` build pin. Use rustc 1.99.1 as recorded. The commands
 below rerun the protocol in that checkout; run offline artifact validation in the PR checkout,
-which contains the later summary tools. Keep separate build directories for the serial and
+which contains the later summary tools. The recorded host uses mold; incremental caching
+was enabled for both builds. The explicit flags below pin that setup rather than inheriting
+a user override. Keep separate build directories for the serial and
 combined revisions.
 
 ```sh
@@ -43,6 +45,8 @@ cd ../zeebra-269-serial-repro
 ```sh
 export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-269
 export RUSTC_WRAPPER=''
+export CARGO_INCREMENTAL=1
+export RUSTFLAGS='-C target-cpu=x86-64-v3 -C link-arg=-fuse-ld=mold'
 export TMPDIR="$CARGO_TARGET_DIR/tmp"
 mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR/frozen"
 cargo test --features research-work --lib linalg::selective
@@ -171,3 +175,7 @@ row aggregation. Conservative concurrent reservations are not mathematical nonze
 
 Production integration is tracked separately in [#749](https://github.com/mfaulk/zeebra/issues/749).
 The measured prototype remains opt-in pending that contract/budget review.
+
+The crossing controller at `4c39c1bc` is byte-identical to the measured `1bf48baa` controller;
+the latter adds the exploratory-data audit and documentation. Both have the same frozen Rust
+tree as `ff15a0af`. The serial `0ed4fe33`/`c148058b` Rust/Cargo trees are likewise identical.

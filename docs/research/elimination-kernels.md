@@ -606,7 +606,8 @@ The [combined summary](../../research/selective-backward/combined-summary.json) 
 native/diagnostic answers match the full independent references and preserve the F4 pair/degree/
 shape trajectory. There are no excluded attempts or compiler-gate refusals in these cohorts.
 After waiting 1,737 seconds for the shared lock, this campaign ran on the same machine, toolchain,
-ISA/profile and allocator as above. Serial/one-worker children pin CPU 3; four-worker children pin
+ISA/profile and allocator as above. Both builds inherited `CARGO_INCREMENTAL=1`; compiler
+caching stays private and `RUSTC_WRAPPER` is disabled. Serial/one-worker children pin CPU 3; four-worker children pin
 CPUs 0–3. Native load observations are 2.06–2.93. Its times are not pooled with the earlier binary.
 
 Median complete F4 call milliseconds, five fresh processes per cell. `one` is the same concurrent
