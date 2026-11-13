@@ -143,13 +143,31 @@ fn main() {
     let order = MonomialOrder::GradedReverseLexicographic;
     let input = corpus::instance("mq-random-10", 32003, order).unwrap();
     let names: [&str; 10] = std::array::from_fn(|i| input.variables[i].as_str());
-    let system: Vec<MultivariatePolynomial<10, F>> = input
+    let mut system: Vec<MultivariatePolynomial<10, F>> = input
         .system
         .iter()
         .map(|s| MultivariatePolynomial::parse(s, names).unwrap())
         .collect();
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let sorted = match args.as_slice() {
+        [] => false,
+        [flag] if flag == "--sorted-input" => true,
+        _ => panic!("usage: symbolic_attribution [--sorted-input]"),
+    };
     let options = F4Options::default();
+    let reference = sorted.then(|| {
+        zeebra::grobner::f4_with_options(&system, order, &options)
+            .unwrap()
+            .0
+    });
+    if sorted {
+        system.sort_by(|a, b| order.cmp(&a.leading_monomial(order), &b.leading_monomial(order)));
+    }
     let (basis, _, trace) = trace_batches(&system, order, &options).unwrap();
+    if let Some(reference) = reference {
+        assert_eq!(basis, reference, "sorting input changed the reduced basis");
+    }
+    println!("# sorted_input {sorted}; sorted mode asserts exact reduced-basis equality");
     println!(
         "# mq-random-10 GF(32003) digest {} reduced_basis {}",
         input.digest(),
@@ -184,6 +202,9 @@ fn main() {
                 true,
             ),
         ] {
+            if sorted && name != "baseline" && name != "dedup" {
+                continue;
+            }
             let pre = replay(&batch.basis, &batch.pairs, choice, active, dedup);
             if name == "baseline" {
                 assert_eq!(pre.rows, baseline.rows);
@@ -284,6 +305,43 @@ mod tests {
             })
             .unwrap();
         assert_eq!(row.basis_index, 3);
+    }
+
+    // Every replay arm covers all reducible columns and maps every term handle to its shifted monomial.
+    #[test]
+    fn all_controls_preserve_closure_and_handles() {
+        let (basis, pairs) = fixture();
+        for choice in [
+            Choice::First,
+            Choice::Newest,
+            Choice::Sparse,
+            Choice::InputOrder(4),
+        ] {
+            for active in [false, true] {
+                for dedup in [false, true] {
+                    let pre = replay(&basis, &pairs, choice, active, dedup);
+                    assert!(pre
+                        .monomials
+                        .iter()
+                        .all(|m| !basis.is_top_reducible(m) || pre.leading_monomials.contains(m)));
+                    let actual: Vec<_> = pre
+                        .term_handles
+                        .iter()
+                        .map(|&h| pre.monomials[h as usize])
+                        .collect();
+                    let expected: Vec<_> = pre
+                        .rows
+                        .iter()
+                        .flat_map(|row| {
+                            basis
+                                .shifted_terms(row.basis_index, &row.multiplier)
+                                .map(|(m, _)| m)
+                        })
+                        .collect();
+                    assert_eq!(actual, expected);
+                }
+            }
+        }
     }
 
     // Active filtering excludes divisible old leads and keeps the earlier of equal leads.

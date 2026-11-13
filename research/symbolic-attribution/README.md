@@ -29,3 +29,14 @@ Forward counts use the production structured Adaptive elimination and passive
 These are frozen-batch ablations, not alternative complete F4 runs or timings.
 The active filter is a divisibility control, not an emulation of msolve's
 history-dependent redundancy flags (which also test polynomial degree).
+
+`--sorted-input` reruns the complete F4 computation with only the input generators
+sorted by increasing leading monomial. It asserts exact equality of the reduced
+basis with the original input order, then emits baseline and deduplicated frozen
+replays of the sorted run. Save it separately as `sorted.tsv`. The corpus digest
+continues to identify the original published system. The library and its pair
+criteria are unchanged.
+
+`python3 research/symbolic-attribution/summarize.py` checks the retained campaign
+against #737 and prints totals. CI runs this check and the instrument's unit tests;
+CI does not rerun the measurement campaign or require msolve.
