@@ -161,6 +161,10 @@ The pinned F4 matrix corpus has a separate opt-in large set. Run
 The default corpus walk and benchmark smoke retain the bounded small set. See the
 [corpus report](docs/research/f4-matrix-corpus.md) for capture costs and limits.
 
+The [multicore NTT caller study](docs/research/multicore-ntt.md) records the reachable
+callers, field/domain limits, and bounded Graeffe profiles. It defers threading
+until transform-only timing and worker dispatch costs establish a useful crossover.
+
 For the monomial-order dispatch and F4 column-sort replay, build with
 `cargo build --release --example monomial_order_width` and follow the pinned run command in the
 [benchmarking guide](docs/guide/benchmarking.md#monomial-order-width).

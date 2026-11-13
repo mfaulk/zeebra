@@ -276,6 +276,13 @@ jobs:
           bash tools/test/check-measurement-provenance-test.sh
           bash tools/test/ci-scope-test.sh
 
+      - name: NTT caller gate artifacts
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/ntt-caller-gate -p 'test_*.py'
+          python3 research/ntt-caller-gate/summary.py > "$RUNNER_TEMP/ntt-caller-table.md"
+          diff -u research/ntt-caller-gate/table.md "$RUNNER_TEMP/ntt-caller-table.md"
+
       # Every document that publishes a measurement says which commit it came from (#335). Separate
       # from the unit tests above because this one reads the repository's own documents: a finding
       # here is a document to fix, not a script that is broken.
