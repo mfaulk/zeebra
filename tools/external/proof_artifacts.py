@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 
-def pack_attempts(attempts, output):
+def pack_attempts(attempts, output, keys=('cofactors', 'certificate')):
     output = Path(output)
     proof_dir = output.parent / (output.name.removesuffix('.gz').removesuffix('.json') + '-proofs')
     decoder = json.JSONDecoder()
@@ -17,10 +17,11 @@ def pack_attempts(attempts, output):
         if not raw:
             continue
         decoded = json.loads(raw)
-        for key in ('cofactors', 'certificate'):
-            if not isinstance(decoded.get(key), str):
+        for key in keys:
+            value = decoded.get(key)
+            if not (isinstance(value, str) or (key == 'basis' and isinstance(value, list))):
                 continue
-            for match in re.finditer(r'"' + key + r'"\s*:\s*', raw):
+            for match in re.finditer(r'"' + re.escape(key) + r'"\s*:\s*', raw):
                 value, end = decoder.raw_decode(raw, match.end())
                 if value != decoded[key]:
                     continue
