@@ -278,6 +278,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     });
     let mut candidate_reduction = super::statistics::CandidateReductionStatistics::default();
     let mut production = |matrix: &mut MacaulayMatrix<N, F>| {
+        let mut split_clock = StageClock::new(options.measure_stages);
         let mut block = eliminate_to(
             plan,
             RowForm::Echelon,
@@ -285,6 +286,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             matrix,
             allowance,
         )?;
+        stages.forward = split_clock.lap();
         if form == RowForm::Reduced {
             let has_candidates = matrix.matrix().rows().iter().any(|row| {
                 row.leading_column().is_some_and(|column| {
@@ -324,6 +326,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
                 fallback_batches: usize::from(report.fell_back),
             };
         }
+        stages.backward = split_clock.lap();
         Ok(block)
     };
     #[cfg(feature = "research-work")]
