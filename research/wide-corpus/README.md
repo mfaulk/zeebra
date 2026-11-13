@@ -51,7 +51,8 @@ Measure a committed, clean instrument. One worker, one case/engine per fresh pro
 the Zeebra/Julia runner has a 65 s / 2 GiB tree watchdog to allow harness overhead. Watchdog kills are recorded
 with their specific cause, never as engine completions. F4 also has a cooperative live-byte budget;
 the watchdog covers memory outside its matrices. The tree RSS observation sums process high waters
-and can conservatively stop earlier than a live-RSS sum. Sampling can miss short-lived peaks.
+and can conservatively stop earlier than a live-RSS sum. Sampling can miss short-lived peaks; retained kernel high-water snapshots also enforce the ceiling
+after a completed child exits, so a missed poll cannot turn a recorded overrun into timing evidence.
 The Julia adapter also enforces its 2-GiB subprocess RSS ceiling. Native drivers are supervised
 directly; their process wall excludes separate verification computations.
 The campaign resumes only when commit, binaries, machine, affinity and policy match.

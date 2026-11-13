@@ -102,6 +102,17 @@ def validate_native(raw, request, engine):
     return basis
 
 
+def enforce_peak(attempt):
+    report = attempt.get('report', {})
+    peak = max(attempt['observed_tree_peak_bytes'],
+               attempt.get('raw', {}).get('kernel_peak_rss_bytes') or 0,
+               report.get('peak_rss_bytes') or 0)
+    attempt['observed_tree_peak_bytes'] = peak
+    if peak > 2 * 1024**3:
+        attempt['stop'] = 'rss-2GiB-kernel'
+        report.update(status='stopped-by-limit', detail='kernel high water exceeds 2 GiB')
+
+
 def verify_bases(attempts):
     digests = {a['digest'] for a in attempts if 'digest' in a}
     if len(digests) > 1:
@@ -310,6 +321,7 @@ def main():
                     raise ValueError('runner changed input identity')
             else:
                 a['stdout'] = stem.with_suffix('.stdout').read_text()
+            enforce_peak(a)
             cohort['attempts'].append(a)
             write(args.output, cohort)
             print(c['field'], c['name'], engine, stop or a.get('report', {}).get('status', 'runner-failure'), flush=True)

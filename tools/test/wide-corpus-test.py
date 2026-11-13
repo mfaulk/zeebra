@@ -44,6 +44,14 @@ class WideCorpusTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             wide.validate_native(dict(raw, generators=['x1+2']), request, 'groebner-rs')
 
+    # A kernel peak above the ceiling remains a memory stop even if the polling loop missed it.
+    def test_kernel_peak_cannot_escape_memory_limit(self):
+        attempt = {'observed_tree_peak_bytes': 100, 'raw': {'kernel_peak_rss_bytes': 2**31+1},
+                   'report': {'status': 'complete'}}
+        wide.enforce_peak(attempt)
+        self.assertEqual(attempt['report']['status'], 'stopped-by-limit')
+        self.assertEqual(attempt['stop'], 'rss-2GiB-kernel')
+
     # A stopped attempt is retained without being treated as a completed oracle.
     def test_limit_is_not_an_oracle(self):
         self.assertEqual(wide.verify_bases([{'stop': 'wall'}]), 0)
