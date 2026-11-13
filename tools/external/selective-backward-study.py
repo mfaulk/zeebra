@@ -77,6 +77,14 @@ def check_trajectory(raw, reference):
             raise ValueError('forward trajectory differs: ' + key)
 
 
+def environment_refusal(max_load, compilers):
+    if compilers:
+        return dict(reason='compiler', processes=compilers)
+    if os.getloadavg()[0] > max_load:
+        return dict(reason='load', load=os.getloadavg()[0])
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('stock', 'binary', 'scratch', 'output'):
@@ -84,9 +92,13 @@ def main():
     parser.add_argument('--phase', choices=('native', 'work', 'probe'), default='native')
     parser.add_argument('--max-load', type=float, default=4)
     parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--build-commit', required=True, help='commit used to build the frozen executables')
     args = parser.parse_args()
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         parser.error('commit instruments before measuring')
+    build_commit = subprocess.check_output(['git', 'rev-parse', args.build_commit], cwd=ROOT, text=True).strip()
+    if subprocess.call(['git', 'diff', '--quiet', build_commit, '--', 'Cargo.toml', 'Cargo.lock', '.cargo', 'src', 'examples'], cwd=ROOT):
+        parser.error('frozen build source differs from current library/examples')
     affinity = ','.join(map(str, sorted(os.sched_getaffinity(0))))
     if os.environ.get('ZEEBRA_AFFINITY') != affinity or not os.environ.get('ZEEBRA_MACHINE'):
         parser.error('declare the actual machine and affinity and use benchlock')
@@ -95,6 +107,7 @@ def main():
     storage, guard = load('study_artifacts'), load('grobx-work-study')
     identity = dict(commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         binaries={name: dict(path=str(getattr(args, name).resolve()), sha256=sha(getattr(args, name))) for name in ('stock', 'binary')},
+        build_commit=build_commit, compiler_gate=True,
         phase=args.phase, affinity=affinity, machine=os.environ['ZEEBRA_MACHINE'],
         max_load=args.max_load, cargo_lock_sha256=sha(ROOT/'Cargo.lock'))
     cohort = dict(schema=1, identity=identity, rustc=subprocess.check_output(['rustc', '-vV'], text=True),
@@ -107,8 +120,9 @@ def main():
     cells = list(plan(args.phase))
     if args.resume:
         cohort = storage.load_study(args.output)
-        if cohort['identity'] != identity or cohort.get('refusal', {}).get('reason') != 'load':
-            parser.error('resume requires identical source/binaries/limits and a load refusal')
+        if (cohort['identity'] != identity or cohort.get('refusal', {}).get('reason') not in ('load', 'compiler')
+                or len(cohort.get('excluded_attempts', [])) > 1):
+            parser.error('resume requires identical source/binaries/limits, an environmental refusal and at most one excluded attempt')
         seen = [(a['repeat'], a['problem'], a['modulus'], a['arm']) for a in cohort['attempts']]
         if seen != cells[:len(seen)] or any(a['status'] != 'verified' for a in cohort['attempts']):
             parser.error('resume requires a verified plan prefix')
@@ -121,10 +135,11 @@ def main():
     for a in storage.iter_attempts(args.output) if args.resume else ():
         trajectories.setdefault((a['problem'], a['modulus']), a['raw'])
     for repeat, problem, modulus, arm in cells[len(cohort['attempts']):]:
-        if os.getloadavg()[0] > args.max_load:
-            cohort['refusal'] = dict(reason='load', next=[repeat, problem, modulus, arm], load=os.getloadavg()[0])
+        refusal = environment_refusal(args.max_load, load('worker-pool-study').compiler_processes())
+        if refusal:
+            cohort['refusal'] = dict(refusal, next=[repeat, problem, modulus, arm])
             guard.write(args.output, cohort)
-            raise RuntimeError('load gate refused; verified prefix retained')
+            raise RuntimeError('environment gate refused; verified prefix retained')
         mode = arm.removesuffix('-on').removesuffix('-off')
         binary = args.stock if mode == 'stock' else args.binary
         if sha(binary) != identity['binaries']['stock' if mode == 'stock' else 'binary']['sha256']:
@@ -155,6 +170,14 @@ def main():
                     result['status'] = 'verified'
         except (ValueError, KeyError, TypeError) as error:
             result['failure'] = str(error)
+        result['compiler_before'] = []
+        result['compiler_after'] = load('worker-pool-study').compiler_processes()
+        if result['compiler_after']:
+            result['status'] = 'contaminated'
+            cohort.setdefault('excluded_attempts', []).append(result)
+            cohort['refusal'] = dict(reason='compiler', processes=result['compiler_after'], next=[repeat, problem, modulus, arm])
+            guard.write(args.output, cohort)
+            raise RuntimeError('ambient compilation began during attempt; excluded response retained')
         if result['status'] == 'verified': result = storage.pack_attempt(result, args.output)
         cohort['attempts'].append(result)
         guard.write(args.output, cohort)

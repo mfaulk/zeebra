@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('study', Path(__file__).resolve().parents[1] / 'external/selective-backward-study.py')
 study = importlib.util.module_from_spec(spec)
@@ -27,6 +28,14 @@ class Acceptance(unittest.TestCase):
         for key in study.TRAJECTORY:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 study.check_trajectory(dict(statistics=dict(stats, **{key: 2})), dict(statistics=stats))
+
+    # An ambient compiler blocks timing even when the load average is low.
+    def test_environment_gate(self):
+        with patch.object(study.os, 'getloadavg', return_value=(0, 0, 0)):
+            self.assertEqual(study.environment_refusal(4, [(7, 'rustc')])['reason'], 'compiler')
+            self.assertIsNone(study.environment_refusal(4, []))
+        with patch.object(study.os, 'getloadavg', return_value=(5, 0, 0)):
+            self.assertEqual(study.environment_refusal(4, [])['reason'], 'load')
 
     # Native and observation-on measurements remain distinct cells in a fixed five-repeat plan.
     def test_plan(self):

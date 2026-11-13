@@ -50,12 +50,16 @@ ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
   tools/benchlock.sh selective-backward-269 taskset -c 3 \
   python3 tools/external/selective-backward-study.py \
   --stock "$CARGO_TARGET_DIR/frozen/stock" --binary "$CARGO_TARGET_DIR/frozen/observed" \
+  --build-commit "$(git rev-parse HEAD)" \
   --scratch "$CARGO_TARGET_DIR/native" --output "$CARGO_TARGET_DIR/native.json.gz"
 ```
 
 Use separate outputs and scratch directories with `--phase work` for passive-work overhead
 controls, or `--phase probe` for the larger MQ14 fixed-budget probe. `--resume` only continues
-a verified prefix stopped by the ambient-load gate, with unchanged source, binaries and limits.
+a verified prefix stopped by an ambient-load or compiler gate, with unchanged source, binaries
+and limits. The runner checks for compiler processes before and after every child. One attempt
+interrupted by new ambient compilation may be retained separately and retried after the gate
+clears; a second such interruption ends this bounded confirmation without an adoption verdict.
 The work cohort has five fresh processes each for full-off, full-on, dense-all-on and
 selected-on, separately from the 120 native attempts. It checks every complete coefficient
 and the complete F4 pair/degree/shape trajectory. Source inputs remain the existing public
@@ -73,3 +77,11 @@ Decode packed answers with `tools/external/study_artifacts.py`'s `load_study` or
 The content-addressed payload hashes are checked during decoding. Native whole-process wall,
 self peak RSS and F4 stages are separate quantities; work-on and probe times are not native
 performance samples. Logical field products and scanned cells are not physical DRAM bandwidth.
+
+
+The first 160-attempt cohort at `0ed4fe33` completed all coefficient checks, but compilation
+started in another worktree during its measurement window. Its times are excluded from the
+performance decision and retained under `exploratory/`. A single bounded confirmation uses
+the same four arms, five accepted repetitions and acceptance thresholds, adding compiler gates.
+The frozen Rust sources/executables remain at `0ed4fe33`; the controller records its own commit
+separately and rejects a changed Rust source tree. Environmental gate waits are not new samples.
