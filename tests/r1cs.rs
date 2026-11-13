@@ -107,6 +107,34 @@ fn test_reads_the_pinned_circom_fixture() {
     assert_eq!(model.constraints()[0].c.terms(), &[(1, -Bn254Fr::one())]);
 }
 
+/// Wide canonical residues decode independently of the field's internal Montgomery representation.
+#[test]
+fn test_bn254_coefficients_are_canonical_little_endian_residues() {
+    use rand::{rngs::StdRng, SeedableRng};
+    let mut rng = StdRng::seed_from_u64(725);
+    let values = [
+        Bn254Fr::new(255),
+        Bn254Fr::new(256),
+        Bn254Fr::new(600),
+        -Bn254Fr::one(),
+        Bn254Fr::random(&mut rng),
+        Bn254Fr::random(&mut rng),
+    ];
+    for expected in values {
+        let mut sections = parts(include_bytes!("fixtures/r1cs/multiplier.r1cs"));
+        let constraints = &mut sections.iter_mut().find(|(kind, _)| *kind == 2).unwrap().1;
+        let encoded: Vec<_> = expected
+            .canonical_limbs()
+            .into_iter()
+            .flat_map(u64::to_le_bytes)
+            .collect();
+        constraints[48..80].copy_from_slice(&encoded);
+        let model =
+            R1cs::<Bn254Fr>::parse(&container(&sections), &ImportLimits::default()).unwrap();
+        assert_eq!(model.constraints()[0].b.terms(), &[(3, expected)]);
+    }
+}
+
 /// Original sparse rows and expanded polynomials agree on every GF(7)^3 assignment.
 #[test]
 fn test_exhaustive_small_field_semantics() {
