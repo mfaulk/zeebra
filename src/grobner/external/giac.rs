@@ -245,6 +245,52 @@ impl GiacSolver {
         unique(&read_output(&output), "@giac_version")?;
         Ok(Measurement::of_process(&process))
     }
+    fn check_with_singular(
+        &self,
+        answer: Answer,
+        instance: &Instance,
+        limits: &Limits,
+        binary: &str,
+    ) -> Result<RunStatus, RunFailure> {
+        use crate::grobner::differential::singular::error_line;
+        let directory = self.work_dir.join(format!("verify-{}", self.runs));
+        let oracle = SingularSolver::with_binary(binary, &directory, limits.wall)?;
+        let input = directory.join("basis.sing");
+        let output = directory.join("basis.out");
+        std::fs::write(&input, oracle.script(instance, Task::ReducedGrobnerBasis))?;
+        let invocation = Invocation::new(binary, &directory, &output)
+            .arg("-q")
+            .arg("--no-warn")
+            .arg(&input);
+        let process = Supervisor::new(limits.wall)
+            .with_max_rss_bytes(limits.max_rss_bytes)
+            .run(&invocation)?;
+        if process.memory_limited {
+            return Ok(RunStatus::StoppedByLimit(LimitStop::Memory {
+                limit: limits.max_rss_bytes.unwrap(),
+                observed: process.peak_rss_bytes,
+            }));
+        }
+        if process.timed_out {
+            return Ok(RunStatus::StoppedByLimit(LimitStop::WallClock {
+                limit: limits.wall,
+                elapsed: process.wall,
+            }));
+        }
+        if !process.succeeded() {
+            return Err(RunFailure::NonZeroExit {
+                code: process.exit_code,
+            });
+        }
+        let raw = read_output(&output);
+        if error_line(&raw).is_some() || !raw.lines().any(|line| line.trim() == "@done") {
+            return Err(invalid(
+                "independent Singular verification did not complete",
+            ));
+        }
+        let trusted = oracle.answer(&raw, Task::ReducedGrobnerBasis)?;
+        verified(answer, &trusted, instance.field.characteristic)
+    }
     fn invocation(&self, input: &std::path::Path, output: &std::path::Path) -> Invocation {
         let invocation = Invocation::new(&self.binary, &self.work_dir, output).arg(input);
         match std::env::var("ZEEBRA_GIAC_LIBRARY_PATH") {
@@ -381,31 +427,16 @@ impl ExternalSolver for GiacSolver {
             }
             let answer = parse_answer(&read_output(&output), instance, limits.workers)?;
             let start = Instant::now();
-            let mut oracle = SingularSolver::with_binary(
-                std::env::var("ZEEBRA_SINGULAR").unwrap_or_else(|_| "Singular".into()),
-                self.work_dir.join(format!("verify-{}", self.runs)),
-                limits.wall,
-            )?;
-            let trusted = oracle.run(
+            let result = self.check_with_singular(
+                answer,
                 instance,
-                task,
-                &Limits {
-                    workers: 1,
-                    ..limits.clone()
-                },
+                limits,
+                &std::env::var("ZEEBRA_SINGULAR").unwrap_or_else(|_| "Singular".into()),
             );
             measurement
                 .stages
                 .push(("independent-verification".into(), start.elapsed()));
-            match trusted.status.answer() {
-                Some(reference) => verified(answer, reference, instance.field.characteristic),
-                None => Err(RunFailure::Incomplete {
-                    detail: format!(
-                        "independent Singular verification unavailable: {:?}",
-                        trusted.status
-                    ),
-                }),
-            }
+            result
         })();
         let status = result.unwrap_or_else(RunStatus::Failed);
         let mut report = RunReport::new(self.id(), instance, task, limits, status, measurement)
@@ -546,6 +577,32 @@ mod tests {
                 );
             }
         }
+    }
+
+    // The independent verifier is also stopped before exceeding its declared memory ceiling.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn verification_obeys_memory_ceiling() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("giac-verifier-limit-{}", std::process::id()));
+        let solver = GiacSolver::new("unused", &root).unwrap();
+        let binary = root.join("slow-verifier");
+        std::fs::write(&binary, "#!/bin/sh\nexec sleep 5\n").unwrap();
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let answer = parse_answer(output(), &instance(), 2).unwrap();
+        let status = solver
+            .check_with_singular(
+                answer,
+                &instance(),
+                &Limits::wall(Duration::from_secs(2)).with_max_rss_bytes(0),
+                binary.to_str().unwrap(),
+            )
+            .unwrap();
+        assert!(matches!(
+            status,
+            RunStatus::StoppedByLimit(LimitStop::Memory { .. })
+        ));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     // Missing executables remain unavailable rather than a measured failure or limit stop.

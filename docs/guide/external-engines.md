@@ -741,7 +741,8 @@ back over the integers and require a complete basis plus completion marker.
 Every completed basis must match Singular's full monic reduced basis, including
 every coefficient. Singular must therefore also be installed (`ZEEBRA_SINGULAR`
 overrides its path). Missing verification cannot supply a successful timing row.
-The verifier has the same per-child wall/RSS limits with one worker; its elapsed
+The verifier reuses the existing Singular script/parser through a direct
+supervised process, with the same per-child wall/RSS limits and one worker; its elapsed
 time is recorded separately as `independent-verification`, outside Giac's child
 wall/CPU/RSS. A timeout is a limit stop, not an unsupported field or a speedup.
 

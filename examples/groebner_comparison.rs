@@ -155,6 +155,14 @@ fn main() {
         ("status_detail", Json::string(status_detail)),
         ("digest", Json::string(instance.digest())),
         (
+            "transformation",
+            instance
+                .transformation
+                .as_ref()
+                .map(Json::string)
+                .unwrap_or(Json::Null),
+        ),
+        (
             "variables",
             Json::Array(instance.variables.iter().map(Json::string).collect()),
         ),
