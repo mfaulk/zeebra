@@ -1,0 +1,149 @@
+{
+  "note": "All original statuses retained. This post-hoc mathematical recheck does not include diagnostic attempts in primary timing medians.",
+  "attempts": [
+    {
+      "arm": "stock",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "native-off",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "native-on",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "no-plain",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "no-signature",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "none",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "plain-only",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "plain-only-no-combinations",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "plain-only-validated",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "certified",
+      "modulus": 32003,
+      "original_status": "failed",
+      "original_failure": "run lacks enabled input echelon",
+      "full_basis_recheck": "verified",
+      "certified": true
+    },
+    {
+      "arm": "no-plain-off",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "no-signature-off",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "none-off",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "plain-only-off",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "plain-only-no-combinations-off",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "plain-only-validated-off",
+      "modulus": 32003,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    },
+    {
+      "arm": "certified-off",
+      "modulus": 32003,
+      "original_status": "failed",
+      "original_failure": "run lacks enabled input echelon",
+      "full_basis_recheck": "verified",
+      "certified": true
+    },
+    {
+      "arm": "stock",
+      "modulus": 2147483647,
+      "original_status": "verified",
+      "original_failure": null,
+      "full_basis_recheck": "verified",
+      "certified": null
+    }
+  ]
+}

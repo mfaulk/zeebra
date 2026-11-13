@@ -26,7 +26,7 @@ Experimental JSON requests retain the ordinary driver contract and accept:
 | `research_policy` | `native`, `no-plain`, `no-signature`, or `none`; the latter two disable signature **zero tests**, not the signature engine. |
 | `research_signatures` | Boolean, default true; false selects public `Params.signatures=false`. |
 | `research_seed` | Unsigned 64-bit solver seed, default zero. Input-generator seed and input digest stay unchanged. |
-| `research_validate` | Boolean, default false; enables the native residual guard only in raw, plain-only runs. |
+| `research_validate` | Boolean, default false; enables the native residual audit only in raw, plain-only runs. |
 | `research_work` | Existing passive work-counter switch; also enables event observations. |
 
 Bad policy names/types and signature/certified residual-guard requests are refused. The plain
@@ -35,18 +35,19 @@ policy retain their pinned values. Turning off combinations inherently removes t
 that interaction is reported, not described as a SIMD-only ablation. Observe actual reports,
 including discarded signature rounds and original-input restarts.
 
-The native guard reduces every original matrix row, including reducer rows, by final pivots before
+The native audit reduces every original matrix row, including reducer rows, by final pivots before
 the plain batch returns. It spends the same deadline/budget and records residual-check work and
 time separately. Valid pivot formation supplies the reverse rowspace inclusion. This is a native
-invariant check, not an independently checked cofactor certificate. It does not certify signature
-prefixes; final global span equality cannot validate earlier signature-zero decisions.
+invariant check, not an independently checked cofactor certificate. A failed audit is recorded and
+refused at the driver boundary after the whole call; transactional per-batch refusal, rollback and
+retry/fallback are not implemented. It does not certify signature prefixes; final global span equality cannot validate earlier signature-zero decisions.
 `randomization_contract.py` independently tests both span inclusions with explicit combination
 witnesses, including omitted/rogue pivots, degenerate rows and incomplete checks.
 
 Freeze and commit sources before timing. Every primary arm receives five fresh-process
 repetitions at each prime, reversing order on alternate repetitions. The base arms are stock,
 patched/counters-off, patched/counters-on, no-plain, no-signature-tests, neither, plain-only,
-plain-only/no-combinations, plain-only/native-residual-guard, and exact-certified. The latter is a
+plain-only/no-combinations, plain-only/native-residual-audit, and exact-certified. The latter is a
 **separate objective** whose cofactors/checker disable several optimizations, not an isolated
 randomization or validation control. Seeds 1 and 2 form a separate sensitivity cohort for three
 raw policies, with one attempt per seed/policy/prime. Each of the seven changed policies additionally receives an observer-off control in the same
@@ -69,7 +70,7 @@ retained. The existing guard enforces 60 seconds and 2 GiB for the complete dire
 including its exact checker; this is tighter than the historical nested 185-second parent watchdog.
 The whole campaign has a separately declared 1,800-second outer stop. Process wall includes full
 answer encoding. Independent coefficient-for-coefficient comparison to complete retained
-Singular-verified references occurs afterwards. Native guard/checker work remains inside its own
+Singular-verified references occurs afterwards. Native audit/checker work remains inside its own
 process wall. Raw stage times and process wall are distinct.
 
 The load gate preserves a partial cohort and refuses the next attempt; failures/stops remain
@@ -82,12 +83,33 @@ public Katsura/Cyclic/larger-MQ validation; this campaign alone does not authori
 
 ## Declared diagnostic restart
 
-The first campaign was interrupted after18 retained outcomes when two exact-certified controls
+The first campaign was interrupted after 18 retained outcomes when two exact-certified controls
 completed but failed an overly strict report-decoder assumption: cofactor tracking suppresses
 input echelonization even when the requested call flag says `echelon=on`. Its large certificates
 also exposed avoidable accumulation in the measurement runner. The parser now checks the actual
 cofactor mode, and the existing lossless proof store packs each response before retaining the
 next. Regression tests preserve missing-echelon refusal for ordinary raw reports and exact
-round-tripping of failed responses. **One complete182-attempt restart is declared**; the original
+round-tripping of failed responses. **One complete 182-attempt restart is declared**; the original
 18 outcomes remain diagnostic evidence and are excluded from the new timing medians. There is
 no further extension or silent replacement of these outcomes.
+
+## Frozen evidence and recovery
+
+The report is [here](../../docs/research/grobx-randomization.md). `cohort.json.gz` retains all 182
+completed restart attempts; `diagnostic.json.gz` retains the initial 18 outcomes. `builds.json`
+binds base/source/recipe/lock identities and the SHA-256 of `source.patch.gz`. Check out its
+`base_commit`, decompress/apply that patch, then provision the pinned driver to reconstruct the
+measured source even if a branch commit is later removed. Patch paths retain their existing
+licenses; GPL templates are used only in the separate external build.
+
+Proof storage points to already committed, byte-identical content-addressed payloads. No new
+large proof copies are added. Every response is restored with its hash checked; the summarizer
+processes one certificate at a time and rechecks every completed full basis against the
+independently Singular-verified reference:
+
+```sh
+python3 research/grobx-randomization/summarize.py
+```
+
+`summary.json` and `summary.csv` are deterministic. Ordinary CI reruns the parser/storage/model
+regressions and this complete evidence validation without fetching or executing Grobx.
