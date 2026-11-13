@@ -38,10 +38,10 @@ index f842a091..5e0df203 100644
          // The argument is a `u64` because the trait says so; a value above P reduces, as it does
          // for every other prime field here.
 diff --git a/src/linalg/dense/accumulator.rs b/src/linalg/dense/accumulator.rs
-index 42d855a3..3505593a 100644
+index cf74238e..d3e71c5d 100644
 --- a/src/linalg/dense/accumulator.rs
 +++ b/src/linalg/dense/accumulator.rs
-@@ -18,6 +18,112 @@ use crate::{
+@@ -8,6 +8,112 @@ use crate::{
      FiniteField,
  };
  
@@ -154,7 +154,7 @@ index 42d855a3..3505593a 100644
  /// A dense row used as the working register of a sparse elimination.
  #[derive(Clone, Debug)]
  pub struct DenseAccumulator<F: FiniteField> {
-@@ -220,6 +326,16 @@ fn eliminate_from<F: FiniteField>(
+@@ -227,6 +333,16 @@ fn eliminate_from<F: FiniteField>(
      accumulator: &mut DenseAccumulator<F>,
      max_nonzeros: usize,
  ) -> Result<(), usize> {
@@ -168,10 +168,10 @@ index 42d855a3..3505593a 100644
 +            max_nonzeros,
 +        );
 +    }
-     for index in first..matrix.num_rows() {
-         // Taken out so the pivot rows, which are still in the matrix, can be read while this one
-         // is rewritten. A pivot's index is always one already processed, so never this one.
-@@ -270,6 +386,23 @@ mod tests {
+     #[cfg(feature = "research-work")]
+     let mut allocated = if crate::linalg::work::enabled() {
+         matrix.entry_capacity()
+@@ -307,6 +423,23 @@ mod tests {
      use super::DenseAccumulator;
      use crate::{fields::Zp13, linalg::sparse::SparseRow, FiniteField, One};
  
