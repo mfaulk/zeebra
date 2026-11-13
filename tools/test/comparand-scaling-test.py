@@ -60,7 +60,7 @@ class ComparandScalingTests(unittest.TestCase):
             scaling.validate_cohort(report)
     # A zero-exit engine missing its basis keeps all timing and termination evidence as failure.
     def test_missing_basis_keeps_failed_attempt_measurements(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling,'active_compilers',return_value=[]):
             fake=Path(directory)/'fake';fake.write_text('#!/bin/sh\nexit 0\n');fake.chmod(0o755)
             case=dict(modulus=13,variables=['x1'],generators=['x1+1'])
             a=scaling.execute('msolve',case,1,False,{'msolve':{'path':str(fake)}},
