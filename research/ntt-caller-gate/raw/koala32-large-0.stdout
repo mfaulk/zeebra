@@ -1,0 +1,43 @@
+# Graeffe root finding: stage-separated cost against degree
+
+`graeffe_root` is [P937] Algorithm 2's forward phase with [P937] §5.3's progressive degree reduction and [PC] Algorithm 2 line 8's gcd descent. See `docs/research/graeffe-root-finding.md` §3.5 and §3.6.
+
+Degrees: [1594323]
+
+
+## KoalaBear, 2^31 - 2^24 + 1, in a u32
+
+- an element is 4 bytes
+- two-adicity s = 24, so the largest power-of-two domain is 2^24
+- the odd part of q - 1 is 127, which is the order of the subgroup the iteration leaves the roots in
+GATE {"degree":1594323,"verified":true,"root":"1996319544","forward_ns":2427222964,"subgroup_ns":141388,"descent_ns":47149698,"total_ns":2480170248,"max_n":2097152,"transforms":72,"total_n":75496704,"stored":18023881,"peak_heap_bytes":97327976}
+
+### Stage-separated cost
+
+|    degree |  log2 d |   steps | xforms | forward s |  subgrp s | descent s |   total s |
+|-----------|---------|---------|--------|-----------|-----------|----------|-----------|
+|   1594323 |   20.60 |      24 |     72 |    2.4272 |  0.000141 | 0.047150 |    2.4802 |
+
+### Transform sizes, memory and the subgroup search
+
+`peak bytes` is peak live heap from a counting allocator, attributed to the call alone. `est. bytes` is the retained `G_(2^i)` plus 4 x the largest transform's domain size, post-#161.
+
+|    degree | log2 max n | sum n / max n |   final deg |   peak bytes |   est. bytes |   stored |   cands |  root |
+|-----------|------------|---------------|-------------|--------------|--------------|----------|---------|-------|
+|   1594323 |         21 |         36.00 |         126 |     97327976 |    105649956 | 18023881 |       5 |  true |
+
+The subgroup search took the Enumerated { points: 127 } route at the largest degree.
+Largest degree completed: 1594323 (log2 20.60), in 2.4802 s.
+This reaches the 3^13 = 1594323 target degree of the disclosed R_P = 8 solve.
+
+
+## What these figures are, and are not
+
+- A working order-2 transform validated against directly squared roots is a **unit test**. It establishes correctness of one transform and nothing about a challenge.
+- A degree-3^13 root find completing is a **benchmark of one stage of one family**. Per the scoreboard's class discipline this is `BenchmarkClass::Engineering` and could not be anything else until it produces a witness verified through the permutation.
+- It is **not** evidence about `poseidon31-cico-rf6-rp8`. The per-family cost measured here is separate from the number of families a CICO-2 witness needs, which is an open question tracked in `docs/research/graeffe-root-finding.md` §11 — §9.3's estimate there is marked superseded pending verification and is not quoted.
+- Nothing here reproduces the published attack. Three attack-specific components are absent: the round-skipping parametrization, the univariate construction, and candidate reconstruction through the permutation.
+- Timings are **post-#161**: `evaluate` and `interpolate` are the iterative in-place kernel at their `1 n B` and `2 n B` floors (`fast-univariate.md` §3.3). The pre-#161 figures are kept in `docs/research/graeffe-root-finding.md` §4.4, marked as such, because they are what quantifies #161's effect on a downstream consumer.
+
+
+process peak resident bytes: 114331648

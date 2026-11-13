@@ -1,0 +1,650 @@
+[
+  {
+    "case": "koala64-small",
+    "degree": 6561,
+    "repeat": 0,
+    "kind": "identity",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-small-0.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=6561",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-small-0.stdout",
+    "load_after": [
+      4.833984375,
+      4.3623046875,
+      2.83740234375
+    ],
+    "sha256": {
+      "raw/koala64-small-0.stdout": "1c0bbabe1917da5f6624f87fcb8139ca6bcd4236343857e349e198bc77fd6d34",
+      "raw/koala64-small-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-small-0.time": "7296a2cfc7bf3189198a84aa4787b466d7eaef21b547a6889bc258d0635678d8"
+    },
+    "wall_s": 0.01,
+    "cpu_s": 0.01,
+    "rss_kib": 3124
+  },
+  {
+    "case": "koala64-large",
+    "degree": 1594323,
+    "repeat": 0,
+    "kind": "identity",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-large-0.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-large-0.stdout",
+    "load_after": [
+      4.833984375,
+      4.3623046875,
+      2.83740234375
+    ],
+    "sha256": {
+      "raw/koala64-large-0.stdout": "1d6c358b9289459df5b5377cedcdd876cf54486664aad13ec1ce18a9e4e1d320",
+      "raw/koala64-large-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-large-0.time": "5c5c8f4e76ee4f11a2b3046de48967b102d32eda3b612a4788e2a080c9a2b0cc"
+    },
+    "wall_s": 3.5,
+    "cpu_s": 3.4800000000000004,
+    "rss_kib": 221128
+  },
+  {
+    "case": "koala32-large",
+    "degree": 1594323,
+    "repeat": 0,
+    "kind": "identity",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala32-large-0.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear32",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala32-large-0.stdout",
+    "load_after": [
+      4.84765625,
+      4.373046875,
+      2.84912109375
+    ],
+    "sha256": {
+      "raw/koala32-large-0.stdout": "e211298ae6427aab216d4c723cc46d8c500c83f80efe6e96be42a177de1811c2",
+      "raw/koala32-large-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala32-large-0.time": "80bc0c87ef5c86069b299a3e5723b6b4b5eed644e63f88eb1406c3a180776c9b"
+    },
+    "wall_s": 2.56,
+    "cpu_s": 2.54,
+    "rss_kib": 111652
+  },
+  {
+    "case": "koala64-small",
+    "degree": 6561,
+    "repeat": 1,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-small-1.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=6561",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-small-1.stdout",
+    "load_after": [
+      4.84765625,
+      4.373046875,
+      2.84912109375
+    ],
+    "sha256": {
+      "raw/koala64-small-1.stdout": "0f68fd17d62222fa622f5c67fcc52aefdfe8644be271b3bf38a31f68f06c0329",
+      "raw/koala64-small-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-small-1.time": "afac654647cda8ee358e833166e793321f11d09259366e535b06c32c99a5f56d"
+    },
+    "wall_s": 0.01,
+    "cpu_s": 0.01,
+    "rss_kib": 4168
+  },
+  {
+    "case": "koala64-large",
+    "degree": 1594323,
+    "repeat": 1,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-large-1.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-large-1.stdout",
+    "load_after": [
+      4.779296875,
+      4.36669921875,
+      2.85546875
+    ],
+    "sha256": {
+      "raw/koala64-large-1.stdout": "3ef81fd9bd1d3f416954aea4ec23040962780229a371a99358563e63e80adfe3",
+      "raw/koala64-large-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-large-1.time": "269de78403d38f1f9e71bbdf72772a4a2f1e4d8cc0f730f06ab5a6ae75422a13"
+    },
+    "wall_s": 3.21,
+    "cpu_s": 3.1900000000000004,
+    "rss_kib": 221156
+  },
+  {
+    "case": "koala32-large",
+    "degree": 1594323,
+    "repeat": 1,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala32-large-1.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear32",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala32-large-1.stdout",
+    "load_after": [
+      4.779296875,
+      4.36669921875,
+      2.85546875
+    ],
+    "sha256": {
+      "raw/koala32-large-1.stdout": "e6981b5899672d01020eada2db1b0d9b4bd74c23a209f0eb28d6df8b31604a0c",
+      "raw/koala32-large-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala32-large-1.time": "6fa130dd19b461f3aad3ab2b1ffd4bafd3424de7843af416d3d2761e8d09c619"
+    },
+    "wall_s": 2.53,
+    "cpu_s": 2.52,
+    "rss_kib": 110724
+  },
+  {
+    "case": "koala64-small",
+    "degree": 6561,
+    "repeat": 2,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-small-2.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=6561",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-small-2.stdout",
+    "load_after": [
+      4.779296875,
+      4.36669921875,
+      2.85546875
+    ],
+    "sha256": {
+      "raw/koala64-small-2.stdout": "ec94e11cea524e8ef0e8fd926fee51807519bd8f941cfed914dcf9d17b8c4cea",
+      "raw/koala64-small-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-small-2.time": "de94b5c4b5104626e2ba25b8b22e9b0efd378c9b9451d02f0ad968ed4ba851d2"
+    },
+    "wall_s": 0.01,
+    "cpu_s": 0.01,
+    "rss_kib": 4220
+  },
+  {
+    "case": "koala64-large",
+    "degree": 1594323,
+    "repeat": 2,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-large-2.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-large-2.stdout",
+    "load_after": [
+      4.716796875,
+      4.3603515625,
+      2.86181640625
+    ],
+    "sha256": {
+      "raw/koala64-large-2.stdout": "088f22f2f1ed194050855ca33a27b67f56588632ee4f8e3526ed62b7761e3f9f",
+      "raw/koala64-large-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-large-2.time": "5a7c455b03575dbb040098ad2f5c97e39612956b14f8480667a720f0cece769b"
+    },
+    "wall_s": 3.24,
+    "cpu_s": 3.22,
+    "rss_kib": 221148
+  },
+  {
+    "case": "koala32-large",
+    "degree": 1594323,
+    "repeat": 2,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala32-large-2.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear32",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala32-large-2.stdout",
+    "load_after": [
+      4.716796875,
+      4.3603515625,
+      2.86181640625
+    ],
+    "sha256": {
+      "raw/koala32-large-2.stdout": "127a503ec0e15476e34b337d29c5aa3fd6bb3497335a5dd25257a12a0e7cb10b",
+      "raw/koala32-large-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala32-large-2.time": "44d83de94a7e477a37792f46991718fec3307098d3f0aba5426f15d9ce1bf5a6"
+    },
+    "wall_s": 2.51,
+    "cpu_s": 2.49,
+    "rss_kib": 110844
+  },
+  {
+    "case": "koala64-small",
+    "degree": 6561,
+    "repeat": 3,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-small-3.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=6561",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-small-3.stdout",
+    "load_after": [
+      4.716796875,
+      4.3603515625,
+      2.86181640625
+    ],
+    "sha256": {
+      "raw/koala64-small-3.stdout": "78de4025a09d21194136770608740f2cde1965fae4bfffd8484d26b96b5a740f",
+      "raw/koala64-small-3.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-small-3.time": "3dbe969b32765fbd796cdb3449df1974d4a172fc4e2559a23b5c5b55b16c27ce"
+    },
+    "wall_s": 0.01,
+    "cpu_s": 0.01,
+    "rss_kib": 3136
+  },
+  {
+    "case": "koala64-large",
+    "degree": 1594323,
+    "repeat": 3,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-large-3.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-large-3.stdout",
+    "load_after": [
+      4.73974609375,
+      4.37109375,
+      2.87353515625
+    ],
+    "sha256": {
+      "raw/koala64-large-3.stdout": "97e7e35a1b598aa1743f68151d7b851172dbab200e01b96c6c29bec68c72900d",
+      "raw/koala64-large-3.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-large-3.time": "c8c0bd8756e77b5c73b1cc6be56fe3d553c096e08cbca671f0cb616daf81ae62"
+    },
+    "wall_s": 3.2,
+    "cpu_s": 3.1799999999999997,
+    "rss_kib": 220980
+  },
+  {
+    "case": "koala32-large",
+    "degree": 1594323,
+    "repeat": 3,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala32-large-3.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear32",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala32-large-3.stdout",
+    "load_after": [
+      4.73974609375,
+      4.37109375,
+      2.87353515625
+    ],
+    "sha256": {
+      "raw/koala32-large-3.stdout": "69db5b194e90d9241c518bcfc4e884060ab98337c1c8059f6cd455b9b3e16c86",
+      "raw/koala32-large-3.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala32-large-3.time": "92924aaf1c5b1e3170538ae0fbeda10589f205f58984609ca30d0b3da31bb524"
+    },
+    "wall_s": 2.53,
+    "cpu_s": 2.51,
+    "rss_kib": 110684
+  },
+  {
+    "case": "koala64-small",
+    "degree": 6561,
+    "repeat": 4,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-small-4.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=6561",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-small-4.stdout",
+    "load_after": [
+      4.73974609375,
+      4.37109375,
+      2.87353515625
+    ],
+    "sha256": {
+      "raw/koala64-small-4.stdout": "c6f2d5a67868e39411187338c4b1661163b397602f5a49aae2aaf53ae427e8f5",
+      "raw/koala64-small-4.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-small-4.time": "35a4bbf3d3034a4d086abde75e43eb033525eb3af25bc9a2ce9961dd2cfaec33"
+    },
+    "wall_s": 0.01,
+    "cpu_s": 0.01,
+    "rss_kib": 3076
+  },
+  {
+    "case": "koala64-large",
+    "degree": 1594323,
+    "repeat": 4,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-large-4.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-large-4.stdout",
+    "load_after": [
+      4.8408203125,
+      4.3984375,
+      2.890625
+    ],
+    "sha256": {
+      "raw/koala64-large-4.stdout": "94fdc801ae72f392bc3c10a5ba6e90e38ada32da310728bccbe3ec44da3ac8db",
+      "raw/koala64-large-4.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-large-4.time": "922865a330d9415bde5f45521be0ebe26ef80d83094a6a3261cab7b965a0766f"
+    },
+    "wall_s": 3.18,
+    "cpu_s": 3.16,
+    "rss_kib": 221108
+  },
+  {
+    "case": "koala32-large",
+    "degree": 1594323,
+    "repeat": 4,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala32-large-4.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear32",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala32-large-4.stdout",
+    "load_after": [
+      4.85400390625,
+      4.40869140625,
+      2.90234375
+    ],
+    "sha256": {
+      "raw/koala32-large-4.stdout": "174157fb6a59c3e4b969855c9fab0db41c4b278365cbea47a52cdff5c19fe19c",
+      "raw/koala32-large-4.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala32-large-4.time": "ae2702da6bf252a710bd018931ab8f15d9dd37b2345c3211198684f397293c49"
+    },
+    "wall_s": 2.48,
+    "cpu_s": 2.47,
+    "rss_kib": 111644
+  },
+  {
+    "case": "koala64-small",
+    "degree": 6561,
+    "repeat": 5,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-small-5.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=6561",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-small-5.stdout",
+    "load_after": [
+      4.85400390625,
+      4.40869140625,
+      2.90234375
+    ],
+    "sha256": {
+      "raw/koala64-small-5.stdout": "58e5d46145a6202336e60df3c7067b9c10139a787ee803c6bd15a02a7b4ad2f6",
+      "raw/koala64-small-5.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-small-5.time": "48dceb34ffa08a9a9a5de450ec3e76df8dd8fad4a2aa02f2d2da583628c33586"
+    },
+    "wall_s": 0.01,
+    "cpu_s": 0.01,
+    "rss_kib": 4164
+  },
+  {
+    "case": "koala64-large",
+    "degree": 1594323,
+    "repeat": 5,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala64-large-5.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala64-large-5.stdout",
+    "load_after": [
+      4.85400390625,
+      4.40869140625,
+      2.90234375
+    ],
+    "sha256": {
+      "raw/koala64-large-5.stdout": "ae8307bfbfc7ee98324e64c8f5328b65062cf141232170643c570ddd7bc11242",
+      "raw/koala64-large-5.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala64-large-5.time": "1d1f727649f3ce32f7eb0890ad698d9da5bfe7da12913396d460f0a92b93f70f"
+    },
+    "wall_s": 3.21,
+    "cpu_s": 3.18,
+    "rss_kib": 221152
+  },
+  {
+    "case": "koala32-large",
+    "degree": 1594323,
+    "repeat": 5,
+    "kind": "timing",
+    "returncode": 0,
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "%e %U %S %M",
+      "-o",
+      "/home/mfaulk/projects/zb-732-ntt-gate/research/ntt-caller-gate/raw/koala32-large-5.time",
+      "timeout",
+      "--signal=INT",
+      "--kill-after=5s",
+      "60s",
+      "/buildcache/cargo-target/zeebra-732/release/examples/graeffe_root",
+      "koalabear32",
+      "degrees=1594323",
+      "no-comparand"
+    ],
+    "stdout": "raw/koala32-large-5.stdout",
+    "load_after": [
+      4.78515625,
+      4.40185546875,
+      2.90869140625
+    ],
+    "sha256": {
+      "raw/koala32-large-5.stdout": "677ac0500f789a1f33090947866804c68b2ceb45993a0bcd30781733560d2dc6",
+      "raw/koala32-large-5.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw/koala32-large-5.time": "17ca5f1997d0a48ad4402d9ba1a63507618334c689ee3f049bd286b21a49dee3"
+    },
+    "wall_s": 2.5,
+    "cpu_s": 2.48,
+    "rss_kib": 110736
+  }
+]
