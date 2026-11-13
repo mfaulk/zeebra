@@ -22,9 +22,10 @@ The existing runner's `adoption` phase schedules five alternating repetitions of
 feature-absent production and feature-present/counters-off production on MQ10, Cyclic-5 and
 Katsura-6 at GF(32003)/GF(2^31−1): 90 attempts. `adoption-work` adds 20 separate MQ10 diagnostics
 (full research control versus ordinary production with passive counters), never pooled into native
-timings. Each child retains 60 seconds/2 GiB, with the existing 185-second outer watchdog.
-Worst-case child budget: 6,600 seconds across 110 attempts; expected hot-region cost is under
-three minutes from retained pilot evidence. A single 900-second outer campaign watchdog covers both phases; each completed attempt is checkpointed.
+timings. `adoption-off` adds 20 MQ10 stock/production attempts with stage clocks disabled.
+Each child retains 60 seconds/2 GiB, with the existing 185-second outer watchdog.
+Worst-case child budget: 7,800 seconds across 130 attempts; expected hot-region cost is under
+three minutes from retained pilot evidence. A single 900-second outer campaign watchdog covers all three phases; each completed attempt is checkpointed.
 An aggregate timeout preserves the readable prefix and is not an accepted complete cohort.
 No retries or budget extensions are preauthorized.
 Output cap: 256 MiB for retained compressed records and full-basis sidecars; refuse expansion.
@@ -46,7 +47,8 @@ ZEEBRA_MACHINE=5995wx ZEEBRA_AFFINITY=3 tools/benchlock.sh candidate-adoption \
   --output /buildcache/cargo-target/zeebra-m28-749/campaign/adoption.json.gz
 ```
 
-Use `--phase adoption-work` with a separate scratch/output path for diagnostics. The runner rejects
+Use `--phase adoption-work` and `--phase adoption-off` with separate scratch/output paths for
+diagnostics and stage-clock-disabled controls. The runner rejects
 research overrides presented as production, absent production metadata, mismatched complete bases,
 input/trajectory drift, binary changes, dirty sources and ambient compilation. Build pins and the
 final retained report replace `ADOPTION_BUILD_COMMIT` after the implementation is committed.

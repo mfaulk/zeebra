@@ -64,7 +64,7 @@ def summarize(cohorts, refs):
                        cpu_ms=median(a['cpu_seconds'] * 1000 for a in attempts),
                        self_peak_mib=max(r['peak_rss_bytes'] for r in raws) / 1024**2,
                        tree_peak_mib=max(a['observed_peak_rss_bytes'] for a in attempts) / 1024**2,
-                       stages_ms={key: median(r['statistics'][key] / 1e6 for r in raws) for key in
+                       stages_ms={key: (None if phase == 'adoption-off' else median(r['statistics'][key] / 1e6 for r in raws)) for key in
                                   ('symbolic_ns', 'construction_ns', 'elimination_ns', 'extraction_ns',
                                    'interreduction_ns', 'other_ns')})
             if arm in ('production', 'feature-off', 'production-on'):
@@ -90,7 +90,7 @@ def main():
     storage, driver = tool('study_artifacts'), tool('selective-backward-study')
     paths = sorted(HERE.rglob('*.gz')) + sorted(HERE.glob('*.log'))
     inventory = {str(p.relative_to(HERE)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
-    cohorts = {phase: storage.load_study(HERE / (phase + '.json.gz')) for phase in ('adoption', 'adoption-work')}
+    cohorts = {phase: storage.load_study(HERE / (phase + '.json.gz')) for phase in ('adoption', 'adoption-work', 'adoption-off')}
     result = summarize(cohorts, driver.references())
     for name, value in [('summary.json', result), ('inventory.json', inventory)]:
         encoded = json.dumps(value, indent=2) + '\n'

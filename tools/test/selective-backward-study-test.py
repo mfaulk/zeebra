@@ -38,6 +38,7 @@ class Acceptance(unittest.TestCase):
         self.assertEqual(len(native),90)
         self.assertEqual({c[-1] for c in native},{'stock','production','feature-off'})
         self.assertEqual(len(list(study.plan('adoption-work'))),20)
+        self.assertEqual(len(list(study.plan('adoption-off'))),20)
 
     # Interrupting the process-tree supervisor kills and reaps its owned child before propagating.
     def test_guard_interrupt_cleanup(self):

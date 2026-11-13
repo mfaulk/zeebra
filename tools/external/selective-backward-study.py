@@ -28,13 +28,14 @@ def sha(path):
 
 
 def plan(phase):
-    if phase not in ('native', 'work', 'probe', 'adoption', 'adoption-work'):
+    if phase not in ('native', 'work', 'probe', 'adoption', 'adoption-work', 'adoption-off'):
         raise ValueError('unknown campaign phase')
-    if phase in ('adoption', 'adoption-work'):
+    if phase in ('adoption', 'adoption-work', 'adoption-off'):
         for repeat in range(5):
             for problem in (('mq-random-10','cyclic-5','katsura-6') if phase == 'adoption' else ('mq-random-10',)):
                 for modulus in (32003,2147483647):
-                    arms=('stock','production','feature-off') if phase == 'adoption' else ('full-on','production-on')
+                    arms=(('stock','production','feature-off') if phase == 'adoption' else
+                          ('stock','production') if phase == 'adoption-off' else ('full-on','production-on'))
                     for arm in arms if repeat % 2 == 0 else reversed(arms):
                         yield repeat,problem,modulus,arm
         return
@@ -108,7 +109,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('stock', 'binary', 'scratch', 'output'):
         parser.add_argument('--' + name, required=True, type=Path)
-    parser.add_argument('--phase', choices=('native', 'work', 'probe', 'adoption', 'adoption-work'), default='native')
+    parser.add_argument('--phase', choices=('native', 'work', 'probe', 'adoption', 'adoption-work', 'adoption-off'), default='native')
     parser.add_argument('--production', type=Path, help='feature-absent adopted production binary')
     parser.add_argument('--baseline-commit', help='source revision of the stock control')
     parser.add_argument('--max-load', type=float, default=4)
@@ -172,7 +173,8 @@ def main():
         binary=getattr(args,binary_name)
         if sha(binary) != identity['binaries'][binary_name]['sha256']:
             raise ValueError('binary changed during campaign')
-        command = [str(binary.resolve()), str(modulus), '--stages', '--problem='+problem]
+        command = [str(binary.resolve()), str(modulus), '--problem='+problem]
+        if args.phase != 'adoption-off': command += ['--stages']
         if mode not in ('stock','production'): command += ['--backward='+mode]
         if arm.endswith('-on'): command += ['--work']
         before = resource.getrusage(resource.RUSAGE_CHILDREN)
