@@ -1,3 +1,5 @@
+#[cfg(feature = "research-work")]
+pub mod concurrent;
 mod crout;
 pub mod dense;
 pub mod echelon;

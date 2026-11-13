@@ -59,6 +59,28 @@ pub struct PhaseWork {
 }
 
 impl PhaseWork {
+    /// Sum worker-local logical operations; memory peaks must be accounted separately.
+    pub fn accumulate(&mut self, other: &Self) {
+        macro_rules! add { ($($field:ident),* $(,)?) => { $(self.$field += other.$field;)* }; }
+        add!(
+            pivot_applications,
+            coefficient_products,
+            sparse_target_entries,
+            sparse_prefix_preserved,
+            sparse_merge_output_entries,
+            sparse_copyback_entries,
+            dense_load_entries,
+            dense_scan_cells,
+            dense_gather_cells,
+            dense_gather_entries,
+            normalized_cells,
+            reducer_target_operations,
+            pair_target_operations,
+            rows_loaded,
+            rows_zero
+        );
+    }
+
     pub fn json(&self) -> Json {
         Json::object([
             ("pivot_applications", Json::size(self.pivot_applications)),

@@ -1,7 +1,7 @@
 # Concurrent F4 pivot discovery (#728)
 
-Source audit: Zeebra `e22b9b58`; the measurement instrument is committed separately
-before running. [Protocol and reproduction](../../research/concurrent-pivots/README.md).
+Source audit: Zeebra `e22b9b58`; serial census **measured at `65a02699`** with Rust
+instrumentation from `8e971167`. [Protocol and reproduction](../../research/concurrent-pivots/README.md).
 The post-prefix #713 census is reused, not relabelled as a new timing result.
 
 ## Reference mechanisms
@@ -16,6 +16,51 @@ The post-prefix #713 census is reused, not relabelled as a new timing result.
 The GPL sources are algorithm references only. The initial instrument modifies
 Zeebra's own serial observer and uses no imported elimination implementation.
 No comparand source is vendored into the MIT library.
+
+The pinned msolve trace/application sparse routines explicitly choose one thread
+in final reduction; the ordinary exact sparse routine takes `st->nthrds`.
+Groebner.jl's dispatch requires at least twice as many lower rows as tasks and at
+least 1000 columns. These policies are not Zeebra crossover measurements.
+
+## Initial serial census and prototype gate
+
+The retained [complete cohort](../../research/concurrent-pivots/census.json.gz)
+contains 40 verified attempts: five repetitions of four arms on each MQ10 field.
+Every complete reduced basis equals the retained independently Singular-verified
+answer coefficient-for-coefficient. Input digests, degree sequences, pairs and
+algebraic counters are unchanged by observation. The earlier
+[interrupted cohort](../../research/concurrent-pivots/census-interrupted.json.gz)
+retains seven completed attempts followed by a load-gate refusal; it is not pooled
+into the complete cohort. The complete lock window is 2026-11-13 00:25:09–00:30:40
+America/New_York, `end=exited status=0`; load at its boundaries is 2.25/1.48.
+
+| Field | Stock wall median [min,max], ms | Feature/off | Aggregate work | Discovery |
+|---|---:|---:|---:|---:|
+| 32003 | 3130.08 [3106.49,3137.79] | 3256.53 [3225.50,3298.21] | 3288.24 [3268.82,3317.26] | 3304.37 [3300.07,3393.94] |
+| 2147483647 | 3462.92 [3437.34,3501.92] | 3510.72 [3504.26,3597.26] | 3534.78 [3485.27,3622.65] | 3569.37 [3512.11,3600.86] |
+
+These are fresh-process spawn-to-reap times including full answer encoding;
+verification follows timing. Per-process RSS and all per-row elapsed observations
+are retained in the cohort. Detailed forward row clocks occupy within-run median
+37.93%/38.04% of the observed F4 call. This is a measured elapsed fraction of the
+instrumented path, **not an exact stock stage fraction**. Feature/off versus stock
+and discovery/off expose compilation and observation costs. Even assigning their
+whole observed difference to forward work leaves ample margin over the declared
+10% investigation threshold. The observed Amdahl model saturates near 1.61x;
+crediting all elimination time to forward discovery would be invalid.
+
+Inherited pivots account for 307650953/307661703 products, newly discovered pivots
+for 277516029/277533475. This refines #713's existing total of
+585166982/585195178 forward products. The dominant batch has 1468 candidates,
+579 new pivots, 889 zeros and 12020 columns. Its serial first-claim groups have at
+most six rows. Dependency counts and weighted DAG lengths describe this serial
+trajectory; concurrent winners may change work, so neither proves concurrent
+critical-path length or retry count.
+
+At the largest width, 64 dense accumulators require about 2.94 MiB for GF(32003)
+and 5.87 MiB for GF(2147483647), below the declared 256 MiB scratch gate.
+Publication tables, live entries, reservations and thread stacks cost extra.
+The gates justify **one bounded prototype**, not an adoption or scaling claim.
 
 ## Correctness and resource requirements for a possible prototype
 

@@ -10,6 +10,133 @@ use zeebra::{
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
+#[cfg(feature = "research-work")]
+struct ConcurrentObserver {
+    config: zeebra::linalg::concurrent::Config,
+    batches: Vec<Json>,
+    fallbacks: usize,
+}
+
+#[cfg(feature = "research-work")]
+impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObserver<N, F>
+    for ConcurrentObserver
+{
+    fn batch(
+        &mut self,
+        _: &zeebra::grobner::f4::symbolic::MonicBasis<N, F>,
+        _: &[zeebra::grobner::pairs::CriticalPair<N>],
+    ) {
+    }
+
+    fn eliminate(
+        &mut self,
+        matrix: &mut zeebra::grobner::f4::macaulay::MacaulayMatrix<N, F>,
+        options: &F4Options,
+    ) -> Option<Result<zeebra::grobner::f4::structured::BlockOutcome, usize>> {
+        use zeebra::{
+            grobner::{
+                f4::structured::{check_reducer_block, BlockOutcome},
+                ReductionStrategy,
+            },
+            linalg::{concurrent, sparse::back_substitute_pivots_within, Backend},
+        };
+        if options.reduction != ReductionStrategy::Structured
+            || options.elimination != Backend::Adaptive
+        {
+            self.fallbacks += 1;
+            return None;
+        }
+        let split = matrix.partition_reducers_first();
+        check_reducer_block(matrix.matrix(), split).expect("symbolic reducer invariant");
+        let config = concurrent::Config {
+            max_entries: options.live_entry_allowance::<F>(),
+            ..self.config
+        };
+        let digest = config
+            .measure_work
+            .then(|| zeebra::grobner::f4::matrix_corpus::digest_of(matrix));
+        let started = Instant::now();
+        let report = match concurrent::reduce(
+            matrix.matrix_mut(),
+            split,
+            &config,
+            &std::sync::atomic::AtomicBool::new(false),
+        ) {
+            Ok(report) => report,
+            Err(concurrent::Error::Entries { .. } | concurrent::Error::Workspace { .. }) => {
+                self.fallbacks += 1;
+                return None;
+            }
+            Err(error) => panic!("concurrent elimination failed: {error:?}"),
+        };
+        let forward = started.elapsed();
+        let mut statistics = report.statistics.clone();
+        let started = Instant::now();
+        let backward = if options.reduce_batch_rows {
+            match back_substitute_pivots_within(
+                matrix.matrix_mut(),
+                config.max_entries,
+                &mut statistics,
+            ) {
+                Ok(rows) => Some(rows),
+                Err(nonzeros) => return Some(Err(nonzeros)),
+            }
+        } else {
+            None
+        };
+        let backward_time = started.elapsed();
+        self.batches.push(Json::object([
+            (
+                "batch_index",
+                Json::size(self.batches.len() + self.fallbacks),
+            ),
+            (
+                "input_matrix_digest",
+                digest.map_or(Json::Null, Json::string),
+            ),
+            ("rows", Json::size(matrix.num_rows())),
+            ("columns", Json::size(matrix.num_columns())),
+            ("split", Json::size(split)),
+            ("forward_ns", Json::nanos(forward)),
+            ("backward_ns", Json::nanos(backward_time)),
+            ("successes", Json::size(report.successful_publications)),
+            ("retries", Json::size(report.failed_publications)),
+            ("products", Json::size(report.products)),
+            ("inherited_products", Json::size(report.inherited_products)),
+            (
+                "discovered_products",
+                Json::size(report.discovered_products),
+            ),
+            ("retry_products", Json::size(report.retry_products)),
+            (
+                "peak_reserved_entries",
+                Json::size(report.peak_reserved_entries),
+            ),
+            ("workspace_bytes", Json::size(report.workspace_bytes)),
+            ("scheduling_ns", Json::int(report.scheduling_ns)),
+            ("publication_ns", Json::int(report.publication_ns)),
+            ("work", report.work.json()),
+            (
+                "worker_rows",
+                Json::Array(report.worker_rows.into_iter().map(Json::size).collect()),
+            ),
+            (
+                "worker_ns",
+                Json::Array(report.worker_ns.into_iter().map(Json::int).collect()),
+            ),
+        ]));
+        Some(Ok(BlockOutcome {
+            statistics,
+            free_pivots: split,
+            back_substituted_rows: backward,
+        }))
+    }
+}
+
+fn execute<T>(f: impl FnOnce() -> T) -> T {
+    f()
+}
+
 fn statistics(s: &F4Statistics, measured: bool) -> Json {
     let time = |duration| {
         if measured {
@@ -60,16 +187,25 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
     ])
 }
 
-fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool, discovery: bool) {
+fn run<const N: usize, F: FiniteField + Send + Sync>(
+    modulus: u64,
+    measured: bool,
+    measure_work: bool,
+    discovery: bool,
+    workers: Option<usize>,
+    dynamic: bool,
+    problem: &str,
+) {
     let order = MonomialOrder::GradedReverseLexicographic;
-    let input = corpus::instance("mq-random-10", modulus, order).expect("published MQ10");
+    let input = corpus::instance(problem, modulus, order).expect("published corpus problem");
     let entry = corpus::ladder()
         .into_iter()
         .find(|e| e.name == input.name)
         .unwrap();
     assert_eq!(entry.digest_at(modulus), Some(input.digest().as_str()));
-    let names: [&str; 10] = std::array::from_fn(|i| input.variables[i].as_str());
-    let system: Vec<MultivariatePolynomial<10, F>> = input
+    assert_eq!(input.variables.len(), N);
+    let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
+    let system: Vec<MultivariatePolynomial<N, F>> = input
         .system
         .iter()
         .map(|s| MultivariatePolynomial::parse(s, names).unwrap())
@@ -79,7 +215,29 @@ fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool, discove
         ..F4Options::default()
     };
     let started = Instant::now();
-    let solve = || f4_with_options(&system, order, &options).expect("MQ10 fits the shipped budget");
+    #[cfg(feature = "research-work")]
+    let mut observer = workers.map(|workers| ConcurrentObserver {
+        config: zeebra::linalg::concurrent::Config {
+            workers,
+            schedule: if dynamic {
+                zeebra::linalg::concurrent::Schedule::Dynamic
+            } else {
+                zeebra::linalg::concurrent::Schedule::Static
+            },
+            measure_work,
+            ..Default::default()
+        },
+        batches: Vec::new(),
+        fallbacks: 0,
+    });
+    let solve = || {
+        #[cfg(feature = "research-work")]
+        if let Some(observer) = observer.as_mut() {
+            return zeebra::grobner::f4::f4_observed(&system, order, &options, observer)
+                .expect("bounded concurrent MQ10");
+        }
+        f4_with_options(&system, order, &options).expect("MQ10 fits the shipped budget")
+    };
     #[cfg(feature = "research-work")]
     let ((basis, stats), work) = if measure_work {
         let (result, report) = if discovery {
@@ -89,19 +247,37 @@ fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool, discove
         };
         (result, Some(report))
     } else {
-        (solve(), None)
+        (execute(solve), None)
     };
     #[cfg(not(feature = "research-work"))]
     let (basis, stats) = {
         assert!(!discovery, "--discovery requires --features research-work");
+        assert!(
+            workers.is_none(),
+            "--workers requires --features research-work"
+        );
         assert!(!measure_work, "--work requires --features research-work");
-        solve()
+        execute(solve)
     };
     let elapsed = started.elapsed();
     #[cfg(feature = "research-work")]
     let work = work.map_or(Json::Null, |report| report.json());
     #[cfg(not(feature = "research-work"))]
     let work = Json::Null;
+    #[cfg(feature = "research-work")]
+    let parallel = observer.map_or(Json::Null, |observer| {
+        Json::object([
+            ("workers", Json::size(observer.config.workers)),
+            ("dynamic", Json::Bool(dynamic)),
+            ("fallbacks", Json::size(observer.fallbacks)),
+            ("batches", Json::Array(observer.batches)),
+        ])
+    });
+    #[cfg(not(feature = "research-work"))]
+    let parallel = {
+        let _ = dynamic;
+        Json::Null
+    };
     let mut basis: Vec<_> = basis
         .iter()
         .map(|p| polynomial_to_string(p, &names, order))
@@ -111,9 +287,11 @@ fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool, discove
         "{}",
         Json::object([
             ("modulus", Json::int(modulus)),
+            ("problem", Json::string(problem)),
             ("digest", Json::string(input.digest())),
             ("measured", Json::Bool(measured)),
             ("work", work),
+            ("parallel", parallel),
             ("field_type", Json::string(std::any::type_name::<F>())),
             ("options", Json::string(format!("{options:?}"))),
             ("f4_call_ns", Json::nanos(elapsed)),
@@ -135,16 +313,44 @@ fn run<F: FiniteField>(modulus: u64, measured: bool, measure_work: bool, discove
 
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|arg| arg == "dispatch") {
+        assert_eq!(args.len(), 2, "usage: mq10_profile dispatch WORKERS");
+        let workers: usize = args[1].parse().unwrap();
+        assert!((1..=64).contains(&workers));
+        let samples = (0..16)
+            .map(|_| {
+                let started = Instant::now();
+                std::thread::scope(|scope| {
+                    for _ in 0..workers {
+                        scope.spawn(|| std::hint::black_box(()));
+                    }
+                });
+                Json::nanos(started.elapsed())
+            })
+            .collect();
+        println!(
+            "{}",
+            Json::object([
+                ("workers", Json::size(workers)),
+                ("samples_ns", Json::Array(samples))
+            ])
+            .to_json()
+        );
+        return;
+    }
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static]")
         .parse()
         .unwrap();
     assert!(
-        args.len() <= 3
-            && args[1..]
-                .iter()
-                .all(|s| s == "--stages" || s == "--work" || s == "--discovery")
+        args[1..].iter().all(|s| s == "--stages"
+            || s == "--work"
+            || s == "--discovery"
+            || s.starts_with("--workers=")
+            || s.starts_with("--problem=")
+            || s == "--schedule=dynamic"
+            || s == "--schedule=static")
             && args[1..]
                 .iter()
                 .collect::<std::collections::HashSet<_>>()
@@ -159,9 +365,80 @@ fn main() {
         "choose --work or --discovery"
     );
     let measure_work = discovery || args.iter().any(|s| s == "--work");
+    let worker_args: Vec<_> = args
+        .iter()
+        .filter_map(|s| s.strip_prefix("--workers="))
+        .collect();
+    assert!(worker_args.len() <= 1, "one worker count required");
+    let workers = worker_args
+        .first()
+        .map(|s| s.parse::<usize>().expect("integer workers"));
+    assert!(workers != Some(0), "workers must be positive");
+    let schedules: Vec<_> = args
+        .iter()
+        .filter(|s| s.starts_with("--schedule="))
+        .collect();
+    assert!(
+        schedules.len() <= 1 && (schedules.is_empty() || workers.is_some()),
+        "one schedule requires workers"
+    );
+    assert!(
+        !discovery || workers.is_none(),
+        "discovery observes the serial control only"
+    );
+    let dynamic = !args.iter().any(|s| s == "--schedule=static");
+    let problems: Vec<_> = args
+        .iter()
+        .filter_map(|s| s.strip_prefix("--problem="))
+        .collect();
+    assert!(problems.len() <= 1, "one problem required");
+    let problem = problems.first().copied().unwrap_or("mq-random-10");
+    macro_rules! run_field {
+        ($field:ty) => {
+            match problem {
+                "mq-random-10" => run::<10, $field>(
+                    modulus,
+                    measured,
+                    measure_work,
+                    discovery,
+                    workers,
+                    dynamic,
+                    problem,
+                ),
+                "mq-random-14" => run::<14, $field>(
+                    modulus,
+                    measured,
+                    measure_work,
+                    discovery,
+                    workers,
+                    dynamic,
+                    problem,
+                ),
+                "katsura-6" => run::<6, $field>(
+                    modulus,
+                    measured,
+                    measure_work,
+                    discovery,
+                    workers,
+                    dynamic,
+                    problem,
+                ),
+                "cyclic-5" => run::<5, $field>(
+                    modulus,
+                    measured,
+                    measure_work,
+                    discovery,
+                    workers,
+                    dynamic,
+                    problem,
+                ),
+                _ => panic!("supported problems: mq-random-10, mq-random-14, katsura-6, cyclic-5"),
+            }
+        };
+    }
     match modulus {
-        32003 => run::<Zp32003>(modulus, measured, measure_work, discovery),
-        2147483647 => run::<Zp2147483647>(modulus, measured, measure_work, discovery),
+        32003 => run_field!(Zp32003),
+        2147483647 => run_field!(Zp2147483647),
         _ => panic!("supported moduli: 32003, 2147483647"),
     }
 }

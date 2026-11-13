@@ -68,3 +68,63 @@ on completed public Katsura/Cyclic controls. Compare same-algorithm p=1 separate
 Any apparent success needs a larger MQ rung and the separate #269 policy crossing;
 it does not authorize a production default. Failure of the initial gate ends the
 prototype experiment with a scoped reject/defer verdict.
+
+## Bounded prototype
+
+The opt-in `linalg::concurrent::reduce` uses safe `OnceLock` publication and scoped
+threads. It reuses one dense accumulator per active worker, supports dynamic or
+static contiguous row scheduling, and commits matrix changes only after every
+worker succeeds. Its bounds apply only at this experimental entry. Ordinary F4
+and `FiniteField` keep their existing generic signatures.
+
+The `research-work` observer hook connects this entry to the existing F4 loop;
+`mq10_profile --workers=4 --schedule=dynamic` selects it. `--work` collects actual
+worker-local dense-operation counters, products after failed claims, scheduling
+and publication clocks. Parent thread-local counters alone omit forward work.
+Without `--work`, worker product/operation observation is off; algebraic statistics
+and publication counts remain available. Entry/workspace refusals retain the input
+and explicitly fall back to serial; worker failure never accepts partial output.
+
+The experimental `statistics.peak_nonzeros` is a **conservative reservation upper
+bound**, also exposed as `peak_reserved_entries`, rather than a sampled actual
+mathematical high water. It charges original input copies and concurrent pending
+reservations in addition to published rows. The ordinary serial statistic retains
+its existing meaning. `workspace_bytes` bounds dense buffers and pivot/index
+arrays separately; thread stacks, allocator overhead, sparse capacity and process
+RSS are not inferred from it. A stricter reservation refusal is not a serial
+budget failure or evidence that the mathematical matrix exceeds the limit.
+
+Build the new observed binary with the commands above. For the parallel phase,
+launch the runner with a parent affinity containing all 64 physical cores and
+set `ZEEBRA_AFFINITY` to that exact inherited CPU set (comma-separated CPU IDs).
+It maps topology to one logical CPU per physical core, records each child CPU set,
+and pins every child independently:
+
+```sh
+ZEEBRA_MACHINE=trpro-5995wx \
+ZEEBRA_AFFINITY="$(python3 -c 'import os; print(",".join(map(str, sorted(os.sched_getaffinity(0)))))')" \
+  tools/benchlock.sh concurrent-pivots-728 \
+  python3 tools/external/pivot-discovery-study.py --phase parallel \
+    --stock /buildcache/cargo-target/zeebra-728-stock/release/examples/mq10_profile \
+    --observed /buildcache/cargo-target/zeebra-728-observed/release/examples/mq10_profile \
+    --scratch /buildcache/cargo-target/zeebra-728-parallel \
+    --output /buildcache/cargo-target/zeebra-728-parallel.json.gz
+```
+
+Controls plus both schedules at 1,2,4,8,16,32,64 workers, counters on/off, each get
+five fresh processes per field. The same processes retain per-batch forward and
+backward elapsed times; observed arms hash pre-elimination matrices with the
+existing matrix-corpus fingerprint routine and require identical inputs across
+schedules. CPU time is the change in child user+system resource usage. Empty
+scoped dispatch is measured in five fresh processes per worker count, 16 samples
+each, with actual affinity. This scoped runtime is a bounded experiment; #592
+owns any persistent-pool comparison and production runtime decision.
+
+The runner losslessly packs repeated complete bases using the existing
+`study_artifacts`/`proof_artifacts` storage. Always decode with
+`tools/external/study_artifacts.py`'s `load_study` or `iter_attempts`, which verify
+payload hashes and restore exact stdout. Census archives use the same packing;
+their parsed response key was renamed from `report` to `raw` outside timing.
+Keep interrupted
+cohorts separately and report why each stopped; never pool them into the final
+five-repetition summary.

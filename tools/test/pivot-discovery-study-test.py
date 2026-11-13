@@ -11,6 +11,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 class CensusTests(unittest.TestCase):
+    # Physical-core selection excludes SMT siblings and CPUs outside the inherited affinity.
+    def test_physical_cpu_mapping(self):
+        topology = [(0, 0, 0), (1, 1, 0), (2, 0, 0), (3, 1, 0), (4, 2, 0)]
+        self.assertEqual(MODULE.physical_cpus(topology, {0, 1, 2, 3, 4}), [2, 3, 4])
+        self.assertEqual(MODULE.physical_cpus(topology, {0, 1}), [0, 1])
+
     # The census distinguishes new rank, duplicate claim sites, skew and inherited arithmetic.
     def test_census(self):
         rows = [
