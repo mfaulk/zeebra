@@ -812,3 +812,24 @@ counts, elapsed time, and process peak RSS. Run one invocation per process under
 lock so the high-water mark belongs to that row. Both policies use the same 1000-row/1000-column
 F4 limits, RNG seed 417, and other default budgets. See
 [the measurement protocol](../research/classify-before-lex.md) for pinned commands and results.
+
+### Persistent worker dispatch and border reduction
+
+The [worker-pool study](../../research/worker-pool/README.md) compares scoped threads, a bounded
+parked pool and a Rayon dev-only runtime. Build `worker_pool_study` with `--features research-work`;
+this is a measurement entry point, not a parallel conversion strategy. Its reproduction commands
+use a private `/buildcache` target, the benchmark lock, topology-aware CPU masks, five fresh-process
+repetitions and bounded child processes. The [report](../research/worker-pool.md) retains the full
+worker sweep and negative/default-batch controls. No old single-thread timing is a scaling baseline.
+
+The focused correctness checks are:
+
+```sh
+cargo test --features research-work --example worker_pool_study
+cargo test --features research-work --lib dispatch_tests
+python3 tools/test/worker-pool-study-test.py
+python3 research/worker-pool/summarize.py
+```
+
+The summarizer validates retained evidence without running measurements. It refuses incomplete
+campaigns, missing/duplicate cells, identity mismatches and failed attempts.

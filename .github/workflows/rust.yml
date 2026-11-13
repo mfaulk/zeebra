@@ -101,6 +101,11 @@ jobs:
           git diff --exit-code -- research/grobx-randomization/summary.json research/grobx-randomization/summary.csv
           python3 research/grobx-trajectory/summarize.py
           git diff --exit-code -- research/grobx-trajectory/summary.json research/grobx-trajectory/summary.csv research/grobx-trajectory/summary-rounds.csv
+          cargo test --features research-work --example worker_pool_study
+          cargo test --features research-work --lib dispatch_tests
+          python3 tools/test/worker-pool-study-test.py
+          python3 research/worker-pool/summarize.py
+          git diff --exit-code -- research/worker-pool/summary.json research/worker-pool/summary.csv
           cargo test --features research-work --lib linalg::work
           cargo test --features research-work --lib linalg::concurrent
           cargo test --features research-work --example mq10_profile

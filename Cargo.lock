@@ -1481,6 +1481,7 @@ dependencies = [
  "pest_derive",
  "proptest",
  "rand",
+ "rayon",
  "serde",
  "serde_arrays",
 ]

@@ -71,7 +71,7 @@ default = ["external-runners"]
 # promised.
 external-runners = []
 
-# Passive elimination-work diagnostics; scopes must also be explicitly enabled.
+# Opt-in work diagnostics and owned FGLM executor measurements; production defaults stay unchanged.
 research-work = []
 
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
@@ -154,6 +154,8 @@ all-features = true
 # and `ark-bls12-381`, which pull in `ark-ec` and the whole curve stack unconditionally.
 ark-ff = { version = "0.6", default-features = false, features = ["std"] }
 bincode = "1.3.3"
+# Research-only established-runtime comparand; already present transitively via Criterion.
+rayon = "=1.12.0"
 criterion = { version = "0.5", features = ["html_reports"] }
 # The crate's own property tests; the `Arbitrary` impls they use are compiled under `cfg(test)`.
 proptest = "1.3.1"
@@ -281,3 +283,8 @@ required-features = ["external-runners"]
 name = "batch_splitting_study"
 test = true
 required-features = ["external-runners"]
+
+[[example]]
+name = "worker_pool_study"
+test = true
+required-features = ["research-work"]

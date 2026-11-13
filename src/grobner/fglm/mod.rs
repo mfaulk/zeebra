@@ -49,3 +49,6 @@ pub use spectra::{SpectralError, SpectralOptions, SpectralStatistics};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};
 
 pub use wiedemann::{ConversionRoute, WiedemannFallback};
+
+#[cfg(feature = "research-work")]
+pub use batch::{measure_border_reduction_with, BorderReductionResult, BorderReductionTask};

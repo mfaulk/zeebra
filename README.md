@@ -414,3 +414,6 @@ The [randomized-reduction study](research/grobx-randomization/README.md) provide
 Grobx feature controls, exact residual-span feasibility checks, and a bounded full-basis-verified
 campaign. Its GPL experiment remains outside the MIT library; Zeebra's deterministic defaults
 are unchanged.
+
+The [persistent-worker study](research/worker-pool/README.md) provides an opt-in dispatch and FGLM
+border-reduction experiment under `research-work`; solver defaults remain unchanged.
