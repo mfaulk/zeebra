@@ -341,7 +341,8 @@ proof costs, successful wide controls and conservative harness refusals separate
 The opt-in [selective backward study](research/selective-backward/README.md) compares full
 batch RREF with reducing only F4 candidate rows. Build `mq10_profile` with `--features research-work`
 and pass `--backward=full`, `--backward=dense-all`, or `--backward=dense-selected` to select a
-research policy; ordinary F4 defaults are unchanged.
+research policy. `--workers=4 --backward=dense-selected` combines the experiment with concurrent
+forward pivots; ordinary F4 defaults are unchanged.
 
 ## Contributing and documentation
 

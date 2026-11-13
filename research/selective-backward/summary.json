@@ -1,0 +1,2152 @@
+{
+  "source": {
+    "commit": "c148058bba3f65f794666394db1689835d4c4ada",
+    "binaries": {
+      "stock": {
+        "path": "/buildcache/cargo-target/zeebra-269/frozen/stock",
+        "sha256": "30570311a441a84e008fc1792065ab42cefd3ba0634f96802d6fb85882168134"
+      },
+      "binary": {
+        "path": "/buildcache/cargo-target/zeebra-269/frozen/observed",
+        "sha256": "4e40f75a333eccfb52664a417394b9066f7f3ccdee515b4129d3d4ff1907bb3d"
+      }
+    },
+    "build_commit": "0ed4fe332e3a6bcb51f9502b8f39e75c34b055dc",
+    "compiler_gate": true,
+    "phase": "native",
+    "affinity": "3",
+    "machine": "trpro-5995wx",
+    "max_load": 4,
+    "cargo_lock_sha256": "ec8937ebe16fcdd94e6dfa44663616ceb2ccb098a35b6591826d9c323f61841e"
+  },
+  "native_attempts": 120,
+  "work_attempts": 40,
+  "native": [
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "dense-all",
+      "f4_ms": {
+        "median": 0.754617,
+        "minimum": 0.662403,
+        "maximum": 1.013949
+      },
+      "process_ms": {
+        "median": 4.728336,
+        "minimum": 3.598598,
+        "maximum": 5.60876
+      },
+      "self_peak_mib": 4.62890625,
+      "tree_peak_mib": 6.61328125,
+      "cpu_ms": {
+        "median": 2.633999999978265,
+        "minimum": 2.476999999997731,
+        "maximum": 2.923000000010667
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.211279,
+          "minimum": 0.183807,
+          "maximum": 0.221949
+        },
+        "construction_ns": {
+          "median": 0.04698,
+          "minimum": 0.040489,
+          "maximum": 0.049125
+        },
+        "elimination_ns": {
+          "median": 0.225788,
+          "minimum": 0.20594,
+          "maximum": 0.491591
+        },
+        "extraction_ns": {
+          "median": 0.042778,
+          "minimum": 0.036951,
+          "maximum": 0.045776
+        },
+        "interreduction_ns": {
+          "median": 0.078358,
+          "minimum": 0.067267,
+          "maximum": 0.085321
+        },
+        "other_ns": {
+          "median": 0.129932,
+          "minimum": 0.113426,
+          "maximum": 0.135226
+        }
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "dense-selected",
+      "f4_ms": {
+        "median": 0.595728,
+        "minimum": 0.579877,
+        "maximum": 1.109149
+      },
+      "process_ms": {
+        "median": 5.142749,
+        "minimum": 4.734807,
+        "maximum": 5.321046
+      },
+      "self_peak_mib": 4.7890625,
+      "tree_peak_mib": 6.79296875,
+      "cpu_ms": {
+        "median": 2.7210000000112977,
+        "minimum": 2.412000000000747,
+        "maximum": 3.4489999999998133
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.189398,
+          "minimum": 0.182655,
+          "maximum": 0.250976
+        },
+        "construction_ns": {
+          "median": 0.048321,
+          "minimum": 0.039554,
+          "maximum": 0.056087
+        },
+        "elimination_ns": {
+          "median": 0.131446,
+          "minimum": 0.125768,
+          "maximum": 0.178928
+        },
+        "extraction_ns": {
+          "median": 0.043193,
+          "minimum": 0.039145,
+          "maximum": 0.056047
+        },
+        "interreduction_ns": {
+          "median": 0.071044,
+          "minimum": 0.069382,
+          "maximum": 0.34315
+        },
+        "other_ns": {
+          "median": 0.119477,
+          "minimum": 0.116005,
+          "maximum": 0.472682
+        }
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "full",
+      "f4_ms": {
+        "median": 1.128735,
+        "minimum": 0.745871,
+        "maximum": 1.145387
+      },
+      "process_ms": {
+        "median": 4.830669,
+        "minimum": 4.73615,
+        "maximum": 4.921
+      },
+      "self_peak_mib": 4.93359375,
+      "tree_peak_mib": 7.07421875,
+      "cpu_ms": {
+        "median": 2.897999999998513,
+        "minimum": 2.5529999999993613,
+        "maximum": 2.9740000000071376
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.216357,
+          "minimum": 0.186914,
+          "maximum": 0.475479
+        },
+        "construction_ns": {
+          "median": 0.048524,
+          "minimum": 0.041698,
+          "maximum": 0.299887
+        },
+        "elimination_ns": {
+          "median": 0.351964,
+          "minimum": 0.304988,
+          "maximum": 0.365131
+        },
+        "extraction_ns": {
+          "median": 0.039587,
+          "minimum": 0.034556,
+          "maximum": 0.043635
+        },
+        "interreduction_ns": {
+          "median": 0.075854,
+          "minimum": 0.064893,
+          "maximum": 0.076384
+        },
+        "other_ns": {
+          "median": 0.128953,
+          "minimum": 0.110988,
+          "maximum": 0.138624
+        }
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "stock",
+      "f4_ms": {
+        "median": 0.979994,
+        "minimum": 0.736994,
+        "maximum": 1.112064
+      },
+      "process_ms": {
+        "median": 4.987816,
+        "minimum": 4.749956,
+        "maximum": 5.138831
+      },
+      "self_peak_mib": 4.15625,
+      "tree_peak_mib": 6.203125,
+      "cpu_ms": {
+        "median": 2.8780000000052652,
+        "minimum": 2.5430000000019604,
+        "maximum": 3.13200000000613
+      },
+      "load": {
+        "median": 1.81884765625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.186812,
+          "minimum": 0.182547,
+          "maximum": 0.210158
+        },
+        "construction_ns": {
+          "median": 0.047118,
+          "minimum": 0.045668,
+          "maximum": 0.054142
+        },
+        "elimination_ns": {
+          "median": 0.294037,
+          "minimum": 0.280574,
+          "maximum": 0.594285
+        },
+        "extraction_ns": {
+          "median": 0.03685,
+          "minimum": 0.033405,
+          "maximum": 0.039144
+        },
+        "interreduction_ns": {
+          "median": 0.084941,
+          "minimum": 0.071635,
+          "maximum": 0.314194
+        },
+        "other_ns": {
+          "median": 0.116257,
+          "minimum": 0.114033,
+          "maximum": 0.134943
+        }
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "dense-all",
+      "f4_ms": {
+        "median": 0.690837,
+        "minimum": 0.682271,
+        "maximum": 1.058803
+      },
+      "process_ms": {
+        "median": 4.764874,
+        "minimum": 4.684362,
+        "maximum": 5.044092
+      },
+      "self_peak_mib": 4.55078125,
+      "tree_peak_mib": 6.68359375,
+      "cpu_ms": {
+        "median": 2.562999999994986,
+        "minimum": 2.469999999999306,
+        "maximum": 2.9609999999942183
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.187563,
+          "minimum": 0.181963,
+          "maximum": 0.213745
+        },
+        "construction_ns": {
+          "median": 0.043472,
+          "minimum": 0.042001,
+          "maximum": 0.047078
+        },
+        "elimination_ns": {
+          "median": 0.219396,
+          "minimum": 0.217173,
+          "maximum": 0.249031
+        },
+        "extraction_ns": {
+          "median": 0.043806,
+          "minimum": 0.042727,
+          "maximum": 0.049052
+        },
+        "interreduction_ns": {
+          "median": 0.075653,
+          "minimum": 0.074852,
+          "maximum": 0.356244
+        },
+        "other_ns": {
+          "median": 0.117229,
+          "minimum": 0.114527,
+          "maximum": 0.139906
+        }
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "dense-selected",
+      "f4_ms": {
+        "median": 0.619662,
+        "minimum": 0.595827,
+        "maximum": 0.705355
+      },
+      "process_ms": {
+        "median": 4.713337,
+        "minimum": 3.876083,
+        "maximum": 4.836599
+      },
+      "self_peak_mib": 4.55078125,
+      "tree_peak_mib": 6.6484375,
+      "cpu_ms": {
+        "median": 2.560000000017215,
+        "minimum": 2.395000000000591,
+        "maximum": 3.118999999994543
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.186013,
+          "minimum": 0.181172,
+          "maximum": 0.210439
+        },
+        "construction_ns": {
+          "median": 0.043294,
+          "minimum": 0.040968,
+          "maximum": 0.049554
+        },
+        "elimination_ns": {
+          "median": 0.147432,
+          "minimum": 0.13804,
+          "maximum": 0.159544
+        },
+        "extraction_ns": {
+          "median": 0.048488,
+          "minimum": 0.043772,
+          "maximum": 0.054772
+        },
+        "interreduction_ns": {
+          "median": 0.078068,
+          "minimum": 0.076645,
+          "maximum": 0.093878
+        },
+        "other_ns": {
+          "median": 0.115317,
+          "minimum": 0.112405,
+          "maximum": 0.140113
+        }
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "full",
+      "f4_ms": {
+        "median": 1.033275,
+        "minimum": 0.794833,
+        "maximum": 1.182307
+      },
+      "process_ms": {
+        "median": 4.849123,
+        "minimum": 4.716403,
+        "maximum": 4.965244
+      },
+      "self_peak_mib": 4.5703125,
+      "tree_peak_mib": 6.546875,
+      "cpu_ms": {
+        "median": 2.7320000000043976,
+        "minimum": 2.5900000000005363,
+        "maximum": 3.0709999999980475
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.185852,
+          "minimum": 0.184886,
+          "maximum": 0.463486
+        },
+        "construction_ns": {
+          "median": 0.051658,
+          "minimum": 0.044044,
+          "maximum": 0.052882
+        },
+        "elimination_ns": {
+          "median": 0.334381,
+          "minimum": 0.324144,
+          "maximum": 0.641835
+        },
+        "extraction_ns": {
+          "median": 0.04715,
+          "minimum": 0.044766,
+          "maximum": 0.051897
+        },
+        "interreduction_ns": {
+          "median": 0.083188,
+          "minimum": 0.069752,
+          "maximum": 0.308654
+        },
+        "other_ns": {
+          "median": 0.115338,
+          "minimum": 0.112893,
+          "maximum": 0.13378
+        }
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "stock",
+      "f4_ms": {
+        "median": 0.994882,
+        "minimum": 0.758595,
+        "maximum": 1.163691
+      },
+      "process_ms": {
+        "median": 4.783089,
+        "minimum": 4.752932,
+        "maximum": 5.300618
+      },
+      "self_peak_mib": 4.1796875,
+      "tree_peak_mib": 6.28515625,
+      "cpu_ms": {
+        "median": 2.7230000000026955,
+        "minimum": 2.5860000000016425,
+        "maximum": 3.2439999999946956
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.185272,
+          "minimum": 0.171011,
+          "maximum": 0.204627
+        },
+        "construction_ns": {
+          "median": 0.050657,
+          "minimum": 0.047341,
+          "maximum": 0.058933
+        },
+        "elimination_ns": {
+          "median": 0.303024,
+          "minimum": 0.293544,
+          "maximum": 0.622697
+        },
+        "extraction_ns": {
+          "median": 0.044354,
+          "minimum": 0.040806,
+          "maximum": 0.054113
+        },
+        "interreduction_ns": {
+          "median": 0.092354,
+          "minimum": 0.070884,
+          "maximum": 0.305618
+        },
+        "other_ns": {
+          "median": 0.124086,
+          "minimum": 0.118682,
+          "maximum": 0.140196
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "dense-all",
+      "f4_ms": {
+        "median": 1.571473,
+        "minimum": 1.378568,
+        "maximum": 1.637257
+      },
+      "process_ms": {
+        "median": 5.142709,
+        "minimum": 4.840737,
+        "maximum": 6.398144
+      },
+      "self_peak_mib": 5.82421875,
+      "tree_peak_mib": 7.640625,
+      "cpu_ms": {
+        "median": 3.448000000001894,
+        "minimum": 3.181999999999574,
+        "maximum": 3.8109999999926814
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.298916,
+          "minimum": 0.276333,
+          "maximum": 0.311468
+        },
+        "construction_ns": {
+          "median": 0.069111,
+          "minimum": 0.064141,
+          "maximum": 0.074441
+        },
+        "elimination_ns": {
+          "median": 0.96129,
+          "minimum": 0.821594,
+          "maximum": 1.006162
+        },
+        "extraction_ns": {
+          "median": 0.049595,
+          "minimum": 0.043772,
+          "maximum": 0.054203
+        },
+        "interreduction_ns": {
+          "median": 0.091102,
+          "minimum": 0.088928,
+          "maximum": 0.104477
+        },
+        "other_ns": {
+          "median": 0.087543,
+          "minimum": 0.076826,
+          "maximum": 0.089511
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "dense-selected",
+      "f4_ms": {
+        "median": 1.047722,
+        "minimum": 0.804732,
+        "maximum": 1.229906
+      },
+      "process_ms": {
+        "median": 4.781125,
+        "minimum": 3.596675,
+        "maximum": 5.22807
+      },
+      "self_peak_mib": 5.80859375,
+      "tree_peak_mib": 7.53125,
+      "cpu_ms": {
+        "median": 2.7639999999853337,
+        "minimum": 2.716000000001939,
+        "maximum": 3.382000000014873
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.281343,
+          "minimum": 0.276983,
+          "maximum": 0.326788
+        },
+        "construction_ns": {
+          "median": 0.071967,
+          "minimum": 0.065164,
+          "maximum": 0.356576
+        },
+        "elimination_ns": {
+          "median": 0.2595,
+          "minimum": 0.257067,
+          "maximum": 0.309056
+        },
+        "extraction_ns": {
+          "median": 0.035928,
+          "minimum": 0.033612,
+          "maximum": 0.044061
+        },
+        "interreduction_ns": {
+          "median": 0.317731,
+          "minimum": 0.089659,
+          "maximum": 0.325075
+        },
+        "other_ns": {
+          "median": 0.069821,
+          "minimum": 0.068811,
+          "maximum": 0.083568
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "full",
+      "f4_ms": {
+        "median": 1.738358,
+        "minimum": 1.579488,
+        "maximum": 1.760991
+      },
+      "process_ms": {
+        "median": 4.837211,
+        "minimum": 4.742461,
+        "maximum": 5.134834
+      },
+      "self_peak_mib": 5.9140625,
+      "tree_peak_mib": 7.640625,
+      "cpu_ms": {
+        "median": 3.444999999998255,
+        "minimum": 3.3920000000136064,
+        "maximum": 3.759000000010282
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.317803,
+          "minimum": 0.292575,
+          "maximum": 0.325968
+        },
+        "construction_ns": {
+          "median": 0.07484,
+          "minimum": 0.066145,
+          "maximum": 0.076314
+        },
+        "elimination_ns": {
+          "median": 1.111873,
+          "minimum": 1.015892,
+          "maximum": 1.141119
+        },
+        "extraction_ns": {
+          "median": 0.041838,
+          "minimum": 0.033183,
+          "maximum": 0.049715
+        },
+        "interreduction_ns": {
+          "median": 0.0902,
+          "minimum": 0.086083,
+          "maximum": 0.097595
+        },
+        "other_ns": {
+          "median": 0.08353,
+          "minimum": 0.080813,
+          "maximum": 0.087094
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "stock",
+      "f4_ms": {
+        "median": 1.635695,
+        "minimum": 1.500729,
+        "maximum": 1.717639
+      },
+      "process_ms": {
+        "median": 4.830569,
+        "minimum": 4.700612,
+        "maximum": 5.181402
+      },
+      "self_peak_mib": 4.68359375,
+      "tree_peak_mib": 6.48828125,
+      "cpu_ms": {
+        "median": 3.3409999999820528,
+        "minimum": 3.196000000002863,
+        "maximum": 3.9140000000030817
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.317391,
+          "minimum": 0.297993,
+          "maximum": 0.506508
+        },
+        "construction_ns": {
+          "median": 0.071574,
+          "minimum": 0.070944,
+          "maximum": 0.079429
+        },
+        "elimination_ns": {
+          "median": 1.034768,
+          "minimum": 0.728708,
+          "maximum": 1.109159
+        },
+        "extraction_ns": {
+          "median": 0.035087,
+          "minimum": 0.029345,
+          "maximum": 0.262909
+        },
+        "interreduction_ns": {
+          "median": 0.087164,
+          "minimum": 0.086233,
+          "maximum": 0.099117
+        },
+        "other_ns": {
+          "median": 0.086563,
+          "minimum": 0.077356,
+          "maximum": 0.097134
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "dense-all",
+      "f4_ms": {
+        "median": 1.487925,
+        "minimum": 1.324827,
+        "maximum": 2.927489
+      },
+      "process_ms": {
+        "median": 4.827473,
+        "minimum": 3.835906,
+        "maximum": 6.264662
+      },
+      "self_peak_mib": 4.80078125,
+      "tree_peak_mib": 6.6953125,
+      "cpu_ms": {
+        "median": 3.274999999990147,
+        "minimum": 3.1629999999992497,
+        "maximum": 3.5449999999968007
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.493913,
+          "minimum": 0.293975,
+          "maximum": 1.946743
+        },
+        "construction_ns": {
+          "median": 0.064913,
+          "minimum": 0.061787,
+          "maximum": 0.070403
+        },
+        "elimination_ns": {
+          "median": 0.6925,
+          "minimum": 0.691749,
+          "maximum": 1.050357
+        },
+        "extraction_ns": {
+          "median": 0.050266,
+          "minimum": 0.045245,
+          "maximum": 0.056667
+        },
+        "interreduction_ns": {
+          "median": 0.092776,
+          "minimum": 0.08996,
+          "maximum": 0.102023
+        },
+        "other_ns": {
+          "median": 0.075152,
+          "minimum": 0.071748,
+          "maximum": 0.084309
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "dense-selected",
+      "f4_ms": {
+        "median": 1.213256,
+        "minimum": 1.071878,
+        "maximum": 1.227192
+      },
+      "process_ms": {
+        "median": 4.830849,
+        "minimum": 4.793037,
+        "maximum": 4.910129
+      },
+      "self_peak_mib": 4.8671875,
+      "tree_peak_mib": 6.66015625,
+      "cpu_ms": {
+        "median": 2.995999999966692,
+        "minimum": 2.8109999999870183,
+        "maximum": 3.1529999999961866
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.321577,
+          "minimum": 0.27529,
+          "maximum": 0.323362
+        },
+        "construction_ns": {
+          "median": 0.07419,
+          "minimum": 0.064944,
+          "maximum": 0.077016
+        },
+        "elimination_ns": {
+          "median": 0.576881,
+          "minimum": 0.283739,
+          "maximum": 0.586341
+        },
+        "extraction_ns": {
+          "median": 0.047829,
+          "minimum": 0.042639,
+          "maximum": 0.26948
+        },
+        "interreduction_ns": {
+          "median": 0.10596,
+          "minimum": 0.096923,
+          "maximum": 0.321398
+        },
+        "other_ns": {
+          "median": 0.081635,
+          "minimum": 0.073488,
+          "maximum": 0.087154
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "full",
+      "f4_ms": {
+        "median": 1.722338,
+        "minimum": 1.58609,
+        "maximum": 1.830042
+      },
+      "process_ms": {
+        "median": 4.859423,
+        "minimum": 4.714599,
+        "maximum": 5.189999
+      },
+      "self_peak_mib": 4.97265625,
+      "tree_peak_mib": 6.8984375,
+      "cpu_ms": {
+        "median": 3.530000000028455,
+        "minimum": 3.381999999999663,
+        "maximum": 4.029000000004501
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.300999,
+          "minimum": 0.267466,
+          "maximum": 0.315087
+        },
+        "construction_ns": {
+          "median": 0.07864,
+          "minimum": 0.071095,
+          "maximum": 0.081062
+        },
+        "elimination_ns": {
+          "median": 1.133684,
+          "minimum": 1.043534,
+          "maximum": 1.210211
+        },
+        "extraction_ns": {
+          "median": 0.033662,
+          "minimum": 0.03196,
+          "maximum": 0.036476
+        },
+        "interreduction_ns": {
+          "median": 0.089419,
+          "minimum": 0.085322,
+          "maximum": 0.109437
+        },
+        "other_ns": {
+          "median": 0.08059,
+          "minimum": 0.073872,
+          "maximum": 0.085263
+        }
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "stock",
+      "f4_ms": {
+        "median": 1.664088,
+        "minimum": 1.530947,
+        "maximum": 1.774988
+      },
+      "process_ms": {
+        "median": 4.758272,
+        "minimum": 4.722895,
+        "maximum": 5.216028
+      },
+      "self_peak_mib": 4.4140625,
+      "tree_peak_mib": 6.32421875,
+      "cpu_ms": {
+        "median": 3.3250000000002444,
+        "minimum": 3.2299999999976237,
+        "maximum": 4.022999999993004
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.289978,
+          "minimum": 0.275331,
+          "maximum": 0.33303
+        },
+        "construction_ns": {
+          "median": 0.079239,
+          "minimum": 0.070833,
+          "maximum": 0.087566
+        },
+        "elimination_ns": {
+          "median": 1.080895,
+          "minimum": 0.749047,
+          "maximum": 1.132533
+        },
+        "extraction_ns": {
+          "median": 0.039283,
+          "minimum": 0.036892,
+          "maximum": 0.259932
+        },
+        "interreduction_ns": {
+          "median": 0.093447,
+          "minimum": 0.085992,
+          "maximum": 0.104888
+        },
+        "other_ns": {
+          "median": 0.084841,
+          "minimum": 0.077607,
+          "maximum": 0.307007
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "dense-all",
+      "f4_ms": {
+        "median": 14167.29549,
+        "minimum": 13921.878626,
+        "maximum": 14545.054371
+      },
+      "process_ms": {
+        "median": 14199.14823,
+        "minimum": 13953.145007,
+        "maximum": 14575.220429
+      },
+      "self_peak_mib": 74.5234375,
+      "tree_peak_mib": 77.375,
+      "cpu_ms": {
+        "median": 13299.432999999983,
+        "minimum": 13098.798,
+        "maximum": 13640.709999999997
+      },
+      "load": {
+        "median": 1.86474609375,
+        "minimum": 1.74365234375,
+        "maximum": 2.1201171875
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 81.73676,
+          "minimum": 80.022338,
+          "maximum": 85.553404
+        },
+        "construction_ns": {
+          "median": 13.663921,
+          "minimum": 13.471367,
+          "maximum": 13.793634
+        },
+        "elimination_ns": {
+          "median": 14031.040211,
+          "minimum": 13787.682922,
+          "maximum": 14407.862157
+        },
+        "extraction_ns": {
+          "median": 10.611917,
+          "minimum": 10.054231,
+          "maximum": 10.643016
+        },
+        "interreduction_ns": {
+          "median": 16.966257,
+          "minimum": 16.272955,
+          "maximum": 18.788244
+        },
+        "other_ns": {
+          "median": 11.481429,
+          "minimum": 11.298307,
+          "maximum": 12.044557
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "dense-selected",
+      "f4_ms": {
+        "median": 1321.361694,
+        "minimum": 1297.606172,
+        "maximum": 1384.993894
+      },
+      "process_ms": {
+        "median": 1350.424024,
+        "minimum": 1328.445425,
+        "maximum": 1415.900824
+      },
+      "self_peak_mib": 35.31640625,
+      "tree_peak_mib": 37.29296875,
+      "cpu_ms": {
+        "median": 1265.1779999999917,
+        "minimum": 1243.7790000000036,
+        "maximum": 1319.8090000000109
+      },
+      "load": {
+        "median": 1.86181640625,
+        "minimum": 1.74365234375,
+        "maximum": 2.138671875
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 86.640066,
+          "minimum": 85.311233,
+          "maximum": 88.89305
+        },
+        "construction_ns": {
+          "median": 17.497692,
+          "minimum": 17.287135,
+          "maximum": 17.628861
+        },
+        "elimination_ns": {
+          "median": 1181.968546,
+          "minimum": 1160.000987,
+          "maximum": 1245.514974
+        },
+        "extraction_ns": {
+          "median": 8.619849,
+          "minimum": 8.586943,
+          "maximum": 9.271551
+        },
+        "interreduction_ns": {
+          "median": 12.821866,
+          "minimum": 12.401872,
+          "maximum": 13.461848
+        },
+        "other_ns": {
+          "median": 11.864272,
+          "minimum": 11.516007,
+          "maximum": 11.993271
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "full",
+      "f4_ms": {
+        "median": 3144.293296,
+        "minimum": 3094.194868,
+        "maximum": 3224.573621
+      },
+      "process_ms": {
+        "median": 3176.056936,
+        "minimum": 3125.792856,
+        "maximum": 3254.102013
+      },
+      "self_peak_mib": 133.73828125,
+      "tree_peak_mib": 136.54296875,
+      "cpu_ms": {
+        "median": 2971.030999999992,
+        "minimum": 2928.395,
+        "maximum": 3040.841999999979
+      },
+      "load": {
+        "median": 1.82666015625,
+        "minimum": 1.77294921875,
+        "maximum": 2.1201171875
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 84.550112,
+          "minimum": 82.381109,
+          "maximum": 86.851078
+        },
+        "construction_ns": {
+          "median": 13.281587,
+          "minimum": 12.989073,
+          "maximum": 13.385591
+        },
+        "elimination_ns": {
+          "median": 2999.104416,
+          "minimum": 2949.337404,
+          "maximum": 3072.856681
+        },
+        "extraction_ns": {
+          "median": 5.804411,
+          "minimum": 5.59857,
+          "maximum": 6.456412
+        },
+        "interreduction_ns": {
+          "median": 17.082818,
+          "minimum": 16.917074,
+          "maximum": 19.643893
+        },
+        "other_ns": {
+          "median": 27.362617,
+          "minimum": 26.923416,
+          "maximum": 28.192263
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "stock",
+      "f4_ms": {
+        "median": 3278.917039,
+        "minimum": 3214.547884,
+        "maximum": 3298.390028
+      },
+      "process_ms": {
+        "median": 3311.493016,
+        "minimum": 3245.645054,
+        "maximum": 3332.767784
+      },
+      "self_peak_mib": 134.640625,
+      "tree_peak_mib": 137.6640625,
+      "cpu_ms": {
+        "median": 3094.222999999998,
+        "minimum": 3039.805000000007,
+        "maximum": 3116.513999999999
+      },
+      "load": {
+        "median": 1.8515625,
+        "minimum": 1.7529296875,
+        "maximum": 2.1103515625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 83.577875,
+          "minimum": 81.781777,
+          "maximum": 84.082097
+        },
+        "construction_ns": {
+          "median": 13.818851,
+          "minimum": 13.449812,
+          "maximum": 14.237616
+        },
+        "elimination_ns": {
+          "median": 3127.51829,
+          "minimum": 3066.215076,
+          "maximum": 3145.112147
+        },
+        "extraction_ns": {
+          "median": 6.609535,
+          "minimum": 6.239567,
+          "maximum": 8.883748
+        },
+        "interreduction_ns": {
+          "median": 12.922357,
+          "minimum": 12.596329,
+          "maximum": 14.255278
+        },
+        "other_ns": {
+          "median": 33.855788,
+          "minimum": 33.564018,
+          "maximum": 34.596725
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "dense-all",
+      "f4_ms": {
+        "median": 15580.29177,
+        "minimum": 15466.872581,
+        "maximum": 16612.138815
+      },
+      "process_ms": {
+        "median": 15616.470683,
+        "minimum": 15499.693142,
+        "maximum": 16644.529001
+      },
+      "self_peak_mib": 74.546875,
+      "tree_peak_mib": 77.9375,
+      "cpu_ms": {
+        "median": 14642.405999999997,
+        "minimum": 14538.214000000014,
+        "maximum": 15534.926999999985
+      },
+      "load": {
+        "median": 1.802734375,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 84.779968,
+          "minimum": 82.4823,
+          "maximum": 89.626418
+        },
+        "construction_ns": {
+          "median": 14.087091,
+          "minimum": 13.445017,
+          "maximum": 14.987353
+        },
+        "elimination_ns": {
+          "median": 15439.516842,
+          "minimum": 15328.76636,
+          "maximum": 16464.70069
+        },
+        "extraction_ns": {
+          "median": 10.489654,
+          "minimum": 10.359289,
+          "maximum": 11.212273
+        },
+        "interreduction_ns": {
+          "median": 18.903912,
+          "minimum": 17.083189,
+          "maximum": 19.112788
+        },
+        "other_ns": {
+          "median": 11.794854,
+          "minimum": 11.232098,
+          "maximum": 12.703049
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "dense-selected",
+      "f4_ms": {
+        "median": 1476.386081,
+        "minimum": 1397.632073,
+        "maximum": 1555.130181
+      },
+      "process_ms": {
+        "median": 1506.190837,
+        "minimum": 1427.643459,
+        "maximum": 1587.396623
+      },
+      "self_peak_mib": 35.8359375,
+      "tree_peak_mib": 37.875,
+      "cpu_ms": {
+        "median": 1404.4620000000045,
+        "minimum": 1338.0459999999946,
+        "maximum": 1478.7800000000252
+      },
+      "load": {
+        "median": 1.8408203125,
+        "minimum": 1.5517578125,
+        "maximum": 2.15087890625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 90.319039,
+          "minimum": 86.413098,
+          "maximum": 95.512421
+        },
+        "construction_ns": {
+          "median": 17.568346,
+          "minimum": 16.768863,
+          "maximum": 18.592754
+        },
+        "elimination_ns": {
+          "median": 1332.673744,
+          "minimum": 1261.408454,
+          "maximum": 1404.154313
+        },
+        "extraction_ns": {
+          "median": 8.762324,
+          "minimum": 8.497966,
+          "maximum": 9.773189
+        },
+        "interreduction_ns": {
+          "median": 12.676101,
+          "minimum": 12.480631,
+          "maximum": 14.368282
+        },
+        "other_ns": {
+          "median": 12.085165,
+          "minimum": 11.235493,
+          "maximum": 12.824573
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "full",
+      "f4_ms": {
+        "median": 3387.923058,
+        "minimum": 3376.530616,
+        "maximum": 3438.2356
+      },
+      "process_ms": {
+        "median": 3419.030768,
+        "minimum": 3409.233905,
+        "maximum": 3469.510065
+      },
+      "self_peak_mib": 137.63671875,
+      "tree_peak_mib": 140.23046875,
+      "cpu_ms": {
+        "median": 3201.2050000000017,
+        "minimum": 3191.2669999999885,
+        "maximum": 3245.8579999999934
+      },
+      "load": {
+        "median": 1.80615234375,
+        "minimum": 1.68408203125,
+        "maximum": 2.01025390625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 82.917954,
+          "minimum": 81.878059,
+          "maximum": 84.465503
+        },
+        "construction_ns": {
+          "median": 13.687716,
+          "minimum": 13.396452,
+          "maximum": 13.953188
+        },
+        "elimination_ns": {
+          "median": 3238.128396,
+          "minimum": 3223.492458,
+          "maximum": 3286.749355
+        },
+        "extraction_ns": {
+          "median": 6.538589,
+          "minimum": 6.476601,
+          "maximum": 6.876729
+        },
+        "interreduction_ns": {
+          "median": 12.838418,
+          "minimum": 12.805405,
+          "maximum": 13.036663
+        },
+        "other_ns": {
+          "median": 35.355227,
+          "minimum": 35.200774,
+          "maximum": 36.072282
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "stock",
+      "f4_ms": {
+        "median": 3321.061067,
+        "minimum": 3287.466372,
+        "maximum": 3484.364378
+      },
+      "process_ms": {
+        "median": 3354.942074,
+        "minimum": 3321.650702,
+        "maximum": 3521.856015
+      },
+      "self_peak_mib": 136.7421875,
+      "tree_peak_mib": 139.5390625,
+      "cpu_ms": {
+        "median": 3138.9819999999936,
+        "minimum": 3111.151999999998,
+        "maximum": 3283.782999999996
+      },
+      "load": {
+        "median": 1.81884765625,
+        "minimum": 1.68408203125,
+        "maximum": 2.00927734375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 81.690773,
+          "minimum": 81.079429,
+          "maximum": 84.419177
+        },
+        "construction_ns": {
+          "median": 13.438504,
+          "minimum": 13.21058,
+          "maximum": 14.06011
+        },
+        "elimination_ns": {
+          "median": 3174.165928,
+          "minimum": 3140.765088,
+          "maximum": 3330.985422
+        },
+        "extraction_ns": {
+          "median": 6.524436,
+          "minimum": 6.378676,
+          "maximum": 6.927666
+        },
+        "interreduction_ns": {
+          "median": 12.849589,
+          "minimum": 12.817689,
+          "maximum": 14.664382
+        },
+        "other_ns": {
+          "median": 32.732574,
+          "minimum": 32.14351,
+          "maximum": 33.641872
+        }
+      }
+    }
+  ],
+  "work": [
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "dense-all-on",
+      "f4_ms": {
+        "median": 15147.275202,
+        "minimum": 14579.373997,
+        "maximum": 15834.522497
+      },
+      "process_ms": {
+        "median": 15178.007892,
+        "minimum": 14608.457157,
+        "maximum": 15867.522037
+      },
+      "self_peak_mib": 74.3671875,
+      "tree_peak_mib": 77.3359375,
+      "cpu_ms": {
+        "median": 14203.21300000002,
+        "minimum": 13703.821000000027,
+        "maximum": 14812.422000000002
+      },
+      "load": {
+        "median": 1.8203125,
+        "minimum": 1.55615234375,
+        "maximum": 2.02978515625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 82.957852,
+          "minimum": 81.929908,
+          "maximum": 88.185402
+        },
+        "construction_ns": {
+          "median": 13.904367,
+          "minimum": 13.270716,
+          "maximum": 14.138034
+        },
+        "elimination_ns": {
+          "median": 15011.57412,
+          "minimum": 14445.058995,
+          "maximum": 15689.6417
+        },
+        "extraction_ns": {
+          "median": 10.600876,
+          "minimum": 10.150253,
+          "maximum": 11.090611
+        },
+        "interreduction_ns": {
+          "median": 17.727067,
+          "minimum": 16.807797,
+          "maximum": 19.130702
+        },
+        "other_ns": {
+          "median": 11.886311,
+          "minimum": 11.315166,
+          "maximum": 12.439945
+        }
+      },
+      "totals": {
+        "forward": {
+          "pivot_applications": 7885325,
+          "coefficient_products": 585166982,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 807021,
+          "dense_scan_cells": 19463077,
+          "dense_gather_cells": 9118976,
+          "dense_gather_entries": 1191590,
+          "normalized_cells": 4024355,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 7885325,
+          "rows_loaded": 3554,
+          "rows_zero": 1867
+        },
+        "backward": {
+          "pivot_applications": 117422954,
+          "coefficient_products": 7079509066,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 3007072,
+          "dense_scan_cells": 246623808,
+          "dense_gather_cells": 246674720,
+          "dense_gather_entries": 15572375,
+          "normalized_cells": 0,
+          "reducer_target_operations": 111244901,
+          "pair_target_operations": 6178053,
+          "rows_loaded": 50912,
+          "rows_zero": 0
+        }
+      },
+      "targets": 50912,
+      "workspace_bytes": 144240,
+      "peak_entries": 3772487,
+      "peak_sparse_capacity_entries": 3772487,
+      "kernel_allocations": 50932
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "dense-selected-on",
+      "f4_ms": {
+        "median": 1640.156074,
+        "minimum": 1617.870824,
+        "maximum": 1841.444294
+      },
+      "process_ms": {
+        "median": 1669.550433,
+        "minimum": 1645.697227,
+        "maximum": 1874.054577
+      },
+      "self_peak_mib": 35.3046875,
+      "tree_peak_mib": 37.47265625,
+      "cpu_ms": {
+        "median": 1562.9429999999668,
+        "minimum": 1541.8760000000145,
+        "maximum": 1741.7109999999757
+      },
+      "load": {
+        "median": 1.9150390625,
+        "minimum": 1.53271484375,
+        "maximum": 2.13427734375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 85.518528,
+          "minimum": 84.464691,
+          "maximum": 97.652721
+        },
+        "construction_ns": {
+          "median": 17.683732,
+          "minimum": 16.848004,
+          "maximum": 19.287931
+        },
+        "elimination_ns": {
+          "median": 1503.205368,
+          "minimum": 1483.040427,
+          "maximum": 1687.369715
+        },
+        "extraction_ns": {
+          "median": 8.985038,
+          "minimum": 8.511564,
+          "maximum": 10.264088
+        },
+        "interreduction_ns": {
+          "median": 13.449665,
+          "minimum": 12.431528,
+          "maximum": 14.234148
+        },
+        "other_ns": {
+          "median": 11.646344,
+          "minimum": 11.308132,
+          "maximum": 12.893267
+        }
+      },
+      "totals": {
+        "forward": {
+          "pivot_applications": 7885325,
+          "coefficient_products": 585166982,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 807021,
+          "dense_scan_cells": 19463077,
+          "dense_gather_cells": 9118976,
+          "dense_gather_entries": 1191590,
+          "normalized_cells": 4024355,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 7885325,
+          "rows_loaded": 3554,
+          "rows_zero": 1867
+        },
+        "backward": {
+          "pivot_applications": 471831,
+          "coefficient_products": 23566622,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 210902,
+          "dense_scan_cells": 629935,
+          "dense_gather_cells": 630185,
+          "dense_gather_entries": 71088,
+          "normalized_cells": 0,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 471831,
+          "rows_loaded": 250,
+          "rows_zero": 0
+        }
+      },
+      "targets": 250,
+      "workspace_bytes": 144240,
+      "peak_entries": 1069717,
+      "peak_sparse_capacity_entries": 1066897,
+      "kernel_allocations": 270
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "full-off",
+      "f4_ms": {
+        "median": 3169.260008,
+        "minimum": 3103.033409,
+        "maximum": 3287.528349
+      },
+      "process_ms": {
+        "median": 3200.624594,
+        "minimum": 3133.2377,
+        "maximum": 3318.839584
+      },
+      "self_peak_mib": 133.6796875,
+      "tree_peak_mib": 136.3515625,
+      "cpu_ms": {
+        "median": 2990.849000000022,
+        "minimum": 2935.471000000032,
+        "maximum": 3097.7110000000216
+      },
+      "load": {
+        "median": 1.626953125,
+        "minimum": 1.50732421875,
+        "maximum": 2.02490234375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 85.57424,
+          "minimum": 83.277164,
+          "maximum": 89.250125
+        },
+        "construction_ns": {
+          "median": 13.575756,
+          "minimum": 13.371496,
+          "maximum": 13.797473
+        },
+        "elimination_ns": {
+          "median": 3019.457339,
+          "minimum": 2955.669995,
+          "maximum": 3134.678034
+        },
+        "extraction_ns": {
+          "median": 5.674836,
+          "minimum": 5.651279,
+          "maximum": 6.659629
+        },
+        "interreduction_ns": {
+          "median": 17.139936,
+          "minimum": 17.039325,
+          "maximum": 17.341767
+        },
+        "other_ns": {
+          "median": 27.931981,
+          "minimum": 26.639607,
+          "maximum": 28.915384
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "full-on",
+      "f4_ms": {
+        "median": 3519.921194,
+        "minimum": 3464.351617,
+        "maximum": 3684.154714
+      },
+      "process_ms": {
+        "median": 3553.32053,
+        "minimum": 3495.028812,
+        "maximum": 3715.438968
+      },
+      "self_peak_mib": 137.265625,
+      "tree_peak_mib": 140.12109375,
+      "cpu_ms": {
+        "median": 3322.910000000032,
+        "minimum": 3271.2839999999783,
+        "maximum": 3463.6290000000186
+      },
+      "load": {
+        "median": 1.6572265625,
+        "minimum": 1.55615234375,
+        "maximum": 2.02734375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 84.551124,
+          "minimum": 80.169704,
+          "maximum": 85.002329
+        },
+        "construction_ns": {
+          "median": 13.804217,
+          "minimum": 13.448473,
+          "maximum": 14.358864
+        },
+        "elimination_ns": {
+          "median": 3373.071113,
+          "minimum": 3325.685656,
+          "maximum": 3539.515855
+        },
+        "extraction_ns": {
+          "median": 6.550181,
+          "minimum": 6.113473,
+          "maximum": 6.786407
+        },
+        "interreduction_ns": {
+          "median": 16.593983,
+          "minimum": 15.882838,
+          "maximum": 18.276977
+        },
+        "other_ns": {
+          "median": 23.106381,
+          "minimum": 22.925452,
+          "maximum": 23.57921
+        }
+      },
+      "totals": {
+        "forward": {
+          "pivot_applications": 7885325,
+          "coefficient_products": 585166982,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 807021,
+          "dense_scan_cells": 19463077,
+          "dense_gather_cells": 9118976,
+          "dense_gather_entries": 1191590,
+          "normalized_cells": 4024355,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 7885325,
+          "rows_loaded": 3554,
+          "rows_zero": 1867
+        },
+        "backward": {
+          "pivot_applications": 2058159,
+          "coefficient_products": 579721912,
+          "sparse_target_entries": 597657296,
+          "sparse_prefix_preserved": 1114687565,
+          "sparse_merge_output_entries": 610222599,
+          "sparse_copyback_entries": 610222599,
+          "dense_load_entries": 0,
+          "dense_scan_cells": 0,
+          "dense_gather_cells": 0,
+          "dense_gather_entries": 0,
+          "normalized_cells": 0,
+          "reducer_target_operations": 1089354,
+          "pair_target_operations": 968805,
+          "rows_loaded": 2058159,
+          "rows_zero": 0
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "dense-all-on",
+      "f4_ms": {
+        "median": 16466.037558,
+        "minimum": 16190.966825,
+        "maximum": 17327.611136
+      },
+      "process_ms": {
+        "median": 16496.726947,
+        "minimum": 16222.290433,
+        "maximum": 17360.746403
+      },
+      "self_peak_mib": 74.453125,
+      "tree_peak_mib": 77.63671875,
+      "cpu_ms": {
+        "median": 15445.223000000005,
+        "minimum": 15201.729999999954,
+        "maximum": 16191.45400000001
+      },
+      "load": {
+        "median": 1.93798828125,
+        "minimum": 1.55859375,
+        "maximum": 2.146484375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 84.551836,
+          "minimum": 83.409279,
+          "maximum": 92.047155
+        },
+        "construction_ns": {
+          "median": 14.018752,
+          "minimum": 13.937344,
+          "maximum": 14.992612
+        },
+        "elimination_ns": {
+          "median": 16327.634814,
+          "minimum": 16053.138862,
+          "maximum": 17177.588038
+        },
+        "extraction_ns": {
+          "median": 11.071186,
+          "minimum": 10.743896,
+          "maximum": 11.679988
+        },
+        "interreduction_ns": {
+          "median": 17.293546,
+          "minimum": 17.260765,
+          "maximum": 19.528384
+        },
+        "other_ns": {
+          "median": 12.015042,
+          "minimum": 11.463255,
+          "maximum": 12.650183
+        }
+      },
+      "totals": {
+        "forward": {
+          "pivot_applications": 7885548,
+          "coefficient_products": 585195178,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 807030,
+          "dense_scan_cells": 19463310,
+          "dense_gather_cells": 9118976,
+          "dense_gather_entries": 1191631,
+          "normalized_cells": 4024355,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 7885548,
+          "rows_loaded": 3554,
+          "rows_zero": 1867
+        },
+        "backward": {
+          "pivot_applications": 117426323,
+          "coefficient_products": 7079798757,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 3007121,
+          "dense_scan_cells": 246623808,
+          "dense_gather_cells": 246674720,
+          "dense_gather_entries": 15572924,
+          "normalized_cells": 0,
+          "reducer_target_operations": 111248084,
+          "pair_target_operations": 6178239,
+          "rows_loaded": 50912,
+          "rows_zero": 0
+        }
+      },
+      "targets": 50912,
+      "workspace_bytes": 192320,
+      "peak_entries": 3772621,
+      "peak_sparse_capacity_entries": 3772621,
+      "kernel_allocations": 50932
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "dense-selected-on",
+      "f4_ms": {
+        "median": 1912.303207,
+        "minimum": 1852.495492,
+        "maximum": 2021.077587
+      },
+      "process_ms": {
+        "median": 1943.067817,
+        "minimum": 1883.456383,
+        "maximum": 2055.871311
+      },
+      "self_peak_mib": 36.0,
+      "tree_peak_mib": 38.03125,
+      "cpu_ms": {
+        "median": 1817.4249999999715,
+        "minimum": 1764.0869999999875,
+        "maximum": 1915.3719999999996
+      },
+      "load": {
+        "median": 2.0234375,
+        "minimum": 1.5791015625,
+        "maximum": 2.13427734375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 88.208796,
+          "minimum": 85.58927,
+          "maximum": 96.229799
+        },
+        "construction_ns": {
+          "median": 18.130189,
+          "minimum": 16.87949,
+          "maximum": 19.186017
+        },
+        "elimination_ns": {
+          "median": 1771.947812,
+          "minimum": 1717.389014,
+          "maximum": 1868.354113
+        },
+        "extraction_ns": {
+          "median": 9.015633,
+          "minimum": 8.559675,
+          "maximum": 9.845954
+        },
+        "interreduction_ns": {
+          "median": 13.198229,
+          "minimum": 12.555463,
+          "maximum": 14.537041
+        },
+        "other_ns": {
+          "median": 12.100462,
+          "minimum": 11.514293,
+          "maximum": 13.446398
+        }
+      },
+      "totals": {
+        "forward": {
+          "pivot_applications": 7885548,
+          "coefficient_products": 585195178,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 807030,
+          "dense_scan_cells": 19463310,
+          "dense_gather_cells": 9118976,
+          "dense_gather_entries": 1191631,
+          "normalized_cells": 4024355,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 7885548,
+          "rows_loaded": 3554,
+          "rows_zero": 1867
+        },
+        "backward": {
+          "pivot_applications": 471840,
+          "coefficient_products": 23567093,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 210910,
+          "dense_scan_cells": 629935,
+          "dense_gather_cells": 630185,
+          "dense_gather_entries": 71089,
+          "normalized_cells": 0,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 471840,
+          "rows_loaded": 250,
+          "rows_zero": 0
+        }
+      },
+      "targets": 250,
+      "workspace_bytes": 192320,
+      "peak_entries": 1069741,
+      "peak_sparse_capacity_entries": 1066920,
+      "kernel_allocations": 270
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "full-off",
+      "f4_ms": {
+        "median": 3398.790848,
+        "minimum": 3370.583615,
+        "maximum": 3740.588777
+      },
+      "process_ms": {
+        "median": 3431.832767,
+        "minimum": 3403.190531,
+        "maximum": 3775.489583
+      },
+      "self_peak_mib": 137.58984375,
+      "tree_peak_mib": 140.26171875,
+      "cpu_ms": {
+        "median": 3208.515000000007,
+        "minimum": 3185.9480000000262,
+        "maximum": 3515.06199999999
+      },
+      "load": {
+        "median": 1.9150390625,
+        "minimum": 1.59423828125,
+        "maximum": 2.021484375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 82.926873,
+          "minimum": 81.985623,
+          "maximum": 90.039677
+        },
+        "construction_ns": {
+          "median": 13.660882,
+          "minimum": 13.303938,
+          "maximum": 15.358067
+        },
+        "elimination_ns": {
+          "median": 3247.543695,
+          "minimum": 3220.864765,
+          "maximum": 3575.901508
+        },
+        "extraction_ns": {
+          "median": 6.526585,
+          "minimum": 6.273117,
+          "maximum": 7.423203
+        },
+        "interreduction_ns": {
+          "median": 13.022025,
+          "minimum": 12.816156,
+          "maximum": 14.772878
+        },
+        "other_ns": {
+          "median": 35.46866,
+          "minimum": 34.772744,
+          "maximum": 37.090148
+        }
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "full-on",
+      "f4_ms": {
+        "median": 3908.143129,
+        "minimum": 3824.997753,
+        "maximum": 4206.426486
+      },
+      "process_ms": {
+        "median": 3936.958642,
+        "minimum": 3855.740853,
+        "maximum": 4239.567614
+      },
+      "self_peak_mib": 138.05859375,
+      "tree_peak_mib": 140.86328125,
+      "cpu_ms": {
+        "median": 3681.0660000000653,
+        "minimum": 3609.558000000016,
+        "maximum": 3947.069000000001
+      },
+      "load": {
+        "median": 1.84130859375,
+        "minimum": 1.55859375,
+        "maximum": 2.18017578125
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 83.289221,
+          "minimum": 81.28629,
+          "maximum": 89.3215
+        },
+        "construction_ns": {
+          "median": 13.787862,
+          "minimum": 13.563738,
+          "maximum": 14.847828
+        },
+        "elimination_ns": {
+          "median": 3762.589718,
+          "minimum": 3681.146665,
+          "maximum": 4049.197466
+        },
+        "extraction_ns": {
+          "median": 6.834158,
+          "minimum": 6.24188,
+          "maximum": 7.239497
+        },
+        "interreduction_ns": {
+          "median": 19.169735,
+          "minimum": 18.632008,
+          "maximum": 20.709178
+        },
+        "other_ns": {
+          "median": 23.116834,
+          "minimum": 22.689215,
+          "maximum": 25.103673
+        }
+      },
+      "totals": {
+        "forward": {
+          "pivot_applications": 7885548,
+          "coefficient_products": 585195178,
+          "sparse_target_entries": 0,
+          "sparse_prefix_preserved": 0,
+          "sparse_merge_output_entries": 0,
+          "sparse_copyback_entries": 0,
+          "dense_load_entries": 807030,
+          "dense_scan_cells": 19463310,
+          "dense_gather_cells": 9118976,
+          "dense_gather_entries": 1191631,
+          "normalized_cells": 4024355,
+          "reducer_target_operations": 0,
+          "pair_target_operations": 7885548,
+          "rows_loaded": 3554,
+          "rows_zero": 1867
+        },
+        "backward": {
+          "pivot_applications": 2058195,
+          "coefficient_products": 579751105,
+          "sparse_target_entries": 597686688,
+          "sparse_prefix_preserved": 1114753600,
+          "sparse_merge_output_entries": 610252491,
+          "sparse_copyback_entries": 610252491,
+          "dense_load_entries": 0,
+          "dense_scan_cells": 0,
+          "dense_gather_cells": 0,
+          "dense_gather_entries": 0,
+          "normalized_cells": 0,
+          "reducer_target_operations": 1089357,
+          "pair_target_operations": 968838,
+          "rows_loaded": 2058195,
+          "rows_zero": 0
+        }
+      }
+    }
+  ]
+}

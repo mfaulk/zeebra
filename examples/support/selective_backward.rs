@@ -84,16 +84,7 @@ impl<const N: usize, F: FiniteField> BatchObserver<N, F> for Observer<'_> {
                 Err(selective::Error::Entries(n)) => return Some(Err(n)),
                 Err(error) => panic!("selective research refusal: {error:?}"),
             };
-            details = Json::object([
-                ("targets", Json::size(r.targets)),
-                ("products", Json::size(r.products)),
-                ("scans", Json::size(r.scans)),
-                ("loads", Json::size(r.loads)),
-                ("gathers", Json::size(r.gathers)),
-                ("workspace_bytes", Json::size(r.workspace_bytes)),
-                ("peak_entries", Json::size(r.peak_entries)),
-                ("peak_capacity_entries", Json::size(r.peak_capacity_entries)),
-            ]);
+            details = self::details(&r);
             r.targets
         };
         let backward = start.elapsed();
@@ -111,4 +102,17 @@ impl<const N: usize, F: FiniteField> BatchObserver<N, F> for Observer<'_> {
         ]));
         Some(Ok(block))
     }
+}
+
+pub fn details(r: &selective::Report) -> Json {
+    Json::object([
+        ("targets", Json::size(r.targets)),
+        ("products", Json::size(r.products)),
+        ("scans", Json::size(r.scans)),
+        ("loads", Json::size(r.loads)),
+        ("gathers", Json::size(r.gathers)),
+        ("workspace_bytes", Json::size(r.workspace_bytes)),
+        ("peak_entries", Json::size(r.peak_entries)),
+        ("peak_capacity_entries", Json::size(r.peak_capacity_entries)),
+    ])
 }

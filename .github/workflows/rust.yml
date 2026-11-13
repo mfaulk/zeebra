@@ -110,6 +110,10 @@ jobs:
           cargo test --features research-work --lib linalg::concurrent
           cargo test --features research-work --lib linalg::selective
           python3 tools/test/selective-backward-study-test.py
+          python3 tools/test/selective-backward-summary-test.py
+          python3 tools/test/selective-backward-cross-test.py
+          python3 research/selective-backward/summarize.py
+          git diff --exit-code -- research/selective-backward/summary.json research/selective-backward/native.csv research/selective-backward/inventory.json
           cargo test --features research-work --example mq10_profile
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks

@@ -85,3 +85,41 @@ performance decision and retained under `exploratory/`. A single bounded confirm
 the same four arms, five accepted repetitions and acceptance thresholds, adding compiler gates.
 The frozen Rust sources/executables remain at `0ed4fe33`; the controller records its own commit
 separately and rejects a changed Rust source tree. Environmental gate waits are not new samples.
+
+
+## Forward/backward crossing (declared before running)
+
+After the serial gate passes, `cross.py` runs five fresh-process repetitions per family/field
+of serial full, serial selected, four-worker full and four-worker selected. MQ10 additionally
+gets same-algorithm one-worker full/selected controls: 140 native attempts total. A separate
+12-attempt work phase has one diagnostic per MQ10 field/arm, never pooled with native times.
+Serial and one-worker children pin CPU 3; four-worker children pin CPUs 0–3. The same compiler,
+load, 60-second/2-GiB guards and original F4 budgets apply. No repeated extension is planned.
+Acceptance of the serial gate does not imply that the parallel combination wins; report it
+separately against both serial selected and one-worker selected. No production defaults change.
+
+The four MQ14 probes are serial full/selected at both primes, one attempt each at the same
+60-second/2-GiB cap. A completed probe needs an independent reference before it is timing
+or capacity evidence. Refusals remain visible; no speedup is inferred from them.
+
+Build the updated example with `cargo build --release --features research-work --example mq10_profile`
+after its tests pass, and freeze it separately from the original serial-cohort executable.
+Then run (using separate scratch/output names for `--phase work` and `--phase probe`):
+
+```sh
+ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=0,1,2,3 \
+  tools/benchlock.sh selective-backward-269-cross taskset -c 0-3 \
+  python3 research/selective-backward/cross.py \
+  --binary "$CARGO_TARGET_DIR/frozen/combined" \
+  --scratch "$CARGO_TARGET_DIR/cross" --output "$CARGO_TARGET_DIR/cross.json.gz"
+```
+
+Offline validation rechecks complete bases, trajectory and compiler boundaries, source/binary
+identities and the SHA256 inventory, then regenerates `summary.json` and `native.csv`:
+
+```sh
+python3 tools/test/selective-backward-study-test.py
+python3 tools/test/selective-backward-summary-test.py
+python3 tools/test/selective-backward-cross-test.py
+python3 research/selective-backward/summarize.py
+```

@@ -22,7 +22,8 @@ struct RunMode<'a> {
 }
 
 #[cfg(feature = "research-work")]
-struct ConcurrentObserver {
+struct ConcurrentObserver<'a> {
+    backward: Option<&'a str>,
     config: zeebra::linalg::concurrent::Config,
     batches: Vec<Json>,
     fallbacks: usize,
@@ -30,7 +31,7 @@ struct ConcurrentObserver {
 
 #[cfg(feature = "research-work")]
 impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObserver<N, F>
-    for ConcurrentObserver
+    for ConcurrentObserver<'_>
 {
     fn batch(
         &mut self,
@@ -56,6 +57,21 @@ impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObs
         {
             self.fallbacks += 1;
             return None;
+        }
+        let mut input_leads = vec![
+            false;
+            if self.backward.is_some() {
+                matrix.num_columns()
+            } else {
+                0
+            }
+        ];
+        if self.backward.is_some() {
+            for row in matrix.matrix().rows() {
+                if let Some(c) = row.leading_column() {
+                    input_leads[c] = true;
+                }
+            }
         }
         let split = matrix.partition_reducers_first();
         check_reducer_block(matrix.matrix(), split).expect("symbolic reducer invariant");
@@ -83,7 +99,28 @@ impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObs
         let forward = started.elapsed();
         let mut statistics = report.statistics.clone();
         let started = Instant::now();
-        let backward = if options.reduce_batch_rows {
+        let mut backward_details = Json::Null;
+        let backward = if options.reduce_batch_rows && self.backward == Some("dense-selected") {
+            let selected: Vec<_> = matrix
+                .matrix()
+                .rows()
+                .iter()
+                .map(|r| r.leading_column().is_some_and(|c| !input_leads[c]))
+                .collect();
+            let report = match zeebra::linalg::selective::reduce(
+                matrix.matrix_mut(),
+                &selected,
+                config.max_entries,
+                64 * 1024 * 1024,
+                &mut statistics,
+            ) {
+                Ok(r) => r,
+                Err(zeebra::linalg::selective::Error::Entries(n)) => return Some(Err(n)),
+                Err(e) => panic!("selective research refusal: {e:?}"),
+            };
+            backward_details = selective_backward::details(&report);
+            Some(report.targets)
+        } else if options.reduce_batch_rows {
             match back_substitute_pivots_within(
                 matrix.matrix_mut(),
                 config.max_entries,
@@ -110,6 +147,7 @@ impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObs
             ("split", Json::size(split)),
             ("forward_ns", Json::nanos(forward)),
             ("backward_ns", Json::nanos(backward_time)),
+            ("backward_details", backward_details),
             ("successes", Json::size(report.successful_publications)),
             ("retries", Json::size(report.failed_publications)),
             ("products", Json::size(report.products)),
@@ -232,6 +270,7 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     let started = Instant::now();
     #[cfg(feature = "research-work")]
     let mut observer = workers.map(|workers| ConcurrentObserver {
+        backward,
         config: zeebra::linalg::concurrent::Config {
             workers,
             schedule: if dynamic {
@@ -246,11 +285,14 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         fallbacks: 0,
     });
     #[cfg(feature = "research-work")]
-    let mut selective = backward.map(|mode| selective_backward::Observer {
-        mode,
-        detailed: measure_work,
-        batches: Vec::new(),
-    });
+    let mut selective =
+        backward
+            .filter(|_| workers.is_none())
+            .map(|mode| selective_backward::Observer {
+                mode,
+                detailed: measure_work,
+                batches: Vec::new(),
+            });
     let solve = || {
         #[cfg(feature = "research-work")]
         if let Some(observer) = selective.as_mut() {
@@ -298,6 +340,10 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     let parallel = observer.map_or(Json::Null, |observer| {
         Json::object([
             ("workers", Json::size(observer.config.workers)),
+            (
+                "backward_mode",
+                Json::string(observer.backward.unwrap_or("full")),
+            ),
             ("dynamic", Json::Bool(dynamic)),
             ("fallbacks", Json::size(observer.fallbacks)),
             ("batches", Json::Array(observer.batches)),
@@ -340,6 +386,19 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
                 zeebra::util::peak_resident_bytes()
                     .map(Json::int)
                     .unwrap_or(Json::Null)
+            ),
+            (
+                "input",
+                Json::object([
+                    (
+                        "variables",
+                        Json::Array(input.variables.iter().cloned().map(Json::string).collect())
+                    ),
+                    (
+                        "generators",
+                        Json::Array(input.system.iter().cloned().map(Json::string).collect())
+                    ),
+                ])
             ),
             ("statistics", statistics(&stats, measured)),
             (
@@ -445,8 +504,8 @@ fn main() {
         "unknown backward policy"
     );
     assert!(
-        backward.is_none() || (workers.is_none() && !discovery),
-        "backward policy requires serial forward"
+        backward.is_none() || (!discovery && (workers.is_none() || backward != Some("dense-all"))),
+        "dense-all requires serial forward; backward policies exclude discovery"
     );
     let mode = RunMode {
         workers,
@@ -512,6 +571,37 @@ mod tests {
                     assert_eq!(actual.step_degrees, original.step_degrees);
                     assert!(!observer.batches.is_empty());
                 }
+            }
+        }
+    }
+
+    // Concurrent forward pivots compose with candidate-only backward reduction without changing a basis.
+    #[cfg(feature = "research-work")]
+    #[test]
+    fn concurrent_forward_accepts_selective_backward() {
+        use zeebra::grobner::{
+            benchmark_systems::{cyclic, katsura},
+            f4::f4_observed,
+        };
+        for system in [cyclic::<4, Zp32003>(), katsura::<4, Zp32003>()] {
+            let options = F4Options::default();
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let expected = f4_with_options(&system, order, &options).unwrap().0;
+            for workers in [1, 4] {
+                let mut observer = ConcurrentObserver {
+                    config: zeebra::linalg::concurrent::Config {
+                        workers,
+                        ..Default::default()
+                    },
+                    backward: Some("dense-selected"),
+                    batches: Vec::new(),
+                    fallbacks: 0,
+                };
+                let actual = f4_observed(&system, order, &options, &mut observer)
+                    .unwrap()
+                    .0;
+                assert_eq!(actual, expected);
+                assert_eq!(observer.fallbacks, 0);
             }
         }
     }
