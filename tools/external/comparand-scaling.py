@@ -147,6 +147,7 @@ def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**
         finally:
             if process.poll() is None:
                 kill_group(process)
+    finished=time.monotonic_ns()
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
     output_bytes=sum(p.stat().st_size for p in stem.parent.glob(stem.name+'.*') if p.is_file())
     if output_bytes > output_limit:
@@ -164,7 +165,7 @@ def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**
         stdout=stream.read(output_limit)
     with stem.with_suffix('.stderr').open() as stream:
         stderr=stream.read(output_limit)
-    return dict(command=command, cpus=cpus, process_wall_ns=time.monotonic_ns()-started,
+    return dict(command=command, cpus=cpus, process_wall_ns=finished-started,
                 process_cpu_ns=round((after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime)*1e9),
                 observed_tree_peak_bytes=peak, stop=stop, exit=process.returncode,
                 output_bytes=output_bytes,
@@ -317,25 +318,38 @@ def summarize(cohort, target):
         if not a['diagnostic']:
             groups.setdefault((a['digest'],a['engine'],a['workers']),[]).append(a)
     medians = {}
+    floors={}
     for key, attempts in groups.items():
         valid = [a for a in attempts if a['status']=='verified']
         if valid:
             medians[key] = dict(status='verified',process_wall_ns=statistics.median(a['process_wall_ns'] for a in valid))
+            if valid[0]['name']=='katsura-4':
+                floors[(str(valid[0]['field']),key[1],key[2])]=medians[key]['process_wall_ns']
     lines = ['# Comparand worker cohorts (#739)','',f'**Measured at:** `{cohort["commit"]}`.', '',
              'Full reduced-basis process wall; exact reference checks follow timing. Diagnostic hot-region ticks are separate.',
-             'Missing verification blocks timing ratios; limits/capabilities remain visible. Julia deterministic backend; Rust randomized native backend.', '',
+             'Missing verification blocks timing ratios; limits/capabilities remain visible. Julia deterministic backend; Rust randomized native backend.',
+             'S(p)/E(p) also require both process walls above twice the corresponding Katsura-4 startup control.', '',
              '| Field/input | Engine | Workers | Repeats | Wall median s | Process CPU median s | RSS max MiB | S(p) | E(p) | Status |',
              '|---|---|---:|---:|---:|---:|---:|---:|---:|---|']
     for (digest,engine,workers),attempts in groups.items():
         first = attempts[0];valid=[a for a in attempts if a['status']=='verified']
         base=medians.get((digest,engine,1)); ours=medians.get((digest,engine,workers))
         ratio=speedup(base,ours) if base and ours else None
+        one_floor=floors.get((str(first['field']),engine,1))
+        many_floor=floors.get((str(first['field']),engine,workers))
+        if (first['name']=='katsura-4' or not one_floor or not many_floor
+                or not base or not ours or base['process_wall_ns']<2*one_floor
+                or ours['process_wall_ns']<2*many_floor):
+            ratio=None
         lines.append('| '+' | '.join([f'{first["field"]}/{first["name"]}',engine,str(workers),str(len(valid)),
             f'{ours["process_wall_ns"]/1e9:.4f}' if ours else '—',
             f'{statistics.median(a["process_cpu_ns"] for a in valid)/1e9:.4f}' if valid else '—',
             f'{max(a["observed_tree_peak_bytes"] for a in valid)/1024**2:.2f}' if valid else '—',
             f'{ratio:.3f}' if ratio else '—', f'{ratio/workers:.3f}' if ratio else '—',
             ', '.join(sorted({a['status'] for a in attempts}))])+' |')
+    lines+=['','## Frozen input identities','','| Field/input | Complete canonical SHA-256 |','|---|---|']
+    attempted={a['digest'] for a in cohort['attempts']}
+    lines += ['| '+str(c['field'])+'/'+c['name']+' | `'+c['digest']+'` |' for c in cohort['cases'] if c['digest'] in attempted]
     target.write_text('\n'.join(lines)+'\n')
 
 
