@@ -15,6 +15,7 @@ import shutil
 import signal
 import statistics
 import subprocess
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -192,6 +193,21 @@ def ticks_marker(output, name):
     return {tid:int(ticks) for tid,ticks in (part.split(':') for part in match[1].split(',') if part)}
 
 
+def certified_basis(raw,case,request):
+    if (raw.get('input')!=request or raw.get('certified') is not True
+            or raw.get('flaw') is not None or raw.get('stopped') is not None or not raw.get('cofactors')
+            or raw.get('revision')!=wide.REVISIONS['grobx'] or raw.get('isa')!='x86-64-v3'
+            or raw.get('generator_echoes')!=raw.get('checker_echoes')
+            or hashlib.sha256(raw.get('input_text','').encode()).hexdigest()!=raw.get('input_sha256')):
+        raise ValueError('grobx exact certificate absent or rejected')
+    echoes=raw.get('generator_echoes',[])
+    if len(echoes)!=len(case['generators']):
+        raise ValueError('certified driver changed generator count')
+    for original,echo in zip(case['generators'],echoes):
+        verify_basis(wide.grobx_work.basis_list(echo),[original],case)
+    return wide.grobx_work.basis_list(raw['basis'])
+
+
 def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
     if any(stem.parent.glob(stem.name+'.*')):
         raise ValueError('attempt scratch already contains outputs')
@@ -233,19 +249,7 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
             if engine == 'grobx-certified':
                 if raw.get('stopped'):
                     return dict(attempt,raw=raw,status='stopped-by-limit',detail=raw['stopped'])
-                if (raw.get('input')!=request or raw.get('certified') is not True
-                        or raw.get('flaw') is not None or not raw.get('cofactors')
-                        or raw.get('revision')!=wide.REVISIONS['grobx'] or raw.get('isa')!='x86-64-v3'
-                        or raw.get('generator_echoes')!=raw.get('checker_echoes')
-                        or hashlib.sha256(raw.get('input_text','').encode()).hexdigest()!=raw.get('input_sha256')):
-                    raise ValueError('grobx exact certificate absent or rejected')
-                basis=wide.grobx_work.basis_list(raw['basis'])
-                echoes=raw.get('generator_echoes',[])
-                if len(echoes)!=len(case['generators']):
-                    raise ValueError('certified driver changed generator count')
-                for original,echo in zip(case['generators'],echoes):
-                    polys=wide.grobx_work.basis_list(echo)
-                    verify_basis(polys,[original],case)
+                basis=certified_basis(raw,case,request)
             else:
                 basis = wide.validate_native(raw, request, engine)
             attempt.update(raw=raw, basis=basis, engine_wall_ns=raw.get('solve_ns'))
@@ -312,6 +316,97 @@ def reference_bases(cases):
     return refs
 
 
+def validate_cohort(cohort):
+    if not re.fullmatch('[0-9a-f]{40}',cohort['commit']):
+        raise ValueError('missing exact controller source pin')
+    for binary in [cohort['input_exporter'],*cohort['binaries'].values()]:
+        if not re.fullmatch('[0-9a-f]{64}',binary['sha256']):
+            raise ValueError('missing executable identity')
+    cases={c['digest']:canonical_case(c) for c in cohort['cases']}
+    for a in cohort['attempts']:
+        case=cases[a['digest']]
+        if a['status']!='verified':
+            continue
+        if a.get('stop') or a.get('exit',0):
+            raise ValueError('stopped or failed attempt was promoted to verified')
+        if a['engine']=='grobx-certified':
+            raw=a['raw']
+            request=dict(variables=case['variables'],modulus=int(case['modulus']),order='grevlex',
+                         workers=1,generators=case['generators'],mode='certified',
+                         wall_ns=cohort['policy']['wall']*10**9,rss_bytes=2*1024**3)
+            actual=certified_basis(raw,case,request)
+        elif a['engine']=='msolve':
+            actual=msolve_basis(a['basis_output'],case)
+        elif a['engine'] in ('grobx','groebner-rs'):
+            request=dict(variables=case['variables'],modulus=int(case['modulus']),order='grevlex',
+                         workers=a['workers'],generators=case['generators'])
+            if a['engine']=='grobx':
+                request.update(mode='raw',wall_ns=cohort['policy']['wall']*10**9,rss_bytes=2*1024**3)
+            actual=wide.validate_native(a['raw'],request,a['engine'])
+            version=cohort['binaries'][a['engine']]['version']
+            if any(a['raw'].get(k)!=version.get(k) for k in ('revision','build','build_metadata','isa')):
+                raise ValueError('native build identity changed inside cohort')
+        elif a['engine']=='groebner.jl':
+            output=a['stdout']
+            if '@done 1' not in output or f'@workers {a["workers"]}\n' not in output:
+                raise ValueError('Julia completion or worker setting changed')
+            actual=re.findall(r'^@gb (.*)$',output,re.M)
+        else:
+            raise ValueError('unrecognized verified engine')
+        verify_basis(a['basis'],actual,case)
+        if a['engine']!='grobx-certified':
+            ref=cohort['references'].get(a['digest'])
+            if not ref:
+                raise ValueError('verified status lacks an independent exact reference')
+            verify_basis(actual,ref['basis'],case)
+    return cohort
+
+
+def warmed_table(cohort):
+    groups={}
+    for a in cohort['attempts']:
+        if a['status']=='verified' and not a['diagnostic'] and a.get('engine_wall_ns',0)>0:
+            groups.setdefault((a['digest'],a['engine'],a['workers']),[]).append(a)
+    lines=['## Same-engine hot-call curves','','These internal timers exclude process setup/input/output and cannot be divided by another engine’s process wall.',
+           'Each S(p) uses this engine/configuration’s own one-worker control; pivot work can change.','',
+           '| Field/input | Engine | Workers | Repeats | Hot median [min,max] ms | S(p) | E(p) |','|---|---|---:|---:|---:|---:|---:|']
+    for (digest,engine,p),rows in groups.items():
+        one=groups.get((digest,engine,1))
+        values=[a['engine_wall_ns']/1e6 for a in rows]
+        ratio=statistics.median(a['engine_wall_ns'] for a in one)/statistics.median(a['engine_wall_ns'] for a in rows) if one else None
+        lines.append('| '+' | '.join([str(rows[0]['field'])+'/'+rows[0]['name'],engine,str(p),str(len(rows)),
+            f'{statistics.median(values):.3f} [{min(values):.3f},{max(values):.3f}]',f'{ratio:.3f}' if ratio else '—',f'{ratio/p:.3f}' if ratio else '—'])+' |')
+    return '\n'.join(lines)+'\n'
+
+
+def replay(directory,write=False):
+    inventory=json.loads((directory/'inventory.json').read_text())
+    boards=['# Comparand scaling cohorts (#739)','','Generated from hash-bound retained attempts; no solver is invoked by replay.',
+            'Whole-process, hot-call, certification and diagnostic observations are separate configurations.','']
+    count=0
+    for filename,digest in inventory['cohorts'].items():
+        path=directory/filename
+        if hashlib.sha256(path.read_bytes()).hexdigest()!=digest:
+            raise ValueError('retained archive identity changed: '+filename)
+        cohort=validate_cohort(wide.load(path));count+=len(cohort['attempts'])
+        for ref in cohort['references'].values():
+            if ref.get('archive_sha256'):
+                artifact=directory/Path(ref['provenance']).name
+                if hashlib.sha256(artifact.read_bytes()).hexdigest()!=ref['archive_sha256']:
+                    raise ValueError('independent reference archive changed')
+        boards+=['## '+filename,'']
+        with tempfile.TemporaryDirectory() as scratch:
+            target=Path(scratch)/'board.md';summarize(cohort,target);boards+=[target.read_text()]
+        boards+=[warmed_table(cohort)]
+    rendered='\n'.join(boards)
+    target=directory/'BOARD.md'
+    if write:
+        target.write_text(rendered)
+    elif target.read_text()!=rendered:
+        raise ValueError('generated cohort board is stale')
+    print(f'validated {count} retained attempts and regenerated board equality')
+
+
 def summarize(cohort, target):
     groups = {}
     for a in cohort['attempts']:
@@ -359,7 +454,9 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path)
     parser.add_argument('--scratch',type=Path)
-    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--output',type=Path)
+    parser.add_argument('--replay',type=Path,help='offline coefficient/provenance/board validation of retained campaign directory')
+    parser.add_argument('--write-board',action='store_true')
     parser.add_argument('--rows',default='katsura-4,mq-random-10,katsura-11,cyclic-7,cyclic-10,katsura-9')
     parser.add_argument('--engines',default='msolve,groebner.jl,groebner-rs,grobx,zeebra')
     parser.add_argument('--fields',default='32003,2147483647,wide64,goldilocks')
@@ -372,6 +469,10 @@ def main():
     parser.add_argument('--diagnostic',action='store_true')
     parser.add_argument('--summarize',action='store_true')
     args=parser.parse_args()
+    if args.replay:
+        replay(args.replay,args.write_board);return
+    if not args.output:
+        parser.error('--output required for measurement/single-cohort summaries')
     if args.summarize:
         summarize(wide.load(args.output),args.output.with_suffix('.md'));return
     if not args.binary or not args.scratch or str(args.scratch.resolve()).startswith(str(Path.home())):
@@ -432,6 +533,11 @@ def main():
     if julia_source.exists():
         cohort['julia_source']={str(p.relative_to(julia_source)):hashlib.sha256(p.read_bytes()).hexdigest()
                                 for p in [julia_source/'Project.toml',julia_source/'src/groebner/parameters.jl',julia_source/'src/f4/linalg/linalg.jl']}
+    prefix=Path(os.environ.get('ZEEBRA_EXT_PREFIX',str(Path.home()/'.local/opt/zeebra-ext')))
+    makefile=prefix/'src/msolve-0.11.0/src/neogb/Makefile'
+    if makefile.exists():
+        cohort['msolve_build']=dict(path=str(makefile),sha256=hashlib.sha256(makefile.read_bytes()).hexdigest(),
+            flags=[line for line in makefile.read_text().splitlines() if re.match(r'^(CC|CFLAGS|SIMD_FLAGS|CPUEXT_FLAGS|OPENMP_CFLAGS|libneogb_la_CFLAGS) =',line)])
     args.scratch.mkdir(parents=True,exist_ok=True)
     # Worker order alternates between repetitions; timed arms exclude hot snapshot diagnostics.
     stopped={}

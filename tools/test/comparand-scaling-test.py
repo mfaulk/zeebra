@@ -13,6 +13,18 @@ spec.loader.exec_module(scaling)
 
 
 class ComparandScalingTests(unittest.TestCase):
+    # Offline replay rechecks coefficients instead of trusting a persisted verified status.
+    def test_offline_replay_rejects_a_forged_verified_basis(self):
+        canonical='characteristic 13\nextension-degree 1\norder grevlex\nvariables x1\ngenerator x1+1\n'
+        c=dict(field='13',name='fixture',modulus=13,variables=['x1'],generators=['x1+1'],canonical=canonical,
+               digest=hashlib.sha256(canonical.encode()).hexdigest())
+        report=dict(commit='a'*40,input_exporter={'sha256':'b'*64},binaries={'msolve':{'sha256':'c'*64}},cases=[c],
+                    references={c['digest']:{'basis':['x1+1']}},attempts=[dict(engine='msolve',digest=c['digest'],
+                    status='verified',basis=['x1+1'],basis_output='#field characteristic: 13\n#variable order: x1\n#monomial order: graded reverse lexicographical\n#---\n[x1+1]:\n')])
+        scaling.validate_cohort(report)
+        report['attempts'][0]['basis']=['x1+2']
+        with self.assertRaises(ValueError):
+            scaling.validate_cohort(report)
     # A zero-exit engine missing its basis keeps all timing and termination evidence as failure.
     def test_missing_basis_keeps_failed_attempt_measurements(self):
         with tempfile.TemporaryDirectory() as directory:
