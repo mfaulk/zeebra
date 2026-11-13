@@ -316,7 +316,10 @@ ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=2 \
 ```
 
 The live test compares every coefficient of the complete monic reduced bases from all four engines
-and emits their inputs, digests, bases, driver identities and proof outputs as JSON. Verification is a separate run;
+and emits their inputs, digests, bases, driver identities and proof outputs as JSON. Each child has
+60 seconds and one worker; Julia also has a 2 GiB RSS cap. The optional RSS cap is omitted for
+native drivers because these small children can exit before the supervisor obtains a sample.
+Their kernel RSS snapshots remain in the retained outputs. Verification is a separate run;
 its runtime is excluded from board solve times. The sweep retains unsupported-engine outcomes.
 Groebner.jl does not offer FGLM, so use `--task reduced-grobner-basis` for this comparison.
 The sweep includes grobx; `--engines zeebra,groebner.jl,groebner-rs,grobx` selects only the supported

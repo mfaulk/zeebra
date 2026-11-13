@@ -2606,6 +2606,9 @@ mod tests {
         let limits = Limits::wall(std::time::Duration::from_secs(60))
             .with_workers(1)
             .with_max_rss_bytes(2 * 1024 * 1024 * 1024);
+        // Very short native children may exit before Supervisor samples RSS; the driver snapshots
+        // are retained, but an optional supervisor RSS cap cannot be asserted for those processes.
+        let native_limits = Limits::wall(std::time::Duration::from_secs(60)).with_workers(1);
         let mut artifacts = Vec::new();
         for entry in ladder()
             .into_iter()
@@ -2629,8 +2632,8 @@ mod tests {
                 entry.quotient_dimension.map(|d| d as usize)
             );
             assert!(ours.invariants.agree(&theirs.invariants).is_empty());
-            let rust_report = rust.run(&built, Task::ReducedGrobnerBasis, &limits);
-            let grobx_report = grobx.run(&built, Task::ReducedGrobnerBasis, &limits);
+            let rust_report = rust.run(&built, Task::ReducedGrobnerBasis, &native_limits);
+            let grobx_report = grobx.run(&built, Task::ReducedGrobnerBasis, &native_limits);
             let rust_basis = rust_report
                 .status
                 .answer()
@@ -2709,6 +2712,7 @@ mod tests {
         let driver_artifacts = retained_outputs(&scratch, &scratch);
         println!("{}", Json::object([
             ("driver_artifacts", Json::Array(driver_artifacts)),
+            ("limits", Json::string("60 s per child, one worker; Julia 2 GiB RSS cap; native drivers have no optional RSS cap because they can exit before the supervisor's first sample")),
             ("verification", Json::string("complete monic reduced bases agree coefficient for coefficient; separate verification run, no timing claim")),
             ("julia_version", Json::string(format!("{version:?}"))),
             ("groebner_rs_version", Json::string(format!("{rust_version:?}"))),
