@@ -6,6 +6,8 @@
 //! monomial, and the leftmost-first pivot rule of [`crate::linalg::sparse::row_echelon`] coincides
 //! with the monomial order. Nothing downstream has to translate between the two.
 
+pub mod io;
+
 use std::{
     hint::black_box,
     time::{Duration, Instant},
