@@ -72,8 +72,8 @@ degree; it does not saturate the homogenized ideal. Random MQ uses seed zero.
 The fixture name, original ordered generators and canonical input digest are
 retained in every response.
 
-Each cell has a one-worker, 60-second, 2 GiB process-tree RSS watchdog, the same
-2 GiB hard address-space limit, and at most 32 retries. The runner reuses the
+Each cell has a one-worker, 60-second, 2 GiB process-tree RSS watchdog and at
+most 32 retries. Address space is not additionally constrained. The runner reuses the
 existing `grobx-work-study.py` watchdog and `mq10-profile.py` process-tree memory
 reader. A single machine benchmark lock covers the campaign. Each completed
 answer is checked coefficient-for-coefficient against a live Singular reduced
@@ -124,4 +124,25 @@ Single functional run (requires Singular and GNU `timeout`):
 allowance and optional maximum retries in 0..32. `unbounded` ignores the numeric
 allowance. The CLI accepts only the declared small fixtures and fixed field.
 
-Measured outcomes and the go/no-go decision will be added after the pinned run.
+## Initial infrastructure failure and bounded correction
+
+The first campaign at `b8a9bc2bd9beb50f12184fcca7b65157bd6cbda9` added a 2 GiB
+hard address-space limit beyond the issue's RSS requirement. Its first eight
+cells failed when Singular timed out with empty output; the campaign was
+interrupted during the ninth cell. Every completed and partial stdout/stderr,
+command, exit, metadata and lock event is retained in
+[`initial-failed`](../../research/batch-splitting/initial-failed/). None is an
+accepted solver result. A bounded three-command diagnostic submits the same tiny
+Cyclic-3 input on CPU 0: both the installed Singular wrapper and its underlying
+ELF time out with the address-space cap, while the uncapped wrapper returns the
+exact basis. The diagnostic does not identify which virtual mappings cause the
+failure; RSS and address space are different resources.
+
+The corrected runner removes only the additional address-space limit and keeps
+the existing 2 GiB process-tree RSS / 60-second watcher, including the independent
+verifier. A new source-pinned campaign runs the same declared 74 cells once each
+with fresh output paths. Initial failures remain separate and are never pooled
+with the corrected run. This is the full declared correction; further runs need
+a separately stated bound.
+
+Measured outcomes and the go/no-go decision will be added after the corrected pinned run.

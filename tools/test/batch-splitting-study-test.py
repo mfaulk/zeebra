@@ -27,6 +27,12 @@ class Acceptance(unittest.TestCase):
             with self.assertRaises(ValueError):
                 study.accept_report(dict(row, **update))
 
+    # The process command leaves address space unconstrained while the existing watcher bounds RSS.
+    def test_rss_budget_does_not_change_child_address_space(self):
+        cell = ('cyclic-4', 'adaptive', 'rows', 7, 32)
+        command = study.solver_command(Path('/binary'), cell)
+        self.assertEqual(command, ['/binary', 'cyclic-4', 'adaptive', 'rows', '7', '32'])
+
     # The frozen study enumerates all controls and boundary cases without implicit extra attempts.
     def test_frozen_plan(self):
         cells = list(study.cells())

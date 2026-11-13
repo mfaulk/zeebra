@@ -30,6 +30,10 @@ def cells():
     yield 'cyclic-4', 'adaptive', 'columns', 3, 32
 
 
+def solver_command(binary, cell):
+    return [str(binary), *map(str, cell)]
+
+
 def accept_report(row):
     if row['status'] == 'complete':
         if row['basis'] != row['reference_basis'] or not row['exact_reference_and_submitted_checks']:
@@ -71,12 +75,12 @@ def main():
         build='release; fat LTO; codegen-units=1; x86-64-v3; system allocator',
         policy='one fresh process per declared cell; single feasibility sample, no speedup claim',
         wall_limit_seconds=60, rss_limit_bytes=2 * 1024**3,
-        address_space_limit_bytes=2 * 1024**3, attempts=[],
+        address_space_limit_bytes=None, attempts=[],
     )
     failed = False
     for index, cell in enumerate(cells()):
         fixture, policy, budget, allowance, retries = cell
-        command = ['prlimit', '--as=2147483648', '--', str(binary), fixture, policy, budget, str(allowance), str(retries)]
+        command = solver_command(binary, cell)
         attempt = guard.guarded(command, args.scratch / str(index), 60, 2 * 1024**3)
         attempt.update(fixture=fixture, policy=policy, budget=budget, allowance=allowance,
                        max_retries=retries, load=os.getloadavg())
