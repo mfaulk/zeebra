@@ -1,0 +1,11 @@
+2026-11-13T02:03:36Z
+ 21:03:36 up 2 days,  2:12,  1 user,  load average: 9.10, 66.42, 51.96
+D=4 mode=sparse construction=12.203µs operator_bytes=272 VmHWM:	    2808 kB
+operator_nonzeros=4
+minimal=2.395µs degree=4 stats=SpectralStatistics { workspace_bytes: 1696, materialized_bytes: 0, work_units: 365 } VmHWM:	    2812 kB
+characteristic=2.204µs degree=4 stats=SpectralStatistics { workspace_bytes: 1696, materialized_bytes: 64, work_units: 145 } VmHWM:	    2812 kB
+verified against the independent cyclic-algebra formulas
+minimal coefficients=[PrimeFieldElement32 { value: 27322 }, PrimeFieldElement32 { value: 0 }, PrimeFieldElement32 { value: 0 }, PrimeFieldElement32 { value: 0 }, PrimeFieldElement32 { value: 4681 }]
+characteristic coefficients=[PrimeFieldElement32 { value: 27322 }, PrimeFieldElement32 { value: 0 }, PrimeFieldElement32 { value: 0 }, PrimeFieldElement32 { value: 0 }, PrimeFieldElement32 { value: 4681 }]
+process_wall_s=0.00 process_peak_rss_kb=2164
+exit_status=0

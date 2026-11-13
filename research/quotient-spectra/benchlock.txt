@@ -1,0 +1,3 @@
+2026-11-12T21:03:36-05:00  QUEUED   quotient-spectra-686  pid=3878711  /buildcache/cargo-target/zeebra-686/run-feasibility.sh
+2026-11-12T21:03:36-05:00  START    quotient-spectra-686  pid=3878711  waited=0s load=9.10 /buildcache/cargo-target/zeebra-686/run-feasibility.sh
+2026-11-12T21:03:36-05:00  END      quotient-spectra-686  pid=3878711  status=0 end=exited elapsed=0s load=9.10 /buildcache/cargo-target/zeebra-686/run-feasibility.sh

@@ -546,11 +546,13 @@ Run the public example with
 `cargo run --release --example quotient_spectra -- 4 dense`.
 It separately prints construction, minimal and characteristic durations,
 operator storage, workspace/work charges and Linux process peak RSS, then checks
-that the minimal polynomial divides the characteristic polynomial. Arguments
+that the minimal polynomial divides the characteristic polynomial and verifies both
+against independent cyclic-algebra formulas. Arguments
 are dimension 1..128 and `sparse|dense`; the latter selects x=y or
 x=y+...+y^(D-1) in `F[x,y]/(x-h(y), y^D-1)` over GF(32003).
 Dense fixtures exercise a dense x operator, while sparse fixtures use a cyclic
-shift. The reported RSS is a cumulative process high-water mark, not incremental
-allocation by each phase. These are feasibility checks, not evidence of an FGLM
+shift. The reported RSS comes from the kernel
+and is process-wide, not incremental allocation by each phase; kernel-specific
+limitations are recorded with the retained runs. These are feasibility checks, not evidence of an FGLM
 speedup. For retained bounded runs, see
 [quotient spectra](../research/quotient-spectra.md).

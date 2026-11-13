@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -uo pipefail
+cd /home/mfaulk/projects/zeebra-686
+bin=/buildcache/cargo-target/zeebra-686/release/examples/quotient_spectra
+records=research/quotient-spectra
+mkdir -p "$records"
+{
+  git rev-parse HEAD
+  git status --short
+  date -u +%FT%TZ
+  rustc -Vv
+  sha256sum Cargo.lock "$bin"
+  lscpu
+  taskset -pc $$
+  uptime
+  printf 'build: cargo build -j4 --release --example quotient_spectra; fat LTO; codegen-units=1; target-cpu=x86-64-v3; link-arg=-fuse-ld=mold\n'
+  printf 'run: taskset -c 0; one worker; 40 s external timeout; 1 GiB hard address-space cap; defaults D<=128, 30s, 256MiB incremental workspace, 100000000 work units\n'
+  printf 'one fresh process per fixture; feasibility only; no speed comparison; ambient builds present\n'
+} > "$records/manifest.txt"
+for dimension in 4 16 64 128; do
+  for mode in sparse dense; do
+    output="$records/d${dimension}-${mode}.txt"
+    {
+      date -u +%FT%TZ
+      uptime
+      status=0
+      /usr/bin/time -f 'process_wall_s=%e process_peak_rss_kb=%M' timeout --signal=INT --kill-after=5s 40s prlimit --as=1073741824 taskset -c 0 "$bin" "$dimension" "$mode" || status=$?
+      printf 'exit_status=%s\n' "$status"
+    } > "$output" 2>&1
+    cat "$output"
+  done
+done
