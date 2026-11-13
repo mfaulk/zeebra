@@ -168,7 +168,8 @@ Production F4 reduces only rows that become extracted candidates; unused inherit
 sufficient echelon tails. A conservative temporary reservation falls back to full batch RREF when
 needed, preserving existing budget admission and public RREF behavior. `F4Statistics::candidate_reduction`
 reports selected work, workspace, reservations, sparse capacities and fallback batches separately
-from mathematical entry peaks. See the [adoption protocol](research/candidate-adoption/README.md).
+from mathematical entry peaks. See the [adoption result](docs/research/candidate-only-f4.md) and
+[reproduction protocol](research/candidate-adoption/README.md).
 
 The [concurrent-pivot feasibility study](research/concurrent-pivots/README.md) measures
 serial F4 candidate-row work and dependencies with

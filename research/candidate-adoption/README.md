@@ -1,6 +1,8 @@
 # Candidate-only production adoption (#749)
 
 The production F4 route fully reduces extracted candidate rows and keeps unused echelon rows.
+[The retained adoption report](../../docs/research/candidate-only-f4.md) records 130 independent
+full-basis checks and the matched serial time/RSS/work result.
 Public RREF remains full RREF. The private kernel reserves an upper bound for every selected
 replacement's possible suffix growth plus one dense row **before** any target changes. If entry
 reservation or the 64-MiB scratch/index/selection ceiling cannot be met, the original full-RREF
@@ -42,7 +44,7 @@ ZEEBRA_MACHINE=5995wx ZEEBRA_AFFINITY=3 tools/benchlock.sh candidate-adoption \
   --phase adoption --stock /buildcache/cargo-target/zeebra-m28-749/campaign/stock \
   --production /buildcache/cargo-target/zeebra-m28-749/campaign/production \
   --binary /buildcache/cargo-target/zeebra-m28-749/campaign/observed \
-  --baseline-commit 778e1dc9 --build-commit ADOPTION_BUILD_COMMIT \
+  --baseline-commit 778e1dc9 --build-commit a9f86ec0 \
   --scratch /buildcache/cargo-target/zeebra-m28-749/campaign/native \
   --output /buildcache/cargo-target/zeebra-m28-749/campaign/adoption.json.gz
 ```
@@ -50,5 +52,5 @@ ZEEBRA_MACHINE=5995wx ZEEBRA_AFFINITY=3 tools/benchlock.sh candidate-adoption \
 Use `--phase adoption-work` and `--phase adoption-off` with separate scratch/output paths for
 diagnostics and stage-clock-disabled controls. The runner rejects
 research overrides presented as production, absent production metadata, mismatched complete bases,
-input/trajectory drift, binary changes, dirty sources and ambient compilation. Build pins and the
-final retained report replace `ADOPTION_BUILD_COMMIT` after the implementation is committed.
+input/trajectory drift, binary changes, dirty sources and ambient compilation. The recorded Rust build pin is `a9f86ec0`; controller `36f792a1` records the exact binaries,
+input identities and complete accepted plans.
