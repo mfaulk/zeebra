@@ -39,6 +39,22 @@ class Acceptance(unittest.TestCase):
         self.assertEqual({c[-1] for c in native},{'stock','production','feature-off'})
         self.assertEqual(len(list(study.plan('adoption-work'))),20)
 
+    # Interrupting the process-tree supervisor kills and reaps its owned child before propagating.
+    def test_guard_interrupt_cleanup(self):
+        import tempfile
+        from unittest.mock import Mock
+        guard=study.load('grobx-work-study')
+        memory=Mock();memory.tree_hwm.side_effect=KeyboardInterrupt
+        process=Mock(pid=321);process.poll.return_value=None
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(guard,'sibling',return_value=memory), \
+             patch.object(guard.subprocess,'Popen',return_value=process), \
+             patch.object(guard.os,'killpg') as kill:
+            with self.assertRaises(KeyboardInterrupt):
+                guard.guarded(['placeholder'],Path(directory)/'attempt',60,1024)
+            kill.assert_called_once_with(321,guard.signal.SIGKILL)
+            process.wait.assert_called_once()
+
     # Pair trajectory drift is rejected instead of being credited to the backward kernel.
     def test_trajectory(self):
         stats = {key: 1 for key in study.TRAJECTORY}
