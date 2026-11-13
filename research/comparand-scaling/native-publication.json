@@ -1,0 +1,18 @@
+{
+  "native-v1.json.gz": {
+    "original_archive_sha256": "98b8ffb67e0e03cf413e85787de72063f1a857d7b41ca0917c82ea20571a7c9c",
+    "attempts": 222,
+    "controller": "d7d2bc8f043eead4add57e03d6d6b835c2646a4c",
+    "elapsed_seconds": null,
+    "campaign_stop": "declared-total-wall",
+    "publication_manifest_sha256": "974bd1640e8c8878d2db2bac37b9422daba16f7fac8572176d74fc290926ab39"
+  },
+  "native-resume-v1.json.gz": {
+    "original_archive_sha256": "9bf7265567bd9c9fdbc0f633bfdb3c373bd47ab38811f9bc082494533f22e4d7",
+    "attempts": 1296,
+    "controller": "2f6616261efe6b600cdcddb0e291071352acbc01",
+    "elapsed_seconds": 527.553473367996,
+    "campaign_stop": "complete",
+    "publication_manifest_sha256": "3e058b702fb647f2dd928e982e9ab29aeb7d857a089864df19aaa54ca839adca"
+  }
+}

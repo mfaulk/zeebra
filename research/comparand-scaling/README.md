@@ -180,3 +180,33 @@ ZEEBRA_MACHINE=5995wx tools/benchlock.sh comparand-739-julia \
   timeout --signal=TERM --kill-after=3s 1200 \
   bash research/comparand-scaling/julia-stage.sh "$CARGO_TARGET_DIR/julia-stage-fresh"
 ```
+
+
+## Published result and audit
+
+See the [report](../../docs/research/comparand-scaling.md) and generated [BOARD](BOARD.md).
+`inventory.json` binds cohorts, original reference archives, publication provenance and separate
+post-campaign attestations. The 222-row native prefix is retained separately and not counted
+twice in the 1,296-row completed grid. Ordinary Julia has 108 verified observations; its full-case
+warm diagnostic has three. The Rust 15-second stage has one complete row and one separately
+retained native response interrupted during parent reference checking; p=16 is unattempted.
+The wide Julia stage has eight of nine planned records. No omitted cell is silently filled.
+
+`trusted-exact-attestations.json` records 71 input-specific agreements with a separately audited,
+trusted deterministic Julia finite-field F4 answer (63 native plus eight Julia responses).
+This is not witness/cofactor certification; original complete-unverified statuses and clocks stay
+immutable. Offline replay rechecks actual script/input bindings and all listed full coefficients.
+Goldilocks and wide64 Katsura-9 are not extrapolated into that attestation.
+
+`rust-postprocessing-interruption.json.gz` retains the p=8 native request/stdout/usage and hot
+participant evidence without fabricating lost process wall/exit metadata. Future controller runs
+retain guarded metrics if a deadline interrupts the coefficient/reference-check phase; this
+specific fix is covered by a regression. Other signal boundaries retain their stated limitations.
+`offline-validation-pause.json` records the owned validator pause during Julia timing. Its paused
+wall is never used as a checker-cost measurement; published checker costs are original unpaused
+per-attempt observations.
+
+CI runs `python3 tools/external/comparand-scaling.py --replay research/comparand-scaling`.
+It launches no solver and validates retained bytes, inputs, complete coefficients, continuation
+identity and generated-board equality. It does not rerun native cofactor identities or reconstruct
+an independently certified ideal-membership proof from a successful native checker flag.

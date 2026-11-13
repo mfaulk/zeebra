@@ -82,6 +82,7 @@ jobs:
           cargo test --example wide_corpus
           python3 tools/test/wide-corpus-test.py
           python3 tools/test/comparand-scaling-test.py
+          python3 tools/external/comparand-scaling.py --replay research/comparand-scaling
           cargo test --example public_corpus
           cargo test --example elimination_kernel_study
           python3 tools/test/elimination-kernel-study-test.py

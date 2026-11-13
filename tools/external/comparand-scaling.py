@@ -607,10 +607,69 @@ def diagnostic_table(cohort):
     return '\n'.join(lines)+'\n'
 
 
+def validate_trusted_julia_script(script,case,workers):
+    required=[f'zb_F = AbstractAlgebra.GF({case["modulus"]})',
+              'zb_sys = ['+', '.join(case['generators'])+']',
+              f'ordering=Groebner.DegRevLex(), tasks={workers}, linalg=:deterministic',
+              f'AbstractAlgebra.polynomial_ring(zb_F, {json.dumps(case["variables"])}, internal_ordering=:degrevlex)']
+    if any(text not in script for text in required) or 'linalg=:randomized' in script:
+        raise ValueError('trusted Julia reference changed exact mode or input')
+
+
+def attestation_table(directory):
+    attestation=json.loads((directory/'trusted-exact-attestations.json').read_text())
+    scripts=wide.load(directory/'julia-input-scripts.json.gz')['scripts']
+    cohorts={}
+    def cohort(filename):
+        if filename not in cohorts:cohorts[filename]=load_cohort(directory/filename)
+        return cohorts[filename]
+    lines=['## Separate post-campaign exact-engine agreement','',
+           'Original complete-unverified statuses remain unchanged above. This layer uses trusted deterministic Julia F4, not an ideal-membership witness/cofactor certificate.',
+           'Wide Julia observations have one repetition; this is not a robust competitive-win claim.','',
+           '| Field/input | Native checked answers | Julia checked answers | Trusted reference |','|---|---:|---:|---|']
+    for entry in attestation['inputs']:
+        reference=entry['reference'];source=cohort(reference['cohort'])
+        anchor=next(a for a in source['attempts'] if a['digest']==entry['digest'] and a['workers']==reference['workers'] and a['repeat']==reference['repeat'])
+        if anchor['status'] not in ('complete','verified') or anchor.get('stop') or anchor.get('exit'):
+            raise ValueError('incomplete trusted reference')
+        case=next(c for c in source['cases'] if c['digest']==entry['digest'])
+        script=next(x for x in scripts if x['cohort']=='wide' and x['digest']==entry['digest'] and x['workers']==reference['workers'] and x['repeat']==reference['repeat'])
+        if hashlib.sha256(script['text'].encode()).hexdigest()!=reference['script_sha256']:
+            raise ValueError('trusted reference script changed')
+        validate_trusted_julia_script(script['text'],case,reference['workers'])
+        counts={'native':0,'julia':0}
+        for checked in entry['checked']:
+            rows=[a for a in cohort(checked['cohort'])['attempts'] if a['digest']==entry['digest'] and a['engine']==checked['engine'] and a['workers']==checked['workers'] and a['repeat']==checked['repeat']]
+            if len(rows)!=1 or rows[0]['status'] not in ('complete','verified'):raise ValueError('post-check identity absent or ambiguous')
+            row=rows[0]
+            if hashlib.sha256(json.dumps(row['basis'],separators=(',',':')).encode()).hexdigest()!=checked['basis_text_sha256']:
+                raise ValueError('post-checked answer changed')
+            verify_basis(row['basis'],anchor['basis'],case)
+            counts['julia' if checked['engine']=='groebner.jl' else 'native']+=1
+        lines.append('| '+str(case['field'])+'/'+case['name']+' | '+str(counts['native'])+' | '+str(counts['julia'])+' | Groebner.jl deterministic, p=1 |')
+    orphan=wide.load(directory/'rust-postprocessing-interruption.json.gz')
+    for suffix,text in orphan['files'].items():
+        if hashlib.sha256(text.encode()).hexdigest()!=orphan['file_sha256'][suffix]:raise ValueError('partial diagnostic bytes changed')
+    raw=json.loads(orphan['files']['.stdout']);request=json.loads(orphan['files']['.request'])
+    actual=wide.validate_native(raw,request,'groebner-rs');source=cohort('native-resume-v1.json.gz')
+    case=next(c for c in source['cases'] if c['digest']==orphan['digest'])
+    verify_basis(actual,source['references'][case['digest']]['basis'],case)
+    lines+=['','Rust p=8 partial diagnostic retains eight CPU-active hot-call participants after exact known-basis checking. Its parent coefficient check was interrupted: process wall/exit metadata are unavailable, so no full-process observation or ratio is fabricated. Rust p=16 hot diagnostics were not attempted.','']
+    return '\n'.join(lines)
+
+
 def replay(directory,write=False):
     inventory=json.loads((directory/'inventory.json').read_text())
     boards=['# Comparand scaling cohorts (#739)','','Generated from hash-bound retained attempts; no solver is invoked by replay.',
             'Whole-process, hot-call, certification and diagnostic observations are separate configurations.','']
+    for filename,digest in inventory.get('artifacts',{}).items():
+        if hashlib.sha256((directory/filename).read_bytes()).hexdigest()!=digest:raise ValueError('retained artifact changed: '+filename)
+    for continuation in inventory.get('continuations',[]):
+        before=load_cohort(directory/continuation['prefix']);after=load_cohort(directory/continuation['completed'])
+        check_resume(before,after)
+        if len({attempt_key(a) for a in after['attempts']})!=len(after['attempts']):raise ValueError('duplicate continuation identity')
+        for old,new in zip(before['attempts'],after['attempts']):
+            if dict(old,controller_commit=old.get('controller_commit',before['commit']))!=new:raise ValueError('continuation rewrote retained prefix')
     count=0
     for filename,digest in inventory['cohorts'].items():
         path=directory/filename
@@ -626,6 +685,7 @@ def replay(directory,write=False):
         with tempfile.TemporaryDirectory() as scratch:
             target=Path(scratch)/'board.md';summarize(cohort,target);boards+=[target.read_text()]
         boards+=[warmed_table(cohort),diagnostic_table(cohort)]
+    boards+=[attestation_table(directory)]
     rendered='\n'.join(boards)
     target=directory/'BOARD.md'
     if write:

@@ -1,0 +1,12 @@
+{
+  "pid": 1940765,
+  "start_ticks": "25308277",
+  "state": "T",
+  "cwd": "/home/mfaulk/projects/zeebra-m28-739",
+  "executable": "/usr/bin/python3.14",
+  "command": "python3 - ",
+  "recorded_pause_at": "2026-11-13T22:17:30.378616+00:00",
+  "qualification": "offline validation paused; wall across this interval is not a checker-cost observation",
+  "resumed_at": "2026-11-13T22:34:27.948882+00:00",
+  "state_before_resume": "T"
+}

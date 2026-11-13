@@ -68,6 +68,14 @@ class ComparandScalingTests(unittest.TestCase):
         self.assertEqual(result['interrupt_exit'],143)
         self.assertTrue(result['verification_interrupted'])
 
+    # Trusted Julia references must bind deterministic mode, prime, ordering and the exact generator vector.
+    def test_trusted_julia_script_binds_exact_mode_and_input(self):
+        c=dict(modulus=13,variables=['x1'],generators=['x1+1'])
+        script=scaling.julia_script(c,1)
+        scaling.validate_trusted_julia_script(script,c,1)
+        for bad in [script.replace('linalg=:deterministic','linalg=:randomized'),script.replace('GF(13)','GF(17)'),script.replace('zb_sys = [x1+1]','zb_sys = [x1+2]')]:
+            with self.assertRaises(ValueError):scaling.validate_trusted_julia_script(bad,c,1)
+
     # A launcher signal preserves an interrupted attempt after killing and reaping its solver.
     def test_launcher_signal_retains_interruption_boundary(self):
         with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling.wide.guard,'tree_hwm',side_effect=SystemExit(143)):
