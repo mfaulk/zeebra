@@ -60,6 +60,11 @@ The [wide-field run instructions](docs/guide/external-engines.md#wide-planted-mq
 live full-basis verification and recording results with live-oracle provenance. The sweep also
 accepts `--engines grobx` to select the pinned grobx driver.
 
+The [transform-tree estimate](research/transform-tree-gate/README.md) records field/root
+limits, tree padding and the unresolved generic dispatch design for NTT-based arbitrary-point
+interpolation. Its reproducible tables are analytical estimates; production interpolation retains
+the generic Karatsuba/Newton route.
+
 The [hard wide-field catalog](research/wide-corpus/README.md) adds unplanted dense MQ,
 Katsura, zero-dimensional Cyclic, Eco and Noonburg at `2^64 - 353`, Goldilocks,
 and BN254 r. The 64-bit rungs are `katsura-{9,11,14}`, `cyclic-{7,11}`,

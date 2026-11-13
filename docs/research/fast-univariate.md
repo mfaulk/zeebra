@@ -1337,6 +1337,99 @@ and its only non-test user in the repository is `examples/graeffe_root.rs`. So:
   honest version of that prediction. #606 is where `O(n log^2 n)` would be reached, if the
   measurement it asks for says the crossover is inside the reachable range.
 
+#### 4.3.4 Transform-tree estimate gate (#606)
+
+**Source audit at `778e1dc9`; no new timings.** Historical figures below retain
+this document's publication bound `29ce42b4`…`b9c104be` for §4.1.2 and
+`1154bf5b` plus the measured change for §4.3.3. They are evidence about their
+original artifacts, not current-default timings. The reproducible
+[geometry/sensitivity table](../../research/transform-tree-gate/table.md) and
+[analysis commands](../../research/transform-tree-gate/README.md) supply the
+estimate-first deliverable. **Decision: defer production specialization;
+retain #606 for dispatch design and a bounded arithmetic experiment.** The
+estimate does not establish an above-reach crossover or justify rejecting NTT.
+
+At the actual four-round reference count `n = 13,123`, the raw asymptotic
+ratio `n^(e-1)/log2(n)^2` is **1.370** for `e = log2(3)`, or **1.580** for
+`e = 1.6`. At `2^20` it is **8.313 / 10.240** respectively. These are ratios
+of normalized growth functions, not speedup ceilings: their relative constants remain
+unmeasured without calibration at common sizes. Writing
+`T_K = C_K n^e` and `T_N = C_N n log2(n)^2`, the model ratio is that raw ratio
+divided by `C_N/C_K`. At 13,123 points it is 0.790 if that unknown constant
+ratio is 2, or 0.395 if it is 4; at `2^20`, 5.120 or 2.560. These deliberately
+hypothetical constants demonstrate why the exponents alone cannot decide.
+
+The existing width-specific evidence is stronger than asymptotics, but still
+only prices some arithmetic kernels:
+
+| field / representation | historical evidence in §4.1.2 | consequence for the gate |
+|---|---|---|
+| Mersenne31, 4 B | radix-two limit 2; no large transform | no transform-tree arm; retain generic Karatsuba/Newton |
+| KoalaBear, 4 B | dense/NTT 0.83 at operand length 1024; 1.19 at 2048; 2.14 at 8192 | multiplication opportunity occurs within reachable sizes; whole-tree/division crossover unknown |
+| Goldilocks, 8 B | dense/NTT 0.89 at length 128; 1.32 at 256 | upper levels are candidates, not a measured interpolation gain |
+| BN254 Fr, 32 B | dense/NTT 0.85 at length 128; 1.27 at 256 | same candidate status; wider elements price memory separately |
+
+KoalaBear's table does not calibrate every 4-byte field, nor does Goldilocks
+calibrate an 8-byte KoalaBear representation. §4.3.3's measured interpolation
+controls are Mersenne31 (4/8 B), Goldilocks (8 B) and BN254 (32 B); its separate
+reach sweep uses KoalaBear in its historical representation. Mixing those
+rows into a synthetic current width-specific runtime would be invalid.
+
+**Tree geometry changes the multiplication question.** A root build over
+`2^14` points multiplies degree-8192 monic children: its coefficient length is
+16,385 and its NTT domain is **32,768**. A top combine product has degree at
+most 16,383 and fits **16,384**. At 13,123 points both fit 16,384, with odd
+subtrees carried unchanged; padding the point count first would incorrectly
+charge the power-of-two build penalty. At `2^20`, build/combine domains are
+`2^21 / 2^20`, within the listed NTT-friendly fields' root limits. One build
+domain array costs 8/16/64 MiB at widths 4/8/32 B, before other arrays, tree
+storage and scratch. These are algebraic byte estimates, not allocation/RSS
+measurements.
+
+Applying the existing product-degree thresholds (4096 for 4 B; 512 for 8/32 B)
+at 13,123 points makes **6 build / 6 combine calls** eligible for KoalaBear,
+and **50 / 50** for Goldilocks or BN254, out of 13,122 / 26,244 calls.
+Mersenne31 has none. Few calls does not mean little work: these are the large
+upper-level products. The counts assume maximal dense degrees; ordinate
+cancellation can shorten combine products. They exclude derivative,
+batch inversion and all Newton/remainder arithmetic, so they cannot be used
+as a complete interpolation cost fraction or an Amdahl input.
+
+**Division is the missing price, not just another multiplication threshold.**
+The derivative evaluation descends through moduli of varying degrees. Its
+quotient precision is `k = len(f)-len(g)+1`; Newton truncates products to that
+precision, then recovers the remainder with a differently shaped `q*g`.
+`invert_mod_xk` and `multiply_truncated` currently use Karatsuba. Root-level
+multiplication wins do not establish that full padded convolution beats these
+truncated products. A transform pilot must include both node products and
+remainders, and calibrate on actual `(k,m)` shapes including irregular 13,123
+points. The existing §4.5 Newton crossover cannot select that new arm unchanged.
+
+**The public signature constraint needs an explicit design.**
+`multipoint_evaluate<F: FiniteField>` and `lagrange_interpolate<F: FiniteField>`
+provide neither `KnownOrder` nor caller randomness; `fft::multiply` requires
+both `KnownOrder` and `RngCore + CryptoRng`. All built-in fields implementing
+`KnownOrder` does not add that bound inside generic functions. Stable Rust
+cannot provide overlapping blanket arithmetic implementations specialized on
+that extra trait. Consequently this is not a one-line dispatch replacement.
+An additive default capability hook on `FiniteField` could preserve existing
+user implementations and function signatures, but requires a public trait
+change, concrete field overrides, and a root/domain/randomness policy. It
+must be reviewed rather than silently coupling `FiniteField` to `KnownOrder`.
+An internal `KnownOrder` research strategy can test the economics first, but
+would not itself satisfy the requested unchanged public dispatch contract.
+
+The next experiment, if the dispatch design is accepted, should retain both
+arithmetic strategies in one opt-in instrument, check exact outputs, and
+measure build, derivative evaluation/remainders, combination and complete
+interpolation at 13,123 and neighboring padded sizes per representation.
+Use the existing subproduct/division instruments and serialized bounded
+protocol; do not launch an unbounded `2^20` campaign from the growth model.
+Include a real resultant caller and root-recovery costs where relevant before
+claiming a solve improvement. Historical §5.1 roots and resultant stage shares
+cannot establish a current whole-route ceiling: later arithmetic changed them.
+#732's existing caller audit remains separate from this unimplemented tree arm.
+
 ### 4.4 Root finding: quadratic, and it is the binding stage
 
 `roots` computes `gcd(f, x^q - x)` with `pow_mod_limbs(&x, F::order_limbs(), f)`, then splits with
