@@ -18,6 +18,7 @@ all**; Collins' subresultant PRS then became the default on correctness evidence
 figure for either route, and before #434 Brown's modular route did not exist.
 [§5](#5-browns-modular-route-measured-it-owns-the-tail-both-sequences-lose) is the three-route
 comparison; §§0–4 are #407's two-route one and are unchanged except where §5 supersedes them.
+Section 8 adds #658's call-site audit and deterministic census against runtime source `778e1dc9`.
 
 Machine: AMD Ryzen Threadripper PRO 5995WX, 128 hardware threads, 503 GB RAM. One core
 (`taskset --cpu-list 12`), release profile with the repository's defaults, `RUSTFLAGS` unset,
@@ -121,9 +122,9 @@ other is tested against.
 * **Where the primitive route's blow-up comes from.** The historical attribution was an inference,
   not a causal profile. [§7](#7-intermediate-size-profiles-652) adds support/degree and call-count
   observations, preserving the limits on what these establish about time.
-* **Any instance from the solver.** These are planted-factor random inputs. What F4 and FGLM
-  actually hand `gcd` is unmeasured, and that is the input distribution a default should really be
-  chosen against.
+* **Any instance from the solver.** These are planted-factor random inputs. Section 8's later
+  audit and census find no multivariate GCD calls in the current solver, so this distribution
+  cannot justify a solver-specific multivariate dispatcher.
 
 ## 5. Brown's modular route, measured: it owns the tail both sequences lose
 
@@ -222,10 +223,10 @@ route to ask for when the inputs are not known to be small.
 
 * **A dispatching default.** The obvious next move is a default that tries Brown's where the field
   admits it and falls back otherwise. That is attractive and is **not** done here, for the reason §4
-  already gave: Brown's loses up to 5.2x on the smallest shapes, and what F4 and FGLM actually hand
-  `gcd` is still unmeasured. Changing the default on this evidence would be tuning the tail of a
-  distribution nobody has looked at. **Filed as #658**, which asks for the solver's own input
-  distribution first and records a measured "no predictor exists" as an acceptable answer.
+  already gave: Brown's loses up to 5.2x on the smallest shapes. **#658 is resolved by §8's
+  narrower null result:** current F4/FGLM/point-recovery routes make no multivariate GCD calls.
+  There is no solver input population on which to train or score this dispatcher. Whether a
+  predictor helps external multivariate GCD callers remains unmeasured.
 * **The interpolation's own bound.** `brown` falls through to the subresultant route when the
   interpolated candidate fails to divide both inputs, which is what a degree bound that was not tight
   produces. `brown_outcomes` counts the two outcomes and
@@ -443,5 +444,99 @@ explanation; leave the default GCD route unchanged. The experiment establishes
 actual size growth and structural recursion counts on these planted-factor
 fixtures, with typed stops retained. It does not establish causal wall-time
 shares, behavior on arbitrary inputs, a shape predictor, or the solver's own GCD
-input distribution; #658 owns the distribution/dispatch question. No solver
+input distribution; §8 supplies #658's separate solver call audit. No solver
 speedup or universal runtime guarantee follows from the degree bounds.
+
+## 8. Solver input census and default decision (#658)
+
+**Audited and exercised runtime source:** `778e1dc9`; this change modifies tests and documentation,
+with no runtime changes. The [retained census](../../research/gcd-solver/census.txt) binds its
+observation lines to that commit, the new test harness SHA-256 and the frozen cryptanalytic input
+SHA-256. These are deterministic call counts and verified outcomes, not elapsed-time measurements.
+
+**Decision: retain `GcdRoute::SubresultantPrs` and reject a solver-driven multivariate dispatcher
+for the current call graph.** The solver supplies no inputs to this API. This is an empty input
+population, not evidence that no shape predictor can exist on general multivariate inputs.
+
+### Call-site audit
+
+The similarly named operations belong to distinct polynomial types:
+
+| Boundary | Current implementation | Multivariate GCD consumer? |
+|---|---|---|
+| F4, Buchberger, normal forms and FGLM operator construction | polynomial division, row reduction and monomial operations | No |
+| Solver candidate recovery | `src/grobner/solve.rs::candidate_values` converts constraints with `as_univariate`, calls `roots`, then filters candidates against other constraints | No |
+| Root finding and equal-degree splitting | `src/poly/univariate/{roots,factorize}.rs` calls the free `gcd` on `UnivariatePolynomial<F>` | No |
+| Certified Wiedemann reconstruction | `src/grobner/fglm/wiedemann.rs` calls the free `xgcd` on `UnivariatePolynomial<F>` | No |
+| Planned solving | `src/grobner/planning/policy.rs` delegates to F4, FGLM and `solve_from_lex_basis` | No |
+| Resultant route | `src/grobner/resultant.rs` builds Sylvester determinants and interpolates a univariate polynomial | No |
+| Multivariate content, primitive part, squarefree part and squarefree decomposition | `src/poly/multivariate/multivariate_gcd.rs` calls its own `gcd_by` / `try_gcd_by` | Yes, for direct API callers; no incoming solver calls |
+
+The multivariate `gcd`, `gcd_by` and `try_gcd_by` entry points and their content/squarefree wrappers
+have no incoming runtime call from outside `multivariate_gcd.rs` in this revision. Integer GCD
+methods in integer factorization are also distinct. The audit checks the indirect wrappers,
+not just occurrences of the token `gcd` in `src/grobner`.
+
+### Dynamic census
+
+The existing `research-work` observer enters before zero/constant early returns in `gcd_by`, and
+before Brown's field/degree refusal in `try_gcd_by`; non-Brown `try_gcd_by` delegates to `gcd_by`.
+It counts every recursive entry. Therefore zero total `gcd_calls` proves zero outermost calls,
+without needing a second shape-scanning observer. Every negative case asserts the **entire**
+`GcdProfile` equals its default value. Three positive controls prove that the scope is active
+and that all routes return the expected common factor.
+
+| Workload | Field | Attempts / boundary | Multivariate GCD calls |
+|---|---|---|---:|
+| Cyclic-3, Katsura-3, Eco-3, Noon-3, Reimer-3, planted-3 | GF(32003) | 12 completed solves: six systems × direct lex F4 and grevlex F4/FGLM | 0 each |
+| `x+y-3`, `x*y-2` | GF(13) | Three completed planner policies: conservative, fallback-enabled, classify-then-direct-lex | 0 each |
+| The same bivariate pair | GF(13) | Completed resultant: degree 2, vanishes at 1 and 2 | 0 |
+| Frozen `anemoi17-cico-n5-fcico.system`, ten variables | GF(65537) | One completed F4 batch, then explicit `TooManyBatches { limit: 1 }` | 0 |
+| `(x+y)(y+1)`, `(x+y)(y+2)` | GF(13) | Primitive / subresultant / Brown positive controls, GCD `x+y` | 22 / 20 / 21 including recursion |
+
+All solve RNGs use seed 0. The planted-3 generator receives `[3,5,7]`; the other systems are
+exactly `benchmark_systems::{cyclic,katsura,eco,noon,reimer}::<3, Zp32003>()` at the audited commit
+(Katsura-3 here means three variables, conventionally Katsura-2). Both routes return
+`NoBaseFieldPoint` for Cyclic-3 and Reimer-3; the other eight corpus attempts return points checked
+by substitution into every original equation. Each planner point is checked the same way.
+The fallback-enabled planner completes on its first attempt; this census does not force its
+failure/fallback branch. The static call audit covers that branch's existing delegated solvers.
+
+The Anemoi fixture's SHA-256 is
+`d39cf955ea1a683e468a5433236a2fd20b816cf405d41b3e46141044adb1679f`.
+Its test retains default F4 settings except `max_batches=Some(1)` and asserts exactly one batch
+completed. This is an actual cryptanalytic **prefix refusal**, not a completed basis or solve,
+and says nothing about this input's later recovery cost. No large cryptanalytic campaign is needed
+to establish absence of a call edge in the audited solver source.
+
+Scopes are thread-local and synchronous. These cases use the current serial defaults; the
+observer would need explicit worker aggregation if a future implementation called multivariate
+GCD on worker threads. They do not count the separate univariate GCD, and make no claim that the
+solver performs no GCD work of any kind.
+
+### Predictor, wrong-choice cost and recommendation
+
+The outermost multivariate input list is empty: arity, operand term counts and per-variable degrees
+have **no observations**, rather than observed zero-valued shapes. A predictor's accuracy and
+error rate are undefined on this population. The multivariate dispatcher has no call site at
+which it could improve this solver, and the cost of any multivariate Brown probe/fallback in these
+solves is exactly zero because no such probe runs. No speedup follows from changing the default.
+
+For a direct multivariate API caller the trade-offs remain those of §§5 and 7. Brown's field
+eligibility check can refuse extension fields or too few points before recursive work, but an
+accepted shape can still pay interpolation plus PRS cleanup/fallback. Field eligibility alone
+does not predict that cost. The existing `FiniteField`-only `gcd` cannot select Brown's
+`KnownOrder`-bounded entry point without changing its contract. Retain the infallible subresultant
+default; callers with an appropriate prime field can explicitly request Brown and handle
+`GcdError`. External callers need their **own** input census before a dispatch/default proposal.
+The present result neither ranks fixed defaults for that unobserved population nor proves a
+universal predictor impossible. Univariate GCD optimization remains the separate #194 question.
+
+### Reproduction and checks
+
+The [census README](../../research/gcd-solver/README.md) gives the exact commands and output
+regeneration procedure. Existing CI already runs `cargo test --features research-work --test
+gcd_profile`, so all new guards run without an additional workflow. No production behavior is
+changed: the new tests capture existing behavior, and a failing-before-implementation cycle is
+inapplicable to this negative feasibility result. No new file-level source documentation is
+needed; each new test has one sentence describing its assertion.

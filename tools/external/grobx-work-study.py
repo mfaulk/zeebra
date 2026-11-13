@@ -101,14 +101,22 @@ def guarded(command, stem, wall, rss, env=None):
     peak, stop = 0, None
     with stem.with_suffix('.stdout').open('w') as stdout, stem.with_suffix('.stderr').open('w') as stderr:
         process = subprocess.Popen(command, stdout=stdout, stderr=stderr, start_new_session=True, env=env)
-        while process.poll() is None:
-            peak = max(peak, guard.tree_hwm(process.pid))
-            if peak > rss or time.monotonic_ns() - started > wall * 1e9:
-                stop = 'rss' if peak > rss else 'wall'
-                os.killpg(process.pid, signal.SIGKILL)
+        try:
+            while process.poll() is None:
+                peak = max(peak, guard.tree_hwm(process.pid))
+                if peak > rss or time.monotonic_ns() - started > wall * 1e9:
+                    stop = 'rss' if peak > rss else 'wall'
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+                    break
+                time.sleep(.002)
+        finally:
+            if process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 process.wait()
-                break
-            time.sleep(.002)
     return {'command': command, 'process_wall_ns': time.monotonic_ns() - started,
             'observed_peak_rss_bytes': peak, 'stop': stop, 'exit': process.returncode,
             'stdout': stem.with_suffix('.stdout').read_text(),

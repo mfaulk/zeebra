@@ -120,6 +120,8 @@ jobs:
           cargo test --features research-work --lib linalg::concurrent
           cargo test --features research-work --lib linalg::selective
           python3 tools/test/selective-backward-study-test.py
+          python3 tools/test/candidate-adoption-summary-test.py
+          python3 research/candidate-adoption/summary.py --check
           python3 tools/test/selective-backward-summary-test.py
           python3 tools/test/selective-backward-cross-test.py
           python3 tools/test/selective-backward-combined-summary-test.py
@@ -318,6 +320,13 @@ jobs:
           python3 -m unittest discover -s research/ntt-caller-gate -p 'test_*.py'
           python3 research/ntt-caller-gate/summary.py > "$RUNNER_TEMP/ntt-caller-table.md"
           diff -u research/ntt-caller-gate/table.md "$RUNNER_TEMP/ntt-caller-table.md"
+
+      - name: Transform-tree estimate artifacts
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/transform-tree-gate -p 'test_*.py'
+          python3 research/transform-tree-gate/estimate.py > "$RUNNER_TEMP/transform-tree-table.md"
+          diff -u research/transform-tree-gate/table.md "$RUNNER_TEMP/transform-tree-table.md"
 
       # Every document that publishes a measurement says which commit it came from (#335). Separate
       # from the unit tests above because this one reads the repository's own documents: a finding

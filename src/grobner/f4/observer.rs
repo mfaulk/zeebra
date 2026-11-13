@@ -35,7 +35,8 @@ pub trait BatchObserver<const N: usize, F: FiniteField> {
     /// Implementations must preserve row space, row provenance and budgets. A selective-backward
     /// experiment must fully reduce every row whose leading column was absent from the input
     /// leading set; other rows may remain echelon because F4 discards them at extraction.
-    /// This exception is confined to this research hook, not the public RREF operations.
+    /// The ordinary F4 route has the same private candidate-output contract; public RREF
+    /// operations still reduce every row.
     #[cfg(feature = "research-work")]
     fn eliminate(
         &mut self,

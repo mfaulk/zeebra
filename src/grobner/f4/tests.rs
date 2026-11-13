@@ -4109,7 +4109,7 @@ fn test_public_mq_refusal_reports_full_construction_demand() {
     }
 }
 
-// The default completes the reduced-row regression and preserves an explicit historical cap.
+// Candidate-only batches preserve the full regression basis, admit the historical cap and refuse a binding cap.
 #[test]
 #[ignore = "large resource regression; CI runs this explicitly in ci-release"]
 fn test_reduced_batches_complete_the_measured_live_budget_regression() {
@@ -4130,7 +4130,8 @@ fn test_reduced_batches_complete_the_measured_live_budget_regression() {
     let (basis, stats) = f4_reported(&system, order, &F4Options::default());
     let basis = basis.expect("the default must admit the measured reduced-row workload");
     assert_eq!(basis.len(), 109);
-    assert_eq!(stats.max_live_nonzeros, 22_530_520);
+    assert!(stats.max_live_nonzeros < 20_000_000);
+    assert!(stats.candidate_reduction.targets > 0);
     let mut canonical: Vec<_> = basis.iter().map(ToString::to_string).collect();
     canonical.sort();
     assert_eq!(
@@ -4138,12 +4139,17 @@ fn test_reduced_batches_complete_the_measured_live_budget_regression() {
         "0e3f388bb4c88285a2f6f77c4b4b7d31d86d7ed315cfdd9359cf073b1e342512"
     );
     let options = F4Options::default().with_live_entries::<G>(20_000_000);
+    let (result, capped_stats) = f4_reported(&system, order, &options);
+    let capped_basis = result.expect("candidate-only output must admit the formerly binding cap");
+    assert_eq!(capped_basis, basis);
+    assert_eq!(capped_stats.max_live_nonzeros, stats.max_live_nonzeros);
+
+    let binding_cap = stats.max_live_nonzeros - 1;
+    let options = F4Options::default().with_live_entries::<G>(binding_cap);
     let (result, _) = f4_reported(&system, order, &options);
     assert!(matches!(
         result,
-        Err(F4Error::TooManyNonzeros {
-            limit: 20_000_000,
-            ..
-        })
+        Err(F4Error::TooManyNonzeros { limit, nonzeros })
+            if limit == binding_cap && nonzeros > limit
     ));
 }

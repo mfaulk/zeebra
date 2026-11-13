@@ -1,9 +1,4 @@
-//! Counters describing the work an F4 computation performed.
-//!
-//! Wall-clock time says a computation was slow; it does not say whether the matrices were large,
-//! whether elimination filled them in, or how many of the rows were there only to make the
-//! reduction possible. These are the numbers that attribute the cost, and they are plain counters,
-//! so they belong in an example binary rather than in Criterion.
+//! Mathematical entry counts exclude temporary-copy reservations, workspace and process RSS.
 
 use std::time::{Duration, Instant};
 
@@ -368,9 +363,47 @@ impl HilbertCounts {
     }
 }
 
+/// Candidate-only F4 backward work and temporary storage, separate from mathematical entries.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CandidateReductionStatistics {
+    /// Batches using the private candidate-output contract, including fallback batches.
+    pub batches: usize,
+    /// Selected target rows fully reduced; zero for full-RREF fallback batches.
+    pub targets: usize,
+    /// Pivot coefficients multiplied during selected-target substitution.
+    pub coefficient_products: usize,
+    /// Maximum dense-row, pivot-index and selection-mask workspace bytes.
+    pub workspace_bytes: usize,
+    /// Maximum conservative whole-pass temporary-copy entry reservation, not mathematical nonzeros.
+    pub reserved_entries: usize,
+    /// Maximum sparse row/output capacity in entries during candidate reduction.
+    pub peak_sparse_capacity_entries: usize,
+    /// Batches preserving the old full-RREF route because the temporary reservation was unavailable.
+    pub fallback_batches: usize,
+}
+
+impl CandidateReductionStatistics {
+    fn record(&mut self, other: &Self) {
+        self.batches += other.batches;
+        self.targets += other.targets;
+        self.coefficient_products = self
+            .coefficient_products
+            .saturating_add(other.coefficient_products);
+        self.workspace_bytes = self.workspace_bytes.max(other.workspace_bytes);
+        self.reserved_entries = self.reserved_entries.max(other.reserved_entries);
+        self.peak_sparse_capacity_entries = self
+            .peak_sparse_capacity_entries
+            .max(other.peak_sparse_capacity_entries);
+        self.fallback_batches += other.fallback_batches;
+    }
+}
+
 /// What one batch of critical pairs cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BatchStatistics {
+    /// Candidate-only backward work; zero for echelon and research-override routes.
+    pub candidate_reduction: CandidateReductionStatistics,
+
     /// Pairs reduced in this batch, after the product criterion.
     pub pairs: usize,
 
@@ -464,12 +497,10 @@ pub struct BatchStatistics {
     /// happens, so this is comparable between the two.
     pub free_pivots: usize,
 
-    /// Rows the back-substitution pass examined, or `None` when
-    /// [`super::F4Options::reduce_batch_rows`] was off.
-    ///
-    /// `Some(0)` and `None` are different findings: the first says the batch's echelon form was
-    /// already reduced and so carried no debt forward, the second says nobody looked. #477 exists
-    /// because the debt is real on `mq-random-10`, and this is where a batch reports its share.
+    /// Backward target visits, or `None` when reduced batch rows were disabled.
+    /// Candidate-only batches count distinct selected targets; full-RREF fallback and research
+    /// overrides can count repeated row visits. Compare routes using `candidate_reduction` and
+    /// coefficient products, not this mixed visit count alone.
     pub back_substituted_rows: Option<usize>,
 
     /// Distinct leading monomials among the input rows.
@@ -548,12 +579,16 @@ impl BatchStatistics {
     pub fn estimated_bytes(&self) -> usize {
         self.peak_live_bytes()
             .saturating_add(self.dense_buffer_bytes)
+            .saturating_add(self.candidate_reduction.workspace_bytes)
     }
 }
 
 /// What a whole F4 computation cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct F4Statistics {
+    /// Aggregate selected-target work and temporary reservations; mathematical peaks stay separate.
+    pub candidate_reduction: CandidateReductionStatistics,
+
     /// Pairs taken off the queue.
     pub pairs_considered: usize,
 
@@ -790,8 +825,8 @@ pub struct F4Statistics {
     /// Summed over every batch: rows the back-substitution pass examined, or `None` when
     /// [`super::F4Options::reduce_batch_rows`] was off for every batch.
     ///
-    /// The price side of #477's trade, in the unit the price is paid in. The payoff side is
-    /// [`Self::interreduction_matrix`]'s shape, which is why the two are reported together.
+    /// Candidate-only and full-RREF visit units differ; consult `candidate_reduction` before
+    /// comparing this count across routes or historical revisions.
     pub back_substituted_rows: Option<usize>,
 
     /// Summed over every batch: rank the pair rows added on top of the reducer block.
@@ -898,6 +933,7 @@ impl F4Statistics {
     /// same way the main loop does.
     pub fn record(&mut self, batch: &BatchStatistics) {
         self.batches += 1;
+        self.candidate_reduction.record(&batch.candidate_reduction);
         self.max_pairs_per_batch = self.max_pairs_per_batch.max(batch.pairs);
         self.max_matrix_rows = self.max_matrix_rows.max(batch.rows);
         self.max_matrix_columns = self.max_matrix_columns.max(batch.columns);

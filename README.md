@@ -60,6 +60,11 @@ The [wide-field run instructions](docs/guide/external-engines.md#wide-planted-mq
 live full-basis verification and recording results with live-oracle provenance. The sweep also
 accepts `--engines grobx` to select the pinned grobx driver.
 
+The [transform-tree estimate](research/transform-tree-gate/README.md) records field/root
+limits, tree padding and the unresolved generic dispatch design for NTT-based arbitrary-point
+interpolation. Its reproducible tables are analytical estimates; production interpolation retains
+the generic Karatsuba/Newton route.
+
 The [hard wide-field catalog](research/wide-corpus/README.md) adds unplanted dense MQ,
 Katsura, zero-dimensional Cyclic, Eco and Noonburg at `2^64 - 353`, Goldilocks,
 and BN254 r. The 64-bit rungs are `katsura-{9,11,14}`, `cyclic-{7,11}`,
@@ -164,6 +169,13 @@ instrumented examples — along with the measurement rules this repository follo
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.
 
+Production F4 reduces only rows that become extracted candidates; unused inherited rows keep
+sufficient echelon tails. A conservative temporary reservation falls back to full batch RREF when
+needed, preserving existing budget admission and public RREF behavior. `F4Statistics::candidate_reduction`
+reports selected work, workspace, reservations, sparse capacities and fallback batches separately
+from mathematical entry peaks. See the [adoption result](docs/research/candidate-only-f4.md) and
+[reproduction protocol](research/candidate-adoption/README.md).
+
 The [concurrent-pivot feasibility study](research/concurrent-pivots/README.md) measures
 serial F4 candidate-row work and dependencies with
 `cargo run --release --features research-work --example mq10_profile -- 32003 --stages --discovery`.
@@ -210,6 +222,13 @@ Inspect multivariate GCD intermediate support and coefficient degree with
 Run expensive cases under an external timeout; the [GCD size study](docs/research/multivariate-gcd.md#7-intermediate-size-profiles-652)
 documents bounded campaigns, observer overhead and the distinction between scaled PRS entries,
 raw remainders, Brown images and interpolants.
+
+The [solver call census](docs/research/multivariate-gcd.md#8-solver-input-census-and-default-decision-658)
+finds no multivariate GCD consumer in the current solving routes; root finding uses the separate
+univariate GCD. Reproduce the guarded census with
+`cargo test --features research-work --test gcd_profile solver_census -- --nocapture --test-threads=1`.
+The multivariate default remains subresultant PRS; these results do not select a route for external
+callers of the multivariate GCD API.
 
 Univariate `gcd` uses classical Euclid. Run `cargo run --release --example gcd_crossover`
 to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254. The
