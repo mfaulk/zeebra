@@ -145,7 +145,7 @@ def write(path, data):
 
 def load(path):
     cohort = json.loads(gzip.decompress(path.read_bytes()) if path.suffix == '.gz' else path.read_bytes())
-    if cohort.get('storage') != 'wide-corpus-chunks-v1':
+    if not isinstance(cohort, dict) or cohort.get('storage') != 'wide-corpus-chunks-v1':
         return cohort
     del cohort['storage']
     attempts = []

@@ -128,6 +128,13 @@ class WideCorpusTests(unittest.TestCase):
                 os.kill(pid, 9)
                 self.fail('solver outlived interrupted controller')
 
+    # Frozen catalogs remain ordinary JSON arrays when read by the campaign storage loader.
+    def test_catalog_array_loads_without_campaign_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'cases.json'
+            wide.write(path, [{'name':'katsura-9'}])
+            self.assertEqual(wide.load(path), [{'name':'katsura-9'}])
+
     # A stopped attempt is retained without being treated as a completed oracle.
     def test_limit_is_not_an_oracle(self):
         self.assertEqual(wide.verify_bases([{'stop': 'wall'}]), 0)
