@@ -31,6 +31,17 @@ pub trait BatchObserver<const N: usize, F: FiniteField> {
     /// Defaulted to nothing, so an observer that only wants the inputs is unaffected.
     fn matrix(&mut self, _matrix: &MacaulayMatrix<N, F>) {}
 
+    /// Research-only replacement for one batch's elimination; `None` keeps the ordinary path.
+    /// Implementations must preserve row space, row provenance, budgets and the requested row form.
+    #[cfg(feature = "research-work")]
+    fn eliminate(
+        &mut self,
+        _matrix: &mut MacaulayMatrix<N, F>,
+        _options: &F4Options,
+    ) -> Option<Result<super::structured::BlockOutcome, usize>> {
+        None
+    }
+
     /// Checked after `matrix`, before elimination. Returning true aborts with
     /// [`F4Error::StoppedByObserver`], never a successful partial basis.
     fn should_stop(&self) -> bool {

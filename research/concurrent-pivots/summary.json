@@ -1,0 +1,4295 @@
+{
+  "census_commit": "65a0269951896c6e96b271aa848fa7e5bbb9946e",
+  "census": [
+    {
+      "modulus": 32003,
+      "arm": "discovery",
+      "process_wall_ms": {
+        "median": 3304.369315,
+        "minimum": 3300.07254,
+        "maximum": 3393.944053
+      },
+      "rss_mib": {
+        "median": 137.8671875,
+        "minimum": 137.71484375,
+        "maximum": 137.91015625
+      },
+      "forward_share": {
+        "median": 0.3792772066104538,
+        "minimum": 0.3750310480469377,
+        "maximum": 0.38107053149299464
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "off",
+      "process_wall_ms": {
+        "median": 3256.534079,
+        "minimum": 3225.501214,
+        "maximum": 3298.206156
+      },
+      "rss_mib": {
+        "median": 134.15234375,
+        "minimum": 134.1015625,
+        "maximum": 134.31640625
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "stock",
+      "process_wall_ms": {
+        "median": 3130.079453,
+        "minimum": 3106.487507,
+        "maximum": 3137.785644
+      },
+      "rss_mib": {
+        "median": 135.5,
+        "minimum": 135.484375,
+        "maximum": 135.60546875
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "work",
+      "process_wall_ms": {
+        "median": 3288.24154,
+        "minimum": 3268.822294,
+        "maximum": 3317.260079
+      },
+      "rss_mib": {
+        "median": 135.64453125,
+        "minimum": 135.55078125,
+        "maximum": 135.7109375
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "discovery",
+      "process_wall_ms": {
+        "median": 3569.372763,
+        "minimum": 3512.11143,
+        "maximum": 3600.864035
+      },
+      "rss_mib": {
+        "median": 137.1640625,
+        "minimum": 137.0390625,
+        "maximum": 137.25390625
+      },
+      "forward_share": {
+        "median": 0.38038333462575463,
+        "minimum": 0.3778186865080266,
+        "maximum": 0.38277287022471224
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "off",
+      "process_wall_ms": {
+        "median": 3510.717321,
+        "minimum": 3504.256199,
+        "maximum": 3597.264711
+      },
+      "rss_mib": {
+        "median": 136.0703125,
+        "minimum": 136.0546875,
+        "maximum": 136.13671875
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "stock",
+      "process_wall_ms": {
+        "median": 3462.924666,
+        "minimum": 3437.335899,
+        "maximum": 3501.916307
+      },
+      "rss_mib": {
+        "median": 136.42578125,
+        "minimum": 136.2109375,
+        "maximum": 136.46484375
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "work",
+      "process_wall_ms": {
+        "median": 3534.783304,
+        "minimum": 3485.274751,
+        "maximum": 3622.647577
+      },
+      "rss_mib": {
+        "median": 136.32421875,
+        "minimum": 136.234375,
+        "maximum": 136.359375
+      }
+    }
+  ],
+  "separately_retained_interrupted_attempts": 7,
+  "parallel_commit": "cf92a3cb64aaa56346b68c19b8db5dc99f5ae383",
+  "parallel": [
+    {
+      "modulus": 32003,
+      "arm": "dynamic-1-off",
+      "process_wall_ms": {
+        "median": 3206.897895,
+        "minimum": 3059.13478,
+        "maximum": 3276.882822
+      },
+      "f4_call_ms": {
+        "median": 3172.771445,
+        "minimum": 3024.603112,
+        "maximum": 3241.923444
+      },
+      "cpu_seconds": {
+        "median": 3.186466999999997,
+        "minimum": 3.040218000000001,
+        "maximum": 3.256827999999981
+      },
+      "rss_mib": {
+        "median": 132.734375,
+        "minimum": 132.546875,
+        "maximum": 132.83203125
+      },
+      "stock_speedup": 0.9604513448346007,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1127.23397,
+        "minimum": 1076.548434,
+        "maximum": 1166.010536
+      },
+      "backward_ms": {
+        "median": 1874.350305,
+        "minimum": 1798.554809,
+        "maximum": 1919.504792
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 721200,
+      "reservation_entries": 1500607,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-1-on",
+      "process_wall_ms": {
+        "median": 3478.332865,
+        "minimum": 3397.318071,
+        "maximum": 3565.913652
+      },
+      "f4_call_ms": {
+        "median": 3447.133529,
+        "minimum": 3362.115623,
+        "maximum": 3532.717114
+      },
+      "cpu_seconds": {
+        "median": 3.4572880000000197,
+        "minimum": 3.3762739999999987,
+        "maximum": 3.5430240000000115
+      },
+      "rss_mib": {
+        "median": 132.7109375,
+        "minimum": 132.49609375,
+        "maximum": 132.77734375
+      },
+      "stock_speedup": 0.8855016226286324,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1116.618499,
+        "minimum": 1091.912346,
+        "maximum": 1180.176778
+      },
+      "backward_ms": {
+        "median": 1860.963437,
+        "minimum": 1811.332832,
+        "maximum": 1896.805768
+      },
+      "products": {
+        "median": 585166982,
+        "minimum": 585166982,
+        "maximum": 585166982
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 721200,
+      "reservation_entries": 1500607,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-16-off",
+      "process_wall_ms": {
+        "median": 2109.88031,
+        "minimum": 2065.572612,
+        "maximum": 2216.312693
+      },
+      "f4_call_ms": {
+        "median": 2074.559226,
+        "minimum": 2030.358604,
+        "maximum": 2180.441159
+      },
+      "cpu_seconds": {
+        "median": 3.2245910000000007,
+        "minimum": 3.1968619999999923,
+        "maximum": 3.345677999999964
+      },
+      "rss_mib": {
+        "median": 135.83984375,
+        "minimum": 135.47265625,
+        "maximum": 136.07421875
+      },
+      "stock_speedup": 1.4598313380155674,
+      "same_algorithm_speedup": 1.519943041223983,
+      "efficiency": 0.09499644007649893,
+      "forward_ms": {
+        "median": 83.749612,
+        "minimum": 83.071468,
+        "maximum": 92.174504
+      },
+      "backward_ms": {
+        "median": 1830.189833,
+        "minimum": 1800.615855,
+        "maximum": 1934.692226
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 579,
+        "minimum": 537,
+        "maximum": 590
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1849803,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-16-on",
+      "process_wall_ms": {
+        "median": 2461.907334,
+        "minimum": 2415.629855,
+        "maximum": 2511.199075
+      },
+      "f4_call_ms": {
+        "median": 2426.545706,
+        "minimum": 2380.314101,
+        "maximum": 2474.09699
+      },
+      "cpu_seconds": {
+        "median": 3.601891000000018,
+        "minimum": 3.563782999999967,
+        "maximum": 3.6442560000000004
+      },
+      "rss_mib": {
+        "median": 135.60546875,
+        "minimum": 135.2890625,
+        "maximum": 136.140625
+      },
+      "stock_speedup": 1.251090710630297,
+      "same_algorithm_speedup": 1.4128610029153925,
+      "efficiency": 0.08830381268221203,
+      "forward_ms": {
+        "median": 84.556179,
+        "minimum": 84.09092,
+        "maximum": 88.610226
+      },
+      "backward_ms": {
+        "median": 1860.001619,
+        "minimum": 1836.084994,
+        "maximum": 1899.380631
+      },
+      "products": {
+        "median": 578354208,
+        "minimum": 577181738,
+        "maximum": 578623944
+      },
+      "retries": {
+        "median": 569,
+        "minimum": 534,
+        "maximum": 604
+      },
+      "retry_products": {
+        "median": 34391960,
+        "minimum": 29124717,
+        "maximum": 34961066
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1850170,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-2-off",
+      "process_wall_ms": {
+        "median": 2590.92878,
+        "minimum": 2535.199505,
+        "maximum": 2671.696065
+      },
+      "f4_call_ms": {
+        "median": 2557.31463,
+        "minimum": 2499.179249,
+        "maximum": 2633.708745
+      },
+      "cpu_seconds": {
+        "median": 3.1252760000000057,
+        "minimum": 3.0562580000000024,
+        "maximum": 3.2395279999999786
+      },
+      "rss_mib": {
+        "median": 134.11328125,
+        "minimum": 133.6640625,
+        "maximum": 134.328125
+      },
+      "stock_speedup": 1.1887896802782822,
+      "same_algorithm_speedup": 1.2377406587764253,
+      "efficiency": 0.6188703293882126,
+      "forward_ms": {
+        "median": 557.322408,
+        "minimum": 545.46655,
+        "maximum": 594.139051
+      },
+      "backward_ms": {
+        "median": 1848.229568,
+        "minimum": 1805.693855,
+        "maximum": 1886.469935
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 59,
+        "minimum": 50,
+        "maximum": 63
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1524334,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-2-on",
+      "process_wall_ms": {
+        "median": 2887.227921,
+        "minimum": 2829.633466,
+        "maximum": 3032.08906
+      },
+      "f4_call_ms": {
+        "median": 2855.17104,
+        "minimum": 2796.61367,
+        "maximum": 2997.539889
+      },
+      "cpu_seconds": {
+        "median": 3.4234870000000175,
+        "minimum": 3.357691999999998,
+        "maximum": 3.586195000000007
+      },
+      "rss_mib": {
+        "median": 134.37109375,
+        "minimum": 134.015625,
+        "maximum": 134.71875
+      },
+      "stock_speedup": 1.0667912199093754,
+      "same_algorithm_speedup": 1.2047309599982217,
+      "efficiency": 0.6023654799991108,
+      "forward_ms": {
+        "median": 565.029329,
+        "minimum": 553.344817,
+        "maximum": 595.329747
+      },
+      "backward_ms": {
+        "median": 1832.144401,
+        "minimum": 1796.38572,
+        "maximum": 1927.860482
+      },
+      "products": {
+        "median": 584900172,
+        "minimum": 583949095,
+        "maximum": 584918713
+      },
+      "retries": {
+        "median": 58,
+        "minimum": 51,
+        "maximum": 67
+      },
+      "retry_products": {
+        "median": 3553480,
+        "minimum": 2493715,
+        "maximum": 4343748
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1524471,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-32-off",
+      "process_wall_ms": {
+        "median": 2178.910434,
+        "minimum": 2131.036781,
+        "maximum": 2249.994882
+      },
+      "f4_call_ms": {
+        "median": 2138.566261,
+        "minimum": 2092.693537,
+        "maximum": 2213.415417
+      },
+      "cpu_seconds": {
+        "median": 3.364787,
+        "minimum": 3.3255929999999942,
+        "maximum": 3.456518999999986
+      },
+      "rss_mib": {
+        "median": 137.109375,
+        "minimum": 136.546875,
+        "maximum": 137.28515625
+      },
+      "stock_speedup": 1.4135823794949067,
+      "same_algorithm_speedup": 1.471789682108613,
+      "efficiency": 0.045993427565894154,
+      "forward_ms": {
+        "median": 51.851884,
+        "minimum": 51.556816,
+        "maximum": 55.909226
+      },
+      "backward_ms": {
+        "median": 1926.79647,
+        "minimum": 1885.720498,
+        "maximum": 1989.508364
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 801,
+        "minimum": 783,
+        "maximum": 831
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 2219110,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-32-on",
+      "process_wall_ms": {
+        "median": 2566.053542,
+        "minimum": 2502.902559,
+        "maximum": 2603.197721
+      },
+      "f4_call_ms": {
+        "median": 2528.91125,
+        "minimum": 2467.772229,
+        "maximum": 2566.005216
+      },
+      "cpu_seconds": {
+        "median": 3.768285999999982,
+        "minimum": 3.705631999999982,
+        "maximum": 3.810964000000009
+      },
+      "rss_mib": {
+        "median": 136.84375,
+        "minimum": 136.4140625,
+        "maximum": 137.3359375
+      },
+      "stock_speedup": 1.200313768043738,
+      "same_algorithm_speedup": 1.3555184286174182,
+      "efficiency": 0.04235995089429432,
+      "forward_ms": {
+        "median": 53.40435,
+        "minimum": 52.935993,
+        "maximum": 54.94416
+      },
+      "backward_ms": {
+        "median": 1974.582444,
+        "minimum": 1920.790484,
+        "maximum": 2008.142406
+      },
+      "products": {
+        "median": 571752685,
+        "minimum": 569665207,
+        "maximum": 573431189
+      },
+      "retries": {
+        "median": 806,
+        "minimum": 786,
+        "maximum": 834
+      },
+      "retry_products": {
+        "median": 63357015,
+        "minimum": 61199609,
+        "maximum": 72140972
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 2222604,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-4-off",
+      "process_wall_ms": {
+        "median": 2375.005763,
+        "minimum": 2298.46187,
+        "maximum": 2410.791444
+      },
+      "f4_call_ms": {
+        "median": 2339.595673,
+        "minimum": 2262.190588,
+        "maximum": 2373.412667
+      },
+      "cpu_seconds": {
+        "median": 3.2498000000000014,
+        "minimum": 3.118017000000001,
+        "maximum": 3.2753979999999743
+      },
+      "rss_mib": {
+        "median": 134.515625,
+        "minimum": 134.17578125,
+        "maximum": 134.7109375
+      },
+      "stock_speedup": 1.2968681777468176,
+      "same_algorithm_speedup": 1.3502695214302096,
+      "efficiency": 0.3375673803575524,
+      "forward_ms": {
+        "median": 299.33593,
+        "minimum": 283.92244,
+        "maximum": 302.037816
+      },
+      "backward_ms": {
+        "median": 1883.482619,
+        "minimum": 1830.997673,
+        "maximum": 1916.201135
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 158,
+        "minimum": 151,
+        "maximum": 171
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1572401,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-4-on",
+      "process_wall_ms": {
+        "median": 2758.207125,
+        "minimum": 2608.403111,
+        "maximum": 2800.409848
+      },
+      "f4_call_ms": {
+        "median": 2721.409086,
+        "minimum": 2573.734463,
+        "maximum": 2766.786602
+      },
+      "cpu_seconds": {
+        "median": 3.6383829999999424,
+        "minimum": 3.454442000000001,
+        "maximum": 3.6866640000000013
+      },
+      "rss_mib": {
+        "median": 134.3828125,
+        "minimum": 134.21875,
+        "maximum": 134.78515625
+      },
+      "stock_speedup": 1.1166925674590156,
+      "same_algorithm_speedup": 1.261084721837197,
+      "efficiency": 0.31527118045929925,
+      "forward_ms": {
+        "median": 304.194972,
+        "minimum": 293.371118,
+        "maximum": 307.342152
+      },
+      "backward_ms": {
+        "median": 1929.982571,
+        "minimum": 1818.422945,
+        "maximum": 1971.001928
+      },
+      "products": {
+        "median": 584469781,
+        "minimum": 582955826,
+        "maximum": 584692303
+      },
+      "retries": {
+        "median": 145,
+        "minimum": 136,
+        "maximum": 163
+      },
+      "retry_products": {
+        "median": 7252448,
+        "minimum": 2823367,
+        "maximum": 8250237
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1572401,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-64-off",
+      "process_wall_ms": {
+        "median": 2207.931172,
+        "minimum": 2106.855463,
+        "maximum": 2234.8847
+      },
+      "f4_call_ms": {
+        "median": 2169.133077,
+        "minimum": 2071.086602,
+        "maximum": 2194.520869
+      },
+      "cpu_seconds": {
+        "median": 3.5391129999999755,
+        "minimum": 3.4326239999999935,
+        "maximum": 3.562157
+      },
+      "rss_mib": {
+        "median": 138.43359375,
+        "minimum": 137.9921875,
+        "maximum": 140.75390625
+      },
+      "stock_speedup": 1.3950024507376266,
+      "same_algorithm_speedup": 1.4524446847204528,
+      "efficiency": 0.022694448198757076,
+      "forward_ms": {
+        "median": 45.664865,
+        "minimum": 44.313891,
+        "maximum": 47.255387
+      },
+      "backward_ms": {
+        "median": 1957.003163,
+        "minimum": 1863.076006,
+        "maximum": 1982.903677
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 973,
+        "minimum": 831,
+        "maximum": 1023
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2974893,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-64-on",
+      "process_wall_ms": {
+        "median": 2501.701816,
+        "minimum": 2467.381148,
+        "maximum": 2554.109882
+      },
+      "f4_call_ms": {
+        "median": 2459.469047,
+        "minimum": 2429.609416,
+        "maximum": 2516.283587
+      },
+      "cpu_seconds": {
+        "median": 3.8417300000000054,
+        "minimum": 3.8015940000000086,
+        "maximum": 3.8777699999999733
+      },
+      "rss_mib": {
+        "median": 138.78125,
+        "minimum": 138.359375,
+        "maximum": 140.6953125
+      },
+      "stock_speedup": 1.2311896550983676,
+      "same_algorithm_speedup": 1.3903866730854226,
+      "efficiency": 0.02172479176695973,
+      "forward_ms": {
+        "median": 47.169256,
+        "minimum": 45.162797,
+        "maximum": 54.38658
+      },
+      "backward_ms": {
+        "median": 1910.623877,
+        "minimum": 1895.23916,
+        "maximum": 1975.168821
+      },
+      "products": {
+        "median": 560401051,
+        "minimum": 558693581,
+        "maximum": 567203926
+      },
+      "retries": {
+        "median": 928,
+        "minimum": 793,
+        "maximum": 981
+      },
+      "retry_products": {
+        "median": 75939650,
+        "minimum": 73319275,
+        "maximum": 81376916
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2976303,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-8-off",
+      "process_wall_ms": {
+        "median": 2214.040075,
+        "minimum": 2159.219144,
+        "maximum": 2310.786532
+      },
+      "f4_call_ms": {
+        "median": 2176.523074,
+        "minimum": 2125.026179,
+        "maximum": 2272.187914
+      },
+      "cpu_seconds": {
+        "median": 3.2422720000000353,
+        "minimum": 3.188542,
+        "maximum": 3.331742999999999
+      },
+      "rss_mib": {
+        "median": 135.36328125,
+        "minimum": 134.6015625,
+        "maximum": 135.421875
+      },
+      "stock_speedup": 1.3911534080971864,
+      "same_algorithm_speedup": 1.4484371494495194,
+      "efficiency": 0.18105464368118993,
+      "forward_ms": {
+        "median": 154.876973,
+        "minimum": 154.455302,
+        "maximum": 155.565292
+      },
+      "backward_ms": {
+        "median": 1864.782324,
+        "minimum": 1821.925762,
+        "maximum": 1956.649176
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 319,
+        "minimum": 293,
+        "maximum": 334
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1665120,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "dynamic-8-on",
+      "process_wall_ms": {
+        "median": 2543.605903,
+        "minimum": 2518.385311,
+        "maximum": 2578.273015
+      },
+      "f4_call_ms": {
+        "median": 2510.270601,
+        "minimum": 2484.407782,
+        "maximum": 2540.080056
+      },
+      "cpu_seconds": {
+        "median": 3.572439000000001,
+        "minimum": 3.555581000000016,
+        "maximum": 3.6162280000000315
+      },
+      "rss_mib": {
+        "median": 134.63671875,
+        "minimum": 133.953125,
+        "maximum": 135.30078125
+      },
+      "stock_speedup": 1.2109066865929505,
+      "same_algorithm_speedup": 1.3674810476330304,
+      "efficiency": 0.1709351309541288,
+      "forward_ms": {
+        "median": 156.843047,
+        "minimum": 155.594,
+        "maximum": 173.32148
+      },
+      "backward_ms": {
+        "median": 1876.086277,
+        "minimum": 1851.267277,
+        "maximum": 1908.871503
+      },
+      "products": {
+        "median": 583436778,
+        "minimum": 581601516,
+        "maximum": 583994796
+      },
+      "retries": {
+        "median": 310,
+        "minimum": 293,
+        "maximum": 321
+      },
+      "retry_products": {
+        "median": 17425362,
+        "minimum": 14267556,
+        "maximum": 20896978
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1668129,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "off",
+      "process_wall_ms": {
+        "median": 3145.471983,
+        "minimum": 3110.865762,
+        "maximum": 3221.249711
+      },
+      "f4_call_ms": {
+        "median": 3113.348844,
+        "minimum": 3081.380188,
+        "maximum": 3190.471331
+      },
+      "cpu_seconds": {
+        "median": 3.1252679999999993,
+        "minimum": 3.0937009999999923,
+        "maximum": 3.200624999999996
+      },
+      "rss_mib": {
+        "median": 135.18359375,
+        "minimum": 135.02734375,
+        "maximum": 135.35546875
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-1-off",
+      "process_wall_ms": {
+        "median": 3106.927629,
+        "minimum": 3053.270798,
+        "maximum": 3286.776447
+      },
+      "f4_call_ms": {
+        "median": 3073.261029,
+        "minimum": 3019.068563,
+        "maximum": 3249.962038
+      },
+      "cpu_seconds": {
+        "median": 3.087126999999988,
+        "minimum": 3.034181999999987,
+        "maximum": 3.264837
+      },
+      "rss_mib": {
+        "median": 132.67578125,
+        "minimum": 132.5234375,
+        "maximum": 132.765625
+      },
+      "stock_speedup": 0.9913553721852721,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1093.959973,
+        "minimum": 1074.812429,
+        "maximum": 1168.353412
+      },
+      "backward_ms": {
+        "median": 1825.783843,
+        "minimum": 1798.027038,
+        "maximum": 1924.441337
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 721200,
+      "reservation_entries": 1500607,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-1-on",
+      "process_wall_ms": {
+        "median": 3467.438547,
+        "minimum": 3407.368241,
+        "maximum": 3775.197119
+      },
+      "f4_call_ms": {
+        "median": 3435.307365,
+        "minimum": 3373.806281,
+        "maximum": 3742.722214
+      },
+      "cpu_seconds": {
+        "median": 3.4456560000000227,
+        "minimum": 3.386360999999944,
+        "maximum": 3.751911
+      },
+      "rss_mib": {
+        "median": 132.6484375,
+        "minimum": 132.56640625,
+        "maximum": 132.78125
+      },
+      "stock_speedup": 0.8882837732379861,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1121.119274,
+        "minimum": 1096.345698,
+        "maximum": 1224.419739
+      },
+      "backward_ms": {
+        "median": 1840.494569,
+        "minimum": 1816.561452,
+        "maximum": 2013.056584
+      },
+      "products": {
+        "median": 585166982,
+        "minimum": 585166982,
+        "maximum": 585166982
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 721200,
+      "reservation_entries": 1500607,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-16-off",
+      "process_wall_ms": {
+        "median": 2225.773708,
+        "minimum": 2218.469567,
+        "maximum": 2281.250575
+      },
+      "f4_call_ms": {
+        "median": 2185.702271,
+        "minimum": 2179.509445,
+        "maximum": 2246.286088
+      },
+      "cpu_seconds": {
+        "median": 3.3662969999999994,
+        "minimum": 3.350945999999963,
+        "maximum": 3.42849500000008
+      },
+      "rss_mib": {
+        "median": 133.75390625,
+        "minimum": 133.48828125,
+        "maximum": 134.2578125
+      },
+      "stock_speedup": 1.383819651085572,
+      "same_algorithm_speedup": 1.395886570963125,
+      "efficiency": 0.08724291068519531,
+      "forward_ms": {
+        "median": 134.1982,
+        "minimum": 133.815853,
+        "maximum": 137.340845
+      },
+      "backward_ms": {
+        "median": 1901.916314,
+        "minimum": 1896.2467,
+        "maximum": 1952.69807
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 175,
+        "minimum": 146,
+        "maximum": 188
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1840397,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-16-on",
+      "process_wall_ms": {
+        "median": 2595.515404,
+        "minimum": 2545.289991,
+        "maximum": 2630.78668
+      },
+      "f4_call_ms": {
+        "median": 2562.485401,
+        "minimum": 2511.053964,
+        "maximum": 2596.794163
+      },
+      "cpu_seconds": {
+        "median": 3.748145000000033,
+        "minimum": 3.7070649999998864,
+        "maximum": 3.8254649999999923
+      },
+      "rss_mib": {
+        "median": 134.22265625,
+        "minimum": 133.234375,
+        "maximum": 134.57421875
+      },
+      "stock_speedup": 1.1866889293946181,
+      "same_algorithm_speedup": 1.3359344897958463,
+      "efficiency": 0.08349590561224039,
+      "forward_ms": {
+        "median": 138.609893,
+        "minimum": 134.060709,
+        "maximum": 178.944174
+      },
+      "backward_ms": {
+        "median": 1940.453324,
+        "minimum": 1915.190749,
+        "maximum": 1982.314921
+      },
+      "products": {
+        "median": 622277258,
+        "minimum": 618190316,
+        "maximum": 638019636
+      },
+      "retries": {
+        "median": 168,
+        "minimum": 142,
+        "maximum": 173
+      },
+      "retry_products": {
+        "median": 2077138,
+        "minimum": 1273012,
+        "maximum": 3215371
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1845124,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-2-off",
+      "process_wall_ms": {
+        "median": 2684.107643,
+        "minimum": 2663.482342,
+        "maximum": 2741.129388
+      },
+      "f4_call_ms": {
+        "median": 2649.614618,
+        "minimum": 2626.773281,
+        "maximum": 2703.170122
+      },
+      "cpu_seconds": {
+        "median": 3.147499000000053,
+        "minimum": 3.134038999999996,
+        "maximum": 3.2099670000000273
+      },
+      "rss_mib": {
+        "median": 131.37109375,
+        "minimum": 131.296875,
+        "maximum": 131.51171875
+      },
+      "stock_speedup": 1.1475208172193263,
+      "same_algorithm_speedup": 1.1575272091276556,
+      "efficiency": 0.5787636045638278,
+      "forward_ms": {
+        "median": 657.101579,
+        "minimum": 652.659637,
+        "maximum": 676.179765
+      },
+      "backward_ms": {
+        "median": 1839.547558,
+        "minimum": 1804.479546,
+        "maximum": 1894.560385
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 12,
+        "minimum": 11,
+        "maximum": 13
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1468551,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-2-on",
+      "process_wall_ms": {
+        "median": 3050.711032,
+        "minimum": 2971.592738,
+        "maximum": 3242.702783
+      },
+      "f4_call_ms": {
+        "median": 3015.855911,
+        "minimum": 2936.02112,
+        "maximum": 3208.703655
+      },
+      "cpu_seconds": {
+        "median": 3.527844000000009,
+        "minimum": 3.423264999999999,
+        "maximum": 3.711916999999975
+      },
+      "rss_mib": {
+        "median": 131.51953125,
+        "minimum": 131.3203125,
+        "maximum": 131.99609375
+      },
+      "stock_speedup": 1.009623449645689,
+      "same_algorithm_speedup": 1.1366001271929056,
+      "efficiency": 0.5683000635964528,
+      "forward_ms": {
+        "median": 673.580504,
+        "minimum": 650.71029,
+        "maximum": 694.071244
+      },
+      "backward_ms": {
+        "median": 1862.17521,
+        "minimum": 1821.45278,
+        "maximum": 2010.968548
+      },
+      "products": {
+        "median": 587926384,
+        "minimum": 584483550,
+        "maximum": 588390990
+      },
+      "retries": {
+        "median": 12,
+        "minimum": 8,
+        "maximum": 15
+      },
+      "retry_products": {
+        "median": 50119,
+        "minimum": 15566,
+        "maximum": 289374
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1469126,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-32-off",
+      "process_wall_ms": {
+        "median": 2270.435398,
+        "minimum": 2253.109605,
+        "maximum": 2340.137559
+      },
+      "f4_call_ms": {
+        "median": 2232.622858,
+        "minimum": 2215.82241,
+        "maximum": 2301.355363
+      },
+      "cpu_seconds": {
+        "median": 3.4388800000000206,
+        "minimum": 3.4303329999999903,
+        "maximum": 3.529034999999965
+      },
+      "rss_mib": {
+        "median": 134.2890625,
+        "minimum": 133.96875,
+        "maximum": 135.5234375
+      },
+      "stock_speedup": 1.3565985619820748,
+      "same_algorithm_speedup": 1.368428113716363,
+      "efficiency": 0.04276337855363634,
+      "forward_ms": {
+        "median": 87.219703,
+        "minimum": 86.210341,
+        "maximum": 92.20772
+      },
+      "backward_ms": {
+        "median": 1983.082912,
+        "minimum": 1966.635896,
+        "maximum": 2047.433433
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 222,
+        "minimum": 205,
+        "maximum": 254
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 2193887,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-32-on",
+      "process_wall_ms": {
+        "median": 2602.744803,
+        "minimum": 2551.998581,
+        "maximum": 2792.381947
+      },
+      "f4_call_ms": {
+        "median": 2569.284726,
+        "minimum": 2516.879551,
+        "maximum": 2757.319856
+      },
+      "cpu_seconds": {
+        "median": 3.7890979999999406,
+        "minimum": 3.749159000000007,
+        "maximum": 3.9971449999999678
+      },
+      "rss_mib": {
+        "median": 134.28515625,
+        "minimum": 133.94921875,
+        "maximum": 135.75
+      },
+      "stock_speedup": 1.1833927753692262,
+      "same_algorithm_speedup": 1.3322237904397423,
+      "efficiency": 0.041631993451241946,
+      "forward_ms": {
+        "median": 88.915813,
+        "minimum": 84.743786,
+        "maximum": 100.783697
+      },
+      "backward_ms": {
+        "median": 1993.962486,
+        "minimum": 1952.968651,
+        "maximum": 2147.804792
+      },
+      "products": {
+        "median": 593023720,
+        "minimum": 586680427,
+        "maximum": 606220829
+      },
+      "retries": {
+        "median": 250,
+        "minimum": 210,
+        "maximum": 273
+      },
+      "retry_products": {
+        "median": 3688342,
+        "minimum": 2990946,
+        "maximum": 4515214
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 2188437,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-4-off",
+      "process_wall_ms": {
+        "median": 2502.141567,
+        "minimum": 2460.550093,
+        "maximum": 2645.463403
+      },
+      "f4_call_ms": {
+        "median": 2467.300061,
+        "minimum": 2426.617582,
+        "maximum": 2605.949451
+      },
+      "cpu_seconds": {
+        "median": 3.2580020000000056,
+        "minimum": 3.2237109999999802,
+        "maximum": 3.406013000000012
+      },
+      "rss_mib": {
+        "median": 132.5,
+        "minimum": 130.9609375,
+        "maximum": 132.74609375
+      },
+      "stock_speedup": 1.2309732737036616,
+      "same_algorithm_speedup": 1.2417073717875693,
+      "efficiency": 0.3104268429468923,
+      "forward_ms": {
+        "median": 437.893994,
+        "minimum": 434.879607,
+        "maximum": 443.115103
+      },
+      "backward_ms": {
+        "median": 1883.151174,
+        "minimum": 1844.710011,
+        "maximum": 2007.423785
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 43,
+        "minimum": 40,
+        "maximum": 45
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1557469,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-4-on",
+      "process_wall_ms": {
+        "median": 2846.240881,
+        "minimum": 2798.984769,
+        "maximum": 2970.08825
+      },
+      "f4_call_ms": {
+        "median": 2812.2939,
+        "minimum": 2766.769576,
+        "maximum": 2935.878462
+      },
+      "cpu_seconds": {
+        "median": 3.6112249999999935,
+        "minimum": 3.549272999999987,
+        "maximum": 3.735622999999922
+      },
+      "rss_mib": {
+        "median": 132.03515625,
+        "minimum": 130.82421875,
+        "maximum": 133.0703125
+      },
+      "stock_speedup": 1.082153452492695,
+      "same_algorithm_speedup": 1.2182519653015973,
+      "efficiency": 0.3045629913253993,
+      "forward_ms": {
+        "median": 438.62073,
+        "minimum": 431.393665,
+        "maximum": 455.5083
+      },
+      "backward_ms": {
+        "median": 1901.088576,
+        "minimum": 1876.553983,
+        "maximum": 1981.980501
+      },
+      "products": {
+        "median": 604716731,
+        "minimum": 602520207,
+        "maximum": 605710606
+      },
+      "retries": {
+        "median": 44,
+        "minimum": 34,
+        "maximum": 47
+      },
+      "retry_products": {
+        "median": 408155,
+        "minimum": 94050,
+        "maximum": 471527
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1559161,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-64-off",
+      "process_wall_ms": {
+        "median": 2255.085446,
+        "minimum": 2231.769322,
+        "maximum": 2310.904746
+      },
+      "f4_call_ms": {
+        "median": 2215.820086,
+        "minimum": 2196.164151,
+        "maximum": 2272.834789
+      },
+      "cpu_seconds": {
+        "median": 3.5073170000000324,
+        "minimum": 3.430182000000112,
+        "maximum": 3.5446830000000986
+      },
+      "rss_mib": {
+        "median": 137.5625,
+        "minimum": 137.30859375,
+        "maximum": 137.80078125
+      },
+      "stock_speedup": 1.365832678962711,
+      "same_algorithm_speedup": 1.3777427522806158,
+      "efficiency": 0.021527230504384622,
+      "forward_ms": {
+        "median": 71.792956,
+        "minimum": 70.227332,
+        "maximum": 74.576562
+      },
+      "backward_ms": {
+        "median": 1986.845487,
+        "minimum": 1962.094728,
+        "maximum": 2038.001663
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 195,
+        "minimum": 164,
+        "maximum": 220
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2796566,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-64-on",
+      "process_wall_ms": {
+        "median": 2625.915177,
+        "minimum": 2583.125123,
+        "maximum": 2650.351728
+      },
+      "f4_call_ms": {
+        "median": 2589.391509,
+        "minimum": 2547.657925,
+        "maximum": 2612.082775
+      },
+      "cpu_seconds": {
+        "median": 3.844481,
+        "minimum": 3.8385929999999817,
+        "maximum": 3.8706679999999647
+      },
+      "rss_mib": {
+        "median": 137.7421875,
+        "minimum": 137.30859375,
+        "maximum": 138.50390625
+      },
+      "stock_speedup": 1.1729508336666277,
+      "same_algorithm_speedup": 1.3204686036208548,
+      "efficiency": 0.020632321931575857,
+      "forward_ms": {
+        "median": 75.221177,
+        "minimum": 71.638483,
+        "maximum": 78.407117
+      },
+      "backward_ms": {
+        "median": 2015.63253,
+        "minimum": 1988.972598,
+        "maximum": 2040.551285
+      },
+      "products": {
+        "median": 584851720,
+        "minimum": 556255062,
+        "maximum": 594267523
+      },
+      "retries": {
+        "median": 181,
+        "minimum": 172,
+        "maximum": 216
+      },
+      "retry_products": {
+        "median": 6702692,
+        "minimum": 4008997,
+        "maximum": 7368719
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2791083,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-8-off",
+      "process_wall_ms": {
+        "median": 2385.309023,
+        "minimum": 2360.725453,
+        "maximum": 2412.118056
+      },
+      "f4_call_ms": {
+        "median": 2348.686326,
+        "minimum": 2324.623683,
+        "maximum": 2376.279442
+      },
+      "cpu_seconds": {
+        "median": 3.383446000000017,
+        "minimum": 3.3586169999999935,
+        "maximum": 3.4189819999999767
+      },
+      "rss_mib": {
+        "median": 133.05078125,
+        "minimum": 132.70703125,
+        "maximum": 133.65234375
+      },
+      "stock_speedup": 1.2912664004122203,
+      "same_algorithm_speedup": 1.3025262551065275,
+      "efficiency": 0.16281578188831594,
+      "forward_ms": {
+        "median": 243.26088,
+        "minimum": 239.22039,
+        "maximum": 252.736356
+      },
+      "backward_ms": {
+        "median": 1956.05451,
+        "minimum": 1928.029178,
+        "maximum": 1971.808089
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 92,
+        "minimum": 81,
+        "maximum": 110
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1675866,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "static-8-on",
+      "process_wall_ms": {
+        "median": 2721.373869,
+        "minimum": 2695.908415,
+        "maximum": 2806.590752
+      },
+      "f4_call_ms": {
+        "median": 2684.330444,
+        "minimum": 2663.350553,
+        "maximum": 2769.242602
+      },
+      "cpu_seconds": {
+        "median": 3.7264220000000243,
+        "minimum": 3.710753000000003,
+        "maximum": 3.8018829999999433
+      },
+      "rss_mib": {
+        "median": 133.12890625,
+        "minimum": 132.1484375,
+        "maximum": 133.734375
+      },
+      "stock_speedup": 1.131806780055475,
+      "same_algorithm_speedup": 1.2741500116902902,
+      "efficiency": 0.15926875146128627,
+      "forward_ms": {
+        "median": 244.15712,
+        "minimum": 235.771654,
+        "maximum": 255.6331
+      },
+      "backward_ms": {
+        "median": 1968.820233,
+        "minimum": 1942.226723,
+        "maximum": 2040.008435
+      },
+      "products": {
+        "median": 618999271,
+        "minimum": 605087532,
+        "maximum": 625567654
+      },
+      "retries": {
+        "median": 95,
+        "minimum": 76,
+        "maximum": 107
+      },
+      "retry_products": {
+        "median": 852529,
+        "minimum": 229059,
+        "maximum": 1266598
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1659445,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 32003,
+      "arm": "stock",
+      "process_wall_ms": {
+        "median": 3080.069396,
+        "minimum": 3048.287521,
+        "maximum": 3190.002694
+      },
+      "f4_call_ms": {
+        "median": 3051.659337,
+        "minimum": 3018.926706,
+        "maximum": 3160.477947
+      },
+      "cpu_seconds": {
+        "median": 3.061522,
+        "minimum": 3.0291189999999872,
+        "maximum": 3.1708960000000026
+      },
+      "rss_mib": {
+        "median": 135.56640625,
+        "minimum": 135.48828125,
+        "maximum": 135.58203125
+      }
+    },
+    {
+      "modulus": 32003,
+      "arm": "work",
+      "process_wall_ms": {
+        "median": 3232.099054,
+        "minimum": 3060.758286,
+        "maximum": 3262.009881
+      },
+      "f4_call_ms": {
+        "median": 3203.096797,
+        "minimum": 3030.28283,
+        "maximum": 3232.530311
+      },
+      "cpu_seconds": {
+        "median": 3.2128090000000284,
+        "minimum": 3.0424089999999975,
+        "maximum": 3.2392180000000006
+      },
+      "rss_mib": {
+        "median": 136.71484375,
+        "minimum": 136.54296875,
+        "maximum": 136.7265625
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-1-off",
+      "process_wall_ms": {
+        "median": 3386.014808,
+        "minimum": 3243.444868,
+        "maximum": 3716.227662
+      },
+      "f4_call_ms": {
+        "median": 3351.467512,
+        "minimum": 3210.604443,
+        "maximum": 3677.976882
+      },
+      "cpu_seconds": {
+        "median": 3.366269000000024,
+        "minimum": 3.224114999999987,
+        "maximum": 3.690476999999987
+      },
+      "rss_mib": {
+        "median": 133.47265625,
+        "minimum": 133.34765625,
+        "maximum": 133.53515625
+      },
+      "stock_speedup": 0.9984787148633167,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1211.701994,
+        "minimum": 1159.712718,
+        "maximum": 1318.984149
+      },
+      "backward_ms": {
+        "median": 1985.474164,
+        "minimum": 1903.656639,
+        "maximum": 2191.687948
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1500639,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-1-on",
+      "process_wall_ms": {
+        "median": 3803.402314,
+        "minimum": 3718.776513,
+        "maximum": 4184.903555
+      },
+      "f4_call_ms": {
+        "median": 3767.816351,
+        "minimum": 3683.153368,
+        "maximum": 4146.667302
+      },
+      "cpu_seconds": {
+        "median": 3.7792529999999758,
+        "minimum": 3.6961440000000785,
+        "maximum": 4.156365000000004
+      },
+      "rss_mib": {
+        "median": 132.85546875,
+        "minimum": 132.8125,
+        "maximum": 133.0078125
+      },
+      "stock_speedup": 0.888905099929957,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1195.939598,
+        "minimum": 1171.5417,
+        "maximum": 1320.01929
+      },
+      "backward_ms": {
+        "median": 1955.49103,
+        "minimum": 1914.395584,
+        "maximum": 2166.498726
+      },
+      "products": {
+        "median": 585195178,
+        "minimum": 585195178,
+        "maximum": 585195178
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1500639,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-16-off",
+      "process_wall_ms": {
+        "median": 2297.422497,
+        "minimum": 2276.784769,
+        "maximum": 2397.812188
+      },
+      "f4_call_ms": {
+        "median": 2259.428945,
+        "minimum": 2240.318609,
+        "maximum": 2359.085257
+      },
+      "cpu_seconds": {
+        "median": 3.5142209999999565,
+        "minimum": 3.5083689999999876,
+        "maximum": 3.6160350000000587
+      },
+      "rss_mib": {
+        "median": 136.3828125,
+        "minimum": 136.19921875,
+        "maximum": 136.8125
+      },
+      "stock_speedup": 1.4715898875434403,
+      "same_algorithm_speedup": 1.4738320062685448,
+      "efficiency": 0.09211450039178405,
+      "forward_ms": {
+        "median": 90.845659,
+        "minimum": 89.569362,
+        "maximum": 91.413613
+      },
+      "backward_ms": {
+        "median": 2011.877067,
+        "minimum": 1991.57235,
+        "maximum": 2101.09344
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 791,
+        "minimum": 770,
+        "maximum": 827
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 1851349,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-16-on",
+      "process_wall_ms": {
+        "median": 2768.006461,
+        "minimum": 2695.370083,
+        "maximum": 2857.035787
+      },
+      "f4_call_ms": {
+        "median": 2729.695198,
+        "minimum": 2659.139198,
+        "maximum": 2821.03176
+      },
+      "cpu_seconds": {
+        "median": 4.013101999999987,
+        "minimum": 3.943176999999956,
+        "maximum": 4.0816269999999975
+      },
+      "rss_mib": {
+        "median": 136.79296875,
+        "minimum": 136.58984375,
+        "maximum": 137.17578125
+      },
+      "stock_speedup": 1.221407450320254,
+      "same_algorithm_speedup": 1.3740583223299059,
+      "efficiency": 0.08587864514561912,
+      "forward_ms": {
+        "median": 91.980148,
+        "minimum": 91.051057,
+        "maximum": 93.917653
+      },
+      "backward_ms": {
+        "median": 2000.240536,
+        "minimum": 1952.511928,
+        "maximum": 2070.698928
+      },
+      "products": {
+        "median": 576824272,
+        "minimum": 576067621,
+        "maximum": 580394192
+      },
+      "retries": {
+        "median": 750,
+        "minimum": 683,
+        "maximum": 808
+      },
+      "retry_products": {
+        "median": 40254066,
+        "minimum": 38014434,
+        "maximum": 46828245
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 1850769,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-2-off",
+      "process_wall_ms": {
+        "median": 2803.053343,
+        "minimum": 2655.496079,
+        "maximum": 3069.848084
+      },
+      "f4_call_ms": {
+        "median": 2766.602864,
+        "minimum": 2620.060983,
+        "maximum": 3031.654272
+      },
+      "cpu_seconds": {
+        "median": 3.402744999999996,
+        "minimum": 3.2185139999999386,
+        "maximum": 3.6890640000000072
+      },
+      "rss_mib": {
+        "median": 135.44140625,
+        "minimum": 134.93359375,
+        "maximum": 135.5390625
+      },
+      "stock_speedup": 1.2061360596090518,
+      "same_algorithm_speedup": 1.2079737320931891,
+      "efficiency": 0.6039868660465946,
+      "forward_ms": {
+        "median": 616.536818,
+        "minimum": 584.29971,
+        "maximum": 651.97385
+      },
+      "backward_ms": {
+        "median": 1991.665135,
+        "minimum": 1892.255372,
+        "maximum": 2215.330067
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 79,
+        "minimum": 63,
+        "maximum": 82
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1524360,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-2-on",
+      "process_wall_ms": {
+        "median": 3217.14035,
+        "minimum": 3208.845853,
+        "maximum": 3507.54804
+      },
+      "f4_call_ms": {
+        "median": 3183.773999,
+        "minimum": 3174.062901,
+        "maximum": 3471.253072
+      },
+      "cpu_seconds": {
+        "median": 3.814859999999996,
+        "minimum": 3.7935750000000024,
+        "maximum": 4.125777999999999
+      },
+      "rss_mib": {
+        "median": 135.12109375,
+        "minimum": 134.81640625,
+        "maximum": 135.43359375
+      },
+      "stock_speedup": 1.0508909609740837,
+      "same_algorithm_speedup": 1.1822307702553294,
+      "efficiency": 0.5911153851276647,
+      "forward_ms": {
+        "median": 623.610615,
+        "minimum": 607.54824,
+        "maximum": 658.159409
+      },
+      "backward_ms": {
+        "median": 1967.812912,
+        "minimum": 1950.672636,
+        "maximum": 2139.095295
+      },
+      "products": {
+        "median": 584927740,
+        "minimum": 584304417,
+        "maximum": 584989641
+      },
+      "retries": {
+        "median": 69,
+        "minimum": 64,
+        "maximum": 93
+      },
+      "retry_products": {
+        "median": 2840656,
+        "minimum": 1875286,
+        "maximum": 3725682
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1524505,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-32-off",
+      "process_wall_ms": {
+        "median": 2348.795573,
+        "minimum": 2330.043025,
+        "maximum": 2445.96611
+      },
+      "f4_call_ms": {
+        "median": 2311.259097,
+        "minimum": 2289.085761,
+        "maximum": 2400.660333
+      },
+      "cpu_seconds": {
+        "median": 3.644383999999988,
+        "minimum": 3.623197999999979,
+        "maximum": 3.7196040000000714
+      },
+      "rss_mib": {
+        "median": 137.6484375,
+        "minimum": 137.43359375,
+        "maximum": 138.22265625
+      },
+      "stock_speedup": 1.439403136170676,
+      "same_algorithm_speedup": 1.4415962150657544,
+      "efficiency": 0.045049881720804826,
+      "forward_ms": {
+        "median": 55.529347,
+        "minimum": 55.152063,
+        "maximum": 58.539485
+      },
+      "backward_ms": {
+        "median": 2091.475691,
+        "minimum": 2074.900334,
+        "maximum": 2170.403106
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 1151,
+        "minimum": 1052,
+        "maximum": 1208
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2211932,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-32-on",
+      "process_wall_ms": {
+        "median": 2822.622959,
+        "minimum": 2744.237945,
+        "maximum": 2959.569393
+      },
+      "f4_call_ms": {
+        "median": 2785.209817,
+        "minimum": 2703.345765,
+        "maximum": 2921.530425
+      },
+      "cpu_seconds": {
+        "median": 4.160483000000042,
+        "minimum": 4.05179700000002,
+        "maximum": 4.271240000000006
+      },
+      "rss_mib": {
+        "median": 138.234375,
+        "minimum": 137.8203125,
+        "maximum": 138.3359375
+      },
+      "stock_speedup": 1.1977737597648443,
+      "same_algorithm_speedup": 1.3474709053409921,
+      "efficiency": 0.042108465791906004,
+      "forward_ms": {
+        "median": 57.826946,
+        "minimum": 57.369911,
+        "maximum": 65.636944
+      },
+      "backward_ms": {
+        "median": 2081.026915,
+        "minimum": 2015.56411,
+        "maximum": 2199.102913
+      },
+      "products": {
+        "median": 573320935,
+        "minimum": 571290750,
+        "maximum": 574177955
+      },
+      "retries": {
+        "median": 1076,
+        "minimum": 985,
+        "maximum": 1123
+      },
+      "retry_products": {
+        "median": 68256398,
+        "minimum": 63204583,
+        "maximum": 78270083
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2231361,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-4-off",
+      "process_wall_ms": {
+        "median": 2486.424578,
+        "minimum": 2431.593233,
+        "maximum": 2603.026221
+      },
+      "f4_call_ms": {
+        "median": 2450.379876,
+        "minimum": 2395.704156,
+        "maximum": 2566.367476
+      },
+      "cpu_seconds": {
+        "median": 3.4187020000000032,
+        "minimum": 3.3328210000000222,
+        "maximum": 3.5498340000000095
+      },
+      "rss_mib": {
+        "median": 135.5078125,
+        "minimum": 135.09375,
+        "maximum": 135.94921875
+      },
+      "stock_speedup": 1.359729043830261,
+      "same_algorithm_speedup": 1.3618007310415188,
+      "efficiency": 0.3404501827603797,
+      "forward_ms": {
+        "median": 323.107854,
+        "minimum": 311.617624,
+        "maximum": 328.640423
+      },
+      "backward_ms": {
+        "median": 1979.026857,
+        "minimum": 1934.074605,
+        "maximum": 2079.279824
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 201,
+        "minimum": 192,
+        "maximum": 208
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1572526,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-4-on",
+      "process_wall_ms": {
+        "median": 2998.605621,
+        "minimum": 2929.497559,
+        "maximum": 3036.992895
+      },
+      "f4_call_ms": {
+        "median": 2965.896342,
+        "minimum": 2893.895375,
+        "maximum": 3000.630702
+      },
+      "cpu_seconds": {
+        "median": 3.95383100000001,
+        "minimum": 3.8717309999999987,
+        "maximum": 3.982751999999995
+      },
+      "rss_mib": {
+        "median": 135.484375,
+        "minimum": 135.37109375,
+        "maximum": 135.60546875
+      },
+      "stock_speedup": 1.1274786155014682,
+      "same_algorithm_speedup": 1.268390310270815,
+      "efficiency": 0.31709757756770374,
+      "forward_ms": {
+        "median": 328.571131,
+        "minimum": 325.289072,
+        "maximum": 331.395409
+      },
+      "backward_ms": {
+        "median": 2007.066414,
+        "minimum": 1954.448665,
+        "maximum": 2041.706551
+      },
+      "products": {
+        "median": 584218535,
+        "minimum": 584165998,
+        "maximum": 584700622
+      },
+      "retries": {
+        "median": 200,
+        "minimum": 190,
+        "maximum": 211
+      },
+      "retry_products": {
+        "median": 9300846,
+        "minimum": 5381911,
+        "maximum": 9913617
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1572541,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-64-off",
+      "process_wall_ms": {
+        "median": 2302.872717,
+        "minimum": 2287.590059,
+        "maximum": 2325.660266
+      },
+      "f4_call_ms": {
+        "median": 2261.47059,
+        "minimum": 2249.671208,
+        "maximum": 2283.095749
+      },
+      "cpu_seconds": {
+        "median": 3.723365000000003,
+        "minimum": 3.713565999999961,
+        "maximum": 3.7419329999999213
+      },
+      "rss_mib": {
+        "median": 140.52734375,
+        "minimum": 140.2890625,
+        "maximum": 140.87109375
+      },
+      "stock_speedup": 1.468107068637437,
+      "same_algorithm_speedup": 1.470343880929308,
+      "efficiency": 0.022974123139520436,
+      "forward_ms": {
+        "median": 48.6348,
+        "minimum": 46.565693,
+        "maximum": 49.539415
+      },
+      "backward_ms": {
+        "median": 2053.934093,
+        "minimum": 2039.563993,
+        "maximum": 2075.188562
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 1493,
+        "minimum": 1351,
+        "maximum": 1583
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 6827360,
+      "reservation_entries": 2944772,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-64-on",
+      "process_wall_ms": {
+        "median": 2827.958355,
+        "minimum": 2768.81393,
+        "maximum": 2900.8765
+      },
+      "f4_call_ms": {
+        "median": 2791.693946,
+        "minimum": 2731.02725,
+        "maximum": 2861.642929
+      },
+      "cpu_seconds": {
+        "median": 4.269326999999981,
+        "minimum": 4.214054000000007,
+        "maximum": 4.327468000000035
+      },
+      "rss_mib": {
+        "median": 140.84765625,
+        "minimum": 140.27734375,
+        "maximum": 141.1015625
+      },
+      "stock_speedup": 1.1955139678851459,
+      "same_algorithm_speedup": 1.3449286858398593,
+      "efficiency": 0.0210145107162478,
+      "forward_ms": {
+        "median": 49.520609,
+        "minimum": 48.061195,
+        "maximum": 51.246517
+      },
+      "backward_ms": {
+        "median": 2087.247318,
+        "minimum": 2052.424276,
+        "maximum": 2132.878722
+      },
+      "products": {
+        "median": 554372312,
+        "minimum": 550378032,
+        "maximum": 555437784
+      },
+      "retries": {
+        "median": 1475,
+        "minimum": 1297,
+        "maximum": 1551
+      },
+      "retry_products": {
+        "median": 92012623,
+        "minimum": 87084120,
+        "maximum": 96857980
+      },
+      "workspace_bytes": 6827360,
+      "reservation_entries": 2951173,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-8-off",
+      "process_wall_ms": {
+        "median": 2354.140607,
+        "minimum": 2317.442526,
+        "maximum": 2389.501335
+      },
+      "f4_call_ms": {
+        "median": 2317.558045,
+        "minimum": 2281.436347,
+        "maximum": 2353.401638
+      },
+      "cpu_seconds": {
+        "median": 3.4607819999999982,
+        "minimum": 3.4293710000001063,
+        "maximum": 3.499284999999972
+      },
+      "rss_mib": {
+        "median": 135.890625,
+        "minimum": 135.25,
+        "maximum": 136.08203125
+      },
+      "stock_speedup": 1.4361349971820099,
+      "same_algorithm_speedup": 1.4383230967308147,
+      "efficiency": 0.17979038709135184,
+      "forward_ms": {
+        "median": 168.123107,
+        "minimum": 167.150524,
+        "maximum": 174.806642
+      },
+      "backward_ms": {
+        "median": 1993.099589,
+        "minimum": 1964.956714,
+        "maximum": 2029.440233
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 429,
+        "minimum": 427,
+        "maximum": 443
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1666018,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "dynamic-8-on",
+      "process_wall_ms": {
+        "median": 2866.670685,
+        "minimum": 2806.544484,
+        "maximum": 2990.50571
+      },
+      "f4_call_ms": {
+        "median": 2827.557102,
+        "minimum": 2771.34891,
+        "maximum": 2954.547702
+      },
+      "cpu_seconds": {
+        "median": 3.986070000000015,
+        "minimum": 3.9317099999999883,
+        "maximum": 4.1134179999999585
+      },
+      "rss_mib": {
+        "median": 135.73046875,
+        "minimum": 135.72265625,
+        "maximum": 136.09375
+      },
+      "stock_speedup": 1.1793694098490424,
+      "same_algorithm_speedup": 1.326766389282695,
+      "efficiency": 0.16584579866033688,
+      "forward_ms": {
+        "median": 169.937641,
+        "minimum": 169.463334,
+        "maximum": 171.746258
+      },
+      "backward_ms": {
+        "median": 2010.667386,
+        "minimum": 1993.269265,
+        "maximum": 2116.088255
+      },
+      "products": {
+        "median": 582252858,
+        "minimum": 581497028,
+        "maximum": 584114790
+      },
+      "retries": {
+        "median": 441,
+        "minimum": 405,
+        "maximum": 445
+      },
+      "retry_products": {
+        "median": 22096513,
+        "minimum": 18956715,
+        "maximum": 24532773
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1664459,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "off",
+      "process_wall_ms": {
+        "median": 3360.471911,
+        "minimum": 3263.914868,
+        "maximum": 3533.929938
+      },
+      "f4_call_ms": {
+        "median": 3328.049479,
+        "minimum": 3232.285727,
+        "maximum": 3501.18365
+      },
+      "cpu_seconds": {
+        "median": 3.3388170000000112,
+        "minimum": 3.2432989999999933,
+        "maximum": 3.5139100000000045
+      },
+      "rss_mib": {
+        "median": 137.08203125,
+        "minimum": 136.99609375,
+        "maximum": 137.10546875
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-1-off",
+      "process_wall_ms": {
+        "median": 3396.235321,
+        "minimum": 3366.639831,
+        "maximum": 3547.112066
+      },
+      "f4_call_ms": {
+        "median": 3358.737829,
+        "minimum": 3323.996625,
+        "maximum": 3509.736593
+      },
+      "cpu_seconds": {
+        "median": 3.3723030000000005,
+        "minimum": 3.3440269999999614,
+        "maximum": 3.523053000000022
+      },
+      "rss_mib": {
+        "median": 133.49609375,
+        "minimum": 133.44140625,
+        "maximum": 133.609375
+      },
+      "stock_speedup": 0.9954739275853612,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1226.521659,
+        "minimum": 1209.29844,
+        "maximum": 1243.564107
+      },
+      "backward_ms": {
+        "median": 1967.749903,
+        "minimum": 1957.512217,
+        "maximum": 2106.504329
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1500639,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-1-on",
+      "process_wall_ms": {
+        "median": 3880.761654,
+        "minimum": 3820.522982,
+        "maximum": 4191.266996
+      },
+      "f4_call_ms": {
+        "median": 3845.908046,
+        "minimum": 3784.451549,
+        "maximum": 4153.280478
+      },
+      "cpu_seconds": {
+        "median": 3.8562079999999987,
+        "minimum": 3.794001000000062,
+        "maximum": 4.160693000000014
+      },
+      "rss_mib": {
+        "median": 132.90234375,
+        "minimum": 132.84375,
+        "maximum": 132.98828125
+      },
+      "stock_speedup": 0.871185611338758,
+      "same_algorithm_speedup": 1.0,
+      "efficiency": 1.0,
+      "forward_ms": {
+        "median": 1236.208448,
+        "minimum": 1217.978338,
+        "maximum": 1316.011638
+      },
+      "backward_ms": {
+        "median": 1980.522941,
+        "minimum": 1951.327496,
+        "maximum": 2169.34107
+      },
+      "products": {
+        "median": 585195178,
+        "minimum": 585195178,
+        "maximum": 585195178
+      },
+      "retries": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 769280,
+      "reservation_entries": 1500639,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-16-off",
+      "process_wall_ms": {
+        "median": 2402.342618,
+        "minimum": 2360.71903,
+        "maximum": 2451.168159
+      },
+      "f4_call_ms": {
+        "median": 2363.666583,
+        "minimum": 2323.387552,
+        "maximum": 2413.752751
+      },
+      "cpu_seconds": {
+        "median": 3.6225030000000142,
+        "minimum": 3.604674999999876,
+        "maximum": 3.6865579999999962
+      },
+      "rss_mib": {
+        "median": 134.84765625,
+        "minimum": 134.44140625,
+        "maximum": 135.05078125
+      },
+      "stock_speedup": 1.4073195424616989,
+      "same_algorithm_speedup": 1.4137181331060247,
+      "efficiency": 0.08835738331912654,
+      "forward_ms": {
+        "median": 146.86548,
+        "minimum": 143.582598,
+        "maximum": 154.313082
+      },
+      "backward_ms": {
+        "median": 2056.825729,
+        "minimum": 2029.305029,
+        "maximum": 2108.078477
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 346,
+        "minimum": 302,
+        "maximum": 372
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 1821147,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-16-on",
+      "process_wall_ms": {
+        "median": 2921.55949,
+        "minimum": 2853.066274,
+        "maximum": 2969.453617
+      },
+      "f4_call_ms": {
+        "median": 2886.232005,
+        "minimum": 2816.679666,
+        "maximum": 2930.378979
+      },
+      "cpu_seconds": {
+        "median": 4.164113999999985,
+        "minimum": 4.097927999999978,
+        "maximum": 4.232059000000026
+      },
+      "rss_mib": {
+        "median": 134.80078125,
+        "minimum": 134.42578125,
+        "maximum": 135.00390625
+      },
+      "stock_speedup": 1.157212004606485,
+      "same_algorithm_speedup": 1.3283185460652729,
+      "efficiency": 0.08301990912907956,
+      "forward_ms": {
+        "median": 148.698161,
+        "minimum": 145.261475,
+        "maximum": 154.76857
+      },
+      "backward_ms": {
+        "median": 2100.206225,
+        "minimum": 2046.423525,
+        "maximum": 2132.56674
+      },
+      "products": {
+        "median": 614764387,
+        "minimum": 609380720,
+        "maximum": 630134174
+      },
+      "retries": {
+        "median": 322,
+        "minimum": 300,
+        "maximum": 334
+      },
+      "retry_products": {
+        "median": 3603489,
+        "minimum": 2555879,
+        "maximum": 5119696
+      },
+      "workspace_bytes": 2211680,
+      "reservation_entries": 1853662,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-2-off",
+      "process_wall_ms": {
+        "median": 2865.167498,
+        "minimum": 2828.995396,
+        "maximum": 3005.610393
+      },
+      "f4_call_ms": {
+        "median": 2829.310633,
+        "minimum": 2793.087243,
+        "maximum": 2968.113901
+      },
+      "cpu_seconds": {
+        "median": 3.362703999999944,
+        "minimum": 3.3372759999999992,
+        "maximum": 3.5551160000000213
+      },
+      "rss_mib": {
+        "median": 132.2890625,
+        "minimum": 132.109375,
+        "maximum": 132.68359375
+      },
+      "stock_speedup": 1.1799881564899701,
+      "same_algorithm_speedup": 1.1853531506868993,
+      "efficiency": 0.5926765753434496,
+      "forward_ms": {
+        "median": 708.040496,
+        "minimum": 698.438514,
+        "maximum": 750.53732
+      },
+      "backward_ms": {
+        "median": 1982.988227,
+        "minimum": 1939.018429,
+        "maximum": 2056.547415
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 20,
+        "minimum": 15,
+        "maximum": 23
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1464323,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-2-on",
+      "process_wall_ms": {
+        "median": 3331.794116,
+        "minimum": 3289.321653,
+        "maximum": 3419.314672
+      },
+      "f4_call_ms": {
+        "median": 3296.50876,
+        "minimum": 3254.020036,
+        "maximum": 3384.020181
+      },
+      "cpu_seconds": {
+        "median": 3.8380280000000724,
+        "minimum": 3.776356999999999,
+        "maximum": 3.934880000000005
+      },
+      "rss_mib": {
+        "median": 132.3125,
+        "minimum": 132.12890625,
+        "maximum": 132.625
+      },
+      "stock_speedup": 1.0147276801301608,
+      "same_algorithm_speedup": 1.1647663447641432,
+      "efficiency": 0.5823831723820716,
+      "forward_ms": {
+        "median": 723.515438,
+        "minimum": 695.428935,
+        "maximum": 727.166187
+      },
+      "backward_ms": {
+        "median": 1963.490691,
+        "minimum": 1931.672469,
+        "maximum": 2043.430164
+      },
+      "products": {
+        "median": 586185845,
+        "minimum": 585494924,
+        "maximum": 587257112
+      },
+      "retries": {
+        "median": 15,
+        "minimum": 11,
+        "maximum": 20
+      },
+      "retry_products": {
+        "median": 29463,
+        "minimum": 9227,
+        "maximum": 245452
+      },
+      "workspace_bytes": 865440,
+      "reservation_entries": 1464160,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-32-off",
+      "process_wall_ms": {
+        "median": 2479.904582,
+        "minimum": 2355.493569,
+        "maximum": 2532.622134
+      },
+      "f4_call_ms": {
+        "median": 2439.071693,
+        "minimum": 2315.846144,
+        "maximum": 2490.707779
+      },
+      "cpu_seconds": {
+        "median": 3.776085999999985,
+        "minimum": 3.5988230000000065,
+        "maximum": 3.7974020000000017
+      },
+      "rss_mib": {
+        "median": 135.93359375,
+        "minimum": 135.421875,
+        "maximum": 136.44140625
+      },
+      "stock_speedup": 1.3633039507001483,
+      "same_algorithm_speedup": 1.3695024178152029,
+      "efficiency": 0.04279695055672509,
+      "forward_ms": {
+        "median": 92.914005,
+        "minimum": 92.636571,
+        "maximum": 104.138784
+      },
+      "backward_ms": {
+        "median": 2188.736475,
+        "minimum": 2059.235363,
+        "maximum": 2230.434352
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 513,
+        "minimum": 445,
+        "maximum": 553
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2192079,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-32-on",
+      "process_wall_ms": {
+        "median": 3025.298432,
+        "minimum": 2909.7072,
+        "maximum": 3037.092153
+      },
+      "f4_call_ms": {
+        "median": 2987.974467,
+        "minimum": 2871.082642,
+        "maximum": 2994.929357
+      },
+      "cpu_seconds": {
+        "median": 4.318181000000003,
+        "minimum": 4.219097999999999,
+        "maximum": 4.322136000000016
+      },
+      "rss_mib": {
+        "median": 135.84765625,
+        "minimum": 135.47265625,
+        "maximum": 136.02734375
+      },
+      "stock_speedup": 1.1175306469732107,
+      "same_algorithm_speedup": 1.2827698626196227,
+      "efficiency": 0.04008655820686321,
+      "forward_ms": {
+        "median": 97.741283,
+        "minimum": 91.074131,
+        "maximum": 116.129958
+      },
+      "backward_ms": {
+        "median": 2215.620925,
+        "minimum": 2140.712815,
+        "maximum": 2233.582916
+      },
+      "products": {
+        "median": 592695666,
+        "minimum": 583113576,
+        "maximum": 601266708
+      },
+      "retries": {
+        "median": 480,
+        "minimum": 439,
+        "maximum": 519
+      },
+      "retry_products": {
+        "median": 6561941,
+        "minimum": 5365724,
+        "maximum": 7595694
+      },
+      "workspace_bytes": 3750240,
+      "reservation_entries": 2214711,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-4-off",
+      "process_wall_ms": {
+        "median": 2674.19761,
+        "minimum": 2645.913399,
+        "maximum": 2734.371783
+      },
+      "f4_call_ms": {
+        "median": 2639.526868,
+        "minimum": 2610.203961,
+        "maximum": 2697.941191
+      },
+      "cpu_seconds": {
+        "median": 3.518332999999977,
+        "minimum": 3.482702999999958,
+        "maximum": 3.5737000000000094
+      },
+      "rss_mib": {
+        "median": 132.81640625,
+        "minimum": 132.6484375,
+        "maximum": 133.64453125
+      },
+      "stock_speedup": 1.2642535096723835,
+      "same_algorithm_speedup": 1.270001629012001,
+      "efficiency": 0.31750040725300027,
+      "forward_ms": {
+        "median": 465.633452,
+        "minimum": 454.488818,
+        "maximum": 466.384863
+      },
+      "backward_ms": {
+        "median": 2027.729114,
+        "minimum": 1994.380203,
+        "maximum": 2082.047644
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 62,
+        "minimum": 52,
+        "maximum": 74
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1564235,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-4-on",
+      "process_wall_ms": {
+        "median": 3192.580746,
+        "minimum": 3151.659019,
+        "maximum": 3213.387416
+      },
+      "f4_call_ms": {
+        "median": 3158.733124,
+        "minimum": 3115.625739,
+        "maximum": 3180.093691
+      },
+      "cpu_seconds": {
+        "median": 4.035415999999989,
+        "minimum": 4.004237,
+        "maximum": 4.059249000000037
+      },
+      "rss_mib": {
+        "median": 132.91015625,
+        "minimum": 132.828125,
+        "maximum": 133.7578125
+      },
+      "stock_speedup": 1.0589751624092518,
+      "same_algorithm_speedup": 1.215556304679913,
+      "efficiency": 0.30388907616997823,
+      "forward_ms": {
+        "median": 471.305129,
+        "minimum": 468.889156,
+        "maximum": 474.384891
+      },
+      "backward_ms": {
+        "median": 2063.541218,
+        "minimum": 2028.288904,
+        "maximum": 2070.935315
+      },
+      "products": {
+        "median": 602252358,
+        "minimum": 600736921,
+        "maximum": 604266810
+      },
+      "retries": {
+        "median": 59,
+        "minimum": 56,
+        "maximum": 65
+      },
+      "retry_products": {
+        "median": 196876,
+        "minimum": 142425,
+        "maximum": 402862
+      },
+      "workspace_bytes": 1057760,
+      "reservation_entries": 1561303,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-64-off",
+      "process_wall_ms": {
+        "median": 2459.437627,
+        "minimum": 2390.080562,
+        "maximum": 2484.669026
+      },
+      "f4_call_ms": {
+        "median": 2417.132902,
+        "minimum": 2353.09585,
+        "maximum": 2445.255004
+      },
+      "cpu_seconds": {
+        "median": 3.7546469999999523,
+        "minimum": 3.7215289999999968,
+        "maximum": 3.860619999999976
+      },
+      "rss_mib": {
+        "median": 139.98828125,
+        "minimum": 138.40625,
+        "maximum": 140.1328125
+      },
+      "stock_speedup": 1.374649097372698,
+      "same_algorithm_speedup": 1.3808991469089207,
+      "efficiency": 0.021576549170451886,
+      "forward_ms": {
+        "median": 78.453376,
+        "minimum": 74.173619,
+        "maximum": 82.991557
+      },
+      "backward_ms": {
+        "median": 2169.620861,
+        "minimum": 2118.967794,
+        "maximum": 2194.550546
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 388,
+        "minimum": 294,
+        "maximum": 723
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 6827360,
+      "reservation_entries": 2821425,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-64-on",
+      "process_wall_ms": {
+        "median": 2953.971482,
+        "minimum": 2874.852377,
+        "maximum": 3099.794902
+      },
+      "f4_call_ms": {
+        "median": 2912.812696,
+        "minimum": 2835.138809,
+        "maximum": 3060.028484
+      },
+      "cpu_seconds": {
+        "median": 4.322811999999903,
+        "minimum": 4.203324999999992,
+        "maximum": 4.4000240000000055
+      },
+      "rss_mib": {
+        "median": 139.66015625,
+        "minimum": 139.1484375,
+        "maximum": 140.43359375
+      },
+      "stock_speedup": 1.144514676123742,
+      "same_algorithm_speedup": 1.3137437777065175,
+      "efficiency": 0.020527246526664336,
+      "forward_ms": {
+        "median": 79.813389,
+        "minimum": 73.349022,
+        "maximum": 85.040878
+      },
+      "backward_ms": {
+        "median": 2199.884715,
+        "minimum": 2100.974079,
+        "maximum": 2275.526115
+      },
+      "products": {
+        "median": 577246837,
+        "minimum": 560994793,
+        "maximum": 584860302
+      },
+      "retries": {
+        "median": 527,
+        "minimum": 366,
+        "maximum": 628
+      },
+      "retry_products": {
+        "median": 12096368,
+        "minimum": 10028684,
+        "maximum": 12735979
+      },
+      "workspace_bytes": 6827360,
+      "reservation_entries": 2879860,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-8-off",
+      "process_wall_ms": {
+        "median": 2532.727975,
+        "minimum": 2494.564792,
+        "maximum": 2621.075554
+      },
+      "f4_call_ms": {
+        "median": 2494.621869,
+        "minimum": 2454.827908,
+        "maximum": 2581.540884
+      },
+      "cpu_seconds": {
+        "median": 3.657461000000037,
+        "minimum": 3.583300000000028,
+        "maximum": 3.7127829999999946
+      },
+      "rss_mib": {
+        "median": 133.7890625,
+        "minimum": 132.96875,
+        "maximum": 133.80859375
+      },
+      "stock_speedup": 1.3348704430052343,
+      "same_algorithm_speedup": 1.3409396328873415,
+      "efficiency": 0.1676174541109177,
+      "forward_ms": {
+        "median": 251.976244,
+        "minimum": 249.672728,
+        "maximum": 276.238256
+      },
+      "backward_ms": {
+        "median": 2075.957407,
+        "minimum": 2052.503187,
+        "maximum": 2165.940908
+      },
+      "products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "retries": {
+        "median": 173,
+        "minimum": 158,
+        "maximum": 203
+      },
+      "retry_products": {
+        "median": 0,
+        "minimum": 0,
+        "maximum": 0
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1668529,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "static-8-on",
+      "process_wall_ms": {
+        "median": 2977.686024,
+        "minimum": 2961.648568,
+        "maximum": 3042.141053
+      },
+      "f4_call_ms": {
+        "median": 2942.235926,
+        "minimum": 2924.440324,
+        "maximum": 3008.057435
+      },
+      "cpu_seconds": {
+        "median": 4.07762899999998,
+        "minimum": 4.055066000000036,
+        "maximum": 4.143769999999996
+      },
+      "rss_mib": {
+        "median": 133.41796875,
+        "minimum": 133.1796875,
+        "maximum": 133.9765625
+      },
+      "stock_speedup": 1.1353996649580944,
+      "same_algorithm_speedup": 1.3032810117390672,
+      "efficiency": 0.1629101264673834,
+      "forward_ms": {
+        "median": 261.027351,
+        "minimum": 256.105292,
+        "maximum": 284.97056
+      },
+      "backward_ms": {
+        "median": 2059.29092,
+        "minimum": 2049.840453,
+        "maximum": 2128.64977
+      },
+      "products": {
+        "median": 614771241,
+        "minimum": 612158760,
+        "maximum": 621403357
+      },
+      "retries": {
+        "median": 156,
+        "minimum": 144,
+        "maximum": 172
+      },
+      "retry_products": {
+        "median": 1634483,
+        "minimum": 696851,
+        "maximum": 1847325
+      },
+      "workspace_bytes": 1442400,
+      "reservation_entries": 1647007,
+      "fallbacks": 0
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "stock",
+      "process_wall_ms": {
+        "median": 3380.863714,
+        "minimum": 3340.752993,
+        "maximum": 3563.92074
+      },
+      "f4_call_ms": {
+        "median": 3349.60778,
+        "minimum": 3310.066267,
+        "maximum": 3532.903466
+      },
+      "cpu_seconds": {
+        "median": 3.3597869999999723,
+        "minimum": 3.320301000000006,
+        "maximum": 3.5437959999999897
+      },
+      "rss_mib": {
+        "median": 136.28125,
+        "minimum": 136.1484375,
+        "maximum": 136.37890625
+      }
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "work",
+      "process_wall_ms": {
+        "median": 3370.477939,
+        "minimum": 3333.548322,
+        "maximum": 3730.544228
+      },
+      "f4_call_ms": {
+        "median": 3337.660447,
+        "minimum": 3303.575938,
+        "maximum": 3697.763464
+      },
+      "cpu_seconds": {
+        "median": 3.3473950000000006,
+        "minimum": 3.313519000000003,
+        "maximum": 3.704834
+      },
+      "rss_mib": {
+        "median": 137.3046875,
+        "minimum": 137.21875,
+        "maximum": 137.32421875
+      }
+    }
+  ],
+  "scoped_dispatch_us": [
+    {
+      "workers": 1,
+      "median": 42.3555,
+      "minimum": 33.534,
+      "maximum": 176.364
+    },
+    {
+      "workers": 2,
+      "median": 65.7345,
+      "minimum": 59.723,
+      "maximum": 186.403
+    },
+    {
+      "workers": 4,
+      "median": 78.8395,
+      "minimum": 64.583,
+      "maximum": 324.014
+    },
+    {
+      "workers": 8,
+      "median": 127.431,
+      "minimum": 110.79,
+      "maximum": 445.323
+    },
+    {
+      "workers": 16,
+      "median": 299.6425,
+      "minimum": 245.945,
+      "maximum": 739.55
+    },
+    {
+      "workers": 32,
+      "median": 600.1315,
+      "minimum": 554.199,
+      "maximum": 1284.522
+    },
+    {
+      "workers": 64,
+      "median": 1334.2015000000001,
+      "minimum": 1269.112,
+      "maximum": 2079.087
+    }
+  ],
+  "controls": [
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 1,
+      "f4_ms": 1.754823,
+      "f4_min_ms": 1.736458,
+      "f4_max_ms": 1.762728,
+      "serial_speedup": 0.4798911343195297,
+      "process_serial_speedup": 0.9879473992103516,
+      "cpu_seconds": 0.0041239999999999055,
+      "process_wall_ms": 5.152166,
+      "rss_mib": 4.1875
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 2,
+      "f4_ms": 2.090398,
+      "f4_min_ms": 2.057495,
+      "f4_max_ms": 2.110035,
+      "serial_speedup": 0.40285342791181394,
+      "process_serial_speedup": 0.9849519189370404,
+      "cpu_seconds": 0.005087000000000064,
+      "process_wall_ms": 5.167835,
+      "rss_mib": 4.203125
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 4,
+      "f4_ms": 2.468314,
+      "f4_min_ms": 2.44504,
+      "f4_max_ms": 2.552033,
+      "serial_speedup": 0.34117377286682327,
+      "process_serial_speedup": 0.9864742454252635,
+      "cpu_seconds": 0.006346000000000185,
+      "process_wall_ms": 5.15986,
+      "rss_mib": 4.18359375
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 8,
+      "f4_ms": 2.974983,
+      "f4_min_ms": 2.89392,
+      "f4_max_ms": 3.157319,
+      "serial_speedup": 0.2830685082906356,
+      "process_serial_speedup": 0.6960228915954255,
+      "cpu_seconds": 0.008645999999999932,
+      "process_wall_ms": 7.313077,
+      "rss_mib": 4.2890625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 16,
+      "f4_ms": 4.878508,
+      "f4_min_ms": 4.42585,
+      "f4_max_ms": 5.238379,
+      "serial_speedup": 0.1726191696313709,
+      "process_serial_speedup": 0.5381897550994903,
+      "cpu_seconds": 0.013362000000000096,
+      "process_wall_ms": 9.457759,
+      "rss_mib": 4.39453125
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 32,
+      "f4_ms": 7.720469,
+      "f4_min_ms": 7.190114,
+      "f4_max_ms": 8.310266,
+      "serial_speedup": 0.10907679313264518,
+      "process_serial_speedup": 0.43750050496672377,
+      "cpu_seconds": 0.02101799999999987,
+      "process_wall_ms": 11.63443,
+      "rss_mib": 4.4453125
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 64,
+      "f4_ms": 8.555179,
+      "f4_min_ms": 8.234683,
+      "f4_max_ms": 8.818428,
+      "serial_speedup": 0.09843441031450073,
+      "process_serial_speedup": 0.4366642154322763,
+      "cpu_seconds": 0.02223899999999998,
+      "process_wall_ms": 11.656712,
+      "rss_mib": 4.4609375
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "serial",
+      "workers": 1,
+      "f4_ms": 0.842124,
+      "f4_min_ms": 0.827286,
+      "f4_max_ms": 0.850561,
+      "serial_speedup": 1.0,
+      "process_serial_speedup": 1.0,
+      "cpu_seconds": 0.0030839999999999895,
+      "process_wall_ms": 5.090069,
+      "rss_mib": 3.94140625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 1,
+      "f4_ms": 1.744152,
+      "f4_min_ms": 1.726088,
+      "f4_max_ms": 1.80604,
+      "serial_speedup": 0.48282718478664705,
+      "process_serial_speedup": 0.9854618278113693,
+      "cpu_seconds": 0.003974000000000005,
+      "process_wall_ms": 5.165161,
+      "rss_mib": 4.21875
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 2,
+      "f4_ms": 2.227237,
+      "f4_min_ms": 2.082483,
+      "f4_max_ms": 2.285848,
+      "serial_speedup": 0.37810255486955363,
+      "process_serial_speedup": 0.9976886865400684,
+      "cpu_seconds": 0.004906000000000077,
+      "process_wall_ms": 5.101861,
+      "rss_mib": 4.19921875
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 4,
+      "f4_ms": 2.388112,
+      "f4_min_ms": 2.289004,
+      "f4_max_ms": 2.559716,
+      "serial_speedup": 0.35263170236571817,
+      "process_serial_speedup": 0.7016297300609252,
+      "cpu_seconds": 0.0064469999999996475,
+      "process_wall_ms": 7.254637,
+      "rss_mib": 4.25390625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 8,
+      "f4_ms": 3.113646,
+      "f4_min_ms": 2.945418,
+      "f4_max_ms": 3.255976,
+      "serial_speedup": 0.27046234543040537,
+      "process_serial_speedup": 0.6925596562664846,
+      "cpu_seconds": 0.008718999999999921,
+      "process_wall_ms": 7.349647,
+      "rss_mib": 4.27734375
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 16,
+      "f4_ms": 5.089267,
+      "f4_min_ms": 4.625288,
+      "f4_max_ms": 5.326205,
+      "serial_speedup": 0.16547058741465126,
+      "process_serial_speedup": 0.5441991138762371,
+      "cpu_seconds": 0.013271000000000033,
+      "process_wall_ms": 9.353321,
+      "rss_mib": 4.39453125
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 32,
+      "f4_ms": 7.692446,
+      "f4_min_ms": 7.286638,
+      "f4_max_ms": 8.051345,
+      "serial_speedup": 0.10947415165475324,
+      "process_serial_speedup": 0.43560762503267014,
+      "cpu_seconds": 0.02089799999999964,
+      "process_wall_ms": 11.684986,
+      "rss_mib": 4.4609375
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 64,
+      "f4_ms": 8.167025,
+      "f4_min_ms": 7.90545,
+      "f4_max_ms": 8.607869,
+      "serial_speedup": 0.10311270015703392,
+      "process_serial_speedup": 0.4356688834693974,
+      "cpu_seconds": 0.02198800000000034,
+      "process_wall_ms": 11.683343,
+      "rss_mib": 4.5
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 1,
+      "f4_ms": 1.76881,
+      "f4_min_ms": 1.757118,
+      "f4_max_ms": 1.812923,
+      "serial_speedup": 0.5002097455351338,
+      "process_serial_speedup": 1.0158397690167627,
+      "cpu_seconds": 0.0042200000000000015,
+      "process_wall_ms": 5.13284,
+      "rss_mib": 4.125
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 2,
+      "f4_ms": 2.151484,
+      "f4_min_ms": 2.106087,
+      "f4_max_ms": 2.201939,
+      "serial_speedup": 0.41123986978290333,
+      "process_serial_speedup": 1.0041095339068322,
+      "cpu_seconds": 0.005138000000000087,
+      "process_wall_ms": 5.192803,
+      "rss_mib": 4.13671875
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 4,
+      "f4_ms": 2.553926,
+      "f4_min_ms": 2.501677,
+      "f4_max_ms": 2.662412,
+      "serial_speedup": 0.3464376023424328,
+      "process_serial_speedup": 0.7110153631833415,
+      "cpu_seconds": 0.006594999999999962,
+      "process_wall_ms": 7.333376,
+      "rss_mib": 4.1640625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 8,
+      "f4_ms": 3.03693,
+      "f4_min_ms": 2.967789,
+      "f4_max_ms": 3.060305,
+      "serial_speedup": 0.2913389508483897,
+      "process_serial_speedup": 0.7104223899812208,
+      "cpu_seconds": 0.00865500000000008,
+      "process_wall_ms": 7.339497,
+      "rss_mib": 4.16796875
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 16,
+      "f4_ms": 4.756517,
+      "f4_min_ms": 4.546469,
+      "f4_max_ms": 5.039372,
+      "serial_speedup": 0.18601342116510883,
+      "process_serial_speedup": 0.5515574671364756,
+      "cpu_seconds": 0.013456999999999997,
+      "process_wall_ms": 9.45349,
+      "rss_mib": 4.28125
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 32,
+      "f4_ms": 7.567519,
+      "f4_min_ms": 7.368032,
+      "f4_max_ms": 7.814767,
+      "serial_speedup": 0.11691757893174765,
+      "process_serial_speedup": 0.4470492259375752,
+      "cpu_seconds": 0.020349000000000395,
+      "process_wall_ms": 11.663465,
+      "rss_mib": 4.375
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 64,
+      "f4_ms": 7.965683,
+      "f4_min_ms": 7.938122,
+      "f4_max_ms": 8.397,
+      "serial_speedup": 0.11107346350589146,
+      "process_serial_speedup": 0.4401568921284733,
+      "cpu_seconds": 0.021902999999999895,
+      "process_wall_ms": 11.846101,
+      "rss_mib": 4.37890625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "serial",
+      "workers": 1,
+      "f4_ms": 0.884776,
+      "f4_min_ms": 0.867914,
+      "f4_max_ms": 0.909011,
+      "serial_speedup": 1.0,
+      "process_serial_speedup": 1.0,
+      "cpu_seconds": 0.0033199999999997676,
+      "process_wall_ms": 5.214143,
+      "rss_mib": 3.89453125
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 1,
+      "f4_ms": 1.790711,
+      "f4_min_ms": 1.750825,
+      "f4_max_ms": 1.817301,
+      "serial_speedup": 0.49409201149710924,
+      "process_serial_speedup": 1.0133693451158745,
+      "cpu_seconds": 0.004180000000000295,
+      "process_wall_ms": 5.145353,
+      "rss_mib": 4.0390625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 2,
+      "f4_ms": 2.153558,
+      "f4_min_ms": 2.065842,
+      "f4_max_ms": 2.246484,
+      "serial_speedup": 0.410843822177067,
+      "process_serial_speedup": 1.0053976456523626,
+      "cpu_seconds": 0.005118000000000178,
+      "process_wall_ms": 5.18615,
+      "rss_mib": 4.0625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 4,
+      "f4_ms": 2.4507,
+      "f4_min_ms": 2.351262,
+      "f4_max_ms": 2.547324,
+      "serial_speedup": 0.3610299098216836,
+      "process_serial_speedup": 0.7105445655528884,
+      "cpu_seconds": 0.00646100000000005,
+      "process_wall_ms": 7.338235,
+      "rss_mib": 4.12890625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 8,
+      "f4_ms": 3.092887,
+      "f4_min_ms": 2.924207,
+      "f4_max_ms": 3.187716,
+      "serial_speedup": 0.2860680005444751,
+      "process_serial_speedup": 0.7131872000770342,
+      "cpu_seconds": 0.00827599999999995,
+      "process_wall_ms": 7.311044,
+      "rss_mib": 4.24609375
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 16,
+      "f4_ms": 4.949893,
+      "f4_min_ms": 4.613686,
+      "f4_max_ms": 5.134502,
+      "serial_speedup": 0.17874649007564405,
+      "process_serial_speedup": 0.5449154688313034,
+      "cpu_seconds": 0.01400099999999993,
+      "process_wall_ms": 9.568719,
+      "rss_mib": 4.34375
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 32,
+      "f4_ms": 7.497928,
+      "f4_min_ms": 7.405383,
+      "f4_max_ms": 8.679795,
+      "serial_speedup": 0.11800273355519018,
+      "process_serial_speedup": 0.4463230758023944,
+      "cpu_seconds": 0.021394000000000135,
+      "process_wall_ms": 11.682441,
+      "rss_mib": 4.2890625
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 64,
+      "f4_ms": 8.292161,
+      "f4_min_ms": 7.948391,
+      "f4_max_ms": 8.533618,
+      "serial_speedup": 0.106700291998672,
+      "process_serial_speedup": 0.44675639249394444,
+      "cpu_seconds": 0.02215800000000001,
+      "process_wall_ms": 11.67111,
+      "rss_mib": 4.40234375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 1,
+      "f4_ms": 1.910928,
+      "f4_min_ms": 1.891512,
+      "f4_max_ms": 1.93296,
+      "serial_speedup": 0.7779597138144398,
+      "process_serial_speedup": 0.9877832597185771,
+      "cpu_seconds": 0.00451600000000002,
+      "process_wall_ms": 5.177404,
+      "rss_mib": 4.8671875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 2,
+      "f4_ms": 2.023711,
+      "f4_min_ms": 1.966894,
+      "f4_max_ms": 2.121918,
+      "serial_speedup": 0.734603409281266,
+      "process_serial_speedup": 0.9864680081638684,
+      "cpu_seconds": 0.005035000000000012,
+      "process_wall_ms": 5.184307,
+      "rss_mib": 5.015625
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 4,
+      "f4_ms": 2.227198,
+      "f4_min_ms": 2.182282,
+      "f4_max_ms": 2.326806,
+      "serial_speedup": 0.6674866805735278,
+      "process_serial_speedup": 0.9889966296993339,
+      "cpu_seconds": 0.005874000000000157,
+      "process_wall_ms": 5.171052,
+      "rss_mib": 4.92578125
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 8,
+      "f4_ms": 2.495355,
+      "f4_min_ms": 2.398812,
+      "f4_max_ms": 2.83062,
+      "serial_speedup": 0.5957569163505794,
+      "process_serial_speedup": 0.6947607046189744,
+      "cpu_seconds": 0.00720899999999991,
+      "process_wall_ms": 7.361028,
+      "rss_mib": 4.98046875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 16,
+      "f4_ms": 3.555723,
+      "f4_min_ms": 3.486292,
+      "f4_max_ms": 3.714203,
+      "serial_speedup": 0.418093591654918,
+      "process_serial_speedup": 0.6951069819735636,
+      "cpu_seconds": 0.0106409999999999,
+      "process_wall_ms": 7.357361,
+      "rss_mib": 5.16015625
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 32,
+      "f4_ms": 5.58754,
+      "f4_min_ms": 5.362815,
+      "f4_max_ms": 5.70888,
+      "serial_speedup": 0.2660607351356769,
+      "process_serial_speedup": 0.5346852848117644,
+      "cpu_seconds": 0.016020000000000145,
+      "process_wall_ms": 9.564791,
+      "rss_mib": 5.24609375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "dynamic",
+      "workers": 64,
+      "f4_ms": 6.114598,
+      "f4_min_ms": 5.985754,
+      "f4_max_ms": 6.244545,
+      "serial_speedup": 0.24312718513956272,
+      "process_serial_speedup": 0.5377727808677231,
+      "cpu_seconds": 0.016927000000000136,
+      "process_wall_ms": 9.509877,
+      "rss_mib": 5.21875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "serial",
+      "workers": 1,
+      "f4_ms": 1.486625,
+      "f4_min_ms": 1.47838,
+      "f4_max_ms": 1.494771,
+      "serial_speedup": 1.0,
+      "process_serial_speedup": 1.0,
+      "cpu_seconds": 0.0039679999999999715,
+      "process_wall_ms": 5.114153,
+      "rss_mib": 4.6796875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 1,
+      "f4_ms": 1.919795,
+      "f4_min_ms": 1.916198,
+      "f4_max_ms": 1.95442,
+      "serial_speedup": 0.7743665339267994,
+      "process_serial_speedup": 0.9960368113596996,
+      "cpu_seconds": 0.004474999999999785,
+      "process_wall_ms": 5.134502,
+      "rss_mib": 4.9296875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 2,
+      "f4_ms": 2.265399,
+      "f4_min_ms": 2.016378,
+      "f4_max_ms": 2.295657,
+      "serial_speedup": 0.656230977412809,
+      "process_serial_speedup": 0.9881542896670055,
+      "cpu_seconds": 0.00504300000000002,
+      "process_wall_ms": 5.17546,
+      "rss_mib": 4.9609375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 4,
+      "f4_ms": 2.294064,
+      "f4_min_ms": 2.172463,
+      "f4_max_ms": 2.38704,
+      "serial_speedup": 0.6480311796009178,
+      "process_serial_speedup": 0.7104796080114807,
+      "cpu_seconds": 0.005813000000000068,
+      "process_wall_ms": 7.19817,
+      "rss_mib": 5.01171875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 8,
+      "f4_ms": 2.580366,
+      "f4_min_ms": 2.549247,
+      "f4_max_ms": 2.707257,
+      "serial_speedup": 0.5761295103097778,
+      "process_serial_speedup": 0.6984453432338253,
+      "cpu_seconds": 0.0072429999999999994,
+      "process_wall_ms": 7.322195,
+      "rss_mib": 5.0078125
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 16,
+      "f4_ms": 3.626367,
+      "f4_min_ms": 3.468678,
+      "f4_max_ms": 3.891008,
+      "serial_speedup": 0.40994885514896867,
+      "process_serial_speedup": 0.6974910576111196,
+      "cpu_seconds": 0.010227000000000208,
+      "process_wall_ms": 7.332213,
+      "rss_mib": 5.1796875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 32,
+      "f4_ms": 5.39194,
+      "f4_min_ms": 5.305797,
+      "f4_max_ms": 5.627075,
+      "serial_speedup": 0.2757124522898994,
+      "process_serial_speedup": 0.5416773510757545,
+      "cpu_seconds": 0.015036999999999856,
+      "process_wall_ms": 9.441327,
+      "rss_mib": 5.125
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "schedule": "static",
+      "workers": 64,
+      "f4_ms": 6.225118,
+      "f4_min_ms": 6.156147,
+      "f4_max_ms": 6.544111,
+      "serial_speedup": 0.23881073419009888,
+      "process_serial_speedup": 0.5365545999839689,
+      "cpu_seconds": 0.01718799999999998,
+      "process_wall_ms": 9.531468,
+      "rss_mib": 5.15234375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 1,
+      "f4_ms": 1.942217,
+      "f4_min_ms": 1.918493,
+      "f4_max_ms": 1.98071,
+      "serial_speedup": 0.7861639559328335,
+      "process_serial_speedup": 0.9896304138775449,
+      "cpu_seconds": 0.0042280000000001206,
+      "process_wall_ms": 5.221327,
+      "rss_mib": 4.6484375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 2,
+      "f4_ms": 2.120365,
+      "f4_min_ms": 1.990099,
+      "f4_max_ms": 2.197201,
+      "serial_speedup": 0.720112339149156,
+      "process_serial_speedup": 1.0064418163144506,
+      "cpu_seconds": 0.004885999999999946,
+      "process_wall_ms": 5.134111,
+      "rss_mib": 4.68359375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 4,
+      "f4_ms": 2.251593,
+      "f4_min_ms": 2.04361,
+      "f4_max_ms": 2.33978,
+      "serial_speedup": 0.6781425417471098,
+      "process_serial_speedup": 0.7137489367356686,
+      "cpu_seconds": 0.005975000000000008,
+      "process_wall_ms": 7.239498,
+      "rss_mib": 4.7109375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 8,
+      "f4_ms": 2.573383,
+      "f4_min_ms": 2.487851,
+      "f4_max_ms": 2.621013,
+      "serial_speedup": 0.5933438590369176,
+      "process_serial_speedup": 0.7040174571582415,
+      "cpu_seconds": 0.007541999999999993,
+      "process_wall_ms": 7.339568,
+      "rss_mib": 4.734375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 16,
+      "f4_ms": 3.567726,
+      "f4_min_ms": 3.327772,
+      "f4_max_ms": 3.79728,
+      "serial_speedup": 0.4279759712489132,
+      "process_serial_speedup": 0.7050801350234277,
+      "cpu_seconds": 0.010950000000000237,
+      "process_wall_ms": 7.328506,
+      "rss_mib": 4.8359375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 32,
+      "f4_ms": 5.657402,
+      "f4_min_ms": 5.452985,
+      "f4_max_ms": 5.774634,
+      "serial_speedup": 0.26989437908071584,
+      "process_serial_speedup": 0.5424553571569171,
+      "cpu_seconds": 0.016666999999999932,
+      "process_wall_ms": 9.525547,
+      "rss_mib": 4.96875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "dynamic",
+      "workers": 64,
+      "f4_ms": 6.581101,
+      "f4_min_ms": 6.296552,
+      "f4_max_ms": 7.169285,
+      "serial_speedup": 0.23201300207974318,
+      "process_serial_speedup": 0.44811806653696246,
+      "cpu_seconds": 0.01771600000000001,
+      "process_wall_ms": 11.530854,
+      "rss_mib": 5.01171875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "serial",
+      "workers": 1,
+      "f4_ms": 1.526901,
+      "f4_min_ms": 1.522303,
+      "f4_max_ms": 1.530838,
+      "serial_speedup": 1.0,
+      "process_serial_speedup": 1.0,
+      "cpu_seconds": 0.004041999999999879,
+      "process_wall_ms": 5.167184,
+      "rss_mib": 4.47265625
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 1,
+      "f4_ms": 1.968498,
+      "f4_min_ms": 1.820187,
+      "f4_max_ms": 2.040554,
+      "serial_speedup": 0.775668047414831,
+      "process_serial_speedup": 1.0017947132636813,
+      "cpu_seconds": 0.004369999999999985,
+      "process_wall_ms": 5.157927,
+      "rss_mib": 4.640625
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 2,
+      "f4_ms": 2.067195,
+      "f4_min_ms": 2.045744,
+      "f4_max_ms": 2.352855,
+      "serial_speedup": 0.738634236247669,
+      "process_serial_speedup": 1.000438341736174,
+      "cpu_seconds": 0.004848999999999881,
+      "process_wall_ms": 5.16492,
+      "rss_mib": 4.67578125
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 4,
+      "f4_ms": 2.313671,
+      "f4_min_ms": 2.243318,
+      "f4_max_ms": 2.387741,
+      "serial_speedup": 0.6599473304545028,
+      "process_serial_speedup": 0.9785223229410148,
+      "cpu_seconds": 0.005890000000000062,
+      "process_wall_ms": 5.280599,
+      "rss_mib": 4.69921875
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 8,
+      "f4_ms": 2.586007,
+      "f4_min_ms": 2.457182,
+      "f4_max_ms": 2.856058,
+      "serial_speedup": 0.5904473576444302,
+      "process_serial_speedup": 0.699845597915301,
+      "cpu_seconds": 0.007278999999999813,
+      "process_wall_ms": 7.38332,
+      "rss_mib": 4.75390625
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 16,
+      "f4_ms": 3.688834,
+      "f4_min_ms": 3.489288,
+      "f4_max_ms": 3.924932,
+      "serial_speedup": 0.4139251047892098,
+      "process_serial_speedup": 0.7046812791112195,
+      "cpu_seconds": 0.01068099999999994,
+      "process_wall_ms": 7.332654,
+      "rss_mib": 4.83984375
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 32,
+      "f4_ms": 5.390968,
+      "f4_min_ms": 5.280889,
+      "f4_max_ms": 5.526826,
+      "serial_speedup": 0.28323317816021165,
+      "process_serial_speedup": 0.5435358615178427,
+      "cpu_seconds": 0.015628000000000197,
+      "process_wall_ms": 9.506611,
+      "rss_mib": 4.92578125
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "schedule": "static",
+      "workers": 64,
+      "f4_ms": 6.330146,
+      "f4_min_ms": 6.053282,
+      "f4_max_ms": 6.505819,
+      "serial_speedup": 0.24121102420070564,
+      "process_serial_speedup": 0.542325889623661,
+      "cpu_seconds": 0.017067000000000054,
+      "process_wall_ms": 9.527821,
+      "rss_mib": 4.921875
+    }
+  ],
+  "probes": [
+    {
+      "problem": "mq-random-14",
+      "modulus": 32003,
+      "digest": "4e440cfac84262260736a2368f43c7a96181986ca5bc108517299520d56f8795",
+      "schedule": "serial",
+      "workers": 1,
+      "status": "incomplete-unverified",
+      "exit": 101,
+      "stop": null,
+      "process_wall_ns": 31720476762,
+      "observed_peak_rss_bytes": 802467840,
+      "stderr": "\nthread 'main' (988430) panicked at examples/mq10_profile.rs:239:51:\nMQ10 fits the shipped budget: TooManyNonzeros { nonzeros: 32000887, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    },
+    {
+      "problem": "mq-random-14",
+      "modulus": 32003,
+      "digest": "4e440cfac84262260736a2368f43c7a96181986ca5bc108517299520d56f8795",
+      "schedule": "dynamic",
+      "workers": 4,
+      "status": "incomplete-unverified",
+      "exit": 101,
+      "stop": null,
+      "process_wall_ns": 21527658793,
+      "observed_peak_rss_bytes": 805654528,
+      "stderr": "\nthread 'main' (988544) panicked at examples/mq10_profile.rs:237:18:\nbounded concurrent MQ10: TooManyNonzeros { nonzeros: 32000015, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    },
+    {
+      "problem": "mq-random-14",
+      "modulus": 2147483647,
+      "digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "schedule": "serial",
+      "workers": 1,
+      "status": "incomplete-unverified",
+      "exit": 101,
+      "stop": null,
+      "process_wall_ns": 31549527805,
+      "observed_peak_rss_bytes": 805179392,
+      "stderr": "\nthread 'main' (988678) panicked at examples/mq10_profile.rs:239:51:\nMQ10 fits the shipped budget: TooManyNonzeros { nonzeros: 32001899, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    },
+    {
+      "problem": "mq-random-14",
+      "modulus": 2147483647,
+      "digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "schedule": "dynamic",
+      "workers": 4,
+      "status": "incomplete-unverified",
+      "exit": 101,
+      "stop": null,
+      "process_wall_ns": 22641096319,
+      "observed_peak_rss_bytes": 809717760,
+      "stderr": "\nthread 'main' (988798) panicked at examples/mq10_profile.rs:237:18:\nbounded concurrent MQ10: TooManyNonzeros { nonzeros: 32000129, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    }
+  ]
+}

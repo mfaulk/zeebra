@@ -1,0 +1,220 @@
+{
+  "base_commit": "e22b9b58cd29fd074a4234593d8790303a99c5f5",
+  "sources": {
+    "census": {
+      "commit": "65a0269951896c6e96b271aa848fa7e5bbb9946e",
+      "patch": "census.patch.gz",
+      "patch_sha256": "e8b23678669c776d4c96f257c4c0cf7e333095dcc6baecbfc5521e9a72f71b79",
+      "source_archive_sha256": "21c215df84921144b768254dc2dea1013c556c5f716a0f88f533154608ae3b5c"
+    },
+    "prototype": {
+      "commit": "cf92a3cb64aaa56346b68c19b8db5dc99f5ae383",
+      "patch": "prototype.patch.gz",
+      "patch_sha256": "76b273b579a044a3e0b30d848eadf406182f4afa1464795a5d1872e33f93e5bb",
+      "source_archive_sha256": "30c6447f833f4ff03cb580d3d07929595122818513f28bfb1d72abc9aee7c8f8"
+    },
+    "runner": {
+      "commit": "1e16ac906765bab2d2eda274d4c42cf847837df5",
+      "patch": "runner.patch.gz",
+      "patch_sha256": "e076afe87f0ce4170b4d6efccbb18cd3d0b9f92ee2165f3cd43f5f21e53559e7"
+    }
+  },
+  "build_recipe": "env RUSTC_WRAPPER= CARGO_TARGET_DIR=<private /buildcache path> TMPDIR=<private /buildcache path> cargo build --release [--features research-work] --example mq10_profile; RUSTFLAGS unset",
+  "build_fingerprints": {
+    "stock": {
+      ".fingerprint/zeebra-f04002f405f455df/example-mq10_profile.json": {
+        "rustc": 11835527281324007204,
+        "features": "[\"default\", \"external-runners\"]",
+        "declared_features": "[\"default\", \"external-runners\", \"proptest\", \"research-work\"]",
+        "target": 7079525145864670293,
+        "profile": 11826027486216815164,
+        "path": 6126358326292895858,
+        "deps": [
+          [
+            65234016722529558,
+            "bincode",
+            false,
+            14483144590401758667
+          ],
+          [
+            368492036915771276,
+            "proptest",
+            false,
+            3719956546900411177
+          ],
+          [
+            720731745621185994,
+            "criterion",
+            false,
+            17509495912818992970
+          ],
+          [
+            5792757459284085107,
+            "ark_ff",
+            false,
+            3417259965369347763
+          ],
+          [
+            6557439603276904804,
+            "serde",
+            false,
+            9347811305899035471
+          ],
+          [
+            9045754397332874331,
+            "lazy_static",
+            false,
+            11289331787133401225
+          ],
+          [
+            11784517437581582528,
+            "pest_derive",
+            false,
+            1509375090198798870
+          ],
+          [
+            13208667028893622512,
+            "rand",
+            false,
+            5027888373261105486
+          ],
+          [
+            15269564664536803040,
+            "pest",
+            false,
+            2569759663240866386
+          ],
+          [
+            16728356305607762645,
+            "serde_arrays",
+            false,
+            13491671786606273003
+          ],
+          [
+            18283066100005974038,
+            "zeebra",
+            false,
+            16657815951118449274
+          ]
+        ],
+        "local": [
+          {
+            "CheckDepInfo": {
+              "dep_info": "release/.fingerprint/zeebra-f04002f405f455df/dep-example-mq10_profile",
+              "checksum": false
+            }
+          }
+        ],
+        "rustflags": [
+          "-C",
+          "link-arg=-fuse-ld=mold",
+          "-C",
+          "target-cpu=x86-64-v3"
+        ],
+        "config": 9396254390672932401,
+        "compile_kind": 0
+      },
+      "binary_sha256": "2564b8fbf766416949f001a41c4ef871d79a9a4a5bbe1e801deca34778adfb4f"
+    },
+    "observed": {
+      ".fingerprint/zeebra-62245349142b1e3d/example-mq10_profile.json": {
+        "rustc": 11835527281324007204,
+        "features": "[\"default\", \"external-runners\", \"research-work\"]",
+        "declared_features": "[\"default\", \"external-runners\", \"proptest\", \"research-work\"]",
+        "target": 7079525145864670293,
+        "profile": 11826027486216815164,
+        "path": 6126358326292895858,
+        "deps": [
+          [
+            65234016722529558,
+            "bincode",
+            false,
+            14483144590401758667
+          ],
+          [
+            368492036915771276,
+            "proptest",
+            false,
+            3719956546900411177
+          ],
+          [
+            720731745621185994,
+            "criterion",
+            false,
+            17509495912818992970
+          ],
+          [
+            5792757459284085107,
+            "ark_ff",
+            false,
+            3417259965369347763
+          ],
+          [
+            6557439603276904804,
+            "serde",
+            false,
+            9347811305899035471
+          ],
+          [
+            9045754397332874331,
+            "lazy_static",
+            false,
+            11289331787133401225
+          ],
+          [
+            11784517437581582528,
+            "pest_derive",
+            false,
+            1509375090198798870
+          ],
+          [
+            13208667028893622512,
+            "rand",
+            false,
+            5027888373261105486
+          ],
+          [
+            15269564664536803040,
+            "pest",
+            false,
+            2569759663240866386
+          ],
+          [
+            16728356305607762645,
+            "serde_arrays",
+            false,
+            13491671786606273003
+          ],
+          [
+            18283066100005974038,
+            "zeebra",
+            false,
+            13210012792000994271
+          ]
+        ],
+        "local": [
+          {
+            "CheckDepInfo": {
+              "dep_info": "release/.fingerprint/zeebra-62245349142b1e3d/dep-example-mq10_profile",
+              "checksum": false
+            }
+          }
+        ],
+        "rustflags": [
+          "-C",
+          "link-arg=-fuse-ld=mold",
+          "-C",
+          "target-cpu=x86-64-v3"
+        ],
+        "config": 9396254390672932401,
+        "compile_kind": 0
+      },
+      "binary_sha256": "2f631fe3a1a4fa565ce8260d46ce0c0df21a023b62757014098e0ae5c69d0d1a"
+    }
+  },
+  "compiler": {
+    "version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+    "path": "/buildcache/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc",
+    "sha256": "b53b780f77f952062f8ca8a3b70aef2390b1e45ad91939be94afdc9543026853"
+  }
+}

@@ -91,6 +91,9 @@ jobs:
           python3 tools/test/msolve-count-test.py
           python3 tools/test/grobx-trajectory-test.py
           python3 tools/test/grobx-work-study-test.py
+          python3 tools/test/pivot-discovery-study-test.py
+          python3 research/concurrent-pivots/summarize.py
+          git diff --exit-code -- research/concurrent-pivots/summary.json research/concurrent-pivots/matrix-census.csv research/concurrent-pivots/parallel.csv research/concurrent-pivots/matrix-scaling.csv research/concurrent-pivots/dispatch.csv research/concurrent-pivots/controls.csv
           python3 tools/test/grobx-randomization-test.py
           python3 tools/external/grobx-driver/research/randomization/test_policy.py
           python3 tools/test/proof-artifacts-test.py
@@ -99,6 +102,7 @@ jobs:
           python3 research/grobx-trajectory/summarize.py
           git diff --exit-code -- research/grobx-trajectory/summary.json research/grobx-trajectory/summary.csv research/grobx-trajectory/summary-rounds.csv
           cargo test --features research-work --lib linalg::work
+          cargo test --features research-work --lib linalg::concurrent
           cargo test --features research-work --example mq10_profile
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks
