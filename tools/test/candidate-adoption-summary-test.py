@@ -23,7 +23,7 @@ def fixture():
                work=dict(batches=[dict(forward=dict(coefficient_products=2),backward=dict(coefficient_products=1))]))
     attempt = dict(repeat=0, problem='mq-random-10',modulus=13,arm='production',status='verified',
                    exit=0,stop=None,raw=raw,process_wall_ns=20,observed_peak_rss_bytes=100,cpu_seconds=1)
-    cohort = dict(identity=dict(compiler_gate=True,baseline_commit='a',build_commit='b'),attempts=[attempt])
+    cohort = dict(identity=dict(phase='adoption',compiler_gate=True,baseline_commit='a',build_commit='b',binaries={name:dict(sha256='a'*64) for name in ('stock','binary','production')}),attempts=[attempt])
     return dict(adoption=cohort), {('mq-random-10',13):ref}
 
 
@@ -42,6 +42,8 @@ class AdoptionSummary(unittest.TestCase):
         broken=copy.deepcopy(cohorts);broken['adoption']['attempts'][0]['raw']['basis']=['x+1']
         with self.assertRaises(ValueError):self.run_summary(broken,refs)
         broken=copy.deepcopy(cohorts);broken['adoption']['identity'].pop('baseline_commit')
+        with self.assertRaises(ValueError):self.run_summary(broken,refs)
+        broken=copy.deepcopy(cohorts);broken['adoption']['identity']['binaries']['production']['sha256']='short'
         with self.assertRaises(ValueError):self.run_summary(broken,refs)
         broken=copy.deepcopy(cohorts);broken['adoption']['attempts']*=2
         with self.assertRaises(ValueError):self.run_summary(broken,refs)

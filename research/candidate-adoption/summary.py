@@ -24,9 +24,13 @@ def summarize(cohorts, refs):
     result = dict(source={phase: c['identity'] for phase, c in cohorts.items()}, rows=[])
     for phase, cohort in cohorts.items():
         identity = cohort['identity']
-        if (not identity.get('compiler_gate') or not identity.get('baseline_commit')
+        if (identity.get('phase') != phase or not identity.get('compiler_gate') or not identity.get('baseline_commit')
                 or not identity.get('build_commit') or 'refusal' in cohort):
             raise ValueError('incomplete provenance or refused campaign')
+        for name in ('stock','binary','production'):
+            digest=identity.get('binaries',{}).get(name,{}).get('sha256','')
+            if len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):
+                raise ValueError('missing executable identity')
         attempts = cohort['attempts']
         if [(a['repeat'], a['problem'], a['modulus'], a['arm']) for a in attempts] != list(study.plan(phase)):
             raise ValueError('incomplete, reordered or duplicate cells')
@@ -71,6 +75,11 @@ def summarize(cohorts, refs):
                 row['work'] = {direction: sum(b[direction]['coefficient_products'] for b in raws[0]['work']['batches'])
                                for direction in ('forward', 'backward')}
             result['rows'].append(row)
+    work_rows=[r for r in result['rows'] if r['phase']=='adoption-work']
+    for row in work_rows:
+        other=next(r for r in work_rows if r['problem']==row['problem'] and r['modulus']==row['modulus'] and r['arm']!=row['arm'])
+        if row['work']['forward'] != other['work']['forward']:
+            raise ValueError('forward work changed across backward policies')
     return result
 
 
