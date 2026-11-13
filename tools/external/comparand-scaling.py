@@ -30,6 +30,25 @@ def interrupt(signum, _frame):
 
 
 def kill_group(process):
+    pending=[process.pid];seen=set();groups=set()
+    while pending:
+        pid=pending.pop()
+        if pid in seen:continue
+        seen.add(pid)
+        try:
+            pending.extend(int(p) for p in Path(f'/proc/{pid}/task/{pid}/children').read_text().split())
+            groups.add(os.getpgid(pid))
+        except (FileNotFoundError,ProcessLookupError):
+            pass
+    # Adapter supervisors may give their native solver a separate process group.
+    # Kill those leaves first while the wrapper can still wait/reap its own children.
+    for group in groups & seen - {process.pid,os.getpgrp()}:
+        try:os.killpg(group,signal.SIGKILL)
+        except ProcessLookupError:pass
+    if len(groups)>1:
+        until=time.monotonic()+.2
+        while time.monotonic()<until and any(Path(f'/proc/{pid}').exists() for pid in seen if pid!=process.pid):
+            time.sleep(.005)
     try:
         os.killpg(process.pid,signal.SIGKILL)
     except ProcessLookupError:
@@ -98,6 +117,21 @@ def msolve_basis(text, case):
     return wide.grobx_work.basis_list(text[start:].strip())
 
 
+def singular_basis(text,case):
+    if not re.search(r'^@done\s*$',text,re.M) or re.search(r'^\s*\?',text,re.M):
+        raise ValueError('Singular did not complete')
+    echoed=re.findall(r'^@gen (.*)$',text,re.M)
+    if len(echoed)!=len(case['generators']):
+        raise ValueError('Singular generator count changed')
+    for original,actual in zip(case['generators'],echoed):
+        verify_basis([actual],[original],case)
+    basis=re.findall(r'^@gb (.*)$',text,re.M)
+    count=re.search(r'^@gbsize (\d+)$',text,re.M)
+    if not count or len(basis)!=int(count[1]):
+        raise ValueError('Singular basis is truncated')
+    return basis
+
+
 def julia_script(case, workers, diagnostic=False):
     variables = case['variables']
     # The provisioned 0.10.11 uses tasks and a global threading switch, not threaded=:yes.
@@ -146,6 +180,7 @@ def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
     environment=dict(os.environ, GROEBNER_NO_THREADED='0', OPENBLAS_NUM_THREADS='1', OMP_DYNAMIC='FALSE')
     environment.pop('ZEEBRA_RESEARCH_THREAD_TICKS',None)
+    environment['ZEEBRA_AFFINITY']=','.join(map(str,cpus))
     with stem.with_suffix('.stdout').open('w') as out, stem.with_suffix('.stderr').open('w') as err:
         process = subprocess.Popen(['taskset', '-c', ','.join(map(str, cpus)), '/usr/bin/time',
                                    '-o', str(stem.with_suffix('.usage')), '-f', '%U %S %M', *command],
@@ -263,6 +298,11 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
         stem.with_suffix('.jl').write_text(julia_script(case, workers, diagnostic))
         command = [binaries[engine]['path'],'--startup-file=no','--history-file=no',f'-t{workers}',
                    '--heap-size-hint=2147483648',str(stem.with_suffix('.jl'))]
+    elif engine=='singular':
+        adapter=stem.with_suffix('.adapter');adapter.mkdir()
+        command=['env','TMPDIR='+str(adapter),binaries[engine]['wrapper'],'--engines','singular',
+                 '--measure','--row',case['name'],'--task','reduced-grobner-basis','--characteristic',str(case['modulus']),
+                 '--workers','1','--wall',str(wall),'--rss-mib','2048']
     else:
         raise ValueError('unknown engine')
     busy=active_compilers()
@@ -304,6 +344,13 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
                            concurrency_boundary='whole process CPU/wall; no kernel thread-participation claim')
             # Independent native-process CPU exceeding wall proves concurrent CPU use; no JIT here.
             attempt['observed_cpu_parallelism'] = attempt['process_cpu_ns']/attempt['process_wall_ns']
+        elif engine=='singular':
+            files={str(p.relative_to(stem.with_suffix('.adapter'))):p.read_text()
+                   for p in stem.with_suffix('.adapter').rglob('*') if p.is_file()}
+            reports=[text for text in files.values() if re.search(r'^@gbsize ',text,re.M)]
+            if len(reports)!=1:raise ValueError('Singular adapter did not retain one complete answer')
+            attempt.update(adapter_artifacts=files,basis=singular_basis(reports[0],case),
+                           verification='independent Singular std/redSB through existing adapter')
         else:
             output = attempt['stdout']
             if '@done 1' not in output or 'ERROR:' in output:
@@ -370,6 +417,10 @@ def validate_cohort(cohort):
             actual=certified_basis(raw,case,request)
         elif a['engine']=='msolve':
             actual=msolve_basis(a['basis_output'],case)
+        elif a['engine']=='singular':
+            outputs=[t for t in a['adapter_artifacts'].values() if re.search(r'^@gbsize ',t,re.M)]
+            if len(outputs)!=1:raise ValueError('Singular reference output absent')
+            actual=singular_basis(outputs[0],case)
         elif a['engine'] in ('grobx','groebner-rs'):
             request=dict(variables=case['variables'],modulus=int(case['modulus']),order='grevlex',
                          workers=a['workers'],generators=case['generators'])
@@ -387,7 +438,7 @@ def validate_cohort(cohort):
         else:
             raise ValueError('unrecognized verified engine')
         verify_basis(a['basis'],actual,case)
-        if a['engine']!='grobx-certified':
+        if a['engine'] not in ('grobx-certified','singular'):
             ref=cohort['references'].get(a['digest'])
             if not ref:
                 raise ValueError('verified status lacks an independent exact reference')
@@ -493,7 +544,8 @@ def main():
     parser.add_argument('--rows',default='katsura-4,mq-random-10,katsura-11,cyclic-7,cyclic-10,katsura-9')
     parser.add_argument('--engines',default='msolve,groebner.jl,groebner-rs,grobx,zeebra')
     parser.add_argument('--fields',default='32003,2147483647,wide64,goldilocks')
-    parser.add_argument('--references',type=Path,help='previous exact-reference cohort; hashes and full evidence retained')
+    parser.add_argument('--references',type=Path,nargs='*',default=[],help='previous exact-reference cohort; hashes and full evidence retained')
+    parser.add_argument('--reference-only',action='store_true',help='record independent Singular references through existing adapter')
     parser.add_argument('--certify',action='store_true',help='one bounded independent grobx exact/cofactor reference per input')
     parser.add_argument('--workers',default='1,2,4,8,16,32')
     parser.add_argument('--repeats',type=int,default=3)
@@ -527,19 +579,28 @@ def main():
         engines=['grobx']
         workers=[1]
         args.repeats=1
-    binaries={engine:dict(path=shutil.which({'groebner.jl':'julia','groebner-rs':os.environ.get('ZEEBRA_GROEBNER_RS_DRIVER','groebner-rs-driver'),'grobx':'grobx-driver'}.get(engine,engine))) for engine in engines if engine!='zeebra'}
+    binaries={engine:dict(path=shutil.which({'groebner.jl':'julia','groebner-rs':os.environ.get('ZEEBRA_GROEBNER_RS_DRIVER','groebner-rs-driver'),'grobx':'grobx-driver','singular':'Singular'}.get(engine,engine))) for engine in engines if engine!='zeebra'}
     for engine,b in binaries.items():
         if not b['path']:parser.error('unprovisioned '+engine)
         b['sha256']=hashlib.sha256(Path(b['path']).read_bytes()).hexdigest()
+        if engine=='singular':b['wrapper']=str(args.binary)
     cases=load_cases(args.binary);refs=reference_bases(cases)
-    if args.references:
-        previous=wide.load(args.references)
+    for archive in args.references:
+        previous=wide.load(archive)
         previous_cases={c['digest']:canonical_case(c) for c in previous['cases']}
+        archive_hash=hashlib.sha256(archive.read_bytes()).hexdigest()
         for a in previous['attempts']:
             if a['engine']=='grobx-certified' and a['status'] in ('verified','excluded-environment-overlap'):
                 ref=certificate_reference(a,previous_cases[a['digest']],previous['policy']['wall'])
-                ref.update(provenance=str(args.references),archive_sha256=hashlib.sha256(args.references.read_bytes()).hexdigest())
-                refs[a['digest']]=ref
+            elif a['engine']=='singular' and a['status']=='verified' and not a.get('stop') and not a.get('exit'):
+                outputs=[t for t in a['adapter_artifacts'].values() if re.search(r'^@gbsize ',t,re.M)]
+                if len(outputs)!=1:raise ValueError('Singular reference output absent')
+                ref=dict(basis=singular_basis(outputs[0],previous_cases[a['digest']]),timing_eligible=False,
+                         verification='independent Singular std/redSB through existing adapter')
+            else:
+                continue
+            ref.update(provenance=str(archive),archive_sha256=archive_hash)
+            refs[a['digest']]=ref
     started=time.monotonic()
     cohort=dict(schema=1,issue=739,commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         started_at=datetime.now(timezone.utc).isoformat(),machine=os.environ.get('ZEEBRA_MACHINE'),
@@ -550,7 +611,7 @@ def main():
         effective_environment=dict(GROEBNER_NO_THREADED='0',OPENBLAS_NUM_THREADS='1',OMP_DYNAMIC='FALSE',
                                    ZEEBRA_RESEARCH_THREAD_TICKS='removed from timing arms; explicitly enabled only in diagnostics'))
     if args.references:
-        cohort['policy']['references']=str(args.references)
+        cohort['policy']['references']=[str(p) for p in args.references]
     for engine,b in binaries.items():
         if engine in ('groebner-rs','grobx'):
             b['version']=json.loads(subprocess.check_output([b['path'],'--version'],text=True))
@@ -572,6 +633,7 @@ def main():
     if makefile.exists():
         cohort['msolve_build']=dict(path=str(makefile),sha256=hashlib.sha256(makefile.read_bytes()).hexdigest(),
             flags=[line for line in makefile.read_text().splitlines() if re.match(r'^(CC|CFLAGS|SIMD_FLAGS|CPUEXT_FLAGS|OPENMP_CFLAGS|libneogb_la_CFLAGS) =',line)])
+    cohort['policy']['references']=[str(p) for p in args.references]
     args.scratch.mkdir(parents=True,exist_ok=True)
     # Worker order alternates between repetitions; timed arms exclude hot snapshot diagnostics.
     stopped={}
@@ -601,9 +663,9 @@ def main():
                                stderr=stem.with_suffix('.stderr').read_text() if stem.with_suffix('.stderr').exists() else '')
                     a.update(field=case['field'],name=case['name'],digest=case['digest'],engine=actual_engine,workers=p,repeat=repeat,diagnostic=args.diagnostic)
                     if a['status']=='complete':
-                        if args.certify:
+                        if args.certify or (args.reference_only and engine=='singular'):
                             a['status']='verified'
-                            a['verification']='independent exact grobx-checker/cofactor certificate retained'
+                            if args.certify:a['verification']='independent exact grobx-checker/cofactor certificate retained'
                         elif case['digest'] in refs:
                             checking=time.monotonic_ns()
                             try:

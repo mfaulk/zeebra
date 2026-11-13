@@ -5,6 +5,8 @@ import hashlib
 import tempfile
 import sys
 import os
+import subprocess
+import time
 from unittest import mock
 
 spec = importlib.util.spec_from_file_location('scaling', Path(__file__).parents[1] / 'external/comparand-scaling.py')
@@ -13,6 +15,25 @@ spec.loader.exec_module(scaling)
 
 
 class ComparandScalingTests(unittest.TestCase):
+    # Independent Singular references require complete output and exact ordered generator echoes.
+    def test_singular_reference_checks_full_echo_and_completion(self):
+        case=dict(modulus=13,variables=['x1'],generators=['x1+1'])
+        text='@gensize 1\n@gen x1+1\n@gbsize 1\n@gb x1+1\n@lead x1\n@done\n'
+        self.assertEqual(scaling.singular_basis(text,case),['x1+1'])
+        for bad in [text.replace('@done','missing'),text.replace('@gen x1+1','@gen x1+2')]:
+            with self.assertRaises(ValueError):scaling.singular_basis(bad,case)
+    # Cancelling a wrapper also kills a detached solver group and lets the wrapper reap it.
+    def test_guard_cleans_detached_adapter_solver(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stem=Path(directory)/'run';leaf=Path(directory)/'leaf';reaped=Path(directory)/'reaped'
+            code=('import subprocess,sys,time;from pathlib import Path;'
+                  'p=subprocess.Popen([sys.executable,"-c","import time;time.sleep(30)"],start_new_session=True);'
+                  'Path('+repr(str(leaf))+').write_text(str(p.pid));p.wait();'
+                  'Path('+repr(str(reaped))+').write_text("reaped");time.sleep(30)')
+            a=scaling.guarded([sys.executable,'-c',code],stem,sorted(os.sched_getaffinity(0))[:1],wall=.15)
+            self.assertIsNotNone(a['stop'])
+            self.assertTrue(reaped.exists(),'adapter must reap its separately grouped solver')
+            with self.assertRaises(ProcessLookupError):os.kill(int(leaf.read_text()),0)
     # A certified answer with excluded timings supplies only mathematics and never clocks or RSS.
     def test_excluded_certificate_reference_cannot_promote_timings(self):
         case=dict(modulus=13,variables=['x1'],generators=['x1+1'])
