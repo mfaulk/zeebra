@@ -301,7 +301,7 @@ mod tests {
             .iter()
             .find(|row| {
                 matches!(row.kind, RowKind::Reducer)
-                    && basis.element(row.basis_index).leading_monomial * &row.multiplier == square
+                    && basis.element(row.basis_index).leading_monomial * row.multiplier == square
             })
             .unwrap();
         assert_eq!(row.basis_index, 3);

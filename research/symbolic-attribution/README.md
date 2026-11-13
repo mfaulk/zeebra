@@ -11,6 +11,7 @@ Build and run from the repository root:
 ```sh
 export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-742 RUSTC_WRAPPER=""
 cargo test --features research-work --example symbolic_attribution
+cargo clippy --features research-work --example symbolic_attribution --tests -- -D warnings
 cargo build --release --features research-work --example symbolic_attribution
 tools/benchlock.sh symbolic-742 timeout --signal=INT --kill-after=60s 600 \
   taskset -c 4 "$CARGO_TARGET_DIR/release/examples/symbolic_attribution" > research/symbolic-attribution/replay.tsv
