@@ -196,8 +196,9 @@ legacy sweep still reports load without a gate and should be interpreted accordi
 §3 kept `SubresultantPrs` as the default because its measured tail on these inputs was smaller than the primitive route's. Brown's tail is better still — and **it cannot be the default**, because it is the one route
 that can refuse:
 
-- **Prime fields only.** Fixing a variable at an element of GF(2^8) and lifting back would answer a
-  question about the prime subfield. `GcdError::ExtensionField`.
+- **Prime fields only in this implementation.** Points are generated as0,1,2,… by repeated
+  addition of one, which enumerates only the prime subfield of an extension. Extension-field
+  point enumeration is not implemented, so the route returns `GcdError::ExtensionField`.
 - **More elements than the degree it interpolates over.** GF(2) and GF(3) do not have them for most
   inputs. `GcdError::TooFewPoints` — and that is what the exhaustive GF(3) brute-force test asserts.
   It runs Brown's on every enumerated pair and requires the *refusal*, which is how a route that
@@ -277,7 +278,8 @@ bit lengths, or allocator/RSS measurements. Brown's PRS columns include cleanup
 and fallback; they are never relabelled image sizes.
 
 For a local PRS call with main-variable degrees m,n and largest input
-coefficient total degree C, a coefficient is a determinant of order at most m+n.
+coefficient total degree C, a subresultant coefficient is a Sylvester-minor
+determinant of order at most m+n.
 Each product in the determinant has degree at most B=(m+n)C; addition and finite-field
 cancellation cannot increase degree. Each materialized scaled/primitive next entry and the
 initial operands are checked against that local bound. The term count of a
@@ -333,5 +335,113 @@ pass's own duration is not substituted for an unobserved route's time.
 
 Reproduction commands and retained data are in
 [`research/gcd-size/README.md`](../../research/gcd-size/README.md).
-Native outcome tables and the scoped attribution decision follow after the
-frozen campaign; no timings or size maxima are inferred from the historical table.
+### Native outcomes and reproducible tables
+
+**Measured at:** `e74e70589e77b5a7dc952ece892674886b3b7955` (runner); compiled Rust/config is
+`3a9bae54`, unchanged at the runner commit. The [source/config fingerprints and
+recovery patch](../../research/gcd-size/evidence/provenance.json) reconstruct the
+frozen source from base `a33a192e`; compiler and binary hashes are retained.
+
+The [complete cohort](../../research/gcd-size/cohort.json.gz) retains all **702**
+planned attempts: **699 completed**, **3 wall stops**, zero refusals and zero
+validation/infrastructure failures. Every one of the 675 regular attempts
+completed. The three diagnostic stops are KoalaBear arity 4 / shape 6 primitive PRS,
+once each under stock/off/on, at the declared ten-second child ceiling. No timing
+or intermediate maximum is invented for those interrupted computations. The
+remaining 24 diagnostic attempts completed; they remain single feasibility
+samples, not repeated timing evidence.
+
+Machine: Threadripper PRO 5995WX, one worker pinned to CPU 2, Rust 1.99.1 / LLVM 23.1.1,
+release/fat LTO/one codegen unit, x86-64-v3 with the local mold linker. The
+[lock log](../../research/gcd-size/evidence/benchlock.log) records START 23:06:21 and
+END 23:08:12 on 2026-11-12 America/New_York, status=0 / end=exited, with no builds or
+tests from this study during the window. Attempt-start load was 1.70–2.93, below
+the declared load gate of 4. Each process wall/RSS includes generation, full GCD checks and
+JSON encoding; function time excludes those and profile JSON construction. The
+controller's existing two-millisecond polling and process spawn create a floor
+for small process-wall samples. Do not rank tiny operations from that floor or
+divide function time by process wall to infer a stage share.
+
+All completed full normalized GCDs agree across routes and stock/off/on modes for
+the same input digest. All five fixed-input profile repetitions are identical.
+Every checked normalized/scaled entry satisfies its local determinant degree
+envelope; no bound overflows occurred. Brown actually uses fallback on some
+fixtures: the diagnostic KoalaBear arity 4 / shape 6 profile records eight fallbacks,
+so its PRS work is retained rather than hidden under an interpolation label.
+
+[The generated full table](../../research/gcd-size/table.md) places function
+median/range, process wall/range and RSS/range beside the phase-size columns for
+all three fields and all regular cases. [summary.csv](../../research/gcd-size/summary.csv)
+and [summary.json](../../research/gcd-size/summary.json) retain all arms, repeat
+ranges, diagnostics and outcomes. Regeneration revalidates complete GCDs and
+profile stability. The following KoalaBear rows focus on the historical outliers;
+time/RSS are medians from stock, while sizes come from separate capture-on calls.
+T/D means independent maxima of polynomial term count / coefficient total degree,
+not necessarily the same entry or simultaneous storage.
+
+| arity/shape | route | function ms | process wall ms | RSS MiB | PRS T/D | raw T/D | image T/D | interpolant T/D | contents | max local B |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+
+| 4/4 | primitive | 1592.308559 | 1597.024787 | 87.18 | 2330/139 | 6051/401 | — | — | 2289 | 1914 |
+| 4/4 | subresultant | 4.167038 | 5.935336 | 6.80 | 162/22 | 162/27 | — | — | 429 | 143 |
+| 4/4 | brown | 0.468607 | 3.822005 | 3.11 | 1/0 | — | 2/1 | 2/1 | 210 | 0 |
+| 4/3 | primitive | 1.220300 | 3.832234 | 3.11 | 38/8 | 241/31 | — | — | 615 | 144 |
+| 4/3 | subresultant | 29.923675 | 32.600723 | 33.07 | 367/57 | 517/66 | — | — | 721 | 180 |
+| 4/3 | brown | 0.567143 | 3.724701 | 3.18 | 3/2 | 1/0 | 4/4 | 4/4 | 275 | 2 |
+| 3/6 | primitive | 2.138047 | 3.790064 | 3.21 | 83/19 | 273/50 | — | — | 505 | 300 |
+| 3/6 | subresultant | 9.220665 | 12.358855 | 9.11 | 377/38 | 481/46 | — | — | 468 | 456 |
+| 3/6 | brown | 0.364661 | 3.469037 | 3.19 | 1/0 | 0/0 | 5/3 | 5/4 | 170 | 0 |
+
+The degree envelope is deliberately loose: on arity 4 / shape 4, the largest observed
+primitive coefficient degree 139 is below its largest local B=1914; subresultant
+coefficient degree 22 is below B=143. On arity 4 / shape 3 the corresponding pairs are
+8 / B=144 and57 / B=180. All *individual* checks used each call's own bound, not these
+independently aggregated maxima. These bounds quantify the theorem but do not
+predict practical support or memory.
+
+### Observer overhead and corrected attribution
+
+Across the fifteen regular route/case cells per field, the extrema of within-cell
+function-median quotients are:
+
+| field | capture-off / stock | capture-on / capture-off |
+|---|---:|---:|
+| KoalaBear | 0.959–1.134 | 0.971–1.044 |
+| Goldilocks | 0.950–1.154 | 0.895–1.122 |
+| BN254 | 0.906–1.054 | 0.914–1.101 |
+
+These are matched observation controls, not optimization gains. Some ranges
+include negative apparent overhead; scheduling, layout and microsecond-scale
+noise preclude assigning those differences to a useful technique. Full per-cell
+ranges remain in the generated table/summary. Use stock for unobserved durations,
+and capture-on for size/call evidence; this campaign does not claim that profiling
+is free or choose a faster default from noisy small rows.
+
+**The historical recursion-only explanation is rejected as stated.** The
+KoalaBear arity 4 / shape 4 generator geometry is the historical 628x outlier, with
+contemporary input SHA-256
+`c7adfed5c2119ade6d146559428dc9ac8f21a94b497ab5006c04e0d21a84d245`.
+Historical timings remain at the §§0–5 pins; the new duration is not a reassertion
+of 628x. Normalized primitive entries reach 2,330 terms / degree 139, while completed
+raw remainders reach 6,051 terms / degree 401. They demonstrably do **not** stay small.
+The primitive run also makes 2,289 content calls and 36,723 GCD entry calls, versus
+429 and2182 for subresultant PRS. Growth and repeated recursive work coexist;
+these maxima include content subproblems and do not assign exclusive CPU shares
+to either mechanism. A growth-only explanation would be equally unsupported.
+
+The historical 24x subresultant outlier (arity 4 / shape 3, input SHA-256
+`05d22eaae3d31618f6180eb9e3549bf9b1308e1ac8a19193b4d3842ffb6b74e3`)
+shows the other side: scaled entries 367 terms / degree 57 versus primitive 38/8, and
+raw 517/66 versus 241/31. Global content counts can even be higher for the
+subresultant route on that shape, 721 versus 615, despite replacing per-step
+content extraction at any one PRS level. Nested coefficient growth matters to
+the whole computation. The arity 3 / shape 6 rows similarly expose the larger
+subresultant intermediates instead of assuming their cost from theory.
+
+**Decision:** retain these bounded, opt-in diagnostics and correct the earlier
+explanation; leave the default GCD route unchanged. The experiment establishes
+actual size growth and structural recursion counts on these planted-factor
+fixtures, with typed stops retained. It does not establish causal wall-time
+shares, behavior on arbitrary inputs, a shape predictor, or the solver's own GCD
+input distribution; #658 owns the distribution/dispatch question. No solver
+speedup or universal runtime guarantee follows from the degree bounds.

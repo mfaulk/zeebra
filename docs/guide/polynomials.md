@@ -278,9 +278,9 @@ cleanup and fallback can still invoke PRS.
 | `SubresultantPrs` (default) | divide by `g * h^delta`, one exact division | by a theorem: the entries are subresultants | no |
 | `Brown` | evaluate, solve image GCDs, interpolate; PRS cleanup/fallback | image/interpolant degrees depend on the input | **yes** |
 
-`Brown` is reached through `try_gcd_by`, not `gcd_by`. It needs a **prime field** — fixing a
-variable at an element of an extension field and lifting back would answer a question about the
-prime subfield — and it needs **more elements than the degree it interpolates over**, which GF(2)
+`Brown` is reached through `try_gcd_by`, not `gcd_by`. This implementation generates points by
+repeated addition of one and therefore enumerates only a prime field, not all elements of an
+extension. It also needs **more elements than the degree it interpolates over**, which GF(2)
 and GF(3) do not have for most inputs. `FiniteField` carries no characteristic, so `gcd_by` cannot
 check either condition and panics rather than guessing; `try_gcd_by` is bounded on `KnownOrder` and
 returns `GcdError::ExtensionField`, `GcdError::TooFewPoints` or `GcdError::OrderNotEnumerable`
@@ -532,7 +532,9 @@ columns therefore describe cleanup/fallback, not image sizes.
 Every phase reports its largest polynomial term count and coefficient total degree:
 remove the current main variable's exponent from each monomial, sum remaining
 exponents in `u64`, and take the maximum. This is neither coefficient bit length
-nor simultaneous memory. `gcd_calls` and `max_recursion_depth` count recursive
+nor simultaneous memory. The two maxima need not occur in the same entry;
+`observations=0` distinguishes an unobserved phase from an observed zero polynomial
+(whose reported degree is zero). `gcd_calls` and `max_recursion_depth` count recursive
 `gcd_by`/Brown `try_gcd_by` entry points (including content recursion), excluding
 Brown's private evaluation recursion and univariate Euclid internals.
 `content_calls` includes both PRS and Brown content entry points. Fallbacks are

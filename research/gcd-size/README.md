@@ -43,3 +43,16 @@ silently rerun a stopped/noisy attempt. All raw JSON, stdout/stderr, process wal
 RSS, stop reasons and binary/compiler/input identities stay in the gzip cohort.
 All new figures must name the measured source commit; do not quote these commands
 as measurements before the campaign has run.
+
+The retained campaign completed the declared plan: see [cohort.json.gz](cohort.json.gz),
+[all regular-case tables](table.md), [summary.csv](summary.csv) and
+[summary.json](summary.json). The [source/build recovery manifest](evidence/provenance.json)
+and [benchmark lock](evidence/benchlock.log) bind the records to the measured source.
+Regenerate and revalidate every completed full answer and fixed-input profile with:
+
+```sh
+python3 research/gcd-size/summarize.py
+```
+
+Stopped attempts remain outcomes and never enter completed-run timing medians.
+No profile maxima are inferred for a process killed before its JSON response.

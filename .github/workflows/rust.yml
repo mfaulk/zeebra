@@ -101,6 +101,8 @@ jobs:
           cargo test --features research-work --test gcd_profile
           cargo test --features research-work --lib gcd_profile
           python3 tools/test/gcd-size-study-test.py
+          python3 research/gcd-size/summarize.py
+          git diff --exit-code -- research/gcd-size/summary.json research/gcd-size/summary.csv research/gcd-size/table.md
           cargo test --features research-work --example mq10_profile
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks

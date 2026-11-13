@@ -75,6 +75,31 @@ def main():
                 flat.update(content_calls=profile['content_calls'], gcd_calls=profile['gcd_calls'],
                             local_degree_bound=profile['max_subresultant_degree_bound'])
             writer.writerow(flat)
+    lines = ["# GCD intermediate sizes: all regular cases", "",
+             f"**Measured at:** `{cohort['commit']}`; compiled Rust instrument `3a9bae54`.", "",
+             "Five fresh-process repetitions per stock/off/on arm. Times below use feature-absent stock; size profiles use capture-on.",
+             "Term/degree cells are independent maxima, possibly attained by different recursive entries. A dash means no observation.",
+             "Full repeat ranges, all three arms and diagnostic stops are in summary.json/summary.csv and the raw cohort.", ""]
+    def timing(value):
+        return f"{value['median']/1e6:.6f} [{value['min']/1e6:.6f},{value['max']/1e6:.6f}]"
+    def memory(value):
+        return f"{value['median']/1024**2:.2f} [{value['min']/1024**2:.2f},{value['max']/1024**2:.2f}]"
+    def size(profile, phase):
+        value = profile[phase]
+        return f"{value['max_terms']}/{value['max_coefficient_degree']}" if value['observations'] else "—"
+    for field in study.FIELDS:
+        lines += [f"## {field}", "",
+            "| arity/shape | route | function ms [min,max] | process wall ms [min,max] | RSS MiB [min,max] | PRS T/D | raw T/D | image T/D | interpolant T/D | content calls | max local B |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        for arity, shape in study.CASES:
+            for route in study.ROUTES:
+                matched = {row['arm']: row for row in summary['rows'] if
+                    (row['field'],row['arity'],row['shape'],row['route'],row['diagnostic']) == (field,arity,shape,route,False)}
+                stock, observed = matched['stock'], matched['on']
+                profile = observed['profile']
+                lines.append(f"| {arity}/{shape} | {route} | {timing(stock['elapsed_ns'])} | {timing(stock['process_wall_ns'])} | {memory(stock['peak_rss_bytes'])} | {size(profile,'prs_entries')} | {size(profile,'raw_remainders')} | {size(profile,'brown_images')} | {size(profile,'brown_interpolants')} | {profile['content_calls']} | {profile['max_subresultant_degree_bound']} |")
+        lines += [""]
+    (HERE / 'table.md').write_text('\n'.join(lines) + '\n')
     print(f"validated {summary['attempts']} retained attempts in {len(summary['rows'])} groups")
 
 
