@@ -53,7 +53,7 @@ the better of them — and it loses the median on two fields of three, by up to 
 shapes. Three routes, each fastest somewhere. The default is the best route that **always answers**,
 which Brown's does not: it refuses over an extension field and over a field with too few points.
 
-## 1. The primitive route's tail is unbounded; the subresultant route's is not
+## 1. Historical outliers and a sweep that exceeded its budget
 
 | | shape | primitive | subresultant | |
 |---|---|---:|---:|---|
@@ -78,29 +78,29 @@ the cost cannot be bounded after the fact: a single pass of either route is a sy
 correctness pass primitive-first, and the neighbouring shape has the primitive route 628x slower, so
 it is the overwhelmingly likely culprit, but the run died before it could say which arm it was in.
 
-## 2. Why the tails differ, which the theory already said
+## 2. The structural trade-off, with finite-field qualifications
 
-- **Primitive PRS** removes the content from every pseudo-remainder. A content is itself a recursive
-  GCD in a smaller ring, so the cost is a *recursion over recursions*, and nothing bounds how much
-  work a step's content costs in terms of the original inputs. Coefficients cannot grow — that is
-  the bound it buys — but the recursion is where the time goes, and it is the recursion that
-  explodes.
-- **Subresultant PRS** replaces that with one exact division by `g * h^delta`. The sequence's
-  entries *are* subresultants, determinants of submatrices of the inputs' Sylvester matrix, so
-  Hadamard's inequality bounds them in terms of the inputs alone. There is no recursion to explode;
-  the cost is the growth, and the growth is bounded in advance.
+Primitive PRS extracts a recursive content after every completed pseudo-remainder.
+This removes a common polynomial factor; it does **not** prevent the remaining
+coefficient polynomials from growing in support or degree. Subresultant PRS
+replaces those per-step content extractions with exact scaling. It still extracts
+contents at entry and exit, so neither recursion nor expensive input shapes have
+disappeared.
 
-So the measured picture is the theoretical one with the emphasis moved: the subresultant route pays
-a steady 10–50% to buy a bounded worst case, and the primitive route takes a better median in
-exchange for a tail that reaches 628x and, on at least one shape, does not land.
+Scaled subresultant entries have coefficients represented by Sylvester minors.
+Hadamard's inequality gives magnitude bounds over the integers. Here each field
+coefficient has fixed width: the relevant analog is the degree/support bound from
+determinant expansion, specified and checked in [§7](#7-intermediate-size-profiles-652).
+Raw pseudo-remainders before exact division are a separate size quantity.
+
+The historical timings show different tails on this planted-factor distribution.
+They do not establish a universal runtime guarantee for either route, nor do they
+by themselves identify which recursion or polynomial-size mechanism dominates.
 
 ## 3. What this changes
 
-**The default does not move.** `GcdRoute::SubresultantPrs` stays, and the justification in the
-source changes from "correctness evidence, not a measurement" to a measurement — of the tail rather
-than the median. A library default should be the route that cannot fall off a cliff on an input the
-caller did not know was special, which is the usual argument for a bounded worst case over a better
-average, and it is now supported by numbers rather than by the operation count.
+**The default does not move.** `GcdRoute::SubresultantPrs` stays, and the historical justification is the measured tail rather than the median. This is a
+choice on the measured distribution, not a universal bound on runtime or support growth.
 
 **`PrimitivePrs` stops being only a reference implementation.** It is 10–50% faster on most shapes,
 which makes it a legitimate choice for a caller who knows its inputs, and `gcd_by` already exposes
@@ -111,25 +111,28 @@ other is tested against.
 
 * ~~**Brown's modular algorithm.**~~ **Done, #434** —
   [§5](#5-browns-modular-route-measured-it-owns-the-tail-both-sequences-lose). It is the route that
-  changes the asymptotics and the measurement bears that out in the tail rather than the median.
-  §§0–3 below are the two-route comparison and stay as they were taken.
+  adds an image/interpolation route whose measured advantage is in the tail rather than the median.
+  The historical timings in §§0–3 remain at their original source pins; explanatory prose is
+  qualified by §7 rather than treating timings as complexity proofs.
 * **A shape-aware default.** The two routes' costs differ by up to 628x in one direction and 24x in
   the other on *neighbouring* shapes, which is the signature of a choice that wants to be made per
   input rather than once. Nothing here measures a predictor — term count, arity and exponent are
   the three axes swept and none of them separates the 628x row from its neighbours on its own.
-* **Where the primitive route's blow-up comes from.** Attributed to the content recursion by the
-  theory and by the shape of the measurement, not by a profile.
+* **Where the primitive route's blow-up comes from.** The historical attribution was an inference,
+  not a causal profile. [§7](#7-intermediate-size-profiles-652) adds support/degree and call-count
+  observations, preserving the limits on what these establish about time.
 * **Any instance from the solver.** These are planted-factor random inputs. What F4 and FGLM
   actually hand `gcd` is unmeasured, and that is the input distribution a default should really be
   chosen against.
 
 ## 5. Brown's modular route, measured: it owns the tail both sequences lose
 
-#434 added the third route. It does no Euclidean step at all — it fixes the other variables at field
-elements, solves the univariate problems with `poly::gcd` and interpolates the answer back — so
-neither coefficient growth nor a content recursion arises. §4 named it "the route that changes the
-asymptotics", and the measurement says where that cashes out: **not in the median, and decisively in
-the tail.**
+#434 added the third route. Its main path fixes other variables at field elements,
+solves image GCDs recursively and interpolates the candidate. Content extraction is
+still recursive. It materializes coefficient polynomials in images/interpolants,
+and uses subresultant PRS for candidate cleanup and fallback. The historical
+measurement found its advantage in the tail rather than the median; these timings
+do not establish an asymptotic improvement for this implementation.
 
 Same harness, same machine, same twenty shapes per field, with a third timed arm. All three routes
 are asserted equal at every shape before the clock starts.
@@ -171,7 +174,7 @@ interpolation, and on a shape the sequences finish in ten microseconds that fixe
 whole cost. So the same shape as §0: **the route with the better tail loses the median**, now one
 level up. Three routes, and each is the fastest on some shapes and the slowest on others.
 
-### 5.3 The ratios are load-independent, and this sweep is where that was checked
+### 5.3 A historical cross-load observation
 
 §0 warns that these are shared-machine durations. This revision can say how much that matters,
 because the whole sweep was taken twice — at a one-minute load of **9.51** and again at **2 100.79**,
@@ -183,21 +186,19 @@ runs covered:
 | 40 paired shape ratios across a 221x load range | **every one within 0.06**, most within 0.02 |
 | the three tail rows above | within 2% at the two loads |
 
-So the ratio columns here are figures and the absolute-seconds columns are a snapshot — the same
-split `graeffe-root-finding.md` §6.3.2 found for the NTT sweep, confirmed independently on a workload
-with completely different memory behaviour. `examples/gcd_routes.rs` now prints the one-minute load
-at the head of every run and says which columns survive it. That is also why no load gate was added
-here, unlike `examples/ntt_access.rs`: this workload's figures do not need one, and the evidence for
-that claim is the table above rather than an assumption.
+This is an observation about those two historical runs, not a guarantee that ratios
+survive contention. New measurements need matched controls, interleaving and repeat
+ranges; the bounded §7 campaign has an explicit ambient-load gate. The ordinary
+legacy sweep still reports load without a gate and should be interpreted accordingly.
 
 ### 5.4 So the default stays, and the reason is sharper than before
 
-§3 kept `SubresultantPrs` as the default because its tail is bounded and the primitive route's is
-not. Brown's tail is better still — and **it cannot be the default**, because it is the one route
+§3 kept `SubresultantPrs` as the default because its measured tail on these inputs was smaller than the primitive route's. Brown's tail is better still — and **it cannot be the default**, because it is the one route
 that can refuse:
 
-- **Prime fields only.** Fixing a variable at an element of GF(2^8) and lifting back would answer a
-  question about the prime subfield. `GcdError::ExtensionField`.
+- **Prime fields only in this implementation.** Points are generated as0,1,2,… by repeated
+  addition of one, which enumerates only the prime subfield of an extension. Extension-field
+  point enumeration is not implemented, so the route returns `GcdError::ExtensionField`.
 - **More elements than the degree it interpolates over.** GF(2) and GF(3) do not have them for most
   inputs. `GcdError::TooFewPoints` — and that is what the exhaustive GF(3) brute-force test asserts.
   It runs Brown's on every enumerated pair and requires the *refusal*, which is how a route that
@@ -265,3 +266,182 @@ that fell back silently would report another route's time under Brown's name.
 cargo bench --bench multivariate_gcd
 cargo bench --bench multivariate_gcd -- brown/koalabear/3vars   # one arm
 ```
+
+## 7. Intermediate-size profiles (#652)
+
+The instrument is opt-in under the existing `research-work` feature. Its
+[API and boundary definitions](../guide/polynomials.md#intermediate-size-diagnostics)
+distinguish normalized/scaled PRS entries, completed raw pseudo-remainders,
+Brown's accepted scaled images and complete interpolants. Maxima cover all
+recursive calls in the scope. They are not simultaneous live memory, coefficient
+bit lengths, or allocator/RSS measurements. Brown's PRS columns include cleanup
+and fallback; they are never relabelled image sizes.
+
+For a local PRS call with main-variable degrees m,n and largest input
+coefficient total degree C, a subresultant coefficient is a Sylvester-minor
+determinant of order at most m+n.
+Each product in the determinant has degree at most B=(m+n)C; addition and finite-field
+cancellation cannot increase degree. Each materialized scaled/primitive next entry and the
+initial operands are checked against that local bound. The term count of a
+coefficient in v remaining variables is therefore at most binomial(B+v,v), and
+an entry of main-variable degree d has at most (d+1)binomial(B+v,v) terms. These are
+loose support envelopes, not predictions. Bounds are recomputed per recursive
+call and overflow is reported explicitly. They do not bound raw pseudo-remainders
+before exact scaling or transient products.
+
+The determinant interpretation is the primary result used here; compare
+[Brown, *Euclid's Algorithm and Computation of Polynomial GCD's*, §3](https://www.cecm.sfu.ca/~mmonagan/teaching/TopicsinCA19/Brown1971.pdf).
+Its integer Hadamard magnitude argument is not transplanted to finite-field bit
+length. Brown also notes that primitive PRS entries divide the corresponding
+subresultants. Thus this degree envelope applies to primitive entries too: the
+trade-off is **not** bounded subresultant degree versus unbounded primitive degree.
+Normalization removes content but does not imply constant coefficient degree or
+support. The `subresultant_*` profile fields name this theorem, not an exclusive route.
+The implementation checks the envelope for both PRS routes; Brown still
+performs recursive contents and its cleanup/fallback PRS is included.
+
+### Declared campaign
+
+The runner reuses `grobx-work-study.py`'s fresh-process/RSS guard and the machine
+benchmark lock. Each child has a 10-second / 512 MiB RSS ceiling. The aggregate
+campaign ceiling is 600 seconds, checked before each child; at most one bounded
+child plus artifact writing can extend beyond it. Every stop, refusal or failure
+is retained. A timeout is an outcome, not a duration estimate or a claimed speedup.
+Build and test both binaries before locking and commit the instrument first.
+
+Five interleaved fresh-process repetitions cover each combination of:
+
+- KoalaBear, Goldilocks and BN254;
+- (arity, historical shape index) (2,0), (3,3), (3,6), (4,3), (4,4);
+- primitive, subresultant and Brown;
+- feature-absent stock, feature-present/capture-off and capture-on.
+
+This is 675 planned attempts. In addition, the previously omitted four-variable
+shape index6 gets one diagnostic attempt per field/route/arm (27 attempts), under
+the same child caps. No repeated timing claim is made for that diagnostic.
+The generator replays preceding shapes from each field's historical fixed seed,
+so the 628x and 24x shapes are represented by identical mathematical generator
+rules, with full contemporary input digests retained. Historical timings remain
+at their original pins and are not pooled with this campaign.
+
+Every completed call checks that its result divides both inputs and contains the
+planted factor. The runner compares the **complete normalized GCD**, bound to
+its input digest, across all completed routes and observer modes. Divisibility
+alone is not a greatestness proof; these equality checks preserve the existing
+independent-algorithm agreement, backed by the library's exhaustive GCD tests.
+Profile support scans run separately from the unobserved timing passes, and the
+stock/off/on controls expose compilation/no-op and collection overhead. A profile
+pass's own duration is not substituted for an unobserved route's time.
+
+Reproduction commands and retained data are in
+[`research/gcd-size/README.md`](../../research/gcd-size/README.md).
+### Native outcomes and reproducible tables
+
+**Measured at:** `e74e70589e77b5a7dc952ece892674886b3b7955` (runner); compiled Rust/config is
+`3a9bae54`, unchanged at the runner commit. The [source/config fingerprints and
+recovery patch](../../research/gcd-size/evidence/provenance.json) reconstruct the
+frozen source from base `a33a192e`; compiler and binary hashes are retained.
+
+The [complete cohort](../../research/gcd-size/cohort.json.gz) retains all **702**
+planned attempts: **699 completed**, **3 wall stops**, zero refusals and zero
+validation/infrastructure failures. Every one of the 675 regular attempts
+completed. The three diagnostic stops are KoalaBear arity 4 / shape 6 primitive PRS,
+once each under stock/off/on, at the declared ten-second child ceiling. No timing
+or intermediate maximum is invented for those interrupted computations. The
+remaining 24 diagnostic attempts completed; they remain single feasibility
+samples, not repeated timing evidence.
+
+Machine: Threadripper PRO 5995WX, one worker pinned to CPU 2, Rust 1.99.1 / LLVM 23.1.1,
+release/fat LTO/one codegen unit, x86-64-v3 with the local mold linker. The
+[lock log](../../research/gcd-size/evidence/benchlock.log) records START 23:06:21 and
+END 23:08:12 on 2026-11-12 America/New_York, status=0 / end=exited, with no builds or
+tests from this study during the window. Attempt-start load was 1.70–2.93, below
+the declared load gate of 4. Each process wall/RSS includes generation, full GCD checks and
+JSON encoding; function time excludes those and profile JSON construction. The
+controller's existing two-millisecond polling and process spawn create a floor
+for small process-wall samples. Do not rank tiny operations from that floor or
+divide function time by process wall to infer a stage share.
+
+All completed full normalized GCDs agree across routes and stock/off/on modes for
+the same input digest. All five fixed-input profile repetitions are identical.
+Every checked normalized/scaled entry satisfies its local determinant degree
+envelope; no bound overflows occurred. Brown actually uses fallback on some
+fixtures: the diagnostic KoalaBear arity 4 / shape 6 profile records eight fallbacks,
+so its PRS work is retained rather than hidden under an interpolation label.
+
+[The generated full table](../../research/gcd-size/table.md) places function
+median/range, process wall/range and RSS/range beside the phase-size columns for
+all three fields and all regular cases. [summary.csv](../../research/gcd-size/summary.csv)
+and [summary.json](../../research/gcd-size/summary.json) retain all arms, repeat
+ranges, diagnostics and outcomes. Regeneration revalidates complete GCDs and
+profile stability. The following KoalaBear rows focus on the historical outliers;
+time/RSS are medians from stock, while sizes come from separate capture-on calls.
+T/D means independent maxima of polynomial term count / coefficient total degree,
+not necessarily the same entry or simultaneous storage.
+
+| arity/shape | route | function ms | process wall ms | RSS MiB | PRS T/D | raw T/D | image T/D | interpolant T/D | contents | max local B |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+
+| 4/4 | primitive | 1592.308559 | 1597.024787 | 87.18 | 2330/139 | 6051/401 | — | — | 2289 | 1914 |
+| 4/4 | subresultant | 4.167038 | 5.935336 | 6.80 | 162/22 | 162/27 | — | — | 429 | 143 |
+| 4/4 | brown | 0.468607 | 3.822005 | 3.11 | 1/0 | — | 2/1 | 2/1 | 210 | 0 |
+| 4/3 | primitive | 1.220300 | 3.832234 | 3.11 | 38/8 | 241/31 | — | — | 615 | 144 |
+| 4/3 | subresultant | 29.923675 | 32.600723 | 33.07 | 367/57 | 517/66 | — | — | 721 | 180 |
+| 4/3 | brown | 0.567143 | 3.724701 | 3.18 | 3/2 | 1/0 | 4/4 | 4/4 | 275 | 2 |
+| 3/6 | primitive | 2.138047 | 3.790064 | 3.21 | 83/19 | 273/50 | — | — | 505 | 300 |
+| 3/6 | subresultant | 9.220665 | 12.358855 | 9.11 | 377/38 | 481/46 | — | — | 468 | 456 |
+| 3/6 | brown | 0.364661 | 3.469037 | 3.19 | 1/0 | 0/0 | 5/3 | 5/4 | 170 | 0 |
+
+The degree envelope is deliberately loose: on arity 4 / shape 4, the largest observed
+primitive coefficient degree 139 is below its largest local B=1914; subresultant
+coefficient degree 22 is below B=143. On arity 4 / shape 3 the corresponding pairs are
+8 / B=144 and57 / B=180. All *individual* checks used each call's own bound, not these
+independently aggregated maxima. These bounds quantify the theorem but do not
+predict practical support or memory.
+
+### Observer overhead and corrected attribution
+
+Across the fifteen regular route/case cells per field, the extrema of within-cell
+function-median quotients are:
+
+| field | capture-off / stock | capture-on / capture-off |
+|---|---:|---:|
+| KoalaBear | 0.959–1.134 | 0.971–1.044 |
+| Goldilocks | 0.950–1.154 | 0.895–1.122 |
+| BN254 | 0.906–1.054 | 0.914–1.101 |
+
+These are matched observation controls, not optimization gains. Some ranges
+include negative apparent overhead; scheduling, layout and microsecond-scale
+noise preclude assigning those differences to a useful technique. Full per-cell
+ranges remain in the generated table/summary. Use stock for unobserved durations,
+and capture-on for size/call evidence; this campaign does not claim that profiling
+is free or choose a faster default from noisy small rows.
+
+**The historical recursion-only explanation is rejected as stated.** The
+KoalaBear arity 4 / shape 4 generator geometry is the historical 628x outlier, with
+contemporary input SHA-256
+`c7adfed5c2119ade6d146559428dc9ac8f21a94b497ab5006c04e0d21a84d245`.
+Historical timings remain at the §§0–5 pins; the new duration is not a reassertion
+of 628x. Normalized primitive entries reach 2,330 terms / degree 139, while completed
+raw remainders reach 6,051 terms / degree 401. They demonstrably do **not** stay small.
+The primitive run also makes 2,289 content calls and 36,723 GCD entry calls, versus
+429 and2182 for subresultant PRS. Growth and repeated recursive work coexist;
+these maxima include content subproblems and do not assign exclusive CPU shares
+to either mechanism. A growth-only explanation would be equally unsupported.
+
+The historical 24x subresultant outlier (arity 4 / shape 3, input SHA-256
+`05d22eaae3d31618f6180eb9e3549bf9b1308e1ac8a19193b4d3842ffb6b74e3`)
+shows the other side: scaled entries 367 terms / degree 57 versus primitive 38/8, and
+raw 517/66 versus 241/31. Global content counts can even be higher for the
+subresultant route on that shape, 721 versus 615, despite replacing per-step
+content extraction at any one PRS level. Nested coefficient growth matters to
+the whole computation. The arity 3 / shape 6 rows similarly expose the larger
+subresultant intermediates instead of assuming their cost from theory.
+
+**Decision:** retain these bounded, opt-in diagnostics and correct the earlier
+explanation; leave the default GCD route unchanged. The experiment establishes
+actual size growth and structural recursion counts on these planted-factor
+fixtures, with typed stops retained. It does not establish causal wall-time
+shares, behavior on arbitrary inputs, a shape predictor, or the solver's own GCD
+input distribution; #658 owns the distribution/dispatch question. No solver
+speedup or universal runtime guarantee follows from the degree bounds.

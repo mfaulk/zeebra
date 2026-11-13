@@ -1,36 +1,4 @@
-//! The three multivariate GCD routes, measured against each other.
-//!
-//! Issue #407. #128 landed the primitive PRS and published **no timings at all**; Collins'
-//! subresultant PRS then became the default on correctness evidence and an asserted operation
-//! count — `test_the_subresultant_route_takes_fewer_content_gcds` — with the wall clock explicitly
-//! left to this issue. So there is no baseline figure for either route and this takes the first.
-//!
-//! The question is not which does fewer content GCDs; that is already asserted. It is whether
-//! fewer content GCDs is *faster*, and the two routes trade in opposite directions:
-//!
-//! - **Primitive PRS** divides the content out of every pseudo-remainder, so nothing grows — the
-//!   coefficient bound is by construction — and pays one recursive GCD in a smaller ring per
-//!   Euclidean step.
-//! - **Subresultant PRS** replaces that with one exact division by `g * h^delta`, three content
-//!   GCDs for the whole computation. Coefficients then grow, bounded by Hadamard rather than
-//!   unboundedly, and in a *sparse* representation growth costs terms as well as bits.
-//!
-//! - **Brown's modular route** (#434) does no Euclidean step at all: it fixes the other variables
-//!   at field elements, solves the univariate problems and interpolates the answer back, so neither
-//!   coefficient growth nor a content recursion arises. It is the only route that can **refuse** —
-//!   prime fields only, and more elements than the degree it interpolates over.
-//!
-//! So the two sequences trade recursion for size and Brown's declines the trade, and whether either
-//! pays is a measurement on the shape of the input. This sweep varies the three things that should
-//! decide it: the arity, the shared factor's size, and the cofactors' size.
-//!
-//! Every timed result goes through `std::hint::black_box`, and the two routes are asserted equal at
-//! every shape before the clock starts — a comparison of routes that disagree is worthless.
-//!
-//! ```text
-//! cargo run --release --example gcd_routes
-//! cargo run --release --example gcd_routes -- bn254
-//! ```
+//! Size profiles run separately from timing passes; use the bounded single-case mode for outliers.
 
 use std::{
     cell::RefCell,
@@ -92,6 +60,8 @@ struct Row {
     /// `None` where Brown's route refused this shape over this field, with the reason printed once.
     brown: Option<Duration>,
     repetitions: usize,
+    #[cfg(feature = "research-work")]
+    profiles: [zeebra::gcd_profile::GcdProfile; 3],
 }
 
 const SHAPES: [Shape; 7] = [
@@ -186,7 +156,15 @@ fn pair<const N: usize, F: KnownOrder>(
     f: &MultivariatePolynomial<N, F>,
     g: &MultivariatePolynomial<N, F>,
 ) -> Row {
+    #[cfg(feature = "research-work")]
+    let (primitive, primitive_profile) =
+        zeebra::gcd_profile::measure(|| f.gcd_by(g, GcdRoute::PrimitivePrs));
+    #[cfg(not(feature = "research-work"))]
     let primitive = f.gcd_by(g, GcdRoute::PrimitivePrs);
+    #[cfg(feature = "research-work")]
+    let (subresultant, subresultant_profile) =
+        zeebra::gcd_profile::measure(|| f.gcd_by(g, GcdRoute::SubresultantPrs));
+    #[cfg(not(feature = "research-work"))]
     let subresultant = f.gcd_by(g, GcdRoute::SubresultantPrs);
     assert_eq!(
         primitive, subresultant,
@@ -195,7 +173,12 @@ fn pair<const N: usize, F: KnownOrder>(
 
     // Brown's route can refuse, so whether it is timed at all is decided before the clock starts —
     // and when it answers, it must agree, or there is nothing to compare.
-    let brown_applies = match f.try_gcd_by(g, GcdRoute::Brown) {
+    #[cfg(feature = "research-work")]
+    let (brown_result, brown_profile) =
+        zeebra::gcd_profile::measure(|| f.try_gcd_by(g, GcdRoute::Brown));
+    #[cfg(not(feature = "research-work"))]
+    let brown_result = f.try_gcd_by(g, GcdRoute::Brown);
+    let brown_applies = match brown_result {
         Ok(value) => {
             assert_eq!(
                 value, subresultant,
@@ -252,6 +235,8 @@ fn pair<const N: usize, F: KnownOrder>(
         subresultant: best.1,
         brown: brown_applies.then_some(best.2),
         repetitions: taken,
+        #[cfg(feature = "research-work")]
+        profiles: [primitive_profile, subresultant_profile, brown_profile],
     }
 }
 
@@ -331,6 +316,27 @@ fn sweep<const N: usize, F: KnownOrder>(seed: u64) -> (usize, usize) {
             brown_ratio,
             row.repetitions,
         );
+        #[cfg(feature = "research-work")]
+        {
+            println!("\n| route | PRS max terms | PRS max coefficient degree | raw max terms | raw coefficient degree | image max terms | image coefficient degree | interpolant max terms | interpolant coefficient degree |");
+            println!("|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+            for (route, stats) in ["primitive", "subresultant", "brown"]
+                .into_iter()
+                .zip(row.profiles)
+            {
+                println!(
+                    "| {route} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                    stats.prs_entries.max_terms,
+                    stats.prs_entries.max_coefficient_degree,
+                    stats.raw_remainders.max_terms,
+                    stats.raw_remainders.max_coefficient_degree,
+                    stats.brown_images.max_terms,
+                    stats.brown_images.max_coefficient_degree,
+                    stats.brown_interpolants.max_terms,
+                    stats.brown_interpolants.max_coefficient_degree
+                );
+            }
+        }
         if let Some(brown) = row.brown {
             let ratio = brown.as_secs_f64() / subresultant.as_secs_f64();
             if ratio > 1.1 {
@@ -403,6 +409,10 @@ fn measure_field<F: KnownOrder>(name: &str, seed: u64) {
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--case") {
+        single_case();
+        return;
+    }
     let which = std::env::args().nth(1).unwrap_or_else(|| "all".into());
 
     println!("# The multivariate GCD routes: two remainder sequences against Brown's modular");
@@ -412,11 +422,9 @@ fn main() {
          began with #407 and the Brown's column with #434."
     );
     println!(
-        "\n- one-minute load at the start of this run: **{:.2}**. There is no gate: the quantity \
-         this sweep reports is a **ratio** between routes timed arm-by-arm inside one repetition, \
-         and a ratio taken that way survives ambient contention — `graeffe-root-finding.md` §6.3.2 \
-         is where that was measured rather than assumed. The absolute seconds columns do **not** \
-         survive it, and two runs at different loads should be compared by their ratios only.",
+        "\n- one-minute load at the start of this run: **{:.2}**. Interleaving limits drift, but \
+         neither durations nor ratios are guaranteed to survive contention. Use matched controls \
+         and inspect repeat ranges before interpreting a difference.",
         one_minute_load()
     );
     println!(
@@ -452,4 +460,102 @@ fn main() {
         ),
         None => println!("\n\nprocess peak resident set: unavailable on this platform"),
     }
+}
+
+fn single_case() {
+    let args: Vec<_> = std::env::args().skip(2).collect();
+    assert_eq!(
+        args.len(),
+        5,
+        "--case FIELD ARITY SHAPE(0..6) ROUTE MODE(off|on)"
+    );
+    let route = match args[3].as_str() {
+        "primitive" => GcdRoute::PrimitivePrs,
+        "subresultant" => GcdRoute::SubresultantPrs,
+        "brown" => GcdRoute::Brown,
+        _ => panic!("unknown route"),
+    };
+    let observe = match args[4].as_str() {
+        "off" => false,
+        "on" => true,
+        _ => panic!("mode must be off or on"),
+    };
+    let shape: usize = args[2].parse().expect("shape index");
+    assert!(shape < SHAPES.len(), "shape index must be 0..6");
+    let arity: usize = args[1].parse().expect("arity");
+    macro_rules! dispatch {
+        ($field:ty, $seed:expr) => {
+            match arity {
+                2 => case::<2, $field>($seed ^ 2, shape, route, observe),
+                3 => case::<3, $field>($seed ^ 3, shape, route, observe),
+                4 => case::<4, $field>($seed ^ 4, shape, route, observe),
+                _ => panic!("arity must be 2, 3 or 4"),
+            }
+        };
+    }
+    match args[0].as_str() {
+        "koalabear" => dispatch!(KoalaBear, 0x0407_1001),
+        "goldilocks" => dispatch!(Goldilocks, 0x0407_1002),
+        "bn254" => dispatch!(Bn254Fr, 0x0407_1003),
+        _ => panic!("unknown field"),
+    }
+}
+
+fn case<const N: usize, F: KnownOrder>(seed: u64, shape: usize, route: GcdRoute, observe: bool) {
+    use zeebra::util::{sha256_hex, Json};
+    let mut rng = StdRng::seed_from_u64(seed);
+    // Replay all preceding draws so this is byte-for-byte the historical sweep's chosen pair.
+    let mut selected = None;
+    for current in SHAPES.iter().take(shape + 1) {
+        selected = planted::<N, F>(*current, &mut rng);
+    }
+    let (f, g, shared) = selected.expect("degenerate fixture");
+    let input = format!(
+        "characteristic={:?}\nvariables={N}\n{f}\n{g}\n",
+        F::characteristic_limbs()
+    );
+    let start = Instant::now();
+    let (answer, elapsed, profile) = if observe {
+        #[cfg(feature = "research-work")]
+        {
+            let (answer, profile) = zeebra::gcd_profile::measure(|| f.try_gcd_by(&g, route));
+            let elapsed = start.elapsed();
+            (answer, elapsed, profile.json())
+        }
+        #[cfg(not(feature = "research-work"))]
+        panic!("on requires --features research-work");
+    } else {
+        let answer = f.try_gcd_by(&g, route);
+        (answer, start.elapsed(), Json::Null)
+    };
+    let mut result = vec![
+        ("arity", Json::size(N)),
+        ("shape", Json::size(shape)),
+        ("seed", Json::int(seed)),
+        ("input", Json::string(&input)),
+        ("input_sha256", Json::string(sha256_hex(input.as_bytes()))),
+        ("input_terms", Json::size(f.terms().len())),
+        ("other_terms", Json::size(g.terms().len())),
+        ("route", Json::string(format!("{route:?}"))),
+        ("observed", Json::Bool(observe)),
+        ("elapsed_ns", Json::nanos(elapsed)),
+        (
+            "peak_rss_bytes",
+            peak_resident_bytes().map_or(Json::Null, Json::int),
+        ),
+        ("profile", profile),
+    ];
+    match answer {
+        Ok(gcd) => {
+            assert!(f.exact_div(&gcd).is_some() && g.exact_div(&gcd).is_some());
+            assert!(gcd.exact_div(&shared).is_some());
+            result.push(("status", Json::string("completed")));
+            result.push(("gcd", Json::string(gcd.to_string())));
+        }
+        Err(error) => {
+            result.push(("status", Json::string("refused")));
+            result.push(("refusal", Json::string(error.to_string())));
+        }
+    }
+    println!("{}", Json::object(result).to_json());
 }
