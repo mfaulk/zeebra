@@ -186,6 +186,7 @@ def attempt_output_bytes(stem):
 
 def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**2):
     started, peak, stop = time.monotonic_ns(), 0, None
+    interrupted=None
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
     environment=dict(os.environ, GROEBNER_NO_THREADED='0', OPENBLAS_NUM_THREADS='1', OMP_DYNAMIC='FALSE')
     environment.pop('ZEEBRA_RESEARCH_THREAD_TICKS',None)
@@ -204,6 +205,11 @@ def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**
                     kill_group(process)
                     break
                 time.sleep(.005)
+        except SystemExit as error:
+            interrupted=int(error.code)
+            stop='launcher-signal-'+str(interrupted-128)
+        except KeyboardInterrupt:
+            interrupted=130;stop='launcher-signal-2'
         finally:
             if process.poll() is None:
                 kill_group(process)
@@ -228,6 +234,7 @@ def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**
     return dict(command=command, cpus=cpus, process_wall_ns=finished-started,
                 process_cpu_ns=round((after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime)*1e9),
                 observed_tree_peak_bytes=peak, stop=stop, exit=process.returncode,
+                interrupt_exit=interrupted,
                 output_bytes=output_bytes,
                 stdout=stdout,stderr=stderr)
 
@@ -318,6 +325,11 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
     if busy:
         return dict(status='environment-refused',compilers=busy,command=command,cpus=cpus)
     attempt = guarded(command, stem, cpus, wall)
+    if engine=='singular':
+        attempt['adapter_artifacts']={str(p.relative_to(stem.with_suffix('.adapter'))):p.read_text()[:128*1024**2]
+                                      for p in stem.with_suffix('.adapter').rglob('*') if p.is_file()}
+    if attempt.get('interrupt_exit'):
+        return dict(attempt,status='interrupted')
     busy=active_compilers()
     if busy:
         return dict(attempt,status='excluded-environment-overlap',compilers=busy)
@@ -354,8 +366,7 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
             # Independent native-process CPU exceeding wall proves concurrent CPU use; no JIT here.
             attempt['observed_cpu_parallelism'] = attempt['process_cpu_ns']/attempt['process_wall_ns']
         elif engine=='singular':
-            files={str(p.relative_to(stem.with_suffix('.adapter'))):p.read_text()
-                   for p in stem.with_suffix('.adapter').rglob('*') if p.is_file()}
+            files=attempt['adapter_artifacts']
             reports=[text for text in files.values() if re.search(r'^@gbsize ',text,re.M)]
             if len(reports)!=1:raise ValueError('Singular adapter did not retain one complete answer')
             attempt.update(adapter_artifacts=files,basis=singular_basis(reports[0],case),
@@ -530,7 +541,7 @@ def summarize(cohort, target):
                 or ours['process_wall_ns']<2*many_floor):
             ratio=None
         lines.append('| '+' | '.join([f'{first["field"]}/{first["name"]}',engine,str(workers),str(len(valid)),
-            f'{ours["process_wall_ns"]/1e9:.4f}' if ours else '—',
+            f'{ours["process_wall_ns"]/1e9:.4f} [{min(a["process_wall_ns"] for a in valid)/1e9:.4f},{max(a["process_wall_ns"] for a in valid)/1e9:.4f}]' if ours else '—',
             f'{statistics.median(a["process_cpu_ns"] for a in valid)/1e9:.4f}' if valid else '—',
             f'{max(a["observed_tree_peak_bytes"] for a in valid)/1024**2:.2f}' if valid else '—',
             f'{ratio:.3f}' if ratio else '—', f'{ratio/workers:.3f}' if ratio else '—',
@@ -689,6 +700,9 @@ def main():
                         stopped.pop(key,None)
                     cohort['attempts'].append(a);wide.write(args.output,cohort)
                     print(case['field'],case['name'],engine,p,repeat,a['status'],flush=True)
+                    if a['status']=='interrupted':
+                        cohort['campaign_stop']='launcher-signal';wide.write(args.output,cohort)
+                        summarize(cohort,args.output.with_suffix('.md'));raise SystemExit(a['interrupt_exit'])
                     if a['status'] in ('environment-refused','excluded-environment-overlap'):
                         cohort['campaign_stop']='compiler-environment-gate';wide.write(args.output,cohort)
                         summarize(cohort,args.output.with_suffix('.md'));raise SystemExit(75)

@@ -15,6 +15,13 @@ spec.loader.exec_module(scaling)
 
 
 class ComparandScalingTests(unittest.TestCase):
+    # A launcher signal preserves an interrupted attempt after killing and reaping its solver.
+    def test_launcher_signal_retains_interruption_boundary(self):
+        with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling.wide.guard,'tree_hwm',side_effect=SystemExit(143)):
+            a=scaling.guarded([sys.executable,'-c','import time;time.sleep(30)'],Path(directory)/'run',sorted(os.sched_getaffinity(0))[:1])
+            self.assertEqual(a['interrupt_exit'],143)
+            self.assertEqual(a['stop'],'launcher-signal-15')
+            self.assertNotEqual(a['exit'],0)
     # Native adapter files count toward the output ceiling even when wrapper stdout is tiny.
     def test_adapter_output_is_included_in_storage_limit(self):
         with tempfile.TemporaryDirectory() as directory:
