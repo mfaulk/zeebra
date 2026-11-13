@@ -56,3 +56,4 @@ python3 research/gcd-size/summarize.py
 
 Stopped attempts remain outcomes and never enter completed-run timing medians.
 No profile maxima are inferred for a process killed before its JSON response.
+Generated CSV and Markdown use LF line endings and one final newline.

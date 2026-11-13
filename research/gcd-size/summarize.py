@@ -59,7 +59,7 @@ def main():
               'raw_terms', 'raw_coefficient_degree', 'image_terms', 'image_coefficient_degree',
               'interpolant_terms', 'interpolant_coefficient_degree', 'content_calls', 'gcd_calls', 'local_degree_bound']
     with (HERE / 'summary.csv').open('w', newline='') as stream:
-        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer = csv.DictWriter(stream, fieldnames=fields, lineterminator='\n')
         writer.writeheader()
         for row in summary['rows']:
             flat = {name: row[name] for name in fields[:6]}
@@ -99,7 +99,7 @@ def main():
                 profile = observed['profile']
                 lines.append(f"| {arity}/{shape} | {route} | {timing(stock['elapsed_ns'])} | {timing(stock['process_wall_ns'])} | {memory(stock['peak_rss_bytes'])} | {size(profile,'prs_entries')} | {size(profile,'raw_remainders')} | {size(profile,'brown_images')} | {size(profile,'brown_interpolants')} | {profile['content_calls']} | {profile['max_subresultant_degree_bound']} |")
         lines += [""]
-    (HERE / 'table.md').write_text('\n'.join(lines) + '\n')
+    (HERE / 'table.md').write_text('\n'.join(lines).rstrip() + '\n')
     print(f"validated {summary['attempts']} retained attempts in {len(summary['rows'])} groups")
 
 
