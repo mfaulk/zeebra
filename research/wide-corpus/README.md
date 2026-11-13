@@ -1,5 +1,7 @@
 # Hard wide-field corpus (#738)
 
+**Measured at:** `4ea1463a` and `fa7cc30d`; native binary source `4ea1463a`.
+
 This opt-in catalog freezes `wide64` (`18446744073709551263`), `goldilocks`
 (`18446744069414584321`) and `bn254` (BN254 scalar r, decimal in the catalog).
 Every entry in [cases.json](cases.json) retains the full generators, ordered variables,
@@ -14,6 +16,53 @@ prime and grevlex; it is separate from the historical competitive `Instance::can
 | Dense random MQ | `mq-random-{10,11,12,14,16}` | `mq-random-10` |
 | Eco | `eco-{12,14,18}` | `eco-12` |
 | Noonburg | `noon-{7,8,11}` | `noon-7` |
+
+
+## Measured findings
+
+The retained campaign has **141 unique attempts: 74 completions and 67 limit stops**.
+All 70 completed 64-bit answers on the 19 identities with multiple completing engines agree
+coefficient for coefficient after normalization. Grobx alone completes `mq-random-12` at
+`2^64 - 353`; that answer has no independent live oracle. BN254 has three native completions
+(Katsura-9, Cyclic-7, Noon-7) and two 65-second runner stops (MQ-10, Eco-12), with no external oracle.
+
+Each of the five families at each 64-bit field has at least one Zeebra/native-comparand wall ratio
+above **both** engines' 2× startup-floor gate. All 24 eligible native ratios in this single-sample
+campaign exceed one: the easy planted-MQ advantage does not carry over to these observations.
+The table shows Zeebra/comparand wall; values above one mean Zeebra took longer.
+
+| Rung | Z/rs, 2^64−353 | Z/grobx, 2^64−353 | Z/rs, Goldilocks | Z/grobx, Goldilocks |
+|---|---:|---:|---:|---:|
+| katsura-11 | 11.062x | 42.550x | 11.621x | 45.198x |
+| cyclic-7 | 2.573x | 4.322x | 3.201x | 4.838x |
+| mq-random-10 | 7.295x | 22.433x | 7.761x | 26.059x |
+| eco-12 | 11.663x | 21.366x | 12.296x | 22.341x |
+| noon-7 | 3.242x | 20.414x | 3.264x | 21.064x |
+
+Dense MQ-11 clears the requested hard-rung target with margin: the fastest completing comparand
+is grobx at **2.925 s** (`2^64−353`) and **3.326 s** (Goldilocks). Julia, groebner-rs and grobx
+agree on both full bases; Zeebra reaches the 65-second runner watchdog. At Goldilocks MQ-12,
+groebner-rs completes in 57.319 s and agrees with grobx, close to its 60-second ceiling.
+Katsura-14, Cyclic-11, MQ-14/16, Eco-14/18 and Noon-11 retain all external limit-stop outcomes.
+Zeebra's named internal stops include 32 million live nonzeros and 200,000 symbolic rows.
+
+Julia's Katsura-4 process controls are 8.187 s and 8.044 s. Every rung where both Zeebra and Julia
+complete remains below Julia's 2× process-startup gate; their wall ratios are withheld.
+Native driver controls are about 6 ms. Engine-call times remain in the archive; they are never
+substituted for Julia process wall to make a wall ratio pass.
+
+Machine: AMD Ryzen Threadripper PRO 5995WX, host `fedora`, affinity CPU 2, one solver worker.
+Zeebra uses release/fat LTO/codegen-units=1/x86-64-v3. Executable hashes, compiler, native driver
+revision/build/allocator data and full limits are retained in the archive. These are single
+observations, not repeated-run estimates of a general speedup or slowdown.
+
+The controller continued from `4ea1463a` to `fa7cc30d` to accelerate archival compression outside
+solver measurements. Saved attempts retain their original stamps, both controller headers retain
+base-commit/patch provenance, and native binary hashes and all resource settings match exactly.
+The old controller was stopped between solver processes; no active engine was interrupted for
+this continuation. [Benchmark-lock records](benchmark-lock.log) retain the serialized run lifecycle,
+including the separate initial adapter failure. The final controller exits normally after all 141
+attempts and their full-basis checks.
 
 Katsura names count variables, so `katsura-9` is literature Katsura-8. Cyclic-7 and Cyclic-11
 are squarefree-size affine systems, without field equations or slicing. Eco and Noonburg use
@@ -40,6 +89,8 @@ coefficient for coefficient with every other completed answer on that identity. 
 Zeebra capability row with **no external oracle**: the current external contract stores its prime
 in `u64`. No ratio or correctness claim based on an independent engine is made for that field.
 
+Provision Groebner.jl, groebner-rs and grobx using the
+[external-engine guide](../../docs/guide/external-engines.md) before running the campaign.
 Build and test outside the benchmark lock:
 
 ```sh
@@ -94,7 +145,8 @@ that engine's measured startup control. Native wall is the complete runner proce
 input/output); external wall is the adapter's supervised engine process, excluding version probes.
 Wrapper wall and F4-call timings are separately retained. A single observation does not establish
 a stable speedup. Rows with one completion have no independent live oracle, and stops do not
-become ratios. At least one external completion is needed for a verified Zeebra comparison.
+become ratios. A guardian stop also overrides any successful response arriving at its deadline.
+At least one external completion is needed for a verified Zeebra comparison.
 
 Intentional regeneration after changing a definition:
 `python3 tools/external/wide-corpus.py --binary "$CARGO_TARGET_DIR/release/examples/wide_corpus" --freeze`.
@@ -103,10 +155,13 @@ use full compression. Complete basis responses can exceed GitHub's single-file l
 with a manifest and writes content-addressed payload chunks under `campaign-payloads/`, each at
 most 16 MiB before compression. `load()` in the campaign tool checks every chunk's SHA-256 and
 length, reconstructs the original attempts, and verifies a lossless round trip. Native report copies
-share the raw response's basis and are restored from it; the raw response itself is preserved exactly. The summary command
+share the raw response's basis and are restored from it; the raw JSON values are preserved exactly.
+The summary command
 accepts both unpacked campaigns and this manifest. Raw native responses and full bases remain
 available; no coefficients are discarded. Commit the manifest and its payload directory together.
 
 Review the full catalog diff and remeasure; never update pins to accommodate stale evidence.
 CI runs the generator and gate tests plus offline catalog integrity checks; external solvers and
-long resource-boundary runs are opt-in and are not required on GitHub Actions.
+long resource-boundary runs are opt-in and are not required on GitHub Actions. Published source
+packages omit research data, so the fixture replay is skipped only when those files are absent
+outside a Git checkout.

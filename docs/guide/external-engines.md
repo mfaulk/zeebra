@@ -299,6 +299,17 @@ are fresh Katsura-4 processes at each field; ratios require **both** wall operan
 the corresponding control. Native wall includes the complete runner; external wall is the
 supervised engine process, excluding version probing. Engine-internal timings remain separate.
 
+
+The frozen #738 campaign retains 141 attempts: 74 completions and 67 limit stops. All 70 shared
+64-bit answers agree on complete normalized bases. Dense MQ-11's fastest comparand takes 2.925 s
+at `2^64−353` and 3.326 s at Goldilocks; Zeebra times out on both. Every family has native wall
+comparisons above the startup floor, and the native comparands are faster on all eligible pairs
+in these single observations. Julia wall ratios remain withheld because its approximately 8-second
+process startup controls dominate the smaller shared completions. The corpus README records the
+measured controller and binary source stamps, exact ratios, uncorroborated single-engine outcomes,
+and the three successful BN254 capability rows. These hard-rung results do not support extending
+the easy planted-MQ speedup claim to the wider corpus.
+
 ### Wide planted MQ ladder
 
 `mq-planted-wide-6`, `mq-planted-wide-10`, and `mq-planted-wide-14` reuse the generic planted
