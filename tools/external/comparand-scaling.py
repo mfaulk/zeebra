@@ -367,6 +367,10 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
             attempt['observed_cpu_parallelism'] = attempt['process_cpu_ns']/attempt['process_wall_ns']
         elif engine=='singular':
             files=attempt['adapter_artifacts']
+            row_pattern=r'^-\s+'+re.escape(case['name'])+r'\s+reduced-grobner-basis\s+singular\s+[0-9.]+ ms'
+            if not re.search(row_pattern,attempt['stdout'],re.M):
+                return dict(attempt,status='stopped-by-limit' if re.search(r'limit|wall|memory',attempt['stdout'],re.I) else 'failed',
+                            detail='existing Singular adapter did not admit a complete timing/result')
             reports=[text for text in files.values() if re.search(r'^@gbsize ',text,re.M)]
             if len(reports)!=1:raise ValueError('Singular adapter did not retain one complete answer')
             attempt.update(adapter_artifacts=files,basis=singular_basis(reports[0],case),
