@@ -232,6 +232,33 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
             "degree_sequence",
             Json::Array(s.step_degrees.iter().map(|d| Json::int(*d)).collect()),
         ),
+        (
+            "candidate_reduction",
+            Json::object([
+                ("batches", Json::size(s.candidate_reduction.batches)),
+                ("targets", Json::size(s.candidate_reduction.targets)),
+                (
+                    "coefficient_products",
+                    Json::size(s.candidate_reduction.coefficient_products),
+                ),
+                (
+                    "workspace_bytes",
+                    Json::size(s.candidate_reduction.workspace_bytes),
+                ),
+                (
+                    "reserved_entries",
+                    Json::size(s.candidate_reduction.reserved_entries),
+                ),
+                (
+                    "peak_sparse_capacity_entries",
+                    Json::size(s.candidate_reduction.peak_sparse_capacity_entries),
+                ),
+                (
+                    "fallback_batches",
+                    Json::size(s.candidate_reduction.fallback_batches),
+                ),
+            ]),
+        ),
         ("full_statistics", Json::string(format!("{s:#?}"))),
     ])
 }
