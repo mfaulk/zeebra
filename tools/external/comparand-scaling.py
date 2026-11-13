@@ -25,6 +25,75 @@ spec.loader.exec_module(wide)
 WORKERS = (1, 2, 4, 8, 16, 32)
 
 
+def attempt_key(row):
+    return (row['digest'],row['engine'],row['workers'],row['repeat'],row['diagnostic'])
+
+
+def check_resume(previous,current):
+    for key in ('machine','physical_cpus','cases','references','binaries','input_exporter',
+                'effective_environment','rustc','julia_manifest','julia_source','msolve_build'):
+        if previous.get(key)!=current.get(key):
+            raise ValueError('controller-only continuation changed '+key)
+    for key in ('wall','workers','repeats','rows','fields','engines','diagnostic','certify','reference_only'):
+        if previous['policy'].get(key)!=current['policy'].get(key):
+            raise ValueError('controller-only continuation changed policy '+key)
+
+
+class AttemptJournal:
+    def __init__(self,path,cohort,resume=None):
+        self.path=path
+        self.payloads=Path(str(path)+'.attempts')
+        self.payloads.mkdir(parents=True,exist_ok=False)
+        self.journal=Path(str(path)+'.journal.jsonl')
+        self.journal.touch(exist_ok=False)
+        header={k:v for k,v in cohort.items() if k!='attempts'}
+        header.update(storage='comparand-attempt-journal-v1',journal=self.journal.name)
+        if resume:
+            header['resume_archive']=dict(path=str(resume.resolve()),sha256=hashlib.sha256(resume.read_bytes()).hexdigest())
+        wide.write(path,header)
+        self.count=0
+        self.retained_bytes=path.stat().st_size
+
+    def append(self,row):
+        payload=self.payloads/(str(self.count)+'.json.gz')
+        wide.write(payload,row)
+        entry=dict(path=str(payload.relative_to(self.path.parent)),sha256=hashlib.sha256(payload.read_bytes()).hexdigest())
+        # Like #592, publish each completed row once before dispatching the next child.
+        with self.journal.open('a') as journal:
+            journal.write(json.dumps(entry,separators=(',',':'))+'\n');journal.flush();os.fsync(journal.fileno())
+        self.count+=1
+        self.retained_bytes+=payload.stat().st_size+row.get('output_bytes',0)
+
+    def stop(self,reason,**values):
+        wide.write(Path(str(self.path)+'.status.json'),dict(campaign_stop=reason,**values))
+
+
+def load_cohort(path):
+    cohort=wide.load(path)
+    if cohort.get('storage')!='comparand-attempt-journal-v1':return cohort
+    del cohort['storage']
+    entries=path.parent/cohort.pop('journal')
+    attempts=[]
+    if 'resume_archive' in cohort:
+        archived=cohort['resume_archive'];source=Path(archived['path'])
+        if hashlib.sha256(source.read_bytes()).hexdigest()!=archived['sha256']:
+            raise ValueError('continuation prefix identity changed')
+        previous=load_cohort(source)
+        attempts=previous['attempts']
+        for row in attempts:row.setdefault('controller_commit',previous['commit'])
+    for line in entries.read_text().splitlines(keepends=True):
+        if not line.endswith('\n'):raise ValueError('incomplete journal record; retain for explicit recovery')
+        entry=json.loads(line);payload=path.parent/entry['path']
+        if hashlib.sha256(payload.read_bytes()).hexdigest()!=entry['sha256']:
+            raise ValueError('journal payload identity changed')
+        row=wide.load(payload);row.setdefault('controller_commit',cohort['commit'])
+        attempts.append(row)
+    cohort['attempts']=attempts
+    status=Path(str(path)+'.status.json')
+    if status.exists():cohort.update(wide.load(status))
+    return cohort
+
+
 def interrupt(signum, _frame):
     raise SystemExit(128+signum)
 
@@ -496,7 +565,7 @@ def replay(directory,write=False):
         path=directory/filename
         if hashlib.sha256(path.read_bytes()).hexdigest()!=digest:
             raise ValueError('retained archive identity changed: '+filename)
-        cohort=validate_cohort(wide.load(path));count+=len(cohort['attempts'])
+        cohort=validate_cohort(load_cohort(path));count+=len(cohort['attempts'])
         for ref in cohort['references'].values():
             if ref.get('archive_sha256'):
                 artifact=directory/Path(ref['provenance']).name
@@ -572,12 +641,14 @@ def main():
     parser.add_argument('--engines',default='msolve,groebner.jl,groebner-rs,grobx,zeebra')
     parser.add_argument('--fields',default='32003,2147483647,wide64,goldilocks')
     parser.add_argument('--references',type=Path,nargs='*',default=[],help='previous exact-reference cohort; hashes and full evidence retained')
+    parser.add_argument('--resume',type=Path,help='explicit same-instrument continuation of missing cells only')
     parser.add_argument('--reference-only',action='store_true',help='record independent Singular references through existing adapter')
     parser.add_argument('--certify',action='store_true',help='one bounded independent grobx exact/cofactor reference per input')
     parser.add_argument('--workers',default='1,2,4,8,16,32')
     parser.add_argument('--repeats',type=int,default=3)
     parser.add_argument('--wall',type=int,default=60)
     parser.add_argument('--campaign-wall',type=int,default=1200)
+    parser.add_argument('--campaign-output-mib',type=int,default=16384)
     parser.add_argument('--diagnostic',action='store_true')
     parser.add_argument('--summarize',action='store_true')
     args=parser.parse_args()
@@ -586,7 +657,7 @@ def main():
     if not args.output:
         parser.error('--output required for measurement/single-cohort summaries')
     if args.summarize:
-        summarize(wide.load(args.output),args.output.with_suffix('.md'));return
+        summarize(load_cohort(args.output),args.output.with_suffix('.md'));return
     if not args.binary or not args.scratch or str(args.scratch.resolve()).startswith(str(Path.home())):
         parser.error('binary and scratch outside home/worktree required')
     if not re.fullmatch('[0-9a-f]{40}',args.input_source or ''):
@@ -620,7 +691,7 @@ def main():
             b['wrapper_source_commit']=args.oracle_source or args.input_source
     cases=load_cases(args.binary);refs=reference_bases(cases)
     for archive in args.references:
-        previous=wide.load(archive)
+        previous=load_cohort(archive)
         previous_cases={c['digest']:canonical_case(c) for c in previous['cases']}
         archive_hash=hashlib.sha256(archive.read_bytes()).hexdigest()
         for a in previous['attempts']:
@@ -669,16 +740,31 @@ def main():
         cohort['msolve_build']=dict(path=str(makefile),sha256=hashlib.sha256(makefile.read_bytes()).hexdigest(),
             flags=[line for line in makefile.read_text().splitlines() if re.match(r'^(CC|CFLAGS|SIMD_FLAGS|CPUEXT_FLAGS|OPENMP_CFLAGS|libneogb_la_CFLAGS) =',line)])
     cohort['policy']['references']=[str(p) for p in args.references]
+    cohort['policy']['resume']=str(args.resume) if args.resume else None
+    previous=load_cohort(args.resume) if args.resume else None
+    if previous:
+        check_resume(previous,cohort)
+        cohort['attempts']=previous['attempts']
+    journal=AttemptJournal(args.output,cohort,args.resume)
+    done={attempt_key(a) for a in cohort['attempts']}
     args.scratch.mkdir(parents=True,exist_ok=True)
     # Worker order alternates between repetitions; timed arms exclude hot snapshot diagnostics.
     stopped={}
+    for a in cohort['attempts']:
+        key=(a['digest'],a['engine'])
+        if a['status']=='stopped-by-limit' and a['workers']==1:stopped[key]=True
+        elif a['workers']==16 and a['status'] in ('complete','verified'):stopped.pop(key,None)
     for repeat in range(args.repeats):
         for case in cases:
             if case['name'] not in args.rows.split(',') or str(case['field']) not in args.fields.split(','):continue
             for p in workers if repeat%2==0 else list(reversed(workers)):
                 for engine in engines if repeat%2==0 else list(reversed(engines)):
+                    actual_engine='grobx-certified' if args.certify else engine
+                    if (case['digest'],actual_engine,p,repeat,args.diagnostic) in done:continue
+                    if journal.retained_bytes>args.campaign_output_mib*1024**2:
+                        journal.stop('declared-total-storage',retained_bytes=journal.retained_bytes);return
                     if time.monotonic()-started>args.campaign_wall:
-                        cohort['campaign_stop']='declared-total-wall';wide.write(args.output,cohort);summarize(cohort,args.output.with_suffix('.md'));return
+                        journal.stop('declared-total-wall',elapsed_seconds=time.monotonic()-started);return
                     key=(case['digest'],engine)
                     # One serial resource refusal gates the rest of that case/engine grid.
                     gated = key in stopped and (repeat > 0 or p != 16 or args.certify)
@@ -686,7 +772,8 @@ def main():
                         a=dict(field=case['field'],name=case['name'],digest=case['digest'],engine=engine,
                                workers=p,repeat=repeat,diagnostic=args.diagnostic,status='skipped-by-gate',
                                detail='serial resource refusal; one 16-worker rescue retained separately')
-                        cohort['attempts'].append(a);wide.write(args.output,cohort)
+                        a['controller_commit']=cohort['commit']
+                        cohort['attempts'].append(a);journal.append(a)
                         continue
                     stem=args.scratch/str(len(cohort['attempts']))
                     actual_engine='grobx-certified' if args.certify else engine
@@ -713,17 +800,17 @@ def main():
                     if a['status']=='stopped-by-limit' and p==1:stopped[key]=True
                     elif p==16 and a['status'] in ('complete','verified'):
                         stopped.pop(key,None)
-                    cohort['attempts'].append(a);wide.write(args.output,cohort)
+                    a['controller_commit']=cohort['commit']
+                    cohort['attempts'].append(a);journal.append(a)
                     print(case['field'],case['name'],engine,p,repeat,a['status'],flush=True)
                     if a['status']=='interrupted':
-                        cohort['campaign_stop']='launcher-signal';wide.write(args.output,cohort)
-                        summarize(cohort,args.output.with_suffix('.md'));raise SystemExit(a['interrupt_exit'])
+                        journal.stop('launcher-signal',elapsed_seconds=time.monotonic()-started)
+                        raise SystemExit(a['interrupt_exit'])
                     if a['status'] in ('environment-refused','excluded-environment-overlap'):
-                        cohort['campaign_stop']='compiler-environment-gate';wide.write(args.output,cohort)
-                        summarize(cohort,args.output.with_suffix('.md'));raise SystemExit(75)
+                        journal.stop('compiler-environment-gate',elapsed_seconds=time.monotonic()-started)
+                        raise SystemExit(75)
                     if a['status']=='failed':raise RuntimeError('unexpected engine failure retained')
-    cohort['elapsed_seconds']=time.monotonic()-started
-    wide.write(args.output,cohort);summarize(cohort,args.output.with_suffix('.md'))
+    journal.stop('complete',elapsed_seconds=time.monotonic()-started)
 
 
 if __name__=='__main__':

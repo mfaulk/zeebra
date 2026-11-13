@@ -62,6 +62,7 @@ Use fresh output paths for distinct grids and diagnostic arms; no silent continu
 ZEEBRA_MACHINE=5995wx tools/benchlock.sh comparand-739 \
   python3 tools/external/comparand-scaling.py \
   --binary "$CARGO_TARGET_DIR/debug/examples/competitive_sweep" \
+  --input-source "$(git rev-parse HEAD)" \
   --scratch "$CARGO_TARGET_DIR/native" --output "$CARGO_TARGET_DIR/native.json.gz" \
   --fields 32003,2147483647 --rows katsura-4,mq-random-10,katsura-11,cyclic-7 \
   --repeats 3 --campaign-wall 1200
@@ -111,3 +112,28 @@ Grobx's pinned driver and production Zeebra refuse multiworker requests explicit
 These experimental cohort tables are retained research evidence, not new shipping Zeebra board
 rows. Final main-board integration must use existing CompetitiveRecord contracts and exact
 configuration/provenance gates; unsupported Zeebra multiworker rows remain capability refusals.
+
+## Bounded controller continuation
+
+The first native campaign stopped at its declared 1150-second before-next-cell cutoff after
+222 grid records. Whole-cohort gzip checkpointing consumed substantial controller time:
+391.91 seconds of child wall time and 70.83 seconds of exact coefficient checking leave about
+687 seconds of the declared window for input/output parsing, archival and other controller work.
+This residual is not a measurement of compression alone. Its 250,212,529-byte compressed
+checkpoint retains the accepted prefix, refusals and all original controller identities.
+
+The continuation changes archival behavior only: following the existing #592 journal pattern,
+write static metadata once, each gzip attempt payload once, and append a flushed/fsynced
+hash/path descriptor. A small status sidecar records termination. An incomplete descriptor is
+an explicit recovery blocker; committed payload changes are rejected. Existing `wide.pack`
+provides lossless bounded publication chunks after timing. `--resume PATH` requires identical
+inputs, executable hashes, compiler/package provenance, affinity, effective environment and
+solver policy. Every previous complete, refused, unsupported or gated identity is skipped.
+Original attempts retain their original controller commit. There is one declared continuation,
+not repeated sampling until a favorable result. The new aggregate storage ceiling is 16 GiB
+for newly retained payloads plus measured child output; each original child cap remains intact.
+
+The continuation has a 1150-second dispatch cutoff and an external **1200-second hard wall
+limit**. Pending cells remain unattempted if the bound is reached. Julia is a separately declared
+stage with its own at-most-1200-second hard cap, including diagnostics. No claim of saturation
+or a scaling knee is made from a single unresolved repetition.

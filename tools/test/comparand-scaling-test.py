@@ -15,6 +15,39 @@ spec.loader.exec_module(scaling)
 
 
 class ComparandScalingTests(unittest.TestCase):
+    # Journal payloads retain failed rows once and reject modified committed bytes.
+    def test_journal_checkpoint_is_lossless_and_hash_bound(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'cohort.json.gz'
+            journal=scaling.AttemptJournal(path,dict(commit='a'*40,attempts=[]))
+            row=dict(status='failed',error='missing native answer',stdout='x'*10000,controller_commit='a'*40)
+            journal.append(row);journal.stop('interrupted')
+            recovered=scaling.load_cohort(path)
+            self.assertEqual(recovered['attempts'],[row])
+            self.assertEqual(recovered['campaign_stop'],'interrupted')
+            recovered['attempts'][0].update(field='13',name='control',engine='fake')
+            packed=Path(directory)/'packed.json.gz';scaling.wide.pack(recovered,packed,chunk_size=100)
+            self.assertEqual(scaling.wide.load(packed),recovered)
+            payload=next((Path(str(path)+'.attempts')).glob('*.gz'))
+            payload.write_bytes(b'changed')
+            with self.assertRaises(ValueError):scaling.load_cohort(path)
+    # A controller-only continuation skips every prior identity and rejects changed instruments.
+    def test_resume_reuses_complete_and_refused_cells_without_rerun(self):
+        identity=dict(machine='host',physical_cpus=[0,2],cases=[],references={},binaries={},
+                      input_exporter={},effective_environment={},rustc='pin',policy=dict(wall=60,workers='1,2',repeats=3,rows='x',fields='13',engines='grobx',diagnostic=False,certify=False,reference_only=False))
+        previous=dict(identity,commit='a'*40,attempts=[dict(digest='d',engine='grobx',workers=1,repeat=0,diagnostic=False,status='stopped-by-limit')])
+        current=dict(identity,commit='b'*40,attempts=[])
+        scaling.check_resume(previous,current)
+        self.assertEqual(scaling.attempt_key(previous['attempts'][0]),('d','grobx',1,0,False))
+        changed=dict(current,binaries={'grobx':{'sha256':'other'}})
+        with self.assertRaises(ValueError):scaling.check_resume(previous,changed)
+    # An interrupted uncommitted journal tail is an explicit blocker, never a silently accepted row.
+    def test_partial_journal_line_requires_explicit_recovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'cohort.json.gz'
+            journal=scaling.AttemptJournal(path,dict(commit='a'*40,attempts=[]))
+            journal.journal.write_text('{"path":')
+            with self.assertRaisesRegex(ValueError,'incomplete journal'):scaling.load_cohort(path)
     # A launcher signal preserves an interrupted attempt after killing and reaping its solver.
     def test_launcher_signal_retains_interruption_boundary(self):
         with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling.wide.guard,'tree_hwm',side_effect=SystemExit(143)):
