@@ -597,3 +597,98 @@ prototype removes work without adding mark maintenance, and its scan counts do n
 scan-time bottleneck. Generic correctness covers characteristic two, binary extension, 64-bit
 and BN254 fields; wide-field performance and independently witnessed wider full solves remain
 outside this shipping decision. #149's negative AVX2 shipping verdict remains unchanged.
+
+### Forward/backward crossing and larger probe
+
+**Measured at:** combined executable Rust source `ff15a0af`, controller `1bf48baa`.
+The [combined summary](../../research/selective-backward/combined-summary.json) retains
+140 native attempts, 12 separately timed work diagnostics and four MQ14 probes. All 152 completed
+native/diagnostic answers match the full independent references and preserve the F4 pair/degree/
+shape trajectory. There are no excluded attempts or compiler-gate refusals in these cohorts.
+After waiting 1,737 seconds for the shared lock, this campaign ran on the same machine, toolchain,
+ISA/profile and allocator as above. Serial/one-worker children pin CPU 3; four-worker children pin
+CPUs 0–3. Native load observations are 2.06–2.93. Its times are not pooled with the earlier binary.
+
+Median complete F4 call milliseconds, five fresh processes per cell. `one` is the same concurrent
+forward algorithm at one worker, not a relabelled serial control. The last column is maximum
+self RSS, serial selected → four-worker selected, MiB.
+
+| Prime | Serial full | Serial selected | One full | One selected | Four full | Four selected | Selected RSS |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 32003 | 3200.824 | 1300.425 | 3169.729 | 1274.008 | 2332.214 | 494.656 | 34.49 → 40.43 |
+| 2147483647 | 3309.431 | 1383.567 | 3264.976 | 1367.392 | 2438.262 | 513.758 | 34.84 → 40.97 |
+
+Within this cohort the combined route is 6.47x/6.44x faster than serial full, 2.63x/2.69x faster
+than serial selected, and 2.58x/2.66x faster than one-worker selected. Selected RSS rises about
+17%/18% with four workers, remaining below the existing 1.5x feasibility ceiling. The matched
+serial-full ranges are 3073–3219/3142–3421 ms; four-selected ranges are 471–501/473–530 ms.
+The sign is not an overlapping-noise result. Final interreduction remains approximately 13 ms.
+
+The stage split makes the interaction explicit. At the small prime, median batch-forward/backward
+sums change from **1156/1896 ms** (serial full), to **1126/40 ms** (serial selected), to **301/44 ms**
+(four selected). At the larger prime they are **1197/1967**, **1203/45**, and **315/49 ms**.
+Removing backward work exposes a forward stage that the existing concurrent prototype can shorten.
+The full task still charges symbolic preprocessing, construction, extraction, final interreduction
+and observer/runtime overhead. Medians of stage sums need not add to the complete-call median.
+
+The small controls reject an unconditional parallel policy:
+
+| Control / prime | Serial selected ms | Four selected ms |
+|---|---:|---:|
+| Cyclic-5 / 32003 | 0.704 | 2.110 |
+| Cyclic-5 / 2147483647 | 0.724 | 2.240 |
+| Katsura-6 / 32003 | 0.965 | 1.656 |
+| Katsura-6 / 2147483647 | 0.961 | 1.753 |
+
+The concurrent forward route grows to 0.8–1.5 ms on these controls, versus 0.1–0.3 ms serial.
+This campaign does not isolate thread startup from its other forward overhead. It fails the
+no-5%-control-regression shipping gate despite the MQ10 result. A size gate or runtime policy belongs to the existing
+#592/#728 work; this study does not silently select one or introduce a production thread pool.
+
+Single work-on observations preserve the complete pre-forward matrix digests across concurrent
+arms. Serial forward work remains 585,166,982/585,195,178 products under both backward policies.
+Four-worker selected observations report 584,134,280/584,319,879 forward products, including
+8,415,756/7,231,959 products attributed to failed-publication retries. One-worker concurrent
+products equal serial and retry products are zero. Publication order changes the echelon pivots;
+backward selected products are 23,561,084/23,530,121 at four workers versus
+23,566,622/23,567,093 serial. These are measured trajectory differences, not a pure cost-per-product
+comparison. Worker-local passive counts equal the direct worker products; row aggregation covers
+every non-inherited input row. Each diagnostic has one sample and its time is not a native median.
+
+Four-worker forward workspace is bounded at 865,440/1,057,760 bytes in these diagnostics.
+Peak reserved entries are 1,571,889/1,573,215: these are the concurrent algorithm's conservative
+reservation upper bounds, including retained input/pending reservations, not measured mathematical
+nonzero peaks. They are distinct from sparse capacities, dense scratch and process RSS.
+
+All four MQ14 probes end with `TooManyNonzeros` at the **unchanged 32,000,000-entry allowance**:
+
+| Prime | Full offending count | Selected offending count | Full/selected sampled tree RSS MiB |
+|---|---:|---:|---:|
+| 32003 | 32,000,887 | 32,000,270 | 767.16 / 725.28 |
+| 2147483647 | 32,001,899 | 32,000,112 | 769.41 / 738.43 |
+
+No probe completed, no basis was promoted and no stopped duration is used as a speedup.
+Both routes hit the same declared entry ceiling before the 60-second/2-GiB outer caps. Lower
+observed RSS on an incomplete computation is not a frontier-capacity win. The requested public
+MQ14 digests, derived from the invoked case and frozen corpus source, are
+`4e440cfac84262260736a2368f43c7a96181986ca5bc108517299520d56f8795` and
+`029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d`, respectively.
+Raw commands, typed refusal messages and complete outputs for every completed control remain in
+the archives. A future larger successful solve needs its own independent reference.
+
+**Disposition:** adopt candidate-only transient reduction as a justified production follow-up;
+reject the all-target dense replacement and an unconditional four-worker default; defer marked
+scans, wider-field performance and any frontier-capacity claim. This PR retains experimental
+entry points behind `research-work`, with ordinary F4/RREF defaults unchanged. Production
+integration is tracked in [#749](https://github.com/mfaulk/zeebra/issues/749) and must reconcile
+mathematical versus reserved-entry statistics, stricter temporary-copy
+budget charging, backend/order coverage and fallback behavior before enabling a default.
+
+Red-Green tests first failed on selected-subset behavior and refusal/reuse, then covered five
+field types, random rank deficiency, duplicate/nonmonic pivots, empty/partial selections and
+mid-operation entry stops. Complete small F4 solves and one/four-worker composition agree.
+All 2,808 active library tests at the initial pin passed; the final seven focused kernel tests
+and four profiling-example tests pass. Offline CI rechecks basis coefficients, complete plans,
+trajectory/input digests, timer/RSS validity, worker counter consistency and all artifact hashes.
+Commands, source pins, README examples, workflow references and source comments were reviewed.
+The unresolved performance claims above are deliberately not presented as completed evidence.

@@ -140,3 +140,34 @@ The combined executable's Rust source pin is `ff15a0af`. The controller records 
 revision separately and rejects a different Cargo/library/example tree. Resume accepts
 retained resource-limited probe outcomes without reclassifying them as verified answers;
 failed or unverified native timing attempts still cannot resume.
+
+
+## Retained result
+
+The isolated serial gate passes, and the four-worker combination improves MQ10 further,
+but scoped parallel dispatch regresses the small classical controls. All four MQ14 probes
+stop at the existing 32-million-entry budget. No production default or frontier-capacity
+claim follows from these experiments. See the report's separate adopt/reject/defer decisions.
+
+`native.json.gz`/`work.json.gz` retain the 160 accepted serial attempts;
+`cross-native.json.gz`/`cross-work.json.gz` retain 140 native crossings and 12 diagnostics;
+`probes.json.gz` retains four resource refusals. `exploratory/` retains 160 earlier complete
+answers whose times are excluded. The source/controller pins travel in each cohort.
+`benchlock.log` and `cross-benchlock.log` preserve the complete lock windows, including the
+1,737-second queue wait. Every archive/payload/log is covered by `inventory.json`.
+
+The combined executable also echoes the full ordered generators after the self-RSS snapshot;
+whole-process timing includes that output, while the F4 timer excludes parsing/rendering.
+Its samples therefore stay in their own cohort. Recheck the crossing with:
+
+```sh
+python3 tools/test/selective-backward-combined-summary-test.py
+python3 research/selective-backward/combined_summary.py
+```
+
+`combined-summary.json` retains native spreads, all F4 stages, worker-local diagnostics and
+explicitly unverified probe outcomes. It checks direct/passive worker products and complete
+row aggregation. Conservative concurrent reservations are not mathematical nonzero peaks.
+
+Production integration is tracked separately in [#749](https://github.com/mfaulk/zeebra/issues/749).
+The measured prototype remains opt-in pending that contract/budget review.

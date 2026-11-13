@@ -1,0 +1,2697 @@
+{
+  "identities": {
+    "native": {
+      "commit": "1bf48baa306070ca7761aa025f5967873204f3db",
+      "binary_sha256": "426bade7dedd8a869afbe150e048b92a6eef15d6a76bc02c361ad35d3cd456ee",
+      "binary_source_commit": "ff15a0afa463c31cbeee0dac7f9163e09d1c70c8",
+      "phase": "native",
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "machine": "trpro-5995wx",
+      "compiler_gate": true,
+      "cargo_lock_sha256": "ec8937ebe16fcdd94e6dfa44663616ceb2ccb098a35b6591826d9c323f61841e"
+    },
+    "work": {
+      "commit": "1bf48baa306070ca7761aa025f5967873204f3db",
+      "binary_sha256": "426bade7dedd8a869afbe150e048b92a6eef15d6a76bc02c361ad35d3cd456ee",
+      "binary_source_commit": "ff15a0afa463c31cbeee0dac7f9163e09d1c70c8",
+      "phase": "work",
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "machine": "trpro-5995wx",
+      "compiler_gate": true,
+      "cargo_lock_sha256": "ec8937ebe16fcdd94e6dfa44663616ceb2ccb098a35b6591826d9c323f61841e"
+    },
+    "probe": {
+      "commit": "1bf48baa306070ca7761aa025f5967873204f3db",
+      "binary_sha256": "426bade7dedd8a869afbe150e048b92a6eef15d6a76bc02c361ad35d3cd456ee",
+      "binary_source_commit": "ff15a0afa463c31cbeee0dac7f9163e09d1c70c8",
+      "phase": "probe",
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "machine": "trpro-5995wx",
+      "compiler_gate": true,
+      "cargo_lock_sha256": "ec8937ebe16fcdd94e6dfa44663616ceb2ccb098a35b6591826d9c323f61841e"
+    }
+  },
+  "accepted_native_attempts": 140,
+  "work_attempts": 12,
+  "native": [
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "parallel-full",
+      "f4_ms": {
+        "median": 2.338297,
+        "minimum": 2.180328,
+        "maximum": 2.64087
+      },
+      "process_ms": {
+        "median": 7.271807,
+        "minimum": 7.197186,
+        "maximum": 7.383147
+      },
+      "cpu_ms": {
+        "median": 6.782999999995987,
+        "minimum": 6.581999999996313,
+        "maximum": 7.438999999996199
+      },
+      "self_peak_mib": 4.41796875,
+      "tree_peak_mib": 6.3984375,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.14990234375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.229573,
+          "minimum": 0.203955,
+          "maximum": 0.270193
+        },
+        "construction_ns": {
+          "median": 0.057729,
+          "minimum": 0.047461,
+          "maximum": 0.062069
+        },
+        "elimination_ns": {
+          "median": 1.735086,
+          "minimum": 1.651086,
+          "maximum": 1.992202
+        },
+        "extraction_ns": {
+          "median": 0.051797,
+          "minimum": 0.044525,
+          "maximum": 0.059051
+        },
+        "interreduction_ns": {
+          "median": 0.07895,
+          "minimum": 0.070173,
+          "maximum": 0.090422
+        },
+        "other_ns": {
+          "median": 0.154228,
+          "minimum": 0.139032,
+          "maximum": 0.169068
+        }
+      },
+      "forward_ms": {
+        "median": 1.391855,
+        "minimum": 1.335646,
+        "maximum": 1.635105
+      },
+      "backward_ms": {
+        "median": 0.278288,
+        "minimum": 0.252107,
+        "maximum": 0.287501
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "parallel-selected",
+      "f4_ms": {
+        "median": 2.110185,
+        "minimum": 2.065551,
+        "maximum": 2.322126
+      },
+      "process_ms": {
+        "median": 7.282247,
+        "minimum": 7.204239,
+        "maximum": 7.3526
+      },
+      "cpu_ms": {
+        "median": 6.778999999999757,
+        "minimum": 6.23900000001143,
+        "maximum": 7.1670000000017
+      },
+      "self_peak_mib": 4.34765625,
+      "tree_peak_mib": 6.40625,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.14990234375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.24261,
+          "minimum": 0.228103,
+          "maximum": 0.253799
+        },
+        "construction_ns": {
+          "median": 0.05756,
+          "minimum": 0.052319,
+          "maximum": 0.073437
+        },
+        "elimination_ns": {
+          "median": 1.528884,
+          "minimum": 1.467739,
+          "maximum": 1.626578
+        },
+        "extraction_ns": {
+          "median": 0.055547,
+          "minimum": 0.05333,
+          "maximum": 0.067929
+        },
+        "interreduction_ns": {
+          "median": 0.083868,
+          "minimum": 0.075803,
+          "maximum": 0.118855
+        },
+        "other_ns": {
+          "median": 0.164509,
+          "minimum": 0.152851,
+          "maximum": 0.190866
+        }
+      },
+      "forward_ms": {
+        "median": 1.435127,
+        "minimum": 1.376397,
+        "maximum": 1.527221
+      },
+      "backward_ms": {
+        "median": 0.031985,
+        "minimum": 0.031027,
+        "maximum": 0.036961
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "serial-full",
+      "f4_ms": {
+        "median": 0.802149,
+        "minimum": 0.77613,
+        "maximum": 0.907608
+      },
+      "process_ms": {
+        "median": 5.095867,
+        "minimum": 5.014173,
+        "maximum": 5.130353
+      },
+      "cpu_ms": {
+        "median": 4.094000000000264,
+        "minimum": 3.8179999999918834,
+        "maximum": 4.570999999995884
+      },
+      "self_peak_mib": 4.234375,
+      "tree_peak_mib": 5.6015625,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.14990234375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.193575,
+          "minimum": 0.187044,
+          "maximum": 0.23808
+        },
+        "construction_ns": {
+          "median": 0.045306,
+          "minimum": 0.043583,
+          "maximum": 0.050185
+        },
+        "elimination_ns": {
+          "median": 0.32356,
+          "minimum": 0.315099,
+          "maximum": 0.362736
+        },
+        "extraction_ns": {
+          "median": 0.037923,
+          "minimum": 0.036797,
+          "maximum": 0.042731
+        },
+        "interreduction_ns": {
+          "median": 0.077617,
+          "minimum": 0.069411,
+          "maximum": 0.086143
+        },
+        "other_ns": {
+          "median": 0.117165,
+          "minimum": 0.109607,
+          "maximum": 0.133875
+        }
+      },
+      "forward_ms": {
+        "median": 0.10654,
+        "minimum": 0.103987,
+        "maximum": 0.122012
+      },
+      "backward_ms": {
+        "median": 0.20422,
+        "minimum": 0.200708,
+        "maximum": 0.22764
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 32003,
+      "arm": "serial-selected",
+      "f4_ms": {
+        "median": 0.703853,
+        "minimum": 0.601288,
+        "maximum": 0.848656
+      },
+      "process_ms": {
+        "median": 5.109133,
+        "minimum": 4.971973,
+        "maximum": 6.138081
+      },
+      "cpu_ms": {
+        "median": 4.222999999992538,
+        "minimum": 3.317999999999932,
+        "maximum": 4.587999999997372
+      },
+      "self_peak_mib": 4.1640625,
+      "tree_peak_mib": 6.078125,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.14990234375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.216189,
+          "minimum": 0.185705,
+          "maximum": 0.26927
+        },
+        "construction_ns": {
+          "median": 0.049884,
+          "minimum": 0.04264,
+          "maximum": 0.076527
+        },
+        "elimination_ns": {
+          "median": 0.157458,
+          "minimum": 0.135219,
+          "maximum": 0.188555
+        },
+        "extraction_ns": {
+          "median": 0.045705,
+          "minimum": 0.039463,
+          "maximum": 0.064786
+        },
+        "interreduction_ns": {
+          "median": 0.083067,
+          "minimum": 0.073389,
+          "maximum": 0.085713
+        },
+        "other_ns": {
+          "median": 0.141199,
+          "minimum": 0.11802,
+          "maximum": 0.168595
+        }
+      },
+      "forward_ms": {
+        "median": 0.118604,
+        "minimum": 0.103057,
+        "maximum": 0.142713
+      },
+      "backward_ms": {
+        "median": 0.0258,
+        "minimum": 0.022009,
+        "maximum": 0.030097
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "parallel-full",
+      "f4_ms": {
+        "median": 2.471499,
+        "minimum": 2.165269,
+        "maximum": 2.649696
+      },
+      "process_ms": {
+        "median": 7.351177,
+        "minimum": 7.206964,
+        "maximum": 7.522772
+      },
+      "cpu_ms": {
+        "median": 7.178000000001461,
+        "minimum": 6.3299999999886225,
+        "maximum": 7.424000000009201
+      },
+      "self_peak_mib": 4.28515625,
+      "tree_peak_mib": 6.2734375,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.219066,
+          "minimum": 0.205537,
+          "maximum": 0.248099
+        },
+        "construction_ns": {
+          "median": 0.065955,
+          "minimum": 0.056608,
+          "maximum": 0.070762
+        },
+        "elimination_ns": {
+          "median": 1.885159,
+          "minimum": 1.630348,
+          "maximum": 1.981441
+        },
+        "extraction_ns": {
+          "median": 0.060334,
+          "minimum": 0.0534,
+          "maximum": 0.073701
+        },
+        "interreduction_ns": {
+          "median": 0.082326,
+          "minimum": 0.070774,
+          "maximum": 0.093256
+        },
+        "other_ns": {
+          "median": 0.153718,
+          "minimum": 0.14233,
+          "maximum": 0.17326
+        }
+      },
+      "forward_ms": {
+        "median": 1.536026,
+        "minimum": 1.329013,
+        "maximum": 1.599717
+      },
+      "backward_ms": {
+        "median": 0.274191,
+        "minimum": 0.240536,
+        "maximum": 0.325157
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "parallel-selected",
+      "f4_ms": {
+        "median": 2.240301,
+        "minimum": 2.001499,
+        "maximum": 2.322937
+      },
+      "process_ms": {
+        "median": 7.365675,
+        "minimum": 7.265605,
+        "maximum": 7.392155
+      },
+      "cpu_ms": {
+        "median": 6.934999999992364,
+        "minimum": 6.4040000000060715,
+        "maximum": 7.1630000000002525
+      },
+      "self_peak_mib": 4.203125,
+      "tree_peak_mib": 6.37109375,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.236046,
+          "minimum": 0.218203,
+          "maximum": 0.251034
+        },
+        "construction_ns": {
+          "median": 0.062318,
+          "minimum": 0.059724,
+          "maximum": 0.069121
+        },
+        "elimination_ns": {
+          "median": 1.594346,
+          "minimum": 1.427845,
+          "maximum": 1.692958
+        },
+        "extraction_ns": {
+          "median": 0.074017,
+          "minimum": 0.057108,
+          "maximum": 0.07443
+        },
+        "interreduction_ns": {
+          "median": 0.094599,
+          "minimum": 0.079761,
+          "maximum": 0.097805
+        },
+        "other_ns": {
+          "median": 0.165473,
+          "minimum": 0.140726,
+          "maximum": 0.175724
+        }
+      },
+      "forward_ms": {
+        "median": 1.492647,
+        "minimum": 1.338196,
+        "maximum": 1.586072
+      },
+      "backward_ms": {
+        "median": 0.032523,
+        "minimum": 0.029847,
+        "maximum": 0.035415
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "serial-full",
+      "f4_ms": {
+        "median": 0.914381,
+        "minimum": 0.815955,
+        "maximum": 0.960488
+      },
+      "process_ms": {
+        "median": 5.023651,
+        "minimum": 5.000918,
+        "maximum": 5.433096
+      },
+      "cpu_ms": {
+        "median": 4.075000000000273,
+        "minimum": 3.7950000000090967,
+        "maximum": 4.7109999999990215
+      },
+      "self_peak_mib": 4.0625,
+      "tree_peak_mib": 5.4921875,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.14990234375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.202334,
+          "minimum": 0.183906,
+          "maximum": 0.210617
+        },
+        "construction_ns": {
+          "median": 0.054713,
+          "minimum": 0.048421,
+          "maximum": 0.069771
+        },
+        "elimination_ns": {
+          "median": 0.380879,
+          "minimum": 0.334995,
+          "maximum": 0.403375
+        },
+        "extraction_ns": {
+          "median": 0.049433,
+          "minimum": 0.04301,
+          "maximum": 0.053151
+        },
+        "interreduction_ns": {
+          "median": 0.080833,
+          "minimum": 0.071265,
+          "maximum": 0.089329
+        },
+        "other_ns": {
+          "median": 0.131762,
+          "minimum": 0.120759,
+          "maximum": 0.136599
+        }
+      },
+      "forward_ms": {
+        "median": 0.132872,
+        "minimum": 0.112925,
+        "maximum": 0.135925
+      },
+      "backward_ms": {
+        "median": 0.233454,
+        "minimum": 0.20708,
+        "maximum": 0.248507
+      }
+    },
+    {
+      "problem": "cyclic-5",
+      "modulus": 2147483647,
+      "arm": "serial-selected",
+      "f4_ms": {
+        "median": 0.72401,
+        "minimum": 0.710174,
+        "maximum": 0.806948
+      },
+      "process_ms": {
+        "median": 5.1075,
+        "minimum": 5.025764,
+        "maximum": 5.227036
+      },
+      "cpu_ms": {
+        "median": 4.178999999989053,
+        "minimum": 3.7299999999973465,
+        "maximum": 4.322999999996302
+      },
+      "self_peak_mib": 4.01953125,
+      "tree_peak_mib": 5.5625,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.222711,
+          "minimum": 0.207931,
+          "maximum": 0.260643
+        },
+        "construction_ns": {
+          "median": 0.05287,
+          "minimum": 0.049044,
+          "maximum": 0.059132
+        },
+        "elimination_ns": {
+          "median": 0.164861,
+          "minimum": 0.160936,
+          "maximum": 0.18381
+        },
+        "extraction_ns": {
+          "median": 0.053811,
+          "minimum": 0.050184,
+          "maximum": 0.060204
+        },
+        "interreduction_ns": {
+          "median": 0.093868,
+          "minimum": 0.083237,
+          "maximum": 0.099809
+        },
+        "other_ns": {
+          "median": 0.138431,
+          "minimum": 0.132713,
+          "maximum": 0.147197
+        }
+      },
+      "forward_ms": {
+        "median": 0.130927,
+        "minimum": 0.130237,
+        "maximum": 0.149034
+      },
+      "backward_ms": {
+        "median": 0.023186,
+        "minimum": 0.021972,
+        "maximum": 0.025748
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "parallel-full",
+      "f4_ms": {
+        "median": 2.194124,
+        "minimum": 2.007119,
+        "maximum": 2.459577
+      },
+      "process_ms": {
+        "median": 7.319668,
+        "minimum": 7.234216,
+        "maximum": 7.372758
+      },
+      "cpu_ms": {
+        "median": 6.567000000012868,
+        "minimum": 6.265000000010623,
+        "maximum": 7.149000000003625
+      },
+      "self_peak_mib": 5.3046875,
+      "tree_peak_mib": 7.23828125,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.350052,
+          "minimum": 0.307586,
+          "maximum": 0.368968
+        },
+        "construction_ns": {
+          "median": 0.085671,
+          "minimum": 0.074469,
+          "maximum": 0.095531
+        },
+        "elimination_ns": {
+          "median": 1.492314,
+          "minimum": 1.376917,
+          "maximum": 1.700249
+        },
+        "extraction_ns": {
+          "median": 0.046949,
+          "minimum": 0.040297,
+          "maximum": 0.056748
+        },
+        "interreduction_ns": {
+          "median": 0.094929,
+          "minimum": 0.092235,
+          "maximum": 0.10567
+        },
+        "other_ns": {
+          "median": 0.122452,
+          "minimum": 0.110236,
+          "maximum": 0.128083
+        }
+      },
+      "forward_ms": {
+        "median": 0.807459,
+        "minimum": 0.751433,
+        "maximum": 0.912056
+      },
+      "backward_ms": {
+        "median": 0.620083,
+        "minimum": 0.564128,
+        "maximum": 0.703713
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "parallel-selected",
+      "f4_ms": {
+        "median": 1.656265,
+        "minimum": 1.481956,
+        "maximum": 1.842979
+      },
+      "process_ms": {
+        "median": 7.304509,
+        "minimum": 5.183403,
+        "maximum": 7.417323
+      },
+      "cpu_ms": {
+        "median": 6.180999999999104,
+        "minimum": 5.704999999989191,
+        "maximum": 6.523000000002721
+      },
+      "self_peak_mib": 4.9765625,
+      "tree_peak_mib": 6.953125,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.337238,
+          "minimum": 0.304385,
+          "maximum": 0.382405
+        },
+        "construction_ns": {
+          "median": 0.087485,
+          "minimum": 0.076424,
+          "maximum": 0.097944
+        },
+        "elimination_ns": {
+          "median": 0.92449,
+          "minimum": 0.832886,
+          "maximum": 1.024229
+        },
+        "extraction_ns": {
+          "median": 0.052941,
+          "minimum": 0.045576,
+          "maximum": 0.061036
+        },
+        "interreduction_ns": {
+          "median": 0.113735,
+          "minimum": 0.098667,
+          "maximum": 0.124426
+        },
+        "other_ns": {
+          "median": 0.140664,
+          "minimum": 0.116934,
+          "maximum": 0.152018
+        }
+      },
+      "forward_ms": {
+        "median": 0.829138,
+        "minimum": 0.733338,
+        "maximum": 0.915613
+      },
+      "backward_ms": {
+        "median": 0.035688,
+        "minimum": 0.032091,
+        "maximum": 0.041679
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "serial-full",
+      "f4_ms": {
+        "median": 1.513044,
+        "minimum": 1.342031,
+        "maximum": 1.536268
+      },
+      "process_ms": {
+        "median": 7.253693,
+        "minimum": 5.003793,
+        "maximum": 7.597113
+      },
+      "cpu_ms": {
+        "median": 4.895000000000316,
+        "minimum": 4.457000000009259,
+        "maximum": 4.9679999999900915
+      },
+      "self_peak_mib": 5.046875,
+      "tree_peak_mib": 6.08203125,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.309244,
+          "minimum": 0.27966,
+          "maximum": 0.330475
+        },
+        "construction_ns": {
+          "median": 0.075724,
+          "minimum": 0.067488,
+          "maximum": 0.080512
+        },
+        "elimination_ns": {
+          "median": 0.876479,
+          "minimum": 0.769596,
+          "maximum": 0.890284
+        },
+        "extraction_ns": {
+          "median": 0.038774,
+          "minimum": 0.035547,
+          "maximum": 0.042833
+        },
+        "interreduction_ns": {
+          "median": 0.091904,
+          "minimum": 0.088498,
+          "maximum": 0.100099
+        },
+        "other_ns": {
+          "median": 0.097517,
+          "minimum": 0.091374,
+          "maximum": 0.101393
+        }
+      },
+      "forward_ms": {
+        "median": 0.273358,
+        "minimum": 0.237309,
+        "maximum": 0.287843
+      },
+      "backward_ms": {
+        "median": 0.580007,
+        "minimum": 0.522649,
+        "maximum": 0.606888
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 32003,
+      "arm": "serial-selected",
+      "f4_ms": {
+        "median": 0.964656,
+        "minimum": 0.954317,
+        "maximum": 1.045749
+      },
+      "process_ms": {
+        "median": 5.099996,
+        "minimum": 4.959149,
+        "maximum": 5.312057
+      },
+      "cpu_ms": {
+        "median": 4.172000000003173,
+        "minimum": 4.107000000002969,
+        "maximum": 4.934999999999912
+      },
+      "self_peak_mib": 4.921875,
+      "tree_peak_mib": 6.2578125,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.319925,
+          "minimum": 0.311799,
+          "maximum": 0.349773
+        },
+        "construction_ns": {
+          "median": 0.077357,
+          "minimum": 0.072066,
+          "maximum": 0.080742
+        },
+        "elimination_ns": {
+          "median": 0.320065,
+          "minimum": 0.305709,
+          "maximum": 0.335555
+        },
+        "extraction_ns": {
+          "median": 0.044414,
+          "minimum": 0.041359,
+          "maximum": 0.049313
+        },
+        "interreduction_ns": {
+          "median": 0.106802,
+          "minimum": 0.097374,
+          "maximum": 0.111902
+        },
+        "other_ns": {
+          "median": 0.100422,
+          "minimum": 0.094401,
+          "maximum": 0.112603
+        }
+      },
+      "forward_ms": {
+        "median": 0.283558,
+        "minimum": 0.266838,
+        "maximum": 0.292123
+      },
+      "backward_ms": {
+        "median": 0.029946,
+        "minimum": 0.026941,
+        "maximum": 0.032442
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "parallel-full",
+      "f4_ms": {
+        "median": 2.199814,
+        "minimum": 2.023331,
+        "maximum": 2.393341
+      },
+      "process_ms": {
+        "median": 7.345126,
+        "minimum": 7.286796,
+        "maximum": 7.480692
+      },
+      "cpu_ms": {
+        "median": 6.487000000016785,
+        "minimum": 6.295000000016593,
+        "maximum": 6.910999999996115
+      },
+      "self_peak_mib": 5.04296875,
+      "tree_peak_mib": 7.234375,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.323072,
+          "minimum": 0.294456,
+          "maximum": 0.340954
+        },
+        "construction_ns": {
+          "median": 0.090391,
+          "minimum": 0.083066,
+          "maximum": 0.091936
+        },
+        "elimination_ns": {
+          "median": 1.504808,
+          "minimum": 1.399579,
+          "maximum": 1.697514
+        },
+        "extraction_ns": {
+          "median": 0.052279,
+          "minimum": 0.049975,
+          "maximum": 0.071234
+        },
+        "interreduction_ns": {
+          "median": 0.093658,
+          "minimum": 0.088528,
+          "maximum": 0.106662
+        },
+        "other_ns": {
+          "median": 0.095721,
+          "minimum": 0.089891,
+          "maximum": 0.100134
+        }
+      },
+      "forward_ms": {
+        "median": 0.835903,
+        "minimum": 0.767452,
+        "maximum": 0.99773
+      },
+      "backward_ms": {
+        "median": 0.612399,
+        "minimum": 0.564929,
+        "maximum": 0.636475
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "parallel-selected",
+      "f4_ms": {
+        "median": 1.753329,
+        "minimum": 1.627772,
+        "maximum": 1.776844
+      },
+      "process_ms": {
+        "median": 7.311102,
+        "minimum": 5.128218,
+        "maximum": 7.635656
+      },
+      "cpu_ms": {
+        "median": 6.168999999983882,
+        "minimum": 5.883000000025618,
+        "maximum": 6.656999999997915
+      },
+      "self_peak_mib": 4.890625,
+      "tree_peak_mib": 5.78125,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.341767,
+          "minimum": 0.311751,
+          "maximum": 0.399033
+        },
+        "construction_ns": {
+          "median": 0.086123,
+          "minimum": 0.076084,
+          "maximum": 0.094842
+        },
+        "elimination_ns": {
+          "median": 0.97703,
+          "minimum": 0.942063,
+          "maximum": 1.024901
+        },
+        "extraction_ns": {
+          "median": 0.063509,
+          "minimum": 0.060854,
+          "maximum": 0.066124
+        },
+        "interreduction_ns": {
+          "median": 0.109838,
+          "minimum": 0.100911,
+          "maximum": 0.113976
+        },
+        "other_ns": {
+          "median": 0.12149,
+          "minimum": 0.112073,
+          "maximum": 0.129887
+        }
+      },
+      "forward_ms": {
+        "median": 0.869607,
+        "minimum": 0.830444,
+        "maximum": 0.909141
+      },
+      "backward_ms": {
+        "median": 0.035105,
+        "minimum": 0.033692,
+        "maximum": 0.044495
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "serial-full",
+      "f4_ms": {
+        "median": 1.477697,
+        "minimum": 1.359604,
+        "maximum": 1.66361
+      },
+      "process_ms": {
+        "median": 5.061743,
+        "minimum": 5.006448,
+        "maximum": 7.331169
+      },
+      "cpu_ms": {
+        "median": 4.5979999999974375,
+        "minimum": 4.479999999986717,
+        "maximum": 5.031000000001562
+      },
+      "self_peak_mib": 4.64453125,
+      "tree_peak_mib": 5.7890625,
+      "load": {
+        "median": 2.60693359375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.295337,
+          "minimum": 0.266407,
+          "maximum": 0.324165
+        },
+        "construction_ns": {
+          "median": 0.081515,
+          "minimum": 0.071473,
+          "maximum": 0.089227
+        },
+        "elimination_ns": {
+          "median": 0.885847,
+          "minimum": 0.806867,
+          "maximum": 0.989465
+        },
+        "extraction_ns": {
+          "median": 0.036028,
+          "minimum": 0.033694,
+          "maximum": 0.050965
+        },
+        "interreduction_ns": {
+          "median": 0.088397,
+          "minimum": 0.084891,
+          "maximum": 0.104077
+        },
+        "other_ns": {
+          "median": 0.086284,
+          "minimum": 0.083647,
+          "maximum": 0.101362
+        }
+      },
+      "forward_ms": {
+        "median": 0.285001,
+        "minimum": 0.263789,
+        "maximum": 0.321538
+      },
+      "backward_ms": {
+        "median": 0.590038,
+        "minimum": 0.536325,
+        "maximum": 0.654729
+      }
+    },
+    {
+      "problem": "katsura-6",
+      "modulus": 2147483647,
+      "arm": "serial-selected",
+      "f4_ms": {
+        "median": 0.96142,
+        "minimum": 0.858656,
+        "maximum": 0.990626
+      },
+      "process_ms": {
+        "median": 5.067574,
+        "minimum": 5.039871,
+        "maximum": 5.205715
+      },
+      "cpu_ms": {
+        "median": 4.351999999996581,
+        "minimum": 3.936000000001272,
+        "maximum": 4.3779999999924435
+      },
+      "self_peak_mib": 4.60546875,
+      "tree_peak_mib": 6.06640625,
+      "load": {
+        "median": 2.60693359375,
+        "minimum": 2.0576171875,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 0.311119,
+          "minimum": 0.280313,
+          "maximum": 0.323643
+        },
+        "construction_ns": {
+          "median": 0.07416,
+          "minimum": 0.065893,
+          "maximum": 0.076528
+        },
+        "elimination_ns": {
+          "median": 0.330135,
+          "minimum": 0.292322,
+          "maximum": 0.342849
+        },
+        "extraction_ns": {
+          "median": 0.04793,
+          "minimum": 0.037573,
+          "maximum": 0.052811
+        },
+        "interreduction_ns": {
+          "median": 0.103657,
+          "minimum": 0.097805,
+          "maximum": 0.106392
+        },
+        "other_ns": {
+          "median": 0.086743,
+          "minimum": 0.073749,
+          "maximum": 0.095943
+        }
+      },
+      "forward_ms": {
+        "median": 0.295519,
+        "minimum": 0.262035,
+        "maximum": 0.309115
+      },
+      "backward_ms": {
+        "median": 0.025369,
+        "minimum": 0.024966,
+        "maximum": 0.029716
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "one-full",
+      "f4_ms": {
+        "median": 3169.728629,
+        "minimum": 2947.247668,
+        "maximum": 3229.372075
+      },
+      "process_ms": {
+        "median": 3206.212048,
+        "minimum": 2982.18447,
+        "maximum": 3266.249631
+      },
+      "cpu_ms": {
+        "median": 3187.2799999999934,
+        "minimum": 2964.870000000002,
+        "maximum": 3245.421999999998
+      },
+      "self_peak_mib": 132.39453125,
+      "tree_peak_mib": 135.01953125,
+      "load": {
+        "median": 2.54931640625,
+        "minimum": 2.359375,
+        "maximum": 2.724609375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 82.064115,
+          "minimum": 76.669362,
+          "maximum": 85.47467
+        },
+        "construction_ns": {
+          "median": 14.460174,
+          "minimum": 13.317402,
+          "maximum": 14.674842
+        },
+        "elimination_ns": {
+          "median": 3025.896497,
+          "minimum": 2812.970895,
+          "maximum": 3081.076735
+        },
+        "extraction_ns": {
+          "median": 5.844524,
+          "minimum": 5.358495,
+          "maximum": 5.895301
+        },
+        "interreduction_ns": {
+          "median": 12.611536,
+          "minimum": 11.897404,
+          "maximum": 13.469881
+        },
+        "other_ns": {
+          "median": 28.852843,
+          "minimum": 27.029952,
+          "maximum": 29.480695
+        }
+      },
+      "forward_ms": {
+        "median": 1125.701757,
+        "minimum": 1050.057214,
+        "maximum": 1169.275369
+      },
+      "backward_ms": {
+        "median": 1894.848999,
+        "minimum": 1757.992423,
+        "maximum": 1947.727799
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "one-selected",
+      "f4_ms": {
+        "median": 1274.008178,
+        "minimum": 1214.629432,
+        "maximum": 1293.557588
+      },
+      "process_ms": {
+        "median": 1305.472236,
+        "minimum": 1243.754261,
+        "maximum": 1325.801994
+      },
+      "cpu_ms": {
+        "median": 1296.9000000000053,
+        "minimum": 1235.5080000000003,
+        "maximum": 1316.3160000000023
+      },
+      "self_peak_mib": 37.94921875,
+      "tree_peak_mib": 41.0234375,
+      "load": {
+        "median": 2.54931640625,
+        "minimum": 2.359375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 84.556341,
+          "minimum": 79.736136,
+          "maximum": 85.293957
+        },
+        "construction_ns": {
+          "median": 18.26498,
+          "minimum": 16.900154,
+          "maximum": 18.592298
+        },
+        "elimination_ns": {
+          "median": 1137.611762,
+          "minimum": 1086.774399,
+          "maximum": 1156.894499
+        },
+        "extraction_ns": {
+          "median": 8.33503,
+          "minimum": 7.789709,
+          "maximum": 8.5258
+        },
+        "interreduction_ns": {
+          "median": 12.39673,
+          "minimum": 11.683249,
+          "maximum": 13.611218
+        },
+        "other_ns": {
+          "median": 12.346394,
+          "minimum": 11.738741,
+          "maximum": 12.836531
+        }
+      },
+      "forward_ms": {
+        "median": 1090.736647,
+        "minimum": 1042.416491,
+        "maximum": 1109.669281
+      },
+      "backward_ms": {
+        "median": 41.36348,
+        "minimum": 38.751816,
+        "maximum": 41.961911
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "parallel-full",
+      "f4_ms": {
+        "median": 2332.213969,
+        "minimum": 2213.793395,
+        "maximum": 2408.791716
+      },
+      "process_ms": {
+        "median": 2365.697089,
+        "minimum": 2246.39645,
+        "maximum": 2444.002356
+      },
+      "cpu_ms": {
+        "median": 3230.0290000000014,
+        "minimum": 3045.0500000000025,
+        "maximum": 3308.280999999993
+      },
+      "self_peak_mib": 131.53515625,
+      "tree_peak_mib": 136.80859375,
+      "load": {
+        "median": 2.509765625,
+        "minimum": 2.4384765625,
+        "maximum": 2.66650390625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 83.189674,
+          "minimum": 78.213364,
+          "maximum": 86.247335
+        },
+        "construction_ns": {
+          "median": 14.412046,
+          "minimum": 13.971901,
+          "maximum": 15.111668
+        },
+        "elimination_ns": {
+          "median": 2185.87455,
+          "minimum": 2075.048043,
+          "maximum": 2256.221801
+        },
+        "extraction_ns": {
+          "median": 5.847889,
+          "minimum": 5.58324,
+          "maximum": 6.523479
+        },
+        "interreduction_ns": {
+          "median": 13.206392,
+          "minimum": 12.780506,
+          "maximum": 15.050574
+        },
+        "other_ns": {
+          "median": 29.488707,
+          "minimum": 27.617524,
+          "maximum": 31.63455
+        }
+      },
+      "forward_ms": {
+        "median": 304.601833,
+        "minimum": 281.896174,
+        "maximum": 306.282362
+      },
+      "backward_ms": {
+        "median": 1874.850069,
+        "minimum": 1787.872604,
+        "maximum": 1944.38945
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "parallel-selected",
+      "f4_ms": {
+        "median": 494.65567,
+        "minimum": 471.457061,
+        "maximum": 500.664717
+      },
+      "process_ms": {
+        "median": 528.120646,
+        "minimum": 501.709354,
+        "maximum": 534.151875
+      },
+      "cpu_ms": {
+        "median": 1391.2759999999996,
+        "minimum": 1337.2809999999865,
+        "maximum": 1405.3280000000025
+      },
+      "self_peak_mib": 40.43359375,
+      "tree_peak_mib": 42.60546875,
+      "load": {
+        "median": 2.509765625,
+        "minimum": 2.4384765625,
+        "maximum": 2.724609375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 88.949219,
+          "minimum": 82.787212,
+          "maximum": 89.686243
+        },
+        "construction_ns": {
+          "median": 19.133863,
+          "minimum": 18.895985,
+          "maximum": 20.373311
+        },
+        "elimination_ns": {
+          "median": 351.486053,
+          "minimum": 337.473154,
+          "maximum": 355.155328
+        },
+        "extraction_ns": {
+          "median": 8.823364,
+          "minimum": 8.280365,
+          "maximum": 9.244079
+        },
+        "interreduction_ns": {
+          "median": 13.262909,
+          "minimum": 12.215577,
+          "maximum": 13.674238
+        },
+        "other_ns": {
+          "median": 12.477743,
+          "minimum": 11.795921,
+          "maximum": 12.76148
+        }
+      },
+      "forward_ms": {
+        "median": 301.137642,
+        "minimum": 290.755497,
+        "maximum": 304.326681
+      },
+      "backward_ms": {
+        "median": 43.99974,
+        "minimum": 41.120449,
+        "maximum": 44.388059
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "serial-full",
+      "f4_ms": {
+        "median": 3200.824018,
+        "minimum": 3073.237071,
+        "maximum": 3219.306059
+      },
+      "process_ms": {
+        "median": 3231.652763,
+        "minimum": 3102.165308,
+        "maximum": 3250.024214
+      },
+      "cpu_ms": {
+        "median": 3212.4890000000005,
+        "minimum": 3084.09300000001,
+        "maximum": 3230.9730000000072
+      },
+      "self_peak_mib": 132.2421875,
+      "tree_peak_mib": 135.40625,
+      "load": {
+        "median": 2.509765625,
+        "minimum": 2.466796875,
+        "maximum": 2.693359375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 82.225439,
+          "minimum": 77.490324,
+          "maximum": 83.555398
+        },
+        "construction_ns": {
+          "median": 13.122173,
+          "minimum": 12.056074,
+          "maximum": 13.389697
+        },
+        "elimination_ns": {
+          "median": 3052.453582,
+          "minimum": 2936.02294,
+          "maximum": 3073.939313
+        },
+        "extraction_ns": {
+          "median": 5.794117,
+          "minimum": 5.381777,
+          "maximum": 6.271002
+        },
+        "interreduction_ns": {
+          "median": 16.979095,
+          "minimum": 16.485139,
+          "maximum": 17.095825
+        },
+        "other_ns": {
+          "median": 27.066935,
+          "minimum": 25.796278,
+          "maximum": 28.160847
+        }
+      },
+      "forward_ms": {
+        "median": 1156.042329,
+        "minimum": 1127.575692,
+        "maximum": 1163.663514
+      },
+      "backward_ms": {
+        "median": 1896.058582,
+        "minimum": 1808.166132,
+        "maximum": 1926.204964
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 32003,
+      "arm": "serial-selected",
+      "f4_ms": {
+        "median": 1300.425431,
+        "minimum": 1222.636802,
+        "maximum": 1340.678548
+      },
+      "process_ms": {
+        "median": 1329.7036,
+        "minimum": 1251.499584,
+        "maximum": 1370.097915
+      },
+      "cpu_ms": {
+        "median": 1321.3730000000003,
+        "minimum": 1244.1140000000032,
+        "maximum": 1361.001999999999
+      },
+      "self_peak_mib": 34.4921875,
+      "tree_peak_mib": 36.54296875,
+      "load": {
+        "median": 2.55419921875,
+        "minimum": 2.4384765625,
+        "maximum": 2.66650390625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 83.261239,
+          "minimum": 79.336039,
+          "maximum": 85.711838
+        },
+        "construction_ns": {
+          "median": 17.342953,
+          "minimum": 16.223105,
+          "maximum": 17.583819
+        },
+        "elimination_ns": {
+          "median": 1166.777028,
+          "minimum": 1096.400873,
+          "maximum": 1204.804809
+        },
+        "extraction_ns": {
+          "median": 8.929074,
+          "minimum": 8.228106,
+          "maximum": 8.986334
+        },
+        "interreduction_ns": {
+          "median": 12.479557,
+          "minimum": 11.722383,
+          "maximum": 12.541694
+        },
+        "other_ns": {
+          "median": 11.254568,
+          "minimum": 10.723159,
+          "maximum": 12.030378
+        }
+      },
+      "forward_ms": {
+        "median": 1126.077314,
+        "minimum": 1057.251576,
+        "maximum": 1161.494626
+      },
+      "backward_ms": {
+        "median": 40.352986,
+        "minimum": 38.83517,
+        "maximum": 42.98539
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "one-full",
+      "f4_ms": {
+        "median": 3264.97572,
+        "minimum": 3097.948564,
+        "maximum": 3391.768234
+      },
+      "process_ms": {
+        "median": 3299.864551,
+        "minimum": 3131.580727,
+        "maximum": 3426.968884
+      },
+      "cpu_ms": {
+        "median": 3280.8269999999975,
+        "minimum": 3114.547999999992,
+        "maximum": 3406.0979999999963
+      },
+      "self_peak_mib": 133.30078125,
+      "tree_peak_mib": 135.8203125,
+      "load": {
+        "median": 2.6376953125,
+        "minimum": 2.14990234375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 83.238025,
+          "minimum": 78.204618,
+          "maximum": 83.678569
+        },
+        "construction_ns": {
+          "median": 14.436551,
+          "minimum": 13.450212,
+          "maximum": 14.791266
+        },
+        "elimination_ns": {
+          "median": 3116.826764,
+          "minimum": 2959.648404,
+          "maximum": 3243.084735
+        },
+        "extraction_ns": {
+          "median": 5.807173,
+          "minimum": 5.504802,
+          "maximum": 5.958471
+        },
+        "interreduction_ns": {
+          "median": 12.699062,
+          "minimum": 12.054722,
+          "maximum": 13.621368
+        },
+        "other_ns": {
+          "median": 30.634639,
+          "minimum": 29.077571,
+          "maximum": 32.021173
+        }
+      },
+      "forward_ms": {
+        "median": 1188.906855,
+        "minimum": 1120.65505,
+        "maximum": 1252.199961
+      },
+      "backward_ms": {
+        "median": 1922.552048,
+        "minimum": 1834.139456,
+        "maximum": 1985.75325
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "one-selected",
+      "f4_ms": {
+        "median": 1367.392452,
+        "minimum": 1304.444439,
+        "maximum": 1434.777305
+      },
+      "process_ms": {
+        "median": 1402.003919,
+        "minimum": 1335.115876,
+        "maximum": 1466.968249
+      },
+      "cpu_ms": {
+        "median": 1391.5469999999966,
+        "minimum": 1326.1529999999952,
+        "maximum": 1457.467000000002
+      },
+      "self_peak_mib": 39.5625,
+      "tree_peak_mib": 41.97265625,
+      "load": {
+        "median": 2.6552734375,
+        "minimum": 2.14990234375,
+        "maximum": 2.7880859375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 84.263246,
+          "minimum": 80.072483,
+          "maximum": 88.869649
+        },
+        "construction_ns": {
+          "median": 17.925978,
+          "minimum": 17.53762,
+          "maximum": 19.094759
+        },
+        "elimination_ns": {
+          "median": 1227.735385,
+          "minimum": 1174.442979,
+          "maximum": 1291.167171
+        },
+        "extraction_ns": {
+          "median": 8.58287,
+          "minimum": 8.15408,
+          "maximum": 9.299047
+        },
+        "interreduction_ns": {
+          "median": 12.865026,
+          "minimum": 11.903516,
+          "maximum": 13.445926
+        },
+        "other_ns": {
+          "median": 12.858001,
+          "minimum": 12.328001,
+          "maximum": 13.217492
+        }
+      },
+      "forward_ms": {
+        "median": 1176.414611,
+        "minimum": 1123.063419,
+        "maximum": 1235.673082
+      },
+      "backward_ms": {
+        "median": 45.505702,
+        "minimum": 45.135011,
+        "maximum": 49.252104
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "parallel-full",
+      "f4_ms": {
+        "median": 2438.261668,
+        "minimum": 2283.505023,
+        "maximum": 2543.081192
+      },
+      "process_ms": {
+        "median": 2473.221905,
+        "minimum": 2318.136388,
+        "maximum": 2579.808684
+      },
+      "cpu_ms": {
+        "median": 3395.199999999998,
+        "minimum": 3173.5989999999765,
+        "maximum": 3515.791000000003
+      },
+      "self_peak_mib": 133.859375,
+      "tree_peak_mib": 137.80078125,
+      "load": {
+        "median": 2.5380859375,
+        "minimum": 2.25048828125,
+        "maximum": 2.85693359375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 81.853384,
+          "minimum": 79.321179,
+          "maximum": 84.107484
+        },
+        "construction_ns": {
+          "median": 14.578347,
+          "minimum": 13.944742,
+          "maximum": 14.896102
+        },
+        "elimination_ns": {
+          "median": 2290.046016,
+          "minimum": 2144.401831,
+          "maximum": 2392.33965
+        },
+        "extraction_ns": {
+          "median": 5.986252,
+          "minimum": 5.797859,
+          "maximum": 6.314152
+        },
+        "interreduction_ns": {
+          "median": 13.514686,
+          "minimum": 12.74586,
+          "maximum": 14.76338
+        },
+        "other_ns": {
+          "median": 28.330523,
+          "minimum": 26.411133,
+          "maximum": 32.896581
+        }
+      },
+      "forward_ms": {
+        "median": 325.200758,
+        "minimum": 301.086814,
+        "maximum": 332.464389
+      },
+      "backward_ms": {
+        "median": 1959.756062,
+        "minimum": 1838.378272,
+        "maximum": 2054.321184
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "parallel-selected",
+      "f4_ms": {
+        "median": 513.758486,
+        "minimum": 472.964705,
+        "maximum": 530.089653
+      },
+      "process_ms": {
+        "median": 546.632503,
+        "minimum": 504.837487,
+        "maximum": 563.467945
+      },
+      "cpu_ms": {
+        "median": 1451.3979999999824,
+        "minimum": 1341.4080000000208,
+        "maximum": 1508.8449999999984
+      },
+      "self_peak_mib": 40.97265625,
+      "tree_peak_mib": 42.98046875,
+      "load": {
+        "median": 2.5380859375,
+        "minimum": 2.25048828125,
+        "maximum": 2.85693359375
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 88.289849,
+          "minimum": 82.158,
+          "maximum": 90.39104
+        },
+        "construction_ns": {
+          "median": 19.133132,
+          "minimum": 18.088825,
+          "maximum": 20.016925
+        },
+        "elimination_ns": {
+          "median": 369.997909,
+          "minimum": 341.383747,
+          "maximum": 386.080686
+        },
+        "extraction_ns": {
+          "median": 8.886705,
+          "minimum": 7.917147,
+          "maximum": 9.23395
+        },
+        "interreduction_ns": {
+          "median": 13.632188,
+          "minimum": 12.041717,
+          "maximum": 13.667755
+        },
+        "other_ns": {
+          "median": 12.903328,
+          "minimum": 11.367515,
+          "maximum": 12.981305
+        }
+      },
+      "forward_ms": {
+        "median": 315.390938,
+        "minimum": 291.296203,
+        "maximum": 330.204072
+      },
+      "backward_ms": {
+        "median": 49.166603,
+        "minimum": 44.561943,
+        "maximum": 49.590828
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "serial-full",
+      "f4_ms": {
+        "median": 3309.430992,
+        "minimum": 3142.14616,
+        "maximum": 3421.038848
+      },
+      "process_ms": {
+        "median": 3343.661718,
+        "minimum": 3174.047786,
+        "maximum": 3453.317918
+      },
+      "cpu_ms": {
+        "median": 3323.679000000001,
+        "minimum": 3154.951000000006,
+        "maximum": 3432.702000000003
+      },
+      "self_peak_mib": 136.078125,
+      "tree_peak_mib": 139.234375,
+      "load": {
+        "median": 2.58544921875,
+        "minimum": 2.25048828125,
+        "maximum": 2.931640625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 78.708901,
+          "minimum": 75.188554,
+          "maximum": 83.315862
+        },
+        "construction_ns": {
+          "median": 13.626158,
+          "minimum": 12.952142,
+          "maximum": 14.321214
+        },
+        "elimination_ns": {
+          "median": 3163.810284,
+          "minimum": 3002.906399,
+          "maximum": 3268.409941
+        },
+        "extraction_ns": {
+          "median": 6.245906,
+          "minimum": 6.124193,
+          "maximum": 6.658116
+        },
+        "interreduction_ns": {
+          "median": 12.66111,
+          "minimum": 12.057276,
+          "maximum": 13.456826
+        },
+        "other_ns": {
+          "median": 34.891654,
+          "minimum": 32.902167,
+          "maximum": 35.554172
+        }
+      },
+      "forward_ms": {
+        "median": 1196.552658,
+        "minimum": 1146.984374,
+        "maximum": 1266.865906
+      },
+      "backward_ms": {
+        "median": 1966.926978,
+        "minimum": 1855.632336,
+        "maximum": 2006.553367
+      }
+    },
+    {
+      "problem": "mq-random-10",
+      "modulus": 2147483647,
+      "arm": "serial-selected",
+      "f4_ms": {
+        "median": 1383.566934,
+        "minimum": 1304.303573,
+        "maximum": 1393.339124
+      },
+      "process_ms": {
+        "median": 1415.486664,
+        "minimum": 1334.891903,
+        "maximum": 1425.786073
+      },
+      "cpu_ms": {
+        "median": 1405.379999999993,
+        "minimum": 1325.9490000000173,
+        "maximum": 1417.5920000000071
+      },
+      "self_peak_mib": 34.8359375,
+      "tree_peak_mib": 36.8828125,
+      "load": {
+        "median": 2.58544921875,
+        "minimum": 2.25048828125,
+        "maximum": 2.931640625
+      },
+      "stages_ms": {
+        "symbolic_ns": {
+          "median": 83.386257,
+          "minimum": 80.049659,
+          "maximum": 86.216867
+        },
+        "construction_ns": {
+          "median": 16.884535,
+          "minimum": 15.790885,
+          "maximum": 17.311594
+        },
+        "elimination_ns": {
+          "median": 1249.736488,
+          "minimum": 1177.735973,
+          "maximum": 1257.740138
+        },
+        "extraction_ns": {
+          "median": 9.034865,
+          "minimum": 8.109856,
+          "maximum": 9.24418
+        },
+        "interreduction_ns": {
+          "median": 12.046417,
+          "minimum": 11.826661,
+          "maximum": 12.755879
+        },
+        "other_ns": {
+          "median": 11.097359,
+          "minimum": 10.787573,
+          "maximum": 11.932559
+        }
+      },
+      "forward_ms": {
+        "median": 1202.816278,
+        "minimum": 1133.957637,
+        "maximum": 1213.604729
+      },
+      "backward_ms": {
+        "median": 45.055449,
+        "minimum": 43.42262,
+        "maximum": 47.041588
+      }
+    }
+  ],
+  "work": [
+    {
+      "modulus": 32003,
+      "arm": "serial-full",
+      "backward": {
+        "pivot_applications": 2058159,
+        "coefficient_products": 579721912,
+        "sparse_target_entries": 597657296,
+        "sparse_prefix_preserved": 1114687565,
+        "sparse_merge_output_entries": 610222599,
+        "sparse_copyback_entries": 610222599,
+        "dense_load_entries": 0,
+        "dense_scan_cells": 0,
+        "dense_gather_cells": 0,
+        "dense_gather_entries": 0,
+        "normalized_cells": 0,
+        "reducer_target_operations": 1089354,
+        "pair_target_operations": 968805,
+        "rows_loaded": 2058159,
+        "rows_zero": 0
+      },
+      "forward_products": 585166982
+    },
+    {
+      "modulus": 32003,
+      "arm": "serial-selected",
+      "backward": {
+        "pivot_applications": 471831,
+        "coefficient_products": 23566622,
+        "sparse_target_entries": 0,
+        "sparse_prefix_preserved": 0,
+        "sparse_merge_output_entries": 0,
+        "sparse_copyback_entries": 0,
+        "dense_load_entries": 210902,
+        "dense_scan_cells": 629935,
+        "dense_gather_cells": 630185,
+        "dense_gather_entries": 71088,
+        "normalized_cells": 0,
+        "reducer_target_operations": 0,
+        "pair_target_operations": 471831,
+        "rows_loaded": 250,
+        "rows_zero": 0
+      },
+      "forward_products": 585166982
+    },
+    {
+      "modulus": 32003,
+      "arm": "parallel-full",
+      "backward": {
+        "pivot_applications": 2054154,
+        "coefficient_products": 578722770,
+        "sparse_target_entries": 596512707,
+        "sparse_prefix_preserved": 1111510590,
+        "sparse_merge_output_entries": 609083113,
+        "sparse_copyback_entries": 609083113,
+        "dense_load_entries": 0,
+        "dense_scan_cells": 0,
+        "dense_gather_cells": 0,
+        "dense_gather_entries": 0,
+        "normalized_cells": 0,
+        "reducer_target_operations": 1089354,
+        "pair_target_operations": 964800,
+        "rows_loaded": 2054154,
+        "rows_zero": 0
+      },
+      "forward_products": 583805903,
+      "forward_retry_products": 5345503,
+      "worker_rows": [
+        [
+          0,
+          10,
+          0,
+          0
+        ],
+        [
+          28,
+          0,
+          0,
+          0
+        ],
+        [
+          64,
+          34,
+          27,
+          19
+        ],
+        [
+          116,
+          111,
+          112,
+          119
+        ],
+        [
+          236,
+          211,
+          213,
+          224
+        ],
+        [
+          73,
+          96,
+          79,
+          90
+        ],
+        [
+          33,
+          17,
+          32,
+          32
+        ],
+        [
+          382,
+          362,
+          357,
+          367
+        ],
+        [
+          25,
+          25,
+          20,
+          26
+        ],
+        [
+          4,
+          3,
+          4,
+          3
+        ]
+      ],
+      "workspace_bytes": 865440,
+      "peak_reserved_entries": 1572425
+    },
+    {
+      "modulus": 32003,
+      "arm": "parallel-selected",
+      "backward": {
+        "pivot_applications": 471814,
+        "coefficient_products": 23561084,
+        "sparse_target_entries": 0,
+        "sparse_prefix_preserved": 0,
+        "sparse_merge_output_entries": 0,
+        "sparse_copyback_entries": 0,
+        "dense_load_entries": 210415,
+        "dense_scan_cells": 629935,
+        "dense_gather_cells": 630185,
+        "dense_gather_entries": 71088,
+        "normalized_cells": 0,
+        "reducer_target_operations": 0,
+        "pair_target_operations": 471814,
+        "rows_loaded": 250,
+        "rows_zero": 0
+      },
+      "forward_products": 584134280,
+      "forward_retry_products": 8415756,
+      "worker_rows": [
+        [
+          10,
+          0,
+          0,
+          0
+        ],
+        [
+          28,
+          0,
+          0,
+          0
+        ],
+        [
+          44,
+          39,
+          36,
+          25
+        ],
+        [
+          122,
+          118,
+          107,
+          111
+        ],
+        [
+          212,
+          247,
+          209,
+          216
+        ],
+        [
+          74,
+          92,
+          86,
+          86
+        ],
+        [
+          26,
+          17,
+          40,
+          31
+        ],
+        [
+          366,
+          391,
+          341,
+          370
+        ],
+        [
+          25,
+          24,
+          24,
+          23
+        ],
+        [
+          4,
+          2,
+          5,
+          3
+        ]
+      ],
+      "workspace_bytes": 865440,
+      "peak_reserved_entries": 1571889
+    },
+    {
+      "modulus": 32003,
+      "arm": "one-full",
+      "backward": {
+        "pivot_applications": 2058159,
+        "coefficient_products": 579721912,
+        "sparse_target_entries": 597657296,
+        "sparse_prefix_preserved": 1114687565,
+        "sparse_merge_output_entries": 610222599,
+        "sparse_copyback_entries": 610222599,
+        "dense_load_entries": 0,
+        "dense_scan_cells": 0,
+        "dense_gather_cells": 0,
+        "dense_gather_entries": 0,
+        "normalized_cells": 0,
+        "reducer_target_operations": 1089354,
+        "pair_target_operations": 968805,
+        "rows_loaded": 2058159,
+        "rows_zero": 0
+      },
+      "forward_products": 585166982,
+      "forward_retry_products": 0,
+      "worker_rows": [
+        [
+          10
+        ],
+        [
+          28
+        ],
+        [
+          144
+        ],
+        [
+          458
+        ],
+        [
+          884
+        ],
+        [
+          338
+        ],
+        [
+          114
+        ],
+        [
+          1468
+        ],
+        [
+          96
+        ],
+        [
+          14
+        ]
+      ],
+      "workspace_bytes": 721200,
+      "peak_reserved_entries": 1500607
+    },
+    {
+      "modulus": 32003,
+      "arm": "one-selected",
+      "backward": {
+        "pivot_applications": 471831,
+        "coefficient_products": 23566622,
+        "sparse_target_entries": 0,
+        "sparse_prefix_preserved": 0,
+        "sparse_merge_output_entries": 0,
+        "sparse_copyback_entries": 0,
+        "dense_load_entries": 210902,
+        "dense_scan_cells": 629935,
+        "dense_gather_cells": 630185,
+        "dense_gather_entries": 71088,
+        "normalized_cells": 0,
+        "reducer_target_operations": 0,
+        "pair_target_operations": 471831,
+        "rows_loaded": 250,
+        "rows_zero": 0
+      },
+      "forward_products": 585166982,
+      "forward_retry_products": 0,
+      "worker_rows": [
+        [
+          10
+        ],
+        [
+          28
+        ],
+        [
+          144
+        ],
+        [
+          458
+        ],
+        [
+          884
+        ],
+        [
+          338
+        ],
+        [
+          114
+        ],
+        [
+          1468
+        ],
+        [
+          96
+        ],
+        [
+          14
+        ]
+      ],
+      "workspace_bytes": 721200,
+      "peak_reserved_entries": 1500607
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "serial-full",
+      "backward": {
+        "pivot_applications": 2058195,
+        "coefficient_products": 579751105,
+        "sparse_target_entries": 597686688,
+        "sparse_prefix_preserved": 1114753600,
+        "sparse_merge_output_entries": 610252491,
+        "sparse_copyback_entries": 610252491,
+        "dense_load_entries": 0,
+        "dense_scan_cells": 0,
+        "dense_gather_cells": 0,
+        "dense_gather_entries": 0,
+        "normalized_cells": 0,
+        "reducer_target_operations": 1089357,
+        "pair_target_operations": 968838,
+        "rows_loaded": 2058195,
+        "rows_zero": 0
+      },
+      "forward_products": 585195178
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "serial-selected",
+      "backward": {
+        "pivot_applications": 471840,
+        "coefficient_products": 23567093,
+        "sparse_target_entries": 0,
+        "sparse_prefix_preserved": 0,
+        "sparse_merge_output_entries": 0,
+        "sparse_copyback_entries": 0,
+        "dense_load_entries": 210910,
+        "dense_scan_cells": 629935,
+        "dense_gather_cells": 630185,
+        "dense_gather_entries": 71089,
+        "normalized_cells": 0,
+        "reducer_target_operations": 0,
+        "pair_target_operations": 471840,
+        "rows_loaded": 250,
+        "rows_zero": 0
+      },
+      "forward_products": 585195178
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "parallel-full",
+      "backward": {
+        "pivot_applications": 2055194,
+        "coefficient_products": 579020966,
+        "sparse_target_entries": 596853472,
+        "sparse_prefix_preserved": 1112485573,
+        "sparse_merge_output_entries": 609422816,
+        "sparse_copyback_entries": 609422816,
+        "dense_load_entries": 0,
+        "dense_scan_cells": 0,
+        "dense_gather_cells": 0,
+        "dense_gather_entries": 0,
+        "normalized_cells": 0,
+        "reducer_target_operations": 1089357,
+        "pair_target_operations": 965837,
+        "rows_loaded": 2055194,
+        "rows_zero": 0
+      },
+      "forward_products": 584495047,
+      "forward_retry_products": 10715725,
+      "worker_rows": [
+        [
+          8,
+          0,
+          2,
+          0
+        ],
+        [
+          20,
+          8,
+          0,
+          0
+        ],
+        [
+          45,
+          35,
+          36,
+          28
+        ],
+        [
+          118,
+          125,
+          99,
+          116
+        ],
+        [
+          231,
+          228,
+          219,
+          206
+        ],
+        [
+          74,
+          79,
+          92,
+          93
+        ],
+        [
+          36,
+          22,
+          27,
+          29
+        ],
+        [
+          365,
+          378,
+          341,
+          384
+        ],
+        [
+          22,
+          24,
+          22,
+          28
+        ],
+        [
+          5,
+          4,
+          2,
+          3
+        ]
+      ],
+      "workspace_bytes": 1057760,
+      "peak_reserved_entries": 1572563
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "parallel-selected",
+      "backward": {
+        "pivot_applications": 471842,
+        "coefficient_products": 23530121,
+        "sparse_target_entries": 0,
+        "sparse_prefix_preserved": 0,
+        "sparse_merge_output_entries": 0,
+        "sparse_copyback_entries": 0,
+        "dense_load_entries": 210745,
+        "dense_scan_cells": 629935,
+        "dense_gather_cells": 630185,
+        "dense_gather_entries": 71089,
+        "normalized_cells": 0,
+        "reducer_target_operations": 0,
+        "pair_target_operations": 471842,
+        "rows_loaded": 250,
+        "rows_zero": 0
+      },
+      "forward_products": 584319879,
+      "forward_retry_products": 7231959,
+      "worker_rows": [
+        [
+          8,
+          0,
+          0,
+          2
+        ],
+        [
+          28,
+          0,
+          0,
+          0
+        ],
+        [
+          44,
+          32,
+          43,
+          25
+        ],
+        [
+          108,
+          125,
+          123,
+          102
+        ],
+        [
+          238,
+          220,
+          202,
+          224
+        ],
+        [
+          90,
+          91,
+          77,
+          80
+        ],
+        [
+          26,
+          29,
+          27,
+          32
+        ],
+        [
+          368,
+          406,
+          340,
+          354
+        ],
+        [
+          24,
+          21,
+          24,
+          27
+        ],
+        [
+          4,
+          2,
+          4,
+          4
+        ]
+      ],
+      "workspace_bytes": 1057760,
+      "peak_reserved_entries": 1573215
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "one-full",
+      "backward": {
+        "pivot_applications": 2058195,
+        "coefficient_products": 579751105,
+        "sparse_target_entries": 597686688,
+        "sparse_prefix_preserved": 1114753600,
+        "sparse_merge_output_entries": 610252491,
+        "sparse_copyback_entries": 610252491,
+        "dense_load_entries": 0,
+        "dense_scan_cells": 0,
+        "dense_gather_cells": 0,
+        "dense_gather_entries": 0,
+        "normalized_cells": 0,
+        "reducer_target_operations": 1089357,
+        "pair_target_operations": 968838,
+        "rows_loaded": 2058195,
+        "rows_zero": 0
+      },
+      "forward_products": 585195178,
+      "forward_retry_products": 0,
+      "worker_rows": [
+        [
+          10
+        ],
+        [
+          28
+        ],
+        [
+          144
+        ],
+        [
+          458
+        ],
+        [
+          884
+        ],
+        [
+          338
+        ],
+        [
+          114
+        ],
+        [
+          1468
+        ],
+        [
+          96
+        ],
+        [
+          14
+        ]
+      ],
+      "workspace_bytes": 769280,
+      "peak_reserved_entries": 1500639
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "one-selected",
+      "backward": {
+        "pivot_applications": 471840,
+        "coefficient_products": 23567093,
+        "sparse_target_entries": 0,
+        "sparse_prefix_preserved": 0,
+        "sparse_merge_output_entries": 0,
+        "sparse_copyback_entries": 0,
+        "dense_load_entries": 210910,
+        "dense_scan_cells": 629935,
+        "dense_gather_cells": 630185,
+        "dense_gather_entries": 71089,
+        "normalized_cells": 0,
+        "reducer_target_operations": 0,
+        "pair_target_operations": 471840,
+        "rows_loaded": 250,
+        "rows_zero": 0
+      },
+      "forward_products": 585195178,
+      "forward_retry_products": 0,
+      "worker_rows": [
+        [
+          10
+        ],
+        [
+          28
+        ],
+        [
+          144
+        ],
+        [
+          458
+        ],
+        [
+          884
+        ],
+        [
+          338
+        ],
+        [
+          114
+        ],
+        [
+          1468
+        ],
+        [
+          96
+        ],
+        [
+          14
+        ]
+      ],
+      "workspace_bytes": 769280,
+      "peak_reserved_entries": 1500639
+    }
+  ],
+  "probes": [
+    {
+      "modulus": 32003,
+      "arm": "serial-full",
+      "status": "incomplete-unverified",
+      "reason": "solver-refusal",
+      "requested_digest": "4e440cfac84262260736a2368f43c7a96181986ca5bc108517299520d56f8795",
+      "exit": 101,
+      "process_wall_seconds": 30.167710103,
+      "observed_peak_mib": 767.1640625,
+      "stderr": "\nthread 'main' (1446998) panicked at examples/mq10_profile.rs:300:18:\nselective backward corpus computation failed: TooManyNonzeros { nonzeros: 32000887, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    },
+    {
+      "modulus": 32003,
+      "arm": "serial-selected",
+      "status": "incomplete-unverified",
+      "reason": "solver-refusal",
+      "requested_digest": "4e440cfac84262260736a2368f43c7a96181986ca5bc108517299520d56f8795",
+      "exit": 101,
+      "process_wall_seconds": 17.180494326,
+      "observed_peak_mib": 725.28125,
+      "stderr": "\nthread 'main' (1447104) panicked at examples/mq10_profile.rs:300:18:\nselective backward corpus computation failed: TooManyNonzeros { nonzeros: 32000270, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "serial-full",
+      "status": "incomplete-unverified",
+      "reason": "solver-refusal",
+      "requested_digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "exit": 101,
+      "process_wall_seconds": 32.103210068,
+      "observed_peak_mib": 769.41015625,
+      "stderr": "\nthread 'main' (1447126) panicked at examples/mq10_profile.rs:300:18:\nselective backward corpus computation failed: TooManyNonzeros { nonzeros: 32001899, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    },
+    {
+      "modulus": 2147483647,
+      "arm": "serial-selected",
+      "status": "incomplete-unverified",
+      "reason": "solver-refusal",
+      "requested_digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "exit": 101,
+      "process_wall_seconds": 18.770304155,
+      "observed_peak_mib": 738.4296875,
+      "stderr": "\nthread 'main' (1447297) panicked at examples/mq10_profile.rs:300:18:\nselective backward corpus computation failed: TooManyNonzeros { nonzeros: 32000112, limit: 32000000 }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    }
+  ]
+}
