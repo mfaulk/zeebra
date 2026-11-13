@@ -168,6 +168,11 @@ The pinned F4 matrix corpus has a separate opt-in large set. Run
 `check-all` verifies both sets; `list-large` shows the large dimensions and explicit live-entry budgets without computing a basis.
 The default corpus walk and benchmark smoke retain the bounded small set. See the
 [corpus report](docs/research/f4-matrix-corpus.md) for capture costs and limits.
+Native archives support offline elimination replay without regenerating F4:
+`cargo run --release --example f4_matrix_files -- dump cyclic-6/grevlex/m31/default /buildcache/cyclic-6.zbf4`,
+then replace `dump` with `replay` to load it or `sms` to export prime-field triples to stdout.
+The [matrix-file guide](docs/guide/f4-matrix-files.md) documents the versioned format,
+read limits, field identity checks and external-tool modulus requirements.
 
 The [multicore NTT caller study](docs/research/multicore-ntt.md) records the reachable
 callers, field/domain limits, and bounded Graeffe profiles. It defers threading
