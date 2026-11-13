@@ -102,6 +102,7 @@ jobs:
           python3 research/grobx-trajectory/summarize.py
           git diff --exit-code -- research/grobx-trajectory/summary.json research/grobx-trajectory/summary.csv research/grobx-trajectory/summary-rounds.csv
           cargo test --features research-work --example symbolic_attribution
+          python3 research/symbolic-attribution/summarize.py | diff - research/symbolic-attribution/totals.tsv
           cargo test --features research-work --example worker_pool_study
           cargo test --features research-work --lib dispatch_tests
           python3 tools/test/worker-pool-study-test.py

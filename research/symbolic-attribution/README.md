@@ -40,3 +40,17 @@ criteria are unchanged.
 `python3 research/symbolic-attribution/summarize.py` checks the retained campaign
 against #737 and prints totals. CI runs this check and the instrument's unit tests;
 CI does not rerun the measurement campaign or require msolve.
+
+Retained files:
+
+- `replay.tsv`: nine controls on the original ten frozen batches, at `575f59d9`.
+- `sorted.tsv`: the full sorted-input run's baseline and deduplicated replays, at `f80adee9`.
+- `totals.tsv`: output of the summarizer.
+- `metadata.json`: base commit, instrument/code-delta hashes and raw-record hashes.
+- `benchlock.log`: the two completed measurement windows; no timing claim is made.
+
+The [report](../../docs/research/symbolic-attribution.md) contains the per-round
+attribution and the remaining cross-engine uncertainty. Reproduce the sorted run
+with the same pinned command plus `--sorted-input`, writing to `sorted.tsv`.
+The final instrument adds a mode header to `replay.tsv`; count records match the
+retained earlier instrument exactly.

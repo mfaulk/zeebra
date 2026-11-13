@@ -162,8 +162,10 @@ afford at 0.23% of products. Zeebra's backward phase is about half its products.
 forward phase alone therefore bounds the product share at about 2x until #269 removes the
 back-substitution, so #269 should land before #728's prototype is judged.
 
-**Not owned by any existing issue:** symbolic preprocessing builds 1.20x msolve's rows and 1.19x
-its columns on the same pairs. Filed as #742.
+**Symbolic preprocessing (#742):** preprocessing builds 1.20x msolve's rows and 1.19x
+its columns on the same pairs. [#742's attribution](symbolic-attribution.md) now explains
+89.6% of the row excess and 89.1% of the column excess through initial reducer
+ordering and duplicate pair multiples, with an explicit per-round residual.
 
 ## 5. Reproducing
 
