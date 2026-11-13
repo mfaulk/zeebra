@@ -1040,6 +1040,14 @@ count, one worker was the fastest row at a batch of 64 on every system in all th
 planted-10's peak speedup was 8.84x, 7.29x and 7.73x — a 17% spread around a figure that would have
 to improve by 9 ms to change the projection table's verdict.
 
+**Persistent-pool follow-up (#592), measured at `6360904a`:**
+[the new report](research/worker-pool.md) lowers the dispatch floor and repeats this eight-fixture
+border experiment with the same arithmetic, matched owned-task pipelines and scalar answer checks.
+It finds a narrow default-batch opportunity on Katsura-7; most small/default batches still favor
+inline execution, and planted-10's faster parallel unbounded reduction still loses to its bounded
+whole border. The earlier scoped-thread verdict stands at its stated runtime. No conversion API,
+field bounds or default strategy changes; full-conversion evidence remains a separate gate.
+
 ---
 
 ## 7. M18-3: adaptive operator storage

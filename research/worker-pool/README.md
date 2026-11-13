@@ -88,3 +88,30 @@ smoke run; they do not stand in for the declared full sweep. A quick correctness
 
 After completion copy retained cohorts into this directory and run `python3 research/worker-pool/summarize.py`.
 Keep benchmark-lock windows and provenance with the report in `docs/research/worker-pool.md`.
+
+## Retained verdict and frozen-source reconstruction
+
+The [report](../../docs/research/worker-pool.md) accepts a material dispatch reduction and defers
+production integration. `results.json.gz` contains the complete 2,280-attempt restart; the
+interrupted checkpoint and log are explicitly excluded evidence. `summary.json`/`summary.csv`
+are reproducible from that complete cohort, and `provenance.json` binds archives and decoded bytes.
+
+`instrument.patch.gz` reconstructs runner commit `6360904a` from main ancestor `c5f7ecdb`, including
+the exact Cargo lockfile and Rust source. This does not depend on keeping a research branch alive
+after squash merge. In an isolated checkout of that ancestor, apply the patch with:
+
+```sh
+gzip -dc /absolute/path/to/research/worker-pool/instrument.patch.gz | git apply --index
+```
+
+Check the patch SHA-256 and source blob IDs against `provenance.json`, then use the pinned compiler
+and build commands above. A rebuilt executable may have a different hash; record it as a new cohort,
+and compare all arms from that same new binary. The interrupted first cohort is neither a timing
+baseline nor a readable successful JSON archive. The published gzip was recompressed losslessly;
+the decoded-results hash binds its content to the original accepted journalled run.
+
+The development checkout inherits `-C link-arg=-fuse-ld=mold` from its parent Cargo configuration.
+For reconstruction elsewhere, preserve the fingerprint's effective flags explicitly, for example
+`RUSTFLAGS='-C link-arg=-fuse-ld=mold -C target-cpu=x86-64-v3'` with mold installed. Environment
+`RUSTFLAGS` replaces the target configuration; do not accidentally omit the ISA floor. Record any
+compiler/linker/flag difference as a new measurement cohort.

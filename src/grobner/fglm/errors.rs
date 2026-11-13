@@ -58,7 +58,8 @@ pub enum FglmError {
     /// is the work being refused. See
     /// [`BorderBatch`](crate::grobner::fglm::BorderBatch).
     BorderBatchExceeded {
-        /// Which limit: `"columns"`, `"reducer rows"`, or `"reducer entries"`.
+        /// Which closure limit was crossed, or `"worker scratch cells"` for the opt-in
+        /// `research-work` executor measurement.
         reason: &'static str,
         /// Its value.
         limit: usize,

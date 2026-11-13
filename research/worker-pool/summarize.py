@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import csv
 import gzip
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -13,6 +14,14 @@ spec.loader.exec_module(study)
 
 def main():
     directory = Path(__file__).resolve().parent
+    provenance = json.loads((directory / 'provenance.json').read_text())
+    for name in ['results.json.gz', 'instrument.patch.gz', 'interrupted-checkpoint.gz', 'interrupted-checkpoint.log']:
+        if hashlib.sha256((directory / name).read_bytes()).hexdigest() != provenance[name + '_sha256']:
+            raise ValueError('archive digest mismatch: ' + name)
+    if hashlib.sha256(gzip.decompress((directory / 'instrument.patch.gz').read_bytes())).hexdigest() != provenance['patch_sha256']:
+        raise ValueError('source patch digest mismatch')
+    if hashlib.sha256(gzip.decompress((directory / 'results.json.gz').read_bytes())).hexdigest() != provenance['decoded_results_sha256']:
+        raise ValueError('decoded cohort digest mismatch')
     with gzip.open(directory / 'results.json.gz', 'rt') as stream:
         record = json.load(stream)
     summary = study.summarize(record)
