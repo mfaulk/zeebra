@@ -33,7 +33,7 @@ assert!(original.iter().all(Zero::is_zero));
 `evaluate_assignment` computes `(A·w)(B·w) − C·w` directly from the original sparse rows;
 it does not invoke the converter or evaluate a polynomial. It returns one residual per
 original row, so a nonzero value identifies a failed row. Assignment length must equal the
-original wire count, and assignment wire zero must be one.
+R1CS file's retained wire count, and assignment wire zero must be one.
 
 The expansion substitutes constant one for wire zero and maps original wire `i > 0` to
 polynomial variable `i − 1`. `expand::<N>()` refuses if `N < wire_count − 1`; it does not

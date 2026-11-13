@@ -37,7 +37,8 @@
     ],
     "custom_gates": "unsupported",
     "runtime_arity": "none; caller-selected const genericN",
-    "symbol_mapping": "canonical labels must retain their selected wire; absent labels may alias or be optimized out"
+    "symbol_mapping": "canonical labels must retain their selected wire; absent labels may alias or be optimized out",
+    "private_roles": "declared count retained; nonpublic witnesses are unclassified when count is positive, internal when zero"
   },
   "files": {
     "tests/fixtures/r1cs/multiplier.circom": "10ff7de73324f224dc02c9922a368f5108db984ea37cce9ae173daf771687ac1",
@@ -54,7 +55,7 @@
     "tests/fixtures/r1cs/roles-many-o2.sym": "81db7ca0653a9ae8736d2159b3e6b961893338493f1aae1d9c405e8f62221aff"
   },
   "pilot": {
-    "source_commit": "f6df75c3ea9953f834b1741c2c8c50a0c20290f4",
+    "source_commit": "d7e1e130b1d4ae25f39b2e117977622023549725",
     "review_fix_commit": "1d0d1803",
     "limits": {
       "wire_count": 100,
@@ -77,14 +78,19 @@
     "native_validation_baseline": "original sparse row evaluator",
     "independent_oracle": "external reader and Circom witness calculator",
     "outputs": "pilot.json",
-    "note": "The same ten instances were rerun once after canonical-symbol and stack-admission fixes. Both complete cohorts are retained separately; no new instances or pooled timing estimates.",
+    "note": "The same ten timing instances were rerun after stack/symbol fixes and again after optimized-role correction. All three cohorts and their recovery patches are retained separately; no new timing instances or pooled timing estimates.",
     "source_patch": "final-source.patch",
-    "source_patch_sha256": "9d7bbf1bd99641b83e273293b307583ffab1eaa1ac73c5ced37d97fe5aa05f57",
+    "source_patch_sha256": "01420097f5081e29c6f822bbb3ab4921f58d22fc22f2609ce7db98c316086dc1",
     "initial_source_commit": "c01a937763d54fbd5b1c52f32c7f947f410e0da1",
     "initial_source_patch": "pilot-source.patch",
     "initial_source_patch_sha256": "7b9b3f0fcaf01755815196d5eed5d8c06ee53cfd3e304eb14fd7b1aae0345eb3",
     "capacity_fix_commit": "63153923",
-    "initial_outputs": "pilot-initial.json"
+    "initial_outputs": "pilot-initial.json",
+    "before_role_audit_source_commit": "f6df75c3ea9953f834b1741c2c8c50a0c20290f4",
+    "before_role_audit_source_patch": "stack-guard-source.patch",
+    "before_role_audit_source_patch_sha256": "9d7bbf1bd99641b83e273293b307583ffab1eaa1ac73c5ced37d97fe5aa05f57",
+    "before_role_audit_outputs": "pilot-before-role-audit.json",
+    "role_fix_commit": "d7e1e130"
   },
   "accessed_utc": "2026-11-13T04:09:54.756990+00:00",
   "node_version": "v22.22.2",

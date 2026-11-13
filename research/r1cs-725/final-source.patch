@@ -1,14 +1,14 @@
 diff --git a/docs/guide/r1cs.md b/docs/guide/r1cs.md
 new file mode 100644
-index 00000000..08f3a6b0
+index 00000000..f54e0cd7
 --- /dev/null
 +++ b/docs/guide/r1cs.md
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,110 @@
 +# Checked R1CS import
 +
 +`zeebra::r1cs` imports a narrow R1CS v1 profile over a caller-selected prime field.
-+It preserves original sparse rows, row IDs, wire-to-label mapping, public/private input roles,
-+and optional Circom symbols before producing any polynomials. The
++It preserves original sparse rows, row IDs, wire-to-label mapping, public-interface roles,
++declared private-input counts and optional Circom symbols before producing any polynomials. The
 +[design gate and evidence](../research/bounded-r1cs.md) record the public fixture round-trip,
 +independent reader and producer identities, exhaustive small-field checks, and bounded pilot.
 +
@@ -66,9 +66,14 @@ index 00000000..08f3a6b0
 +counts, duplicate/out-of-range labels, trailing bytes, and truncation fail explicitly.
 +The API returns no partial model or partial expansion on failure.
 +
-+`wire_role` distinguishes the constant, public outputs, public inputs, private inputs, and
-+remaining internal witness wires according to the header's ordered ranges. Wire zero's
-+canonical label must be zero. Labels do not permute polynomial variables.
++`wire_role` identifies the constant and public output/input prefix. `Header.private_inputs`
++is the producer's declared count, which can include optimized-out signals. It does not identify
++retained private-input wires: pinned Circom 2.2.3 `--O2` keeps that original count while deleting
++inputs and renumbering later internal witnesses. Nonpublic wires therefore have
++`UnclassifiedWitness` role when the declared private count is nonzero, and `Internal` role
++when it is zero. Private declarations need not fit the retained nonpublic wire count. No role
++is inferred from label numbers or symbol names; exact private-wire identity needs additional
++producer metadata. Wire zero's canonical label must be zero. Labels do not permute variables.
 +
 +Attach optional UTF-8 Circom `.sym` records with `with_symbols(text)`. Labels and qualified
 +names must be unique, and any label selected by the binary wire map must name that same wire.
@@ -111,10 +116,10 @@ index 00000000..08f3a6b0
 +[reproduction commands](../../research/r1cs-725/README.md).
 diff --git a/examples/r1cs_import.rs b/examples/r1cs_import.rs
 new file mode 100644
-index 00000000..051c7d6e
+index 00000000..d5909c7b
 --- /dev/null
 +++ b/examples/r1cs_import.rs
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,265 @@
 +use std::{error::Error, fs::File, io::Read, path::Path, process::ExitCode, time::Instant};
 +use zeebra::{
 +    fields::{Bn254Fr, Zp7},
@@ -187,6 +192,27 @@ index 00000000..051c7d6e
 +                .unwrap_or(Json::Null),
 +        ));
 +        report.push(("wires", Json::size(model.header().wire_count)));
++        report.push(("public_outputs", Json::size(model.header().public_outputs)));
++        report.push(("public_inputs", Json::size(model.header().public_inputs)));
++        report.push((
++            "declared_private_inputs",
++            Json::size(model.header().private_inputs),
++        ));
++        report.push((
++            "wire_roles",
++            Json::Array(
++                (0..model.header().wire_count)
++                    .map(|wire| {
++                        Json::string(format!(
++                            "{:?}",
++                            model
++                                .wire_role(wire as u32)
++                                .expect("original wire in range")
++                        ))
++                    })
++                    .collect(),
++            ),
++        ));
 +        report.push(("constraints", Json::size(model.header().constraint_count)));
 +        report.push((
 +            "wire_labels",
@@ -390,10 +416,10 @@ index d7230e13..884992eb 100644
  pub struct DocumentationExamples;
 diff --git a/src/r1cs.rs b/src/r1cs.rs
 new file mode 100644
-index 00000000..405c16d7
+index 00000000..a9f2473b
 --- /dev/null
 +++ b/src/r1cs.rs
-@@ -0,0 +1,695 @@
+@@ -0,0 +1,696 @@
 +//! A strict R1CS v1 profile: wire zero is constant one, and wire i maps to variable i − 1.
 +//! Custom gates and unknown sections are refused rather than silently losing constraints.
 +
@@ -495,7 +521,7 @@ index 00000000..405c16d7
 +}
 +impl std::error::Error for Error {}
 +
-+/// Original header counts; public and private inputs precede internal wires.
++/// Original header counts; private declarations need not count retained witness wires.
 +#[derive(Clone, Debug, Eq, PartialEq)]
 +pub struct Header {
 +    /// Canonical field width, in bytes, rounded up to a whole 64-bit limb.
@@ -506,7 +532,7 @@ index 00000000..405c16d7
 +    pub public_outputs: usize,
 +    /// Public input count, immediately after the public outputs.
 +    pub public_inputs: usize,
-+    /// Private input count, immediately after the public inputs.
++    /// Private input count declared by the producer, including any optimized-out inputs.
 +    pub private_inputs: usize,
 +    /// Label identifiers are strictly below this bound.
 +    pub label_count: u64,
@@ -523,10 +549,10 @@ index 00000000..405c16d7
 +    PublicOutput,
 +    /// Public input.
 +    PublicInput,
-+    /// Private input.
-+    PrivateInput,
 +    /// Intermediate witness wire.
 +    Internal,
++    /// A retained witness whose private-input versus internal role is not encoded reliably.
++    UnclassifiedWitness,
 +}
 +
 +/// One original sparse dot product, in strictly increasing wire order.
@@ -760,7 +786,7 @@ index 00000000..405c16d7
 +        let label_count = header.u64()?;
 +        let constraint_count = header.u32()? as usize;
 +        header.finish()?;
-+        let inputs = (public_outputs as u64) + (public_inputs as u64) + (private_inputs as u64);
++        let inputs = (public_outputs as u64) + (public_inputs as u64);
 +        if wire_count == 0 || inputs >= wire_count as u64 || label_count < wire_count as u64 {
 +            return Err(Error::InvalidHeader(
 +                "wire, role or label counts are inconsistent",
@@ -872,7 +898,10 @@ index 00000000..405c16d7
 +        &self.source_digest
 +    }
 +
-+    /// Classify an original wire; internal witness wires are not private-input declarations.
++    /// Classify the constant and public prefix; private declarations do not identify witness wires.
++    ///
++    /// A nonpublic wire is unclassified when private inputs were declared, because producers can
++    /// eliminate inputs without updating that count. It is internal when the declared count is zero.
 +    pub fn wire_role(&self, wire: u32) -> Option<WireRole> {
 +        let wire = wire as usize;
 +        if wire >= self.header.wire_count {
@@ -884,12 +913,10 @@ index 00000000..405c16d7
 +            WireRole::PublicOutput
 +        } else if wire <= self.header.public_outputs + self.header.public_inputs {
 +            WireRole::PublicInput
-+        } else if wire
-+            <= self.header.public_outputs + self.header.public_inputs + self.header.private_inputs
-+        {
-+            WireRole::PrivateInput
-+        } else {
++        } else if self.header.private_inputs == 0 {
 +            WireRole::Internal
++        } else {
++            WireRole::UnclassifiedWitness
 +        })
 +    }
 +
@@ -1126,12 +1153,113 @@ index 00000000..94e2f29b
 +1,1,0,main.product
 +2,2,0,main.a
 +3,3,0,main.b
+diff --git a/tests/fixtures/r1cs/roles-many-o2.r1cs b/tests/fixtures/r1cs/roles-many-o2.r1cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a87d0cd2d5ae97cfe66a58cb42dc62fbebc02331
+GIT binary patch
+literal 384
+zcmXRiOfF_*U|?WoU|?WkU|{&b00AH|5FaEo`RhaHi3K|=Jzf}V#6~nWZgUOTp}D~D
+zVUb^o0Zbi;#s^?_5Mv(5EySuL#$Kozg8p!T*vp{6zyQ*NS3L_v4H&R8FfedH^@73-
+S<bIGD$N=U}XqYmvLnQ%|Yf5+k
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/fixtures/r1cs/roles-many-o2.sym b/tests/fixtures/r1cs/roles-many-o2.sym
+new file mode 100644
+index 00000000..2321737c
+--- /dev/null
++++ b/tests/fixtures/r1cs/roles-many-o2.sym
+@@ -0,0 +1,7 @@
++1,1,0,main.result
++2,2,0,main.used
++3,-1,0,main.unused[0]
++4,-1,0,main.unused[1]
++5,-1,0,main.unused[2]
++6,-1,0,main.unused[3]
++7,3,0,main.t
+diff --git a/tests/fixtures/r1cs/roles-many.circom b/tests/fixtures/r1cs/roles-many.circom
+new file mode 100644
+index 00000000..014aac41
+--- /dev/null
++++ b/tests/fixtures/r1cs/roles-many.circom
+@@ -0,0 +1,10 @@
++pragma circom 2.2.3;
++template Roles() {
++ signal input used;
++ signal input unused[4];
++ signal output result;
++ signal t;
++ t <== used*used;
++ result <== t*t;
++}
++component main = Roles();
+diff --git a/tests/fixtures/r1cs/roles-o0.r1cs b/tests/fixtures/r1cs/roles-o0.r1cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..88d9ad0657de5439a9a8c0753adb0961b34c0885
+GIT binary patch
+literal 392
+zcmXRiOfF_*U|?WoU|?WkU|{&b00AH|5FaEo`RhaHi3K|=Jzf}V#6~nWZgUOTp}D~D
+zVUb^o0Zbi;#s@(1ED!|*%_Bt}G4?{$5VY3;>H!4?29O@S>RBObzyK6ZAU+6y*r2e~
+TfbwAg=1ypsg4KWk)UONx>Pbp|
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/fixtures/r1cs/roles-o0.sym b/tests/fixtures/r1cs/roles-o0.sym
+new file mode 100644
+index 00000000..1a819307
+--- /dev/null
++++ b/tests/fixtures/r1cs/roles-o0.sym
+@@ -0,0 +1,4 @@
++1,1,0,main.result
++2,2,0,main.used
++3,3,0,main.unused
++4,4,0,main.t
+diff --git a/tests/fixtures/r1cs/roles-o2.r1cs b/tests/fixtures/r1cs/roles-o2.r1cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5087aad470c9e253935f42e4eccf11e32982373
+GIT binary patch
+literal 384
+zcmXRiOfF_*U|?WoU|?WkU|{&b00AH|5FaEo`RhaHi3K|=Jzf}V#6~nWZgUOTp}D~D
+zVUb^o0Zbi;#s^?_5Mv(5EySuL#$Kozg8p!T*vp{6zyQ*NS3L_v4H$sJi503B#0I$^
+RWCk*Txf2?u3?Tg=005EqN^bxF
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/fixtures/r1cs/roles-o2.sym b/tests/fixtures/r1cs/roles-o2.sym
+new file mode 100644
+index 00000000..bd3243dc
+--- /dev/null
++++ b/tests/fixtures/r1cs/roles-o2.sym
+@@ -0,0 +1,4 @@
++1,1,0,main.result
++2,2,0,main.used
++3,-1,0,main.unused
++4,3,0,main.t
+diff --git a/tests/fixtures/r1cs/roles.circom b/tests/fixtures/r1cs/roles.circom
+new file mode 100644
+index 00000000..9d8847c2
+--- /dev/null
++++ b/tests/fixtures/r1cs/roles.circom
+@@ -0,0 +1,10 @@
++pragma circom 2.2.3;
++template Roles() {
++ signal input used;
++ signal input unused;
++ signal output result;
++ signal t;
++ t <== used*used;
++ result <== t*t;
++}
++component main = Roles();
 diff --git a/tests/r1cs.rs b/tests/r1cs.rs
 new file mode 100644
-index 00000000..4f891653
+index 00000000..93accfae
 --- /dev/null
 +++ b/tests/r1cs.rs
-@@ -0,0 +1,573 @@
+@@ -0,0 +1,623 @@
 +use std::time::Duration;
 +use zeebra::{
 +    fields::{Bn254Fr, Gf256, Zp7},
@@ -1225,7 +1353,7 @@ index 00000000..4f891653
 +    assert_eq!(model.wire_role(0), Some(WireRole::Constant));
 +    assert_eq!(model.wire_role(1), Some(WireRole::PublicOutput));
 +    assert_eq!(model.wire_role(2), Some(WireRole::PublicInput));
-+    assert_eq!(model.wire_role(3), Some(WireRole::PrivateInput));
++    assert_eq!(model.wire_role(3), Some(WireRole::UnclassifiedWitness));
 +    assert_eq!(model.wire_role(4), None);
 +    assert_eq!(model.symbols()[1].name, "main.a");
 +    assert_eq!(
@@ -1323,6 +1451,53 @@ index 00000000..4f891653
 +        model.evaluate_assignment(&wires).unwrap()[0],
 +        expansion.polynomials[0].eval(&wires[1..])
 +    );
++}
++
++/// Optimized Circom files retain declared private counts without identifying retained private wires.
++#[test]
++fn test_optimized_private_inputs_do_not_relabel_internal_witnesses() {
++    for (bytes, symbols, wire_count, labels) in [
++        (
++            include_bytes!("fixtures/r1cs/roles-o0.r1cs").as_slice(),
++            include_str!("fixtures/r1cs/roles-o0.sym"),
++            5,
++            vec![0, 1, 2, 3, 4],
++        ),
++        (
++            include_bytes!("fixtures/r1cs/roles-o2.r1cs").as_slice(),
++            include_str!("fixtures/r1cs/roles-o2.sym"),
++            4,
++            vec![0, 1, 2, 4],
++        ),
++    ] {
++        let model = R1cs::<Bn254Fr>::parse(bytes, &ImportLimits::default())
++            .unwrap()
++            .with_symbols(symbols)
++            .unwrap();
++        assert_eq!(model.header().private_inputs, 2);
++        assert_eq!(model.header().wire_count, wire_count);
++        assert_eq!(model.wire_labels(), labels);
++        assert_eq!(model.wire_role(1), Some(WireRole::PublicOutput));
++        assert_eq!(model.wire_role(3), Some(WireRole::UnclassifiedWitness));
++    }
++}
++
++/// Declared private counts may exceed the number of retained nonpublic witness wires.
++#[test]
++fn test_optimized_declared_private_count_can_exceed_retained_wires() {
++    let model = R1cs::<Bn254Fr>::parse(
++        include_bytes!("fixtures/r1cs/roles-many-o2.r1cs"),
++        &ImportLimits::default(),
++    );
++    assert!(model.is_ok());
++    let model = model
++        .unwrap()
++        .with_symbols(include_str!("fixtures/r1cs/roles-many-o2.sym"))
++        .unwrap();
++    assert_eq!(model.header().private_inputs, 5);
++    assert_eq!(model.header().wire_count, 4);
++    assert_eq!(model.wire_labels(), &[0, 1, 2, 7]);
++    assert_eq!(model.wire_role(3), Some(WireRole::UnclassifiedWitness));
 +}
 +
 +/// Section order does not change canonical identity or the polynomial system.
@@ -1674,7 +1849,7 @@ index 00000000..4f891653
 +    }
 +}
 +
-+/// Nonidentity labels never permute polynomial variables, and trailing witnesses remain internal.
++/// Nonidentity labels never permute variables, and private declarations do not classify witnesses.
 +#[test]
 +fn test_nonidentity_labels_and_internal_wires() {
 +    let mut sections = parts(&encode(5, &[[vec![(1, 1)], vec![(2, 1)], vec![(3, 1)]]]));
@@ -1684,7 +1859,10 @@ index 00000000..4f891653
 +        .collect();
 +    let model = R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()).unwrap();
 +    assert_eq!(model.wire_labels(), &[0, 4, 3, 2, 1]);
-+    assert_eq!(model.wire_role(4), Some(WireRole::Internal));
++    assert_eq!(model.wire_role(4), Some(WireRole::UnclassifiedWitness));
++    sections[0].1[24..28].copy_from_slice(&0u32.to_le_bytes());
++    let no_private = R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()).unwrap();
++    assert_eq!(no_private.wire_role(4), Some(WireRole::Internal));
 +    let expanded = model.expand::<4>().unwrap();
 +    assert_eq!(expanded.variable_to_wire, vec![1, 2, 3, 4]);
 +    assert!(expanded.polynomials[0]
