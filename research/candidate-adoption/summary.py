@@ -49,7 +49,7 @@ def summarize(cohorts, refs):
             key = (a['problem'], a['modulus'])
             study.validate(raw, refs[key], mode, a['problem'])
             trajectories.setdefault(key, raw)
-            study.check_trajectory(raw, trajectories[key])
+            study.check_trajectory(raw, trajectories[key], adoption=True)
             if mode == 'production' and a['arm'].endswith('-on'):
                 products = sum(b['backward']['coefficient_products'] for b in raw['work']['batches'])
                 if products != raw['statistics']['candidate_reduction']['coefficient_products']:
@@ -72,6 +72,9 @@ def summarize(cohorts, refs):
                 if any(r['statistics']['candidate_reduction'] != row['candidate_reduction'] for r in raws):
                     raise ValueError('production work/reservation drift')
             if phase == 'adoption-work':
+                for direction in ('forward','backward'):
+                    totals=[sum(b[direction]['coefficient_products'] for b in r['work']['batches']) for r in raws]
+                    if len(set(totals)) != 1: raise ValueError('work changed across repeats')
                 row['work'] = {direction: sum(b[direction]['coefficient_products'] for b in raws[0]['work']['batches'])
                                for direction in ('forward', 'backward')}
             result['rows'].append(row)

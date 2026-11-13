@@ -64,6 +64,15 @@ class Acceptance(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 study.check_trajectory(dict(statistics=dict(stats, **{key: 2})), dict(statistics=stats))
 
+    # A changed mathematical memory peak can select another denominator without changing the F4 trajectory.
+    def test_adoption_trajectory_excludes_peak_batch_denominator(self):
+        stats={key:1 for key in study.TRAJECTORY}
+        changed=dict(stats,max_live_nonzeros_as_built=2)
+        study.check_trajectory(dict(statistics=stats),dict(statistics=changed),adoption=True)
+        with self.assertRaises(ValueError):study.check_trajectory(dict(statistics=stats),dict(statistics=changed))
+        changed=dict(stats,pairs_reduced=2)
+        with self.assertRaises(ValueError):study.check_trajectory(dict(statistics=stats),dict(statistics=changed),adoption=True)
+
     # An ambient compiler blocks timing even when the load average is low.
     def test_environment_gate(self):
         with patch.object(study.os, 'getloadavg', return_value=(0, 0, 0)):

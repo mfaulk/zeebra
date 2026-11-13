@@ -14,6 +14,7 @@ TRAJECTORY = ('batches', 'pairs_considered', 'pairs_reduced', 'elements_added', 
               'max_matrix_rows', 'max_matrix_columns', 'degree_sequence', 'max_live_nonzeros_as_built',
               'peak_basis_elements', 'peak_basis_terms')
 ARMS = ('stock', 'full', 'dense-all', 'dense-selected')
+ADOPTION_TRAJECTORY = tuple(key for key in TRAJECTORY if key != 'max_live_nonzeros_as_built')
 
 
 def load(name):
@@ -86,8 +87,9 @@ def validate(raw, reference, mode, problem):
         raise ValueError('backward policy absent or differs')
 
 
-def check_trajectory(raw, reference):
-    for key in TRAJECTORY:
+def check_trajectory(raw, reference, adoption=False):
+    # The peak batch may change when mathematical backward support changes.
+    for key in ADOPTION_TRAJECTORY if adoption else TRAJECTORY:
         if raw['statistics'][key] != reference['statistics'][key]:
             raise ValueError('forward trajectory differs: ' + key)
 
@@ -196,7 +198,7 @@ def main():
                 else:
                     validate(raw, refs[(problem, modulus)], mode, problem)
                     trajectories.setdefault((problem, modulus), raw)
-                    check_trajectory(raw, trajectories[(problem, modulus)])
+                    check_trajectory(raw, trajectories[(problem, modulus)], adoption=args.phase.startswith('adoption'))
                     if mode == 'production' and arm.endswith('-on'):
                         products=sum(b['backward']['coefficient_products'] for b in raw['work']['batches'])
                         if products != raw['statistics']['candidate_reduction']['coefficient_products']:
