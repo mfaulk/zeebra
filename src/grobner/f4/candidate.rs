@@ -59,6 +59,7 @@ pub(crate) fn finish<F: FiniteField>(
     statistics: &mut EliminationStatistics,
 ) -> Result<(usize, Report), usize> {
     use crate::linalg::sparse::SparseRow;
+    #[cfg(feature = "research-work")]
     use std::mem::size_of;
     debug_assert_eq!(selected_columns.len(), matrix.num_columns());
     let columns = matrix.num_columns();
