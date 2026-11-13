@@ -16,7 +16,7 @@ use super::{FieldSpec, Instance};
 ///
 /// `2^31 − 1`, chosen because **every engine in the comparison accepts it**: Singular and msolve
 /// both stop below `2^31`. The separate wide planted family uses [`WIDE_64_CHARACTERISTIC`]
-/// and records its sole external comparand explicitly.
+/// and records live oracle evidence explicitly.
 pub const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 
 /// The corpus's **small-prime** reference characteristic: `GF(32003)`.
@@ -133,8 +133,8 @@ pub const ALTERNATE_CHARACTERISTIC: u64 = 1_073_741_827;
 /// ceiling, so a system over it can be checked four ways.
 pub const KOALABEAR_CHARACTERISTIC: u64 = 2_130_706_433;
 
-/// `2^64 - 353`: a prime just below `2^64`, where only Groebner.jl among the external engines
-/// reaches. The widest prime field the Zeebra adapter compiles at 64-bit storage.
+/// `2^64 - 353`: a prime just below `2^64`, supported by Groebner.jl, groebner-rs and grobx.
+/// A 64-bit field compiled by the Zeebra adapter for the public wide planted ladder.
 pub const WIDE_64_CHARACTERISTIC: u64 = 18_446_744_073_709_551_263;
 
 /// The primes the const-generic families have a compiled field for.
@@ -423,7 +423,8 @@ impl CorpusEntry {
 /// `None` for a name not in [`ladder`], for a name whose variable count has no compiled
 /// instantiation, or — for the variable-field const-generic families — for a characteristic outside
 /// [`GENERATED_CHARACTERISTICS`]. `mq-planted-wide-*` always builds at [`WIDE_64_CHARACTERISTIC`],
-/// independently of the requested characteristic; [`CorpusEntry::digest_at`] gates publication. The families are const-generic in both the size and the field, so
+/// independently of the requested characteristic; [`CorpusEntry::digest_at`] gates publication.
+/// The families are const-generic in both the size and the field, so
 /// the available sizes are exactly those listed here — adding a rung means adding a match arm,
 /// which is deliberate: a size nobody wrote down is a size nobody checked the equivalence of.
 pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option<Instance> {
@@ -746,7 +747,10 @@ fn ceiling_for(engine: &str, task: super::Task) -> Option<u64> {
     }
 }
 
-/// Every engine the corpus compares against.
+/// The original four-engine survey used by [`corroboration`].
+///
+/// This historical capability table excludes newer adapters such as groebner-rs and grobx;
+/// its `SoleEngine` result is not a claim that those adapters cannot represent the field.
 pub const ENGINES: [&str; 4] = ["msolve", "singular", "sagebrush", "groebner.jl"];
 
 /// Minimum characteristic supported by the engine's adapter for this task.
@@ -1363,9 +1367,8 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Easy,
             zero_dimensional: true,
             quotient_dimension: Some(64),
-            equivalence: Equivalence::SoleComparand {
+            equivalence: Equivalence::LiveOracle {
                 tool: "Groebner.jl",
-                reason: "2^64 - 353 exceeds the other surveyed engines' prime-field bounds",
             },
             digests: &[(
                 WIDE_64_CHARACTERISTIC,
@@ -1378,9 +1381,8 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Intermediate,
             zero_dimensional: true,
             quotient_dimension: Some(1024),
-            equivalence: Equivalence::SoleComparand {
+            equivalence: Equivalence::LiveOracle {
                 tool: "Groebner.jl",
-                reason: "2^64 - 353 exceeds the other surveyed engines' prime-field bounds",
             },
             digests: &[(
                 WIDE_64_CHARACTERISTIC,
@@ -1393,9 +1395,8 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Challenging,
             zero_dimensional: true,
             quotient_dimension: Some(16384),
-            equivalence: Equivalence::SoleComparand {
+            equivalence: Equivalence::LiveOracle {
                 tool: "Groebner.jl",
-                reason: "2^64 - 353 exceeds the other surveyed engines' prime-field bounds",
             },
             digests: &[(
                 WIDE_64_CHARACTERISTIC,
@@ -2315,19 +2316,18 @@ mod tests {
         );
     }
 
-    /// Every family licenses a timing, but the wide planted family has only one external comparand.
+    /// Every family licenses a timing and records external evidence.
     #[test]
-    fn test_every_family_licenses_a_timing_and_only_some_are_corroborated() {
+    fn test_every_family_licenses_a_timing_and_records_corroboration() {
         for entry in ladder() {
             assert!(
                 entry.equivalence.licenses_timing(),
                 "{} should license a timing",
                 entry.name
             );
-            assert_eq!(
+            assert!(
                 entry.equivalence.is_corroborated(),
-                entry.family != "mq-planted-wide",
-                "{} has incorrect corroboration",
+                "{} has a live oracle",
                 entry.name
             );
         }
@@ -2479,9 +2479,9 @@ mod tests {
         }
     }
 
-    /// Wide planted rungs freeze their field, digest, dimension and sole external comparand.
+    /// Wide planted rungs freeze their field, digest, dimension and live oracle provenance.
     #[test]
-    fn test_wide_planted_rungs_have_frozen_sole_comparand_provenance() {
+    fn test_wide_planted_rungs_have_frozen_live_oracle_provenance() {
         let wide: Vec<_> = ladder()
             .into_iter()
             .filter(|entry| entry.family == "mq-planted-wide")
@@ -2492,9 +2492,8 @@ mod tests {
             assert_eq!(entry.quotient_dimension, Some(1 << n));
             assert!(matches!(
                 entry.equivalence,
-                super::Equivalence::SoleComparand {
-                    tool: "Groebner.jl",
-                    ..
+                super::Equivalence::LiveOracle {
+                    tool: "Groebner.jl"
                 }
             ));
             assert_eq!(entry.digests.len(), 1);
@@ -2513,6 +2512,47 @@ mod tests {
             );
         }
         assert!(super::PUBLISHED_CHARACTERISTICS.contains(&WIDE_64_CHARACTERISTIC));
+    }
+
+    /// The newer wide-field adapters support these rungs, so Julia is not the sole comparand.
+    #[test]
+    fn test_wide_planted_rungs_have_multiple_current_external_comparands() {
+        use crate::grobner::external::{
+            ExternalSolver, GrobxSolver, GroebnerRsSolver, SylvesterSolver,
+        };
+        let scratch =
+            std::env::temp_dir().join(format!("wide-planted-capabilities-{}", std::process::id()));
+        let rust = GroebnerRsSolver::new("not-invoked", scratch.join("rust")).expect("scratch");
+        let grobx = GrobxSolver::new(
+            "not-invoked",
+            scratch.join("grobx"),
+            super::super::grobx::Mode::Raw,
+        )
+        .expect("scratch");
+        let sylvester = SylvesterSolver::new(
+            "not-invoked",
+            scratch.join("sylvester"),
+            super::super::sylvester::Mode::Raw,
+        )
+        .expect("scratch");
+        for n in [6, 10, 14] {
+            let built = instance(
+                &format!("mq-planted-wide-{n}"),
+                WIDE_64_CHARACTERISTIC,
+                GREVLEX,
+            )
+            .expect("builds");
+            assert!(rust
+                .supports(&built, Task::ReducedGrobnerBasis)
+                .is_supported());
+            assert!(grobx
+                .supports(&built, Task::ReducedGrobnerBasis)
+                .is_supported());
+            assert!(!sylvester
+                .supports(&built, Task::ReducedGrobnerBasis)
+                .is_supported());
+        }
+        std::fs::remove_dir_all(scratch).expect("remove scratch");
     }
 
     /// Every wide planted system vanishes at its declared nonzero planted point.
@@ -2542,7 +2582,7 @@ mod tests {
         check::<14>();
     }
 
-    /// Live Groebner.jl and Zeebra return identical complete reduced bases on every wide rung.
+    /// All four wide-field engines return identical complete reduced bases on every wide rung.
     #[test]
     #[ignore = "requires provisioned Groebner.jl; run under the benchmark lock"]
     fn test_wide_planted_live_groebner_jl_agrees_on_complete_bases() {
@@ -2554,6 +2594,15 @@ mod tests {
             std::env::temp_dir().join(format!("wide-planted-live-{}", std::process::id()));
         let mut julia = GroebnerJlSolver::from_env(&scratch).expect("provisioned Julia");
         let version = julia.probe_version().expect("Julia version");
+        let mut rust = crate::grobner::external::GroebnerRsSolver::from_env(scratch.join("rust"))
+            .expect("Rust driver");
+        let rust_version = rust.probe_version().expect("Rust driver version");
+        let mut grobx = crate::grobner::external::GrobxSolver::from_env(
+            scratch.join("grobx"),
+            super::super::grobx::Mode::Raw,
+        )
+        .expect("grobx driver");
+        let grobx_version = grobx.probe_version().expect("grobx driver version");
         let limits = Limits::wall(std::time::Duration::from_secs(60))
             .with_workers(1)
             .with_max_rss_bytes(2 * 1024 * 1024 * 1024);
@@ -2580,8 +2629,36 @@ mod tests {
                 entry.quotient_dimension.map(|d| d as usize)
             );
             assert!(ours.invariants.agree(&theirs.invariants).is_empty());
+            let rust_report = rust.run(&built, Task::ReducedGrobnerBasis, &limits);
+            let grobx_report = grobx.run(&built, Task::ReducedGrobnerBasis, &limits);
+            let rust_basis = rust_report
+                .status
+                .answer()
+                .expect("Rust driver completes")
+                .basis
+                .as_ref()
+                .expect("complete Rust basis");
+            let grobx_basis = grobx_report
+                .status
+                .answer()
+                .expect("grobx completes")
+                .basis
+                .as_ref()
+                .expect("complete grobx basis");
+            for basis in [rust_basis, grobx_basis] {
+                super::super::contract::generators_agree(our_basis, basis, WIDE_64_CHARACTERISTIC)
+                    .expect("complete reduced basis agrees with Zeebra");
+            }
             artifacts.push(Json::object([
                 ("problem", Json::string(entry.name)),
+                (
+                    "groebner_rs_basis",
+                    Json::Array(rust_basis.iter().map(Json::string).collect()),
+                ),
+                (
+                    "grobx_basis",
+                    Json::Array(grobx_basis.iter().map(Json::string).collect()),
+                ),
                 ("input_digest", Json::string(built.digest())),
                 (
                     "input",
@@ -2597,15 +2674,51 @@ mod tests {
                 ),
             ]));
         }
+        fn retained_outputs(path: &std::path::Path, root: &std::path::Path) -> Vec<Json> {
+            let mut entries: Vec<_> = std::fs::read_dir(path)
+                .expect("scratch directory")
+                .map(|entry| entry.expect("scratch entry").path())
+                .collect();
+            entries.sort();
+            let mut outputs = Vec::new();
+            for path in entries {
+                if path.is_dir() {
+                    outputs.extend(retained_outputs(&path, root));
+                } else if matches!(
+                    path.extension().and_then(|ext| ext.to_str()),
+                    Some("json" | "out")
+                ) {
+                    outputs.push(Json::object([
+                        (
+                            "path",
+                            Json::string(
+                                path.strip_prefix(root)
+                                    .expect("relative artifact")
+                                    .to_string_lossy(),
+                            ),
+                        ),
+                        (
+                            "content",
+                            Json::string(std::fs::read_to_string(&path).expect("text artifact")),
+                        ),
+                    ]));
+                }
+            }
+            outputs
+        }
+        let driver_artifacts = retained_outputs(&scratch, &scratch);
         println!("{}", Json::object([
+            ("driver_artifacts", Json::Array(driver_artifacts)),
             ("verification", Json::string("complete monic reduced bases agree coefficient for coefficient; separate verification run, no timing claim")),
             ("julia_version", Json::string(format!("{version:?}"))),
+            ("groebner_rs_version", Json::string(format!("{rust_version:?}"))),
+            ("grobx_version", Json::string(format!("{grobx_version:?}"))),
             ("attempts", Json::Array(artifacts)),
         ]).to_json());
         std::fs::remove_dir_all(scratch).expect("remove scratch");
     }
 
-    /// The five public families exercise every recorded kind of timing evidence.
+    /// The five public families each record timing evidence.
     #[test]
     fn test_the_corpus_covers_five_families_each_with_recorded_evidence() {
         let families: BTreeSet<&str> = ladder().iter().map(|entry| entry.family).collect();
@@ -2624,12 +2737,7 @@ mod tests {
             .iter()
             .map(|entry| entry.equivalence.tag())
             .collect();
-        for expected in [
-            "comparand-file",
-            "known-solution",
-            "live-oracle",
-            "sole-comparand",
-        ] {
+        for expected in ["comparand-file", "known-solution", "live-oracle"] {
             assert!(kinds.contains(expected), "no family uses {}", expected);
         }
         // `no-comparand` is deliberately unused by the ladder: it is for Zeebra's 254/255-bit

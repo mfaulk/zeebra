@@ -285,9 +285,10 @@ characteristic; `digest_at` and the sweep publish them only at `2^64 - 353`.
 
 `mq-planted-wide-6`, `mq-planted-wide-10`, and `mq-planted-wide-14` reuse the generic planted
 quadratic construction, with quotient dimensions 64, 1,024, and 16,384. Each has one frozen digest
-at `18446744073709551263`. Their provenance is `SoleComparand { tool: "Groebner.jl" }`: a known
-planted point checks the input, but does not replace a complete-basis check or provide another
-external engine at this field. The measured [board](../../research/competitive/COMPETITIVE.md)
+at `18446744073709551263`. Their provenance is `LiveOracle { tool: "Groebner.jl" }`. A known
+planted point checks the input; the live test separately checks every coefficient of the complete
+reduced bases from Zeebra, Groebner.jl, groebner-rs and grobx. Grobx also checks its wide-field
+answers with its exact cofactor certificate. The measured [board](../../research/competitive/COMPETITIVE.md)
 and [verification evidence](../../research/competitive/results/wide-planted-675-verification.json)
 record the live comparison; these easy structured instances do not establish a general speedup.
 
@@ -302,7 +303,7 @@ mkdir -p "$TMPDIR"
 . tools/external/env.sh
 cargo test --lib grobner::external::corpus::tests
 cargo build --release --example competitive_sweep
-# Executes all three complete-basis comparisons; requires the provisioned Julia package.
+# Checks all three rungs against the provisioned Julia, groebner-rs and grobx drivers.
 tools/benchlock.sh wide-planted-verify taskset -c 2 \
   cargo test --lib test_wide_planted_live_groebner_jl_agrees_on_complete_bases \
   -- --ignored --nocapture
@@ -314,10 +315,18 @@ ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=2 \
   --task reduced-grobner-basis --wall 60 --measure --write
 ```
 
-The live test compares every coefficient of the complete monic reduced bases from Zeebra and
-Groebner.jl and emits their inputs, digests and bases as JSON. Verification is a separate run;
+The live test compares every coefficient of the complete monic reduced bases from all four engines
+and emits their inputs, digests, bases, driver identities and proof outputs as JSON. Verification is a separate run;
 its runtime is excluded from board solve times. The sweep retains unsupported-engine outcomes.
 Groebner.jl does not offer FGLM, so use `--task reduced-grobner-basis` for this comparison.
+The sweep includes grobx; `--engines zeebra,groebner.jl,groebner-rs,grobx` selects only the supported
+wide-field engines. msolve, Singular, Sagebrush and Sylvester stop below this characteristic.
+
+Issue #675 predates the groebner-rs and grobx integrations. Its requested sole-comparand label is
+now stale: both newer adapters accept this field, and groebner-rs already has verified wide-control
+results. The original-four `corpus::ENGINES` capability survey remains historical; its `SoleEngine`
+answer at this field does not describe all current adapters. This family therefore records live
+oracle evidence and does not claim to exercise the obsolete sole-comparand acceptance condition.
 
 The msolve corpus agreement test runs whenever msolve is installed, so by default it builds
 oracles only up to seven variables, which is 1.4 s for nine rungs where `mq-random-10` alone did

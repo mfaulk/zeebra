@@ -9,7 +9,7 @@ use zeebra::{
         external::{
             corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
             msolve::{MAX_CHARACTERISTIC_ELIMINANT, MIN_CHARACTERISTIC_ELIMINANT},
-            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver,
+            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GrobxSolver, GroebnerJlSolver,
             GroebnerRsSolver, Instance, Limits, Measurement, MsolveSolver, RunFailure, RunReport,
             RunStatus, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
         },
@@ -260,7 +260,7 @@ fn run_one(
         board.add(CompetitiveRecord::of(&report, built, environment));
     }
 
-    // The four external engines. The scratch directory is per process and per row, which is what
+    // The external engines. The scratch directory is per process and per row, which is what
     // keeps two concurrent sweeps from handing one filename to two processes.
     //
     // Every engine is probed once per row rather than once per sweep. That costs a process per
@@ -316,6 +316,18 @@ fn run_one(
                 environment,
                 failure,
             ),
+        }
+    }
+
+    if wanted("grobx") {
+        match GrobxSolver::from_env(
+            scratch.join("grobx"),
+            zeebra::grobner::external::grobx::Mode::Raw,
+        ) {
+            Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+            Err(failure) => {
+                unreachable_engine(board, "grobx", built, task, limits, environment, failure)
+            }
         }
     }
 
