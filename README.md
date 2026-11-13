@@ -216,6 +216,11 @@ Run `cargo run --release --example quotient_spectra -- 4 dense`; the
 [quotient operator guide](docs/guide/grobner-bases.md#quotient-operator-polynomials)
 describes limits and coefficient conventions.
 
+The isolated F4 [batch-splitting study](docs/research/f4-batch-splitting.md)
+can be run with `cargo run --example batch_splitting_study -- cyclic-4 adaptive rows 7`
+(requires Singular and GNU `timeout`). It tests transactional construction retries
+under fixed matrix allowances; the shipping solver and its defaults are unchanged.
+
 ## What is in the box
 
 | Area | Guide |
