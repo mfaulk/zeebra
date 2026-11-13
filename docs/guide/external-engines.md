@@ -460,6 +460,14 @@ which needs no patched build. It is a measurement instrument on no build path, a
 randomized linear algebra (4.89x, declined by policy), interreduction done by division rather than
 by one Macaulay matrix (5.03x), and a per-operation representation constant (14.0x).
 
+`tools/external/msolve-count.py` is the msolve counterpart. It copies the provisioned msolve 0.11.0
+source and adds per-phase pivot-application and coefficient-product counters to the exact sparse
+linear algebra. It then builds a private counting copy that is never installed or linked.
+`examples/msolve_gap.rs` records Zeebra's per-batch matrix shapes and writes msolve's input for the
+same digest. [`docs/research/msolve-gap.md`](../research/msolve-gap.md) is what they produced:
+on `mq-random-10`, elimination is about 20x behind, split into 4.14x more coefficient products
+(back-substitution 580 M against msolve's 0.64 M) and 4.8x more time per product.
+
 [`docs/research/m27-baseline.md`](../research/m27-baseline.md) is the frozen baseline these
 ratios are quoted against: which cohort each engine's rows belong to, the cryptanalysis frontier by
 class, the `poseidon31-cico-t16-rf4-rp2` row resolved across its three cost tables, and the rule for
