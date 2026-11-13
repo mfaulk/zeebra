@@ -175,6 +175,15 @@ def physical_cpus():
     return selected
 
 
+def attempt_output_bytes(stem):
+    total=0
+    for path in stem.parent.glob(stem.name+'.*'):
+        if path.is_file():total+=path.stat().st_size
+        elif path.is_dir():
+            total+=sum(p.stat().st_size for p in path.rglob('*') if p.is_file())
+    return total
+
+
 def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**2):
     started, peak, stop = time.monotonic_ns(), 0, None
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -189,7 +198,7 @@ def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**
         try:
             while process.poll() is None:
                 peak = max(peak, wide.guard.tree_hwm(process.pid))
-                output_bytes = sum(p.stat().st_size for p in stem.parent.glob(stem.name+'.*') if p.is_file())
+                output_bytes = attempt_output_bytes(stem)
                 if peak > rss or time.monotonic_ns()-started > wall*10**9 or output_bytes > output_limit:
                     stop = 'rss-2GiB' if peak > rss else 'output-128MiB' if output_bytes > output_limit else 'wall-60s'
                     kill_group(process)
@@ -200,7 +209,7 @@ def guarded(command, stem, cpus, wall=60, rss=2*1024**3, output_limit=128*1024**
                 kill_group(process)
     finished=time.monotonic_ns()
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
-    output_bytes=sum(p.stat().st_size for p in stem.parent.glob(stem.name+'.*') if p.is_file())
+    output_bytes=attempt_output_bytes(stem)
     if output_bytes > output_limit:
         stop='output-128MiB'
     if stem.with_suffix('.usage').exists():

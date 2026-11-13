@@ -15,6 +15,13 @@ spec.loader.exec_module(scaling)
 
 
 class ComparandScalingTests(unittest.TestCase):
+    # Native adapter files count toward the output ceiling even when wrapper stdout is tiny.
+    def test_adapter_output_is_included_in_storage_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stem=Path(directory)/'run';adapter=stem.with_suffix('.adapter');adapter.mkdir()
+            command=[sys.executable,'-c','from pathlib import Path;Path('+repr(str(adapter/'basis.out'))+').write_text("x"*1000)']
+            a=scaling.guarded(command,stem,sorted(os.sched_getaffinity(0))[:1],output_limit=100)
+            self.assertTrue(a['stop'].startswith('output-'))
     # Independent Singular references require complete output and exact ordered generator echoes.
     def test_singular_reference_checks_full_echo_and_completion(self):
         case=dict(modulus=13,variables=['x1'],generators=['x1+1'])
