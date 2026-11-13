@@ -592,6 +592,15 @@ impl<F: KnownOrder> R1cs<F> {
             self.limits.max_wires.saturating_sub(1),
             "polynomial capacity",
         )?;
+        self.expand_checked::<N>(&deadline)
+    }
+
+    // Rejected capacities must not reserve the fixed exponent arrays in the guard's stack frame.
+    #[inline(never)]
+    fn expand_checked<const N: usize>(
+        &self,
+        deadline: &Deadline,
+    ) -> Result<Expansion<N, F>, Error> {
         let mut result = Expansion {
             polynomials: Vec::new(),
             row_ids: Vec::new(),

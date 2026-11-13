@@ -417,6 +417,25 @@ fn test_const_generic_capacity() {
     );
 }
 
+/// Over-budget capacities are refused on a small stack before allocating fixed exponent arrays.
+#[test]
+fn test_capacity_refusal_precedes_exponent_array_stack_allocation() {
+    let model = R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
+    let result = std::thread::Builder::new()
+        .stack_size(64 * 1024)
+        .spawn(move || model.expand::<100_000>())
+        .unwrap()
+        .join()
+        .unwrap();
+    assert!(matches!(
+        result,
+        Err(Error::Limit {
+            resource: "polynomial capacity",
+            limit: 99
+        })
+    ));
+}
+
 /// Assignment checks require every original wire and the implicit constant wire equal to one.
 #[test]
 fn test_assignment_guards() {
