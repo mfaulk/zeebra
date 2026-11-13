@@ -11,6 +11,8 @@ pub mod contract;
 #[cfg(feature = "external-runners")]
 pub mod corpus;
 #[cfg(feature = "external-runners")]
+pub mod giac;
+#[cfg(feature = "external-runners")]
 pub mod grobx;
 #[cfg(feature = "external-runners")]
 pub mod groebner_jl;
@@ -46,6 +48,8 @@ pub use corpus::{
     cyclic_instance, instance, katsura_instance, CorpusEntry, Rung, ALTERNATE_CHARACTERISTIC,
     GENERATED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC,
 };
+#[cfg(feature = "external-runners")]
+pub use giac::GiacSolver;
 #[cfg(feature = "external-runners")]
 pub use grobx::GrobxSolver;
 #[cfg(feature = "external-runners")]

@@ -9,9 +9,9 @@ use zeebra::{
         external::{
             corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
             msolve::{MAX_CHARACTERISTIC_ELIMINANT, MIN_CHARACTERISTIC_ELIMINANT},
-            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GrobxSolver, GroebnerJlSolver,
-            GroebnerRsSolver, Instance, Limits, Measurement, MsolveSolver, RunFailure, RunReport,
-            RunStatus, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
+            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GiacSolver, GrobxSolver,
+            GroebnerJlSolver, GroebnerRsSolver, Instance, Limits, Measurement, MsolveSolver,
+            RunFailure, RunReport, RunStatus, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
         },
         record::Environment,
         F4Options, InterreductionRoute,
@@ -38,6 +38,29 @@ fn sweep_tasks(characteristic: u64) -> Vec<Task> {
     tasks
 }
 
+fn worker_count(value: Option<&str>) -> Result<usize, String> {
+    match value {
+        None => Ok(1),
+        Some(raw) => raw
+            .parse::<usize>()
+            .ok()
+            .filter(|n| (1..=1024).contains(n))
+            .ok_or_else(|| "--workers requires an integer in 1..=1024".into()),
+    }
+}
+
+fn memory_limit(value: Option<&str>) -> Result<Option<u64>, String> {
+    value
+        .map(|raw| {
+            raw.parse::<u64>()
+                .ok()
+                .filter(|n| *n > 0)
+                .and_then(|n| n.checked_mul(1024 * 1024))
+                .ok_or_else(|| "--rss-mib requires a positive, representable byte ceiling".into())
+        })
+        .transpose()
+}
+
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let flag = |name: &str| arguments.iter().any(|a| a == name);
@@ -49,6 +72,14 @@ fn main() {
             .cloned()
     };
 
+    let workers = worker_count(value("--workers").as_deref()).unwrap_or_else(|error| {
+        eprintln!("{error}");
+        std::process::exit(2);
+    });
+    let max_rss = memory_limit(value("--rss-mib").as_deref()).unwrap_or_else(|error| {
+        eprintln!("{error}");
+        std::process::exit(2);
+    });
     let write = flag("--write");
     let measure = flag("--measure");
     let only_row = value("--row");
@@ -145,7 +176,7 @@ fn main() {
         std::process::exit(2);
     }
 
-    let environment = detect_environment(wall, measure);
+    let environment = detect_environment(wall, measure, workers);
     println!("# Competitive sweep");
     println!("- machine: {}", environment.machine);
     println!("- cpu:     {}", environment.cpu);
@@ -163,7 +194,8 @@ fn main() {
     );
 
     let mut board = CompetitiveBoard::new();
-    let limits = Limits::wall(wall).with_workers(1);
+    let mut limits = Limits::wall(wall).with_workers(workers);
+    limits.max_rss_bytes = max_rss;
 
     for name in rows {
         let built = instance(
@@ -331,6 +363,15 @@ fn run_one(
         }
     }
 
+    if wanted("giac") {
+        match GiacSolver::from_env(scratch.join("giac")) {
+            Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+            Err(failure) => {
+                unreachable_engine(board, "giac", built, task, limits, environment, failure)
+            }
+        }
+    }
+
     if wanted("sagebrush") {
         match SagebrushSolver::from_env(scratch.join("sagebrush")) {
             Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
@@ -458,7 +499,7 @@ fn append(board: &CompetitiveBoard) {
 ///
 /// `Environment::policy` carries the limits summary, which is what makes two rows comparable or
 /// not: `Environment::comparable` is half of `CompetitiveRecord::comparable_with`.
-fn detect_environment(wall: Duration, measure: bool) -> Environment {
+fn detect_environment(wall: Duration, measure: bool, workers: usize) -> Environment {
     let machine = std::env::var("ZEEBRA_MACHINE").unwrap_or_else(|_| {
         std::process::Command::new("hostname")
             .output()
@@ -481,9 +522,7 @@ fn detect_environment(wall: Duration, measure: bool) -> Environment {
     Environment {
         machine,
         cpu: format!("{}, affinity {}", cpu, affinity),
-        // One worker throughout. A cross-concurrency ratio is refused by the board, so a sweep
-        // that varied this would produce rows that cannot be compared with each other.
-        concurrency: 1,
+        concurrency: workers,
         build: format!(
             "release, rustc {}",
             std::process::Command::new("rustc")
@@ -495,7 +534,7 @@ fn detect_environment(wall: Duration, measure: bool) -> Environment {
                 .unwrap_or_else(|| "unknown".to_string())
         ),
         policy: format!(
-            "{} s wall, 1 worker, {}",
+            "{} s wall, {workers} workers, {}",
             wall.as_secs(),
             if measure {
                 "one row per process"
@@ -514,6 +553,29 @@ fn detect_environment(wall: Duration, measure: bool) -> Environment {
 mod tests {
     use super::sweep_rows;
     use zeebra::grobner::external::corpus::BINARY_CHARACTERISTIC;
+
+    // Worker counts default to one and accept positive bounded explicit cohorts.
+    #[test]
+    fn test_worker_cohort_argument() {
+        assert_eq!(super::worker_count(None).unwrap(), 1);
+        assert_eq!(super::worker_count(Some("4")).unwrap(), 4);
+        for invalid in ["0", "-1", "many", "1025", "--measure"] {
+            assert!(super::worker_count(Some(invalid)).is_err());
+        }
+    }
+
+    // Explicit resident-memory ceilings are positive and cannot overflow bytes.
+    #[test]
+    fn test_memory_ceiling_argument() {
+        assert_eq!(super::memory_limit(None).unwrap(), None);
+        assert_eq!(
+            super::memory_limit(Some("2048")).unwrap(),
+            Some(2 * 1024 * 1024 * 1024)
+        );
+        for invalid in ["0", "-1", "all", "18446744073709551615"] {
+            assert!(super::memory_limit(Some(invalid)).is_err());
+        }
+    }
 
     // The default small-prime sweep includes the eliminant comparison task.
     #[test]

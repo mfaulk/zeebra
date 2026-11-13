@@ -5,8 +5,8 @@ use zeebra::{
         external::{
             corpus,
             groebner_rs::{control_entry, wide_control},
-            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerRsSolver, Limits,
-            Measurement, RunReport, RunStatus, Task, Unsupported, ZeebraSolver,
+            CompetitiveBoard, CompetitiveRecord, ExternalSolver, GiacSolver, GroebnerRsSolver,
+            Limits, Measurement, RunReport, RunStatus, Task, Unsupported, ZeebraSolver,
         },
         record::Environment,
     },
@@ -69,13 +69,23 @@ fn main() {
         .with_max_rss_bytes(rss * 1024 * 1024);
     let scratch = PathBuf::from(std::env::var("TMPDIR").expect("set TMPDIR on the build cache"))
         .join(format!("groebner-comparison-{}", std::process::id()));
-    let mut driver = GroebnerRsSolver::from_env(&scratch).unwrap();
-    let version = driver
-        .probe_version()
-        .expect("provision the pinned driver first");
-    let startup = driver
-        .startup_measurement(&Limits::wall(Duration::from_secs(10)))
-        .expect("startup observation");
+    let (mut driver, version, startup): (Box<dyn ExternalSolver>, _, _) = if engine == "giac" {
+        let mut solver = GiacSolver::from_env(&scratch).unwrap();
+        let version = solver.probe_version().expect("install Giac first");
+        let startup = solver
+            .startup_measurement(&Limits::wall(Duration::from_secs(10)))
+            .expect("Giac startup observation");
+        (Box::new(solver), version, startup)
+    } else {
+        let mut solver = GroebnerRsSolver::from_env(&scratch).unwrap();
+        let version = solver
+            .probe_version()
+            .expect("provision the pinned driver first");
+        let startup = solver
+            .startup_measurement(&Limits::wall(Duration::from_secs(10)))
+            .expect("startup observation");
+        (Box::new(solver), version, startup)
+    };
     let mut environment = Environment::from_git();
     environment.machine = std::env::var("ZEEBRA_MACHINE").expect("ZEEBRA_MACHINE");
     environment.cpu = format!(
@@ -115,11 +125,21 @@ fn main() {
         wall,
         rss,
         workers,
-        version.build.as_deref().unwrap()
+        version
+            .build
+            .as_deref()
+            .unwrap_or("Giac upstream package; ISA unspecified")
     );
+    if engine == "giac" {
+        environment.build = format!(
+            "harness {}; Giac upstream package; engine ISA unspecified",
+            environment.build
+        );
+        environment.policy = format!("#740; one row per process; {wall}s per child; {rss}MiB RSS; {workers} workers; exact independent Singular verification");
+    }
     let task = Task::ReducedGrobnerBasis;
     let report=match engine.as_str(){
-        "groebner-rs"=>driver.run(&instance,task,&limits),
+        "groebner-rs"|"giac"=>driver.run(&instance,task,&limits),
         "zeebra" if workers!=1=>RunReport::new("zeebra",&instance,task,&limits,
             RunStatus::Unsupported(Unsupported::Representation{detail:"the configured Zeebra F4 is serial; cannot supply the requested multiworker cohort".into()}),Measurement::unmeasured()),
         "zeebra"=>{let mut solver=ZeebraSolver::new().measuring_one_row();let _=solver.probe_version();solver.run(&instance,task,&limits)},
@@ -162,6 +182,25 @@ fn main() {
             startup.peak_rss_bytes.map(Json::int).unwrap_or(Json::Null),
         ),
         ("driver", Json::string(version.to_string())),
+        (
+            "independent_outputs",
+            if engine == "giac" {
+                Json::Array(
+                    fs::read_dir(&scratch)
+                        .unwrap()
+                        .filter_map(Result::ok)
+                        .filter(|entry| entry.file_name().to_string_lossy().starts_with("verify-"))
+                        .flat_map(|entry| {
+                            fs::read_dir(entry.path()).unwrap().filter_map(Result::ok)
+                        })
+                        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "out"))
+                        .map(|entry| Json::string(fs::read_to_string(entry.path()).unwrap()))
+                        .collect(),
+                )
+            } else {
+                Json::Null
+            },
+        ),
         (
             "raw_output",
             report

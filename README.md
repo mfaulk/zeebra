@@ -202,11 +202,16 @@ For partial elimination, run `cargo run --example block_elimination`. A checked
 grevlex within each block. See the [two-block order guide](docs/guide/grobner-bases.md#two-block-elimination-orders)
 for validation, extraction of the retained basis, and current adapter/FGLM limits.
 
+Giac's modular grevlex route is available through `GiacSolver` and
+`competitive_sweep --engines giac`. Each completed basis is checked coefficient
+for coefficient with Singular. See the [Giac setup and limits](docs/guide/external-engines.md#giac-modular-grevlex-comparand)
+for installation, worker cohorts, and supported fields/tasks.
+
 ### Cargo features
 
 | Feature | Default | What it adds |
 |---|---|---|
-| `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush and Singular as subprocesses. Uses only `std` and adds no dependency. |
+| `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush, Giac and Singular as subprocesses. Uses only `std` and adds no dependency. |
 | `proptest` | off | `proptest::arbitrary::Arbitrary` for the public types: field elements, big integers, monomials, polynomials, vectors and matrices. Lets you property-test downstream code with `any::<T>()`. |
 
 ```toml
