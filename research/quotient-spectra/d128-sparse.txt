@@ -1,0 +1,9 @@
+2026-11-13T02:03:36Z
+ 21:03:36 up 2 days,  2:12,  1 user,  load average: 9.10, 66.42, 51.96
+D=128 mode=sparse construction=108.705µs operator_bytes=8208 VmHWM:	    2852 kB
+operator_nonzeros=128
+minimal=69.131µs degree=128 stats=SpectralStatistics { workspace_bytes: 307232, materialized_bytes: 0, work_units: 8487297 } VmHWM:	    2968 kB
+characteristic=124.506675ms degree=128 stats=SpectralStatistics { workspace_bytes: 307232, materialized_bytes: 65536, work_units: 68194689 } VmHWM:	    3032 kB
+verified against the independent cyclic-algebra formulas
+process_wall_s=0.12 process_peak_rss_kb=2136
+exit_status=0
