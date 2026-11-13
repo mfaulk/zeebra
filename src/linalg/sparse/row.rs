@@ -153,6 +153,8 @@ impl<F: FiniteField> SparseRow<F> {
         // multiplication by `inverse()`, and `inverse()` is a modular exponentiation of about
         // log2(q) multiplications.
         let inverse = coefficient.inverse();
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::counters(|work| work.normalized_cells += self.entries.len());
         for (_, entry) in self.entries.iter_mut() {
             *entry *= inverse;
         }
@@ -180,6 +182,8 @@ impl<F: FiniteField> SparseRow<F> {
         } else {
             0
         };
+        #[cfg(feature = "research-work")]
+        let before = self.entries.len();
         scratch.clear();
         scratch.reserve(self.entries.len() - lo + other.entries.len());
 
@@ -208,8 +212,29 @@ impl<F: FiniteField> SparseRow<F> {
             scratch.push((*column, F::zero() - *factor * *coefficient));
         }
 
+        #[cfg(feature = "research-work")]
+        {
+            crate::linalg::work::pivot(other.entries.len());
+            crate::linalg::work::counters(|work| {
+                work.sparse_target_entries += before - lo;
+                work.sparse_prefix_preserved += lo;
+                work.sparse_merge_output_entries += scratch.len();
+                work.sparse_copyback_entries += scratch.len();
+            });
+            crate::linalg::work::sparse_storage(
+                self.entries.len() + scratch.len(),
+                self.entries.capacity() + scratch.capacity(),
+                std::mem::size_of::<(usize, F)>(),
+            );
+        }
         self.entries.truncate(lo);
         self.entries.extend_from_slice(scratch);
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::sparse_storage(
+            self.entries.len() + scratch.len(),
+            self.entries.capacity() + scratch.capacity(),
+            std::mem::size_of::<(usize, F)>(),
+        );
         debug_assert!(self.is_canonical(), "{:?} is not canonical", self.entries);
     }
 

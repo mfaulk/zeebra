@@ -1,23 +1,4 @@
-//! The elimination interface F4 calls, and the backends that implement it.
-//!
-//! Two functions, and the choice of representation is a parameter rather than a call site. That
-//! separation exists so that a caller which knows something about the *structure* of its matrix —
-//! which rows are already pivots, which are the work — and a backend which knows something about
-//! its *density* can be developed independently of each other.
-//!
-//! [`Backend::Sparse`] is the implementation from the preceding milestone and the reference every
-//! other backend is checked against. Every backend runs the *same* algorithm — leftmost nonzero
-//! column, first row to reach it, unit pivot, one inverse per pivot — so all three agree on the
-//! resulting matrix and on every counter in [`EliminationStatistics`], and a comparison between
-//! them measures storage and nothing else.
-//!
-//! `linalg` does not depend on `grobner`, and does not learn to. [`Backend`] is this module's own
-//! type; F4 holds one in its options.
-//!
-//! **Black-box methods — Wiedemann, block Wiedemann, Krylov — are a recorded won't-do here**, not a
-//! cost question: the output of this elimination *is* the transformed matrix and its rank defect,
-//! so there is no vector to solve for. `docs/research/wiedemann-krylov.md` §1 has the argument and
-//! the measurements; do not re-derive it.
+//! Backends share pivot order and algebraic counters; representation-specific diagnostics stay separate.
 
 use crate::{
     linalg::{
@@ -210,10 +191,23 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
     // Nonzero entries held by the rows still in the matrix; the row being worked on is taken out.
     let mut resident = statistics.initial_nonzeros;
     let mut scratch: Vec<(usize, F)> = Vec::new();
+    #[cfg(feature = "research-work")]
+    let mut allocated = if crate::linalg::work::enabled() {
+        matrix.entry_capacity()
+    } else {
+        0
+    };
 
     for index in split..matrix.num_rows() {
         let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
         resident -= row.nonzeros();
+        #[cfg(feature = "research-work")]
+        {
+            allocated = allocated.saturating_sub(row.capacity());
+            crate::linalg::work::target(index);
+            crate::linalg::work::row_context(resident, allocated);
+            crate::linalg::work::counters(|work| work.rows_loaded += 1);
+        }
 
         while let Some(column) = row.leading_column() {
             match pivot_of_column.pivot_of(column) {
@@ -245,8 +239,21 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
 
         if row.is_zero() {
             statistics.zero_rows += 1;
+            #[cfg(feature = "research-work")]
+            crate::linalg::work::counters(|work| work.rows_zero += 1);
         }
         resident += row.nonzeros();
+        #[cfg(feature = "research-work")]
+        {
+            allocated += row.capacity();
+            crate::linalg::work::memory(
+                resident + scratch.len(),
+                allocated + scratch.capacity(),
+                0,
+                0,
+                std::mem::size_of::<(usize, F)>(),
+            );
+        }
         statistics.peak_nonzeros = statistics.peak_nonzeros.max(resident);
         matrix.rows_mut()[index] = row;
     }

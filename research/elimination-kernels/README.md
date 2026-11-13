@@ -128,3 +128,8 @@ blank-at-end-of-line checking. Ordinary source files still use the repository's 
 
 CI verifies the raw artifact SHA256 inventory, regenerates the CSV/summary and checks that neither
 derived file changes. It runs no timings or privileged hardware counters.
+
+The delayed pilot overlay was refreshed for #718 after passive `research-work`
+hooks changed accumulator context. This changes patch application context only;
+the pilot dispatch and arithmetic are unchanged. Historical cohorts retain their
+original measured overlay hashes and are not relabelled.

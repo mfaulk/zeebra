@@ -1,12 +1,4 @@
-//! Deterministic Gaussian elimination on a sparse finite-field matrix.
-//!
-//! Rows are taken in index order; each is reduced against the pivots already established, and
-//! becomes the pivot for its own leading column if that column has none. Over a finite field there
-//! is no numerical stability to pivot for, so the choice can be the leftmost nonzero column and
-//! the first row to reach it — which makes the result a function of the input alone.
-//!
-//! See Sec 2.10 of Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea for the role this
-//! plays in F4, and Faugère (1999) for the algorithm that calls it.
+//! Right-to-left pivot back substitution relies on a static incidence index; pivots cannot create entries to their left.
 
 use crate::{
     linalg::{
@@ -136,6 +128,8 @@ fn row_echelon_tracked<F: FiniteField>(
     // whatever its length says.
     let mut allocated = matrix.entry_capacity();
     buffers.capacity = buffers.capacity.max(allocated);
+    #[cfg(feature = "research-work")]
+    crate::linalg::work::memory(resident, allocated, 0, 0, std::mem::size_of::<(usize, F)>());
 
     // Which row is the pivot for a given column, indexed by the column. Never iterated, so no
     // storage order can reach the result.
@@ -148,6 +142,12 @@ fn row_echelon_tracked<F: FiniteField>(
         let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
         resident -= row.nonzeros();
         allocated -= row.capacity();
+        #[cfg(feature = "research-work")]
+        {
+            crate::linalg::work::target(index);
+            crate::linalg::work::row_context(resident, allocated);
+            crate::linalg::work::counters(|work| work.rows_loaded += 1);
+        }
 
         while let Some(column) = row.leading_column() {
             match pivot_of_column.pivot_of(column) {
@@ -182,6 +182,8 @@ fn row_echelon_tracked<F: FiniteField>(
 
         if row.is_zero() {
             statistics.zero_rows += 1;
+            #[cfg(feature = "research-work")]
+            crate::linalg::work::counters(|work| work.rows_zero += 1);
         }
         resident += row.nonzeros();
         allocated += row.capacity();
@@ -283,10 +285,14 @@ fn back_substitute_pivots_tracked<F: FiniteField>(
     statistics: &mut EliminationStatistics,
     buffers: &mut EntryBufferPeak,
 ) -> Result<usize, usize> {
+    #[cfg(feature = "research-work")]
+    let _phase = crate::linalg::work::backward();
     let mut scratch: Vec<(usize, F)> = Vec::new();
     let mut resident = statistics.final_nonzeros;
     let mut allocated = matrix.entry_capacity();
     buffers.capacity = buffers.capacity.max(allocated);
+    #[cfg(feature = "research-work")]
+    crate::linalg::work::memory(resident, allocated, 0, 0, std::mem::size_of::<(usize, F)>());
     let mut rows_examined = 0usize;
 
     // Pivot columns, right to left. The sort stays: the rows are visited in row order, and what
@@ -306,6 +312,16 @@ fn back_substitute_pivots_tracked<F: FiniteField>(
     // any column further left, and the column being cleared therefore holds exactly the entries the
     // echelon pass left in it. Visit the pivots left to right and that stops being true.
     let column_rows = PivotColumnRows::build(matrix, &pivots);
+    #[cfg(feature = "research-work")]
+    crate::linalg::work::memory(
+        resident,
+        allocated,
+        0,
+        pivots.capacity() * std::mem::size_of::<(usize, usize)>()
+            + (column_rows.offsets.capacity() + column_rows.rows.capacity())
+                * std::mem::size_of::<usize>(),
+        std::mem::size_of::<(usize, F)>(),
+    );
 
     for (slot, &(column, pivot_index)) in pivots.iter().enumerate().rev() {
         for &index in column_rows.rows_in(slot) {
@@ -323,6 +339,12 @@ fn back_substitute_pivots_tracked<F: FiniteField>(
             let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
             resident -= row.nonzeros();
             allocated -= row.capacity();
+            #[cfg(feature = "research-work")]
+            {
+                crate::linalg::work::target(index);
+                crate::linalg::work::row_context(resident, allocated);
+                crate::linalg::work::counters(|work| work.rows_loaded += 1);
+            }
             row.subtract_scaled(matrix.row(pivot_index), &factor, &mut scratch);
             statistics.row_operations += 1;
             resident += row.nonzeros();
@@ -338,6 +360,8 @@ fn back_substitute_pivots_tracked<F: FiniteField>(
 
     matrix.sort_rows_by_leading_column();
     statistics.final_nonzeros = resident;
+    #[cfg(feature = "research-work")]
+    crate::linalg::work::outside_summary(statistics, matrix.num_rows(), matrix.num_columns());
     debug_assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
     Ok(rows_examined)
 }

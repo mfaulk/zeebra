@@ -124,6 +124,7 @@ cargo run --release --example f4_statistics   # pairs, reductions, zero reductio
 cargo run --release --example f4_profile      # cost attributed per stage
 cargo run --release --example mq10_profile -- 32003 --stages  # current-default MQ10, JSON
 cargo run --release --example mq10_profile -- 2147483647     # clocks disabled control
+cargo run --release --features research-work --example mq10_profile -- 32003 --stages --work
 cargo run --release --example solve_one       # a system in, verified solutions out
 ```
 
@@ -319,6 +320,11 @@ provenance.
 
 The [current-default MQ10 profiling report](docs/research/mq10-current-profile.md) gives the
 matched stage/control campaign and instruction-profile reproduction commands.
+
+The [grobx trajectory study](docs/research/grobx-trajectory.md) separates algebraic
+work, coefficient traffic and live matrix storage, including abandoned signature
+runs. Its [reproduction guide](research/grobx-trajectory/README.md) documents optional
+passive counters and matched full-basis-verified controls; solver defaults are unchanged.
 
 A completed external process can have unavailable RSS if it exits before sampling. The supervisor
 preserves its exit result and leaves the peak unavailable; adapters with child self-high-water

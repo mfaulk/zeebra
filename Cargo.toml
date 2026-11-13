@@ -71,6 +71,9 @@ default = ["external-runners"]
 # promised.
 external-runners = []
 
+# Passive elimination-work diagnostics; scopes must also be explicitly enabled.
+research-work = []
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
