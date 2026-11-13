@@ -1,0 +1,23 @@
+{
+  "base_commit": "a7827de109aad8b7d4f04d3e40d4dc0d30e63fc2",
+  "target_cpu": "x86-64-v3",
+  "field": 32003,
+  "affinity": "4",
+  "instrument_only": true,
+  "campaigns": [
+    {
+      "file": "replay.tsv",
+      "commit": "575f59d9aff7d97274ab31d6dc77cfb1cd366b58",
+      "instrument_sha256": "e4ca8e835c6086963afec5d57021a5c14db0b8eb43d4b277d71900a9b3d72c79",
+      "code_delta_sha256": "a4e35ddfc3c7c329947947a383af86eaa1f217e07d1b9b18e039dad8e20f7e86",
+      "record_sha256": "cd9a09cc8b5690bd8bb65870e305cdc85eea5b68646e8214c168d12d65feb46b"
+    },
+    {
+      "file": "sorted.tsv",
+      "commit": "f80adee9bbf17ff186f9bb3e8779ddc188a34c6d",
+      "instrument_sha256": "681e19e170e438b9dae982668b6fc90298daebc209d211730fe4d9081ed0ad2d",
+      "code_delta_sha256": "d7855108eec7ed6ba2dff558752ca70c576a5a39d1abd77eeff36bc1c560e012",
+      "record_sha256": "cfed0147f4c8621d3ebd6b2476607fb5ac05bd75e414a792bfebd35a6b1b902f"
+    }
+  ]
+}
