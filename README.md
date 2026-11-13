@@ -338,6 +338,11 @@ documents the bounded comparison and the revision's serial worker contract. The
 [retained comparison](docs/research/grobx-comparand.md) records current-default MQ results,
 proof costs, successful wide controls and conservative harness refusals separately.
 
+The opt-in [selective backward study](research/selective-backward/README.md) compares full
+batch RREF with reducing only F4 candidate rows. Build `mq10_profile` with `--features research-work`
+and pass `--backward=full`, `--backward=dense-all`, or `--backward=dense-selected` to select a
+research policy; ordinary F4 defaults are unchanged.
+
 ## Contributing and documentation
 
 The [M27 algorithm decision](docs/research/m27-algorithm-decision.md) records why an additional

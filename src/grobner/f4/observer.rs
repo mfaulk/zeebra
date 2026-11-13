@@ -32,7 +32,10 @@ pub trait BatchObserver<const N: usize, F: FiniteField> {
     fn matrix(&mut self, _matrix: &MacaulayMatrix<N, F>) {}
 
     /// Research-only replacement for one batch's elimination; `None` keeps the ordinary path.
-    /// Implementations must preserve row space, row provenance, budgets and the requested row form.
+    /// Implementations must preserve row space, row provenance and budgets. A selective-backward
+    /// experiment must fully reduce every row whose leading column was absent from the input
+    /// leading set; other rows may remain echelon because F4 discards them at extraction.
+    /// This exception is confined to this research hook, not the public RREF operations.
     #[cfg(feature = "research-work")]
     fn eliminate(
         &mut self,

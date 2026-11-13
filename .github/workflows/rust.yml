@@ -108,6 +108,8 @@ jobs:
           git diff --exit-code -- research/worker-pool/summary.json research/worker-pool/summary.csv
           cargo test --features research-work --lib linalg::work
           cargo test --features research-work --lib linalg::concurrent
+          cargo test --features research-work --lib linalg::selective
+          python3 tools/test/selective-backward-study-test.py
           cargo test --features research-work --example mq10_profile
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks
