@@ -22,6 +22,34 @@ class RecordTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'digest'):
             study.validate(dict(raw, input='other'), answers, ('field', 2, 0), False)
 
+    # Refusal records bind the input and preserve a reason rather than inventing an answer.
+    def test_refusals_remain_distinct_from_completed_answers(self):
+        raw = {'input': 'pair', 'input_sha256': study.digest(b'pair'), 'observed': False,
+               'profile': None, 'status': 'refused', 'refusal': 'too few points'}
+        answers = {}
+        study.validate(raw, answers, ('field', 2, 0), False)
+        self.assertEqual(answers, {})
+        with self.assertRaisesRegex(ValueError, 'reason'):
+            study.validate(dict(raw, refusal=''), {}, ('field', 2, 0), False)
+
+    # Stopped attempts stay outcomes and never enter completed-run timing medians.
+    def test_summary_does_not_turn_stops_into_timings(self):
+        summary_path = PATH.parents[1].parent / 'research/gcd-size/summarize.py'
+        summary_spec = importlib.util.spec_from_file_location('gcd_size_summary', summary_path)
+        summary = importlib.util.module_from_spec(summary_spec)
+        summary_spec.loader.exec_module(summary)
+        raw = {'input': 'pair', 'input_sha256': study.digest(b'pair'), 'gcd': 'x',
+               'observed': False, 'profile': None, 'status': 'completed',
+               'peak_rss_bytes': 100, 'elapsed_ns': 10}
+        complete = dict(field='field', arity=2, shape=0, route='primitive', arm='stock',
+                        diagnostic=False, status='completed', raw=raw,
+                        process_wall_ns=1000, peak_rss_bytes=100)
+        stopped = dict(complete, status='stopped', process_wall_ns=999999)
+        row = summary.summarize({'commit': 'source', 'attempts': [complete, stopped]})['rows'][0]
+        self.assertEqual(row['outcomes']['stopped'], 1)
+        self.assertEqual(row['outcomes']['completed'], 1)
+        self.assertEqual(row['process_wall_ns']['median'], 1000)
+
     # Missing profiles, negative counters and violated local degree bounds cannot become accepted evidence.
     def test_size_observations_are_checked(self):
         profile = {name: {'observations': 1, 'max_terms': 2, 'max_coefficient_degree': 3}
