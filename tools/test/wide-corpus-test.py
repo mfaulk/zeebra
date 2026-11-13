@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
+import gzip
 
 spec = importlib.util.spec_from_file_location('wide', Path(__file__).parents[1] / 'external/wide-corpus.py')
 wide = importlib.util.module_from_spec(spec)
@@ -51,6 +53,19 @@ class WideCorpusTests(unittest.TestCase):
         wide.enforce_peak(attempt)
         self.assertEqual(attempt['report']['status'], 'stopped-by-limit')
         self.assertEqual(attempt['stop'], 'rss-2GiB-kernel')
+
+    # Large retained responses round-trip through bounded, hash-checked repository payload files.
+    def test_payload_storage_is_lossless_and_detects_corruption(self):
+        cohort = {'commit': 'abc', 'attempts': [{'field': 'wide64', 'name': 'test',
+                  'engine': 'zeebra', 'report': {'status': 'complete', 'basis': ['x1+1']}}]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'campaign.json.gz'
+            wide.pack(cohort, path, chunk_size=32)
+            self.assertEqual(wide.load(path), cohort)
+            payload = next((path.parent / 'campaign-payloads').iterdir())
+            payload.write_bytes(gzip.compress(b'corrupt', mtime=0))
+            with self.assertRaises(ValueError):
+                wide.load(path)
 
     # A stopped attempt is retained without being treated as a completed oracle.
     def test_limit_is_not_an_oracle(self):

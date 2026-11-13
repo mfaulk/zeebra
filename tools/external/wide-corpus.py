@@ -144,7 +144,42 @@ def write(path, data):
 
 
 def load(path):
-    return json.loads(gzip.decompress(path.read_bytes()) if path.suffix == '.gz' else path.read_bytes())
+    cohort = json.loads(gzip.decompress(path.read_bytes()) if path.suffix == '.gz' else path.read_bytes())
+    if cohort.get('storage') != 'wide-corpus-chunks-v1':
+        return cohort
+    del cohort['storage']
+    attempts = []
+    for entry in cohort.pop('attempt_payloads'):
+        chunks = []
+        for part in entry['parts']:
+            payload = gzip.decompress((path.parent / part['path']).read_bytes())
+            if len(payload) != part['bytes'] or hashlib.sha256(payload).hexdigest() != part['sha256']:
+                raise ValueError('wide campaign payload hash/length mismatch')
+            chunks.append(payload)
+        attempts.append(json.loads(b''.join(chunks)))
+    cohort['attempts'] = attempts
+    return cohort
+
+
+def pack(cohort, path, chunk_size=16*1024**2):
+    payload_dir = path.parent / (path.name.removesuffix('.gz').removesuffix('.json') + '-payloads')
+    payload_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {k: v for k, v in cohort.items() if k != 'attempts'}
+    manifest.update(storage='wide-corpus-chunks-v1', attempt_payloads=[])
+    for attempt in cohort['attempts']:
+        data = json.dumps(attempt, separators=(',', ':'), ensure_ascii=False).encode()
+        parts = []
+        for start in range(0, len(data), chunk_size):
+            chunk = data[start:start+chunk_size]
+            digest = hashlib.sha256(chunk).hexdigest()
+            payload = payload_dir / (digest + '.json-chunk.gz')
+            payload.write_bytes(gzip.compress(chunk, mtime=0))
+            parts.append(dict(path=str(payload.relative_to(path.parent)), sha256=digest, bytes=len(chunk)))
+        manifest['attempt_payloads'].append(dict(field=attempt['field'], name=attempt['name'],
+                                                 engine=attempt['engine'], parts=parts))
+    write(path, manifest)
+    if load(path) != cohort:
+        raise ValueError('packing changed the retained campaign')
 
 
 def validate_catalog(cases):
@@ -220,11 +255,15 @@ def main():
     p.add_argument('--binary', type=Path)
     p.add_argument('--freeze', action='store_true')
     p.add_argument('--summarize', type=Path)
+    p.add_argument('--pack', type=Path, help='losslessly pack retained attempts into <=16MiB input chunks')
     p.add_argument('--output', type=Path, default=ROOT / 'research/wide-corpus/campaign.json.gz')
     p.add_argument('--scratch', type=Path)
     p.add_argument('--fields', default='wide64,goldilocks,bn254')
     p.add_argument('--rows', help='comma separated; default all frozen rows')
     args = p.parse_args()
+    if args.pack:
+        pack(load(args.pack), args.output)
+        return
     if args.summarize:
         summary(load(args.summarize), ROOT / 'research/wide-corpus/BOARD.md')
         return

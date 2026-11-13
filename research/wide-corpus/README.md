@@ -64,6 +64,7 @@ ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=2 \
   --binary "$CARGO_TARGET_DIR/release/examples/wide_corpus" \
   --scratch "$CARGO_TARGET_DIR/campaign" \
   --output research/wide-corpus/campaign.json.gz
+python3 tools/external/wide-corpus.py --pack research/wide-corpus/campaign.json.gz
 python3 tools/external/wide-corpus.py --summarize research/wide-corpus/campaign.json.gz
 ```
 
@@ -77,6 +78,13 @@ become ratios. At least one external completion is needed for a verified Zeebra 
 
 Intentional regeneration after changing a definition:
 `python3 tools/external/wide-corpus.py --binary "$CARGO_TARGET_DIR/release/examples/wide_corpus" --freeze`.
+Complete basis responses can exceed GitHub's single-file limit. `--pack` replaces the main gzip
+with a manifest and writes content-addressed payload chunks under `campaign-payloads/`, each at
+most 16 MiB before compression. `load()` in the campaign tool checks every chunk's SHA-256 and
+length, reconstructs the original attempts, and verifies a lossless round trip. The summary command
+accepts both unpacked campaigns and this manifest. Raw native responses and full bases remain
+available; no coefficients are discarded. Commit the manifest and its payload directory together.
+
 Review the full catalog diff and remeasure; never update pins to accommodate stale evidence.
 CI runs the generator and gate tests plus offline catalog integrity checks; external solvers and
 long resource-boundary runs are opt-in and are not required on GitHub Actions.
