@@ -210,6 +210,12 @@ zeebra = { version = "0.1", features = ["proptest"] }
 
 `Ring` does not require `Arbitrary`, so you can implement it for your own type whether or not the feature is on.
 
+For a finite `QuotientAlgebra`, bounded variable minimal and characteristic
+polynomials retain nilpotent multiplicities over every field characteristic.
+Run `cargo run --release --example quotient_spectra -- 4 dense`; the
+[quotient operator guide](docs/guide/grobner-bases.md#quotient-operator-polynomials)
+describes limits and coefficient conventions.
+
 ## What is in the box
 
 | Area | Guide |

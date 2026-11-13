@@ -96,25 +96,36 @@ fn krylov_span<const N: usize, F: FiniteField>(
     algebra: &QuotientAlgebra<N, F>,
     variable: usize,
 ) -> (IncrementalSpan<F>, usize, Vec<F>) {
+    krylov_span_bounded(algebra, variable, |_| Ok::<_, std::convert::Infallible>(())).unwrap()
+}
+
+pub(super) fn krylov_span_bounded<const N: usize, F: FiniteField, E>(
+    algebra: &QuotientAlgebra<N, F>,
+    variable: usize,
+    mut charge: impl FnMut(usize) -> Result<(), E>,
+) -> Result<(IncrementalSpan<F>, usize, Vec<F>), E> {
     let dimension = algebra.dimension();
+    charge(0)?;
     let mut span = IncrementalSpan::new(dimension);
     let mut power = algebra.one();
-
     for _ in 0..dimension {
+        // Upper bound on coordinate/combination updates, insertion and operator application.
+        charge(
+            4usize
+                .saturating_mul(dimension)
+                .saturating_mul(dimension + 1),
+        )?;
         match span.reduce(&power) {
             Dependence::Independent {
                 residue,
                 combination,
             } => span.insert(residue, combination),
-            // `t^k` is a combination of lower powers, so the minimal polynomial has degree `k` and
-            // no higher power can be independent either.
             Dependence::Dependent { .. } => break,
         }
         power = algebra.multiply_by_variable(variable, &power);
     }
-
     let degree = span.accepted();
-    (span, degree, power)
+    Ok((span, degree, power))
 }
 
 /// Whether a variable generates the quotient algebra, and the degree of its minimal polynomial.

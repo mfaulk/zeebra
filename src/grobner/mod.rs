@@ -43,8 +43,9 @@ pub use fglm::{
     krull_dimension, largest_quotient_dimension_within, BorderIndex, BorderStatistics,
     ColumnTarget, ConversionRoute, ConversionStrategy, FglmError, FglmMemory, FglmOptions,
     FglmStageTimings, FglmStatistics, IdealClass, MultiplicationOperator, OperatorConstruction,
-    OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics, WiedemannFallback,
-    RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES,
+    OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics, SpectralError,
+    SpectralOptions, SpectralStatistics, WiedemannFallback, RECOMMENDED_MAX_QUOTIENT_DIMENSION,
+    RECOMMENDED_MAX_SPAN_ENTRIES,
 };
 pub use field_equations::{
     field_equations, rational_points_by_enumeration, with_field_equations, FieldEquationError,

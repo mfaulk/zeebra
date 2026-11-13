@@ -489,3 +489,68 @@ reduction, but polynomial-vector term growth would require separate generation b
 actual caller workload. This increment verifies caller evidence and needs no producer. Production
 F4 propagation, an independent trace verifier, and a bounded producer cost study remain separate
 follow-ups; no code from external engines is used here.
+
+## Quotient operator polynomials
+
+An already constructed `QuotientAlgebra` exposes
+`variable_minimal_polynomial(variable, &SpectralOptions)` and
+`variable_characteristic_polynomial(variable, &SpectralOptions)`. Both return
+`(UnivariatePolynomial<F>, SpectralStatistics)`; coefficients are in ascending
+power order and the result is monic. Variable indices start at zero. Invalid
+indices produce `SpectralError::InvalidVariable`, including on the unit ideal.
+The unit ideal has dimension zero and both polynomials are 1. The zero ideal
+in a ring with variables is positive-dimensional and `QuotientAlgebra::new`
+rejects it before constructing operators with `FglmError::PositiveDimensional`.
+As with the other quotient operations, construction assumes a source Gröbner
+basis under the specified order.
+
+The minimal polynomial uses the same first-dependence Krylov sweep as
+`shape_report`, starting at 1. If `a` is the variable's residue class, then
+`p(T_a)1 = p(a) = 0` implies `p(T_a)b = p(a)b = 0` for every class `b`.
+Independence before the first relation proves minimality. This uses
+multiplication in a unital algebra and makes no claim about a single Krylov
+vector for an arbitrary matrix. No radicality or separating-variable assumption
+is needed. For example, in `F[x,y]/(x²,y²)`, multiplication by x has minimal
+polynomial t² and characteristic polynomial t⁴, even in characteristic two.
+
+The characteristic operation independently materializes the variable operator
+and uses division-free Berkowitz: O(D⁴) coefficient work and O(D²) workspace.
+Its recurrence partitions the trailing matrix as `[a R; C M]`, uses the Toeplitz
+column `1, -a, -RC, -RMC, ...`, and multiplies by the characteristic coefficient
+vector for M. No division by integer indices occurs. See the mathematical
+[Berkowitz description in FLINT](https://flintlib.org/doc/algorithms/linear-algebra/charpoly.html).
+The implementation is independent; it imports no external source code.
+
+`SpectralOptions` defaults to dimension 128, 256 MiB incremental workspace,
+100,000,000 conservative coefficient-update work units and 30 seconds.
+`DimensionExceeded`, `WorkspaceExceeded`, `WorkExceeded`, `DeadlineExceeded`
+and checked-size `SizeOverflow` outcomes are typed resource refusals.
+These are cooperative limits, not a hard process watchdog: time is checked
+before each bounded block, and a field operation itself cannot be interrupted.
+Construction has its separate `FglmOptions` budgets and is outside this timer.
+
+The workspace allowance is `(4D² + 24D + 8) * size_of::<F>() + 256D` bytes,
+checked before allocating. Four squares cover span coordinate and combination
+capacities (including geometric vector growth), or the dense matrix plus
+Berkowitz registers. Linear slack covers live power vectors, polynomial
+coefficients including the returned polynomial and its construction copy, and
+scratch buffers; 256D covers span row metadata with capacity growth. This is a
+conservative representation allowance, not measured RSS; allocator bookkeeping
+and the existing algebra are excluded. Statistics report this allowance, dense
+materialization bytes (zero for minimal), and charged work units separately.
+Work units conservatively charge coordinate/combination updates and operator
+applications even where zero coefficients skip arithmetic; they are neither
+field-operation counts nor CPU instructions.
+
+Run the public example with
+`cargo run --release --example quotient_spectra -- 4 dense`.
+It separately prints construction, minimal and characteristic durations,
+operator storage, workspace/work charges and Linux process peak RSS, then checks
+that the minimal polynomial divides the characteristic polynomial. Arguments
+are dimension 1..128 and `sparse|dense`; the latter selects x=y or
+x=y+...+y^(D-1) in `F[x,y]/(x-h(y), y^D-1)` over GF(32003).
+Dense fixtures exercise a dense x operator, while sparse fixtures use a cyclic
+shift. The reported RSS is a cumulative process high-water mark, not incremental
+allocation by each phase. These are feasibility checks, not evidence of an FGLM
+speedup. For retained bounded runs, see
+[quotient spectra](../research/quotient-spectra.md).

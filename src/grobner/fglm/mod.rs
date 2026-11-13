@@ -18,6 +18,7 @@ mod options;
 mod quotient_algebra;
 mod quotient_basis;
 pub mod shape;
+mod spectra;
 mod statistics;
 mod wiedemann;
 
@@ -44,6 +45,7 @@ pub use options::{
 pub use quotient_algebra::{QuotientAlgebra, QuotientStatistics};
 pub use quotient_basis::{classify_ideal, krull_dimension, IdealClass, QuotientBasis};
 pub use shape::{separating_variables, shape_lex_basis, shape_report, ShapeError, ShapeReport};
+pub use spectra::{SpectralError, SpectralOptions, SpectralStatistics};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};
 
 pub use wiedemann::{ConversionRoute, WiedemannFallback};
