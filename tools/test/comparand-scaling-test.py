@@ -41,6 +41,15 @@ class ComparandScalingTests(unittest.TestCase):
         self.assertEqual(scaling.attempt_key(previous['attempts'][0]),('d','grobx',1,0,False))
         changed=dict(current,binaries={'grobx':{'sha256':'other'}})
         with self.assertRaises(ValueError):scaling.check_resume(previous,changed)
+    # Version-probe RSS is runtime telemetry; unchanged executable/build identities still bind resumption.
+    def test_resume_ignores_only_version_probe_peak_rss(self):
+        base=dict(machine='host',physical_cpus=[],cases=[],references={},input_exporter={},
+                  effective_environment={},rustc='pin',policy={})
+        previous=dict(base,binaries={'grobx':dict(sha256='same',version=dict(build='pin',kernel_peak_rss_bytes=100))})
+        current=dict(base,binaries={'grobx':dict(sha256='same',version=dict(build='pin',kernel_peak_rss_bytes=200))})
+        scaling.check_resume(previous,current)
+        current['binaries']['grobx']['version']['build']='changed'
+        with self.assertRaises(ValueError):scaling.check_resume(previous,current)
     # An interrupted uncommitted journal tail is an explicit blocker, never a silently accepted row.
     def test_partial_journal_line_requires_explicit_recovery(self):
         with tempfile.TemporaryDirectory() as directory:

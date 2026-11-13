@@ -30,7 +30,17 @@ def attempt_key(row):
 
 
 def check_resume(previous,current):
-    for key in ('machine','physical_cpus','cases','references','binaries','input_exporter',
+    def identities(binaries):
+        result={}
+        for engine,binary in binaries.items():
+            item=dict(binary)
+            if isinstance(item.get('version'),dict):
+                item['version']={k:v for k,v in item['version'].items() if k!='kernel_peak_rss_bytes'}
+            result[engine]=item
+        return result
+    if identities(previous['binaries'])!=identities(current['binaries']):
+        raise ValueError('controller-only continuation changed binaries')
+    for key in ('machine','physical_cpus','cases','references','input_exporter',
                 'effective_environment','rustc','julia_manifest','julia_source','msolve_build'):
         if previous.get(key)!=current.get(key):
             raise ValueError('controller-only continuation changed '+key)

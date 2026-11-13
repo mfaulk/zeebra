@@ -128,7 +128,8 @@ hash/path descriptor. A small status sidecar records termination. An incomplete 
 an explicit recovery blocker; committed payload changes are rejected. Existing `wide.pack`
 provides lossless bounded publication chunks after timing. `--resume PATH` requires identical
 inputs, executable hashes, compiler/package provenance, affinity, effective environment and
-solver policy. Every previous complete, refused, unsupported or gated identity is skipped.
+solver policy. Version-probe RSS is retained as runtime telemetry and excluded only from the
+immutable version-identity comparison; executable/build hashes remain exact. Every previous complete, refused, unsupported or gated identity is skipped.
 Original attempts retain their original controller commit. There is one declared continuation,
 not repeated sampling until a favorable result. The new aggregate storage ceiling is 16 GiB
 for newly retained payloads plus measured child output; each original child cap remains intact.
