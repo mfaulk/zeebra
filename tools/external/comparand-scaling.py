@@ -317,7 +317,7 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
     elif engine=='singular':
         adapter=stem.with_suffix('.adapter');adapter.mkdir()
         command=['env','TMPDIR='+str(adapter),binaries[engine]['wrapper'],'--engines','singular',
-                 '--measure','--row',case['name'],'--task','reduced-grobner-basis','--characteristic',str(case['modulus']),
+                 '--retain-artifacts','--measure','--row',case['name'],'--task','reduced-grobner-basis','--characteristic',str(case['modulus']),
                  '--workers','1','--wall',str(wall),'--rss-mib','2048']
     else:
         raise ValueError('unknown engine')
@@ -561,6 +561,9 @@ def main():
         signal.signal(signum,interrupt)
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path)
+    parser.add_argument('--input-source',help='exact source commit used to build the input-only exporter')
+    parser.add_argument('--oracle-wrapper',type=Path,help='debug competitive_sweep with explicit native-artifact retention')
+    parser.add_argument('--oracle-source',help='exact source commit used to build the optional retained oracle wrapper')
     parser.add_argument('--scratch',type=Path)
     parser.add_argument('--output',type=Path)
     parser.add_argument('--replay',type=Path,help='offline coefficient/provenance/board validation of retained campaign directory')
@@ -586,6 +589,10 @@ def main():
         summarize(wide.load(args.output),args.output.with_suffix('.md'));return
     if not args.binary or not args.scratch or str(args.scratch.resolve()).startswith(str(Path.home())):
         parser.error('binary and scratch outside home/worktree required')
+    if not re.fullmatch('[0-9a-f]{40}',args.input_source or ''):
+        parser.error('--input-source requires the exact 40-hex build source commit')
+    if args.oracle_wrapper and not re.fullmatch('[0-9a-f]{40}',args.oracle_source or ''):
+        parser.error('--oracle-source requires the exact retained-wrapper source commit')
     if args.output.exists():
         parser.error('output exists; use a distinct declared campaign rather than silently pooling')
     if args.scratch.exists():
@@ -607,7 +614,10 @@ def main():
     for engine,b in binaries.items():
         if not b['path']:parser.error('unprovisioned '+engine)
         b['sha256']=hashlib.sha256(Path(b['path']).read_bytes()).hexdigest()
-        if engine=='singular':b['wrapper']=str(args.binary)
+        if engine=='singular':
+            b['wrapper']=str(args.oracle_wrapper or args.binary)
+            b['wrapper_sha256']=hashlib.sha256(Path(b['wrapper']).read_bytes()).hexdigest()
+            b['wrapper_source_commit']=args.oracle_source or args.input_source
     cases=load_cases(args.binary);refs=reference_bases(cases)
     for archive in args.references:
         previous=wide.load(archive)
@@ -631,11 +641,12 @@ def main():
         cpu=platform.processor(),platform=platform.platform(),physical_cpus=cpus,binaries=binaries,
         rustc=subprocess.check_output(['rustc','-vV'],text=True),policy=vars(args)|{'binary':str(args.binary),'scratch':str(args.scratch),'output':str(args.output)},
         references=refs,cases=cases,attempts=[], input_exporter=dict(path=str(args.binary),sha256=hashlib.sha256(args.binary.read_bytes()).hexdigest(),
-            source_commit='e131a0829a94d9d4bfeff1bc2404c56f2a175e1e',build='debug; input-only; outside every timed region'),
+            source_commit=args.input_source,build='debug; input-only; outside every timed region'),
         effective_environment=dict(GROEBNER_NO_THREADED='0',OPENBLAS_NUM_THREADS='1',OMP_DYNAMIC='FALSE',
                                    ZEEBRA_RESEARCH_THREAD_TICKS='removed from timing arms; explicitly enabled only in diagnostics'))
     if args.references:
         cohort['policy']['references']=[str(p) for p in args.references]
+    cohort['policy']['oracle_wrapper']=str(args.oracle_wrapper) if args.oracle_wrapper else None
     for engine,b in binaries.items():
         if engine in ('groebner-rs','grobx'):
             b['version']=json.loads(subprocess.check_output([b['path'],'--version'],text=True))
