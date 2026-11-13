@@ -373,3 +373,61 @@ The measurement example exposes explicit overrides through `--max-dimension`, `-
 `--span-bytes`, `--operator-entries`, `--operator-bytes`, `--border-entries`, `--border-columns`,
 and `--border-rows`. These change only that invocation; keep an external wall/RSS backstop when
 raising them. A border-construction refusal precedes conversion and needs its own budget decision.
+
+## Exact submitted-basis witnesses
+
+`certify_submitted_basis` checks forward ideal inclusion, Buchberger's criterion and reducedness,
+but its legacy report is always incomplete for a submitted basis. To establish reverse inclusion,
+supply a cofactor row for each basis polynomial, using the **original ordered generator list**:
+
+```rust
+use zeebra::{fields::Zp32003, grobner::{certify_submitted_basis_with_witnesses,
+    verify_ideal_membership, MembershipLimits, MembershipStatus},
+    MonomialOrder, MultivariatePolynomial};
+type P = MultivariatePolynomial<2, Zp32003>;
+let p = |s| P::parse(s, ["x", "y"]).unwrap();
+let generators = [p("x^2-y"), p("x*y-1")];
+let basis = [p("x-y^2"), p("y^3-1")];
+// x-y² = y*f₀-x*f₁; y³-1 = -y²*f₀+(x*y+1)*f₁.
+let witnesses = [vec![p("y"), p("-x")], vec![p("-y^2"), p("x*y+1")]];
+let limits = MembershipLimits::default();
+let report = certify_submitted_basis_with_witnesses(&generators, &basis,
+    Some(&witnesses), MonomialOrder::Lexicographic, &limits).unwrap();
+assert!(report.is_complete());
+assert_eq!(verify_ideal_membership(&generators, &basis[0], &witnesses[0], &limits),
+    Ok(MembershipStatus::Verified));
+```
+
+The typed `N, F` arguments fix variable positions and the coefficient field; display names are
+not ring metadata. Zero and duplicate generators retain their positions, so every row must have
+exactly the original generator count. Empty generators certify only zero. An empty submitted
+basis needs `Some(&[])`; `None` means missing evidence. A unit generator needs the same exact
+identity as every other case. Changing coefficients or reordering unequal generators invalidates
+the identity. Membership alone proves neither forward inclusion nor the Gröbner property.
+
+`MembershipStatus` distinguishes `Verified`, false identities (`Invalid`), `Missing`, and
+`ResourceLimited`. `WitnessError` distinguishes wrong row/cofactor counts, order arity mismatch,
+and exponent addition overflow. `WitnessCertificationReport::is_complete` requires verified
+identities **and** all existing checks. It never changes the old `Provenance` contract.
+
+Defaults cap witness input terms at 100,000, coefficient products at 1,000,000, live residual
+terms at 100,000, and cooperative wall time at 30 seconds. Product and time budgets are shared
+across all rows. The verifier streams products into a sparse residual, checks exponent sums, and
+never materializes a full polynomial product. Input terms count stored terms in generators,
+targets and cofactors; the live-term cap counts residual monomials, not bytes or allocator
+metadata. Caller-owned evidence and all existing basis checks are outside these bounds. In
+particular, the combined route's normal forms and pair checks remain unbounded; enforce an
+external process time/RSS limit for untrusted large bases. Witness limits are inconclusive,
+not evidence of nonmembership.
+
+Run `cargo run --release --example membership_witness` for separately timed existing checks and
+witness verification on the small positive-dimensional ideal `(x²-y, xy-1)` extended with a free
+variable, over GF(32003) and BN254 Fr. The example prints cofactor term counts and process peak
+RSS (not incremental verifier allocation), and demonstrates an explicit budget refusal. It also
+checks the unit ideal. These small fixtures establish feasibility only; no speedup is claimed.
+
+A tracked Buchberger producer could carry a vector of cofactors through each S-polynomial and
+reduction, but polynomial-vector term growth would require separate generation budgets and an
+actual caller workload. This increment verifies caller evidence and needs no producer. Production
+F4 propagation, an independent trace verifier, and a bounded producer cost study remain separate
+follow-ups; no code from external engines is used here.
