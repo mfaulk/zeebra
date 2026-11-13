@@ -13,6 +13,21 @@ spec.loader.exec_module(scaling)
 
 
 class ComparandScalingTests(unittest.TestCase):
+    # Compiler activity refuses a cell before launching any measured solver process.
+    def test_compiler_gate_refuses_before_solve(self):
+        with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling,'active_compilers',return_value=[{'pid':1,'command':'rustc'}]):
+            a=scaling.execute('msolve',dict(modulus=13,variables=['x1'],generators=['x1']),1,False,
+                              {'msolve':{'path':'must-not-run'}},Path(directory)/'run',[0],60)
+            self.assertEqual(a['status'],'environment-refused')
+            self.assertNotIn('process_wall_ns',a)
+
+    # A compiler seen after a completed process excludes its timing while retaining the attempt.
+    def test_compiler_overlap_never_becomes_a_verified_timing(self):
+        with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling,'active_compilers',side_effect=[[],[{'pid':1,'command':'rustc'}]]),mock.patch.object(scaling,'guarded',return_value={'exit':0,'stop':None,'process_wall_ns':123}):
+            a=scaling.execute('msolve',dict(modulus=13,variables=['x1'],generators=['x1']),1,False,
+                              {'msolve':{'path':'fake'}},Path(directory)/'run',[0],60)
+            self.assertEqual(a['status'],'excluded-environment-overlap')
+            self.assertEqual(a['process_wall_ns'],123)
     # Offline replay rechecks coefficients instead of trusting a persisted verified status.
     def test_offline_replay_rejects_a_forged_verified_basis(self):
         canonical='characteristic 13\nextension-degree 1\norder grevlex\nvariables x1\ngenerator x1+1\n'

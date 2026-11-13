@@ -37,6 +37,21 @@ def kill_group(process):
     process.wait()
 
 
+def active_compilers():
+    result=[]
+    names={'cargo','rustc','clippy-driver','cc1','cc1plus','rust-lld','mold'}
+    for proc in Path('/proc').iterdir():
+        if not proc.name.isdigit():continue
+        try:
+            name=(proc/'comm').read_text().strip()
+            status=(proc/'status').read_text()
+            if name in names and not re.search(r'^State:\s+Z',status,re.M):
+                result.append(dict(pid=int(proc.name),command=(proc/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')[:2048]))
+        except (FileNotFoundError,ProcessLookupError,PermissionError):
+            pass
+    return result
+
+
 def cpu_activity(before, after):
     deltas = {tid: ticks - before.get(tid, 0) for tid, ticks in after.items()
               if ticks - before.get(tid, 0) > 0}
@@ -238,7 +253,13 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
                    '--heap-size-hint=2147483648',str(stem.with_suffix('.jl'))]
     else:
         raise ValueError('unknown engine')
+    busy=active_compilers()
+    if busy:
+        return dict(status='environment-refused',compilers=busy,command=command,cpus=cpus)
     attempt = guarded(command, stem, cpus, wall)
+    busy=active_compilers()
+    if busy:
+        return dict(attempt,status='excluded-environment-overlap',compilers=busy)
     attempt['status'] = 'stopped-by-limit' if attempt['stop'] else 'failed' if attempt['exit'] else 'complete'
     if attempt['status'] != 'complete':
         return attempt
@@ -584,6 +605,9 @@ def main():
                         stopped.pop(key,None)
                     cohort['attempts'].append(a);wide.write(args.output,cohort)
                     print(case['field'],case['name'],engine,p,repeat,a['status'],flush=True)
+                    if a['status'] in ('environment-refused','excluded-environment-overlap'):
+                        cohort['campaign_stop']='compiler-environment-gate';wide.write(args.output,cohort)
+                        summarize(cohort,args.output.with_suffix('.md'));raise SystemExit(75)
                     if a['status']=='failed':raise RuntimeError('unexpected engine failure retained')
     cohort['elapsed_seconds']=time.monotonic()-started
     wide.write(args.output,cohort);summarize(cohort,args.output.with_suffix('.md'))
