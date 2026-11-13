@@ -11,7 +11,19 @@ use zeebra::{
 };
 
 #[cfg(feature = "research-work")]
-struct ConcurrentObserver {
+#[path = "support/selective_backward.rs"]
+mod selective_backward;
+
+#[derive(Clone, Copy)]
+struct RunMode<'a> {
+    workers: Option<usize>,
+    dynamic: bool,
+    backward: Option<&'a str>,
+}
+
+#[cfg(feature = "research-work")]
+struct ConcurrentObserver<'a> {
+    backward: Option<&'a str>,
     config: zeebra::linalg::concurrent::Config,
     batches: Vec<Json>,
     fallbacks: usize,
@@ -19,7 +31,7 @@ struct ConcurrentObserver {
 
 #[cfg(feature = "research-work")]
 impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObserver<N, F>
-    for ConcurrentObserver
+    for ConcurrentObserver<'_>
 {
     fn batch(
         &mut self,
@@ -45,6 +57,21 @@ impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObs
         {
             self.fallbacks += 1;
             return None;
+        }
+        let mut input_leads = vec![
+            false;
+            if self.backward.is_some() {
+                matrix.num_columns()
+            } else {
+                0
+            }
+        ];
+        if self.backward.is_some() {
+            for row in matrix.matrix().rows() {
+                if let Some(c) = row.leading_column() {
+                    input_leads[c] = true;
+                }
+            }
         }
         let split = matrix.partition_reducers_first();
         check_reducer_block(matrix.matrix(), split).expect("symbolic reducer invariant");
@@ -72,7 +99,28 @@ impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObs
         let forward = started.elapsed();
         let mut statistics = report.statistics.clone();
         let started = Instant::now();
-        let backward = if options.reduce_batch_rows {
+        let mut backward_details = Json::Null;
+        let backward = if options.reduce_batch_rows && self.backward == Some("dense-selected") {
+            let selected: Vec<_> = matrix
+                .matrix()
+                .rows()
+                .iter()
+                .map(|r| r.leading_column().is_some_and(|c| !input_leads[c]))
+                .collect();
+            let report = match zeebra::linalg::selective::reduce(
+                matrix.matrix_mut(),
+                &selected,
+                config.max_entries,
+                64 * 1024 * 1024,
+                &mut statistics,
+            ) {
+                Ok(r) => r,
+                Err(zeebra::linalg::selective::Error::Entries(n)) => return Some(Err(n)),
+                Err(e) => panic!("selective research refusal: {e:?}"),
+            };
+            backward_details = selective_backward::details(&report);
+            Some(report.targets)
+        } else if options.reduce_batch_rows {
             match back_substitute_pivots_within(
                 matrix.matrix_mut(),
                 config.max_entries,
@@ -99,6 +147,7 @@ impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObs
             ("split", Json::size(split)),
             ("forward_ns", Json::nanos(forward)),
             ("backward_ns", Json::nanos(backward_time)),
+            ("backward_details", backward_details),
             ("successes", Json::size(report.successful_publications)),
             ("retries", Json::size(report.failed_publications)),
             ("products", Json::size(report.products)),
@@ -192,10 +241,14 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     measured: bool,
     measure_work: bool,
     discovery: bool,
-    workers: Option<usize>,
-    dynamic: bool,
+    mode: RunMode<'_>,
     problem: &str,
 ) {
+    let RunMode {
+        workers,
+        dynamic,
+        backward,
+    } = mode;
     let order = MonomialOrder::GradedReverseLexicographic;
     let input = corpus::instance(problem, modulus, order).expect("published corpus problem");
     let entry = corpus::ladder()
@@ -217,6 +270,7 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     let started = Instant::now();
     #[cfg(feature = "research-work")]
     let mut observer = workers.map(|workers| ConcurrentObserver {
+        backward,
         config: zeebra::linalg::concurrent::Config {
             workers,
             schedule: if dynamic {
@@ -230,7 +284,21 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         batches: Vec::new(),
         fallbacks: 0,
     });
+    #[cfg(feature = "research-work")]
+    let mut selective =
+        backward
+            .filter(|_| workers.is_none())
+            .map(|mode| selective_backward::Observer {
+                mode,
+                detailed: measure_work,
+                batches: Vec::new(),
+            });
     let solve = || {
+        #[cfg(feature = "research-work")]
+        if let Some(observer) = selective.as_mut() {
+            return zeebra::grobner::f4::f4_observed(&system, order, &options, observer)
+                .expect("selective backward corpus computation failed");
+        }
         #[cfg(feature = "research-work")]
         if let Some(observer) = observer.as_mut() {
             return zeebra::grobner::f4::f4_observed(&system, order, &options, observer)
@@ -251,6 +319,10 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     };
     #[cfg(not(feature = "research-work"))]
     let (basis, stats) = {
+        assert!(
+            backward.is_none(),
+            "--backward requires --features research-work"
+        );
         assert!(!discovery, "--discovery requires --features research-work");
         assert!(
             workers.is_none(),
@@ -268,6 +340,10 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     let parallel = observer.map_or(Json::Null, |observer| {
         Json::object([
             ("workers", Json::size(observer.config.workers)),
+            (
+                "backward_mode",
+                Json::string(observer.backward.unwrap_or("full")),
+            ),
             ("dynamic", Json::Bool(dynamic)),
             ("fallbacks", Json::size(observer.fallbacks)),
             ("batches", Json::Array(observer.batches)),
@@ -278,6 +354,15 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         let _ = dynamic;
         Json::Null
     };
+    #[cfg(feature = "research-work")]
+    let backward_report = selective.map_or(Json::Null, |o| {
+        Json::object([
+            ("mode", Json::string(o.mode)),
+            ("batches", Json::Array(o.batches)),
+        ])
+    });
+    #[cfg(not(feature = "research-work"))]
+    let backward_report = Json::Null;
     let mut basis: Vec<_> = basis
         .iter()
         .map(|p| polynomial_to_string(p, &names, order))
@@ -292,6 +377,7 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
             ("measured", Json::Bool(measured)),
             ("work", work),
             ("parallel", parallel),
+            ("backward", backward_report),
             ("field_type", Json::string(std::any::type_name::<F>())),
             ("options", Json::string(format!("{options:?}"))),
             ("f4_call_ns", Json::nanos(elapsed)),
@@ -300,6 +386,19 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
                 zeebra::util::peak_resident_bytes()
                     .map(Json::int)
                     .unwrap_or(Json::Null)
+            ),
+            (
+                "input",
+                Json::object([
+                    (
+                        "variables",
+                        Json::Array(input.variables.iter().cloned().map(Json::string).collect())
+                    ),
+                    (
+                        "generators",
+                        Json::Array(input.system.iter().cloned().map(Json::string).collect())
+                    ),
+                ])
             ),
             ("statistics", statistics(&stats, measured)),
             (
@@ -340,7 +439,7 @@ fn main() {
     }
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected]")
         .parse()
         .unwrap();
     assert!(
@@ -349,6 +448,7 @@ fn main() {
             || s == "--discovery"
             || s.starts_with("--workers=")
             || s.starts_with("--problem=")
+            || s.starts_with("--backward=")
             || s == "--schedule=dynamic"
             || s == "--schedule=static")
             && args[1..]
@@ -393,45 +493,40 @@ fn main() {
         .collect();
     assert!(problems.len() <= 1, "one problem required");
     let problem = problems.first().copied().unwrap_or("mq-random-10");
+    let backwards: Vec<_> = args
+        .iter()
+        .filter_map(|s| s.strip_prefix("--backward="))
+        .collect();
+    assert!(backwards.len() <= 1, "one backward policy required");
+    let backward = backwards.first().copied();
+    assert!(
+        backward.is_none_or(|p| matches!(p, "full" | "dense-all" | "dense-selected")),
+        "unknown backward policy"
+    );
+    assert!(
+        backward.is_none() || (!discovery && (workers.is_none() || backward != Some("dense-all"))),
+        "dense-all requires serial forward; backward policies exclude discovery"
+    );
+    let mode = RunMode {
+        workers,
+        dynamic,
+        backward,
+    };
     macro_rules! run_field {
         ($field:ty) => {
             match problem {
-                "mq-random-10" => run::<10, $field>(
-                    modulus,
-                    measured,
-                    measure_work,
-                    discovery,
-                    workers,
-                    dynamic,
-                    problem,
-                ),
-                "mq-random-14" => run::<14, $field>(
-                    modulus,
-                    measured,
-                    measure_work,
-                    discovery,
-                    workers,
-                    dynamic,
-                    problem,
-                ),
-                "katsura-6" => run::<6, $field>(
-                    modulus,
-                    measured,
-                    measure_work,
-                    discovery,
-                    workers,
-                    dynamic,
-                    problem,
-                ),
-                "cyclic-5" => run::<5, $field>(
-                    modulus,
-                    measured,
-                    measure_work,
-                    discovery,
-                    workers,
-                    dynamic,
-                    problem,
-                ),
+                "mq-random-10" => {
+                    run::<10, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
+                "mq-random-14" => {
+                    run::<14, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
+                "katsura-6" => {
+                    run::<6, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
+                "cyclic-5" => {
+                    run::<5, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
                 _ => panic!("supported problems: mq-random-10, mq-random-14, katsura-6, cyclic-5"),
             }
         };
@@ -447,6 +542,69 @@ fn main() {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    // Selective and all-target research policies return the exact ordinary basis and pair schedule.
+    #[cfg(feature = "research-work")]
+    #[test]
+    fn backward_policies_preserve_complete_solves() {
+        use zeebra::grobner::{
+            benchmark_systems::{cyclic, katsura},
+            f4::f4_observed,
+        };
+        for system in [cyclic::<4, Zp32003>(), katsura::<4, Zp32003>()] {
+            for order in [
+                MonomialOrder::GradedReverseLexicographic,
+                MonomialOrder::Lexicographic,
+            ] {
+                let options = F4Options::default();
+                let (expected, original) = f4_with_options(&system, order, &options).unwrap();
+                for mode in ["full", "dense-all", "dense-selected"] {
+                    let mut observer = selective_backward::Observer {
+                        mode,
+                        detailed: true,
+                        batches: Vec::new(),
+                    };
+                    let (basis, actual) =
+                        f4_observed(&system, order, &options, &mut observer).unwrap();
+                    assert_eq!(basis, expected, "{mode}");
+                    assert_eq!(actual.batches, original.batches);
+                    assert_eq!(actual.step_degrees, original.step_degrees);
+                    assert!(!observer.batches.is_empty());
+                }
+            }
+        }
+    }
+
+    // Concurrent forward pivots compose with candidate-only backward reduction without changing a basis.
+    #[cfg(feature = "research-work")]
+    #[test]
+    fn concurrent_forward_accepts_selective_backward() {
+        use zeebra::grobner::{
+            benchmark_systems::{cyclic, katsura},
+            f4::f4_observed,
+        };
+        for system in [cyclic::<4, Zp32003>(), katsura::<4, Zp32003>()] {
+            let options = F4Options::default();
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let expected = f4_with_options(&system, order, &options).unwrap().0;
+            for workers in [1, 4] {
+                let mut observer = ConcurrentObserver {
+                    config: zeebra::linalg::concurrent::Config {
+                        workers,
+                        ..Default::default()
+                    },
+                    backward: Some("dense-selected"),
+                    batches: Vec::new(),
+                    fallbacks: 0,
+                };
+                let actual = f4_observed(&system, order, &options, &mut observer)
+                    .unwrap()
+                    .0;
+                assert_eq!(actual, expected);
+                assert_eq!(observer.fallbacks, 0);
+            }
+        }
+    }
 
     // Refining timers are excluded from the partition, so stage shares never double count them.
     #[test]

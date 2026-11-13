@@ -6,6 +6,8 @@ pub mod echelon;
 mod gauss_jordan;
 mod matrix;
 mod pivots;
+#[cfg(feature = "research-work")]
+pub mod selective;
 pub mod sparse;
 mod vector;
 mod vector_indexing;
