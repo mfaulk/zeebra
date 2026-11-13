@@ -38,12 +38,12 @@ No frontier or wide-field performance claim follows from this bounded campaign.
 ```sh
 ZEEBRA_MACHINE=5995wx ZEEBRA_AFFINITY=3 tools/benchlock.sh candidate-adoption \
   taskset -c 3 python3 tools/external/selective-backward-study.py \
-  --phase adoption --stock /buildcache/candidate-adoption/stock \
-  --production /buildcache/candidate-adoption/production \
-  --binary /buildcache/candidate-adoption/observed \
+  --phase adoption --stock /buildcache/cargo-target/zeebra-m28-749/campaign/stock \
+  --production /buildcache/cargo-target/zeebra-m28-749/campaign/production \
+  --binary /buildcache/cargo-target/zeebra-m28-749/campaign/observed \
   --baseline-commit 778e1dc9 --build-commit ADOPTION_BUILD_COMMIT \
-  --scratch /buildcache/candidate-adoption/native \
-  --output /buildcache/candidate-adoption/adoption.json.gz
+  --scratch /buildcache/cargo-target/zeebra-m28-749/campaign/native \
+  --output /buildcache/cargo-target/zeebra-m28-749/campaign/adoption.json.gz
 ```
 
 Use `--phase adoption-work` with a separate scratch/output path for diagnostics. The runner rejects
