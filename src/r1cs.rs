@@ -499,14 +499,20 @@ impl<F: KnownOrder> R1cs<F> {
 
     /// Attach a bounded Circom `.sym` sidecar without changing row or wire identity.
     ///
-    /// Labels and names must be unique; distinct labels may alias one wire. `-1` retains an
-    /// optimized-out signal without inventing a polynomial variable for it.
+    /// Labels and names must be unique. Labels chosen by the binary map must retain their wire;
+    /// other labels may alias a wire or use `-1` for an optimized-out signal.
     pub fn with_symbols(mut self, text: &str) -> Result<Self, Error> {
         let deadline = Deadline::new(self.limits.timeout);
         deadline.check()?;
         limit(text.len(), self.limits.max_input_bytes, "symbol bytes")?;
         let mut labels = BTreeMap::new();
         let mut names = BTreeSet::new();
+        let canonical_wires: BTreeMap<_, _> = self
+            .wire_labels
+            .iter()
+            .enumerate()
+            .map(|(wire, label)| (*label, wire as u32))
+            .collect();
         for (at, line) in text.lines().enumerate() {
             deadline.check()?;
             limit(at + 1, self.limits.max_symbols, "symbols")?;
@@ -526,6 +532,9 @@ impl<F: KnownOrder> R1cs<F> {
             if label >= self.header.label_count
                 || wire.is_some_and(|wire| wire as usize >= self.header.wire_count)
                 || (label == 0 && wire != Some(0))
+                || canonical_wires
+                    .get(&label)
+                    .is_some_and(|canonical| wire != Some(*canonical))
                 || labels.contains_key(&label)
                 || !names.insert(fields[3].to_string())
             {

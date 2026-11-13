@@ -423,20 +423,24 @@ fn test_empty_and_cancelling_constraints() {
 /// Symbol records preserve optimized-out labels and aliases while rejecting ambiguous or invalid records.
 #[test]
 fn test_optional_symbols() {
-    let parse = || R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
+    let parse = || {
+        let mut sections = parts(&fixture());
+        sections[0].1[28..36].copy_from_slice(&8u64.to_le_bytes());
+        R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()).unwrap()
+    };
     let one = parse()
-        .with_symbols("2,2,0,main.a\n1,-1,1,main.removed\n3,2,0,main.alias\n")
+        .with_symbols("2,2,0,main.a\n4,-1,1,main.removed\n5,2,0,main.alias\n")
         .unwrap();
-    assert_eq!(one.symbols()[0].wire, None);
+    assert_eq!(one.symbols()[1].wire, None);
     assert_eq!(one.symbols()[2].wire, Some(2));
     let two = parse()
-        .with_symbols("3,2,0,main.alias\n1,-1,1,main.removed\n2,2,0,main.a\n")
+        .with_symbols("5,2,0,main.alias\n4,-1,1,main.removed\n2,2,0,main.a\n")
         .unwrap();
     assert_eq!(one.symbol_digest(), two.symbol_digest());
     assert_eq!(one.canonical_digest(), parse().canonical_digest());
     for text in [
         "1,4,0,bad",
-        "4,1,0,bad",
+        "8,1,0,bad",
         "1,-2,0,bad",
         "1,1,0,",
         "1,1,0,a\n1,2,0,b",
@@ -468,6 +472,25 @@ fn test_symbol_count_limit() {
             limit: 1
         })
     ));
+}
+
+/// Symbols for labels chosen by the binary map must name that same canonical witness wire.
+#[test]
+fn test_symbols_cannot_contradict_the_canonical_wire_map() {
+    for text in [
+        "1,2,0,wrong_wire",
+        "1,-1,0,falsely_removed",
+        "2,0,0,false_constant",
+    ] {
+        let model = R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
+        assert!(
+            matches!(
+                model.with_symbols(text),
+                Err(Error::InvalidSymbol { line: 1 })
+            ),
+            "{text}"
+        );
+    }
 }
 
 /// Nonidentity labels never permute polynomial variables, and trailing witnesses remain internal.
