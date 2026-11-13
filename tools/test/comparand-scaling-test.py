@@ -76,6 +76,13 @@ class ComparandScalingTests(unittest.TestCase):
         for bad in [script.replace('linalg=:deterministic','linalg=:randomized'),script.replace('GF(13)','GF(17)'),script.replace('zb_sys = [x1+1]','zb_sys = [x1+2]')]:
             with self.assertRaises(ValueError):scaling.validate_trusted_julia_script(bad,c,1)
 
+    # A retained partial diagnostic is distinguished from a cell that was never attempted.
+    def test_partial_diagnostic_keeps_process_metadata_blank(self):
+        c=dict(cases=[dict(field='13',name='mq',digest='d')],attempts=[],policy=dict(fields='13',rows='mq',workers='8,16',engines='groebner-rs',diagnostic=True))
+        table=scaling.diagnostic_table(c,partial_workers=(8,))
+        self.assertIn('| 8 | partial/no-process-metadata | — |',table)
+        self.assertIn('| 16 | unattempted | — |',table)
+
     # A launcher signal preserves an interrupted attempt after killing and reaping its solver.
     def test_launcher_signal_retains_interruption_boundary(self):
         with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling.wide.guard,'tree_hwm',side_effect=SystemExit(143)):

@@ -662,7 +662,7 @@ Full-case-prewarmed Julia processes contain two complete solves; their process w
 | Field/input | Engine | Workers | Status | Process s | Hot ms | Compile ms | Recompile ms | GC ms | CPU-active participants | Peak MiB |
 |---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|
 | 2147483647/katsura-11 | groebner-rs | 1 | verified | 0.803 | 682.799 | — | — | — | 1 | 82.684 |
-| 2147483647/katsura-11 | groebner-rs | 8 | unattempted | — | — | — | — | — | unresolved | — |
+| 2147483647/katsura-11 | groebner-rs | 8 | partial/no-process-metadata | — | — | — | — | — | unresolved | — |
 | 2147483647/katsura-11 | groebner-rs | 16 | unattempted | — | — | — | — | — | unresolved | — |
 
 ## julia-julia-diagnostic.json.gz

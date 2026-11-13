@@ -583,7 +583,7 @@ def warmed_table(cohort):
     return '\n'.join(lines)+'\n'
 
 
-def diagnostic_table(cohort):
+def diagnostic_table(cohort,partial_workers=()):
     if not cohort['policy'].get('diagnostic'):return ''
     lines=['## Separate concurrency diagnostics','',
            'CPU-active participants are tick-resolution lower bounds, not simultaneous algebra workers. Julia ticks may include JIT/GC.',
@@ -598,7 +598,7 @@ def diagnostic_table(cohort):
                 a=by_key.get((case['digest'],engine,p),{})
                 telemetry=a.get('julia_telemetry',{})
                 fmt=lambda n,scale:f'{n/scale:.3f}' if n is not None else '—'
-                fields=[str(case['field'])+'/'+case['name'],engine,str(p),a.get('status','unattempted'),
+                fields=[str(case['field'])+'/'+case['name'],engine,str(p),a.get('status','partial/no-process-metadata' if p in partial_workers else 'unattempted'),
                         fmt(a.get('process_wall_ns'),1e9),fmt(a.get('engine_wall_ns'),1e6),
                         *[fmt(telemetry.get(k),1e6) for k in ('compile','recompile','gc')],
                         str(a.get('hot_activity',{}).get('active_threads') or 'unresolved'),
@@ -684,7 +684,7 @@ def replay(directory,write=False):
         boards+=['## '+filename,'']
         with tempfile.TemporaryDirectory() as scratch:
             target=Path(scratch)/'board.md';summarize(cohort,target);boards+=[target.read_text()]
-        boards+=[warmed_table(cohort),diagnostic_table(cohort)]
+        boards+=[warmed_table(cohort),diagnostic_table(cohort,partial_workers=(8,) if filename=='julia-rust-diagnostic.json.gz' else ())]
     boards+=[attestation_table(directory)]
     rendered='\n'.join(boards)
     target=directory/'BOARD.md'

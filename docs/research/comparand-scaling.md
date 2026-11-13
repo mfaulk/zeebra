@@ -147,7 +147,9 @@ arithmetic/backend setting or measurement region.
 All 108 ordinary deterministic Julia observations complete and match independently retained exact
 bases: three repetitions, workers 1/2/4/8/16/32, GF(32003) K4/MQ10/C7 and M31 K4/MQ10/K11.
 Its 819.47-second controller stage stays inside the 900-second watchdog. The startup-screened
-board withholds ordinary process-wall scaling ratios on these small tasks. For example, M31
+board withholds most ordinary process-wall scaling ratios on these small tasks; M31 Katsura-11
+at p=2 narrowly clears the measured floor and reports S(2)=1.143. Passing that gate is not a
+claim that the other cells are startup-independent or that the internal timer is JIT-free. For example, M31
 Katsura-11 process medians are 9.617/7.136/7.174 seconds at 1/8/16 workers, while tiny-warmup
 internal calls are 2.954/0.807/0.845 seconds. These are distinct boundaries. Ordinary internal
 calls can still contain target-specific threaded JIT and GC; they are not compilation-free timings.
