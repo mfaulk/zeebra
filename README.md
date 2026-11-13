@@ -211,6 +211,13 @@ Run expensive cases under an external timeout; the [GCD size study](docs/researc
 documents bounded campaigns, observer overhead and the distinction between scaled PRS entries,
 raw remainders, Brown images and interpolants.
 
+The [solver call census](docs/research/multivariate-gcd.md#8-solver-input-census-and-default-decision-658)
+finds no multivariate GCD consumer in the current solving routes; root finding uses the separate
+univariate GCD. Reproduce the guarded census with
+`cargo test --features research-work --test gcd_profile solver_census -- --nocapture --test-threads=1`.
+The multivariate default remains subresultant PRS; these results do not select a route for external
+callers of the multivariate GCD API.
+
 Univariate `gcd` uses classical Euclid. Run `cargo run --release --example gcd_crossover`
 to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254. The
 [half-GCD measurements](docs/research/fast-univariate.md#194-experimental-half-gcd)

@@ -1,0 +1,25 @@
+runtime-source=778e1dc94fbb963a9a1970dde526393ffbf5bdfe
+harness-sha256=10191644fe4bf256ff6a753d89e544c18e6d2c52278ef15e04a20d26e763f7d3
+fixture-sha256=d39cf955ea1a683e468a5433236a2fd20b816cf405d41b3e46141044adb1679f
+scope=synchronous serial research-work; seed=0; no timing claims
+
+CENSUS anemoi17-cico-n5-fcico: batch-limit=1, completed-batches=1; gcd_calls=0
+CENSUS cyclic-3 DirectLexF4: no-base-field-point; gcd_calls=0
+CENSUS cyclic-3 GrevlexF4ThenFglm: no-base-field-point; gcd_calls=0
+CENSUS katsura-3 DirectLexF4: point-verified; gcd_calls=0
+CENSUS katsura-3 GrevlexF4ThenFglm: point-verified; gcd_calls=0
+CENSUS eco-3 DirectLexF4: point-verified; gcd_calls=0
+CENSUS eco-3 GrevlexF4ThenFglm: point-verified; gcd_calls=0
+CENSUS noon-3 DirectLexF4: point-verified; gcd_calls=0
+CENSUS noon-3 GrevlexF4ThenFglm: point-verified; gcd_calls=0
+CENSUS reimer-3 DirectLexF4: no-base-field-point; gcd_calls=0
+CENSUS reimer-3 GrevlexF4ThenFglm: no-base-field-point; gcd_calls=0
+CENSUS planted-3 DirectLexF4: point-verified; gcd_calls=0
+CENSUS planted-3 GrevlexF4ThenFglm: point-verified; gcd_calls=0
+CENSUS planner ConservativeAuto: verified point; gcd_calls=0
+CENSUS planner AutoWithFallback: verified point; gcd_calls=0
+CENSUS planner ClassifyThenDirectLex: verified point; gcd_calls=0
+CENSUS resultant: degree=2, roots=1,2; gcd_calls=0
+CENSUS positive-control PrimitivePrs: gcd_calls=22
+CENSUS positive-control SubresultantPrs: gcd_calls=20
+CENSUS positive-control Brown: gcd_calls=21
