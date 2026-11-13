@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a separately identified passive-counter driver; never replace the normal comparand."""
+"""Build separately identified GPL research drivers in a private build workspace."""
 import argparse
 import hashlib
 import json
@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tarfile
 import io
+import importlib.util
 from instrument import instrument, PIN
 
 HERE = Path(__file__).resolve().parent
@@ -19,6 +20,7 @@ def main():
     p.add_argument('--source', type=Path, required=True, help='clean local upstream git checkout')
     p.add_argument('--target', type=Path, required=True, help='private buildcache root')
     p.add_argument('--test', action='store_true', help='run driver and hand-computable counter tests')
+    p.add_argument('--randomization', action='store_true', help='add isolated #714 feature gates and plain residual checks')
     args = p.parse_args()
     target = args.target.resolve()
     if not str(target).startswith('/buildcache/'):
@@ -53,13 +55,21 @@ def main():
     s = s.replace('\"contract\":1,\"revision\":REVISION,', '\"contract\":1,\"research_identity\":include_str!(\"../research-identity.json\"),\"revision\":REVISION,')
     s += '\n' + (HERE / 'driver-tests.rs').read_text()
     main.write_text(s)
+    if args.randomization:
+        spec = importlib.util.spec_from_file_location('randomization_overlay', HERE / 'randomization/overlay.py')
+        overlay = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(overlay)
+        overlay.apply(source, driver)
     # Hash all changed upstream bytes and the original instrumentation recipe, never just the pin.
     patch = {str(path.relative_to(source)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in source.rglob('*') if path.is_file()
         and original.get(str(path.relative_to(source))) != path.read_bytes()}
+    recipes = ['instrument.py', 'work.rs', 'driver-tests.rs', 'provision.py']
+    if args.randomization:
+        recipes += ['randomization/overlay.py', 'randomization/policy.rs', 'randomization/driver-tests.rs']
     identity = {'upstream_revision': PIN, 'modified_upstream_files': patch,
         'recipe': {name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
-            for name in ['instrument.py', 'work.rs', 'driver-tests.rs', 'provision.py']}}
+            for name in recipes}}
     identity['digest'] = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     (driver / 'research-identity.json').write_text(json.dumps(identity, sort_keys=True, indent=2) + '\n')
     build = driver / 'build.rs'
@@ -74,6 +84,9 @@ def main():
         subprocess.run(['cargo', 'test', '--locked', '--offline'], cwd=driver, env=env, check=True)
         subprocess.run(['cargo', 'test', '--locked', '--manifest-path', str(source / 'Cargo.toml'),
                         '--lib', 'research_work::tests'], cwd=driver, env=env, check=True)
+        if args.randomization:
+            subprocess.run(['cargo', 'test', '--locked', '--manifest-path', str(source / 'Cargo.toml'),
+                            '--lib', 'research_random::tests'], cwd=driver, env=env, check=True)
     print(json.dumps({'binary': str(target / 'build/release/grobx-driver'), 'identity': identity}, indent=2))
 
 

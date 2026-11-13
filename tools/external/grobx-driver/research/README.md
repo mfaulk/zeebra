@@ -73,3 +73,12 @@ larger than resident pages. #268 owns fuller allocation attribution.
 Tests cover fail-closed source guards, exact scalar/four-lane product counts, disabled collection,
 and simultaneous role accounting. The ordinary driver tests still cover input binding, exact
 checking and resource stops. These are correctness checks, not performance measurements.
+
+## Independent randomization controls (#714)
+
+Add `--randomization` to the provisioner for the isolated feature-ablation driver. Its pinned
+[overlay and tests](randomization/) add independent plain-combination and signature-zero-test
+controls, optional public plain-only engine selection, solver seeds and a budgeted native residual
+check restricted to plain F4. This option does not change the normal provisioner path or install a
+replacement stock binary. See the [experiment contract](../../../../research/grobx-randomization/README.md)
+for requests, observation limits and the predeclared campaign.

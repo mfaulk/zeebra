@@ -89,6 +89,8 @@ jobs:
           python3 tools/test/mq10-profile-test.py
           python3 tools/test/grobx-trajectory-test.py
           python3 tools/test/grobx-work-study-test.py
+          python3 tools/test/grobx-randomization-test.py
+          python3 tools/external/grobx-driver/research/randomization/test_policy.py
           python3 tools/test/proof-artifacts-test.py
           python3 research/grobx-trajectory/summarize.py
           git diff --exit-code -- research/grobx-trajectory/summary.json research/grobx-trajectory/summary.csv research/grobx-trajectory/summary-rounds.csv
