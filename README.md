@@ -180,6 +180,12 @@ and root finding. See the [five-axis decision](docs/research/structured-sylveste
 algorithm choice and the [measurement protocol](docs/guide/benchmarking.md#sylvester-kernel-comparison)
 for pinned runs.
 
+Inspect multivariate GCD intermediate support and coefficient degree with
+`cargo run --release --features research-work --example gcd_routes -- --case koalabear 4 4 primitive on`.
+Run expensive cases under an external timeout; the [GCD size study](docs/research/multivariate-gcd.md#6-intermediate-size-profiles-652)
+documents bounded campaigns, observer overhead and the distinction between scaled PRS entries,
+raw remainders, Brown images and interpolants.
+
 Univariate `gcd` uses classical Euclid. Run `cargo run --release --example gcd_crossover`
 to compare the experimental half-GCD route over KoalaBear, Goldilocks, and BN254. The
 [half-GCD measurements](docs/research/fast-univariate.md#194-experimental-half-gcd)

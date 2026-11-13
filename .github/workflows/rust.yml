@@ -98,6 +98,9 @@ jobs:
           python3 research/grobx-trajectory/summarize.py
           git diff --exit-code -- research/grobx-trajectory/summary.json research/grobx-trajectory/summary.csv research/grobx-trajectory/summary-rounds.csv
           cargo test --features research-work --lib linalg::work
+          cargo test --features research-work --test gcd_profile
+          cargo test --features research-work --lib gcd_profile
+          python3 tools/test/gcd-size-study-test.py
           cargo test --features research-work --example mq10_profile
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks

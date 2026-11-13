@@ -27,6 +27,8 @@ pub mod integers;
 mod left_scalar_mul;
 pub mod linalg;
 mod poly;
+#[cfg(feature = "research-work")]
+pub use poly::gcd_profile;
 mod rings;
 
 pub mod util;

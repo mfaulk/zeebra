@@ -71,7 +71,7 @@ default = ["external-runners"]
 # promised.
 external-runners = []
 
-# Passive elimination-work diagnostics; scopes must also be explicitly enabled.
+# Passive elimination-work and GCD-size diagnostics; scopes must also be explicitly enabled.
 research-work = []
 
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and

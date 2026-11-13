@@ -269,13 +269,14 @@ and several candidates share the maximal degree.
 
 `GcdRoute` picks the route. All three return the same value — a reduced GCD is unique once
 normalized — but only the first two are the same recursion, differing in what they do to a
-pseudo-remainder before the next step. Brown's does no Euclidean step at all.
+pseudo-remainder before the next step. Brown's main path evaluates and interpolates; its
+cleanup and fallback can still invoke PRS.
 
 | route | per step | coefficient bound | can refuse |
 |---|---|---|---|
-| `PrimitivePrs` | divide out the content, which is a recursive GCD | by construction: nothing grows | no |
+| `PrimitivePrs` | divide out the content, which is a recursive GCD | removes content; support and coefficient degree can still grow | no |
 | `SubresultantPrs` (default) | divide by `g * h^delta`, one exact division | by a theorem: the entries are subresultants | no |
-| `Brown` | no step: evaluate, solve univariate, interpolate | none needed: no multivariate coefficient is ever formed | **yes** |
+| `Brown` | evaluate, solve image GCDs, interpolate; PRS cleanup/fallback | image/interpolant degrees depend on the input | **yes** |
 
 `Brown` is reached through `try_gcd_by`, not `gcd_by`. It needs a **prime field** — fixing a
 variable at an element of an extension field and lifting back would answer a question about the
@@ -289,9 +290,11 @@ them.
 Collins' subresultant PRS carries `g = lc(a)` and `h = h^(1-delta) * g^delta` across steps, and the
 fundamental theorem of subresultants is what makes the division by `g * h^delta` exact. The entries
 of the sequence then *are* subresultants — determinants of submatrices of the inputs' Sylvester
-matrix — so Hadamard's inequality bounds them in terms of the inputs alone. The primitive PRS
-instead makes every remainder primitive, which cannot grow at all, and pays a recursive GCD in a
-smaller ring for each step.
+matrix. Over finite fields their coefficient *degree* is bounded by determinant expansion;
+Hadamard's integer magnitude bound does not measure fixed-width field elements. The primitive
+PRS removes content but can still grow support and coefficient degree, paying a recursive GCD
+in a smaller ring for each step. Raw pseudo-remainders precede exact scaling and have a separate
+size profile.
 
 It needs a pseudo-remainder with **exactly** `delta + 1` powers of the divisor's leading
 coefficient, which is what the theorem is stated over. The primitive route's pseudo-remainder
@@ -314,11 +317,11 @@ What decides the default is the other end of the distribution:
 
 And on one four-variable shape the primitive route did not finish a single pass in the ~40 minutes
 remaining of a 2 400 s run, which is how the first attempt at this sweep was killed mid-table. The
-theory says why: a content is itself a recursive GCD, so the primitive route is a recursion over
-recursions with nothing bounding a step's cost in terms of the inputs, while the subresultant
-route's entries *are* subresultants and Hadamard bounds them in advance. The routes are not
-slower-and-faster but different-tailed, and a library default should be the one that cannot fall off
-a cliff on an input the caller did not know was special.
+content recursion is a possible explanation, rather than an established causal profile. Both
+PRS routes extract contents; subresultant scaling avoids extracting one after every step.
+The [intermediate-size study](../research/multivariate-gcd.md#6-intermediate-size-profiles-652)
+separates normalized entries, completed raw remainders and recursive call counts. Neither route
+has a universal runtime bound established by these timings.
 
 **So `PrimitivePrs` is not merely the reference implementation.** It is 10–50% faster on most
 shapes, and `gcd_by(&other, GcdRoute::PrimitivePrs)` is a reasonable choice for a caller who knows
@@ -339,10 +342,10 @@ is one univariate GCD per evaluation point per level of recursion plus one inter
 the whole cost on a shape the sequences finish in ten microseconds. So all three routes are fastest
 somewhere, and the default is the best route that **always answers**.
 
-The ratio columns are load-independent and the absolute seconds are not: the whole sweep was taken
-at one-minute loads of 9.51 and 2 100.79, a **221x** range, and the `subresultant / brown` ratio
-agreed on all 40 paired shapes to within 0.06. `gcd_routes` prints the load at the head of every run
-and says which columns survive it.
+The historical sweep at one-minute loads of 9.51 and 2 100.79 found the
+`subresultant / brown` ratio agreed on all 40 paired shapes to within 0.06. This observation is
+not a general contention guarantee. `gcd_routes` reports ambient load; matched controls and
+repeat ranges are needed before interpreting new timing differences.
 
 [`docs/research/multivariate-gcd.md`](../research/multivariate-gcd.md) has the full tables, the
 single-repetition caveat on the 628x figure, §5.3's cross-load check, and what the measurement does
@@ -508,3 +511,51 @@ assert_eq!(is_permutation_polynomial(&f), None);
 A cipher's S-box exponent is part of its specification: a different exponent is a different
 cryptographic problem, not a variation on the same one. What these utilities are for is a sweep that varies `alpha` deliberately and measures what the
 solving degree does.
+
+### Intermediate-size diagnostics
+
+The opt-in `research-work` feature exports `gcd_profile::measure(|| computation)`.
+It returns the unchanged answer and a `GcdProfile` whose maxima cover all recursive
+calls in that synchronous scope. Normal builds compile out its hooks. Nested
+scopes panic, and unwinding resets the thread-local scope.
+
+`prs_entries` observes the initial primitive operands and each subsequent normalized/scaled
+entry. `raw_remainders` observes completed pseudo-remainders before content extraction or
+exact scaling, including constant remainders where the solver returns immediately.
+It does not observe every multiplication temporary inside pseudo-division.
+Brown's `brown_images` records accepted scaled images; `brown_interpolants` records
+the complete interpolated candidate before primitive-part cleanup. Rejected image
+attempts and interpolation construction temporaries are excluded. Brown's PRS
+columns therefore describe cleanup/fallback, not image sizes.
+
+Every phase reports its largest polynomial term count and coefficient total degree:
+remove the current main variable's exponent from each monomial, sum remaining
+exponents in `u64`, and take the maximum. This is neither coefficient bit length
+nor simultaneous memory. `gcd_calls` and `max_recursion_depth` count recursive
+`gcd_by`/Brown `try_gcd_by` entry points (including content recursion), excluding
+Brown's private evaluation recursion and univariate Euclid internals.
+`content_calls` includes both PRS and Brown content entry points. Fallbacks are
+reported separately. The subresultant-derived degree envelope also applies to primitive entries,
+which divide the corresponding subresultants. Local bound checks cover initial
+inputs and every materialized scaled/primitive next entry of both PRS routes;
+raw remainders have no such claim.
+
+With `--features research-work`, the ordinary `gcd_routes` sweep prints phase-size
+tables from its pre-timing correctness passes. For expensive shapes, isolate a
+single route instead:
+
+```sh
+cargo build --release --features research-work --example gcd_routes
+timeout 10s target/release/examples/gcd_routes --case koalabear 4 4 primitive on
+```
+
+Use the actual `$CARGO_TARGET_DIR/release/examples/gcd_routes` path when configuring
+an external target directory. `--case FIELD ARITY SHAPE ROUTE MODE` accepts fields
+`koalabear|goldilocks|bn254`, arities `2|3|4`, shape indices `0..6`, routes
+`primitive|subresultant|brown`, and modes `off|on`. `off` also works without the
+feature. Each JSON response retains deterministic input text/digest, full normalized
+GCD or typed refusal text, scoped function duration, process RSS and optional
+profile. Its input SHA-256 binds characteristic limbs, arity and both canonical
+Display polynomials. It is a study identity, not the external corpus digest.
+The legacy full sweep still excludes the known over-budget four-variable
+shape; per-child external limits protect the single-case campaign instead.
