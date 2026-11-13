@@ -125,7 +125,7 @@ def parse_report(report):
                 for key, total_key in [('rounds', 'rounds'), ('reduced', 'reductions'), ('zero', 'zero_reductions')]:
                     _require(fields[key] == total[total_key], f'ran {key} disagrees with round sum')
                 _require('inputs' in active, 'run lacks original inputs')
-                if result['call'].get('echelon') == 'on':
+                if result['call'].get('echelon') == 'on' and active['config'].get('cofactors') != 'on':
                     _require('echelon' in active, 'run lacks enabled input echelon')
                 _require(fields.get('outcome') in ('basis', 'handover'), 'run did not complete or hand over')
                 if fields['outcome'] == 'handover':

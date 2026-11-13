@@ -79,3 +79,15 @@ for every policy, with structural-path equality. Wall comparisons use observer-o
 provide separately labelled coefficient-work counts.
 Any integration proposal needs independent exact acceptance, bounded retry/fallback costs and
 public Katsura/Cyclic/larger-MQ validation; this campaign alone does not authorize integration.
+
+## Declared diagnostic restart
+
+The first campaign was interrupted after18 retained outcomes when two exact-certified controls
+completed but failed an overly strict report-decoder assumption: cofactor tracking suppresses
+input echelonization even when the requested call flag says `echelon=on`. Its large certificates
+also exposed avoidable accumulation in the measurement runner. The parser now checks the actual
+cofactor mode, and the existing lossless proof store packs each response before retaining the
+next. Regression tests preserve missing-echelon refusal for ordinary raw reports and exact
+round-tripping of failed responses. **One complete182-attempt restart is declared**; the original
+18 outcomes remain diagnostic evidence and are excluded from the new timing medians. There is
+no further extension or silent replacement of these outcomes.

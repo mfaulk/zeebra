@@ -111,6 +111,7 @@ def main():
         parser.error('commit the experimental sources before measuring')
     refs = BASE.references(ROOT / 'research/competitive/results/grobx-683.json.gz')
     decoder = sibling('grobx-trajectory')
+    storage = sibling('study_artifacts')
     binaries = {'stock': args.grobx_stock.resolve(), 'research': args.grobx_research.resolve()}
     identities = {key: {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                        'version': json.loads(subprocess.check_output([str(path), '--version'], text=True))}
@@ -127,6 +128,8 @@ def main():
                          'outer_campaign_seconds': 1800, 'max_load': args.max_load},
               'reference_sha256': hashlib.sha256((ROOT / 'research/competitive/results/grobx-683.json.gz').read_bytes()).hexdigest(),
               'binaries': identities,
+              'storage': 'lossless existing SHA256 response sidecars, packed after each attempt outside process timing',
+              'campaign_extension': 'one full restart after an 18-attempt diagnostic cohort exposed certified-report decoding and large-certificate storage limitations; all initial outcomes retained separately; no additional extensions',
               'objective_note': 'Raw ablations share parameters except named flags. Certified mode is a separate changed-trajectory exact objective, not an isolated validation or randomization control.',
               'timing_boundary': 'fresh process spawn to reap, full output included; independent reference validation afterwards; native residual guard and certified checker charged inside their own process wall'}
     paths = {}
@@ -172,6 +175,9 @@ def main():
             result.update(status='verified', verification='every coefficient matches independently Singular-verified full basis')
         except (ValueError, KeyError, TypeError) as error:
             result['failure'] = str(error)
+        if result.get('raw') is not None:
+            result = storage.pack_attempt(result, args.output, keys=('cofactors', 'basis'))
+        raw = None
         cohort['attempts'].append(result)
         BASE.write(args.output, cohort)
         print(len(cohort['attempts'])-1, item['arm'], item['modulus'], item['seed'], result['status'],
