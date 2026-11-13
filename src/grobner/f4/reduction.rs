@@ -276,13 +276,58 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             structured,
         )
     });
+    let mut candidate_reduction = super::statistics::CandidateReductionStatistics::default();
+    let mut production = |matrix: &mut MacaulayMatrix<N, F>| {
+        let mut block = eliminate_to(
+            plan,
+            RowForm::Echelon,
+            options.elimination,
+            matrix,
+            allowance,
+        )?;
+        if form == RowForm::Reduced {
+            let has_candidates = matrix.matrix().rows().iter().any(|row| {
+                row.leading_column().is_some_and(|column| {
+                    !preprocessed
+                        .leading_monomials
+                        .contains(&matrix.columns()[column])
+                })
+            });
+            let (visits, report) = if has_candidates {
+                let selected: Vec<_> = matrix
+                    .columns()
+                    .iter()
+                    .map(|monomial| !preprocessed.leading_monomials.contains(monomial))
+                    .collect();
+                super::candidate::finish(
+                    matrix.matrix_mut(),
+                    &selected,
+                    allowance,
+                    64 * 1024 * 1024,
+                    &mut block.statistics,
+                )?
+            } else {
+                (0, super::candidate::Report::default())
+            };
+            block.back_substituted_rows = Some(visits);
+            candidate_reduction = super::statistics::CandidateReductionStatistics {
+                batches: 1,
+                targets: report.targets,
+                coefficient_products: report.products,
+                workspace_bytes: report.workspace_bytes,
+                reserved_entries: report.reserved_entries,
+                peak_sparse_capacity_entries: report.peak_capacity_entries,
+                fallback_batches: usize::from(report.fell_back),
+            };
+        }
+        Ok(block)
+    };
     #[cfg(feature = "research-work")]
     let replacement = observer.eliminate(&mut matrix, options);
     #[cfg(feature = "research-work")]
-    let block = replacement
-        .unwrap_or_else(|| eliminate_to(plan, form, options.elimination, &mut matrix, allowance));
+    let block = replacement.unwrap_or_else(|| production(&mut matrix));
     #[cfg(not(feature = "research-work"))]
-    let block = eliminate_to(plan, form, options.elimination, &mut matrix, allowance);
+    let block = production(&mut matrix);
     let block = block.map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
     let elimination = block.statistics;
     #[cfg(feature = "research-work")]
@@ -337,6 +382,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     };
 
     let statistics = BatchStatistics {
+        candidate_reduction,
         pairs: pairs.len(),
         rows,
         reducer_rows,
@@ -431,6 +477,92 @@ mod tests {
             }
         }
         pairs
+    }
+
+    fn candidate_contract<G: FiniteField>() {
+        use crate::{
+            grobner::f4::{
+                structured::{eliminate_to, BlockPlan, RowForm},
+                symbolic::ReducerCache,
+                ReductionStrategy,
+            },
+            linalg::Backend,
+        };
+        for order in ALL_ORDERS {
+            for backend in [Backend::Sparse, Backend::Dense, Backend::Adaptive] {
+                for reduction in [
+                    ReductionStrategy::Structured,
+                    ReductionStrategy::Unstructured,
+                ] {
+                    for strings in ROW_FORM_SYSTEMS {
+                        let polynomials: Vec<_> = strings
+                            .iter()
+                            .map(|s| MultivariatePolynomial::<3, G>::parse(s, VARS).unwrap())
+                            .collect();
+                        let basis = MonicBasis::new(&polynomials, order);
+                        let pairs = all_pairs(&polynomials, order);
+                        let options = F4Options {
+                            elimination: backend,
+                            reduction,
+                            ..F4Options::default()
+                        };
+                        let actual = reduce_batch(&basis, &pairs, order, &options).unwrap();
+                        let mut built = super::build_batch_matrix(
+                            &basis,
+                            &pairs,
+                            order,
+                            &options,
+                            &mut ReducerCache::disabled(),
+                        )
+                        .unwrap();
+                        let plan = if reduction == ReductionStrategy::Structured {
+                            BlockPlan::ReducersFirstBlock
+                        } else {
+                            BlockPlan::Baseline
+                        };
+                        eliminate_to(
+                            plan,
+                            RowForm::Reduced,
+                            backend,
+                            &mut built.matrix,
+                            usize::MAX,
+                        )
+                        .unwrap();
+                        let mut expected: Vec<_> = (0..built.matrix.num_rows())
+                            .filter_map(|index| {
+                                let column = built.matrix.matrix().row(index).leading_column()?;
+                                (!built
+                                    .preprocessed
+                                    .leading_monomials
+                                    .contains(&built.matrix.columns()[column]))
+                                .then(|| built.matrix.row_polynomial(index))
+                            })
+                            .collect();
+                        expected.sort_by(|a, b| {
+                            order.cmp(&b.leading_monomial(order), &a.leading_monomial(order))
+                        });
+                        assert_eq!(actual.candidates, expected);
+                        assert_eq!(actual.statistics.candidate_reduction.batches, 1);
+                        assert_eq!(
+                            actual.statistics.candidate_reduction.targets,
+                            expected.len()
+                        );
+                        assert_eq!(actual.statistics.candidate_reduction.fallback_batches, 0);
+                    }
+                }
+            }
+        }
+    }
+
+    // Production candidates equal public full RREF across all orders, backends, prime and extension fields.
+    #[test]
+    fn candidate_output_contract_matches_full_rref() {
+        use crate::fields::{Bn254Fr, Gf256, Zp18446744069414584321, Zp2};
+        candidate_contract::<Zp13>();
+        candidate_contract::<Zp2>();
+        candidate_contract::<Gf256>();
+        candidate_contract::<Zp18446744069414584321>();
+        candidate_contract::<Bn254Fr>();
     }
 
     /// The textbook case: f = x^2 + y and g = x^2 + z, whose S-polynomial is y - z.

@@ -501,51 +501,19 @@ pub struct F4Options {
     /// How final interreduction is performed. See [`InterreductionRoute`].
     pub interreduction: InterreductionRoute,
 
-    /// Leave each batch's rows in **reduced** row echelon form rather than merely echelon.
+    /// Fully reduce every extracted candidate against batch pivots, rather than emit echelon tails.
     ///
-    /// Off by default until the A/B is on record, which is the discipline every other strategy
-    /// flag in this struct follows.
+    /// Enabled by default with `InterreductionRoute::ByOrder`. Candidate leading columns do not
+    /// change, but reducing their tails avoids transferring batch reduction debt into the final
+    /// interreduction. Unused inherited rows can retain echelon tails: this is a private F4 output
+    /// contract, and public matrix RREF still reduces every row.
     ///
-    /// # What it changes, and what it cannot change
-    ///
-    /// Candidates are extracted from the rows whose leading column is new. Echelon is enough for
-    /// that selection — back-substitution never changes a row's *leading* column — so this flag
-    /// **cannot** change which rows become candidates, and
-    /// `reduction::tests::test_the_row_form_does_not_change_candidate_selection` asserts that
-    /// rather than arguing it. What it changes is each candidate's **tail**: an echelon row still
-    /// carries entries in other pivots' columns, i.e. monomials that other basis elements lead
-    /// with, so every batch emits candidates that are not in normal form and the debt is paid once
-    /// at the end by final interreduction. #477 measured that final matrix at 405x the cells
-    /// Groebner.jl's carries, and attributed it here.
-    ///
-    /// It cannot change the answer either, for the same reason
-    /// [`InterreductionRoute::Matrix`] cannot: a reduced Gröbner basis is determined by its
-    /// leading monomials.
-    ///
-    /// # What it costs
-    ///
-    /// A second sweep over every batch matrix, where the flag above pays one over a single much
-    /// smaller matrix at the end. Back-substitution is quadratic in the rows whatever the sparsity
-    /// (#168), the batch stage is already 13.90% of `mq-random-10`, and
-    /// [`super::structured::BlockPlan::InterreducedBlock`] was measured and **rejected** for filling in the
-    /// reducer block — which is the same fill-in paid before the elimination instead of after it.
-    /// So the prior is unfavourable and the measurement is the point.
-    ///
-    /// # And the measurement moved the default — #575
-    ///
-    /// **On by default**, together with [`InterreductionRoute::ByOrder`]. The unfavourable prior
-    /// above did not hold: on `mq-random-10` this flag alone is **4.63x** end to end and the pair
-    /// is **5.86x**, and on `katsura-11` the pair is **8.10x** where the route alone is 1.03x
-    /// because without this flag the matrix pass is refused by #536's budget and falls back.
-    ///
-    /// It is also what makes the route affordable in memory: the autoreduce matrix it leaves is
-    /// small, so `ByOrder` costs 419 MB against the matrix route's 603 MB on the same rung. The
-    /// cost it does carry is real and is paid where this doc said it would be — 162 MB to 418 MB
-    /// on `mq-random-10`, 2.58x, in the batch loop. The tables are on
-    /// [`InterreductionRoute`] and in `docs/research/interreduction-cost.md` §3f.
-    ///
-    /// Still off in [`F4Options::baseline`], so an ablation against the pre-#575 configuration
-    /// stays available.
+    /// Candidate-only substitution reserves whole-pass possible output growth plus a temporary
+    /// row before mutation, with a separate 64-MiB dense/index/selection workspace ceiling.
+    /// If either bound cannot be met, the original full-RREF pass preserves existing budget
+    /// admission and error behavior. Statistics separate mathematical entries, reservations,
+    /// sparse capacities, workspace and fallback batches. No parallel dispatch is enabled here.
+    /// Still off in [`F4Options::baseline`] for historical ablations.
     pub reduce_batch_rows: bool,
 
     /// Break the work down by the degree it was done at, into

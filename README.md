@@ -164,6 +164,12 @@ instrumented examples — along with the measurement rules this repository follo
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.
 
+Production F4 reduces only rows that become extracted candidates; unused inherited rows keep
+sufficient echelon tails. A conservative temporary reservation falls back to full batch RREF when
+needed, preserving existing budget admission and public RREF behavior. `F4Statistics::candidate_reduction`
+reports selected work, workspace, reservations, sparse capacities and fallback batches separately
+from mathematical entry peaks. See the [adoption protocol](research/candidate-adoption/README.md).
+
 The [concurrent-pivot feasibility study](research/concurrent-pivots/README.md) measures
 serial F4 candidate-row work and dependencies with
 `cargo run --release --features research-work --example mq10_profile -- 32003 --stages --discovery`.

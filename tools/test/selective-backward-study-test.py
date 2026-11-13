@@ -21,6 +21,24 @@ class Acceptance(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 study.validate(dict(raw, **{key: value}), ref, 'dense-selected', 'mq-random-10')
 
+    # Adoption compares shipping routes and rejects an experimental observer presented as production.
+    def test_production_route(self):
+        ref = dict(digest='d', modulus=13, basis=['x+2*y'])
+        raw = dict(ref, problem='mq-random-10', backward=None, parallel=None,
+                   statistics=dict(batches=2, candidate_reduction=dict(batches=2, targets=1)))
+        study.validate(raw, ref, 'production', 'mq-random-10')
+        for changed in [dict(backward=dict(mode='dense-selected')), dict(parallel={}),
+                        dict(statistics=dict(batches=2,candidate_reduction=dict(batches=0)))]:
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                study.validate(dict(raw, **changed), ref, 'production', 'mq-random-10')
+
+    # Adoption timing keeps no-feature and feature-off production arms separate from work diagnostics.
+    def test_adoption_plan(self):
+        native=list(study.plan('adoption'))
+        self.assertEqual(len(native),90)
+        self.assertEqual({c[-1] for c in native},{'stock','production','feature-off'})
+        self.assertEqual(len(list(study.plan('adoption-work'))),20)
+
     # Pair trajectory drift is rejected instead of being credited to the backward kernel.
     def test_trajectory(self):
         stats = {key: 1 for key in study.TRAJECTORY}

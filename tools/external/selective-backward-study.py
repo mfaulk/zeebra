@@ -28,8 +28,16 @@ def sha(path):
 
 
 def plan(phase):
-    if phase not in ('native', 'work', 'probe'):
+    if phase not in ('native', 'work', 'probe', 'adoption', 'adoption-work'):
         raise ValueError('unknown campaign phase')
+    if phase in ('adoption', 'adoption-work'):
+        for repeat in range(5):
+            for problem in (('mq-random-10','cyclic-5','katsura-6') if phase == 'adoption' else ('mq-random-10',)):
+                for modulus in (32003,2147483647):
+                    arms=('stock','production','feature-off') if phase == 'adoption' else ('full-on','production-on')
+                    for arm in arms if repeat % 2 == 0 else reversed(arms):
+                        yield repeat,problem,modulus,arm
+        return
     if phase == 'probe':
         for modulus in (32003, 2147483647):
             for arm in ('full', 'dense-selected'):
@@ -64,7 +72,13 @@ def validate(raw, reference, mode, problem):
     if raw.get('problem') != problem:
         raise ValueError('problem differs')
     backward = raw.get('backward')
-    if mode == 'stock':
+    if mode == 'production':
+        if backward is not None or raw.get('parallel') is not None:
+            raise ValueError('production unexpectedly uses a research override')
+        stats=raw['statistics']
+        if stats['candidate_reduction']['batches'] != stats['batches']:
+            raise ValueError('production candidate-output contract was not used')
+    elif mode == 'stock':
         if backward is not None:
             raise ValueError('stock unexpectedly selected a backward policy')
     elif not backward or backward.get('mode') != mode or not backward.get('batches'):
@@ -94,11 +108,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('stock', 'binary', 'scratch', 'output'):
         parser.add_argument('--' + name, required=True, type=Path)
-    parser.add_argument('--phase', choices=('native', 'work', 'probe'), default='native')
+    parser.add_argument('--phase', choices=('native', 'work', 'probe', 'adoption', 'adoption-work'), default='native')
+    parser.add_argument('--production', type=Path, help='feature-absent adopted production binary')
+    parser.add_argument('--baseline-commit', help='source revision of the stock control')
     parser.add_argument('--max-load', type=float, default=4)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--build-commit', required=True, help='commit used to build the frozen executables')
     args = parser.parse_args()
+    if args.phase.startswith('adoption') and (not args.production or not args.baseline_commit):
+        parser.error('adoption requires --production and --baseline-commit')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         parser.error('commit instruments before measuring')
     build_commit = subprocess.check_output(['git', 'rev-parse', args.build_commit], cwd=ROOT, text=True).strip()
@@ -115,6 +133,9 @@ def main():
         build_commit=build_commit, compiler_gate=True,
         phase=args.phase, affinity=affinity, machine=os.environ['ZEEBRA_MACHINE'],
         max_load=args.max_load, cargo_lock_sha256=sha(ROOT/'Cargo.lock'))
+    if args.production:
+        identity['binaries']['production']=dict(path=str(args.production.resolve()),sha256=sha(args.production))
+        identity['baseline_commit']=subprocess.check_output(['git','rev-parse',args.baseline_commit],cwd=ROOT,text=True).strip()
     cohort = dict(schema=1, identity=identity, rustc=subprocess.check_output(['rustc', '-vV'], text=True),
         topology=subprocess.check_output(['lscpu', '-e=CPU,CORE,SOCKET,NODE,CACHE,ONLINE'], text=True),
         build='cargo build --release --example mq10_profile; observed adds --features research-work; fat LTO; codegen-units=1; x86-64-v3; mold; system allocator',
@@ -146,11 +167,13 @@ def main():
             guard.write(args.output, cohort)
             raise RuntimeError('environment gate refused; verified prefix retained')
         mode = arm.removesuffix('-on').removesuffix('-off')
-        binary = args.stock if mode == 'stock' else args.binary
-        if sha(binary) != identity['binaries']['stock' if mode == 'stock' else 'binary']['sha256']:
+        if arm == 'feature-off': mode='production'
+        binary_name='stock' if mode == 'stock' else ('production' if arm == 'production' else 'binary')
+        binary=getattr(args,binary_name)
+        if sha(binary) != identity['binaries'][binary_name]['sha256']:
             raise ValueError('binary changed during campaign')
         command = [str(binary.resolve()), str(modulus), '--stages', '--problem='+problem]
-        if mode != 'stock': command += ['--backward='+mode]
+        if mode not in ('stock','production'): command += ['--backward='+mode]
         if arm.endswith('-on'): command += ['--work']
         before = resource.getrusage(resource.RUSAGE_CHILDREN)
         result = guard.guarded(['timeout', '--signal=KILL', '185', *command], args.scratch/str(len(cohort['attempts'])), 60, 2*1024**3)
@@ -172,6 +195,10 @@ def main():
                     validate(raw, refs[(problem, modulus)], mode, problem)
                     trajectories.setdefault((problem, modulus), raw)
                     check_trajectory(raw, trajectories[(problem, modulus)])
+                    if mode == 'production' and arm.endswith('-on'):
+                        products=sum(b['backward']['coefficient_products'] for b in raw['work']['batches'])
+                        if products != raw['statistics']['candidate_reduction']['coefficient_products']:
+                            raise ValueError('passive/direct production work differs')
                     result['status'] = 'verified'
         except (ValueError, KeyError, TypeError) as error:
             result['failure'] = str(error)
