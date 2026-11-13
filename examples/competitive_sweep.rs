@@ -165,6 +165,24 @@ fn main() {
         return;
     }
 
+    if flag("--export-input") {
+        let inputs = rows
+            .iter()
+            .map(|name| {
+                export_instance(
+                    &instance(
+                        name,
+                        characteristic,
+                        zeebra::MonomialOrder::GradedReverseLexicographic,
+                    )
+                    .expect("published input"),
+                )
+            })
+            .collect();
+        println!("{}", Json::Array(inputs).to_json());
+        return;
+    }
+
     // A measured run is one row in one process, or the memory figure means nothing. Refused rather
     // than silently downgraded: a harness that quietly dropped the figure would make a sweep look
     // like a measurement.
@@ -242,6 +260,29 @@ fn main() {
         return;
     }
     append(&board);
+}
+
+fn export_instance(input: &Instance) -> Json {
+    Json::object([
+        (
+            "field",
+            Json::string(input.field.characteristic.to_string()),
+        ),
+        ("modulus", Json::int(input.field.characteristic)),
+        ("name", Json::string(&input.name)),
+        ("family", Json::string(&input.family)),
+        ("order", Json::string("grevlex")),
+        (
+            "variables",
+            Json::Array(input.variables.iter().map(Json::string).collect()),
+        ),
+        (
+            "generators",
+            Json::Array(input.system.iter().map(Json::string).collect()),
+        ),
+        ("canonical", Json::string(input.canonical())),
+        ("digest", Json::string(input.digest())),
+    ])
 }
 
 fn sweep_rows(characteristic: u64, only_row: Option<&str>) -> Vec<&'static str> {
@@ -568,6 +609,24 @@ fn detect_environment(wall: Duration, measure: bool, workers: usize) -> Environm
 mod tests {
     use super::sweep_rows;
     use zeebra::grobner::external::corpus::BINARY_CHARACTERISTIC;
+
+    // Exported inputs preserve the canonical digest and all ordered generator bytes without solving.
+    #[test]
+    fn test_export_pins_the_complete_instance() {
+        let built = super::instance(
+            "mq-random-10",
+            32003,
+            zeebra::MonomialOrder::GradedReverseLexicographic,
+        )
+        .unwrap();
+        let exported = super::export_instance(&built).to_json();
+        assert!(exported.contains(&built.digest()));
+        assert!(
+            exported.contains("16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f")
+        );
+        assert!(exported.contains("generators"));
+        assert!(exported.contains("canonical"));
+    }
 
     // Worker counts default to one and accept positive bounded explicit cohorts.
     #[test]
