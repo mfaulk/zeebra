@@ -17,6 +17,15 @@ planted. This is a distinct identity from the historical term-capped `mq-random-
 The catalog includes intermediate candidates and upper rungs intended to hit the resource boundary;
 size alone is not an observed completion or a performance claim.
 
+The native Rust comparands run their pinned drivers directly. Their standard adapters otherwise
+run extra Zeebra/cofactor computations after the measured solve; on new widths, that can reject
+a completed answer solely because the adapter's built-in verifier has no compiled instantiation.
+The campaign binds the ring, ordered generator echoes, revision, ISA and build profile, retains
+raw responses, and checks full reduced bases independently across engines. Polynomial comparison
+reduces coefficients modulo the full declared prime and normalizes to monic grevlex form.
+The [initial adapter failure](adapter-failure-738.json.gz) retains the Katsura-9 case that exposed
+this verifier-width limitation; it is excluded from the final campaign and ratios.
+
 The live-oracle provenance is the campaign's complete normalized bases from Groebner.jl,
 groebner-rs and grobx, with versions and executable hashes. Every completed answer must agree
 coefficient for coefficient with every other completed answer on that identity. BN254 is a native
@@ -38,13 +47,13 @@ cargo build --release --example wide_corpus
 ```
 
 Measure a committed, clean instrument. One worker, one case/engine per fresh process, grevlex,
-60 s / 2 GiB solver budgets and a 65 s / 2 GiB process-tree watchdog. Watchdog kills are recorded
+60 s / 2 GiB solver budgets. Direct native drivers have a 60 s / 2 GiB process-tree watchdog;
+the Zeebra/Julia runner has a 65 s / 2 GiB tree watchdog to allow harness overhead. Watchdog kills are recorded
 with their specific cause, never as engine completions. F4 also has a cooperative live-byte budget;
 the watchdog covers memory outside its matrices. The tree RSS observation sums process high waters
 and can conservatively stop earlier than a live-RSS sum. Sampling can miss short-lived peaks.
-The Julia adapter also enforces its 2-GiB subprocess RSS ceiling. Native adapters omit that optional
-inner RSS cap because short controls can finish before its first poll; the outer tree watchdog
-still enforces the campaign ceiling, as in the planted-wide verification.
+The Julia adapter also enforces its 2-GiB subprocess RSS ceiling. Native drivers are supervised
+directly; their process wall excludes separate verification computations.
 The campaign resumes only when commit, binaries, machine, affinity and policy match.
 
 ```sh
