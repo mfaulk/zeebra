@@ -171,4 +171,4 @@ alongside the hand-matrix, forced-race and observation tests. Frozen source patc
 source archive hashes, Cargo fingerprints and binary hashes live under `evidence/`;
 apply the named decompressed patch to its recorded base to recover the measured
 source after a squash. The prototype measurement source is distinct from the later
-feature-disabled lint cleanup, which changes no elimination algorithm.
+feature-disabled lint and failure-label cleanup, which change no elimination algorithm.

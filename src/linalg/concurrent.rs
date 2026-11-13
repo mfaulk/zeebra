@@ -646,4 +646,52 @@ mod tests {
             }
         }
     }
+
+    // A digest-pinned live F4 matrix preserves its complete row space under every measured worker count.
+    #[test]
+    fn captured_corpus_row_space() {
+        use crate::{
+            fields::Mersenne31,
+            grobner::{
+                benchmark_systems::katsura,
+                f4::{
+                    matrix_corpus::{capture_matrix, corpus, BatchSelector},
+                    F4Options,
+                },
+            },
+            MonomialOrder,
+        };
+        let label = "katsura-7/grevlex/m31/default";
+        let mut captured = capture_matrix(
+            label,
+            &katsura::<7, Mersenne31>(),
+            MonomialOrder::GradedReverseLexicographic,
+            &F4Options::default(),
+            BatchSelector::Prefix(4),
+        )
+        .unwrap();
+        let specs = corpus();
+        let spec = specs.iter().find(|spec| spec.label == label).unwrap();
+        assert_eq!(captured.fingerprint, spec.fingerprint);
+        let split = captured.matrix.partition_reducers_first();
+        let input = captured.matrix.matrix().clone();
+        let expected = canonical(input.clone());
+        for workers in [1, 2, 4, 8, 16, 32, 64] {
+            for schedule in [Schedule::Static, Schedule::Dynamic] {
+                let mut matrix = input.clone();
+                reduce(
+                    &mut matrix,
+                    split,
+                    &Config {
+                        workers,
+                        schedule,
+                        ..Config::default()
+                    },
+                    &AtomicBool::new(false),
+                )
+                .unwrap();
+                assert_eq!(canonical(matrix), expected);
+            }
+        }
+    }
 }

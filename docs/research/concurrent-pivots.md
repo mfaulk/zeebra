@@ -108,3 +108,163 @@ and adversarial scheduling tests described in #728. Serial thread-local counters
 in a parent scope cannot observe worker work. No custom atomics or unsafe code are
 necessary for publication; synchronization-library guarantees do not replace forced
 race, panic, cancellation, reservation-refusal and reuse tests.
+
+## Native prototype results and verdict
+
+**Measured prototype source: `cf92a3cb`; resumption runner: `1e16ac90`.** The
+[310-attempt cohort](../../research/concurrent-pivots/parallel.json.gz),
+[300 classical controls and four budget probes](../../research/concurrent-pivots/controls.json.gz),
+[source/build recovery stamps](../../research/concurrent-pivots/evidence/provenance.json)
+and [benchmark lock log](../../research/concurrent-pivots/evidence/benchlock.log)
+retain every attempt, exact answer and verification outcome. Together with the
+40 serial census attempts, **650 completed final-cohort answers verify**. Seven
+additional verified answers remain in the separately retained interrupted census.
+CI rechecks them too. The four
+MQ14 probes are incomplete resource refusals and are excluded from that count.
+No completed MQ10 solve used the serial budget fallback.
+
+Machine: Threadripper PRO 5995WX, 64 physical cores/128 logical CPUs; Rust 1.99.1,
+release/fat LTO/one codegen unit, x86-64-v3. Each child uses one logical CPU per
+physical core, selected from actual topology, starting with CPU 2. The exact sets,
+cache/node IDs, binary/lock hashes, limits and load readings are retained. No SMT
+arm was selected. Scratch is first touched by its worker; immutable inputs are
+built by the main thread. No separate NUMA-placement experiment was performed.
+
+Five interleaved fresh processes per arm/field compare stock serial, the new
+feature-present serial controls, and the same concurrent algorithm at
+1,2,4,8,16,32,64 workers under both schedules, counters off/on. A load-gate refusal
+at 5.826 interrupted the fourth repetition. The resumption preserved the exact
+verified prefix and the frozen binary hashes and ran only the missing samples;
+no sample was discarded or repeated to improve a result. Its runner commit and
+the original refusal remain in `resumptions`. Ranges include all five samples.
+
+The following are **uninstrumented-counter process walls**, including input,
+complete F4 and full output encoding. Stock controls in this cohort are
+3080.07 [3048.29,3190.00] ms / 135.57 MiB and
+3380.86 [3340.75,3563.92] ms / 136.28 MiB respectively. No historical timing is a
+denominator. Efficiency uses the new algorithm's own p=1 wall, not stock wall.
+
+| Workers | GF(32003) wall median [min,max], ms | Stock speedup | Same-algorithm efficiency | GF(2147483647) wall median [min,max], ms | Stock speedup | Same-algorithm efficiency |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 3206.90 [3059.13,3276.88] | 0.96x | 100% | 3386.01 [3243.44,3716.23] | 1.00x | 100% |
+| 2 | 2590.93 [2535.20,2671.70] | 1.19x | 61.9% | 2803.05 [2655.50,3069.85] | 1.21x | 60.4% |
+| 4 | 2375.01 [2298.46,2410.79] | 1.30x | 33.8% | 2486.42 [2431.59,2603.03] | 1.36x | 34.0% |
+| 8 | 2214.04 [2159.22,2310.79] | 1.39x | 18.1% | 2354.14 [2317.44,2389.50] | 1.44x | 18.0% |
+| 16 | 2109.88 [2065.57,2216.31] | 1.46x | 9.5% | 2297.42 [2276.78,2397.81] | 1.47x | 9.2% |
+| 32 | 2178.91 [2131.04,2249.99] | 1.41x | 4.6% | 2348.80 [2330.04,2445.97] | 1.44x | 4.5% |
+| 64 | 2207.93 [2106.86,2234.88] | 1.40x | 2.3% | 2302.87 [2287.59,2325.66] | 1.47x | 2.3% |
+
+Exact ranges and both schedules are in [parallel.csv](../../research/concurrent-pivots/parallel.csv).
+Four to sixteen workers are a useful MQ10 range; the experiment does not establish
+a unique optimum between overlapping high-worker ranges. At p=16, same-algorithm
+full-task speedups are 1.52x/1.47x. At p=64 extra cores do not produce a persuasive
+complete-task gain over p=16, while CPU time rises. Dynamic p=16 is faster in median
+than static p=16 (2225.77/2402.34 ms), but their full-task ranges overlap on the
+larger field; the data do not calibrate a universal scheduler crossover.
+
+The dominant **same-input matrix** scales much further: its forward phase changes
+from 843.74/901.88 ms at p=1 to 18.57/19.90 ms at p=64, about 45.4x/45.3x and 71%
+matrix-stage efficiency. Every observed arm has identical pre-elimination matrix
+digests, checked using the existing corpus fingerprint routine. These are matrix
+stage results, not 45x complete-basis speedups. All per-batch curves and active
+worker counts are retained in [matrix-scaling.csv](../../research/concurrent-pivots/matrix-scaling.csv).
+Some matrix ratios slightly exceed linear scaling; work differences and noise
+prevent interpreting that as hardware superlinearity.
+The serial backward phase still takes 1830.19/2011.88 ms at dynamic p=16.
+
+| Field/arm | Process CPU median, s | Process RSS median [min,max], MiB |
+|---|---:|---:|
+| 32003 stock | 3.062 | 135.57 [135.49,135.58] |
+| 32003 dynamic p=16 | 3.225 | 135.84 [135.47,136.07] |
+| 32003 dynamic p=64 | 3.539 | 138.43 [137.99,140.75] |
+| 2147483647 stock | 3.360 | 136.28 [136.15,136.38] |
+| 2147483647 dynamic p=16 | 3.514 | 136.38 [136.20,136.81] |
+| 2147483647 dynamic p=64 | 3.723 | 140.53 [140.29,140.87] |
+
+The p=16 wall and RSS gates pass on MQ10. Workspace maxima at p=64 are 3750240 /
+6827360 bytes, including dense buffers and pivot/index arrays; reservation peaks
+stay below three million entries on these inputs. Observed p=16 sparse live peaks
+are 3928801/3929819 entries and sparse capacity maxima 6840008/6843659 slots, in
+the later backward phase. These are separate boundaries, not quantities to sum
+as a simultaneous peak. Allocator events and physical memory bandwidth were not
+measured. Nonzero sparse materializations are counted by successful plus failed
+publications; dense allocations are one per active worker per batch. Additional
+report, thread and allocator allocations are outside that count.
+The legacy F4 per-backend dense-buffer statistic still describes one Adaptive row;
+the experimental workspace ledger reports worker capacity for this hook.
+
+### Work, contention, skew and overhead
+
+Counters-on p=1 reproduces the serial control's 585166982/585195178 forward
+products with zero lost publications. At dynamic p=16 the product medians are
+578354208/576824272, with 569/750 failed publications; at p=64 they are
+560401051/554372312, with 928/1475 failures. Thus changed pivot winners alter work;
+the strong-scaling rows are not an equal-instruction experiment. Products executed
+after a lost claim are 34391960/40254066 at p=16 and 75939650/92012623 at p=64.
+They are not all provably redundant work: baseline pivot trajectories also require
+reductions, and total work can decrease despite more retries.
+
+Static p=16 loses fewer claims (168/322 medians) but performs more products
+(622277258/614764387). In the dominant matrix, median min/max worker durations are
+54.17/56.06 ms and 58.81/60.77 ms for dynamic p=16, versus 16.93/89.77 ms and
+20.26/98.45 ms for static. This supports dynamic scheduling as the smaller useful
+prototype; it does not justify implementing weighted scheduling or another queue.
+Worker durations/row counts, actual dense loads/scans/gathers, normalization work,
+scheduling and publication clocks remain available in each complete response.
+
+Observed p=16 sums of scheduling/reservation clocks are 0.84/0.37 ms, and sums of
+publication clocks 0.32/0.39 ms. These sums span workers and are neither independent
+elapsed shares nor pure lock-wait times. There is no custom unsafe/atomic pivot
+protocol: `OnceLock` and scoped joins provide publication/lifetime synchronization;
+relaxed cancellation flags carry no data ownership.
+
+Observation is material. Dynamic p=16 counters-on process medians are
+2461.91/2768.01 ms versus 2109.88/2297.42 ms off. These arms additionally hash
+matrices and collect worker/parent diagnostics; they establish work and identity,
+not the timing speedup. Feature-present serial/off controls are
+3145.47/3360.47 ms; ranges overlap stock on the larger field. Do not turn a
+compiler/layout or observation difference into a threading result.
+
+Five fresh processes per worker count measure sixteen empty scoped dispatches
+each. Median floors in microseconds are 42.36, 65.73, 78.84, 127.43, 299.64,
+600.13, 1334.20 at 1,2,4,8,16,32,64 workers; [dispatch.csv](../../research/concurrent-pivots/dispatch.csv)
+retains min/max. This is spawn/join wall cost, not a persistent-pool measurement
+or a decomposition of enqueue/wake/barrier CPU cost. #592 remains the runtime
+comparison; no predicted nanosecond pool floor is assumed here.
+
+### Classical controls, fixed budget and decision
+
+All 300 classical-control answers verify. Cyclic uses the retained full independent
+reference. Each Katsura field additionally retains a fresh Singular computation
+and complete coefficient-set comparison, outside timing. At dynamic p=8, whole
+process serial/new speed ratios are 0.696/0.710 on Cyclic-5 and 0.695/0.704 on
+Katsura-6: about 41–44% slower. F4-call ratios are separately retained; they are
+not substituted for process-wall adoption criteria. The [control table](../../research/concurrent-pivots/controls.csv)
+includes every worker count and both schedules. **Unconditional dispatch fails
+the predeclared 5% regression gate.**
+
+The public MQ14 probes keep the default 32000000-entry cap. Both serial and
+dynamic p=4 return `TooManyNonzeros` in both fields, with no accepted partial
+basis. Times to refusal are 31.72/21.53 seconds at 32003 and 31.55/22.64 seconds
+at 2147483647; peak RSS is 765–773 MiB. These are resource outcomes, not speedups.
+No completed larger rung or fixed-budget frontier improvement is established.
+The separately gated 24843682-entry corpus case uses a 64-million-entry preset;
+that larger-budget replay was not enabled or represented as covered by this run.
+
+**Verdict: retain the opt-in prototype and evidence; reject unconditional
+dispatch; defer production integration.** Concurrent discovery is useful on the
+tested MQ10 tasks, with a measured full-task gain and affordable memory. Its
+maintenance cost is a research-only hook, safe pivot ownership, strict reservation
+logic and failure tests; serial remains the default and the generic fallback.
+The new tests cover forced pivot races, rectangular/rank-deficient inputs, binary
+and 254-bit fields, mid-run budget refusal, cancellation, worker panic and reuse.
+A digest-pinned live corpus matrix also matches an independent sparse RREF
+coefficient-for-coefficient under both schedules at every measured worker count.
+
+A later integration proposal needs a validated dispatch gate for small batches,
+a completed independently checked larger target under fixed resources, and the
+selective-backward × parallel-forward 2×2 after #269 supplies its policy. #269 and
+#592 were still open at this audit; neither result is invented here. The new
+worker evidence can inform #729, but claim counts alone do not establish a
+waiting-queue opportunity. Removing backward work may change both the eligible
+fraction and the best worker count: do not multiply separately measured gains.

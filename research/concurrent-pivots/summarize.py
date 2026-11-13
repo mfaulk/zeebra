@@ -27,7 +27,7 @@ def write_csv(name, rows):
     if not rows:
         return
     with (HERE / name).open('w') as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator='\n')
         writer.writeheader()
         writer.writerows(rows)
 
@@ -64,7 +64,13 @@ def main():
         if arm == 'discovery':
             row['forward_share'] = spread(sum(b['row_sum_ns'] for b in a['census'])/a['raw']['statistics']['total_ns'] for a in attempts)
         census_summary.append(row)
-    summary = dict(census_commit=census['commit'], census=census_summary)
+    interrupted = storage.load_study(HERE / 'census-interrupted.json.gz')
+    assert interrupted['refusal']['reason'] == 'load' and len(interrupted['attempts']) == 7
+    for attempt in interrupted['attempts']:
+        assert attempt['status'] == 'verified' and attempt['exit'] == 0 and attempt['stop'] is None
+        check(attempt['raw'], refs[attempt['modulus']])
+    summary = dict(census_commit=census['commit'], census=census_summary,
+                   separately_retained_interrupted_attempts=len(interrupted['attempts']))
     write_csv('matrix-census.csv', matrix_rows)
     parallel_path = HERE / 'parallel.json.gz'
     if parallel_path.exists():
@@ -128,7 +134,9 @@ def main():
         for workers in driver.WORKERS:
             attempts = [a for a in parallel['dispatch'] if a['workers'] == workers]
             assert len(attempts) == 5 and all(a['exit'] == 0 and a['stop'] is None for a in attempts)
-            samples = [n/1000 for a in attempts for n in json.loads(a['stdout'])['samples_ns']]
+            reports = [json.loads(a['stdout']) for a in attempts]
+            assert all(report['workers'] == workers and len(report['samples_ns']) == 16 for report in reports)
+            samples = [n/1000 for report in reports for n in report['samples_ns']]
             dispatch.append(dict(workers=workers, **spread(samples)))
         summary['scoped_dispatch_us'] = dispatch
         write_csv('dispatch.csv', dispatch)
@@ -150,10 +158,13 @@ def main():
         for (name, modulus, schedule, workers), attempts in sorted(groups.items()):
             assert len(attempts) == 5
             baseline = statistics.median(a['raw']['f4_call_ns'] for a in groups[(name, modulus, 'serial', 1)])
+            process_baseline = statistics.median(a['process_wall_ns'] for a in groups[(name, modulus, 'serial', 1)])
             duration = spread(a['raw']['f4_call_ns']/1e6 for a in attempts)
             rows.append(dict(problem=name, modulus=modulus, schedule=schedule, workers=workers,
                 f4_ms=duration['median'], f4_min_ms=duration['minimum'], f4_max_ms=duration['maximum'],
                 serial_speedup=baseline/(duration['median']*1e6),
+                process_serial_speedup=process_baseline/statistics.median(a['process_wall_ns'] for a in attempts),
+                cpu_seconds=statistics.median(a['cpu_seconds'] for a in attempts),
                 process_wall_ms=statistics.median(a['process_wall_ns']/1e6 for a in attempts),
                 rss_mib=statistics.median(max(a['observed_peak_rss_bytes'], a['raw']['peak_rss_bytes'] or 0)/1024**2 for a in attempts)))
         assert len(controls['probes']) == 4
