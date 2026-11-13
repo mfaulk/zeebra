@@ -687,6 +687,29 @@ def summarize(cohort, target):
     target.write_text('\n'.join(lines)+'\n')
 
 
+def verify_complete_attempt(attempt,case,references,certify=False,reference_only=False):
+    if attempt['status']!='complete':return attempt
+    checking=time.monotonic_ns()
+    try:
+        if certify or (reference_only and attempt['engine']=='singular'):
+            attempt['status']='verified'
+            if certify:attempt['verification']='independent exact grobx-checker/cofactor certificate retained'
+        elif case['digest'] in references:
+            verify_basis(attempt['basis'],references[case['digest']]['basis'],case)
+            attempt['status']='verified'
+            attempt['verification_wall_ns']=time.monotonic_ns()-checking
+        else:
+            attempt['verification']='no independent reference retained yet; no ratios'
+    except ValueError as error:
+        attempt.update(status='failed',error=str(error),verification_wall_ns=time.monotonic_ns()-checking)
+    except (SystemExit,KeyboardInterrupt) as error:
+        code=int(error.code) if isinstance(error,SystemExit) else 130
+        # The solver already exited: retain that boundary when the oracle check hits a deadline.
+        attempt.update(status='interrupted',stop='postprocessing-signal-'+str(code-128),interrupt_exit=code,
+                       verification_interrupted=True,partial_verification_wall_ns=time.monotonic_ns()-checking)
+    return attempt
+
+
 def selected_case(case,policy):
     pairs=policy.get('case_pairs')
     return (case['name'] in policy['rows'].split(',') and str(case['field']) in policy['fields'].split(',')
@@ -856,19 +879,7 @@ def main():
                                stdout=stem.with_suffix('.stdout').read_text() if stem.with_suffix('.stdout').exists() else '',
                                stderr=stem.with_suffix('.stderr').read_text() if stem.with_suffix('.stderr').exists() else '')
                     a.update(field=case['field'],name=case['name'],digest=case['digest'],engine=actual_engine,workers=p,repeat=repeat,diagnostic=args.diagnostic)
-                    if a['status']=='complete':
-                        if args.certify or (args.reference_only and engine=='singular'):
-                            a['status']='verified'
-                            if args.certify:a['verification']='independent exact grobx-checker/cofactor certificate retained'
-                        elif case['digest'] in refs:
-                            checking=time.monotonic_ns()
-                            try:
-                                verify_basis(a['basis'],refs[case['digest']]['basis'],case)
-                                a['status']='verified'
-                            except ValueError as error:
-                                a.update(status='failed',error=str(error))
-                            a['verification_wall_ns']=time.monotonic_ns()-checking
-                        else:a['verification']='no independent reference retained yet; no ratios'
+                    a=verify_complete_attempt(a,case,refs,args.certify,args.reference_only)
                     if a['status']=='stopped-by-limit' and p==1:stopped[key]=True
                     elif p==16 and a['status'] in ('complete','verified'):
                         stopped.pop(key,None)

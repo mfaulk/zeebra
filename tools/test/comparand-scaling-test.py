@@ -57,6 +57,17 @@ class ComparandScalingTests(unittest.TestCase):
             journal=scaling.AttemptJournal(path,dict(commit='a'*40,attempts=[]))
             journal.journal.write_text('{"path":')
             with self.assertRaisesRegex(ValueError,'incomplete journal'):scaling.load_cohort(path)
+    # A deadline during coefficient checking preserves the already completed solver measurements.
+    def test_postprocessing_signal_retains_completed_native_boundary(self):
+        a=dict(status='complete',basis=['x1'],engine='groebner-rs',process_wall_ns=123,exit=0,stop=None)
+        with mock.patch.object(scaling,'verify_basis',side_effect=SystemExit(143)):
+            result=scaling.verify_complete_attempt(a,dict(digest='d'),{'d':dict(basis=['x1'])})
+        self.assertEqual(result['status'],'interrupted')
+        self.assertEqual(result['process_wall_ns'],123)
+        self.assertEqual(result['exit'],0)
+        self.assertEqual(result['interrupt_exit'],143)
+        self.assertTrue(result['verification_interrupted'])
+
     # A launcher signal preserves an interrupted attempt after killing and reaping its solver.
     def test_launcher_signal_retains_interruption_boundary(self):
         with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling.wide.guard,'tree_hwm',side_effect=SystemExit(143)):
