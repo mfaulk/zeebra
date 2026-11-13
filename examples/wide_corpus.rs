@@ -355,8 +355,14 @@ mod tests {
                 });
             }
         }
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("research/wide-corpus/cases.json");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join("research/wide-corpus/cases.json");
+        if !path.exists() && !root.join(".git").exists() {
+            eprintln!(
+                "research fixtures are omitted from source packages; repository replay skipped"
+            );
+            return;
+        }
         let expected =
             Json::parse(&std::fs::read_to_string(path).expect("frozen catalog")).unwrap();
         assert_eq!(Json::Array(actual), expected);
