@@ -13,6 +13,40 @@ pub(crate) struct Report {
     pub fell_back: bool,
 }
 
+pub(crate) const WORKSPACE_LIMIT: usize = 64 * 1024 * 1024;
+
+pub(crate) fn workspace_bytes<F>(columns: usize) -> Option<usize> {
+    columns.checked_mul(
+        std::mem::size_of::<F>() + std::mem::size_of::<usize>() + std::mem::size_of::<bool>(),
+    )
+}
+
+pub(crate) fn full<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    max_entries: usize,
+    mask_bytes: usize,
+    statistics: &mut EliminationStatistics,
+) -> Result<(usize, Report), usize> {
+    #[cfg(feature = "research-work")]
+    crate::linalg::work::memory(
+        matrix.nonzeros(),
+        matrix.entry_capacity(),
+        0,
+        mask_bytes,
+        std::mem::size_of::<(usize, F)>(),
+    );
+    let visits =
+        crate::linalg::sparse::back_substitute_pivots_within(matrix, max_entries, statistics)?;
+    Ok((
+        visits,
+        Report {
+            fell_back: true,
+            workspace_bytes: mask_bytes,
+            ..Report::default()
+        },
+    ))
+}
+
 /// Finish precisely the requested pivot rows; public matrix RREF keeps its full-row contract.
 /// Later echelon pivots stay immutable because targets run in increasing leading column.
 /// A checked whole-pass reservation precedes mutation; insufficient temporary space selects
@@ -24,7 +58,7 @@ pub(crate) fn finish<F: FiniteField>(
     max_workspace: usize,
     statistics: &mut EliminationStatistics,
 ) -> Result<(usize, Report), usize> {
-    use crate::linalg::sparse::{back_substitute_pivots_within, SparseRow};
+    use crate::linalg::sparse::SparseRow;
     use std::mem::size_of;
     debug_assert_eq!(selected_columns.len(), matrix.num_columns());
     let columns = matrix.num_columns();
@@ -44,25 +78,9 @@ pub(crate) fn finish<F: FiniteField>(
             bound.checked_add(suffix.saturating_sub(row.nonzeros()))
         })
         .and_then(|bound| bound.checked_add(columns));
-    let workspace = columns.checked_mul(size_of::<F>() + size_of::<usize>() + size_of::<bool>());
+    let workspace = workspace_bytes::<F>(columns);
     if reservation.is_none_or(|n| n > max_entries) || workspace.is_none_or(|n| n > max_workspace) {
-        #[cfg(feature = "research-work")]
-        crate::linalg::work::memory(
-            matrix.nonzeros(),
-            matrix.entry_capacity(),
-            0,
-            selected_columns.len(),
-            std::mem::size_of::<(usize, F)>(),
-        );
-        let visits = back_substitute_pivots_within(matrix, max_entries, statistics)?;
-        return Ok((
-            visits,
-            Report {
-                fell_back: true,
-                workspace_bytes: selected_columns.len(),
-                ..Report::default()
-            },
-        ));
+        return full(matrix, max_entries, selected_columns.len(), statistics);
     }
     let mut report = Report {
         workspace_bytes: workspace.unwrap(),
@@ -204,6 +222,17 @@ mod tests {
             }
             assert_eq!(stats.final_nonzeros, matrix.nonzeros());
         }
+    }
+
+    // Selection-mask admission checks total workspace and overflow without allocating an oversized matrix.
+    #[test]
+    fn workspace_preflight_precedes_selection_allocation() {
+        let width =
+            WORKSPACE_LIMIT / (std::mem::size_of::<Bn254Fr>() + std::mem::size_of::<usize>() + 1);
+        assert!(workspace_bytes::<Bn254Fr>(width).unwrap() <= WORKSPACE_LIMIT);
+        assert!(workspace_bytes::<Bn254Fr>(width + 1).unwrap() > WORKSPACE_LIMIT);
+        assert_eq!(workspace_bytes::<Bn254Fr>(usize::MAX), None);
+        assert_eq!(workspace_bytes::<Bn254Fr>(0), Some(0));
     }
 
     // Every selected subset matches full RREF over prime, binary, extension and wide fields.

@@ -293,7 +293,11 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
                         .contains(&matrix.columns()[column])
                 })
             });
-            let (visits, report) = if has_candidates {
+            let workspace_fits = super::candidate::workspace_bytes::<F>(matrix.num_columns())
+                .is_some_and(|bytes| bytes <= super::candidate::WORKSPACE_LIMIT);
+            let (visits, report) = if has_candidates && !workspace_fits {
+                super::candidate::full(matrix.matrix_mut(), allowance, 0, &mut block.statistics)?
+            } else if has_candidates {
                 let selected: Vec<_> = matrix
                     .columns()
                     .iter()
@@ -303,7 +307,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
                     matrix.matrix_mut(),
                     &selected,
                     allowance,
-                    64 * 1024 * 1024,
+                    super::candidate::WORKSPACE_LIMIT,
                     &mut block.statistics,
                 )?
             } else {
