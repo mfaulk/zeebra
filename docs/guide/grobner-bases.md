@@ -424,7 +424,9 @@ Run `cargo run --release --example membership_witness` for separately timed exis
 witness verification on the small positive-dimensional ideal `(x²-y, xy-1)` extended with a free
 variable, over GF(32003) and BN254 Fr. The example prints cofactor term counts and process peak
 RSS (not incremental verifier allocation), and demonstrates an explicit budget refusal. It also
-checks the unit ideal. These small fixtures establish feasibility only; no speedup is claimed.
+checks the unit ideal. The [retained release sample](../research/membership-witnesses.md) records
+build context, timings and process RSS. These small fixtures establish feasibility only; no
+speedup is claimed.
 
 A tracked Buchberger producer could carry a vector of cofactors through each S-polynomial and
 reduction, but polynomial-vector term growth would require separate generation budgets and an
