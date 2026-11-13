@@ -72,6 +72,26 @@ ZEEBRA_MACHINE=5995wx tools/benchlock.sh comparand-739 \
 thread CPU snapshots in Julia/Rust and must remain separate from counters-off medians.
 `--summarize --output PATH` regenerates a campaign table from retained records without solving.
 
+For bounded narrow-field oracle alternatives, `--reference-only --engines singular --workers 1
+--repeats 1 --wall 55` drives the existing Singular adapter through the input-export executable;
+its generated script, ordered generator echoes and complete native answer are retained. Adapter
+native solvers can own a separate process group: cancellation kills those leaves first and lets
+the wrapper reap them before terminating the wrapper. The aggregate hard watchdog remains
+separate from the controller's before-next-cell wall cutoff. Launcher signals retain the current
+interrupted attempt before propagating their exit status.
+
+`--references PATH...` can reuse multiple pinned reference cohorts. An exact native-checker answer
+whose timing was excluded for compiler overlap may supply mathematics after input/checker/output
+validation; its original status is preserved and its clocks/RSS never enter timing medians.
+Pre/post-child compiler snapshots refuse or exclude a cell and halt the cohort, retaining process
+identities instead of silently retrying a favorable sample.
+
+Final artifacts use `--replay research/comparand-scaling` to check archive/source/executable
+identity consistency, full input binding, complete coefficients against retained exact references,
+and generated board equality. This offline check does **not** rerun the native cofactor checker:
+original mathematical certification is the pinned external checker's successful execution, with
+its full witness/output retained. Hash/format checks and full-basis equality are distinct evidence.
+
 ## Concurrency and comparison boundaries
 
 The installed Groebner.jl 0.10.11 uses `tasks=N` and `threading_enabled()`, not `threaded=:yes`.
