@@ -2,6 +2,8 @@
 
 **Baseline source:** `a33a192e819f3ed63fed20b6e3df1445cd0fb1f7`.
 
+**Measured at:** `f1158dbad91cb648f3560feaea4209efc28157a4` on 2026-11-13 UTC.
+
 Issue #685 asks whether a construction refusal can recover under unchanged matrix
 budgets. This study keeps the shipping solver and its defaults unchanged. The
 prototype is `examples/batch_splitting_study.rs`, built only as an example. Its
@@ -145,4 +147,86 @@ with fresh output paths. Initial failures remain separate and are never pooled
 with the corrected run. This is the full declared correction; further runs need
 a separately stated bound.
 
-Measured outcomes and the go/no-go decision will be added after the corrected pinned run.
+## Corrected outcomes and decision
+
+**Measured at:** `f1158dbad91cb648f3560feaea4209efc28157a4` on 2026-11-13 UTC.
+
+All 74 declared cells ran: 55 complete answers passed exact reference and
+submitted-basis checks; 19 returned explicit refusals. There were no external
+watchdog stops, process failures or failed verifier checks. The shipping and
+custom unlimited-budget controls completed all ten fixtures. The table shows
+fixed-row-budget outcomes; `ok` means a fully verified reduced basis, `rows`
+is construction refusal, and `one pair` means splitting cannot shrink further.
+
+| Fixture | Rows | Shipping | Custom pair cap ∞ | Static 1 | Static 2 | Adaptive | Retries | Adaptive process ms | Adaptive observed tree MiB |
+|---|---:|---|---|---|---|---|---:|---:|---:|
+| cyclic-3 | 3 | ok | ok | ok | ok | ok | 0 | 38.28 | 23.98 |
+| cyclic-4 | 7 | rows | rows | ok | rows | ok | 4 | 39.05 | 24.45 |
+| katsura-2 | 7 | ok | ok | ok | ok | ok | 0 | 39.43 | 21.96 |
+| katsura-3 | 18 | rows | rows | ok | rows | ok | 2 | 40.34 | 23.05 |
+| mq-random-3 | 18 | ok | ok | ok | ok | ok | 0 | 38.95 | 22.58 |
+| mq-homogeneous-3 | 20 | ok | ok | ok | ok | ok | 0 | 36.81 | 22.98 |
+| cyclic-homogeneous-4 | 10 | rows | rows | ok | ok | ok | 1 | 38.59 | 23.24 |
+| katsura-homogeneous-3 | 20 | rows | rows | ok | ok | ok | 1 | 37.23 | 21.88 |
+| unit | 1 | ok | ok | ok | ok | ok | 0 | 37.13 | 21.50 |
+| positive-dimensional | 1 | rows | rows | rows | rows | one pair | 0 | 37.42 | 21.68 |
+
+Four workloads recover under the same row allowance after the unlimited-batch
+controls refuse: Cyclic-4, Katsura-3 and their homogeneous transforms. Static 1
+also completes these four workloads. This supports the narrow proposition that
+construction-batch width can cause an otherwise avoidable refusal; it does not
+establish an advantage of adaptive splitting over a suitable static cap. The
+positive-dimensional fixture under one row cannot construct even one pair and
+correctly refuses. Unit input needs no matrix and completes under that allowance.
+
+The four additional boundary outcomes are retained separately:
+
+| Boundary | Outcome | Retries | Process ms | Observed tree MiB |
+|---|---|---:|---:|---:|
+| Cyclic-4 rows=0, max retries=32 | one-pair | 0 | 37.90 | 22.39 |
+| Cyclic-4 rows=7, max retries=0 | retry-limit | 0 | 37.56 | 22.38 |
+| Cyclic-4 entries=19, max retries=32 | reduction | 0 | 38.83 | 22.71 |
+| Cyclic-4 columns=3, max retries=32 | one-pair | 0 | 37.47 | 21.76 |
+
+The successful adaptive recoveries include the repeated preflight/rebuild work:
+
+| Fixture | Attempts | Failed builds | Selected pairs across attempts | Successful preflight rows | Preflight ms | Reduction plus rebuild ms | Final division ms | Peak reported queue payload lower bound B |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| cyclic-4 | 14 | 4 | 20 | 47 | 0.047 | 0.042 | 0.014 | 744 |
+| katsura-3 | 8 | 2 | 17 | 89 | 0.067 | 0.073 | 0.018 | 744 |
+| cyclic-homogeneous-4 | 8 | 1 | 14 | 43 | 0.027 | 0.040 | 0.015 | 784 |
+| katsura-homogeneous-3 | 6 | 1 | 15 | 75 | 0.063 | 0.069 | 0.023 | 784 |
+
+Row totals exclude unknown failed symbolic prefixes. Every successful preflight
+is rebuilt once for reduction, and that cost is included in the reduction column.
+Private queue capacities remain unknown; the payload figure is a lower bound,
+not a workspace budget. Raw records retain every successful matrix entry and
+symbolic capacity, filtered/selected count, and provisional handled count.
+
+The largest observed process-tree RSS across the corrected cohort is 25,649,152 bytes; the longest whole-child wall is 42.97 ms, including reference verification.
+These single feasibility samples stayed within the declared caps. The shared
+workstation was not isolated: the lock reports one-minute load 2.15 and other
+work existed earlier; the coordinated GCD builds had finished before this
+corrected campaign. No comparative timing, crossover or scaling claim follows.
+
+**Decision: continue to a separate production design proposal; do not ship this
+prototype as a scheduler.** The narrow go gate is met by four independently
+verified recoveries under unchanged limits, finite retries and the transactional
+criterion argument. A production proposal must remove the duplicate successful
+build, define reversible queue bookkeeping without a full snapshot, expose or
+bound owned capacities, preserve deadlines and prove that every unresolved pair
+remains reachable. It must compare total time/RSS against static 1 and other
+caps on larger public workloads before claiming an adaptive advantage. There is
+no production-default change, broad memory guarantee or generic performance
+claim in this PR.
+
+[`corrected/cohort.json.gz`](../../research/batch-splitting/corrected/cohort.json.gz)
+contains every exact stdout/stderr and all full answers, metadata and outcomes;
+[`environment.json`](../../research/batch-splitting/corrected/environment.json)
+adds build/configuration and both Singular wrapper/ELF hashes. The binary was
+built from the identical Rust source at `b8a9bc2b`; only the Python runner,
+diagnostics and documentation changed at the corrected instrument commit.
+[`benchlock.txt`](../../research/batch-splitting/corrected/benchlock.txt) and
+[`run-command.sh`](../../research/batch-splitting/corrected/run-command.sh) retain
+actual lock events and the exact historical command. Replay uses fresh scratch
+and output paths as described above.

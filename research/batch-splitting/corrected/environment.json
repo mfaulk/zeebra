@@ -1,0 +1,22 @@
+{
+  "git_status": "",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_PROFILE_RELEASE_LTO": null,
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": null
+  },
+  "command": "CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-685 TMPDIR=/buildcache/cargo-target/zeebra-685/tmp RUSTC_WRAPPER= cargo build -j4 --release --example batch_splitting_study",
+  "build_elapsed": "5m43s",
+  "files": {
+    "Cargo.lock": "6b0fba412b786b5bb41ec1300a3082e30552a3b98b61bd57b56e11fb058bc406",
+    "Cargo.toml": "67a6488710cfb48a998990f62edd8cde919f5b88be3762a0c29c0e13e3232ac2",
+    ".cargo/config.toml": "4149fbfd3f145b146c5dff23954d0def331ad72ca2d9d5d6b46976f8fe7786f7",
+    "/usr/bin/Singular": "08a5400c9d29834271bd29e02a76d27dff5eff835d99063357a0afb73c29bbb4",
+    "/buildcache/cargo-target/zeebra-685/release/examples/batch_splitting_study": "668215ddb4d1fc31b4454726845f07a01fc3e4a04a1f38ca068d9a3df40d275f",
+    "/usr/lib64/Singular/Singular": "f35112080f257b6b7886387bf5ad45f237290697ad55c17132ee804339f33b69"
+  },
+  "binary_source_commit": "b8a9bc2bd9beb50f12184fcca7b65157bd6cbda9",
+  "instrument_commit": "f1158dbad91cb648f3560feaea4209efc28157a4",
+  "rust_source_unchanged_since_build": true
+}
