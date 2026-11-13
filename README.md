@@ -388,3 +388,8 @@ The [measured H13 decision](docs/research/elimination-kernels.md#h13-remainder-d
 retains the three-field density curves, full-solve controls and the negative delayed-pilot shipping
 decision. Regenerate its checked CSV and paired summaries with
 `python3 research/elimination-kernels/summarize.py`.
+
+The [randomized-reduction study](research/grobx-randomization/README.md) provides independent
+Grobx feature controls, exact residual-span feasibility checks, and a bounded full-basis-verified
+campaign. Its GPL experiment remains outside the MIT library; Zeebra's deterministic defaults
+are unchanged.

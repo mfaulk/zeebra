@@ -1,0 +1,2050 @@
+{
+  "cells": [
+    {
+      "arm": "certified",
+      "engines": [
+        "signature"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 3866700,
+        "direct_field_mul_calls": 30991134,
+        "executed_lane_products": 90898335,
+        "loaded_entries": 246840,
+        "nonzero_multiplier_products": 90898335,
+        "row_kernel_calls": 1670230,
+        "source_entries_read": 90898335,
+        "subtracted_entry_charges": 92568565,
+        "subtraction_budget_calls": 1670230
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 152.08984375,
+      "rss_mib_range": [
+        151.7109375,
+        152.21484375
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 10,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 16514.582343,
+      "wall_ms_range": [
+        15735.320222,
+        17711.832729
+      ]
+    },
+    {
+      "arm": "certified-off",
+      "engines": [
+        "signature"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 151.96484375,
+      "rss_mib_range": [
+        151.73828125,
+        151.98828125
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 10,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 15730.148392,
+      "wall_ms_range": [
+        15559.658842,
+        17043.728875
+      ]
+    },
+    {
+      "arm": "native-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.265625,
+      "rss_mib_range": [
+        16.125,
+        16.32421875
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 405.546382,
+      "wall_ms_range": [
+        389.111492,
+        413.622971
+      ]
+    },
+    {
+      "arm": "native-on",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13373471,
+        "direct_field_mul_calls": 187525,
+        "executed_lane_products": 371017379,
+        "loaded_entries": 819722,
+        "nonzero_multiplier_products": 371017379,
+        "row_kernel_calls": 7693434,
+        "source_entries_read": 371017379,
+        "subtracted_entry_charges": 378608700,
+        "subtraction_budget_calls": 7693119
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.1875,
+      "rss_mib_range": [
+        16.12890625,
+        16.32421875
+      ],
+      "seed": 0,
+      "signature_groups": 26,
+      "signature_passed_rows": 27,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 429.593042,
+      "wall_ms_range": [
+        400.060257,
+        445.057726
+      ]
+    },
+    {
+      "arm": "no-plain",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13373471,
+        "direct_field_mul_calls": 187525,
+        "executed_lane_products": 371017379,
+        "loaded_entries": 819722,
+        "nonzero_multiplier_products": 371017379,
+        "row_kernel_calls": 7693434,
+        "source_entries_read": 371017379,
+        "subtracted_entry_charges": 378608700,
+        "subtraction_budget_calls": 7693119
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.25,
+      "rss_mib_range": [
+        16.1953125,
+        16.3203125
+      ],
+      "seed": 0,
+      "signature_groups": 26,
+      "signature_passed_rows": 27,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 425.625652,
+      "wall_ms_range": [
+        404.374885,
+        458.126083
+      ]
+    },
+    {
+      "arm": "no-plain-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.328125,
+      "rss_mib_range": [
+        16.2421875,
+        16.390625
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 389.93979,
+      "wall_ms_range": [
+        386.447069,
+        426.169551
+      ]
+    },
+    {
+      "arm": "no-signature",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13497189,
+        "direct_field_mul_calls": 187525,
+        "executed_lane_products": 374004721,
+        "loaded_entries": 829238,
+        "nonzero_multiplier_products": 374004721,
+        "row_kernel_calls": 7751770,
+        "source_entries_read": 374004721,
+        "subtracted_entry_charges": 381756491,
+        "subtraction_budget_calls": 7751770
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.2578125,
+      "rss_mib_range": [
+        16.12890625,
+        16.578125
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 418.760697,
+      "wall_ms_range": [
+        404.579261,
+        466.135896
+      ]
+    },
+    {
+      "arm": "no-signature-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.3203125,
+      "rss_mib_range": [
+        16.12890625,
+        16.39453125
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 401.36132,
+      "wall_ms_range": [
+        387.156842,
+        432.61357
+      ]
+    },
+    {
+      "arm": "none",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13497189,
+        "direct_field_mul_calls": 187525,
+        "executed_lane_products": 374004721,
+        "loaded_entries": 829238,
+        "nonzero_multiplier_products": 374004721,
+        "row_kernel_calls": 7751770,
+        "source_entries_read": 374004721,
+        "subtracted_entry_charges": 381756491,
+        "subtraction_budget_calls": 7751770
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.265625,
+      "rss_mib_range": [
+        16.125,
+        16.63671875
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 423.427872,
+      "wall_ms_range": [
+        407.311814,
+        462.622896
+      ]
+    },
+    {
+      "arm": "none-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.26953125,
+      "rss_mib_range": [
+        16.26171875,
+        16.3828125
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 394.851958,
+      "wall_ms_range": [
+        384.919066,
+        424.397757
+      ]
+    },
+    {
+      "arm": "plain-only",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10340784,
+        "direct_field_mul_calls": 70322,
+        "executed_lane_products": 288543363,
+        "loaded_entries": 651425,
+        "nonzero_multiplier_products": 288543363,
+        "row_kernel_calls": 6218789,
+        "source_entries_read": 288543363,
+        "subtracted_entry_charges": 294762152,
+        "subtraction_budget_calls": 6218789
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.8671875,
+      "rss_mib_range": [
+        14.85546875,
+        15.16796875
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 338.170994,
+      "wall_ms_range": [
+        306.658602,
+        350.17641
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10340784,
+        "direct_field_mul_calls": 70322,
+        "executed_lane_products": 288543363,
+        "loaded_entries": 651425,
+        "nonzero_multiplier_products": 288543363,
+        "row_kernel_calls": 6218789,
+        "source_entries_read": 288543363,
+        "subtracted_entry_charges": 294762152,
+        "subtraction_budget_calls": 6218789
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.9296875,
+      "rss_mib_range": [
+        14.828125,
+        14.984375
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 324.696878,
+      "wall_ms_range": [
+        308.652246,
+        347.958771
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations-off",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.921875,
+      "rss_mib_range": [
+        14.85546875,
+        15.23046875
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 293.601886,
+      "wall_ms_range": [
+        290.298443,
+        308.788073
+      ]
+    },
+    {
+      "arm": "plain-only-off",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.87890625,
+      "rss_mib_range": [
+        14.8515625,
+        14.98828125
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 296.771727,
+      "wall_ms_range": [
+        291.287666,
+        321.142119
+      ]
+    },
+    {
+      "arm": "plain-only-validated",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10340784,
+        "direct_field_mul_calls": 70322,
+        "executed_lane_products": 288543363,
+        "loaded_entries": 651425,
+        "nonzero_multiplier_products": 288543363,
+        "row_kernel_calls": 6218789,
+        "source_entries_read": 288543363,
+        "subtracted_entry_charges": 294762152,
+        "subtraction_budget_calls": 6218789
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.8671875,
+      "rss_mib_range": [
+        14.7890625,
+        15.1640625
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": 353.460568,
+      "validation_ms_range": [
+        343.17823,
+        370.501295
+      ],
+      "validation_rows": 47955,
+      "validation_work": {
+        "dense_take_calls": 25983005,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 289749910,
+        "loaded_entries": 2445736,
+        "nonzero_multiplier_products": 289749910,
+        "row_kernel_calls": 6262814,
+        "source_entries_read": 289749910,
+        "subtracted_entry_charges": 296012724,
+        "subtraction_budget_calls": 6262814
+      },
+      "wall_ms_median": 675.914729,
+      "wall_ms_range": [
+        661.306807,
+        693.731495
+      ]
+    },
+    {
+      "arm": "plain-only-validated-off",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.98046875,
+      "rss_mib_range": [
+        14.7890625,
+        15.04296875
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 0,
+      "validation_ms_median": 321.11664,
+      "validation_ms_range": [
+        315.633031,
+        351.022121
+      ],
+      "validation_rows": 47955,
+      "validation_work": null,
+      "wall_ms_median": 619.863656,
+      "wall_ms_range": [
+        606.476405,
+        673.753928
+      ]
+    },
+    {
+      "arm": "stock",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 32003,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.3046875,
+      "rss_mib_range": [
+        16.1796875,
+        16.3515625
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 360.614649,
+      "wall_ms_range": [
+        344.466351,
+        370.395744
+      ]
+    },
+    {
+      "arm": "certified",
+      "engines": [
+        "signature"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 3866700,
+        "direct_field_mul_calls": 30991735,
+        "executed_lane_products": 90902748,
+        "loaded_entries": 246842,
+        "nonzero_multiplier_products": 90902748,
+        "row_kernel_calls": 1670289,
+        "source_entries_read": 90902748,
+        "subtracted_entry_charges": 92573037,
+        "subtraction_budget_calls": 1670289
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 164.10546875,
+      "rss_mib_range": [
+        164.09765625,
+        164.35546875
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 10,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 15914.438205,
+      "wall_ms_range": [
+        15681.083384,
+        17416.165192
+      ]
+    },
+    {
+      "arm": "certified-off",
+      "engines": [
+        "signature"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 164.28515625,
+      "rss_mib_range": [
+        164.03125,
+        164.34765625
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 10,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 16623.135039,
+      "wall_ms_range": [
+        15606.00832,
+        17253.427326
+      ]
+    },
+    {
+      "arm": "native-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "tests",
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.28515625,
+      "rss_mib_range": [
+        16.27734375,
+        16.46875
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 177.808705,
+      "wall_ms_range": [
+        173.575772,
+        197.487546
+      ]
+    },
+    {
+      "arm": "native-on",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 4629342,
+        "direct_field_mul_calls": 227980,
+        "executed_lane_products": 122327779,
+        "loaded_entries": 306143,
+        "nonzero_multiplier_products": 122327779,
+        "row_kernel_calls": 2138360,
+        "source_entries_read": 114307669,
+        "subtracted_entry_charges": 119102193,
+        "subtraction_budget_calls": 2121807
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "tests",
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.10546875,
+      "rss_mib_range": [
+        16.07421875,
+        16.1640625
+      ],
+      "seed": 0,
+      "signature_groups": 36,
+      "signature_passed_rows": 32,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 187.774359,
+      "wall_ms_range": [
+        177.411774,
+        196.880787
+      ]
+    },
+    {
+      "arm": "no-plain",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13315005,
+        "direct_field_mul_calls": 187533,
+        "executed_lane_products": 359788914,
+        "loaded_entries": 817958,
+        "nonzero_multiplier_products": 359788914,
+        "row_kernel_calls": 7369346,
+        "source_entries_read": 359788914,
+        "subtracted_entry_charges": 367051614,
+        "subtraction_budget_calls": 7369012
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.10546875,
+      "rss_mib_range": [
+        15.9765625,
+        16.16796875
+      ],
+      "seed": 0,
+      "signature_groups": 36,
+      "signature_passed_rows": 32,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 470.118405,
+      "wall_ms_range": [
+        460.772664,
+        492.491005
+      ]
+    },
+    {
+      "arm": "no-plain-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.4140625,
+      "rss_mib_range": [
+        16.33203125,
+        16.7265625
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 470.199358,
+      "wall_ms_range": [
+        461.638352,
+        508.743079
+      ]
+    },
+    {
+      "arm": "no-signature",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 4806450,
+        "direct_field_mul_calls": 227980,
+        "executed_lane_products": 126949398,
+        "loaded_entries": 317434,
+        "nonzero_multiplier_products": 126949398,
+        "row_kernel_calls": 2229795,
+        "source_entries_read": 118929288,
+        "subtracted_entry_charges": 123921893,
+        "subtraction_budget_calls": 2213576
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "rows",
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.34375,
+      "rss_mib_range": [
+        16.20703125,
+        16.40625
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 189.74508,
+      "wall_ms_range": [
+        184.756476,
+        194.973046
+      ]
+    },
+    {
+      "arm": "no-signature-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows",
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.40625,
+      "rss_mib_range": [
+        16.2734375,
+        16.71875
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 199.473535,
+      "wall_ms_range": [
+        179.735863,
+        203.742446
+      ]
+    },
+    {
+      "arm": "none",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13492113,
+        "direct_field_mul_calls": 187533,
+        "executed_lane_products": 364410533,
+        "loaded_entries": 829249,
+        "nonzero_multiplier_products": 364410533,
+        "row_kernel_calls": 7460781,
+        "source_entries_read": 364410533,
+        "subtracted_entry_charges": 371871314,
+        "subtraction_budget_calls": 7460781
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.34375,
+      "rss_mib_range": [
+        16.20703125,
+        16.71875
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 483.999851,
+      "wall_ms_range": [
+        471.53127,
+        516.045533
+      ]
+    },
+    {
+      "arm": "none-off",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows",
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.390625,
+      "rss_mib_range": [
+        16.20703125,
+        16.46875
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 497.578716,
+      "wall_ms_range": [
+        450.908831,
+        516.937581
+      ]
+    },
+    {
+      "arm": "plain-only",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 1650045,
+        "direct_field_mul_calls": 110772,
+        "executed_lane_products": 41480363,
+        "loaded_entries": 139616,
+        "nonzero_multiplier_products": 41480363,
+        "row_kernel_calls": 696732,
+        "source_entries_read": 33460253,
+        "subtracted_entry_charges": 36919795,
+        "subtraction_budget_calls": 680513
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.9921875,
+      "rss_mib_range": [
+        14.96875,
+        15.16015625
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 69.178612,
+      "wall_ms_range": [
+        68.034546,
+        78.752886
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10335708,
+        "direct_field_mul_calls": 70325,
+        "executed_lane_products": 278941498,
+        "loaded_entries": 651431,
+        "nonzero_multiplier_products": 278941498,
+        "row_kernel_calls": 5927718,
+        "source_entries_read": 278941498,
+        "subtracted_entry_charges": 284869216,
+        "subtraction_budget_calls": 5927718
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.91796875,
+      "rss_mib_range": [
+        14.9140625,
+        14.98046875
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 373.549313,
+      "wall_ms_range": [
+        349.79141,
+        377.838172
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations-off",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 14.90625,
+      "rss_mib_range": [
+        14.78125,
+        15.0390625
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 350.75265,
+      "wall_ms_range": [
+        341.256625,
+        371.132599
+      ]
+    },
+    {
+      "arm": "plain-only-off",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 15.0859375,
+      "rss_mib_range": [
+        14.90625,
+        15.10546875
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 66.627373,
+      "wall_ms_range": [
+        66.079045,
+        73.440901
+      ]
+    },
+    {
+      "arm": "plain-only-validated",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 1650045,
+        "direct_field_mul_calls": 110772,
+        "executed_lane_products": 41480363,
+        "loaded_entries": 139616,
+        "nonzero_multiplier_products": 41480363,
+        "row_kernel_calls": 696732,
+        "source_entries_read": 33460253,
+        "subtracted_entry_charges": 36919795,
+        "subtraction_budget_calls": 680513
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 15.0390625,
+      "rss_mib_range": [
+        14.85546875,
+        15.15625
+      ],
+      "seed": 0,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": 401.844726,
+      "validation_ms_range": [
+        376.276759,
+        429.352455
+      ],
+      "validation_rows": 47265,
+      "validation_work": {
+        "dense_take_calls": 24893367,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 283216831,
+        "loaded_entries": 2431925,
+        "nonzero_multiplier_products": 283216831,
+        "row_kernel_calls": 5979127,
+        "source_entries_read": 283216831,
+        "subtracted_entry_charges": 289195958,
+        "subtraction_budget_calls": 5979127
+      },
+      "wall_ms_median": 473.463817,
+      "wall_ms_range": [
+        442.701425,
+        507.788813
+      ]
+    },
+    {
+      "arm": "plain-only-validated-off",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 15.04296875,
+      "rss_mib_range": [
+        14.83984375,
+        15.109375
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 0,
+      "validation_ms_median": 383.933428,
+      "validation_ms_range": [
+        361.557111,
+        399.207093
+      ],
+      "validation_rows": 47265,
+      "validation_work": null,
+      "wall_ms_median": 455.903307,
+      "wall_ms_range": [
+        429.141948,
+        472.402138
+      ]
+    },
+    {
+      "arm": "stock",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": null,
+      "modulus": 2147483647,
+      "plain_blocks": null,
+      "reduction_modes": [
+        "tests",
+        "combinations"
+      ],
+      "repetitions": 5,
+      "rss_mib_median": 16.328125,
+      "rss_mib_range": [
+        16.19140625,
+        16.4453125
+      ],
+      "seed": 0,
+      "signature_groups": null,
+      "signature_passed_rows": null,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": null,
+      "wall_ms_median": 164.005837,
+      "wall_ms_range": [
+        160.163884,
+        186.117312
+      ]
+    }
+  ],
+  "measurement_commit": "32996435f28ec1db2bf3ca7a221e19b88f0e0ddf",
+  "schema": 1,
+  "sensitivity": [
+    {
+      "arm": "native-on",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13373471,
+        "direct_field_mul_calls": 187525,
+        "executed_lane_products": 371017875,
+        "loaded_entries": 819722,
+        "nonzero_multiplier_products": 371017875,
+        "row_kernel_calls": 7693436,
+        "source_entries_read": 371017875,
+        "subtracted_entry_charges": 378609198,
+        "subtraction_budget_calls": 7693121
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 16.38671875,
+      "rss_mib_range": [
+        16.38671875,
+        16.38671875
+      ],
+      "seed": 1,
+      "signature_groups": 26,
+      "signature_passed_rows": 27,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 455.856397,
+      "wall_ms_range": [
+        455.856397,
+        455.856397
+      ]
+    },
+    {
+      "arm": "native-on",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 13373471,
+        "direct_field_mul_calls": 187525,
+        "executed_lane_products": 371018267,
+        "loaded_entries": 819722,
+        "nonzero_multiplier_products": 371018267,
+        "row_kernel_calls": 7693439,
+        "source_entries_read": 371018267,
+        "subtracted_entry_charges": 378609593,
+        "subtraction_budget_calls": 7693124
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "tests",
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 16.1953125,
+      "rss_mib_range": [
+        16.1953125,
+        16.1953125
+      ],
+      "seed": 2,
+      "signature_groups": 26,
+      "signature_passed_rows": 27,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 460.671371,
+      "wall_ms_range": [
+        460.671371,
+        460.671371
+      ]
+    },
+    {
+      "arm": "plain-only",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10340784,
+        "direct_field_mul_calls": 70322,
+        "executed_lane_products": 288543363,
+        "loaded_entries": 651425,
+        "nonzero_multiplier_products": 288543363,
+        "row_kernel_calls": 6218789,
+        "source_entries_read": 288543363,
+        "subtracted_entry_charges": 294762152,
+        "subtraction_budget_calls": 6218789
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 14.921875,
+      "rss_mib_range": [
+        14.921875,
+        14.921875
+      ],
+      "seed": 1,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 332.885508,
+      "wall_ms_range": [
+        332.885508,
+        332.885508
+      ]
+    },
+    {
+      "arm": "plain-only",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10340784,
+        "direct_field_mul_calls": 70322,
+        "executed_lane_products": 288543363,
+        "loaded_entries": 651425,
+        "nonzero_multiplier_products": 288543363,
+        "row_kernel_calls": 6218789,
+        "source_entries_read": 288543363,
+        "subtracted_entry_charges": 294762152,
+        "subtraction_budget_calls": 6218789
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 14.984375,
+      "rss_mib_range": [
+        14.984375,
+        14.984375
+      ],
+      "seed": 2,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 343.381517,
+      "wall_ms_range": [
+        343.381517,
+        343.381517
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10340784,
+        "direct_field_mul_calls": 70322,
+        "executed_lane_products": 288543363,
+        "loaded_entries": 651425,
+        "nonzero_multiplier_products": 288543363,
+        "row_kernel_calls": 6218789,
+        "source_entries_read": 288543363,
+        "subtracted_entry_charges": 294762152,
+        "subtraction_budget_calls": 6218789
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 14.8515625,
+      "rss_mib_range": [
+        14.8515625,
+        14.8515625
+      ],
+      "seed": 1,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 339.065527,
+      "wall_ms_range": [
+        339.065527,
+        339.065527
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10340784,
+        "direct_field_mul_calls": 70322,
+        "executed_lane_products": 288543363,
+        "loaded_entries": 651425,
+        "nonzero_multiplier_products": 288543363,
+        "row_kernel_calls": 6218789,
+        "source_entries_read": 288543363,
+        "subtracted_entry_charges": 294762152,
+        "subtraction_budget_calls": 6218789
+      },
+      "modulus": 32003,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 14.80078125,
+      "rss_mib_range": [
+        14.80078125,
+        14.80078125
+      ],
+      "seed": 2,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 347.897566,
+      "wall_ms_range": [
+        347.897566,
+        347.897566
+      ]
+    },
+    {
+      "arm": "native-on",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 4629342,
+        "direct_field_mul_calls": 227980,
+        "executed_lane_products": 122327779,
+        "loaded_entries": 306143,
+        "nonzero_multiplier_products": 122327779,
+        "row_kernel_calls": 2138360,
+        "source_entries_read": 114307669,
+        "subtracted_entry_charges": 119102193,
+        "subtraction_budget_calls": 2121807
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "tests",
+        "combinations"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 16.16015625,
+      "rss_mib_range": [
+        16.16015625,
+        16.16015625
+      ],
+      "seed": 1,
+      "signature_groups": 36,
+      "signature_passed_rows": 32,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 199.624701,
+      "wall_ms_range": [
+        199.624701,
+        199.624701
+      ]
+    },
+    {
+      "arm": "native-on",
+      "engines": [
+        "signature",
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 4629342,
+        "direct_field_mul_calls": 227980,
+        "executed_lane_products": 122327779,
+        "loaded_entries": 306143,
+        "nonzero_multiplier_products": 122327779,
+        "row_kernel_calls": 2138360,
+        "source_entries_read": 114307669,
+        "subtracted_entry_charges": 119102193,
+        "subtraction_budget_calls": 2121807
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "tests",
+        "combinations"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 16.02734375,
+      "rss_mib_range": [
+        16.02734375,
+        16.02734375
+      ],
+      "seed": 2,
+      "signature_groups": 36,
+      "signature_passed_rows": 32,
+      "signature_rounds": 9,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 199.339151,
+      "wall_ms_range": [
+        199.339151,
+        199.339151
+      ]
+    },
+    {
+      "arm": "plain-only",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 1650045,
+        "direct_field_mul_calls": 110772,
+        "executed_lane_products": 41480363,
+        "loaded_entries": 139616,
+        "nonzero_multiplier_products": 41480363,
+        "row_kernel_calls": 696732,
+        "source_entries_read": 33460253,
+        "subtracted_entry_charges": 36919795,
+        "subtraction_budget_calls": 680513
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "combinations"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 14.984375,
+      "rss_mib_range": [
+        14.984375,
+        14.984375
+      ],
+      "seed": 1,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 75.232212,
+      "wall_ms_range": [
+        75.232212,
+        75.232212
+      ]
+    },
+    {
+      "arm": "plain-only",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 1650045,
+        "direct_field_mul_calls": 110772,
+        "executed_lane_products": 41480363,
+        "loaded_entries": 139616,
+        "nonzero_multiplier_products": 41480363,
+        "row_kernel_calls": 696732,
+        "source_entries_read": 33460253,
+        "subtracted_entry_charges": 36919795,
+        "subtraction_budget_calls": 680513
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 28,
+      "reduction_modes": [
+        "combinations"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 15.09765625,
+      "rss_mib_range": [
+        15.09765625,
+        15.09765625
+      ],
+      "seed": 2,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 72.82286,
+      "wall_ms_range": [
+        72.82286,
+        72.82286
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10335708,
+        "direct_field_mul_calls": 70325,
+        "executed_lane_products": 278941498,
+        "loaded_entries": 651431,
+        "nonzero_multiplier_products": 278941498,
+        "row_kernel_calls": 5927718,
+        "source_entries_read": 278941498,
+        "subtracted_entry_charges": 284869216,
+        "subtraction_budget_calls": 5927718
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 14.78125,
+      "rss_mib_range": [
+        14.78125,
+        14.78125
+      ],
+      "seed": 1,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 390.741408,
+      "wall_ms_range": [
+        390.741408,
+        390.741408
+      ]
+    },
+    {
+      "arm": "plain-only-no-combinations",
+      "engines": [
+        "plain"
+      ],
+      "matrix_work": {
+        "dense_take_calls": 10335708,
+        "direct_field_mul_calls": 70325,
+        "executed_lane_products": 278941498,
+        "loaded_entries": 651431,
+        "nonzero_multiplier_products": 278941498,
+        "row_kernel_calls": 5927718,
+        "source_entries_read": 278941498,
+        "subtracted_entry_charges": 284869216,
+        "subtraction_budget_calls": 5927718
+      },
+      "modulus": 2147483647,
+      "plain_blocks": 0,
+      "reduction_modes": [
+        "rows"
+      ],
+      "repetitions": 1,
+      "rss_mib_median": 15.17578125,
+      "rss_mib_range": [
+        15.17578125,
+        15.17578125
+      ],
+      "seed": 2,
+      "signature_groups": 0,
+      "signature_passed_rows": 0,
+      "signature_rounds": 0,
+      "validation_ms_median": null,
+      "validation_ms_range": null,
+      "validation_rows": null,
+      "validation_work": {
+        "dense_take_calls": 0,
+        "direct_field_mul_calls": 0,
+        "executed_lane_products": 0,
+        "loaded_entries": 0,
+        "nonzero_multiplier_products": 0,
+        "row_kernel_calls": 0,
+        "source_entries_read": 0,
+        "subtracted_entry_charges": 0,
+        "subtraction_budget_calls": 0
+      },
+      "wall_ms_median": 381.64099,
+      "wall_ms_range": [
+        381.64099,
+        381.64099
+      ]
+    }
+  ]
+}

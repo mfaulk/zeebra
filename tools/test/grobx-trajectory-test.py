@@ -86,6 +86,15 @@ class TrajectoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'restart input'):
             MODULE.parse_report(changed)
 
+    # Cofactor tracking disables input echelonization despite the requested call flag remaining on.
+    def test_certified_report_can_omit_input_echelon(self):
+        text = (ROOT / 'tools/external/grobx-driver/research/randomization/certified-no-echelon-report.txt').read_text()
+        parsed = MODULE.parse_report(text)
+        self.assertEqual(parsed['runs'][0]['config']['cofactors'], 'on')
+        self.assertEqual(parsed['totals']['input_echelon_subtracted_entry_charges'], 0)
+        with self.assertRaisesRegex(ValueError, 'input echelon'):
+            MODULE.parse_report(text.replace('cofactors=on', 'cofactors=off'))
+
     # Future passive events remain visible without changing reduction-mode interpretation.
     def test_unknown_passive_events_are_retained(self):
         text = report_at(10).replace('0.084153 run number=2',

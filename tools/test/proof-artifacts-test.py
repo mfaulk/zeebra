@@ -105,6 +105,21 @@ class StudyArtifactsTests(unittest.TestCase):
             self.assertEqual(helper.load_study(output), original)
             self.assertEqual(len(list(Path(scratch).rglob('*.json-string.gz'))), 1)
 
+    # Streaming one complete failed response preserves status and stores its large certificate once.
+    def test_single_attempt_certificate_packing(self):
+        helper = self.helper()
+        raw = {'basis': '[x]:', 'cofactors': 'certificate', 'other': 3}
+        original = {'status': 'failed', 'failure': 'decoder', 'raw': raw, 'stdout': json.dumps(raw)}
+        with tempfile.TemporaryDirectory() as scratch:
+            output = Path(scratch) / 'study.json.gz'
+            packed = helper.pack_attempt(original, output, keys=('cofactors', 'basis'))
+            self.assertNotIn('stdout', packed)
+            self.assertNotIn('raw', packed)
+            module.write_cohort(output, {'attempts': [packed]})
+            self.assertEqual(helper.load_study(output)['attempts'], [original])
+            self.assertEqual(list(helper.iter_attempts(output)), [original])
+            self.assertEqual(len(list(Path(scratch).rglob('*.json-string.gz'))), 1)
+
     # Absent artifacts and an explicitly empty artifacts mapping remain distinguishable after loading.
     def test_artifacts_presence_roundtrips(self):
         helper = self.helper()

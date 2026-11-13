@@ -1,0 +1,35 @@
+{
+  "base_commit": "02b21224b37f8dcefc3edf60624b338b7ae9e7fc",
+  "measured_commit": "32996435f28ec1db2bf3ca7a221e19b88f0e0ddf",
+  "source_patch_sha256": "3977146c7537a6b1397d7f86915892556d79042766449b80fba47ae4db9dbb0f",
+  "research_identity": {
+    "digest": "822233cbe359537d9f76310dedd0372a45e999e802a33977f1b04879c940bb98",
+    "modified_upstream_files": {
+      "Cargo.toml": "779f0ac67f0d553ed5ef165899729e5c834321d7e4f11e8d4295d8e1eba216e9",
+      "src/budget.rs": "f31adf2c1efc6757641cf381a04215c3a5ecf12062b81c55b05d82c80baef7a2",
+      "src/field.rs": "3e9c90ef0b17e85cf02581a6fa22d5c1984546c3e2f17f1972a57e115ae6de3c",
+      "src/lib.rs": "ab60f4f93e1a275fe0e1bb470de4fabe9dab80e5424f5694cffcd2df2c8a996d",
+      "src/matrix.rs": "d195a2eb91ab487e8b39137bcf0b0067b9f0aacb6e0a22bbc360277aac7e5f64",
+      "src/research_random.rs": "2844de7ce2c873bd31e6d9bfc246737b8af10df04dbbc96e6fc9270063611616",
+      "src/research_work.rs": "6ba6106f0dda6d9d35238c5c4dfe39de6800f8e925672d5e94eb320d88f24fbe"
+    },
+    "recipe": {
+      "driver-tests.rs": "c10deba8d784c3d3145c38de11cd22f3aff834433b025d38c3eae9a71e1729ae",
+      "instrument.py": "73ca75bd16b90b1f6995df31b31ad51ab82b2675f2c04c6f01e42f4525fba33d",
+      "provision.py": "e1a16f7367fb8886b15406b3e15c0070152d83ded841d1ed50c6c4cf7c026ccd",
+      "randomization/driver-tests.rs": "80c19fc41a8088b8334a44a4258f54c761d699c91cecdf50506ef42866c74a81",
+      "randomization/overlay.py": "3357fd8bedfa33c55b966284e7532947725c20f03e8d3b19bea46aca8d9a3b01",
+      "randomization/policy.rs": "2844de7ce2c873bd31e6d9bfc246737b8af10df04dbbc96e6fc9270063611616",
+      "work.rs": "8fcb8d3e82d78ec17c9fd8b352b857bdcc453cce81f1110f0e5e35de32c0a21c"
+    },
+    "upstream_revision": "1854835dbc25f24dc9a9ba017024d5030e99da1c"
+  },
+  "cargo_lock_sha256": "56ed01ba6893c00fe259eb0ddc668abc7b498a08989f004d97e868c22dfd1977",
+  "stock_cargo_lock_sha256": "b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b",
+  "storage_relocation": "Only payload paths are relocated to existing byte-identical committed SHA256 payloads; every exact response is restored and revalidated by summarize.py.",
+  "campaign_outcomes": {
+    "diagnostic": 18,
+    "primary": 170,
+    "sensitivity": 12
+  }
+}
