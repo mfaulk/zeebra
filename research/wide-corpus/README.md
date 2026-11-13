@@ -7,6 +7,14 @@ transformation, canonical bytes and SHA-256 digest. The `wide-corpus-v1` identit
 prime and grevlex; it is separate from the historical competitive `Instance::canonical` format.
 [BOARD.md](BOARD.md) is regenerated from [campaign.json.gz](campaign.json.gz).
 
+| Family | Both 64-bit fields | BN254 capability only |
+|---|---|---|
+| Katsura | `katsura-{4,9,11,14}` (4 is the startup control) | `katsura-9` |
+| Cyclic | `cyclic-{7,11}` | `cyclic-7` |
+| Dense random MQ | `mq-random-{10,11,12,14,16}` | `mq-random-10` |
+| Eco | `eco-{12,14,18}` | `eco-12` |
+| Noonburg | `noon-{7,8,11}` | `noon-7` |
+
 Katsura names count variables, so `katsura-9` is literature Katsura-8. Cyclic-7 and Cyclic-11
 are squarefree-size affine systems, without field equations or slicing. Eco and Noonburg use
 `grobner::benchmark_systems`' independently defined equations; Noonburg's parameter is 11/10,
@@ -48,23 +56,30 @@ cargo build --release --example wide_corpus
 
 Measure a committed, clean instrument. One worker, one case/engine per fresh process, grevlex,
 60 s / 2 GiB solver budgets. Direct native drivers have a 60 s / 2 GiB process-tree watchdog;
-the Zeebra/Julia runner has a 65 s / 2 GiB tree watchdog to allow harness overhead. Watchdog kills are recorded
+the Zeebra/Julia runner has a 65 s / 2 GiB tree watchdog to allow harness overhead. Watchdog kills
+are recorded
 with their specific cause, never as engine completions. F4 also has a cooperative live-byte budget;
 the watchdog covers memory outside its matrices. The tree RSS observation sums process high waters
-and can conservatively stop earlier than a live-RSS sum. Sampling can miss short-lived peaks; retained kernel high-water snapshots also enforce the ceiling
+and can conservatively stop earlier than a live-RSS sum. Sampling can miss short-lived peaks;
+retained kernel high-water snapshots also enforce the ceiling
 after a completed child exits, so a missed poll cannot turn a recorded overrun into timing evidence.
 The Julia adapter also enforces its 2-GiB subprocess RSS ceiling. Native drivers are supervised
 directly; their process wall excludes separate verification computations.
-The campaign resumes only when commit, binaries, machine, affinity and policy match.
+The campaign resumes only when commit, binaries, machine, affinity and policy match. Use a fresh
+output path for a new instrument; the retained publication archive is not overwritten on replay.
+F4 retains its default matrix/nonzero limits as well as the wall/live-byte budgets; all options
+and the precise internal limit responsible for a stop are recorded.
 
 ```sh
+WIDE_CAMPAIGN_OUTPUT="$CARGO_TARGET_DIR/replay.json.gz"
 ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=2 \
   tools/benchlock.sh hard-wide-738 timeout --signal=INT --kill-after=60s 7200 \
   taskset -c 2 python3 tools/external/wide-corpus.py \
   --binary "$CARGO_TARGET_DIR/release/examples/wide_corpus" \
   --scratch "$CARGO_TARGET_DIR/campaign" \
-  --output research/wide-corpus/campaign.json.gz
-python3 tools/external/wide-corpus.py --pack research/wide-corpus/campaign.json.gz
+  --output "$WIDE_CAMPAIGN_OUTPUT"
+python3 tools/external/wide-corpus.py --pack "$WIDE_CAMPAIGN_OUTPUT" --output "$WIDE_CAMPAIGN_OUTPUT"
+# Regenerate the published board from its retained evidence:
 python3 tools/external/wide-corpus.py --summarize research/wide-corpus/campaign.json.gz
 ```
 
@@ -81,7 +96,8 @@ Intentional regeneration after changing a definition:
 Complete basis responses can exceed GitHub's single-file limit. `--pack` replaces the main gzip
 with a manifest and writes content-addressed payload chunks under `campaign-payloads/`, each at
 most 16 MiB before compression. `load()` in the campaign tool checks every chunk's SHA-256 and
-length, reconstructs the original attempts, and verifies a lossless round trip. The summary command
+length, reconstructs the original attempts, and verifies a lossless round trip. Native report copies
+share the raw response's basis and are restored from it; the raw response itself is preserved exactly. The summary command
 accepts both unpacked campaigns and this manifest. Raw native responses and full bases remain
 available; no coefficients are discarded. Commit the manifest and its payload directory together.
 

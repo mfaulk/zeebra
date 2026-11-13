@@ -156,7 +156,11 @@ def load(path):
             if len(payload) != part['bytes'] or hashlib.sha256(payload).hexdigest() != part['sha256']:
                 raise ValueError('wide campaign payload hash/length mismatch')
             chunks.append(payload)
-        attempts.append(json.loads(b''.join(chunks)))
+        attempt = json.loads(b''.join(chunks))
+        if attempt.pop('_report_basis_from_raw', False):
+            basis = attempt['raw']['basis']
+            attempt['report']['basis'] = basis if isinstance(basis, list) else grobx_work.basis_list(basis)
+        attempts.append(attempt)
     cohort['attempts'] = attempts
     return cohort
 
@@ -167,7 +171,14 @@ def pack(cohort, path, chunk_size=16*1024**2):
     manifest = {k: v for k, v in cohort.items() if k != 'attempts'}
     manifest.update(storage='wide-corpus-chunks-v1', attempt_payloads=[])
     for attempt in cohort['attempts']:
-        data = json.dumps(attempt, separators=(',', ':'), ensure_ascii=False).encode()
+        packed = dict(attempt)
+        raw_basis = attempt.get('raw', {}).get('basis')
+        if isinstance(raw_basis, (list, str)) and 'basis' in attempt.get('report', {}):
+            basis = raw_basis if isinstance(raw_basis, list) else grobx_work.basis_list(raw_basis)
+            if basis == attempt['report']['basis']:
+                packed['report'] = {k: v for k, v in attempt['report'].items() if k != 'basis'}
+                packed['_report_basis_from_raw'] = True
+        data = json.dumps(packed, separators=(',', ':'), ensure_ascii=False).encode()
         parts = []
         for start in range(0, len(data), chunk_size):
             chunk = data[start:start+chunk_size]

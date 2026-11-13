@@ -3,6 +3,7 @@ from pathlib import Path
 import unittest
 import tempfile
 import gzip
+import json
 
 spec = importlib.util.spec_from_file_location('wide', Path(__file__).parents[1] / 'external/wide-corpus.py')
 wide = importlib.util.module_from_spec(spec)
@@ -26,7 +27,7 @@ class WideCorpusTests(unittest.TestCase):
              'engine_wall_ns': 100_000_000, 'solver_process_wall_ns': 5_000_000_000}}
         self.assertEqual(wide.seconds(a), 5)
 
-    # Residues, term order and nonzero scalar normalization preserve the exact polynomial.
+    # Residue and scalar representations normalize to the same monic polynomial.
     def test_polynomial_normalization(self):
         self.assertEqual(wide.canonical_polynomial('2*x1+2*x2-2', 13, ['x1','x2']),
                          wide.canonical_polynomial('12+x2+x1', 13, ['x1','x2']))
@@ -66,6 +67,21 @@ class WideCorpusTests(unittest.TestCase):
             payload.write_bytes(gzip.compress(b'corrupt', mtime=0))
             with self.assertRaises(ValueError):
                 wide.load(path)
+
+    # Native report copies share the retained raw basis without losing either restored response.
+    def test_native_basis_copy_is_stored_once(self):
+        basis = 'x1+' + '+'.join(str(i)+'*x2' for i in range(1,1000))
+        for raw_basis in ([basis], '['+basis+']:\n'):
+            with self.subTest(kind=type(raw_basis).__name__), tempfile.TemporaryDirectory() as directory:
+                attempt = {'field':'wide64','name':'test','engine':'grobx',
+                           'raw': {'basis':raw_basis}, 'report':{'basis':[basis]}}
+                cohort = {'attempts':[attempt]}
+                path = Path(directory) / 'campaign.json.gz'
+                wide.pack(cohort, path)
+                manifest = json.loads(gzip.decompress(path.read_bytes()))
+                stored = sum(p['bytes'] for a in manifest['attempt_payloads'] for p in a['parts'])
+                self.assertLess(stored, len(json.dumps(attempt)) - len(basis)//2)
+                self.assertEqual(wide.load(path), cohort)
 
     # A stopped attempt is retained without being treated as a completed oracle.
     def test_limit_is_not_an_oracle(self):
