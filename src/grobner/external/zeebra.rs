@@ -1,5 +1,4 @@
-//! The comparison adapter explicitly instantiates each supported field and variable count.
-//! An uncompiled width is an adapter limitation, distinct from an engine resource refusal.
+//! Field/width instantiations are local to each adapter; unregistered pairs are adapter limits.
 
 use std::time::{Duration, Instant};
 
@@ -24,7 +23,7 @@ use super::{
 const INVARIANT_DIMENSION_CEILING: usize = 1 << 20;
 
 use crate::{
-    fields::{PrimeFieldElement64, Zp2, Zp32003},
+    fields::{KnownOrder, PrimeFieldElement64, Zp2, Zp32003},
     grobner::{
         differential::polynomial_to_string,
         f4_reported,
@@ -41,6 +40,23 @@ pub struct ZeebraSolver {
     f4_options: F4Options,
     fglm_options: FglmOptions,
     measuring_one_row: bool,
+    instantiations: Vec<Instantiation>,
+}
+
+type SolveParsed = fn(&Instance, Task, &F4Options, &FglmOptions) -> Result<Solved, RunFailure>;
+
+#[derive(Clone, Debug)]
+struct Instantiation {
+    characteristic: u64,
+    width: usize,
+    solve: SolveParsed,
+}
+
+impl Instantiation {
+    fn matches(&self, instance: &Instance) -> bool {
+        self.characteristic == instance.field.characteristic
+            && self.width == instance.variables.len()
+    }
 }
 
 impl Default for ZeebraSolver {
@@ -56,7 +72,39 @@ impl ZeebraSolver {
             f4_options: F4Options::default(),
             fglm_options: FglmOptions::default(),
             measuring_one_row: false,
+            instantiations: Vec::new(),
         }
+    }
+
+    /// Compile an additional prime-field and variable-count pair in the caller's harness.
+    ///
+    /// The characteristic is inferred from `F`, so it cannot be mislabeled by the caller.
+    /// Repeated registration replaces the implementation for that pair. Existing compiled pairs,
+    /// task/order checks and solver options remain available. Each pair monomorphizes F4/FGLM.
+    ///
+    /// # Errors
+    /// Returns [`RunFailure::Reported`] for `N == 0`, extension fields, or characteristics that
+    /// cannot be represented by the external contract's `u64` characteristic.
+    pub fn with_instantiation<const N: usize, F: KnownOrder>(mut self) -> Result<Self, RunFailure> {
+        let characteristic = F::characteristic_u128().and_then(|p| u64::try_from(p).ok());
+        let Some(characteristic) = characteristic.filter(|&p| p >= 2) else {
+            return Err(RunFailure::Reported {
+                message: "registration requires a prime characteristic fitting u64".into(),
+            });
+        };
+        if N == 0 || F::order_limbs() != F::characteristic_limbs() {
+            return Err(RunFailure::Reported {
+                message: "registration requires a nonzero variable count and a prime field".into(),
+            });
+        }
+        self.instantiations
+            .retain(|entry| entry.characteristic != characteristic || entry.width != N);
+        self.instantiations.push(Instantiation {
+            characteristic,
+            width: N,
+            solve: solve_parsed::<N, F>,
+        });
+        Ok(self)
     }
 
     /// Set the F4 options, including `max_wall_time`, which is how [`Limits::wall`] is enforced.
@@ -95,11 +143,7 @@ impl ZeebraSolver {
     }
 }
 
-/// Which (characteristic, variable count) pairs this adapter compiles.
-///
-/// Exactly the corpus ladder's, listed so the monomorphization cost is a deliberate choice rather
-/// than whatever a generic call site happened to need. Each field appears with only the dimensions
-/// its own families use.
+/// Built-in pairs keep the adapter's monomorphization cost explicit; callers can register more.
 fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
     match characteristic {
         // Katsura 4–11, Cyclic 4–10, random and planted MQ at 6, 10, 14.
@@ -124,7 +168,7 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
         // The binary corpus publishes only the Cyclic family.
         BINARY_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10],
         // KoalaBear and 2^64 - 353 at the widths their callers' systems have been measured at.
-        // A caller needing another width adds it here; see #668.
+        // Callers register other pairs with `with_instantiation`.
         KOALABEAR_CHARACTERISTIC => &[5, 7, 9],
         WIDE_64_CHARACTERISTIC => &[2, 4],
         18_446_744_073_709_551_557 => &[2],
@@ -439,37 +483,43 @@ fn solve<const N: usize, F: FiniteField>(
     }
 }
 
-/// Parse `instance`'s text at a compiled dimension and solve it.
-///
-/// A macro because the dimension is a const generic: one arm per compiled `N`, and the field type
-/// is the caller's. Returns `None` for a dimension this field does not compile.
+fn solve_parsed<const N: usize, F: FiniteField>(
+    instance: &Instance,
+    task: Task,
+    f4: &F4Options,
+    fglm: &FglmOptions,
+) -> Result<Solved, RunFailure> {
+    let names: Vec<&str> = instance.variables.iter().map(String::as_str).collect();
+    let compiled: [&str; N] = names.try_into().map_err(|_| RunFailure::Incomplete {
+        detail: "no compiled dimension, which `supports` should have refused".into(),
+    })?;
+    let generators = instance
+        .system
+        .iter()
+        .map(|text| {
+            MultivariatePolynomial::parse(text, compiled).map_err(|error| RunFailure::Unparsable {
+                marker: "generator".into(),
+                value: format!("{}: {}", text, error),
+            })
+        })
+        .collect::<Result<Vec<MultivariatePolynomial<N, F>>, _>>()?;
+    Ok(solve(
+        &generators,
+        &compiled,
+        task,
+        instance.order,
+        f4,
+        fglm,
+    ))
+}
+
+// Const-generic widths require one match arm per built-in instantiation.
 macro_rules! dispatch {
     ($field:ty, $instance:expr, $task:expr, $f4:expr, $fglm:expr, $($n:literal),+ $(,)?) => {{
-        let names: Vec<&str> = $instance.variables.iter().map(String::as_str).collect();
         match $instance.variables.len() {
-            $(
-                $n => {
-                    let mut compiled = [""; $n];
-                    compiled.copy_from_slice(&names[..$n]);
-                    let mut generators: Vec<MultivariatePolynomial<$n, $field>> = Vec::new();
-                    for text in &$instance.system {
-                        match MultivariatePolynomial::parse(text, compiled) {
-                            Ok(polynomial) => generators.push(polynomial),
-                            // A generator this crate's own renderer produced and its own parser
-                            // refuses is a bug, not a capability gap, and says so.
-                            Err(e) => {
-                                return Err(RunFailure::Unparsable {
-                                    marker: "generator".to_string(),
-                                    value: format!("{}: {}", text, e),
-                                })
-                            }
-                        }
-                    }
-                    Ok(solve(&generators, &compiled, $task, $instance.order, $f4, $fglm))
-                }
-            )+
+            $( $n => solve_parsed::<$n, $field>($instance, $task, $f4, $fglm), )+
             _ => Err(RunFailure::Incomplete {
-                detail: "no compiled dimension, which `supports` should have refused".to_string(),
+                detail: "no compiled dimension, which `supports` should have refused".into(),
             }),
         }
     }};
@@ -478,6 +528,13 @@ macro_rules! dispatch {
 impl ZeebraSolver {
     /// Parse and solve, dispatching on the characteristic and then the variable count.
     fn dispatch(&self, instance: &Instance, task: Task) -> Result<Solved, RunFailure> {
+        if let Some(entry) = self
+            .instantiations
+            .iter()
+            .find(|entry| entry.matches(instance))
+        {
+            return (entry.solve)(instance, task, &self.f4_options, &self.fglm_options);
+        }
         match instance.field.characteristic {
             BINARY_CHARACTERISTIC => dispatch!(
                 Zp2,
@@ -663,14 +720,19 @@ impl ExternalSolver for ZeebraSolver {
         }
 
         let dimensions = compiled_dimensions(instance.field.characteristic);
-        if !dimensions.contains(&instance.variables.len()) {
+        if !dimensions.contains(&instance.variables.len())
+            && !self
+                .instantiations
+                .iter()
+                .any(|entry| entry.matches(instance))
+        {
             // **An adapter limit, not an engine limit**, and the wording has to say so: Zeebra
             // solves shapes this file does not instantiate, and a board row reading "unsupported"
             // against Zeebra would otherwise be a false statement about the engine.
             return Support::No(Unsupported::Representation {
                 detail: format!(
-                    "this adapter compiles GF({}) at {:?} variables, not {} — an adapter \
-                     monomorphization limit, not a limit of Zeebra's engine",
+                    "this adapter's built-in GF({}) widths are {:?}; {} variables is not built in \
+                     or registered — an adapter monomorphization limit, not a limit of Zeebra's engine",
                     instance.field.characteristic,
                     dimensions,
                     instance.variables.len()
@@ -687,11 +749,20 @@ impl ExternalSolver for ZeebraSolver {
             if let Some(version) = version.clone() {
                 report = report.with_version(version);
             }
-            report.with_command_line(format!(
-                "cargo run --release --example competitive_sweep -- --row {} --task {}",
-                instance.name,
-                task.tag()
-            ))
+            // A caller's compiled instantiation is unavailable in the stock sweep executable.
+            if self
+                .instantiations
+                .iter()
+                .any(|entry| entry.matches(instance))
+            {
+                report
+            } else {
+                report.with_command_line(format!(
+                    "cargo run --release --example competitive_sweep -- --row {} --task {}",
+                    instance.name,
+                    task.tag()
+                ))
+            }
         };
 
         if let Support::No(reason) = self.supports(instance, task) {
@@ -737,6 +808,169 @@ mod tests {
 
     fn limits() -> Limits {
         Limits::wall(Duration::from_secs(60))
+    }
+
+    fn custom_instance() -> crate::grobner::external::Instance {
+        crate::grobner::external::Instance::new(
+            "caller-gf13",
+            "caller",
+            crate::grobner::external::FieldSpec::prime(13),
+            vec!["x".into(), "y".into()],
+            vec!["x^2 - 1".into(), "y - x".into()],
+            GREVLEX,
+        )
+    }
+
+    // Registration adds a previously uncompiled field and width as a measured board row.
+    #[test]
+    fn test_registered_instantiation_produces_a_measured_board_row() {
+        use crate::{
+            fields::Zp13,
+            grobner::{
+                external::{CompetitiveBoard, CompetitiveRecord},
+                record::Environment,
+            },
+        };
+        let input = custom_instance();
+        assert!(matches!(
+            ZeebraSolver::new().supports(&input, Task::ReducedGrobnerBasis),
+            Support::No(_)
+        ));
+        let mut solver = ZeebraSolver::new().with_instantiation::<2, Zp13>().unwrap();
+        assert!(matches!(
+            solver.supports(&input, Task::ReducedGrobnerBasis),
+            Support::Yes
+        ));
+        let report = solver.run(&input, Task::ReducedGrobnerBasis, &limits());
+        let RunStatus::Complete(answer) = &report.status else {
+            panic!("{:?}", report.status)
+        };
+        assert_eq!(answer.invariants.quotient_dimension, Some(2));
+        assert!(!report.measurement.wall.is_zero());
+        assert!(
+            report.command_line.is_none(),
+            "custom rows must not name the stock sweep harness"
+        );
+        let mut board = CompetitiveBoard::new();
+        board.add(CompetitiveRecord::of(
+            &report,
+            &input,
+            &Environment::from_git(),
+        ));
+        assert!(board.rows()[0].is_timing_evidence());
+    }
+
+    // Repeated registrations keep the pair usable and extend an existing field at a missing width.
+    #[test]
+    fn test_registration_extends_existing_field_and_replaces_pair() {
+        use crate::{
+            fields::{PrimeFieldElement64, Zp32003},
+            grobner::external::FieldSpec,
+        };
+        let mut input = custom_instance();
+        input.field = FieldSpec::prime(SMALL_PRIME_CHARACTERISTIC);
+        assert!(!compiled_dimensions(SMALL_PRIME_CHARACTERISTIC).contains(&2));
+        let mut solver = ZeebraSolver::new()
+            .with_instantiation::<2, Zp32003>()
+            .unwrap()
+            .with_instantiation::<2, PrimeFieldElement64<32003>>()
+            .unwrap();
+        let report = solver.run(&input, Task::ReducedGrobnerBasis, &limits());
+        let RunStatus::Complete(answer) = report.status else {
+            panic!("{:?}", report.status)
+        };
+        assert_eq!(answer.invariants.quotient_dimension, Some(2));
+    }
+
+    // Registration rejects zero widths, extension fields and characteristics outside the text contract.
+    #[test]
+    fn test_registration_rejects_unrepresentable_instantiations() {
+        use crate::fields::{Bn254Fr, Gf256, Zp13};
+        assert!(ZeebraSolver::new().with_instantiation::<0, Zp13>().is_err());
+        assert!(ZeebraSolver::new()
+            .with_instantiation::<2, Gf256>()
+            .is_err());
+        assert!(ZeebraSolver::new()
+            .with_instantiation::<2, Bn254Fr>()
+            .is_err());
+    }
+
+    // Registration preserves shape, field, task and order refusals and compiled defaults.
+    #[test]
+    fn test_registration_preserves_support_guards_and_defaults() {
+        use crate::{fields::Zp13, grobner::external::FieldSpec};
+        let solver = ZeebraSolver::new().with_instantiation::<2, Zp13>().unwrap();
+        let mut input = custom_instance();
+        assert!(matches!(
+            solver.supports(&input, Task::OneFiniteFieldSolution),
+            Support::No(Unsupported::Task { .. })
+        ));
+        assert!(matches!(
+            solver.supports(&input, Task::LexBasis),
+            Support::No(Unsupported::Order { .. })
+        ));
+        input.variables.push("z".into());
+        assert!(matches!(
+            solver.supports(&input, Task::ReducedGrobnerBasis),
+            Support::No(Unsupported::Representation { .. })
+        ));
+        input = custom_instance();
+        input.field = FieldSpec::prime(17);
+        assert!(matches!(
+            solver.supports(&input, Task::ReducedGrobnerBasis),
+            Support::No(Unsupported::Representation { .. })
+        ));
+        input.field = FieldSpec::extension(13, 2, "a^2 + 2");
+        assert!(matches!(
+            solver.supports(&input, Task::ReducedGrobnerBasis),
+            Support::No(Unsupported::ExtensionField { .. })
+        ));
+        let builtin = instance("katsura-4", REFERENCE_CHARACTERISTIC, GREVLEX).unwrap();
+        assert!(matches!(
+            solver.supports(&builtin, Task::ReducedGrobnerBasis),
+            Support::Yes
+        ));
+    }
+
+    // Registered solves retain configured resource limits and report invalid generator text.
+    #[test]
+    fn test_registration_preserves_limits_and_parse_failures() {
+        use crate::fields::Zp13;
+        let mut input = custom_instance();
+        let mut solver = ZeebraSolver::new().with_instantiation::<2, Zp13>().unwrap();
+        input.system = vec!["not_a_variable".into()];
+        assert!(matches!(
+            solver
+                .run(&input, Task::ReducedGrobnerBasis, &limits())
+                .status,
+            RunStatus::Failed(crate::grobner::external::RunFailure::Unparsable { .. })
+        ));
+        let mut limited = ZeebraSolver::new()
+            .with_instantiation::<2, Zp13>()
+            .unwrap()
+            .with_f4_options(crate::grobner::F4Options {
+                max_basis_elements: Some(0),
+                ..Default::default()
+            });
+        assert!(matches!(
+            limited
+                .run(&custom_instance(), Task::ReducedGrobnerBasis, &limits())
+                .status,
+            RunStatus::StoppedByLimit(_)
+        ));
+        let mut conversion = ZeebraSolver::new()
+            .with_instantiation::<2, Zp13>()
+            .unwrap()
+            .with_fglm_options(crate::grobner::FglmOptions {
+                max_quotient_dimension: 1,
+                ..Default::default()
+            });
+        assert!(matches!(
+            conversion
+                .run(&custom_instance(), Task::LexBasisByConversion, &limits())
+                .status,
+            RunStatus::StoppedByLimit(_)
+        ));
     }
 
     /// Zeebra answers a `GF(2)` Cyclic rung, and refuses a width it does not compile there as an
