@@ -319,7 +319,7 @@ And on one four-variable shape the primitive route did not finish a single pass 
 remaining of a 2 400 s run, which is how the first attempt at this sweep was killed mid-table. The
 content recursion is a possible explanation, rather than an established causal profile. Both
 PRS routes extract contents; subresultant scaling avoids extracting one after every step.
-The [intermediate-size study](../research/multivariate-gcd.md#6-intermediate-size-profiles-652)
+The [intermediate-size study](../research/multivariate-gcd.md#7-intermediate-size-profiles-652)
 separates normalized entries, completed raw remainders and recursive call counts. Neither route
 has a universal runtime bound established by these timings.
 
@@ -523,7 +523,8 @@ scopes panic, and unwinding resets the thread-local scope.
 entry. `raw_remainders` observes completed pseudo-remainders before content extraction or
 exact scaling, including constant remainders where the solver returns immediately.
 It does not observe every multiplication temporary inside pseudo-division.
-Brown's `brown_images` records accepted scaled images; `brown_interpolants` records
+Brown's `brown_images` records accepted scaled images, including images later
+discarded when a lower GCD degree is discovered; `brown_interpolants` records
 the complete interpolated candidate before primitive-part cleanup. Rejected image
 attempts and interpolation construction temporaries are excluded. Brown's PRS
 columns therefore describe cleanup/fallback, not image sizes.
@@ -538,7 +539,9 @@ Brown's private evaluation recursion and univariate Euclid internals.
 reported separately. The subresultant-derived degree envelope also applies to primitive entries,
 which divide the corresponding subresultants. Local bound checks cover initial
 inputs and every materialized scaled/primitive next entry of both PRS routes;
-raw remainders have no such claim.
+raw remainders have no such claim. The `subresultant_*` statistics are named for
+the determinant theorem supplying the bound and include checks on primitive
+entries as well; they are not counters exclusive to `GcdRoute::SubresultantPrs`.
 
 With `--features research-work`, the ordinary `gcd_routes` sweep prints phase-size
 tables from its pre-timing correctness passes. For expensive shapes, isolate a

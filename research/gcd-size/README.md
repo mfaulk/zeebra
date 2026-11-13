@@ -1,7 +1,7 @@
 # Multivariate GCD intermediate-size campaign
 
 Issue [#652](https://github.com/mfaulk/zeebra/issues/652); the
-[research note](../../docs/research/multivariate-gcd.md#6-intermediate-size-profiles-652)
+[research note](../../docs/research/multivariate-gcd.md#7-intermediate-size-profiles-652)
 defines phase boundaries, local determinant degree bounds and the fixed campaign.
 
 Build both configurations from the same clean, committed source before acquiring

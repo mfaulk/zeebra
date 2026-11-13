@@ -182,7 +182,7 @@ for pinned runs.
 
 Inspect multivariate GCD intermediate support and coefficient degree with
 `cargo run --release --features research-work --example gcd_routes -- --case koalabear 4 4 primitive on`.
-Run expensive cases under an external timeout; the [GCD size study](docs/research/multivariate-gcd.md#6-intermediate-size-profiles-652)
+Run expensive cases under an external timeout; the [GCD size study](docs/research/multivariate-gcd.md#7-intermediate-size-profiles-652)
 documents bounded campaigns, observer overhead and the distinction between scaled PRS entries,
 raw remainders, Brown images and interpolants.
 

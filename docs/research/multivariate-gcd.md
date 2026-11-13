@@ -90,7 +90,7 @@ disappeared.
 Scaled subresultant entries have coefficients represented by Sylvester minors.
 Hadamard's inequality gives magnitude bounds over the integers. Here each field
 coefficient has fixed width: the relevant analog is the degree/support bound from
-determinant expansion, specified and checked in [§6](#6-intermediate-size-profiles-652).
+determinant expansion, specified and checked in [§7](#7-intermediate-size-profiles-652).
 Raw pseudo-remainders before exact division are a separate size quantity.
 
 The historical timings show different tails on this planted-factor distribution.
@@ -113,13 +113,13 @@ other is tested against.
   [§5](#5-browns-modular-route-measured-it-owns-the-tail-both-sequences-lose). It is the route that
   adds an image/interpolation route whose measured advantage is in the tail rather than the median.
   The historical timings in §§0–3 remain at their original source pins; explanatory prose is
-  qualified by §6 rather than treating timings as complexity proofs.
+  qualified by §7 rather than treating timings as complexity proofs.
 * **A shape-aware default.** The two routes' costs differ by up to 628x in one direction and 24x in
   the other on *neighbouring* shapes, which is the signature of a choice that wants to be made per
   input rather than once. Nothing here measures a predictor — term count, arity and exponent are
   the three axes swept and none of them separates the 628x row from its neighbours on its own.
 * **Where the primitive route's blow-up comes from.** The historical attribution was an inference,
-  not a causal profile. [§6](#6-intermediate-size-profiles-652) adds support/degree and call-count
+  not a causal profile. [§7](#7-intermediate-size-profiles-652) adds support/degree and call-count
   observations, preserving the limits on what these establish about time.
 * **Any instance from the solver.** These are planted-factor random inputs. What F4 and FGLM
   actually hand `gcd` is unmeasured, and that is the input distribution a default should really be
@@ -188,7 +188,7 @@ runs covered:
 
 This is an observation about those two historical runs, not a guarantee that ratios
 survive contention. New measurements need matched controls, interleaving and repeat
-ranges; the bounded §6 campaign has an explicit ambient-load gate. The ordinary
+ranges; the bounded §7 campaign has an explicit ambient-load gate. The ordinary
 legacy sweep still reports load without a gate and should be interpreted accordingly.
 
 ### 5.4 So the default stays, and the reason is sharper than before
@@ -266,7 +266,7 @@ cargo bench --bench multivariate_gcd
 cargo bench --bench multivariate_gcd -- brown/koalabear/3vars   # one arm
 ```
 
-## 6. Intermediate-size profiles (#652)
+## 7. Intermediate-size profiles (#652)
 
 The instrument is opt-in under the existing `research-work` feature. Its
 [API and boundary definitions](../guide/polynomials.md#intermediate-size-diagnostics)
@@ -294,7 +294,8 @@ length. Brown also notes that primitive PRS entries divide the corresponding
 subresultants. Thus this degree envelope applies to primitive entries too: the
 trade-off is **not** bounded subresultant degree versus unbounded primitive degree.
 Normalization removes content but does not imply constant coefficient degree or
-support. The implementation checks the envelope for both PRS routes; Brown still
+support. The `subresultant_*` profile fields name this theorem, not an exclusive route.
+The implementation checks the envelope for both PRS routes; Brown still
 performs recursive contents and its cleanup/fallback PRS is included.
 
 ### Declared campaign
