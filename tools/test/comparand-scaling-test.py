@@ -135,6 +135,15 @@ class ComparandScalingTests(unittest.TestCase):
         report['attempts'][0]['basis']=['x1+2']
         with self.assertRaises(ValueError):
             scaling.validate_cohort(report)
+    # Unverified completions still bind their reported field and raw coefficients during offline replay.
+    def test_unverified_completions_cannot_change_reported_ring(self):
+        canonical='characteristic 13\nextension-degree 1\norder grevlex\nvariables x1\ngenerator x1+1\n'
+        c=dict(field='13',name='fixture',modulus=13,variables=['x1'],generators=['x1+1'],canonical=canonical,digest=hashlib.sha256(canonical.encode()).hexdigest())
+        a=dict(engine='msolve',digest=c['digest'],status='complete',basis=['x1+1'],
+               basis_output='#field characteristic: 17\n#variable order: x1\n#monomial order: graded reverse lexicographical\n[x1+1]:\n')
+        report=dict(commit='a'*40,input_exporter={'sha256':'b'*64},binaries={'msolve':{'sha256':'c'*64}},cases=[c],references={},attempts=[a])
+        with self.assertRaises(ValueError):scaling.validate_cohort(report)
+
     # A zero-exit engine missing its basis keeps all timing and termination evidence as failure.
     def test_missing_basis_keeps_failed_attempt_measurements(self):
         with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling,'active_compilers',return_value=[]):
@@ -216,6 +225,36 @@ class ComparandScalingTests(unittest.TestCase):
         for bad in [text.replace('13','17'), text.replace('x1\n','x2\n'), text.replace(']:',']')]:
             with self.assertRaises(ValueError):
                 scaling.msolve_basis(bad, c)
+
+    # A declared field/input subset avoids spending repeated samples on inputs lacking exact references.
+    def test_declared_case_pairs_filter_only_named_inputs(self):
+        policy=dict(rows='mq-random-10,katsura-11',fields='32003,2147483647',case_pairs='32003/mq-random-10,2147483647/katsura-11')
+        self.assertTrue(scaling.selected_case(dict(field=32003,name='mq-random-10'),policy))
+        self.assertFalse(scaling.selected_case(dict(field=32003,name='katsura-11'),policy))
+        self.assertTrue(scaling.selected_case(dict(field=2147483647,name='katsura-11'),policy))
+
+    # The board displays incomplete grids and unverified raw wall observations without ratios.
+    def test_board_retains_unattempted_cells_and_unverified_times(self):
+        case=dict(field='13',name='mq',digest='d')
+        a=dict(case,engine='grobx',workers=1,repeat=0,diagnostic=False,status='complete',
+               process_wall_ns=123400000,process_cpu_ns=100000000,observed_tree_peak_bytes=1024)
+        cohort=dict(commit='a'*40,cases=[case],attempts=[a],policy=dict(fields='13',rows='mq',workers='1,8',repeats=3,engines='grobx',diagnostic=False))
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'board.md';scaling.summarize(cohort,target);text=target.read_text()
+            self.assertIn('unattempted',text)
+            self.assertIn('0.1234',text)
+            self.assertIn('1/3',text)
+
+    # Julia diagnostics expose JIT/GC and label a separate full-case warmup before the hot snapshot.
+    def test_julia_compilation_and_full_warmup_are_explicit(self):
+        c=dict(modulus=13,variables=['x1'],generators=['x1+1'])
+        script=scaling.julia_script(c,8,True,True)
+        self.assertIn('deepcopy(zb_sys)',script)
+        self.assertLess(script.index('deepcopy(zb_sys)'),script.index('@hot_begin'))
+        for marker in ('@compile_ns','@recompile_ns','@gc_ns'):self.assertIn(marker,script)
+        plain=scaling.julia_script(c,8)
+        self.assertNotIn('deepcopy(zb_sys)',plain)
+        self.assertNotIn('@timed',plain)
 
     # Output verification compares every normalized coefficient rather than ranks or leads.
     def test_changed_basis_tail_is_rejected(self):

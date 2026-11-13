@@ -44,7 +44,7 @@ def check_resume(previous,current):
                 'effective_environment','rustc','julia_manifest','julia_source','msolve_build'):
         if previous.get(key)!=current.get(key):
             raise ValueError('controller-only continuation changed '+key)
-    for key in ('wall','workers','repeats','rows','fields','engines','diagnostic','certify','reference_only'):
+    for key in ('wall','workers','repeats','rows','fields','engines','diagnostic','certify','reference_only','case_pairs'):
         if previous['policy'].get(key)!=current['policy'].get(key):
             raise ValueError('controller-only continuation changed policy '+key)
 
@@ -211,7 +211,7 @@ def singular_basis(text,case):
     return basis
 
 
-def julia_script(case, workers, diagnostic=False):
+def julia_script(case, workers, diagnostic=False, full_warmup=False):
     variables = case['variables']
     # The provisioned 0.10.11 uses tasks and a global threading switch, not threaded=:yes.
     policy = f'ordering=Groebner.DegRevLex(), tasks={workers}, linalg=:deterministic'
@@ -224,7 +224,11 @@ def julia_script(case, workers, diagnostic=False):
     script += ['zb_sys = [' + ', '.join(case['generators']) + ']',
                'for f in zb_sys; println("@gen ", f); end',
                'zb_warm = [zb_vars[1]^2+zb_vars[end]-1,zb_vars[end]^2-zb_vars[1]]',
-               f'Groebner.groebner(zb_warm; {policy})', 'GC.gc()']
+               f'Groebner.groebner(zb_warm; {policy})']
+    if full_warmup:
+        if not diagnostic:raise ValueError('full-case warmup belongs only to separately labeled diagnostics')
+        script += [f'Groebner.groebner(deepcopy(zb_sys); {policy})']
+    script += ['GC.gc()']
     if diagnostic:
         script += ['function zb_ticks()', '  result = String[]',
                    '  for tid in readdir("/proc/self/task")',
@@ -233,10 +237,17 @@ def julia_script(case, workers, diagnostic=False):
                    '      push!(result,tid*":"*string(parse(Int,fields[12])+parse(Int,fields[13])))',
                    '    catch; end', '  end', '  join(result,",")', 'end',
                    'zb_ticks()', 'println("@hot_begin ", zb_ticks()); flush(stdout)']
-    script += ['zb_start = time_ns()', f'zb_G = Groebner.groebner(zb_sys; {policy})',
-               'zb_elapsed = time_ns()-zb_start']
     if diagnostic:
-        script += ['println("@hot_end ", zb_ticks())']
+        script += [f'zb_stat = @timed Groebner.groebner(zb_sys; {policy})',
+                   'zb_G = zb_stat.value','zb_elapsed = round(Int,zb_stat.time*1e9)']
+    else:
+        script += ['zb_start = time_ns()', f'zb_G = Groebner.groebner(zb_sys; {policy})',
+                   'zb_elapsed = time_ns()-zb_start']
+    if diagnostic:
+        script += ['println("@hot_end ", zb_ticks())',
+                   'println("@compile_ns ", round(Int,zb_stat.compile_time*1e9))',
+                   'println("@recompile_ns ", round(Int,zb_stat.recompile_time*1e9))',
+                   'println("@gc_ns ", round(Int,zb_stat.gctime*1e9))']
     script += ['println("@solve_ns ", zb_elapsed)',
                'println("@workers ", Threads.nthreads())',
                'for g in zb_G; println("@gb ", g); end', 'println("@done 1")']
@@ -390,7 +401,7 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
         command = [binaries[engine]['path'], '-f', str(stem.with_suffix('.ms')), '-o', str(stem.with_suffix('.basis')),
                    '-t',str(workers),'-g','2','-v','2','-l','2']
     elif engine == 'groebner.jl':
-        stem.with_suffix('.jl').write_text(julia_script(case, workers, diagnostic))
+        stem.with_suffix('.jl').write_text(julia_script(case, workers, diagnostic,binaries[engine].get('full_case_warmup',False)))
         command = [binaries[engine]['path'],'--startup-file=no','--history-file=no',f'-t{workers}',
                    '--heap-size-hint=2147483648',str(stem.with_suffix('.jl'))]
     elif engine=='singular':
@@ -467,9 +478,12 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
                 raise ValueError('Julia thread pool differs')
             attempt['basis'] = re.findall(r'^@gb (.*)$', output,re.M)
             attempt['engine_wall_ns'] = int(re.search(r'^@solve_ns (\d+)$',output,re.M)[1])
+            attempt['full_case_warmup']=binaries[engine].get('full_case_warmup',False)
+            attempt['hot_boundary']='full-case-prewarmed diagnostic; two full solves in process' if attempt['full_case_warmup'] else 'tiny-warmup call; threaded JIT and GC may remain'
             if diagnostic:
+                attempt['julia_telemetry']={name:int(re.search(r'^@'+name+r'_ns (\d+)$',output,re.M)[1]) for name in ('compile','recompile','gc')}
                 attempt['hot_activity'] = cpu_activity(ticks_marker(output,'hot_begin'),ticks_marker(output,'hot_end'))
-                attempt['concurrency_boundary'] = 'hot groebner call; user+system CPU ticks per OS thread; may include GC'
+                attempt['concurrency_boundary'] = 'hot groebner call; user+system CPU ticks per OS thread; may include JIT and GC; participant count does not prove simultaneous use'
     except (ValueError, KeyError, IndexError, OSError) as error:
         attempt.update(status='failed',error=str(error))
     return attempt
@@ -508,7 +522,7 @@ def validate_cohort(cohort):
     cases={c['digest']:canonical_case(c) for c in cohort['cases']}
     for a in cohort['attempts']:
         case=cases[a['digest']]
-        if a['status']!='verified':
+        if a['status'] not in ('complete','verified'):
             continue
         if a.get('stop') or a.get('exit',0):
             raise ValueError('stopped or failed attempt was promoted to verified')
@@ -538,10 +552,13 @@ def validate_cohort(cohort):
             if '@done 1' not in output or f'@workers {a["workers"]}\n' not in output:
                 raise ValueError('Julia completion or worker setting changed')
             actual=re.findall(r'^@gb (.*)$',output,re.M)
+            echoes=re.findall(r'^@gen (.*)$',output,re.M)
+            if len(echoes)!=len(case['generators']):raise ValueError('Julia generator echoes changed')
+            for original,echo in zip(case['generators'],echoes):verify_basis([original],[echo],case)
         else:
             raise ValueError('unrecognized verified engine')
-        verify_basis(a['basis'],actual,case)
-        if a['engine'] not in ('grobx-certified','singular'):
+        if a['basis']!=actual:verify_basis(a['basis'],actual,case)
+        if a['status']=='verified' and a['engine'] not in ('grobx-certified','singular'):
             ref=cohort['references'].get(a['digest'])
             if not ref:
                 raise ValueError('verified status lacks an independent exact reference')
@@ -554,7 +571,7 @@ def warmed_table(cohort):
     for a in cohort['attempts']:
         if a['status']=='verified' and not a['diagnostic'] and a.get('engine_wall_ns',0)>0:
             groups.setdefault((a['digest'],a['engine'],a['workers']),[]).append(a)
-    lines=['## Same-engine hot-call curves','','These internal timers exclude process setup/input/output and cannot be divided by another engine’s process wall.',
+    lines=['## Same-engine hot-call curves','','These internal timers exclude process setup/input/output; Julia tiny-warmup calls can still include threaded JIT and GC and cannot be divided by another engine’s process wall.',
            'Each S(p) uses this engine/configuration’s own one-worker control; pivot work can change.','',
            '| Field/input | Engine | Workers | Repeats | Hot median [min,max] ms | S(p) | E(p) |','|---|---|---:|---:|---:|---:|---:|']
     for (digest,engine,p),rows in groups.items():
@@ -563,6 +580,30 @@ def warmed_table(cohort):
         ratio=statistics.median(a['engine_wall_ns'] for a in one)/statistics.median(a['engine_wall_ns'] for a in rows) if one else None
         lines.append('| '+' | '.join([str(rows[0]['field'])+'/'+rows[0]['name'],engine,str(p),str(len(rows)),
             f'{statistics.median(values):.3f} [{min(values):.3f},{max(values):.3f}]',f'{ratio:.3f}' if ratio else '—',f'{ratio/p:.3f}' if ratio else '—'])+' |')
+    return '\n'.join(lines)+'\n'
+
+
+def diagnostic_table(cohort):
+    if not cohort['policy'].get('diagnostic'):return ''
+    lines=['## Separate concurrency diagnostics','',
+           'CPU-active participants are tick-resolution lower bounds, not simultaneous algebra workers. Julia ticks may include JIT/GC.',
+           'Full-case-prewarmed Julia processes contain two complete solves; their process wall is not comparable to the ordinary one-solve cohort.','',
+           '| Field/input | Engine | Workers | Status | Process s | Hot ms | Compile ms | Recompile ms | GC ms | CPU-active participants | Peak MiB |',
+           '|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|']
+    by_key={(a['digest'],a['engine'],a['workers']):a for a in cohort['attempts']}
+    for case in cohort['cases']:
+        if not selected_case(case,cohort['policy']):continue
+        for engine in cohort['policy']['engines'].split(','):
+            for p in map(int,cohort['policy']['workers'].split(',')):
+                a=by_key.get((case['digest'],engine,p),{})
+                telemetry=a.get('julia_telemetry',{})
+                fmt=lambda n,scale:f'{n/scale:.3f}' if n is not None else '—'
+                fields=[str(case['field'])+'/'+case['name'],engine,str(p),a.get('status','unattempted'),
+                        fmt(a.get('process_wall_ns'),1e9),fmt(a.get('engine_wall_ns'),1e6),
+                        *[fmt(telemetry.get(k),1e6) for k in ('compile','recompile','gc')],
+                        str(a.get('hot_activity',{}).get('active_threads') or 'unresolved'),
+                        fmt(a.get('observed_tree_peak_bytes'),1024**2)]
+                lines.append('| '+' | '.join(fields)+' |')
     return '\n'.join(lines)+'\n'
 
 
@@ -584,7 +625,7 @@ def replay(directory,write=False):
         boards+=['## '+filename,'']
         with tempfile.TemporaryDirectory() as scratch:
             target=Path(scratch)/'board.md';summarize(cohort,target);boards+=[target.read_text()]
-        boards+=[warmed_table(cohort)]
+        boards+=[warmed_table(cohort),diagnostic_table(cohort)]
     rendered='\n'.join(boards)
     target=directory/'BOARD.md'
     if write:
@@ -596,6 +637,14 @@ def replay(directory,write=False):
 
 def summarize(cohort, target):
     groups = {}
+    policy=cohort['policy'];cases={c['digest']:c for c in cohort['cases']}
+    expected=policy.get('repeats',1)
+    if not policy.get('diagnostic'):
+        for case in cohort['cases']:
+            if selected_case(case,policy):
+                for engine in policy['engines'].split(','):
+                    for worker in map(int,policy['workers'].split(',')):
+                        groups[(case['digest'],engine,worker)]=[]
     for a in cohort['attempts']:
         if not a['diagnostic']:
             groups.setdefault((a['digest'],a['engine'],a['workers']),[]).append(a)
@@ -609,12 +658,15 @@ def summarize(cohort, target):
                 floors[(str(valid[0]['field']),key[1],key[2])]=medians[key]['process_wall_ns']
     lines = ['# Comparand worker cohorts (#739)','',f'**Measured at:** `{cohort["commit"]}`.', '',
              'Full reduced-basis process wall; exact reference checks follow timing. Diagnostic hot-region ticks are separate.',
-             'Missing verification blocks timing ratios; limits/capabilities remain visible. Julia deterministic backend; Rust randomized native backend.',
+             'Unverified completions retain raw wall observations but no timing ratios; limits/capabilities remain visible. Julia deterministic backend; Rust randomized native backend.',
              'S(p)/E(p) also require both process walls above twice the corresponding Katsura-4 startup control.', '',
-             '| Field/input | Engine | Workers | Repeats | Wall median s | Process CPU median s | RSS max MiB | S(p) | E(p) | Status |',
+             '| Field/input | Engine | Workers | Complete/planned (verified) | Wall median s | Process CPU median s | RSS max MiB | S(p) | E(p) | Status |',
              '|---|---|---:|---:|---:|---:|---:|---:|---:|---|']
     for (digest,engine,workers),attempts in groups.items():
-        first = attempts[0];valid=[a for a in attempts if a['status']=='verified']
+        first = cases[digest];valid=[a for a in attempts if a['status']=='verified']
+        observed=[a for a in attempts if a['status'] in ('verified','complete')]
+        statuses=sorted({a['status'] for a in attempts})
+        if len(attempts)<expected:statuses.append('unattempted('+str(expected-len(attempts))+')')
         base=medians.get((digest,engine,1)); ours=medians.get((digest,engine,workers))
         ratio=speedup(base,ours) if base and ours else None
         one_floor=floors.get((str(first['field']),engine,1))
@@ -623,16 +675,22 @@ def summarize(cohort, target):
                 or not base or not ours or base['process_wall_ns']<2*one_floor
                 or ours['process_wall_ns']<2*many_floor):
             ratio=None
-        lines.append('| '+' | '.join([f'{first["field"]}/{first["name"]}',engine,str(workers),str(len(valid)),
-            f'{ours["process_wall_ns"]/1e9:.4f} [{min(a["process_wall_ns"] for a in valid)/1e9:.4f},{max(a["process_wall_ns"] for a in valid)/1e9:.4f}]' if ours else '—',
-            f'{statistics.median(a["process_cpu_ns"] for a in valid)/1e9:.4f}' if valid else '—',
-            f'{max(a["observed_tree_peak_bytes"] for a in valid)/1024**2:.2f}' if valid else '—',
+        lines.append('| '+' | '.join([f'{first["field"]}/{first["name"]}',engine,str(workers),f'{len(observed)}/{expected} ({len(valid)})',
+            f'{statistics.median(a["process_wall_ns"] for a in observed)/1e9:.4f} [{min(a["process_wall_ns"] for a in observed)/1e9:.4f},{max(a["process_wall_ns"] for a in observed)/1e9:.4f}]' if observed else '—',
+            f'{statistics.median(a["process_cpu_ns"] for a in observed)/1e9:.4f}' if observed else '—',
+            f'{max(a["observed_tree_peak_bytes"] for a in observed)/1024**2:.2f}' if observed else '—',
             f'{ratio:.3f}' if ratio else '—', f'{ratio/workers:.3f}' if ratio else '—',
-            ', '.join(sorted({a['status'] for a in attempts}))])+' |')
+            ', '.join(statuses)])+' |')
     lines+=['','## Frozen input identities','','| Field/input | Complete canonical SHA-256 |','|---|---|']
     attempted={a['digest'] for a in cohort['attempts']}
     lines += ['| '+str(c['field'])+'/'+c['name']+' | `'+c['digest']+'` |' for c in cohort['cases'] if c['digest'] in attempted]
     target.write_text('\n'.join(lines)+'\n')
+
+
+def selected_case(case,policy):
+    pairs=policy.get('case_pairs')
+    return (case['name'] in policy['rows'].split(',') and str(case['field']) in policy['fields'].split(',')
+            and (not pairs or str(case['field'])+'/'+case['name'] in pairs.split(',')))
 
 
 def main():
@@ -648,6 +706,8 @@ def main():
     parser.add_argument('--replay',type=Path,help='offline coefficient/provenance/board validation of retained campaign directory')
     parser.add_argument('--write-board',action='store_true')
     parser.add_argument('--rows',default='katsura-4,mq-random-10,katsura-11,cyclic-7,cyclic-10,katsura-9')
+    parser.add_argument('--case-pairs',help='optional comma-separated field/input whitelist within the rows/fields grid')
+    parser.add_argument('--julia-full-warmup',action='store_true',help='diagnostic-only copied full-input warmup; process contains two full solves')
     parser.add_argument('--engines',default='msolve,groebner.jl,groebner-rs,grobx,zeebra')
     parser.add_argument('--fields',default='32003,2147483647,wide64,goldilocks')
     parser.add_argument('--references',type=Path,nargs='*',default=[],help='previous exact-reference cohort; hashes and full evidence retained')
@@ -662,6 +722,7 @@ def main():
     parser.add_argument('--diagnostic',action='store_true')
     parser.add_argument('--summarize',action='store_true')
     args=parser.parse_args()
+    if args.julia_full_warmup and not args.diagnostic:parser.error('--julia-full-warmup requires --diagnostic')
     if args.replay:
         replay(args.replay,args.write_board);return
     if not args.output:
@@ -695,6 +756,7 @@ def main():
     for engine,b in binaries.items():
         if not b['path']:parser.error('unprovisioned '+engine)
         b['sha256']=hashlib.sha256(Path(b['path']).read_bytes()).hexdigest()
+        if engine=='groebner.jl':b['full_case_warmup']=args.julia_full_warmup
         if engine=='singular':
             b['wrapper']=str(args.oracle_wrapper or args.binary)
             b['wrapper_sha256']=hashlib.sha256(Path(b['wrapper']).read_bytes()).hexdigest()
@@ -766,7 +828,7 @@ def main():
         elif a['workers']==16 and a['status'] in ('complete','verified'):stopped.pop(key,None)
     for repeat in range(args.repeats):
         for case in cases:
-            if case['name'] not in args.rows.split(',') or str(case['field']) not in args.fields.split(','):continue
+            if not selected_case(case,cohort['policy']):continue
             for p in workers if repeat%2==0 else list(reversed(workers)):
                 for engine in engines if repeat%2==0 else list(reversed(engines)):
                     actual_engine='grobx-certified' if args.certify else engine

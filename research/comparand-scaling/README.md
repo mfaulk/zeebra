@@ -97,10 +97,10 @@ its full witness/output retained. Hash/format checks and full-basis equality are
 
 The installed Groebner.jl 0.10.11 uses `tasks=N` and `threading_enabled()`, not `threaded=:yes`.
 The study explicitly enables the supported global switch, asserts it, and requests deterministic
-linear algebra at every worker count. Its warmed internal solve excludes setup/JIT/output; the
-published wall column includes the complete fresh Julia process. Do not compare its warmed timer
+linear algebra at every worker count. Its internal call excludes setup/input/output but the tiny warmup can leave target-specific
+threaded JIT compilation and GC inside it. The published wall column includes the complete fresh Julia process. Do not compare its warmed timer
 with another engine's process wall. Hot user+system CPU tick deltas are a lower bound on observed
-OS-thread participation, may include GC, and cannot resolve sub-tick or exited-thread work.
+OS-thread participation, may include JIT/GC, and cannot resolve sub-tick or exited-thread work.
 
 The Rust driver normally reports Rayon pool capacity, not actual solver participation. Optional
 `ZEEBRA_RESEARCH_THREAD_TICKS=1` adds before/after snapshots immediately around its existing F4
@@ -138,3 +138,45 @@ The continuation has a 1150-second dispatch cutoff and an external **1200-second
 limit**. Pending cells remain unattempted if the bound is reached. Julia is a separately declared
 stage with its own at-most-1200-second hard cap, including diagnostics. No claim of saturation
 or a scaling knee is made from a single unresolved repetition.
+
+## Julia stage protocol
+
+One Julia stage has a hard aggregate limit of 1200 seconds, including every child startup,
+full-case warmup, tick diagnostic and artifact write. No new native reference attempts are
+included. Ordinary timing keeps the existing tiny same-ring warmup; hot-call curves are labeled
+**tiny-warmup calls, possibly containing threaded JIT and GC**. They are diagnostic observations,
+not claims of compilation-free steady state. The installed 0.10.11 explicitly selects threaded
+linear algebra only when `tasks > 1`, lower-row count is at least `2*tasks`, and total columns
+are at least 1000 (`src/f4/linalg/linalg.jl`, pinned source hashes in the cohort).
+
+Separate `--diagnostic --julia-full-warmup` processes first solve a `deepcopy(zb_sys)`, then time
+the original input. Their whole-process time contains two complete solves and never enters an
+external process-wall comparison. Julia 1.11's `@timed` exposes compilation, recompilation and
+GC times for the hot call; these are retained with CPU-tick participation. `@timed` also enables
+runtime accounting/lock profiling, so those arms remain separate from ordinary timers. Positive
+hot tick deltas may still include JIT/GC work; a participant count alone does not prove simultaneous
+algebra workers. Full-case warmup is not assumed to eliminate all compilation without checking
+the reported telemetry. `--case-pairs field/input,...` declares a narrow exact-reference subset
+within the regular rows/fields grid.
+
+The exact [Julia stage launcher](julia-stage.sh) declares 900 seconds ordinary timing,
+15 seconds Rust diagnostics, 165 seconds Julia diagnostics and 120 seconds wide observations.
+Ordinary timing selects only these exact-reference inputs: GF(32003) K4/MQ10/C7 and
+GF(2^31−1) K4/MQ10/K11, three repetitions at all six worker counts (108 planned records).
+Both diagnostic stages use M31 Katsura-11 at 1/8/16 workers, one repetition. Wide64 K4/MQ10/C7
+gets one observation at 1/8/16 workers (nine planned records), with missing independent exact
+references still blocking ratios. Every stage has a before-next-cell cutoff, a separate hard
+watchdog and no automatic retry. All stages together run under a 1200-second outer watchdog.
+`timeout --foreground` keeps the inner controller in the outer process group; its existing signal
+handler kills and reaps separately grouped solvers. An environment/failure exit stops the whole
+sequence. Omitted/remainder cells stay explicit in the generated board.
+
+Set `ZEEBRA_739_EXPORTER`, `ZEEBRA_739_EXPORTER_SOURCE`, `ZEEBRA_739_REFERENCE_A` and
+`ZEEBRA_739_REFERENCE_B` to the pinned executable/archives and exact exporter build commit.
+Then, after clean-source/quiet gates, use the existing lock:
+
+```sh
+ZEEBRA_MACHINE=5995wx tools/benchlock.sh comparand-739-julia \
+  timeout --signal=TERM --kill-after=3s 1200 \
+  bash research/comparand-scaling/julia-stage.sh "$CARGO_TARGET_DIR/julia-stage-fresh"
+```

@@ -1,0 +1,57 @@
+{
+  "category": "protocol-validation-not-performance-evidence",
+  "source": "d7d2bc8f",
+  "attempt": {
+    "command": [
+      "env",
+      "TMPDIR=/buildcache/cargo-target/zeebra-m28-739/protocol-retention-smoke-v3.adapter",
+      "/buildcache/cargo-target/zeebra-m28-739/debug/examples/competitive_sweep",
+      "--engines",
+      "singular",
+      "--retain-artifacts",
+      "--measure",
+      "--row",
+      "katsura-4",
+      "--task",
+      "reduced-grobner-basis",
+      "--characteristic",
+      "32003",
+      "--workers",
+      "1",
+      "--wall",
+      "5",
+      "--rss-mib",
+      "2048"
+    ],
+    "cpus": [
+      0
+    ],
+    "process_wall_ns": 102194439,
+    "process_cpu_ns": 92304000,
+    "observed_tree_peak_bytes": 37937152,
+    "stop": null,
+    "exit": 0,
+    "interrupt_exit": null,
+    "output_bytes": 1896,
+    "stdout": "# Competitive sweep\n- machine: fedora\n- cpu:     AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0\n- commit:  d7d2bc8f\n- build:   release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)\n- policy:  5 s wall, 1 workers, one row per process\n- field:   GF(32003)\n- mode:    MEASURED (one row, this process, memory attributable)\n\n\n- katsura-4                      reduced-grobner-basis    singular         31.73 ms, 18.5 MB, dim 8\n\n(1 rows; nothing written, pass --write to append to research/competitive/)\n",
+    "stderr": "",
+    "adapter_artifacts": {
+      "zeebra-competitive-1864178-katsura-4/singular/run-1864178-1.sing": "printf(\"@version %s\", system(\"version\"));\nprintf(\"@done\");\nexit;\n",
+      "zeebra-competitive-1864178-katsura-4/singular/run-1864178-1.out": "@version 44105\n@done\n",
+      "zeebra-competitive-1864178-katsura-4/singular/run-1864178-2.sing": "option(redSB);\nsystem(\"--ticks-per-sec\", 1000);\nint t0;\nint vd;\nint k;\nring Rsrc = 32003,(x1,x2,x3,x4),dp;\nshort = 0;\nideal I = x1^2+2*x2^2+2*x3^2+2*x4^2+32002*x1,2*x1*x2+2*x2*x3+2*x3*x4+32002*x2,x2^2+2*x1*x3+2*x2*x4+32002*x3,x1+2*x2+2*x3+2*x4+32002;\nprintf(\"@gensize %s\", ncols(I));\nfor (k = 1; k <= ncols(I); k++) { printf(\"@gen %s\", I[k]); }\nt0 = timer;\nideal G = std(I);\nprintf(\"@solve_ms %s\", timer - t0);\nprintf(\"@gbsize %s\", ncols(G));\nfor (k = 1; k <= ncols(G); k++) { printf(\"@gb %s\", G[k]); printf(\"@lead %s\", lead(G[k])); }\nvd = vdim(G);\nprintf(\"@vdim %s\", vd);\nprintf(\"@done\");\nexit;\n",
+      "zeebra-competitive-1864178-katsura-4/singular/run-1864178-2.out": "@gensize 4\n@gen x1^2+2*x2^2+2*x3^2+2*x4^2-x1\n@gen 2*x1*x2+2*x2*x3+2*x3*x4-x2\n@gen x2^2+2*x1*x3+2*x2*x4-x3\n@gen x1+2*x2+2*x3+2*x4-1\n@solve_ms 0\n@gbsize 7\n@gb x1+2*x2+2*x3+2*x4-1\n@lead x1\n@gb x3^2+2*x2*x4-13711*x3*x4-4568*x4^2-4572*x2+13715*x3-9145*x4\n@lead x3^2\n@gb x2*x3-2*x2*x4-9147*x3*x4-13719*x4^2+2286*x2+9144*x3+4573*x4\n@lead x2*x3\n@gb x2^2+2*x2*x4+4573*x3*x4-9142*x4^2-9144*x2-4572*x3+13715*x4\n@lead x2^2\n@gb x3*x4^2+3557*x4^3-1778*x2*x4-3161*x3*x4+5926*x4^2-10075*x2-6124*x3+11853*x4\n@lead x3*x4^2\n@gb x2*x4^2-10668*x4^3-3556*x2*x4-10075*x3*x4+3556*x4^2-889*x2-11853*x3\n@lead x2*x4^2\n@gb x4^4+12535*x4^3+7471*x2*x4+6188*x3*x4+10117*x4^2+10521*x2+11393*x3+11829*x4\n@lead x4^4\n@vdim 8\n@done\n"
+    },
+    "status": "complete",
+    "basis": [
+      "x1+2*x2+2*x3+2*x4-1",
+      "x3^2+2*x2*x4-13711*x3*x4-4568*x4^2-4572*x2+13715*x3-9145*x4",
+      "x2*x3-2*x2*x4-9147*x3*x4-13719*x4^2+2286*x2+9144*x3+4573*x4",
+      "x2^2+2*x2*x4+4573*x3*x4-9142*x4^2-9144*x2-4572*x3+13715*x4",
+      "x3*x4^2+3557*x4^3-1778*x2*x4-3161*x3*x4+5926*x4^2-10075*x2-6124*x3+11853*x4",
+      "x2*x4^2-10668*x4^3-3556*x2*x4-10075*x3*x4+3556*x4^2-889*x2-11853*x3",
+      "x4^4+12535*x4^3+7471*x2*x4+6188*x3*x4+10117*x4^2+10521*x2+11393*x3+11829*x4"
+    ],
+    "verification": "independent Singular std/redSB through existing adapter"
+  },
+  "classification": "protocol validation only; excluded from performance cohorts"
+}

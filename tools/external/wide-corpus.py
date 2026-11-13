@@ -20,6 +20,9 @@ CATALOG = ROOT / 'research/wide-corpus/cases.json'
 spec = importlib.util.spec_from_file_location('guard', Path(__file__).with_name('mq10-profile.py'))
 guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
+spec = importlib.util.spec_from_file_location('proof_artifacts', Path(__file__).with_name('proof_artifacts.py'))
+proof_artifacts = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(proof_artifacts)
 COMPLETE = ('complete', 'verified')
 ENGINES = ('zeebra', 'groebner.jl', 'groebner-rs', 'grobx')
 
@@ -161,6 +164,21 @@ def load(path):
                 raise ValueError('wide campaign payload hash/length mismatch')
             chunks.append(payload)
         attempt = json.loads(b''.join(chunks))
+        if '_text_basis_parts' in attempt:
+            entry=attempt.pop('_text_basis_parts')
+            text=json.loads(proof_artifacts.restore_response({'raw_output_parts':entry['parts']},path.parent))['basis']
+            attempt[entry['field']]=entry['prefix']+text
+            if entry['field']=='basis_output':
+                attempt['basis']=grobx_work.basis_list(text[text.index('['):].strip())
+            else:
+                attempt['basis']=re.findall(r'^@gb (.*)$',text,re.M)
+        if '_stdout_parts' in attempt:
+            attempt['stdout'] = proof_artifacts.restore_response({'raw_output_parts':attempt.pop('_stdout_parts')},path.parent)
+        if attempt.pop('_raw_from_stdout',False):
+            attempt['raw'] = json.loads(attempt['stdout'])
+        if attempt.pop('_basis_from_raw',False):
+            basis=attempt['raw']['basis']
+            attempt['basis']=basis if isinstance(basis,list) else grobx_work.basis_list(basis)
         if attempt.pop('_report_basis_from_raw', False):
             basis = attempt['raw']['basis']
             attempt['report']['basis'] = basis if isinstance(basis, list) else grobx_work.basis_list(basis)
@@ -182,6 +200,35 @@ def pack(cohort, path, chunk_size=16*1024**2):
             if basis == attempt['report']['basis']:
                 packed['report'] = {k: v for k, v in attempt['report'].items() if k != 'basis'}
                 packed['_report_basis_from_raw'] = True
+        if isinstance(raw_basis,(list,str)) and 'basis' in attempt:
+            basis=raw_basis if isinstance(raw_basis,list) else grobx_work.basis_list(raw_basis)
+            if basis==attempt['basis']:
+                packed.pop('basis');packed['_basis_from_raw']=True
+        # Reuse exact JSON-literal storage: repeated native bases share one payload across attempts.
+        stdout=attempt.get('stdout')
+        if stdout and isinstance(attempt.get('raw'),dict):
+            try:matches=json.loads(stdout)==attempt['raw']
+            except ValueError:matches=False
+            if matches and isinstance(raw_basis,(list,str)):
+                wrapper={'artifacts':{'raw_output':stdout}}
+                proof_artifacts.pack_attempts([wrapper],path,keys=('basis',))
+                packed.pop('stdout');packed.pop('raw')
+                packed['_stdout_parts']=wrapper['artifacts']['raw_output_parts']
+                packed['_raw_from_stdout']=True
+        text_field='basis_output' if attempt.get('basis_output') else 'stdout' if attempt.get('engine')=='groebner.jl' and attempt.get('stdout') else None
+        if text_field and attempt.get('basis'):
+            text=attempt[text_field];prefix=''
+            if text_field=='basis_output':
+                recovered=grobx_work.basis_list(text[text.index('['):].strip()) if '[' in text else None
+            else:
+                first=re.search(r'^@gb ',text,re.M)
+                if first:prefix,text=text[:first.start()],text[first.start():]
+                recovered=re.findall(r'^@gb (.*)$',text,re.M)
+            if recovered==attempt['basis']:
+                wrapper={'artifacts':{'raw_output':json.dumps({'basis':text},separators=(',',':'),ensure_ascii=False)}}
+                proof_artifacts.pack_attempts([wrapper],path,keys=('basis',))
+                packed.pop(text_field);packed.pop('basis')
+                packed['_text_basis_parts']=dict(field=text_field,prefix=prefix,parts=wrapper['artifacts']['raw_output_parts'])
         data = json.dumps(packed, separators=(',', ':'), ensure_ascii=False).encode()
         parts = []
         for start in range(0, len(data), chunk_size):
