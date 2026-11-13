@@ -1,45 +1,10 @@
-//! Greatest common divisor, content, and squarefree decomposition of sparse multivariate
-//! polynomials.
-//!
-//! `F[x_0, ..., x_{N-1}]` is not Euclidean, so the GCD is recursive: read the polynomials as
-//! univariate in their highest occurring variable, with coefficients in the polynomial ring over
-//! the remaining ones. That coefficient ring is a UFD but not a field, so the Euclidean step is
-//! *pseudo*-division — scale the dividend by a power of the divisor's leading coefficient so the
-//! division goes through — and the content is removed from every remainder to keep the
-//! coefficients from growing. This is the classical primitive PRS.
-//!
-//! The recursion terminates because the main variable strictly decreases: the coefficients of a
-//! polynomial read in `x_v` do not involve `x_v`, so the GCDs that compute a content are taken in
-//! a smaller ring.
-//!
-//! Three routes answer, and [`GcdRoute`] chooses. Two of them do that Euclidean step. The
-//! **primitive PRS** removes the
-//! content from every pseudo-remainder — nothing can grow, so the coefficient bound is by
-//! construction, and a content is itself a recursive GCD so it pays one per step. **Collins'
-//! subresultant PRS** divides each pseudo-remainder by `g * h^delta` instead, which the
-//! fundamental theorem of subresultants makes exact: one division per step and three content GCDs
-//! for the whole computation. Coefficients can then grow, but by a bound rather than unboundedly,
-//! since the sequence's entries are subresultants and so determinants of submatrices of the
-//! inputs' Sylvester matrix.
-//!
-//! The subresultant route is the default, and #407 measured why. Not for the reason the asserted
-//! operation count suggests: on twenty shapes per field the **primitive** route is faster on 14–16
-//! of them, by 10% to 50%. What decides it is the tail. The primitive route's content GCD is itself
-//! a recursion, so nothing bounds a step's cost in terms of the inputs, and it was measured at
-//! **628x** the subresultant route on one four-variable shape and did not finish a single pass on
-//! another. The subresultant route's entries are subresultants, which Hadamard bounds in advance,
-//! and its own worst measured case is 24x. See `docs/research/multivariate-gcd.md`.
-//!
-//! **Brown's modular algorithm** is the third, and it does no Euclidean step at all: it fixes the
-//! other variables at field elements, solves the univariate problems, and interpolates the answer
-//! back. So neither coefficient growth nor a content recursion arises — and that is why it is the
-//! route that changes the asymptotics rather than the constant. It is also the only route that can
-//! **refuse**: it needs a prime field, and more elements than the degree it has to interpolate
-//! over. [`SparseMultiPoly::try_gcd_by`] is its entry point, bounded on `KnownOrder`;
-//! [`SparseMultiPoly::gcd_by`] panics if asked for it, because `FiniteField` carries no
-//! characteristic to check and a silent fallback would hand a caller who asked for the asymptotics
-//! the constant factors with no indication.
+//! GCD recurses through polynomial contents in smaller variable rings. Primitive PRS removes
+//! each remainder's content; subresultant PRS replaces that recursion with exact scaling.
+//! Over finite fields, intermediate size means polynomial support and degree, not coefficient
+//! bit length. Brown uses evaluated images and interpolation, with PRS cleanup/fallback.
 
+#[cfg(feature = "research-work")]
+use super::gcd_profile::{self, Phase};
 use std::collections::HashMap;
 
 use crate::{
@@ -57,38 +22,29 @@ use crate::{
 pub enum GcdRoute {
     /// Take the primitive part of every pseudo-remainder.
     ///
-    /// #128's route. Nothing can grow, because a content is divided out at every step — so the
-    /// coefficient bound is by construction. A content is itself a recursive GCD in a smaller
-    /// ring, so this pays one such GCD per Euclidean step, which is the cost
-    /// [`Self::SubresultantPrs`] removes. It is the reference the other is differentially tested
-    /// against — and also, per #407, the **faster** route on most shapes, by 10% to 50%, so a
-    /// caller who knows its inputs are ordinary can reasonably ask for it. What it cannot offer is
-    /// a bounded worst case; see [`Self::SubresultantPrs`].
+    /// Removes scalar-polynomial content after each pseudo-remainder, paying recursive content
+    /// GCDs. Primitive coefficient polynomials and the raw remainders can still grow in support
+    /// and degree. The route is a correctness reference and has expensive measured outliers;
+    /// see `docs/research/multivariate-gcd.md` for the bounded size profiles.
     PrimitivePrs,
 
     /// Divide every pseudo-remainder by `g * h^delta`, carrying `g` and `h` across steps.
     ///
-    /// Collins' subresultant PRS, and the default. One *exact division* per step instead of a
-    /// recursive GCD: three content GCDs for the whole computation rather than one per step.
-    /// Coefficients can grow, but by a bound rather than unboundedly — the sequence's entries are
-    /// subresultants, determinants of submatrices of the inputs' Sylvester matrix, so Hadamard's
-    /// inequality bounds them in terms of the inputs alone.
-    ///
-    /// **Default on a measured tail rather than a measured median.** #407 found this route 10% to
-    /// 50% *slower* than [`Self::PrimitivePrs`] on most shapes, and kept it the default anyway
-    /// because the primitive route's tail is unbounded — 628x on one measured four-variable shape,
-    /// and non-terminating within 40 minutes on another — while this route's worst measured case is
-    /// 24x. A default should be the route that cannot fall off a cliff on an input the caller did
-    /// not know was special. `docs/research/multivariate-gcd.md` has the tables.
+    /// Collins' subresultant PRS, and the default. Scaled entries are subresultants up to units,
+    /// whose coefficients are Sylvester minors. Determinant expansion bounds coefficient degree;
+    /// raw pseudo-remainders before exact division need not satisfy the same bound. Finite-field
+    /// coefficients have fixed width, so integer Hadamard magnitude bounds are not size profiles.
+    /// The default remains based on the measured route trade-offs in
+    /// `docs/research/multivariate-gcd.md`, rather than a universal runtime guarantee.
     #[default]
     SubresultantPrs,
 
     /// Evaluate the other variables down to univariate GCDs over a prime field, and interpolate.
     ///
-    /// Brown's modular algorithm, and the route that changes the asymptotics rather than the
-    /// constant: neither PRS can avoid carrying multivariate coefficients through every Euclidean
-    /// step, and this one never forms them — it solves `d + 1` univariate problems and rebuilds the
-    /// answer, where `d` bounds the GCD's degree in the variable being interpolated.
+    /// Brown's modular algorithm recursively evaluates variables, solves image GCDs and
+    /// interpolates a candidate. Content extraction remains recursive; candidate primitive-part
+    /// cleanup and failed interpolation may use the subresultant PRS. Size profiles distinguish
+    /// the images and interpolants from these PRS entries.
     ///
     /// **This route can refuse, and the other two cannot.** It needs a prime field, because
     /// evaluating a variable at a point of an extension field and lifting back would answer a
@@ -344,6 +300,8 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// # Panics
     /// As [`Self::content`].
     pub fn content_by(&self, index: usize, route: GcdRoute) -> Self {
+        #[cfg(feature = "research-work")]
+        gcd_profile::content();
         #[cfg(test)]
         content_calls::record();
         let mut content = Self::zero();
@@ -490,6 +448,8 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// would be worse than either: a caller who asked for the asymptotics would get the constant
     /// factors and no indication.
     pub fn gcd_by(&self, other: &Self, route: GcdRoute) -> Self {
+        #[cfg(feature = "research-work")]
+        let _call = gcd_profile::enter();
         if self.is_zero() {
             return other.normalized();
         }
@@ -547,14 +507,30 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// default: a reference implementation that followed whatever the default happened to be would
     /// stop being a reference the moment the default changed.
     fn primitive_prs(mut a: Self, mut b: Self, variable: usize) -> Self {
+        #[cfg(feature = "research-work")]
+        let degree_bound = gcd_profile::bound(&a, &b, variable);
+        #[cfg(feature = "research-work")]
+        {
+            gcd_profile::observe(&a, variable, Phase::Prs);
+            gcd_profile::observe(&b, variable, Phase::Prs);
+            gcd_profile::check_bound(&a, variable, degree_bound);
+            gcd_profile::check_bound(&b, variable, degree_bound);
+        }
         while !b.is_zero() {
             let remainder = a.pseudo_remainder(&b, variable);
+            #[cfg(feature = "research-work")]
+            gcd_profile::observe(&remainder, variable, Phase::Raw);
             a = b;
             b = if remainder.is_zero() {
                 Self::zero()
             } else {
                 remainder.primitive_part_by(variable, GcdRoute::PrimitivePrs)
             };
+            #[cfg(feature = "research-work")]
+            {
+                gcd_profile::observe(&b, variable, Phase::Prs);
+                gcd_profile::check_bound(&b, variable, degree_bound);
+            }
         }
         a
     }
@@ -565,20 +541,24 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// `a` and `b` are primitive in `variable`, nonzero, with `deg_v(a) >= deg_v(b)`; the result is
     /// their GCD, primitive in `variable`.
     ///
-    /// Carries `g = lc(a)` and `h` across steps, and divides each pseudo-remainder by
-    /// `g * h^delta` instead of by its content. The fundamental theorem of subresultants is what
-    /// makes that division exact, and it is also what bounds the coefficients: the entries of the
-    /// sequence *are* subresultants, which are determinants of submatrices of the Sylvester matrix
-    /// of the inputs, so their size is bounded by Hadamard's inequality on the inputs alone. The
-    /// primitive PRS bounds them by construction — nothing can grow, since every remainder is made
-    /// primitive — and pays a recursive GCD per step for it; this bounds them by a theorem and pays
-    /// one exact division. **Which is faster here is unmeasured**; what is structural is the GCD
-    /// count: `3` recursive GCDs in a smaller ring in total, against one per Euclidean step.
+    /// Carries `g = lc(a)` and `h` across steps and divides the raw pseudo-remainder by
+    /// `g * h^delta`. The subresultant theorem makes the division exact and bounds the scaled
+    /// entry's coefficient degree through its Sylvester-minor representation. Raw remainder
+    /// growth and the recursive cost of content extraction are separate quantities.
     ///
     /// # Panics
     /// Panics if either division the subresultant theorem makes exact is not — which would be a
     /// defect in this function or in `exact_div`, not an input it cannot handle.
     fn subresultant_prs(mut a: Self, mut b: Self, variable: usize) -> Self {
+        #[cfg(feature = "research-work")]
+        let degree_bound = gcd_profile::bound(&a, &b, variable);
+        #[cfg(feature = "research-work")]
+        {
+            gcd_profile::observe(&a, variable, Phase::Prs);
+            gcd_profile::observe(&b, variable, Phase::Prs);
+            gcd_profile::check_bound(&a, variable, degree_bound);
+            gcd_profile::check_bound(&b, variable, degree_bound);
+        }
         // `b` is primitive and constant in `variable`, so its content is one and it is a unit.
         if b.degree_in(variable) == 0 {
             return Self::one();
@@ -589,6 +569,8 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         loop {
             let delta = a.degree_in(variable) - b.degree_in(variable);
             let remainder = a.pseudo_remainder_scaled(&b, variable);
+            #[cfg(feature = "research-work")]
+            gcd_profile::observe(&remainder, variable, Phase::Raw);
             if remainder.is_zero() {
                 // `b` divides `a` up to content, and `b` is not primitive — the route does not
                 // make it so — which is why the primitive part is taken here and not at the top.
@@ -607,6 +589,11 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
                 .expect("the subresultant divisibility theorem makes this division exact");
             a = b;
             b = next;
+            #[cfg(feature = "research-work")]
+            {
+                gcd_profile::observe(&b, variable, Phase::Prs);
+                gcd_profile::check_bound(&b, variable, degree_bound);
+            }
             g = a.coefficient_in(variable, a.degree_in(variable));
             // `h <- h^(1 - delta) * g^delta`, which for `delta = 0` leaves `h` alone and otherwise
             // is the exact division below. Written this way because a negative exponent is not a
@@ -647,6 +634,8 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
         if route != GcdRoute::Brown {
             return Ok(self.gcd_by(other, route));
         }
+        #[cfg(feature = "research-work")]
+        let _call = gcd_profile::enter();
         Self::require_prime_field_with_points(self.degree().max(other.degree()))?;
 
         if self.is_zero() {
@@ -685,6 +674,8 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
 
     /// [`Self::content_by`] for a route that can refuse.
     fn try_content_by(&self, index: usize, route: GcdRoute) -> Result<Self, GcdError> {
+        #[cfg(feature = "research-work")]
+        gcd_profile::content();
         let mut content = Self::zero();
         for coefficient in self.coefficients_in(index) {
             content = content.try_gcd_by(&coefficient, route)?;
@@ -829,7 +820,10 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
                 best_degree = image_degree;
                 images.clear();
             }
-            images.push((point, &image * &multiplier));
+            let scaled_image = &image * &multiplier;
+            #[cfg(feature = "research-work")]
+            gcd_profile::observe(&scaled_image, variable, Phase::Image);
+            images.push((point, scaled_image));
         }
 
         if images.len() <= degree_bound as usize {
@@ -839,8 +833,11 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
             });
         }
 
-        let candidate = Self::interpolate_in(&images, interpolated)
-            .primitive_part_by(variable, GcdRoute::SubresultantPrs);
+        let interpolant = Self::interpolate_in(&images, interpolated);
+        #[cfg(feature = "research-work")]
+        gcd_profile::observe(&interpolant, variable, Phase::Interpolant);
+        let candidate = interpolant.primitive_part_by(variable, GcdRoute::SubresultantPrs);
+        drop(interpolant);
 
         if a.exact_div(&candidate).is_some() && b.exact_div(&candidate).is_some() {
             #[cfg(test)]
@@ -849,6 +846,8 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
         }
         #[cfg(test)]
         brown_outcomes::record_fallback();
+        #[cfg(feature = "research-work")]
+        gcd_profile::fallback();
 
         // Every point looked good by degree and the candidate still does not divide, so the degree
         // bound in `interpolated` was not tight. Nothing cheap tells the two cases apart, so this
@@ -1801,14 +1800,7 @@ mod tests {
             assert_eq!(f.gcd(&g), f.gcd_by(&g, GcdRoute::SubresultantPrs));
         }
 
-        /// The subresultant route takes strictly fewer recursive content GCDs.
-        ///
-        /// The structural claim #407 rests on, asserted as a **count of operations** and not as a
-        /// duration: the primitive PRS divides the content out of every pseudo-remainder, and a
-        /// content is itself a recursive GCD, so it pays one per Euclidean step; the subresultant
-        /// route pays one exact division per step and takes contents only at the top and at the
-        /// end. Whether that is faster in wall clock on any machine is **unmeasured**, and this
-        /// test deliberately does not pretend otherwise.
+        // On this fixture the subresultant route computes the same GCD with fewer content calls.
         #[test]
         fn test_the_subresultant_route_takes_fewer_content_gcds() {
             use crate::poly::multivariate::multivariate_gcd::content_calls;
