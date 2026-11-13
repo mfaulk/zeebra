@@ -1,7 +1,4 @@
-//! Algebra
-//!
-//! This crate provides efficient operations for computing with finite fields and polynomials
-//! over finite fields.  
+//! Finite-field algebra with const-generic multivariate polynomial arity.
 
 // These are noisy. Maybe re-enable them later.
 #![allow(clippy::suspicious_arithmetic_impl)]
@@ -29,6 +26,7 @@ pub mod linalg;
 mod poly;
 #[cfg(feature = "research-work")]
 pub use poly::gcd_profile;
+pub mod r1cs;
 mod rings;
 
 pub mod util;
@@ -89,6 +87,7 @@ pub use rings::Ring;
 #[doc = include_str!("../docs/guide/number-theory.md")]
 #[doc = include_str!("../docs/guide/polynomials.md")]
 #[doc = include_str!("../docs/guide/reed-solomon.md")]
+#[doc = include_str!("../docs/guide/r1cs.md")]
 #[doc = include_str!("../docs/guide/solving-systems.md")]
 #[doc = include_str!("../docs/guide/status.md")]
 pub struct DocumentationExamples;

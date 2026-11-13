@@ -10,7 +10,7 @@ msolve, Groebner.jl and Singular are GPL and are **run as separate processes onl
 is in the policy's "reuse permitted" class, and **nothing is reused from it here either** — the
 driver in `tools/external/sagebrush-driver` only calls its public library.
 
-Everything below was executed on this machine on **2026-11-06**. Provisioning is
+The original provisioning below was executed on **2026-11-06**; the separately dated Giac addition is from **2026-11-13**. Provisioning is
 `tools/external/provision.sh`; the environment is `tools/external/env.sh`; the smoke test is
 `tools/external/smoke/smoke.sh`.
 
@@ -734,3 +734,39 @@ accept).
   from source would add ~10 minutes to every run for no benefit, since no test depends on a
   comparand. `shellcheck -S warning tools/external/*.sh tools/external/smoke/*.sh` is clean and
   was run by hand.
+
+## Giac 2.0.0 modular subprocess
+
+Added for #740 on 2026-11-13. **GPL-3.0: subprocess comparand only.** No Giac
+source or library is linked into the MIT crate. The
+[upstream installation page](https://www-fourier.univ-grenoble-alpes.fr/~parisse/install_en.html)
+links the Debian 12 package
+[`giac_2.0.0-3_amd64.deb`](https://www-fourier.univ-grenoble-alpes.fr/~parisse/giac/debian12/giac_2.0.0-3_amd64.deb).
+This is the pinned tested build, not a claim to be the latest release.
+
+| artifact | SHA-256 |
+|---|---|
+| upstream Debian package | `4986dec6c37fcc8a76e4a71c483f722666e9ebc149d84921bfbafe114aa9a451` |
+| `usr/bin/icas` | `ca29bb964382fcdfa206417570aed032e2fc3865e868355e91ef5326c89bdd5e` |
+| `usr/lib/libgiac.so.0.0.0` | `fddc2809bf073e622c317e3257e4907b25e53d378df3a18c239cb941fd7ef6f2` |
+
+`icas --version` reports `2.0.0`; `version()` identifies Giac, Parisse and
+De Graeve. The local installation was extracted under
+`/buildcache/cargo-target/zeebra-740/giac`; Debian Bookworm runtime dependencies
+were extracted alongside it. Library paths are passed only to Giac, preserving
+the system Singular verification environment. Runtime package versions/hashes
+are retained with the measurement provenance. No upstream build flags or ISA
+floor are inferred from the Debian binary.
+
+The [author's algorithm manual, §9.6](https://www-fourier.univ-grenoble-alpes.fr/~parisse/giac/algo.pdf)
+describes the modular F4 route for primes below `2^31` and the optimized revlex
+representation with fifteen variable slots and 16-bit degrees. The adapter
+registers that route only. Live script checks establish the `threads` assignment,
+`gbasis(...,revlex)` syntax, modular generator echo via `%0`, and complete basis
+printing. Unsupported tasks/fields stay capability rows. Each accepted answer
+also requires exact full reduced-basis equality with independent Singular.
+See the [usage guide](../guide/external-engines.md#giac-modular-grevlex-comparand).
+
+The [retained acceptance cohort](giac-comparand.md) records full MQ/Cyclic
+equivalence and the bounded Katsura-11 blocker, including source recovery and
+runtime dependency provenance.

@@ -1,0 +1,32 @@
+--- a/examples/graeffe_root.rs
++++ b/examples/graeffe_root.rs
+@@ -172,6 +172,14 @@
+     }
+     let cofactor = UnivariatePolynomial::new(&coefficients);
+     let f = &cofactor * &UnivariatePolynomial::from_zeros(&planted);
++    // Identity capture is outside the caller timer and disabled in timing runs.
++    if let Ok(path) = std::env::var("ZEEBRA_NTT_GATE_INPUT") {
++        use std::io::Write;
++        let mut output = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
++        for coefficient in f.coefficients() {
++            writeln!(output, "{coefficient}").unwrap();
++        }
++    }
+     (f, planted)
+ }
+ 
+@@ -287,6 +295,14 @@
+             found,
+             "degree {degree}: {PLANTED} roots were planted, among them {}",
+             planted[0]
++        );
++
++        // Exact serial stage durations and the complete, independently evaluated answer.
++        println!(
++            "GATE {{\"degree\":{degree},\"verified\":true,\"root\":\"{}\",\"forward_ns\":{},\"subgroup_ns\":{},\"descent_ns\":{},\"total_ns\":{},\"max_n\":{},\"transforms\":{},\"total_n\":{},\"stored\":{},\"peak_heap_bytes\":{peak_bytes}}}",
++            outcome.unwrap(), stats.forward_time.as_nanos(), stats.subgroup_time.as_nanos(),
++            stats.descent_time.as_nanos(), total.as_nanos(), stats.max_transform_size,
++            stats.transforms, stats.total_transform_elements, stats.stored_coefficients,
+         );
+ 
+         rows.push(GraeffeRow {

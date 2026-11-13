@@ -242,6 +242,8 @@ fn eliminate_from<F: FiniteField>(
         std::mem::size_of::<(usize, F)>(),
     );
     for index in first..matrix.num_rows() {
+        #[cfg(feature = "research-work")]
+        let _discovery = crate::linalg::work::discovery_row(index);
         // Taken out so the pivot rows, which are still in the matrix, can be read while this one
         // is rewritten. A pivot's index is always one already processed, so never this one.
         let row = std::mem::take(&mut matrix.rows_mut()[index]);
@@ -253,6 +255,15 @@ fn eliminate_from<F: FiniteField>(
         accumulator.load(&row);
 
         while let Some(column) = accumulator.leading_column() {
+            #[cfg(feature = "research-work")]
+            crate::linalg::work::discovery_pivot(
+                column,
+                pivot_of_column.pivot_of(column),
+                first,
+                pivot_of_column
+                    .pivot_of(column)
+                    .map_or(0, |pivot| matrix.row(pivot).nonzeros()),
+            );
             match pivot_of_column.pivot_of(column) {
                 Some(pivot_index) => {
                     // Every pivot's leading coefficient is one, so the factor that clears this
@@ -280,6 +291,8 @@ fn eliminate_from<F: FiniteField>(
         }
 
         let row = accumulator.take();
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::discovery_finish(row.leading_column());
         #[cfg(feature = "research-work")]
         {
             // The loaded input row still owns its buffer until this iteration ends.

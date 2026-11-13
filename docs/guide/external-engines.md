@@ -460,6 +460,14 @@ which needs no patched build. It is a measurement instrument on no build path, a
 randomized linear algebra (4.89x, declined by policy), interreduction done by division rather than
 by one Macaulay matrix (5.03x), and a per-operation representation constant (14.0x).
 
+`tools/external/msolve-count.py` is the msolve counterpart. It copies the provisioned msolve 0.11.0
+source and adds per-phase pivot-application and coefficient-product counters to the exact sparse
+linear algebra. It then builds a private counting copy that is never installed or linked.
+`examples/msolve_gap.rs` records Zeebra's per-batch matrix shapes and writes msolve's input for the
+same digest. [`docs/research/msolve-gap.md`](../research/msolve-gap.md) is what they produced:
+on `mq-random-10`, elimination is about 20x behind, split into 4.14x more coefficient products
+(back-substitution 580 M against msolve's 0.64 M) and 4.8x more time per product.
+
 [`docs/research/m27-baseline.md`](../research/m27-baseline.md) is the frozen baseline these
 ratios are quoted against: which cohort each engine's rows belong to, the cryptanalysis frontier by
 class, the `poseidon31-cico-t16-rf4-rp2` row resolved across its three cost tables, and the rule for
@@ -710,3 +718,68 @@ use `.json.gz`; `tools/external/proof_artifacts.py COHORT INDEX` reconstructs th
 JSON response byte for byte and verifies the proof SHA-256. This preserves full certificates
 without repeating them in every response. `--small-controls-only` restricts a follow-up cohort to
 Katsura-4 at 32003 and the two registered wide controls; it does not pool different affinities.
+
+## Giac modular grevlex comparand
+
+`GiacSolver` runs `icas` as a separate GPL-3.0 subprocess; it adds no linked
+library or Cargo dependency. Set `ZEEBRA_GIAC` to an absolute executable path,
+or install `icas` on PATH. Debian/Ubuntu packages normally provide it through
+`xcas`; Fedora provides `giac`. The pinned upstream Debian package and its
+SHA-256 are recorded in [external comparands](../research/external-comparands.md#giac-200-modular-subprocess).
+Other versions are reported by the version probe and need live equivalence checks
+before publishing measurements.
+
+The registered route is `gbasis(input % p, variables, revlex)`, with deterministic
+`proba_epsilon=0` and explicit `threads=N`. It supports only reduced grevlex
+bases over prime fields `2 <= p < 2^31`, at most 15 variables, expanded integer
+polynomial input and 16-bit input degrees. These are limits of the registered
+modular route, not a claim about every Giac algorithm. Conversion, direct lex,
+solutions, wide/extension fields and other orders produce capability refusals.
+Giac scripts rename whole variable identifiers, echo parsed modular generators
+back over the integers and require a complete basis plus completion marker.
+
+Every completed basis must match Singular's full monic reduced basis, including
+every coefficient. Singular must therefore also be installed (`ZEEBRA_SINGULAR`
+overrides its path). Missing verification cannot supply a successful timing row.
+The verifier reuses the existing Singular script/parser through a direct
+supervised process, with the same per-child wall/RSS limits and one worker; its elapsed
+time is recorded separately as `independent-verification`, outside Giac's child
+wall/CPU/RSS. A timeout is a limit stop, not an unsupported field or a speedup.
+
+For an extracted local installation, `ZEEBRA_GIAC_LIBRARY_PATH` sets
+`LD_LIBRARY_PATH` **only in the Giac child**. This avoids changing Singular's
+libraries. Leave it unset for a normal system installation.
+
+```sh
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-giac
+export TMPDIR="$CARGO_TARGET_DIR/tmp"
+export RUSTC_WRAPPER=''
+mkdir -p "$TMPDIR"
+cargo build --release --example groebner_comparison --example competitive_sweep
+# Exact live checks, including zero/unit ideals and both board primes:
+cargo test --lib grobner::external::giac::tests::live_giac_bases_agree -- --ignored
+# One bounded, artifact-retaining row; affinity must match the worker cohort:
+ZEEBRA_MACHINE=my-machine ZEEBRA_AFFINITY=2 tools/benchlock.sh giac-row \
+  taskset -c 2 "$CARGO_TARGET_DIR/release/examples/groebner_comparison" \
+  --engine giac --row mq-random-10 --modulus 32003 --workers 1 \
+  --wall 30 --rss-mib 1024 --output "$TMPDIR/giac-mq10.json"
+```
+
+Use `--workers 4` with four physical cores for a separate cohort. The returned
+JSON retains the complete Giac basis, raw output, independent oracle output,
+startup observation and board record. The harness's compiler/ISA settings do not
+imply that a prebuilt Giac package was compiled the same way; its engine ISA is
+explicitly unspecified. No engine-internal `solve` timer is fabricated.
+
+The general `competitive_sweep` also accepts `--engines giac`, `--workers N`
+(default 1, range 1–1024) and optional `--rss-mib N` (positive resident-memory
+ceiling). Unsupported tasks remain visible in its default task sweep. Use
+`--measure --row NAME --task reduced-grobner-basis` for an attributable single
+row and `--write` only when intentionally appending to competitive history.
+
+The configured serial Zeebra engine is refused in multiworker sweep cohorts,
+so a serial solve cannot be recorded under a parallel worker count.
+
+The [Giac acceptance study](../research/giac-comparand.md) retains the five-repeat
+MQ/Cyclic cohorts and the Katsura-11 60-second wall stops. These limit stops
+provide no completed answer or speedup denominator.

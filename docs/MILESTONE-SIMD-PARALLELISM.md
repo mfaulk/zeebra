@@ -402,6 +402,20 @@ not about where the work sits in the algorithm. It also names the one thing that
 figure here, which neither this section nor #167 tested: 21 µs per worker is an OS thread spawn, and
 a persistent pool is a different floor.
 
+### 6.5 The persistent-pool premise, measured (#592)
+
+**Measured at:** `6360904a`, Rust instrument `81aaa1be`. The
+[worker-pool report](research/worker-pool.md) tests the shared dispatch premise with scoped
+threads, a safe parked pool and a pinned Rayon dev comparand. Warm task dispatch is materially
+cheaper with persistent workers, but still grows with worker count; the constant/nanosecond
+expectation is not supported. Default border batches remain too small on most controls, with a
+narrow Katsura-7 opportunity and no general conversion/default recommendation.
+
+These are new matched-build measurements, not revised historical ratios. Preserve #50's zero-work
+prefix result and the original #51/#52/#167 verdicts. A different kernel needs its own useful-work,
+whole-route and resource gate; fewer spawning microseconds cannot create absent work. #728 consumes
+the runtime evidence for concurrent residual pivots, independently of those decompositions.
+
 ## 7. Acceptance criteria, closed out
 
 | Criterion | State |

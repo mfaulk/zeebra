@@ -1,0 +1,80 @@
+[
+  {
+    "Package": "libcliquer1",
+    "Version": "1.21-3+b1",
+    "Filename": "pool/main/c/cliquer/libcliquer1_1.21-3+b1_amd64.deb",
+    "SHA256": "7858686f9e8a1931644e7bf58d68df85cbb95299c255466b3c6c65706bacc563"
+  },
+  {
+    "Package": "libfltk-gl1.3",
+    "Version": "1.3.8-5",
+    "Filename": "pool/main/f/fltk1.3/libfltk-gl1.3_1.3.8-5_amd64.deb",
+    "SHA256": "842762c82511d19e1cbd8010626afd3b3396c56a27ad583909145aecde69f4ea"
+  },
+  {
+    "Package": "libfltk1.3",
+    "Version": "1.3.8-5",
+    "Filename": "pool/main/f/fltk1.3/libfltk1.3_1.3.8-5_amd64.deb",
+    "SHA256": "703f71611b4a81e87453e1d82135c2428005734f1a4f9d4735176dff67d2a652"
+  },
+  {
+    "Package": "libgf2x3",
+    "Version": "1.3.0-2",
+    "Filename": "pool/main/g/gf2x/libgf2x3_1.3.0-2_amd64.deb",
+    "SHA256": "432d96c40aed60c25987fe1456eb5ea8b1cf6bc60032a90ab06325505786d1bd"
+  },
+  {
+    "Package": "libgmp10",
+    "Version": "2:6.2.1+dfsg1-1.1",
+    "Filename": "pool/main/g/gmp/libgmp10_6.2.1+dfsg1-1.1_amd64.deb",
+    "SHA256": "187aedef2ed763f425c1e523753b9719677633c7eede660401739e9c893482bd"
+  },
+  {
+    "Package": "libecm1",
+    "Version": "7.0.5+ds-1",
+    "Filename": "pool/main/g/gmp-ecm/libecm1_7.0.5+ds-1_amd64.deb",
+    "SHA256": "e70ed11412c03b5292b21195ebe41f4b59056d859eab3cc5f1aa5c53697eea40"
+  },
+  {
+    "Package": "libgsl27",
+    "Version": "2.7.1+dfsg-5+deb12u1",
+    "Filename": "pool/main/g/gsl/libgsl27_2.7.1+dfsg-5+deb12u1_amd64.deb",
+    "SHA256": "7a2ac4431a1bfa2e1776961d4f3d82d6b660fc3fa62e7bfbc4a14aaf013fa422"
+  },
+  {
+    "Package": "libgslcblas0",
+    "Version": "2.7.1+dfsg-5+deb12u1",
+    "Filename": "pool/main/g/gsl/libgslcblas0_2.7.1+dfsg-5+deb12u1_amd64.deb",
+    "SHA256": "46bd7671bbf548b0d13be8523a8ac7e453009fd2e7a480d07458aad99828f393"
+  },
+  {
+    "Package": "libmpfi0",
+    "Version": "1.5.3+ds-6+b1",
+    "Filename": "pool/main/m/mpfi/libmpfi0_1.5.3+ds-6+b1_amd64.deb",
+    "SHA256": "b04a66c5928737f0adc321d8e31596a7af4505c4bd1bca0664b588de9219dec7"
+  },
+  {
+    "Package": "libmpfr6",
+    "Version": "4.2.0-1",
+    "Filename": "pool/main/m/mpfr4/libmpfr6_4.2.0-1_amd64.deb",
+    "SHA256": "37b7a2b4e78890b6a074777f27b96c84f58e81558ba08410c2b6c0ca4a4ad77b"
+  },
+  {
+    "Package": "libnauty2",
+    "Version": "2.8.6+ds-2",
+    "Filename": "pool/main/n/nauty/libnauty2_2.8.6+ds-2_amd64.deb",
+    "SHA256": "38ab75377f7021941621af6e23c63146acb351523811973ffc7e23c7321d986e"
+  },
+  {
+    "Package": "libntl44",
+    "Version": "11.5.1-1+b2",
+    "Filename": "pool/main/n/ntl/libntl44_11.5.1-1+b2_amd64.deb",
+    "SHA256": "1ec859c23f8875141a2ddb4c7a81f0a1b837b64cd4cb822917b1e3f725c4540e"
+  },
+  {
+    "Package": "libpari-gmp-tls8",
+    "Version": "2.15.2-1",
+    "Filename": "pool/main/p/pari/libpari-gmp-tls8_2.15.2-1_amd64.deb",
+    "SHA256": "7ca79d18ca40588ebd4a4e88b52c2a5a076b049e6e10b88ab42f4a294ade79bd"
+  }
+]

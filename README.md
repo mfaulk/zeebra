@@ -138,6 +138,7 @@ cargo run --release --example f4_profile      # cost attributed per stage
 cargo run --release --example mq10_profile -- 32003 --stages  # current-default MQ10, JSON
 cargo run --release --example mq10_profile -- 2147483647     # clocks disabled control
 cargo run --release --features research-work --example mq10_profile -- 32003 --stages --work
+cargo run --release --example msolve_gap -- --characteristic 32003  # per-batch shapes vs msolve
 cargo run --release --example solve_one       # a system in, verified solutions out
 ```
 
@@ -155,11 +156,22 @@ instrumented examples — along with the measurement rules this repository follo
 so two runs cannot share a machine, a memory ceiling guard, and a lint that refuses a published
 figure carrying no commit.
 
+The [concurrent-pivot feasibility study](research/concurrent-pivots/README.md) measures
+serial F4 candidate-row work and dependencies with
+`cargo run --release --features research-work --example mq10_profile -- 32003 --stages --discovery`.
+The observer is disabled in ordinary builds; its row clocks describe the measured serial trajectory.
+The same research feature enables `--workers=P --schedule=dynamic|static` for the
+bounded concurrent-pivot experiment; ordinary F4 remains serial.
+
 The pinned F4 matrix corpus has a separate opt-in large set. Run
 `cargo run --release --example f4_matrix_corpus -- check-large` to capture and verify it;
 `check-all` verifies both sets; `list-large` shows the large dimensions and explicit live-entry budgets without computing a basis.
 The default corpus walk and benchmark smoke retain the bounded small set. See the
 [corpus report](docs/research/f4-matrix-corpus.md) for capture costs and limits.
+
+The [multicore NTT caller study](docs/research/multicore-ntt.md) records the reachable
+callers, field/domain limits, and bounded Graeffe profiles. It defers threading
+until transform-only timing and worker dispatch costs establish a useful crossover.
 
 For the monomial-order dispatch and F4 column-sort replay, build with
 `cargo build --release --example monomial_order_width` and follow the pinned run command in the
@@ -203,12 +215,20 @@ For partial elimination, run `cargo run --example block_elimination`. A checked
 grevlex within each block. See the [two-block order guide](docs/guide/grobner-bases.md#two-block-elimination-orders)
 for validation, extraction of the retained basis, and current adapter/FGLM limits.
 
+Giac's modular grevlex route is available through `GiacSolver` and
+`competitive_sweep --engines giac`. Each completed basis is checked coefficient
+for coefficient with Singular. See the [Giac setup and limits](docs/guide/external-engines.md#giac-modular-grevlex-comparand)
+for installation, worker cohorts, and supported fields/tasks.
+The [acceptance cohort](docs/research/giac-comparand.md) retains exact MQ/Cyclic
+agreement and the reproducible Katsura-11 resource limit.
+
 ### Cargo features
 
 | Feature | Default | What it adds |
 |---|---|---|
-| `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush and Singular as subprocesses. Uses only `std` and adds no dependency. |
+| `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush, Giac and Singular as subprocesses. Uses only `std` and adds no dependency. |
 | `proptest` | off | `proptest::arbitrary::Arbitrary` for the public types: field elements, big integers, monomials, polynomials, vectors and matrices. Lets you property-test downstream code with `any::<T>()`. |
+| `research-work` | off | Research operation counters, opt-in GCD size profiles, serial row tracing, and the opt-in concurrent F4 pivot experiment. |
 
 ```toml
 zeebra = { version = "0.1", features = ["proptest"] }
@@ -233,6 +253,7 @@ under fixed matrix allowances; the shipping solver and its defaults are unchange
 |---|---|
 | Finite fields: 31- to 256-bit primes, binary fields, extension fields | [`finite-fields.md`](docs/guide/finite-fields.md) |
 | Polynomials: multivariate arithmetic, GCD, squarefree decomposition, factorization | [`polynomials.md`](docs/guide/polynomials.md) |
+| Bounded R1CS v1 import, wire identity, independent assignment checks | [`r1cs.md`](docs/guide/r1cs.md) |
 | Linear algebra: dense and sparse matrices, echelon backends | [`linear-algebra.md`](docs/guide/linear-algebra.md) |
 | NTT and fast univariate arithmetic, root finding | [`ntt.md`](docs/guide/ntt.md) |
 | Gröbner bases: Buchberger, monomial orders, FGLM conversion | [`grobner-bases.md`](docs/guide/grobner-bases.md) |
@@ -399,3 +420,6 @@ The [randomized-reduction study](research/grobx-randomization/README.md) provide
 Grobx feature controls, exact residual-span feasibility checks, and a bounded full-basis-verified
 campaign. Its GPL experiment remains outside the MIT library; Zeebra's deterministic defaults
 are unchanged.
+
+The [persistent-worker study](research/worker-pool/README.md) provides an opt-in dispatch and FGLM
+border-reduction experiment under `research-work`; solver defaults remain unchanged.

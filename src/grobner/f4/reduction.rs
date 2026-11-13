@@ -276,8 +276,14 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             structured,
         )
     });
-    let block = eliminate_to(plan, form, options.elimination, &mut matrix, allowance)
-        .map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
+    #[cfg(feature = "research-work")]
+    let replacement = observer.eliminate(&mut matrix, options);
+    #[cfg(feature = "research-work")]
+    let block = replacement
+        .unwrap_or_else(|| eliminate_to(plan, form, options.elimination, &mut matrix, allowance));
+    #[cfg(not(feature = "research-work"))]
+    let block = eliminate_to(plan, form, options.elimination, &mut matrix, allowance);
+    let block = block.map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
     let elimination = block.statistics;
     #[cfg(feature = "research-work")]
     crate::linalg::work::finish_batch(&elimination);

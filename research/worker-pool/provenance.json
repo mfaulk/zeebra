@@ -1,0 +1,122 @@
+{
+  "base_commit": "c5f7ecdb4dd799604ab6c3bfb59a440118a3acac",
+  "runner_commit": "6360904ab06f9ed773a530da3314ecfaef3d5837",
+  "rust_source_commit": "81aaa1be098e67ed3d4ede23123404f5668fa54a",
+  "patch_sha256": "8b219431c02567af2f7eb331fbc97826924787f2e2aa76ea522f3b95a3680ee6",
+  "patch_id": "4d52466a47ad8116020dec19e212a58ee12625da",
+  "source_blobs": {
+    "Cargo.toml": "1c52316b58b20d5c096c8b6d9ff04a0c1eed1181",
+    "Cargo.lock": "e6e76f4ea2501c1b86dc09c3b86e1391d581eaed",
+    "src/grobner/fglm/batch.rs": "55af60ed25c1bffda510434d28d43bb7d9b5b07f",
+    "examples/worker_pool_study.rs": "129c180c95a673e3080e1dc5facf400b7af3acb7",
+    "examples/support/worker_pool.rs": "cad7b4d4e8032fdefbfc1259aa3f9019a49f95ee",
+    "tools/external/worker-pool-study.py": "e6b27e39ca1b816fe7858ff7e9ab4584c0d235c0"
+  },
+  "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  128\nOn-line CPU(s) list:                     0-127\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen Threadripper PRO 5995WX 64-Cores\nCPU family:                              25\nModel:                                   8\nThread(s) per core:                      2\nCore(s) per socket:                      64\nSocket(s):                               1\nStepping:                                2\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      36%\nCPU max MHz:                             4575.1641\nCPU min MHz:                             413.4190\nBogoMIPS:                                5389.84\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap\nVirtualization:                          AMD-V\nL1d cache:                               2 MiB (64 instances)\nL1i cache:                               2 MiB (64 instances)\nL2 cache:                                32 MiB (64 instances)\nL3 cache:                                256 MiB (8 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-127\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; Safe RET\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Mitigation; Clear CPU buffers\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB before exit to userspace\n",
+  "kernel": "Linux fedora 7.3.3-200.fc44.x86_64 #1 SMP PREEMPT_DYNAMIC Fri Nov  6 20:34:09 UTC 2026 x86_64 GNU/Linux\n",
+  "profile_environment": {},
+  "results.json.gz_sha256": "872bec0259193fef2d21ad02c05aeb272cf39334d12cf34dda4581347715a028",
+  "instrument.patch.gz_sha256": "fa12fda4f724160aecbe55d1c3c50707d49d468a4785598bb1cb25654e64b1a2",
+  "interrupted-checkpoint.gz_sha256": "5cc1d0a9d0741ae517c74c74e3665cfc5ce403948b90eb76ab3d7da7d8edd686",
+  "interrupted-checkpoint.log_sha256": "a76502502c8f8b77186f492506d221df72f04744d45b728dc4e7d121b208e0c7",
+  "decoded_results_sha256": "d9e15ecde46f124c2e345b3e227404813212f454fca8dc13e1e3a35f5c9ba810",
+  "cargo_fingerprint": {
+    "rustc": 11835527281324007204,
+    "features": "[\"default\", \"external-runners\", \"research-work\"]",
+    "declared_features": "[\"default\", \"external-runners\", \"proptest\", \"research-work\"]",
+    "target": 6305685261542454590,
+    "profile": 11826027486216815164,
+    "path": 17240445566277818633,
+    "deps": [
+      [
+        65234016722529558,
+        "bincode",
+        false,
+        14483144590401758667
+      ],
+      [
+        368492036915771276,
+        "proptest",
+        false,
+        3719956546900411177
+      ],
+      [
+        720731745621185994,
+        "criterion",
+        false,
+        17509495912818992970
+      ],
+      [
+        5792757459284085107,
+        "ark_ff",
+        false,
+        3417259965369347763
+      ],
+      [
+        6557439603276904804,
+        "serde",
+        false,
+        9347811305899035471
+      ],
+      [
+        9045754397332874331,
+        "lazy_static",
+        false,
+        11289331787133401225
+      ],
+      [
+        11784517437581582528,
+        "pest_derive",
+        false,
+        1509375090198798870
+      ],
+      [
+        11910974697091955563,
+        "rayon",
+        false,
+        6357130640831972830
+      ],
+      [
+        13208667028893622512,
+        "rand",
+        false,
+        5027888373261105486
+      ],
+      [
+        15269564664536803040,
+        "pest",
+        false,
+        2569759663240866386
+      ],
+      [
+        16728356305607762645,
+        "serde_arrays",
+        false,
+        13491671786606273003
+      ],
+      [
+        18283066100005974038,
+        "zeebra",
+        false,
+        13210012792000994271
+      ]
+    ],
+    "local": [
+      {
+        "CheckDepInfo": {
+          "dep_info": "release/.fingerprint/zeebra-f1046e10461a7899/dep-example-worker_pool_study",
+          "checksum": false
+        }
+      }
+    ],
+    "rustflags": [
+      "-C",
+      "link-arg=-fuse-ld=mold",
+      "-C",
+      "target-cpu=x86-64-v3"
+    ],
+    "config": 9396254390672932401,
+    "compile_kind": 0
+  },
+  "verified_reconstructed_tree": "705b788aaec27c014d0d9539d7208313374a47c7"
+}

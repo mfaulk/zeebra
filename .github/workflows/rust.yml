@@ -88,8 +88,12 @@ jobs:
           python3 tools/test/row-merge-study-test.py
           python3 tools/test/batch-splitting-study-test.py
           python3 tools/test/mq10-profile-test.py
+          python3 tools/test/msolve-count-test.py
           python3 tools/test/grobx-trajectory-test.py
           python3 tools/test/grobx-work-study-test.py
+          python3 tools/test/pivot-discovery-study-test.py
+          python3 research/concurrent-pivots/summarize.py
+          git diff --exit-code -- research/concurrent-pivots/summary.json research/concurrent-pivots/matrix-census.csv research/concurrent-pivots/parallel.csv research/concurrent-pivots/matrix-scaling.csv research/concurrent-pivots/dispatch.csv research/concurrent-pivots/controls.csv
           python3 tools/test/grobx-randomization-test.py
           python3 tools/external/grobx-driver/research/randomization/test_policy.py
           python3 tools/test/proof-artifacts-test.py
@@ -97,12 +101,18 @@ jobs:
           git diff --exit-code -- research/grobx-randomization/summary.json research/grobx-randomization/summary.csv
           python3 research/grobx-trajectory/summarize.py
           git diff --exit-code -- research/grobx-trajectory/summary.json research/grobx-trajectory/summary.csv research/grobx-trajectory/summary-rounds.csv
+          cargo test --features research-work --example worker_pool_study
+          cargo test --features research-work --lib dispatch_tests
+          python3 tools/test/worker-pool-study-test.py
+          python3 research/worker-pool/summarize.py
+          git diff --exit-code -- research/worker-pool/summary.json research/worker-pool/summary.csv
           cargo test --features research-work --lib linalg::work
           cargo test --features research-work --test gcd_profile
           cargo test --features research-work --lib gcd_profile
           python3 tools/test/gcd-size-study-test.py
           python3 research/gcd-size/summarize.py
           git diff --exit-code -- research/gcd-size/summary.json research/gcd-size/summary.csv research/gcd-size/table.md
+          cargo test --features research-work --lib linalg::concurrent
           cargo test --features research-work --example mq10_profile
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks
@@ -280,6 +290,20 @@ jobs:
           bash tools/test/benchlock-test.sh
           bash tools/test/check-measurement-provenance-test.sh
           bash tools/test/ci-scope-test.sh
+
+      - name: Giac comparand artifacts
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/giac -p 'test_*.py'
+          python3 research/giac/summary.py > "$RUNNER_TEMP/giac-table.md"
+          diff -u research/giac/table.md "$RUNNER_TEMP/giac-table.md"
+
+      - name: NTT caller gate artifacts
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/ntt-caller-gate -p 'test_*.py'
+          python3 research/ntt-caller-gate/summary.py > "$RUNNER_TEMP/ntt-caller-table.md"
+          diff -u research/ntt-caller-gate/table.md "$RUNNER_TEMP/ntt-caller-table.md"
 
       # Every document that publishes a measurement says which commit it came from (#335). Separate
       # from the unit tests above because this one reads the repository's own documents: a finding

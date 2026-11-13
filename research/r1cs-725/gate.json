@@ -1,0 +1,36 @@
+{
+  "decision": "continue",
+  "scope": "bounded const-generic adapter; no solver integration",
+  "fixtures": [
+    {
+      "input": "/buildcache/cargo-target/zeebra-725/sources/r1csfile/test/testutils/example.r1cs",
+      "input_sha256": "8fdbe0d7cfd4379e36593ed9597889a3b7b750566d035c7cc805b9acaaf3d039",
+      "canonical_sha256": "8fdbe0d7cfd4379e36593ed9597889a3b7b750566d035c7cc805b9acaaf3d039",
+      "wire_count": 7,
+      "constraint_count": 3,
+      "capacity": 6,
+      "expanded_terms_before_field_cancellation": [
+        8,
+        6,
+        3
+      ],
+      "canonical_file": "/buildcache/cargo-target/zeebra-725/gate/canonical-0.r1cs"
+    },
+    {
+      "input": "/home/mfaulk/projects/zb-725-r1cs/tests/fixtures/r1cs/multiplier.r1cs",
+      "input_sha256": "16ab9e569919f7d25f32321974db3b1803b469d4ab0c25769cc94cc3f0d324f7",
+      "canonical_sha256": "945ef7efeda20135be64cfb8a91533cad8aba99bf1cd8f56c5d55ded1b9c4add",
+      "wire_count": 4,
+      "constraint_count": 1,
+      "capacity": 3,
+      "expanded_terms_before_field_cancellation": [
+        2
+      ],
+      "canonical_file": "/buildcache/cargo-target/zeebra-725/gate/canonical-1.r1cs"
+    }
+  ],
+  "gf7_assignments": 343,
+  "gf7_row_checks": 1029,
+  "independent_reader_roundtrip": "all header counts, coefficients and wire-label mappings agree",
+  "producer_witness_and_perturbation": "agree with original rows"
+}

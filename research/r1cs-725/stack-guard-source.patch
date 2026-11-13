@@ -1,0 +1,1707 @@
+diff --git a/docs/guide/r1cs.md b/docs/guide/r1cs.md
+new file mode 100644
+index 00000000..08f3a6b0
+--- /dev/null
++++ b/docs/guide/r1cs.md
+@@ -0,0 +1,105 @@
++# Checked R1CS import
++
++`zeebra::r1cs` imports a narrow R1CS v1 profile over a caller-selected prime field.
++It preserves original sparse rows, row IDs, wire-to-label mapping, public/private input roles,
++and optional Circom symbols before producing any polynomials. The
++[design gate and evidence](../research/bounded-r1cs.md) record the public fixture round-trip,
++independent reader and producer identities, exhaustive small-field checks, and bounded pilot.
++
++## Import, expand, check
++
++```rust
++use zeebra::{
++    fields::Bn254Fr,
++    r1cs::{ImportLimits, R1cs, WireRole},
++    FiniteField, One, Zero,
++};
++
++let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
++    "/tests/fixtures/r1cs/multiplier.r1cs"));
++let rows = R1cs::<Bn254Fr>::parse(bytes, &ImportLimits::default()).unwrap();
++assert_eq!(rows.wire_role(1), Some(WireRole::PublicOutput));
++let system = rows.expand::<3>().unwrap();
++assert_eq!(system.variable_to_wire, vec![1, 2, 3]);
++
++// The producer's original witness order is [one, product, a, b].
++let wires = [Bn254Fr::one(), Bn254Fr::new(15), Bn254Fr::new(3), Bn254Fr::new(5)];
++let original = rows.evaluate_assignment(&wires).unwrap();
++let expanded: Vec<_> = system.polynomials.iter().map(|p| p.eval(&wires[1..])).collect();
++assert_eq!(original, expanded);
++assert!(original.iter().all(Zero::is_zero));
++```
++
++`evaluate_assignment` computes `(A·w)(B·w) − C·w` directly from the original sparse rows;
++it does not invoke the converter or evaluate a polynomial. It returns one residual per
++original row, so a nonzero value identifies a failed row. Assignment length must equal the
++original wire count, and assignment wire zero must be one.
++
++The expansion substitutes constant one for wire zero and maps original wire `i > 0` to
++polynomial variable `i − 1`. `expand::<N>()` refuses if `N < wire_count − 1`; it does not
++change Zeebra's const-generic arity. Choose exact capacity for dimension-sensitive solving:
++extra coordinates are unconstrained padding, not additional witness wires. Capacity also
++cannot exceed `max_wires − 1`, which bounds each monomial's storage.
++
++Every original row receives a polynomial and retains its row ID, including tautologies that
++expand to zero and impossible constant-only rows. `ExpansionStats` reports source sparse terms,
++raw A-by-B products before cancellation, retained polynomial terms, and the largest row.
++No solver is invoked by import, expansion, or assignment checking.
++
++## Accepted profile and refusals
++
++The parser requires magic `r1cs`, version one, and exactly one each of sections 1 (header),
++2 (constraints), and 3 (wire-to-label map), in any order. Custom-gate and unknown sections
++return `UnsupportedSection`. This deliberately narrower profile also refuses extension
++sections that the broader format permits readers to ignore.
++
++The requested field must have equal order and characteristic and a canonical modulus width
++of 8, 16, 24, or 32 bytes. The modulus must match exactly; field reduction never repairs a
++wrong modulus. Sparse factors must have strictly increasing, in-range wire IDs and nonzero
++coefficients strictly below the modulus. Nonminimal field widths, duplicate sections, invalid
++counts, duplicate/out-of-range labels, trailing bytes, and truncation fail explicitly.
++The API returns no partial model or partial expansion on failure.
++
++`wire_role` distinguishes the constant, public outputs, public inputs, private inputs, and
++remaining internal witness wires according to the header's ordered ranges. Wire zero's
++canonical label must be zero. Labels do not permute polynomial variables.
++
++Attach optional UTF-8 Circom `.sym` records with `with_symbols(text)`. Labels and qualified
++names must be unique, and any label selected by the binary wire map must name that same wire.
++Other labels may alias a wire or retain `-1` as an optimized-out signal without acquiring a
++polynomial variable. Component IDs and names are retained. Symbol order is normalized by label.
++
++`source_digest` hashes the exact input bytes. `canonical_digest` hashes the checked binary with
++section order normalized to 1, 2, 3; original rows and maps remain ordered. Symbols are excluded
++from that binary identity. `symbol_digest` separately binds a nonempty canonical symbol
++sidecar to the model's canonical digest. `to_bytes` emits that canonical R1CS representation.
++
++## Limits and runnable example
++
++Default `ImportLimits` are 16 MiB per binary or symbol sidecar, 100 wires including constant
++wire zero, 1,000 rows, 10,000 symbol records, 100,000 A-by-B products, 100,000 retained expanded
++terms, and a 60-second cooperative deadline per parsing, symbol or expansion operation.
++The API accepts an existing byte slice, so callers must also bound input allocation before
++parsing; the example uses a limited read. Callers can supply smaller or explicitly larger
++limits. Deadlines do not interrupt an
++individual field operation, and structural counts are not process-memory bounds.
++Use an external supervisor for a hard end-to-end wall or process-memory ceiling; the retained
++pilot used 60 seconds and a stricter 512 MiB virtual-address-space ceiling per child.
++
++The example compiles fields `7` and `bn254` and capacities `0,1,2,3,4,6,8,16,32,64,99`:
++
++```sh
++cargo run --release --no-default-features --example r1cs_import -- \
++  tests/fixtures/r1cs/multiplier.r1cs --field bn254 --capacity 3 \
++  --symbols tests/fixtures/r1cs/multiplier.sym --assignment 1,15,3,5
++```
++
++The JSON separates parse, expansion/model, original-row checking, polynomial checking, and
++process-high-water observations. An unsupported capacity or malformed file produces a structured
++refusal and a nonzero exit status. `--max-products N` demonstrates the expansion budget.
++`solve_ns` and `recovery_ns` are null because those operations are outside this adapter.
++Only the active assignment wires are copied into a padded polynomial point.
++
++The Rust integration suite is offline; Circom, Node and the independent reader are required
++only to regenerate the pinned fixture and research evidence. See the
++[reproduction commands](../../research/r1cs-725/README.md).
+diff --git a/examples/r1cs_import.rs b/examples/r1cs_import.rs
+new file mode 100644
+index 00000000..051c7d6e
+--- /dev/null
++++ b/examples/r1cs_import.rs
+@@ -0,0 +1,244 @@
++use std::{error::Error, fs::File, io::Read, path::Path, process::ExitCode, time::Instant};
++use zeebra::{
++    fields::{Bn254Fr, Zp7},
++    r1cs::{ImportLimits, R1cs},
++    util::{peak_resident_bytes, Json},
++    KnownOrder,
++};
++
++struct Args {
++    input: String,
++    field: String,
++    capacity: usize,
++    symbols: Option<String>,
++    assignment: Option<String>,
++    limits: ImportLimits,
++}
++
++fn bounded_read(path: &Path, maximum: usize) -> Result<Vec<u8>, Box<dyn Error>> {
++    let mut bytes = Vec::new();
++    File::open(path)?
++        .take((maximum as u64).saturating_add(1))
++        .read_to_end(&mut bytes)?;
++    if bytes.len() > maximum {
++        return Err(zeebra::r1cs::Error::Limit {
++            resource: "input bytes",
++            limit: maximum,
++        }
++        .into());
++    }
++    Ok(bytes)
++}
++
++fn run<F: KnownOrder, const N: usize>(args: &Args) -> (Json, bool) {
++    let start = Instant::now();
++    let mut stage = "read";
++    let mut report = vec![
++        ("input", Json::string(&args.input)),
++        ("field", Json::string(&args.field)),
++        ("capacity", Json::size(N)),
++        ("workers", Json::int(1)),
++        ("seed", Json::int(0)),
++        ("solve_ns", Json::Null),
++        ("recovery_ns", Json::Null),
++    ];
++    let result = (|| -> Result<(), Box<dyn Error>> {
++        let at = Instant::now();
++        let read = bounded_read(Path::new(&args.input), args.limits.max_input_bytes);
++        report.push(("read_ns", Json::nanos(at.elapsed())));
++        let bytes = read?;
++        report.push(("input_bytes", Json::size(bytes.len())));
++        stage = "parse";
++        let at = Instant::now();
++        let parsed = R1cs::<F>::parse(&bytes, &args.limits);
++        report.push(("parse_ns", Json::nanos(at.elapsed())));
++        let mut model = parsed?;
++        if let Some(path) = &args.symbols {
++            stage = "symbols";
++            let at = Instant::now();
++            let symbols = bounded_read(Path::new(path), args.limits.max_input_bytes)?;
++            model = model.with_symbols(std::str::from_utf8(&symbols)?)?;
++            report.push(("symbols_ns", Json::nanos(at.elapsed())));
++        }
++        report.push(("source_digest", Json::string(model.source_digest())));
++        report.push(("canonical_digest", Json::string(model.canonical_digest())));
++        report.push((
++            "symbol_digest",
++            model
++                .symbol_digest()
++                .map(Json::string)
++                .unwrap_or(Json::Null),
++        ));
++        report.push(("wires", Json::size(model.header().wire_count)));
++        report.push(("constraints", Json::size(model.header().constraint_count)));
++        report.push((
++            "wire_labels",
++            Json::Array(
++                model
++                    .wire_labels()
++                    .iter()
++                    .map(|label| Json::int(*label))
++                    .collect(),
++            ),
++        ));
++        stage = "expand";
++        let at = Instant::now();
++        let expansion = model.expand::<N>();
++        report.push(("model_ns", Json::nanos(at.elapsed())));
++        let expanded = expansion?;
++        report.push(("source_terms", Json::size(expanded.stats.source_terms)));
++        report.push(("products", Json::size(expanded.stats.products)));
++        report.push(("expanded_terms", Json::size(expanded.stats.expanded_terms)));
++        report.push(("max_row_terms", Json::size(expanded.stats.max_row_terms)));
++        report.push((
++            "row_ids",
++            Json::Array(
++                expanded
++                    .row_ids
++                    .iter()
++                    .map(|row| Json::size(*row))
++                    .collect(),
++            ),
++        ));
++        report.push((
++            "variable_to_wire",
++            Json::Array(
++                expanded
++                    .variable_to_wire
++                    .iter()
++                    .map(|wire| Json::int(*wire))
++                    .collect(),
++            ),
++        ));
++        if let Some(assignment) = &args.assignment {
++            stage = "assignment";
++            let wires = assignment
++                .split(',')
++                .map(F::from_str)
++                .collect::<Result<Vec<_>, _>>()?;
++            let at = Instant::now();
++            let evaluation = model.evaluate_assignment(&wires);
++            report.push(("independent_check_ns", Json::nanos(at.elapsed())));
++            let residuals = evaluation?;
++            let at = Instant::now();
++            let mut point = [F::zero(); N];
++            point[..wires.len() - 1].copy_from_slice(&wires[1..]);
++            let evaluated: Vec<_> = expanded
++                .polynomials
++                .iter()
++                .map(|p| p.eval(&point))
++                .collect();
++            report.push(("polynomial_check_ns", Json::nanos(at.elapsed())));
++            if residuals != evaluated {
++                return Err("original rows and expanded polynomials disagree".into());
++            }
++            report.push(("evaluation_agrees", Json::Bool(true)));
++            report.push((
++                "assignment_satisfies",
++                Json::Bool(residuals.iter().all(|value| value.is_zero())),
++            ));
++            report.push((
++                "residuals",
++                Json::Array(
++                    residuals
++                        .iter()
++                        .map(|value| Json::string(value.to_string()))
++                        .collect(),
++                ),
++            ));
++        }
++        Ok(())
++    })();
++    let complete = result.is_ok();
++    match result {
++        Ok(()) => report.push(("outcome", Json::string("complete"))),
++        Err(error) => {
++            report.push(("outcome", Json::string("refused")));
++            report.push(("stage", Json::string(stage)));
++            report.push(("error", Json::string(error.to_string())));
++        }
++    }
++    report.push(("elapsed_ns", Json::nanos(start.elapsed())));
++    report.push((
++        "peak_rss_bytes",
++        peak_resident_bytes().map(Json::int).unwrap_or(Json::Null),
++    ));
++    (Json::object(report), complete)
++}
++
++fn dispatch<F: KnownOrder>(args: &Args) -> Result<(Json, bool), Box<dyn Error>> {
++    Ok(match args.capacity {
++        0 => run::<F, 0>(args),
++        1 => run::<F, 1>(args),
++        2 => run::<F, 2>(args),
++        3 => run::<F, 3>(args),
++        4 => run::<F, 4>(args),
++        6 => run::<F, 6>(args),
++        8 => run::<F, 8>(args),
++        16 => run::<F, 16>(args),
++        32 => run::<F, 32>(args),
++        64 => run::<F, 64>(args),
++        99 => run::<F, 99>(args),
++        _ => return Err("compiled capacities: 0,1,2,3,4,6,8,16,32,64,99".into()),
++    })
++}
++
++fn main() -> ExitCode {
++    let mut arguments = std::env::args().skip(1);
++    let Some(input) = arguments.next() else {
++        eprintln!("usage: r1cs_import INPUT --field 7|bn254 --capacity N [--symbols FILE] [--assignment 1,...] [--max-products N]");
++        return ExitCode::FAILURE;
++    };
++    if input == "--help" {
++        println!("usage: r1cs_import INPUT --field 7|bn254 --capacity N [--symbols FILE] [--assignment 1,...] [--max-products N]");
++        return ExitCode::SUCCESS;
++    }
++    let result = (|| -> Result<(Json, bool), Box<dyn Error>> {
++        let mut args = Args {
++            input,
++            field: "bn254".into(),
++            capacity: 3,
++            symbols: None,
++            assignment: None,
++            limits: ImportLimits::default(),
++        };
++        while let Some(flag) = arguments.next() {
++            let value = arguments.next().ok_or("a flag is missing its value")?;
++            match flag.as_str() {
++                "--field" => args.field = value,
++                "--capacity" => args.capacity = value.parse()?,
++                "--symbols" => args.symbols = Some(value),
++                "--assignment" => args.assignment = Some(value),
++                "--max-products" => args.limits.max_products = value.parse()?,
++                _ => return Err(format!("unknown flag {flag}").into()),
++            }
++        }
++        match args.field.as_str() {
++            "7" => dispatch::<Zp7>(&args),
++            "bn254" => dispatch::<Bn254Fr>(&args),
++            _ => Err("field must be 7 or bn254".into()),
++        }
++    })();
++    match result {
++        Ok((report, complete)) => {
++            println!("{}", report.to_json());
++            if complete {
++                ExitCode::SUCCESS
++            } else {
++                ExitCode::FAILURE
++            }
++        }
++        Err(error) => {
++            println!(
++                "{}",
++                Json::object([
++                    ("outcome", Json::string("refused")),
++                    ("stage", Json::string("arguments")),
++                    ("error", Json::string(error.to_string()))
++                ])
++                .to_json()
++            );
++            ExitCode::FAILURE
++        }
++    }
++}
+diff --git a/src/lib.rs b/src/lib.rs
+index d7230e13..884992eb 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,7 +1,4 @@
+-//! Algebra
+-//!
+-//! This crate provides efficient operations for computing with finite fields and polynomials
+-//! over finite fields.  
++//! Finite-field algebra with const-generic multivariate polynomial arity.
+ 
+ // These are noisy. Maybe re-enable them later.
+ #![allow(clippy::suspicious_arithmetic_impl)]
+@@ -27,6 +24,7 @@ pub mod integers;
+ mod left_scalar_mul;
+ pub mod linalg;
+ mod poly;
++pub mod r1cs;
+ mod rings;
+ 
+ pub mod util;
+@@ -87,6 +85,7 @@ pub use rings::Ring;
+ #[doc = include_str!("../docs/guide/number-theory.md")]
+ #[doc = include_str!("../docs/guide/polynomials.md")]
+ #[doc = include_str!("../docs/guide/reed-solomon.md")]
++#[doc = include_str!("../docs/guide/r1cs.md")]
+ #[doc = include_str!("../docs/guide/solving-systems.md")]
+ #[doc = include_str!("../docs/guide/status.md")]
+ pub struct DocumentationExamples;
+diff --git a/src/r1cs.rs b/src/r1cs.rs
+new file mode 100644
+index 00000000..405c16d7
+--- /dev/null
++++ b/src/r1cs.rs
+@@ -0,0 +1,695 @@
++//! A strict R1CS v1 profile: wire zero is constant one, and wire i maps to variable i − 1.
++//! Custom gates and unknown sections are refused rather than silently losing constraints.
++
++use crate::{util::sha256_hex, KnownOrder, Monomial, MultivariatePolynomial};
++use std::{
++    collections::{BTreeMap, BTreeSet},
++    fmt,
++    time::{Duration, Instant},
++};
++
++/// Structural limits and a cooperative deadline for each parser or expansion operation.
++///
++/// These do not enforce total process RSS or interrupt an individual field operation. Use an
++/// external process supervisor when a hard wall or memory ceiling is required.
++#[derive(Clone, Debug)]
++pub struct ImportLimits {
++    /// Maximum binary input or symbol-sidecar bytes.
++    pub max_input_bytes: usize,
++    /// Maximum number of wires, including constant wire zero.
++    pub max_wires: usize,
++    /// Maximum number of original rows.
++    pub max_constraints: usize,
++    /// Maximum optional symbol-sidecar records, including optimized-out signals.
++    pub max_symbols: usize,
++    /// Maximum total A-by-B scalar products during expansion, before cancellation.
++    pub max_products: usize,
++    /// Maximum retained polynomial terms across all rows, after cancellation.
++    pub max_expanded_terms: usize,
++    /// Cooperative per-operation deadline.
++    pub timeout: Duration,
++}
++
++impl Default for ImportLimits {
++    fn default() -> Self {
++        Self {
++            max_input_bytes: 16 * 1024 * 1024,
++            max_wires: 100,
++            max_constraints: 1_000,
++            max_symbols: 10_000,
++            max_products: 100_000,
++            max_expanded_terms: 100_000,
++            timeout: Duration::from_secs(60),
++        }
++    }
++}
++
++/// A rejected input, assignment, capacity or resource boundary.
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub enum Error {
++    /// The file does not start with the R1CS magic bytes.
++    InvalidMagic,
++    /// Only version one is supported.
++    UnsupportedVersion(u32),
++    /// A requested read extends past the supplied bytes.
++    Truncated { offset: usize, needed: usize },
++    /// A container or section has unconsumed bytes.
++    TrailingBytes,
++    /// A required section is absent.
++    MissingSection(u32),
++    /// A section occurs more than once.
++    DuplicateSection(u32),
++    /// This profile does not interpret the section.
++    UnsupportedSection(u32),
++    /// Header counts or field width are inconsistent.
++    InvalidHeader(&'static str),
++    /// The requested coefficient domain is not a prime field.
++    NonPrimeField,
++    /// The declared modulus differs from the requested field.
++    FieldMismatch,
++    /// A row references a nonexistent wire.
++    InvalidWire { row: usize, wire: u32 },
++    /// Sparse terms are repeated, unordered or exceed the wire count.
++    InvalidLinearCombination { row: usize },
++    /// A sparse coefficient is zero or outside the canonical residue range.
++    NonCanonicalCoefficient { row: usize },
++    /// Wire-label mappings are repeated, out of range or violate wire zero's identity.
++    InvalidWireMap,
++    /// A symbol record is malformed, ambiguous or out of range.
++    InvalidSymbol { line: usize },
++    /// An assignment does not provide exactly the original wire count.
++    AssignmentLength { expected: usize, actual: usize },
++    /// Assignment wire zero is not one.
++    ConstantWire,
++    /// The caller-selected polynomial capacity is too small.
++    Arity { needed: usize, capacity: usize },
++    /// A structural limit would be exceeded.
++    Limit {
++        resource: &'static str,
++        limit: usize,
++    },
++    /// The cooperative deadline expired.
++    Deadline,
++}
++
++impl fmt::Display for Error {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        write!(f, "R1CS: {self:?}")
++    }
++}
++impl std::error::Error for Error {}
++
++/// Original header counts; public and private inputs precede internal wires.
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct Header {
++    /// Canonical field width, in bytes, rounded up to a whole 64-bit limb.
++    pub field_bytes: usize,
++    /// Wire count including wire zero.
++    pub wire_count: usize,
++    /// Public output count, starting at wire one.
++    pub public_outputs: usize,
++    /// Public input count, immediately after the public outputs.
++    pub public_inputs: usize,
++    /// Private input count, immediately after the public inputs.
++    pub private_inputs: usize,
++    /// Label identifiers are strictly below this bound.
++    pub label_count: u64,
++    /// Number of original rows, including rows that expand to zero.
++    pub constraint_count: usize,
++}
++
++/// A wire's original R1CS role, without identifying private inputs with internal wires.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum WireRole {
++    /// Implicit constant one.
++    Constant,
++    /// Public output.
++    PublicOutput,
++    /// Public input.
++    PublicInput,
++    /// Private input.
++    PrivateInput,
++    /// Intermediate witness wire.
++    Internal,
++}
++
++/// One original sparse dot product, in strictly increasing wire order.
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct LinearCombination<F: KnownOrder> {
++    terms: Vec<(u32, F)>,
++}
++
++impl<F: KnownOrder> LinearCombination<F> {
++    /// Original wire identifiers and canonical nonzero coefficients.
++    pub fn terms(&self) -> &[(u32, F)] {
++        &self.terms
++    }
++
++    fn dot(&self, assignment: &[F]) -> F {
++        self.terms
++            .iter()
++            .fold(F::zero(), |sum, (wire, coefficient)| {
++                sum + *coefficient * assignment[*wire as usize]
++            })
++    }
++}
++
++/// A preserved original row `(A·w)(B·w) − C·w = 0`.
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct Constraint<F: KnownOrder> {
++    /// Zero-based row index in the input file.
++    pub id: usize,
++    /// Left dot product.
++    pub a: LinearCombination<F>,
++    /// Right dot product.
++    pub b: LinearCombination<F>,
++    /// Subtracted dot product.
++    pub c: LinearCombination<F>,
++}
++
++/// An optional Circom `.sym` record; aliases and optimized-out signals are retained.
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct Symbol {
++    /// Original signal label.
++    pub label: u64,
++    /// Witness wire, or `None` for a producer's `-1` optimized-out signal.
++    pub wire: Option<u32>,
++    /// Producer component identifier.
++    pub component: u64,
++    /// Original qualified signal name.
++    pub name: String,
++}
++
++/// A parsed model, kept independently of its polynomial expansion.
++#[derive(Clone, Debug)]
++pub struct R1cs<F: KnownOrder> {
++    header: Header,
++    constraints: Vec<Constraint<F>>,
++    wire_labels: Vec<u64>,
++    symbols: Vec<Symbol>,
++    source_digest: String,
++    canonical: Vec<u8>,
++    limits: ImportLimits,
++}
++
++/// Actual expansion work and retained size, without inferring process memory from them.
++#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
++pub struct ExpansionStats {
++    /// Total original A, B and C sparse entries.
++    pub source_terms: usize,
++    /// A-by-B scalar products, including products that later cancel.
++    pub products: usize,
++    /// Retained terms across all polynomial rows.
++    pub expanded_terms: usize,
++    /// Largest retained polynomial row.
++    pub max_row_terms: usize,
++}
++
++/// A caller-sized polynomial system with explicit original-row and active-variable mappings.
++#[derive(Clone, Debug)]
++pub struct Expansion<const N: usize, F: KnownOrder> {
++    /// Exactly one polynomial per original row, including zero polynomials.
++    pub polynomials: Vec<MultivariatePolynomial<N, F>>,
++    /// Corresponding zero-based original row IDs.
++    pub row_ids: Vec<usize>,
++    /// Wire IDs for the active prefix of variables; remaining capacity is unused padding.
++    pub variable_to_wire: Vec<u32>,
++    /// Expansion work and size.
++    pub stats: ExpansionStats,
++}
++
++struct Deadline {
++    start: Instant,
++    duration: Duration,
++}
++impl Deadline {
++    fn new(duration: Duration) -> Self {
++        Self {
++            start: Instant::now(),
++            duration,
++        }
++    }
++    fn check(&self) -> Result<(), Error> {
++        if self.start.elapsed() >= self.duration {
++            Err(Error::Deadline)
++        } else {
++            Ok(())
++        }
++    }
++}
++
++struct Reader<'a> {
++    bytes: &'a [u8],
++    at: usize,
++}
++impl<'a> Reader<'a> {
++    fn new(bytes: &'a [u8]) -> Self {
++        Self { bytes, at: 0 }
++    }
++    fn take(&mut self, count: usize) -> Result<&'a [u8], Error> {
++        let end = self
++            .at
++            .checked_add(count)
++            .filter(|end| *end <= self.bytes.len())
++            .ok_or(Error::Truncated {
++                offset: self.at,
++                needed: count,
++            })?;
++        let result = &self.bytes[self.at..end];
++        self.at = end;
++        Ok(result)
++    }
++    fn u32(&mut self) -> Result<u32, Error> {
++        Ok(u32::from_le_bytes(
++            self.take(4)?.try_into().expect("four bytes"),
++        ))
++    }
++    fn u64(&mut self) -> Result<u64, Error> {
++        Ok(u64::from_le_bytes(
++            self.take(8)?.try_into().expect("eight bytes"),
++        ))
++    }
++    fn finish(self) -> Result<(), Error> {
++        if self.at == self.bytes.len() {
++            Ok(())
++        } else {
++            Err(Error::TrailingBytes)
++        }
++    }
++}
++
++fn limit(value: usize, maximum: usize, resource: &'static str) -> Result<(), Error> {
++    if value > maximum {
++        Err(Error::Limit {
++            resource,
++            limit: maximum,
++        })
++    } else {
++        Ok(())
++    }
++}
++
++fn modulus<F: KnownOrder>() -> Result<Vec<u8>, Error> {
++    if F::characteristic_limbs() != F::order_limbs() {
++        return Err(Error::NonPrimeField);
++    }
++    let words = F::characteristic_limbs();
++    if words.is_empty() || words.len() > 4 || (words.len() == 1 && words[0] < 2) {
++        return Err(Error::InvalidHeader(
++            "prime field width must be 8 to 32 bytes",
++        ));
++    }
++    Ok(words.iter().flat_map(|word| word.to_le_bytes()).collect())
++}
++
++fn decode<F: KnownOrder>(bytes: &[u8]) -> F {
++    bytes.iter().rev().fold(F::zero(), |value, byte| {
++        value * F::new(256) + F::new(u64::from(*byte))
++    })
++}
++
++impl<F: KnownOrder> R1cs<F> {
++    /// Parse the strict three-section R1CS v1 profile into the requested prime field.
++    ///
++    /// Sections 1, 2 and 3 are required exactly once in any order. Custom gates and unknown
++    /// sections are explicitly unsupported. Coefficients must be sorted, nonzero canonical residues.
++    pub fn parse(bytes: &[u8], limits: &ImportLimits) -> Result<Self, Error> {
++        let deadline = Deadline::new(limits.timeout);
++        deadline.check()?;
++        limit(bytes.len(), limits.max_input_bytes, "input bytes")?;
++        let prime = modulus::<F>()?;
++        let mut reader = Reader::new(bytes);
++        if reader.take(4)? != b"r1cs" {
++            return Err(Error::InvalidMagic);
++        }
++        let version = reader.u32()?;
++        if version != 1 {
++            return Err(Error::UnsupportedVersion(version));
++        }
++        let section_count = reader.u32()?;
++        let mut sections = BTreeMap::new();
++        for _ in 0..section_count {
++            deadline.check()?;
++            let kind = reader.u32()?;
++            if !matches!(kind, 1..=3) {
++                return Err(Error::UnsupportedSection(kind));
++            }
++            if sections.contains_key(&kind) {
++                return Err(Error::DuplicateSection(kind));
++            }
++            let size = usize::try_from(reader.u64()?)
++                .map_err(|_| Error::InvalidHeader("section size overflows usize"))?;
++            sections.insert(kind, reader.take(size)?);
++        }
++        reader.finish()?;
++        for kind in 1..=3 {
++            if !sections.contains_key(&kind) {
++                return Err(Error::MissingSection(kind));
++            }
++        }
++        let mut header = Reader::new(sections[&1]);
++        let field_bytes = header.u32()? as usize;
++        if field_bytes != prime.len() {
++            return Err(Error::InvalidHeader(
++                "noncanonical or unsupported field width",
++            ));
++        }
++        if header.take(field_bytes)? != prime {
++            return Err(Error::FieldMismatch);
++        }
++        let wire_count = header.u32()? as usize;
++        let public_outputs = header.u32()? as usize;
++        let public_inputs = header.u32()? as usize;
++        let private_inputs = header.u32()? as usize;
++        let label_count = header.u64()?;
++        let constraint_count = header.u32()? as usize;
++        header.finish()?;
++        let inputs = (public_outputs as u64) + (public_inputs as u64) + (private_inputs as u64);
++        if wire_count == 0 || inputs >= wire_count as u64 || label_count < wire_count as u64 {
++            return Err(Error::InvalidHeader(
++                "wire, role or label counts are inconsistent",
++            ));
++        }
++        limit(wire_count, limits.max_wires, "wires")?;
++        limit(constraint_count, limits.max_constraints, "constraints")?;
++        let header = Header {
++            field_bytes,
++            wire_count,
++            public_outputs,
++            public_inputs,
++            private_inputs,
++            label_count,
++            constraint_count,
++        };
++        let mut rows = Reader::new(sections[&2]);
++        let mut constraints = Vec::new();
++        for id in 0..constraint_count {
++            deadline.check()?;
++            let mut read_lc = || -> Result<LinearCombination<F>, Error> {
++                let count = rows.u32()? as usize;
++                if count > wire_count {
++                    return Err(Error::InvalidLinearCombination { row: id });
++                }
++                let mut terms = Vec::new();
++                let mut previous = None;
++                for _ in 0..count {
++                    deadline.check()?;
++                    let wire = rows.u32()?;
++                    if wire as usize >= wire_count {
++                        return Err(Error::InvalidWire { row: id, wire });
++                    }
++                    if previous.is_some_and(|previous| wire <= previous) {
++                        return Err(Error::InvalidLinearCombination { row: id });
++                    }
++                    previous = Some(wire);
++                    let bytes = rows.take(field_bytes)?;
++                    if bytes.iter().all(|byte| *byte == 0)
++                        || bytes.iter().rev().cmp(prime.iter().rev()).is_ge()
++                    {
++                        return Err(Error::NonCanonicalCoefficient { row: id });
++                    }
++                    terms.push((wire, decode(bytes)));
++                }
++                Ok(LinearCombination { terms })
++            };
++            constraints.push(Constraint {
++                id,
++                a: read_lc()?,
++                b: read_lc()?,
++                c: read_lc()?,
++            });
++        }
++        rows.finish()?;
++        let mut labels = Reader::new(sections[&3]);
++        let mut wire_labels = Vec::new();
++        let mut seen = BTreeSet::new();
++        for wire in 0..wire_count {
++            deadline.check()?;
++            let label = labels.u64()?;
++            if label >= label_count || !seen.insert(label) || (wire == 0 && label != 0) {
++                return Err(Error::InvalidWireMap);
++            }
++            wire_labels.push(label);
++        }
++        labels.finish()?;
++        deadline.check()?;
++        let mut canonical = b"r1cs".to_vec();
++        canonical.extend(1u32.to_le_bytes());
++        canonical.extend(3u32.to_le_bytes());
++        for kind in 1u32..=3 {
++            let section = sections[&kind];
++            canonical.extend(kind.to_le_bytes());
++            canonical.extend((section.len() as u64).to_le_bytes());
++            canonical.extend(section);
++        }
++        let source_digest = sha256_hex(bytes);
++        deadline.check()?;
++        Ok(Self {
++            header,
++            constraints,
++            wire_labels,
++            symbols: Vec::new(),
++            source_digest,
++            canonical,
++            limits: limits.clone(),
++        })
++    }
++
++    /// Checked original header counts.
++    pub fn header(&self) -> &Header {
++        &self.header
++    }
++    /// Original rows, without polynomial expansion or renumbering.
++    pub fn constraints(&self) -> &[Constraint<F>] {
++        &self.constraints
++    }
++    /// Original wire-to-label map, indexed by wire ID.
++    pub fn wire_labels(&self) -> &[u64] {
++        &self.wire_labels
++    }
++    /// Optional symbol records, ordered by original label ID.
++    pub fn symbols(&self) -> &[Symbol] {
++        &self.symbols
++    }
++    /// SHA-256 of the exact input bytes, before normalization.
++    pub fn source_digest(&self) -> &str {
++        &self.source_digest
++    }
++
++    /// Classify an original wire; internal witness wires are not private-input declarations.
++    pub fn wire_role(&self, wire: u32) -> Option<WireRole> {
++        let wire = wire as usize;
++        if wire >= self.header.wire_count {
++            return None;
++        }
++        Some(if wire == 0 {
++            WireRole::Constant
++        } else if wire <= self.header.public_outputs {
++            WireRole::PublicOutput
++        } else if wire <= self.header.public_outputs + self.header.public_inputs {
++            WireRole::PublicInput
++        } else if wire
++            <= self.header.public_outputs + self.header.public_inputs + self.header.private_inputs
++        {
++            WireRole::PrivateInput
++        } else {
++            WireRole::Internal
++        })
++    }
++
++    /// Attach a bounded Circom `.sym` sidecar without changing row or wire identity.
++    ///
++    /// Labels and names must be unique. Labels chosen by the binary map must retain their wire;
++    /// other labels may alias a wire or use `-1` for an optimized-out signal.
++    pub fn with_symbols(mut self, text: &str) -> Result<Self, Error> {
++        let deadline = Deadline::new(self.limits.timeout);
++        deadline.check()?;
++        limit(text.len(), self.limits.max_input_bytes, "symbol bytes")?;
++        let mut labels = BTreeMap::new();
++        let mut names = BTreeSet::new();
++        let canonical_wires: BTreeMap<_, _> = self
++            .wire_labels
++            .iter()
++            .enumerate()
++            .map(|(wire, label)| (*label, wire as u32))
++            .collect();
++        for (at, line) in text.lines().enumerate() {
++            deadline.check()?;
++            limit(at + 1, self.limits.max_symbols, "symbols")?;
++            let line_number = at + 1;
++            let invalid = || Error::InvalidSymbol { line: line_number };
++            let fields: Vec<_> = line.splitn(4, ',').collect();
++            if fields.len() != 4 || fields[3].is_empty() {
++                return Err(invalid());
++            }
++            let label: u64 = fields[0].parse().map_err(|_| invalid())?;
++            let wire = if fields[1] == "-1" {
++                None
++            } else {
++                Some(fields[1].parse::<u32>().map_err(|_| invalid())?)
++            };
++            let component: u64 = fields[2].parse().map_err(|_| invalid())?;
++            if label >= self.header.label_count
++                || wire.is_some_and(|wire| wire as usize >= self.header.wire_count)
++                || (label == 0 && wire != Some(0))
++                || canonical_wires
++                    .get(&label)
++                    .is_some_and(|canonical| wire != Some(*canonical))
++                || labels.contains_key(&label)
++                || !names.insert(fields[3].to_string())
++            {
++                return Err(invalid());
++            }
++            labels.insert(
++                label,
++                Symbol {
++                    label,
++                    wire,
++                    component,
++                    name: fields[3].to_string(),
++                },
++            );
++        }
++        self.symbols = labels.into_values().collect();
++        deadline.check()?;
++        Ok(self)
++    }
++
++    /// Evaluate original sparse rows directly; this does not call the polynomial converter.
++    pub fn evaluate_assignment(&self, assignment: &[F]) -> Result<Vec<F>, Error> {
++        if assignment.len() != self.header.wire_count {
++            return Err(Error::AssignmentLength {
++                expected: self.header.wire_count,
++                actual: assignment.len(),
++            });
++        }
++        if assignment[0] != F::one() {
++            return Err(Error::ConstantWire);
++        }
++        Ok(self
++            .constraints
++            .iter()
++            .map(|row| row.a.dot(assignment) * row.b.dot(assignment) - row.c.dot(assignment))
++            .collect())
++    }
++
++    /// Expand rows into capacity `N`, replacing wire zero by one and wire i by variable i − 1.
++    ///
++    /// Padding beyond the active prefix remains unconstrained and is not a new witness wire.
++    /// Capacity itself is bounded by `max_wires - 1` to bound per-term monomial storage.
++    pub fn expand<const N: usize>(&self) -> Result<Expansion<N, F>, Error> {
++        let deadline = Deadline::new(self.limits.timeout);
++        deadline.check()?;
++        let needed = self.header.wire_count - 1;
++        if needed > N {
++            return Err(Error::Arity {
++                needed,
++                capacity: N,
++            });
++        }
++        limit(
++            N,
++            self.limits.max_wires.saturating_sub(1),
++            "polynomial capacity",
++        )?;
++        self.expand_checked::<N>(&deadline)
++    }
++
++    // Rejected capacities must not reserve the fixed exponent arrays in the guard's stack frame.
++    #[inline(never)]
++    fn expand_checked<const N: usize>(
++        &self,
++        deadline: &Deadline,
++    ) -> Result<Expansion<N, F>, Error> {
++        let mut result = Expansion {
++            polynomials: Vec::new(),
++            row_ids: Vec::new(),
++            variable_to_wire: (1..self.header.wire_count as u32).collect(),
++            stats: ExpansionStats::default(),
++        };
++        for row in &self.constraints {
++            deadline.check()?;
++            let products = row
++                .a
++                .terms
++                .len()
++                .checked_mul(row.b.terms.len())
++                .and_then(|count| result.stats.products.checked_add(count))
++                .ok_or(Error::Limit {
++                    resource: "products",
++                    limit: self.limits.max_products,
++                })?;
++            limit(products, self.limits.max_products, "products")?;
++            result.stats.products = products;
++            result.stats.source_terms += row.a.terms.len() + row.b.terms.len() + row.c.terms.len();
++            let mut terms = Vec::new();
++            for (left, a) in &row.a.terms {
++                for (right, b) in &row.b.terms {
++                    deadline.check()?;
++                    let mut powers = [0u32; N];
++                    if *left != 0 {
++                        powers[*left as usize - 1] += 1;
++                    }
++                    if *right != 0 {
++                        powers[*right as usize - 1] += 1;
++                    }
++                    terms.push((Monomial::new(&powers), *a * *b));
++                }
++            }
++            for (wire, coefficient) in &row.c.terms {
++                deadline.check()?;
++                let mut powers = [0u32; N];
++                if *wire != 0 {
++                    powers[*wire as usize - 1] = 1;
++                }
++                terms.push((Monomial::new(&powers), -*coefficient));
++            }
++            let polynomial = MultivariatePolynomial::new(&terms);
++            let count = polynomial.terms().len();
++            let expanded = result
++                .stats
++                .expanded_terms
++                .checked_add(count)
++                .ok_or(Error::Limit {
++                    resource: "expanded terms",
++                    limit: self.limits.max_expanded_terms,
++                })?;
++            limit(expanded, self.limits.max_expanded_terms, "expanded terms")?;
++            result.stats.expanded_terms = expanded;
++            result.stats.max_row_terms = result.stats.max_row_terms.max(count);
++            result.row_ids.push(row.id);
++            result.polynomials.push(polynomial);
++        }
++        deadline.check()?;
++        Ok(result)
++    }
++
++    /// Canonical three-section R1CS bytes, with sections ordered 1, 2, 3.
++    ///
++    /// Optional symbols are a sidecar and are excluded; use [`Self::symbol_digest`] to bind them.
++    pub fn to_bytes(&self) -> Vec<u8> {
++        self.canonical.clone()
++    }
++
++    /// SHA-256 of canonical R1CS bytes, independent of section order and optional symbols.
++    pub fn canonical_digest(&self) -> String {
++        sha256_hex(&self.canonical)
++    }
++
++    /// SHA-256 binding a nonempty ordered symbol sidecar to the canonical R1CS identity.
++    pub fn symbol_digest(&self) -> Option<String> {
++        if self.symbols.is_empty() {
++            return None;
++        }
++        let mut bytes = b"zeebra-r1cs-symbols-v1\0".to_vec();
++        bytes.extend(self.canonical_digest().bytes());
++        for symbol in &self.symbols {
++            bytes.extend(symbol.label.to_le_bytes());
++            bytes.extend(symbol.wire.map(i64::from).unwrap_or(-1).to_le_bytes());
++            bytes.extend(symbol.component.to_le_bytes());
++            bytes.extend((symbol.name.len() as u64).to_le_bytes());
++            bytes.extend(symbol.name.bytes());
++        }
++        Some(sha256_hex(&bytes))
++    }
++}
+diff --git a/tests/fixtures/r1cs/multiplier.circom b/tests/fixtures/r1cs/multiplier.circom
+new file mode 100644
+index 00000000..682e4aa8
+--- /dev/null
++++ b/tests/fixtures/r1cs/multiplier.circom
+@@ -0,0 +1,10 @@
++pragma circom 2.2.3;
++
++template Multiplier() {
++    signal input a;
++    signal input b;
++    signal output product;
++    product <== a * b;
++}
++
++component main {public [a]} = Multiplier();
+diff --git a/tests/fixtures/r1cs/multiplier.r1cs b/tests/fixtures/r1cs/multiplier.r1cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8db3126d2f00f35fa87a3b5d4c4d4202ea7bf20c
+GIT binary patch
+literal 264
+zcmXRiOfF_*U|?WoU|?WkU|^_VfB=vfh|j>l@L}@Tht3lVc2;`4FxH5TXl&f(8n8oi
+zf#Jg<zZ3(QUJ#8BfaIZS2%6^rHAn%X2d{b-sJSrnL3|JZ@j-q9nSl(TZh-j>tOf)C
+D+MX?9
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/fixtures/r1cs/multiplier.sym b/tests/fixtures/r1cs/multiplier.sym
+new file mode 100644
+index 00000000..94e2f29b
+--- /dev/null
++++ b/tests/fixtures/r1cs/multiplier.sym
+@@ -0,0 +1,3 @@
++1,1,0,main.product
++2,2,0,main.a
++3,3,0,main.b
+diff --git a/tests/r1cs.rs b/tests/r1cs.rs
+new file mode 100644
+index 00000000..4f891653
+--- /dev/null
++++ b/tests/r1cs.rs
+@@ -0,0 +1,573 @@
++use std::time::Duration;
++use zeebra::{
++    fields::{Bn254Fr, Gf256, Zp7},
++    r1cs::{Error, ImportLimits, R1cs, WireRole},
++    FiniteField, One, Zero,
++};
++
++type Row = [Vec<(u32, u64)>; 3];
++
++fn encode(wires: u32, rows: &[Row]) -> Vec<u8> {
++    let mut header = 8u32.to_le_bytes().to_vec();
++    header.extend(7u64.to_le_bytes());
++    for count in [
++        wires,
++        u32::from(wires > 1),
++        u32::from(wires > 2),
++        u32::from(wires > 3),
++    ] {
++        header.extend(count.to_le_bytes());
++    }
++    header.extend(u64::from(wires).to_le_bytes());
++    header.extend((rows.len() as u32).to_le_bytes());
++    let mut constraints = Vec::new();
++    for row in rows {
++        for lc in row {
++            constraints.extend((lc.len() as u32).to_le_bytes());
++            for (wire, coefficient) in lc {
++                constraints.extend(wire.to_le_bytes());
++                constraints.extend(coefficient.to_le_bytes());
++            }
++        }
++    }
++    let mapping = (0..u64::from(wires)).flat_map(u64::to_le_bytes).collect();
++    container(&[(1, header), (2, constraints), (3, mapping)])
++}
++
++fn container(parts: &[(u32, Vec<u8>)]) -> Vec<u8> {
++    let mut output = b"r1cs".to_vec();
++    output.extend(1u32.to_le_bytes());
++    output.extend((parts.len() as u32).to_le_bytes());
++    for (kind, data) in parts {
++        output.extend(kind.to_le_bytes());
++        output.extend((data.len() as u64).to_le_bytes());
++        output.extend(data);
++    }
++    output
++}
++
++fn parts(bytes: &[u8]) -> Vec<(u32, Vec<u8>)> {
++    let count = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
++    let mut at = 12;
++    (0..count)
++        .map(|_| {
++            let kind = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
++            let len = u64::from_le_bytes(bytes[at + 4..at + 12].try_into().unwrap()) as usize;
++            at += 12;
++            let data = bytes[at..at + len].to_vec();
++            at += len;
++            (kind, data)
++        })
++        .collect()
++}
++
++fn fixture() -> Vec<u8> {
++    encode(
++        4,
++        &[
++            [
++                vec![(0, 3), (1, 1), (2, 2)],
++                vec![(2, 1), (3, 4)],
++                vec![(0, 6), (3, 1)],
++            ],
++            [vec![(0, 1)], vec![(1, 1)], vec![(3, 1)]],
++            [vec![], vec![(2, 1)], vec![]],
++        ],
++    )
++}
++
++/// The pinned Circom fixture retains BN254 modulus, row order, wire roles, labels and symbols.
++#[test]
++fn test_reads_the_pinned_circom_fixture() {
++    let bytes = include_bytes!("fixtures/r1cs/multiplier.r1cs");
++    let model = R1cs::<Bn254Fr>::parse(bytes, &ImportLimits::default())
++        .unwrap()
++        .with_symbols(include_str!("fixtures/r1cs/multiplier.sym"))
++        .unwrap();
++    assert_eq!(model.header().wire_count, 4);
++    assert_eq!(model.header().constraint_count, 1);
++    assert_eq!(model.constraints()[0].id, 0);
++    assert_eq!(model.wire_labels(), &[0, 1, 2, 3]);
++    assert_eq!(model.wire_role(0), Some(WireRole::Constant));
++    assert_eq!(model.wire_role(1), Some(WireRole::PublicOutput));
++    assert_eq!(model.wire_role(2), Some(WireRole::PublicInput));
++    assert_eq!(model.wire_role(3), Some(WireRole::PrivateInput));
++    assert_eq!(model.wire_role(4), None);
++    assert_eq!(model.symbols()[1].name, "main.a");
++    assert_eq!(
++        model.source_digest(),
++        "16ab9e569919f7d25f32321974db3b1803b469d4ab0c25769cc94cc3f0d324f7"
++    );
++    assert_eq!(
++        model.canonical_digest(),
++        "945ef7efeda20135be64cfb8a91533cad8aba99bf1cd8f56c5d55ded1b9c4add"
++    );
++    assert_eq!(model.constraints()[0].a.terms(), &[(2, -Bn254Fr::one())]);
++    assert_eq!(model.constraints()[0].b.terms(), &[(3, Bn254Fr::one())]);
++    assert_eq!(model.constraints()[0].c.terms(), &[(1, -Bn254Fr::one())]);
++}
++
++/// Wide canonical residues decode independently of the field's internal Montgomery representation.
++#[test]
++fn test_bn254_coefficients_are_canonical_little_endian_residues() {
++    use rand::{rngs::StdRng, SeedableRng};
++    let mut rng = StdRng::seed_from_u64(725);
++    let values = [
++        Bn254Fr::new(255),
++        Bn254Fr::new(256),
++        Bn254Fr::new(600),
++        -Bn254Fr::one(),
++        Bn254Fr::random(&mut rng),
++        Bn254Fr::random(&mut rng),
++    ];
++    for expected in values {
++        let mut sections = parts(include_bytes!("fixtures/r1cs/multiplier.r1cs"));
++        let constraints = &mut sections.iter_mut().find(|(kind, _)| *kind == 2).unwrap().1;
++        let encoded: Vec<_> = expected
++            .canonical_limbs()
++            .into_iter()
++            .flat_map(u64::to_le_bytes)
++            .collect();
++        constraints[48..80].copy_from_slice(&encoded);
++        let model =
++            R1cs::<Bn254Fr>::parse(&container(&sections), &ImportLimits::default()).unwrap();
++        assert_eq!(model.constraints()[0].b.terms(), &[(3, expected)]);
++    }
++}
++
++/// Original sparse rows and expanded polynomials agree on every GF(7)^3 assignment.
++#[test]
++fn test_exhaustive_small_field_semantics() {
++    let model = R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
++    let expansion = model.expand::<3>().unwrap();
++    assert_eq!(expansion.row_ids, vec![0, 1, 2]);
++    assert_eq!(expansion.variable_to_wire, vec![1, 2, 3]);
++    assert_eq!(expansion.stats.products, 7);
++    assert_eq!(expansion.stats.source_terms, 11);
++    for a in 0..7 {
++        for b in 0..7 {
++            for c in 0..7 {
++                let point = [Zp7::new(a), Zp7::new(b), Zp7::new(c)];
++                let rows = model
++                    .evaluate_assignment(&[Zp7::one(), point[0], point[1], point[2]])
++                    .unwrap();
++                let expanded: Vec<_> = expansion
++                    .polynomials
++                    .iter()
++                    .map(|poly| poly.eval(&point))
++                    .collect();
++                assert_eq!(rows, expanded);
++            }
++        }
++    }
++}
++
++/// Circom's independently generated witness is accepted and a changed public output is rejected.
++#[test]
++fn test_producer_witness_and_perturbation() {
++    let model = R1cs::<Bn254Fr>::parse(
++        include_bytes!("fixtures/r1cs/multiplier.r1cs"),
++        &ImportLimits::default(),
++    )
++    .unwrap();
++    let expansion = model.expand::<3>().unwrap();
++    let mut wires = [
++        Bn254Fr::one(),
++        Bn254Fr::new(15),
++        Bn254Fr::new(3),
++        Bn254Fr::new(5),
++    ];
++    assert!(model
++        .evaluate_assignment(&wires)
++        .unwrap()
++        .iter()
++        .all(Zero::is_zero));
++    assert!(expansion.polynomials[0].eval(&wires[1..]).is_zero());
++    wires[1] += Bn254Fr::one();
++    assert!(!model.evaluate_assignment(&wires).unwrap()[0].is_zero());
++    assert_eq!(
++        model.evaluate_assignment(&wires).unwrap()[0],
++        expansion.polynomials[0].eval(&wires[1..])
++    );
++}
++
++/// Section order does not change canonical identity or the polynomial system.
++#[test]
++fn test_canonical_roundtrip_and_section_order() {
++    let bytes = fixture();
++    let original = R1cs::<Zp7>::parse(&bytes, &ImportLimits::default()).unwrap();
++    let mut reordered = parts(&bytes);
++    reordered.reverse();
++    let reordered = R1cs::<Zp7>::parse(&container(&reordered), &ImportLimits::default()).unwrap();
++    assert_eq!(original.canonical_digest(), reordered.canonical_digest());
++    assert_ne!(original.source_digest(), reordered.source_digest());
++    let again = R1cs::<Zp7>::parse(&original.to_bytes(), &ImportLimits::default()).unwrap();
++    assert_eq!(again.to_bytes(), bytes);
++    assert_eq!(
++        again.expand::<3>().unwrap().polynomials,
++        original.expand::<3>().unwrap().polynomials
++    );
++}
++
++/// Truncated containers and trailing data are rejected instead of returning partial rows.
++#[test]
++fn test_truncation_and_trailing_bytes() {
++    let bytes = fixture();
++    for end in 0..bytes.len() {
++        assert!(
++            R1cs::<Zp7>::parse(&bytes[..end], &ImportLimits::default()).is_err(),
++            "prefix {end}"
++        );
++    }
++    let mut extra = bytes;
++    extra.push(0);
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&extra, &ImportLimits::default()),
++        Err(Error::TrailingBytes)
++    ));
++}
++
++/// Missing, duplicate, unsupported and overflow-sized sections fail explicitly.
++#[test]
++fn test_section_validation() {
++    let original = parts(&fixture());
++    for missing in 1..=3 {
++        let rest: Vec<_> = original
++            .iter()
++            .filter(|(kind, _)| *kind != missing)
++            .cloned()
++            .collect();
++        assert!(
++            matches!(R1cs::<Zp7>::parse(&container(&rest), &ImportLimits::default()), Err(Error::MissingSection(kind)) if kind==missing)
++        );
++    }
++    let mut duplicate = original.clone();
++    duplicate.push(original[0].clone());
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&container(&duplicate), &ImportLimits::default()),
++        Err(Error::DuplicateSection(1))
++    ));
++    for unknown in [4, 5, 42] {
++        let mut extended = original.clone();
++        extended.push((unknown, vec![]));
++        assert!(
++            matches!(R1cs::<Zp7>::parse(&container(&extended), &ImportLimits::default()), Err(Error::UnsupportedSection(kind)) if kind==unknown)
++        );
++    }
++    let mut huge = fixture();
++    huge[16..24].copy_from_slice(&u64::MAX.to_le_bytes());
++    assert!(R1cs::<Zp7>::parse(&huge, &ImportLimits::default()).is_err());
++}
++
++/// Version, modulus, prime-field type and inconsistent role counts are checked before rows.
++#[test]
++fn test_header_validation() {
++    let mut bytes = fixture();
++    bytes[0] = b'X';
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&bytes, &ImportLimits::default()),
++        Err(Error::InvalidMagic)
++    ));
++    bytes = fixture();
++    bytes[4] = 2;
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&bytes, &ImportLimits::default()),
++        Err(Error::UnsupportedVersion(2))
++    ));
++    let mut fields = parts(&fixture());
++    fields[0].1[4] = 11;
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&container(&fields), &ImportLimits::default()),
++        Err(Error::FieldMismatch)
++    ));
++    assert!(matches!(
++        R1cs::<Gf256>::parse(&fixture(), &ImportLimits::default()),
++        Err(Error::NonPrimeField)
++    ));
++    fields = parts(&fixture());
++    fields[0].1[12..16].copy_from_slice(&0u32.to_le_bytes());
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&container(&fields), &ImportLimits::default()),
++        Err(Error::InvalidHeader(_))
++    ));
++    fields = parts(&fixture());
++    fields[0].1[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&container(&fields), &ImportLimits::default()),
++        Err(Error::InvalidHeader(_))
++    ));
++}
++
++/// Linear combinations reject out-of-range, repeated or unordered wires and noncanonical coefficients.
++#[test]
++fn test_constraint_validation() {
++    let mut sections = parts(&fixture());
++    sections[1].1[4..8].copy_from_slice(&4u32.to_le_bytes());
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()),
++        Err(Error::InvalidWire { row: 0, wire: 4 })
++    ));
++    sections = parts(&fixture());
++    sections[1].1[16..20].copy_from_slice(&0u32.to_le_bytes());
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()),
++        Err(Error::InvalidLinearCombination { row: 0 })
++    ));
++    for coefficient in [0, 7, u64::MAX] {
++        sections = parts(&fixture());
++        sections[1].1[8..16].copy_from_slice(&coefficient.to_le_bytes());
++        assert!(matches!(
++            R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()),
++            Err(Error::NonCanonicalCoefficient { row: 0 })
++        ));
++    }
++    sections = parts(&fixture());
++    sections[1].1[..4].copy_from_slice(&u32::MAX.to_le_bytes());
++    assert!(matches!(
++        R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()),
++        Err(Error::InvalidLinearCombination { row: 0 })
++    ));
++}
++
++/// Wire-label identity requires a unique in-range label per wire and label zero on wire zero.
++#[test]
++fn test_wire_label_validation() {
++    for (offset, label) in [(0, 1u64), (8, 0), (24, 4)] {
++        let mut sections = parts(&fixture());
++        sections[2].1[offset..offset + 8].copy_from_slice(&label.to_le_bytes());
++        assert!(matches!(
++            R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()),
++            Err(Error::InvalidWireMap)
++        ));
++    }
++}
++
++/// Parsing and expansion enforce structural limits and deadlines before accepting a result.
++#[test]
++fn test_import_and_expansion_limits() {
++    let bytes = fixture();
++    for limits in [
++        ImportLimits {
++            max_input_bytes: bytes.len() - 1,
++            ..ImportLimits::default()
++        },
++        ImportLimits {
++            max_wires: 3,
++            ..ImportLimits::default()
++        },
++        ImportLimits {
++            max_constraints: 2,
++            ..ImportLimits::default()
++        },
++    ] {
++        assert!(matches!(
++            R1cs::<Zp7>::parse(&bytes, &limits),
++            Err(Error::Limit { .. })
++        ));
++    }
++    for limits in [
++        ImportLimits {
++            max_products: 1,
++            ..ImportLimits::default()
++        },
++        ImportLimits {
++            max_expanded_terms: 0,
++            ..ImportLimits::default()
++        },
++    ] {
++        let parsed = R1cs::<Zp7>::parse(&bytes, &limits).unwrap();
++        assert!(matches!(parsed.expand::<3>(), Err(Error::Limit { .. })));
++    }
++    assert!(matches!(
++        R1cs::<Zp7>::parse(
++            &bytes,
++            &ImportLimits {
++                timeout: Duration::ZERO,
++                ..ImportLimits::default()
++            }
++        ),
++        Err(Error::Deadline)
++    ));
++}
++
++/// Capacity refusal is explicit and spare const-generic coordinates never relabel active wires.
++#[test]
++fn test_const_generic_capacity() {
++    let model = R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
++    assert!(matches!(
++        model.expand::<2>(),
++        Err(Error::Arity {
++            needed: 3,
++            capacity: 2
++        })
++    ));
++    let padded = model.expand::<5>().unwrap();
++    assert_eq!(padded.variable_to_wire, vec![1, 2, 3]);
++    assert_eq!(
++        padded.polynomials[0].eval(&[
++            Zp7::new(2),
++            Zp7::new(3),
++            Zp7::new(4),
++            Zp7::new(5),
++            Zp7::new(6)
++        ]),
++        model
++            .evaluate_assignment(&[Zp7::one(), Zp7::new(2), Zp7::new(3), Zp7::new(4)])
++            .unwrap()[0]
++    );
++}
++
++/// Over-budget capacities are refused on a small stack before allocating fixed exponent arrays.
++#[test]
++fn test_capacity_refusal_precedes_exponent_array_stack_allocation() {
++    let model = R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
++    let result = std::thread::Builder::new()
++        .stack_size(64 * 1024)
++        .spawn(move || model.expand::<100_000>())
++        .unwrap()
++        .join()
++        .unwrap();
++    assert!(matches!(
++        result,
++        Err(Error::Limit {
++            resource: "polynomial capacity",
++            limit: 99
++        })
++    ));
++}
++
++/// Assignment checks require every original wire and the implicit constant wire equal to one.
++#[test]
++fn test_assignment_guards() {
++    let model = R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
++    assert!(matches!(
++        model.evaluate_assignment(&[Zp7::one(); 3]),
++        Err(Error::AssignmentLength {
++            expected: 4,
++            actual: 3
++        })
++    ));
++    assert!(matches!(
++        model.evaluate_assignment(&[Zp7::zero(); 4]),
++        Err(Error::ConstantWire)
++    ));
++}
++
++/// Empty systems and rows that cancel remain distinct original-row obligations.
++#[test]
++fn test_empty_and_cancelling_constraints() {
++    let empty = R1cs::<Zp7>::parse(&encode(1, &[]), &ImportLimits::default()).unwrap();
++    assert!(empty.expand::<0>().unwrap().polynomials.is_empty());
++    assert!(empty.evaluate_assignment(&[Zp7::one()]).unwrap().is_empty());
++    let cancellation = encode(2, &[[vec![(0, 1)], vec![(1, 1)], vec![(1, 1)]]]);
++    let parsed = R1cs::<Zp7>::parse(&cancellation, &ImportLimits::default()).unwrap();
++    let expanded = parsed.expand::<1>().unwrap();
++    assert_eq!(expanded.row_ids, vec![0]);
++    assert!(expanded.polynomials[0].is_zero());
++    assert_eq!(expanded.stats.expanded_terms, 0);
++}
++
++/// Symbol records preserve optimized-out labels and aliases while rejecting ambiguous or invalid records.
++#[test]
++fn test_optional_symbols() {
++    let parse = || {
++        let mut sections = parts(&fixture());
++        sections[0].1[28..36].copy_from_slice(&8u64.to_le_bytes());
++        R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()).unwrap()
++    };
++    let one = parse()
++        .with_symbols("2,2,0,main.a\n4,-1,1,main.removed\n5,2,0,main.alias\n")
++        .unwrap();
++    assert_eq!(one.symbols()[1].wire, None);
++    assert_eq!(one.symbols()[2].wire, Some(2));
++    let two = parse()
++        .with_symbols("5,2,0,main.alias\n4,-1,1,main.removed\n2,2,0,main.a\n")
++        .unwrap();
++    assert_eq!(one.symbol_digest(), two.symbol_digest());
++    assert_eq!(one.canonical_digest(), parse().canonical_digest());
++    for text in [
++        "1,4,0,bad",
++        "8,1,0,bad",
++        "1,-2,0,bad",
++        "1,1,0,",
++        "1,1,0,a\n1,2,0,b",
++        "1,1,0,a\n2,2,0,a",
++        "1,1,main.a",
++    ] {
++        assert!(
++            matches!(parse().with_symbols(text), Err(Error::InvalidSymbol { .. })),
++            "{text}"
++        );
++    }
++}
++
++/// Symbol-sidecar record counts have their own limit independent of text bytes and wire count.
++#[test]
++fn test_symbol_count_limit() {
++    let model = R1cs::<Zp7>::parse(
++        &fixture(),
++        &ImportLimits {
++            max_symbols: 1,
++            ..ImportLimits::default()
++        },
++    )
++    .unwrap();
++    assert!(matches!(
++        model.with_symbols("1,1,0,a\n2,2,0,b\n"),
++        Err(Error::Limit {
++            resource: "symbols",
++            limit: 1
++        })
++    ));
++}
++
++/// Symbols for labels chosen by the binary map must name that same canonical witness wire.
++#[test]
++fn test_symbols_cannot_contradict_the_canonical_wire_map() {
++    for text in [
++        "1,2,0,wrong_wire",
++        "1,-1,0,falsely_removed",
++        "2,0,0,false_constant",
++    ] {
++        let model = R1cs::<Zp7>::parse(&fixture(), &ImportLimits::default()).unwrap();
++        assert!(
++            matches!(
++                model.with_symbols(text),
++                Err(Error::InvalidSymbol { line: 1 })
++            ),
++            "{text}"
++        );
++    }
++}
++
++/// Nonidentity labels never permute polynomial variables, and trailing witnesses remain internal.
++#[test]
++fn test_nonidentity_labels_and_internal_wires() {
++    let mut sections = parts(&encode(5, &[[vec![(1, 1)], vec![(2, 1)], vec![(3, 1)]]]));
++    sections[2].1 = [0u64, 4, 3, 2, 1]
++        .into_iter()
++        .flat_map(u64::to_le_bytes)
++        .collect();
++    let model = R1cs::<Zp7>::parse(&container(&sections), &ImportLimits::default()).unwrap();
++    assert_eq!(model.wire_labels(), &[0, 4, 3, 2, 1]);
++    assert_eq!(model.wire_role(4), Some(WireRole::Internal));
++    let expanded = model.expand::<4>().unwrap();
++    assert_eq!(expanded.variable_to_wire, vec![1, 2, 3, 4]);
++    assert!(expanded.polynomials[0]
++        .eval(&[Zp7::new(2), Zp7::new(3), Zp7::new(6), Zp7::new(4)])
++        .is_zero());
++}
++
++/// A constant-only impossible row remains a nonzero polynomial at arity zero.
++#[test]
++fn test_constant_only_impossible_constraint() {
++    let bytes = encode(1, &[[vec![], vec![], vec![(0, 1)]]]);
++    let model = R1cs::<Zp7>::parse(&bytes, &ImportLimits::default()).unwrap();
++    let expanded = model.expand::<0>().unwrap();
++    assert_eq!(expanded.polynomials.len(), 1);
++    assert_eq!(expanded.polynomials[0].eval(&[]), -Zp7::one());
++    assert_eq!(
++        model.evaluate_assignment(&[Zp7::one()]).unwrap(),
++        vec![-Zp7::one()]
++    );
++}

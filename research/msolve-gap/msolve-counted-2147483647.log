@@ -1,0 +1,79 @@
+Initial seed for pseudo-random number generator is 1794548393
+
+--------------- INPUT DATA ---------------
+#variables                      10
+#equations                      10
+#invalid equations               0
+field characteristic    2147483647
+homogeneous input?               0
+signature-based computation      0
+monomial order                 DRL
+basis hash table resetting     OFF
+linear algebra option            2
+initial hash table size     131072 (2^17)
+max pair selection             ALL
+reduce gb                        1
+#threads                         1
+info level                       2
+generate pbm files               0
+------------------------------------------
+
+Legend for f4 information
+--------------------------------------------------------
+deg       current degree of pairs selected in this round
+sel       number of pairs selected in this round
+pairs     total number of pairs in pair list
+mat       matrix dimensions (# rows x # columns)
+density   density of the matrix
+new data  # new elements for basis in this round
+          # zero reductions during linear algebra
+time(rd)  time of the current f4 round in seconds given
+          for real and cpu time
+--------------------------------------------------------
+
+deg     sel   pairs        mat          density            new data         time(rd) in sec (real|cpu)
+------------------------------------------------------------------------------------------------------
+  2       5       6      14 x 40         18.04%        5 new       0 zero         0.00 | 0.00         
+  3      14      14      82 x 178         6.65%       14 new       0 zero         0.00 | 0.00         
+  4      72      72     459 x 622         4.02%       35 new      37 zero         0.00 | 0.00         
+  5     229     229    1404 x 1538        3.68%       62 new     167 zero         0.01 | 0.01         
+  6     442     444    3430 x 3404        2.13%       64 new     378 zero         0.03 | 0.03         
+  6     169     497    4954 x 5199        1.00%       44 new     125 zero         0.02 | 0.02         
+  6      57     646    4877 x 5195        0.92%       18 new      39 zero         0.01 | 0.01         
+  7     733     733    9977 x 9607        0.71%        8 new     725 zero         0.12 | 0.12         
+  7      48      59    8889 x 9195        0.50%        0 new      48 zero         0.02 | 0.02         
+  8      11      11    9883 x 10226       0.48%        0 new      11 zero         0.02 | 0.02         
+------------------------------------------------------------------------------------------------------
+reduce final basis      252 x 606        44.74%      247 new       0 zero         0.00 | 0.00         
+------------------------------------------------------------------------------------------------------
+
+---------------- TIMINGS ----------------
+overall(elapsed)        0.22 sec
+overall(cpu)            0.22 sec
+select                  0.01 sec   6.0%
+symbolic prep.          0.04 sec  16.5%
+update                  0.01 sec   2.4%
+convert                 0.01 sec   2.5%
+linear algebra          0.16 sec  71.2%
+reduce gb               0.00 sec   0.0%
+-----------------------------------------
+
+---------- COMPUTATIONAL DATA -----------
+size of basis                   247
+#terms in basis               68242
+#pairs reduced                 1780
+#GM criterion                 31890
+#redundant elements              13
+#rows reduced                  3807
+#zero reductions               1530
+max. matrix data               9883 x 10226 (0.481%)
+max. symbolic hash table size  2^14
+max. basis hash table size     2^16
+-----------------------------------------
+
+
+
+------------------------------------------------------------------------------------
+msolve overall time           0.24 sec (elapsed) /  0.24 sec (cpu)
+------------------------------------------------------------------------------------
+ZB_COUNT forward_apps 5345076 forward_products 280577385 newpiv_apps 2089 newpiv_products 644800 final_apps 281 final_products 93441

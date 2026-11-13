@@ -1,0 +1,7 @@
+1,1,0,main.result
+2,2,0,main.used
+3,-1,0,main.unused[0]
+4,-1,0,main.unused[1]
+5,-1,0,main.unused[2]
+6,-1,0,main.unused[3]
+7,3,0,main.t

@@ -1,24 +1,4 @@
-//! Singular as an [`ExternalSolver`]: the reference adapter.
-//!
-//! Read this as the worked example for a new adapter. It is deliberately thin — every hard part
-//! lives in [`Supervisor`](super::process::Supervisor) and in the marker parsing the differential
-//! harness already uses — and what is left is exactly the four pieces an adapter owes:
-//!
-//! 1. **Capability, as constants.** [`MAX_CHARACTERISTIC`] is Singular's own `p < 2^31` bound,
-//!    stated once and checked before anything runs.
-//! 2. **Input conversion.** A script, built from the instance's text. The variable order declared
-//!    to Singular is the instance's variable order, because under lex that *is* the order.
-//! 3. **Execution.** Delegated to `SingularOracle::run_measured`, which is the same code path
-//!    the differential sweep uses — so the two harnesses cannot drift into two invocations of the
-//!    same tool.
-//! 4. **Extraction.** Markers into [`Invariants`], which is what a cross-library check compares.
-//!
-//! # Why the exit status is not consulted
-//!
-//! Singular exits 0 after a script error: it prints `   ? ...` and carries on. Every adapter needs
-//! its own evidence that a run completed, and Singular's is a `@done` marker plus the absence of
-//! an error line. A new adapter must establish the equivalent for its own tool before trusting a
-//! single number it prints.
+//! Singular can exit zero after script errors; completion requires markers and error checks.
 
 use std::time::Duration;
 
@@ -106,7 +86,7 @@ impl SingularSolver {
     /// of a second, which would quantize every fast instance to zero. The tool-reported figure is
     /// recorded as a *stage*, never as the run's wall time: it excludes parsing and startup, and a
     /// board's wall column must be the whole cost of asking.
-    fn script(&self, instance: &Instance, task: Task) -> String {
+    pub(super) fn script(&self, instance: &Instance, task: Task) -> String {
         let order = singular_order(instance.order);
         let variables = instance.variables.join(",");
         let generators = instance.system.join(",");
@@ -170,7 +150,7 @@ impl SingularSolver {
     }
 
     /// Parse a completed run's output into an answer.
-    fn answer(&self, output: &str, task: Task) -> Result<Answer, RunFailure> {
+    pub(super) fn answer(&self, output: &str, task: Task) -> Result<Answer, RunFailure> {
         let integer = |name: &'static str| -> Result<i64, RunFailure> {
             let value = marker(output, name).ok_or(RunFailure::MissingMarker {
                 marker: name.to_string(),

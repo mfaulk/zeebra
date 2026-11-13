@@ -1,0 +1,1009 @@
+1 ['floor', 'scoped', '1', '0'] complete
+2 ['floor', 'parked', '1', '0'] complete
+3 ['floor', 'rayon', '1', '0'] complete
+4 ['floor', 'scoped', '2', '0'] complete
+5 ['floor', 'parked', '2', '0'] complete
+6 ['floor', 'rayon', '2', '0'] complete
+7 ['floor', 'scoped', '4', '0'] complete
+8 ['floor', 'parked', '4', '0'] complete
+9 ['floor', 'rayon', '4', '0'] complete
+10 ['floor', 'scoped', '8', '0'] complete
+11 ['floor', 'parked', '8', '0'] complete
+12 ['floor', 'rayon', '8', '0'] complete
+13 ['floor', 'scoped', '16', '0'] complete
+14 ['floor', 'parked', '16', '0'] complete
+15 ['floor', 'rayon', '16', '0'] complete
+16 ['floor', 'scoped', '32', '0'] complete
+17 ['floor', 'parked', '32', '0'] complete
+18 ['floor', 'rayon', '32', '0'] complete
+19 ['floor', 'scoped', '64', '0'] complete
+20 ['floor', 'parked', '64', '0'] complete
+21 ['floor', 'rayon', '64', '0'] complete
+22 ['floor', 'scoped', '128', '0'] complete
+23 ['floor', 'parked', '128', '0'] complete
+24 ['floor', 'rayon', '128', '0'] complete
+25 ['floor', 'scoped', '1', '256'] complete
+26 ['floor', 'parked', '1', '256'] complete
+27 ['floor', 'rayon', '1', '256'] complete
+28 ['floor', 'scoped', '2', '256'] complete
+29 ['floor', 'parked', '2', '256'] complete
+30 ['floor', 'rayon', '2', '256'] complete
+31 ['floor', 'scoped', '4', '256'] complete
+32 ['floor', 'parked', '4', '256'] complete
+33 ['floor', 'rayon', '4', '256'] complete
+34 ['floor', 'scoped', '8', '256'] complete
+35 ['floor', 'parked', '8', '256'] complete
+36 ['floor', 'rayon', '8', '256'] complete
+37 ['floor', 'scoped', '16', '256'] complete
+38 ['floor', 'parked', '16', '256'] complete
+39 ['floor', 'rayon', '16', '256'] complete
+40 ['floor', 'scoped', '32', '256'] complete
+41 ['floor', 'parked', '32', '256'] complete
+42 ['floor', 'rayon', '32', '256'] complete
+43 ['floor', 'scoped', '64', '256'] complete
+44 ['floor', 'parked', '64', '256'] complete
+45 ['floor', 'rayon', '64', '256'] complete
+46 ['floor', 'scoped', '128', '256'] complete
+47 ['floor', 'parked', '128', '256'] complete
+48 ['floor', 'rayon', '128', '256'] complete
+49 ['floor', 'scoped', '1', '65536'] complete
+50 ['floor', 'parked', '1', '65536'] complete
+51 ['floor', 'rayon', '1', '65536'] complete
+52 ['floor', 'scoped', '2', '65536'] complete
+53 ['floor', 'parked', '2', '65536'] complete
+54 ['floor', 'rayon', '2', '65536'] complete
+55 ['floor', 'scoped', '4', '65536'] complete
+56 ['floor', 'parked', '4', '65536'] complete
+57 ['floor', 'rayon', '4', '65536'] complete
+58 ['floor', 'scoped', '8', '65536'] complete
+59 ['floor', 'parked', '8', '65536'] complete
+60 ['floor', 'rayon', '8', '65536'] complete
+61 ['floor', 'scoped', '16', '65536'] complete
+62 ['floor', 'parked', '16', '65536'] complete
+63 ['floor', 'rayon', '16', '65536'] complete
+64 ['floor', 'scoped', '32', '65536'] complete
+65 ['floor', 'parked', '32', '65536'] complete
+66 ['floor', 'rayon', '32', '65536'] complete
+67 ['floor', 'scoped', '64', '65536'] complete
+68 ['floor', 'parked', '64', '65536'] complete
+69 ['floor', 'rayon', '64', '65536'] complete
+70 ['floor', 'scoped', '128', '65536'] complete
+71 ['floor', 'parked', '128', '65536'] complete
+72 ['floor', 'rayon', '128', '65536'] complete
+73 ['border', 'scoped', '1', 'katsura-5', '64'] complete
+74 ['border', 'parked', '1', 'katsura-5', '64'] complete
+75 ['border', 'rayon', '1', 'katsura-5', '64'] complete
+76 ['border', 'scoped', '2', 'katsura-5', '64'] complete
+77 ['border', 'parked', '2', 'katsura-5', '64'] complete
+78 ['border', 'rayon', '2', 'katsura-5', '64'] complete
+79 ['border', 'scoped', '4', 'katsura-5', '64'] complete
+80 ['border', 'parked', '4', 'katsura-5', '64'] complete
+81 ['border', 'rayon', '4', 'katsura-5', '64'] complete
+82 ['border', 'scoped', '8', 'katsura-5', '64'] complete
+83 ['border', 'parked', '8', 'katsura-5', '64'] complete
+84 ['border', 'rayon', '8', 'katsura-5', '64'] complete
+85 ['border', 'scoped', '16', 'katsura-5', '64'] complete
+86 ['border', 'parked', '16', 'katsura-5', '64'] complete
+87 ['border', 'rayon', '16', 'katsura-5', '64'] complete
+88 ['border', 'scoped', '32', 'katsura-5', '64'] complete
+89 ['border', 'parked', '32', 'katsura-5', '64'] complete
+90 ['border', 'rayon', '32', 'katsura-5', '64'] complete
+91 ['border', 'scoped', '64', 'katsura-5', '64'] complete
+92 ['border', 'parked', '64', 'katsura-5', '64'] complete
+93 ['border', 'rayon', '64', 'katsura-5', '64'] complete
+94 ['border', 'scoped', '128', 'katsura-5', '64'] complete
+95 ['border', 'parked', '128', 'katsura-5', '64'] complete
+96 ['border', 'rayon', '128', 'katsura-5', '64'] complete
+97 ['border', 'scoped', '1', 'katsura-5', 'all'] complete
+98 ['border', 'parked', '1', 'katsura-5', 'all'] complete
+99 ['border', 'rayon', '1', 'katsura-5', 'all'] complete
+100 ['border', 'scoped', '2', 'katsura-5', 'all'] complete
+101 ['border', 'parked', '2', 'katsura-5', 'all'] complete
+102 ['border', 'rayon', '2', 'katsura-5', 'all'] complete
+103 ['border', 'scoped', '4', 'katsura-5', 'all'] complete
+104 ['border', 'parked', '4', 'katsura-5', 'all'] complete
+105 ['border', 'rayon', '4', 'katsura-5', 'all'] complete
+106 ['border', 'scoped', '8', 'katsura-5', 'all'] complete
+107 ['border', 'parked', '8', 'katsura-5', 'all'] complete
+108 ['border', 'rayon', '8', 'katsura-5', 'all'] complete
+109 ['border', 'scoped', '16', 'katsura-5', 'all'] complete
+110 ['border', 'parked', '16', 'katsura-5', 'all'] complete
+111 ['border', 'rayon', '16', 'katsura-5', 'all'] complete
+112 ['border', 'scoped', '32', 'katsura-5', 'all'] complete
+113 ['border', 'parked', '32', 'katsura-5', 'all'] complete
+114 ['border', 'rayon', '32', 'katsura-5', 'all'] complete
+115 ['border', 'scoped', '64', 'katsura-5', 'all'] complete
+116 ['border', 'parked', '64', 'katsura-5', 'all'] complete
+117 ['border', 'rayon', '64', 'katsura-5', 'all'] complete
+118 ['border', 'scoped', '128', 'katsura-5', 'all'] complete
+119 ['border', 'parked', '128', 'katsura-5', 'all'] complete
+120 ['border', 'rayon', '128', 'katsura-5', 'all'] complete
+121 ['border', 'scoped', '1', 'katsura-6', '64'] complete
+122 ['border', 'parked', '1', 'katsura-6', '64'] complete
+123 ['border', 'rayon', '1', 'katsura-6', '64'] complete
+124 ['border', 'scoped', '2', 'katsura-6', '64'] complete
+125 ['border', 'parked', '2', 'katsura-6', '64'] complete
+126 ['border', 'rayon', '2', 'katsura-6', '64'] complete
+127 ['border', 'scoped', '4', 'katsura-6', '64'] complete
+128 ['border', 'parked', '4', 'katsura-6', '64'] complete
+129 ['border', 'rayon', '4', 'katsura-6', '64'] complete
+130 ['border', 'scoped', '8', 'katsura-6', '64'] complete
+131 ['border', 'parked', '8', 'katsura-6', '64'] complete
+132 ['border', 'rayon', '8', 'katsura-6', '64'] complete
+133 ['border', 'scoped', '16', 'katsura-6', '64'] complete
+134 ['border', 'parked', '16', 'katsura-6', '64'] complete
+135 ['border', 'rayon', '16', 'katsura-6', '64'] complete
+136 ['border', 'scoped', '32', 'katsura-6', '64'] complete
+137 ['border', 'parked', '32', 'katsura-6', '64'] complete
+138 ['border', 'rayon', '32', 'katsura-6', '64'] complete
+139 ['border', 'scoped', '64', 'katsura-6', '64'] complete
+140 ['border', 'parked', '64', 'katsura-6', '64'] complete
+141 ['border', 'rayon', '64', 'katsura-6', '64'] complete
+142 ['border', 'scoped', '128', 'katsura-6', '64'] complete
+143 ['border', 'parked', '128', 'katsura-6', '64'] complete
+144 ['border', 'rayon', '128', 'katsura-6', '64'] complete
+145 ['border', 'scoped', '1', 'katsura-6', 'all'] complete
+146 ['border', 'parked', '1', 'katsura-6', 'all'] complete
+147 ['border', 'rayon', '1', 'katsura-6', 'all'] complete
+148 ['border', 'scoped', '2', 'katsura-6', 'all'] complete
+149 ['border', 'parked', '2', 'katsura-6', 'all'] complete
+150 ['border', 'rayon', '2', 'katsura-6', 'all'] complete
+151 ['border', 'scoped', '4', 'katsura-6', 'all'] complete
+152 ['border', 'parked', '4', 'katsura-6', 'all'] complete
+153 ['border', 'rayon', '4', 'katsura-6', 'all'] complete
+154 ['border', 'scoped', '8', 'katsura-6', 'all'] complete
+155 ['border', 'parked', '8', 'katsura-6', 'all'] complete
+156 ['border', 'rayon', '8', 'katsura-6', 'all'] complete
+157 ['border', 'scoped', '16', 'katsura-6', 'all'] complete
+158 ['border', 'parked', '16', 'katsura-6', 'all'] complete
+159 ['border', 'rayon', '16', 'katsura-6', 'all'] complete
+160 ['border', 'scoped', '32', 'katsura-6', 'all'] complete
+161 ['border', 'parked', '32', 'katsura-6', 'all'] complete
+162 ['border', 'rayon', '32', 'katsura-6', 'all'] complete
+163 ['border', 'scoped', '64', 'katsura-6', 'all'] complete
+164 ['border', 'parked', '64', 'katsura-6', 'all'] complete
+165 ['border', 'rayon', '64', 'katsura-6', 'all'] complete
+166 ['border', 'scoped', '128', 'katsura-6', 'all'] complete
+167 ['border', 'parked', '128', 'katsura-6', 'all'] complete
+168 ['border', 'rayon', '128', 'katsura-6', 'all'] complete
+169 ['border', 'scoped', '1', 'katsura-7', '64'] complete
+170 ['border', 'parked', '1', 'katsura-7', '64'] complete
+171 ['border', 'rayon', '1', 'katsura-7', '64'] complete
+172 ['border', 'scoped', '2', 'katsura-7', '64'] complete
+173 ['border', 'parked', '2', 'katsura-7', '64'] complete
+174 ['border', 'rayon', '2', 'katsura-7', '64'] complete
+175 ['border', 'scoped', '4', 'katsura-7', '64'] complete
+176 ['border', 'parked', '4', 'katsura-7', '64'] complete
+177 ['border', 'rayon', '4', 'katsura-7', '64'] complete
+178 ['border', 'scoped', '8', 'katsura-7', '64'] complete
+179 ['border', 'parked', '8', 'katsura-7', '64'] complete
+180 ['border', 'rayon', '8', 'katsura-7', '64'] complete
+181 ['border', 'scoped', '16', 'katsura-7', '64'] complete
+182 ['border', 'parked', '16', 'katsura-7', '64'] complete
+183 ['border', 'rayon', '16', 'katsura-7', '64'] complete
+184 ['border', 'scoped', '32', 'katsura-7', '64'] complete
+185 ['border', 'parked', '32', 'katsura-7', '64'] complete
+186 ['border', 'rayon', '32', 'katsura-7', '64'] complete
+187 ['border', 'scoped', '64', 'katsura-7', '64'] complete
+188 ['border', 'parked', '64', 'katsura-7', '64'] complete
+189 ['border', 'rayon', '64', 'katsura-7', '64'] complete
+190 ['border', 'scoped', '128', 'katsura-7', '64'] complete
+191 ['border', 'parked', '128', 'katsura-7', '64'] complete
+192 ['border', 'rayon', '128', 'katsura-7', '64'] complete
+193 ['border', 'scoped', '1', 'katsura-7', 'all'] complete
+194 ['border', 'parked', '1', 'katsura-7', 'all'] complete
+195 ['border', 'rayon', '1', 'katsura-7', 'all'] complete
+196 ['border', 'scoped', '2', 'katsura-7', 'all'] complete
+197 ['border', 'parked', '2', 'katsura-7', 'all'] complete
+198 ['border', 'rayon', '2', 'katsura-7', 'all'] complete
+199 ['border', 'scoped', '4', 'katsura-7', 'all'] complete
+200 ['border', 'parked', '4', 'katsura-7', 'all'] complete
+201 ['border', 'rayon', '4', 'katsura-7', 'all'] complete
+202 ['border', 'scoped', '8', 'katsura-7', 'all'] complete
+203 ['border', 'parked', '8', 'katsura-7', 'all'] complete
+204 ['border', 'rayon', '8', 'katsura-7', 'all'] complete
+205 ['border', 'scoped', '16', 'katsura-7', 'all'] complete
+206 ['border', 'parked', '16', 'katsura-7', 'all'] complete
+207 ['border', 'rayon', '16', 'katsura-7', 'all'] complete
+208 ['border', 'scoped', '32', 'katsura-7', 'all'] complete
+209 ['border', 'parked', '32', 'katsura-7', 'all'] complete
+210 ['border', 'rayon', '32', 'katsura-7', 'all'] complete
+211 ['border', 'scoped', '64', 'katsura-7', 'all'] complete
+212 ['border', 'parked', '64', 'katsura-7', 'all'] complete
+213 ['border', 'rayon', '64', 'katsura-7', 'all'] complete
+214 ['border', 'scoped', '128', 'katsura-7', 'all'] complete
+215 ['border', 'parked', '128', 'katsura-7', 'all'] complete
+216 ['border', 'rayon', '128', 'katsura-7', 'all'] complete
+217 ['border', 'scoped', '1', 'cyclic-5', '64'] complete
+218 ['border', 'parked', '1', 'cyclic-5', '64'] complete
+219 ['border', 'rayon', '1', 'cyclic-5', '64'] complete
+220 ['border', 'scoped', '2', 'cyclic-5', '64'] complete
+221 ['border', 'parked', '2', 'cyclic-5', '64'] complete
+222 ['border', 'rayon', '2', 'cyclic-5', '64'] complete
+223 ['border', 'scoped', '4', 'cyclic-5', '64'] complete
+224 ['border', 'parked', '4', 'cyclic-5', '64'] complete
+225 ['border', 'rayon', '4', 'cyclic-5', '64'] complete
+226 ['border', 'scoped', '8', 'cyclic-5', '64'] complete
+227 ['border', 'parked', '8', 'cyclic-5', '64'] complete
+228 ['border', 'rayon', '8', 'cyclic-5', '64'] complete
+229 ['border', 'scoped', '16', 'cyclic-5', '64'] complete
+230 ['border', 'parked', '16', 'cyclic-5', '64'] complete
+231 ['border', 'rayon', '16', 'cyclic-5', '64'] complete
+232 ['border', 'scoped', '32', 'cyclic-5', '64'] complete
+233 ['border', 'parked', '32', 'cyclic-5', '64'] complete
+234 ['border', 'rayon', '32', 'cyclic-5', '64'] complete
+235 ['border', 'scoped', '64', 'cyclic-5', '64'] complete
+236 ['border', 'parked', '64', 'cyclic-5', '64'] complete
+237 ['border', 'rayon', '64', 'cyclic-5', '64'] complete
+238 ['border', 'scoped', '128', 'cyclic-5', '64'] complete
+239 ['border', 'parked', '128', 'cyclic-5', '64'] complete
+240 ['border', 'rayon', '128', 'cyclic-5', '64'] complete
+241 ['border', 'scoped', '1', 'cyclic-5', 'all'] complete
+242 ['border', 'parked', '1', 'cyclic-5', 'all'] complete
+243 ['border', 'rayon', '1', 'cyclic-5', 'all'] complete
+244 ['border', 'scoped', '2', 'cyclic-5', 'all'] complete
+245 ['border', 'parked', '2', 'cyclic-5', 'all'] complete
+246 ['border', 'rayon', '2', 'cyclic-5', 'all'] complete
+247 ['border', 'scoped', '4', 'cyclic-5', 'all'] complete
+248 ['border', 'parked', '4', 'cyclic-5', 'all'] complete
+249 ['border', 'rayon', '4', 'cyclic-5', 'all'] complete
+250 ['border', 'scoped', '8', 'cyclic-5', 'all'] complete
+251 ['border', 'parked', '8', 'cyclic-5', 'all'] complete
+252 ['border', 'rayon', '8', 'cyclic-5', 'all'] complete
+253 ['border', 'scoped', '16', 'cyclic-5', 'all'] complete
+254 ['border', 'parked', '16', 'cyclic-5', 'all'] complete
+255 ['border', 'rayon', '16', 'cyclic-5', 'all'] complete
+256 ['border', 'scoped', '32', 'cyclic-5', 'all'] complete
+257 ['border', 'parked', '32', 'cyclic-5', 'all'] complete
+258 ['border', 'rayon', '32', 'cyclic-5', 'all'] complete
+259 ['border', 'scoped', '64', 'cyclic-5', 'all'] complete
+260 ['border', 'parked', '64', 'cyclic-5', 'all'] complete
+261 ['border', 'rayon', '64', 'cyclic-5', 'all'] complete
+262 ['border', 'scoped', '128', 'cyclic-5', 'all'] complete
+263 ['border', 'parked', '128', 'cyclic-5', 'all'] complete
+264 ['border', 'rayon', '128', 'cyclic-5', 'all'] complete
+265 ['border', 'scoped', '1', 'cyclic-6', '64'] complete
+266 ['border', 'parked', '1', 'cyclic-6', '64'] complete
+267 ['border', 'rayon', '1', 'cyclic-6', '64'] complete
+268 ['border', 'scoped', '2', 'cyclic-6', '64'] complete
+269 ['border', 'parked', '2', 'cyclic-6', '64'] complete
+270 ['border', 'rayon', '2', 'cyclic-6', '64'] complete
+271 ['border', 'scoped', '4', 'cyclic-6', '64'] complete
+272 ['border', 'parked', '4', 'cyclic-6', '64'] complete
+273 ['border', 'rayon', '4', 'cyclic-6', '64'] complete
+274 ['border', 'scoped', '8', 'cyclic-6', '64'] complete
+275 ['border', 'parked', '8', 'cyclic-6', '64'] complete
+276 ['border', 'rayon', '8', 'cyclic-6', '64'] complete
+277 ['border', 'scoped', '16', 'cyclic-6', '64'] complete
+278 ['border', 'parked', '16', 'cyclic-6', '64'] complete
+279 ['border', 'rayon', '16', 'cyclic-6', '64'] complete
+280 ['border', 'scoped', '32', 'cyclic-6', '64'] complete
+281 ['border', 'parked', '32', 'cyclic-6', '64'] complete
+282 ['border', 'rayon', '32', 'cyclic-6', '64'] complete
+283 ['border', 'scoped', '64', 'cyclic-6', '64'] complete
+284 ['border', 'parked', '64', 'cyclic-6', '64'] complete
+285 ['border', 'rayon', '64', 'cyclic-6', '64'] complete
+286 ['border', 'scoped', '128', 'cyclic-6', '64'] complete
+287 ['border', 'parked', '128', 'cyclic-6', '64'] complete
+288 ['border', 'rayon', '128', 'cyclic-6', '64'] complete
+289 ['border', 'scoped', '1', 'cyclic-6', 'all'] complete
+290 ['border', 'parked', '1', 'cyclic-6', 'all'] complete
+291 ['border', 'rayon', '1', 'cyclic-6', 'all'] complete
+292 ['border', 'scoped', '2', 'cyclic-6', 'all'] complete
+293 ['border', 'parked', '2', 'cyclic-6', 'all'] complete
+294 ['border', 'rayon', '2', 'cyclic-6', 'all'] complete
+295 ['border', 'scoped', '4', 'cyclic-6', 'all'] complete
+296 ['border', 'parked', '4', 'cyclic-6', 'all'] complete
+297 ['border', 'rayon', '4', 'cyclic-6', 'all'] complete
+298 ['border', 'scoped', '8', 'cyclic-6', 'all'] complete
+299 ['border', 'parked', '8', 'cyclic-6', 'all'] complete
+300 ['border', 'rayon', '8', 'cyclic-6', 'all'] complete
+301 ['border', 'scoped', '16', 'cyclic-6', 'all'] complete
+302 ['border', 'parked', '16', 'cyclic-6', 'all'] complete
+303 ['border', 'rayon', '16', 'cyclic-6', 'all'] complete
+304 ['border', 'scoped', '32', 'cyclic-6', 'all'] complete
+305 ['border', 'parked', '32', 'cyclic-6', 'all'] complete
+306 ['border', 'rayon', '32', 'cyclic-6', 'all'] complete
+307 ['border', 'scoped', '64', 'cyclic-6', 'all'] complete
+308 ['border', 'parked', '64', 'cyclic-6', 'all'] complete
+309 ['border', 'rayon', '64', 'cyclic-6', 'all'] complete
+310 ['border', 'scoped', '128', 'cyclic-6', 'all'] complete
+311 ['border', 'parked', '128', 'cyclic-6', 'all'] complete
+312 ['border', 'rayon', '128', 'cyclic-6', 'all'] complete
+313 ['border', 'scoped', '1', 'planted-6', '64'] complete
+314 ['border', 'parked', '1', 'planted-6', '64'] complete
+315 ['border', 'rayon', '1', 'planted-6', '64'] complete
+316 ['border', 'scoped', '2', 'planted-6', '64'] complete
+317 ['border', 'parked', '2', 'planted-6', '64'] complete
+318 ['border', 'rayon', '2', 'planted-6', '64'] complete
+319 ['border', 'scoped', '4', 'planted-6', '64'] complete
+320 ['border', 'parked', '4', 'planted-6', '64'] complete
+321 ['border', 'rayon', '4', 'planted-6', '64'] complete
+322 ['border', 'scoped', '8', 'planted-6', '64'] complete
+323 ['border', 'parked', '8', 'planted-6', '64'] complete
+324 ['border', 'rayon', '8', 'planted-6', '64'] complete
+325 ['border', 'scoped', '16', 'planted-6', '64'] complete
+326 ['border', 'parked', '16', 'planted-6', '64'] complete
+327 ['border', 'rayon', '16', 'planted-6', '64'] complete
+328 ['border', 'scoped', '32', 'planted-6', '64'] complete
+329 ['border', 'parked', '32', 'planted-6', '64'] complete
+330 ['border', 'rayon', '32', 'planted-6', '64'] complete
+331 ['border', 'scoped', '64', 'planted-6', '64'] complete
+332 ['border', 'parked', '64', 'planted-6', '64'] complete
+333 ['border', 'rayon', '64', 'planted-6', '64'] complete
+334 ['border', 'scoped', '128', 'planted-6', '64'] complete
+335 ['border', 'parked', '128', 'planted-6', '64'] complete
+336 ['border', 'rayon', '128', 'planted-6', '64'] complete
+337 ['border', 'scoped', '1', 'planted-6', 'all'] complete
+338 ['border', 'parked', '1', 'planted-6', 'all'] complete
+339 ['border', 'rayon', '1', 'planted-6', 'all'] complete
+340 ['border', 'scoped', '2', 'planted-6', 'all'] complete
+341 ['border', 'parked', '2', 'planted-6', 'all'] complete
+342 ['border', 'rayon', '2', 'planted-6', 'all'] complete
+343 ['border', 'scoped', '4', 'planted-6', 'all'] complete
+344 ['border', 'parked', '4', 'planted-6', 'all'] complete
+345 ['border', 'rayon', '4', 'planted-6', 'all'] complete
+346 ['border', 'scoped', '8', 'planted-6', 'all'] complete
+347 ['border', 'parked', '8', 'planted-6', 'all'] complete
+348 ['border', 'rayon', '8', 'planted-6', 'all'] complete
+349 ['border', 'scoped', '16', 'planted-6', 'all'] complete
+350 ['border', 'parked', '16', 'planted-6', 'all'] complete
+351 ['border', 'rayon', '16', 'planted-6', 'all'] complete
+352 ['border', 'scoped', '32', 'planted-6', 'all'] complete
+353 ['border', 'parked', '32', 'planted-6', 'all'] complete
+354 ['border', 'rayon', '32', 'planted-6', 'all'] complete
+355 ['border', 'scoped', '64', 'planted-6', 'all'] complete
+356 ['border', 'parked', '64', 'planted-6', 'all'] complete
+357 ['border', 'rayon', '64', 'planted-6', 'all'] complete
+358 ['border', 'scoped', '128', 'planted-6', 'all'] complete
+359 ['border', 'parked', '128', 'planted-6', 'all'] complete
+360 ['border', 'rayon', '128', 'planted-6', 'all'] complete
+361 ['border', 'scoped', '1', 'planted-8', '64'] complete
+362 ['border', 'parked', '1', 'planted-8', '64'] complete
+363 ['border', 'rayon', '1', 'planted-8', '64'] complete
+364 ['border', 'scoped', '2', 'planted-8', '64'] complete
+365 ['border', 'parked', '2', 'planted-8', '64'] complete
+366 ['border', 'rayon', '2', 'planted-8', '64'] complete
+367 ['border', 'scoped', '4', 'planted-8', '64'] complete
+368 ['border', 'parked', '4', 'planted-8', '64'] complete
+369 ['border', 'rayon', '4', 'planted-8', '64'] complete
+370 ['border', 'scoped', '8', 'planted-8', '64'] complete
+371 ['border', 'parked', '8', 'planted-8', '64'] complete
+372 ['border', 'rayon', '8', 'planted-8', '64'] complete
+373 ['border', 'scoped', '16', 'planted-8', '64'] complete
+374 ['border', 'parked', '16', 'planted-8', '64'] complete
+375 ['border', 'rayon', '16', 'planted-8', '64'] complete
+376 ['border', 'scoped', '32', 'planted-8', '64'] complete
+377 ['border', 'parked', '32', 'planted-8', '64'] complete
+378 ['border', 'rayon', '32', 'planted-8', '64'] complete
+379 ['border', 'scoped', '64', 'planted-8', '64'] complete
+380 ['border', 'parked', '64', 'planted-8', '64'] complete
+381 ['border', 'rayon', '64', 'planted-8', '64'] complete
+382 ['border', 'scoped', '128', 'planted-8', '64'] complete
+383 ['border', 'parked', '128', 'planted-8', '64'] complete
+384 ['border', 'rayon', '128', 'planted-8', '64'] complete
+385 ['border', 'scoped', '1', 'planted-8', 'all'] complete
+386 ['border', 'parked', '1', 'planted-8', 'all'] complete
+387 ['border', 'rayon', '1', 'planted-8', 'all'] complete
+388 ['border', 'scoped', '2', 'planted-8', 'all'] complete
+389 ['border', 'parked', '2', 'planted-8', 'all'] complete
+390 ['border', 'rayon', '2', 'planted-8', 'all'] complete
+391 ['border', 'scoped', '4', 'planted-8', 'all'] complete
+392 ['border', 'parked', '4', 'planted-8', 'all'] complete
+393 ['border', 'rayon', '4', 'planted-8', 'all'] complete
+394 ['border', 'scoped', '8', 'planted-8', 'all'] complete
+395 ['border', 'parked', '8', 'planted-8', 'all'] complete
+396 ['border', 'rayon', '8', 'planted-8', 'all'] complete
+397 ['border', 'scoped', '16', 'planted-8', 'all'] complete
+398 ['border', 'parked', '16', 'planted-8', 'all'] complete
+399 ['border', 'rayon', '16', 'planted-8', 'all'] complete
+400 ['border', 'scoped', '32', 'planted-8', 'all'] complete
+401 ['border', 'parked', '32', 'planted-8', 'all'] complete
+402 ['border', 'rayon', '32', 'planted-8', 'all'] complete
+403 ['border', 'scoped', '64', 'planted-8', 'all'] complete
+404 ['border', 'parked', '64', 'planted-8', 'all'] complete
+405 ['border', 'rayon', '64', 'planted-8', 'all'] complete
+406 ['border', 'scoped', '128', 'planted-8', 'all'] complete
+407 ['border', 'parked', '128', 'planted-8', 'all'] complete
+408 ['border', 'rayon', '128', 'planted-8', 'all'] complete
+409 ['border', 'scoped', '1', 'planted-10', '64'] complete
+410 ['border', 'parked', '1', 'planted-10', '64'] complete
+411 ['border', 'rayon', '1', 'planted-10', '64'] complete
+412 ['border', 'scoped', '2', 'planted-10', '64'] complete
+413 ['border', 'parked', '2', 'planted-10', '64'] complete
+414 ['border', 'rayon', '2', 'planted-10', '64'] complete
+415 ['border', 'scoped', '4', 'planted-10', '64'] complete
+416 ['border', 'parked', '4', 'planted-10', '64'] complete
+417 ['border', 'rayon', '4', 'planted-10', '64'] complete
+418 ['border', 'scoped', '8', 'planted-10', '64'] complete
+419 ['border', 'parked', '8', 'planted-10', '64'] complete
+420 ['border', 'rayon', '8', 'planted-10', '64'] complete
+421 ['border', 'scoped', '16', 'planted-10', '64'] complete
+422 ['border', 'parked', '16', 'planted-10', '64'] complete
+423 ['border', 'rayon', '16', 'planted-10', '64'] complete
+424 ['border', 'scoped', '32', 'planted-10', '64'] complete
+425 ['border', 'parked', '32', 'planted-10', '64'] complete
+426 ['border', 'rayon', '32', 'planted-10', '64'] complete
+427 ['border', 'scoped', '64', 'planted-10', '64'] complete
+428 ['border', 'parked', '64', 'planted-10', '64'] complete
+429 ['border', 'rayon', '64', 'planted-10', '64'] complete
+430 ['border', 'scoped', '128', 'planted-10', '64'] complete
+431 ['border', 'parked', '128', 'planted-10', '64'] complete
+432 ['border', 'rayon', '128', 'planted-10', '64'] complete
+433 ['border', 'scoped', '1', 'planted-10', 'all'] complete
+434 ['border', 'parked', '1', 'planted-10', 'all'] complete
+435 ['border', 'rayon', '1', 'planted-10', 'all'] complete
+436 ['border', 'scoped', '2', 'planted-10', 'all'] complete
+437 ['border', 'parked', '2', 'planted-10', 'all'] complete
+438 ['border', 'rayon', '2', 'planted-10', 'all'] complete
+439 ['border', 'scoped', '4', 'planted-10', 'all'] complete
+440 ['border', 'parked', '4', 'planted-10', 'all'] complete
+441 ['border', 'rayon', '4', 'planted-10', 'all'] complete
+442 ['border', 'scoped', '8', 'planted-10', 'all'] complete
+443 ['border', 'parked', '8', 'planted-10', 'all'] complete
+444 ['border', 'rayon', '8', 'planted-10', 'all'] complete
+445 ['border', 'scoped', '16', 'planted-10', 'all'] complete
+446 ['border', 'parked', '16', 'planted-10', 'all'] complete
+447 ['border', 'rayon', '16', 'planted-10', 'all'] complete
+448 ['border', 'scoped', '32', 'planted-10', 'all'] complete
+449 ['border', 'parked', '32', 'planted-10', 'all'] complete
+450 ['border', 'rayon', '32', 'planted-10', 'all'] complete
+451 ['border', 'scoped', '64', 'planted-10', 'all'] complete
+452 ['border', 'parked', '64', 'planted-10', 'all'] complete
+453 ['border', 'rayon', '64', 'planted-10', 'all'] complete
+454 ['border', 'scoped', '128', 'planted-10', 'all'] complete
+455 ['border', 'parked', '128', 'planted-10', 'all'] complete
+456 ['border', 'rayon', '128', 'planted-10', 'all'] complete
+457 ['floor', 'parked', '1', '0'] complete
+458 ['floor', 'rayon', '1', '0'] complete
+459 ['floor', 'scoped', '1', '0'] complete
+460 ['floor', 'parked', '2', '0'] complete
+461 ['floor', 'rayon', '2', '0'] complete
+462 ['floor', 'scoped', '2', '0'] complete
+463 ['floor', 'parked', '4', '0'] complete
+464 ['floor', 'rayon', '4', '0'] complete
+465 ['floor', 'scoped', '4', '0'] complete
+466 ['floor', 'parked', '8', '0'] complete
+467 ['floor', 'rayon', '8', '0'] complete
+468 ['floor', 'scoped', '8', '0'] complete
+469 ['floor', 'parked', '16', '0'] complete
+470 ['floor', 'rayon', '16', '0'] complete
+471 ['floor', 'scoped', '16', '0'] complete
+472 ['floor', 'parked', '32', '0'] complete
+473 ['floor', 'rayon', '32', '0'] complete
+474 ['floor', 'scoped', '32', '0'] complete
+475 ['floor', 'parked', '64', '0'] complete
+476 ['floor', 'rayon', '64', '0'] complete
+477 ['floor', 'scoped', '64', '0'] complete
+478 ['floor', 'parked', '128', '0'] complete
+479 ['floor', 'rayon', '128', '0'] complete
+480 ['floor', 'scoped', '128', '0'] complete
+481 ['floor', 'parked', '1', '256'] complete
+482 ['floor', 'rayon', '1', '256'] complete
+483 ['floor', 'scoped', '1', '256'] complete
+484 ['floor', 'parked', '2', '256'] complete
+485 ['floor', 'rayon', '2', '256'] complete
+486 ['floor', 'scoped', '2', '256'] complete
+487 ['floor', 'parked', '4', '256'] complete
+488 ['floor', 'rayon', '4', '256'] complete
+489 ['floor', 'scoped', '4', '256'] complete
+490 ['floor', 'parked', '8', '256'] complete
+491 ['floor', 'rayon', '8', '256'] complete
+492 ['floor', 'scoped', '8', '256'] complete
+493 ['floor', 'parked', '16', '256'] complete
+494 ['floor', 'rayon', '16', '256'] complete
+495 ['floor', 'scoped', '16', '256'] complete
+496 ['floor', 'parked', '32', '256'] complete
+497 ['floor', 'rayon', '32', '256'] complete
+498 ['floor', 'scoped', '32', '256'] complete
+499 ['floor', 'parked', '64', '256'] complete
+500 ['floor', 'rayon', '64', '256'] complete
+501 ['floor', 'scoped', '64', '256'] complete
+502 ['floor', 'parked', '128', '256'] complete
+503 ['floor', 'rayon', '128', '256'] complete
+504 ['floor', 'scoped', '128', '256'] complete
+505 ['floor', 'parked', '1', '65536'] complete
+506 ['floor', 'rayon', '1', '65536'] complete
+507 ['floor', 'scoped', '1', '65536'] complete
+508 ['floor', 'parked', '2', '65536'] complete
+509 ['floor', 'rayon', '2', '65536'] complete
+510 ['floor', 'scoped', '2', '65536'] complete
+511 ['floor', 'parked', '4', '65536'] complete
+512 ['floor', 'rayon', '4', '65536'] complete
+513 ['floor', 'scoped', '4', '65536'] complete
+514 ['floor', 'parked', '8', '65536'] complete
+515 ['floor', 'rayon', '8', '65536'] complete
+516 ['floor', 'scoped', '8', '65536'] complete
+517 ['floor', 'parked', '16', '65536'] complete
+518 ['floor', 'rayon', '16', '65536'] complete
+519 ['floor', 'scoped', '16', '65536'] complete
+520 ['floor', 'parked', '32', '65536'] complete
+521 ['floor', 'rayon', '32', '65536'] complete
+522 ['floor', 'scoped', '32', '65536'] complete
+523 ['floor', 'parked', '64', '65536'] complete
+524 ['floor', 'rayon', '64', '65536'] complete
+525 ['floor', 'scoped', '64', '65536'] complete
+526 ['floor', 'parked', '128', '65536'] complete
+527 ['floor', 'rayon', '128', '65536'] complete
+528 ['floor', 'scoped', '128', '65536'] complete
+529 ['border', 'parked', '1', 'katsura-5', '64'] complete
+530 ['border', 'rayon', '1', 'katsura-5', '64'] complete
+531 ['border', 'scoped', '1', 'katsura-5', '64'] complete
+532 ['border', 'parked', '2', 'katsura-5', '64'] complete
+533 ['border', 'rayon', '2', 'katsura-5', '64'] complete
+534 ['border', 'scoped', '2', 'katsura-5', '64'] complete
+535 ['border', 'parked', '4', 'katsura-5', '64'] complete
+536 ['border', 'rayon', '4', 'katsura-5', '64'] complete
+537 ['border', 'scoped', '4', 'katsura-5', '64'] complete
+538 ['border', 'parked', '8', 'katsura-5', '64'] complete
+539 ['border', 'rayon', '8', 'katsura-5', '64'] complete
+540 ['border', 'scoped', '8', 'katsura-5', '64'] complete
+541 ['border', 'parked', '16', 'katsura-5', '64'] complete
+542 ['border', 'rayon', '16', 'katsura-5', '64'] complete
+543 ['border', 'scoped', '16', 'katsura-5', '64'] complete
+544 ['border', 'parked', '32', 'katsura-5', '64'] complete
+545 ['border', 'rayon', '32', 'katsura-5', '64'] complete
+546 ['border', 'scoped', '32', 'katsura-5', '64'] complete
+547 ['border', 'parked', '64', 'katsura-5', '64'] complete
+548 ['border', 'rayon', '64', 'katsura-5', '64'] complete
+549 ['border', 'scoped', '64', 'katsura-5', '64'] complete
+550 ['border', 'parked', '128', 'katsura-5', '64'] complete
+551 ['border', 'rayon', '128', 'katsura-5', '64'] complete
+552 ['border', 'scoped', '128', 'katsura-5', '64'] complete
+553 ['border', 'parked', '1', 'katsura-5', 'all'] complete
+554 ['border', 'rayon', '1', 'katsura-5', 'all'] complete
+555 ['border', 'scoped', '1', 'katsura-5', 'all'] complete
+556 ['border', 'parked', '2', 'katsura-5', 'all'] complete
+557 ['border', 'rayon', '2', 'katsura-5', 'all'] complete
+558 ['border', 'scoped', '2', 'katsura-5', 'all'] complete
+559 ['border', 'parked', '4', 'katsura-5', 'all'] complete
+560 ['border', 'rayon', '4', 'katsura-5', 'all'] complete
+561 ['border', 'scoped', '4', 'katsura-5', 'all'] complete
+562 ['border', 'parked', '8', 'katsura-5', 'all'] complete
+563 ['border', 'rayon', '8', 'katsura-5', 'all'] complete
+564 ['border', 'scoped', '8', 'katsura-5', 'all'] complete
+565 ['border', 'parked', '16', 'katsura-5', 'all'] complete
+566 ['border', 'rayon', '16', 'katsura-5', 'all'] complete
+567 ['border', 'scoped', '16', 'katsura-5', 'all'] complete
+568 ['border', 'parked', '32', 'katsura-5', 'all'] complete
+569 ['border', 'rayon', '32', 'katsura-5', 'all'] complete
+570 ['border', 'scoped', '32', 'katsura-5', 'all'] complete
+571 ['border', 'parked', '64', 'katsura-5', 'all'] complete
+572 ['border', 'rayon', '64', 'katsura-5', 'all'] complete
+573 ['border', 'scoped', '64', 'katsura-5', 'all'] complete
+574 ['border', 'parked', '128', 'katsura-5', 'all'] complete
+575 ['border', 'rayon', '128', 'katsura-5', 'all'] complete
+576 ['border', 'scoped', '128', 'katsura-5', 'all'] complete
+577 ['border', 'parked', '1', 'katsura-6', '64'] complete
+578 ['border', 'rayon', '1', 'katsura-6', '64'] complete
+579 ['border', 'scoped', '1', 'katsura-6', '64'] complete
+580 ['border', 'parked', '2', 'katsura-6', '64'] complete
+581 ['border', 'rayon', '2', 'katsura-6', '64'] complete
+582 ['border', 'scoped', '2', 'katsura-6', '64'] complete
+583 ['border', 'parked', '4', 'katsura-6', '64'] complete
+584 ['border', 'rayon', '4', 'katsura-6', '64'] complete
+585 ['border', 'scoped', '4', 'katsura-6', '64'] complete
+586 ['border', 'parked', '8', 'katsura-6', '64'] complete
+587 ['border', 'rayon', '8', 'katsura-6', '64'] complete
+588 ['border', 'scoped', '8', 'katsura-6', '64'] complete
+589 ['border', 'parked', '16', 'katsura-6', '64'] complete
+590 ['border', 'rayon', '16', 'katsura-6', '64'] complete
+591 ['border', 'scoped', '16', 'katsura-6', '64'] complete
+592 ['border', 'parked', '32', 'katsura-6', '64'] complete
+593 ['border', 'rayon', '32', 'katsura-6', '64'] complete
+594 ['border', 'scoped', '32', 'katsura-6', '64'] complete
+595 ['border', 'parked', '64', 'katsura-6', '64'] complete
+596 ['border', 'rayon', '64', 'katsura-6', '64'] complete
+597 ['border', 'scoped', '64', 'katsura-6', '64'] complete
+598 ['border', 'parked', '128', 'katsura-6', '64'] complete
+599 ['border', 'rayon', '128', 'katsura-6', '64'] complete
+600 ['border', 'scoped', '128', 'katsura-6', '64'] complete
+601 ['border', 'parked', '1', 'katsura-6', 'all'] complete
+602 ['border', 'rayon', '1', 'katsura-6', 'all'] complete
+603 ['border', 'scoped', '1', 'katsura-6', 'all'] complete
+604 ['border', 'parked', '2', 'katsura-6', 'all'] complete
+605 ['border', 'rayon', '2', 'katsura-6', 'all'] complete
+606 ['border', 'scoped', '2', 'katsura-6', 'all'] complete
+607 ['border', 'parked', '4', 'katsura-6', 'all'] complete
+608 ['border', 'rayon', '4', 'katsura-6', 'all'] complete
+609 ['border', 'scoped', '4', 'katsura-6', 'all'] complete
+610 ['border', 'parked', '8', 'katsura-6', 'all'] complete
+611 ['border', 'rayon', '8', 'katsura-6', 'all'] complete
+612 ['border', 'scoped', '8', 'katsura-6', 'all'] complete
+613 ['border', 'parked', '16', 'katsura-6', 'all'] complete
+614 ['border', 'rayon', '16', 'katsura-6', 'all'] complete
+615 ['border', 'scoped', '16', 'katsura-6', 'all'] complete
+616 ['border', 'parked', '32', 'katsura-6', 'all'] complete
+617 ['border', 'rayon', '32', 'katsura-6', 'all'] complete
+618 ['border', 'scoped', '32', 'katsura-6', 'all'] complete
+619 ['border', 'parked', '64', 'katsura-6', 'all'] complete
+620 ['border', 'rayon', '64', 'katsura-6', 'all'] complete
+621 ['border', 'scoped', '64', 'katsura-6', 'all'] complete
+622 ['border', 'parked', '128', 'katsura-6', 'all'] complete
+623 ['border', 'rayon', '128', 'katsura-6', 'all'] complete
+624 ['border', 'scoped', '128', 'katsura-6', 'all'] complete
+625 ['border', 'parked', '1', 'katsura-7', '64'] complete
+626 ['border', 'rayon', '1', 'katsura-7', '64'] complete
+627 ['border', 'scoped', '1', 'katsura-7', '64'] complete
+628 ['border', 'parked', '2', 'katsura-7', '64'] complete
+629 ['border', 'rayon', '2', 'katsura-7', '64'] complete
+630 ['border', 'scoped', '2', 'katsura-7', '64'] complete
+631 ['border', 'parked', '4', 'katsura-7', '64'] complete
+632 ['border', 'rayon', '4', 'katsura-7', '64'] complete
+633 ['border', 'scoped', '4', 'katsura-7', '64'] complete
+634 ['border', 'parked', '8', 'katsura-7', '64'] complete
+635 ['border', 'rayon', '8', 'katsura-7', '64'] complete
+636 ['border', 'scoped', '8', 'katsura-7', '64'] complete
+637 ['border', 'parked', '16', 'katsura-7', '64'] complete
+638 ['border', 'rayon', '16', 'katsura-7', '64'] complete
+639 ['border', 'scoped', '16', 'katsura-7', '64'] complete
+640 ['border', 'parked', '32', 'katsura-7', '64'] complete
+641 ['border', 'rayon', '32', 'katsura-7', '64'] complete
+642 ['border', 'scoped', '32', 'katsura-7', '64'] complete
+643 ['border', 'parked', '64', 'katsura-7', '64'] complete
+644 ['border', 'rayon', '64', 'katsura-7', '64'] complete
+645 ['border', 'scoped', '64', 'katsura-7', '64'] complete
+646 ['border', 'parked', '128', 'katsura-7', '64'] complete
+647 ['border', 'rayon', '128', 'katsura-7', '64'] complete
+648 ['border', 'scoped', '128', 'katsura-7', '64'] complete
+649 ['border', 'parked', '1', 'katsura-7', 'all'] complete
+650 ['border', 'rayon', '1', 'katsura-7', 'all'] complete
+651 ['border', 'scoped', '1', 'katsura-7', 'all'] complete
+652 ['border', 'parked', '2', 'katsura-7', 'all'] complete
+653 ['border', 'rayon', '2', 'katsura-7', 'all'] complete
+654 ['border', 'scoped', '2', 'katsura-7', 'all'] complete
+655 ['border', 'parked', '4', 'katsura-7', 'all'] complete
+656 ['border', 'rayon', '4', 'katsura-7', 'all'] complete
+657 ['border', 'scoped', '4', 'katsura-7', 'all'] complete
+658 ['border', 'parked', '8', 'katsura-7', 'all'] complete
+659 ['border', 'rayon', '8', 'katsura-7', 'all'] complete
+660 ['border', 'scoped', '8', 'katsura-7', 'all'] complete
+661 ['border', 'parked', '16', 'katsura-7', 'all'] complete
+662 ['border', 'rayon', '16', 'katsura-7', 'all'] complete
+663 ['border', 'scoped', '16', 'katsura-7', 'all'] complete
+664 ['border', 'parked', '32', 'katsura-7', 'all'] complete
+665 ['border', 'rayon', '32', 'katsura-7', 'all'] complete
+666 ['border', 'scoped', '32', 'katsura-7', 'all'] complete
+667 ['border', 'parked', '64', 'katsura-7', 'all'] complete
+668 ['border', 'rayon', '64', 'katsura-7', 'all'] complete
+669 ['border', 'scoped', '64', 'katsura-7', 'all'] complete
+670 ['border', 'parked', '128', 'katsura-7', 'all'] complete
+671 ['border', 'rayon', '128', 'katsura-7', 'all'] complete
+672 ['border', 'scoped', '128', 'katsura-7', 'all'] complete
+673 ['border', 'parked', '1', 'cyclic-5', '64'] complete
+674 ['border', 'rayon', '1', 'cyclic-5', '64'] complete
+675 ['border', 'scoped', '1', 'cyclic-5', '64'] complete
+676 ['border', 'parked', '2', 'cyclic-5', '64'] complete
+677 ['border', 'rayon', '2', 'cyclic-5', '64'] complete
+678 ['border', 'scoped', '2', 'cyclic-5', '64'] complete
+679 ['border', 'parked', '4', 'cyclic-5', '64'] complete
+680 ['border', 'rayon', '4', 'cyclic-5', '64'] complete
+681 ['border', 'scoped', '4', 'cyclic-5', '64'] complete
+682 ['border', 'parked', '8', 'cyclic-5', '64'] complete
+683 ['border', 'rayon', '8', 'cyclic-5', '64'] complete
+684 ['border', 'scoped', '8', 'cyclic-5', '64'] complete
+685 ['border', 'parked', '16', 'cyclic-5', '64'] complete
+686 ['border', 'rayon', '16', 'cyclic-5', '64'] complete
+687 ['border', 'scoped', '16', 'cyclic-5', '64'] complete
+688 ['border', 'parked', '32', 'cyclic-5', '64'] complete
+689 ['border', 'rayon', '32', 'cyclic-5', '64'] complete
+690 ['border', 'scoped', '32', 'cyclic-5', '64'] complete
+691 ['border', 'parked', '64', 'cyclic-5', '64'] complete
+692 ['border', 'rayon', '64', 'cyclic-5', '64'] complete
+693 ['border', 'scoped', '64', 'cyclic-5', '64'] complete
+694 ['border', 'parked', '128', 'cyclic-5', '64'] complete
+695 ['border', 'rayon', '128', 'cyclic-5', '64'] complete
+696 ['border', 'scoped', '128', 'cyclic-5', '64'] complete
+697 ['border', 'parked', '1', 'cyclic-5', 'all'] complete
+698 ['border', 'rayon', '1', 'cyclic-5', 'all'] complete
+699 ['border', 'scoped', '1', 'cyclic-5', 'all'] complete
+700 ['border', 'parked', '2', 'cyclic-5', 'all'] complete
+701 ['border', 'rayon', '2', 'cyclic-5', 'all'] complete
+702 ['border', 'scoped', '2', 'cyclic-5', 'all'] complete
+703 ['border', 'parked', '4', 'cyclic-5', 'all'] complete
+704 ['border', 'rayon', '4', 'cyclic-5', 'all'] complete
+705 ['border', 'scoped', '4', 'cyclic-5', 'all'] complete
+706 ['border', 'parked', '8', 'cyclic-5', 'all'] complete
+707 ['border', 'rayon', '8', 'cyclic-5', 'all'] complete
+708 ['border', 'scoped', '8', 'cyclic-5', 'all'] complete
+709 ['border', 'parked', '16', 'cyclic-5', 'all'] complete
+710 ['border', 'rayon', '16', 'cyclic-5', 'all'] complete
+711 ['border', 'scoped', '16', 'cyclic-5', 'all'] complete
+712 ['border', 'parked', '32', 'cyclic-5', 'all'] complete
+713 ['border', 'rayon', '32', 'cyclic-5', 'all'] complete
+714 ['border', 'scoped', '32', 'cyclic-5', 'all'] complete
+715 ['border', 'parked', '64', 'cyclic-5', 'all'] complete
+716 ['border', 'rayon', '64', 'cyclic-5', 'all'] complete
+717 ['border', 'scoped', '64', 'cyclic-5', 'all'] complete
+718 ['border', 'parked', '128', 'cyclic-5', 'all'] complete
+719 ['border', 'rayon', '128', 'cyclic-5', 'all'] complete
+720 ['border', 'scoped', '128', 'cyclic-5', 'all'] complete
+721 ['border', 'parked', '1', 'cyclic-6', '64'] complete
+722 ['border', 'rayon', '1', 'cyclic-6', '64'] complete
+723 ['border', 'scoped', '1', 'cyclic-6', '64'] complete
+724 ['border', 'parked', '2', 'cyclic-6', '64'] complete
+725 ['border', 'rayon', '2', 'cyclic-6', '64'] complete
+726 ['border', 'scoped', '2', 'cyclic-6', '64'] complete
+727 ['border', 'parked', '4', 'cyclic-6', '64'] complete
+728 ['border', 'rayon', '4', 'cyclic-6', '64'] complete
+729 ['border', 'scoped', '4', 'cyclic-6', '64'] complete
+730 ['border', 'parked', '8', 'cyclic-6', '64'] complete
+731 ['border', 'rayon', '8', 'cyclic-6', '64'] complete
+732 ['border', 'scoped', '8', 'cyclic-6', '64'] complete
+733 ['border', 'parked', '16', 'cyclic-6', '64'] complete
+734 ['border', 'rayon', '16', 'cyclic-6', '64'] complete
+735 ['border', 'scoped', '16', 'cyclic-6', '64'] complete
+736 ['border', 'parked', '32', 'cyclic-6', '64'] complete
+737 ['border', 'rayon', '32', 'cyclic-6', '64'] complete
+738 ['border', 'scoped', '32', 'cyclic-6', '64'] complete
+739 ['border', 'parked', '64', 'cyclic-6', '64'] complete
+740 ['border', 'rayon', '64', 'cyclic-6', '64'] complete
+741 ['border', 'scoped', '64', 'cyclic-6', '64'] complete
+742 ['border', 'parked', '128', 'cyclic-6', '64'] complete
+743 ['border', 'rayon', '128', 'cyclic-6', '64'] complete
+744 ['border', 'scoped', '128', 'cyclic-6', '64'] complete
+745 ['border', 'parked', '1', 'cyclic-6', 'all'] complete
+746 ['border', 'rayon', '1', 'cyclic-6', 'all'] complete
+747 ['border', 'scoped', '1', 'cyclic-6', 'all'] complete
+748 ['border', 'parked', '2', 'cyclic-6', 'all'] complete
+749 ['border', 'rayon', '2', 'cyclic-6', 'all'] complete
+750 ['border', 'scoped', '2', 'cyclic-6', 'all'] complete
+751 ['border', 'parked', '4', 'cyclic-6', 'all'] complete
+752 ['border', 'rayon', '4', 'cyclic-6', 'all'] complete
+753 ['border', 'scoped', '4', 'cyclic-6', 'all'] complete
+754 ['border', 'parked', '8', 'cyclic-6', 'all'] complete
+755 ['border', 'rayon', '8', 'cyclic-6', 'all'] complete
+756 ['border', 'scoped', '8', 'cyclic-6', 'all'] complete
+757 ['border', 'parked', '16', 'cyclic-6', 'all'] complete
+758 ['border', 'rayon', '16', 'cyclic-6', 'all'] complete
+759 ['border', 'scoped', '16', 'cyclic-6', 'all'] complete
+760 ['border', 'parked', '32', 'cyclic-6', 'all'] complete
+761 ['border', 'rayon', '32', 'cyclic-6', 'all'] complete
+762 ['border', 'scoped', '32', 'cyclic-6', 'all'] complete
+763 ['border', 'parked', '64', 'cyclic-6', 'all'] complete
+764 ['border', 'rayon', '64', 'cyclic-6', 'all'] complete
+765 ['border', 'scoped', '64', 'cyclic-6', 'all'] complete
+766 ['border', 'parked', '128', 'cyclic-6', 'all'] complete
+767 ['border', 'rayon', '128', 'cyclic-6', 'all'] complete
+768 ['border', 'scoped', '128', 'cyclic-6', 'all'] complete
+769 ['border', 'parked', '1', 'planted-6', '64'] complete
+770 ['border', 'rayon', '1', 'planted-6', '64'] complete
+771 ['border', 'scoped', '1', 'planted-6', '64'] complete
+772 ['border', 'parked', '2', 'planted-6', '64'] complete
+773 ['border', 'rayon', '2', 'planted-6', '64'] complete
+774 ['border', 'scoped', '2', 'planted-6', '64'] complete
+775 ['border', 'parked', '4', 'planted-6', '64'] complete
+776 ['border', 'rayon', '4', 'planted-6', '64'] complete
+777 ['border', 'scoped', '4', 'planted-6', '64'] complete
+778 ['border', 'parked', '8', 'planted-6', '64'] complete
+779 ['border', 'rayon', '8', 'planted-6', '64'] complete
+780 ['border', 'scoped', '8', 'planted-6', '64'] complete
+781 ['border', 'parked', '16', 'planted-6', '64'] complete
+782 ['border', 'rayon', '16', 'planted-6', '64'] complete
+783 ['border', 'scoped', '16', 'planted-6', '64'] complete
+784 ['border', 'parked', '32', 'planted-6', '64'] complete
+785 ['border', 'rayon', '32', 'planted-6', '64'] complete
+786 ['border', 'scoped', '32', 'planted-6', '64'] complete
+787 ['border', 'parked', '64', 'planted-6', '64'] complete
+788 ['border', 'rayon', '64', 'planted-6', '64'] complete
+789 ['border', 'scoped', '64', 'planted-6', '64'] complete
+790 ['border', 'parked', '128', 'planted-6', '64'] complete
+791 ['border', 'rayon', '128', 'planted-6', '64'] complete
+792 ['border', 'scoped', '128', 'planted-6', '64'] complete
+793 ['border', 'parked', '1', 'planted-6', 'all'] complete
+794 ['border', 'rayon', '1', 'planted-6', 'all'] complete
+795 ['border', 'scoped', '1', 'planted-6', 'all'] complete
+796 ['border', 'parked', '2', 'planted-6', 'all'] complete
+797 ['border', 'rayon', '2', 'planted-6', 'all'] complete
+798 ['border', 'scoped', '2', 'planted-6', 'all'] complete
+799 ['border', 'parked', '4', 'planted-6', 'all'] complete
+800 ['border', 'rayon', '4', 'planted-6', 'all'] complete
+801 ['border', 'scoped', '4', 'planted-6', 'all'] complete
+802 ['border', 'parked', '8', 'planted-6', 'all'] complete
+803 ['border', 'rayon', '8', 'planted-6', 'all'] complete
+804 ['border', 'scoped', '8', 'planted-6', 'all'] complete
+805 ['border', 'parked', '16', 'planted-6', 'all'] complete
+806 ['border', 'rayon', '16', 'planted-6', 'all'] complete
+807 ['border', 'scoped', '16', 'planted-6', 'all'] complete
+808 ['border', 'parked', '32', 'planted-6', 'all'] complete
+809 ['border', 'rayon', '32', 'planted-6', 'all'] complete
+810 ['border', 'scoped', '32', 'planted-6', 'all'] complete
+811 ['border', 'parked', '64', 'planted-6', 'all'] complete
+812 ['border', 'rayon', '64', 'planted-6', 'all'] complete
+813 ['border', 'scoped', '64', 'planted-6', 'all'] complete
+814 ['border', 'parked', '128', 'planted-6', 'all'] complete
+815 ['border', 'rayon', '128', 'planted-6', 'all'] complete
+816 ['border', 'scoped', '128', 'planted-6', 'all'] complete
+817 ['border', 'parked', '1', 'planted-8', '64'] complete
+818 ['border', 'rayon', '1', 'planted-8', '64'] complete
+819 ['border', 'scoped', '1', 'planted-8', '64'] complete
+820 ['border', 'parked', '2', 'planted-8', '64'] complete
+821 ['border', 'rayon', '2', 'planted-8', '64'] complete
+822 ['border', 'scoped', '2', 'planted-8', '64'] complete
+823 ['border', 'parked', '4', 'planted-8', '64'] complete
+824 ['border', 'rayon', '4', 'planted-8', '64'] complete
+825 ['border', 'scoped', '4', 'planted-8', '64'] complete
+826 ['border', 'parked', '8', 'planted-8', '64'] complete
+827 ['border', 'rayon', '8', 'planted-8', '64'] complete
+828 ['border', 'scoped', '8', 'planted-8', '64'] complete
+829 ['border', 'parked', '16', 'planted-8', '64'] complete
+830 ['border', 'rayon', '16', 'planted-8', '64'] complete
+831 ['border', 'scoped', '16', 'planted-8', '64'] complete
+832 ['border', 'parked', '32', 'planted-8', '64'] complete
+833 ['border', 'rayon', '32', 'planted-8', '64'] complete
+834 ['border', 'scoped', '32', 'planted-8', '64'] complete
+835 ['border', 'parked', '64', 'planted-8', '64'] complete
+836 ['border', 'rayon', '64', 'planted-8', '64'] complete
+837 ['border', 'scoped', '64', 'planted-8', '64'] complete
+838 ['border', 'parked', '128', 'planted-8', '64'] complete
+839 ['border', 'rayon', '128', 'planted-8', '64'] complete
+840 ['border', 'scoped', '128', 'planted-8', '64'] complete
+841 ['border', 'parked', '1', 'planted-8', 'all'] complete
+842 ['border', 'rayon', '1', 'planted-8', 'all'] complete
+843 ['border', 'scoped', '1', 'planted-8', 'all'] complete
+844 ['border', 'parked', '2', 'planted-8', 'all'] complete
+845 ['border', 'rayon', '2', 'planted-8', 'all'] complete
+846 ['border', 'scoped', '2', 'planted-8', 'all'] complete
+847 ['border', 'parked', '4', 'planted-8', 'all'] complete
+848 ['border', 'rayon', '4', 'planted-8', 'all'] complete
+849 ['border', 'scoped', '4', 'planted-8', 'all'] complete
+850 ['border', 'parked', '8', 'planted-8', 'all'] complete
+851 ['border', 'rayon', '8', 'planted-8', 'all'] complete
+852 ['border', 'scoped', '8', 'planted-8', 'all'] complete
+853 ['border', 'parked', '16', 'planted-8', 'all'] complete
+854 ['border', 'rayon', '16', 'planted-8', 'all'] complete
+855 ['border', 'scoped', '16', 'planted-8', 'all'] complete
+856 ['border', 'parked', '32', 'planted-8', 'all'] complete
+857 ['border', 'rayon', '32', 'planted-8', 'all'] complete
+858 ['border', 'scoped', '32', 'planted-8', 'all'] complete
+859 ['border', 'parked', '64', 'planted-8', 'all'] complete
+860 ['border', 'rayon', '64', 'planted-8', 'all'] complete
+861 ['border', 'scoped', '64', 'planted-8', 'all'] complete
+862 ['border', 'parked', '128', 'planted-8', 'all'] complete
+863 ['border', 'rayon', '128', 'planted-8', 'all'] complete
+864 ['border', 'scoped', '128', 'planted-8', 'all'] complete
+865 ['border', 'parked', '1', 'planted-10', '64'] complete
+866 ['border', 'rayon', '1', 'planted-10', '64'] complete
+867 ['border', 'scoped', '1', 'planted-10', '64'] complete
+868 ['border', 'parked', '2', 'planted-10', '64'] complete
+869 ['border', 'rayon', '2', 'planted-10', '64'] complete
+870 ['border', 'scoped', '2', 'planted-10', '64'] complete
+871 ['border', 'parked', '4', 'planted-10', '64'] complete
+872 ['border', 'rayon', '4', 'planted-10', '64'] complete
+873 ['border', 'scoped', '4', 'planted-10', '64'] complete
+874 ['border', 'parked', '8', 'planted-10', '64'] complete
+875 ['border', 'rayon', '8', 'planted-10', '64'] complete
+876 ['border', 'scoped', '8', 'planted-10', '64'] complete
+877 ['border', 'parked', '16', 'planted-10', '64'] complete
+878 ['border', 'rayon', '16', 'planted-10', '64'] complete
+879 ['border', 'scoped', '16', 'planted-10', '64'] complete
+880 ['border', 'parked', '32', 'planted-10', '64'] complete
+881 ['border', 'rayon', '32', 'planted-10', '64'] complete
+882 ['border', 'scoped', '32', 'planted-10', '64'] complete
+883 ['border', 'parked', '64', 'planted-10', '64'] complete
+884 ['border', 'rayon', '64', 'planted-10', '64'] complete
+885 ['border', 'scoped', '64', 'planted-10', '64'] complete
+886 ['border', 'parked', '128', 'planted-10', '64'] complete
+887 ['border', 'rayon', '128', 'planted-10', '64'] complete
+888 ['border', 'scoped', '128', 'planted-10', '64'] complete
+889 ['border', 'parked', '1', 'planted-10', 'all'] complete
+890 ['border', 'rayon', '1', 'planted-10', 'all'] complete
+891 ['border', 'scoped', '1', 'planted-10', 'all'] complete
+892 ['border', 'parked', '2', 'planted-10', 'all'] complete
+893 ['border', 'rayon', '2', 'planted-10', 'all'] complete
+894 ['border', 'scoped', '2', 'planted-10', 'all'] complete
+895 ['border', 'parked', '4', 'planted-10', 'all'] complete
+896 ['border', 'rayon', '4', 'planted-10', 'all'] complete
+897 ['border', 'scoped', '4', 'planted-10', 'all'] complete
+898 ['border', 'parked', '8', 'planted-10', 'all'] complete
+899 ['border', 'rayon', '8', 'planted-10', 'all'] complete
+900 ['border', 'scoped', '8', 'planted-10', 'all'] complete
+901 ['border', 'parked', '16', 'planted-10', 'all'] complete
+902 ['border', 'rayon', '16', 'planted-10', 'all'] complete
+903 ['border', 'scoped', '16', 'planted-10', 'all'] complete
+904 ['border', 'parked', '32', 'planted-10', 'all'] complete
+905 ['border', 'rayon', '32', 'planted-10', 'all'] complete
+906 ['border', 'scoped', '32', 'planted-10', 'all'] complete
+907 ['border', 'parked', '64', 'planted-10', 'all'] complete
+908 ['border', 'rayon', '64', 'planted-10', 'all'] complete
+909 ['border', 'scoped', '64', 'planted-10', 'all'] complete
+910 ['border', 'parked', '128', 'planted-10', 'all'] complete
+911 ['border', 'rayon', '128', 'planted-10', 'all'] complete
+912 ['border', 'scoped', '128', 'planted-10', 'all'] complete
+913 ['floor', 'rayon', '1', '0'] complete
+914 ['floor', 'scoped', '1', '0'] complete
+915 ['floor', 'parked', '1', '0'] complete
+916 ['floor', 'rayon', '2', '0'] complete
+917 ['floor', 'scoped', '2', '0'] complete
+918 ['floor', 'parked', '2', '0'] complete
+919 ['floor', 'rayon', '4', '0'] complete
+920 ['floor', 'scoped', '4', '0'] complete
+921 ['floor', 'parked', '4', '0'] complete
+922 ['floor', 'rayon', '8', '0'] complete
+923 ['floor', 'scoped', '8', '0'] complete
+924 ['floor', 'parked', '8', '0'] complete
+925 ['floor', 'rayon', '16', '0'] complete
+926 ['floor', 'scoped', '16', '0'] complete
+927 ['floor', 'parked', '16', '0'] complete
+928 ['floor', 'rayon', '32', '0'] complete
+929 ['floor', 'scoped', '32', '0'] complete
+930 ['floor', 'parked', '32', '0'] complete
+931 ['floor', 'rayon', '64', '0'] complete
+932 ['floor', 'scoped', '64', '0'] complete
+933 ['floor', 'parked', '64', '0'] complete
+934 ['floor', 'rayon', '128', '0'] complete
+935 ['floor', 'scoped', '128', '0'] complete
+936 ['floor', 'parked', '128', '0'] complete
+937 ['floor', 'rayon', '1', '256'] complete
+938 ['floor', 'scoped', '1', '256'] complete
+939 ['floor', 'parked', '1', '256'] complete
+940 ['floor', 'rayon', '2', '256'] complete
+941 ['floor', 'scoped', '2', '256'] complete
+942 ['floor', 'parked', '2', '256'] complete
+943 ['floor', 'rayon', '4', '256'] complete
+944 ['floor', 'scoped', '4', '256'] complete
+945 ['floor', 'parked', '4', '256'] complete
+946 ['floor', 'rayon', '8', '256'] complete
+947 ['floor', 'scoped', '8', '256'] complete
+948 ['floor', 'parked', '8', '256'] complete
+949 ['floor', 'rayon', '16', '256'] complete
+950 ['floor', 'scoped', '16', '256'] complete
+951 ['floor', 'parked', '16', '256'] complete
+952 ['floor', 'rayon', '32', '256'] complete
+953 ['floor', 'scoped', '32', '256'] complete
+954 ['floor', 'parked', '32', '256'] complete
+955 ['floor', 'rayon', '64', '256'] complete
+956 ['floor', 'scoped', '64', '256'] complete
+957 ['floor', 'parked', '64', '256'] complete
+958 ['floor', 'rayon', '128', '256'] complete
+959 ['floor', 'scoped', '128', '256'] complete
+960 ['floor', 'parked', '128', '256'] complete
+961 ['floor', 'rayon', '1', '65536'] complete
+962 ['floor', 'scoped', '1', '65536'] complete
+963 ['floor', 'parked', '1', '65536'] complete
+964 ['floor', 'rayon', '2', '65536'] complete
+965 ['floor', 'scoped', '2', '65536'] complete
+966 ['floor', 'parked', '2', '65536'] complete
+967 ['floor', 'rayon', '4', '65536'] complete
+968 ['floor', 'scoped', '4', '65536'] complete
+969 ['floor', 'parked', '4', '65536'] complete
+970 ['floor', 'rayon', '8', '65536'] complete
+971 ['floor', 'scoped', '8', '65536'] complete
+972 ['floor', 'parked', '8', '65536'] complete
+973 ['floor', 'rayon', '16', '65536'] complete
+974 ['floor', 'scoped', '16', '65536'] complete
+975 ['floor', 'parked', '16', '65536'] complete
+976 ['floor', 'rayon', '32', '65536'] complete
+977 ['floor', 'scoped', '32', '65536'] complete
+978 ['floor', 'parked', '32', '65536'] complete
+979 ['floor', 'rayon', '64', '65536'] complete
+980 ['floor', 'scoped', '64', '65536'] complete
+981 ['floor', 'parked', '64', '65536'] complete
+982 ['floor', 'rayon', '128', '65536'] complete
+983 ['floor', 'scoped', '128', '65536'] complete
+984 ['floor', 'parked', '128', '65536'] complete
+985 ['border', 'rayon', '1', 'katsura-5', '64'] complete
+986 ['border', 'scoped', '1', 'katsura-5', '64'] complete
+Traceback (most recent call last):
+  File "/home/mfaulk/projects/zb-592-worker-pool/tools/external/worker-pool-study.py", line 225, in <module>
+    main()
+    ~~~~^^
+  File "/home/mfaulk/projects/zb-592-worker-pool/tools/external/worker-pool-study.py", line 214, in main
+    save(args.output, record)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mfaulk/projects/zb-592-worker-pool/tools/external/worker-pool-study.py", line 77, in save
+    json.dump(record, stream)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.14/json/__init__.py", line 182, in dump
+    fp.write(chunk)
+    ~~~~~~~~^^^^^^^
+  File "/usr/lib64/python3.14/gzip.py", line 326, in write
+    return self._buffer.write(data)
+           ~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib64/python3.14/gzip.py", line 138, in write
+    return gzip_file._write_raw(data)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib64/python3.14/gzip.py", line 338, in _write_raw
+    self.fileobj.write(self.compress.compress(data))
+                       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+KeyboardInterrupt

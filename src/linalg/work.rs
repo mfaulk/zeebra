@@ -1,8 +1,41 @@
 //! Passive, thread-local research counters; disabled scopes retain no solver state.
 
 use std::cell::RefCell;
+use std::time::Instant;
 
 use crate::util::Json;
+
+/// Serial row timings and dependencies describe the control trajectory, not a parallel schedule.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DiscoveryRow {
+    pub row: usize,
+    pub completed: bool,
+    pub elapsed_ns: u64,
+    pub first_claim_column: Option<usize>,
+    pub pivot_column: Option<usize>,
+    pub inherited_products: usize,
+    pub discovered_products: usize,
+    pub dependencies: Vec<usize>,
+}
+
+impl DiscoveryRow {
+    fn json(&self) -> Json {
+        let column = |value: Option<usize>| value.map_or(Json::Null, Json::size);
+        Json::object([
+            ("row", Json::size(self.row)),
+            ("completed", Json::Bool(self.completed)),
+            ("elapsed_ns", Json::int(self.elapsed_ns)),
+            ("first_claim_column", column(self.first_claim_column)),
+            ("pivot_column", column(self.pivot_column)),
+            ("inherited_products", Json::size(self.inherited_products)),
+            ("discovered_products", Json::size(self.discovered_products)),
+            (
+                "dependencies",
+                Json::Array(self.dependencies.iter().copied().map(Json::size).collect()),
+            ),
+        ])
+    }
+}
 
 /// Logical entry operations, not CPU instructions or physical memory traffic.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -26,6 +59,28 @@ pub struct PhaseWork {
 }
 
 impl PhaseWork {
+    /// Sum worker-local logical operations; memory peaks must be accounted separately.
+    pub fn accumulate(&mut self, other: &Self) {
+        macro_rules! add { ($($field:ident),* $(,)?) => { $(self.$field += other.$field;)* }; }
+        add!(
+            pivot_applications,
+            coefficient_products,
+            sparse_target_entries,
+            sparse_prefix_preserved,
+            sparse_merge_output_entries,
+            sparse_copyback_entries,
+            dense_load_entries,
+            dense_scan_cells,
+            dense_gather_cells,
+            dense_gather_entries,
+            normalized_cells,
+            reducer_target_operations,
+            pair_target_operations,
+            rows_loaded,
+            rows_zero
+        );
+    }
+
     pub fn json(&self) -> Json {
         Json::object([
             ("pivot_applications", Json::size(self.pivot_applications)),
@@ -74,6 +129,7 @@ impl PhaseWork {
 /// One matrix's live payload/capacity peaks exclude basis, monomial tables and allocator overhead.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MatrixWork {
+    pub discovery: Vec<DiscoveryRow>,
     /// False for an interrupted/refused matrix; zero summary counts then mean unavailable.
     pub completed: bool,
     pub degree: u64,
@@ -98,6 +154,10 @@ pub struct MatrixWork {
 impl MatrixWork {
     pub fn json(&self) -> Json {
         Json::object([
+            (
+                "discovery",
+                Json::Array(self.discovery.iter().map(DiscoveryRow::json).collect()),
+            ),
             ("completed", Json::Bool(self.completed)),
             ("degree", Json::int(self.degree)),
             ("pairs", Json::size(self.pairs)),
@@ -170,6 +230,8 @@ struct State {
     structured: bool,
     resident: usize,
     allocated: usize,
+    discovery: bool,
+    discovery_row: Option<DiscoveryRow>,
 }
 
 thread_local! {
@@ -194,6 +256,83 @@ pub fn measure<T>(f: impl FnOnce() -> T) -> (T, WorkReport) {
     let report = ACTIVE.with(|active| active.borrow_mut().take().unwrap().report);
     drop(reset);
     (result, report)
+}
+
+/// Add per-row clocks and dependency observations to the normal serial work scope.
+pub fn measure_discovery<T>(f: impl FnOnce() -> T) -> (T, WorkReport) {
+    measure(|| {
+        ACTIVE.with(|active| active.borrow_mut().as_mut().unwrap().discovery = true);
+        f()
+    })
+}
+
+pub(crate) struct DiscoveryScope(Option<Instant>);
+
+impl Drop for DiscoveryScope {
+    fn drop(&mut self) {
+        if let Some(started) = self.0 {
+            let row = ACTIVE.with(|active| {
+                active
+                    .borrow_mut()
+                    .as_mut()
+                    .and_then(|state| state.discovery_row.take())
+            });
+            if let Some(mut row) = row {
+                row.elapsed_ns = started.elapsed().as_nanos().min(u64::MAX as u128) as u64;
+                update(|matrix, _, _| matrix.discovery.push(row));
+            }
+        }
+    }
+}
+
+pub(crate) fn discovery_row(row: usize) -> DiscoveryScope {
+    DiscoveryScope(ACTIVE.with(|active| {
+        let mut active = active.borrow_mut();
+        let state = active.as_mut()?;
+        if !state.discovery {
+            return None;
+        }
+        assert!(state.discovery_row.is_none());
+        state.discovery_row = Some(DiscoveryRow {
+            row,
+            ..Default::default()
+        });
+        Some(Instant::now())
+    }))
+}
+
+pub(crate) fn discovery_pivot(column: usize, pivot: Option<usize>, first: usize, products: usize) {
+    ACTIVE.with(|active| {
+        if let Some(row) = active
+            .borrow_mut()
+            .as_mut()
+            .and_then(|state| state.discovery_row.as_mut())
+        {
+            match pivot {
+                Some(index) if index < first => row.inherited_products += products,
+                other => {
+                    row.first_claim_column.get_or_insert(column);
+                    if let Some(index) = other {
+                        row.discovered_products += products;
+                        row.dependencies.push(index);
+                    }
+                }
+            }
+        }
+    });
+}
+
+pub(crate) fn discovery_finish(column: Option<usize>) {
+    ACTIVE.with(|active| {
+        if let Some(row) = active
+            .borrow_mut()
+            .as_mut()
+            .and_then(|state| state.discovery_row.as_mut())
+        {
+            row.completed = true;
+            row.pivot_column = column;
+        }
+    });
 }
 
 fn update(f: impl FnOnce(&mut MatrixWork, bool, Option<bool>)) {
@@ -393,6 +532,64 @@ mod tests {
         },
         One,
     };
+
+    // Discovery tracing separates inherited work, new-pivot dependencies and zero residuals without changing rows.
+    #[test]
+    fn discovery_records_row_dependencies() {
+        use crate::linalg::{reduce_rows_against_pivots_with, Backend};
+        let rows = vec![
+            SparseRow::<Zp13>::new(&[(0, Zp13::ONE), (3, Zp13::ONE)]),
+            SparseRow::new(&[(1, Zp13::ONE), (2, Zp13::ONE)]),
+            SparseRow::new(&[(0, Zp13::ONE), (1, Zp13::ONE)]),
+            SparseRow::new(&[(1, Zp13::ONE), (2, Zp13::ONE)]),
+        ];
+        let mut control = SparseMatrix::new(4, rows);
+        let mut observed = control.clone();
+        let expected =
+            reduce_rows_against_pivots_with(Backend::Adaptive, &mut control, 1, usize::MAX)
+                .unwrap();
+        let (actual, report) = super::measure_discovery(|| {
+            reduce_rows_against_pivots_with(Backend::Adaptive, &mut observed, 1, usize::MAX)
+                .unwrap()
+        });
+        assert_eq!(actual, expected);
+        assert_eq!(observed, control);
+        let rows = report.outside_batch.discovery;
+        assert_eq!(rows.len(), 3);
+        assert!(rows.iter().all(|row| row.completed));
+        assert_eq!(rows[0].pivot_column, Some(1));
+        assert_eq!(rows[1].inherited_products, 2);
+        assert_eq!(rows[1].discovered_products, 2);
+        assert_eq!(rows[1].dependencies, vec![1]);
+        assert_eq!(rows[1].pivot_column, Some(2));
+        assert_eq!(rows[2].dependencies, vec![1]);
+        assert_eq!(rows[2].pivot_column, None);
+        assert_eq!(rows[2].first_claim_column, Some(1));
+    }
+
+    // Discovery refusal records an incomplete row and unwinding leaves the next scope clean.
+    #[test]
+    fn discovery_refusal_and_panic_cleanup() {
+        use crate::linalg::{reduce_rows_against_pivots_with, Backend};
+        let mut matrix = SparseMatrix::new(
+            4,
+            vec![
+                SparseRow::<Zp13>::new(&[(0, Zp13::ONE), (1, Zp13::ONE), (2, Zp13::ONE)]),
+                SparseRow::new(&[(0, Zp13::ONE), (3, Zp13::ONE)]),
+            ],
+        );
+        let (result, report) = super::measure_discovery(|| {
+            reduce_rows_against_pivots_with(Backend::Adaptive, &mut matrix, 1, 5)
+        });
+        assert!(result.is_err());
+        assert_eq!(report.outside_batch.discovery.len(), 1);
+        assert!(!report.outside_batch.discovery[0].completed);
+        assert!(
+            std::panic::catch_unwind(|| super::measure_discovery(|| panic!("intentional")))
+                .is_err()
+        );
+        assert_eq!(measure(|| ()).1, super::WorkReport::default());
+    }
 
     // A three-row echelon fixture prices two back substitutions and leaves its RREF unchanged.
     #[test]

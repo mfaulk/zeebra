@@ -1,43 +1,4 @@
-//! Many border monomials reduced at once, sharing the symbolic work and the reducer multiples.
-//!
-//! M18-1 removed the duplicated reductions. What is left is `|∂B|` independent normal forms, each
-//! of which searches the basis for a divisor, builds a multiple, and subtracts it — through
-//! `MultivariatePolynomial`'s `HashMap`, once per step. F4's answer to the same shape of problem is
-//! to do the symbolic work for a whole batch once and the arithmetic over integer column indices,
-//! and that is what this does for border monomials.
-//!
-//! # The targets must not reduce one another
-//! This is the one way a batch here differs from an F4 batch, and it is not a detail. An F4 matrix
-//! is echelonized: any row may become a pivot, and rows reduce each other. Here **each target has
-//! its own answer** — `NF(u_1)` must not involve `u_2` — so the pivots are *fixed* before any
-//! target is touched, every pivot is a reducer multiple, and no target ever becomes one.
-//!
-//! That is also why `linalg::reduce_rows_against_pivots_with` is not what runs below. Its contract
-//! is to echelonize the lower block against an upper one, which for these targets would be the
-//! wrong computation rather than a slower one.
-//!
-//! # The closure
-//! Start from the targets. For every monomial `m` seen, if some `LM(g)` divides `m`, add the
-//! reducer multiple `(m / LM(g)) * g` and look at its monomials too. Stop when nothing new appears.
-//!
-//! Each reducible monomial then has **exactly one** reducer row, whose leading monomial it is, and
-//! whose other monomials are strictly below it. So the reducer rows are a triangular system in the
-//! order's own column indexing, and reducing a target is one descending pass: at each column with a
-//! nonzero, subtract that column's reducer row if it has one. Nothing can reintroduce a nonzero in
-//! a column already passed.
-//!
-//! **The pass cannot stop at the first standard column.** A standard monomial can be *larger* than
-//! a nonstandard one — with `G = {x^2, y^2}` under grevlex, `xy` is standard and `y^2 < xy` is not —
-//! so the scan runs to the end of the columns.
-//!
-//! §6 of `docs/MILESTONE-FGLM-SCALABILITY.md` has the measurements, including why the batch size is
-//! bounded rather than left unbounded.
-//!
-//! # References
-//! * Faugère, J.-C. (1999), *A new efficient algorithm for computing Gröbner bases (F4)*, for the
-//!   symbolic-preprocessing-then-linear-algebra shape.
-//! * *An Algorithm for Splitting Polynomial Systems Based on F4*, PASCO 2017, for F4-style
-//!   preprocessing in support of quotient-algebra normal forms.
+//! Border targets reduce independently against an immutable triangular symbolic closure; targets must never become pivots for one another.
 
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
@@ -600,8 +561,16 @@ fn reduce_group<const N: usize, F: FiniteField>(
     closure: &Closure<N, F>,
     slots: &mut [Remainder<N, F>],
 ) -> usize {
-    let mut buffer: Vec<F> = vec![F::zero(); closure.columns.len()];
+    let mut buffer = vec![F::zero(); closure.columns.len()];
+    reduce_group_with_buffer(targets, closure, slots, &mut buffer)
+}
 
+fn reduce_group_with_buffer<const N: usize, F: FiniteField>(
+    targets: &[Monomial<N>],
+    closure: &Closure<N, F>,
+    slots: &mut [Remainder<N, F>],
+    buffer: &mut [F],
+) -> usize {
     // The previous target's leading column, below which the buffer is known to be zero. Starts at
     // the width because a freshly allocated buffer is zero everywhere.
     let mut dirty_from = closure.columns.len();
@@ -761,6 +730,138 @@ pub fn measure_border_reduction<const N: usize, F: FiniteField + Send + Sync>(
             reducer_entries: closed.reducer_entries(),
             peak_reducer_entries: closed.reducer_entries(),
             buffer_cells_zeroed,
+            closure_time,
+            reduction_time,
+            peak_reduction_time: reduction_time,
+        });
+    }
+    Ok((total, hasher.finish()))
+}
+
+/// An owned group for research executors, sharing one immutable closure per batch.
+#[cfg(feature = "research-work")]
+pub struct BorderReductionTask<const N: usize, F: FiniteField> {
+    data: std::sync::Arc<(Vec<Monomial<N>>, Closure<N, F>)>,
+    range: std::ops::Range<usize>,
+    index: usize,
+}
+
+/// An ordered group's complete remainders; fields are private to prevent fabricated results.
+#[cfg(feature = "research-work")]
+pub struct BorderReductionResult<const N: usize, F: FiniteField> {
+    remainders: Vec<Remainder<N, F>>,
+    zeroed: usize,
+    index: usize,
+}
+
+#[cfg(feature = "research-work")]
+impl<const N: usize, F: FiniteField> BorderReductionTask<N, F> {
+    /// Reduce this group with reusable scratch; every active cell is cleared before reuse.
+    pub fn run(self, scratch: &mut Vec<F>) -> BorderReductionResult<N, F> {
+        let width = self.data.1.columns.len();
+        let reused = scratch.len().min(width);
+        scratch[..reused].fill(F::zero());
+        scratch.resize(width, F::zero());
+        let mut remainders = vec![Vec::new(); self.range.len()];
+        let zeroed = reduce_group_with_buffer(
+            &self.data.0[self.range],
+            &self.data.1,
+            &mut remainders,
+            scratch,
+        );
+        BorderReductionResult {
+            remainders,
+            zeroed,
+            index: self.index,
+        }
+    }
+}
+
+/// Measure owned task dispatch without changing the conversion or its public field bounds.
+///
+/// Only available with `research-work`. The callback must finish every submitted group before
+/// returning. Closure construction, task ownership/collection and clearing are timed; executor
+/// construction is the caller's responsibility. Scratch capacities and RSS are separate from
+/// `max_scratch_cells`, which bounds active field cells for one batch, not retained allocations.
+///
+/// # Errors
+/// Returns the existing closure/quotient errors, or `BorderBatchExceeded` with reason
+/// `"worker scratch cells"` before dispatch if this explicit research allowance is insufficient.
+///
+/// # Panics
+/// Panics if the dispatcher drops, duplicates or corrupts the ordered groups.
+#[cfg(feature = "research-work")]
+pub fn measure_border_reduction_with<const N: usize, F: FiniteField + Send + Sync>(
+    source_basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    limits: &BorderBatch,
+    workers: usize,
+    max_scratch_cells: usize,
+    mut dispatch: impl FnMut(Vec<BorderReductionTask<N, F>>) -> Vec<BorderReductionResult<N, F>>,
+) -> Result<(BorderBatchStatistics, u64), FglmError> {
+    let quotient = QuotientBasis::new(source_basis, order, usize::MAX)?;
+    let targets = BorderIndex::new(&quotient).monomials().to_vec();
+    let nonzero: Vec<_> = source_basis
+        .iter()
+        .filter(|p| !p.is_zero())
+        .cloned()
+        .collect();
+    let monic = MonicBasis::new(&nonzero, order);
+    let mut total = BorderBatchStatistics::default();
+    let mut hasher = DefaultHasher::new();
+    for group in targets.chunks(limits.size.chunk(targets.len())) {
+        let mut clock = StageClock::new(true);
+        let closed = closure(group, &monic, order, limits)?;
+        let closure_time = clock.lap();
+        let block = group.len().div_ceil(workers.max(1)).max(1);
+        let count = group.len().div_ceil(block);
+        if closed
+            .columns()
+            .checked_mul(count)
+            .is_none_or(|cells| cells > max_scratch_cells)
+        {
+            return Err(FglmError::BorderBatchExceeded {
+                reason: "worker scratch cells",
+                limit: max_scratch_cells,
+            });
+        }
+        let columns = closed.columns();
+        let reducer_rows = closed.reducer_rows();
+        let reducer_entries = closed.reducer_entries();
+        let data = std::sync::Arc::new((group.to_vec(), closed));
+        let tasks = (0..count)
+            .map(|index| BorderReductionTask {
+                data: data.clone(),
+                range: index * block..((index + 1) * block).min(group.len()),
+                index,
+            })
+            .collect();
+        let mut results = dispatch(tasks);
+        assert_eq!(results.len(), count, "dispatcher dropped a group");
+        results.sort_unstable_by_key(|r| r.index);
+        let mut zeroed = 0;
+        for (index, result) in results.iter().enumerate() {
+            assert_eq!(result.index, index, "dispatcher duplicated a group");
+            assert_eq!(
+                result.remainders.len(),
+                (group.len() - index * block).min(block)
+            );
+            zeroed += result.zeroed;
+        }
+        let reduction_time = clock.lap();
+        for result in results {
+            for remainder in result.remainders {
+                remainder.hash(&mut hasher);
+            }
+        }
+        total.add(&BorderBatchStatistics {
+            batches: 1,
+            fallbacks: 0,
+            columns,
+            reducer_rows,
+            reducer_entries,
+            peak_reducer_entries: reducer_entries,
+            buffer_cells_zeroed: zeroed,
             closure_time,
             reduction_time,
             peak_reduction_time: reduction_time,
@@ -1419,5 +1520,130 @@ mod tests {
             crate::grobner::fglm::QuotientAlgebra::new(&basis, order, &options),
             Err(FglmError::BorderBatchExceeded { .. })
         ));
+    }
+}
+
+#[cfg(all(test, feature = "research-work"))]
+mod dispatch_tests {
+    use super::*;
+    use crate::{fields::Zp2147483647 as F, One};
+
+    fn basis() -> Vec<MultivariatePolynomial<2, F>> {
+        ["x^2 - y", "y^3 - 1"]
+            .iter()
+            .map(|p| MultivariatePolynomial::parse(p, ["x", "y"]).unwrap())
+            .collect()
+    }
+
+    // Owned dispatched batches reproduce scalar remainders with dirty reused scratch and reversed completion.
+    #[test]
+    fn dispatched_remainders_agree_with_scalar() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = basis();
+        for workers in [1, 2, 7] {
+            let limits = BorderBatch::recommended().with_size(BorderBatchSize::Fixed(2));
+            let reference = measure_border_reduction(&basis, order, &limits, 1).unwrap();
+            let got =
+                measure_border_reduction_with(&basis, order, &limits, workers, 100_000, |tasks| {
+                    let mut scratch = vec![F::ONE; 200];
+                    tasks
+                        .into_iter()
+                        .rev()
+                        .map(|task| task.run(&mut scratch))
+                        .collect()
+                })
+                .unwrap();
+            assert_eq!(got.1, reference.1);
+            assert_eq!(got.0.reducer_entries, reference.0.reducer_entries);
+        }
+    }
+
+    // Reused scratch yields every exact scalar coefficient across prime widths and characteristic two.
+    #[test]
+    fn exact_remainders_across_fields() {
+        fn check<G: FiniteField>() {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let basis: Vec<MultivariatePolynomial<2, G>> = ["x^2 - y", "y^3 - 1"]
+                .iter()
+                .map(|p| MultivariatePolynomial::parse(p, ["x", "y"]).unwrap())
+                .collect();
+            let quotient = QuotientBasis::new(&basis, order, 100).unwrap();
+            let targets = BorderIndex::new(&quotient).monomials().to_vec();
+            let monic = MonicBasis::new(&basis, order);
+            let closed = closure(&targets, &monic, order, &BorderBatch::recommended()).unwrap();
+            let reference = reduce_targets(&targets, &closed, BorderReduction::Sequential).0;
+            let task = BorderReductionTask {
+                data: std::sync::Arc::new((targets.clone(), closed)),
+                range: 0..targets.len(),
+                index: 0,
+            };
+            let mut scratch = vec![G::ONE; 300];
+            assert_eq!(task.run(&mut scratch).remainders, reference);
+        }
+        check::<crate::fields::Zp2>();
+        check::<crate::fields::Zp32003>();
+        check::<F>();
+        check::<crate::fields::Gf256Mq>();
+    }
+
+    // Scratch and closure refusals occur before handing any batch to workers.
+    #[test]
+    fn dispatch_budgets_refuse_before_execution() {
+        let basis = basis();
+        let mut calls = 0;
+        let result = measure_border_reduction_with(
+            &basis,
+            MonomialOrder::GradedReverseLexicographic,
+            &BorderBatch::recommended(),
+            2,
+            0,
+            |_| {
+                calls += 1;
+                Vec::new()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(FglmError::BorderBatchExceeded {
+                reason: "worker scratch cells",
+                limit: 0
+            })
+        ));
+        assert_eq!(calls, 0);
+        let mut limits = BorderBatch::recommended();
+        limits.max_columns = 1;
+        let result = measure_border_reduction_with(
+            &basis,
+            MonomialOrder::GradedReverseLexicographic,
+            &limits,
+            2,
+            100_000,
+            |_| {
+                calls += 1;
+                Vec::new()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(FglmError::BorderBatchExceeded {
+                reason: "columns",
+                limit: 1
+            })
+        ));
+        assert_eq!(calls, 0);
+    }
+
+    // A dispatcher that drops results cannot report a complete mathematical answer.
+    #[test]
+    #[should_panic(expected = "dispatcher dropped a group")]
+    fn dispatch_requires_all_results() {
+        let _ = measure_border_reduction_with(
+            &basis(),
+            MonomialOrder::GradedReverseLexicographic,
+            &BorderBatch::recommended(),
+            2,
+            100_000,
+            |_| Vec::new(),
+        );
     }
 }
