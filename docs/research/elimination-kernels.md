@@ -688,7 +688,7 @@ budget charging, backend/order coverage and fallback behavior before enabling a 
 Red-Green tests first failed on selected-subset behavior and refusal/reuse, then covered five
 field types, random rank deficiency, duplicate/nonmonic pivots, empty/partial selections and
 mid-operation entry stops. Complete small F4 solves and one/four-worker composition agree.
-All 2,808 active library tests at the initial pin passed; the final seven focused kernel tests
+A full library run passed 2,808 tests; the final seven focused kernel tests
 and four profiling-example tests pass. Offline CI rechecks basis coefficients, complete plans,
 trajectory/input digests, timer/RSS validity, worker counter consistency and all artifact hashes.
 Commands, source pins, README examples, workflow references and source comments were reviewed.
