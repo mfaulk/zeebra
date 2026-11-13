@@ -83,6 +83,25 @@ class WideCorpusTests(unittest.TestCase):
                 self.assertLess(stored, len(json.dumps(attempt)) - len(basis)//2)
                 self.assertEqual(wide.load(path), cohort)
 
+    # Controller updates require explicit continuation and preserve the originating stamp of every attempt.
+    def test_compatible_controller_continuation_preserves_provenance(self):
+        previous = {'commit':'old', 'attempts':[{'name':'done'}], 'binaries':{'z':'hash'},
+                    'affinity':'2','machine':'host','policy':'60s'}
+        current = dict(previous, commit='new', attempts=[])
+        with self.assertRaises(ValueError):
+            wide.resume_cohort(previous, current, False)
+        resumed = wide.resume_cohort(previous, current, True)
+        self.assertEqual(resumed['attempts'][0]['controller_commit'], 'old')
+        self.assertEqual([c['commit'] for c in resumed['controllers']], ['old','new'])
+
+    # A controller continuation cannot change the native binaries, host, affinity or resource policy.
+    def test_controller_continuation_rejects_changed_instrument(self):
+        previous = {'commit':'old', 'attempts':[], 'binaries':{'z':'hash'},
+                    'affinity':'2','machine':'host','policy':'60s'}
+        for key, value in [('binaries',{'z':'other'}), ('affinity','3'), ('machine','other'), ('policy','120s')]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                wide.resume_cohort(previous, dict(previous, commit='new', **{key:value}), True)
+
     # A stopped attempt is retained without being treated as a completed oracle.
     def test_limit_is_not_an_oracle(self):
         self.assertEqual(wide.verify_bases([{'stop': 'wall'}]), 0)

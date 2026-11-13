@@ -139,7 +139,7 @@ def write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + '.tmp')
     payload = (json.dumps(data, indent=2) + '\n').encode()
-    tmp.write_bytes(gzip.compress(payload, mtime=0) if path.suffix == '.gz' else payload)
+    tmp.write_bytes(gzip.compress(payload, compresslevel=1, mtime=0) if path.suffix == '.gz' else payload)
     tmp.replace(path)
 
 
@@ -193,6 +193,22 @@ def pack(cohort, path, chunk_size=16*1024**2):
         raise ValueError('packing changed the retained campaign')
 
 
+def resume_cohort(previous, current, allow_controller_change=False):
+    for key in ('binaries', 'affinity', 'machine', 'policy', 'workers', 'build', 'rustflags', 'cpu', 'platform', 'rustc'):
+        if previous.get(key) != current.get(key):
+            raise ValueError('cannot resume a different instrument: ' + key)
+    if previous['commit'] != current['commit'] and not allow_controller_change:
+        raise ValueError('controller commit differs; explicit compatible continuation required')
+    for attempt in previous['attempts']:
+        attempt.setdefault('controller_commit', previous['commit'])
+    controllers = previous.setdefault('controllers', [
+        {k: v for k, v in previous.items() if k not in ('attempts', 'controllers')}])
+    if current['commit'] not in {c['commit'] for c in controllers}:
+        controllers.append({k: v for k, v in current.items() if k != 'attempts'})
+    previous.setdefault('binary_source_commit', previous['commit'])
+    return previous
+
+
 def validate_catalog(cases):
     identities = set()
     for c in cases:
@@ -222,7 +238,7 @@ def summary(cohort, target):
                 if a.get('report', {}).get('status') in COMPLETE:
                     floors[field, a['engine']] = seconds(a)
     lines = ['# Hard wide-field board (#738)', '',
-             '**Measured at:** `' + cohort['commit'] + '`.', '',
+             '**Measured at:** ' + ', '.join('`'+c['commit']+'`' for c in cohort.get('controllers', [cohort])) + '.', '',
              'One worker, affinity ' + cohort['affinity'] + '; 60 s / 2 GiB per solver attempt. ',
              'Each attempt runs in a fresh process. Native wall includes the complete runner; external wall',
              'is the adapter-supervised solver process and excludes version probing. Wrapper wall is also retained.',
@@ -271,6 +287,7 @@ def main():
     p.add_argument('--scratch', type=Path)
     p.add_argument('--fields', default='wide64,goldilocks,bn254')
     p.add_argument('--rows', help='comma separated; default all frozen rows')
+    p.add_argument('--continue-controller', action='store_true', help='allow an explicitly audited controller update with an identical native instrument')
     args = p.parse_args()
     if args.pack:
         pack(load(args.pack), args.output)
@@ -312,13 +329,10 @@ def main():
                          ('groebner-rs', shutil.which(os.environ.get('ZEEBRA_GROEBNER_RS_DRIVER', 'groebner-rs-driver'))), ('grobx', shutil.which(os.environ.get('ZEEBRA_GROBX_DRIVER', 'grobx-driver')))]:
         if binary:
             cohort['binaries'][name] = dict(path=binary, sha256=hashlib.sha256(Path(binary).read_bytes()).hexdigest())
-    # Resume only an identical instrument on the same host and affinity; preserve earlier stops.
+    # Timed executables and limits remain identical; each controller revision stays attributable.
+    controller_commit = cohort['commit']
     if args.output.exists():
-        previous = load(args.output)
-        for key in ('commit', 'binaries', 'affinity', 'machine', 'policy'):
-            if previous[key] != cohort[key]:
-                raise ValueError('cannot resume a different campaign: ' + key)
-        cohort = previous
+        cohort = resume_cohort(load(args.output), cohort, args.continue_controller)
     done = {(a['field'], a['name'], a['engine']) for a in cohort['attempts']}
     for c in cases:
         if c['field'] not in args.fields.split(',') or (args.rows and c['name'] not in args.rows.split(',')):
@@ -350,7 +364,7 @@ def main():
                         process.wait()
                         break
                     time.sleep(0.005)
-            a = dict(field=c['field'], name=c['name'], engine=engine, digest=c['digest'],
+            a = dict(field=c['field'], name=c['name'], engine=engine, digest=c['digest'], controller_commit=controller_commit,
                      exit=process.returncode, stop=stop, process_wall_ns=time.monotonic_ns()-started,
                      observed_tree_peak_bytes=peak, stderr=stem.with_suffix('.stderr').read_text())
             if process.returncode == 0:

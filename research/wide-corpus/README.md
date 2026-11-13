@@ -65,7 +65,11 @@ retained kernel high-water snapshots also enforce the ceiling
 after a completed child exits, so a missed poll cannot turn a recorded overrun into timing evidence.
 The Julia adapter also enforces its 2-GiB subprocess RSS ceiling. Native drivers are supervised
 directly; their process wall excludes separate verification computations.
-The campaign resumes only when commit, binaries, machine, affinity and policy match. Use a fresh
+Normal resumption requires the same controller commit. `--continue-controller` is reserved for an
+explicitly audited controller update outside the timed solver sections; it still requires identical
+executables, machine/CPU, affinity, compiler/build settings, workers and limit policy. Every attempt
+retains its originating controller commit, and the archive keeps both complete controller headers
+with base-commit/patch provenance. The native binary source stamp is retained separately. Use a fresh
 output path for a new instrument; the retained publication archive is not overwritten on replay.
 F4 retains its default matrix/nonzero limits as well as the wall/live-byte budgets; all options
 and the precise internal limit responsible for a stop are recorded.
@@ -93,7 +97,8 @@ become ratios. At least one external completion is needed for a verified Zeebra 
 
 Intentional regeneration after changing a definition:
 `python3 tools/external/wide-corpus.py --binary "$CARGO_TARGET_DIR/release/examples/wide_corpus" --freeze`.
-Complete basis responses can exceed GitHub's single-file limit. `--pack` replaces the main gzip
+Checkpoint writes use fast compression outside solver wall measurements; final payload chunks
+use full compression. Complete basis responses can exceed GitHub's single-file limit. `--pack` replaces the main gzip
 with a manifest and writes content-addressed payload chunks under `campaign-payloads/`, each at
 most 16 MiB before compression. `load()` in the campaign tool checks every chunk's SHA-256 and
 length, reconstructs the original attempts, and verifies a lossless round trip. Native report copies
