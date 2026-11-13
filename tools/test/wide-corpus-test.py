@@ -135,6 +135,12 @@ class WideCorpusTests(unittest.TestCase):
             wide.write(path, [{'name':'katsura-9'}])
             self.assertEqual(wide.load(path), [{'name':'katsura-9'}])
 
+    # A late successful response cannot turn a guardian wall stop into an oracle answer.
+    def test_guard_stop_overrides_complete_response(self):
+        attempts = [{'stop':'wall-60s-native', 'report':{'status':'complete','basis':['x1+2']}},
+                    {'report':{'status':'complete','basis':['x1+1']}}]
+        self.assertEqual(wide.verify_bases(attempts), 1)
+
     # A stopped attempt is retained without being treated as a completed oracle.
     def test_limit_is_not_an_oracle(self):
         self.assertEqual(wide.verify_bases([{'stop': 'wall'}]), 0)

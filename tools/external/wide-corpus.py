@@ -113,11 +113,15 @@ def enforce_peak(attempt):
         report.update(status='stopped-by-limit', detail='kernel high water exceeds 2 GiB')
 
 
+def completed(attempt):
+    return not attempt.get('stop') and attempt.get('report', {}).get('status') in COMPLETE
+
+
 def verify_bases(attempts):
     digests = {a['digest'] for a in attempts if 'digest' in a}
     if len(digests) > 1:
         raise ValueError('oracle inputs have different identities')
-    reports = [a['report'] for a in attempts if a.get('report', {}).get('status') in COMPLETE]
+    reports = [a['report'] for a in attempts if completed(a)]
     bases = [sorted(canonical_polynomial(p, int(r['modulus']), r['variables']) for p in r['basis'])
              if 'modulus' in r else r['basis'] for r in reports]
     if any(not b for b in bases):
@@ -235,13 +239,13 @@ def summary(cohort, target):
     for (field, name), attempts in grouped.items():
         if name == 'katsura-4':
             for a in attempts:
-                if a.get('report', {}).get('status') in COMPLETE:
+                if completed(a):
                     floors[field, a['engine']] = seconds(a)
     lines = ['# Hard wide-field board (#738)', '',
              '**Measured at:** ' + ', '.join('`'+c['commit']+'`' for c in cohort.get('controllers', [cohort])) + '.', '',
-             'One worker, affinity ' + cohort['affinity'] + '; 60 s / 2 GiB per solver attempt. ',
+             'One worker, affinity ' + cohort['affinity'] + '; 60 s / 2 GiB per solver attempt.',
              'Each attempt runs in a fresh process. Native wall includes the complete runner; external wall',
-             'is the adapter-supervised solver process and excludes version probing. Wrapper wall is also retained.',
+             'is the supervised solver process and excludes version probing. Wrapper wall is also retained.',
              'All completed bases are normalized in the declared field and compared coefficient for coefficient.',
              'Ratios are Zeebra/comparand wall and require both operands ≥2× their measured Katsura-4 startup control.',
              'BN254 is capability-only: it has no external oracle and no ratios. These are single observations, not medians.', '',
@@ -254,8 +258,8 @@ def summary(cohort, target):
         for engine in ENGINES:
             a = by_engine.get(engine)
             if not a:
-                cells.append('capability-only' if field == 'bn254' else 'not run')
-            elif a.get('report', {}).get('status') in COMPLETE:
+                cells.append('unsupported (>u64 contract)' if field == 'bn254' else 'not run')
+            elif completed(a):
                 cells.append(f'{seconds(a):.3f}')
             else:
                 r = a.get('report', {})
@@ -267,8 +271,7 @@ def summary(cohort, target):
         for engine in ENGINES[1:]:
             ours, theirs = by_engine.get('zeebra'), by_engine.get(engine)
             ratio = None
-            if (ours and theirs and ours.get('report', {}).get('status') in COMPLETE
-                    and theirs.get('report', {}).get('status') in COMPLETE and count >= 2):
+            if (ours and theirs and completed(ours) and completed(theirs) and count >= 2):
                 ratio = wall_ratio(seconds(ours), seconds(theirs), floors.get((field, 'zeebra'), 0), floors.get((field, engine), 0))
             ratios.append('—' if ratio is None else f'{ratio:.3f}x')
         lines.append('| ' + ' | '.join([field, name] + cells + ratios + [str(count) if field != 'bn254' else 'no external oracle']) + ' |')
