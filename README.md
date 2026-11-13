@@ -216,6 +216,10 @@ for installation, worker cohorts, and supported fields/tasks.
 The [acceptance cohort](docs/research/giac-comparand.md) retains exact MQ/Cyclic
 agreement and the reproducible Katsura-11 resource limit.
 
+The [symbolic preprocessing attribution](research/symbolic-attribution/README.md) replays frozen
+MQ10 batches with reducer and pair-multiple controls. Run
+`cargo test --features research-work --example symbolic_attribution` for the instrument checks.
+
 ### Cargo features
 
 | Feature | Default | What it adds |

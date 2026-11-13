@@ -288,3 +288,8 @@ required-features = ["external-runners"]
 name = "worker_pool_study"
 test = true
 required-features = ["research-work"]
+
+[[example]]
+name = "symbolic_attribution"
+test = true
+required-features = ["external-runners", "research-work"]
