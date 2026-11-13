@@ -1,11 +1,11 @@
 # Bounded R1CS adapter decision (#725)
 
-**Measured at:** `c01a9377` — first importer pilot. Its base is `02b21224`, and the full
-[retained source patch](../../research/r1cs-725/pilot-source.patch) reconstructs that importer
-from the base. The later canonical-symbol consistency fix is `1d0d1803`, and capacity admission precedes
-fixed-array stack reservation at `63153923`. Their failing regressions and passing stricter
-checks supplement the initial pilot. Compiler, executable and source
-identities, all attempts, producer/reader revisions and limits are retained in
+**Measured at:** `f6df75c3` — final importer pilot. Its base is `02b21224`, and the full
+[retained source patch](../../research/r1cs-725/final-source.patch) reconstructs that importer
+from the base. The first pilot at `c01a9377` is retained separately with its own source patch;
+the same ten instances were rerun once after canonical-symbol and stack-admission fixes.
+No timings are pooled. Compiler, executable and source identities, all twenty attempts,
+producer/reader revisions and limits are retained in
 [`research/r1cs-725/`](../../research/r1cs-725/README.md).
 
 ## Gate and recommendation
@@ -67,22 +67,22 @@ with cooperative per-operation deadlines. Counts do not constitute a process-mem
 
 Values below are single observations, not throughput estimates or ratios. Harness wall includes
 GNU `time` startup; kernel child RSS and the native self-high-water snapshot are retained as
-separate fields. The native snapshots were 2.43–2.80 MiB across all ten children. There were
+separate fields. The native snapshots were 2.39–2.79 MiB across all ten children. There were
 no timeout, memory-limit or unexpected failures; seven refusals are expected outcomes, not
 missing answers.
 
 | Case | Outcome / refusal | Raw products / retained terms | Parse / model | Original-row / polynomial check | Harness wall / kernel child RSS |
 |---|---|---:|---:|---:|---:|
-| Producer BN254 | complete, witness agrees | 1 / 2 | 15.8 / 3.94 µs | 0.471 / 3.13 µs | 4.31 ms / 2.04 MiB |
-| Public example | complete, exact canonical round-trip | 15 / 17 | 50.0 / 9.65 µs | not requested | 3.89 ms / 2.06 MiB |
-| Synthetic GF(7) | complete, witness agrees | 2 / 2 | 6.31 / 1.91 µs | 0.090 / 0.290 µs | 3.77 ms / 2.04 MiB |
-| Capacity 2 | `Arity` | not expanded | 15.5 / 0.100 µs | not reached | 3.78 ms / 2.06 MiB |
-| Wrong modulus | `FieldMismatch` | not expanded | 0.661 µs / not reached | not reached | 3.75 ms / 2.05 MiB |
-| Truncated file | `Truncated` | not expanded | 0.551 µs / not reached | not reached | 3.76 ms / 2.08 MiB |
-| Constant wire zero | `ConstantWire` | 1 / 2 | 13.7 / 3.98 µs | 0.030 µs refusal / not reached | 3.86 ms / 2.06 MiB |
-| Declared 101 wires | wire `Limit` | not expanded | 2.23 µs / not reached | not reached | 3.73 ms / 2.06 MiB |
-| Declared 1,001 rows | row `Limit` | not expanded | 2.18 µs / not reached | not reached | 3.81 ms / 2.04 MiB |
-| Product budget zero | product `Limit` | refused before first product | 13.9 / 1.80 µs | not reached | 3.70 ms / 2.05 MiB |
+| Producer BN254 | complete, witness agrees | 1 / 2 | 15.9 / 4.78 µs | 0.32 / 1.28 µs | 4.34 ms / 2.06 MiB |
+| Public example | complete, exact canonical round-trip | 15 / 17 | 53.2 / 7.64 µs | not requested | 4.12 ms / 2.02 MiB |
+| Synthetic GF(7) | complete, witness agrees | 2 / 2 | 6.35 / 3.63 µs | 0.09 / 0.331 µs | 3.79 ms / 2.08 MiB |
+| Capacity 2 | `Arity` | not expanded | 16.5 / 0.1 µs | not reached | 3.99 ms / 2.04 MiB |
+| Wrong modulus | `FieldMismatch` | not expanded | 2.1 µs / not reached | not reached | 3.74 ms / 2.07 MiB |
+| Truncated file | `Truncated` | not expanded | 1.98 µs / not reached | not reached | 3.73 ms / 2.09 MiB |
+| Constant wire zero | `ConstantWire` | 1 / 2 | 14.6 / 4.64 µs | 0.04 µs refusal / not reached | 3.70 ms / 2.06 MiB |
+| Declared 101 wires | wire `Limit` | not expanded | 2.15 µs / not reached | not reached | 3.94 ms / 2.09 MiB |
+| Declared 1,001 rows | row `Limit` | not expanded | 0.702 µs / not reached | not reached | 3.82 ms / 2.02 MiB |
+| Product budget zero | product `Limit` | refused before first product | 14.9 / 1.71 µs | not reached | 3.74 ms / 2.05 MiB |
 
 The two declared-count cases are admission tests, not valid large-system cost measurements.
 `solve_ns` and `recovery_ns` are null for every row, since those tasks were not attempted.
@@ -94,7 +94,8 @@ those limits.
 ## Validation and integration
 
 The initial parser test failed before implementation. The symbol-identity regression separately
-failed before the stronger consistency check. Twenty integration tests cover malformed and
+failed before the stronger consistency check; a small-stack regression failed before capacity
+admission was moved ahead of fixed exponent-array allocation. Twenty integration tests cover malformed and
 every-prefix-truncated files, missing/duplicate/unsupported sections, field and coefficient
 checks, roles and labels, symbols, empty/constant-only/tautological rows, const-generic padding,
 structural limits and zero deadlines, plus exhaustive GF(7) and the producer's BN254 witness.

@@ -5,6 +5,9 @@ compiled BN254 multiplier round-trip through the external `r1csfile` reader, whi
 GF(7)^3 assignments agree between original rows and an independent polynomial prototype.
 The typed Rust integration suite repeats the semantic comparison without that reader.
 
+The two `pilot` JSON files retain the initial and final runs separately; both use the same ten
+instances, with no pooled clock estimates.
+
 `manifest.json` pins the binary producer, source tags, reader source/package lock, circuit
 source, generated R1CS/symbols/witness, and schema scope. `gate.json` and `oracle.json` retain
 all coefficients, counts, mappings and canonical identities. The upstream reader and producer

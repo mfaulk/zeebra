@@ -46,7 +46,7 @@
     "research/r1cs-725/producer-witness.json": "548bbae4a15f1fe1054f30f2915b89ad77d45b8c30531c933c25a8838185d002"
   },
   "pilot": {
-    "source_commit": "c01a937763d54fbd5b1c52f32c7f947f410e0da1",
+    "source_commit": "f6df75c3ea9953f834b1741c2c8c50a0c20290f4",
     "review_fix_commit": "1d0d1803",
     "limits": {
       "wire_count": 100,
@@ -69,8 +69,16 @@
     "native_validation_baseline": "original sparse row evaluator",
     "independent_oracle": "external reader and Circom witness calculator",
     "outputs": "pilot.json",
-    "note": "Pilot predates the canonical-symbol identity tightening; original producer symbols retain matching canonical wires. Final regression tests cover that stricter check.",
-    "source_patch": "pilot-source.patch",
-    "source_patch_sha256": "7b9b3f0fcaf01755815196d5eed5d8c06ee53cfd3e304eb14fd7b1aae0345eb3"
-  }
+    "note": "The same ten instances were rerun once after canonical-symbol and stack-admission fixes. Both complete cohorts are retained separately; no new instances or pooled timing estimates.",
+    "source_patch": "final-source.patch",
+    "source_patch_sha256": "9d7bbf1bd99641b83e273293b307583ffab1eaa1ac73c5ced37d97fe5aa05f57",
+    "initial_source_commit": "c01a937763d54fbd5b1c52f32c7f947f410e0da1",
+    "initial_source_patch": "pilot-source.patch",
+    "initial_source_patch_sha256": "7b9b3f0fcaf01755815196d5eed5d8c06ee53cfd3e304eb14fd7b1aae0345eb3",
+    "capacity_fix_commit": "63153923",
+    "initial_outputs": "pilot-initial.json"
+  },
+  "accessed_utc": "2026-11-13T04:09:54.756990+00:00",
+  "node_version": "v22.22.2",
+  "npm_version": "10.9.7"
 }
