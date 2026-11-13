@@ -122,6 +122,7 @@ cargo run --release --example f4_statistics   # pairs, reductions, zero reductio
 cargo run --release --example f4_profile      # cost attributed per stage
 cargo run --release --example mq10_profile -- 32003 --stages  # current-default MQ10, JSON
 cargo run --release --example mq10_profile -- 2147483647     # clocks disabled control
+cargo run --release --features research-work --example mq10_profile -- 32003 --stages --work
 cargo run --release --example solve_one       # a system in, verified solutions out
 ```
 

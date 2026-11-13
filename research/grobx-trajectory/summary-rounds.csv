@@ -1,0 +1,61 @@
+field,engine,phase,round,degree,pairs_native,rows,columns,given_rows_native,mode,initial_entries,initial_density,rank_or_new_pivots,rank_semantics,zero_native,zero_semantics,known_zero_rows_native,forward_products,back_products,peak_stored_sparse_entries
+32003,zeebra,f4,1,2,5,17,40,10,deterministic structured/Adaptive,135,0.19852941176470587,14,full rank,3,input rows,3,350,261,205
+32003,zeebra,f4,2,3,14,98,196,28,deterministic structured/Adaptive,1194,0.062161599333611,96,full rank,2,input rows,2,1404,10642,3417
+32003,zeebra,f4,3,4,72,503,658,144,deterministic structured/Adaptive,12683,0.038320230592131105,458,full rank,45,input rows,45,447030,579927,46692
+32003,zeebra,f4,4,5,229,1611,1695,458,deterministic structured/Adaptive,91219,0.03340566056737511,1393,full rank,218,input rows,218,13046999,8633649,255024
+32003,zeebra,f4,5,6,442,4290,4169,884,deterministic structured/Adaptive,288054,0.01610588979262522,3813,full rank,477,input rows,477,78472994,51219293,1034810
+32003,zeebra,f4,6,6,169,6057,6292,338,deterministic structured/Adaptive,270044,0.007085789471308855,5922,full rank,135,input rows,135,28314118,50438545,1758906
+32003,zeebra,f4,7,6,57,5710,6027,114,deterministic structured/Adaptive,239132,0.00694864934996253,5670,full rank,40,input rows,40,7658743,34366002,1668733
+32003,zeebra,f4,8,7,734,12554,12020,1468,deterministic structured/Adaptive,783727,0.005193716224114819,11665,full rank,889,input rows,889,439394932,254267930,3933280
+32003,zeebra,f4,9,7,48,10435,10738,96,deterministic structured/Adaptive,431626,0.0038520484818390334,10384,full rank,51,input rows,51,15082082,77090353,3357751
+32003,zeebra,f4,10,8,7,11504,11851,14,deterministic structured/Adaptive,504689,0.0037018598103080802,11497,full rank,7,input rows,7,2748330,103115310,3754056
+32003,grobx,signature,1,2,1,5,23,1,tests,40,0.34782608695652173,1,new pivots,0,reductions including combination/tests when active,0,15,0,78
+32003,grobx,signature,2,3,14,104,201,14,tests,1224,0.05855338691159587,14,new pivots,0,reductions including combination/tests when active,0,6598,0,2203
+32003,grobx,signature,3,4,38,422,624,38,tests,9100,0.034557661927330174,40,new pivots,3,reductions including combination/tests when active,3,160250,0,15931
+32003,grobx,signature,4,4,1,226,419,1,tests,7174,0.07575981582782436,1,new pivots,0,reductions including combination/tests when active,0,6861,0,7552
+32003,grobx,signature,5,5,86,1311,1588,86,tests,53497,0.025696633984479324,73,new pivots,24,reductions including combination/tests when active,24,2470164,0,73326
+32003,grobx,signature,6,6,126,3310,3607,126,tests,171242,0.01434287308079205,109,new pivots,62,reductions including combination/tests when active,62,12776023,0,208294
+32003,grobx,signature,7,7,142,6864,7143,142,tests,347510,0.007087766170084523,97,new pivots,72,reductions including combination/tests when active,80,27615030,0,382760
+32003,grobx,signature,8,8,99,9448,9728,99,tests,514288,0.0055955521079370735,48,new pivots,73,reductions including combination/tests when active,78,32531393,0,531895
+32003,grobx,signature,9,9,21,15882,16217,21,tests,740023,0.0028732241590231377,3,new pivots,16,reductions including combination/tests when active,21,6805884,0,741444
+32003,grobx,plain,1,2,1,5,23,2,rows,40,0.34782608695652173,1,new pivots,0,reductions including combination/tests when active,0,15,0,78
+32003,grobx,plain,2,3,16,110,205,30,rows,1310,0.05809312638580931,14,new pivots,2,reductions including combination/tests when active,2,7103,422,2387
+32003,grobx,plain,3,4,72,474,637,136,rows,12280,0.0406706012492631,35,new pivots,37,reductions including combination/tests when active,37,277912,30474,18844
+32003,grobx,plain,4,5,229,1467,1602,407,rows,81145,0.034527818413758536,62,new pivots,167,reductions including combination/tests when active,167,6521192,177772,98984
+32003,grobx,plain,5,6,442,3598,3576,785,rows,253779,0.0197240916840452,64,new pivots,378,reductions including combination/tests when active,378,38848525,360031,276601
+32003,grobx,plain,6,6,169,5224,5469,328,rows,259102,0.009069005675032629,44,new pivots,125,reductions including combination/tests when active,125,26087099,67950,275506
+32003,grobx,plain,7,6,57,4927,5245,113,rows,231106,0.008942998667098263,18,new pivots,39,reductions including combination/tests when active,39,9575435,9199,238228
+32003,grobx,plain,8,7,734,11423,11052,1305,rows,710061,0.00562437937137134,8,new pivots,726,reductions including combination/tests when active,726,190623637,1416,713615
+32003,grobx,plain,9,7,48,9694,10000,93,rows,415987,0.004291180111409119,0,new pivots,48,reductions including combination/tests when active,48,13083162,0,415987
+32003,grobx,plain,10,8,7,11033,11380,14,rows,480926,0.0038303845453573774,0,new pivots,7,reductions including combination/tests when active,7,2779116,0,480926
+32003,grobx,plain,inter,,,253,607,247,rows,68335,0.44497333480930645,,new pivots,,reductions including combination/tests when active,,92903,0,69045
+2147483647,zeebra,f4,1,2,5,17,40,10,deterministic structured/Adaptive,135,0.19852941176470587,14,full rank,3,input rows,3,350,261,205
+2147483647,zeebra,f4,2,3,14,98,196,28,deterministic structured/Adaptive,1194,0.062161599333611,96,full rank,2,input rows,2,1404,10642,3417
+2147483647,zeebra,f4,3,4,72,503,658,144,deterministic structured/Adaptive,12683,0.038320230592131105,458,full rank,45,input rows,45,447030,579927,46692
+2147483647,zeebra,f4,4,5,229,1611,1695,458,deterministic structured/Adaptive,91219,0.03340566056737511,1393,full rank,218,input rows,218,13047334,8634030,255026
+2147483647,zeebra,f4,5,6,442,4290,4169,884,deterministic structured/Adaptive,288054,0.01610588979262522,3813,full rank,477,input rows,477,78476734,51221884,1034845
+2147483647,zeebra,f4,6,6,169,6057,6292,338,deterministic structured/Adaptive,270045,0.007085815710697515,5922,full rank,135,input rows,135,28315500,50441234,1758962
+2147483647,zeebra,f4,7,6,57,5710,6027,114,deterministic structured/Adaptive,239133,0.006948678407760524,5670,full rank,40,input rows,40,7658834,34367345,1668785
+2147483647,zeebra,f4,8,7,734,12554,12020,1468,deterministic structured/Adaptive,783737,0.0051937824935712,11665,full rank,889,input rows,889,439416816,254283141,3933399
+2147483647,zeebra,f4,9,7,48,10435,10738,96,deterministic structured/Adaptive,431628,0.0038520663308494354,10384,full rank,51,input rows,51,15082829,77093196,3357869
+2147483647,zeebra,f4,10,8,7,11504,11851,14,deterministic structured/Adaptive,504692,0.0037018818151059473,11497,full rank,7,input rows,7,2748347,103119445,3754188
+2147483647,grobx,signature,1,2,1,5,23,1,tests,40,0.34782608695652173,1,new pivots,0,reductions including combination/tests when active,0,15,0,78
+2147483647,grobx,signature,2,3,14,104,201,14,tests,1224,0.05855338691159587,14,new pivots,0,reductions including combination/tests when active,0,6598,0,2203
+2147483647,grobx,signature,3,4,38,422,624,38,tests,9100,0.034557661927330174,40,new pivots,3,reductions including combination/tests when active,3,160250,0,15931
+2147483647,grobx,signature,4,4,1,226,419,1,tests,7174,0.07575981582782436,1,new pivots,0,reductions including combination/tests when active,0,6861,0,7552
+2147483647,grobx,signature,5,5,86,1311,1588,86,tests,53497,0.025696633984479324,73,new pivots,24,reductions including combination/tests when active,24,2471314,0,73326
+2147483647,grobx,signature,6,6,126,3310,3607,126,tests,171242,0.01434287308079205,109,new pivots,62,reductions including combination/tests when active,62,12786780,0,208296
+2147483647,grobx,signature,7,7,142,6864,7143,142,tests,347518,0.007087929336984356,97,new pivots,71,reductions including combination/tests when active,80,27432168,0,382769
+2147483647,grobx,signature,8,8,99,9448,9728,99,tests,514299,0.005595671790047462,48,new pivots,69,reductions including combination/tests when active,78,31614751,0,531908
+2147483647,grobx,signature,9,9,21,15882,16217,21,tests,740035,0.002873270750399228,3,new pivots,15,reductions including combination/tests when active,21,6262367,0,741456
+2147483647,grobx,plain,1,2,1,5,23,2,combinations,40,0.34782608695652173,1,new pivots,0,reductions including combination/tests when active,,15,0,78
+2147483647,grobx,plain,2,3,16,110,205,30,combinations,1310,0.05809312638580931,14,new pivots,2,reductions including combination/tests when active,,25273,4932,2589
+2147483647,grobx,plain,3,4,72,474,637,136,combinations,12280,0.0406706012492631,35,new pivots,4,reductions including combination/tests when active,,410030,91979,19495
+2147483647,grobx,plain,4,5,229,1467,1602,407,combinations,81145,0.034527818413758536,62,new pivots,8,reductions including combination/tests when active,,2546170,285260,99704
+2147483647,grobx,plain,5,6,442,3598,3576,785,combinations,253779,0.0197240916840452,64,new pivots,20,reductions including combination/tests when active,,8803268,504971,277751
+2147483647,grobx,plain,6,6,169,5224,5469,328,combinations,259103,0.009069040676714109,44,new pivots,6,reductions including combination/tests when active,,9647752,204720,276029
+2147483647,grobx,plain,7,6,57,4927,5245,113,combinations,231107,0.00894303736362136,18,new pivots,2,reductions including combination/tests when active,,4196909,54056,238380
+2147483647,grobx,plain,8,7,734,11423,11052,1305,combinations,710071,0.005624458581176855,8,new pivots,14,reductions including combination/tests when active,,7534083,6018,713638
+2147483647,grobx,plain,9,7,48,9688,9994,93,combinations,415783,0.004294308624811551,0,new pivots,2,reductions including combination/tests when active,,774498,0,415783
+2147483647,grobx,plain,10,8,7,10349,10696,14,combinations,467307,0.004221652726718598,0,new pivots,2,reductions including combination/tests when active,,907006,0,467307
+2147483647,grobx,plain,inter,,,253,607,247,combinations,68336,0.44497984645538546,,new pivots,,reductions including combination/tests when active,,92903,0,69046

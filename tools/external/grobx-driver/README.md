@@ -58,3 +58,10 @@ checking its content hash; the cohort's prefix and suffix preserve the exact ori
 For the separately identified #713 passive-counter build, see
 [`research/README.md`](research/README.md). It preserves the stock provisioner and adapter contract;
 its opt-in diagnostics are research artifacts, not a replacement competitive-board engine.
+
+The optional [passive-counter research workspace](research/README.md) builds a
+separately identified copy for trajectory studies. It leaves this pinned driver
+and normal provisioner unchanged, supports same-binary counters-on/off controls,
+and reports explicitly bounded matrix storage snapshots. Its GPL source/recipe
+hashes remain separate from Zeebra's MIT library; it is not installed over the
+ordinary comparand.

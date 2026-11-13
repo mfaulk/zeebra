@@ -1,0 +1,10 @@
+{
+  "measured_commit": "b108c2be975c60d53125f3e53548947d5c0b5139",
+  "base_commit": "ff65d2b4e530d478bc4d6ca43dfa76e8dd0b6ad6",
+  "patch_id": "575de582fed59e1652a119cff03bb73e7c270384",
+  "patch": "instrument.patch.gz",
+  "method": "Recovered immediately after the campaign from the frozen clean commit, without changing the retained native record. Apply this patch at base_commit to reconstruct the instrument source tree even after squash/branch deletion.",
+  "source_pins": "Stock Zeebra source is base_commit; observed Rust source/config is identical to reachable-prefix commit 6d951ea4. Build fingerprints are in ../builds.json. Grobx recipe/source identities are embedded in each version response.",
+  "uncompressed_patch_sha256": "96558a234c3e3572cd2d2be9590a21f50e9a033fc0978ac449d3bc6a0545a482",
+  "compressed_patch_sha256": "6a90214e1491b09ef554a14fc7f6e6e300ac3d019bfcf03508c1f6fefe12db53"
+}

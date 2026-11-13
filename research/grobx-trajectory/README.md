@@ -80,3 +80,38 @@ Do not sum independently attained capacity maxima as a simultaneous peak or infe
 physical memory traffic from logical scans/products. Native stage timings are
 separate from process wall, and historical grobx/Zeebra cohorts never become a new
 paired ratio. Larger-family adoption experiments belong to follow-up issues.
+
+After the campaign, pack repeated full-basis literals without changing any response
+bytes, then regenerate tables and verify every retained answer again:
+
+```sh
+python3 tools/external/study_artifacts.py \
+  /buildcache/cargo-target/zeebra-713-study/grobx-trajectory-native.json.gz \
+  research/competitive/results/grobx-trajectory-native.json.gz
+python3 research/grobx-trajectory/summarize.py
+python3 tools/external/proof_artifacts.py \
+  research/competitive/results/grobx-trajectory-native.json.gz 5 \
+  > /buildcache/grobx-713-response.json
+```
+
+The existing SHA-256 proof storage now accepts an explicit `basis` payload key,
+including JSON arrays. Normal certificate packing defaults are unchanged. The
+study loader restores both exact stdout and parsed response, checks payload hashes,
+and preserves all failure/metadata fields. Four repeated basis literals are stored
+once; packing is outside timing. `summary.json`, `summary.csv`, and
+`summary-rounds.csv` are reproducible from the cohort. The committed
+`builds.json` records each frozen Zeebra source/config fingerprint and binary hash;
+the grobx research binary embeds hashes of every patched source and recipe.
+
+The measured instruments precede the observer-only refusal cleanup in
+`b37ea6d3`: it marks incomplete batches and permits a caught resource refusal to
+be followed by another measured call. No native attempt refused; the retained
+binaries and measured source stamps remain unchanged, and no post-cleanup timing
+is claimed.
+
+Frozen-source recovery uses `evidence/provenance.json`: check out its `base_commit`
+and apply the SHA-256-checked `evidence/instrument.patch.gz` (decompress it before `git apply`). This reconstructs the
+measured instrument tree even if intermediate branch commits disappear after a
+squash. The stock library is the base source; the observed Rust/config tree is the
+counter source identified in `builds.json`. This recovery stamp was collected
+from git after the campaign and does not modify the original native record.

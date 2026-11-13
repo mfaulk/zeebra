@@ -55,3 +55,12 @@ def load_study(path):
                 raise ValueError('unexpected metadata in generated study artifacts')
             del attempt['artifacts']
     return cohort
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('input', type=Path, help='unpacked native cohort JSON or JSON.gz')
+    parser.add_argument('output', type=Path, help='packed cohort JSON.gz and adjacent payload directory')
+    args = parser.parse_args()
+    pack_study(_PROOFS.load_cohort(args.input), args.output)
