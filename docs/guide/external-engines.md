@@ -776,3 +776,6 @@ The general `competitive_sweep` also accepts `--engines giac`, `--workers N`
 ceiling). Unsupported tasks remain visible in its default task sweep. Use
 `--measure --row NAME --task reduced-grobner-basis` for an attributable single
 row and `--write` only when intentionally appending to competitive history.
+
+The configured serial Zeebra engine is refused in multiworker sweep cohorts,
+so a serial solve cannot be recorded under a parallel worker count.

@@ -419,6 +419,21 @@ fn unreachable_engine(
     board.add(CompetitiveRecord::of(&report, built, environment));
 }
 
+fn run_for_cohort(
+    solver: &mut dyn ExternalSolver,
+    built: &Instance,
+    task: Task,
+    limits: &Limits,
+) -> RunReport {
+    if solver.id() == "zeebra" && limits.workers != 1 {
+        return RunReport::unsupported("zeebra", built, task, limits,
+            zeebra::grobner::external::Unsupported::Representation {
+                detail: "the configured Zeebra F4 is serial; cannot supply the requested multiworker cohort".into(),
+            });
+    }
+    solver.run(built, task, limits)
+}
+
 /// Probe one engine, run it, and record whatever came back.
 ///
 /// Every outcome is recorded, including the ones with no answer: a board that kept only its
@@ -435,7 +450,7 @@ fn drive(
     environment: &Environment,
 ) {
     let _ = solver.probe_version();
-    let report = solver.run(built, task, limits);
+    let report = run_for_cohort(solver, built, task, limits);
     board.add(CompetitiveRecord::of(&report, built, environment));
 }
 
@@ -575,6 +590,25 @@ mod tests {
         for invalid in ["0", "-1", "all", "18446744073709551615"] {
             assert!(super::memory_limit(Some(invalid)).is_err());
         }
+    }
+
+    // A serial Zeebra answer cannot be mislabeled as a requested multiworker result.
+    #[test]
+    fn test_serial_zeebra_refuses_multiworker_cohort() {
+        let input = zeebra::grobner::external::corpus::instance(
+            "katsura-4",
+            32003,
+            zeebra::MonomialOrder::GradedReverseLexicographic,
+        )
+        .unwrap();
+        let report = super::run_for_cohort(
+            &mut super::ZeebraSolver::new(),
+            &input,
+            super::Task::ReducedGrobnerBasis,
+            &super::Limits::wall(std::time::Duration::ZERO).with_workers(4),
+        );
+        assert!(matches!(report.status, super::RunStatus::Unsupported(_)));
+        assert_eq!(report.measurement.wall, std::time::Duration::ZERO);
     }
 
     // The default small-prime sweep includes the eliminant comparison task.
