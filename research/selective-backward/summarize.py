@@ -24,10 +24,10 @@ def spread(values):
     return dict(median=median(values), minimum=min(values), maximum=max(values))
 
 
-def validate_cohort(cohort, phase, refs):
+def validate_cohort(cohort, phase, refs, gated=True):
     study = tool('selective-backward-study')
     expected = list(study.plan(phase))
-    if not cohort['identity'].get('compiler_gate'):
+    if gated and not cohort['identity'].get('compiler_gate'):
         raise ValueError('accepted cohort lacks compiler gates')
     observed = [(a['repeat'], a['problem'], a['modulus'], a['arm']) for a in cohort['attempts']]
     if observed != expected or 'refusal' in cohort:
@@ -109,7 +109,10 @@ def main():
                         row['peak_entries'] = max(d['peak_entries'] for d in details)
                         row['peak_sparse_capacity_entries'] = max(d['peak_capacity_entries'] for d in details)
                         row['kernel_allocations'] = sum(2 + d['targets'] for d in details)
-    summary = dict(source=cohorts['native']['identity'], native_attempts=len(cohorts['native']['attempts']),
+    exploratory = {phase: validate_cohort(storage.load_study(HERE/'exploratory'/(phase+'.json.gz')),
+        phase, refs, gated=False) for phase in ('native', 'work')}
+    summary = dict(exploratory_attempts_excluded_from_timings=sum(len(c['attempts']) for c in exploratory.values()),
+        source=cohorts['native']['identity'], native_attempts=len(cohorts['native']['attempts']),
         work_attempts=len(cohorts['work']['attempts']), native=native, work=work)
     (HERE/'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
     with (HERE/'native.csv').open('w') as stream:
@@ -121,7 +124,7 @@ def main():
                 f4_median_ms=row['f4_ms']['median'], f4_min_ms=row['f4_ms']['minimum'],
                 f4_max_ms=row['f4_ms']['maximum'], process_median_ms=row['process_ms']['median'],
                 self_peak_mib=row['self_peak_mib'], tree_peak_mib=row['tree_peak_mib']))
-    paths = sorted(HERE.glob('*-proofs/*')) + [HERE/(p+'.json.gz') for p in ('native', 'work')]
+    paths = sorted(HERE.rglob('*.gz')) + sorted(HERE.glob('*.log'))
     inventory = {str(p.relative_to(HERE)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     (HERE/'inventory.json').write_text(json.dumps(inventory, indent=2)+'\n')
 

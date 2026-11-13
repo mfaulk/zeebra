@@ -29,6 +29,17 @@ heuristic is bundled into this prototype.
 
 ## Reproduce
 
+For the recorded serial campaign, create a checkout at controller `c148058b`; its Rust/Cargo
+files are byte-identical to the `0ed4fe33` build pin. Use rustc 1.99.1 as recorded. The commands
+below rerun the protocol in that checkout; run offline artifact validation in the PR checkout,
+which contains the later summary tools. Keep separate build directories for the serial and
+combined revisions.
+
+```sh
+git worktree add ../zeebra-269-serial-repro c148058b
+cd ../zeebra-269-serial-repro
+```
+
 ```sh
 export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-269
 export RUSTC_WRAPPER=''
@@ -102,7 +113,8 @@ The four MQ14 probes are serial full/selected at both primes, one attempt each a
 60-second/2-GiB cap. A completed probe needs an independent reference before it is timing
 or capacity evidence. Refusals remain visible; no speedup is inferred from them.
 
-Build the updated example with `cargo build --release --features research-work --example mq10_profile`
+Use a separate checkout at controller `4c39c1bc` for the combined campaign; its Rust tree matches
+`ff15a0af`. Build that example with `cargo build --release --features research-work --example mq10_profile`
 after its tests pass, and freeze it separately from the original serial-cohort executable.
 Then run (using separate scratch/output names for `--phase work` and `--phase probe`):
 

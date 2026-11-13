@@ -1,4 +1,5 @@
 {
+  "exploratory_attempts_excluded_from_timings": 160,
   "source": {
     "commit": "c148058bba3f65f794666394db1689835d4c4ada",
     "binaries": {

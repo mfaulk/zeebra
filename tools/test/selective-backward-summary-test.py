@@ -23,6 +23,12 @@ class RetainedEvidence(unittest.TestCase):
     def test_complete_cohort(self):
         summary.validate_cohort(self.cohort, 'native', self.refs)
 
+    # Exploratory answers remain checkable but cannot pass the strict timing-cohort gate.
+    def test_exploratory_classification(self):
+        cohort = summary.tool('study_artifacts').load_study(ROOT/'research/selective-backward/exploratory/native.json.gz')
+        with self.assertRaises(ValueError): summary.validate_cohort(cohort, 'native', self.refs)
+        summary.validate_cohort(cohort, 'native', self.refs, gated=False)
+
     # Missing, duplicated and stopped attempts cannot produce accepted medians.
     def test_incomplete_cohorts(self):
         for kind in ('missing', 'duplicate', 'stopped'):

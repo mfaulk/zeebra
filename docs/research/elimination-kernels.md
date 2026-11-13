@@ -4,6 +4,7 @@
 Earlier prototypes: `220a99f1` and `cc993a00`. Build metadata inside each artifact records full
 commits, rustc identity and executable SHA-256 values. Focused repeats use runner `62c252d3` with
 the same frozen baseline/final binaries. Campaign date: 2026-11-12 (UTC).
+Candidate-only feasibility below uses `0ed4fe33` with controller `c148058b`, measured 2026-11-13 UTC.
 
 ## Decision and scope
 
