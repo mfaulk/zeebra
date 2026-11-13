@@ -223,6 +223,18 @@ def certified_basis(raw,case,request):
     return wide.grobx_work.basis_list(raw['basis'])
 
 
+def certificate_reference(attempt,case,wall):
+    if (attempt['status'] not in ('verified','excluded-environment-overlap')
+            or attempt.get('exit')!=0 or attempt.get('stop')):
+        raise ValueError('an incomplete or resource-stopped attempt is not a reference')
+    raw=attempt.get('raw') or json.loads(attempt['stdout'])
+    request=dict(variables=case['variables'],modulus=int(case['modulus']),order='grevlex',workers=1,
+                 generators=case['generators'],mode='certified',wall_ns=wall*10**9,rss_bytes=2*1024**3)
+    basis=certified_basis(raw,case,request)
+    return dict(basis=basis,timing_eligible=False,source_status=attempt['status'],
+                verification='independent exact grobx-checker/cofactors; reference construction timing excluded')
+
+
 def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
     if any(stem.parent.glob(stem.name+'.*')):
         raise ValueError('attempt scratch already contains outputs')
@@ -522,11 +534,12 @@ def main():
     cases=load_cases(args.binary);refs=reference_bases(cases)
     if args.references:
         previous=wide.load(args.references)
+        previous_cases={c['digest']:canonical_case(c) for c in previous['cases']}
         for a in previous['attempts']:
-            if a['engine']=='grobx-certified' and a['status']=='verified':
-                refs[a['digest']]=dict(basis=a['basis'],provenance=str(args.references),
-                                      archive_sha256=hashlib.sha256(args.references.read_bytes()).hexdigest(),
-                                      verification='independent exact grobx-checker with both ideal inclusions/cofactors')
+            if a['engine']=='grobx-certified' and a['status'] in ('verified','excluded-environment-overlap'):
+                ref=certificate_reference(a,previous_cases[a['digest']],previous['policy']['wall'])
+                ref.update(provenance=str(args.references),archive_sha256=hashlib.sha256(args.references.read_bytes()).hexdigest())
+                refs[a['digest']]=ref
     started=time.monotonic()
     cohort=dict(schema=1,issue=739,commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         started_at=datetime.now(timezone.utc).isoformat(),machine=os.environ.get('ZEEBRA_MACHINE'),

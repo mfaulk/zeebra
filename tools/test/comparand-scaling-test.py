@@ -13,6 +13,24 @@ spec.loader.exec_module(scaling)
 
 
 class ComparandScalingTests(unittest.TestCase):
+    # A certified answer with excluded timings supplies only mathematics and never clocks or RSS.
+    def test_excluded_certificate_reference_cannot_promote_timings(self):
+        case=dict(modulus=13,variables=['x1'],generators=['x1+1'])
+        request=dict(case,order='grevlex',workers=1,mode='certified',wall_ns=60*10**9,rss_bytes=2*1024**3)
+        raw=dict(input=request,certified=True,flaw=None,stopped=None,cofactors='[[1]]',
+                 revision=scaling.wide.REVISIONS['grobx'],isa='x86-64-v3',
+                 generator_echoes=['[x1+1]:'],checker_echoes=['[x1+1]:'],
+                 input_text='fixture',input_sha256=hashlib.sha256(b'fixture').hexdigest(),basis='[x1+1]:')
+        a=dict(status='excluded-environment-overlap',exit=0,stop=None,stdout=__import__('json').dumps(raw),
+               process_wall_ns=123,observed_tree_peak_bytes=456)
+        ref=scaling.certificate_reference(a,case,60)
+        self.assertEqual(ref['basis'],['x1+1'])
+        self.assertFalse(ref['timing_eligible'])
+        self.assertNotIn('process_wall_ns',ref)
+        self.assertNotIn('observed_tree_peak_bytes',ref)
+        self.assertEqual(a['status'],'excluded-environment-overlap')
+        with self.assertRaises(ValueError):
+            scaling.certificate_reference(dict(a,stop='wall-60s'),case,60)
     # Compiler activity refuses a cell before launching any measured solver process.
     def test_compiler_gate_refuses_before_solve(self):
         with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling,'active_compilers',return_value=[{'pid':1,'command':'rustc'}]):
