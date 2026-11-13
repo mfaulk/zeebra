@@ -9,6 +9,9 @@ change to `y` may break the public API.
 
 ### Added
 
+- Checked bounded R1CS v1 import with original-wire/row identity, independent sparse-row assignment
+  evaluation and caller-sized polynomial expansion (#725).
+
 - Checked two-block product orders for direct F4 partial elimination, canonical order identities,
   and a runnable suffix-basis extraction example (#680).
 

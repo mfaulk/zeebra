@@ -1,0 +1,23 @@
+[
+  {
+    "record": "pilot-initial.json",
+    "source_commit": "c01a937763d54fbd5b1c52f32c7f947f410e0da1",
+    "base_commit": "02b21224b37f8dcefc3edf60624b338b7ae9e7fc",
+    "patch": "pilot-source.patch",
+    "patch_sha256": "7b9b3f0fcaf01755815196d5eed5d8c06ee53cfd3e304eb14fd7b1aae0345eb3"
+  },
+  {
+    "record": "pilot-before-role-audit.json",
+    "source_commit": "f6df75c3ea9953f834b1741c2c8c50a0c20290f4",
+    "base_commit": "02b21224b37f8dcefc3edf60624b338b7ae9e7fc",
+    "patch": "stack-guard-source.patch",
+    "patch_sha256": "9d7bbf1bd99641b83e273293b307583ffab1eaa1ac73c5ced37d97fe5aa05f57"
+  },
+  {
+    "record": "pilot.json",
+    "source_commit": "d7e1e130b1d4ae25f39b2e117977622023549725",
+    "base_commit": "02b21224b37f8dcefc3edf60624b338b7ae9e7fc",
+    "patch": "final-source.patch",
+    "patch_sha256": "01420097f5081e29c6f822bbb3ab4921f58d22fc22f2609ce7db98c316086dc1"
+  }
+]

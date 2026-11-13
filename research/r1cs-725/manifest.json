@@ -1,0 +1,108 @@
+{
+  "issue": 725,
+  "base_commit": "02b21224b37f8dcefc3edf60624b338b7ae9e7fc",
+  "decision": "continue with checked bounded adapter; no solver integration or runtime-arity core redesign",
+  "producer": {
+    "repository": "https://github.com/iden3/circom",
+    "tag": "v2.2.3",
+    "source_commit": "ad44e915a12bb047b05745c2884aad9cc8326bc6",
+    "asset": "https://github.com/iden3/circom/releases/download/v2.2.3/circom-linux-amd64",
+    "asset_sha256": "85342c7ff332d948df7c0c50ecf201e6129349aef550ce873f3c811b79fe53a3",
+    "version": "circom compiler 2.2.3",
+    "options": [
+      "--r1cs",
+      "--sym",
+      "--wasm",
+      "--O0"
+    ],
+    "seed": 0,
+    "note": "official release binary pinned directly; no source-to-binary reproducibility claim"
+  },
+  "oracle": {
+    "repository": "https://github.com/iden3/r1csfile",
+    "commit": "d82959da1f88fbd06db0407051fde94afbf8824a",
+    "package": "r1csfile0.0.48",
+    "license": "GPL-3.0 as declared by package.json; external subprocess only",
+    "package_lock_sha256": "dad562f31b08bf20a66c3cd593badb37fa49134eabd27e48a0b0f9efa2e38df8",
+    "format": "https://github.com/iden3/r1csfile/blob/d82959da1f88fbd06db0407051fde94afbf8824a/doc/r1cs_bin_format.md",
+    "public_fixture": "test/testutils/example.r1cs",
+    "public_fixture_sha256": "8fdbe0d7cfd4379e36593ed9597889a3b7b750566d035c7cc805b9acaaf3d039"
+  },
+  "scope": {
+    "field_profile": "prime field, canonical8/16/24/32-byte width",
+    "sections": [
+      1,
+      2,
+      3
+    ],
+    "custom_gates": "unsupported",
+    "runtime_arity": "none; caller-selected const genericN",
+    "symbol_mapping": "canonical labels must retain their selected wire; absent labels may alias or be optimized out",
+    "private_roles": "declared count retained; nonpublic witnesses are unclassified when count is positive, internal when zero"
+  },
+  "files": {
+    "tests/fixtures/r1cs/multiplier.circom": "10ff7de73324f224dc02c9922a368f5108db984ea37cce9ae173daf771687ac1",
+    "tests/fixtures/r1cs/multiplier.r1cs": "16ab9e569919f7d25f32321974db3b1803b469d4ab0c25769cc94cc3f0d324f7",
+    "tests/fixtures/r1cs/multiplier.sym": "47148e1bdf0e96b72fb41c1626d38135d8b2dc26ec9f8703a46721182637862e",
+    "research/r1cs-725/producer-witness.json": "548bbae4a15f1fe1054f30f2915b89ad77d45b8c30531c933c25a8838185d002",
+    "tests/fixtures/r1cs/roles.circom": "2064aea866141d9fcd45558a1b5665ae2eda9d1c513b374dbb6c94e007949efa",
+    "tests/fixtures/r1cs/roles-o0.r1cs": "0cf71c306a1064358949c03745655722a3362df6bfc7e1c3e8cbe8c9433982fe",
+    "tests/fixtures/r1cs/roles-o0.sym": "77e2b3c85961d4aa8386d620eb0246d38277d80d706fb3b81d62d5f03aa550d1",
+    "tests/fixtures/r1cs/roles-o2.r1cs": "aacf15751e7cd0a2d9ba0cac1fabc6ee778106254a85ed768ad92ab6bf17cd37",
+    "tests/fixtures/r1cs/roles-o2.sym": "c314ea98081e1b0a1c82b04d578f47ccf1269e5070f1be7d2e83ed0b8772d4cc",
+    "tests/fixtures/r1cs/roles-many.circom": "5389af16625ec082803df705513bf0ecab1dc1066afb765e91b78f464cec6e06",
+    "tests/fixtures/r1cs/roles-many-o2.r1cs": "50e4644ce4051b7b74e1f1ce35a1bcc6cfa97da0abbd223756cf3f32df9590b1",
+    "tests/fixtures/r1cs/roles-many-o2.sym": "81db7ca0653a9ae8736d2159b3e6b961893338493f1aae1d9c405e8f62221aff"
+  },
+  "pilot": {
+    "source_commit": "d7e1e130b1d4ae25f39b2e117977622023549725",
+    "review_fix_commit": "1d0d1803",
+    "limits": {
+      "wire_count": 100,
+      "constraint_count": 1000,
+      "input_bytes": 16777216,
+      "symbols": 10000,
+      "products": 100000,
+      "expanded_terms": 100000,
+      "per_operation_cooperative_seconds": 60,
+      "external_child_wall_seconds": 60,
+      "external_child_virtual_bytes": 536870912
+    },
+    "workers": 1,
+    "affinity": [
+      2
+    ],
+    "instances": 10,
+    "solving": "not requested",
+    "recovery": "not requested",
+    "native_validation_baseline": "original sparse row evaluator",
+    "independent_oracle": "external reader and Circom witness calculator",
+    "outputs": "pilot.json",
+    "note": "The same ten timing instances were rerun after stack/symbol fixes and again after optimized-role correction. All three cohorts and their recovery patches are retained separately; no new timing instances or pooled timing estimates.",
+    "source_patch": "final-source.patch",
+    "source_patch_sha256": "01420097f5081e29c6f822bbb3ab4921f58d22fc22f2609ce7db98c316086dc1",
+    "initial_source_commit": "c01a937763d54fbd5b1c52f32c7f947f410e0da1",
+    "initial_source_patch": "pilot-source.patch",
+    "initial_source_patch_sha256": "7b9b3f0fcaf01755815196d5eed5d8c06ee53cfd3e304eb14fd7b1aae0345eb3",
+    "capacity_fix_commit": "63153923",
+    "initial_outputs": "pilot-initial.json",
+    "before_role_audit_source_commit": "f6df75c3ea9953f834b1741c2c8c50a0c20290f4",
+    "before_role_audit_source_patch": "stack-guard-source.patch",
+    "before_role_audit_source_patch_sha256": "9d7bbf1bd99641b83e273293b307583ffab1eaa1ac73c5ced37d97fe5aa05f57",
+    "before_role_audit_outputs": "pilot-before-role-audit.json",
+    "role_fix_commit": "d7e1e130"
+  },
+  "accessed_utc": "2026-11-13T04:09:54.756990+00:00",
+  "node_version": "v22.22.2",
+  "npm_version": "10.9.7",
+  "role_conformance": {
+    "source_commit": "ad44e915a12bb047b05745c2884aad9cc8326bc6",
+    "producer_options": [
+      "--O0",
+      "--O2"
+    ],
+    "outputs": "role-conformance.json",
+    "finding": "nPrvInputs is original declared count, not retained witness count; generic nonpublic wire identity is unclassified when count is nonzero",
+    "kind": "functional conformance probes, separate from timing pilot"
+  }
+}
