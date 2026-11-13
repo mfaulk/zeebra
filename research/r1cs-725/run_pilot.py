@@ -6,6 +6,7 @@ import json
 import os
 import pathlib
 import resource
+import signal
 import subprocess
 import sys
 import time
@@ -17,6 +18,25 @@ from gate import encode, section
 def hard_limit():
     ceiling = 512 * 1024 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (ceiling, ceiling))
+
+
+def run_child(command, wall):
+    process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               start_new_session=True, preexec_fn=hard_limit)
+    stop = None
+    try:
+        try:
+            stdout, stderr = process.communicate(timeout=wall)
+        except subprocess.TimeoutExpired:
+            stop = 'timeout'
+            os.killpg(process.pid, signal.SIGKILL)
+            stdout, stderr = process.communicate()
+    except BaseException:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+        raise
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr), stop
 
 
 def sections(raw):
@@ -87,12 +107,22 @@ def main():
         timing = args.output / f'{name}.time'
         at = time.perf_counter_ns()
         try:
-            child = subprocess.run(['/usr/bin/time','-f','%M','-o',str(timing),*command],text=True,capture_output=True,timeout=60,preexec_fn=hard_limit,check=False)
+            child, stop = run_child(['/usr/bin/time','-f','%M','-o',str(timing),*command],60)
             wall = time.perf_counter_ns()-at
-            report = json.loads(child.stdout)
+            try:
+                report = json.loads(child.stdout)
+            except (ValueError, TypeError) as error:
+                manifest['attempts'].append({'name':name,'command':command,
+                    'input_sha256':hashlib.sha256(filename.read_bytes()).hexdigest(),
+                    'outcome':'invalid-response','stop':stop,'returncode':child.returncode,
+                    'harness_wall_ns':wall,'stdout_text':child.stdout,'stderr':child.stderr,
+                    'detail':str(error)})
+                (args.output / f'{name}.stdout.txt').write_text(child.stdout)
+                (args.output / f'{name}.stderr.txt').write_text(child.stderr)
+                raise RuntimeError('child failed to return JSON; raw outcome retained') from error
             peak = int(timing.read_text().strip().splitlines()[-1])*1024
             record = {'name':name,'command':command,'input_sha256':hashlib.sha256(filename.read_bytes()).hexdigest(),
-                      'returncode':child.returncode,'harness_wall_ns':wall,'process_peak_rss_bytes':peak,
+                      'returncode':child.returncode,'stop':stop,'harness_wall_ns':wall,'process_peak_rss_bytes':peak,
                       'stdout':report,'stderr':child.stderr,'expected':expected}
             (args.output / f'{name}.stdout.json').write_text(child.stdout)
             (args.output / f'{name}.stderr.txt').write_text(child.stderr)
@@ -105,9 +135,6 @@ def main():
                 assert report['source_digest']==report['canonical_digest']=='8fdbe0d7cfd4379e36593ed9597889a3b7b750566d035c7cc805b9acaaf3d039'
             if name in ['producer-valid','gf7-valid']:
                 assert report['evaluation_agrees'] and report['assignment_satisfies']
-        except subprocess.TimeoutExpired as error:
-            manifest['attempts'].append({'name':name,'outcome':'timeout','command':command,'harness_wall_ns':time.perf_counter_ns()-at,'detail':str(error)})
-            raise
         finally:
             (args.output / 'pilot.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print(json.dumps({'attempts':len(manifest['attempts']),'all_expected_outcomes':True}))
