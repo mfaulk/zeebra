@@ -272,3 +272,8 @@ required-features = ["external-runners"]
 [[example]]
 name = "row_merge_study"
 required-features = ["external-runners"]
+
+[[example]]
+name = "batch_splitting_study"
+test = true
+required-features = ["external-runners"]

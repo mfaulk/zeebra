@@ -1,0 +1,66 @@
+{
+  "source": "b8a9bc2bd9beb50f12184fcca7b65157bd6cbda9",
+  "attempts": [
+    {
+      "label": "wrapper-as2g",
+      "command": [
+        "timeout",
+        "3s",
+        "taskset",
+        "-c",
+        "0",
+        "prlimit",
+        "--as=2147483648",
+        "--",
+        "Singular",
+        "-q"
+      ],
+      "stdin": "ring r=32003,(x1,x2,x3),dp; short=0; option(redSB); ideal i=x1+x2+x3,x1*x2+x2*x3+x1*x3,x1*x2*x3-1; ideal g=std(i); print(g); quit;\n",
+      "exit": 124,
+      "stdout": "",
+      "stderr": "",
+      "wall_ns": 3002778772
+    },
+    {
+      "label": "wrapper-rss-only",
+      "command": [
+        "timeout",
+        "3s",
+        "taskset",
+        "-c",
+        "0",
+        "Singular",
+        "-q"
+      ],
+      "stdin": "ring r=32003,(x1,x2,x3),dp; short=0; option(redSB); ideal i=x1+x2+x3,x1*x2+x2*x3+x1*x3,x1*x2*x3-1; ideal g=std(i); print(g); quit;\n",
+      "exit": 0,
+      "stdout": "x1+x2+x3,\nx2^2+x2*x3+x3^2,\nx3^3-1\n",
+      "stderr": "",
+      "wall_ns": 37512119
+    },
+    {
+      "label": "elf-as2g",
+      "command": [
+        "timeout",
+        "3s",
+        "taskset",
+        "-c",
+        "0",
+        "prlimit",
+        "--as=2147483648",
+        "--",
+        "/usr/lib64/Singular/Singular",
+        "-q"
+      ],
+      "stdin": "ring r=32003,(x1,x2,x3),dp; short=0; option(redSB); ideal i=x1+x2+x3,x1*x2+x2*x3+x1*x3,x1*x2*x3-1; ideal g=std(i); print(g); quit;\n",
+      "exit": 124,
+      "stdout": "",
+      "stderr": "",
+      "wall_ns": 3002521715
+    }
+  ],
+  "sha256": {
+    "/usr/bin/Singular": "08a5400c9d29834271bd29e02a76d27dff5eff835d99063357a0afb73c29bbb4",
+    "/usr/lib64/Singular/Singular": "f35112080f257b6b7886387bf5ad45f237290697ad55c17132ee804339f33b69"
+  }
+}

@@ -1,0 +1,18 @@
+0 cyclic-3 shipping unbounded 0 32 failed
+1 cyclic-3 static-none unbounded 0 32 failed
+2 cyclic-3 shipping rows 3 32 failed
+3 cyclic-3 static-none rows 3 32 failed
+4 cyclic-3 static1 rows 3 32 failed
+5 cyclic-3 static2 rows 3 32 failed
+6 cyclic-3 adaptive rows 3 32 failed
+7 cyclic-4 shipping unbounded 0 32 failed
+Traceback (most recent call last):
+  File "/home/mfaulk/projects/zeebra-685/tools/external/batch-splitting-study.py", line 100, in <module>
+    main()
+    ~~~~^^
+  File "/home/mfaulk/projects/zeebra-685/tools/external/batch-splitting-study.py", line 80, in main
+    attempt = guard.guarded(command, args.scratch / str(index), 60, 2 * 1024**3)
+  File "/home/mfaulk/projects/zeebra-685/tools/external/grobx-work-study.py", line 111, in guarded
+    time.sleep(.002)
+    ~~~~~~~~~~^^^^^^
+KeyboardInterrupt
