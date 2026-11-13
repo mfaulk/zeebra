@@ -1,5 +1,3 @@
-//! A term (monomial) of a multivariate polynomial.
-
 use crate::FiniteField;
 #[cfg(any(test, feature = "proptest"))]
 use proptest::{
@@ -59,10 +57,25 @@ impl<const N: usize> Monomial<N> {
     /// Evaluate the monomial at the vector x.
     pub fn eval<F: FiniteField>(&self, x: &[F]) -> F {
         assert_eq!(x.len(), N);
-        self.exponents
-            .iter()
-            .zip(x)
-            .fold(F::one(), |acc, (e, x)| acc * x.pow(*e as u128))
+        self.exponents.iter().zip(x).fold(F::one(), |acc, (e, x)| {
+            // Fixed chains avoid pulling the general exponentiation walks into this loop.
+            let power = match e {
+                0 => F::one(),
+                1 => *x,
+                2 => *x * *x,
+                3 => (*x * *x) * *x,
+                4 => {
+                    let square = *x * *x;
+                    square * square
+                }
+                5 => {
+                    let square = *x * *x;
+                    (square * square) * *x
+                }
+                _ => x.pow(*e as u128),
+            };
+            acc * power
+        })
     }
 
     /// The least common multiple of two monomials.
@@ -155,6 +168,52 @@ mod tests {
 
         // xy^4z^2
         assert_eq!(Monomial::<3>::new(&[1, 4, 2]).degree(), 7)
+    }
+
+    /// Evaluation multiplies each variable's declared power over prime and extension fields.
+    #[test]
+    fn test_eval_small_exponents_across_fields() {
+        fn check<F: FiniteField>() {
+            use rand::{rngs::StdRng, SeedableRng};
+            let mut rng = StdRng::seed_from_u64(632);
+            for _ in 0..8 {
+                let random = std::array::from_fn(|_| F::random(&mut rng));
+                for point in [[F::zero(); 4], [F::one(); 4], random] {
+                    for exponent in 0..=8 {
+                        for position in 0..4 {
+                            let mut exponents = [3, 0, 5, 1];
+                            exponents[position] = exponent;
+                            let expected =
+                                point.iter().zip(exponents).fold(F::one(), |acc, (x, e)| {
+                                    acc * (0..e).fold(F::one(), |power, _| power * *x)
+                                });
+                            assert_eq!(Monomial::<4>::new(&exponents).eval(&point), expected);
+                        }
+                    }
+                }
+            }
+        }
+        check::<crate::fields::Mersenne31>();
+        check::<crate::fields::Zp18446744073709551557>();
+        check::<crate::fields::Bn254Fr>();
+        check::<crate::fields::Gf256>();
+        check::<crate::fields::Gf13Pow4>();
+    }
+
+    /// Zero-arity evaluation returns one and the full u32 exponent range remains supported.
+    #[test]
+    fn test_eval_empty_and_large_exponents() {
+        type F = crate::fields::Bn254Fr;
+        assert_eq!(Monomial::<0>::one().eval::<F>(&[]), F::one());
+        let point = [F::zero(), F::one() + F::one(), F::one()];
+        assert_eq!(
+            Monomial::<3>::new(&[0, u32::MAX, 5]).eval(&point),
+            point[1].pow(u32::MAX as u128)
+        );
+        assert_eq!(
+            Monomial::<3>::new(&[u32::MAX, 0, 0]).eval(&point),
+            F::zero()
+        );
     }
 
     #[test]

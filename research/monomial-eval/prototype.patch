@@ -1,0 +1,99 @@
+diff --git a/benches/pow_strategy.rs b/benches/pow_strategy.rs
+index 24727224..d4b66799 100644
+--- a/benches/pow_strategy.rs
++++ b/benches/pow_strategy.rs
+@@ -1,41 +1,8 @@
+-//! `FiniteField::pow`'s body: the recursive shape against three iterative bit-walks.
++//! Compares exponentiation strategies at the field widths and call sites used in the crate.
+ //!
+-//! #181's gate rather than a coverage benchmark. `pow`'s default body was recursive and
+-//! `pow_limbs` is the same algorithm as a loop, so the question is whether the one-line delegation
+-//! `pow(b) = pow_limbs(&[b as u64, (b >> 64) as u64])` costs anything at the exponent widths the
+-//! call sites actually use. It turns out to depend on the width, and the five arms are what
+-//! separates the two reasons:
+-//!
+-//! - `production` — `FiniteField::pow` as shipped. The arm that moves when the default changes.
+-//! - `recursive` — the pre-#181 recursive body.
+-//! - `ascending` — the delegation as proposed: the upward walk `pow_limbs` was, from an
+-//!   accumulator seeded with `one`.
+-//! - `descending` — the same walk from the top bit down, which needs no seed because the top bit
+-//!   is set, but whose squaring and accumulate are one value and so strictly serial.
+-//! - `seeded` — upward, with the accumulator started at `a^(2^lowest)` rather than at one. The
+-//!   multiplication count of `recursive` and `descending`, the dependency structure of
+-//!   `ascending`.
+-//!
+-//! The four candidates are bench-local transcriptions, including the two the shipped `pow_limbs`
+-//! is made of: `pow_limbs` chooses between them on the exponent's width, so an arm that called it
+-//! would measure the shipped choice rather than the walk it names. `production` tracking the arm
+-//! the threshold selects — `descending` at `d1` to `d5`, `ascending` above — is therefore the
+-//! fidelity check, and it has to be made rather than assumed: this crate builds under fat LTO at
+-//! one codegen unit, so a transcription is not automatically compiled like the trait default it
+-//! copies, and one that does not match the arm it claims to reproduce prices nothing.
+-//!
+-//! It does not match perfectly, and the `d1` cells are where it shows: at about 2 ns a call the
+-//! whole measurement is a handful of cycles, and `production` and the arm it should be have been
+-//! seen 0.8 ns apart. Read those cells as "both are about 2 ns" rather than as a ratio; the
+-//! differences this benchmark exists to price are 1.2x to 41x and sit well clear of it.
+-//!
+-//! The exponent widths are the ones in the tree, plus two that are not. `d1` through `d5` are
+-//! every small-exponent site — `Monomial::eval`, `SparseMultiPoly::substitute`, Poseidon's
+-//! `x^alpha` — which are all literally `x.pow(d)` for a degree of 1 to 5. `e31` is the width of
+-//! `PowerPermutation`'s `inverse_exponent`, `d^-1 mod q - 1`, which is as wide as the field; the
+-//! `power_permutation` group runs the real `invert` at the real inverse exponent, and the
+-//! microbench cells hold the width fixed across fields so the per-field multiply cost is what
+-//! varies. `e8` and `e16` are in no call site and exist only to site `NARROW_EXPONENT_BITS`.
++//! Candidates are local transcriptions: fat LTO can optimize them differently from the trait
++//! default, so inspect production codegen before interpreting a candidate ratio. The small-chain
++//! arm isolates fixed exponents 0 through 5 while retaining general exponentiation above them.
+ 
+ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+ use rand::{prelude::StdRng, SeedableRng};
+@@ -371,6 +338,27 @@ impl Route for Seeded {
+     }
+ }
+ 
++struct SmallChains;
++impl Route for SmallChains {
++    fn pow<F: FiniteField>(a: &F, b: u128) -> F {
++        match b {
++            0 => F::one(),
++            1 => *a,
++            2 => *a * *a,
++            3 => (*a * *a) * *a,
++            4 => {
++                let square = *a * *a;
++                square * square
++            }
++            5 => {
++                let square = *a * *a;
++                (square * square) * *a
++            }
++            _ => a.pow(b),
++        }
++    }
++}
++
+ /// `Monomial::eval`, transcribed with a given exponentiation route in place of `pow`.
+ fn eval_with<F: FiniteField, R: Route>(monomial: &Monomial<ARITY>, x: &[F]) -> F {
+     monomial
+@@ -419,6 +407,12 @@ fn bench_small_exponent_sites<F: FiniteField>(c: &mut Criterion, name: &str) {
+     let polynomial = MultivariatePolynomial::<ARITY, F>::new(&terms);
+     let value = F::random(&mut rng);
+ 
++    for exponent in [0, 1, 2, 3, 4, 5, 6, 7, 8, u32::MAX as u128] {
++        for base in point.iter().chain([F::zero(), F::one()].iter()) {
++            assert_eq!(SmallChains::pow(base, exponent), base.pow(exponent));
++        }
++    }
++
+     let mut group = c.benchmark_group("small_exponent");
+     group.bench_function(
+         BenchmarkId::new(format!("{name}/eval/production"), ARITY),
+@@ -443,6 +437,7 @@ fn bench_small_exponent_sites<F: FiniteField>(c: &mut Criterion, name: &str) {
+     eval_arm!("ascending", Ascending);
+     eval_arm!("descending", Descending);
+     eval_arm!("seeded", Seeded);
++    eval_arm!("small_chains", SmallChains);
+ 
+     group.bench_function(
+         BenchmarkId::new(format!("{name}/substitute/production"), 64),

@@ -1,0 +1,75 @@
+Gnuplot not found, using plotters backend
+Benchmarking power_permutation/p31_u32/invert/production/31
+Benchmarking power_permutation/p31_u32/invert/production/31: Warming up for 1.0000 s
+Benchmarking power_permutation/p31_u32/invert/production/31: Collecting 30 samples in estimated 1.0023 s (186k iterations)
+Benchmarking power_permutation/p31_u32/invert/production/31: Analyzing
+power_permutation/p31_u32/invert/production/31
+                        time:   [5.3433 µs 5.3444 µs 5.3462 µs]
+                        change: [-1.3746% -0.5865% +0.0438%] (p = 0.12 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 30 measurements (6.67%)
+  1 (3.33%) high mild
+  1 (3.33%) high severe
+
+Benchmarking power_permutation/p64/invert/production/64
+Benchmarking power_permutation/p64/invert/production/64: Warming up for 1.0000 s
+Benchmarking power_permutation/p64/invert/production/64: Collecting 30 samples in estimated 1.0042 s (84k iterations)
+Benchmarking power_permutation/p64/invert/production/64: Analyzing
+power_permutation/p64/invert/production/64
+                        time:   [11.979 µs 12.158 µs 12.362 µs]
+                        change: [+0.3500% +1.4165% +2.7761%] (p = 0.02 < 0.05)
+                        Change within noise threshold.
+Found 5 outliers among 30 measurements (16.67%)
+  5 (16.67%) high severe
+
+Benchmarking small_exponent/p31_u32/eval/production/4
+Benchmarking small_exponent/p31_u32/eval/production/4: Warming up for 1.0000 s
+Benchmarking small_exponent/p31_u32/eval/production/4: Collecting 30 samples in estimated 1.0000 s (85M iterations)
+Benchmarking small_exponent/p31_u32/eval/production/4: Analyzing
+small_exponent/p31_u32/eval/production/4
+                        time:   [11.635 ns 11.644 ns 11.654 ns]
+                        change: [+0.2122% +0.7482% +1.2834%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 4 outliers among 30 measurements (13.33%)
+  1 (3.33%) low mild
+  2 (6.67%) high mild
+  1 (3.33%) high severe
+
+Benchmarking small_exponent/p64/eval/production/4
+Benchmarking small_exponent/p64/eval/production/4: Warming up for 1.0000 s
+Benchmarking small_exponent/p64/eval/production/4: Collecting 30 samples in estimated 1.0000 s (69M iterations)
+Benchmarking small_exponent/p64/eval/production/4: Analyzing
+small_exponent/p64/eval/production/4
+                        time:   [14.347 ns 14.399 ns 14.489 ns]
+                        change: [+7.2155% +7.9823% +8.6299%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 6 outliers among 30 measurements (20.00%)
+  1 (3.33%) low severe
+  2 (6.67%) low mild
+  1 (3.33%) high mild
+  2 (6.67%) high severe
+
+Benchmarking small_exponent/p254_bn254/eval/production/4
+Benchmarking small_exponent/p254_bn254/eval/production/4: Warming up for 1.0000 s
+Benchmarking small_exponent/p254_bn254/eval/production/4: Collecting 30 samples in estimated 1.0000 s (4.2M iterations)
+Benchmarking small_exponent/p254_bn254/eval/production/4: Analyzing
+small_exponent/p254_bn254/eval/production/4
+                        time:   [235.75 ns 235.85 ns 235.96 ns]
+                        change: [+25.836% +26.663% +27.332%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 30 measurements (13.33%)
+  3 (10.00%) high mild
+  1 (3.33%) high severe
+Benchmarking small_exponent/p254_bn254/substitute/production/64
+Benchmarking small_exponent/p254_bn254/substitute/production/64: Warming up for 1.0000 s
+Benchmarking small_exponent/p254_bn254/substitute/production/64: Collecting 30 samples in estimated 1.0011 s (214k iterations)
+Benchmarking small_exponent/p254_bn254/substitute/production/64: Analyzing
+small_exponent/p254_bn254/substitute/production/64
+                        time:   [4.6336 µs 4.7421 µs 4.8700 µs]
+                        change: [+3.1687% +4.0833% +5.3433%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 30 measurements (16.67%)
+  1 (3.33%) low mild
+  1 (3.33%) high mild
+  3 (10.00%) high severe
+

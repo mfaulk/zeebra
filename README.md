@@ -124,6 +124,11 @@ cargo bench --bench grobner      # one suite
 cargo bench --bench f4_stages    # F4, stage by stage
 ```
 
+Compare monomial evaluation across exponentiation strategies with
+`cargo bench --bench pow_strategy -- 'small_exponent/.*/eval/'`.
+Evaluation uses fixed addition chains for exponents 0–5 and the field's general exponentiation
+for larger exponents; the [evaluation study](docs/research/monomial-evaluation.md) records the gate.
+
 Wall-clock time does not say *why* a Gröbner computation cost what it did, so the algorithmic
 counters are reported by examples rather than benchmarks:
 

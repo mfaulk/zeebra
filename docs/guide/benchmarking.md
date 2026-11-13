@@ -240,6 +240,12 @@ threshold's crossover, which turns out to be field-dependent. Four arms also cau
 that should have won on operation count and did not — `seeded` — which is the reason the arm
 exists. See `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2.
 
+The `small_exponent/.*/eval/` cells compare actual `Monomial::eval` with those same routes.
+Production evaluation uses fixed addition chains through exponent five, retaining `pow` above
+that range. The [evaluation study](../research/monomial-evaluation.md) records the before/after
+gate and the rejected `#[inline]` hint; a local transcription's timing alone does not price a
+production change.
+
 `sparse_polynomial`'s `mul_dense` arm is separate from `mul` because they are different shapes, not
 just different sizes. `mul` draws monomials independently, which is sparse in the total-degree sense
 at every size; `mul_dense` builds the dense total-degree simplex, which is what the symbolic
