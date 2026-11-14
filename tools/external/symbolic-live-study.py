@@ -46,7 +46,7 @@ def references():
         rows = [a['report'] for a in cohort['attempts'] if a['engine'] == 'singular' and a['name'] == problem and not a['exit'] and not a['stop']]
         if len(rows) != 3 or any(r['status'] != 'complete' or '44105' not in r['version'] or r['modulus'] != modulus or hashlib.sha256(r['canonical'].encode()).hexdigest() != r['digest'] or r['basis'] != rows[0]['basis'] for r in rows):
             raise ValueError('independent public reference is missing or inconsistent')
-        ref = dict(digest=rows[0]['digest'], modulus=modulus, basis=rows[0]['basis'])
+        ref = dict(digest=rows[0]['digest'], modulus=modulus, variables=rows[0]['variables'], basis=rows[0]['basis'])
         fixture = ROOT / 'src/grobner/external/public_corpus_references' / (problem + '.basis')
         if sorted(ref['basis']) != sorted(fixture.read_text().splitlines()):
             raise ValueError('public fixture differs from retained independent answer')
@@ -55,7 +55,15 @@ def references():
 
 
 def validate(raw, reference, phase, problem, arm):
-    load('mq10-profile').check_answer(raw, reference)
+    if reference.get('variables'):
+        if raw['digest'] != reference['digest'] or raw['modulus'] != reference['modulus']:
+            raise ValueError('input identity differs from independent public reference')
+        canonical = load('wide-corpus').canonical_polynomial
+        normalize = lambda basis: sorted(canonical(p, reference['modulus'], reference['variables']) for p in basis)
+        if normalize(raw['basis']) != normalize(reference['basis']):
+            raise ValueError('complete normalized coefficients differ from public reference')
+    else:
+        load('mq10-profile').check_answer(raw, reference)
     if raw['problem'] != problem or raw.get('backward') is not None or raw.get('parallel') is not None:
         raise ValueError('task or elimination path differs')
     if raw['measured'] != (phase != 'stage-off') or (raw['work'] is not None) != (phase == 'work'):
@@ -95,12 +103,38 @@ def validate_attempt(a, refs):
 def verify_prefix(cohort, identity, refs):
     if cohort['identity'] != identity or cohort.get('refusal', {}).get('reason') != 'environment' or len(cohort.get('resumptions', [])) >= 8 or not 0 <= cohort['active_wall_seconds'] < 900:
         raise ValueError('resumption requires immutable identities and a bounded pre-child environment hold')
+    accepted_prefix(cohort, refs)
+
+
+def accepted_prefix(cohort, refs):
     keys = [(a['phase'], a['repeat'], a['problem'], a['modulus'], a['arm']) for a in cohort['attempts']]
     expected = list(plan())
     if keys != expected[:len(keys)] or len(keys) >= len(expected):
         raise ValueError('accepted attempts are not the exact incomplete plan prefix')
     for a in cohort['attempts']:
         validate_attempt(a, refs)
+
+
+def repair_signed_reference(cohort, audit, identity, refs):
+    old = cohort['attempts'][-1]
+    if (cohort.get('validator_repairs') or old != audit['original_failed_attempt']
+            or old['status'] != 'failed' or old['exit'] or old['stop']
+            or old['compiler_before'] or old['compiler_after']
+            or old.get('failure') != 'full reduced basis differs from the verified reference'
+            or not old['problem'].startswith('public-')
+            or cohort['identity']['commit'] != audit['original_controller_commit']
+            or hashlib.sha256(old['stdout'].encode()).hexdigest() != audit['stdout_sha256']
+            or hashlib.sha256(json.dumps(old['raw'],sort_keys=True).encode()).hexdigest() != audit['raw_sha256']):
+        raise ValueError('repair is not the single pinned signed-residue reference mismatch')
+    if {k:v for k,v in cohort['identity'].items() if k != 'commit'} != {k:v for k,v in identity.items() if k != 'commit'}:
+        raise ValueError('repair changed binary, reference, hardware or build identities')
+    validate(old['raw'], refs[(old['problem'],old['modulus'])], old['phase'], old['problem'], old['arm'])
+    # Raw response and original failure text remain intact; only its acceptance is adjudicated.
+    old['status'] = 'verified'
+    old['validator_repair'] = dict(stdout_sha256=audit['stdout_sha256'], controller=audit['repair_controller_commit'])
+    cohort['identity'] = identity
+    cohort.setdefault('validator_repairs',[]).append(audit)
+    accepted_prefix(cohort,refs)
 
 
 def summarize(cohort):
@@ -136,7 +170,7 @@ def summarize(cohort):
             row['statistics'] = raw['statistics']
             row['work'] = raw['work']
         rows.append(row)
-    return dict(source=cohort['identity'], attempts=len(cohort['attempts']), active_wall_seconds=cohort['active_wall_seconds'], resumptions=cohort['resumptions'], rows=rows)
+    return dict(source=cohort['identity'], attempts=len(cohort['attempts']), active_wall_seconds=cohort['active_wall_seconds'], resumptions=cohort['resumptions'], validator_repairs=cohort.get('validator_repairs',[]), rows=rows)
 
 
 def main():
@@ -149,7 +183,10 @@ def main():
     parser.add_argument('--build-metadata', type=Path)
     parser.add_argument('--replay', type=Path)
     parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--validator-repair', type=Path)
     args = parser.parse_args()
+    if args.validator_repair and not args.resume:
+        parser.error('validator repair requires explicit resumption of the retained original cohort')
     storage, guard = load('study_artifacts'), load('grobx-work-study')
     if args.replay:
         summary = summarize(storage.load_study(args.replay / 'results.json.gz'))
@@ -189,12 +226,21 @@ def main():
     refs, start = references(), time.monotonic()
     if args.resume:
         previous = storage.load_study(args.output)
-        verify_prefix(previous, cohort['identity'], refs)
+        if args.validator_repair:
+            audit = json.loads(args.validator_repair.read_text())
+            if sha(args.output) != audit['original_cohort_sha256']:
+                parser.error('repair audit does not bind the untouched original cohort')
+            if subprocess.call(['git','diff','--quiet',audit['repair_controller_commit'],'--','tools/external/symbolic-live-study.py','tools/test/symbolic-live-study-test.py'],cwd=ROOT):
+                parser.error('continuation controller differs from audited repair implementation')
+            repair_signed_reference(previous,audit,cohort['identity'],refs)
+        else:
+            verify_prefix(previous, cohort['identity'], refs)
         for key in ('limits','environment','cargo_config_sha256','reference_cohorts_sha256','references'):
             if previous[key] != cohort[key]:
                 parser.error('resumption changed frozen manifest/reference metadata')
         cohort = previous
-        cohort['resumptions'].append(cohort.pop('refusal'))
+        if not args.validator_repair:
+            cohort['resumptions'].append(cohort.pop('refusal'))
         cohort['attempts'] = [storage.pack_attempt(a,args.output) for a in cohort['attempts']]
     prior_active_seconds = cohort['active_wall_seconds']
     cells = list(plan())
