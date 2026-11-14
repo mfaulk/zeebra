@@ -35,6 +35,13 @@ def sha(path):
 
 def plan(phase):
     """Every cell, repetition-major; arm order rotates so no arm always runs first or last."""
+    if phase == 'extension':
+        # Declared after the native cohort left the band4 sign on MQ10 inside the noise.
+        for repeat in range(5, 15):
+            for modulus in MODULI:
+                for arm in ('single', 'band4') if repeat % 2 else ('band4', 'single'):
+                    yield repeat, 'mq-random-10', modulus, arm
+        return
     problems = PROBLEMS if phase == 'native' else ('mq-random-14',)
     repeats = 5 if phase == 'native' else 1
     for repeat in range(repeats):
@@ -96,7 +103,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('stock', 'binary', 'scratch', 'output'):
         parser.add_argument('--' + name, required=True, type=Path)
-    parser.add_argument('--phase', choices=('native', 'probe'), default='native')
+    parser.add_argument('--phase', choices=('native', 'extension', 'probe'), default='native')
     parser.add_argument('--max-load', type=float, default=8)
     parser.add_argument('--max-wait', type=float, default=1800, help='seconds to wait for a quiet machine')
     parser.add_argument('--build-commit', required=True)
@@ -124,7 +131,7 @@ def main():
         build='cargo build --release --example mq10_profile; binary adds --features research-multirow; '
               'fat LTO; codegen-units=1; x86-64-v3 from .cargo/config.toml; system allocator',
         limits=dict(child_wall_seconds=60, rss_bytes=2 * 1024**3, parent_wall_seconds=185), attempts=[])
-    refs = load('selective-backward-study').references() if args.phase == 'native' else {}
+    refs = load('selective-backward-study').references() if args.phase != 'probe' else {}
     trajectories = {}
     cohort['excluded_attempts'] = []
     for repeat, problem, modulus, arm in plan(args.phase):

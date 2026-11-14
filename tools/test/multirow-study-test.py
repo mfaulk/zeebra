@@ -25,6 +25,15 @@ class Plan(unittest.TestCase):
         firsts = {cells[r * 24][3] for r in range(4)}
         self.assertEqual(firsts, set(study.ARMS))
 
+    # The declared extension pairs only single and band4 on MQ10, alternating which runs first.
+    def test_extension_is_paired_and_alternating(self):
+        cells = list(study.plan('extension'))
+        self.assertEqual(len(cells), 10 * 2 * 2)
+        self.assertEqual({c[3] for c in cells}, {'single', 'band4'})
+        self.assertEqual({c[1] for c in cells}, {'mq-random-10'})
+        self.assertNotEqual(cells[0][3], cells[4][3])
+        self.assertEqual(min(c[0] for c in cells), 5)
+
     # Every arm except the stock control selects its multirow mode explicitly.
     def test_command_names_the_arm(self):
         binary = Path('/bin/true')
