@@ -55,6 +55,9 @@
 
 use std::collections::BTreeMap;
 
+mod bigraded;
+pub use bigraded::BigradedHilbertSeries;
+
 use crate::{poly::MonomialOrder, FiniteField, Monomial, MultivariatePolynomial};
 
 /// Why a Hilbert computation did not finish.
