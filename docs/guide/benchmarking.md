@@ -348,6 +348,8 @@ cargo run --release --example solve_auto           # four policies against an of
 cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
 cargo run --release --example field_width          # what a 4-byte field element is worth, per
 cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
+cargo run --release --example field_reduction      # #270: every reduction per field width, one
+cargo run --release --example field_reduction -- 64  #   build, oracle-checked first (32, 64, 256)
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
 cargo run --release --example ntt_access           # #591: is the NTT access-bound or
