@@ -115,6 +115,18 @@ class SymbolicStudy(unittest.TestCase):
         self.assertEqual(initial['validator_repairs'][0]['original_failed_attempt'],original)
         self.assertEqual(initial['attempts'][-1]['failure'],original['failure'])
 
+    # Paired comparisons match repetition ids rather than dividing unrelated aggregate medians.
+    def test_paired_timings_match_repetitions(self):
+        samples = [dict(repeat=1,process_wall_ns=40,raw=dict(f4_call_ns=20)),dict(repeat=0,process_wall_ns=30,raw=dict(f4_call_ns=15))]
+        controls = [dict(repeat=0,process_wall_ns=60,raw=dict(f4_call_ns=30)),dict(repeat=1,process_wall_ns=80,raw=dict(f4_call_ns=40))]
+        pairs = study.pair_timings(samples,controls)
+        self.assertEqual([p['repeat'] for p in pairs],[0,1])
+        self.assertEqual([p['f4_ratio'] for p in pairs],[.5,.5])
+        with self.assertRaises(ValueError):
+            study.pair_timings(samples,controls[:1])
+        with self.assertRaises(ValueError):
+            study.pair_timings(samples,[dict(controls[0],process_wall_ns=0),controls[1]])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -489,7 +489,8 @@ observer overrides leave these production refinements zero. Their sum is exclude
 The opt-in [live symbolic-policy pilot](research/symbolic-live/README.md) compares initial-generator
 reducer ordering and exact pair-multiple deduplication against the production candidate-only route.
 Enable `research-work` and use `mq10_profile --symbolic=original|order|dedup|both` for the scoped
-experiment; omission keeps ordinary symbolic policy. No default adoption follows from replay counts.
+experiment; omission keeps ordinary symbolic policy. The [measured live decision](docs/research/symbolic-live-policy.md)
+retains exact verified gains and small-control regressions and defers production adoption.
 
 The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanalyzes retained
 concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated

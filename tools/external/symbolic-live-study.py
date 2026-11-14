@@ -137,6 +137,19 @@ def repair_signed_reference(cohort, audit, identity, refs):
     accepted_prefix(cohort,refs)
 
 
+def pair_timings(samples, controls):
+    lookup = {a['repeat']: a for a in controls}
+    if len(lookup) != len(controls) or len({a['repeat'] for a in samples}) != len(samples) or set(lookup) != {a['repeat'] for a in samples}:
+        raise ValueError('paired repetitions differ')
+    rows = []
+    for a in sorted(samples,key=lambda a:a['repeat']):
+        control = lookup[a['repeat']]
+        if min(a['process_wall_ns'],control['process_wall_ns'],a['raw']['f4_call_ns'],control['raw']['f4_call_ns']) <= 0:
+            raise ValueError('paired durations must be positive')
+        rows.append(dict(repeat=a['repeat'],process_ratio=a['process_wall_ns']/control['process_wall_ns'],f4_ratio=a['raw']['f4_call_ns']/control['raw']['f4_call_ns']))
+    return rows
+
+
 def summarize(cohort):
     check_plan(cohort['attempts'])
     refs = references()
@@ -159,18 +172,23 @@ def summarize(cohort):
         if stats != trajectories.setdefault(identity, stats):
             raise ValueError('same-policy trajectory drifted across observation/repetition controls')
         groups[(a['phase'], a['problem'], a['modulus'], a['arm'])].append(a)
-    rows = []
+    rows, paired = [], []
     for (phase, problem, modulus, arm), attempts in sorted(groups.items()):
         row = dict(phase=phase, problem=problem, modulus=modulus, arm=arm, repeats=len(attempts))
         for key, values in [('process_ms', [a['process_wall_ns']/1e6 for a in attempts]), ('f4_ms', [a['raw']['f4_call_ns']/1e6 for a in attempts]), ('rss_mib', [a['peak_rss_bytes']/1024**2 for a in attempts]), ('cpu_ms', [a['cpu_seconds']*1000 for a in attempts])]:
             row[key] = dict(median=median(values), minimum=min(values), maximum=max(values))
+        if phase == 'native':
+            row['stages_ms'] = {key: dict(median=median(a['raw']['statistics'][key]/1e6 for a in attempts), minimum=min(a['raw']['statistics'][key]/1e6 for a in attempts), maximum=max(a['raw']['statistics'][key]/1e6 for a in attempts)) for key in ('symbolic_ns','construction_ns','forward_ns','backward_ns','extraction_ns','interreduction_ns')}
+            if arm in POLICIES:
+                for baseline in ('stock','original'):
+                    paired.append(dict(problem=problem,modulus=modulus,arm=arm,baseline=baseline,observations=pair_timings(attempts,groups[(phase,problem,modulus,baseline)])))
         if phase == 'work':
             raw = attempts[0]['raw']
             row['symbolic'] = raw['symbolic']
             row['statistics'] = raw['statistics']
             row['work'] = raw['work']
         rows.append(row)
-    return dict(source=cohort['identity'], attempts=len(cohort['attempts']), active_wall_seconds=cohort['active_wall_seconds'], resumptions=cohort['resumptions'], validator_repairs=cohort.get('validator_repairs',[]), rows=rows)
+    return dict(source=cohort['identity'], attempts=len(cohort['attempts']), active_wall_seconds=cohort['active_wall_seconds'], resumptions=cohort['resumptions'], validator_repairs=cohort.get('validator_repairs',[]), rows=rows, paired=paired)
 
 
 def main():

@@ -1,6 +1,8 @@
 # Live symbolic policy pilot (#753)
 
-The opt-in `research-work` policy keeps basis indices and pair seeds in their original order.
+The [completed pilot report](../../docs/research/symbolic-live-policy.md) retains all 346 exact-verified
+answers and defers production adoption. The opt-in `research-work` policy keeps basis indices and
+pair seeds in their original order.
 `mq10_profile --symbolic=order` sorts only the normalized distinct initial generator prefix in
 first-applicable reducer searches; later inserted basis elements retain insertion order.
 `--symbolic=dedup` retains one seed for each exact `(basis_index, monomial_multiplier)` identity;
@@ -23,7 +25,7 @@ repository's x86-64-v3 ISA and system allocator; private build/scratch under `/b
 `RUSTC_WRAPPER`, `CARGO_INCREMENTAL=0`, at most 16 concurrent compiler jobs. Build a feature-absent
 stock and a feature-present experiment, copy each executable before rebuilding the next arm.
 
-Exactly one bounded 2×2 policy experiment, no speculative follow-up retries:
+Exactly one bounded 2×2 policy experiment, no speculative follow-up solver retries:
 
 - Native: 5 interleaved fresh-process repetitions × 9 field/input cells × 6 arms = 270 attempts.
   Arms are stock, feature-present/scope-off, original-scope, order, dedup, combined. Stage clocks
@@ -57,7 +59,24 @@ precise 5% performance ordering; overlapping ranges are inconclusive. A process 
 changes output/rendering is insufficient. At most one 2×2 is run; retain reject/defer if gates fail.
 Post-#749 serial candidate reduction is always used; no backward/concurrency factor is bundled.
 
-## Reproduction
+## Offline verification and retained launch
+
+```sh
+python3 tools/test/symbolic-live-study-test.py
+python3 tools/external/symbolic-live-study.py --replay research/symbolic-live
+```
+
+The replay launches no solver. The published summary adds only derived `stages_ms` and `paired`
+groups to the original controller schema, pairing exact repetition ids and summarizing stage
+clocks already present in the unchanged raw responses. The original buildcache summary lacks
+these analysis-only fields and should not be checked against the extended publication schema.
+No measured response, timing or numeric counter was edited to produce the extension.
+
+The commands below show the retained launch with existing frozen binaries. To rebuild those
+instruments, use a separate checkout at `d8a32288`, the build commands/environment/fingerprints in
+`build-metadata.json`, and new private output. Fresh builds can have different executable hashes;
+record fresh build metadata and a separate campaign identity. Never overwrite retained evidence
+or relabel a new build with the committed executable hashes.
 
 ```sh
 export RUSTC_WRAPPER=''
@@ -68,16 +87,12 @@ mkdir -p "$TMPDIR"
 cargo test -j16 --features research-work --test symbolic_live
 cargo test -j16 --features research-work --example mq10_profile
 python3 tools/test/symbolic-live-study-test.py
-cargo build -j16 --release --example mq10_profile
-cp "$CARGO_TARGET_DIR/release/examples/mq10_profile" "$CARGO_TARGET_DIR/stock"
-cargo build -j16 --release --features research-work --example mq10_profile
-cp "$CARGO_TARGET_DIR/release/examples/mq10_profile" "$CARGO_TARGET_DIR/observed"
 ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=4 \
   tools/benchlock.sh symbolic-live-753 taskset -c 4 \
   python3 tools/external/symbolic-live-study.py \
     --stock "$CARGO_TARGET_DIR/stock" --binary "$CARGO_TARGET_DIR/observed" \
     --build-commit d8a32288 --build-metadata research/symbolic-live/build-metadata.json \
-    --scratch "$CARGO_TARGET_DIR/campaign" --output research/symbolic-live/results.json.gz
+    --scratch "$CARGO_TARGET_DIR/campaign" --output "$CARGO_TARGET_DIR/campaign/results.json.gz"
 python3 tools/external/symbolic-live-study.py --replay research/symbolic-live
 ```
 
@@ -93,3 +108,11 @@ The shared #751 correction `4b0750166d76626f73e4636087024ec766588871` initialize
 inside an existing `cfg(test)` fixture after binary freeze. The controller permits exactly that
 pinned two-line source patch and records its full diff/hash; all production/Cargo/config differences
 from build `d8a32288` are rejected. The binaries do not require rebuilding for this test-only fix.
+
+The signed-residue reference repair is fully retained in `repair-audit.json` and
+`pre-repair-results.json.gz`. It uses existing exact field polynomial normalization and preserves
+the original failed response/failure text; no child was rerun. A separate pre-child compiler hold
+is retained in the final cohort's `resumptions`. The complete controller consumed 251.354 active
+seconds through attempt publication; all three lock windows including final offline validation
+sum to 319 seconds. The raw scratch was 125.4 MiB; accepted publication uses lossless content-addressed
+basis payloads. Rechecking the published directory verifies 346 answers, not a selected subset.
