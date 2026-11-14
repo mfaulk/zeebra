@@ -107,7 +107,10 @@ pub fn profile<const N: usize, F: KnownOrder>(
             }
             let conversion_started = Instant::now();
             let lex = if route == "fglm" {
-                match fglm_to_lex_with_options(&basis, order, &fglm_options) {
+                let result = fglm_to_lex_with_options(&basis, order, &fglm_options);
+                let elapsed = conversion_started.elapsed();
+                set(&mut fields, "conversion_call_ns", Json::nanos(elapsed));
+                match result {
                     Ok((lex, fglm)) => {
                         let t = fglm.timings;
                         set(
@@ -150,13 +153,6 @@ pub fn profile<const N: usize, F: KnownOrder>(
             } else {
                 Some(basis)
             };
-            if route == "fglm" {
-                set(
-                    &mut fields,
-                    "conversion_call_ns",
-                    Json::nanos(conversion_started.elapsed()),
-                );
-            }
             if let Some(lex) = lex {
                 set(
                     &mut fields,
