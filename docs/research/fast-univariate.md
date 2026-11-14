@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `646fe1d8`**, both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1433,7 +1433,7 @@ cannot establish a current whole-route ceiling: later arithmetic changed them.
 
 #### 4.3.5 The transform tree, measured (#606)
 
-**Measured at `646fe1d8`**, `examples/transform_tree_ab.rs`, both arms in one binary,
+**Measured at `2ec9d3af` plus this change** (branch commit `646fe1d8` before rebasing onto #782 / #786), `examples/transform_tree_ab.rs`, both arms in one binary,
 `taskset -c 7`, serialized through `tools/benchlock.sh` (two runs, 270 s and 410 s, start load
 13.7 and 2.8), ISA floor `x86-64-v3 or better (AVX2)` printed by the run. Every arm is checked
 equal to `subproduct_interpolate_unstable` before its clock starts; each figure is the fastest of
@@ -1498,6 +1498,13 @@ loses by more than 4% at the measured threshold.
 | 4 B | KoalaBear | 32 … 8192 | **2048** at every `n` from 8192 | 1024 / 4096 within 5%; 32 is 15% slower |
 | 8 B | Goldilocks | 32 … 2048 | **128** | flat 32 – 256 (±3%); 2048 is 37% slower |
 | 32 B | BN254 `Fr` | 32 … 2048 | **128** | flat 32 – 256 (within 5%); 2048 is 29% slower |
+
+**#782 does not touch these rows.** It moved `PrimeFieldElement64` to plain residues for primes
+below `2^32`, after `2ec9d3af`; none of the three measured fields is such a type (KoalaBear is
+`PrimeFieldElement32`, Goldilocks's prime exceeds `2^32`, BN254 `Fr` has its own type). An 8-byte
+field below `2^32` — Mersenne-31 or KoalaBear in a `u64` — would take the 8-byte tier's 128
+unmeasured, and #782 changed its multiplication under both arms; re-sweep it before relying on
+that threshold there.
 
 Compiled in as `transform_tree_threshold`. The 4-byte figure is **half** #185's standalone
 4096 and the wider ones a quarter of its 512: the tree reuses one table and the cyclic savings,

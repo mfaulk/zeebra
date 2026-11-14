@@ -34,7 +34,7 @@ use crate::{
 };
 
 /// Product degree at and above which a tree node goes through the transform, for an element of
-/// at most 4 bytes. Measured by `examples/transform_tree_ab.rs` over KoalaBear at `646fe1d8`
+/// at most 4 bytes. Measured by `examples/transform_tree_ab.rs` over KoalaBear at `2ec9d3af` plus #606
 /// (`docs/research/fast-univariate.md` §4.3.5): 2048 was fastest at every `n` from 8192 to 65 536,
 /// with 1024 and 4096 within 5%. Half #185's standalone 4096, because the tree reuses one
 /// twiddle table and takes the cyclic savings a standalone product cannot.
