@@ -10,6 +10,11 @@
 //! All of them end in the same drop-on-cancel step as [`SparseMultiPoly::new`]: a monomial whose
 //! coefficients cancel is not a term of the product, and a surviving zero would make a polynomial
 //! unequal to its own canonical form.
+//!
+//! [`multiply_sorted`] is the one exit that is not a `SparseMultiPoly`: a heap merge that emits the
+//! product in monomial order. `docs/research/heap-multiply.md` measured it 2.2x–10x slower than
+//! `Accumulate` as a multiply, faster as a multiply-then-sort only on collision-poor pairs, and
+//! found no caller that sorts a product, so nothing dispatches to it.
 
 use crate::{
     poly::multivariate::{
@@ -72,8 +77,12 @@ pub enum MultiplyRoute {
     /// through a binary heap of at most `min(|a|, |b|)` entries, so the product comes out sorted
     /// and nothing is hashed until the output is stored. See [`multiply_sorted`].
     ///
-    /// **Never selected** — a measured negative result on the multiply alone, kept reachable so
-    /// that it stays reproducible; `multiply_sorted` is where its ordered output is available.
+    /// **Never selected** — a measured negative result, kept reachable so that it stays
+    /// reproducible. As a multiply it is 2.2x–8.3x slower than `Accumulate` on every sparse shape
+    /// `examples/multivariate_mul.rs -- heap` sweeps: a pop costs `log₂ rows` unpacked monomial
+    /// comparisons where `Accumulate` pays one hash. Its ordered output beats accumulate-then-sort
+    /// by up to 1.9x on collision-poor pairs, but no caller sorts a product
+    /// (`docs/research/heap-multiply.md` §1).
     Heap,
 }
 
