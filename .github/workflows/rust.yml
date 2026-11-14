@@ -97,6 +97,9 @@ jobs:
           python3 tools/test/grobx-work-study-test.py
           python3 tools/test/pivot-discovery-study-test.py
           python3 research/concurrent-pivots/summarize.py
+          python3 -m unittest discover -s research/waiting-row -p 'test_*.py'
+          python3 research/waiting-row/evidence.py > /tmp/waiting-row-evidence.json
+          diff -u research/waiting-row/evidence.json /tmp/waiting-row-evidence.json
           git diff --exit-code -- research/concurrent-pivots/summary.json research/concurrent-pivots/matrix-census.csv research/concurrent-pivots/parallel.csv research/concurrent-pivots/matrix-scaling.csv research/concurrent-pivots/dispatch.csv research/concurrent-pivots/controls.csv
           python3 tools/test/grobx-randomization-test.py
           python3 tools/external/grobx-driver/research/randomization/test_policy.py

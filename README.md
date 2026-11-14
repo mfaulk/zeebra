@@ -480,3 +480,8 @@ are unchanged.
 
 The [persistent-worker study](research/worker-pool/README.md) provides an opt-in dispatch and FGLM
 border-reduction experiment under `research-work`; solver defaults remain unchanged.
+
+The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanalyzes retained
+concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated
+comparator demonstrates enough avoidable elapsed work to cover queue and suspended-row costs;
+[offline reproduction](research/waiting-row/README.md) launches no benchmarks.
