@@ -40,15 +40,18 @@
 //! cargo run --release --example multivariate_mul
 //! cargo run --release --example multivariate_mul -- chunk
 //! cargo run --release --example multivariate_mul -- max_degree=90
+//! cargo run --release --example multivariate_mul -- heap   # #443: heap vs accumulate(+sort)
 //! ```
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use zeebra::{
-    fields::KoalaBear, multiply_multivariate_unstable, multivariate_multiply_route_unstable,
-    util::peak_resident_bytes, FiniteField, Monomial, MultiplyRoute, MultivariatePolynomial,
+    fields::KoalaBear, multiply_multivariate_sorted_unstable, multiply_multivariate_unstable,
+    multivariate_multiply_route_unstable, util::peak_resident_bytes, FiniteField, Monomial,
+    MonomialOrder, MultiplyRoute, MultivariatePolynomial,
 };
 
 /// KoalaBear, the field the six-round row is built over.
@@ -403,8 +406,187 @@ fn sweep_chunk(degree: u32) {
     }
 }
 
+// === the heap route against accumulate-then-sort (#443) ===
+
+/// Interleaved repetitions per arm in the `heap` sweep; each cell reports the minimum and median.
+const HEAP_REPETITIONS: usize = 7;
+
+/// `terms` random terms in `N` variables with exponents in `0..=max_exponent`, all coefficients
+/// nonzero. Seeded, so every arm and every run sees the same operands.
+fn random_sparse<const N: usize>(
+    rng: &mut StdRng,
+    terms: usize,
+    max_exponent: u32,
+) -> MultivariatePolynomial<N, F> {
+    let terms: Vec<(Monomial<N>, F)> = (0..terms)
+        .map(|_| {
+            let exponents: Vec<u32> = (0..N).map(|_| rng.gen_range(0..=max_exponent)).collect();
+            (
+                Monomial::new(&exponents),
+                F::new(rng.gen_range(1..1_000_000)),
+            )
+        })
+        .collect();
+    MultivariatePolynomial::new(&terms)
+}
+
+/// The caller's sort that ordered output would remove: `normal_form`'s `sorted_terms` and
+/// `Reducer::new`'s tail collect the term map and sort it, which this reproduces (descending, as
+/// the heap emits).
+fn sorted_descending<const N: usize>(
+    p: &MultivariatePolynomial<N, F>,
+    order: MonomialOrder,
+) -> Vec<(Monomial<N>, F)> {
+    let mut terms: Vec<(Monomial<N>, F)> = p.terms().iter().map(|(m, c)| (*m, *c)).collect();
+    terms.sort_by(|x, y| order.cmp(&y.0, &x.0));
+    terms
+}
+
+/// Four arms on one operand pair, interleaved: the multiply alone on each route, then
+/// multiply-then-sort against the heap's sorted output. Arm order rotates per repetition.
+fn measure_heap_arms<const N: usize>(
+    label: &str,
+    a: &MultivariatePolynomial<N, F>,
+    b: &MultivariatePolynomial<N, F>,
+) {
+    const ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
+    const ARMS: [&str; 4] = ["accumulate", "heap", "acc+sort", "heap sorted"];
+    let expected = multiply_multivariate_unstable(a, b, MultiplyRoute::Accumulate);
+    let expected_sorted = sorted_descending(&expected, ORDER);
+    let mut times: [Vec<Duration>; 4] = Default::default();
+
+    for repetition in 0..HEAP_REPETITIONS {
+        for k in 0..ARMS.len() {
+            let arm = (k + repetition) % ARMS.len();
+            let start = Instant::now();
+            match arm {
+                0 => {
+                    let p = multiply_multivariate_unstable(a, b, MultiplyRoute::Accumulate);
+                    times[arm].push(start.elapsed());
+                    assert_eq!(p, expected);
+                }
+                1 => {
+                    let p = multiply_multivariate_unstable(a, b, MultiplyRoute::Heap);
+                    times[arm].push(start.elapsed());
+                    assert_eq!(p, expected, "heap disagrees at {label}");
+                }
+                2 => {
+                    let p = multiply_multivariate_unstable(a, b, MultiplyRoute::Accumulate);
+                    let sorted = sorted_descending(&p, ORDER);
+                    times[arm].push(start.elapsed());
+                    assert_eq!(sorted, expected_sorted);
+                }
+                _ => {
+                    let sorted = multiply_multivariate_sorted_unstable(a, b, ORDER);
+                    times[arm].push(start.elapsed());
+                    assert_eq!(sorted, expected_sorted, "heap order disagrees at {label}");
+                }
+            }
+        }
+    }
+
+    let summary = |arm: usize| {
+        let mut t = times[arm].clone();
+        t.sort();
+        (t[0], t[t.len() / 2])
+    };
+    let [acc, heap, acc_sort, heap_sorted] = [0, 1, 2, 3].map(summary);
+    println!(
+        "  {:<34} {:>9} {:>8} {:<14} {:>10} {:>10} {:>6} {:>10} {:>10} {:>6}",
+        label,
+        (a.terms().len() as u64) * (b.terms().len() as u64),
+        expected.terms().len(),
+        format!("{:?}", multivariate_multiply_route_unstable(a, b)),
+        format_duration(acc.0),
+        format_duration(heap.0),
+        format!("{:.2}", heap.0.as_secs_f64() / acc.0.as_secs_f64()),
+        format_duration(acc_sort.0),
+        format_duration(heap_sorted.0),
+        format!(
+            "{:.2}",
+            heap_sorted.0.as_secs_f64() / acc_sort.0.as_secs_f64()
+        ),
+    );
+    println!(
+        "  {:<34} {:>9} {:>8} {:<14} {:>10} {:>10} {:>6} {:>10} {:>10} {:>6}",
+        "    (medians)",
+        "",
+        "",
+        "",
+        format_duration(acc.1),
+        format_duration(heap.1),
+        format!("{:.2}", heap.1.as_secs_f64() / acc.1.as_secs_f64()),
+        format_duration(acc_sort.1),
+        format_duration(heap_sorted.1),
+        format!(
+            "{:.2}",
+            heap_sorted.1.as_secs_f64() / acc_sort.1.as_secs_f64()
+        ),
+    );
+}
+
+/// The `heap` sweep: sparse high-arity pairs, where `DENSE_MERGE_FACTOR` refuses the dense routes
+/// and `Accumulate` is selected, then dense controls where a dense route is.
+fn sweep_heap() {
+    println!();
+    println!(
+        "=== heap vs accumulate, grevlex, min of {HEAP_REPETITIONS} interleaved (median below) ==="
+    );
+    println!(
+        "  {:<34} {:>9} {:>8} {:<14} {:>10} {:>10} {:>6} {:>10} {:>10} {:>6}",
+        "shape",
+        "products",
+        "out",
+        "dispatched",
+        "accumulate",
+        "heap",
+        "ratio",
+        "acc+sort",
+        "heap sort",
+        "ratio"
+    );
+    let mut rng = StdRng::seed_from_u64(443);
+    for terms in [30usize, 100, 300, 1000] {
+        let a = random_sparse::<4>(&mut rng, terms, 20);
+        let b = random_sparse::<4>(&mut rng, terms, 20);
+        measure_heap_arms(&format!("N=4 sparse {terms}x{terms} e<=20"), &a, &b);
+    }
+    for terms in [30usize, 100, 300, 1000] {
+        let a = random_sparse::<6>(&mut rng, terms, 12);
+        let b = random_sparse::<6>(&mut rng, terms, 12);
+        measure_heap_arms(&format!("N=6 sparse {terms}x{terms} e<=12"), &a, &b);
+    }
+    for terms in [100usize, 1000] {
+        let a = random_sparse::<8>(&mut rng, terms, 8);
+        let b = random_sparse::<8>(&mut rng, terms, 8);
+        measure_heap_arms(&format!("N=8 sparse {terms}x{terms} e<=8"), &a, &b);
+    }
+    // Colliding but still refused by the dense predicates' merge test or close to it.
+    for terms in [100usize, 300] {
+        let a = random_sparse::<6>(&mut rng, terms, 2);
+        let b = random_sparse::<6>(&mut rng, terms, 2);
+        measure_heap_arms(&format!("N=6 sparse {terms}x{terms} e<=2"), &a, &b);
+    }
+    // Unbalanced: few rows, so the heap is small.
+    let few = random_sparse::<6>(&mut rng, 10, 12);
+    let many = random_sparse::<6>(&mut rng, 3000, 12);
+    measure_heap_arms("N=6 sparse 10x3000 e<=12", &few, &many);
+    // The reduction inner step: one term against many.
+    let single = random_sparse::<6>(&mut rng, 1, 3);
+    measure_heap_arms("N=6 1x3000 (term multiple)", &single, &many);
+    // Dense controls, where a dense route is dispatched.
+    let p3 = dense_simplex_3(12);
+    measure_heap_arms("N=3 dense simplex deg 12 squared", &p3, &p3);
+    let p5 = dense_simplex::<5>(4);
+    measure_heap_arms("N=5 dense simplex deg 4 squared", &p5, &p5);
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|a| a == "heap") {
+        sweep_heap();
+        return;
+    }
     let chunk_only = args.iter().any(|a| a == "chunk");
     let max_degree: u32 = args
         .iter()
