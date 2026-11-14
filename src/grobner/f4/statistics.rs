@@ -1362,6 +1362,8 @@ mod tests {
     #[test]
     fn test_stage_timings_accumulate() {
         let one = StageTimings {
+            forward: Duration::ZERO,
+            backward: Duration::ZERO,
             symbolic: Duration::from_micros(10),
             construction: Duration::from_micros(20),
             elimination: Duration::from_micros(30),
