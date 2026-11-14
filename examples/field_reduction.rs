@@ -33,9 +33,7 @@ use ark_ff::{
 };
 use rand::{prelude::StdRng, Rng, SeedableRng};
 use zeebra::{
-    fields::{
-        Bn254Fr, PrimeFieldElement256, PrimeFieldElement32, PrimeFieldElement64,
-    },
+    fields::{Bn254Fr, PrimeFieldElement256, PrimeFieldElement32, PrimeFieldElement64},
     FiniteField,
 };
 
@@ -196,7 +194,12 @@ impl<const P: u32> Repr for Rem32<P> {
 /// conditional subtraction finishes it.
 struct Barrett32<const P: u32>;
 impl<const P: u32> Barrett32<P> {
-    const MU: u64 = (u64::MAX / P as u64) + if u64::MAX % P as u64 == P as u64 - 1 { 1 } else { 0 };
+    const MU: u64 = (u64::MAX / P as u64)
+        + if u64::MAX % P as u64 == P as u64 - 1 {
+            1
+        } else {
+            0
+        };
 }
 impl<const P: u32> Repr for Barrett32<P> {
     const NAME: &'static str = "canonical-barrett";
@@ -685,7 +688,11 @@ fn scatter_shoup64<const P: u64>(row: &mut [u64], cols: &[usize], coefs: &[u64],
 /// How many raw `(p-1)^2` products fit on top of one residue below `p` in an accumulator of
 /// `bits` bits; the delayed dot folds after that many.
 fn delay_budget(p: u128, bits: u32) -> u128 {
-    let max = if bits == 128 { u128::MAX } else { (1u128 << bits) - 1 };
+    let max = if bits == 128 {
+        u128::MAX
+    } else {
+        (1u128 << bits) - 1
+    };
     let sq = (p - 1).checked_mul(p - 1);
     match sq {
         Some(sq) if sq > 0 => (max - (p - 1)) / sq,
@@ -732,9 +739,10 @@ struct Expected {
 
 fn expected(p: u128, seed: u64) -> Expected {
     let (a, b, cols, mut row, f) = canonical_operands(p, seed);
-    let (mulm, addm) = (|x: u64, y: u64| (x as u128 * y as u128 % p) as u64, |x: u64, y: u64| {
-        ((x as u128 + y as u128) % p) as u64
-    });
+    let (mulm, addm) = (
+        |x: u64, y: u64| (x as u128 * y as u128 % p) as u64,
+        |x: u64, y: u64| ((x as u128 + y as u128) % p) as u64,
+    );
     let mut x = a[N / 2];
     for i in 0..N {
         x = addm(mulm(x, a[i]), b[i]);
@@ -744,8 +752,16 @@ fn expected(p: u128, seed: u64) -> Expected {
         let prod = mulm(f, *y);
         row[*c] = ((row[*c] as u128 + p - prod as u128) % p) as u64;
     }
-    let dot = a.iter().zip(&b).fold(0u64, |s, (x, y)| addm(s, mulm(*x, *y)));
-    Expected { chain: x, map, scatter: row, dot }
+    let dot = a
+        .iter()
+        .zip(&b)
+        .fold(0u64, |s, (x, y)| addm(s, mulm(*x, *y)));
+    Expected {
+        chain: x,
+        map,
+        scatter: row,
+        dot,
+    }
 }
 
 fn check<R: Repr>(seed: u64) {
@@ -753,7 +769,12 @@ fn check<R: Repr>(seed: u64) {
     let want = expected(p, seed);
     let ops = operands::<R>(seed);
     let ctx = |k: &str| format!("{} p={p} kernel={k}", R::NAME);
-    assert_eq!(R::dec(chain::<R>(&ops.a, &ops.b)), want.chain, "{}", ctx("chain"));
+    assert_eq!(
+        R::dec(chain::<R>(&ops.a, &ops.b)),
+        want.chain,
+        "{}",
+        ctx("chain")
+    );
     let mut out = vec![R::E::default(); N];
     map::<R>(&ops.a, &ops.b, &mut out);
     let got: Vec<u64> = out.iter().map(|e| R::dec(*e)).collect();
@@ -768,14 +789,23 @@ fn check<R: Repr>(seed: u64) {
 fn check_special32<const P: u32>(seed: u64) {
     let want = expected(P as u128, seed);
     let (a, b, cols, row, f) = canonical_operands(P as u128, seed);
-    let (a, b): (Vec<u32>, Vec<u32>) =
-        (a.iter().map(|x| *x as u32).collect(), b.iter().map(|x| *x as u32).collect());
+    let (a, b): (Vec<u32>, Vec<u32>) = (
+        a.iter().map(|x| *x as u32).collect(),
+        b.iter().map(|x| *x as u32).collect(),
+    );
     let mut row: Vec<u32> = row.iter().map(|x| *x as u32).collect();
     scatter_shoup32::<P>(&mut row, &cols, &a, f as u32);
-    assert!(row.iter().zip(&want.scatter).all(|(g, w)| *g as u64 == *w), "shoup32 p={P}");
+    assert!(
+        row.iter().zip(&want.scatter).all(|(g, w)| *g as u64 == *w),
+        "shoup32 p={P}"
+    );
     let budget = delay_budget(P as u128, 64).min(N as u128) as usize;
     assert!(budget >= 1, "a u64 holds at least one product for p < 2^32");
-    assert_eq!(dot_delayed32::<P>(&a, &b, budget) as u64, want.dot, "delayed32 p={P}");
+    assert_eq!(
+        dot_delayed32::<P>(&a, &b, budget) as u64,
+        want.dot,
+        "delayed32 p={P}"
+    );
 }
 
 fn check_special64<const P: u64>(seed: u64) {
@@ -787,7 +817,11 @@ fn check_special64<const P: u64>(seed: u64) {
     }
     let budget = delay_budget(P as u128, 128).min(N as u128) as usize;
     if budget >= 1 {
-        assert_eq!(dot_delayed64::<P>(&a, &b, budget), want.dot, "delayed64 p={P}");
+        assert_eq!(
+            dot_delayed64::<P>(&a, &b, budget),
+            want.dot,
+            "delayed64 p={P}"
+        );
     }
 }
 
@@ -828,50 +862,110 @@ fn bench_repr<R: Repr>(width: &str, seed: u64) {
     let p = R::modulus();
     let mut out = vec![R::E::default(); N];
     let mut row = ops.row.clone();
-    emit(width, p, "chain", R::NAME, time_min(|| {
-        black_box(chain::<R>(black_box(&ops.a), black_box(&ops.b)));
-    }));
-    emit(width, p, "map", R::NAME, time_min(|| {
-        map::<R>(black_box(&ops.a), black_box(&ops.b), black_box(&mut out));
-    }));
-    emit(width, p, "scatter", R::NAME, time_min(|| {
-        scatter::<R>(black_box(&mut row), black_box(&ops.cols), black_box(&ops.a), ops.factor);
-    }));
-    emit(width, p, "dot", R::NAME, time_min(|| {
-        black_box(dot::<R>(black_box(&ops.a), black_box(&ops.b)));
-    }));
+    emit(
+        width,
+        p,
+        "chain",
+        R::NAME,
+        time_min(|| {
+            black_box(chain::<R>(black_box(&ops.a), black_box(&ops.b)));
+        }),
+    );
+    emit(
+        width,
+        p,
+        "map",
+        R::NAME,
+        time_min(|| {
+            map::<R>(black_box(&ops.a), black_box(&ops.b), black_box(&mut out));
+        }),
+    );
+    emit(
+        width,
+        p,
+        "scatter",
+        R::NAME,
+        time_min(|| {
+            scatter::<R>(
+                black_box(&mut row),
+                black_box(&ops.cols),
+                black_box(&ops.a),
+                ops.factor,
+            );
+        }),
+    );
+    emit(
+        width,
+        p,
+        "dot",
+        R::NAME,
+        time_min(|| {
+            black_box(dot::<R>(black_box(&ops.a), black_box(&ops.b)));
+        }),
+    );
 }
 
 fn bench_special32<const P: u32>(seed: u64) {
     check_special32::<P>(seed);
     let (a, b, cols, row, f) = canonical_operands(P as u128, seed);
-    let (a, b): (Vec<u32>, Vec<u32>) =
-        (a.iter().map(|x| *x as u32).collect(), b.iter().map(|x| *x as u32).collect());
+    let (a, b): (Vec<u32>, Vec<u32>) = (
+        a.iter().map(|x| *x as u32).collect(),
+        b.iter().map(|x| *x as u32).collect(),
+    );
     let mut row: Vec<u32> = row.iter().map(|x| *x as u32).collect();
     let budget = delay_budget(P as u128, 64).min(N as u128) as usize;
-    emit("32", P as u128, "scatter", "canonical-shoup", time_min(|| {
-        scatter_shoup32::<P>(black_box(&mut row), black_box(&cols), black_box(&a), f as u32);
-    }));
+    emit(
+        "32",
+        P as u128,
+        "scatter",
+        "canonical-shoup",
+        time_min(|| {
+            scatter_shoup32::<P>(
+                black_box(&mut row),
+                black_box(&cols),
+                black_box(&a),
+                f as u32,
+            );
+        }),
+    );
     let arm = format!("delayed-u64(fold/{budget})");
-    emit("32", P as u128, "dot", &arm, time_min(|| {
-        black_box(dot_delayed32::<P>(black_box(&a), black_box(&b), budget));
-    }));
+    emit(
+        "32",
+        P as u128,
+        "dot",
+        &arm,
+        time_min(|| {
+            black_box(dot_delayed32::<P>(black_box(&a), black_box(&b), budget));
+        }),
+    );
 }
 
 fn bench_special64<const P: u64>(seed: u64) {
     check_special64::<P>(seed);
     let (a, b, cols, mut row, f) = canonical_operands(P as u128, seed);
     if P < 1 << 63 {
-        emit("64", P as u128, "scatter", "canonical-shoup", time_min(|| {
-            scatter_shoup64::<P>(black_box(&mut row), black_box(&cols), black_box(&a), f);
-        }));
+        emit(
+            "64",
+            P as u128,
+            "scatter",
+            "canonical-shoup",
+            time_min(|| {
+                scatter_shoup64::<P>(black_box(&mut row), black_box(&cols), black_box(&a), f);
+            }),
+        );
     }
     let budget = delay_budget(P as u128, 128).min(N as u128) as usize;
     if budget >= 1 {
         let arm = format!("delayed-u128(fold/{budget})");
-        emit("64", P as u128, "dot", &arm, time_min(|| {
-            black_box(dot_delayed64::<P>(black_box(&a), black_box(&b), budget));
-        }));
+        emit(
+            "64",
+            P as u128,
+            "dot",
+            &arm,
+            time_min(|| {
+                black_box(dot_delayed64::<P>(black_box(&a), black_box(&b), budget));
+            }),
+        );
     }
 }
 
@@ -953,6 +1047,9 @@ macro_rules! wide_kernels {
                     *o = *x * *y;
                 }
             }
+            // The binary operators on both sides, since the two types' `-=` need not be the same
+            // code path as their `-`.
+            #[allow(clippy::assign_op_pattern)]
             #[inline(never)]
             pub fn scatter(row: &mut [$ty], cols: &[usize], coefs: &[$ty], f: $ty) {
                 for (c, x) in cols.iter().zip(coefs) {
@@ -972,8 +1069,9 @@ fn width256(seed: u64) {
         rng.fill(&mut b);
         b
     };
-    let ark: Vec<ArkBn254Fr> =
-        (0..2 * N + ROW_WIDTH).map(|_| ArkBn254Fr::from_le_bytes_mod_order(&bytes())).collect();
+    let ark: Vec<ArkBn254Fr> = (0..2 * N + ROW_WIDTH)
+        .map(|_| ArkBn254Fr::from_le_bytes_mod_order(&bytes()))
+        .collect();
     let mut ark = ark;
     ark[0] = ArkBn254Fr::ZERO;
     ark[1] = -ArkBn254Fr::ONE;
@@ -988,7 +1086,10 @@ fn width256(seed: u64) {
 
     // Oracle agreement on every kernel before timing.
     let same = |z: &Bn254Fr, a: &ArkBn254Fr| z.canonical_limbs() == a.into_bigint().0;
-    assert!(same(&zb256::chain(za, zbb), &ark256::chain(aa, ab)), "256 chain");
+    assert!(
+        same(&zb256::chain(za, zbb), &ark256::chain(aa, ab)),
+        "256 chain"
+    );
     let (mut zo, mut ao) = (vec![Bn254Fr::zero(); N], vec![ArkBn254Fr::ZERO; N]);
     zb256::map(za, zbb, &mut zo);
     ark256::map(aa, ab, &mut ao);
@@ -997,7 +1098,10 @@ fn width256(seed: u64) {
     zb256::scatter(&mut zr, &cols, za, zf);
     ark256::scatter(&mut ar, &cols, aa, af);
     assert!(zr.iter().zip(&ar).all(|(z, a)| same(z, a)), "256 scatter");
-    assert!(ar.iter().any(|a| a.into_bigint().is_odd()), "nontrivial row");
+    assert!(
+        ar.iter().any(|a| a.into_bigint().is_odd()),
+        "nontrivial row"
+    );
 
     let p = 0u128; // the modulus does not fit; the column records the width instead
     for (arm, z) in [("shipped-cios", true), ("ark-ff-0.6", false)] {

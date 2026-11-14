@@ -517,7 +517,10 @@ mod tests {
         assert!(super::montgomery::uses_montgomery(4294967311));
         assert!(super::montgomery::uses_montgomery(18446744073709551557));
         assert_eq!(PrimeFieldElement64::<2147483647>::new(5).value, 5);
-        assert_eq!(PrimeFieldElement64::<4294967291>::new(u64::MAX).value, u64::MAX % 4294967291);
+        assert_eq!(
+            PrimeFieldElement64::<4294967291>::new(u64::MAX).value,
+            u64::MAX % 4294967291
+        );
     }
 
     proptest! {
