@@ -10,6 +10,20 @@ SPEC.loader.exec_module(study)
 
 
 class WholeRouteStudy(unittest.TestCase):
+    # A continuation accepts the exact verified prefix and rejects binary or cell drift.
+    def test_continuation_preserves_frozen_prefix(self):
+        cells=list(study.plan('pilot'))
+        identity={key:key for key in ('binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')}
+        previous=dict(phase='pilot',plan=cells,identity=identity,references={},
+            refusal=dict(reason='compiler'),attempts=[dict(zip(('repeat','problem','modulus','route','arm'),cells[0]),status='verified')])
+        current=dict(phase='pilot',plan=cells,identity=dict(identity),references={})
+        self.assertEqual(study.resume_prefix(previous,current),1)
+        current['identity']['binary_sha256']='changed'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current)
+        current['identity']=dict(identity)
+        previous['attempts'][0]['problem']='wrong'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current)
+
     # Unexpected process failures stay failures rather than becoming favorable resource refusals.
     def test_terminal_causes_distinguish_resource_limits_and_bugs(self):
         self.assertEqual(study.terminal_kind(-9,'wall',''), 'incomplete-resource-refusal')

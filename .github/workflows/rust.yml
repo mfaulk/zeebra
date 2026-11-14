@@ -93,6 +93,8 @@ jobs:
           python3 tools/test/batch-splitting-study-test.py
           python3 tools/test/mq10-profile-test.py
           python3 tools/test/whole-route-study-test.py
+          python3 tools/test/whole-route-summary-test.py
+          python3 research/m28-current-baseline/summarize.py --check
           cargo test --test stage_refinements
           python3 tools/test/msolve-count-test.py
           python3 tools/test/grobx-trajectory-test.py

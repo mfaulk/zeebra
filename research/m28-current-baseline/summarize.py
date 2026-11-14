@@ -37,6 +37,12 @@ def spread(values):
 def summarize(path):
     cohort=json.loads(gzip.decompress(path.read_bytes()))
     complete=validate_plan(cohort)
+    if cohort.get('resumptions'):
+        resume=cohort['resumptions'][0]
+        prefix_path=ROOT/resume['prefix_archive']
+        if study.sha(prefix_path)!=resume['prefix_archive_sha256']: raise ValueError('continuation prefix archive changed')
+        prefix=json.loads(gzip.decompress(prefix_path.read_bytes()))
+        if cohort['attempts'][:resume['accepted_prefix']]!=prefix['attempts']: raise ValueError('continuation rewrote accepted samples')
     refs=study.references()
     if cohort['references']['katsura-11/2147483647']!=refs[('katsura-11',2147483647)]: raise ValueError('reference archive/provenance drift')
     groups=defaultdict(list)
@@ -97,7 +103,8 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--check',action='store_true')
     args=parser.parse_args()
-    paths=[HERE/name for name in ('pilot.json.gz','native.json.gz') if (HERE/name).exists()]
+    pilot='pilot-completed.json.gz' if (HERE/'pilot-completed.json.gz').exists() else 'pilot.json.gz'
+    paths=[HERE/name for name in (pilot,'native.json.gz') if (HERE/name).exists()]
     if not paths: raise ValueError('no retained cohort')
     encoded=json.dumps([summarize(path) for path in paths],indent=2)+'\n'
     output=HERE/'summary.json'

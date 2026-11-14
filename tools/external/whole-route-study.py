@@ -145,11 +145,26 @@ def references():
     return refs
 
 
+def resume_prefix(previous,current):
+    frozen=('binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')
+    if (previous['phase']!=current['phase'] or [list(c) for c in previous['plan']]!=[list(c) for c in current['plan']]
+            or previous.get('refusal',{}).get('reason') not in ('compiler','load-or-aggregate') or previous.get('resumptions')
+            or previous['references']!=current['references']): raise ValueError('continuation identity or prior refusal differs')
+    if any(previous['identity'][key]!=current['identity'][key] for key in frozen): raise ValueError('frozen executable/source/environment changed')
+    attempts=previous['attempts']
+    actual=[[a[k] for k in ('repeat','problem','modulus','route','arm')] for a in attempts]
+    expected=[list(cell) for cell in current['plan']]
+    if actual!=expected[:len(actual)] or len(actual)>=len(expected) or any(a['status']!='verified' for a in attempts):
+        raise ValueError('continuation requires an exact verified prefix and unattempted tail')
+    return len(attempts)
+
+
 def main():
     parser=argparse.ArgumentParser()
     for key in ('binary','scratch','output'): parser.add_argument('--'+key,type=Path,required=True)
     parser.add_argument('--phase',choices=('pilot','native'),default='pilot')
     parser.add_argument('--build-commit',required=True)
+    parser.add_argument('--resume-from',type=Path)
     args=parser.parse_args()
     if args.output.exists(): parser.error('retain existing campaign and choose new output')
     if subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip(): parser.error('commit instruments before measuring')
@@ -161,6 +176,7 @@ def main():
     cells=list(plan(args.phase))
     campaign_limits=limits()
     if args.phase=='pilot': campaign_limits['aggregate_wall_seconds']=480
+    if args.resume_from: campaign_limits['aggregate_wall_seconds']=180
     cohort=dict(schema=1,phase=args.phase,identity=dict(commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         build_commit=args.build_commit,binary_sha256=sha(args.binary),cargo_lock_sha256=sha(ROOT/'Cargo.lock'),
         cargo_config_sha256=sha(ROOT/'.cargo/config.toml'),rustc=subprocess.check_output(['rustc','-vV'],text=True),
@@ -169,13 +185,22 @@ def main():
         limits=campaign_limits,plan=cells,attempts=[],references={})
     refs=references()
     cohort['references']['katsura-11/2147483647']=refs[('katsura-11',2147483647)]
+    if args.resume_from:
+        import gzip
+        previous=json.loads(gzip.decompress(args.resume_from.read_bytes()))
+        prefix=resume_prefix(previous,cohort)
+        controller=cohort['identity']['commit']
+        cohort=previous
+        refusal=cohort.pop('refusal')
+        cohort['resumptions']=[dict(controller=controller,prefix_archive=str(args.resume_from.relative_to(ROOT)),
+            prefix_archive_sha256=sha(args.resume_from),accepted_prefix=prefix,refusal=refusal,aggregate_wall_seconds=180)]
     guard=load('grobx-work-study')
     supervisor=load('comparand-scaling')
     def interrupted(signum,_): raise SystemExit(128+signum)
     signal.signal(signal.SIGTERM,interrupted)
     runtime=load('worker-pool-study')
     began=time.monotonic()
-    for repeat,problem,modulus,route,arm in cells:
+    for repeat,problem,modulus,route,arm in cells[len(cohort['attempts']):]:
         compilers=runtime.compiler_processes()
         if compilers or os.getloadavg()[0]>4 or time.monotonic()-began>campaign_limits['aggregate_wall_seconds']-60:
             cohort['refusal']=dict(reason='compiler' if compilers else 'load-or-aggregate',compilers=compilers,load=os.getloadavg()[0]);guard.write(args.output,cohort);return

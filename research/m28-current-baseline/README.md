@@ -66,3 +66,38 @@ On FGLM refusal its public API returns no partial statistics, so only conversion
 last completed checkpoint are available; the report names that limitation rather than inventing
 operator/certificate timings. Recovery-call wall includes the solver's own verification; the
 additional original-equation substitution is timed separately.
+
+## Retained prefix and bounded continuation
+
+The first pilot window retained four accepted complete processes and then refused before launching
+Katsura-11 because a new unrelated compiler appeared. The four accepted native responses retain
+empty pre/post compiler snapshots; their one-off clocks are feasibility evidence, not repeated
+performance estimates. MQ10 at GF(32003) and both Cyclic-5 inputs report no base-field point;
+MQ10 at GF(2147483647) returns a point independently substituted into every original equation.
+Adaptive conversion selected Classical with DenseOperator/SmallQuotient fallback respectively.
+The source bases match complete independent references. `pilot.json.gz` preserves the exact
+four-attempt prefix, the pre-child compiler refusal and original identities; no accepted sample
+is discarded or repeated.
+
+One controller-only continuation is declared for the two unattempted pilot cells: frozen source,
+executable, reference archive, machine, affinity and toolchain must match. It writes a separate
+`pilot-completed.json.gz`, retaining every original accepted attempt unchanged and the original
+prefix archive SHA-256. Its two child caps total 120 seconds; an independent 180-second aggregate
+watchdog and the remaining 256-MiB output budget bind. It launches only after the workstation's
+compiler/load gates clear. Use `--resume-from research/m28-current-baseline/pilot.json.gz` with
+`--phase pilot`, a new output path, and the same private scratch tree. This is not permission to
+rerun the accepted cells or lift any solver limit.
+
+Offline checks launch no solver and do not need the benchmark lock:
+
+```sh
+python3 tools/test/whole-route-study-test.py
+python3 tools/test/whole-route-summary-test.py
+python3 research/m28-current-baseline/summarize.py --check
+```
+
+The last command rechecks plan coverage or explicit interrupted-prefix status, original equations,
+full source coefficients and every recovered point. Analytical ceilings use same-attempt clocks.
+The existing comparand supervisor enforces process-tree wall/RSS and 128-MiB per-child output,
+bounded by remaining aggregate output allowance. Launcher signals drain owned processes and retain
+an interrupted attempt. Unexpected process failures are not reclassified as resource refusals.
