@@ -59,20 +59,25 @@ pub fn compose_mod_horner<F: FiniteField>(
 
 /// Brent–Kung composition with a fixed inner argument `g` and modulus `h`.
 ///
-/// Construction costs `m` modular multiplications for `m = ceil(sqrt(deg h))`. Each
+/// Construction costs `m` modular multiplications, for a block of `m` baby steps. Each
 /// [`compose`](Self::compose) then costs one `k × m` by `m × deg h` matrix product and `k − 1`
-/// modular multiplications, for `k = ceil((deg f + 1) / m)`.
+/// modular multiplications, for `k = ceil((deg f + 1) / m)`. The matrix product is
+/// `(deg f + 1) · deg h` multiply-adds whatever `m` is, so a larger block moves work from every
+/// composition into the one-time construction: [`new`](Self::new) balances the two for a single
+/// use, and [`grow_to`](Self::grow_to) is for a caller that will compose many times.
 #[derive(Clone, Debug)]
 pub struct ModularComposer<F: FiniteField> {
     modulus: UnivariatePolynomial<F>,
+    /// `g mod h`.
+    inner: UnivariatePolynomial<F>,
     /// Row `i` is `g^i mod h`, padded to `deg h` coefficients.
     baby_steps: Matrix<F>,
-    /// `g^m mod h`.
+    /// `g^m mod h`, for `m` the number of baby steps.
     giant_step: UnivariatePolynomial<F>,
 }
 
 impl<F: FiniteField> ModularComposer<F> {
-    /// Precompute the baby steps of `g` modulo `h`.
+    /// Precompute `ceil(sqrt(deg h))` baby steps of `g` modulo `h`.
     ///
     /// # Panics
     /// Panics if `h` is the zero polynomial.
@@ -81,23 +86,51 @@ impl<F: FiniteField> ModularComposer<F> {
         Self::with_block(g, h, block_for(h.degree() as usize))
     }
 
-    fn with_block(g: &UnivariatePolynomial<F>, h: &UnivariatePolynomial<F>, block: usize) -> Self {
+    /// Precompute `block` baby steps of `g` modulo `h` (at least one).
+    ///
+    /// # Panics
+    /// Panics if `h` is the zero polynomial.
+    pub fn with_block(
+        g: &UnivariatePolynomial<F>,
+        h: &UnivariatePolynomial<F>,
+        block: usize,
+    ) -> Self {
         assert_nonzero(h);
         let n = h.degree() as usize;
-        let g = g % h;
-
         // Reducing 1 matters only when h is a constant, where F[x]/(h) is the zero ring.
-        let mut power = &UnivariatePolynomial::one() % h;
-        let mut elements = Vec::with_capacity(block * n);
-        for _ in 0..block {
-            push_padded(&mut elements, &power, n);
-            power = &(&power * &g) % h;
-        }
-        Self {
+        let mut composer = Self {
             modulus: h.clone(),
-            baby_steps: Matrix::new(block, n, &elements),
-            giant_step: power,
+            inner: g % h,
+            baby_steps: Matrix::new(0, n, &[]),
+            giant_step: &UnivariatePolynomial::one() % h,
+        };
+        composer.grow_to(block.max(1));
+        composer
+    }
+
+    /// Extend the baby steps to `block`, keeping those already computed. No-op if there are
+    /// already that many.
+    pub fn grow_to(&mut self, block: usize) {
+        let current = self.baby_steps.num_rows();
+        if block <= current {
+            return;
         }
+        let n = self.baby_steps.num_columns();
+        let mut elements = Vec::with_capacity(block * n);
+        elements.extend_from_slice(self.baby_steps.elements());
+        // `giant_step` is g^current, the next row due.
+        let mut power = self.giant_step.clone();
+        for _ in current..block {
+            push_padded(&mut elements, &power, n);
+            power = &(&power * &self.inner) % &self.modulus;
+        }
+        self.baby_steps = Matrix::new(block, n, &elements);
+        self.giant_step = power;
+    }
+
+    /// The number of baby steps.
+    pub fn block(&self) -> usize {
+        self.baby_steps.num_rows()
     }
 
     /// The modulus `h`.
@@ -317,6 +350,29 @@ mod tests {
         for f_degree in [0u64, 3, 49, 50, 151] {
             let f = random::<Zp18446744069414584321>(f_degree, &mut rng);
             assert_eq!(composer.compose(&f), compose_mod_horner(&f, &g, &h));
+        }
+    }
+
+    /// Any block size, including one grown after construction, composes to the same result.
+    #[test]
+    fn test_block_size_does_not_change_the_result() {
+        let mut rng = StdRng::seed_from_u64(14);
+        let h = random::<KoalaBear>(30, &mut rng);
+        let g = random::<KoalaBear>(29, &mut rng);
+        let f = random::<KoalaBear>(29, &mut rng);
+        let expected = compose_mod_horner(&f, &g, &h);
+        for block in [1usize, 2, 7, 30, 31, 100] {
+            assert_eq!(
+                ModularComposer::with_block(&g, &h, block).compose(&f),
+                expected,
+                "block {block}"
+            );
+        }
+        let mut composer = ModularComposer::new(&g, &h);
+        for block in [6, 6, 13, 30, 64] {
+            composer.grow_to(block);
+            assert_eq!(composer.block(), block.max(6));
+            assert_eq!(composer.compose(&f), expected, "grown to {block}");
         }
     }
 

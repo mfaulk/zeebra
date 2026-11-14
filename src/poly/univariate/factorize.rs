@@ -124,7 +124,7 @@ pub fn factorize_with_route<F: KnownOrder, R: RngCore + CryptoRng>(
     // x^(q^d), built by applying the Frobenius map repeatedly. Computing q^d as an integer would
     // overflow for even modest q and d.
     let x_to_the_q = pow_mod_limbs(&x, q, &monic);
-    let frobenius = Frobenius::new(route, &x_to_the_q, &monic);
+    let mut frobenius = Frobenius::new(route, &x_to_the_q, &monic);
     let mut x_to_the_q_to_the_d = x_to_the_q.clone();
 
     for d in 1..=total_degree {
@@ -268,7 +268,7 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
     // worth building. g divides the polynomial `x_to_the_q` was reduced by, so reducing it again
     // modulo g gives x^q mod g without a fresh exponentiation.
     let odd_characteristic = F::characteristic_limbs() != [2];
-    let frobenius = match (route.route, route.x_to_the_q) {
+    let mut frobenius = match (route.route, route.x_to_the_q) {
         (FrobeniusRoute::Composition, Some(x_to_the_q)) if odd_characteristic && d > 1 => {
             Frobenius::new(FrobeniusRoute::Composition, &(x_to_the_q % g), g)
         }
@@ -290,7 +290,7 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
             // ((q - 1)/2) * (1 + q + ... + q^(d-1)) turns it into the norm raised to (q - 1)/2,
             // both of which are computable: the exponent itself would overflow.
             &pow_mod_limbs(
-                &frobenius_norm(&h, g, d, &frobenius),
+                &frobenius_norm(&h, g, d, &mut frobenius),
                 &half_of_q_minus_one::<F>(),
                 g,
             ) - &UnivariatePolynomial::one()
@@ -318,7 +318,7 @@ fn frobenius_norm<F: KnownOrder>(
     h: &UnivariatePolynomial<F>,
     g: &UnivariatePolynomial<F>,
     d: u32,
-    frobenius: &Frobenius<F>,
+    frobenius: &mut Frobenius<F>,
 ) -> UnivariatePolynomial<F> {
     let mut term = h % g;
     let mut norm = term.clone();
@@ -333,9 +333,12 @@ fn frobenius_norm<F: KnownOrder>(
 enum Frobenius<F: FiniteField> {
     /// The modulus `h`.
     PowMod(UnivariatePolynomial<F>),
-    /// Composition with `x^q mod h`.
-    Composition(ModularComposer<F>),
+    /// Composition with `x^q mod h`, and how many times it has been applied.
+    Composition(ModularComposer<F>, usize),
 }
+
+/// The composer's baby-step table is not grown past this many bytes.
+const MAX_BABY_STEP_BYTES: usize = 64 << 20;
 
 impl<F: KnownOrder> Frobenius<F> {
     fn new(
@@ -346,15 +349,29 @@ impl<F: KnownOrder> Frobenius<F> {
         match route {
             FrobeniusRoute::PowMod => Self::PowMod(modulus.clone()),
             FrobeniusRoute::Composition => {
-                Self::Composition(ModularComposer::new(x_to_the_q, modulus))
+                Self::Composition(ModularComposer::new(x_to_the_q, modulus), 0)
             }
         }
     }
 
-    fn apply(&self, p: &UnivariatePolynomial<F>) -> UnivariatePolynomial<F> {
+    fn apply(&mut self, p: &UnivariatePolynomial<F>) -> UnivariatePolynomial<F> {
         match self {
             Self::PowMod(modulus) => pow_mod_limbs(p, F::order_limbs(), modulus),
-            Self::Composition(composer) => composer.compose(p),
+            Self::Composition(composer, uses) => {
+                // With m baby steps a composition pays about n/m modular multiplications, and
+                // doubling m costs m of them once and saves n/(2m) per use thereafter. Taking the
+                // uses so far as the forecast of the uses to come, doubling pays once they reach
+                // 2m²/n. The number of uses is not known up front — the distinct-degree loop stops
+                // as soon as the factor degrees add up — hence growing rather than sizing.
+                let n = composer.modulus().degree() as usize;
+                let m = composer.block();
+                let fits = 2 * m * n * std::mem::size_of::<F>() <= MAX_BABY_STEP_BYTES;
+                if n > 0 && 2 * m <= n && fits && *uses * n >= 2 * m * m {
+                    composer.grow_to(2 * m);
+                }
+                *uses += 1;
+                composer.compose(p)
+            }
         }
     }
 }

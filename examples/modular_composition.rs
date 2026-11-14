@@ -5,8 +5,9 @@
 //!
 //! - `steps`: one Frobenius application `ξ ↦ ξ^q mod h` with `ξ = x^q mod h` and `h` random monic
 //!   of degree n — by `pow_mod` with exponent q, by a prebuilt [`ModularComposer`] (the amortized
-//!   cost inside a distinct-degree loop), by one-shot `compose_mod`, and by Horner (n ≤ 729). The
-//!   composer's construction is reported separately.
+//!   cost inside a distinct-degree loop) at the default `m = ceil(sqrt n)` baby steps and at `4m`,
+//!   by one-shot `compose_mod`, and by Horner (n ≤ 729). The default composer's construction is
+//!   reported separately.
 //! - `factor`: whole `factorize` on a random polynomial of degree n, each `FrobeniusRoute` forced.
 //!   The two routes' factorizations are compared and the run aborts if they differ.
 //!
@@ -100,6 +101,14 @@ fn steps<F: KnownOrder>(field: &str, options: &Options) {
         let xi = pow_mod_limbs_unstable(&x::<F>(), q, &h);
         let expected = pow_mod_limbs_unstable(&xi, q, &h);
         let composer = ModularComposer::new(&xi, &h);
+        // The block the distinct-degree loop grows to after a few dozen uses.
+        let mut wide = composer.clone();
+        wide.grow_to(4 * composer.block());
+        assert_eq!(
+            wide.compose(&xi),
+            expected,
+            "wide composer disagrees at n={n}"
+        );
         assert_eq!(
             composer.compose(&xi),
             expected,
@@ -125,22 +134,29 @@ fn steps<F: KnownOrder>(field: &str, options: &Options) {
         let mut build = || sink3 ^= ModularComposer::new(&xi, &h).modulus().degree() as usize;
         let mut sink4 = 0usize;
         let mut one_shot = || sink4 ^= compose_mod(&xi, &xi, &h).degree() as usize;
+        let mut sink6 = 0usize;
+        let mut by_wide = || sink6 ^= wide.compose(&xi).degree() as usize;
         let mut sink5 = 0usize;
         let mut by_horner = || sink5 ^= compose_mod_horner(&xi, &xi, &h).degree() as usize;
-        let mut arms: Vec<&mut dyn FnMut()> =
-            vec![&mut by_pow_mod, &mut by_composer, &mut build, &mut one_shot];
+        let mut arms: Vec<&mut dyn FnMut()> = vec![
+            &mut by_pow_mod,
+            &mut by_composer,
+            &mut build,
+            &mut one_shot,
+            &mut by_wide,
+        ];
         if horner {
             arms.push(&mut by_horner);
         }
         let mut samples = interleaved(&mut arms, reps);
         let row: Vec<(Duration, Duration)> = samples.iter_mut().map(|s| summary(s)).collect();
         let horner_cell = if horner {
-            format!("{} ({})", ms(row[4].0), ms(row[4].1))
+            format!("{} ({})", ms(row[5].0), ms(row[5].1))
         } else {
             "—".to_string()
         };
         println!(
-            "| {field} | {n} | {reps} | {} ({}) | {} ({}) | {} ({}) | {} ({}) | {horner_cell} | {:.2}x |",
+            "| {field} | {n} | {reps} | {} ({}) | {} ({}) | {} ({}) | {} ({}) | {} ({}) | {horner_cell} | {:.2}x | {:.2}x |",
             ms(row[0].0),
             ms(row[0].1),
             ms(row[1].0),
@@ -149,7 +165,10 @@ fn steps<F: KnownOrder>(field: &str, options: &Options) {
             ms(row[2].1),
             ms(row[3].0),
             ms(row[3].1),
+            ms(row[4].0),
+            ms(row[4].1),
             row[0].0.as_secs_f64() / row[1].0.as_secs_f64(),
+            row[0].0.as_secs_f64() / row[4].0.as_secs_f64(),
         );
     }
 }
@@ -236,9 +255,9 @@ fn main() {
         "steps" => {
             println!("one Frobenius application ξ ↦ ξ^q mod h, ms: median (min)");
             println!(
-                "| field | n | reps | pow_mod | composer.compose | composer build | compose_mod | Horner | pow_mod / compose |"
+                "| field | n | reps | pow_mod | compose, m=√n | build, m=√n | compose_mod | compose, m=4√n | Horner | pow_mod / compose √n | pow_mod / compose 4√n |"
             );
-            println!("|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+            println!("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
             steps::<KoalaBear>("KoalaBear", &options);
             steps::<Goldilocks>("Goldilocks", &options);
             steps::<Bn254Fr>("BN254 Fr", &options);
