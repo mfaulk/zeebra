@@ -11,6 +11,7 @@ pub mod multirow {
     };
 }
 mod gauss_jordan;
+pub mod gf2;
 mod matrix;
 mod pivots;
 #[cfg(feature = "research-work")]
