@@ -401,6 +401,9 @@ are how that is established rather than asserted.
 
 ### 6.2 Where the time actually goes
 
+The M16-0 baseline. Its counterpart under the shipped `F4Options::recommended()` is
+`f4_profile -- shipped`, tabulated in `research/order-conversion.md` §6.2.1 (#614).
+
 From `cargo run --release --example f4_profile`, which is new in M16-0. `other` is the total less
 every stage: pair selection and basis bookkeeping. Milliseconds.
 

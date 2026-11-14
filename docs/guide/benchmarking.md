@@ -298,6 +298,7 @@ cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
+cargo run --release --example f4_profile -- shipped  # the same, under F4Options::recommended() (#614)
 cargo run --release --example f4_memory            # F4, memory attributed per structure
 cargo run --release --example interreduce_working_set -- katsura-11 --arm unbounded
 cargo run --release --example f4_degrees           # F4, work and useful work per degree
