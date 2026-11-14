@@ -376,12 +376,13 @@ impl<F: KnownOrder> Frobenius<F> {
                     // Every unit below is one modular multiplication. A composer with m baby steps
                     // costs m to build and about n/m per application, against `pow_cost` per
                     // application by `pow_mod`; sized so that n/m is at most half of `pow_cost`,
-                    // it wins per application. Renting (`pow_mod`) until the rent paid reaches the
-                    // purchase price, then buying, costs at most twice whichever would have been
-                    // cheaper in hindsight.
+                    // it wins per application. Renting (`pow_mod`) until the rent paid, this
+                    // application's included, would reach the purchase price, then buying, costs
+                    // at most about twice whichever would have been cheaper in hindsight. A
+                    // composer cheaper than one `pow_mod` — every wide field — is bought at once.
                     let pow_cost = square_and_multiply_cost(F::order_limbs());
                     let block = block_cap::<F>(n, ceil_sqrt(n).max((2 * n).div_ceil(pow_cost)));
-                    (uses * pow_cost >= block).then_some(block)
+                    ((uses + 1) * pow_cost >= block).then_some(block)
                 }
             };
             match block {
