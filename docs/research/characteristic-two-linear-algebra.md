@@ -1,9 +1,11 @@
 # Characteristic-two linear algebra: bit-packed GF(2) elimination and Four Russians
 
-**Measured at:** `30f24f6f` (release, `RUSTC_WRAPPER=""`, `CARGO_INCREMENTAL=0`), one core
+**Measured at:** `30f24f6f` for §1–§4 (release, `RUSTC_WRAPPER=""`, `CARGO_INCREMENTAL=0`), one core
 (`taskset -c 37`), serialized through `tools/benchlock.sh` (tag `272`; 1-minute load 4.2–4.4 at
 START and END of both runs on this 128-core machine). Each cell is the minimum of 5 repetitions,
-arms interleaved with a rotating order.
+arms interleaved with a rotating order. §7 (#777) at `21acc4db` (per-batch table) and `db5c5c05`
+(solves) — commits on `perf/777-gf2-f4-dispatch`, squashed into the PR that closed #777 — same
+core, same lock (tag `777`, load 7.5–14.0), release build with the repository's `.cargo/config.toml`.
 
 Reference for #272 (H16), scoped to the **kernel** only — representation and solving route stay
 with #218 and #196. The instrument is `examples/gf2_packed_elimination.rs`; the kernel is
@@ -13,6 +15,9 @@ figures only, not the source).
 
 ## Decision
 
+- **Adopted (#777, §7): F4 eliminates dense GF(2) batches bit-packed by default**, measured at
+  **1.5x–3.9x end to end** on dense MQ with bases asserted equal, and 1.00x–1.16x on the sparse
+  controls. The rest of this bullet is #272's original projection.
 - **Adopt the bit-packed representation for GF(2) — as a follow-up, not in this PR.** On the
   matrices F4 itself builds for dense Boolean systems, packed RREF is **27x–132x** faster than the
   generic sparse RREF of the same matrices, and faster than F4's own (structured, partial)
@@ -145,11 +150,150 @@ table width of 0. The harness re-asserts equality on every measured matrix and e
 
 ## 6. What is not done, and where it went
 
-- **Wiring into F4.** Needs (a) a structured packed elimination matching F4's private
-  candidate-output contract rather than a full RREF, (b) a dispatch rule by matrix density and
-  shape — the sparse families above regress — and (c) a measured solve, not a projection.
-  Filed as #777 (board #7, Priority Medium).
+- **Wiring into F4.** Done in #777; see §7.
 - **GF(2^e), M4RIE slicing.** Not attempted; blocked on the defining-polynomial convention.
 - **Multicore XOR, cache blocking, M4RI/M4RIE as pinned external comparands** (#272's P2 comment):
   not attempted. The serial algorithmic factor measured here is the baseline those would be
   isolated against.
+
+## 7. Wired into F4 (#777): measured solves
+
+`F4Options::gf2_elimination` (`Gf2Elimination::{Generic, Auto, Packed}`, default `Auto`) routes a
+batch through `src/grobner/f4/packed.rs` when F4 is structured with reduced batch rows, the field
+has characteristic two, and every coefficient is one. The route keeps F4's contract rather than
+running a full RREF:
+
+1. **Reducer block untouched.** The reducer rows stay sparse and are never written; groups of up
+   to 8 are copied out, made the identity on their own leads, and applied to the packed pair rows
+   through a Gray-code table — or one pivot at a time when too few pair rows touch the group for
+   the table to pay (`linalg::gf2::reduce_against_pivots`).
+2. **Pair block by Four Russians**, `k` = 4/6/8 by pair-row count (§4's crossover), with
+   **selective back substitution**: a pivot row is cleared by later words' tables only if its
+   leading column is a candidate column (`reduced_row_echelon_four_russians_selected`). Unselected
+   rows stay echelon, as in #749's candidate-only route.
+3. **Write-back** of the pair rows to sparse form, row by row against the entry allowance and
+   against `max_live_bytes` with the bit matrix still charged.
+
+A candidate is the unique reduced row of the batch's row space at its column, so it equals the
+generic route's candidate exactly. Every repetition below asserts that — per batch for the
+candidates, per solve for the basis. Budgets: the packed working set (bit matrix, tables, indices,
+selection mask) is added to the sparse matrix's bytes before anything is packed. If the total goes
+over `max_live_bytes`, the batch is **declined** to the generic route, which then runs under its
+own budget, so choosing packing never refuses a computation the generic route admits. A crossing
+during write-back is refused as `TooManyNonzeros` or `TooManyLiveBytes`. Tests:
+`grobner::f4::packed::tests` (identical bases across three orders on dense and sparse Boolean
+systems; per-batch candidates including rank-deficient and candidate-free batches; empty and
+all-pivot batches; fallback for odd characteristic, a non-binary `GF(2^8)` coefficient and echelon
+output; byte decline at the exact admitted budget; entry refusal at exactly the reported peak; a
+budget the generic route refuses stays refused; the dispatch rule) and `linalg::gf2::tests`.
+
+### 7.1 Per batch: where the threshold comes from
+
+`gf2_f4_dispatch batches 5`: every batch of each instance, replayed under both routes. The times are
+F4's elimination stage (`measure_stages`), conversion included, minimum of 5 interleaved
+repetitions. "auto picks" is the shipped rule applied to each row (recomputed from the row; the binary printed the first rule tried). The table was taken at `21acc4db`, whose
+packed route is byte-identical to `db5c5c05`'s; only the rule changed between them.
+
+| instance | batch | rows | reducer rows | pair rows | columns | entries | density ppm | generic us | packed us | generic/packed | auto picks |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| mq-10 | 0 | 22 | 10 | 12 | 64 | 233 | 165483 | 3.5 | 2.6 | 1.33x | generic |
+| mq-10 | 1 | 221 | 137 | 84 | 281 | 2620 | 42189 | 213.9 | 59.4 | 3.60x | packed |
+| mq-10 | 2 | 1094 | 380 | 714 | 706 | 23380 | 30271 | 2521.4 | 840.8 | 3.00x | packed |
+| mq-10 | 3 | 120 | 10 | 110 | 66 | 346 | 43687 | 8.7 | 19.2 | 0.45x | generic |
+| mq-10 | 4 | 169 | 45 | 124 | 108 | 1593 | 87278 | 40.2 | 33.6 | 1.20x | generic |
+| mq-12 | 0 | 27 | 9 | 18 | 83 | 377 | 168228 | 7.3 | 4.3 | 1.68x | generic |
+| mq-12 | 1 | 315 | 211 | 104 | 447 | 5711 | 40560 | 528.9 | 112.5 | 4.70x | packed |
+| mq-12 | 2 | 1817 | 861 | 956 | 1353 | 73183 | 29769 | 13930.8 | 2275.4 | 6.12x | packed |
+| mq-12 | 3 | 163 | 13 | 150 | 91 | 721 | 48608 | 17.3 | 30.6 | 0.56x | generic |
+| mq-12 | 4 | 550 | 66 | 484 | 243 | 4693 | 35114 | 327.4 | 181.0 | 1.81x | packed |
+| mq-12 | 5 | 68 | 0 | 68 | 34 | 68 | 29412 | 2.6 | 7.1 | 0.36x | generic |
+| mq-13 | 0 | 31 | 13 | 18 | 103 | 500 | 156593 | 8.9 | 5.0 | 1.76x | generic |
+| mq-13 | 1 | 372 | 254 | 118 | 558 | 7495 | 36107 | 846.9 | 152.5 | 5.55x | packed |
+| mq-13 | 2 | 2350 | 1230 | 1120 | 1906 | 117792 | 26298 | 34057.4 | 3853.1 | 8.84x | packed |
+| mq-13 | 3 | 186 | 16 | 170 | 105 | 902 | 46185 | 22.2 | 37.9 | 0.59x | generic |
+| mq-13 | 4 | 812 | 78 | 734 | 333 | 7770 | 28736 | 613.0 | 362.9 | 1.69x | packed |
+| mq-13 | 5 | 176 | 4 | 172 | 94 | 366 | 22123 | 11.0 | 32.6 | 0.34x | generic |
+| overdetermined-mq-14 | 0 | 62 | 12 | 50 | 120 | 1504 | 202151 | 47.3 | 14.6 | 3.25x | generic |
+| overdetermined-mq-14 | 1 | 672 | 334 | 338 | 672 | 19194 | 42504 | 3939.3 | 501.4 | 7.86x | packed |
+| overdetermined-mq-14 | 2 | 1036 | 252 | 784 | 564 | 27030 | 46260 | 4003.7 | 770.3 | 5.20x | packed |
+| overdetermined-mq-14 | 3 | 224 | 14 | 210 | 120 | 2084 | 77530 | 83.1 | 53.4 | 1.56x | generic |
+| overdetermined-mq-14 | 4 | 113 | 49 | 64 | 82 | 935 | 100907 | 15.0 | 16.6 | 0.91x | generic |
+| overdetermined-mq-16 | 0 | 69 | 15 | 54 | 153 | 2189 | 207351 | 87.6 | 20.9 | 4.18x | packed |
+| overdetermined-mq-16 | 1 | 874 | 466 | 408 | 965 | 32798 | 38887 | 9403.0 | 855.2 | 10.99x | packed |
+| overdetermined-mq-16 | 2 | 6958 | 1298 | 5660 | 3146 | 416135 | 19010 | 207326.7 | 26361.1 | 7.86x | packed |
+| overdetermined-mq-16 | 3 | 288 | 16 | 272 | 153 | 1993 | 45230 | 81.6 | 81.4 | 1.00x | packed |
+| overdetermined-mq-16 | 4 | 608 | 104 | 504 | 357 | 16224 | 74746 | 743.8 | 291.9 | 2.55x | packed |
+| sparse-mq-12 | 0 | 19 | 7 | 12 | 33 | 67 | 106858 | 2.0 | 2.1 | 0.96x | generic |
+| sparse-mq-12 | 1 | 9 | 3 | 6 | 12 | 22 | 203704 | 0.8 | 1.0 | 0.76x | generic |
+| sparse-mq-12 | 2 | 202 | 102 | 100 | 244 | 770 | 15622 | 43.4 | 44.2 | 0.98x | generic |
+| sparse-mq-12 | 3 | 443 | 129 | 314 | 311 | 2239 | 16251 | 131.8 | 169.3 | 0.78x | generic |
+| sparse-mq-12 | 4 | 135 | 13 | 122 | 76 | 304 | 29630 | 8.8 | 24.2 | 0.37x | generic |
+| sparse-mq-12 | 5 | 90 | 36 | 54 | 64 | 217 | 37674 | 5.2 | 9.5 | 0.55x | generic |
+| cyclic-8 | 0 | 18 | 14 | 4 | 44 | 96 | 121212 | 1.6 | 1.6 | 0.99x | generic |
+| cyclic-8 | 1 | 44 | 38 | 6 | 86 | 214 | 56554 | 4.1 | 3.6 | 1.15x | generic |
+| cyclic-8 | 2 | 153 | 125 | 28 | 192 | 936 | 31863 | 20.1 | 16.9 | 1.19x | packed |
+| cyclic-8 | 3 | 168 | 112 | 56 | 179 | 1286 | 42764 | 37.8 | 27.0 | 1.40x | packed |
+| cyclic-8 | 4 | 166 | 96 | 70 | 157 | 1094 | 41977 | 32.5 | 26.5 | 1.23x | packed |
+| cyclic-8 | 5 | 145 | 63 | 82 | 119 | 860 | 49841 | 22.0 | 22.9 | 0.96x | generic |
+| cyclic-8 | 6 | 236 | 214 | 22 | 246 | 1322 | 22771 | 19.9 | 23.4 | 0.85x | packed |
+| cyclic-8 | 7 | 253 | 251 | 2 | 273 | 1212 | 17548 | 14.1 | 16.4 | 0.86x | generic |
+| cyclic-8 | 8 | 258 | 256 | 2 | 277 | 1100 | 15392 | 14.0 | 16.4 | 0.86x | generic |
+| cyclic-8 | 9 | 200 | 198 | 2 | 216 | 830 | 19213 | 12.8 | 12.1 | 1.06x | generic |
+| cyclic-8 | 10 | 55 | 41 | 14 | 70 | 216 | 56104 | 4.4 | 5.0 | 0.88x | generic |
+| cyclic-8 | 11 | 34 | 18 | 16 | 27 | 80 | 87146 | 2.0 | 3.1 | 0.66x | generic |
+| cyclic-8 | 12 | 71 | 33 | 38 | 53 | 320 | 85039 | 6.7 | 7.5 | 0.89x | generic |
+| cyclic-8 | 13 | 5 | 3 | 2 | 5 | 10 | 400000 | 0.4 | 0.6 | 0.62x | generic |
+| cyclic-9 | 0 | 20 | 16 | 4 | 54 | 117 | 108333 | 1.8 | 1.8 | 1.00x | generic |
+| cyclic-9 | 1 | 51 | 45 | 6 | 113 | 272 | 47198 | 5.0 | 4.0 | 1.25x | generic |
+| cyclic-9 | 2 | 210 | 182 | 28 | 294 | 1486 | 24069 | 43.2 | 25.6 | 1.69x | packed |
+| cyclic-9 | 3 | 561 | 425 | 136 | 581 | 6139 | 18835 | 407.9 | 183.4 | 2.22x | packed |
+| cyclic-9 | 4 | 253 | 189 | 64 | 282 | 2664 | 37339 | 84.0 | 45.0 | 1.87x | packed |
+| cyclic-9 | 5 | 289 | 161 | 128 | 270 | 3122 | 40010 | 157.3 | 78.3 | 2.01x | packed |
+| cyclic-9 | 6 | 238 | 110 | 128 | 201 | 1706 | 35662 | 63.5 | 49.7 | 1.28x | packed |
+| cyclic-9 | 7 | 577 | 323 | 254 | 447 | 6439 | 24965 | 392.4 | 218.3 | 1.80x | packed |
+| cyclic-9 | 8 | 494 | 492 | 2 | 529 | 3878 | 14840 | 32.3 | 38.1 | 0.85x | generic |
+| cyclic-9 | 9 | 551 | 549 | 2 | 586 | 3895 | 12063 | 35.0 | 41.8 | 0.84x | generic |
+| cyclic-9 | 10 | 545 | 543 | 2 | 580 | 3666 | 11598 | 34.8 | 40.2 | 0.87x | generic |
+| cyclic-9 | 11 | 411 | 409 | 2 | 446 | 2535 | 13829 | 30.3 | 28.1 | 1.08x | generic |
+
+Density alone does not separate the two sides, and the first rule tried (2% density, 64 columns)
+got both ends wrong. Every batch the packed route lost by more than 15% was either **under two
+words wide** (66–105 columns, 0.34x–0.59x, under 25 µs each) or a **two-pair-row batch** against
+hundreds of reducers (cyclic-8/9's late batches, 0.84x–0.87x), where the route is pure
+conversion. The rule admits one measured loss: cyclic-8's batch 6 (22 pair rows, 0.85x, 3.5 µs). Overdetermined-MQ-16's 6958x3146 batch is only 1.9% dense and is the largest win
+(7.9x, 181 ms saved). Shipped rule (`Gf2Elimination::prefers_packed`): **at least 128 columns, at
+least 16 pair rows, and at least 18 000 ppm density.** The density margin is narrow and is stated
+rather than hidden: sparse-MQ-12's two largest batches (1.56%, 1.63%) lose at 0.98x and 0.78x and stay
+generic, while cyclic-9's 1.88% batch wins at 2.2x and packs. A family sitting between 1.6% and
+1.9% could land on the wrong side.
+
+### 7.2 End to end
+
+`gf2_f4_dispatch solve 21`: whole F4 solves under each setting, minimum of 21 interleaved
+repetitions, bases asserted equal to `Generic` in every one. "elim" is the summed elimination stage.
+A 7-repetition run at the same commit agreed within 5% on every row (sparse-MQ-12 read 0.95x there
+and 1.00x here, with no batch packed in either, so that gap is noise).
+
+| instance | basis | batches | generic ms | generic elim ms | auto ms | auto packed batches | auto elim ms | packed ms | packed elim ms | generic/auto | generic/packed |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mq-10 | 10 | 5 | 5.51 | 2.84 | 3.60 | 2 | 0.99 | 3.58 | 0.98 | **1.53x** | 1.54x |
+| mq-12 | 13 | 6 | 25.39 | 14.69 | 13.01 | 3 | 2.60 | 13.06 | 2.59 | **1.95x** | 1.94x |
+| mq-13 | 16 | 6 | 54.35 | 33.42 | 25.68 | 3 | 4.51 | 24.88 | 4.42 | **2.12x** | 2.18x |
+| overdetermined-mq-14 | 14 | 5 | 18.43 | 8.02 | 11.66 | 2 | 1.48 | 10.64 | 1.33 | **1.58x** | 1.73x |
+| overdetermined-mq-16 | 16 | 5 | 249.33 | 209.48 | 64.38 | 5 | 25.22 | 62.14 | 24.42 | **3.87x** | 4.01x |
+| sparse-mq-12 | 12 | 6 | 1.97 | 0.22 | 1.96 | 0 | 0.22 | 1.97 | 0.28 | **1.00x** | 1.00x |
+| cyclic-8 | 8 | 14 | 1.16 | 0.27 | 1.13 | 4 | 0.24 | 1.13 | 0.25 | **1.03x** | 1.02x |
+| cyclic-9 | 1 | 12 | 4.51 | 1.40 | 3.89 | 6 | 0.84 | 3.89 | 0.87 | **1.16x** | 1.16x |
+
+**Measured, not projected:** the dispatch is worth **1.5x–2.2x on dense MQ-10..13, 1.6x on
+overdetermined MQ-14 and 3.9x on overdetermined MQ-16**, all above §3's projection (1.36x–3.41x),
+because the structured route does less work than the full RREF the projection substituted. The
+sparse controls do **not** regress: sparse-MQ-12 packs nothing (1.00x), and cyclic-8/9 pack 4 and 6
+of their batches for 1.03x and 1.16x. `Packed` everywhere is close to `Auto` on these families
+(within 9%), so the rule's job is protecting the sparse controls, not finding the wins. Hence
+`Auto` is the default, and `F4Options::baseline()` keeps `Generic`.
+
+Not measured here: the two-binary A/B of `main` against this branch at defaults. The `Generic` arm
+runs the same code as before, with only the closure around it reshaped, and the in-binary arms
+isolate the dispatch alone. Multicore XOR, cache blocking, GF(2^e) slicing and M4RI as a comparand
+are still out of scope (§6).

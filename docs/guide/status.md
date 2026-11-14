@@ -13,6 +13,8 @@ A running record of what Zeebra implements. The short version is in the [README]
 - [x] Sparse Linear Algebra over Finite Fields
 - [x] F4 Grobner Bases
 - [x] Gebauer-Moller and chain criteria, structured elimination, adaptive linear algebra
+- [x] Bit-packed GF(2) elimination in F4 behind a density dispatch: 1.5x–3.9x on dense Boolean MQ,
+      sparse controls unchanged ([#777](../research/characteristic-two-linear-algebra.md))
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] That oracle over an extension field: a differential case names a field rather than a
