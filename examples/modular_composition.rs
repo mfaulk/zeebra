@@ -8,8 +8,9 @@
 //!   cost inside a distinct-degree loop) at the default `m = ceil(sqrt n)` baby steps and at `4m`,
 //!   by one-shot `compose_mod`, and by Horner (n ≤ 729). The default composer's construction is
 //!   reported separately.
-//! - `factor`: whole `factorize` on a random polynomial of degree n, each `FrobeniusRoute` forced.
-//!   The two routes' factorizations are compared and the run aborts if they differ.
+//! - `factor`: whole `factorize`, each `FrobeniusRoute` forced, on a random polynomial of degree n
+//!   (many Frobenius applications) and on `n - 2` linear factors times an irreducible quadratic
+//!   (one application). The routes' factorizations are compared and the run aborts if they differ.
 //!
 //! Arms are interleaved within each repetition, with the order rotated per repetition; the figure
 //! is the median over repetitions, with the minimum beside it.
@@ -27,8 +28,8 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     compose_mod, compose_mod_horner, factorize_with_route_unstable,
     fields::{Bn254Fr, KoalaBear, PrimeFieldElement64},
-    pow_mod_limbs_unstable, FrobeniusRoute, KnownOrder, ModularComposer, Polynomial,
-    UnivariatePolynomial,
+    is_irreducible, pow_mod_limbs_unstable, FrobeniusRoute, KnownOrder, ModularComposer,
+    Polynomial, UnivariatePolynomial,
 };
 
 /// Goldilocks, `2^64 - 2^32 + 1`.
@@ -173,12 +174,41 @@ fn steps<F: KnownOrder>(field: &str, options: &Options) {
     }
 }
 
-fn factor<F: KnownOrder>(field: &str, n: usize, options: &Options) {
+/// A random polynomial of degree n: the distinct-degree loop runs to about its largest factor.
+fn random_polynomial<F: KnownOrder>(n: usize) -> UnivariatePolynomial<F> {
+    let mut rng = StdRng::seed_from_u64(1000 + n as u64);
+    UnivariatePolynomial::<F>::rand(n as u64, &mut rng)
+}
+
+/// `n - 2` linear factors times an irreducible quadratic: the distinct-degree loop applies the
+/// Frobenius map once and stops, so a composer built for it is never repaid.
+fn few_applications<F: KnownOrder>(n: usize) -> UnivariatePolynomial<F> {
+    let mut rng = StdRng::seed_from_u64(2000 + n as u64);
+    let zeros: Vec<F> = (0..n - 2).map(|_| F::random(&mut rng)).collect();
+    let quadratic = (2u64..)
+        .map(|c| UnivariatePolynomial::new(&[F::zero() - F::new(c), F::zero(), F::one()]))
+        .find(is_irreducible)
+        .expect("some x^2 - c is irreducible in odd characteristic");
+    &UnivariatePolynomial::from_zeros(&zeros) * &quadratic
+}
+
+const ROUTES: [FrobeniusRoute; 3] = [
+    FrobeniusRoute::PowMod,
+    FrobeniusRoute::Composition,
+    FrobeniusRoute::Auto,
+];
+
+fn factor<F: KnownOrder>(
+    field: &str,
+    label: &str,
+    n: usize,
+    make: fn(usize) -> UnivariatePolynomial<F>,
+    options: &Options,
+) {
     if !options.wants(field) || n < options.min_n || n > options.max_n {
         return;
     }
-    let mut rng = StdRng::seed_from_u64(1000 + n as u64);
-    let f = UnivariatePolynomial::<F>::rand(n as u64, &mut rng);
+    let f = make(n);
 
     let key = |factors: Vec<(UnivariatePolynomial<F>, usize)>| {
         let mut keyed: Vec<(u32, String, usize)> = factors
@@ -193,39 +223,45 @@ fn factor<F: KnownOrder>(field: &str, n: usize, options: &Options) {
         &mut StdRng::seed_from_u64(1),
         FrobeniusRoute::PowMod,
     ));
-    let other = key(factorize_with_route_unstable(
-        &f,
-        &mut StdRng::seed_from_u64(2),
-        FrobeniusRoute::Composition,
-    ));
-    assert_eq!(reference, other, "routes disagree at n={n}");
-    let degrees: Vec<u32> = reference.iter().map(|(d, _, _)| *d).collect();
+    for (seed, route) in ROUTES.iter().enumerate().skip(1) {
+        let other = key(factorize_with_route_unstable(
+            &f,
+            &mut StdRng::seed_from_u64(2 + seed as u64),
+            *route,
+        ));
+        assert_eq!(reference, other, "{route:?} disagrees at n={n}");
+    }
+    let mut degrees: Vec<u32> = reference.iter().map(|(d, _, _)| *d).collect();
+    degrees.dedup();
+    let largest = degrees.last().copied().unwrap_or(0);
 
-    let mut sink = 0usize;
-    let mut by_pow_mod = || {
+    let mut sinks = [0usize; 3];
+    let [s0, s1, s2] = &mut sinks;
+    let run = |route: FrobeniusRoute, sink: &mut usize| {
         let mut rng = StdRng::seed_from_u64(3);
-        sink ^= factorize_with_route_unstable(&f, &mut rng, FrobeniusRoute::PowMod).len();
+        *sink ^= factorize_with_route_unstable(&f, &mut rng, route).len();
     };
-    let mut sink2 = 0usize;
-    let mut by_composition = || {
-        let mut rng = StdRng::seed_from_u64(3);
-        sink2 ^= factorize_with_route_unstable(&f, &mut rng, FrobeniusRoute::Composition).len();
-    };
+    let mut a = || run(ROUTES[0], s0);
+    let mut b = || run(ROUTES[1], s1);
+    let mut c = || run(ROUTES[2], s2);
     let reps = if n > 100 {
         options.reps.min(3)
     } else {
         options.reps
     };
-    let mut samples = interleaved(&mut [&mut by_pow_mod, &mut by_composition], reps);
-    let (pow_mod_median, pow_mod_min) = summary(&mut samples[0]);
-    let (composition_median, composition_min) = summary(&mut samples[1]);
+    let mut samples = interleaved(&mut [&mut a, &mut b, &mut c], reps);
+    let row: Vec<(Duration, Duration)> = samples.iter_mut().map(|s| summary(s)).collect();
     println!(
-        "| {field} | {n} | {degrees:?} | {reps} | {} ({}) | {} ({}) | {:.2}x |",
-        ms(pow_mod_median),
-        ms(pow_mod_min),
-        ms(composition_median),
-        ms(composition_min),
-        pow_mod_median.as_secs_f64() / composition_median.as_secs_f64(),
+        "| {field} | {label} | {n} | {} | {largest} | {reps} | {} ({}) | {} ({}) | {} ({}) | {:.2}x | {:.2}x |",
+        reference.len(),
+        ms(row[0].0),
+        ms(row[0].1),
+        ms(row[1].0),
+        ms(row[1].1),
+        ms(row[2].0),
+        ms(row[2].1),
+        row[0].0.as_secs_f64() / row[1].0.as_secs_f64(),
+        row[0].0.as_secs_f64() / row[2].0.as_secs_f64(),
     );
 }
 
@@ -263,16 +299,25 @@ fn main() {
             steps::<Bn254Fr>("BN254 Fr", &options);
         }
         "factor" => {
-            println!("factorize on a random polynomial, ms: median (min)");
+            println!("whole factorize per Frobenius route, ms: median (min)");
             println!(
-                "| field | n | factor degrees | reps | PowMod route | Composition route | PowMod / Composition |"
+                "| field | input | n | distinct factors | largest factor degree | reps | PowMod | Composition | Auto | PowMod / Composition | PowMod / Auto |"
             );
-            println!("|---|---:|---|---:|---:|---:|---:|");
+            println!("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
             for n in [81, 729] {
-                factor::<KoalaBear>("KoalaBear", n, &options);
+                factor::<KoalaBear>("KoalaBear", "random", n, random_polynomial, &options);
             }
-            factor::<Goldilocks>("Goldilocks", 81, &options);
-            factor::<Bn254Fr>("BN254 Fr", 81, &options);
+            factor::<Goldilocks>("Goldilocks", "random", 81, random_polynomial, &options);
+            factor::<Bn254Fr>("BN254 Fr", "random", 81, random_polynomial, &options);
+            for n in [729, 6561] {
+                factor::<KoalaBear>(
+                    "KoalaBear",
+                    "n-2 linear x quadratic",
+                    n,
+                    few_applications,
+                    &options,
+                );
+            }
         }
         other => panic!("unknown mode {other}; expected steps or factor"),
     }

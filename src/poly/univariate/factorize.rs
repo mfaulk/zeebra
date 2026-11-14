@@ -19,6 +19,7 @@
 use rand::{CryptoRng, RngCore};
 
 use crate::{
+    integers::highest_set_bit,
     poly::univariate::{
         gcd, pow_mod, pow_mod::pow_mod_limbs, ModularComposer, Polynomial, UnivariatePolynomial,
     },
@@ -88,11 +89,16 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FrobeniusRoute {
     /// `pow_mod` by `q` every time: `~1.5·log2 q` modular multiplications per application.
-    #[default]
     PowMod,
-    /// Brent–Kung composition with `x^q mod h`: `~sqrt(deg h)` modular multiplications and one
-    /// dense `sqrt(n) × sqrt(n) × n` matrix product per application.
+    /// Brent–Kung composition with `x^q mod h` from the first application: `~sqrt(deg h)` modular
+    /// multiplications and one dense matrix product per application, the baby steps growing as
+    /// the applications accumulate.
     Composition,
+    /// `pow_mod` until its accumulated cost reaches the cost of a composer that would beat it per
+    /// application, then composition. Bounds the loss when only a few applications follow, which
+    /// is where a narrow field at high degree would otherwise pay for a composer it never repays.
+    #[default]
+    Auto,
 }
 
 /// [`factorize`] with the Frobenius route forced. Measurement and differential-testing hook.
@@ -268,11 +274,11 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
     // worth building. g divides the polynomial `x_to_the_q` was reduced by, so reducing it again
     // modulo g gives x^q mod g without a fresh exponentiation.
     let odd_characteristic = F::characteristic_limbs() != [2];
-    let mut frobenius = match (route.route, route.x_to_the_q) {
-        (FrobeniusRoute::Composition, Some(x_to_the_q)) if odd_characteristic && d > 1 => {
-            Frobenius::new(FrobeniusRoute::Composition, &(x_to_the_q % g), g)
+    let mut frobenius = match route.x_to_the_q {
+        Some(x_to_the_q) if odd_characteristic && d > 1 => {
+            Frobenius::new(route.route, &(x_to_the_q % g), g)
         }
-        _ => Frobenius::PowMod(g.clone()),
+        _ => Frobenius::new(FrobeniusRoute::PowMod, g, g),
     };
 
     for _ in 0..MAX_SPLIT_ATTEMPTS {
@@ -330,11 +336,13 @@ fn frobenius_norm<F: KnownOrder>(
 }
 
 /// `p ↦ p^q mod h` for one fixed `h`, by the chosen route.
-enum Frobenius<F: FiniteField> {
-    /// The modulus `h`.
-    PowMod(UnivariatePolynomial<F>),
-    /// Composition with `x^q mod h`, and how many times it has been applied.
-    Composition(ModularComposer<F>, usize),
+struct Frobenius<F: FiniteField> {
+    route: FrobeniusRoute,
+    modulus: UnivariatePolynomial<F>,
+    x_to_the_q: UnivariatePolynomial<F>,
+    /// Built on first need, so a loop that stops before applying the map pays nothing for it.
+    composer: Option<ModularComposer<F>>,
+    uses: usize,
 }
 
 /// The composer's baby-step table is not grown past this many bytes.
@@ -346,34 +354,82 @@ impl<F: KnownOrder> Frobenius<F> {
         x_to_the_q: &UnivariatePolynomial<F>,
         modulus: &UnivariatePolynomial<F>,
     ) -> Self {
-        match route {
-            FrobeniusRoute::PowMod => Self::PowMod(modulus.clone()),
-            FrobeniusRoute::Composition => {
-                Self::Composition(ModularComposer::new(x_to_the_q, modulus), 0)
-            }
+        Self {
+            route,
+            modulus: modulus.clone(),
+            x_to_the_q: x_to_the_q.clone(),
+            composer: None,
+            uses: 0,
         }
     }
 
     fn apply(&mut self, p: &UnivariatePolynomial<F>) -> UnivariatePolynomial<F> {
-        match self {
-            Self::PowMod(modulus) => pow_mod_limbs(p, F::order_limbs(), modulus),
-            Self::Composition(composer, uses) => {
-                // With m baby steps a composition pays about n/m modular multiplications, and
-                // doubling m costs m of them once and saves n/(2m) per use thereafter. Taking the
-                // uses so far as the forecast of the uses to come, doubling pays once they reach
-                // 2m²/n. The number of uses is not known up front — the distinct-degree loop stops
-                // as soon as the factor degrees add up — hence growing rather than sizing.
-                let n = composer.modulus().degree() as usize;
-                let m = composer.block();
-                let fits = 2 * m * n * std::mem::size_of::<F>() <= MAX_BABY_STEP_BYTES;
-                if n > 0 && 2 * m <= n && fits && *uses * n >= 2 * m * m {
-                    composer.grow_to(2 * m);
+        let n = self.modulus.degree() as usize;
+        let uses = self.uses;
+        self.uses += 1;
+
+        if self.composer.is_none() {
+            let block = match self.route {
+                FrobeniusRoute::PowMod => None,
+                FrobeniusRoute::Composition => Some(block_cap::<F>(n, ceil_sqrt(n))),
+                FrobeniusRoute::Auto => {
+                    // Every unit below is one modular multiplication. A composer with m baby steps
+                    // costs m to build and about n/m per application, against `pow_cost` per
+                    // application by `pow_mod`; sized so that n/m is at most half of `pow_cost`,
+                    // it wins per application. Renting (`pow_mod`) until the rent paid reaches the
+                    // purchase price, then buying, costs at most twice whichever would have been
+                    // cheaper in hindsight.
+                    let pow_cost = square_and_multiply_cost(F::order_limbs());
+                    let block = block_cap::<F>(n, ceil_sqrt(n).max((2 * n).div_ceil(pow_cost)));
+                    (uses * pow_cost >= block).then_some(block)
                 }
-                *uses += 1;
-                composer.compose(p)
+            };
+            match block {
+                Some(block) => {
+                    self.composer = Some(ModularComposer::with_block(
+                        &self.x_to_the_q,
+                        &self.modulus,
+                        block,
+                    ))
+                }
+                None => return pow_mod_limbs(p, F::order_limbs(), &self.modulus),
             }
         }
+
+        let composer = self.composer.as_mut().expect("built above");
+        // With m baby steps a composition pays about n/m modular multiplications, and doubling m
+        // costs m of them once and saves n/(2m) per use thereafter. Taking the uses so far as the
+        // forecast of the uses to come, doubling pays once they reach 2m²/n. The number of uses is
+        // not known up front — the distinct-degree loop stops as soon as the factor degrees add up
+        // — hence growing rather than sizing.
+        let m = composer.block();
+        if 2 * m <= block_cap::<F>(n, 2 * m) && uses * n >= 2 * m * m {
+            composer.grow_to(2 * m);
+        }
+        composer.compose(p)
     }
+}
+
+/// `block` baby steps, but no more than `n` of them and none past `MAX_BABY_STEP_BYTES`.
+fn block_cap<F>(n: usize, block: usize) -> usize {
+    let by_memory = MAX_BABY_STEP_BYTES / (n.max(1) * std::mem::size_of::<F>()).max(1);
+    block.min(n).min(by_memory).max(1)
+}
+
+fn ceil_sqrt(n: usize) -> usize {
+    let mut m = (n as f64).sqrt() as usize;
+    while m * m < n {
+        m += 1;
+    }
+    m
+}
+
+/// Modular multiplications `pow_mod` spends on the exponent `limbs`: one squaring per bit after
+/// the first, one multiplication per set bit after the first.
+fn square_and_multiply_cost(limbs: &[u64]) -> usize {
+    let bits = highest_set_bit(limbs).map_or(0, |b| b + 1);
+    let ones: usize = limbs.iter().map(|l| l.count_ones() as usize).sum();
+    (bits + ones).saturating_sub(2).max(1)
 }
 
 /// The absolute trace `h + h^2 + h^4 + ... + h^(2^(m*d - 1))` in F[x]/(g), for q = 2^m.
@@ -755,7 +811,19 @@ mod tests {
         assert_eq!(characteristic_two_degree::<PrimeFieldElement64<2>>(), 1);
     }
 
-    /// The composition Frobenius route returns the same factorization as the `pow_mod` route.
+    /// The square-and-multiply cost counts squarings after the top bit and multiplications after
+    /// the first set bit.
+    #[test]
+    fn test_square_and_multiply_cost() {
+        use crate::poly::univariate::factorize::square_and_multiply_cost;
+        assert_eq!(square_and_multiply_cost(&[7]), 4);
+        assert_eq!(square_and_multiply_cost(&[8]), 3);
+        assert_eq!(square_and_multiply_cost(&[1]), 1);
+        // 2^64 + 1: 64 squarings and one multiplication.
+        assert_eq!(square_and_multiply_cost(&[1, 1]), 65);
+    }
+
+    /// The composition and automatic Frobenius routes return the same factorization as `pow_mod`.
     #[test]
     fn test_composition_route_agrees_with_pow_mod_route() {
         use crate::{
