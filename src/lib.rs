@@ -52,8 +52,9 @@ pub use poly::{
     multiply_multivariate_sorted_unstable, multiply_multivariate_unstable,
     multivariate_multiply_route_unstable, newton_crossover_unstable, newton_floor_unstable,
     newton_is_cheaper_at_unstable, newton_is_cheaper_unstable, product_of_factors_unstable,
-    subproduct_evaluate_unstable, subproduct_interpolate_unstable, tree_crossover_unstable,
-    MultiplyRoute,
+    subproduct_evaluate_unstable, subproduct_interpolate_unstable,
+    transform_tree_interpolate_unstable, tree_crossover_unstable, MultiplyRoute, TransformKernel,
+    TransformTree,
 };
 pub use poly::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,

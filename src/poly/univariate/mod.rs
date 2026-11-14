@@ -42,6 +42,9 @@ pub use subproduct_tree::{
     from_zeros_crossover_unstable, product_of_factors_unstable, subproduct_evaluate_unstable,
     subproduct_interpolate_unstable, tree_crossover_unstable,
 };
+#[doc(hidden)]
+pub use transform_tree::{transform_tree_interpolate_unstable, TransformKernel, TransformTree};
+mod transform_tree;
 mod univariate_parser;
 
 use crate::FiniteField;

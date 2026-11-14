@@ -27,9 +27,9 @@
 //! [`crate::KnownOrder`] and randomness, which the same issue's Scope rules out ("`KnownOrder` is
 //! not required ... the bound should stay `FiniteField`"). #559 settled those competing
 //! requirements in favour of the bound: the criterion now asks for the multiplication exponent,
-//! which the measured ~1.6 meets. Everything here needs nothing of the field but a ring. #606 holds
-//! the deferred `KnownOrder` specialization, which would have to sit beside this path rather than
-//! replace it — Mersenne-31 has two-adicity 1, so Karatsuba is the only route that field has.
+//! which the measured ~1.6 meets. Everything here needs nothing of the field but a ring. The
+//! `KnownOrder` transform arm (#606) is [`super::transform_tree`], beside this path rather than
+//! replacing it — Mersenne-31 has two-adicity 1, so Karatsuba is the only route that field has.
 //!
 //! # The three algorithms
 //!
