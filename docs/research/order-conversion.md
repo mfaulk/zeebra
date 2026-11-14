@@ -12,10 +12,11 @@ conversion are, what each would cost **here**, and whether
 [`MILESTONE-FGLM-SCALABILITY.md`](../MILESTONE-FGLM-SCALABILITY.md) §8.5's recorded no-go on a
 sparse-FGLM milestone should stand, narrow, or reverse.
 
-**Measured at:** not measured here — every timing and memory figure is quoted from the document
-cited beside it, and that document declares its own era. The one new result, §4's shape position on
-Anemoi, is an algebraic fact (a minimal-polynomial degree against a quotient dimension) and carries
-no clock. The audit that re-read every figure below is pinned to `741c85d9`.
+**Measured at:** `a0ddb56d` for §6.2.1 only, the one table timed here (#614). Every other timing
+and memory figure is quoted from the document cited beside it, and that document declares its own
+era. §4's shape position on Anemoi is an algebraic fact (a minimal-polynomial degree against a
+quotient dimension) and carries no clock. The audit that re-read every other figure below is pinned
+to `741c85d9`.
 
 `anemoi.md` and `additional-benchmarks.md`, cited throughout, were moved out with the cryptanalysis
 research in #668; they are preserved at commit 9532a9a2, and the section numbers cited below refer to
@@ -33,7 +34,7 @@ names.
 | E | Krylov/Wiedemann on the multiplication operator | **ranks first, and it is already [#368](https://github.com/mfaulk/zeebra/issues/368).** Nothing new is authorized here. | Table 7 again — Wiedemann is the only one of three routes that survives past `d_I = 5^6` — plus §4, which satisfies the shape-position half of #58's trigger on a real family for the first time. |
 | F | FreeLunch-style known bases, no conversion at all | **no, and already recorded.** | [`griffin-freelunch.md`](griffin-freelunch.md) §4.2: FreeLunch systems do not satisfy the stability property the fast change-of-order algorithms assume, and §1.3's instance is already univariate of degree 21. |
 | G | the Gröbner *walk* (not FGLM's monomial walk) | **no, and it was never on the list.** Recorded because the word collides with "lex walk" and the collision is a trap. | [`singular-engine-notes.md`](singular-engine-notes.md) §7: usually slower than FGLM where FGLM applies. Its value is the positive-dimensional case, which is a capability question and not this one. |
-| H | compute the lex basis directly with F4, skipping conversion | **already the default where it wins; the headroom argument against widening it is superseded** and the current ratio is unmeasured. See §6.2. | §8.5(3): planted-8's lex basis takes F4 **0.04 ms** against a 2.8 ms conversion. Against widening it, `MILESTONE-F4-OPTIMIZATION.md` §7.3.2 — not §6.2 — is the current lex:grevlex figure. |
+| H | compute the lex basis directly with F4, skipping conversion | **already the default where it wins; the headroom argument against widening it is superseded** — the shipped ratio is 1.8x–6.0x on the classical corpus, not 110x. See §6.2.1. | §8.5(3): planted-8's lex basis takes F4 **0.04 ms** against a 2.8 ms conversion. Against widening it, §6.2.1 — not `MILESTONE-F4-OPTIMIZATION.md` §6.2 — is the current lex:grevlex figure. |
 
 And the item #224 was required to defer to:
 
@@ -475,7 +476,9 @@ The argument against widening it has been the lex:grevlex cost ratio, and **the 
 for it is superseded.** The audit is in §6.2 below; the short form is that
 `MILESTONE-F4-OPTIMIZATION.md` §6.2's katsura-6 lex figure is an M16-0 baseline, 84% of it was the
 final interreduction, and §7.3.2 re-measures the same instance with the pair criteria that are now
-`F4Options::recommended()`'s at **23.36 ms against grevlex's 7.66 ms — 3.05x, not 110x.**
+`F4Options::recommended()`'s at **23.36 ms against grevlex's 7.66 ms — 3.05x, not 110x.** The
+shipped configuration, measured in §6.2.1, is **4.70 ms against 0.78 ms — 6.0x** at katsura-6 and
+1.8x–3.4x on the rest of the classical corpus.
 
 What that does **not** license is a claim that direct lex is now affordable on a cryptanalytic
 instance. Nobody has tried. It is one `f4` call per rung and §8 files it.
@@ -570,11 +573,50 @@ is also the M16-0 baseline**, and the same document supersedes it twice over:
 
 So the current ratio at katsura-6 is **3.05x at M16-C**, not 110x. It is not 3.05x under
 `recommended()` either, which adds `Adaptive`, `Structured`, `reduce_batch_rows` and
-`InterreductionRoute::ByOrder` on top: **the shipped lex:grevlex ratio is unmeasured.** Not
-re-derived here, per #224's instruction; §8 files the measurement.
+`InterreductionRoute::ByOrder` on top. §6.2.1 measures the shipped ratio.
 
 This matters to this survey because the 110x is the number that makes route H look hopeless, and it
 is not a current number.
+
+#### 6.2.1 The shipped ratio, measured (#614)
+
+`cargo run --release --example f4_profile -- shipped`, which is `F4Options::recommended()` — what
+`F4Options::default()` returns — with `measure_stages` on. The example's older `recommended` row is
+*not* the shipped configuration: it starts from `baseline()` and so lacks #575's
+`reduce_batch_rows` and `InterreductionRoute::ByOrder`; it is shown as the M16 control. Built at
+`a0ddb56d` plus the `shipped` row itself, `F = Zp2147483647`, `taskset -c 6`, under
+`tools/benchlock.sh` at load 1.4. One computation per cell per session, two sessions per
+configuration interleaved; every total below agreed across sessions within 3%, and the ratios to
+two figures. Totals in milliseconds.
+
+| system | lex | grlex | grevlex | **lex:grevlex, shipped** | lex:grevlex, M16 `recommended` | §6.2 (M16-0) |
+|---|---:|---:|---:|---:|---:|---:|
+| cyclic-4 | 0.10 | 0.06 | 0.04 | — (sub-0.1 ms) | — | — |
+| cyclic-5 | 0.98 | 0.76 | 0.56 | **1.8x** | 1.6x | 1.2x |
+| katsura-4 | 0.08 | 0.06 | 0.06 | — (sub-0.1 ms) | — | — |
+| katsura-5 | 0.45 | 0.23 | 0.21 | **2.1x** | 1.3x | 8.4x |
+| katsura-6 | 4.70 | 1.05 | 0.78 | **6.0x** | 4.3x | 110x |
+| random-4 | 0.54 | 0.17 | 0.16 | **3.4x** | — | — |
+| planted-6 | 0.03 | 0.03 | 0.02 | — (sub-0.1 ms) | — | — |
+
+katsura-7 is graded-only in the instrument, as it was in §6.2.
+
+Three readings:
+
+- **The 110x is gone, and so is the 3.05x.** The shipped lex:grevlex ratio on the classical corpus
+  is **1.8x–6.0x**, largest at katsura-6. The final interreduction that was 84% of katsura-6 lex is
+  now 0.52 of 4.70 ms (11%); symbolic preprocessing is the largest lex stage at 2.32 ms (49%).
+- **The lex cost is batch count, not matrix cost.** katsura-6 lex runs 65 batches against grevlex's
+  6, with the maximum pair degree at 37 against 7 (the example's degree-sequence table). Every
+  per-batch stage is small; there are just ten times as many of them. That is the shape a direct lex
+  route will scale with, and it is why this table does not license extrapolating 6x to a larger
+  instance.
+- **#575's pair widened the ratio it was not aimed at.** Against the M16 `recommended` control,
+  grevlex falls 3.0x on katsura-6 (2.34 → 0.78 ms) and lex 2.1x (9.95 → 4.70; 107 → 65 batches),
+  so the ratio rose from 4.3x to 6.0x even as both orders got faster.
+
+None of this measures the case route H is for — F4 in lex on a cryptanalytic rung — which moved out
+of this repository with the research (#668).
 
 ### 6.3 The operator-sparsity table in #224's thread is not in the sections it cites
 
@@ -662,9 +704,8 @@ Stated as measurements rather than as topics, because each is small and none is 
 1. **F4 in lex on an Anemoi rung.** §2's condition 2 and §5.H's open question, in one `f4` call per
    rung against the existing grevlex + FGLM path. Decides whether route H widens to the family that
    matters. Filed as [#614](https://github.com/mfaulk/zeebra/issues/614).
-2. **The shipped lex:grevlex ratio.** §6.2: the 110x is an M16-0 baseline, M16-C is 3.05x, and
-   `recommended()` is unmeasured. One `f4_profile` pass. Filed with #614, which cannot be answered
-   without it.
+2. **The shipped lex:grevlex ratio.** §6.2: the 110x is an M16-0 baseline and M16-C is 3.05x.
+   **Measured in §6.2.1 (#614): 1.8x–6.0x on the classical corpus, 6.0x at katsura-6.**
 3. **Shape position at `D = 3 125` and `D = 15 625`.** §4 reaches `D = 625`. `N = 5` is a ~47 s
    conversion per model and wants `benchlock`; `N = 6` needs #322's budgets first. Belongs to #368
    stage 1.

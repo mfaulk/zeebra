@@ -13,6 +13,7 @@
 //! ```text
 //! cargo run --release --example f4_profile                 # the baseline, every system
 //! cargo run --release --example f4_profile -- baseline     # the same, named
+//! cargo run --release --example f4_profile -- shipped      # F4Options::recommended(), as shipped (#614)
 //! cargo run --release --example f4_profile -- list         # the configurations available
 //! cargo run --release --example f4_profile -- mq           # #349: the competitive MQ split
 //! cargo run --release --example f4_profile -- mq-counts    # that stage's operation counts
@@ -123,6 +124,13 @@ fn configuration(name: &str) -> Option<F4Options> {
             elimination: Backend::Adaptive,
             ..base
         },
+        // What `F4Options::default()` ships, which `recommended` above is not: it also carries
+        // #575's batch-row reduction and by-order interreduction, and the shipped live budgets
+        // rather than the baseline's (#614).
+        "shipped" => F4Options {
+            measure_stages: true,
+            ..F4Options::recommended()
+        },
         // Everything, including what measurement rejected, for the ablation's sake.
         "abcd" => F4Options {
             reduction: ReductionStrategy::Structured,
@@ -137,7 +145,7 @@ fn configuration(name: &str) -> Option<F4Options> {
     Some(options)
 }
 
-const CONFIGURATIONS: [&str; 12] = [
+const CONFIGURATIONS: [&str; 13] = [
     "baseline",
     "a",
     "b",
@@ -149,6 +157,7 @@ const CONFIGURATIONS: [&str; 12] = [
     "ad",
     "acd",
     "recommended",
+    "shipped",
     "abcd",
 ];
 
