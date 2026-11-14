@@ -296,6 +296,7 @@ impl<F: FiniteField> DenseRows<F> {
         let start = self.lead[source];
         let end = self.tail[source];
 
+        let factor = factor.prepare_factor();
         let mut gained = 0usize;
         let mut lost = 0usize;
         {
@@ -303,7 +304,7 @@ impl<F: FiniteField> DenseRows<F> {
                 two_rows_mut(&mut self.cells, self.num_columns, target, source);
             for column in start..end {
                 let before = target_cells[column];
-                let after = before - factor * source_cells[column];
+                let after = before - source_cells[column].mul_prepared(&factor);
                 target_cells[column] = after;
 
                 let was_zero = before.is_zero();
