@@ -141,7 +141,7 @@ pub(crate) fn newton_crossover<F: FiniteField>() -> usize {
 
 /// Whether Newton inversion is the cheaper route for a quotient of length `quotient_len` against a
 /// divisor of length `divisor_len`. See the module comment for the derivation.
-fn newton_is_cheaper<F: FiniteField>(quotient_len: usize, divisor_len: usize) -> bool {
+pub(crate) fn newton_is_cheaper<F: FiniteField>(quotient_len: usize, divisor_len: usize) -> bool {
     newton_is_cheaper_within(
         quotient_len,
         divisor_len,
@@ -259,7 +259,7 @@ fn reducible<'a, F: FiniteField>(
 
 /// Long division. `(deg f - deg g + 1) * (deg g + 1)` multiplications, no allocation beyond the
 /// two outputs.
-fn divide_long<F: FiniteField>(dividend: &[F], divisor: &[F]) -> (Vec<F>, Vec<F>) {
+pub(crate) fn divide_long<F: FiniteField>(dividend: &[F], divisor: &[F]) -> (Vec<F>, Vec<F>) {
     let divisor_degree = divisor.len() - 1;
     // One inversion for the whole division rather than one division per step.
     let leading_inverse = divisor[divisor_degree].inverse();
