@@ -679,10 +679,11 @@ written out term for term) at `SMALL_PRIME_CHARACTERISTIC`:
 3. **Singular** read msolve's full basis as a standard basis and reported `vdim` = **34940** —
    its own leading-term extraction and its own count.
 
-The two counts share nothing but the basis. A contradiction would have needed a second basis
-before it was believed; an agreement with an externally published integer does not, but
-Groebner.jl was run from the same generators as a corroborating second engine and its result is
-recorded on #656.
+4. **Groebner.jl** computed the basis independently from the same generators by its own F4:
+   **5690 elements**, and its `quotient_basis` has **34940** monomials.
+
+So, as in §10.5, two engines agree on the basis size and three dimension computations agree on the
+integer, none sharing an implementation with another.
 
 **No timing is reported, and none may be** — §4 and §7, as in §10.5. The deliverable is the integer.
 Zeebra itself still does not reach this basis: its F4 refuses at the default live-entry budget
