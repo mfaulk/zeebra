@@ -2,6 +2,7 @@
 
 **Measured at:** publication bound `2b8aa354`…`43ff9fa4` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+§6.13.1 alone is measured at `a0ddb56d`.
 
 Reference for M23-E (#141), which consumes #82 and #85, continued by M24-B (#179, #211). **§1–§5
 are M23-E, with the figures it took; §6 supersedes §4 and amends §2 and §5; §6.7 supersedes §6.4's
@@ -1323,6 +1324,30 @@ which is exactly what no one could do for §6.9's table.
   find instead of one grep, and `tools/benchlock.sh` now writes `load=` on START and END.
 
 *The reproduction recipe, which builds `examples/determinant_era`, was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
+
+#### 6.13.1 The per-call extraction no longer costs 0.37 ms (#509)
+
+#509 recorded, from the difference between `determinant_era`'s per-determinant figure and the
+route's, that the two `coefficients_in` extractions inside `sylvester_determinant_at` cost about
+**0.37 ms** a call on `main` against ~0.01 ms at `93bb1c2`, with byte-identical source, and pointed at
+the multivariate term container under it — the SipHash-keyed monomial maps that PR #493 replaced.
+
+Measured directly at `a0ddb56d`, after #493, by the in-crate probe
+`grobner::resultant::extraction_cost_509::probe_extraction_cost` (ignored; `cargo test --release
+--lib extraction_cost_509 -- --ignored --nocapture`). Random dense KoalaBear bivariates, `taskset -c
+6`, under `tools/benchlock.sh` at load 1.3, best of five, two sessions agreeing within 2%:
+
+| Sylvester order | terms, f + g | both extractions | `sylvester_determinant` | `sylvester_determinant_at` |
+|---:|---:|---:|---:|---:|
+| 40 | 1 722 + 1 722 | **0.016 ms** | 0.072 ms | 0.093 ms |
+| 162 | 6 724 + 6 724 | **0.064 ms** | 3.28–3.35 ms | 3.33–3.38 ms |
+
+About 5 ns a term. At `rf2-rp2`'s ~3 400 term reads that is ~0.02 ms, the regime #509 measured at
+`93bb1c2`, not 0.37 ms; at order 162 extraction is 2% of `sylvester_determinant_at` even on a pair
+four times denser. The slowdown does not reproduce after #493, which is consistent with #509's own
+hypothesis (#164's SipHash). This is a different instrument on a synthetic pair — `rf2-rp2` moved out
+with #668 — and no pre-#493 build was timed, so it shows the cost is gone rather than attributing the
+earlier 0.37 ms to the hasher alone.
 
 ### 6.14 The budget guard costed one term of five, and #350 made that the wrong one (#410)
 

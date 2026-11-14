@@ -2198,3 +2198,57 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod extraction_cost_509 {
+    use super::{coefficients_in, sylvester_determinant, sylvester_determinant_at};
+    use crate::{fields::PrimeFieldElement64, FiniteField};
+    use rand::SeedableRng;
+    use std::time::Instant;
+
+    type Koala = PrimeFieldElement64<2_130_706_433>;
+
+    /// Prints the per-call price of the two `coefficients_in` extractions against the determinant.
+    #[test]
+    #[ignore = "a timing probe for #509, not a check"]
+    fn probe_extraction_cost() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(509);
+        for degree_y in [20u32, 81] {
+            let f = super::random_bivariate::<Koala, _>(81, degree_y, &mut rng);
+            let g = super::random_bivariate::<Koala, _>(81, degree_y, &mut rng);
+            let at = <Koala as FiniteField>::new(7);
+            let reps = 200;
+            let mut best_extract = f64::MAX;
+            let mut best_det = f64::MAX;
+            let mut best_at = f64::MAX;
+            for _ in 0..5 {
+                let start = Instant::now();
+                for _ in 0..reps {
+                    std::hint::black_box(coefficients_in(std::hint::black_box(&f), 1));
+                    std::hint::black_box(coefficients_in(std::hint::black_box(&g), 1));
+                }
+                best_extract = best_extract.min(start.elapsed().as_secs_f64() / reps as f64);
+                let (fc, gc) = (coefficients_in(&f, 1), coefficients_in(&g, 1));
+                let start = Instant::now();
+                for _ in 0..reps / 10 {
+                    std::hint::black_box(sylvester_determinant(&fc, &gc, at));
+                }
+                best_det = best_det.min(start.elapsed().as_secs_f64() / (reps / 10) as f64);
+                let start = Instant::now();
+                for _ in 0..reps / 10 {
+                    std::hint::black_box(sylvester_determinant_at(&f, &g, 1, at).unwrap());
+                }
+                best_at = best_at.min(start.elapsed().as_secs_f64() / (reps / 10) as f64);
+            }
+            println!(
+                "order={} terms={}+{} extract={:.4} ms det={:.4} ms det_at={:.4} ms",
+                2 * degree_y,
+                f.terms().len(),
+                g.terms().len(),
+                best_extract * 1e3,
+                best_det * 1e3,
+                best_at * 1e3
+            );
+        }
+    }
+}
