@@ -132,3 +132,12 @@ ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
     --output research/m28-current-baseline/native.json.gz \
     --phase native --build-commit "$BUILD_COMMIT"
 ```
+
+
+The native launch retained exactly the first two planned cells (MQ10/GF(32003), stage-off/on)
+and then refused before the M31 cell when an unrelated compiler appeared. `native.json.gz`
+preserves this 2/75 prefix and the pre-child refusal. The accepted cells are not retried or pooled
+with the four pilot observations. Five-repeat distributions, work diagnostics, all five native
+Katsura-11 attempts and the two original pilot tail cells remain incomplete. Issue #751 is open;
+its PR is draft. The [current report](../../docs/research/m28-current-baseline.md) states the blocker
+and each acceptance item's incomplete status.

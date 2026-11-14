@@ -647,5 +647,252 @@
         }
       }
     ]
+  },
+  {
+    "phase": "native",
+    "complete": false,
+    "archive_sha256": "3a733e31cf1d70ad27d322f2e950cd736676b4726ccb8004a8fa0754d6b1bd8f",
+    "identity": {
+      "commit": "9e2017806b95cbf88a904ad9213d324c2a1f5b0e",
+      "build_commit": "65734435",
+      "binary_sha256": "4686a81391ebae3ca815db1f85e41e88ce2ffc1d3cb0ec774eecc77d6048f975",
+      "cargo_lock_sha256": "ec8937ebe16fcdd94e6dfa44663616ceb2ccb098a35b6591826d9c323f61841e",
+      "cargo_config_sha256": "4149fbfd3f145b146c5dff23954d0def331ad72ca2d9d5d6b46976f8fe7786f7",
+      "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+      "machine": "trpro-5995wx",
+      "affinity": "3",
+      "build": "release;fat-LTO;one-codegen-unit;x86-64-v3;mold;system allocator;research-work;CARGO_INCREMENTAL=0;RUSTC_WRAPPER empty",
+      "topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3 ONLINE\n  0    0      0    0 0:0:0:0          yes\n  1    1      0    0 1:1:1:0          yes\n  2    2      0    0 2:2:2:0          yes\n  3    3      0    0 3:3:3:0          yes\n  4    4      0    0 4:4:4:0          yes\n  5    5      0    0 5:5:5:0          yes\n  6    6      0    0 6:6:6:0          yes\n  7    7      0    0 7:7:7:0          yes\n  8    8      0    0 8:8:8:1          yes\n  9    9      0    0 9:9:9:1          yes\n 10   10      0    0 10:10:10:1       yes\n 11   11      0    0 11:11:11:1       yes\n 12   12      0    0 12:12:12:1       yes\n 13   13      0    0 13:13:13:1       yes\n 14   14      0    0 14:14:14:1       yes\n 15   15      0    0 15:15:15:1       yes\n 16   16      0    0 16:16:16:2       yes\n 17   17      0    0 17:17:17:2       yes\n 18   18      0    0 18:18:18:2       yes\n 19   19      0    0 19:19:19:2       yes\n 20   20      0    0 20:20:20:2       yes\n 21   21      0    0 21:21:21:2       yes\n 22   22      0    0 22:22:22:2       yes\n 23   23      0    0 23:23:23:2       yes\n 24   24      0    0 24:24:24:3       yes\n 25   25      0    0 25:25:25:3       yes\n 26   26      0    0 26:26:26:3       yes\n 27   27      0    0 27:27:27:3       yes\n 28   28      0    0 28:28:28:3       yes\n 29   29      0    0 29:29:29:3       yes\n 30   30      0    0 30:30:30:3       yes\n 31   31      0    0 31:31:31:3       yes\n 32   32      0    0 32:32:32:4       yes\n 33   33      0    0 33:33:33:4       yes\n 34   34      0    0 34:34:34:4       yes\n 35   35      0    0 35:35:35:4       yes\n 36   36      0    0 36:36:36:4       yes\n 37   37      0    0 37:37:37:4       yes\n 38   38      0    0 38:38:38:4       yes\n 39   39      0    0 39:39:39:4       yes\n 40   40      0    0 40:40:40:5       yes\n 41   41      0    0 41:41:41:5       yes\n 42   42      0    0 42:42:42:5       yes\n 43   43      0    0 43:43:43:5       yes\n 44   44      0    0 44:44:44:5       yes\n 45   45      0    0 45:45:45:5       yes\n 46   46      0    0 46:46:46:5       yes\n 47   47      0    0 47:47:47:5       yes\n 48   48      0    0 48:48:48:6       yes\n 49   49      0    0 49:49:49:6       yes\n 50   50      0    0 50:50:50:6       yes\n 51   51      0    0 51:51:51:6       yes\n 52   52      0    0 52:52:52:6       yes\n 53   53      0    0 53:53:53:6       yes\n 54   54      0    0 54:54:54:6       yes\n 55   55      0    0 55:55:55:6       yes\n 56   56      0    0 56:56:56:7       yes\n 57   57      0    0 57:57:57:7       yes\n 58   58      0    0 58:58:58:7       yes\n 59   59      0    0 59:59:59:7       yes\n 60   60      0    0 60:60:60:7       yes\n 61   61      0    0 61:61:61:7       yes\n 62   62      0    0 62:62:62:7       yes\n 63   63      0    0 63:63:63:7       yes\n 64    0      0    0 0:0:0:0          yes\n 65    1      0    0 1:1:1:0          yes\n 66    2      0    0 2:2:2:0          yes\n 67    3      0    0 3:3:3:0          yes\n 68    4      0    0 4:4:4:0          yes\n 69    5      0    0 5:5:5:0          yes\n 70    6      0    0 6:6:6:0          yes\n 71    7      0    0 7:7:7:0          yes\n 72    8      0    0 8:8:8:1          yes\n 73    9      0    0 9:9:9:1          yes\n 74   10      0    0 10:10:10:1       yes\n 75   11      0    0 11:11:11:1       yes\n 76   12      0    0 12:12:12:1       yes\n 77   13      0    0 13:13:13:1       yes\n 78   14      0    0 14:14:14:1       yes\n 79   15      0    0 15:15:15:1       yes\n 80   16      0    0 16:16:16:2       yes\n 81   17      0    0 17:17:17:2       yes\n 82   18      0    0 18:18:18:2       yes\n 83   19      0    0 19:19:19:2       yes\n 84   20      0    0 20:20:20:2       yes\n 85   21      0    0 21:21:21:2       yes\n 86   22      0    0 22:22:22:2       yes\n 87   23      0    0 23:23:23:2       yes\n 88   24      0    0 24:24:24:3       yes\n 89   25      0    0 25:25:25:3       yes\n 90   26      0    0 26:26:26:3       yes\n 91   27      0    0 27:27:27:3       yes\n 92   28      0    0 28:28:28:3       yes\n 93   29      0    0 29:29:29:3       yes\n 94   30      0    0 30:30:30:3       yes\n 95   31      0    0 31:31:31:3       yes\n 96   32      0    0 32:32:32:4       yes\n 97   33      0    0 33:33:33:4       yes\n 98   34      0    0 34:34:34:4       yes\n 99   35      0    0 35:35:35:4       yes\n100   36      0    0 36:36:36:4       yes\n101   37      0    0 37:37:37:4       yes\n102   38      0    0 38:38:38:4       yes\n103   39      0    0 39:39:39:4       yes\n104   40      0    0 40:40:40:5       yes\n105   41      0    0 41:41:41:5       yes\n106   42      0    0 42:42:42:5       yes\n107   43      0    0 43:43:43:5       yes\n108   44      0    0 44:44:44:5       yes\n109   45      0    0 45:45:45:5       yes\n110   46      0    0 46:46:46:5       yes\n111   47      0    0 47:47:47:5       yes\n112   48      0    0 48:48:48:6       yes\n113   49      0    0 49:49:49:6       yes\n114   50      0    0 50:50:50:6       yes\n115   51      0    0 51:51:51:6       yes\n116   52      0    0 52:52:52:6       yes\n117   53      0    0 53:53:53:6       yes\n118   54      0    0 54:54:54:6       yes\n119   55      0    0 55:55:55:6       yes\n120   56      0    0 56:56:56:7       yes\n121   57      0    0 57:57:57:7       yes\n122   58      0    0 58:58:58:7       yes\n123   59      0    0 59:59:59:7       yes\n124   60      0    0 60:60:60:7       yes\n125   61      0    0 61:61:61:7       yes\n126   62      0    0 62:62:62:7       yes\n127   63      0    0 63:63:63:7       yes\n"
+    },
+    "limits": {
+      "child_wall_seconds": 60,
+      "rss_bytes": 2147483648,
+      "aggregate_wall_seconds": 900,
+      "output_bytes": 268435456
+    },
+    "attempts": 2,
+    "statuses": {
+      "verified": 2
+    },
+    "rows": [
+      {
+        "problem": "mq-random-10",
+        "modulus": 32003,
+        "route": "fglm",
+        "arm": "stage-off",
+        "repetitions": 1,
+        "statuses": {
+          "verified": 1
+        },
+        "outcomes": {
+          "no-base-field-point": 1
+        },
+        "completed_process_ms": {
+          "median": 1777.986678,
+          "minimum": 1777.986678,
+          "maximum": 1777.986678
+        },
+        "attempted_process_ms": {
+          "median": 1777.986678,
+          "minimum": 1777.986678,
+          "maximum": 1777.986678
+        },
+        "cpu_ms": {
+          "median": 1675.2559999999999,
+          "minimum": 1675.2559999999999,
+          "maximum": 1675.2559999999999
+        },
+        "sampled_peak_rss_bytes": {
+          "median": 55263232,
+          "minimum": 55263232,
+          "maximum": 55263232
+        },
+        "self_peak_rss_bytes": {
+          "median": 51597312,
+          "minimum": 51597312,
+          "maximum": 51597312
+        },
+        "f4_call_ms": {
+          "median": 1406.037718,
+          "minimum": 1406.037718,
+          "maximum": 1406.037718
+        },
+        "whole_route_ms": {
+          "median": 1763.464497,
+          "minimum": 1763.464497,
+          "maximum": 1763.464497
+        },
+        "checkpoint_ms": {
+          "median": 2.36106,
+          "minimum": 2.36106,
+          "maximum": 2.36106
+        },
+        "conversion_call_ms": {
+          "median": 308.11563,
+          "minimum": 308.11563,
+          "maximum": 308.11563
+        },
+        "recovery_call_ms": {
+          "median": 0.785366,
+          "minimum": 0.785366,
+          "maximum": 0.785366
+        },
+        "independent_substitution_ms": null
+      },
+      {
+        "problem": "mq-random-10",
+        "modulus": 32003,
+        "route": "fglm",
+        "arm": "stage-on",
+        "repetitions": 1,
+        "statuses": {
+          "verified": 1
+        },
+        "outcomes": {
+          "no-base-field-point": 1
+        },
+        "completed_process_ms": {
+          "median": 1647.55282,
+          "minimum": 1647.55282,
+          "maximum": 1647.55282
+        },
+        "attempted_process_ms": {
+          "median": 1647.55282,
+          "minimum": 1647.55282,
+          "maximum": 1647.55282
+        },
+        "cpu_ms": {
+          "median": 1557.9360000000001,
+          "minimum": 1557.9360000000001,
+          "maximum": 1557.9360000000001
+        },
+        "sampled_peak_rss_bytes": {
+          "median": 55570432,
+          "minimum": 55570432,
+          "maximum": 55570432
+        },
+        "self_peak_rss_bytes": {
+          "median": 51773440,
+          "minimum": 51773440,
+          "maximum": 51773440
+        },
+        "f4_call_ms": {
+          "median": 1313.946985,
+          "minimum": 1313.946985,
+          "maximum": 1313.946985
+        },
+        "whole_route_ms": {
+          "median": 1635.901643,
+          "minimum": 1635.901643,
+          "maximum": 1635.901643
+        },
+        "checkpoint_ms": {
+          "median": 2.072372,
+          "minimum": 2.072372,
+          "maximum": 2.072372
+        },
+        "conversion_call_ms": {
+          "median": 276.936075,
+          "minimum": 276.936075,
+          "maximum": 276.936075
+        },
+        "recovery_call_ms": {
+          "median": 0.709904,
+          "minimum": 0.709904,
+          "maximum": 0.709904
+        },
+        "independent_substitution_ms": null,
+        "symbolic_ms": {
+          "median": 85.573024,
+          "minimum": 85.573024,
+          "maximum": 85.573024
+        },
+        "symbolic_ideal_ceiling": {
+          "median": 1.0551967002035973,
+          "minimum": 1.0551967002035973,
+          "maximum": 1.0551967002035973
+        },
+        "construction_ms": {
+          "median": 18.770484,
+          "minimum": 18.770484,
+          "maximum": 18.770484
+        },
+        "construction_ideal_ceiling": {
+          "median": 1.0116072737177406,
+          "minimum": 1.0116072737177406,
+          "maximum": 1.0116072737177406
+        },
+        "forward_ms": {
+          "median": 1133.908471,
+          "minimum": 1133.908471,
+          "maximum": 1133.908471
+        },
+        "forward_ideal_ceiling": {
+          "median": 3.2588125381912567,
+          "minimum": 3.2588125381912567,
+          "maximum": 3.2588125381912567
+        },
+        "backward_ms": {
+          "median": 42.932164,
+          "minimum": 42.932164,
+          "maximum": 42.932164
+        },
+        "backward_ideal_ceiling": {
+          "median": 1.0269510273523577,
+          "minimum": 1.0269510273523577,
+          "maximum": 1.0269510273523577
+        },
+        "extraction_ms": {
+          "median": 8.072532,
+          "minimum": 8.072532,
+          "maximum": 8.072532
+        },
+        "extraction_ideal_ceiling": {
+          "median": 1.004959078287426,
+          "minimum": 1.004959078287426,
+          "maximum": 1.004959078287426
+        },
+        "interreduction_ms": {
+          "median": 13.032782,
+          "minimum": 13.032782,
+          "maximum": 13.032782
+        },
+        "interreduction_ideal_ceiling": {
+          "median": 1.0080307055691298,
+          "minimum": 1.0080307055691298,
+          "maximum": 1.0080307055691298
+        },
+        "quotient_basis_ms": {
+          "median": 1.973166,
+          "minimum": 1.973166,
+          "maximum": 1.973166
+        },
+        "operator_ms": {
+          "median": 258.613289,
+          "minimum": 258.613289,
+          "maximum": 258.613289
+        },
+        "dependence_ms": {
+          "median": 15.741379,
+          "minimum": 15.741379,
+          "maximum": 15.741379
+        },
+        "scalar_sequence_ms": {
+          "median": 0.0,
+          "minimum": 0.0,
+          "maximum": 0.0
+        },
+        "scalar_reconstruction_ms": {
+          "median": 0.0,
+          "minimum": 0.0,
+          "maximum": 0.0
+        },
+        "scalar_certificate_ms": {
+          "median": 0.0,
+          "minimum": 0.0,
+          "maximum": 0.0
+        }
+      }
+    ]
   }
 ]

@@ -1,6 +1,6 @@
 # M28 current whole-route baseline (#751)
 
-**Status:** implementation and four-cell pilot retained; repeated native evidence pending.
+**Status:** instrumentation, four accepted pilot processes and a two-process native prefix retained; repeated baseline incomplete.
 **Measured at:** `657344357a9cee9fb8d9c8409005f32ac950a2c4` (Rust instrumentation and profiling example);
 controller `72c2a2c6` for the accepted pilot prefix; controller `807547b6` for the refused continuation.
 **Production baseline:** `b9898c9a`, after candidate-only F4 #749/#757; the measurement changes
@@ -14,6 +14,7 @@ observation is promoted to a repeated current baseline, precise speedup or adopt
 The [protocol](../../research/m28-current-baseline/README.md),
 [raw accepted prefix](../../research/m28-current-baseline/pilot.json.gz),
 [refused continuation](../../research/m28-current-baseline/pilot-completed.json.gz) and
+[native prefix](../../research/m28-current-baseline/native.json.gz) and
 [derived summary](../../research/m28-current-baseline/summary.json) preserve the distinction.
 
 ## Timer and task audit
@@ -84,6 +85,18 @@ no redundant external oracle campaign is run.
 
 ## Repeated native baseline and post-selection model
 
+The native window ran 2026-11-13 19:36:12–19:36:21 America/New_York. It accepted exactly two
+fresh processes: repetition 0, MQ10/GF(32003), stage-off and stage-on. Both source bases verify
+exactly, both report no base-field point, and their pre/post compiler snapshots are empty. A new
+unrelated compiler appeared before the M31 cell; the driver retained its identities and stopped.
+The archive preserves the exact **2/75 prefix**, leaving 73 cells unattempted. No native retry or
+resumption is authorized. Its paired observations cannot establish clock overhead or a repeated
+performance estimate. Pilot and native observations are never pooled into five-run medians.
+
+There are six distinct accepted solver processes across the two cohorts; the pilot continuation
+copies its original four accepted records unchanged and adds no new measurement. The external
+compiler workload is the binding measurement blocker. #751 stays open and its PR stays draft.
+
 Pending: five interleaved stage-off/on fresh-process repetitions of MQ10, Katsura-6 and Cyclic-5
 at both primes; five separate work diagnostics at each MQ prime; five staged Katsura-11/M31
 basis-only repetitions. The exact 75-process plan has a 900-second aggregate hard cap, 60-second/
@@ -114,9 +127,9 @@ A whole point-solving route must not be divided by a comparand's basis-only proc
 | #751 deliverable | Current disposition |
 |---|---|
 | Current explicit whole-route instrument and timer-boundary audit | Implemented; focused tests and fixed-route functional control pass |
-| Five-repetition native baseline and stage/work perturbation controls | Pending reviewed 75-process campaign |
-| Weak Katsura repeat or exact resource/capability blocker | Native repeated task pending; pilot tail not launched due compiler refusal |
-| Complete independent source bases and original-equation point checks | Four accepted pilot processes validated; native checks required per completion |
+| Five-repetition native baseline and stage/work perturbation controls | 2/75 native prefix retained; five-repetition coverage and diagnostics incomplete |
+| Weak Katsura repeat or exact resource/capability blocker | All five native Katsura attempts and both pilot tail cells unattempted after compiler refusals |
+| Complete independent source bases and original-equation point checks | Four pilot and two native source bases validated; one M31 pilot point independently substituted |
 | Post-selection Amdahl model and ranked remaining terms | Reproducible same-attempt model implemented; repeated verdict pending |
 | External 8/16-worker targets | Linked to #739 with separate boundaries and exact/raw distinction |
 | Adopt/reject/defer next investments | Pending repeated baseline; no policy selected from single pilot cells |
@@ -128,7 +141,7 @@ functions failed first; implementation then passed nine example/integration test
 Wiedemann tests across supported prime/binary/extension/wide fields. Protocol tests also cover
 relative continuation paths, strict frozen-prefix identity, invalid clocks, missing cells, point
 substitution and unexpected failure versus resource stop. Existing CI runs these offline checks.
-The repeated-native acceptance and final documentation audit remain open until its evidence lands.
+The documentation and command audit covers the published partial result. Repeated-native acceptance remains open; no environmental stop is treated as completion of the issue.
 
 Run the [documented build and offline commands](../../research/m28-current-baseline/README.md).
 Archive replay rechecks exact full source coefficients and points without launching a solver.
