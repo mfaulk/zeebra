@@ -106,6 +106,7 @@ def validate_response(raw, reference, problem, modulus, route, arm):
     if raw['problem'] != problem or raw['modulus'] != modulus: raise ValueError('problem identity drift')
     if route != 'direct' and reference:
         if raw.get('digest')!=reference['digest'] or raw['modulus']!=reference['modulus']: raise ValueError('reference identity drift')
+        if 'generators' in reference and raw.get('input')!=dict(variables=reference['variables'],generators=reference['generators']): raise ValueError('original equations differ from reference')
         if raw.get('basis') is not None: load('mq10-profile').check_answer(raw,reference)
     if route!='basis':
         if raw['route'] != route or raw['outcome'] not in ('verified-point','no-base-field-point','inconsistent','positive-dimensional','conversion-refusal','recovery-refusal','basis-refusal'):
