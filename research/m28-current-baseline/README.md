@@ -8,8 +8,11 @@ same recovery. These are explicit fixed routes, not a planner decision or all-po
 Predeclared pilot: six fresh processes, MQ10 and Cyclic-5 conversion routes at both published
 small primes, the historical weak Katsura-11 reduced-grevlex-basis identity at GF(2147483647),
 and a direct-lex MQ10 control at GF(32003). Each child is capped at 60 seconds and 2 GiB with
-the existing descendant guard and nested 185-second watchdog. Six solver caps plus one independent Singular Katsura-11 check total at most 420 seconds;
-the pilot has a 480-second aggregate outer watchdog and 256 MiB output budget. The exact frozen Katsura digest is `03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13`. No retry or
+the existing descendant guard and nested 185-second watchdog. Six solver caps total at most 360 seconds;
+the pilot has a 480-second aggregate outer watchdog and 256 MiB output budget. The exact independent Singular answer is reused from #739’s
+`research/comparand-scaling/singular-reference31-v1.json.gz`; its archive hash, full source/checker
+identity and exact coefficient-set verification are retained in the cohort. No new oracle is run.
+The exact frozen Katsura digest is `03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13`. No retry or
 larger allowance is authorized. Compiler/load gates run before and after every child. All stops,
 complete phase checkpoints and partial stdout remain retained; no partial basis is accepted.
 

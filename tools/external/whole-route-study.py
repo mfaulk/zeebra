@@ -107,7 +107,9 @@ def validate_response(raw, reference, problem, modulus, route, arm):
     if route != 'direct' and reference:
         if raw.get('digest')!=reference['digest'] or raw['modulus']!=reference['modulus']: raise ValueError('reference identity drift')
         if 'generators' in reference and raw.get('input')!=dict(variables=reference['variables'],generators=reference['generators']): raise ValueError('original equations differ from reference')
-        if raw.get('basis') is not None: load('mq10-profile').check_answer(raw,reference)
+        if raw.get('basis') is not None:
+            if reference.get('canonical_comparison'): load('comparand-scaling').verify_basis(raw['basis'],reference['basis'],dict(modulus=modulus,variables=reference['variables']))
+            else: load('mq10-profile').check_answer(raw,reference)
     if route!='basis':
         if raw['route'] != route or raw['outcome'] not in ('verified-point','no-base-field-point','inconsistent','positive-dimensional','conversion-refusal','recovery-refusal','basis-refusal'):
             raise ValueError('invalid route outcome')
@@ -124,27 +126,22 @@ def terminal_kind(exit_code,stop,stderr):
     return 'failed'
 
 
-def independent_katsura(raw, scratch, guard):
-    if raw['problem']!='katsura-11' or raw['modulus']!=2147483647 or raw['digest']!='03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13':
-        raise ValueError('new independent reference identity differs')
-    script=('option(redSB); ring r=2147483647,('+','.join(raw['input']['variables'])+'),dp; short=0;\n'
-            +'ideal I='+','.join(raw['input']['generators'])+'; ideal G=std(I);\n'
-            +'ideal B='+','.join(raw['basis'])+'; int ok=(ncols(B)==ncols(G)); int i,j,found;\n'
-            +'for(i=1;i<=ncols(B);i++){found=0;for(j=1;j<=ncols(G);j++){if(B[i]==G[j]){found++;}}if(found!=1){ok=0;}}\n'
-            +'print("@match "+string(ok)); quit;\n')
-    path=scratch/'katsura-11.sing'
-    path.write_text(script)
-    proof=guard.guarded(['Singular','-q',str(path)],scratch/'katsura-11-proof',60,limits()['rss_bytes'])
-    return dict(modulus=raw['modulus'],digest=raw['digest'],basis=raw['basis'],script=script,
-                singular_version=subprocess.check_output(['Singular','--version'],text=True,stderr=subprocess.STDOUT),
-                singular_sha256=sha(Path('/usr/bin/Singular').resolve()),
-                script_sha256=hashlib.sha256(script.encode()).hexdigest(),singular=proof)
-
-
-def valid_proof(reference):
-    proof=reference['singular']
-    return (hashlib.sha256(reference['script'].encode()).hexdigest()==reference['script_sha256']
-            and not proof['exit'] and not proof['stop'] and '@match 1\n' in proof['stdout'])
+def references():
+    refs=load('selective-backward-study').references()
+    scaling=load('comparand-scaling')
+    archive=ROOT/'research/comparand-scaling/singular-reference31-v1.json.gz'
+    cohort=scaling.validate_cohort(scaling.load_cohort(archive))
+    attempts=[a for a in cohort['attempts'] if a['engine']=='singular' and a['status']=='verified' and not a['exit'] and not a['stop']]
+    if len(attempts)!=1: raise ValueError('missing independent Katsura reference')
+    attempt=attempts[0]
+    case=scaling.canonical_case(next(c for c in cohort['cases'] if c['digest']==attempt['digest']))
+    if case['name']!='katsura-11' or int(case['modulus'])!=2147483647 or case['digest']!='03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13':
+        raise ValueError('Katsura reference identity differs')
+    refs[('katsura-11',2147483647)]=dict(modulus=2147483647,digest=case['digest'],basis=attempt['basis'],
+        variables=case['variables'],generators=case['generators'],canonical_comparison=True,
+        archive=str(archive.relative_to(ROOT)),archive_sha256=sha(archive),
+        controller=cohort['commit'],checker=cohort['binaries']['singular'],verification='retained independent Singular std/redSB full coefficient set')
+    return refs
 
 
 def main():
@@ -152,7 +149,6 @@ def main():
     for key in ('binary','scratch','output'): parser.add_argument('--'+key,type=Path,required=True)
     parser.add_argument('--phase',choices=('pilot','native'),default='pilot')
     parser.add_argument('--build-commit',required=True)
-    parser.add_argument('--reference-cohort',type=Path)
     args=parser.parse_args()
     if args.output.exists(): parser.error('retain existing campaign and choose new output')
     if subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip(): parser.error('commit instruments before measuring')
@@ -170,14 +166,8 @@ def main():
         machine=os.environ['ZEEBRA_MACHINE'],affinity=affinity,build='release;fat-LTO;one-codegen-unit;x86-64-v3;mold;system allocator;research-work;CARGO_INCREMENTAL=0;RUSTC_WRAPPER empty',
         topology=subprocess.check_output(['lscpu','-e=CPU,CORE,SOCKET,NODE,CACHE,ONLINE'],text=True)),
         limits=campaign_limits,plan=cells,attempts=[],references={})
-    refs=load('selective-backward-study').references()
-    if args.reference_cohort:
-        import gzip
-        prior=json.loads(gzip.decompress(args.reference_cohort.read_bytes()))
-        for key,reference in prior.get('references',{}).items():
-            if valid_proof(reference):
-                refs[('katsura-11',2147483647)]=reference
-                cohort['references'][key]=reference
+    refs=references()
+    cohort['references']['katsura-11/2147483647']=refs[('katsura-11',2147483647)]
     guard=load('grobx-work-study')
     runtime=load('worker-pool-study')
     began=time.monotonic()
@@ -209,10 +199,6 @@ def main():
                     result['source_basis_verified']=True
             else:
                 if raw is None: raise ValueError('successful process has no final response')
-                if problem=='katsura-11' and (problem,modulus) not in refs:
-                    reference=independent_katsura(raw,args.scratch,guard)
-                    cohort['references']['katsura-11/2147483647']=reference
-                    if valid_proof(reference): refs[(problem,modulus)]=reference
                 validate_response(raw,refs.get((problem,modulus)),problem,modulus,route,arm)
                 result['status']=('reported-resource-refusal' if raw.get('outcome') in ('basis-refusal','conversion-refusal','recovery-refusal') else
                                   'verified' if (problem,modulus) in refs and route!='direct' else 'complete-needs-independent-basis-check')

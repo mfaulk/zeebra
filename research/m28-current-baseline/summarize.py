@@ -37,9 +37,8 @@ def spread(values):
 def summarize(path):
     cohort=json.loads(gzip.decompress(path.read_bytes()))
     complete=validate_plan(cohort)
-    refs=study.load('selective-backward-study').references()
-    for reference in cohort.get('references',{}).values():
-        if study.valid_proof(reference): refs[('katsura-11',2147483647)]=reference
+    refs=study.references()
+    if cohort['references']['katsura-11/2147483647']!=refs[('katsura-11',2147483647)]: raise ValueError('reference archive/provenance drift')
     groups=defaultdict(list)
     for attempt in cohort['attempts']:
         decoded=study.responses(attempt['stdout'])
