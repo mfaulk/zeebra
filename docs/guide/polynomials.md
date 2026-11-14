@@ -65,11 +65,19 @@ this is not a conclusion that transfers between arities. The predicate therefore
 product count to be at least twice an upper bound on the output's monomial count before taking a
 dense route above `N = 2`, and that threshold is not applied at `N = 2`.
 
+Three more routes are reachable by name and never selected, each a measured negative result:
+`Materialize` (the pre-#243 reference), `Chunked` and `Heap`. `Heap` is Monagan and Pearce's
+heap merge, and its `multiply_sorted` form returns the product in monomial order. It is 2.2x–10x
+slower than `Accumulate` as a multiply. As a multiply-then-sort it is faster by up to 1.9x, but
+only on collision-poor sparse pairs, and no caller in the crate sorts a product. See
+[`heap-multiply.md`](../research/heap-multiply.md).
+
 Re-measure any of this with
 
 ```sh
 cargo run --release --example multivariate_mul                  # every route, per arity and size
 cargo run --release --example multivariate_mul -- max_degree=90  # stop short of the six-round size
+cargo run --release --example multivariate_mul -- heap           # heap vs accumulate, with the sort
 ```
 
 ## Add, Sub and scale collect into an operand's own map

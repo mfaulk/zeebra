@@ -10,6 +10,11 @@
 //! All of them end in the same drop-on-cancel step as [`SparseMultiPoly::new`]: a monomial whose
 //! coefficients cancel is not a term of the product, and a surviving zero would make a polynomial
 //! unequal to its own canonical form.
+//!
+//! [`multiply_sorted`] is the one exit that is not a `SparseMultiPoly`: a heap merge that emits the
+//! product in monomial order. `docs/research/heap-multiply.md` measured it 2.2x–10x slower than
+//! `Accumulate` as a multiply, faster as a multiply-then-sort only on collision-poor pairs, and
+//! found no caller that sorts a product, so nothing dispatches to it.
 
 use crate::{
     poly::multivariate::{
@@ -19,8 +24,9 @@ use crate::{
         monomial_hash::{BuildMonomialHasher, MonomialMap},
         sparse_multivariate_polynomial::SparseMultiPoly,
     },
-    FiniteField, Monomial,
+    FiniteField, Monomial, MonomialOrder,
 };
+use std::cmp::Ordering;
 
 /// Which route a product takes. Selected by `route`; a caller that wants a specific one for
 /// measurement goes through `multiply_by`.
@@ -67,6 +73,17 @@ pub enum MultiplyRoute {
     /// `N!` in cells for an operand pair dense in the total-degree sense, which is what
     /// `dense_box_profitable` and `DENSE_TRIANGLE_BYTE_CAP` govern.
     DenseBox,
+    /// Monagan and Pearce's heap merge (#443): the products `a_i · b_j` merged in monomial order
+    /// through a binary heap of at most `min(|a|, |b|)` entries, so the product comes out sorted
+    /// and nothing is hashed until the output is stored. See `multiply_sorted`.
+    ///
+    /// **Never selected** — a measured negative result, kept reachable so that it stays
+    /// reproducible. As a multiply it is 2.2x–8.3x slower than `Accumulate` on every sparse shape
+    /// `examples/multivariate_mul.rs -- heap` sweeps: a pop costs `log₂ rows` unpacked monomial
+    /// comparisons where `Accumulate` pays one hash. Its ordered output beats accumulate-then-sort
+    /// by up to 1.9x on collision-poor pairs, but no caller sorts a product
+    /// (`docs/research/heap-multiply.md` §1).
+    Heap,
 }
 
 /// Bytes the flat triangle accumulator may reach before [`MultiplyRoute::DenseTriangle`] is refused.
@@ -154,6 +171,7 @@ pub(crate) fn multiply_by<const N: usize, F: FiniteField>(
         MultiplyRoute::DenseTriangle => multiply_dense_triangle(a, b),
         MultiplyRoute::DenseSimplex => multiply_dense_simplex(a, b),
         MultiplyRoute::DenseBox => multiply_dense_box(a, b),
+        MultiplyRoute::Heap => multiply_heap(a, b),
     }
 }
 
@@ -608,6 +626,190 @@ fn finish<const N: usize, F: FiniteField>(
     SparseMultiPoly { terms: accumulator }
 }
 
+/// [`MultiplyRoute::Heap`] as a `SparseMultiPoly`. The order is immaterial to the polynomial; grevlex
+/// is the one F4 runs under, so it is the one measured.
+fn multiply_heap<const N: usize, F: FiniteField>(
+    a: &SparseMultiPoly<N, F>,
+    b: &SparseMultiPoly<N, F>,
+) -> SparseMultiPoly<N, F> {
+    let sorted = multiply_sorted(a, b, MonomialOrder::GradedReverseLexicographic);
+    let mut terms = MonomialMap::with_capacity_and_hasher(sorted.len(), BuildMonomialHasher);
+    terms.extend(sorted);
+    SparseMultiPoly { terms }
+}
+
+/// The terms of `a * b`, strictly descending under `order`, with cancelled monomials dropped.
+///
+/// The heap merge of Monagan and Pearce ("Polynomial division using dynamic arrays, heaps, and
+/// packed exponent vectors", CASC 2007; "Parallel sparse polynomial multiplication using heaps",
+/// ISSAC 2009), after Johnson (1974). Rows are the shorter operand's terms and columns the
+/// longer's, both sorted descending; because a monomial order is multiplicative, row `i`'s
+/// products `r_i · c_0 > r_i · c_1 > …` are already in order, and the heap merges the rows. Their
+/// refinement is kept: row `i + 1` enters only when `(i, 0)` leaves, so the heap never holds more
+/// than one entry per row. Their *chaining* of equal monomials inside the heap is not
+/// implemented; equal monomials are instead merged as they are popped, which is the same output
+/// for one comparison more per collision.
+pub(crate) fn multiply_sorted<const N: usize, F: FiniteField>(
+    a: &SparseMultiPoly<N, F>,
+    b: &SparseMultiPoly<N, F>,
+    order: MonomialOrder,
+) -> Vec<(Monomial<N>, F)> {
+    if a.terms.is_empty() || b.terms.is_empty() {
+        return Vec::new();
+    }
+    // Matched once so that each built-in order's comparison inlines into the heap's sift loops
+    // instead of being re-dispatched per comparison.
+    match order {
+        MonomialOrder::Lexicographic => {
+            heap_product(a, b, |x, y| MonomialOrder::Lexicographic.cmp(x, y))
+        }
+        MonomialOrder::GradedLexicographic => {
+            heap_product(a, b, |x, y| MonomialOrder::GradedLexicographic.cmp(x, y))
+        }
+        MonomialOrder::GradedReverseLexicographic => heap_product(a, b, |x, y| {
+            MonomialOrder::GradedReverseLexicographic.cmp(x, y)
+        }),
+        other => heap_product(a, b, move |x, y| other.cmp(x, y)),
+    }
+}
+
+/// One pending product in the heap: `rows[row] · cols[col]`, with its monomial formed once.
+struct HeapEntry<const N: usize> {
+    monomial: Monomial<N>,
+    row: usize,
+    col: usize,
+}
+
+/// A binary max-heap of [`HeapEntry`] under a runtime monomial order, which `BinaryHeap` cannot
+/// take without an `Ord` wrapper carrying the order in every element.
+struct ProductHeap<const N: usize, C> {
+    entries: Vec<HeapEntry<N>>,
+    cmp: C,
+}
+
+impl<const N: usize, C: Fn(&Monomial<N>, &Monomial<N>) -> Ordering> ProductHeap<N, C> {
+    #[inline]
+    fn greater(&self, i: usize, j: usize) -> bool {
+        (self.cmp)(&self.entries[i].monomial, &self.entries[j].monomial) == Ordering::Greater
+    }
+
+    fn push(&mut self, entry: HeapEntry<N>) {
+        self.entries.push(entry);
+        let mut child = self.entries.len() - 1;
+        while child > 0 {
+            let parent = (child - 1) / 2;
+            if !self.greater(child, parent) {
+                break;
+            }
+            self.entries.swap(child, parent);
+            child = parent;
+        }
+    }
+
+    fn pop(&mut self) -> Option<HeapEntry<N>> {
+        let last = self.entries.len().checked_sub(1)?;
+        self.entries.swap(0, last);
+        let top = self.entries.pop();
+        let len = self.entries.len();
+        let mut parent = 0;
+        loop {
+            let left = 2 * parent + 1;
+            if left >= len {
+                break;
+            }
+            let right = left + 1;
+            let larger = if right < len && self.greater(right, left) {
+                right
+            } else {
+                left
+            };
+            if !self.greater(larger, parent) {
+                break;
+            }
+            self.entries.swap(parent, larger);
+            parent = larger;
+        }
+        top
+    }
+
+    fn top(&self) -> Option<&Monomial<N>> {
+        self.entries.first().map(|e| &e.monomial)
+    }
+}
+
+/// The heap merge itself, under a comparison `cmp` that must be a monomial order.
+fn heap_product<const N: usize, F: FiniteField, C>(
+    a: &SparseMultiPoly<N, F>,
+    b: &SparseMultiPoly<N, F>,
+    cmp: C,
+) -> Vec<(Monomial<N>, F)>
+where
+    C: Fn(&Monomial<N>, &Monomial<N>) -> Ordering,
+{
+    let (shorter, longer) = if a.terms.len() <= b.terms.len() {
+        (a, b)
+    } else {
+        (b, a)
+    };
+    let rows = descending(shorter, &cmp);
+    let cols = descending(longer, &cmp);
+    let mut heap = ProductHeap {
+        entries: Vec::with_capacity(rows.len()),
+        cmp,
+    };
+    let entry = |row: usize, col: usize| HeapEntry {
+        monomial: &rows[row].0 * &cols[col].0,
+        row,
+        col,
+    };
+    heap.push(entry(0, 0));
+
+    let mut out: Vec<(Monomial<N>, F)> = Vec::new();
+    while let Some(&monomial) = heap.top() {
+        let mut coefficient = F::zero();
+        while heap.top() == Some(&monomial) {
+            let HeapEntry { row, col, .. } = heap.pop().expect("the top was just read");
+            coefficient += rows[row].1 * cols[col].1;
+            // Both successors are strictly below `monomial`, so the equal entries still waiting
+            // stay on top.
+            if col == 0 && row + 1 < rows.len() {
+                heap.push(entry(row + 1, 0));
+            }
+            if col + 1 < cols.len() {
+                heap.push(entry(row, col + 1));
+            }
+        }
+        if !coefficient.is_zero() {
+            out.push((monomial, coefficient));
+        }
+    }
+    out
+}
+
+/// The terms of `p`, sorted descending by `cmp`.
+fn descending<const N: usize, F: FiniteField, C>(
+    p: &SparseMultiPoly<N, F>,
+    cmp: &C,
+) -> Vec<(Monomial<N>, F)>
+where
+    C: Fn(&Monomial<N>, &Monomial<N>) -> Ordering,
+{
+    let mut terms: Vec<(Monomial<N>, F)> = p.terms.iter().map(|(m, c)| (*m, *c)).collect();
+    terms.sort_unstable_by(|x, y| cmp(&y.0, &x.0));
+    terms
+}
+
+/// `multiply_sorted`, reachable from an example binary so that the ordered output can be
+/// measured against accumulating and then sorting.
+#[doc(hidden)]
+pub fn multiply_multivariate_sorted_unstable<const N: usize, F: FiniteField>(
+    a: &SparseMultiPoly<N, F>,
+    b: &SparseMultiPoly<N, F>,
+    order: MonomialOrder,
+) -> Vec<(Monomial<N>, F)> {
+    multiply_sorted(a, b, order)
+}
+
 /// Every route, reachable from an example binary so that the dispatch can be re-measured.
 #[doc(hidden)]
 pub fn multiply_multivariate_unstable<const N: usize, F: FiniteField>(
@@ -630,17 +832,21 @@ pub fn multivariate_multiply_route_unstable<const N: usize, F: FiniteField>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fields::PrimeFieldElement64, One, Zero};
+    use crate::{
+        fields::PrimeFieldElement64, BlockOrder, BlockOrderKind, MonomialOrder, One,
+        WeightedTieBreak, Zero,
+    };
     use proptest::{collection::vec, prelude::*, test_runner::TestRunner};
 
     /// Every route, with the chunk sizes the sweep covers.
-    const ALL_ROUTES: [MultiplyRoute; 6] = [
+    const ALL_ROUTES: [MultiplyRoute; 7] = [
         MultiplyRoute::Materialize,
         MultiplyRoute::Accumulate,
         MultiplyRoute::Chunked { rows: 1 },
         MultiplyRoute::Chunked { rows: 7 },
         MultiplyRoute::Chunked { rows: 64 },
         MultiplyRoute::DenseTriangle,
+        MultiplyRoute::Heap,
     ];
 
     /// A strategy for a polynomial of at most `num_terms` distinct monomials over any field.
@@ -915,6 +1121,7 @@ mod tests {
                     MultiplyRoute::Accumulate,
                     MultiplyRoute::DenseSimplex,
                     MultiplyRoute::DenseBox,
+                    MultiplyRoute::Heap,
                 ] {
                     let product = multiply_by(&a, &b, route);
                     prop_assert_eq!(
@@ -1079,5 +1286,147 @@ mod tests {
             SparseMultiPoly::new(&[(Monomial::<2>::new(&[u32::MAX, 0]), F::one())]);
         assert!(!dense_triangle_profitable(&p, &p));
         assert_eq!(route(&p, &p), MultiplyRoute::Accumulate);
+    }
+
+    // === the heap route (#443) ===
+
+    /// The orders the sorted product is checked under at arity `N`: the three built-ins, a
+    /// weighted order and, past one variable, a block order.
+    fn orders<const N: usize>() -> Vec<MonomialOrder> {
+        let weights: Vec<u32> = (1..=N as u32).collect();
+        let mut orders = vec![
+            MonomialOrder::Lexicographic,
+            MonomialOrder::GradedLexicographic,
+            MonomialOrder::GradedReverseLexicographic,
+            MonomialOrder::weighted(&weights, WeightedTieBreak::ReverseLexicographic).unwrap(),
+        ];
+        if N >= 2 {
+            orders.push(MonomialOrder::Block(
+                BlockOrder::checked(
+                    N,
+                    N / 2,
+                    BlockOrderKind::GradedReverseLexicographic,
+                    BlockOrderKind::Lexicographic,
+                )
+                .unwrap(),
+            ));
+        }
+        orders
+    }
+
+    /// Whether `terms` is strictly descending under `order`.
+    fn strictly_descending<const N: usize, F: FiniteField>(
+        terms: &[(Monomial<N>, F)],
+        order: MonomialOrder,
+    ) -> bool {
+        terms
+            .windows(2)
+            .all(|w| order.cmp(&w[0].0, &w[1].0) == std::cmp::Ordering::Greater)
+    }
+
+    /// The sorted product is the reference product's terms, strictly descending under each order.
+    fn assert_sorted_product<const N: usize, F: FiniteField + Arbitrary>(
+        strategy: impl Strategy<Value = (SparseMultiPoly<N, F>, SparseMultiPoly<N, F>)>,
+    ) {
+        TestRunner::deterministic()
+            .run(&strategy, |(a, b)| {
+                let reference = multiply_by(&a, &b, MultiplyRoute::Materialize);
+                for order in orders::<N>() {
+                    let sorted = multiply_sorted(&a, &b, order);
+                    prop_assert!(
+                        strictly_descending(&sorted, order),
+                        "not strictly descending under {:?}",
+                        order
+                    );
+                    prop_assert!(sorted.iter().all(|(_, c)| !c.is_zero()));
+                    prop_assert_eq!(sorted.len(), reference.terms.len());
+                    prop_assert_eq!(SparseMultiPoly::new(&sorted), reference.clone());
+                }
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    // The heap's sorted product is the materialising product in strictly descending order, under
+    // every order kind, over every field, at arities 1 to 6, on sparse and on collision-heavy
+    // operands.
+    for_each_field!(
+        fn the_heap_emits_the_product_in_order<F>() {
+            assert_sorted_product::<1, F>((poly_strategy(6), poly_strategy(6)));
+            assert_sorted_product::<2, F>((poly_strategy(6), poly_strategy(6)));
+            assert_sorted_product::<3, F>((
+                bounded_poly_strategy(8, 2),
+                bounded_poly_strategy(8, 2),
+            ));
+            assert_sorted_product::<4, F>((poly_strategy(5), poly_strategy(7)));
+            assert_sorted_product::<6, F>((
+                bounded_poly_strategy(6, 1),
+                bounded_poly_strategy(9, 3),
+            ));
+        }
+    );
+
+    // Zero, constant and single-term operands on either side give the reference product on the
+    // heap route, sorted, at an arity no dense route is selected for.
+    #[test]
+    fn test_the_heap_handles_zero_constant_and_monomial_operands() {
+        type F = PrimeFieldElement64<541>;
+        let p: SparseMultiPoly<5, F> = SparseMultiPoly::new(&[
+            (Monomial::<5>::new(&[3, 0, 1, 0, 9]), F::new(4)),
+            (Monomial::<5>::new(&[0, 7, 0, 2, 0]), F::new(540)),
+            (Monomial::<5>::new(&[1, 1, 1, 1, 1]), F::new(2)),
+        ]);
+        let zero: SparseMultiPoly<5, F> = SparseMultiPoly::zero();
+        let constant: SparseMultiPoly<5, F> =
+            SparseMultiPoly::new(&[(Monomial::<5>::one(), F::new(3))]);
+        let monomial: SparseMultiPoly<5, F> =
+            SparseMultiPoly::new(&[(Monomial::<5>::new(&[0, 2, 0, 0, 1]), F::one())]);
+        let order = MonomialOrder::GradedReverseLexicographic;
+        for other in [&zero, &constant, &monomial, &p] {
+            for (left, right) in [(&p, other), (other, &p)] {
+                let reference = multiply_by(left, right, MultiplyRoute::Materialize);
+                assert_eq!(multiply_by(left, right, MultiplyRoute::Heap), reference);
+                let sorted = multiply_sorted(left, right, order);
+                assert_eq!(SparseMultiPoly::new(&sorted), reference);
+                assert!(strictly_descending(&sorted, order));
+            }
+        }
+        assert!(multiply_sorted(&zero, &zero, order).is_empty());
+    }
+
+    // The sorted product's cancellation is the canonical one: a monomial whose coefficients cancel
+    // is absent, not present at zero, so (x + y)^6 * (x + y) over GF(7) is two terms.
+    #[test]
+    fn test_the_sorted_product_drops_cancelled_terms() {
+        type F = PrimeFieldElement64<7>;
+        let p: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[
+            (Monomial::<2>::new(&[1, 0]), F::one()),
+            (Monomial::<2>::new(&[0, 1]), F::one()),
+        ]);
+        let mut sixth = p.clone();
+        for _ in 1..6 {
+            sixth = &sixth * &p;
+        }
+        let sorted = multiply_sorted(&sixth, &p, MonomialOrder::Lexicographic);
+        assert_eq!(
+            sorted,
+            vec![
+                (Monomial::<2>::new(&[7, 0]), F::one()),
+                (Monomial::<2>::new(&[0, 7]), F::one()),
+            ]
+        );
+    }
+
+    // The heap is not what `route` selects on the sparse high-arity shape it was measured on: it
+    // stays reachable by name only.
+    #[test]
+    fn test_route_does_not_select_the_heap() {
+        type F = PrimeFieldElement64<541>;
+        let sparse: SparseMultiPoly<6, F> = SparseMultiPoly::new(&[
+            (Monomial::<6>::new(&[9, 0, 0, 0, 0, 1]), F::one()),
+            (Monomial::<6>::new(&[0, 9, 0, 0, 1, 0]), F::one()),
+            (Monomial::<6>::new(&[0, 0, 9, 1, 0, 0]), F::one()),
+        ]);
+        assert_eq!(route(&sparse, &sparse), MultiplyRoute::Accumulate);
     }
 }

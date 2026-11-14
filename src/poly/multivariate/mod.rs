@@ -25,7 +25,8 @@ pub use monomial_order::{
 };
 pub use multivariate_gcd::{GcdError, GcdRoute, SquarefreeError};
 pub use sparse_multivariate_multiply::{
-    multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
+    multiply_multivariate_sorted_unstable, multiply_multivariate_unstable,
+    multivariate_multiply_route_unstable, MultiplyRoute,
 };
 pub use sparse_multivariate_polynomial::SparseMultiPoly as MultivariatePolynomial;
 pub use sparse_multivariate_polynomial_arithmetic::{

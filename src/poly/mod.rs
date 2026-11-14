@@ -7,7 +7,8 @@ pub use multivariate::gcd_profile;
 
 #[doc(hidden)]
 pub use multivariate::{
-    multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
+    multiply_multivariate_sorted_unstable, multiply_multivariate_unstable,
+    multivariate_multiply_route_unstable, MultiplyRoute,
 };
 pub use multivariate::{
     BlockOrder, BlockOrderError, BlockOrderKind, BuildMonomialHasher, CrossCallRepeats, GcdError,
