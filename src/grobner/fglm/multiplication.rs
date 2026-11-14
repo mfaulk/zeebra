@@ -231,6 +231,30 @@ impl<F: FiniteField> MultiplicationOperator<F> {
         }
     }
 
+    /// Column `j`'s nonzeros as `(row, coefficient)`, ascending by row: the sparse view.
+    ///
+    /// `O(entries)` for a unit or sparse column where [`Self::column`] is `O(D)`, which is what lets
+    /// a caller re-pack the operator into another format without `D^2` work.
+    ///
+    /// # Panics
+    /// If `j` is not below [`Self::dimension`].
+    pub fn column_entries(&self, j: usize) -> Vec<(usize, F)> {
+        match &self.columns[j] {
+            Column::Standard(k) => vec![(*k, F::one())],
+            Column::Sparse(entries) => entries
+                .iter()
+                .filter(|(_, value)| !value.is_zero())
+                .copied()
+                .collect(),
+            Column::Dense(values) => values
+                .iter()
+                .enumerate()
+                .filter(|(_, value)| !value.is_zero())
+                .map(|(k, value)| (k, *value))
+                .collect(),
+        }
+    }
+
     /// Nonzero coefficients across every column, which is what `max_operator_entries` counts.
     ///
     /// **Mathematical nonzeros, not allocated cells.** A dense column of a mostly-zero operator
@@ -417,6 +441,30 @@ mod tests {
                 "{:?}: the nonzero count depends on the representation",
                 storage
             );
+        }
+    }
+
+    /// `column_entries` lists exactly the nonzeros of `column`, ascending, under every storage.
+    #[test]
+    fn test_column_entries_are_the_nonzeros_of_column() {
+        let columns = mixed_columns();
+        for storage in STORAGES {
+            let operator = operator(4, &columns, storage);
+            for j in 0..4 {
+                let expected: Vec<(usize, F)> = operator
+                    .column(j)
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, value)| !value.is_zero())
+                    .collect();
+                assert_eq!(
+                    operator.column_entries(j),
+                    expected,
+                    "{:?}: column {}",
+                    storage,
+                    j
+                );
+            }
         }
     }
 

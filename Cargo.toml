@@ -311,3 +311,7 @@ required-features = ["research-work"]
 name = "symbolic_attribution"
 test = true
 required-features = ["external-runners", "research-work"]
+
+[[example]]
+name = "sparse_matvec_throughput"
+test = true
