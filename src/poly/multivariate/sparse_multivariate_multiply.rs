@@ -75,7 +75,7 @@ pub enum MultiplyRoute {
     DenseBox,
     /// Monagan and Pearce's heap merge (#443): the products `a_i · b_j` merged in monomial order
     /// through a binary heap of at most `min(|a|, |b|)` entries, so the product comes out sorted
-    /// and nothing is hashed until the output is stored. See [`multiply_sorted`].
+    /// and nothing is hashed until the output is stored. See `multiply_sorted`.
     ///
     /// **Never selected** — a measured negative result, kept reachable so that it stays
     /// reproducible. As a multiply it is 2.2x–8.3x slower than `Accumulate` on every sparse shape
@@ -799,7 +799,7 @@ where
     terms
 }
 
-/// [`multiply_sorted`], reachable from an example binary so that the ordered output can be
+/// `multiply_sorted`, reachable from an example binary so that the ordered output can be
 /// measured against accumulating and then sorting.
 #[doc(hidden)]
 pub fn multiply_multivariate_sorted_unstable<const N: usize, F: FiniteField>(
