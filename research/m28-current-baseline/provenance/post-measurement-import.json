@@ -13,5 +13,7 @@
   "source_manifest": "research/m28-current-baseline/provenance/frozen-source-sha256.json",
   "source_manifest_sha256": "8f3f17447a9aa6527b18e189218ce81b492639efb0a746a1dee64239fbf29745",
   "corrected_file": "examples/mq10_profile.rs",
-  "corrected_file_sha256": "e848b39f157f079e794d3489ea3de9f1f497b914f84a60de5bcbe111f19668d3"
+  "corrected_file_sha256": "e848b39f157f079e794d3489ea3de9f1f497b914f84a60de5bcbe111f19668d3",
+  "frozen_source_snapshot": "research/m28-current-baseline/provenance/frozen-source.json.gz",
+  "frozen_source_snapshot_sha256": "652ab574587e93faed77d1f062e708aae2e40685614ccb63240c23748f653e6a"
 }

@@ -96,6 +96,9 @@ jobs:
           python3 tools/test/whole-route-summary-test.py
           python3 research/m28-current-baseline/summarize.py --check
           cargo test --test stage_refinements
+          cargo test --features research-work --test symbolic_live
+          python3 tools/test/symbolic-live-study-test.py
+          python3 tools/external/symbolic-live-study.py --replay research/symbolic-live
           python3 tools/test/msolve-count-test.py
           python3 tools/test/grobx-trajectory-test.py
           python3 tools/test/grobx-work-study-test.py

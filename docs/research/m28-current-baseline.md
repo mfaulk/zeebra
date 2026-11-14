@@ -14,7 +14,8 @@ measurements. The [protocol](../../research/m28-current-baseline/README.md),
 [unchanged native archive](../../research/m28-current-baseline/native-completed.json.gz),
 [derived summary](../../research/m28-current-baseline/summary.json) and
 [external watchdog ledger](../../research/m28-current-baseline/native-amendment-stop.json)
-keep the measured boundaries and missing cells explicit. PR #762 stays draft and #751 stays open.
+keep the measured boundaries and missing cells explicit. PR #762 integrates the instruments and
+retained partial evidence; #751 stays open until its remaining acceptance requirements are met.
 
 ## Timer and task audit
 
@@ -177,7 +178,7 @@ supplied by this narrow-prime campaign.
 | Current post-selection cost model and ranked terms | Implemented for the named MQ route with same-attempt elapsed ceilings; broad production policies remain gated |
 | External 8/16-worker targets | Linked to #739 with separate exact/raw/task boundaries |
 | Raw outcomes, refusals and publication interruption | Retained without rewriting accepted prefixes or inventing lost clocks |
-| Full milestone/issue acceptance | **Not complete**; #751 remains open and PR #762 draft |
+| Full milestone/issue acceptance | **Not complete**; #751 remains open; merging PR #762 does not complete the study |
 
 CI found one default-feature compilation issue after measurement: `FiniteField` became used only
 by the research observer, leaving its unconditional import unused under warnings-denied default
@@ -186,8 +187,11 @@ builds. The post-measurement correction moves only that import behind `research-
 `0cfbcad370601a2739930238778f3631c8f051513e26cffceaec50525c6ee036`,
 [checks/provenance](../../research/m28-current-baseline/provenance/post-measurement-import.json)
 and 315-file frozen-source hash manifest retain this compilation-only exception. The measured
-release executable and response archives are unchanged; offline replay permits only that exact
-approved source difference. Both default/research example builds pass `cargo rustc ... -- -D warnings`.
+release executable and response archives are unchanged. Offline replay checks the retained
+[source snapshot](../../research/m28-current-baseline/provenance/frozen-source.json.gz) against
+the measured manifest and verifies the patch's exact before/after blobs; subsequent source changes
+are independent of historical validation. Replay works without Git history or network access.
+Both default/research example builds pass `cargo rustc ... -- -D warnings`.
 
 Tests preceded behavior changes. Nine example/integration tests and 15 Wiedemann tests across
 supported fields passed before measuring. Eight protocol and four model tests now cover exact

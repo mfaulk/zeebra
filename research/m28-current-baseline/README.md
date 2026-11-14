@@ -175,7 +175,7 @@ ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
     --native-amendment-from research/m28-current-baseline/native.json.gz
 ```
 
-The amendment is allowed once; any blocked or incomplete result remains draft. If it completes,
+The amendment is allowed once; blocked or incomplete results remain explicitly incomplete. If it completes,
 offline validation checks all 75 cells while verifying the immutable original prefix, original
 refusal, source/reference identities and cumulative budget ledger. This documents the explicit
 exception to the original no-resumption plan without rewriting that plan or its first stop.
@@ -200,16 +200,20 @@ postprocessing/publication consumed the binding aggregate allowance; the child w
 not measure compression. Follow-up [#764](https://github.com/mfaulk/zeebra/issues/764) scopes durable
 incremental/content-addressed publication, with High priority on Project #7 and parent #751.
 
-No additional solver run or extension is authorized. #751 remains open and PR #762 stays draft;
+No additional solver run or extension is authorized. #751 remains open; PR #762 integrates the
+instrumentation and retained partial evidence without claiming completed acceptance;
 the full five-repeat acceptance remains incomplete. The original two pilot tails stay separate.
 The [report](../../docs/research/m28-current-baseline.md) scores every delivered and missing item.
 
 The default-feature CI warning was fixed after measurement by moving only `FiniteField`’s import
 behind `research-work`. `provenance/post-measurement-import.patch` has SHA-256
 `0cfbcad370601a2739930238778f3631c8f051513e26cffceaec50525c6ee036`. Its JSON provenance records
-the two successful warnings-denied default/research example builds. The 315-file frozen-source
-hash manifest and offline replay allow only this exact import correction; measured binaries and
-responses are unchanged.
+the two successful warnings-denied default/research example builds. Offline replay validates the
+315-file hash manifest against `provenance/frozen-source.json.gz`, retained from the measured Git
+revision, and checks the exact import patch against its retained before/after source blobs.
+Later checkout changes do not invalidate historical evidence. Replay needs neither Git history nor
+network access; live campaign launch checks still require the frozen build source. Measured
+binaries and responses are unchanged.
 
 Final offline validation (no solver launch):
 

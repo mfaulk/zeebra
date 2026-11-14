@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 from statistics import median
 
 HERE=Path(__file__).resolve().parent
@@ -127,6 +128,46 @@ def summarize(path):
                 statuses=dict(Counter(a['status'] for a in cohort['attempts'])),rows=rows)
 
 
+def validate_frozen_source(manifest,snapshot,correction,source_patch):
+    files=snapshot['files']
+    if snapshot['measured_rust_source']!=correction['measured_rust_source'] or set(files)!=set(manifest):
+        raise ValueError('frozen source identity or file coverage differs')
+    for name,digest in manifest.items():
+        if hashlib.sha256(files[name].encode()).hexdigest()!=digest:
+            raise ValueError('frozen source bytes changed: '+name)
+    name=correction['corrected_file']
+    before,after=files[name],snapshot['corrected_source']
+    if hashlib.sha256(after.encode()).hexdigest()!=correction['corrected_file_sha256']:
+        raise ValueError('retained corrected source changed')
+    lines=source_patch.splitlines(True)
+    if (len(lines)<5 or lines[0]!=f'diff --git a/{name} b/{name}\n'
+            or lines[2:4]!=[f'--- a/{name}\n',f'+++ b/{name}\n']):
+        raise ValueError('approved patch does not describe the retained correction')
+    hunk=re.fullmatch(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@[^\n]*\n',lines[4])
+    if not hunk or any(line[:1] not in (' ','-','+') for line in lines[5:]):
+        raise ValueError('expected the single approved correction hunk')
+    old_start,old_count,new_start,new_count=(int(value) if value is not None else 1 for value in hunk.groups())
+    old=[line[1:] for line in lines[5:] if line[0] in (' ','-')]
+    new=[line[1:] for line in lines[5:] if line[0] in (' ','+')]
+    original=before.splitlines(True)
+    offset=old_start-1
+    if (offset<0 or old_start!=new_start or len(old)!=old_count or len(new)!=new_count
+            or original[offset:offset+old_count]!=old
+            or ''.join(original[:offset]+new+original[offset+old_count:])!=after):
+        raise ValueError('approved correction hunk does not match retained source')
+    index=lines[1].strip().split()
+    if len(index)!=3 or index[0]!='index' or index[2]!='100644':
+        raise ValueError('invalid correction blob identities')
+    identities=index[1].split('..')
+    if len(identities)!=2:
+        raise ValueError('invalid correction blob identities')
+    for content,identity in zip((before,after),identities):
+        data=content.encode()
+        blob=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        if not 7<=len(identity)<=40 or not blob.startswith(identity):
+            raise ValueError('correction blob identity differs')
+
+
 def validate_compilation_correction():
     correction=json.loads((HERE/'provenance/post-measurement-import.json').read_text())
     if study.sha(ROOT/correction['patch_path'])!=correction['patch_sha256']:
@@ -134,11 +175,11 @@ def validate_compilation_correction():
     source_path=ROOT/correction['source_manifest']
     if study.sha(source_path)!=correction['source_manifest_sha256']:
         raise ValueError('frozen measured-source manifest changed')
-    manifest=json.loads(source_path.read_text())
-    for name,digest in manifest.items():
-        expected=correction['corrected_file_sha256'] if name==correction['corrected_file'] else digest
-        if study.sha(ROOT/name)!=expected:
-            raise ValueError('source differs beyond approved import correction: '+name)
+    snapshot_path=ROOT/correction['frozen_source_snapshot']
+    if study.sha(snapshot_path)!=correction['frozen_source_snapshot_sha256']:
+        raise ValueError('retained source snapshot changed')
+    snapshot=json.loads(gzip.decompress(snapshot_path.read_bytes()))
+    validate_frozen_source(json.loads(source_path.read_text()),snapshot,correction,(ROOT/correction['patch_path']).read_text())
 
 
 def main():

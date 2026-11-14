@@ -26,6 +26,7 @@ struct RunMode<'a> {
     dynamic: bool,
     backward: Option<&'a str>,
     whole_route: Option<&'a str>,
+    symbolic: Option<&'a str>,
 }
 
 #[cfg(feature = "research-work")]
@@ -285,11 +286,19 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
         dynamic,
         backward,
         whole_route,
+        symbolic,
     } = mode;
+    assert!(
+        whole_route.is_none() || symbolic.is_none(),
+        "whole-route requires production symbolic policy"
+    );
     let order = MonomialOrder::GradedReverseLexicographic;
-    let input = corpus::instance(problem, modulus, order).expect("published corpus problem");
+    let input = corpus::instance(problem, modulus, order)
+        .or_else(|| zeebra::grobner::external::public_corpus::instance(problem, modulus, order))
+        .expect("published corpus problem");
     let entry = corpus::ladder()
         .into_iter()
+        .chain(zeebra::grobner::external::public_corpus::entries())
         .find(|e| e.name == input.name)
         .unwrap();
     assert_eq!(entry.digest_at(modulus), Some(input.digest().as_str()));
@@ -394,6 +403,25 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
         f4_with_options(&system, order, &options).expect("corpus computation failed")
     };
     #[cfg(feature = "research-work")]
+    let mut symbolic_report = None;
+    #[cfg(feature = "research-work")]
+    let solve = || {
+        if let Some(mode) = symbolic {
+            let (result, report) = zeebra::grobner::f4::live_symbolic::observe(
+                zeebra::grobner::f4::live_symbolic::Policy {
+                    order_initial: matches!(mode, "order" | "both"),
+                    deduplicate: matches!(mode, "dedup" | "both"),
+                },
+                system.len(),
+                solve,
+            );
+            symbolic_report = Some(report);
+            result
+        } else {
+            execute(solve)
+        }
+    };
+    #[cfg(feature = "research-work")]
     let ((basis, stats), work) = if measure_work {
         let (result, report) = if discovery {
             zeebra::linalg::work::measure_discovery(solve)
@@ -406,6 +434,10 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
     };
     #[cfg(not(feature = "research-work"))]
     let (basis, stats) = {
+        assert!(
+            symbolic.is_none(),
+            "--symbolic requires --features research-work"
+        );
         assert!(
             backward.is_none(),
             "--backward requires --features research-work"
@@ -450,6 +482,20 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
     });
     #[cfg(not(feature = "research-work"))]
     let backward_report = Json::Null;
+    #[cfg(feature = "research-work")]
+    let symbolic_report = symbolic_report.map_or(Json::Null, |r| {
+        Json::object([
+            ("mode", Json::string(symbolic.unwrap())),
+            ("initial_generators", Json::size(r.initial_generators)),
+            ("batches", Json::size(r.batches)),
+            ("offered_seeds", Json::size(r.offered_seeds)),
+            ("retained_seeds", Json::size(r.retained_seeds)),
+            ("peak_seed_capacity", Json::size(r.peak_seed_capacity)),
+            ("peak_order_capacity", Json::size(r.peak_order_capacity)),
+        ])
+    });
+    #[cfg(not(feature = "research-work"))]
+    let symbolic_report = Json::Null;
     let mut basis: Vec<_> = basis
         .iter()
         .map(|p| polynomial_to_string(p, &names, order))
@@ -465,6 +511,7 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
             ("work", work),
             ("parallel", parallel),
             ("backward", backward_report),
+            ("symbolic", symbolic_report),
             ("field_type", Json::string(std::any::type_name::<F>())),
             ("options", Json::string(format!("{options:?}"))),
             ("f4_call_ns", Json::nanos(elapsed)),
@@ -526,7 +573,7 @@ fn main() {
     }
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected] [--symbolic=original|order|dedup|both] [--whole-route=fglm|direct]")
         .parse()
         .unwrap();
     assert!(
@@ -537,6 +584,7 @@ fn main() {
             || s.starts_with("--problem=")
             || s.starts_with("--backward=")
             || s.starts_with("--whole-route=")
+            || s.starts_with("--symbolic=")
             || s == "--schedule=dynamic"
             || s == "--schedule=static")
             && args[1..]
@@ -595,11 +643,22 @@ fn main() {
         backward.is_none() || (!discovery && (workers.is_none() || backward != Some("dense-all"))),
         "dense-all requires serial forward; backward policies exclude discovery"
     );
+    let symbolics: Vec<_> = args
+        .iter()
+        .filter_map(|s| s.strip_prefix("--symbolic="))
+        .collect();
+    assert!(symbolics.len() <= 1, "one symbolic policy required");
+    let symbolic = symbolics.first().copied();
+    assert!(
+        symbolic.is_none_or(|s| matches!(s, "original" | "order" | "dedup" | "both")),
+        "unknown symbolic policy"
+    );
     let mode = RunMode {
         workers,
         dynamic,
         backward,
         whole_route: args.iter().find_map(|s| s.strip_prefix("--whole-route=")),
+        symbolic,
     };
     assert!(
         mode.whole_route
@@ -625,10 +684,16 @@ fn main() {
                 "katsura-11" => {
                     run::<11, $field>(modulus, measured, measure_work, discovery, mode, problem)
                 }
+                "public-eco-4" => {
+                    run::<4, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
+                "public-noon-3" | "public-reimer-3" => {
+                    run::<3, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
                 "cyclic-5" => {
                     run::<5, $field>(modulus, measured, measure_work, discovery, mode, problem)
                 }
-                _ => panic!("supported problems: mq-random-10, mq-random-14, katsura-6, cyclic-5"),
+                _ => panic!("supported problems: mq-random-10, mq-random-14, katsura-6, katsura-11, cyclic-5, public-eco-4, public-noon-3, public-reimer-3"),
             }
         };
     }
@@ -643,6 +708,26 @@ fn main() {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    // A whole-route request must reject a symbolic override rather than silently ignore it.
+    #[test]
+    #[should_panic(expected = "whole-route requires production symbolic policy")]
+    fn whole_route_rejects_symbolic_policy() {
+        run::<3, Zp32003>(
+            32003,
+            false,
+            false,
+            false,
+            RunMode {
+                workers: None,
+                dynamic: true,
+                backward: None,
+                whole_route: Some("fglm"),
+                symbolic: Some("both"),
+            },
+            "public-noon-3",
+        );
+    }
 
     // Forward/backward refinements aggregate without being counted twice in elimination.
     #[test]

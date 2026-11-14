@@ -7,6 +7,8 @@ pub mod degrees;
 pub mod divmask;
 pub mod hilbert_driven;
 pub(crate) mod interreduce;
+#[cfg(feature = "research-work")]
+pub mod live_symbolic;
 pub mod macaulay;
 pub mod matrix_corpus;
 pub mod membership;
@@ -253,6 +255,8 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // nothing is appended and nothing was checked.
     check_basis_size(basis.len(), options)?;
 
+    #[cfg(feature = "research-work")]
+    live_symbolic::initialize(basis.len());
     let mut monic = MonicBasis::new(&basis, order);
     if options.measure_divmask {
         // Calibrated from the system as read, not from the basis as it grows: thresholds that move

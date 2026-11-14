@@ -492,6 +492,14 @@ checkpoints and independently checks a returned point against the original equat
 [whole-route protocol](research/m28-current-baseline/README.md) defines its timers and bounded runs.
 The [current report](docs/research/m28-current-baseline.md) retains 70/75 native responses with
 explicit aggregate-publication timeout and acceptance gaps; it claims no completed #751 gate.
+Whole-route mode uses production symbolic policy and rejects `--symbolic` overrides. Historical
+baseline replay validates retained source snapshots, allowing the current solver to evolve.
+
+The opt-in [live symbolic-policy pilot](research/symbolic-live/README.md) compares initial-generator
+reducer ordering and exact pair-multiple deduplication against the production candidate-only route.
+Enable `research-work` and use `mq10_profile --symbolic=original|order|dedup|both` for the scoped
+experiment; omission keeps ordinary symbolic policy. The [measured live decision](docs/research/symbolic-live-policy.md)
+retains exact verified gains and small-control regressions and defers production adoption.
 
 The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanalyzes retained
 concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated
