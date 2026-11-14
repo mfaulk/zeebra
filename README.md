@@ -495,3 +495,7 @@ The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanaly
 concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated
 comparator demonstrates enough avoidable elapsed work to cover queue and suspended-row costs;
 [offline reproduction](research/waiting-row/README.md) launches no benchmarks.
+
+The [residual backward decision](research/residual-backward/README.md) reconciles selected-row
+work with production candidate reduction and models its historical complete-F4 opportunity.
+It defers a separate backward scheduler until current integrated elapsed profiles justify one.

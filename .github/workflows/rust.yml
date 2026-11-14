@@ -128,6 +128,8 @@ jobs:
           cargo test --features research-work --lib linalg::selective
           python3 tools/test/selective-backward-study-test.py
           python3 tools/test/candidate-adoption-summary-test.py
+          python3 tools/test/residual-backward-model-test.py
+          python3 research/residual-backward/model.py --check
           python3 research/candidate-adoption/summary.py --check
           python3 tools/test/selective-backward-summary-test.py
           python3 tools/test/selective-backward-cross-test.py
