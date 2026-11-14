@@ -81,6 +81,18 @@ class WholeSummary(unittest.TestCase):
         ledger['unaccepted_cells']=[]
         with self.assertRaises(ValueError): summary.external_stop(cohort,ledger,'archive')
 
+    # Historical archives keep their order and label; later fresh cohorts under current/ follow, labelled current.
+    def test_cohort_paths_label_current_cohorts_separately(self):
+        with tempfile.TemporaryDirectory() as directory:
+            here=Path(directory)
+            (here/'current').mkdir()
+            for name in ('pilot.json.gz','pilot-completed.json.gz','native.json.gz','native-completed.json.gz',
+                         'current/native-2ec9d3af.json.gz','current/pilot-2ec9d3af.json.gz','current/notes.txt'):
+                (here/name).write_bytes(b'')
+            self.assertEqual([(label,path.relative_to(here).as_posix()) for label,path in summary.cohort_paths(here)],
+                             [('historical','pilot-completed.json.gz'),('historical','native-completed.json.gz'),
+                              ('current','current/native-2ec9d3af.json.gz'),('current','current/pilot-2ec9d3af.json.gz')])
+
     # Missing entire cells cannot masquerade as a complete repeated campaign.
     def test_missing_cells_are_rejected(self):
         with self.assertRaises(ValueError): summary.validate_plan(dict(phase='pilot',plan=[],attempts=[]))

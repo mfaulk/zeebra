@@ -40,6 +40,12 @@ class WholeRouteStudy(unittest.TestCase):
         previous.pop('resumptions')
         previous['attempts'][0]['status']='contaminated'
         with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+    # Idle IDE language servers do not gate a window; any cargo, rustc, clippy or linker process still does.
+    def test_build_gate_ignores_language_servers_only(self):
+        active=[('1','rust-analyzer'),('2','cargo'),('3','rustc'),('4','clippy-driver'),('5','rust-lld'),('6','ld.lld')]
+        self.assertEqual(study.build_processes(lambda: active),active[1:])
+        self.assertEqual(study.build_processes(lambda: [('9','rust-analyzer')]),[])
+
 
     # Relative and absolute repository archive paths produce the same durable provenance path.
     def test_archive_path_is_normalized_before_relativizing(self):

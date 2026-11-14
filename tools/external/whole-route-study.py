@@ -36,6 +36,11 @@ def limits():
     return dict(child_wall_seconds=60, rss_bytes=2*1024**3, aggregate_wall_seconds=900, output_bytes=256*1024**2)
 
 
+def build_processes(compilers):
+    # A long-lived rust-analyzer is not a build; the checks it launches appear as cargo/rustc/clippy-driver and still gate.
+    return [process for process in compilers() if process[1]!='rust-analyzer']
+
+
 def child_wall(remaining):
     if remaining<1: raise ValueError('aggregate allowance exhausted')
     return min(60,int(remaining))
@@ -378,7 +383,7 @@ def main():
         result['cpu_seconds']=after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime
         return result
 
-    measure(journal,len(cohort['attempts']),refs,launch,runtime.compiler_processes,lambda: os.getloadavg()[0],
+    measure(journal,len(cohort['attempts']),refs,launch,lambda: build_processes(runtime.compiler_processes),lambda: os.getloadavg()[0],
         lambda: campaign_limits['aggregate_wall_seconds']-(time.monotonic()-began),
         lambda: limits()['output_bytes']-prior_archive_bytes-scratch_bytes(args.scratch)-journal.retained_bytes,
         native_amendment=bool(args.native_amendment_from))
