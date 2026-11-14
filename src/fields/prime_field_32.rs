@@ -6,7 +6,8 @@
 //! L2. Four bytes a cell halves the bytes that kernel moves.
 //!
 //! Elements are held in Montgomery form with R = 2^32 when P is odd, so that multiplication needs
-//! no division; see [`montgomery`]. An even modulus keeps a remainder, but by a *constant* 64-bit
+//! no division; see [`montgomery`]. The exception is 2^31 - 1, which keeps canonical residues and
+//! reduces by shift-and-add, since 2^31 = 1 modulo it (#780). An even modulus keeps a remainder, but by a *constant* 64-bit
 //! divisor, which LLVM strength-reduces to a multiply and a shift — so no path from multiplication
 //! reaches a software division routine, which is what [`PrimeFieldElement64`] needed Montgomery
 //! form to achieve.
@@ -46,9 +47,10 @@ use crate::{
 mod montgomery {
     /// Whether modulus `p` is represented in Montgomery form.
     ///
-    /// Odd moduli only: R = 2^32 is not invertible modulo an even number.
+    /// Odd moduli only: R = 2^32 is not invertible modulo an even number. And not 2^31 - 1, whose
+    /// Mersenne reduction beats Montgomery on every kernel `examples/field_reduction` measures.
     pub const fn uses_montgomery(p: u32) -> bool {
-        p % 2 == 1
+        p % 2 == 1 && p != super::MERSENNE_31
     }
 
     /// `-P^{-1} mod 2^32`, the factor that makes the low half of `t + m*P` vanish.
@@ -145,6 +147,9 @@ mod montgomery {
     }
 }
 
+/// 2^31 - 1, which keeps canonical residues and gets a shift-and-add reduction (#780).
+const MERSENNE_31: u32 = (1 << 31) - 1;
+
 /// Whether a sum of two reduced residues can overflow a `u32`.
 ///
 /// False for every modulus at or below 2^31, which is all of them that this type is declared for.
@@ -166,7 +171,7 @@ const fn sum_fits_in_32_bits(p: u32) -> bool {
 /// assert_eq!(std::mem::size_of::<Zp2147483647>(), 8);
 /// assert_eq!(Mersenne31::order_u128(), Zp2147483647::order_u128());
 ///
-/// // Montgomery form is not observable: `value()` is the canonical residue.
+/// // The internal representation is not observable: `value()` is the canonical residue.
 /// let a = Mersenne31::new(827376);
 /// assert_eq!(a.pow(2).value(), 1651245630);
 /// assert_eq!(a * a.inverse(), Mersenne31::new(1));
@@ -175,8 +180,8 @@ const fn sum_fits_in_32_bits(p: u32) -> bool {
 /// assert_eq!(BabyBear::order_u128(), Some(2013265921));
 /// ```
 pub struct PrimeFieldElement32<const P: u32> {
-    /// The element's internal representation: `a * 2^32 mod P` for odd P, and the canonical
-    /// residue `a` for even P. [`value`](Self::value) converts back; nothing else should read this
+    /// The element's internal representation: `a * 2^32 mod P` for odd P other than 2^31 - 1, and
+    /// the canonical residue `a` for 2^31 - 1 and even P. [`value`](Self::value) converts back; nothing else should read this
     /// field expecting a residue.
     ///
     /// Private so that neither the reduced-residue invariant nor the choice of representation can
@@ -228,8 +233,8 @@ where
 impl<const P: u32> PrimeFieldElement32<P> {
     /// The element's representative integer in [0,p-1].
     ///
-    /// For an odd modulus this is a Montgomery reduction, not a field read, so a hot loop should
-    /// hold field elements rather than call this per iteration.
+    /// For an odd modulus other than 2^31 - 1 this is a Montgomery reduction, not a field read, so a
+    /// hot loop should hold field elements rather than call this per iteration.
     pub fn value(&self) -> u32 {
         montgomery::to_canonical::<P>(self.value)
     }
@@ -384,6 +389,16 @@ impl<const P: u32> ops::Mul<&PrimeFieldElement32<P>> for &PrimeFieldElement32<P>
         // left is a multiply and a shift rather than a call to a division routine.
         let value = if montgomery::uses_montgomery(P) {
             montgomery::mul::<P>(self.value, rhs.value)
+        } else if P == MERSENNE_31 {
+            // 2^31 = 1 mod P. With t <= (P-1)^2 < 2^62 both halves are below 2^31 and the fold is
+            // at most 2P - 1, so it stays in 32-bit lanes and one conditional subtraction ends it.
+            let t = self.value as u64 * rhs.value as u64;
+            let r = (t as u32 & P) + (t >> 31) as u32;
+            if r >= P {
+                r - P
+            } else {
+                r
+            }
         } else {
             ((self.value as u64 * rhs.value as u64) % P as u64) as u32
         };
@@ -539,6 +554,48 @@ mod tests {
         }
     }
 
+    /// 2^31 - 1 is stored as its canonical residue, and every other odd modulus in Montgomery form.
+    #[test]
+    fn test_mersenne31_is_held_canonically() {
+        use super::montgomery::uses_montgomery;
+
+        assert!(!uses_montgomery(2147483647));
+        assert!(!uses_montgomery(2));
+        assert!(uses_montgomery(31));
+        assert!(uses_montgomery(32003));
+        assert!(uses_montgomery(2013265921));
+        assert!(uses_montgomery(2130706433));
+        assert!(uses_montgomery(BIG));
+
+        assert_eq!(Mersenne31::new(5).value, 5);
+        assert_eq!(Mersenne31::one().value, 1);
+        assert_eq!(Mersenne31::new(u64::MAX).value, (u64::MAX % 2147483647) as u32);
+        assert_ne!(BabyBear::new(5).value, 5);
+    }
+
+    /// The Mersenne fold matches a `u128` remainder at the products that bound its one subtraction.
+    ///
+    /// The fold `(t & P) + (t >> 31)` is at most 2P - 1 for `t <= (P - 1)^2`, so the cases that
+    /// matter are the largest product, products whose fold lands exactly on P or just above it,
+    /// and products of powers of two, which are the ones the identity 2^31 = 1 rotates.
+    #[test]
+    fn test_mersenne31_multiplication_matches_u128_at_boundary_products() {
+        const P: u32 = 2147483647;
+        let mut values: Vec<u32> = vec![0, 1, 2, 3, 46340, 46341, 65535, 65536, P - 2, P - 1];
+        values.extend((0..31).map(|k| 1u32 << k));
+        values.extend((1..31).map(|k| P - (1u32 << k)));
+        values.extend([P / 2, P / 2 + 1, P / 3, 2 * (P / 3)]);
+
+        for &a in &values {
+            for &b in &values {
+                let product = Mersenne31::new(a as u64) * Mersenne31::new(b as u64);
+                let expected = ((a as u128 * b as u128) % P as u128) as u32;
+                assert_eq!(product.value(), expected, "{a} * {b}");
+                assert!(product.value < P, "{a} * {b} is not reduced");
+            }
+        }
+    }
+
     /// Conditional addition and subtraction agree with reducing by a wide remainder.
     ///
     /// Boundary values matter most: with P above 2^31 the sum overflows 32 bits, which is the case
@@ -676,6 +733,10 @@ mod tests {
         );
 
         // One is the case most likely to leak: in Montgomery form it is R mod P, not 1.
+        assert_eq!(
+            bincode::serialize(&BabyBear::one()).unwrap(),
+            bincode::serialize(&1u32).unwrap()
+        );
         assert_eq!(
             bincode::serialize(&Mersenne31::one()).unwrap(),
             bincode::serialize(&1u32).unwrap()
