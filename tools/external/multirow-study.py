@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import resource
 import subprocess
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 PROBLEMS = ('mq-random-10', 'cyclic-5', 'katsura-6')
@@ -17,6 +18,8 @@ ARMS = ('stock', 'single', 'band4', 'lanes4')
 TRAJECTORY = ('batches', 'pairs_considered', 'pairs_reduced', 'elements_added', 'empty_batches',
               'max_matrix_rows', 'max_matrix_columns', 'degree_sequence', 'peak_basis_elements',
               'peak_basis_terms')
+# A build that starts during an attempt excludes it; it is retained and the cell re-run.
+RETRIES = 3
 
 
 def load(name):
@@ -95,6 +98,7 @@ def main():
         parser.add_argument('--' + name, required=True, type=Path)
     parser.add_argument('--phase', choices=('native', 'probe'), default='native')
     parser.add_argument('--max-load', type=float, default=8)
+    parser.add_argument('--max-wait', type=float, default=1800, help='seconds to wait for a quiet machine')
     parser.add_argument('--build-commit', required=True)
     args = parser.parse_args()
     if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=ROOT, text=True).strip():
@@ -109,7 +113,7 @@ def main():
         parser.error('output exists; retain it and use a new campaign path')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.scratch.mkdir(parents=True, exist_ok=True)
-    storage, guard, pool = load('study_artifacts'), load('grobx-work-study'), load('worker-pool-study')
+    storage, guard = load('study_artifacts'), load('grobx-work-study')
     identity = dict(commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         build_commit=build_commit, phase=args.phase, affinity=affinity, machine=os.environ['ZEEBRA_MACHINE'],
         max_load=args.max_load, cargo_lock_sha256=sha(ROOT / 'Cargo.lock'),
@@ -122,43 +126,22 @@ def main():
         limits=dict(child_wall_seconds=60, rss_bytes=2 * 1024**3, parent_wall_seconds=185), attempts=[])
     refs = load('selective-backward-study').references() if args.phase == 'native' else {}
     trajectories = {}
+    cohort['excluded_attempts'] = []
     for repeat, problem, modulus, arm in plan(args.phase):
-        if pool.compiler_processes() or os.getloadavg()[0] > args.max_load:
-            cohort['refusal'] = dict(load=os.getloadavg()[0], compilers=pool.compiler_processes(),
-                                     next=[repeat, problem, modulus, arm])
+        for _ in range(RETRIES):
+            waited = wait_for_quiet(args.max_load, args.max_wait)
+            if waited is None:
+                cohort['refusal'] = dict(load=os.getloadavg()[0], compilers=compilers(),
+                                         next=[repeat, problem, modulus, arm])
+                guard.write(args.output, cohort)
+                raise RuntimeError('environment gate refused; verified prefix retained')
+            result = attempt(args, identity, refs, trajectories, guard, len(cohort['attempts']),
+                             repeat, problem, modulus, arm)
+            result['gate_wait_seconds'] = waited
+            if result['status'] != 'contaminated':
+                break
+            cohort['excluded_attempts'].append(result)
             guard.write(args.output, cohort)
-            raise RuntimeError('environment gate refused; verified prefix retained')
-        binary = args.stock if arm == 'stock' else args.binary
-        if sha(binary) != identity['binaries']['stock' if arm == 'stock' else 'binary']['sha256']:
-            raise ValueError('binary changed during campaign')
-        before = resource.getrusage(resource.RUSAGE_CHILDREN)
-        result = guard.guarded(['timeout', '--signal=KILL', '185', *command(binary, problem, modulus, arm)],
-                               args.scratch / str(len(cohort['attempts'])), 60, 2 * 1024**3)
-        after = resource.getrusage(resource.RUSAGE_CHILDREN)
-        result.update(repeat=repeat, problem=problem, modulus=modulus, arm=arm, status='failed',
-                      load=os.getloadavg()[0],
-                      cpu_seconds=after.ru_utime + after.ru_stime - before.ru_utime - before.ru_stime)
-        try:
-            if result['exit'] or result['stop']:
-                if args.phase != 'probe':
-                    raise ValueError('child failed or refused')
-                result['status'] = 'incomplete-unverified'
-            else:
-                raw = json.loads(result['stdout'])
-                result['raw'] = raw
-                result['census'] = census_totals(raw)
-                if args.phase == 'probe':
-                    result['status'] = 'completed-needs-independent-reference'
-                else:
-                    validate(raw, refs[(problem, modulus)], problem, arm)
-                    trajectories.setdefault((problem, modulus), raw)
-                    check_trajectory(raw, trajectories[(problem, modulus)])
-                    result['status'] = 'verified'
-        except (ValueError, KeyError, TypeError) as error:
-            result['failure'] = str(error)
-        result['compiler_after'] = pool.compiler_processes()
-        if result['compiler_after'] and result['status'] == 'verified':
-            result['status'] = 'contaminated'
         if result['status'] == 'verified':
             result = storage.pack_attempt(result, args.output)
         cohort['attempts'].append(result)
@@ -167,6 +150,56 @@ def main():
         if result['status'] in ('failed', 'contaminated'):
             raise RuntimeError('attempt not verified; retained and stopped')
 
+
+def compilers(proc=Path('/proc')):
+    """Build processes, excluding an idle editor's rust-analyzer server; its checks still count."""
+    return [entry for entry in load('worker-pool-study').compiler_processes(proc) if entry[1] != 'rust-analyzer']
+
+
+def wait_for_quiet(max_load, max_wait):
+    """Seconds waited until no build runs and load is under `max_load`, or None past `max_wait`."""
+    started = time.monotonic()
+    while compilers() or os.getloadavg()[0] > max_load:
+        if time.monotonic() - started > max_wait:
+            return None
+        time.sleep(10)
+    return time.monotonic() - started
+
+
+def attempt(args, identity, refs, trajectories, guard, index, repeat, problem, modulus, arm):
+    binary = args.stock if arm == 'stock' else args.binary
+    if sha(binary) != identity['binaries']['stock' if arm == 'stock' else 'binary']['sha256']:
+        raise ValueError('binary changed during campaign')
+    load_before = os.getloadavg()[0]
+    before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    result = guard.guarded(['timeout', '--signal=KILL', '185', *command(binary, problem, modulus, arm)],
+                           args.scratch / str(index), 60, 2 * 1024**3)
+    after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    result.update(repeat=repeat, problem=problem, modulus=modulus, arm=arm, status='failed',
+                  load_before=load_before, load=os.getloadavg()[0],
+                  cpu_seconds=after.ru_utime + after.ru_stime - before.ru_utime - before.ru_stime)
+    try:
+        if result['exit'] or result['stop']:
+            if args.phase != 'probe':
+                raise ValueError('child failed or refused')
+            result['status'] = 'incomplete-unverified'
+        else:
+            raw = json.loads(result['stdout'])
+            result['raw'] = raw
+            result['census'] = census_totals(raw)
+            if args.phase == 'probe':
+                result['status'] = 'completed-needs-independent-reference'
+            else:
+                validate(raw, refs[(problem, modulus)], problem, arm)
+                trajectories.setdefault((problem, modulus), raw)
+                check_trajectory(raw, trajectories[(problem, modulus)])
+                result['status'] = 'verified'
+    except (ValueError, KeyError, TypeError) as error:
+        result['failure'] = str(error)
+    result['compiler_after'] = compilers()
+    if result['compiler_after'] and result['status'] == 'verified':
+        result['status'] = 'contaminated'
+    return result
 
 if __name__ == '__main__':
     main()

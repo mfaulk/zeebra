@@ -33,6 +33,18 @@ class Plan(unittest.TestCase):
         self.assertIn('--stages', study.command(binary, 'cyclic-5', 13, 'stock'))
 
 
+class Gate(unittest.TestCase):
+    # An idle rust-analyzer does not block the campaign, but a build it or anyone else starts does.
+    def test_compilers_ignore_only_the_editor_server(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            for pid, comm in ((10, 'rust-analyzer'), (11, 'bash'), (12, 'rustc'), (13, 'cargo')):
+                (Path(root) / str(pid)).mkdir()
+                (Path(root) / str(pid) / 'comm').write_text(comm + '\n')
+            found = sorted(name for _, name in study.compilers(Path(root)))
+        self.assertEqual(found, ['cargo', 'rustc'])
+
+
 class Acceptance(unittest.TestCase):
     # A complete answer plus the selected mode is accepted; a wrong basis or mode is not.
     def test_answer_and_mode(self):
