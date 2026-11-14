@@ -235,7 +235,10 @@ and is prime-field only, so there is no GF(2^8) oracle yet: #378).
 hold, in half the bytes. Montgomery form with R = 2^32, the representation unobservable in the same
 two ways; the one place the arithmetic is not a mechanical substitution is that `t + m*P` needs 65
 bits only when P exceeds 2^31, and that predicate is on the const generic, so every declared
-modulus gets a reduction with no carry handling in it.
+modulus gets a reduction with no carry handling in it. `Mersenne31` is the exception: it stores the
+canonical residue and folds the product at bit 31, since 2^31 = 1 modulo 2^31 − 1. That took its F4
+forward elimination on the adaptive backend to 0.77–0.78x and put the 4-byte type back ahead of
+`Zp2147483647` (#780; [the measurements](../research/field-arithmetic-specialization.md#3b-end-to-end-gate-mersenne31-780)).
 
 ```rust
 use zeebra::{fields::{BabyBear, Mersenne31, Zp2147483647}, FiniteField, KnownOrder};
@@ -245,7 +248,7 @@ assert_eq!(std::mem::size_of::<Zp2147483647>(), 8);
 assert_eq!(Mersenne31::order_u128(), Zp2147483647::order_u128());
 
 let a = Mersenne31::new(827376);
-assert_eq!(a.pow(2).value(), 1651245630);   // the canonical residue, not the Montgomery form
+assert_eq!(a.pow(2).value(), 1651245630);   // the canonical residue, whatever is stored
 assert_eq!(BabyBear::order_u128(), Some(2013265921));
 ```
 

@@ -7,10 +7,10 @@
 //!
 //! Elements are held in Montgomery form with R = 2^32 when P is odd, so that multiplication needs
 //! no division; see [`montgomery`]. The exception is 2^31 - 1, which keeps canonical residues and
-//! reduces by shift-and-add, since 2^31 = 1 modulo it (#780). An even modulus keeps a remainder, but by a *constant* 64-bit
-//! divisor, which LLVM strength-reduces to a multiply and a shift — so no path from multiplication
-//! reaches a software division routine, which is what [`PrimeFieldElement64`] needed Montgomery
-//! form to achieve.
+//! reduces by shift-and-add, since 2^31 = 1 modulo it (#780). An even modulus keeps a remainder,
+//! but by a *constant* 64-bit divisor, which LLVM strength-reduces to a multiply and a shift — so
+//! no path from multiplication reaches a software division routine, which is what
+//! [`PrimeFieldElement64`] needed Montgomery form to achieve.
 //!
 //! [`PrimeFieldElement64`]: super::PrimeFieldElement64
 
@@ -569,7 +569,10 @@ mod tests {
 
         assert_eq!(Mersenne31::new(5).value, 5);
         assert_eq!(Mersenne31::one().value, 1);
-        assert_eq!(Mersenne31::new(u64::MAX).value, (u64::MAX % 2147483647) as u32);
+        assert_eq!(
+            Mersenne31::new(u64::MAX).value,
+            (u64::MAX % 2147483647) as u32
+        );
         assert_ne!(BabyBear::new(5).value, 5);
     }
 
