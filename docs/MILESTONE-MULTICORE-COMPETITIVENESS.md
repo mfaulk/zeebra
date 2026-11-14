@@ -67,6 +67,7 @@ tasks, startup screening and current adapter restrictions.
 | Same work study | Zeebra counts from `ff65d2b4`, applicability reconciled to row counts at the timing pin | About 579.7 M backward products versus msolve 0.64 M. Main opportunity: inherited reducer tails need not all be backward reduced. |
 | [Symbolic attribution](research/symbolic-attribution.md) | `575f59d9` frozen replay; `f80adee9` complete sorted-input check | Ordering plus duplicate-multiple removal changes forward products from 585.17 M to 486.42 M in replay. Combined live policy and end-to-end time were not measured. |
 | [Kernel study](research/elimination-kernels.md) | Prefix result `dd36652e`; delayed pilot `6578c0ab` with overlay hash retained there | Generic prefix merge shipped. Delayed small-prime pilot fails broader full-solve regression gates. Read-side fill counts are not measured physical controller bandwidth. |
+| [Multirow reuse](research/multirow-reuse.md) | Binaries `c45bf1eb`; controllers `ebebd9dc`, `65a616b5`; F4 forward stage and process wall | #715: four-row bands cut MQ10 pivot reads 2.47x at identical products but forward time only ~2% (paired 0.98x); interleaved lanes 1.11–1.15x slower and not vectorized. Reject integration; SIMD kernel deferred. |
 
 The [Groebner.jl gap](research/groebner-jl-gap.md) and
 [grobx trajectory](research/grobx-trajectory.md) explain older algorithm/work comparisons. Their

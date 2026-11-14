@@ -95,11 +95,44 @@ def activation(path):
     return '\n'.join(lines) + '\n'
 
 
+def extension(path):
+    """Paired band4/single ratios over the declared extension's repetitions."""
+    lines = ['| p | pairs | forward band4/single, median (range) | pairs below 1 | wall band4/single, median (range) | single forward ms | band4 forward ms | pre-run load |',
+             '|---:|---:|---:|---:|---:|---:|---:|---|']
+    pairs = {}
+    for a in storage.iter_attempts(path):
+        if a['status'] == 'verified':
+            pairs.setdefault(a['modulus'], {}).setdefault(a['repeat'], {})[a['arm']] = a
+    for modulus, repeats in sorted(pairs.items()):
+        both = [r for r in repeats.values() if len(r) == 2]
+        fwd = [r['band4']['raw']['statistics']['forward_ns'] / r['single']['raw']['statistics']['forward_ns'] for r in both]
+        wall = [r['band4']['process_wall_ns'] / r['single']['process_wall_ns'] for r in both]
+        ms = lambda arm: statistics.median(r[arm]['raw']['statistics']['forward_ns'] / 1e6 for r in both)
+        loads = [x[arm]['load_before'] for x in both for arm in x]
+        lines.append(f"| {modulus} | {len(both)} | {statistics.median(fwd):.3f} ({min(fwd):.3f}–{max(fwd):.3f}) | "
+                     f"{sum(x < 1 for x in fwd)} | {statistics.median(wall):.3f} ({min(wall):.3f}–{max(wall):.3f}) | "
+                     f"{ms('single'):.1f} | {ms('band4'):.1f} | {min(loads):.1f}–{max(loads):.1f} |")
+    return '\n'.join(lines) + '\n'
+
+
+def probe(path):
+    """Larger-rung outcomes; without a retained reference these compare arms with each other only."""
+    lines = ['| problem | p | arm | outcome | process wall s | observed peak RSS MiB |', '|---|---:|---|---|---:|---:|']
+    for a in storage.iter_attempts(path):
+        lines.append(f"| {a['problem']} | {a['modulus']} | {a['arm']} | {a['status']} (stop={a['stop']}) | "
+                     f"{a['process_wall_ns'] / 1e9:.1f} | {a['observed_peak_rss_bytes'] / 2**20:.1f} |")
+    return '\n'.join(lines) + '\n'
+
+
 def main():
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / 'native.json.gz'
     rows = summary(path)
     (HERE / 'summary.json').write_text(json.dumps(rows, indent=1) + '\n')
     text = table(rows) + '\n' + activation(path)
+    if (HERE / 'extension.json.gz').exists():
+        text += '\n' + extension(HERE / 'extension.json.gz')
+    if (HERE / 'probe.json.gz').exists():
+        text += '\n' + probe(HERE / 'probe.json.gz')
     (HERE / 'table.md').write_text(text)
     print(text)
 

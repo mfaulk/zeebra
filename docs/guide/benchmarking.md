@@ -814,6 +814,22 @@ lock so the high-water mark belongs to that row. Both policies use the same 1000
 F4 limits, RNG seed 417, and other default budgets. See
 [the measurement protocol](../research/classify-before-lex.md) for pinned commands and results.
 
+### Multirow pivot reuse (#715)
+
+`mq10_profile --multirow=single|band4|lanes4`, built with `--features research-multirow`, runs the
+shipped F4 route with the forward pass in the production single-row loop, four-row bands with
+separate scalar lanes, or four interleaved lanes, and reports the band census (pivot reads against
+applications, sharing width, partial bands, scratch). `tools/external/multirow-study.py` runs the
+three arms plus a feature-absent control under the benchmark lock and verifies every basis against
+the retained references. The [report](../research/multirow-reuse.md) rejects integration and defers
+an explicit SIMD kernel. Checks:
+
+```sh
+cargo test --features research-multirow --lib linalg::dense::band
+python3 tools/test/multirow-study-test.py
+python3 research/multirow-reuse/summarize.py
+```
+
 ### Persistent worker dispatch and border reduction
 
 The [worker-pool study](../../research/worker-pool/README.md) compares scoped threads, a bounded
