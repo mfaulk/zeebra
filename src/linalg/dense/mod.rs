@@ -14,6 +14,8 @@
 //! row.
 
 mod accumulator;
+#[cfg(feature = "research-multirow")]
+pub(crate) mod band;
 mod rows;
 
 pub use accumulator::DenseAccumulator;

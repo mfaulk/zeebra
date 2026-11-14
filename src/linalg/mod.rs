@@ -3,6 +3,13 @@ pub mod concurrent;
 mod crout;
 pub mod dense;
 pub mod echelon;
+#[cfg(feature = "research-multirow")]
+pub mod multirow {
+    //! Research-only multirow sparse pivot reuse (#715); not a production path.
+    pub use super::dense::band::{
+        census, mode, take_census, with_mode, Census, MatrixCensus, Mode,
+    };
+}
 mod gauss_jordan;
 mod matrix;
 mod pivots;

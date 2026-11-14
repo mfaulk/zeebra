@@ -27,6 +27,7 @@ struct RunMode<'a> {
     backward: Option<&'a str>,
     whole_route: Option<&'a str>,
     symbolic: Option<&'a str>,
+    multirow: Option<&'a str>,
 }
 
 #[cfg(feature = "research-work")]
@@ -190,6 +191,46 @@ impl<const N: usize, F: FiniteField + Send + Sync> zeebra::grobner::f4::BatchObs
     }
 }
 
+#[cfg(feature = "research-multirow")]
+fn multirow_report(mode: Option<&str>) -> Json {
+    let Some(mode) = mode else {
+        return Json::Null;
+    };
+    let census = zeebra::linalg::multirow::take_census();
+    let matrices = census.matrices.iter().map(|m| {
+        Json::object([
+            ("rows", Json::size(m.rows)),
+            ("columns", Json::size(m.columns)),
+            ("first", Json::size(m.first)),
+            ("target_entries", Json::size(m.target_entries)),
+            ("bands", Json::size(m.bands)),
+            ("partial_bands", Json::size(m.partial_bands)),
+            ("pivot_applications", Json::size(m.pivot_applications)),
+            ("pivot_reads", Json::size(m.pivot_reads)),
+            ("entries_applied", Json::size(m.entries_applied)),
+            ("entries_read", Json::size(m.entries_read)),
+            ("lane_products", Json::size(m.lane_products)),
+            (
+                "reads_by_lanes",
+                Json::Array(m.reads_by_lanes.iter().copied().map(Json::size).collect()),
+            ),
+            ("intra_band_pivots", Json::size(m.intra_band_pivots)),
+            ("new_pivots", Json::size(m.new_pivots)),
+            ("zero_rows", Json::size(m.zero_rows)),
+            ("scratch_bytes", Json::size(m.scratch_bytes)),
+        ])
+    });
+    Json::object([
+        ("mode", Json::string(mode)),
+        ("matrices", Json::Array(matrices.collect())),
+    ])
+}
+
+#[cfg(not(feature = "research-multirow"))]
+fn multirow_report(_: Option<&str>) -> Json {
+    Json::Null
+}
+
 fn execute<T>(f: impl FnOnce() -> T) -> T {
     f()
 }
@@ -287,7 +328,12 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
         backward,
         whole_route,
         symbolic,
+        multirow,
     } = mode;
+    assert!(
+        multirow.is_none() || (whole_route.is_none() && workers.is_none() && backward.is_none()),
+        "--multirow requires production serial reduction"
+    );
     assert!(
         whole_route.is_none() || symbolic.is_none(),
         "whole-route requires production symbolic policy"
@@ -421,6 +467,19 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
             execute(solve)
         }
     };
+    #[cfg(feature = "research-multirow")]
+    let multirow_mode = match multirow {
+        Some("band4") => zeebra::linalg::multirow::Mode::Band4,
+        Some("lanes4") => zeebra::linalg::multirow::Mode::Lanes4,
+        _ => zeebra::linalg::multirow::Mode::Single,
+    };
+    #[cfg(feature = "research-multirow")]
+    let solve = || zeebra::linalg::multirow::with_mode(multirow_mode, solve);
+    #[cfg(not(feature = "research-multirow"))]
+    assert!(
+        multirow.is_none(),
+        "--multirow requires --features research-multirow"
+    );
     #[cfg(feature = "research-work")]
     let ((basis, stats), work) = if measure_work {
         let (result, report) = if discovery {
@@ -512,6 +571,7 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
             ("parallel", parallel),
             ("backward", backward_report),
             ("symbolic", symbolic_report),
+            ("multirow", multirow_report(multirow)),
             ("field_type", Json::string(std::any::type_name::<F>())),
             ("options", Json::string(format!("{options:?}"))),
             ("f4_call_ns", Json::nanos(elapsed)),
@@ -573,7 +633,7 @@ fn main() {
     }
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected] [--symbolic=original|order|dedup|both] [--whole-route=fglm|direct]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected] [--symbolic=original|order|dedup|both] [--whole-route=fglm|direct] [--multirow=single|band4|lanes4]")
         .parse()
         .unwrap();
     assert!(
@@ -585,6 +645,7 @@ fn main() {
             || s.starts_with("--backward=")
             || s.starts_with("--whole-route=")
             || s.starts_with("--symbolic=")
+            || s.starts_with("--multirow=")
             || s == "--schedule=dynamic"
             || s == "--schedule=static")
             && args[1..]
@@ -659,7 +720,13 @@ fn main() {
         backward,
         whole_route: args.iter().find_map(|s| s.strip_prefix("--whole-route=")),
         symbolic,
+        multirow: args.iter().find_map(|s| s.strip_prefix("--multirow=")),
     };
+    assert!(
+        mode.multirow
+            .is_none_or(|m| matches!(m, "single" | "band4" | "lanes4")),
+        "unknown multirow mode"
+    );
     assert!(
         mode.whole_route
             .is_none_or(|r| matches!(r, "direct" | "fglm")),
@@ -724,6 +791,7 @@ mod tests {
                 backward: None,
                 whole_route: Some("fglm"),
                 symbolic: Some("both"),
+                multirow: None,
             },
             "public-noon-3",
         );
