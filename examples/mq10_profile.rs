@@ -19,6 +19,7 @@ struct RunMode<'a> {
     workers: Option<usize>,
     dynamic: bool,
     backward: Option<&'a str>,
+    symbolic: Option<&'a str>,
 }
 
 #[cfg(feature = "research-work")]
@@ -201,6 +202,8 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
         ("symbolic_ns", time(t.symbolic)),
         ("construction_ns", time(t.construction)),
         ("elimination_ns", time(t.elimination)),
+        ("forward_ns", time(t.forward)),
+        ("backward_ns", time(t.backward)),
         ("extraction_ns", time(t.extraction)),
         ("interreduction_ns", time(t.interreduction)),
         ("other_ns", time(s.total.saturating_sub(t.sum()))),
@@ -275,11 +278,15 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         workers,
         dynamic,
         backward,
+        symbolic,
     } = mode;
     let order = MonomialOrder::GradedReverseLexicographic;
-    let input = corpus::instance(problem, modulus, order).expect("published corpus problem");
+    let input = corpus::instance(problem, modulus, order)
+        .or_else(|| zeebra::grobner::external::public_corpus::instance(problem, modulus, order))
+        .expect("published corpus problem");
     let entry = corpus::ladder()
         .into_iter()
+        .chain(zeebra::grobner::external::public_corpus::entries())
         .find(|e| e.name == input.name)
         .unwrap();
     assert_eq!(entry.digest_at(modulus), Some(input.digest().as_str()));
@@ -334,6 +341,25 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         f4_with_options(&system, order, &options).expect("corpus computation failed")
     };
     #[cfg(feature = "research-work")]
+    let mut symbolic_report = None;
+    #[cfg(feature = "research-work")]
+    let solve = || {
+        if let Some(mode) = symbolic {
+            let (result, report) = zeebra::grobner::f4::live_symbolic::observe(
+                zeebra::grobner::f4::live_symbolic::Policy {
+                    order_initial: matches!(mode, "order" | "both"),
+                    deduplicate: matches!(mode, "dedup" | "both"),
+                },
+                system.len(),
+                solve,
+            );
+            symbolic_report = Some(report);
+            result
+        } else {
+            execute(solve)
+        }
+    };
+    #[cfg(feature = "research-work")]
     let ((basis, stats), work) = if measure_work {
         let (result, report) = if discovery {
             zeebra::linalg::work::measure_discovery(solve)
@@ -346,6 +372,10 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     };
     #[cfg(not(feature = "research-work"))]
     let (basis, stats) = {
+        assert!(
+            symbolic.is_none(),
+            "--symbolic requires --features research-work"
+        );
         assert!(
             backward.is_none(),
             "--backward requires --features research-work"
@@ -390,6 +420,20 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
     });
     #[cfg(not(feature = "research-work"))]
     let backward_report = Json::Null;
+    #[cfg(feature = "research-work")]
+    let symbolic_report = symbolic_report.map_or(Json::Null, |r| {
+        Json::object([
+            ("mode", Json::string(symbolic.unwrap())),
+            ("initial_generators", Json::size(r.initial_generators)),
+            ("batches", Json::size(r.batches)),
+            ("offered_seeds", Json::size(r.offered_seeds)),
+            ("retained_seeds", Json::size(r.retained_seeds)),
+            ("peak_seed_capacity", Json::size(r.peak_seed_capacity)),
+            ("peak_order_capacity", Json::size(r.peak_order_capacity)),
+        ])
+    });
+    #[cfg(not(feature = "research-work"))]
+    let symbolic_report = Json::Null;
     let mut basis: Vec<_> = basis
         .iter()
         .map(|p| polynomial_to_string(p, &names, order))
@@ -405,6 +449,7 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
             ("work", work),
             ("parallel", parallel),
             ("backward", backward_report),
+            ("symbolic", symbolic_report),
             ("field_type", Json::string(std::any::type_name::<F>())),
             ("options", Json::string(format!("{options:?}"))),
             ("f4_call_ns", Json::nanos(elapsed)),
@@ -466,7 +511,7 @@ fn main() {
     }
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected] [--symbolic=original|order|dedup|both]")
         .parse()
         .unwrap();
     assert!(
@@ -476,6 +521,7 @@ fn main() {
             || s.starts_with("--workers=")
             || s.starts_with("--problem=")
             || s.starts_with("--backward=")
+            || s.starts_with("--symbolic=")
             || s == "--schedule=dynamic"
             || s == "--schedule=static")
             && args[1..]
@@ -534,10 +580,21 @@ fn main() {
         backward.is_none() || (!discovery && (workers.is_none() || backward != Some("dense-all"))),
         "dense-all requires serial forward; backward policies exclude discovery"
     );
+    let symbolics: Vec<_> = args
+        .iter()
+        .filter_map(|s| s.strip_prefix("--symbolic="))
+        .collect();
+    assert!(symbolics.len() <= 1, "one symbolic policy required");
+    let symbolic = symbolics.first().copied();
+    assert!(
+        symbolic.is_none_or(|s| matches!(s, "original" | "order" | "dedup" | "both")),
+        "unknown symbolic policy"
+    );
     let mode = RunMode {
         workers,
         dynamic,
         backward,
+        symbolic,
     };
     macro_rules! run_field {
         ($field:ty) => {
@@ -550,6 +607,12 @@ fn main() {
                 }
                 "katsura-6" => {
                     run::<6, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
+                "public-eco-4" => {
+                    run::<4, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
+                "public-noon-3" | "public-reimer-3" => {
+                    run::<3, $field>(modulus, measured, measure_work, discovery, mode, problem)
                 }
                 "cyclic-5" => {
                     run::<5, $field>(modulus, measured, measure_work, discovery, mode, problem)
