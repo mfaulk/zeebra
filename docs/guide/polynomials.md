@@ -467,8 +467,11 @@ let composer = ModularComposer::new(&g, &h);
 assert_eq!(composer.compose(&f), compose_mod(&f, &g, &h));
 ```
 
-Whether composition is worth using for the Frobenius step inside `factorize` was measured in
-[`modular-composition.md`](../research/modular-composition.md).
+`factorize` uses it for the Frobenius map `p ↦ p^q` in its distinct-degree loop and in the norm its
+equal-degree splitter takes, switching from `pow_mod` once enough applications have accumulated to
+repay a composer. On random polynomials of degree 81 and 729 that made whole factorizations 4.5x to
+13.9x faster; [`modular-composition.md`](../research/modular-composition.md) has the measurements
+and the regime (few applications, narrow field, high degree) where it stays on `pow_mod`.
 
 
 ## Permutation Polynomials

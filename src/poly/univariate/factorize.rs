@@ -12,6 +12,10 @@
 //! The distinct factors are collected degree by degree, then each group of equal-degree factors
 //! is separated by Cantor–Zassenhaus splitting.
 //!
+//! Both stages apply the Frobenius map `p ↦ p^q` repeatedly. After `x^q` itself, that is a modular
+//! composition with `x^q`, which beats `pow_mod` once enough applications follow to repay building
+//! the composer; [`FrobeniusRoute::Auto`] decides when (`docs/research/modular-composition.md`).
+//!
 //! # References
 //! * A Computational Introduction to Number Theory and Algebra, 20.3 and 21.3
 //! * Modern Computer Algebra by von zur Gathen and Gerhard, Ch. 14
