@@ -186,29 +186,33 @@ def main():
         after=resource.getrusage(resource.RUSAGE_CHILDREN)
         result.update(repeat=repeat,problem=problem,modulus=modulus,route=route,arm=arm,load=os.getloadavg()[0],cpu_seconds=after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime,
             compiler_before=compilers,compiler_after=runtime.compiler_processes())
-        result['responses']=responses(result['stdout'])
-        raw=result['responses']['final']
-        if result['compiler_after']: result['status']='contaminated'
-        elif result['exit'] or result['stop']:
-            result['status']='incomplete-resource-refusal'
-            checkpoint=result['responses']['source']
-            if checkpoint and (problem,modulus) in refs:
-                identity=result['responses']['identity']
-                if not identity or identity.get('problem')!=problem: raise ValueError('missing input checkpoint')
-                load('mq10-profile').check_answer(dict(checkpoint,digest=identity['digest'],modulus=identity['modulus']),refs[(problem,modulus)])
-                result['source_basis_verified']=True
-        else:
-            if raw is None: raise ValueError('successful process has no final response')
-            if problem=='katsura-11' and (problem,modulus) not in refs:
-                reference=independent_katsura(raw,args.scratch,guard)
-                cohort['references']['katsura-11/2147483647']=reference
-                if valid_proof(reference): refs[(problem,modulus)]=reference
-            validate_response(raw,refs.get((problem,modulus)),problem,modulus,route,arm)
-            result['status']=('reported-resource-refusal' if raw.get('outcome') in ('basis-refusal','conversion-refusal','recovery-refusal') else
-                              'verified' if (problem,modulus) in refs and route!='direct' else 'complete-needs-independent-basis-check')
+        try:
+            result['responses']=responses(result['stdout'])
+            raw=result['responses']['final']
+            if result['compiler_after']: result['status']='contaminated'
+            elif result['exit'] or result['stop']:
+                result['status']='incomplete-resource-refusal'
+                checkpoint=result['responses']['source']
+                if checkpoint and (problem,modulus) in refs:
+                    identity=result['responses']['identity']
+                    if not identity or identity.get('problem')!=problem: raise ValueError('missing input checkpoint')
+                    load('mq10-profile').check_answer(dict(checkpoint,digest=identity['digest'],modulus=identity['modulus']),refs[(problem,modulus)])
+                    result['source_basis_verified']=True
+            else:
+                if raw is None: raise ValueError('successful process has no final response')
+                if problem=='katsura-11' and (problem,modulus) not in refs:
+                    reference=independent_katsura(raw,args.scratch,guard)
+                    cohort['references']['katsura-11/2147483647']=reference
+                    if valid_proof(reference): refs[(problem,modulus)]=reference
+                validate_response(raw,refs.get((problem,modulus)),problem,modulus,route,arm)
+                result['status']=('reported-resource-refusal' if raw.get('outcome') in ('basis-refusal','conversion-refusal','recovery-refusal') else
+                                  'verified' if (problem,modulus) in refs and route!='direct' else 'complete-needs-independent-basis-check')
+        except (ValueError,KeyError,TypeError) as error:
+            result.update(status='failed',failure=str(error))
         cohort['attempts'].append(result)
         guard.write(args.output,cohort)
         print(repeat,problem,modulus,route,arm,result['status'],round(result['process_wall_ns']/1e6,2),flush=True)
+        if result['status']=='failed': raise RuntimeError('failed validation; raw attempt retained')
         if result['status']=='contaminated': cohort['refusal']=dict(reason='compiler');guard.write(args.output,cohort);return
         if sum(p.stat().st_size for p in args.scratch.iterdir())>limits()['output_bytes']: raise RuntimeError('output budget exceeded; retained attempts')
 
