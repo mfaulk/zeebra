@@ -144,6 +144,9 @@ jobs:
           python3 research/selective-backward/summarize.py
           git diff --exit-code -- research/selective-backward/summary.json research/selective-backward/native.csv research/selective-backward/inventory.json
           cargo test --features research-work --example mq10_profile
+          cargo test --features research-multirow --lib linalg::dense::band
+          cargo test --features research-multirow --example mq10_profile
+          python3 tools/test/multirow-study-test.py
           python3 tools/test/public-corpus-test.py
       - name: Isolated delayed-reduction pilot checks
         run: |

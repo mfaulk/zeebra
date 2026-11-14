@@ -43,7 +43,7 @@ def plan(phase):
 
 
 def command(binary, problem, modulus, arm):
-    result = [str(binary.resolve()), str(modulus), '--problem=' + problem]
+    result = [str(binary.resolve()), str(modulus), '--problem=' + problem, '--stages']
     return result if arm == 'stock' else result + ['--multirow=' + arm]
 
 
