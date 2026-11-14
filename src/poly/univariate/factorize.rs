@@ -19,7 +19,9 @@
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    poly::univariate::{gcd, pow_mod, pow_mod::pow_mod_limbs, Polynomial, UnivariatePolynomial},
+    poly::univariate::{
+        gcd, pow_mod, pow_mod::pow_mod_limbs, ModularComposer, Polynomial, UnivariatePolynomial,
+    },
     FiniteField, KnownOrder,
 };
 
@@ -75,6 +77,31 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
     f: &UnivariatePolynomial<F>,
     rng: &mut R,
 ) -> Vec<(UnivariatePolynomial<F>, usize)> {
+    factorize_with_route(f, rng, FrobeniusRoute::default())
+}
+
+/// How the Frobenius map `p ↦ p^q mod h` is applied after the first `x^q`.
+///
+/// Over F_q, `p(x)^q = p(x^q)`, so once `x^q mod h` is known every further application is a
+/// modular composition with that fixed inner argument rather than `log2 q` squarings.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FrobeniusRoute {
+    /// `pow_mod` by `q` every time: `~1.5·log2 q` modular multiplications per application.
+    #[default]
+    PowMod,
+    /// Brent–Kung composition with `x^q mod h`: `~sqrt(deg h)` modular multiplications and one
+    /// dense `sqrt(n) × sqrt(n) × n` matrix product per application.
+    Composition,
+}
+
+/// [`factorize`] with the Frobenius route forced. Measurement and differential-testing hook.
+#[doc(hidden)]
+pub fn factorize_with_route<F: KnownOrder, R: RngCore + CryptoRng>(
+    f: &UnivariatePolynomial<F>,
+    rng: &mut R,
+    route: FrobeniusRoute,
+) -> Vec<(UnivariatePolynomial<F>, usize)> {
     assert!(!f.is_zero(), "the zero polynomial has no factorization");
 
     if f.degree() == 0 {
@@ -96,7 +123,9 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
 
     // x^(q^d), built by applying the Frobenius map repeatedly. Computing q^d as an integer would
     // overflow for even modest q and d.
-    let mut x_to_the_q_to_the_d = pow_mod_limbs(&x, q, &monic);
+    let x_to_the_q = pow_mod_limbs(&x, q, &monic);
+    let frobenius = Frobenius::new(route, &x_to_the_q, &monic);
+    let mut x_to_the_q_to_the_d = x_to_the_q.clone();
 
     for d in 1..=total_degree {
         // The distinct irreducible factors of f whose degree divides d.
@@ -111,7 +140,11 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
         distinct_of_degree.push(exactly_d.clone());
 
         if exactly_d.degree() > 0 {
-            for irreducible in separate_equal_degree(&exactly_d, d, rng) {
+            let split_route = SplitRoute {
+                route,
+                x_to_the_q: Some(&x_to_the_q),
+            };
+            for irreducible in separate_equal_degree_by(&exactly_d, d, rng, &split_route) {
                 let multiplicity = multiplicity_in(&monic, &irreducible);
                 accounted += d * multiplicity as u32;
                 factors.push((irreducible, multiplicity));
@@ -124,7 +157,7 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
             break;
         }
 
-        x_to_the_q_to_the_d = pow_mod_limbs(&x_to_the_q_to_the_d, q, &monic);
+        x_to_the_q_to_the_d = frobenius.apply(&x_to_the_q_to_the_d);
     }
 
     debug_assert_eq!(
@@ -194,14 +227,31 @@ pub(crate) fn separate_equal_degree<F: KnownOrder, R: RngCore + CryptoRng>(
     d: u32,
     rng: &mut R,
 ) -> Vec<UnivariatePolynomial<F>> {
+    separate_equal_degree_by(g, d, rng, &SplitRoute::default())
+}
+
+/// The Frobenius route for equal-degree splitting, with `x^q` modulo some multiple of every `g`
+/// it will be asked to split, when the route needs it.
+#[derive(Default)]
+struct SplitRoute<'a, F: FiniteField> {
+    route: FrobeniusRoute,
+    x_to_the_q: Option<&'a UnivariatePolynomial<F>>,
+}
+
+fn separate_equal_degree_by<F: KnownOrder, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    d: u32,
+    rng: &mut R,
+    route: &SplitRoute<'_, F>,
+) -> Vec<UnivariatePolynomial<F>> {
     // One factor of degree d means g is already that factor.
     if g.degree() == d {
         return vec![g.clone()];
     }
 
-    let (left, right) = split(g, d, rng);
-    let mut factors = separate_equal_degree(&left, d, rng);
-    factors.extend(separate_equal_degree(&right, d, rng));
+    let (left, right) = split(g, d, rng, route);
+    let mut factors = separate_equal_degree_by(&left, d, rng, route);
+    factors.extend(separate_equal_degree_by(&right, d, rng, route));
     factors
 }
 
@@ -210,8 +260,20 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
     g: &UnivariatePolynomial<F>,
     d: u32,
     rng: &mut R,
+    route: &SplitRoute<'_, F>,
 ) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
     debug_assert!(g.degree() > d);
+
+    // Only the norm of a degree d > 1 split applies the Frobenius map, so only then is a composer
+    // worth building. g divides the polynomial `x_to_the_q` was reduced by, so reducing it again
+    // modulo g gives x^q mod g without a fresh exponentiation.
+    let odd_characteristic = F::characteristic_limbs() != [2];
+    let frobenius = match (route.route, route.x_to_the_q) {
+        (FrobeniusRoute::Composition, Some(x_to_the_q)) if odd_characteristic && d > 1 => {
+            Frobenius::new(FrobeniusRoute::Composition, &(x_to_the_q % g), g)
+        }
+        _ => Frobenius::PowMod(g.clone()),
+    };
 
     for _ in 0..MAX_SPLIT_ATTEMPTS {
         let h = random_element_of_quotient(g, rng);
@@ -227,8 +289,11 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
             // The target is h^((q^d - 1)/2). Writing (q^d - 1)/2 as
             // ((q - 1)/2) * (1 + q + ... + q^(d-1)) turns it into the norm raised to (q - 1)/2,
             // both of which are computable: the exponent itself would overflow.
-            &pow_mod_limbs(&frobenius_norm(&h, g, d), &half_of_q_minus_one::<F>(), g)
-                - &UnivariatePolynomial::one()
+            &pow_mod_limbs(
+                &frobenius_norm(&h, g, d, &frobenius),
+                &half_of_q_minus_one::<F>(),
+                g,
+            ) - &UnivariatePolynomial::one()
         };
 
         // Correctness rests on this check, not on the candidate: any proper divisor of g is a
@@ -253,15 +318,45 @@ fn frobenius_norm<F: KnownOrder>(
     h: &UnivariatePolynomial<F>,
     g: &UnivariatePolynomial<F>,
     d: u32,
+    frobenius: &Frobenius<F>,
 ) -> UnivariatePolynomial<F> {
-    let q = F::order_limbs();
     let mut term = h % g;
     let mut norm = term.clone();
     for _ in 1..d {
-        term = pow_mod_limbs(&term, q, g);
+        term = frobenius.apply(&term);
         norm = &(&norm * &term) % g;
     }
     norm
+}
+
+/// `p ↦ p^q mod h` for one fixed `h`, by the chosen route.
+enum Frobenius<F: FiniteField> {
+    /// The modulus `h`.
+    PowMod(UnivariatePolynomial<F>),
+    /// Composition with `x^q mod h`.
+    Composition(ModularComposer<F>),
+}
+
+impl<F: KnownOrder> Frobenius<F> {
+    fn new(
+        route: FrobeniusRoute,
+        x_to_the_q: &UnivariatePolynomial<F>,
+        modulus: &UnivariatePolynomial<F>,
+    ) -> Self {
+        match route {
+            FrobeniusRoute::PowMod => Self::PowMod(modulus.clone()),
+            FrobeniusRoute::Composition => {
+                Self::Composition(ModularComposer::new(x_to_the_q, modulus))
+            }
+        }
+    }
+
+    fn apply(&self, p: &UnivariatePolynomial<F>) -> UnivariatePolynomial<F> {
+        match self {
+            Self::PowMod(modulus) => pow_mod_limbs(p, F::order_limbs(), modulus),
+            Self::Composition(composer) => composer.compose(p),
+        }
+    }
 }
 
 /// The absolute trace `h + h^2 + h^4 + ... + h^(2^(m*d - 1))` in F[x]/(g), for q = 2^m.
@@ -641,6 +736,51 @@ mod tests {
     #[test]
     fn test_characteristic_two_degree_reads_the_single_set_bit() {
         assert_eq!(characteristic_two_degree::<PrimeFieldElement64<2>>(), 1);
+    }
+
+    /// The composition Frobenius route returns the same factorization as the `pow_mod` route.
+    #[test]
+    fn test_composition_route_agrees_with_pow_mod_route() {
+        use crate::{
+            fields::{Bn254Fr, Gf256, KoalaBear},
+            poly::univariate::factorize::{factorize_with_route, FrobeniusRoute},
+            KnownOrder,
+        };
+
+        fn sorted<F: KnownOrder>(
+            factors: Vec<(UnivariatePolynomial<F>, usize)>,
+        ) -> Vec<(String, usize)> {
+            let mut keyed: Vec<_> = factors
+                .into_iter()
+                .map(|(factor, multiplicity)| (format!("{factor:?}"), multiplicity))
+                .collect();
+            keyed.sort();
+            keyed
+        }
+
+        fn check<F: KnownOrder>(seed: u64, degrees: &[u64]) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for &degree in degrees {
+                let random = UnivariatePolynomial::<F>::rand(degree, &mut rng);
+                // A repeated factor and a planted product of two quadratics, so multiplicities
+                // and an equal-degree split above degree one are both exercised.
+                let quadratic = UnivariatePolynomial::<F>::rand(2, &mut rng);
+                let f = &(&random * &quadratic) * &quadratic;
+                let by_pow_mod = factorize_with_route(&f, &mut rng, FrobeniusRoute::PowMod);
+                let by_composition =
+                    factorize_with_route(&f, &mut rng, FrobeniusRoute::Composition);
+                assert_eq!(
+                    sorted(by_pow_mod),
+                    sorted(by_composition),
+                    "degree {degree}"
+                );
+            }
+        }
+
+        check::<PrimeFieldElement64<5>>(31, &[1, 3, 8, 20]);
+        check::<KoalaBear>(32, &[1, 6, 25]);
+        check::<Bn254Fr>(33, &[4, 10]);
+        check::<Gf256>(34, &[5, 12]);
     }
 
     /// Factorization works over a 254-bit field, with the factors recovered as planted.
