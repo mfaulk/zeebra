@@ -39,6 +39,37 @@ class SymbolicStudy(unittest.TestCase):
         with self.assertRaises(ValueError):
             study.check_plan([dict(phase='native', repeat=0, problem='mq-random-10', modulus=32003, arm='both')])
 
+    # Resumption accepts only the exact verified prefix and retains immutable source identity.
+    def test_resume_checks_prefix_and_terminal_holds(self):
+        identity = dict(commit='frozen')
+        cohort = dict(identity=identity, attempts=[], refusal=dict(reason='environment'), resumptions=[], active_wall_seconds=1)
+        study.verify_prefix(cohort, identity, {})
+        for bad in [dict(cohort, identity=dict(commit='different')), dict(cohort, refusal=dict(reason='aggregate-budget')), dict(cohort, resumptions=[{}] * 8)]:
+            with self.assertRaises(ValueError):
+                study.verify_prefix(bad, identity, {})
+        wrong = dict(phase='native', repeat=0, problem='mq-random-10', modulus=32003, arm='both')
+        with self.assertRaises(ValueError):
+            study.verify_prefix(dict(cohort, attempts=[wrong]), identity, {})
+
+    # A verified accepted response is checked again, and changed coefficients cannot be resumed.
+    def test_resume_revalidates_accepted_answers(self):
+        reference = dict(digest='abc', modulus=32003, basis=['x1'])
+        raw = dict(reference, problem='mq-random-10', backward=None, parallel=None, symbolic=None,
+                   measured=True, work=None, statistics=dict(batches=1, forward_ns=7, backward_ns=2,
+                   elimination_ns=10, candidate_reduction=dict(batches=1)))
+        accepted = dict(phase='native', repeat=0, problem='mq-random-10', modulus=32003, arm='stock',
+                        status='verified', exit=0, stop=None, compiler_before=[], compiler_after=[],
+                        peak_rss_bytes=1024, process_wall_ns=100, cpu_seconds=0, raw=raw)
+        identity = dict(commit='frozen')
+        cohort = dict(identity=identity, attempts=[accepted], refusal=dict(reason='environment'), resumptions=[], active_wall_seconds=1)
+        refs = {('mq-random-10', 32003): reference}
+        study.verify_prefix(cohort, identity, refs)
+        changed = dict(accepted, raw=dict(raw, basis=['wrong']))
+        with self.assertRaises(ValueError):
+            study.verify_prefix(dict(cohort, attempts=[changed]), identity, refs)
+        with self.assertRaises(ValueError):
+            study.verify_prefix(dict(cohort, attempts=[dict(accepted, compiler_after=[1])]), identity, refs)
+
 
 if __name__ == '__main__':
     unittest.main()

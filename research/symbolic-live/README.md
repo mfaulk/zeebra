@@ -38,11 +38,15 @@ complete reduced bases, independently checked against retained Singular answers.
 controls are small-case correctness/regression evidence, not broad performance claims.
 
 Each attempt has the existing 60-second/2-GiB descendant RSS guard and 185-second outer watchdog.
-The runner stops starting work at 900 seconds aggregate wall or 512 MiB scratch output. Absolute
-aggregate wall including a final admitted child is at most 960 seconds plus checking/writing;
+The runner stops starting work at 900 cumulative active-controller seconds or 512 MiB cumulative scratch output. Absolute
+active wall including a final admitted child is at most 960 seconds plus checking/writing;
 the mathematical sum of per-child caps is 20,760 seconds, so the aggregate gate is binding.
 Expected native execution is under five minutes; this is an estimate, not a result. Retain every
-attempt/refusal, no solver retry or budget escalation. Compiler/load gates (maximum 1-minute load4)
+attempt/refusal, no solver retry or budget escalation. Pre-child compiler/load holds allow at most eight
+`--resume` continuations with identical controller, binaries, affinity and references. Each continuation
+revalidates the exact accepted plan prefix and appends only missing cells. Refusal markers remain
+in `resumptions`; inactive waiting between windows is excluded from the cumulative active budget.
+An executed failed/contaminated child or aggregate-budget refusal is terminal and cannot resume. Compiler/load gates (maximum 1-minute load4)
 and `tools/benchlock.sh` serialize measurement; all builds/tests finish before locking. The root
 agent also coordinates with the separate #751 campaign so no sibling compiles during measurement.
 
@@ -84,3 +88,8 @@ memory bandwidth. Process wall/CPU/RSS include original input and full answer en
 reference checking is outside that timed child. Publication records source, executable, toolchain,
 lockfile, actual topology/affinity and environmental gates. A baseline/current profile from #751
 must precede any production adoption recommendation.
+
+The shared #751 correction `4b0750166d76626f73e4636087024ec766588871` initializes two zero durations
+inside an existing `cfg(test)` fixture after binary freeze. The controller permits exactly that
+pinned two-line source patch and records its full diff/hash; all production/Cargo/config differences
+from build `d8a32288` are rejected. The binaries do not require rebuilding for this test-only fix.

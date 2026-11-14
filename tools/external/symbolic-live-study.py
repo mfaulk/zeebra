@@ -84,6 +84,25 @@ def check_plan(attempts):
         raise ValueError('incomplete or reordered campaign')
 
 
+def validate_attempt(a, refs):
+    if a['status'] != 'verified' or a['exit'] or a['stop'] or a['compiler_before'] or a['compiler_after']:
+        raise ValueError('incomplete, failed or compiler-contaminated attempt')
+    validate(a['raw'], refs[(a['problem'], a['modulus'])], a['phase'], a['problem'], a['arm'])
+    if not 0 < a['peak_rss_bytes'] <= 2 * 1024**3 or a['process_wall_ns'] <= 0 or a['cpu_seconds'] < 0:
+        raise ValueError('invalid timing or RSS boundary')
+
+
+def verify_prefix(cohort, identity, refs):
+    if cohort['identity'] != identity or cohort.get('refusal', {}).get('reason') != 'environment' or len(cohort.get('resumptions', [])) >= 8 or not 0 <= cohort['active_wall_seconds'] < 900:
+        raise ValueError('resumption requires immutable identities and a bounded pre-child environment hold')
+    keys = [(a['phase'], a['repeat'], a['problem'], a['modulus'], a['arm']) for a in cohort['attempts']]
+    expected = list(plan())
+    if keys != expected[:len(keys)] or len(keys) >= len(expected):
+        raise ValueError('accepted attempts are not the exact incomplete plan prefix')
+    for a in cohort['attempts']:
+        validate_attempt(a, refs)
+
+
 def summarize(cohort):
     check_plan(cohort['attempts'])
     refs = references()
@@ -100,11 +119,7 @@ def summarize(cohort):
     groups = defaultdict(list)
     trajectories = {}
     for a in cohort['attempts']:
-        if a['status'] != 'verified' or a['exit'] or a['stop'] or a['compiler_before'] or a['compiler_after']:
-            raise ValueError('incomplete, failed or compiler-contaminated attempt')
-        validate(a['raw'], refs[(a['problem'], a['modulus'])], a['phase'], a['problem'], a['arm'])
-        if not 0 < a['peak_rss_bytes'] <= 2 * 1024**3 or a['process_wall_ns'] <= 0 or a['cpu_seconds'] < 0:
-            raise ValueError('invalid timing or RSS boundary')
+        validate_attempt(a, refs)
         stats = {k: v for k, v in a['raw']['statistics'].items() if not k.endswith('_ns') and k != 'full_statistics'}
         identity = (a['problem'], a['modulus'], 'original' if a['arm'] in ('stock', 'feature-off') else a['arm'])
         if stats != trajectories.setdefault(identity, stats):
@@ -121,7 +136,7 @@ def summarize(cohort):
             row['statistics'] = raw['statistics']
             row['work'] = raw['work']
         rows.append(row)
-    return dict(source=cohort['identity'], attempts=len(cohort['attempts']), rows=rows)
+    return dict(source=cohort['identity'], attempts=len(cohort['attempts']), active_wall_seconds=cohort['active_wall_seconds'], resumptions=cohort['resumptions'], rows=rows)
 
 
 def main():
@@ -133,6 +148,7 @@ def main():
     parser.add_argument('--build-commit')
     parser.add_argument('--build-metadata', type=Path)
     parser.add_argument('--replay', type=Path)
+    parser.add_argument('--resume', action='store_true')
     args = parser.parse_args()
     storage, guard = load('study_artifacts'), load('grobx-work-study')
     if args.replay:
@@ -151,12 +167,14 @@ def main():
         parser.error('declare actual machine and affinity, and use benchlock')
     args.scratch.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if args.output.exists():
-        parser.error('output exists; retain it')
+    if args.output.exists() and not args.resume:
+        parser.error('output exists; retain it and resume only an environment hold')
     binaries = dict(stock=args.stock.resolve(), binary=args.binary.resolve())
     build_commit = subprocess.check_output(['git','rev-parse',args.build_commit],cwd=ROOT,text=True).strip()
-    if subprocess.call(['git','diff','--quiet',build_commit,'--','Cargo.toml','Cargo.lock','.cargo','src','examples'],cwd=ROOT):
-        parser.error('current production source differs from frozen binary source')
+    source_delta = subprocess.check_output(['git','diff',build_commit,'--','Cargo.toml','Cargo.lock','.cargo','src','examples'],cwd=ROOT,text=True)
+    expected_test_delta = subprocess.check_output(['git','show','--format=','4b0750166d76626f73e4636087024ec766588871','--','src/grobner/f4/statistics.rs'],cwd=ROOT,text=True)
+    if source_delta not in ('', expected_test_delta):
+        parser.error('production source differs from binary build (only the pinned cfg(test) timing fixture fix is allowed)')
     build_metadata = json.loads(args.build_metadata.read_text())
     if build_metadata['source_commit'] != build_commit or any(build_metadata['binaries'][key]['sha256'] != sha(path) for key,path in binaries.items()):
         parser.error('build metadata does not bind these frozen executables')
@@ -164,13 +182,30 @@ def main():
     cohort['identity']['binary_build_commit'] = cohort.pop('binary_build_commit')
     cohort['identity']['build_metadata_sha256'] = cohort.pop('build_metadata_sha256')
     cohort['identity']['build_metadata'] = cohort.pop('build_metadata')
+    cohort['identity']['cfg_test_only_source_delta'] = source_delta
+    cohort['identity']['cfg_test_only_source_delta_sha256'] = hashlib.sha256(source_delta.encode()).hexdigest()
+    cohort['active_wall_seconds'] = 0.0
+    cohort['resumptions'] = []
     refs, start = references(), time.monotonic()
-    for phase, repeat, problem, modulus, arm in plan():
+    if args.resume:
+        previous = storage.load_study(args.output)
+        verify_prefix(previous, cohort['identity'], refs)
+        for key in ('limits','environment','cargo_config_sha256','reference_cohorts_sha256','references'):
+            if previous[key] != cohort[key]:
+                parser.error('resumption changed frozen manifest/reference metadata')
+        cohort = previous
+        cohort['resumptions'].append(cohort.pop('refusal'))
+        cohort['attempts'] = [storage.pack_attempt(a,args.output) for a in cohort['attempts']]
+    prior_active_seconds = cohort['active_wall_seconds']
+    cells = list(plan())
+    for phase, repeat, problem, modulus, arm in cells[len(cohort['attempts']):]:
         compilers = load('worker-pool-study').compiler_processes()
-        if compilers or os.getloadavg()[0] > 4 or time.monotonic()-start > 900 or sum(p.stat().st_size for p in args.scratch.iterdir() if p.is_file()) > 512*1024**2:
-            cohort['refusal'] = dict(reason='environment/aggregate-budget', compilers=compilers, load=os.getloadavg()[0], next=[phase,repeat,problem,modulus,arm])
+        aggregate_refusal = prior_active_seconds + time.monotonic()-start > 900 or sum(p.stat().st_size for p in args.scratch.iterdir() if p.is_file()) > 512*1024**2
+        if compilers or os.getloadavg()[0] > 4 or aggregate_refusal:
+            cohort['active_wall_seconds'] = prior_active_seconds + time.monotonic()-start
+            cohort['refusal'] = dict(reason='aggregate-budget' if aggregate_refusal else 'environment', compilers=compilers, load=os.getloadavg()[0], next=[phase,repeat,problem,modulus,arm], accepted_prefix=len(cohort['attempts']), at_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
             guard.write(args.output, cohort)
-            raise RuntimeError('quiet/resource gate refused; prefix retained')
+            raise RuntimeError('pre-child quiet/resource gate refused; exact verified prefix retained')
         key = 'stock' if arm == 'stock' else 'binary'
         if sha(binaries[key]) != cohort['identity']['binaries'][key]['sha256']:
             raise ValueError('frozen binary changed')
@@ -195,6 +230,7 @@ def main():
         except (ValueError, KeyError, TypeError) as error:
             result['failure'] = str(error)
         cohort['attempts'].append(storage.pack_attempt(result,args.output) if result['status']=='verified' else result)
+        cohort['active_wall_seconds'] = prior_active_seconds + time.monotonic()-start
         guard.write(args.output,cohort)
         print(phase,repeat,problem,modulus,arm,result['status'],flush=True)
         if result['status'] != 'verified':
