@@ -151,8 +151,8 @@ fn divide<const N: usize, F: FiniteField>(
         };
 
         let mut coefficient = F::zero();
-        if dividend_terms.last().is_some_and(|term| term.0 == monomial) {
-            coefficient = dividend_terms.pop().expect("just tested").1;
+        if let Some(term) = dividend_terms.pop_if(|term| term.0 == monomial) {
+            coefficient = term.1;
         }
         // Every stream at this monomial is summed before deciding anything; equality is the
         // array comparison, not the order's.
