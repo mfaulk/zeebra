@@ -191,3 +191,42 @@ The tests check the closed-form recursion against **direct enumeration** on nine
 ideals over all degrees up to eight, reproduce the regular-sequence formula exactly, and check the
 summed Hilbert function against the standard monomials `QuotientBasis` enumerates independently —
 two computations of `dim_F R/I` that were not written with each other in mind.
+
+## 7. Bigraded series (#207)
+
+#207, as narrowed in #668, asks whether `grobner::hilbert` can express a **bigraded** Hilbert series —
+the object the bilinear literature (support-minors, Faugère–Safey El Din–Spaenlehauer's `(1, 1)`
+systems) states its results in — and what the smallest useful extension is.
+
+**As written, no.** `HilbertSeries` is single-graded, and the specialization `s = t = z` loses
+exactly the information a bilinear result is about: `(1 − st)` and `(1 − s²)` both become
+`(1 − z²)`, so a bilinear generator and a quadratic one are indistinguishable, and a bigraded
+prediction can only be checked through its collapse.
+
+**The smallest extension is the same recursion with bigraded shifts**, now
+`hilbert::BigradedHilbertSeries`. The exact sequence `0 → R/(L : x) → R/L → R/(L + <x>) → 0` is
+bigraded whenever the variables are, so the pivot, the base cases and the termination argument are
+the parent's unchanged; only `z` becomes `s` or `t` according to the pivot's block. No new monomial
+order is needed: the reduced basis of a bihomogeneous ideal is bihomogeneous under any order, so its
+leading-term ideal carries the bigraded Hilbert function. (`MonomialOrder::Weighted`, which #306
+landed, already covers the order half of the original request.)
+
+It is checked three independent ways, in `src/grobner/hilbert/bigraded.rs`'s tests:
+
+1. **Enumeration.** `H(a, b)` equals the count of bidegree-`(a, b)` standard monomials for eight
+   small monomial ideals in `F[x0, x1 | y0, y1]`, at every `a, b ≤ 6`.
+2. **Specialization.** `total()` equals `HilbertSeries::of_monomial_ideal` at every split `0 … 4`.
+3. **An external derivation.** `m` generic bilinear forms in `F[x0..x2 | y0..y2]`, solved by F4,
+   give exactly the Koszul series `(1 − st)^m / ((1 − s)³ (1 − t)³)` for `m ≤ 3`. That is a theorem,
+   not a heuristic: the cone's components `x = 0` and `y = 0` have codimension 3, so for `m ≤ 3` the
+   ideal has height `m` and is a complete intersection.
+
+At `m = 4` the same formula is **wrong**, and the first departure is at bidegree `(1, 4)`: observed
+6, Koszul 5. That is consistent with the `x = 0` component (codimension 3) that four forms cannot
+cut to codimension 4 — positive error, the dangerous direction of §3, and the kind of excess the FSS
+series exists to account for. It was observed while
+validating the test, which asserts only `m ≤ 3`.
+
+**Not done here**, and a follow-up rather than part of #207 as narrowed: comparing a published support-minors or FSS
+series against a computed basis. That needs the series transcribed from the papers with its grading
+stated, and an instance family in this repository; the MinRank generators moved out in #668.

@@ -52,8 +52,9 @@ pub use field_equations::{
     field_equations, rational_points_by_enumeration, with_field_equations, FieldEquationError,
 };
 pub use hilbert::{
-    is_homogeneous, leading_generators_by_degree, monomials_of_degree, top_forms, DegreeAgreement,
-    HilbertComparison, HilbertError, HilbertSeries, SemiregularSeries,
+    is_homogeneous, leading_generators_by_degree, monomials_of_degree, top_forms,
+    BigradedHilbertSeries, DegreeAgreement, HilbertComparison, HilbertError, HilbertSeries,
+    SemiregularSeries,
 };
 pub use pairs::{
     CriterionCounts, CriticalPair, PairCriteria, PairQueue, PairQueueFootprint, PairSchedule,
