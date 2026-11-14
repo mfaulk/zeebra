@@ -10,6 +10,12 @@ SPEC.loader.exec_module(study)
 
 
 class WholeRouteStudy(unittest.TestCase):
+    # Unexpected process failures stay failures rather than becoming favorable resource refusals.
+    def test_terminal_causes_distinguish_resource_limits_and_bugs(self):
+        self.assertEqual(study.terminal_kind(-9,'wall',''), 'incomplete-resource-refusal')
+        self.assertEqual(study.terminal_kind(101,None,'TooManyNonzeros { limit: 3 }'), 'incomplete-resource-refusal')
+        self.assertEqual(study.terminal_kind(101,None,'panicked at an invariant'), 'failed')
+
     # A reported basis refusal is retained without checking a nonexistent complete basis.
     def test_reported_refusal_is_not_a_complete_basis(self):
         raw = dict(problem='mq-random-10', modulus=32003, route='fglm', outcome='basis-refusal',

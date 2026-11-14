@@ -53,7 +53,7 @@ def summarize(path):
             study.validate_response(raw,refs.get(key),*key,attempt['route'],attempt['arm'])
             if attempt['status']=='verified' and key not in refs: raise ValueError('independent reference missing')
         elif attempt['status']=='incomplete-resource-refusal':
-            if not attempt['exit'] and not attempt['stop']: raise ValueError('resource refusal lacks terminal cause')
+            if study.terminal_kind(attempt['exit'],attempt['stop'],attempt['stderr'])!='incomplete-resource-refusal': raise ValueError('resource refusal lacks terminal cause')
             if attempt.get('source_basis_verified'):
                 identity=decoded['identity']
                 study.load('mq10-profile').check_answer(dict(decoded['source'],digest=identity['digest'],modulus=identity['modulus']),refs[key])

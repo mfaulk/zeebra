@@ -117,6 +117,13 @@ def validate_response(raw, reference, problem, modulus, route, arm):
     if (raw.get('work') is not None) != (arm=='work'): raise ValueError('work mode drift')
 
 
+def terminal_kind(exit_code,stop,stderr):
+    if stop in ('wall','rss'): return 'incomplete-resource-refusal'
+    if exit_code and any(name in stderr for name in ('TooManyNonzeros','TooManyMatrixRows','TooManyMatrixColumns','TooManyBasisElements')):
+        return 'incomplete-resource-refusal'
+    return 'failed'
+
+
 def independent_katsura(raw, scratch, guard):
     if raw['problem']!='katsura-11' or raw['modulus']!=2147483647 or raw['digest']!='03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13':
         raise ValueError('new independent reference identity differs')
@@ -191,7 +198,7 @@ def main():
             raw=result['responses']['final']
             if result['compiler_after']: result['status']='contaminated'
             elif result['exit'] or result['stop']:
-                result['status']='incomplete-resource-refusal'
+                result['status']=terminal_kind(result['exit'],result['stop'],result['stderr'])
                 checkpoint=result['responses']['source']
                 if checkpoint and (problem,modulus) in refs:
                     identity=result['responses']['identity']
