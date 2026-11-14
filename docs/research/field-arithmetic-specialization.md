@@ -4,7 +4,8 @@
 `src/fields/prime_field_64.rs` is `2ec9d3af`'s) and `9860988e` (the adopted end-to-end arm; the
 binary was built from the same logic before the constant was named). The narrow-only middle arm is
 an uncommitted overlay of `9860988e` without the Mersenne branch. 2026-11-14 UTC. §3b (#780) at
-`a9421093` (before) and `fa27467a` (after), whose trees differ only in `src/fields/prime_field_32.rs`.
+`a9421093` (before) and `fa27467a` (after: `a9421093` plus PR #791's `src/fields/prime_field_32.rs`,
+the only file in which the two trees differ; rebased as `f554babf` and squash-merged by #791).
 
 ## Decision
 
