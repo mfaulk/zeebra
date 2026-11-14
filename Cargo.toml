@@ -117,6 +117,10 @@ name = "f4_profile"
 required-features = ["external-runners"]
 
 [[example]]
+name = "heap_division"
+required-features = ["external-runners"]
+
+[[example]]
 name = "interreduce_working_set"
 required-features = ["external-runners"]
 

@@ -61,10 +61,10 @@ pub use poly::{
     is_permutation_polynomial, lagrange_interpolate, lcm, multipoint_evaluate, partial_bezout,
     permutation_exponents, pow_mod, resultant, resultant_at_formal_degrees,
     resultant_from_coefficients, roots, xgcd, BlockOrder, BlockOrderError, BlockOrderKind,
-    BuildMonomialHasher, GcdError, GcdRoute, GraeffeError, GraeffeStats, Monomial, MonomialHasher,
-    MonomialMap, MonomialOrder, MonomialSet, MultivariatePolynomial, NormalFormError, Polynomial,
-    PolynomialParams, PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
-    WeightedOrder, WeightedOrderError, WeightedTieBreak,
+    BuildMonomialHasher, DivisionRoute, GcdError, GcdRoute, GraeffeError, GraeffeStats, Monomial,
+    MonomialHasher, MonomialMap, MonomialOrder, MonomialSet, MultivariatePolynomial,
+    NormalFormError, Polynomial, PolynomialParams, PowerPermutation, SquarefreeError,
+    SubgroupRoute, UnivariatePolynomial, WeightedOrder, WeightedOrderError, WeightedTieBreak,
 };
 pub use rings::Ring;
 

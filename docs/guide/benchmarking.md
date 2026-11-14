@@ -400,6 +400,9 @@ cargo run --release --example interreduction_repeats           # the division ro
 cargo run --release --example interreduction_repeats -- katsura-6 --order lex
                                                    # the same on the one path the division route
                                                    #   still ships on under the default
+cargo run --release --example heap_division     # DivisionRoute::Heap against the merge route,
+                                                   #   interleaved, on FGLM border reduction, lex
+                                                   #   interreduction and mq-random-10 (#562 §3j)
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
                                                    #   five matrix orders, fitted with residuals

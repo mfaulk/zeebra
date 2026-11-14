@@ -171,6 +171,13 @@ no reduction — Buchberger's first criterion disposes of every S-pair when the 
 share no variable — and it is how the FreeLunch route establishes a Gröbner basis without running
 one. `false` means *not certified by this criterion*, never *not a Gröbner basis*.
 
+`normal_form_with` and `multi_div_rem_with` take a `DivisionRoute`. The default, `Merge`, is what
+`normal_form` and every caller in the crate use; `Heap` is Monagan and Pearce's heap division and
+returns the same remainder and quotients bit for bit. It is there for A/B work: measured, it is
+slower than the merge on FGLM border reduction and lex interreduction and faster only when the
+working polynomial is far longer than the divisor tails
+([`interreduction-cost.md` §3j](../research/interreduction-cost.md#3j-562-monaganpearce-heap-division-measured--slower-on-every-surviving-consumer)).
+
 `buchberger_with_statistics` returns the same basis alongside counters describing the computation,
 which is useful for understanding cost on a hard system. `buchberger_with_criteria` additionally
 takes a `PairCriteria`, so the classical engine can be run under the same pair-elimination

@@ -18,7 +18,7 @@ use crate::impl_mul_variants;
 use crate::{
     poly::{
         multivariate::{
-            monomial_hash::MonomialMap, sparse_multivariate_multiply,
+            heap_division, monomial_hash::MonomialMap, sparse_multivariate_multiply,
             sparse_multivariate_polynomial::SparseMultiPoly,
         },
         MonomialOrder,
@@ -571,6 +571,40 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         Ok(self.normal_form(basis, order))
     }
 
+    /// [`normal_form`](Self::normal_form) by the chosen [`DivisionRoute`].
+    ///
+    /// Every route returns the same remainder, bit for bit: the reduction applies the first divisor
+    /// whose leading term divides the current leading term, whichever structure holds the terms
+    /// still to be reduced.
+    pub fn normal_form_with(
+        &self,
+        divisors: &[Self],
+        order: MonomialOrder,
+        route: DivisionRoute,
+    ) -> Self {
+        match route {
+            DivisionRoute::Merge => self.normal_form(divisors, order),
+            DivisionRoute::Heap => heap_division::normal_form(self, divisors, order),
+        }
+    }
+
+    /// [`multi_div_rem`](Self::multi_div_rem) by the chosen [`DivisionRoute`], with the same
+    /// quotients and remainder from every route.
+    ///
+    /// # Panics
+    /// As `multi_div_rem`: if `divisors` is empty or every divisor is zero.
+    pub fn multi_div_rem_with(
+        &self,
+        divisors: &[Self],
+        order: MonomialOrder,
+        route: DivisionRoute,
+    ) -> (Vec<Self>, Self) {
+        match route {
+            DivisionRoute::Merge => self.multi_div_rem(divisors, order),
+            DivisionRoute::Heap => heap_division::multi_div_rem(self, divisors, order),
+        }
+    }
+
     pub fn multi_div_rem(&self, divisors: &[Self], order: MonomialOrder) -> (Vec<Self>, Self) {
         assert!(!divisors.is_empty());
         assert!(divisors.iter().any(|d| !d.is_zero()));
@@ -607,6 +641,24 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 
         (quotients, r)
     }
+}
+
+/// How [`normal_form_with`](SparseMultiPoly::normal_form_with) and
+/// [`multi_div_rem_with`](SparseMultiPoly::multi_div_rem_with) hold the terms still to be reduced.
+///
+/// The routes differ in cost and never in result. `Merge` is the default and what every caller in
+/// this crate uses; `Heap` exists so the two can be A/B'd on the same input, and
+/// `docs/research/interreduction-cost.md` §3j records what that measured.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DivisionRoute {
+    /// A sorted working polynomial, rewritten by a windowed merge on every reduction step.
+    #[default]
+    Merge,
+    /// Monagan and Pearce's heap division (J. Symbolic Comput. 46 (2011) 807–822): the working
+    /// polynomial is never materialized. A heap holds the next unmerged term of each
+    /// `quotient term * divisor tail` product, so a step costs `O(log k)` comparisons in the
+    /// number `k` of live products rather than a pass over the working polynomial.
+    Heap,
 }
 
 /// Why [`normal_form_modulo`](SparseMultiPoly::normal_form_modulo) refused to reduce.
@@ -934,8 +986,8 @@ impl<const N: usize> CrossCallRepeats<N> {
 }
 
 /// A divisor with its leading term and tail precomputed, so reduction does not recompute them.
-struct Reducer<const N: usize, F: FiniteField> {
-    lead_monomial: Monomial<N>,
+pub(super) struct Reducer<const N: usize, F: FiniteField> {
+    pub(super) lead_monomial: Monomial<N>,
     /// The inverse of the leading coefficient, or `None` when this reducer is monic.
     ///
     /// Reduction divides the popped coefficient by this one on every step. Division is
@@ -946,13 +998,13 @@ struct Reducer<const N: usize, F: FiniteField> {
     /// `None` is not merely an optimization of the common case: Buchberger scales every generator
     /// and every new basis element monic, so it is the only case that arises there, and it skips
     /// the multiply entirely.
-    lead_inverse: Option<F>,
+    pub(super) lead_inverse: Option<F>,
     /// Every term below the leading one, sorted ascending by the order.
-    tail: Vec<(Monomial<N>, F)>,
+    pub(super) tail: Vec<(Monomial<N>, F)>,
 }
 
 impl<const N: usize, F: FiniteField> Reducer<N, F> {
-    fn new(divisor: &SparseMultiPoly<N, F>, order: MonomialOrder) -> Self {
+    pub(super) fn new(divisor: &SparseMultiPoly<N, F>, order: MonomialOrder) -> Self {
         let (lead_coefficient, lead_monomial): (F, Monomial<N>) =
             divisor.leading_term(order).into();
         let mut tail: Vec<(Monomial<N>, F)> = divisor
@@ -976,7 +1028,7 @@ impl<const N: usize, F: FiniteField> Reducer<N, F> {
 }
 
 /// The terms of `p`, sorted ascending by `order`, so the leading term is last.
-fn sorted_terms<const N: usize, F: FiniteField>(
+pub(super) fn sorted_terms<const N: usize, F: FiniteField>(
     p: &SparseMultiPoly<N, F>,
     order: MonomialOrder,
 ) -> Vec<(Monomial<N>, F)> {

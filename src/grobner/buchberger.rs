@@ -21,7 +21,7 @@ use crate::{
         pairs::{divides, CriterionCounts, PairCriteria, PairQueue},
         s_polynomial::s_polynomial,
     },
-    poly::{CrossCallRepeats, MonomialOrder, NormalFormCounts},
+    poly::{CrossCallRepeats, DivisionRoute, MonomialOrder, NormalFormCounts},
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
@@ -343,6 +343,30 @@ pub fn interreduce_for_benchmark<const N: usize, F: FiniteField>(
     reduce_grobner_basis(g, order)
 }
 
+/// [`interreduce_for_benchmark`] with every element's normal form taken by `route`.
+///
+/// #562's A/B entry point: the same loop, the same minimized and sorted input, and only the
+/// division structure varied, so a ratio between two routes is a ratio between the two divisions.
+/// The counting paths stay on [`DivisionRoute::Merge`], whose counters describe the merge.
+#[doc(hidden)]
+pub fn interreduce_with_route_for_benchmark<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    route: DivisionRoute,
+) -> Vec<MultivariatePolynomial<N, F>> {
+    let mut report = InterreductionReport::default();
+    let mut repeats = CrossCallRepeats::default();
+    reduce_grobner_basis_reporting::<N, F, false, false>(
+        g,
+        order,
+        route,
+        || false,
+        &mut report,
+        &mut repeats,
+    )
+    .expect("the stop predicate is constant false")
+}
+
 /// [`interreduce_for_benchmark`], counting what the stage did and which of it repeats.
 ///
 /// #569's measurement entry point: the division route over a basis F4 produced, with
@@ -482,6 +506,7 @@ pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
     reduce_grobner_basis_reporting::<N, F, false, false>(
         g,
         order,
+        DivisionRoute::Merge,
         should_stop,
         &mut report,
         &mut repeats,
@@ -499,7 +524,14 @@ pub(crate) fn reduce_grobner_basis_measured<const N: usize, F: FiniteField>(
     report: &mut InterreductionReport,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
     let mut repeats = CrossCallRepeats::default();
-    reduce_grobner_basis_reporting::<N, F, true, false>(g, order, should_stop, report, &mut repeats)
+    reduce_grobner_basis_reporting::<N, F, true, false>(
+        g,
+        order,
+        DivisionRoute::Merge,
+        should_stop,
+        report,
+        &mut repeats,
+    )
 }
 
 /// [`reduce_grobner_basis_measured`], also counting operations.
@@ -519,7 +551,14 @@ pub(crate) fn reduce_grobner_basis_counted<const N: usize, F: FiniteField>(
     report: &mut InterreductionReport,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
     let mut repeats = CrossCallRepeats::default();
-    reduce_grobner_basis_reporting::<N, F, true, true>(g, order, should_stop, report, &mut repeats)
+    reduce_grobner_basis_reporting::<N, F, true, true>(
+        g,
+        order,
+        DivisionRoute::Merge,
+        should_stop,
+        report,
+        &mut repeats,
+    )
 }
 
 /// [`reduce_grobner_basis_counted`], also tracking which of the stage's reduction steps repeat
@@ -535,7 +574,14 @@ pub(crate) fn reduce_grobner_basis_repeat_counted<const N: usize, F: FiniteField
     report: &mut InterreductionReport,
     repeats: &mut CrossCallRepeats<N>,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
-    reduce_grobner_basis_reporting::<N, F, true, true>(g, order, should_stop, report, repeats)
+    reduce_grobner_basis_reporting::<N, F, true, true>(
+        g,
+        order,
+        DivisionRoute::Merge,
+        should_stop,
+        report,
+        repeats,
+    )
 }
 
 fn reduce_grobner_basis_reporting<
@@ -546,6 +592,7 @@ fn reduce_grobner_basis_reporting<
 >(
     g: Vec<MultivariatePolynomial<N, F>>,
     order: MonomialOrder,
+    route: DivisionRoute,
     mut should_stop: impl FnMut() -> bool,
     report: &mut InterreductionReport,
     repeats: &mut CrossCallRepeats<N>,
@@ -617,7 +664,7 @@ fn reduce_grobner_basis_reporting<
                 report.counts.add(&counts);
                 remainder
             } else {
-                p.normal_form(&reduced[..last], order)
+                p.normal_form_with(&reduced[..last], order, route)
             };
             debug_assert!(
                 !remainder.is_zero(),

@@ -19,7 +19,9 @@ stamps rows with a tree it was not built from, which happened once while taking 
 those rows were discarded. **§3i was taken at base `c6f01f97` plus the instrument it
 introduces** and **re-taken, unchanged to the digit, at base `19ff732c`** after #262 and #625 moved
 `reduce_batch` and the external contract under it; it publishes **counts only**, so unlike every
-other section here it is independent of the machine and of the load it ran under.
+other section here it is independent of the machine and of the load it ran under. **§3j was taken at
+`c41cc7bc`**, one binary built at that commit with a runtime switch between the two routes, recorded
+at the time.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -597,6 +599,9 @@ shape-position bases where #478 measured division **25x** better than the matrix
 wrote ("only if stage 2 leaves the copies dominant") is met and then some; the *priority* is lower
 than when it was written, because the instance that motivated it no longer runs this code by
 default.
+
+**Built and measured in §3j:** slower on every consumer that still divides, 1.26x on
+`mq-random-10`.
 
 ---
 
@@ -1665,6 +1670,86 @@ and this one has a smaller ceiling than either of them had before it started.
   count removed is not a cost removed. The 1.56% is a ceiling computed from §3's counts, not a
   measurement of a change nobody made.
 
+## 3j. #562: Monagan–Pearce heap division, measured — slower on every surviving consumer
+
+#440 stage 3, behind `DivisionRoute::Heap` (`MultivariatePolynomial::normal_form_with`,
+`multi_div_rem_with`); **no default moved**. Implemented from the published description only —
+Monagan and Pearce, *Sparse polynomial division using a heap*, J. Symbolic Comput. 46 (2011)
+807–822 — in the quotient-heap form §3d.3 priced: one entry per quotient term with an unexhausted
+tail, the dividend merged against the heap's top rather than pushed into it, exhausted streams
+recycled, and a bottom-up sift (descend to a leaf at one comparison a level, then sift up).
+
+**Bit-identical, by test rather than by argument.** `src/poly/multivariate/heap_division.rs` asserts
+remainder *and* quotients equal to the merge route and to `multi_div_rem` over GF(13), GF(2^8) and
+Goldilocks, at arities 1, 2, 3, 4 and 6, under lex, grlex and grevlex, with a guard that at least 32
+of each run's cases took more than one division step; the three window-boundary cases and the
+cancelling one; zero, constant and single-divisor edge cases; and the whole interreduction loop on
+katsura-5 and cyclic-5 under all three orders. The example below also asserts equality on every
+workload before timing it.
+
+### 3j.0 The A/B
+
+Budgeted before it ran at **≤ 30 minutes of benchmark wall**; it took **284 s** under
+`tools/benchlock.sh` (START `load=1.92`, END `load=1.83`). One binary at `c41cc7bc`, `taskset -c
+0-7`, `RUSTFLAGS` unset, `RUSTC_WRAPPER=""`, a per-worktree `CARGO_TARGET_DIR`, the x86-64-v3 floor
+printed by the binary and verified in the artifact by `tools/vec_census.sh --require`. Arms
+interleaved within every rep with the arm order alternating rep to rep; 9 reps for the small
+workloads (each repeated inside a sample to ~150 ms or more), 5 for `mq-random-10`. Ratio is
+merge / heap, so above 1 is the heap faster.
+
+| workload | what it is | merge ms | heap ms | median ratio | heap faster | merge spread |
+|---|---|---:|---:|---:|---:|---:|
+| `border-katsura-7` | FGLM scalar border: 223 monomials vs 41 elements, ×8 | 159.62 | 194.09 | **0.822x** | 0/9 | 1.081x |
+| `border-cyclic-6` | the same, 386 monomials vs 45 elements, ×10 | 154.98 | 170.55 | **0.921x** | 0/9 | 1.042x |
+| `lex-katsura-5` | lex final interreduction, 46 elements, ×1000 | 82.89 | 154.31 | **0.534x** | 0/9 | 1.085x |
+| `lex-katsura-6` | lex final interreduction, 206 elements, ×200 | 157.78 | 415.25 | **0.376x** | 0/9 | 1.039x |
+| `lex-cyclic-5` | lex final interreduction, 51 elements, ×750 | 119.90 | 213.39 | **0.557x** | 0/9 | 1.088x |
+| `mq-random-10` | grevlex final interreduction, 260 elements, §3's input | 22 103.74 | 17 585.33 | **1.263x** | 5/5 | 1.027x |
+| `mdr-border-katsura-5` | `multi_div_rem`, 44 monomials vs 13 elements, ×100 | 191.72 | 29.76 | **6.423x** | 9/9 | 1.066x |
+
+`mq-random-10` per rep: 1.264x, 1.283x, 1.239x, 1.263x, 1.257x. `lex-katsura-7` is absent because
+its trace refuses at the 32 000 000 live-nonzero budget before reaching interreduction.
+
+Every ratio is outside its arm's spread and sign-consistent across every rep, so unlike §3b and §3d.2
+none of these is inside the noise — **in either direction.**
+
+### 3j.1 What it says
+
+- **On every consumer the division route still ships on, the heap is slower**: 8–18% on FGLM border
+  reduction, **1.8x–2.7x** on lex interreduction, the path `InterreductionRoute::ByOrder` keeps on
+  division. Those are the instances #562 said the A/B had to cover.
+- **On `mq-random-10` it is a real 1.26x** — and that is the path #471 took off the default. It is
+  also well below §3d.3's **2.2x–4.4x** extrapolation, the third prediction from these counters to
+  land under its count.
+- **`multi_div_rem` gains 6.4x**, but against its own hash-map route, which rebuilds a polynomial per
+  step and was never optimized because nothing in the default path calls it. The heap is not what
+  makes that fast; leaving the hash map is.
+
+**The risk #562 named, answered as far as a duration can.** The heap turns a sequential walk into
+random access into a `k`-entry heap. Where the walk is short — a border reduction's working
+polynomial is bounded by the quotient's dimension, and a lex shape-position reduction merges a long
+tail into a working polynomial of about its own length, so §3's rewrite amplification is near 1 —
+there is nothing for the heap to save and it pays `O(log k)` scattered comparisons and a monomial
+product per tail term for it. Where the amplification is large, as on `mq-random-10`'s 64.2x, it
+wins, but by about half what the comparison count predicts, which is what a higher per-comparison
+cost for random access would produce. **That last step is an inference**: the heap's own comparisons
+were not counted, so the per-comparison cost is not measured here.
+
+### 3j.2 The decision
+
+**No default moves, and the heap stays behind the flag rather than being reverted.** #562's rule —
+*a heap inside the noise is a revert* — does not bite, because nothing here is inside the noise; what
+the numbers say instead is that the heap loses everywhere the division route is still used. Keeping
+it costs one private module and buys two things a revert would discard: the reproducibility of this
+section, and the one regime where it wins — a large rewrite amplification — which is a property a
+caller can know (a large dividend against short tails) and the default cannot. A per-call dispatch on
+that property is not proposed here: the only instance measured in the regime is off the default
+path, and a crossover fitted to one instance would be the extrapolation this section exists to
+replace.
+
+`multi_div_rem`'s 6.4x is recorded and not acted on, for the reason above: its fix is to stop
+rebuilding a polynomial per step, and either division structure does that.
+
 ---
 
 ## 4. Reproducing
@@ -1716,6 +1801,13 @@ tools/benchlock.sh <tag> taskset -c 0-7 \
   cargo run --release --example interreduction_routes -- --orders --wall 60 \
   katsura-4 katsura-5 katsura-6 katsura-7 cyclic-4 cyclic-5 \
   mq-planted-6 mq-planted-10 mq-planted-14 mq-random-6
+
+# §3j's heap-division A/B: both `DivisionRoute`s from one binary, interleaved, the arm order
+# alternating per rep, every workload's outputs asserted equal before it is timed.
+tools/benchlock.sh <tag> taskset -c 0-7 cargo run --release --example heap_division -- --reps 9 \
+  border-katsura-7 border-cyclic-6 mdr-border-katsura-5 lex-katsura-5 lex-katsura-6 lex-cyclic-5
+tools/benchlock.sh <tag> taskset -c 0-7 cargo run --release --example heap_division -- \
+  --reps 5 mq-random-10
 
 # §3i's repeat rate. Counts only, so it is load-independent and needs no interleaving; it
 # runs under the lock out of politeness rather than for validity. Two input arms per rung,
