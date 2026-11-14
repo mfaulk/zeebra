@@ -2,12 +2,17 @@
 //!
 //! For each prime p, the finite field F_p is defined to be the quotient ring Z/pZ.
 //!
-//! Elements are held in Montgomery form when P is odd, so that multiplication needs no division.
-//! `mul` used to compute `(a as u128 * b as u128) % P as u128`, and a const-generic modulus does
-//! not save that: LLVM does not strength-reduce a 128-bit remainder, so every multiplication
-//! compiled to a call to `__umodti3`, compiler-rt's software 128-bit division. Montgomery
-//! reduction replaces it with two multiplications and a shift. See [`montgomery`] for the
-//! representation and the invariant it carries.
+//! Elements are held in Montgomery form when P is odd and at least 2^32, so that multiplication
+//! needs no division. `mul` used to compute `(a as u128 * b as u128) % P as u128`, and a
+//! const-generic modulus does not save that: LLVM does not strength-reduce a 128-bit remainder, so
+//! every multiplication compiled to a call to `__umodti3`, compiler-rt's software 128-bit division.
+//! Montgomery reduction replaces it with two multiplications and a shift. See [`montgomery`] for
+//! the representation and the invariant it carries.
+//!
+//! Below 2^32 the product of two residues fits a `u64`, and a `u64` remainder by a constant *is*
+//! strength-reduced, to a multiply by a precomputed reciprocal. Those moduli keep canonical
+//! residues, and 2^31 - 1 reduces by shift and add instead. Measured in
+//! `docs/research/field-arithmetic-specialization.md` (#270).
 
 use std::{
     fmt::{Display, Formatter},
@@ -35,14 +40,16 @@ use crate::{
 ///
 /// R = 2^64 requires `gcd(P, R) = 1`, which for a power of two means P must be odd. P = 2 is a
 /// legitimate modulus for this type and is used by the GF(2) Gröbner tests, so an even modulus
-/// keeps the wide-remainder path. [`uses_montgomery`] is the one predicate that decides, and
+/// keeps a remainder path, as does every modulus below 2^32. [`uses_montgomery`] is the one predicate that decides, and
 /// because P is a const generic every branch on it folds away at compile time.
 mod montgomery {
     /// Whether modulus `p` is represented in Montgomery form.
     ///
-    /// Odd moduli only: R = 2^64 is not invertible modulo an even number.
+    /// Odd moduli only: R = 2^64 is not invertible modulo an even number. And only from 2^32 up:
+    /// below that the product fits a `u64`, whose remainder by a constant is cheaper than a
+    /// reduction over a 128-bit product.
     pub const fn uses_montgomery(p: u64) -> bool {
-        p % 2 == 1
+        p % 2 == 1 && p >> 32 != 0
     }
 
     /// `-P^{-1} mod 2^64`, the factor that makes the low limb of `t + m*P` vanish.
@@ -317,17 +324,34 @@ impl<const P: u64> ops::Add<&PrimeFieldElement64<P>> for &PrimeFieldElement64<P>
 
 impl_add_variants!([const P: u64], PrimeFieldElement64<P>);
 
+/// 2^31 - 1, which gets a shift-and-add reduction: 25% off MQ10's F4 call over the narrow remainder's
+/// 7% (#270).
+const MERSENNE_31: u64 = (1 << 31) - 1;
+
 /// Borrowed * Borrowed
 impl<const P: u64> ops::Mul<&PrimeFieldElement64<P>> for &PrimeFieldElement64<P> {
     type Output = PrimeFieldElement64<P>;
 
     fn mul(self, rhs: &PrimeFieldElement64<P>) -> Self::Output {
         // Both operands carry the same factor of R, and Montgomery reduction removes exactly one
-        // of them, so the product is in the same representation as the inputs. The wide remainder
-        // survives only for an even modulus, where R is not invertible; that branch is on a const
-        // generic, so it is resolved at compile time and costs nothing here.
+        // of them, so the product is in the same representation as the inputs. Below 2^32 the
+        // residues are canonical and their product fits a u64, whose remainder by a constant LLVM
+        // lowers to a reciprocal multiply. The wide remainder survives only for an even modulus of
+        // 2^32 or more, which is never prime. Every branch is on a const generic.
         let value = if montgomery::uses_montgomery(P) {
             montgomery::mul::<P>(self.value, rhs.value)
+        } else if P == MERSENNE_31 {
+            // 2^31 = 1 mod P. With t <= (P-1)^2 < 2^62 the folded sum is at most 2P - 1, since
+            // reaching 2P would need t = 2^62 - 1; one conditional subtraction finishes it.
+            let t = self.value * rhs.value;
+            let r = (t & P) + (t >> 31);
+            if r >= P {
+                r - P
+            } else {
+                r
+            }
+        } else if P >> 32 == 0 {
+            (self.value * rhs.value) % P
         } else {
             ((self.value as u128 * rhs.value as u128) % P as u128) as u64
         };
@@ -474,6 +498,29 @@ mod tests {
 
         // 2^31 - 1, where the product stays inside 62 bits.
         check::<2147483647>(&[0, 1, 2, 1073741823, 2147483645, 2147483646]);
+
+        // The largest prime below 2^32, where a narrow product reaches (2^32 - 6)^2 and only just
+        // fits a u64; and the smallest prime above it, which must take the Montgomery path.
+        const NARROW_MAX: u64 = 4294967291;
+        check::<NARROW_MAX>(&[0, 1, 2, 1 << 31, NARROW_MAX - 2, NARROW_MAX - 1]);
+        const WIDE_MIN: u64 = 4294967311;
+        check::<WIDE_MIN>(&[0, 1, 2, 1 << 32, WIDE_MIN - 2, WIDE_MIN - 1]);
+        check::<1481823929>(&[0, 1, 2, 740911964, 1481823927, 1481823928]);
+    }
+
+    /// A modulus below 2^32 is stored as its canonical residue, and one above it in Montgomery form.
+    #[test]
+    fn test_moduli_below_two_to_the_32_are_held_canonically() {
+        assert!(!super::montgomery::uses_montgomery(2147483647));
+        assert!(!super::montgomery::uses_montgomery(4294967291));
+        assert!(!super::montgomery::uses_montgomery(7));
+        assert!(super::montgomery::uses_montgomery(4294967311));
+        assert!(super::montgomery::uses_montgomery(18446744073709551557));
+        assert_eq!(PrimeFieldElement64::<2147483647>::new(5).value, 5);
+        assert_eq!(
+            PrimeFieldElement64::<4294967291>::new(u64::MAX).value,
+            u64::MAX % 4294967291
+        );
     }
 
     proptest! {
@@ -491,6 +538,18 @@ mod tests {
                 PrimeFieldElement64::<GOLDILOCKS>::new(b),
             );
             let expected = ((x.value() as u128 * y.value() as u128) % GOLDILOCKS as u128) as u64;
+            prop_assert_eq!((x * y).value(), expected);
+
+            const NARROW_MAX: u64 = 4294967291;
+            let (x, y) = (
+                PrimeFieldElement64::<NARROW_MAX>::new(a),
+                PrimeFieldElement64::<NARROW_MAX>::new(b),
+            );
+            let expected = ((x.value() as u128 * y.value() as u128) % NARROW_MAX as u128) as u64;
+            prop_assert_eq!((x * y).value(), expected);
+
+            let (x, y) = (Zp2147483647::new(a), Zp2147483647::new(b));
+            let expected = ((x.value() as u128 * y.value() as u128) % 2147483647) as u64;
             prop_assert_eq!((x * y).value(), expected);
         }
     }
