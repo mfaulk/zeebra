@@ -70,7 +70,7 @@ def summarize(path):
                  completed_process_ms=spread(a['process_wall_ns']/1e6 for a in complete_attempts),
                  attempted_process_ms=spread(a['process_wall_ns']/1e6 for a in attempts),
                  cpu_ms=spread(a['cpu_seconds']*1000 for a in complete_attempts),
-                 sampled_peak_rss_bytes=spread(a['peak_rss_bytes'] for a in complete_attempts),
+                 sampled_peak_rss_bytes=spread(a['observed_peak_rss_bytes'] for a in complete_attempts),
                  self_peak_rss_bytes=spread(r['peak_rss_bytes'] for r in raw),
                  f4_call_ms=spread(r['f4_call_ns']/1e6 for r in raw))
         if route!='basis':
