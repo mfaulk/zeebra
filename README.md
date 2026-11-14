@@ -490,3 +490,8 @@ observer overrides leave these production refinements zero. Their sum is exclude
 `--whole-route=direct` profiles direct lex F4 and recovery. Each process retains completed-phase
 checkpoints and independently checks a returned point against the original equations. The
 [whole-route protocol](research/m28-current-baseline/README.md) defines its timers and bounded runs.
+
+The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanalyzes retained
+concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated
+comparator demonstrates enough avoidable elapsed work to cover queue and suspended-row costs;
+[offline reproduction](research/waiting-row/README.md) launches no benchmarks.
