@@ -86,6 +86,12 @@ pub struct StageTimings {
     /// Elimination.
     pub elimination: Duration,
 
+    /// Production forward elimination, refining `elimination`; observer overrides leave zero.
+    pub forward: Duration,
+
+    /// Production candidate selection/finishing, refining `elimination`; includes full fallback.
+    pub backward: Duration,
+
     /// Candidate extraction, including converting the surviving rows back to polynomials.
     pub extraction: Duration,
 
@@ -248,6 +254,8 @@ impl StageTimings {
         self.symbolic += other.symbolic;
         self.construction += other.construction;
         self.elimination += other.elimination;
+        self.forward += other.forward;
+        self.backward += other.backward;
         self.extraction += other.extraction;
         self.interreduction += other.interreduction;
         self.interreduction_minimize += other.interreduction_minimize;
@@ -1354,6 +1362,8 @@ mod tests {
     #[test]
     fn test_stage_timings_accumulate() {
         let one = StageTimings {
+            forward: Duration::ZERO,
+            backward: Duration::ZERO,
             symbolic: Duration::from_micros(10),
             construction: Duration::from_micros(20),
             elimination: Duration::from_micros(30),

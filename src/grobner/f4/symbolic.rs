@@ -1,28 +1,5 @@
-//! Symbolic preprocessing: turning a batch of critical pairs into a set of matrix rows.
-//!
-//! For a pair `(f, g)` with `m = lcm(LM(f), LM(g))`, F4 puts **both** multiples `(m/LT(f))*f` and
-//! `(m/LT(g))*g` into the matrix rather than their difference. Their difference is the
-//! S-polynomial, so elimination still recovers it; keeping the halves apart is what lets one
-//! matrix cancel across the whole batch instead of once per pair.
-//!
-//! Reducing those rows needs more rows. Whenever a monomial appearing in some row is divisible by
-//! the leading monomial of a basis element, the corresponding multiple of that element has to be
-//! present too, or the matrix cannot perform the reduction that polynomial division would. Adding
-//! those multiples introduces further monomials, so the process is iterated to a fixed point:
-//!
-//! > **Closure invariant.** For every row `h` and every monomial `u` in the support of `h`: if `u`
-//! > is divisible by `LM(g)` for some basis element `g`, then some row has leading monomial `u`.
-//!
-//! The pair multiples satisfy it at `u = m` by themselves, since each half has leading monomial
-//! `m` — which is why the lcm is seeded as already covered and must not acquire a reducer of its
-//! own. Everything else that is reducible gets `(u / LM(g)) * g`, whose leading monomial is `u`.
-//!
-//! The invariant does not refer to the order monomials are examined in, so any deterministic
-//! traversal reaches the same set of rows. Termination does not depend on it either: a row's
-//! non-leading monomials are strictly below the monomial that produced it, and a monomial order
-//! admits no infinite descending chain.
-//!
-//! See Faugère (1999), Sec 2.1, where this is `SymbolicPreprocessing`.
+//! Pair halves and reducer multiples span every required S-relation. Every reducible support
+//! monomial must be covered by a row lead; pair LCMs are covered by their seed rows.
 
 use std::{
     cmp::Ordering,
@@ -884,6 +861,46 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
 ) -> Result<Preprocessed<N>, RowBudgetExceeded> {
     let counts = SymbolicCounts::default();
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
+    #[cfg(feature = "research-work")]
+    let policy = super::live_symbolic::config();
+    #[cfg(not(feature = "research-work"))]
+    let policy: Option<((), usize)> = None;
+    #[cfg(feature = "research-work")]
+    let deduplicate = policy.is_some_and(|(p, _)| p.deduplicate);
+    #[cfg(not(feature = "research-work"))]
+    let deduplicate = false;
+    let mut seed_keys: Option<HashSet<(usize, Monomial<N>), BuildMonomialHasher>> =
+        deduplicate.then(HashSet::default);
+    let reducer_order: Option<Vec<usize>> = {
+        #[cfg(feature = "research-work")]
+        {
+            policy.filter(|(p, _)| p.order_initial).map(|(_, count)| {
+                assert_eq!(
+                    selection,
+                    ReducerSelection::FirstApplicable,
+                    "initial ordering requires first-applicable selection"
+                );
+                assert!(
+                    basis.divmask.is_none(),
+                    "initial ordering does not replay the divmask probe"
+                );
+                let mut indices: Vec<_> = (0..basis.len()).collect();
+                let end = count.min(indices.len());
+                indices[..end].sort_by(|&i, &j| {
+                    basis.order().cmp(
+                        &basis.element(i).leading_monomial,
+                        &basis.element(j).leading_monomial,
+                    )
+                });
+                indices
+            })
+        }
+        #[cfg(not(feature = "research-work"))]
+        {
+            let _ = policy;
+            None
+        }
+    };
 
     // Monomials that are the leading monomial of some row, so the invariant already holds there.
     let mut covered: MonomialSet<N> = MonomialSet::default();
@@ -897,6 +914,14 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
                 .lcm
                 .checked_div(&basis.element(basis_index).leading_monomial)
                 .expect("a pair's lcm is divisible by each of its leading monomials");
+            // A repeated identity is exactly the same monic polynomial multiple, not merely
+            // a row with the same lead. Its retained copy still spans every pair relation.
+            if seed_keys
+                .as_mut()
+                .is_some_and(|keys| !keys.insert((basis_index, multiplier)))
+            {
+                continue;
+            }
             if rows.len() == max_rows {
                 return Err(RowBudgetExceeded { limit: max_rows });
             }
@@ -950,7 +975,23 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
     //
     // `monomials_enqueued` still counts *offers* rather than admissions, so the figures recorded
     // against it before this change stay comparable. `max_pending_monomials` is what moves.
-    close_over_rows(basis, rows, covered, counts, max_rows, selection, cache)
+    #[cfg(feature = "research-work")]
+    super::live_symbolic::record(
+        2 * pairs.len(),
+        rows.len(),
+        seed_keys.as_ref().map_or(0, HashSet::capacity),
+        reducer_order.as_ref().map_or(0, Vec::capacity),
+    );
+    close_over_rows(
+        basis,
+        rows,
+        covered,
+        counts,
+        max_rows,
+        selection,
+        cache,
+        reducer_order.as_deref(),
+    )
 }
 
 /// The rows of the one Macaulay matrix that interreduces a whole basis.
@@ -1006,7 +1047,9 @@ pub(crate) fn interreduction_rows<const N: usize, F: FiniteField>(
         covered.insert(basis.element(basis_index).leading_monomial);
     }
 
-    close_over_rows(basis, rows, covered, counts, max_rows, selection, cache)
+    close_over_rows(
+        basis, rows, covered, counts, max_rows, selection, cache, None,
+    )
 }
 
 /// Close a seed row set under divisibility, adding a reducer multiple for every reducible monomial
@@ -1032,6 +1075,7 @@ fn close_over_rows<const N: usize, F: FiniteField>(
     max_rows: usize,
     selection: ReducerSelection,
     cache: &mut ReducerCache<N>,
+    reducer_order: Option<&[usize]>,
 ) -> Result<Preprocessed<N>, RowBudgetExceeded> {
     // The interner the queue deduplicates through. It assigns each distinct monomial a handle as a
     // side effect of the test it was already making, which is the whole of #621: `term_handles`
@@ -1059,9 +1103,18 @@ fn close_over_rows<const N: usize, F: FiniteField>(
         if covered.contains(&monomial) {
             continue;
         }
-        let Some((basis_index, multiplier)) =
+        let divisor = if let Some(indices) = reducer_order {
+            counts.divisor_queries += 1;
+            indices.iter().find_map(|&index| {
+                counts.divisor_scan_steps += 1;
+                monomial
+                    .checked_div(&basis.element(index).leading_monomial)
+                    .map(|multiplier| (index, multiplier))
+            })
+        } else {
             basis.find_divisor_with(&monomial, selection, &mut counts)
-        else {
+        };
+        let Some((basis_index, multiplier)) = divisor else {
             // Irreducible: nothing in the matrix can reduce it, and nothing needs to.
             continue;
         };

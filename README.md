@@ -481,6 +481,17 @@ are unchanged.
 The [persistent-worker study](research/worker-pool/README.md) provides an opt-in dispatch and FGLM
 border-reduction experiment under `research-work`; solver defaults remain unchanged.
 
+With `F4Options::measure_stages`, `StageTimings::forward` and `backward` refine production
+elimination time. The backward boundary includes candidate selection and full-RREF fallback;
+observer overrides leave these production refinements zero. Their sum is excluded from
+`StageTimings::sum()` because elimination already contains both phases.
+
+The opt-in [live symbolic-policy pilot](research/symbolic-live/README.md) compares initial-generator
+reducer ordering and exact pair-multiple deduplication against the production candidate-only route.
+Enable `research-work` and use `mq10_profile --symbolic=original|order|dedup|both` for the scoped
+experiment; omission keeps ordinary symbolic policy. The [measured live decision](docs/research/symbolic-live-policy.md)
+retains exact verified gains and small-control regressions and defers production adoption.
+
 The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanalyzes retained
 concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated
 comparator demonstrates enough avoidable elapsed work to cover queue and suspended-row costs;

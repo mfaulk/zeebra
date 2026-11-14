@@ -92,6 +92,10 @@ jobs:
           python3 tools/test/row-merge-study-test.py
           python3 tools/test/batch-splitting-study-test.py
           python3 tools/test/mq10-profile-test.py
+          cargo test --features research-work --test symbolic_live
+          cargo test --test stage_refinements
+          python3 tools/test/symbolic-live-study-test.py
+          python3 tools/external/symbolic-live-study.py --replay research/symbolic-live
           python3 tools/test/msolve-count-test.py
           python3 tools/test/grobx-trajectory-test.py
           python3 tools/test/grobx-work-study-test.py
