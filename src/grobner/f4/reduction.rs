@@ -277,15 +277,53 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         )
     });
     let mut candidate_reduction = super::statistics::CandidateReductionStatistics::default();
-    let mut production = |matrix: &mut MacaulayMatrix<N, F>| {
+    let mut packed_gf2 = super::statistics::PackedGf2Statistics::default();
+    // Reduced rows are the only form whose candidates are unique, which is what lets the packed
+    // route promise the generic route's answer; it is not offered for echelon output.
+    let packed_eligible = structured
+        && form == RowForm::Reduced
+        && super::packed::characteristic_two::<F>()
+        && options
+            .gf2_elimination
+            .selects_packed(rows, columns, matrix.nonzeros());
+    let mut production = |matrix: &mut MacaulayMatrix<N, F>| -> Result<_, F4Error> {
         let mut split_clock = StageClock::new(options.measure_stages);
+        let candidate_columns = |matrix: &MacaulayMatrix<N, F>| -> Vec<bool> {
+            matrix
+                .columns()
+                .iter()
+                .map(|monomial| !preprocessed.leading_monomials.contains(monomial))
+                .collect()
+        };
+        if packed_eligible {
+            let selected = candidate_columns(matrix);
+            match super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes) {
+                Ok(Some(packed)) => {
+                    packed_gf2 = packed.statistics;
+                    stages.forward = split_clock.lap();
+                    return Ok(packed.block);
+                }
+                Ok(None) => packed_gf2.declined_batches = 1,
+                Err(super::packed::Refusal::Entries(nonzeros)) => {
+                    return Err(options.entry_budget_error::<F>(nonzeros))
+                }
+                Err(super::packed::Refusal::Bytes(bytes)) => {
+                    return Err(F4Error::TooManyLiveBytes {
+                        bytes,
+                        limit: options.max_live_bytes,
+                    })
+                }
+            }
+        }
+        let budget = |nonzeros| options.entry_budget_error::<F>(nonzeros);
         let mut block = eliminate_to(
             plan,
             RowForm::Echelon,
             options.elimination,
             matrix,
             allowance,
-        )?;
+        )
+        .map_err(budget)?;
         stages.forward = split_clock.lap();
         if form == RowForm::Reduced {
             let has_candidates = matrix.matrix().rows().iter().any(|row| {
@@ -298,20 +336,18 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             let workspace_fits = super::candidate::workspace_bytes::<F>(matrix.num_columns())
                 .is_some_and(|bytes| bytes <= super::candidate::WORKSPACE_LIMIT);
             let (visits, report) = if has_candidates && !workspace_fits {
-                super::candidate::full(matrix.matrix_mut(), allowance, 0, &mut block.statistics)?
+                super::candidate::full(matrix.matrix_mut(), allowance, 0, &mut block.statistics)
+                    .map_err(budget)?
             } else if has_candidates {
-                let selected: Vec<_> = matrix
-                    .columns()
-                    .iter()
-                    .map(|monomial| !preprocessed.leading_monomials.contains(monomial))
-                    .collect();
+                let selected = candidate_columns(matrix);
                 super::candidate::finish(
                     matrix.matrix_mut(),
                     &selected,
                     allowance,
                     super::candidate::WORKSPACE_LIMIT,
                     &mut block.statistics,
-                )?
+                )
+                .map_err(budget)?
             } else {
                 (0, super::candidate::Report::default())
             };
@@ -330,12 +366,14 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         Ok(block)
     };
     #[cfg(feature = "research-work")]
-    let replacement = observer.eliminate(&mut matrix, options);
+    let replacement = observer
+        .eliminate(&mut matrix, options)
+        .map(|block| block.map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros)));
     #[cfg(feature = "research-work")]
     let block = replacement.unwrap_or_else(|| production(&mut matrix));
     #[cfg(not(feature = "research-work"))]
     let block = production(&mut matrix);
-    let block = block.map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
+    let block = block?;
     let elimination = block.statistics;
     #[cfg(feature = "research-work")]
     crate::linalg::work::finish_batch(&elimination);
@@ -390,6 +428,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
 
     let statistics = BatchStatistics {
         candidate_reduction,
+        packed_gf2,
         pairs: pairs.len(),
         rows,
         reducer_rows,

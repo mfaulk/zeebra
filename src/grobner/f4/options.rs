@@ -50,6 +50,63 @@ pub enum ReductionStrategy {
     Structured,
 }
 
+/// Whether a batch over `GF(2)` is eliminated as packed bits rather than sparse entries (#777).
+///
+/// The packed path ([`crate::linalg::gf2`]) applies only where its answer is provably the generic
+/// path's: [`ReductionStrategy::Structured`] with [`F4Options::reduce_batch_rows`], a field of
+/// characteristic two, and a matrix whose every coefficient is one. Under that contract the
+/// candidates are fully reduced rows of the batch's row space, which are unique, so **the basis is
+/// identical** whichever path ran — asserted on every measured instance. Anywhere else a batch
+/// takes the generic path whatever this says.
+///
+/// It also declines, rather than refuses, a batch whose packed working set would not fit in
+/// [`F4Options::max_live_bytes`] beside the sparse matrix: the generic path then runs under its own
+/// budget, so selecting packing never refuses a computation the generic path admits.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Gf2Elimination {
+    /// Always the generic sparse elimination.
+    Generic,
+
+    /// Packed when the matrix is dense enough to pay for walking every column; generic otherwise.
+    ///
+    /// The rule is [`Gf2Elimination::prefers_packed`]; its thresholds are measured in
+    /// `docs/research/characteristic-two-linear-algebra.md` §7.
+    #[default]
+    Auto,
+
+    /// Packed whenever the contract allows, regardless of density. For measurement.
+    Packed,
+}
+
+impl Gf2Elimination {
+    /// The least density, in entries per million cells, at which [`Gf2Elimination::Auto`] packs.
+    pub const MIN_DENSITY_PPM: u64 = 20_000;
+
+    /// The fewest columns at which [`Gf2Elimination::Auto`] packs: below one machine word, the
+    /// packed row is a single `u64` and the tables are overhead.
+    pub const MIN_COLUMNS: usize = 64;
+
+    /// Whether [`Gf2Elimination::Auto`] packs a matrix of this shape and entry count.
+    ///
+    /// A packed row operation costs one word per 64 columns whatever the row holds, and a sparse
+    /// one costs a merge over the nonzeros, so density is the axis the two cross on.
+    pub fn prefers_packed(rows: usize, columns: usize, nonzeros: usize) -> bool {
+        let cells = (rows as u128) * (columns as u128);
+        columns >= Self::MIN_COLUMNS
+            && cells > 0
+            && (nonzeros as u128) * 1_000_000 >= cells * u128::from(Self::MIN_DENSITY_PPM)
+    }
+
+    /// Whether this setting packs a matrix of this shape, before the field and coefficients are checked.
+    pub fn selects_packed(self, rows: usize, columns: usize, nonzeros: usize) -> bool {
+        match self {
+            Self::Generic => false,
+            Self::Packed => true,
+            Self::Auto => Self::prefers_packed(rows, columns, nonzeros),
+        }
+    }
+}
+
 /// How final interreduction reduces each basis element against the others.
 ///
 /// Both routes return the **same object**: a reduced Gröbner basis is determined by its leading
@@ -525,6 +582,12 @@ pub struct F4Options {
     /// measurement it takes. The rank attribution the profile is built on is free either way, since
     /// it is arithmetic on counters the elimination already returns.
     pub profile_degrees: bool,
+
+    /// Whether a characteristic-two batch may be eliminated bit-packed. See [`Gf2Elimination`].
+    ///
+    /// [`Gf2Elimination::Auto`] at [`recommended`](Self::recommended);
+    /// [`Gf2Elimination::Generic`] at [`baseline`](Self::baseline), which is held fixed.
+    pub gf2_elimination: Gf2Elimination,
 }
 
 impl F4Options {
@@ -557,6 +620,7 @@ impl F4Options {
             interreduction: InterreductionRoute::Division,
             reduce_batch_rows: false,
             profile_degrees: false,
+            gf2_elimination: Gf2Elimination::Generic,
         }
     }
 
@@ -602,6 +666,7 @@ impl F4Options {
             // `InterreductionRoute` and `Self::reduce_batch_rows`.
             reduce_batch_rows: true,
             interreduction: InterreductionRoute::ByOrder,
+            gf2_elimination: Gf2Elimination::Auto,
             ..Self::baseline()
         }
     }
