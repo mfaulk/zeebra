@@ -17,6 +17,7 @@
 //! cargo run --release --example modular_composition -- steps
 //! cargo run --release --example modular_composition -- factor
 //! cargo run --release --example modular_composition -- steps max_n=729 reps=5
+//! cargo run --release --example modular_composition -- steps min_n=6561 field=koala reps=3
 //! ```
 
 use std::time::{Duration, Instant};
@@ -36,8 +37,19 @@ type Goldilocks = PrimeFieldElement64<18_446_744_069_414_584_321>;
 const DEGREES: [usize; 3] = [81, 729, 6561];
 
 struct Options {
+    min_n: usize,
     max_n: usize,
     reps: usize,
+    /// Run only the field whose name contains this, when set.
+    field: Option<String>,
+}
+
+impl Options {
+    fn wants(&self, field: &str) -> bool {
+        self.field
+            .as_ref()
+            .is_none_or(|f| field.to_lowercase().contains(&f.to_lowercase()))
+    }
 }
 
 fn monic<F: KnownOrder>(n: usize, rng: &mut StdRng) -> UnivariatePolynomial<F> {
@@ -75,18 +87,36 @@ fn interleaved(arms: &mut [&mut dyn FnMut()], reps: usize) -> Vec<Vec<Duration>>
 }
 
 fn steps<F: KnownOrder>(field: &str, options: &Options) {
-    for &n in DEGREES.iter().filter(|&&n| n <= options.max_n) {
+    if !options.wants(field) {
+        return;
+    }
+    for &n in DEGREES
+        .iter()
+        .filter(|&&n| n >= options.min_n && n <= options.max_n)
+    {
         let mut rng = StdRng::seed_from_u64(n as u64);
         let h = monic::<F>(n, &mut rng);
         let q = F::order_limbs();
         let xi = pow_mod_limbs_unstable(&x::<F>(), q, &h);
         let expected = pow_mod_limbs_unstable(&xi, q, &h);
         let composer = ModularComposer::new(&xi, &h);
-        assert_eq!(composer.compose(&xi), expected, "composer disagrees at n={n}");
-        assert_eq!(compose_mod(&xi, &xi, &h), expected, "compose_mod disagrees at n={n}");
+        assert_eq!(
+            composer.compose(&xi),
+            expected,
+            "composer disagrees at n={n}"
+        );
+        assert_eq!(
+            compose_mod(&xi, &xi, &h),
+            expected,
+            "compose_mod disagrees at n={n}"
+        );
 
         let horner = n <= 729;
-        let reps = if n > 729 { options.reps.min(3) } else { options.reps };
+        let reps = if n > 729 {
+            options.reps.min(3)
+        } else {
+            options.reps
+        };
         let mut sink = 0usize;
         let mut by_pow_mod = || sink ^= pow_mod_limbs_unstable(&xi, q, &h).degree() as usize;
         let mut sink2 = 0usize;
@@ -125,6 +155,9 @@ fn steps<F: KnownOrder>(field: &str, options: &Options) {
 }
 
 fn factor<F: KnownOrder>(field: &str, n: usize, options: &Options) {
+    if !options.wants(field) || n < options.min_n || n > options.max_n {
+        return;
+    }
     let mut rng = StdRng::seed_from_u64(1000 + n as u64);
     let f = UnivariatePolynomial::<F>::rand(n as u64, &mut rng);
 
@@ -159,7 +192,11 @@ fn factor<F: KnownOrder>(field: &str, n: usize, options: &Options) {
         let mut rng = StdRng::seed_from_u64(3);
         sink2 ^= factorize_with_route_unstable(&f, &mut rng, FrobeniusRoute::Composition).len();
     };
-    let reps = if n > 100 { options.reps.min(3) } else { options.reps };
+    let reps = if n > 100 {
+        options.reps.min(3)
+    } else {
+        options.reps
+    };
     let mut samples = interleaved(&mut [&mut by_pow_mod, &mut by_composition], reps);
     let (pow_mod_median, pow_mod_min) = summary(&mut samples[0]);
     let (composition_median, composition_min) = summary(&mut samples[1]);
@@ -176,12 +213,18 @@ fn factor<F: KnownOrder>(field: &str, n: usize, options: &Options) {
 fn main() {
     let mut mode = "steps".to_string();
     let mut options = Options {
+        min_n: 0,
         max_n: 6561,
         reps: 7,
+        field: None,
     };
     for arg in std::env::args().skip(1) {
         if let Some(v) = arg.strip_prefix("max_n=") {
             options.max_n = v.parse().expect("max_n=<usize>");
+        } else if let Some(v) = arg.strip_prefix("min_n=") {
+            options.min_n = v.parse().expect("min_n=<usize>");
+        } else if let Some(v) = arg.strip_prefix("field=") {
+            options.field = Some(v.to_string());
         } else if let Some(v) = arg.strip_prefix("reps=") {
             options.reps = v.parse().expect("reps=<usize>");
         } else {
@@ -206,7 +249,7 @@ fn main() {
                 "| field | n | factor degrees | reps | PowMod route | Composition route | PowMod / Composition |"
             );
             println!("|---|---:|---|---:|---:|---:|---:|");
-            for n in DEGREES.iter().copied().filter(|&n| n <= options.max_n.min(729)) {
+            for n in [81, 729] {
                 factor::<KoalaBear>("KoalaBear", n, &options);
             }
             factor::<Goldilocks>("Goldilocks", 81, &options);
