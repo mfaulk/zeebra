@@ -338,6 +338,7 @@ cargo run --release --example fglm_parallel -- per-batch   # is the border reduc
 cargo run --release --example fglm_parallel -- sweep       # parallelizing? one table each
 cargo run --release --example fglm_storage         # operator representations, stored and applied
 cargo run --release --example wiedemann_conversion # certified scalar route versus classical
+cargo run --release --example sparse_matvec_throughput -- --quick # matvec per field, width, threads
 cargo run --release --example fglm_shape           # shape position, and what that route would save
 cargo run --release --example fglm_ablation        # every strategy combination, one table
 cargo run --release --example fglm_ablation -- list
@@ -681,6 +682,13 @@ operator-construction time, dependence time and output digest. Its process peak 
 use separate `--route classical` and `--route adaptive` processes for per-route memory.
 `--msolve PATH` checks the eliminant through the existing bounded adapter. See the
 [conversion guide](grobner-bases.md#certified-scalar-wiedemann) for input format and limits.
+
+`sparse_matvec_throughput` times dependent Krylov steps of the real `wiedemann_conversion` operators
+and of density-matched and cache-level synthetic matrices, per field (GF(2), GF(2^8), BabyBear,
+Goldilocks, BN254), storage format, block width and thread count, with an L1 multiply-add rate and a
+streaming-read bandwidth measured beside every repetition. Run the full sweep under
+`tools/benchlock.sh` and `taskset -c 0-63`; `--quick` is a seconds-long smoke test. Results and the
+#731 conclusion are in [`docs/research/sparse-matvec-throughput.md`](../research/sparse-matvec-throughput.md).
 
 `fglm_shape` is M18-4's dense research spike, measured. `grobner::fglm::shape` detects **shape
 position** — whether a single variable's powers `1, t, ..., t^{D-1}` are a basis of `R/I` — and

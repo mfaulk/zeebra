@@ -336,6 +336,11 @@ cost fails the declared economic gate. A certified useful pilot can justify a la
 production block integration is not required here. [XL history](research/xl-block-wiedemann.md)
 does not make block Wiedemann a replacement for F4 echelonization.
 
+#87's measured CPU baseline is [sparse-matvec-throughput](research/sparse-matvec-throughput.md): on
+the real operators, blocks raise per-vector matvec throughput only over GF(2) (bit-packed, 16x) and
+SIMD-friendly small primes (about 4x); for 64-bit, 254-bit and GF(2^8) the native scalar apply is
+already arithmetic-bound and no block CSR beats it.
+
 ### 7.7 M28-I — integration, scoreboards and report
 
 Owner: [#754](https://github.com/mfaulk/zeebra/issues/754). Maintain issue/decision matrix, ensure successful branches compose,

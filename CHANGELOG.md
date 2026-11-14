@@ -9,6 +9,10 @@ change to `y` may break the public API.
 
 ### Added
 
+- `MultiplicationOperator::column_entries`, a sparse view of one operator column, and the
+  `sparse_matvec_throughput` example measuring CPU sparse matvec throughput per field, storage
+  format, block width and thread count (#87).
+
 - Checked bounded R1CS v1 import with original-wire/row identity, independent sparse-row assignment
   evaluation and caller-sized polynomial expansion (#725).
 
