@@ -27,6 +27,15 @@ Buchberger, Faugère's F4, FGLM, resultants and univariate root finding, and ret
 field points. Every stage runs under an explicit resource budget, so a computation at the edge of
 feasibility fails with a typed error rather than exhausting the machine.
 
+## Why this matters for security
+
+Hash functions and ciphers designed for zero-knowledge proofs, such as Poseidon-style
+constructions, choose their round counts from estimates of how expensive an algebraic attack would
+be. Those estimates are usually extrapolated from complexity formulas rather than measured. Zeebra
+makes them measurable: model the primitive as a polynomial system, run the attack under an explicit
+compute and memory budget, and check every recovered solution against the original equations.
+The result is evidence, a measured cost or a verified break, rather than an asymptotic argument.
+
 ## Quickstart
 
 Zeebra builds on stable Rust 1.91 or newer.
@@ -113,6 +122,30 @@ Zeebra fills the gap between them:
   Singular, and a shared corpus of standard families is checked for ideal equivalence before any
   comparison is timed. Cross-engine results are on the
   [competitive board](research/competitive/COMPETITIVE.md).
+
+## Assurance
+
+- **Memory-safe Rust.** `unsafe` is confined to two sites: a row iterator over contiguous matrix
+  storage (`src/linalg/matrix/iterating.rs`) and the carry-less multiply intrinsic for binary
+  fields (`src/fields/binary_field.rs`).
+- **Small supply chain.** No C dependencies, no FFI and no linked algebra system; external engines
+  are driven only as supervised subprocesses.
+- **Bounded handling of untrusted input.** R1CS import enforces explicit `ImportLimits` on size,
+  wires and constraints, and checks assignments independently.
+- **Results are verified.** Solutions are checked against the input system, the solving pipeline is
+  differentially tested against Singular, and every documentation example runs in CI.
+- **Measurements carry provenance.** A CI lint rejects any published timing or memory figure that
+  does not name the commit it came from.
+
+## How it is built
+
+Zeebra is developed by several AI coding agents working concurrently, coordinated through the
+GitHub issue tracker rather than a central scheduler. An agent claims an issue with a structured,
+leased marker; concurrent claims resolve deterministically to the earliest one; a lost race is
+conceded without touching the winner's state; and an expired lease makes the work reclaimable.
+Every read distinguishes *empty* from *failed*, so an unauthenticated or rate-limited API call
+can never look like an empty work queue. The protocol is in [`CLAUDE.md`](CLAUDE.md) and is
+implemented and unit-tested in [`scripts/agent/zb-claim.sh`](scripts/agent/zb-claim.sh).
 
 ## Documentation
 
