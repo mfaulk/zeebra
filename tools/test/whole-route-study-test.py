@@ -10,6 +10,13 @@ SPEC.loader.exec_module(study)
 
 
 class WholeRouteStudy(unittest.TestCase):
+    # Relative and absolute repository archive paths produce the same durable provenance path.
+    def test_archive_path_is_normalized_before_relativizing(self):
+        path=Path('research/m28-current-baseline/pilot.json.gz')
+        self.assertEqual(study.repository_path(path),str(path))
+        self.assertEqual(study.repository_path(ROOT/path),str(path))
+        with self.assertRaises(ValueError): study.repository_path(Path('/tmp/outside-repository.json.gz'))
+
     # A continuation accepts the exact verified prefix and rejects binary or cell drift.
     def test_continuation_preserves_frozen_prefix(self):
         cells=list(study.plan('pilot'))

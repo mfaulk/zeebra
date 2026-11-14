@@ -145,6 +145,10 @@ def references():
     return refs
 
 
+def repository_path(path):
+    return str(path.resolve().relative_to(ROOT))
+
+
 def resume_prefix(previous,current):
     frozen=('binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')
     if (previous['phase']!=current['phase'] or [list(c) for c in previous['plan']]!=[list(c) for c in current['plan']]
@@ -192,7 +196,7 @@ def main():
         controller=cohort['identity']['commit']
         cohort=previous
         refusal=cohort.pop('refusal')
-        cohort['resumptions']=[dict(controller=controller,prefix_archive=str(args.resume_from.relative_to(ROOT)),
+        cohort['resumptions']=[dict(controller=controller,prefix_archive=repository_path(args.resume_from),
             prefix_archive_sha256=sha(args.resume_from),accepted_prefix=prefix,refusal=refusal,aggregate_wall_seconds=180)]
     guard=load('grobx-work-study')
     supervisor=load('comparand-scaling')
