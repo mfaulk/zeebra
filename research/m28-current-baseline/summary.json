@@ -647,7 +647,9 @@
           "maximum": 0.0
         }
       }
-    ]
+    ],
+    "cohort": "historical",
+    "archive": "pilot-completed.json.gz"
   },
   {
     "phase": "native",
@@ -2546,6 +2548,8 @@
           }
         ]
       }
-    ]
+    ],
+    "cohort": "historical",
+    "archive": "native-completed.json.gz"
   }
 ]
