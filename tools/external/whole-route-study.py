@@ -105,7 +105,8 @@ def check_point(raw):
 def validate_response(raw, reference, problem, modulus, route, arm):
     if raw['problem'] != problem or raw['modulus'] != modulus: raise ValueError('problem identity drift')
     if route != 'direct' and reference:
-        load('mq10-profile').check_answer(raw,reference)
+        if raw.get('digest')!=reference['digest'] or raw['modulus']!=reference['modulus']: raise ValueError('reference identity drift')
+        if raw.get('basis') is not None: load('mq10-profile').check_answer(raw,reference)
     if route!='basis':
         if raw['route'] != route or raw['outcome'] not in ('verified-point','no-base-field-point','inconsistent','positive-dimensional','conversion-refusal','recovery-refusal','basis-refusal'):
             raise ValueError('invalid route outcome')
@@ -202,7 +203,8 @@ def main():
                 cohort['references']['katsura-11/2147483647']=reference
                 if valid_proof(reference): refs[(problem,modulus)]=reference
             validate_response(raw,refs.get((problem,modulus)),problem,modulus,route,arm)
-            result['status']='verified' if (problem,modulus) in refs and route!='direct' else 'complete-needs-independent-basis-check'
+            result['status']=('reported-resource-refusal' if raw.get('outcome') in ('basis-refusal','conversion-refusal','recovery-refusal') else
+                              'verified' if (problem,modulus) in refs and route!='direct' else 'complete-needs-independent-basis-check')
         cohort['attempts'].append(result)
         guard.write(args.output,cohort)
         print(repeat,problem,modulus,route,arm,result['status'],round(result['process_wall_ns']/1e6,2),flush=True)

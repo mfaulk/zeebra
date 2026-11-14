@@ -10,6 +10,12 @@ SPEC.loader.exec_module(study)
 
 
 class WholeRouteStudy(unittest.TestCase):
+    # A reported basis refusal is retained without checking a nonexistent complete basis.
+    def test_reported_refusal_is_not_a_complete_basis(self):
+        raw = dict(problem='mq-random-10', modulus=32003, route='fglm', outcome='basis-refusal',
+                   basis=None, point=None, measured=True, work=None, digest='expected')
+        study.validate_response(raw, dict(digest='expected',modulus=32003), 'mq-random-10', 32003, 'fglm', 'stage-on')
+
     # A killed later stage preserves its complete source checkpoint without inventing a solve.
     def test_checkpoint_is_not_a_final_answer(self):
         records = study.responses('{"checkpoint":"source-basis","basis":["x"]}\n')
