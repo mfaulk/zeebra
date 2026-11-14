@@ -244,6 +244,65 @@ where
             Some(*self / rhs)
         }
     }
+
+    /// This element prepared as the fixed factor of many multiplications, for
+    /// [`Self::mul_prepared`].
+    ///
+    /// An elimination row operation multiplies every entry of a pivot row by one factor, so work
+    /// that depends only on the factor can be paid once per row rather than once per entry. The
+    /// default records nothing; `PrimeFieldElement64` below 2^63 records Shoup's quotient (#779).
+    #[inline]
+    fn prepare_factor(&self) -> PreparedFactor<Self> {
+        PreparedFactor::plain(*self)
+    }
+
+    /// `self * factor`, for a factor from [`Self::prepare_factor`].
+    #[inline]
+    fn mul_prepared(&self, factor: &PreparedFactor<Self>) -> Self {
+        *self * factor.element()
+    }
+}
+
+/// A field element prepared as a repeated multiplier, with up to two words of precomputation.
+///
+/// A concrete type rather than an associated `type Prepared` on [`FiniteField`]: a default for an
+/// associated type is unstable (`associated_type_defaults`), and without one every field in the
+/// crate, and every implementation outside it, would have to name a type it does not use. Two
+/// words are what Shoup's method needs (the canonical factor and `floor(f * 2^64 / p)`); a field
+/// that ignores them pays nothing, since the unused words of a local are never written.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PreparedFactor<F> {
+    element: F,
+    words: [u64; 2],
+}
+
+impl<F: Copy> PreparedFactor<F> {
+    /// `element` with no precomputation, which is what the default hook produces.
+    #[inline]
+    pub fn plain(element: F) -> Self {
+        Self {
+            element,
+            words: [0; 2],
+        }
+    }
+
+    /// `element` with field-specific precomputed `words`; their meaning is the field's own.
+    #[inline]
+    pub fn with_words(element: F, words: [u64; 2]) -> Self {
+        Self { element, words }
+    }
+
+    /// The factor itself.
+    #[inline]
+    pub fn element(&self) -> F {
+        self.element
+    }
+
+    /// The precomputed words, `[0, 0]` when the field records none.
+    #[inline]
+    pub fn words(&self) -> [u64; 2] {
+        self.words
+    }
 }
 
 /// `limbs` without its trailing zero words, so that the result is canonical.
@@ -997,5 +1056,32 @@ mod tests {
         assert!(zero.pow_limbs(&[]).is_one());
         assert!(zero.pow_limbs(&[1]).is_zero());
         assert!(zero.pow_limbs(&[0, 1]).is_zero());
+    }
+
+    /// A field without a specialized hook multiplies by a prepared factor exactly as by the
+    /// element itself.
+    #[test]
+    fn test_default_mul_prepared_is_plain_multiplication() {
+        fn check<F: FiniteField>(values: &[F]) {
+            for factor in values {
+                let prepared = factor.prepare_factor();
+                assert_eq!(prepared.element(), *factor);
+                for coefficient in values {
+                    assert_eq!(coefficient.mul_prepared(&prepared), *coefficient * *factor);
+                }
+            }
+        }
+        check::<Bn254Fr>(&[
+            Bn254Fr::zero(),
+            Bn254Fr::one(),
+            Bn254Fr::new(7),
+            -Bn254Fr::one(),
+        ]);
+        check::<Gf256>(
+            &(0..8)
+                .map(|i| Gf256::element_at(i * 31).unwrap())
+                .collect::<Vec<_>>(),
+        );
+        check::<Zp13>(&(0..13).map(Zp13::new).collect::<Vec<_>>());
     }
 }

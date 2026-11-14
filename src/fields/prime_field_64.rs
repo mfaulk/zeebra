@@ -25,7 +25,7 @@ use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    fields::{trim_limbs, KnownOrder, RootOfUnityError},
+    fields::{trim_limbs, KnownOrder, PreparedFactor, RootOfUnityError},
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
     integers::{big_uint::BigUInt, factor, find_generator, limbs_minus_two},
@@ -129,6 +129,40 @@ mod montgomery {
             redc::<P>(internal as u128)
         } else {
             internal
+        }
+    }
+}
+
+/// Shoup's multiplication by a fixed factor, for the Montgomery moduli below 2^63 (#779).
+///
+/// With `f` canonical and `w = floor(f * 2^64 / P)`, the estimate `floor(x * w / 2^64)` of
+/// `floor(x * f / P)` is low by at most one, so `x * f - q * P` lies in `[0, 2P)`: one wrapping
+/// multiply-subtract and a conditional subtraction, against Montgomery's two full products. `2P`
+/// must fit a `u64`, hence the bound. `x` may be in Montgomery form: `(aR) * f mod P = (af)R`, the
+/// Montgomery form of the product, so the representation is untouched and only the factor is
+/// converted, once per [`PreparedFactor`].
+mod shoup {
+    /// Whether `prepare_factor` records Shoup's words for modulus `p`. Below 2^32 the residues
+    /// are canonical and their own product is already cheap, so those keep the plain multiply.
+    pub const fn applies(p: u64) -> bool {
+        super::montgomery::uses_montgomery(p) && p >> 63 == 0
+    }
+
+    /// `floor(f * 2^64 / P)` for a canonical `f < P`; below 2^64 because `f < P`.
+    #[inline]
+    pub fn quotient<const P: u64>(f: u64) -> u64 {
+        (((f as u128) << 64) / P as u128) as u64
+    }
+
+    /// `x * f mod P`, for `x < P` and `w = quotient(f)`.
+    #[inline(always)]
+    pub fn mul<const P: u64>(x: u64, f: u64, w: u64) -> u64 {
+        let q = ((x as u128 * w as u128) >> 64) as u64;
+        let r = x.wrapping_mul(f).wrapping_sub(q.wrapping_mul(P));
+        if r >= P {
+            r - P
+        } else {
+            r
         }
     }
 }
@@ -243,6 +277,28 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
             "The zero element does not have a multiplicative inverse."
         );
         self.pow_limbs(&Self::FERMAT_EXPONENT_LIMBS)
+    }
+
+    #[inline]
+    fn prepare_factor(&self) -> PreparedFactor<Self> {
+        if shoup::applies(P) {
+            let f = self.value();
+            PreparedFactor::with_words(*self, [f, shoup::quotient::<P>(f)])
+        } else {
+            PreparedFactor::plain(*self)
+        }
+    }
+
+    #[inline]
+    fn mul_prepared(&self, factor: &PreparedFactor<Self>) -> Self {
+        if shoup::applies(P) {
+            let [f, w] = factor.words();
+            Self {
+                value: shoup::mul::<P>(self.value, f, w),
+            }
+        } else {
+            *self * factor.element()
+        }
     }
 }
 
@@ -1106,5 +1162,63 @@ mod tests {
                 (x.value() as i128 - y.value() as i128).rem_euclid(BIG as i128) as u64;
             prop_assert_eq!((x - y).value(), expected_difference);
         }
+    }
+
+    /// Multiplying by a prepared factor equals the `u128` product for every boundary residue and
+    /// factor, at moduli that take Shoup, at the 2^63 bound, above it, and below 2^32.
+    #[test]
+    fn test_mul_prepared_matches_wide_reduction() {
+        fn check<const P: u64>() {
+            let mut values = vec![0, 1, 2, P / 2, P - 2, P - 1];
+            let mut state = 0x9e37_79b9_7f4a_7c15_u64 ^ P;
+            for _ in 0..24 {
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                values.push(state % P);
+            }
+            for &f in &values {
+                let factor = PrimeFieldElement64::<P>::new(f);
+                let prepared = factor.prepare_factor();
+                for &a in &values {
+                    let coefficient = PrimeFieldElement64::<P>::new(a);
+                    let expected = ((a as u128 * f as u128) % P as u128) as u64;
+                    assert_eq!(
+                        coefficient.mul_prepared(&prepared).value(),
+                        expected,
+                        "P = {P}: {a} * {f}"
+                    );
+                }
+            }
+        }
+
+        // The largest prime below 2^63, the edge of Shoup's `2p < 2^64` requirement.
+        check::<9223372036854775783>();
+        check::<4611624995532046337>();
+        // The smallest prime above 2^32: the first Montgomery modulus.
+        check::<4294967311>();
+        // Above the bound: Goldilocks and the largest 64-bit prime keep plain Montgomery.
+        check::<18446744069414584321>();
+        check::<18446744073709551557>();
+        // Canonical residues below 2^32, including the Mersenne branch.
+        check::<2147483647>();
+        check::<1481823929>();
+        check::<13>();
+    }
+
+    /// Below 2^63 a prepared Montgomery factor carries its canonical value and Shoup's
+    /// `floor(f * 2^64 / p)`; elsewhere it carries neither.
+    #[test]
+    fn test_prepare_factor_records_the_shoup_quotient() {
+        const P: u64 = 9223372036854775783;
+        for f in [0, 1, 2, P - 1] {
+            let prepared = PrimeFieldElement64::<P>::new(f).prepare_factor();
+            let quotient = (((f as u128) << 64) / P as u128) as u64;
+            assert_eq!(prepared.words(), [f, quotient], "f = {f}");
+        }
+        let above = Zp18446744073709551557::new(5).prepare_factor();
+        assert_eq!(above.words(), [0, 0]);
+        let narrow = Zp2147483647::new(5).prepare_factor();
+        assert_eq!(narrow.words(), [0, 0]);
     }
 }

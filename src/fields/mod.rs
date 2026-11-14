@@ -19,7 +19,7 @@ pub use binary_field::BinaryFieldElement;
 pub use budgeted_generator::{try_primitive_element_with_budget, GeneratorSearchError};
 pub use extension_field::{ExtensionFieldElement, IrreduciblePolynomial};
 pub use finite_field::{
-    trim_limbs, FiniteField, KnownOrder, ParseFieldElementError, RootOfUnityError,
+    trim_limbs, FiniteField, KnownOrder, ParseFieldElementError, PreparedFactor, RootOfUnityError,
 };
 pub use irreducible_polynomials::{Modulus13Pow4, X5_X2_1, X8_X4_X3_X2_1, X8_X4_X3_X_1};
 #[allow(deprecated)]
