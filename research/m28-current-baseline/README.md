@@ -306,3 +306,14 @@ ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
 
 The pilot uses the same command with `--phase pilot`, a 480-second watchdog and `pilot` in the
 names. Offline validation is unchanged: `summarize.py --check` replays every current cohort too.
+
+### Current cohort result
+
+Pilot window 3 accepted 6/6 (`current/pilot-2ec9d3af.json.gz`), including a reported basis refusal
+for direct-lex MQ10 at GF(32003). Native window 1 accepted 60/75 and native window 2 accepted 61/75.
+Both stopped at the load gate after repetition 3's Katsura-11 child, and every accepted child is
+verified. Window 2 is `current/native-2ec9d3af.json.gz`. Window 1 is kept off-repository at
+`/buildcache/cargo-target/zeebra-751/current-native-w1/` (SHA-256 `f6c432e5…4b45a09`) and is not
+pooled with window 2. No further native window is authorized under this protocol; #788 owns a
+complete fifth repetition. The [report](../../docs/research/m28-current-baseline.md#current-cohort-at-2ec9d3af)
+gives the figures.
