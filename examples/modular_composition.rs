@@ -15,18 +15,30 @@
 //! Arms are interleaved within each repetition, with the order rotated per repetition; the figure
 //! is the median over repetitions, with the minimum beside it.
 //!
+//! Two more modes serve the same-machine FLINT comparison (#784), which has to run each side as a
+//! separate process: `export` writes the `factor` inputs as `.poly` files, and `factor-file`
+//! factors one such file with the default route, timing `factorize` alone, and writes the monic
+//! factors in the format `tools/external/flint-factor-driver` writes. The file format and the
+//! harness are in `tools/external/flint-factor-driver/README.md`.
+//!
 //! ```text
 //! cargo run --release --example modular_composition -- steps
 //! cargo run --release --example modular_composition -- factor
 //! cargo run --release --example modular_composition -- steps max_n=729 reps=5
 //! cargo run --release --example modular_composition -- steps min_n=6561 field=koala reps=3
+//! cargo run --release --example modular_composition -- export dir=/path/to/inputs
+//! cargo run --release --example modular_composition -- factor-file path=in.poly out=in.factors
 //! ```
 
-use std::time::{Duration, Instant};
+use std::{
+    fmt::Write as _,
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
 
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
-    compose_mod, compose_mod_horner, factorize_with_route_unstable,
+    compose_mod, compose_mod_horner, factorize, factorize_with_route_unstable,
     fields::{Bn254Fr, KoalaBear, PrimeFieldElement64},
     is_irreducible, pow_mod_limbs_unstable, FrobeniusRoute, KnownOrder, ModularComposer,
     Polynomial, UnivariatePolynomial,
@@ -265,8 +277,142 @@ fn factor<F: KnownOrder>(
     );
 }
 
+/// Decimal moduli of the three fields, checked against `order_limbs` before use.
+const KOALABEAR_MODULUS: &str = "2130706433";
+const GOLDILOCKS_MODULUS: &str = "18446744069414584321";
+const BN254_FR_MODULUS: &str =
+    "21888242871839275222246405745257275088548364400416034343698204186575808495617";
+
+/// Little-endian 64-bit limbs of a decimal string.
+fn decimal_limbs(decimal: &str) -> Vec<u64> {
+    let mut limbs: Vec<u64> = Vec::new();
+    for digit in decimal.bytes() {
+        assert!(digit.is_ascii_digit(), "not a decimal: {decimal}");
+        let mut carry = u128::from(digit - b'0');
+        for limb in &mut limbs {
+            let wide = u128::from(*limb) * 10 + carry;
+            *limb = wide as u64;
+            carry = wide >> 64;
+        }
+        if carry != 0 {
+            limbs.push(carry as u64);
+        }
+    }
+    limbs
+}
+
+fn check_modulus<F: KnownOrder>(decimal: &str) {
+    assert_eq!(
+        decimal_limbs(decimal),
+        F::order_limbs(),
+        "modulus constant {decimal} is not the field order"
+    );
+}
+
+/// `modulus <p>`, `degree <n>`, then the n + 1 coefficients low to high, one per line.
+fn write_poly<F: KnownOrder>(path: &Path, modulus: &str, f: &UnivariatePolynomial<F>) {
+    check_modulus::<F>(modulus);
+    let mut text = format!("modulus {modulus}\ndegree {}\n", f.degree());
+    for c in f.coefficients() {
+        writeln!(text, "{c}").expect("writing to a String");
+    }
+    std::fs::write(path, text).unwrap_or_else(|e| panic!("writing {}: {e}", path.display()));
+}
+
+/// The inputs `factor` measures, under the names the FLINT harness reports them by.
+fn export(dir: &Path) {
+    std::fs::create_dir_all(dir).unwrap_or_else(|e| panic!("creating {}: {e}", dir.display()));
+    for n in [81, 729] {
+        write_poly(
+            &dir.join(format!("koalabear-random-{n}.poly")),
+            KOALABEAR_MODULUS,
+            &random_polynomial::<KoalaBear>(n),
+        );
+    }
+    write_poly(
+        &dir.join("goldilocks-random-81.poly"),
+        GOLDILOCKS_MODULUS,
+        &random_polynomial::<Goldilocks>(81),
+    );
+    write_poly(
+        &dir.join("bn254fr-random-81.poly"),
+        BN254_FR_MODULUS,
+        &random_polynomial::<Bn254Fr>(81),
+    );
+    for n in [729, 6561] {
+        write_poly(
+            &dir.join(format!("koalabear-linquad-{n}.poly")),
+            KOALABEAR_MODULUS,
+            &few_applications::<KoalaBear>(n),
+        );
+    }
+}
+
+/// Factors with the default route, timing `factorize` alone. `out` gets one line per monic factor,
+/// `<multiplicity> <c0> ... <cd>`, sorted bytewise so that `cmp` against the FLINT driver's file
+/// is a multiset comparison.
+fn factor_file_in<F: KnownOrder>(modulus: &str, coefficients: &[&str], out: Option<&Path>) {
+    check_modulus::<F>(modulus);
+    let parsed: Vec<F> = coefficients
+        .iter()
+        .map(|c| F::from_str(c).unwrap_or_else(|e| panic!("coefficient {c}: {e}")))
+        .collect();
+    let f = UnivariatePolynomial::new(&parsed);
+    let mut rng = StdRng::seed_from_u64(3);
+    let start = Instant::now();
+    let factors = factorize(&f, &mut rng);
+    let elapsed = start.elapsed();
+    println!("time_ns {}", elapsed.as_nanos());
+    if let Some(out) = out {
+        let mut lines: Vec<String> = factors
+            .iter()
+            .map(|(p, m)| {
+                let mut line = m.to_string();
+                for c in p.coefficients() {
+                    write!(line, " {c}").expect("writing to a String");
+                }
+                line
+            })
+            .collect();
+        lines.sort();
+        let mut text = lines.join("\n");
+        text.push('\n');
+        std::fs::write(out, text).unwrap_or_else(|e| panic!("writing {}: {e}", out.display()));
+    }
+}
+
+fn factor_file(path: &Path, out: Option<&Path>) {
+    let text =
+        std::fs::read_to_string(path).unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+    let mut lines = text.lines();
+    let modulus = lines
+        .next()
+        .and_then(|l| l.strip_prefix("modulus "))
+        .expect("first line: modulus <p>");
+    let degree: usize = lines
+        .next()
+        .and_then(|l| l.strip_prefix("degree "))
+        .and_then(|d| d.parse().ok())
+        .expect("second line: degree <n>");
+    let coefficients: Vec<&str> = lines.map(str::trim).filter(|l| !l.is_empty()).collect();
+    assert_eq!(
+        coefficients.len(),
+        degree + 1,
+        "expected degree + 1 coefficients"
+    );
+    match modulus {
+        KOALABEAR_MODULUS => factor_file_in::<KoalaBear>(modulus, &coefficients, out),
+        GOLDILOCKS_MODULUS => factor_file_in::<Goldilocks>(modulus, &coefficients, out),
+        BN254_FR_MODULUS => factor_file_in::<Bn254Fr>(modulus, &coefficients, out),
+        other => panic!("no field with modulus {other}"),
+    }
+}
+
 fn main() {
     let mut mode = "steps".to_string();
+    let mut dir: Option<PathBuf> = None;
+    let mut path: Option<PathBuf> = None;
+    let mut out: Option<PathBuf> = None;
     let mut options = Options {
         min_n: 0,
         max_n: 6561,
@@ -282,6 +428,12 @@ fn main() {
             options.field = Some(v.to_string());
         } else if let Some(v) = arg.strip_prefix("reps=") {
             options.reps = v.parse().expect("reps=<usize>");
+        } else if let Some(v) = arg.strip_prefix("dir=") {
+            dir = Some(v.into());
+        } else if let Some(v) = arg.strip_prefix("path=") {
+            path = Some(v.into());
+        } else if let Some(v) = arg.strip_prefix("out=") {
+            out = Some(v.into());
         } else {
             mode = arg;
         }
@@ -319,6 +471,11 @@ fn main() {
                 );
             }
         }
-        other => panic!("unknown mode {other}; expected steps or factor"),
+        "export" => export(&dir.expect("export needs dir=<path>")),
+        "factor-file" => factor_file(
+            &path.expect("factor-file needs path=<file>"),
+            out.as_deref(),
+        ),
+        other => panic!("unknown mode {other}; expected steps, factor, export or factor-file"),
     }
 }
