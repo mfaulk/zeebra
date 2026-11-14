@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/mfaulk/projects/zeebra-m28-751/tools/external/whole-route-study.py", line 249, in <module>
+    if __name__=='__main__': main()
+                             ~~~~^^
+  File "/home/mfaulk/projects/zeebra-m28-751/tools/external/whole-route-study.py", line 195, in main
+    cohort['resumptions']=[dict(controller=controller,prefix_archive=str(args.resume_from.relative_to(ROOT)),
+                                                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib64/python3.14/pathlib/__init__.py", line 490, in relative_to
+    raise ValueError(f"{str(self)!r} is not in the subpath of {str(other)!r}")
+ValueError: 'research/m28-current-baseline/pilot.json.gz' is not in the subpath of '/home/mfaulk/projects/zeebra-m28-751'

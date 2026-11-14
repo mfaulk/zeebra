@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "measured_rust_source": "657344357a9cee9fb8d9c8409005f32ac950a2c4",
+  "correction": "Move the existing FiniteField import behind research-work; default builds otherwise reject an unused import with -D warnings.",
+  "patch_path": "research/m28-current-baseline/provenance/post-measurement-import.patch",
+  "patch_sha256": "0cfbcad370601a2739930238778f3631c8f051513e26cffceaec50525c6ee036",
+  "scope": "Import-only compilation correction after measurement; no algebra, options, timer or output behavior changes.",
+  "commands": [
+    "RUSTC_WRAPPER='' CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-751 TMPDIR=/buildcache/cargo-target/zeebra-751/tmp cargo rustc -j16 --example mq10_profile -- -D warnings",
+    "RUSTC_WRAPPER='' CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-751 TMPDIR=/buildcache/cargo-target/zeebra-751/tmp cargo rustc -j16 --features research-work --example mq10_profile -- -D warnings"
+  ],
+  "checks": "Both commands passed after the measured lock was released; frozen release binary and accepted responses are untouched.",
+  "source_manifest": "research/m28-current-baseline/provenance/frozen-source-sha256.json",
+  "source_manifest_sha256": "8f3f17447a9aa6527b18e189218ce81b492639efb0a746a1dee64239fbf29745",
+  "corrected_file": "examples/mq10_profile.rs",
+  "corrected_file_sha256": "e848b39f157f079e794d3489ea3de9f1f497b914f84a60de5bcbe111f19668d3",
+  "frozen_source_snapshot": "research/m28-current-baseline/provenance/frozen-source.json.gz",
+  "frozen_source_snapshot_sha256": "652ab574587e93faed77d1f062e708aae2e40685614ccb63240c23748f653e6a"
+}

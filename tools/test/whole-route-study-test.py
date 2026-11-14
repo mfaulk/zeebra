@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+import importlib.util
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = importlib.util.spec_from_file_location('whole_route', ROOT / 'tools/external/whole-route-study.py')
+study = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(study)
+
+
+class WholeRouteStudy(unittest.TestCase):
+    # The explicit native amendment keeps the verified two-cell prefix within its original budgets.
+    def test_native_amendment_is_one_time_and_cumulative(self):
+        cells=list(study.plan('native'))
+        identity={key:key for key in ('binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')}
+        identity['commit']=study.NATIVE_PREFIX_CONTROLLER
+        previous=dict(phase='native',plan=cells,identity=identity,references={},
+            refusal=dict(reason='compiler'),attempts=[dict(zip(('repeat','problem','modulus','route','arm'),cell),status='verified') for cell in cells[:2]])
+        current=dict(phase='native',plan=cells,identity=dict(identity),references={})
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current)
+        self.assertEqual(study.resume_prefix(previous,current,native_amendment=True),2)
+        self.assertEqual(study.native_remaining_seconds(),880)
+        self.assertLessEqual(study.native_remaining_seconds()+study.NATIVE_PRIOR_CHARGE_SECONDS,900)
+        current['identity']['binary_sha256']='changed'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+        current['identity']=dict(identity)
+        previous['attempts'][0]['problem']='wrong'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+        previous['attempts'][0]['problem']=cells[0][1]
+        previous['resumptions']=[{}]
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+        previous.pop('resumptions')
+        previous['attempts'][0]['status']='contaminated'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+
+    # Relative and absolute repository archive paths produce the same durable provenance path.
+    def test_archive_path_is_normalized_before_relativizing(self):
+        path=Path('research/m28-current-baseline/pilot.json.gz')
+        self.assertEqual(study.repository_path(path),str(path))
+        self.assertEqual(study.repository_path(ROOT/path),str(path))
+        with self.assertRaises(ValueError): study.repository_path(Path('/tmp/outside-repository.json.gz'))
+
+    # A continuation accepts the exact verified prefix and rejects binary or cell drift.
+    def test_continuation_preserves_frozen_prefix(self):
+        cells=list(study.plan('pilot'))
+        identity={key:key for key in ('binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')}
+        previous=dict(phase='pilot',plan=cells,identity=identity,references={},
+            refusal=dict(reason='compiler'),attempts=[dict(zip(('repeat','problem','modulus','route','arm'),cells[0]),status='verified')])
+        current=dict(phase='pilot',plan=cells,identity=dict(identity),references={})
+        self.assertEqual(study.resume_prefix(previous,current),1)
+        current['identity']['binary_sha256']='changed'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current)
+        current['identity']=dict(identity)
+        previous['attempts'][0]['problem']='wrong'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current)
+
+    # Unexpected process failures stay failures rather than becoming favorable resource refusals.
+    def test_terminal_causes_distinguish_resource_limits_and_bugs(self):
+        self.assertEqual(study.terminal_kind(-9,'wall',''), 'incomplete-resource-refusal')
+        self.assertEqual(study.terminal_kind(-9,'output-128MiB',''), 'incomplete-resource-refusal')
+        self.assertEqual(study.terminal_kind(101,None,'TooManyNonzeros { limit: 3 }'), 'incomplete-resource-refusal')
+        self.assertEqual(study.terminal_kind(101,None,'panicked at an invariant'), 'failed')
+
+    # A reported basis refusal is retained without checking a nonexistent complete basis.
+    def test_reported_refusal_is_not_a_complete_basis(self):
+        raw = dict(problem='mq-random-10', modulus=32003, route='fglm', outcome='basis-refusal',
+                   basis=None, point=None, measured=True, work=None, digest='expected')
+        study.validate_response(raw, dict(digest='expected',modulus=32003), 'mq-random-10', 32003, 'fglm', 'stage-on')
+
+    # A killed later stage preserves its complete source checkpoint without inventing a solve.
+    def test_checkpoint_is_not_a_final_answer(self):
+        records = study.responses('{"checkpoint":"source-basis","basis":["x"]}\n')
+        self.assertIsNone(records['final'])
+        self.assertEqual(records['source']['basis'], ['x'])
+        with self.assertRaises(ValueError):
+            study.responses('{"checkpoint":"source-basis"}\nnot json')
+
+    # Independent modular substitution rejects a point violating any original equation.
+    def test_independent_modular_substitution(self):
+        raw = dict(modulus=13, input=dict(variables=['x','y'], generators=['x^2-1','y-x']), point=['1','1'])
+        study.check_point(raw)
+        raw['point'] = ['1','2']
+        with self.assertRaises(ValueError): study.check_point(raw)
+        raw['input']['generators'] = ['__import__("os")']
+        with self.assertRaises(ValueError): study.check_point(raw)
+
+    # Staged and unstaged runs are repeated in alternating order without pooling work diagnostics.
+    def test_plan_is_interleaved_and_bounded(self):
+        cells = list(study.plan())
+        self.assertEqual(len(cells), len(set(cells)))
+        self.assertEqual({c[0] for c in cells if c[-1] != 'work'}, set(range(5)))
+        self.assertEqual(study.limits()['rss_bytes'], 2 * 1024**3)
+        self.assertEqual(study.limits()['aggregate_wall_seconds'], 900)
+        self.assertEqual(study.child_wall(120),60)
+        self.assertEqual(study.child_wall(7.8),7)
+        with self.assertRaises(ValueError): study.child_wall(.5)
+
+
+if __name__ == '__main__': unittest.main()
