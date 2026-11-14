@@ -134,14 +134,9 @@ ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
 ```
 
 
-The native launch retained exactly the first two planned cells (MQ10/GF(32003), stage-off/on)
-and then refused before the M31 cell when an unrelated compiler appeared. `native.json.gz`
-preserves this 2/75 prefix and the pre-child refusal. The accepted cells are not retried or pooled
-with the four pilot observations. Five-repeat distributions, work diagnostics, all five native
-Katsura-11 attempts and the two original pilot tail cells remain incomplete. Issue #751 is open;
-its PR is draft. The [current report](../../docs/research/m28-current-baseline.md) states the blocker
-and each acceptance item's incomplete status.
-
+The original native launch retained two cells before a compiler refusal. The separately approved
+one-time amendment below preserves that archive and its exact prefix; its final result is described
+under “Final bounded result.” Original records and refusals remain unchanged.
 
 ## Explicit one-time native amendment
 
@@ -184,3 +179,44 @@ The amendment is allowed once; any blocked or incomplete result remains draft. I
 offline validation checks all 75 cells while verifying the immutable original prefix, original
 refusal, source/reference identities and cumulative budget ledger. This documents the explicit
 exception to the original no-resumption plan without rewriting that plan or its first stop.
+
+
+## Final bounded result
+
+The amended archive retains **70/75 unique native accepted samples**, including the unchanged
+original two. There are four separate pilot samples; archive copies are not extra observations.
+Both MQ10 primes and both Katsura-6 primes have five timing repetitions per off/on arm, and
+Cyclic-5/GF(32003) has five. Cyclic-5/M31 has four per arm, both work diagnostics have four,
+and Katsura-11/M31 has four independently verified complete-basis repetitions. The five unaccepted
+cells are precisely listed in `native-amendment-stop.json`.
+
+The 880-second amended watchdog ended with status 124 during controller publication. This is not
+a solver resource refusal. `native-completed.json.gz` remains byte-for-byte unchanged, SHA-256
+`577344c995b23dbae63f4d7567a6c20db16813254e70f199ffda564e26240667`. The external-stop ledger
+hash-binds that durable 70-record prefix, lock/launch logs and row70’s unaccepted stdout/stderr/usage.
+Its full timing/exit/guard record did not become durable, so no timed sample is reconstructed.
+Retained native scratch and both native archives total 184,998,092 bytes, below 256 MiB. Controller
+postprocessing/publication consumed the binding aggregate allowance; the child wall sum alone does
+not measure compression. Follow-up [#764](https://github.com/mfaulk/zeebra/issues/764) scopes durable
+incremental/content-addressed publication, with High priority on Project #7 and parent #751.
+
+No additional solver run or extension is authorized. #751 remains open and PR #762 stays draft;
+the full five-repeat acceptance remains incomplete. The original two pilot tails stay separate.
+The [report](../../docs/research/m28-current-baseline.md) scores every delivered and missing item.
+
+The default-feature CI warning was fixed after measurement by moving only `FiniteField`’s import
+behind `research-work`. `provenance/post-measurement-import.patch` has SHA-256
+`0cfbcad370601a2739930238778f3631c8f051513e26cffceaec50525c6ee036`. Its JSON provenance records
+the two successful warnings-denied default/research example builds. The 315-file frozen-source
+hash manifest and offline replay allow only this exact import correction; measured binaries and
+responses are unchanged.
+
+Final offline validation (no solver launch):
+
+```sh
+python3 tools/test/whole-route-study-test.py
+python3 tools/test/whole-route-summary-test.py
+python3 research/m28-current-baseline/summarize.py --check
+bash tools/check-measurement-provenance.sh docs/research/m28-current-baseline.md
+git diff --check
+```

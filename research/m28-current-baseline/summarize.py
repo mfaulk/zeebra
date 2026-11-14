@@ -34,9 +34,28 @@ def spread(values):
     return dict(median=median(values),minimum=min(values),maximum=max(values)) if values else None
 
 
+def external_stop(cohort,ledger,archive_sha256):
+    tail=[list(c) for c in cohort['plan'][len(cohort['attempts']):]]
+    if (ledger.get('kind')!='aggregate-watchdog-during-publication' or ledger.get('status')!=124
+            or ledger.get('archive_sha256')!=archive_sha256 or ledger.get('durable_attempts')!=len(cohort['attempts'])
+            or ledger.get('unaccepted_cells')!=tail or not tail
+            or ledger.get('prior_controller_charge_seconds')!=20 or ledger.get('window_hard_seconds')!=880):
+        raise ValueError('external publication stop does not bind this exact durable prefix')
+    return dict(reason=ledger['kind'],source='external-watchdog-ledger',status=124)
+
+
 def summarize(path):
     cohort=json.loads(gzip.decompress(path.read_bytes()))
-    complete=validate_plan(cohort)
+    archive_digest=hashlib.sha256(path.read_bytes()).hexdigest()
+    ledger=None
+    if path.name=='native-completed.json.gz' and not cohort.get('refusal') and len(cohort['attempts'])!=len(cohort['plan']):
+        ledger=json.loads((HERE/'native-amendment-stop.json').read_text())
+        for record in ledger['evidence']:
+            if study.sha(ROOT/record['path'])!=record['sha256']: raise ValueError('external stop evidence bytes changed')
+        bound=dict(cohort,refusal=external_stop(cohort,ledger,archive_digest))
+        complete=validate_plan(bound)
+    else:
+        complete=validate_plan(cohort)
     if cohort.get('resumptions'):
         resume=cohort['resumptions'][0]
         prefix_path=ROOT/resume['prefix_archive']
@@ -103,15 +122,30 @@ def summarize(path):
                               backward_products=sum(b['backward']['coefficient_products'] for b in r['work']['batches']),
                               candidate=r['statistics']['candidate_reduction']) for r in raw]
         rows.append(row)
-    return dict(phase=cohort['phase'],complete=complete,archive_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+    return dict(phase=cohort['phase'],complete=complete,external_stop=ledger,archive_sha256=archive_digest,
                 identity=cohort['identity'],limits=cohort['limits'],attempts=len(cohort['attempts']),
                 statuses=dict(Counter(a['status'] for a in cohort['attempts'])),rows=rows)
+
+
+def validate_compilation_correction():
+    correction=json.loads((HERE/'provenance/post-measurement-import.json').read_text())
+    if study.sha(ROOT/correction['patch_path'])!=correction['patch_sha256']:
+        raise ValueError('approved import-only patch changed')
+    source_path=ROOT/correction['source_manifest']
+    if study.sha(source_path)!=correction['source_manifest_sha256']:
+        raise ValueError('frozen measured-source manifest changed')
+    manifest=json.loads(source_path.read_text())
+    for name,digest in manifest.items():
+        expected=correction['corrected_file_sha256'] if name==correction['corrected_file'] else digest
+        if study.sha(ROOT/name)!=expected:
+            raise ValueError('source differs beyond approved import correction: '+name)
 
 
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--check',action='store_true')
     args=parser.parse_args()
+    validate_compilation_correction()
     pilot='pilot-completed.json.gz' if (HERE/'pilot-completed.json.gz').exists() else 'pilot.json.gz'
     native='native-completed.json.gz' if (HERE/'native-completed.json.gz').exists() else 'native.json.gz'
     paths=[HERE/name for name in (pilot,native) if (HERE/name).exists()]

@@ -7,8 +7,11 @@ use zeebra::{
         F4Statistics,
     },
     util::Json,
-    FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
+    KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
+
+#[cfg(feature = "research-work")]
+use zeebra::FiniteField;
 
 #[cfg(feature = "research-work")]
 #[path = "support/selective_backward.rs"]

@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "kind": "aggregate-watchdog-during-publication",
+  "status": 124,
+  "archive_path": "research/m28-current-baseline/native-completed.json.gz",
+  "archive_sha256": "577344c995b23dbae63f4d7567a6c20db16813254e70f199ffda564e26240667",
+  "archive_bytes": 74966049,
+  "durable_attempts": 70,
+  "unaccepted_cells": [
+    [
+      4,
+      "cyclic-5",
+      2147483647,
+      "fglm",
+      "stage-off"
+    ],
+    [
+      4,
+      "cyclic-5",
+      2147483647,
+      "fglm",
+      "stage-on"
+    ],
+    [
+      4,
+      "mq-random-10",
+      32003,
+      "fglm",
+      "work"
+    ],
+    [
+      4,
+      "mq-random-10",
+      2147483647,
+      "fglm",
+      "work"
+    ],
+    [
+      4,
+      "katsura-11",
+      2147483647,
+      "basis",
+      "stage-on"
+    ]
+  ],
+  "controller": "9dafa38271b39f24496119df4b164e47175d1ba1",
+  "prior_controller_charge_seconds": 20,
+  "window_hard_seconds": 880,
+  "lock_elapsed_seconds": 881,
+  "cumulative_output_bytes": 184998092,
+  "cause": "Controller full-cohort JSON/gzip publication exhausted the aggregate watchdog; no solver timeout or refusal is inferred.",
+  "unaccepted_output": "Row70 stdout/stderr/usage are retained, but process wall/exit/guard metadata did not become durable; no timed sample is reconstructed.",
+  "evidence": [
+    {
+      "path": "research/m28-current-baseline/native-amendment-lock.log",
+      "sha256": "6eabd086b8d4c8675441cee4e67d3e9d7fc4c160ba8b2de502ce06d2c23bb984"
+    },
+    {
+      "path": "research/m28-current-baseline/native-amendment-launch.log",
+      "sha256": "243dd5b979eb80bdfb3cd8e9552044e2abe184d6b8998a521cc2e91489e06237"
+    },
+    {
+      "path": "research/m28-current-baseline/unaccepted-70/70.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "research/m28-current-baseline/unaccepted-70/70.stdout",
+      "sha256": "45055b27c6d0b632e909788406130175b8b1ae9ce7df692831d4048085fafd8c"
+    },
+    {
+      "path": "research/m28-current-baseline/unaccepted-70/70.usage",
+      "sha256": "f459ba3aca804a8aab5bd9c14e208b838d215a9d76b55f553741ff314da1fbcd"
+    }
+  ]
+}

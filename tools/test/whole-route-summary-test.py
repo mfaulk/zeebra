@@ -10,6 +10,20 @@ SPEC.loader.exec_module(summary)
 
 
 class WholeSummary(unittest.TestCase):
+    # A hash-bound outer publication stop permits only the exact durable prefix and missing tail.
+    def test_external_publication_stop_is_not_a_solver_refusal(self):
+        cells=list(summary.study.plan('native'))
+        cohort=dict(phase='native',plan=cells,attempts=[dict(zip(('repeat','problem','modulus','route','arm'),cell)) for cell in cells[:70]])
+        ledger=dict(kind='aggregate-watchdog-during-publication',status=124,durable_attempts=70,
+                    archive_sha256='archive',unaccepted_cells=[list(c) for c in cells[70:]],
+                    prior_controller_charge_seconds=20,window_hard_seconds=880)
+        self.assertEqual(summary.external_stop(cohort,ledger,'archive')['reason'],'aggregate-watchdog-during-publication')
+        ledger['status']=0
+        with self.assertRaises(ValueError): summary.external_stop(cohort,ledger,'archive')
+        ledger['status']=124
+        ledger['unaccepted_cells']=[]
+        with self.assertRaises(ValueError): summary.external_stop(cohort,ledger,'archive')
+
     # Missing entire cells cannot masquerade as a complete repeated campaign.
     def test_missing_cells_are_rejected(self):
         with self.assertRaises(ValueError): summary.validate_plan(dict(phase='pilot',plan=[],attempts=[]))

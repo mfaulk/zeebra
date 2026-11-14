@@ -1,21 +1,20 @@
 # M28 current whole-route baseline (#751)
 
-**Status:** instrumentation, four accepted pilot processes and a two-process native prefix retained; repeated baseline incomplete.
-**Measured at:** `657344357a9cee9fb8d9c8409005f32ac950a2c4` (Rust instrumentation and profiling example);
-controller `72c2a2c6` for the accepted pilot prefix; controller `807547b6` for the refused continuation.
-**Production baseline:** `b9898c9a`, after candidate-only F4 #749/#757; the measurement changes
-passive timing and the profiling example, not an algebra algorithm or solver default.
-**Machine:** Threadripper PRO 5995WX, one physical-core affinity CPU 3, Rust 1.99.1,
-release/fat LTO/one codegen unit/x86-64-v3/mold/system allocator. Complete source, binary,
-Cargo/ISA configuration, toolchain and topology identities are retained in the raw archives.
+**Status:** instrumentation and 70/75 native responses retained; acceptance remains incomplete.
+**Measured at:** Rust/example source `657344357a9cee9fb8d9c8409005f32ac950a2c4` (full source identity
+is authoritative in the retained compilation provenance); initial native controller `9e2017806b95cbf88a904ad9213d324c2a1f5b0e`,
+amended implementation `5e2bf3d8`, launch controller `9dafa38271b39f24496119df4b164e47175d1ba1`.
+**Production baseline:** `b9898c9a`, after candidate-only F4 #749/#757. Production algorithms,
+defaults and admission limits are unchanged. The profiling instrument adds explicit fixed-route
+composition and passive clocks. A later import-only compilation correction is recorded below.
 
-This is an **incomplete investigation**, not a completed M28-0 acceptance claim. No single pilot
-observation is promoted to a repeated current baseline, precise speedup or adoption decision.
-The [protocol](../../research/m28-current-baseline/README.md),
-[raw accepted prefix](../../research/m28-current-baseline/pilot.json.gz),
-[refused continuation](../../research/m28-current-baseline/pilot-completed.json.gz) and
-[native prefix](../../research/m28-current-baseline/native.json.gz) and
-[derived summary](../../research/m28-current-baseline/summary.json) preserve the distinction.
+This report preserves **70 distinct accepted native processes and four distinct accepted pilot
+processes**. Original-prefix archives are retained copies of those same records, not additional
+measurements. The [protocol](../../research/m28-current-baseline/README.md),
+[unchanged native archive](../../research/m28-current-baseline/native-completed.json.gz),
+[derived summary](../../research/m28-current-baseline/summary.json) and
+[external watchdog ledger](../../research/m28-current-baseline/native-amendment-stop.json)
+keep the measured boundaries and missing cells explicit. PR #762 stays draft and #751 stays open.
 
 ## Timer and task audit
 
@@ -48,102 +47,154 @@ The whole timer is not the sum of inner clocks. Construction refinements, elimin
 and scalar refinements overlap their parent stages intentionally. No process high waters are
 subtracted and no retained work ratio is called an elapsed share.
 
-## Pilot outcomes and environmental stops
+## Campaign identity, bounds and terminal cause
 
-The first lock window, 2026-11-13 19:21:43–19:21:54 America/New_York, accepted four processes.
-Their pre/post compiler snapshots are empty. Before Katsura-11 could launch, an unrelated compiler
-appeared; the driver retained the exact accepted prefix and refused the next cell. The sole
-bounded continuation then refused before either remaining child for the same reason. The original
-prefix and both compiler identities remain retained; no accepted sample was discarded or repeated.
-A controller path-normalization defect caused a separate preflight failure before any child;
-its log and Red–Green regression are retained too.
+Machine: Threadripper PRO 5995WX, one physical-core affinity CPU 3, Rust 1.99.1,
+release/fat LTO/one codegen unit/x86-64-v3/mold/system allocator. The raw archives retain executable,
+Cargo/configuration, compiler and topology identities. Every accepted native response has empty
+pre/post compiler snapshots and matches its complete independent source basis. Every recovered
+point is independently substituted into the original equations in Python as well as Rust.
 
-The following are **one accepted pilot per cell**, not medians or comparative measurements.
-All source bases match independently verified complete reduced bases coefficient for coefficient.
+The original native window accepted two samples and stopped at a pre-child compiler gate. One
+explicit amendment preserved that exact archive/refusal/prefix and appended only unexecuted cells.
+Its 2026-11-13 19:59:29–20:14:10 America/New_York lock window ended with **status 124, end=budget**.
+The original nine-second window is conservatively charged 20 seconds; the amended watchdog is
+880 seconds under the original 900-second allowance. No limit was raised or accepted sample rerun.
 
-| Input / prime | Process ms | F4 call ms | Forward ms | Backward ms | Conversion ms | Recovery ms | Self RSS MiB | Outcome |
-|---|---:|---:|---:|---:|---:|---:|---:|---|
-| mq-random-10 / 32003 | 1615.844 | 1276.425 | 1096.150 | 43.517 | 279.738 | 0.712 | 49.42 | no-base-field-point |
-| cyclic-5 / 32003 | 8.159 | 0.639 | 0.107 | 0.031 | 0.379 | 0.035 | 5.79 | no-base-field-point |
-| mq-random-10 / 2147483647 | 1908.830 | 1446.367 | 1263.499 | 48.337 | 382.823 | 18.745 | 51.71 | verified-point |
-| cyclic-5 / 2147483647 | 8.090 | 0.652 | 0.128 | 0.024 | 0.454 | 0.109 | 6.02 | no-base-field-point |
+The final amended archive is byte-for-byte preserved, SHA-256
+`577344c995b23dbae63f4d7567a6c20db16813254e70f199ffda564e26240667`.
+The controller exhausted aggregate time while handling publication; this is **not a solver timeout
+or solver resource refusal**. About 100.591 seconds of durable accepted child process wall occurred
+inside the amended 881-second logged window. The remaining controller elapsed includes independent
+checking, JSON serialization, compression and other work; it is not an isolated gzip timing.
+Full growing cohorts were rewritten after each response. Follow-up
+[#764](https://github.com/mfaulk/zeebra/issues/764), linked under #751/#750 with Project #7 High
+priority, scopes incremental/content-addressed durable publication. No implementation or new
+measurement of that follow-up occurs here.
 
-MQ10 has quotient dimension 354 at both primes, not 354 base-field points. Adaptive FGLM takes
-Classical with `DenseOperator`, with zero scalar attempts; Cyclic-5 has dimension 70 and takes
-Classical with `SmallQuotient`. No zero-valued scalar clock is interpreted as a fast certificate.
-The M31 MQ point is independently substituted into all original generators in Python as well
-as Rust. The other outcomes report no base-field point; exact source-basis checking is distinct
-from an independent proof of that root-search outcome.
+The watchdog interrupted controller publication outside a child guard, so the archive has no
+in-band refusal marker. The separate hash-bound external-stop ledger binds its exact 70-record
+prefix, lock log, launcher output and unaccepted row-70 files. That row's stdout/stderr/usage
+survived, but complete process-wall/exit/guard metadata did not become durable; it supplies no
+reconstructed timed sample. Offline replay attaches only the external termination fact in memory.
+The measured archive is not rewritten. Total retained native scratch and both native archives
+were 184,998,092 bytes, below the original 256-MiB cumulative output allowance.
 
-The two pilot tail cells—Katsura-11/M31 basis-only and MQ10/GF(32003) direct lex—remain
-**unattempted**. Native measurements must not be silently counted as completing that pilot.
-The exact frozen Katsura identity is
-`03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13`.
-Its 537-element independent Singular reference is reused from #739 with retained archive hash
-`d52ca65cbdc2a088e42da3faeb58305cbfa614dc2e6740de09fd2b6d13c133c1`;
-no redundant external oracle campaign is run.
+## Coverage and repeated whole-route results
 
-## Repeated native baseline and post-selection model
+All 70 durable native attempts are independently source-basis verified. MQ10, Katsura-6 and
+Cyclic-5/GF(32003) have five stage-off and five stage-on fresh-process repetitions. Cyclic-5/M31
+has four of each; MQ work diagnostics have four per prime; Katsura-11/M31 has four staged
+basis-only repetitions. Five cells remain unaccepted:
 
-The native window ran 2026-11-13 19:36:12–19:36:21 America/New_York. It accepted exactly two
-fresh processes: repetition 0, MQ10/GF(32003), stage-off and stage-on. Both source bases verify
-exactly, both report no base-field point, and their pre/post compiler snapshots are empty. A new
-unrelated compiler appeared before the M31 cell; the driver retained its identities and stopped.
-The archive preserves the exact **2/75 prefix**, leaving 73 cells unattempted. No native retry or
-resumption is authorized. Its paired observations cannot establish clock overhead or a repeated
-performance estimate. Pilot and native observations are never pooled into five-run medians.
+| Repetition | Input / prime | Route | Arm |
+|---:|---|---|---|
+| 4 | Cyclic-5 / 2147483647 | conversion/recovery | stage-off |
+| 4 | Cyclic-5 / 2147483647 | conversion/recovery | stage-on |
+| 4 | MQ10 / 32003 | conversion/recovery | work diagnostic |
+| 4 | MQ10 / 2147483647 | conversion/recovery | work diagnostic |
+| 4 | Katsura-11 / 2147483647 | reduced grevlex basis | stage-on |
 
-There are six distinct accepted solver processes across the two cohorts; the pilot continuation
-copies its original four accepted records unchanged and adds no new measurement. The external
-compiler workload is the binding measurement blocker. #751 stays open and its PR stays draft.
+The two original pilot tail cells (Katsura-11/M31 basis-only and MQ10/GF(32003) direct lex) remain
+separate and unattempted; native Katsura observations do not complete that pilot. The pilot has
+one independently checked M31 MQ point and three no-base-field-point outcomes. Its four accepted
+samples are never pooled with native medians.
 
-Pending: five interleaved stage-off/on fresh-process repetitions of MQ10, Katsura-6 and Cyclic-5
-at both primes; five separate work diagnostics at each MQ prime; five staged Katsura-11/M31
-basis-only repetitions. The exact 75-process plan has a 900-second aggregate hard cap, 60-second/
-2-GiB child caps limited by remaining aggregate time, and 256-MiB cumulative output allowance.
-There is no authorized automatic native retry or resumption. Compiler/load refusals stop the grid
-and preserve the prefix. Work diagnostics never join native timing distributions.
+The following MQ10 process walls include input and output. Five repetitions per arm; milliseconds
+are median [min,max]. Self RSS is the median process high water in MiB, without subtraction.
 
-The offline model computes each eligible-stage ceiling from that attempt's own full-route duration
-`T` and stage duration `S`: `T/(T-S)`. It neither divides unrelated medians nor assigns historical
-backward fractions to production clocks. Pilot forward work is the largest observed term, with
-operator construction also material, but the repeated grid and perturbation controls are required
-before ranking investments or making an adaptive dispatch decision. No current whole-route
-wide-field or larger-frontier result is supplied by the two narrow-field inputs.
+| Prime | Stage-off process ms | Stage-on process ms | Stage-on F4 ms | Stage-on conversion ms | Self RSS MiB | Outcome, both arms |
+|---|---:|---:|---:|---:|---:|---|
+| 32003 | 1656.653 [1626.338,1795.889] | 1647.553 [1629.409,1730.846] | 1313.947 | 282.771 | 49.25 | no base-field point |
+| 2147483647 | 2061.503 [1939.301,2080.516] | 1973.159 [1927.020,2031.248] | 1509.652 | 385.983 | 51.67 | verified point |
 
-Katsura's M27 single-attempt 29,769.4-ms result at `3d0e3759` remains historical, with its original
-600-second envelope and load caveats. The new five-attempt 60-second envelope must retain any
-refusal; a faster stop cannot replace the old completed-basis timing or establish a speedup.
+Stage-off/on ranges overlap, including the M31 median difference; the data do not resolve a
+positive clock-overhead estimate or justify crediting instrumentation with a gain. Work-on
+observations remain separate diagnostics. MQ10's quotient dimension is 354 at both primes,
+not 354 base-field points. Adaptive conversion takes Classical with `DenseOperator` and zero
+scalar attempts; Cyclic-5/Katsura-6 take Classical with `SmallQuotient`. No scalar certificate
+or block-Krylov performance result is inferred from zero scalar subphase clocks.
 
-## External targets and decision status
+| MQ10 prime | Forward ms | Candidate backward ms | Operator construction ms | Classical dependence ms | Recovery ms | Direct checkpoint emission ms |
+|---|---:|---:|---:|---:|---:|---:|
+| 32003 | 1133.908 | 44.237 | 264.405 | 16.010 | 0.710 | 2.344 |
+| 2147483647 | 1316.341 | 50.237 | 284.661 | 98.784 | 19.149 | 2.712 |
 
-[#739's report](comparand-scaling.md#targets-for-zeebra-at-8-and-16-workers) supplies independently
-checked complete-basis process targets at fixed/common core budgets. At both ≤8 and ≤16 cores,
-the named exact-mode MQ10 targets are 0.1168 s at GF(32003) and 0.1670 s at M31; M31 Katsura-11
-is 0.7155 s. They are pinned observations from that separate cohort, not ratios to this pilot.
-Raw randomized checked-answer targets and certificate/checking costs remain separate in that report.
-A whole point-solving route must not be divided by a comparand's basis-only process wall.
+These are stage medians, not an additive partition of a process median. Direct checkpoint time
+excludes construction of its JSON values and cannot bound cache/allocator perturbation. The
+whole-route timer includes source/lex rendering and checkpoint work as documented.
 
-| #751 deliverable | Current disposition |
+The four retained Katsura-11/M31 processes all match the independent 537-element Singular basis.
+Their process median is **13,055.548 ms [12,910.347,13,335.830]**, and F4-call median is
+12,865.848 ms [12,709.734,13,142.479]. Self RSS spans 115.66–116.02 MiB. This repeats the old weak
+single attempt four times, but the declared fifth repetition remains missing. The M27
+29,769.4-ms observation at `3d0e3759` keeps its original 600-second envelope, flags and load
+caveats; no cross-cohort speed ratio or new comparand lead is published.
+
+## Work, current cost model and scoped decisions
+
+The four MQ work diagnostics per prime agree on exact logical counts:
+
+| Prime | Forward products | Candidate backward products | Candidate targets | Full-RREF fallback batches | Candidate workspace bytes |
+|---|---:|---:|---:|---:|---:|
+| 32003 | 585,166,982 | 23,566,622 | 250 | 0 | 156,260 |
+| 2147483647 | 585,195,178 | 23,567,093 | 250 | 0 | 204,340 |
+
+The archives separately retain row visits, scans, gathers, capacities, conservative reservations,
+mathematical peaks, and full stage/trajectory statistics. They are logical work/storage models,
+not allocator counts, physical DRAM bandwidth or measured process RSS. Work scopes here cover F4;
+conversion product-level counters are unavailable and are not silently reported as zero.
+
+The model uses each staged attempt's own whole-route duration `T` and stage duration `S` for the
+ideal zero-cost ceiling `T/(T-S)`. Median forward ceilings are 3.179x/3.010x; median candidate
+backward ceilings are 1.028x/1.026x, with maximum backward ceilings below 1.029x. These are
+analytical ceilings, not parallel forecasts. They use current production pass clocks, rather than
+assigning historical work percentages to elapsed time.
+
+| Investment | Scoped decision from this evidence |
 |---|---|
-| Current explicit whole-route instrument and timer-boundary audit | Implemented; focused tests and fixed-route functional control pass |
-| Five-repetition native baseline and stage/work perturbation controls | 2/75 native prefix retained; five-repetition coverage and diagnostics incomplete |
-| Weak Katsura repeat or exact resource/capability blocker | All five native Katsura attempts and both pilot tail cells unattempted after compiler refusals |
-| Complete independent source bases and original-equation point checks | Four pilot and two native source bases validated; one M31 pilot point independently substituted |
-| Post-selection Amdahl model and ranked remaining terms | Reproducible same-attempt model implemented; repeated verdict pending |
-| External 8/16-worker targets | Linked to #739 with separate boundaries and exact/raw distinction |
-| Adopt/reject/defer next investments | Pending repeated baseline; no policy selected from single pilot cells |
+| Concurrent forward / #752 | Prioritize a bounded matched-control experiment: forward remains the dominant named MQ term; production adoption still requires its full-task/control/memory gates |
+| Residual backward scheduling / #730 | Reject as a 10% whole-route optimization on these serial MQ inputs: even free removal is below 3%; reopen only after integrated forward work changes its measured fraction |
+| Operator construction / #87 and conversion planning | Keep as a measured secondary opportunity; 264–285 ms is material, with explicit construction ownership and a complete-route gate before a prototype |
+| Block/scalar reconstruction / #731 | Defer investment from this cohort: adaptive selection rejects scalar on these dense operators; no successful scalar hot phase was measured |
+| Arithmetic/layout/symbolic changes | Defer policy selection pending their isolated matched controls; coefficient products alone do not price elapsed gains |
+| Study controller publication / #764 | Fix before any new long cohort: aggregate publication cost is the demonstrated completion blocker |
 
-## Validation and reproduction
+The separate [#739 targets](comparand-scaling.md#targets-for-zeebra-at-8-and-16-workers) remain
+complete-basis process targets. Exact-mode ≤8/≤16-core MQ10 targets are 0.1168 s at GF(32003)
+and 0.1670 s at M31; M31 Katsura-11 is 0.7155 s. Those pinned observations, raw randomized
+checked-answer targets and certification costs keep their own boundaries. No whole-point-solving
+wall is divided by a basis-only comparand wall. No current wide-field frontier measurement is
+supplied by this narrow-prime campaign.
 
-Tests preceded changes: missing refinement fields, absent route implementation and protocol/model
-functions failed first; implementation then passed nine example/integration tests and 15 focused
-Wiedemann tests across supported prime/binary/extension/wide fields. Protocol tests also cover
-relative continuation paths, strict frozen-prefix identity, invalid clocks, missing cells, point
-substitution and unexpected failure versus resource stop. Existing CI runs these offline checks.
-The documentation and command audit covers the published partial result. Repeated-native acceptance remains open; no environmental stop is treated as completion of the issue.
+## Acceptance, compilation correction and reproducibility
 
-Run the [documented build and offline commands](../../research/m28-current-baseline/README.md).
-Archive replay rechecks exact full source coefficients and points without launching a solver.
-It does not turn a retained status label into a new external certificate, or turn an interrupted
-prefix into a complete campaign. README paths and commands have been checked against this source.
+| #751 deliverable | Disposition |
+|---|---|
+| Current complete-route MQ profile and timer audit | Implemented; five native timing repetitions per MQ arm, independently checked M31 points and explicit GF(32003) no-point outcomes |
+| Complete declared 75-cell grid and all five-repeat controls | **Incomplete: 70/75**; Cyclic-5/M31 fifth pair, both fifth work diagnostics and fifth Katsura repetition are unaccepted |
+| Weak Katsura repeat | Four independently checked completions retained; declared fifth absent; aggregate controller budget binds, not a solver refusal |
+| Current post-selection cost model and ranked terms | Implemented for the named MQ route with same-attempt elapsed ceilings; broad production policies remain gated |
+| External 8/16-worker targets | Linked to #739 with separate exact/raw/task boundaries |
+| Raw outcomes, refusals and publication interruption | Retained without rewriting accepted prefixes or inventing lost clocks |
+| Full milestone/issue acceptance | **Not complete**; #751 remains open and PR #762 draft |
+
+CI found one default-feature compilation issue after measurement: `FiniteField` became used only
+by the research observer, leaving its unconditional import unused under warnings-denied default
+builds. The post-measurement correction moves only that import behind `research-work`. The exact
+[patch](../../research/m28-current-baseline/provenance/post-measurement-import.patch), SHA-256
+`0cfbcad370601a2739930238778f3631c8f051513e26cffceaec50525c6ee036`,
+[checks/provenance](../../research/m28-current-baseline/provenance/post-measurement-import.json)
+and 315-file frozen-source hash manifest retain this compilation-only exception. The measured
+release executable and response archives are unchanged; offline replay permits only that exact
+approved source difference. Both default/research example builds pass `cargo rustc ... -- -D warnings`.
+
+Tests preceded behavior changes. Nine example/integration tests and 15 Wiedemann tests across
+supported fields passed before measuring. Eight protocol and four model tests now cover exact
+prefixes, one-time cumulative amendments, modular substitution, missing/invalid cells, terminal
+causes and hash-bound external publication stops. Existing CI runs those checks and deterministic
+archive/source/point replay. README commands, local paths and source documentation comments were
+reviewed. No additional solver launch, retry or budget extension is authorized.
+
+Run the [documented offline commands](../../research/m28-current-baseline/README.md).
+The two originally unattempted pilot tail cells remain separate from this native evidence.

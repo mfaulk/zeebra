@@ -490,6 +490,8 @@ observer overrides leave these production refinements zero. Their sum is exclude
 `mq10_profile 32003 --whole-route=direct` profiles direct lex F4 and recovery. Each process retains completed-phase
 checkpoints and independently checks a returned point against the original equations. The
 [whole-route protocol](research/m28-current-baseline/README.md) defines its timers and bounded runs.
+The [current report](docs/research/m28-current-baseline.md) retains 70/75 native responses with
+explicit aggregate-publication timeout and acceptance gaps; it claims no completed #751 gate.
 
 The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanalyzes retained
 concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated
