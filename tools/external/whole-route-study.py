@@ -136,6 +136,8 @@ def independent_katsura(raw, scratch, guard):
     path.write_text(script)
     proof=guard.guarded(['Singular','-q',str(path)],scratch/'katsura-11-proof',60,limits()['rss_bytes'])
     return dict(modulus=raw['modulus'],digest=raw['digest'],basis=raw['basis'],script=script,
+                singular_version=subprocess.check_output(['Singular','--version'],text=True,stderr=subprocess.STDOUT),
+                singular_sha256=sha(Path('/usr/bin/Singular').resolve()),
                 script_sha256=hashlib.sha256(script.encode()).hexdigest(),singular=proof)
 
 
