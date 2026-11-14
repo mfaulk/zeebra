@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import resource
+import signal
 import subprocess
 import time
 
@@ -120,7 +121,7 @@ def validate_response(raw, reference, problem, modulus, route, arm):
 
 
 def terminal_kind(exit_code,stop,stderr):
-    if stop in ('wall','rss'): return 'incomplete-resource-refusal'
+    if stop and any(stop==kind or stop.startswith(kind+'-') for kind in ('wall','rss','output','launcher-signal')): return 'incomplete-resource-refusal'
     if exit_code and any(name in stderr for name in ('TooManyNonzeros','TooManyMatrixRows','TooManyMatrixColumns','TooManyBasisElements')):
         return 'incomplete-resource-refusal'
     return 'failed'
@@ -169,6 +170,9 @@ def main():
     refs=references()
     cohort['references']['katsura-11/2147483647']=refs[('katsura-11',2147483647)]
     guard=load('grobx-work-study')
+    supervisor=load('comparand-scaling')
+    def interrupted(signum,_): raise SystemExit(128+signum)
+    signal.signal(signal.SIGTERM,interrupted)
     runtime=load('worker-pool-study')
     began=time.monotonic()
     for repeat,problem,modulus,route,arm in cells:
@@ -181,7 +185,10 @@ def main():
         if arm!='stage-off': command+=['--stages']
         if arm=='work': command+=['--work']
         usage=resource.getrusage(resource.RUSAGE_CHILDREN)
-        result=guard.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(len(cohort['attempts'])),60,limits()['rss_bytes'])
+        remaining=limits()['output_bytes']-sum(p.stat().st_size for p in args.scratch.iterdir())
+        if remaining<=0: raise RuntimeError('output budget exhausted')
+        result=supervisor.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(len(cohort['attempts'])),sorted(os.sched_getaffinity(0)),60,limits()['rss_bytes'],min(128*1024**2,remaining))
+        result['observed_peak_rss_bytes']=result['observed_tree_peak_bytes']
         after=resource.getrusage(resource.RUSAGE_CHILDREN)
         result.update(repeat=repeat,problem=problem,modulus=modulus,route=route,arm=arm,load=os.getloadavg()[0],cpu_seconds=after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime,
             compiler_before=compilers,compiler_after=runtime.compiler_processes())
@@ -207,6 +214,8 @@ def main():
         cohort['attempts'].append(result)
         guard.write(args.output,cohort)
         print(repeat,problem,modulus,route,arm,result['status'],round(result['process_wall_ns']/1e6,2),flush=True)
+        if result.get('interrupt_exit'):
+            cohort['refusal']=dict(reason='launcher-signal',exit=result['interrupt_exit']);guard.write(args.output,cohort);raise SystemExit(result['interrupt_exit'])
         if result['status']=='failed': raise RuntimeError('failed validation; raw attempt retained')
         if result['status']=='contaminated': cohort['refusal']=dict(reason='compiler');guard.write(args.output,cohort);return
         if sum(p.stat().st_size for p in args.scratch.iterdir())>limits()['output_bytes']: raise RuntimeError('output budget exceeded; retained attempts')

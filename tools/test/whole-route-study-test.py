@@ -13,6 +13,7 @@ class WholeRouteStudy(unittest.TestCase):
     # Unexpected process failures stay failures rather than becoming favorable resource refusals.
     def test_terminal_causes_distinguish_resource_limits_and_bugs(self):
         self.assertEqual(study.terminal_kind(-9,'wall',''), 'incomplete-resource-refusal')
+        self.assertEqual(study.terminal_kind(-9,'output-128MiB',''), 'incomplete-resource-refusal')
         self.assertEqual(study.terminal_kind(101,None,'TooManyNonzeros { limit: 3 }'), 'incomplete-resource-refusal')
         self.assertEqual(study.terminal_kind(101,None,'panicked at an invariant'), 'failed')
 
