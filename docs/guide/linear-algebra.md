@@ -87,3 +87,31 @@ the crate needs it yet. And `Matrix<T>` does not implement `Ring`, so a matrix c
 polynomial coefficient: `Ring` has no fallible operations, and only *square* matrices form one, so
 that wants a `SquareMatrix<T>` type carrying the invariant rather than a runtime check inside
 `mul`. [#132](https://github.com/mfaulk/zeebra/issues/132) has the discussion.
+
+## Bit-packed GF(2)
+
+`linalg::gf2::BitMatrix` stores a `GF(2)` matrix at one bit per coefficient, rows packed into `u64`
+words, and converts to and from `SparseMatrix<Zp2>`. `reduced_row_echelon_packed` is plain
+Gauss-Jordan by row `xor`; `reduced_row_echelon_four_russians(matrix, k)` clears `k` pivots per
+`xor` from Gray-code tables (`1 <= k <= MAX_TABLE_BITS`). Both return the RREF with the nonzero rows
+first in pivot order, equal to the generic kernel's. It is a research prototype (#272) and is
+**not** used by F4; [`docs/research/characteristic-two-linear-algebra.md`](../research/characteristic-two-linear-algebra.md)
+has the measurements.
+
+```rust
+use zeebra::{
+    fields::Zp2,
+    linalg::{gf2::{reduced_row_echelon_four_russians, BitMatrix}, sparse::{SparseMatrix, SparseRow}},
+    One,
+};
+
+let rows = vec![
+    SparseRow::new(&[(0, Zp2::one()), (1, Zp2::one())]),
+    SparseRow::new(&[(1, Zp2::one()), (2, Zp2::one())]),
+    SparseRow::new(&[(0, Zp2::one()), (2, Zp2::one())]), // the sum of the first two
+];
+let mut packed = BitMatrix::from_sparse(&SparseMatrix::new(3, rows));
+let statistics = reduced_row_echelon_four_russians(&mut packed, 8);
+assert_eq!(statistics.rank, 2);
+assert!(packed.get(0, 0) && packed.get(0, 2) && !packed.get(0, 1));
+```

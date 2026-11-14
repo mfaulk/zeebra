@@ -320,6 +320,8 @@ cargo run --release --example accumulator_span     # whether a vectorizable inne
 cargo run --release --example accumulator_span -- list
 cargo run --release --example boolean_density      # what a GF(2) entry costs, at two field widths
 cargo run --release --example boolean_density -- 6 8
+cargo run --release --example gf2_packed_elimination -- f4 5      # bit-packed GF(2) vs generic, F4 matrices
+cargo run --release --example gf2_packed_elimination -- square 5  # Four Russians crossover
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -615,6 +617,13 @@ already cheaper in memory — by entry count, not entry size. It also runs all t
 backends over characteristic-two matrices and asserts they agree, which
 [`docs/research/boolean-solving.md`](../research/boolean-solving.md) §15 explains had never been
 checked.
+
+`gf2_packed_elimination` is #272's instrument: it collects every matrix F4 eliminates for
+characteristic-two systems and times the generic sparse `reduced_row_echelon` over `Zp2` against
+`linalg::gf2`'s bit-packed Gauss-Jordan and Four Russians kernels, asserting every packed RREF equal
+to the generic one, and projects the end-to-end effect from F4's measured elimination stage.
+`square` sweeps dense square matrices for the Four Russians crossover. Results and the decision are in
+[`docs/research/characteristic-two-linear-algebra.md`](../research/characteristic-two-linear-algebra.md).
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,
