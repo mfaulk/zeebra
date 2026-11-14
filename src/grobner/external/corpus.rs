@@ -1221,9 +1221,9 @@ pub fn ladder() -> Vec<CorpusEntry> {
             name: "cyclic-10",
             family: "cyclic",
             rung: Rung::Challenging,
-            // Squarefree, and Steel's page states the quotient dimension verbatim. **Unverified
-            // here**: out of reach at the default budget, so 34940 is the published value this
-            // rung exists to one day be checked against.
+            // Squarefree, and Steel's page states the quotient dimension verbatim. Confirmed by
+            // msolve's basis and Singular's `vdim` (#656, `classical-benchmarks.md` §10.6), though
+            // still out of Zeebra's own reach at the default budget.
             zero_dimensional: true,
             quotient_dimension: Some(34940),
             equivalence: Equivalence::ComparandFile {

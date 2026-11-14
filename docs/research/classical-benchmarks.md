@@ -13,7 +13,8 @@ and basis sizes, none of which depends on the machine or the clock — measured 
 Zeebra, msolve 0.11.0, Singular, Groebner.jl and Sagebrush. §10 publishes **no** wall-clock figure,
 which §4 forbids against the 2004 column and §7 reaffirms. **§10.5 confirms Steel's published Krull
 dimension of 4 at `cyclic-10` over `GF(2)`** — the first published number about an ideal this crate
-generates to be checked rather than recorded.
+generates to be checked rather than recorded. **§10.6 confirms the other one, Cyclic-10's quotient
+dimension of 34940 over `GF(32003)`** (#656), again as an invariant with no timing.
 
 Deliverable for A7 (#199), a child of the benchmark-corpus epic #65. The question: do Zeebra's three
 synthetic generators — `cyclic`, `katsura`, `planted` — have external reference points, and if so
@@ -253,7 +254,7 @@ reports `D = dim_F(R/I)`.
 | cyclic-7 | 7 | zero-dim | **924** | 1 366 |
 | cyclic-8 | 8 | **positive** | — | 21 344 |
 | cyclic-9 | 9 | **positive** (Backelin; unverified here) | — | refuses after 10 600 |
-| cyclic-10 | 10 | zero-dim (Steel) | **34940** published, unverified here | refuses after 24 300 |
+| cyclic-10 | 10 | zero-dim (Steel) | **34940** published, **confirmed externally** (§10.6) | refuses after 24 300 |
 | planted-4 / 6 / 8 | 4 / 6 / 8 | zero-dim | 16 / 64 / 256 | 0.02–0.04 |
 
 ### 3.1 Cyclic agrees with the published solution counts
@@ -281,8 +282,9 @@ Zeebra's reach, so there the theorem is the record and the corpus says so. Asser
 rather than per rung, in `corpus::test_a_cyclic_rung_is_zero_dimensional_exactly_where_n_is_squarefree`.
 
 Steel's page supplies a further, independent agreement in kind: Cyclic-10 over GF(32003) at dimension
-**34940**. Still out of reach — Zeebra's F4 crosses its live-entry budget after 24.3 s — so it is
-recorded in the ladder as the published value that rung exists to one day be checked against.
+**34940**. Still out of reach for Zeebra — its F4 crosses its live-entry budget after 24.3 s — but
+**confirmed by external engines in §10.6** (#656): msolve's basis has exactly 34940 standard
+monomials, counted two independent ways.
 
 ### 3.2 Katsura's dimensions are exactly `2^n`, which pins a naming offset
 
@@ -469,7 +471,7 @@ against his historical wall-clock figures is authorized by it.
 
 | collection | verdict |
 |---|---|
-| **Steel's Magma GB timings page** | **accept, for invariants only — and the grade has now been exercised.** Cyclic-10's dimension 34940 and the GF(2) Cyclic rows are checkable values, and §10.5 checked one: the GF(2) Cyclic-10 Krull dimension of **4 is confirmed**. 34940 is still unverified here. The HFE rows go to #198, where they are much more valuable. |
+| **Steel's Magma GB timings page** | **accept, for invariants only — and the grade has now been exercised.** Cyclic-10's dimension 34940 and the GF(2) Cyclic rows are checkable values, and §10.5 and §10.6 checked both: the GF(2) Cyclic-10 Krull dimension of **4** and the GF(32003) quotient dimension of **34940** are **confirmed**. The HFE rows go to #198, where they are much more valuable. |
 | **Magma's `info/topic_gb` page** (subscriber-side, §2.3) | **accept as a modern difficulty scale, reject as a comparand.** Its V2.27 figures on an i7-7700 come in 1-core and 4-core pairs, which is a usable published scaling figure. No instances, no repetitions, no build description, and no Katsura rows, so §4 still forbids a ratio against Zeebra. |
 | **Steel's *Dense Variant of the F4 Algorithm* page** (`/users/allan/densef4/`) | **accept as historical calibration, reject as a comparand (§2.4, #441).** It publishes separate dense-only, GPU, RH and combined configurations; combined ratios cannot be attributed to one kernel. The cardinality-aware input-occupancy feature belongs to #273; neither a dense-F4 kernel nor a scoreboard row is authorized by these external figures. |
 | **SymbolicData** | **not assessed.** Deliberately: §3 found that the anchor Zeebra needs is an invariant, and a fourth catalogue of systems does not supply one. Reopen only if a specific instance with a published `dim R/I` is wanted. |
@@ -505,7 +507,7 @@ to be quoted; see #198 for why that rule exists.
   whole Katsura/Cyclic/MQ ladder. **`GF(2)` has since been measured too (#427)** — it is a published
   corpus characteristic for Cyclic, every rung `cyclic-4` … `cyclic-10` is frozen there, and §10.5
   **confirmed Steel's published Krull dimension of 4** at `cyclic-10`. So this bullet is retired
-  except for `GF(32003)`'s 34940, which remains unverified.
+  — and §10.6 has since confirmed `GF(32003)`'s 34940 too (#656), so it is retired entirely.
 
 ---
 
@@ -645,7 +647,7 @@ per-characteristic invariants were necessary.** The same `cyclic-10`:
 | | `GF(32003)` | `GF(2)` |
 |---|---|---|
 | dimension class | zero-dimensional | **Krull dimension 4** |
-| quotient dimension | 34940 (Steel, unverified here) | none — no finite quotient exists |
+| quotient dimension | 34940 (Steel; confirmed, §10.6) | none — no finite quotient exists |
 
 A finite point count becomes a fourfold. Both of those numbers are on Steel's page, they are
 different quantities, and conflating them would turn a statement about geometry into a wrong
@@ -657,7 +659,32 @@ against the 2004 column, and the figures above are a basis size and a dimension.
 does in minutes what took Magma half a day in 2004 is a fact about twenty-two years, two machines
 and two implementations, and is attributable to none of them individually.
 
-`GF(32003)`'s 34940 remains **unverified here** — it is a quotient dimension at a rung whose basis
-is far more expensive over a 15-bit prime than over `GF(2)`, where `a + a = 0` roughly halves the
-entries (README, `boolean_density`). That is the natural next anchor on this page and it is not
-claimed as reached.
+`GF(32003)`'s 34940 was the natural next anchor on this page; §10.6 checks it.
+### 10.6 `cyclic-10` over `GF(32003)` against Steel's quotient dimension 34940: **confirmed** (#656)
+
+Not a `GF(2)` result, but the other half of the same rung, and the last checkable value on Steel's
+page about an ideal Zeebra generates. Steel's `GF(32003)` note (§2.1) states the quotient has
+**dimension 34940** as a vector space.
+
+> **The quotient has dimension exactly 34940.**
+
+How it was obtained, from `corpus`'s own generator (the `.ms` input is `benchmark_systems::cyclic`
+written out term for term) at `SMALL_PRIME_CHARACTERISTIC`:
+
+1. **msolve 0.11.0** (`-g 2`, the reduced basis) computed the grevlex basis: **5690 elements**,
+   `rc = 0`, inside its memory cap and wall limit.
+2. **Standard monomials enumerated directly** from the 5690 grevlex leading monomials, by a
+   staircase walk bounded by the pure powers (all ten variables have one, so the ideal is
+   zero-dimensional): **34940**.
+3. **Singular** read msolve's full basis as a standard basis and reported `vdim` = **34940** —
+   its own leading-term extraction and its own count.
+
+4. **Groebner.jl** computed the basis independently from the same generators by its own F4:
+   **5690 elements**, and its `quotient_basis` has **34940** monomials.
+
+So, as in §10.5, two engines agree on the basis size and three dimension computations agree on the
+integer, none sharing an implementation with another.
+
+**No timing is reported, and none may be** — §4 and §7, as in §10.5. The deliverable is the integer.
+Zeebra itself still does not reach this basis: its F4 refuses at the default live-entry budget
+(§3.1), so this rung is confirmed *about* Zeebra's ideal rather than *by* Zeebra.
