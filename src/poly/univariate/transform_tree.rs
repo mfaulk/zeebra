@@ -33,6 +33,29 @@ use crate::{
     FiniteField, KnownOrder,
 };
 
+/// Product degree at and above which a tree node goes through the transform, for an element of
+/// at most 4 bytes. Measured by `examples/transform_tree_ab.rs` over KoalaBear at `646fe1d8`
+/// (`docs/research/fast-univariate.md` §4.3.5): 2048 was fastest at every `n` from 8192 to 65 536,
+/// with 1024 and 4096 within 5%. Half #185's standalone 4096, because the tree reuses one
+/// twiddle table and takes the cyclic savings a standalone product cannot.
+pub(crate) const TRANSFORM_TREE_THRESHOLD_32_BIT: usize = 2048;
+
+/// The same, for an element of 5 to 8 bytes, measured over Goldilocks. The sweep is flat from 32
+/// to 256 to within this box's spread; 128 was the fastest at the largest sizes.
+pub(crate) const TRANSFORM_TREE_THRESHOLD_64_BIT: usize = 128;
+
+/// The same, for an element wider than 8 bytes, measured over BN254 `Fr`; flat from 32 to 256.
+pub(crate) const TRANSFORM_TREE_THRESHOLD_WIDE: usize = 128;
+
+/// The measured threshold for `F`.
+pub(crate) fn transform_tree_threshold<F: FiniteField>() -> usize {
+    match std::mem::size_of::<F>() {
+        0..=4 => TRANSFORM_TREE_THRESHOLD_32_BIT,
+        5..=8 => TRANSFORM_TREE_THRESHOLD_64_BIT,
+        _ => TRANSFORM_TREE_THRESHOLD_WIDE,
+    }
+}
+
 /// Twiddles for one power-of-two size.
 struct Table<F> {
     forward: Vec<F>,
@@ -83,6 +106,17 @@ impl<F: KnownOrder> TransformKernel<F> {
             })
             .collect();
         Ok(Self { tables, threshold })
+    }
+
+    /// [`Self::new`] at the measured threshold for `F`'s width.
+    ///
+    /// # Errors
+    /// As [`Self::new`].
+    pub fn measured<R: RngCore + CryptoRng>(
+        max_len: usize,
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
+        Self::new(max_len, transform_tree_threshold::<F>(), rng)
     }
 }
 
@@ -363,7 +397,10 @@ pub fn transform_tree_interpolate_unstable<F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{transform_tree_interpolate_unstable, TransformKernel, TransformTree};
+    use super::{
+        transform_tree_interpolate_unstable, transform_tree_threshold, TransformKernel,
+        TransformTree,
+    };
     use crate::{
         fields::{Bn254Fr, KoalaBear, Mersenne31, PrimeFieldElement64},
         multipoint_evaluate,
@@ -461,6 +498,30 @@ mod tests {
                 "{da} x {db}"
             );
         }
+    }
+
+    #[test]
+    // The measured-threshold kernel interpolates to the shipped tree's polynomial across each tier's threshold.
+    fn test_measured_kernel_agrees_across_its_threshold() {
+        fn check<F: KnownOrder>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let t = transform_tree_threshold::<F>();
+            for n in [t / 2, t + 1, 2 * t + 3] {
+                let points = random_points::<F>(n, &mut rng);
+                let kernel = TransformKernel::<F>::measured(n + 1, &mut rng).unwrap();
+                assert_eq!(
+                    transform_tree_interpolate_unstable(&points, &kernel),
+                    karatsuba_interpolate(&points),
+                    "n = {n}"
+                );
+            }
+        }
+        assert_eq!(transform_tree_threshold::<KoalaBear>(), 2048);
+        assert_eq!(transform_tree_threshold::<Goldilocks>(), 128);
+        assert_eq!(transform_tree_threshold::<Bn254Fr>(), 128);
+        check::<KoalaBear>(612);
+        check::<Goldilocks>(613);
+        check::<Bn254Fr>(614);
     }
 
     #[test]

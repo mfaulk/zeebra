@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`.
+`66acfed2` plus that change. **§4.3.5 was taken at `646fe1d8`**, both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1346,7 +1346,8 @@ original artifacts, not current-default timings. The reproducible
 [geometry/sensitivity table](../../research/transform-tree-gate/table.md) and
 [analysis commands](../../research/transform-tree-gate/README.md) supply the
 estimate-first deliverable. **Decision: defer production specialization;
-retain #606 for dispatch design and a bounded arithmetic experiment.** The
+retain #606 for dispatch design and a bounded arithmetic experiment** — that experiment is §4.3.5,
+which found the gain inside the reachable range. The
 estimate does not establish an above-reach crossover or justify rejecting NTT.
 
 At the actual four-round reference count `n = 13,123`, the raw asymptotic
@@ -1429,6 +1430,105 @@ Include a real resultant caller and root-recovery costs where relevant before
 claiming a solve improvement. Historical §5.1 roots and resultant stage shares
 cannot establish a current whole-route ceiling: later arithmetic changed them.
 #732's existing caller audit remains separate from this unimplemented tree arm.
+
+#### 4.3.5 The transform tree, measured (#606)
+
+**Measured at `646fe1d8`**, `examples/transform_tree_ab.rs`, both arms in one binary,
+`taskset -c 7`, serialized through `tools/benchlock.sh` (two runs, 270 s and 410 s, start load
+13.7 and 2.8), ISA floor `x86-64-v3 or better (AVX2)` printed by the run. Every arm is checked
+equal to `subproduct_interpolate_unstable` before its clock starts; each figure is the fastest of
+5 interleaved repetitions with rotating arm order (3 at `n = 65 536` over Goldilocks and BN254).
+
+**Verdict: §4.3.4's estimate was too pessimistic. The crossover is inside the reachable range on
+every NTT-friendly width, and at #82's 13 123 points the transform tree is 1.36x – 2.94x faster
+than the Karatsuba tree.** The specialization is justified on arithmetic. What is *not* settled is
+how `FiniteField`-bounded `lagrange_interpolate` reaches it (§4.3.4's capability design), which
+this change does not attempt and which is filed as #783.
+
+##### The instrument
+
+`src/poly/univariate/transform_tree.rs` is the same tree as `subproduct_tree.rs` (same pairing,
+same carried odd node, same transposed combine, same `M'` denominators) over a
+`TransformKernel` that sends a product of degree at least `t` through a radix-two transform and
+everything else to the shipped `multiply_karatsuba`, with the remainder route chosen by #193's
+unchanged `newton_is_cheaper`. A kernel with `t = usize::MAX` takes no transform at all and is the
+**control**; the ratios below are against it, not against `shipped`, so the data-layout difference
+between the two tree implementations cannot be read as an arithmetic gain. `shipped` is reported
+alongside to show that difference is nil: control/shipped is 0.92 – 1.05 in every row, the extremes at the smallest and noisiest sizes.
+
+The transform arm takes the savings a specialization would take, and kernel construction (one
+two-adic root, every twiddle table) is inside its timing — at most 5.6 ms, at BN254 `n = 65 536`:
+
+- one twiddle table per power-of-two size, sliced from a single root's powers;
+- a monic product of degree exactly `2^j` formed cyclically on `2^j` points and unwrapped (the
+  root build at `n = 2^14` fits 16 384 points, not 32 768 — §4.3.4's padding penalty removed);
+- each Newton remainder recovered as `f - qg mod (x^m - 1)` with `m >= deg g`, on half the points
+  the full `qg` would need, and the combine's two products sharing one inverse transform.
+
+It does **not** take the transposed / middle-product evaluation (Bostan–Lecerf–Schost) or keep
+node transforms between build and combine; both would widen the gap, neither is measured.
+
+##### Whole interpolation, control against the fastest threshold
+
+| field | element | `n` = 4096 | 8192 | **13 123** | 16 384 | 65 536 |
+|---|---:|---:|---:|---:|---:|---:|
+| KoalaBear | 4 B | 1.05x | 1.22x | **1.36x** | 1.43x | 2.22x |
+| Goldilocks | 8 B | 2.04x | 2.66x | **2.94x** | 3.39x | 5.69x |
+| BN254 `Fr` | 32 B | 1.94x | 2.62x | **2.80x** | 3.05x | 5.38x |
+
+KoalaBear's row is from the second run (thresholds 1024 – 8192); the first run's best at its
+then-largest threshold 2048 agreed to within 3% (1.07 / 1.23 / 1.40 / 1.49). Absolute seconds at
+13 123 points, control → transform: KoalaBear 0.0539 → 0.0395, Goldilocks 0.2393 → 0.0813,
+BN254 2.2016 → 0.7866. At 65 536: KoalaBear 0.6245 → 0.2810, Goldilocks 2.7055 → 0.4755,
+BN254 24.80 → 4.61.
+
+**The ratio grows with `n` as the exponent gap says it must**, and faster than §4.3.4's model:
+its raw `n^0.6 / log2(n)^2` is 1.58 at 13 123, and the measured 2.8x – 2.9x on the wide fields
+means `C_N / C_K` is below one there, not the 2 – 4 that table hypothesised. Karatsuba's
+constant over a 64- or 256-bit Montgomery multiply is the expensive one.
+
+**Where the transform first wins by more than 10%:** `n = 8192` over KoalaBear (1.07x at 4096),
+`n = 512` over Goldilocks (1.15x) and over BN254 (1.16x). Below those it ties the control, never
+loses by more than 4% at the measured threshold.
+
+##### The threshold, per width
+
+| element | field | swept `t` (product degree) | fastest | spread across the sweep at 13 123 |
+|---|---|---|---:|---|
+| 4 B | KoalaBear | 32 … 8192 | **2048** at every `n` from 8192 | 1024 / 4096 within 5%; 32 is 15% slower |
+| 8 B | Goldilocks | 32 … 2048 | **128** | flat 32 – 256 (±3%); 2048 is 37% slower |
+| 32 B | BN254 `Fr` | 32 … 2048 | **128** | flat 32 – 256 (within 5%); 2048 is 29% slower |
+
+Compiled in as `transform_tree_threshold`. The 4-byte figure is **half** #185's standalone
+4096 and the wider ones a quarter of its 512: the tree reuses one table and the cyclic savings,
+where `fft::multiply` samples a root and builds and inverts a domain per call. Like §4.1.2's, the
+4-byte figure depends on the Karatsuba loop being vectorized (`vpmuludq` count 153 in this binary).
+
+##### Where the time goes
+
+| field, `n` | arm | build | `M'` down the tree | combine |
+|---|---|---:|---:|---:|
+| KoalaBear, 13 123 | control / `t = 2048` | 0.0049 / 0.0036 | 0.0371 / 0.0279 | 0.0098 / 0.0066 |
+| Goldilocks, 13 123 | control / `t = 128` | 0.0239 / 0.0072 | 0.1820 / 0.0667 | 0.0470 / 0.0123 |
+| BN254, 13 123 | control / `t = 32` | 0.1993 / 0.0625 | 1.5484 / 0.6016 | 0.3897 / 0.1026 |
+
+The derivative's descent is 72% of the control on all three fields and 73% – 78% of the transform arm, and it
+gains least (1.33x – 2.73x) because Newton's truncated products waste half of each padded
+transform. That is the stage the unmeasured middle-product evaluation would target.
+
+##### Decision
+
+- **Adopt the arithmetic**, as a research arm with both paths reachable for differential testing:
+  agreement with the shipped tree is tested over KoalaBear, Goldilocks and BN254 at thresholds 0,
+  1, 4, 16, 63, 64, 100 and `usize::MAX`, across odd and power-of-two `n`, and either side of
+  each tier's measured threshold.
+- **The `FiniteField` path is kept** and remains the only path `lagrange_interpolate` and
+  `multipoint_evaluate` take. Mersenne-31 has no domain (the kernel refuses it, tested).
+- **Production dispatch is #783**, not this change: it needs §4.3.4's capability hook from
+  `FiniteField` to a root of unity and a randomness policy, which is a public-trait change in
+  `src/fields` and a design decision, not a measurement.
+- **Nothing here moves §5's binding stage.** Interpolation is not root finding; a solve-level
+  claim needs #82's real resultant caller, which §4.3.4 already required.
 
 ### 4.4 Root finding: quadratic, and it is the binding stage
 
