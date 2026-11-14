@@ -485,3 +485,8 @@ With `F4Options::measure_stages`, `StageTimings::forward` and `backward` refine 
 elimination time. The backward boundary includes candidate selection and full-RREF fallback;
 observer overrides leave these production refinements zero. Their sum is excluded from
 `StageTimings::sum()` because elimination already contains both phases.
+
+`mq10_profile --whole-route=fglm` profiles one explicit default F4/conversion/recovery route;
+`--whole-route=direct` profiles direct lex F4 and recovery. Each process retains completed-phase
+checkpoints and independently checks a returned point against the original equations. The
+[whole-route protocol](research/m28-current-baseline/README.md) defines its timers and bounded runs.

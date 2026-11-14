@@ -7,18 +7,22 @@ use zeebra::{
         F4Statistics,
     },
     util::Json,
-    FiniteField, MonomialOrder, MultivariatePolynomial,
+    FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
 
 #[cfg(feature = "research-work")]
 #[path = "support/selective_backward.rs"]
 mod selective_backward;
 
+#[path = "support/whole_route.rs"]
+mod whole_route;
+
 #[derive(Clone, Copy)]
 struct RunMode<'a> {
     workers: Option<usize>,
     dynamic: bool,
     backward: Option<&'a str>,
+    whole_route: Option<&'a str>,
 }
 
 #[cfg(feature = "research-work")]
@@ -201,6 +205,8 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
         ("symbolic_ns", time(t.symbolic)),
         ("construction_ns", time(t.construction)),
         ("elimination_ns", time(t.elimination)),
+        ("forward_ns", time(t.forward)),
+        ("backward_ns", time(t.backward)),
         ("extraction_ns", time(t.extraction)),
         ("interreduction_ns", time(t.interreduction)),
         ("other_ns", time(s.total.saturating_sub(t.sum()))),
@@ -263,7 +269,7 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
     ])
 }
 
-fn run<const N: usize, F: FiniteField + Send + Sync>(
+fn run<const N: usize, F: KnownOrder + Send + Sync>(
     modulus: u64,
     measured: bool,
     measure_work: bool,
@@ -275,6 +281,7 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         workers,
         dynamic,
         backward,
+        whole_route,
     } = mode;
     let order = MonomialOrder::GradedReverseLexicographic;
     let input = corpus::instance(problem, modulus, order).expect("published corpus problem");
@@ -294,6 +301,56 @@ fn run<const N: usize, F: FiniteField + Send + Sync>(
         measure_stages: measured,
         ..F4Options::default()
     };
+    if let Some(route) = whole_route {
+        println!(
+            "{}",
+            Json::object([
+                ("checkpoint", Json::string("input")),
+                ("digest", Json::string(input.digest())),
+                ("modulus", Json::int(modulus)),
+                ("problem", Json::string(problem)),
+            ])
+            .to_json()
+            .replace('\n', "")
+        );
+        let Json::Object(mut fields) =
+            whole_route::profile(&system, &names, &options, route, measure_work)
+        else {
+            unreachable!()
+        };
+        fields.extend([
+            ("modulus".into(), Json::int(modulus)),
+            ("problem".into(), Json::string(problem)),
+            ("digest".into(), Json::string(input.digest())),
+            ("measured".into(), Json::Bool(measured)),
+            (
+                "field_type".into(),
+                Json::string(std::any::type_name::<F>()),
+            ),
+            ("options".into(), Json::string(format!("{options:?}"))),
+            (
+                "peak_rss_bytes".into(),
+                zeebra::util::peak_resident_bytes()
+                    .map(Json::int)
+                    .unwrap_or(Json::Null),
+            ),
+            (
+                "input".into(),
+                Json::object([
+                    (
+                        "variables",
+                        Json::Array(input.variables.iter().cloned().map(Json::string).collect()),
+                    ),
+                    (
+                        "generators",
+                        Json::Array(input.system.iter().cloned().map(Json::string).collect()),
+                    ),
+                ]),
+            ),
+        ]);
+        println!("{}", Json::Object(fields).to_json().replace('\n', ""));
+        return;
+    }
     let started = Instant::now();
     #[cfg(feature = "research-work")]
     let mut observer = workers.map(|workers| ConcurrentObserver {
@@ -476,6 +533,7 @@ fn main() {
             || s.starts_with("--workers=")
             || s.starts_with("--problem=")
             || s.starts_with("--backward=")
+            || s.starts_with("--whole-route=")
             || s == "--schedule=dynamic"
             || s == "--schedule=static")
             && args[1..]
@@ -538,7 +596,17 @@ fn main() {
         workers,
         dynamic,
         backward,
+        whole_route: args.iter().find_map(|s| s.strip_prefix("--whole-route=")),
     };
+    assert!(
+        mode.whole_route
+            .is_none_or(|r| matches!(r, "direct" | "fglm")),
+        "unknown whole route"
+    );
+    assert!(
+        mode.whole_route.is_none() || (workers.is_none() && backward.is_none() && !discovery),
+        "whole-route requires production serial reduction"
+    );
     macro_rules! run_field {
         ($field:ty) => {
             match problem {
@@ -550,6 +618,9 @@ fn main() {
                 }
                 "katsura-6" => {
                     run::<6, $field>(modulus, measured, measure_work, discovery, mode, problem)
+                }
+                "katsura-11" => {
+                    run::<11, $field>(modulus, measured, measure_work, discovery, mode, problem)
                 }
                 "cyclic-5" => {
                     run::<5, $field>(modulus, measured, measure_work, discovery, mode, problem)
@@ -569,6 +640,22 @@ fn main() {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    // Forward/backward refinements aggregate without being counted twice in elimination.
+    #[test]
+    fn production_elimination_refinements_are_not_a_second_stage() {
+        let mut timings = zeebra::grobner::f4::StageTimings::default();
+        timings.elimination = Duration::from_millis(7);
+        timings.forward = Duration::from_millis(5);
+        timings.backward = Duration::from_millis(2);
+        let mut accumulated = zeebra::grobner::f4::StageTimings::default();
+        accumulated.add(&timings);
+        assert_eq!(accumulated.sum(), Duration::from_millis(7));
+        assert_eq!(
+            accumulated.forward + accumulated.backward,
+            accumulated.elimination
+        );
+    }
 
     // Selective and all-target research policies return the exact ordinary basis and pair schedule.
     #[cfg(feature = "research-work")]

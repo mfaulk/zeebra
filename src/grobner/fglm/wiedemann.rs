@@ -87,7 +87,7 @@ pub(super) fn try_conversion<const N: usize, F: FiniteField>(
     for _ in 0..3 {
         stats.wiedemann_attempts += 1;
         let projection: Vec<F> = (0..d).map(|_| F::random(&mut rng)).collect();
-        match reconstruct(algebra, projection) {
+        match reconstruct(algebra, projection, options.measure_stages, stats) {
             Ok(basis) => {
                 stats.conversion_route = ConversionRoute::Wiedemann;
                 stats.wiedemann_fallback = None;
@@ -102,7 +102,10 @@ pub(super) fn try_conversion<const N: usize, F: FiniteField>(
 fn reconstruct<const N: usize, F: FiniteField>(
     algebra: &QuotientAlgebra<N, F>,
     mut projection: Vec<F>,
+    measured: bool,
+    stats: &mut FglmStatistics,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, WiedemannFallback> {
+    let mut clock = crate::grobner::f4::StageClock::new(measured);
     let d = algebra.dimension();
     let last = N - 1;
     let operator = algebra.operator(last);
@@ -135,26 +138,34 @@ fn reconstruct<const N: usize, F: FiniteField>(
             projection = operator.apply_transpose(&projection);
         }
     }
-    let p = berlekamp_massey(&sequence);
-    if p.len() != d + 1 {
-        return Err(WiedemannFallback::NonCyclicProjection);
-    }
-    let modulus = UnivariatePolynomial::new(&p);
-    let mut result = vec![shape_relation(last, last, &p)];
-    if last > 0 {
-        let numerator = numerator_for(&p, &sequence);
-        let (gcd, _, inverse) = xgcd(&modulus, &UnivariatePolynomial::new(&numerator));
-        if !gcd.is_one() {
+    stats.timings.scalar_sequence += clock.lap();
+    let reconstructed = (|| {
+        let p = berlekamp_massey(&sequence);
+        if p.len() != d + 1 {
             return Err(WiedemannFallback::NonCyclicProjection);
         }
-        for (variable, values) in moments.iter().enumerate() {
-            let num = UnivariatePolynomial::new(&numerator_for(&p, values));
-            let h = &(&num * &inverse) % &modulus;
-            let coefficients: Vec<_> = h.coefficients().iter().map(|c| -*c).collect();
-            result.push(shape_relation(variable, last, &coefficients));
+        let modulus = UnivariatePolynomial::new(&p);
+        let mut result = vec![shape_relation(last, last, &p)];
+        if last > 0 {
+            let numerator = numerator_for(&p, &sequence);
+            let (gcd, _, inverse) = xgcd(&modulus, &UnivariatePolynomial::new(&numerator));
+            if !gcd.is_one() {
+                return Err(WiedemannFallback::NonCyclicProjection);
+            }
+            for (variable, values) in moments.iter().enumerate() {
+                let num = UnivariatePolynomial::new(&numerator_for(&p, values));
+                let h = &(&num * &inverse) % &modulus;
+                let coefficients: Vec<_> = h.coefficients().iter().map(|c| -*c).collect();
+                result.push(shape_relation(variable, last, &coefficients));
+            }
         }
-    }
-    if !certify(algebra, &result) {
+        Ok(result)
+    })();
+    stats.timings.scalar_reconstruction += clock.lap();
+    let mut result = reconstructed?;
+    let certified = certify(algebra, &result);
+    stats.timings.scalar_certificate += clock.lap();
+    if !certified {
         return Err(WiedemannFallback::VerificationFailed);
     }
     result.sort_by(|a, b| {
@@ -254,6 +265,7 @@ fn certify<const N: usize, F: FiniteField>(
 #[cfg(test)]
 mod tests {
     use super::{berlekamp_massey, certify, numerator_for, reconstruct};
+    use crate::grobner::FglmStatistics;
     use crate::{
         fields::Zp13 as F,
         grobner::{
@@ -315,7 +327,13 @@ mod tests {
             .collect();
         let source = f4(&source, order).unwrap();
         let algebra = QuotientAlgebra::new(&source, order, &FglmOptions::recommended()).unwrap();
-        let mut result = reconstruct(&algebra, vec![F::one(), F::new(2), F::new(3)]).unwrap();
+        let mut result = reconstruct(
+            &algebra,
+            vec![F::one(), F::new(2), F::new(3)],
+            false,
+            &mut FglmStatistics::default(),
+        )
+        .unwrap();
         assert!(certify(&algebra, &{
             let mut v = result.clone();
             v.reverse();
@@ -325,7 +343,13 @@ mod tests {
         result[0] = &result[0] + &constant;
         result.reverse();
         assert!(!certify(&algebra, &result));
-        assert!(reconstruct(&algebra, vec![F::zero(); 3]).is_err());
+        assert!(reconstruct(
+            &algebra,
+            vec![F::zero(); 3],
+            false,
+            &mut FglmStatistics::default()
+        )
+        .is_err());
     }
     // Fast conversion and classical FGLM agree across prime, binary, extension and wide fields.
     crate::for_each_field!(

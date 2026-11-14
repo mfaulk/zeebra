@@ -101,6 +101,15 @@ pub struct FglmStageTimings {
 
     /// The lex walk, or scalar sequence/reconstruction and its deterministic certificate.
     pub dependence: Duration,
+
+    /// Scalar Krylov sequence generation across all attempts; refines `dependence`.
+    pub scalar_sequence: Duration,
+
+    /// Scalar recurrence and relation reconstruction, including failed attempts; refines `dependence`.
+    pub scalar_reconstruction: Duration,
+
+    /// Exact quotient-algebra certification across scalar attempts; refines `dependence`.
+    pub scalar_certificate: Duration,
 }
 
 impl FglmStageTimings {
@@ -342,6 +351,7 @@ mod tests {
             border_symbolic: Duration::from_micros(70),
             column_assembly: Duration::from_micros(400),
             dependence: Duration::from_micros(500),
+            ..Default::default()
         };
         assert_eq!(timings.sum(), Duration::from_micros(4_270));
         assert_eq!(
