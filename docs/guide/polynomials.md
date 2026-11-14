@@ -446,6 +446,33 @@ division.
 Splitting is randomized, so this takes an rng and the order of the returned factors is
 unspecified.
 
+### Modular composition
+`compose_mod(f, g, h)` computes `f(g) mod h` by Brent–Kung baby-step/giant-step: the powers
+`g^0 … g^(m-1) mod h` for `m ≈ sqrt(deg h)` become the rows of a matrix, one dense matrix product
+evaluates every length-`m` block of `f` at `g`, and Horner in `g^m` joins the blocks.
+`compose_mod_horner` is the plain Horner reference. When the inner argument is fixed and many outer
+polynomials are composed with it — the Frobenius map `p ↦ p^q = p(x^q) mod h` is the case —
+`ModularComposer` builds the baby steps once:
+
+```rust
+use zeebra::{compose_mod, compose_mod_horner, fields::KoalaBear, FiniteField,
+    ModularComposer, UnivariatePolynomial};
+
+let p = |c: &[u64]| UnivariatePolynomial::<KoalaBear>::new(
+    &c.iter().map(|&v| KoalaBear::new(v)).collect::<Vec<_>>());
+let (f, g, h) = (p(&[1, 2, 3, 4, 5]), p(&[0, 7, 1]), p(&[3, 0, 0, 1]));
+
+assert_eq!(compose_mod(&f, &g, &h), compose_mod_horner(&f, &g, &h));
+let composer = ModularComposer::new(&g, &h);
+assert_eq!(composer.compose(&f), compose_mod(&f, &g, &h));
+```
+
+`factorize` uses it for the Frobenius map `p ↦ p^q` in its distinct-degree loop and in the norm its
+equal-degree splitter takes, switching from `pow_mod` once enough applications have accumulated to
+repay a composer. On random polynomials of degree 81 and 729 that made whole factorizations 4.5x to
+13.9x faster; [`modular-composition.md`](../research/modular-composition.md) has the measurements
+and the regime (few applications, narrow field, high degree) where it stays on `pow_mod`.
+
 
 ## Permutation Polynomials
 An arithmetization-friendly hash is built from a **power permutation**: Poseidon's S-box is

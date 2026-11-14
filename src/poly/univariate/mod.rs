@@ -7,6 +7,8 @@
 //!
 //! The zero polynomial contains the single monomial '0'. Its degree is undefined.
 
+mod compose_mod;
+pub use compose_mod::{compose_mod, compose_mod_horner, ModularComposer};
 mod dense_polynomial;
 mod dense_polynomial_arithmetic;
 mod div_with_remainder;
@@ -49,6 +51,9 @@ pub use dense_polynomial::{DensePolynomial as UnivariatePolynomial, PolynomialPa
 #[cfg(test)]
 pub(crate) use factorize::trace_to_gf2;
 pub use factorize::{factorize, is_irreducible};
+// Measurement and differential-testing hooks for `examples/modular_composition.rs`, not API.
+#[doc(hidden)]
+pub use factorize::{factorize_with_route as factorize_with_route_unstable, FrobeniusRoute};
 pub use gcd::{gcd, gcd_classical_unstable, gcd_half_unstable, lcm, partial_bezout, xgcd};
 pub use graeffe::{
     graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
@@ -70,6 +75,9 @@ pub use lagrange_interpolation::interpolate as lagrange_interpolate;
 pub(crate) use lagrange_interpolation::interpolate_reference as lagrange_interpolate_reference;
 pub use polynomial_trait::Polynomial;
 pub use pow_mod::pow_mod;
+// The limb-exponent form, for `examples/modular_composition.rs`: a 254-bit q does not fit a `u128`.
+#[doc(hidden)]
+pub use pow_mod::pow_mod_limbs as pow_mod_limbs_unstable;
 pub use power_permutation::{
     inverse_exponent, is_permutation_exponent, is_permutation_polynomial, permutation_exponents,
     PowerPermutation,

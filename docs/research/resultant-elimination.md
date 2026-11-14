@@ -219,6 +219,10 @@ The collapse is not cosmetic. It shows up in the shared tail both elimination ro
 finding on the degree-729 polynomial is **59.5 ms** against **4 156.5 ms** on the degree-6 561 one,
 a 70x difference. And it makes the sample count *predictable* rather than merely loose — §6.4.
 
+These three degrees are the ones [`modular-composition.md`](modular-composition.md) (#271) measures
+Brent–Kung composition against `pow_mod` at; its §4 explains why root finding on these eliminants is
+unaffected by it.
+
 ### 6.4 Where the time goes now, and why the interpolation can never matter again
 
 The ranking inverted twice. §3 guessed the determinant; §4.1 measured the cubic interpolation and
