@@ -490,3 +490,8 @@ The opt-in [live symbolic-policy pilot](research/symbolic-live/README.md) compar
 reducer ordering and exact pair-multiple deduplication against the production candidate-only route.
 Enable `research-work` and use `mq10_profile --symbolic=original|order|dedup|both` for the scoped
 experiment; omission keeps ordinary symbolic policy. No default adoption follows from replay counts.
+
+The [waiting-row scheduler gate](docs/research/waiting-row-scheduler.md) reanalyzes retained
+concurrent-pivot and selected-backward evidence. It defers a second scheduler until an integrated
+comparator demonstrates enough avoidable elapsed work to cover queue and suspended-row costs;
+[offline reproduction](research/waiting-row/README.md) launches no benchmarks.
