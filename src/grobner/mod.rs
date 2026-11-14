@@ -26,7 +26,8 @@ mod weighted_reference_bases;
 pub use buchberger::{
     buchberger, buchberger_with_criteria, buchberger_with_statistics,
     interreduce_by_matrix_for_benchmark, interreduce_counting_repeats_for_benchmark,
-    interreduce_for_benchmark, leading_monomials_are_pairwise_coprime, Statistics,
+    interreduce_for_benchmark, interreduce_with_route_for_benchmark,
+    leading_monomials_are_pairwise_coprime, Statistics,
 };
 pub use f4::{
     certify_f4_output, certify_submitted_basis, certify_submitted_basis_with_witnesses, f4,

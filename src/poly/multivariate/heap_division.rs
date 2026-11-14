@@ -57,8 +57,12 @@ impl<const N: usize> Heap<N> {
     }
 
     fn push(&mut self, entry: Entry<N>) {
-        let mut hole = self.entries.len();
+        let hole = self.entries.len();
         self.entries.push(entry);
+        self.sift_up(hole, entry);
+    }
+
+    fn sift_up(&mut self, mut hole: usize, entry: Entry<N>) {
         while hole > 0 {
             let parent = (hole - 1) / 2;
             if self
@@ -75,6 +79,11 @@ impl<const N: usize> Heap<N> {
     }
 
     /// Replace the top with `entry` and restore the heap: one sift where a pop and a push are two.
+    ///
+    /// Bottom-up: the hole goes all the way to a leaf along the larger children, one comparison a
+    /// level, and `entry` then sifts up from there. A replacement is the same stream's next term —
+    /// or, from `pop_top`, the heap's last leaf — so it usually belongs near the bottom, and the
+    /// textbook sift-down pays a second comparison a level to find that out.
     fn replace_top(&mut self, entry: Entry<N>) {
         let len = self.entries.len();
         let mut hole = 0;
@@ -91,17 +100,10 @@ impl<const N: usize> Heap<N> {
             {
                 child += 1;
             }
-            if self
-                .order
-                .cmp(&entry.monomial, &self.entries[child].monomial)
-                != Ordering::Less
-            {
-                break;
-            }
             self.entries[hole] = self.entries[child];
             hole = child;
         }
-        self.entries[hole] = entry;
+        self.sift_up(hole, entry);
     }
 
     fn pop_top(&mut self) {
@@ -454,6 +456,37 @@ mod tests {
     fn test_heap_leaves_a_constant_dividend_alone() {
         let vars = ["x", "y"];
         assert_routes_agree("4", &["x + 1", "y^2"], vars);
+    }
+
+    // The interreduction loop returns the same basis whichever route reduces its elements, on
+    // inputs whose reductions take many steps against many divisors.
+    #[test]
+    fn test_interreduction_is_route_independent() {
+        use crate::grobner::{
+            benchmark_systems::{cyclic, katsura},
+            interreduce_with_route_for_benchmark,
+        };
+        type F = crate::fields::Zp2147483647;
+        fn check<const N: usize>(system: Vec<MultivariatePolynomial<N, F>>) {
+            for order in ALL_ORDERS {
+                assert_eq!(
+                    interreduce_with_route_for_benchmark(
+                        system.clone(),
+                        order,
+                        DivisionRoute::Heap
+                    ),
+                    interreduce_with_route_for_benchmark(
+                        system.clone(),
+                        order,
+                        DivisionRoute::Merge
+                    ),
+                    "{}",
+                    order.name()
+                );
+            }
+        }
+        check(katsura::<5, F>());
+        check(cyclic::<5, F>());
     }
 
     // One divisor: with a tail, without one, equal to the dividend, dividing nothing, non-monic.
