@@ -108,6 +108,7 @@ jobs:
           python3 tools/test/grobx-randomization-test.py
           python3 tools/external/grobx-driver/research/randomization/test_policy.py
           python3 tools/test/proof-artifacts-test.py
+          python3 tools/test/attempt-journal-test.py
           python3 research/grobx-randomization/summarize.py
           git diff --exit-code -- research/grobx-randomization/summary.json research/grobx-randomization/summary.csv
           python3 research/grobx-trajectory/summarize.py

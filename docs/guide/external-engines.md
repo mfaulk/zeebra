@@ -748,6 +748,44 @@ JSON response byte for byte and verifies the proof SHA-256. This preserves full 
 without repeating them in every response. `--small-controls-only` restricts a follow-up cohort to
 Katsura-4 at 32003 and the two registered wide controls; it does not pool different affinities.
 
+### Incremental attempt journals for bounded controllers
+
+A controller that rewrites its whole growing cohort after every child spends quadratic write
+volume inside its measured window, and a watchdog firing mid-rewrite loses the newest child's
+metadata (#764, from #751's 70/75 native prefix). `tools/external/attempt_journal.py` is the
+shared alternative; new and amended controllers record into it instead:
+
+```python
+journal = attempt_journal.StudyJournal.create(directory, header, plan, limits)
+# resuming: StudyJournal.open(directory, header, plan, limits[, quarantine_torn=True])
+refusal = journal.refusal(next_child_wall_seconds=child_wall)
+if refusal: journal.record_stop(refusal.pop('reason'), **refusal)
+journal.record_exit(index, plan[index], stdout_bytes, stderr_bytes, metadata)  # before parsing
+journal.record_verdict(index, 'verified', details)                               # after checking
+```
+
+`header` holds the static identity (source, executable, inputs, affinity, options, references)
+and is written once with the frozen `plan` and `limits`; `open` refuses any difference. Each
+`record_exit` stores stdout/stderr as content-addressed gzip blobs and appends one fsynced,
+self-digested, hash-chained line carrying `process_wall_ns`, `wall_seconds`, `cpu_seconds`,
+`observed_peak_rss_bytes`, `exit`, `stop` and `guard`; missing fields are refused, never inferred.
+An attempt without a verdict stays `unverified`. Exits must arrive in plan order, so an accepted
+prefix cannot be rewritten. Cumulative child wall and retained bytes survive a reopen, and
+`refusal` reports the budget refusal that must be recorded instead of launching. A torn final
+line, from an interruption during the append, is refused until `open(..., quarantine_torn=True)`
+moves it to `torn-<offset>.partial` and journals that it did.
+
+Outside the measured window, verify and publish:
+
+```bash
+python3 tools/external/attempt_journal.py verify DIR
+python3 tools/external/attempt_journal.py render DIR COHORT.json.gz
+```
+
+`render` is deterministic (sorted keys, gzip `mtime=0`), atomic, and checks its own output; it
+records the journal's SHA-256 in the cohort. Existing journals in `comparand-scaling.py`
+(`comparand-attempt-journal-v1`) keep their format.
+
 ## Giac modular grevlex comparand
 
 `GiacSolver` runs `icas` as a separate GPL-3.0 subprocess; it adds no linked
