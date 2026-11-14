@@ -3,6 +3,7 @@
 mod dense_index;
 #[cfg(feature = "research-work")]
 pub mod gcd_profile;
+mod heap_division;
 mod monomial;
 mod monomial_arithmetic;
 mod monomial_hash;
@@ -30,5 +31,5 @@ pub use sparse_multivariate_multiply::{
 };
 pub use sparse_multivariate_polynomial::SparseMultiPoly as MultivariatePolynomial;
 pub use sparse_multivariate_polynomial_arithmetic::{
-    CrossCallRepeats, NormalFormCounts, NormalFormError,
+    CrossCallRepeats, DivisionRoute, NormalFormCounts, NormalFormError,
 };
