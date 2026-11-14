@@ -11,7 +11,8 @@ and a direct-lex MQ10 control at GF(32003). Each child is capped at 60 seconds a
 the existing descendant guard and nested 185-second watchdog. Six solver caps total at most 360 seconds;
 the pilot has a 480-second aggregate outer watchdog and 256 MiB output budget. The exact independent Singular answer is reused from #739’s
 `research/comparand-scaling/singular-reference31-v1.json.gz`; its archive hash, full source/checker
-identity and exact coefficient-set verification are retained in the cohort. No new oracle is run.
+identity and exact coefficient-set verification are retained in the cohort. The archive SHA-256 is
+`d52ca65cbdc2a088e42da3faeb58305cbfa614dc2e6740de09fd2b6d13c133c1`. No new oracle is run.
 The exact frozen Katsura digest is `03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13`. No retry or
 larger allowance is authorized. Compiler/load gates run before and after every child. All stops,
 complete phase checkpoints and partial stdout remain retained; no partial basis is accepted.
