@@ -56,7 +56,12 @@ pub(crate) use factorize::trace_to_gf2;
 pub use factorize::{factorize, is_irreducible};
 // Measurement and differential-testing hooks for `examples/modular_composition.rs`, not API.
 #[doc(hidden)]
-pub use factorize::{factorize_with_route as factorize_with_route_unstable, FrobeniusRoute};
+pub use factorize::{
+    factorize_with_route as factorize_with_route_unstable,
+    factorize_with_routes as factorize_with_routes_unstable,
+    is_irreducible_with_route as is_irreducible_with_route_unstable, DistinctDegreeRoute,
+    FrobeniusRoute, IrreducibilityRoute,
+};
 pub use gcd::{gcd, gcd_classical_unstable, gcd_half_unstable, lcm, partial_bezout, xgcd};
 pub use graeffe::{
     graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
