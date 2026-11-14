@@ -80,29 +80,49 @@ pub enum Gf2Elimination {
 
 impl Gf2Elimination {
     /// The least density, in entries per million cells, at which [`Gf2Elimination::Auto`] packs.
-    pub const MIN_DENSITY_PPM: u64 = 20_000;
+    ///
+    /// Measured: sparse-MQ-12's largest batches (1.6%) lose at 0.78x-0.98x and cyclic-9's
+    /// 1.9% batch wins at 2.2x, as does overdetermined-MQ-16's 6958x3146 batch at 1.9% (7.9x).
+    /// The margin between the two sides is narrow, and the research doc says so.
+    pub const MIN_DENSITY_PPM: u64 = 18_000;
 
-    /// The fewest columns at which [`Gf2Elimination::Auto`] packs: below one machine word, the
-    /// packed row is a single `u64` and the tables are overhead.
-    pub const MIN_COLUMNS: usize = 64;
+    /// The fewest columns at which [`Gf2Elimination::Auto`] packs.
+    ///
+    /// Every measured batch under two words that the packed route lost (0.34x-0.59x) was 66-105
+    /// columns wide and cost the generic route under 25 microseconds; there is nothing to win there.
+    pub const MIN_COLUMNS: usize = 128;
+
+    /// The fewest pair rows at which [`Gf2Elimination::Auto`] packs.
+    ///
+    /// The reducer block is never packed, so a batch of two pair rows against hundreds of reducers
+    /// is pure conversion; cyclic-8/9's late batches are exactly that shape and lose 0.85x.
+    pub const MIN_PAIR_ROWS: usize = 16;
 
     /// Whether [`Gf2Elimination::Auto`] packs a matrix of this shape and entry count.
     ///
     /// A packed row operation costs one word per 64 columns whatever the row holds, and a sparse
-    /// one costs a merge over the nonzeros, so density is the axis the two cross on.
-    pub fn prefers_packed(rows: usize, columns: usize, nonzeros: usize) -> bool {
+    /// one costs a merge over the nonzeros, so density is the axis the two cross on — once the
+    /// matrix is large enough for either to cost anything.
+    pub fn prefers_packed(rows: usize, pair_rows: usize, columns: usize, nonzeros: usize) -> bool {
         let cells = (rows as u128) * (columns as u128);
         columns >= Self::MIN_COLUMNS
-            && cells > 0
+            && pair_rows >= Self::MIN_PAIR_ROWS
             && (nonzeros as u128) * 1_000_000 >= cells * u128::from(Self::MIN_DENSITY_PPM)
     }
 
-    /// Whether this setting packs a matrix of this shape, before the field and coefficients are checked.
-    pub fn selects_packed(self, rows: usize, columns: usize, nonzeros: usize) -> bool {
+    /// Whether this setting packs a matrix of this shape, before the field and coefficients are
+    /// checked.
+    pub fn selects_packed(
+        self,
+        rows: usize,
+        pair_rows: usize,
+        columns: usize,
+        nonzeros: usize,
+    ) -> bool {
         match self {
             Self::Generic => false,
             Self::Packed => true,
-            Self::Auto => Self::prefers_packed(rows, columns, nonzeros),
+            Self::Auto => Self::prefers_packed(rows, pair_rows, columns, nonzeros),
         }
     }
 }

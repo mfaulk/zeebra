@@ -112,7 +112,8 @@ fn batches<const N: usize>(label: &str, system: &[MultivariatePolynomial<N, Zp2>
             micros(best[0]),
             micros(best[1]),
             best[0].as_secs_f64() / best[1].as_secs_f64().max(1e-9),
-            if Gf2Elimination::prefers_packed(s.rows, s.columns, nonzeros) {
+            if Gf2Elimination::prefers_packed(s.rows, s.rows - s.reducer_rows, s.columns, nonzeros)
+            {
                 "packed"
             } else {
                 "generic"

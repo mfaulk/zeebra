@@ -283,9 +283,12 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     let packed_eligible = structured
         && form == RowForm::Reduced
         && super::packed::characteristic_two::<F>()
-        && options
-            .gf2_elimination
-            .selects_packed(rows, columns, matrix.nonzeros());
+        && options.gf2_elimination.selects_packed(
+            rows,
+            rows - reducer_rows,
+            columns,
+            matrix.nonzeros(),
+        );
     let mut production = |matrix: &mut MacaulayMatrix<N, F>| -> Result<_, F4Error> {
         let mut split_clock = StageClock::new(options.measure_stages);
         let candidate_columns = |matrix: &MacaulayMatrix<N, F>| -> Vec<bool> {

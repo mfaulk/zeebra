@@ -499,17 +499,31 @@ mod tests {
     /// Auto packs dense, wide matrices and leaves sparse or narrow ones on the generic route.
     #[test]
     fn test_dispatch_rule() {
-        let dense = Gf2Elimination::MIN_DENSITY_PPM as usize;
-        assert!(Gf2Elimination::prefers_packed(1000, 1000, dense));
-        assert!(!Gf2Elimination::prefers_packed(1000, 1000, dense - 1));
+        let (columns, pairs) = (Gf2Elimination::MIN_COLUMNS, Gf2Elimination::MIN_PAIR_ROWS);
+        // 1000 rows of `columns` cells: the density threshold in entries.
+        let dense = (Gf2Elimination::MIN_DENSITY_PPM as usize * columns).div_ceil(1000);
+        assert!(Gf2Elimination::prefers_packed(1000, pairs, columns, dense));
         assert!(!Gf2Elimination::prefers_packed(
             1000,
-            Gf2Elimination::MIN_COLUMNS - 1,
+            pairs,
+            columns,
+            dense - 1
+        ));
+        assert!(!Gf2Elimination::prefers_packed(
+            1000,
+            pairs,
+            columns - 1,
             1_000_000
         ));
-        assert!(!Gf2Elimination::prefers_packed(0, 0, 0));
-        assert!(!Gf2Elimination::Generic.selects_packed(1000, 1000, 1_000_000));
-        assert!(Gf2Elimination::Packed.selects_packed(1, 1, 0));
+        assert!(!Gf2Elimination::prefers_packed(
+            1000,
+            pairs - 1,
+            columns,
+            1_000_000
+        ));
+        assert!(!Gf2Elimination::prefers_packed(0, 0, 0, 0));
+        assert!(!Gf2Elimination::Generic.selects_packed(1000, 1000, 1000, 1_000_000));
+        assert!(Gf2Elimination::Packed.selects_packed(1, 0, 1, 0));
         assert_eq!(F4Options::default().gf2_elimination, Gf2Elimination::Auto);
         assert_eq!(
             F4Options::baseline().gf2_elimination,
