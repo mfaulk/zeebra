@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+import importlib.util
+from pathlib import Path
+import unittest
+
+spec = importlib.util.spec_from_file_location('study', Path(__file__).resolve().parents[1] / 'external/multirow-study.py')
+study = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(study)
+
+
+def matrix(**overrides):
+    row = dict(rows=8, columns=9, first=0, target_entries=20, bands=2, partial_bands=0,
+               pivot_applications=6, pivot_reads=3, entries_applied=30, entries_read=15,
+               lane_products=40, reads_by_lanes=[0, 1, 1, 1, 0], intra_band_pivots=1,
+               new_pivots=5, zero_rows=3, scratch_bytes=144)
+    row.update(overrides)
+    return row
+
+
+class Plan(unittest.TestCase):
+    # Every arm runs once per cell and repetition, and no arm is always first.
+    def test_plan_is_balanced_and_rotated(self):
+        cells = list(study.plan('native'))
+        self.assertEqual(len(cells), 5 * 3 * 2 * 4)
+        firsts = {cells[r * 24][3] for r in range(4)}
+        self.assertEqual(firsts, set(study.ARMS))
+
+    # The declared extension pairs only single and band4 on MQ10, alternating which runs first.
+    def test_extension_is_paired_and_alternating(self):
+        cells = list(study.plan('extension'))
+        self.assertEqual(len(cells), 10 * 2 * 2)
+        self.assertEqual({c[3] for c in cells}, {'single', 'band4'})
+        self.assertEqual({c[1] for c in cells}, {'mq-random-10'})
+        self.assertNotEqual(cells[0][3], cells[4][3])
+        self.assertEqual(min(c[0] for c in cells), 5)
+
+    # Every arm except the stock control selects its multirow mode explicitly.
+    def test_command_names_the_arm(self):
+        binary = Path('/bin/true')
+        self.assertNotIn('--multirow=stock', study.command(binary, 'cyclic-5', 13, 'stock'))
+        self.assertIn('--multirow=lanes4', study.command(binary, 'cyclic-5', 13, 'lanes4'))
+        self.assertIn('--stages', study.command(binary, 'cyclic-5', 13, 'stock'))
+
+
+class Gate(unittest.TestCase):
+    # An idle rust-analyzer does not block the campaign, but a build it or anyone else starts does.
+    def test_compilers_ignore_only_the_editor_server(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            for pid, comm in ((10, 'rust-analyzer'), (11, 'bash'), (12, 'rustc'), (13, 'cargo')):
+                (Path(root) / str(pid)).mkdir()
+                (Path(root) / str(pid) / 'comm').write_text(comm + '\n')
+            found = sorted(name for _, name in study.compilers(Path(root)))
+        self.assertEqual(found, ['cargo', 'rustc'])
+
+
+class Acceptance(unittest.TestCase):
+    # A complete answer plus the selected mode is accepted; a wrong basis or mode is not.
+    def test_answer_and_mode(self):
+        ref = dict(digest='d', modulus=13, basis=['x+2*y'])
+        raw = dict(ref, problem='cyclic-5', multirow=dict(mode='band4', matrices=[matrix()]))
+        study.validate(raw, ref, 'cyclic-5', 'band4')
+        for key, value in [('basis', ['x+3*y']), ('digest', 'e'), ('multirow', None),
+                           ('multirow', dict(mode='lanes4', matrices=[matrix()])),
+                           ('multirow', dict(mode='band4', matrices=[]))]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                study.validate(dict(raw, **{key: value}), ref, 'cyclic-5', 'band4')
+
+    # The single-row arm must not reach the band kernel, and stock must not report a mode.
+    def test_controls(self):
+        ref = dict(digest='d', modulus=13, basis=['x'])
+        study.validate(dict(ref, problem='p', multirow=dict(mode='single', matrices=[])), ref, 'p', 'single')
+        study.validate(dict(ref, problem='p', multirow=None), ref, 'p', 'stock')
+        with self.assertRaises(ValueError):
+            study.validate(dict(ref, problem='p', multirow=dict(mode='single', matrices=[matrix()])), ref, 'p', 'single')
+        with self.assertRaises(ValueError):
+            study.validate(dict(ref, problem='p', multirow=dict(mode='single', matrices=[])), ref, 'p', 'stock')
+
+    # Totals sum every matrix and derive eligible rows from the split.
+    def test_census_totals(self):
+        raw = dict(multirow=dict(mode='band4', matrices=[matrix(), matrix(first=2, scratch_bytes=200)]))
+        totals = study.census_totals(raw)
+        self.assertEqual(totals['entries_read'], 30)
+        self.assertEqual(totals['eligible_rows'], 14)
+        self.assertEqual(totals['reads_by_lanes'], [0, 2, 2, 2, 0])
+        self.assertEqual(totals['max_scratch_bytes'], 200)
+        self.assertIsNone(study.census_totals(dict(multirow=None)))
+
+
+if __name__ == '__main__':
+    unittest.main()

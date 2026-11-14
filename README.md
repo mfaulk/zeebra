@@ -103,6 +103,7 @@ Every Rust example in this file and in [`docs/guide/`](docs/guide) is compiled a
 | `external-runners` | on | Drives msolve, Groebner.jl, Sagebrush, Giac and Singular as subprocesses. Adds no dependency. |
 | `proptest` | off | `Arbitrary` implementations for the public types, for property-testing downstream code. |
 | `research-work` | off | Research counters and opt-in experiments. Shipping defaults are unaffected. |
+| `research-multirow` | off | Research-only four-row band elimination ([#715](docs/research/multirow-reuse.md)), selected per thread; single-row stays the default even when enabled. |
 
 ## How Zeebra relates to existing systems
 

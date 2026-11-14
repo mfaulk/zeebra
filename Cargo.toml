@@ -75,6 +75,10 @@ external-runners = []
 # Production defaults stay unchanged; diagnostic scopes must also be explicitly enabled.
 research-work = []
 
+# Research-only multirow (band) sparse pivot reuse for #715. Compiled out by default; with the
+# feature on, the production single-row path stays selected unless a caller opts in per thread.
+research-multirow = []
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.

@@ -11,10 +11,10 @@ use crate::{
 /// A dense row used as the working register of a sparse elimination.
 #[derive(Clone, Debug)]
 pub struct DenseAccumulator<F: FiniteField> {
-    cells: Vec<F>,
-    lead: usize,
-    tail: usize,
-    nonzeros: usize,
+    pub(super) cells: Vec<F>,
+    pub(super) lead: usize,
+    pub(super) tail: usize,
+    pub(super) nonzeros: usize,
 }
 
 impl<F: FiniteField> DenseAccumulator<F> {
@@ -176,6 +176,19 @@ pub(crate) fn accumulated_row_echelon<F: FiniteField>(
 
     let mut pivot_of_column = PivotIndex::new(matrix.num_columns(), matrix.num_rows());
     let mut resident = initial_nonzeros;
+    #[cfg(feature = "research-multirow")]
+    if super::band::mode() != super::band::Mode::Single {
+        super::band::eliminate_from(
+            matrix,
+            0,
+            &mut pivot_of_column,
+            &mut statistics,
+            &mut resident,
+            max_nonzeros,
+        )?;
+        statistics.final_nonzeros = resident;
+        return Ok(statistics);
+    }
     let mut accumulator = DenseAccumulator::new(matrix.num_columns());
     eliminate_from(
         matrix,
@@ -203,6 +216,19 @@ pub(crate) fn accumulated_reduce_rows_against_pivots<F: FiniteField>(
     max_nonzeros: usize,
 ) -> Result<(), usize> {
     let mut resident = statistics.initial_nonzeros;
+    #[cfg(feature = "research-multirow")]
+    if super::band::mode() != super::band::Mode::Single {
+        super::band::eliminate_from(
+            matrix,
+            split,
+            pivot_of_column,
+            statistics,
+            &mut resident,
+            max_nonzeros,
+        )?;
+        statistics.final_nonzeros = resident;
+        return Ok(());
+    }
     let mut accumulator = DenseAccumulator::new(matrix.num_columns());
     eliminate_from(
         matrix,
