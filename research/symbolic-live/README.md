@@ -72,6 +72,7 @@ ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=4 \
   tools/benchlock.sh symbolic-live-753 taskset -c 4 \
   python3 tools/external/symbolic-live-study.py \
     --stock "$CARGO_TARGET_DIR/stock" --binary "$CARGO_TARGET_DIR/observed" \
+    --build-commit d8a32288 --build-metadata research/symbolic-live/build-metadata.json \
     --scratch "$CARGO_TARGET_DIR/campaign" --output research/symbolic-live/results.json.gz
 python3 tools/external/symbolic-live-study.py --replay research/symbolic-live
 ```

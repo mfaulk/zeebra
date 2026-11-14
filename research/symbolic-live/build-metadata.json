@@ -1,0 +1,273 @@
+{
+  "source_commit": "d8a322888fdc6837c32fc8c24f7ce5385ee3c849",
+  "commands": [
+    "RUSTC_WRAPPER= CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-753 TMPDIR=/buildcache/cargo-target/zeebra-753/tmp cargo build -j16 --release --example mq10_profile",
+    "RUSTC_WRAPPER= CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-753 TMPDIR=/buildcache/cargo-target/zeebra-753/tmp cargo build -j16 --release --features research-work --example mq10_profile"
+  ],
+  "environment": {
+    "RUSTC_WRAPPER": "",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null
+  },
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+  "profiles": {
+    "release": {
+      "lto": "fat",
+      "codegen-units": 1
+    },
+    "ci-release": {
+      "inherits": "release",
+      "opt-level": 2,
+      "lto": "off",
+      "codegen-units": 16
+    }
+  },
+  "cargo_configs": {
+    "/home/mfaulk/.cargo/config.toml": {
+      "sha256": "189311fa77d41745b6591947c6b986455fbdb5abdbec46b63766dd7ad3136fea",
+      "build": {},
+      "target": {}
+    },
+    "/home/mfaulk/projects/.cargo/config.toml": {
+      "sha256": "5413fd88c76f3844c8cbea7c25176647e75a149507fcd76f034ad3988e556624",
+      "build": {
+        "rustc-wrapper": "sccache"
+      },
+      "target": {
+        "x86_64-unknown-linux-gnu": {
+          "rustflags": [
+            "-C",
+            "link-arg=-fuse-ld=mold"
+          ]
+        }
+      }
+    },
+    "/home/mfaulk/projects/zeebra-m28-753/.cargo/config.toml": {
+      "sha256": "4149fbfd3f145b146c5dff23954d0def331ad72ca2d9d5d6b46976f8fe7786f7",
+      "build": {
+        "rustc-wrapper": ""
+      },
+      "target": {
+        "cfg(target_arch = \"x86_64\")": {
+          "rustflags": [
+            "-C",
+            "target-cpu=x86-64-v3"
+          ]
+        }
+      }
+    }
+  },
+  "example_fingerprints": {
+    "release/.fingerprint/zeebra-5923eb1be181208d/example-mq10_profile.json": {
+      "rustc": 11835527281324007204,
+      "features": "[\"default\", \"external-runners\"]",
+      "declared_features": "[\"default\", \"external-runners\", \"proptest\", \"research-work\"]",
+      "target": 7079525145864670293,
+      "profile": 13760140728491655351,
+      "path": 6126358326292895858,
+      "deps": [
+        [
+          65234016722529558,
+          "bincode",
+          false,
+          14483144590401758667
+        ],
+        [
+          368492036915771276,
+          "proptest",
+          false,
+          3719956546900411177
+        ],
+        [
+          720731745621185994,
+          "criterion",
+          false,
+          17509495912818992970
+        ],
+        [
+          5792757459284085107,
+          "ark_ff",
+          false,
+          3417259965369347763
+        ],
+        [
+          6557439603276904804,
+          "serde",
+          false,
+          9347811305899035471
+        ],
+        [
+          9045754397332874331,
+          "lazy_static",
+          false,
+          11289331787133401225
+        ],
+        [
+          11784517437581582528,
+          "pest_derive",
+          false,
+          1509375090198798870
+        ],
+        [
+          11910974697091955563,
+          "rayon",
+          false,
+          6357130640831972830
+        ],
+        [
+          13208667028893622512,
+          "rand",
+          false,
+          5027888373261105486
+        ],
+        [
+          15269564664536803040,
+          "pest",
+          false,
+          2569759663240866386
+        ],
+        [
+          16728356305607762645,
+          "serde_arrays",
+          false,
+          13491671786606273003
+        ],
+        [
+          18283066100005974038,
+          "zeebra",
+          false,
+          7293503112611867697
+        ]
+      ],
+      "local": [
+        {
+          "CheckDepInfo": {
+            "dep_info": "release/.fingerprint/zeebra-5923eb1be181208d/dep-example-mq10_profile",
+            "checksum": false
+          }
+        }
+      ],
+      "rustflags": [
+        "-C",
+        "link-arg=-fuse-ld=mold",
+        "-C",
+        "target-cpu=x86-64-v3"
+      ],
+      "config": 9396254390672932401,
+      "compile_kind": 0
+    },
+    "release/.fingerprint/zeebra-8e7d7d45c5f5e09f/example-mq10_profile.json": {
+      "rustc": 11835527281324007204,
+      "features": "[\"default\", \"external-runners\", \"research-work\"]",
+      "declared_features": "[\"default\", \"external-runners\", \"proptest\", \"research-work\"]",
+      "target": 7079525145864670293,
+      "profile": 13760140728491655351,
+      "path": 6126358326292895858,
+      "deps": [
+        [
+          65234016722529558,
+          "bincode",
+          false,
+          14483144590401758667
+        ],
+        [
+          368492036915771276,
+          "proptest",
+          false,
+          3719956546900411177
+        ],
+        [
+          720731745621185994,
+          "criterion",
+          false,
+          17509495912818992970
+        ],
+        [
+          5792757459284085107,
+          "ark_ff",
+          false,
+          3417259965369347763
+        ],
+        [
+          6557439603276904804,
+          "serde",
+          false,
+          9347811305899035471
+        ],
+        [
+          9045754397332874331,
+          "lazy_static",
+          false,
+          11289331787133401225
+        ],
+        [
+          11784517437581582528,
+          "pest_derive",
+          false,
+          1509375090198798870
+        ],
+        [
+          11910974697091955563,
+          "rayon",
+          false,
+          6357130640831972830
+        ],
+        [
+          13208667028893622512,
+          "rand",
+          false,
+          5027888373261105486
+        ],
+        [
+          15269564664536803040,
+          "pest",
+          false,
+          2569759663240866386
+        ],
+        [
+          16728356305607762645,
+          "serde_arrays",
+          false,
+          13491671786606273003
+        ],
+        [
+          18283066100005974038,
+          "zeebra",
+          false,
+          8435770595578890134
+        ]
+      ],
+      "local": [
+        {
+          "CheckDepInfo": {
+            "dep_info": "release/.fingerprint/zeebra-8e7d7d45c5f5e09f/dep-example-mq10_profile",
+            "checksum": false
+          }
+        }
+      ],
+      "rustflags": [
+        "-C",
+        "link-arg=-fuse-ld=mold",
+        "-C",
+        "target-cpu=x86-64-v3"
+      ],
+      "config": 9396254390672932401,
+      "compile_kind": 0
+    }
+  },
+  "build_logs_sha256": {
+    "stock": "207357ae4b6d232b4fb286b164f96b4c14e1f1b2ebdf4ebba917698a90aa3101",
+    "observed": "013fd3eec8a5596e858e1d269800853f5fe3ab4e0091a0104319c73123a32bc2"
+  },
+  "binaries": {
+    "stock": {
+      "path": "/buildcache/cargo-target/zeebra-753/stock",
+      "sha256": "d6ab86e8f75a3ead0b915d11e88d7d46300ad9338499a9781db75507b65f5e95"
+    },
+    "binary": {
+      "path": "/buildcache/cargo-target/zeebra-753/observed",
+      "sha256": "950176ede2a4c6d452826b798766bc9f9bde2d349804ab3d3e86c031ff9a5fb6"
+    }
+  }
+}

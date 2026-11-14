@@ -85,7 +85,17 @@ def check_plan(attempts):
 
 
 def summarize(cohort):
+    check_plan(cohort['attempts'])
     refs = references()
+    for path, expected in cohort['reference_cohorts_sha256'].items():
+        if sha(ROOT/path) != expected:
+            raise ValueError('retained independent reference archive changed')
+    identity = cohort['identity']
+    if identity['build_metadata']['source_commit'] != identity['binary_build_commit'] or any(identity['binaries'][name]['sha256'] != identity['build_metadata']['binaries'][name]['sha256'] for name in ('stock','binary')):
+        raise ValueError('binary build provenance differs')
+    expected_refs = {f'{p}/{m}': dict(digest=r['digest'], basis_sha256=hashlib.sha256(('\n'.join(sorted(r['basis']))+'\n').encode()).hexdigest()) for (p,m),r in refs.items() if (p,m) in CASES}
+    if cohort['references'] != expected_refs:
+        raise ValueError('reference field/input/basis identities changed')
     check_plan(cohort['attempts'])
     groups = defaultdict(list)
     trajectories = {}
@@ -120,6 +130,8 @@ def main():
     parser.add_argument('--binary', type=Path)
     parser.add_argument('--scratch', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--build-commit')
+    parser.add_argument('--build-metadata', type=Path)
     parser.add_argument('--replay', type=Path)
     args = parser.parse_args()
     storage, guard = load('study_artifacts'), load('grobx-work-study')
@@ -130,8 +142,8 @@ def main():
             raise ValueError('derived symbolic summary differs')
         print('verified 346 complete reduced bases and the retained symbolic summaries')
         return
-    if not all((args.stock, args.binary, args.scratch, args.output)):
-        parser.error('provide stock, binary, scratch and output for a campaign')
+    if not all((args.stock, args.binary, args.scratch, args.output, args.build_commit, args.build_metadata)):
+        parser.error('provide stock, binary, scratch, output, build-commit and build-metadata for a campaign')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         parser.error('commit the instrument before measurement')
     affinity = ','.join(map(str, sorted(os.sched_getaffinity(0))))
@@ -142,7 +154,16 @@ def main():
     if args.output.exists():
         parser.error('output exists; retain it')
     binaries = dict(stock=args.stock.resolve(), binary=args.binary.resolve())
-    cohort = dict(schema=1, identity=dict(commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(), binaries={k: dict(path=str(p), sha256=sha(p)) for k, p in binaries.items()}, machine=os.environ['ZEEBRA_MACHINE'], affinity=affinity, workers=1, cargo_lock_sha256=sha(ROOT/'Cargo.lock'), rustc=subprocess.check_output(['rustc', '-vV'], text=True), build='release;fat LTO;codegen-units=1;x86-64-v3;mold;system allocator;CARGO_INCREMENTAL=0;RUSTC_WRAPPER=', topology=subprocess.check_output(['lscpu', '-e=CPU,CORE,SOCKET,NODE,CACHE,ONLINE'], text=True)), limits=dict(child_seconds=60, parent_seconds=185, rss_bytes=2*1024**3, campaign_seconds=900, scratch_bytes=512*1024**2, repetitions=5), environment={k: os.environ.get(k) for k in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS','CARGO_INCREMENTAL','RUSTC_WRAPPER')}, cargo_config_sha256=sha(ROOT/'.cargo/config.toml'), reference_cohorts_sha256={str(p.relative_to(ROOT)): sha(p) for p in [ROOT/'research/competitive/results/grobx-683.json.gz', ROOT/'research/competitive/results/grobx-683-small.json.gz', ROOT/'research/concurrent-pivots/controls.json.gz', ROOT/'research/public-corpus/results/public-679.json.gz']}, references={f'{p}/{m}': dict(digest=r['digest'], basis_sha256=hashlib.sha256(('\n'.join(sorted(r['basis']))+'\n').encode()).hexdigest()) for (p,m),r in references().items() if (p,m) in CASES}, attempts=[])
+    build_commit = subprocess.check_output(['git','rev-parse',args.build_commit],cwd=ROOT,text=True).strip()
+    if subprocess.call(['git','diff','--quiet',build_commit,'--','Cargo.toml','Cargo.lock','.cargo','src','examples'],cwd=ROOT):
+        parser.error('current production source differs from frozen binary source')
+    build_metadata = json.loads(args.build_metadata.read_text())
+    if build_metadata['source_commit'] != build_commit or any(build_metadata['binaries'][key]['sha256'] != sha(path) for key,path in binaries.items()):
+        parser.error('build metadata does not bind these frozen executables')
+    cohort = dict(schema=1, identity=dict(commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(), binaries={k: dict(path=str(p), sha256=sha(p)) for k, p in binaries.items()}, machine=os.environ['ZEEBRA_MACHINE'], affinity=affinity, workers=1, cargo_lock_sha256=sha(ROOT/'Cargo.lock'), rustc=subprocess.check_output(['rustc', '-vV'], text=True), build='release;fat LTO;codegen-units=1;x86-64-v3;mold;system allocator;CARGO_INCREMENTAL=0;RUSTC_WRAPPER=', topology=subprocess.check_output(['lscpu', '-e=CPU,CORE,SOCKET,NODE,CACHE,ONLINE'], text=True)), binary_build_commit=build_commit, build_metadata=build_metadata, build_metadata_sha256=sha(args.build_metadata), limits=dict(child_seconds=60, parent_seconds=185, rss_bytes=2*1024**3, campaign_seconds=900, scratch_bytes=512*1024**2, repetitions=5), environment={k: os.environ.get(k) for k in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS','CARGO_INCREMENTAL','RUSTC_WRAPPER')}, cargo_config_sha256=sha(ROOT/'.cargo/config.toml'), reference_cohorts_sha256={str(p.relative_to(ROOT)): sha(p) for p in [ROOT/'research/competitive/results/grobx-683.json.gz', ROOT/'research/competitive/results/grobx-683-small.json.gz', ROOT/'research/concurrent-pivots/controls.json.gz', ROOT/'research/public-corpus/results/public-679.json.gz']}, references={f'{p}/{m}': dict(digest=r['digest'], basis_sha256=hashlib.sha256(('\n'.join(sorted(r['basis']))+'\n').encode()).hexdigest()) for (p,m),r in references().items() if (p,m) in CASES}, attempts=[])
+    cohort['identity']['binary_build_commit'] = cohort.pop('binary_build_commit')
+    cohort['identity']['build_metadata_sha256'] = cohort.pop('build_metadata_sha256')
+    cohort['identity']['build_metadata'] = cohort.pop('build_metadata')
     refs, start = references(), time.monotonic()
     for phase, repeat, problem, modulus, arm in plan():
         compilers = load('worker-pool-study').compiler_processes()
