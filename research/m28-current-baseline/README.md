@@ -150,7 +150,7 @@ grid. It is not an automatic resumption or a fresh campaign allowance. Preserve 
 its two verified attempts and its compiler refusal unchanged. Its SHA-256 is
 `3a733e31cf1d70ad27d322f2e950cd736676b4726ccb8004a8fa0754d6b1bd8f` and its original controller is
 `9e2017806b95cbf88a904ad9213d324c2a1f5b0e`. The amended controller implementation pin is
-`AMENDED_CONTROLLER_PIN`; the actual launch HEAD is stamped separately in `resumptions.controller`.
+`5e2bf3d8fa557845b18a60499b61a88f564e7e2c`; the actual launch HEAD is stamped separately in `resumptions.controller`.
 Rust/example/Cargo source and the executable remain exactly the frozen `65734435` build.
 
 The original native lock window records nine seconds. Conservatively charge **20 seconds** for
