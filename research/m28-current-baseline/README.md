@@ -279,10 +279,19 @@ Three protocol points differ from the historical windows and are declared here:
   repository (SHA-256 `c778f44a9365c25ce89185b31ae262c24b3d7b14280e0bc7f673f83590bcfdbc`) and in
   the benchlock log. The one-minute load gate (at most 4) is unchanged.
 - **Window starts.** Inside the lock, a launch waits up to 300 seconds for load below 3 and no build
-  process before the watchdog starts, because the load average lags the previous lock holder.
-- **Refused windows.** An environmental refusal (build/load gate) mid-window is retained as its
-  own archive and is not pooled. At most one further window per phase may follow it, from a fresh
-  start; a solver failure, validation failure or resource refusal is never relaunched.
+  process before the watchdog starts, because the load average lags the previous lock holder. If
+  the machine is still busy it leaves the lock without starting the controller (amended after the
+  second pilot window below, whose waiter started the controller anyway).
+- **Refused windows.** A window whose controller refuses before its first child holds no sample and
+  does not count. A refusal after one or more children is retained as its own archive and never
+  pooled; at most one further window per phase may follow it, from a fresh start. A solver failure,
+  validation failure or resource refusal is never relaunched.
+
+Zero-sample refusals so far, each retained outside the repository with its benchlock log line:
+pilot window 1 (above) and pilot window 2 at 13:17:35, which hit the build gate under a one-minute
+load of 1,242 from another session's link storm (SHA-256
+`ed10d7c624120813d47202042231f3bff7fafbe6a6845706ceebc70c4d68b0c1`). A native lock entry at
+13:17:58 was cancelled in its waiter and never started the controller.
 
 ```sh
 ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
