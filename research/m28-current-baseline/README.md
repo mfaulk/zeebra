@@ -20,7 +20,7 @@ complete phase checkpoints and partial stdout remain retained; no partial basis 
 A later native cohort requires reviewing the pilot first. Its declared grid has five alternating
 stage-off/on repetitions for MQ10, Katsura-6 and Cyclic-5 at both primes; five separate work-on
 MQ10 repetitions at each prime; and five staged repetitions of the weak Katsura-11 identity.
-That is 75 attempts, a 1,800-second hard aggregate cap and the same child/output limits. The
+That is 75 attempts, a 900-second hard aggregate cap and the same child/output limits. The
 aggregate cap overrides the 4,500-second sum of child caps; an unfinished grid remains incomplete.
 The native cohort is not launched solely because this README exists.
 
@@ -101,3 +101,34 @@ full source coefficients and every recovered point. Analytical ceilings use same
 The existing comparand supervisor enforces process-tree wall/RSS and 128-MiB per-child output,
 bounded by remaining aggregate output allowance. Launcher signals drain owned processes and retain
 an interrupted attempt. Unexpected process failures are not reclassified as resource refusals.
+
+
+## Reviewed native grid
+
+The native grid is exactly 75 fresh processes. For each repetition 0 through 4, run MQ10,
+Katsura-6 and Cyclic-5 at GF(32003) and GF(2147483647), stage-off then stage-on on even repetitions,
+reversed on odd repetitions (60 processes). Each repetition then has two separate MQ10 work-on
+processes, one at each prime (10 diagnostics), followed by Katsura-11/M31 staged basis-only
+(five weak-result repetitions). MQ10/Katsura-6/Cyclic-5 use the fixed conversion/recovery route.
+The Katsura-11 objective is a complete reduced grevlex basis. No direct-route or pilot completion
+is silently inferred from these native cells; the two pilot tail cells remain unattempted.
+
+Every child is limited to the smaller of 60 seconds and the remaining aggregate allowance,
+2 GiB RSS, and 128 MiB output within the remaining 256-MiB cumulative scratch/archive allowance.
+The hard aggregate cap is **900 seconds**, overriding the 4,500-second sum of child caps.
+There are **zero automatic retries or native resumptions**. A compiler/load refusal preserves
+its accepted prefix and stops. Work diagnostics remain separate from native timing distributions.
+The measured pilot source/executable and independent answer identities stay frozen.
+
+Only launch after the coordinator has established the next exclusive measurement window:
+
+```sh
+ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
+  tools/benchlock.sh m28-current-native-751 taskset -c 3 \
+  timeout --signal=TERM --kill-after=5 900 \
+  python3 tools/external/whole-route-study.py \
+    --binary /buildcache/cargo-target/zeebra-751/release/examples/mq10_profile \
+    --scratch /buildcache/cargo-target/zeebra-751/native \
+    --output research/m28-current-baseline/native.json.gz \
+    --phase native --build-commit "$BUILD_COMMIT"
+```

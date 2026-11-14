@@ -67,7 +67,10 @@ class WholeRouteStudy(unittest.TestCase):
         self.assertEqual(len(cells), len(set(cells)))
         self.assertEqual({c[0] for c in cells if c[-1] != 'work'}, set(range(5)))
         self.assertEqual(study.limits()['rss_bytes'], 2 * 1024**3)
-        self.assertLessEqual(study.limits()['aggregate_wall_seconds'], 1800)
+        self.assertEqual(study.limits()['aggregate_wall_seconds'], 900)
+        self.assertEqual(study.child_wall(120),60)
+        self.assertEqual(study.child_wall(7.8),7)
+        with self.assertRaises(ValueError): study.child_wall(.5)
 
 
 if __name__ == '__main__': unittest.main()

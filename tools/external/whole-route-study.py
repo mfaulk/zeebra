@@ -27,7 +27,12 @@ def sha(path):
 
 
 def limits():
-    return dict(child_wall_seconds=60, rss_bytes=2*1024**3, aggregate_wall_seconds=1800, output_bytes=256*1024**2)
+    return dict(child_wall_seconds=60, rss_bytes=2*1024**3, aggregate_wall_seconds=900, output_bytes=256*1024**2)
+
+
+def child_wall(remaining):
+    if remaining<1: raise ValueError('aggregate allowance exhausted')
+    return min(60,int(remaining))
 
 
 def plan(phase='native'):
@@ -171,6 +176,7 @@ def main():
     parser.add_argument('--resume-from',type=Path)
     args=parser.parse_args()
     if args.output.exists(): parser.error('retain existing campaign and choose new output')
+    if args.resume_from and args.phase!='pilot': parser.error('native grid has no authorized resumption')
     if subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip(): parser.error('commit instruments before measuring')
     if subprocess.call(['git','diff','--quiet',args.build_commit,'--','src','examples','Cargo.toml','Cargo.lock','.cargo'],cwd=ROOT): parser.error('build tree differs')
     affinity=','.join(map(str,sorted(os.sched_getaffinity(0))))
@@ -206,7 +212,8 @@ def main():
     began=time.monotonic()
     for repeat,problem,modulus,route,arm in cells[len(cohort['attempts']):]:
         compilers=runtime.compiler_processes()
-        if compilers or os.getloadavg()[0]>4 or time.monotonic()-began>campaign_limits['aggregate_wall_seconds']-60:
+        remaining_wall=campaign_limits['aggregate_wall_seconds']-(time.monotonic()-began)
+        if compilers or os.getloadavg()[0]>4 or remaining_wall<1:
             cohort['refusal']=dict(reason='compiler' if compilers else 'load-or-aggregate',compilers=compilers,load=os.getloadavg()[0]);guard.write(args.output,cohort);return
         if sha(args.binary)!=cohort['identity']['binary_sha256']: raise ValueError('binary changed')
         command=[str(args.binary.resolve()),str(modulus),'--problem='+problem]
@@ -214,9 +221,9 @@ def main():
         if arm!='stage-off': command+=['--stages']
         if arm=='work': command+=['--work']
         usage=resource.getrusage(resource.RUSAGE_CHILDREN)
-        remaining=limits()['output_bytes']-sum(p.stat().st_size for p in args.scratch.iterdir())
+        remaining=limits()['output_bytes']-sum(p.stat().st_size for p in args.scratch.iterdir())-(args.output.stat().st_size if args.output.exists() else 0)
         if remaining<=0: raise RuntimeError('output budget exhausted')
-        result=supervisor.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(len(cohort['attempts'])),sorted(os.sched_getaffinity(0)),60,limits()['rss_bytes'],min(128*1024**2,remaining))
+        result=supervisor.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(len(cohort['attempts'])),sorted(os.sched_getaffinity(0)),child_wall(remaining_wall),limits()['rss_bytes'],min(128*1024**2,remaining))
         result['observed_peak_rss_bytes']=result['observed_tree_peak_bytes']
         after=resource.getrusage(resource.RUSAGE_CHILDREN)
         result.update(repeat=repeat,problem=problem,modulus=modulus,route=route,arm=arm,load=os.getloadavg()[0],cpu_seconds=after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime,
@@ -247,7 +254,7 @@ def main():
             cohort['refusal']=dict(reason='launcher-signal',exit=result['interrupt_exit']);guard.write(args.output,cohort);raise SystemExit(result['interrupt_exit'])
         if result['status']=='failed': raise RuntimeError('failed validation; raw attempt retained')
         if result['status']=='contaminated': cohort['refusal']=dict(reason='compiler');guard.write(args.output,cohort);return
-        if sum(p.stat().st_size for p in args.scratch.iterdir())>limits()['output_bytes']: raise RuntimeError('output budget exceeded; retained attempts')
+        if sum(p.stat().st_size for p in args.scratch.iterdir())+args.output.stat().st_size>limits()['output_bytes']: raise RuntimeError('output budget exceeded; retained attempts')
 
 
 if __name__=='__main__': main()

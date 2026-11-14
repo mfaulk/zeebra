@@ -2,7 +2,7 @@
   {
     "phase": "pilot",
     "complete": false,
-    "archive_sha256": "4958676dce68a55d953b99ce302ca811dfd9a0aed94d1d075b0d3d326bf70281",
+    "archive_sha256": "c1e1bef5ee1dade99e92af89f2867205418bb9a99bf6e652e892e3547535f5d1",
     "identity": {
       "commit": "72c2a2c6d323c2bec12c53adf3bd37cbb59c89e4",
       "build_commit": "65734435",
