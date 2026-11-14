@@ -2,6 +2,8 @@
 import argparse
 import ast
 from collections import defaultdict
+import contextlib
+import gzip
 import hashlib
 import importlib.util
 import json
@@ -10,6 +12,7 @@ from pathlib import Path
 import resource
 import signal
 import subprocess
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -180,16 +183,140 @@ def resume_prefix(previous,current,native_amendment=False):
     return len(attempts)
 
 
+@contextlib.contextmanager
+def deferred_signals():
+    # A watchdog TERM landing mid-append would raise between write and chain update; hold it until the record is whole.
+    blocked=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGTERM,signal.SIGINT})
+    try: yield
+    finally: signal.pthread_sigmask(signal.SIG_SETMASK,blocked)
+
+
+def open_journal(directory, cohort, window_limits):
+    """Static identity and any accepted prefix go in the header once; the journal plan is the unattempted tail."""
+    header={k:v for k,v in cohort.items() if k not in ('plan','limits','attempts')}
+    header.update(cohort_plan=cohort['plan'],cohort_limits=cohort['limits'],prefix_attempts=cohort['attempts'])
+    tail=[list(cell) for cell in cohort['plan'][len(cohort['attempts']):]]
+    return load('attempt_journal').StudyJournal.create(directory,header,tail,window_limits)
+
+
+def attempt_metadata(result, cell, compilers, load_average, child_wall_seconds, output_limit):
+    metadata={k:v for k,v in result.items() if k not in ('stdout','stderr')}
+    metadata.update(zip(('repeat','problem','modulus','route','arm'),cell))
+    metadata.update(load=load_average,compiler_before=compilers,wall_seconds=result['process_wall_ns']/1e9,
+        observed_peak_rss_bytes=result['observed_tree_peak_bytes'],
+        guard=dict(child_wall_seconds=child_wall_seconds,rss_bytes=limits()['rss_bytes'],output_limit_bytes=output_limit,
+                   interrupt_exit=result.get('interrupt_exit')))
+    return metadata
+
+
+def classify(stdout, stderr, metadata, cell, refs, compiler_after):
+    _,problem,modulus,route,arm=cell
+    details=dict(compiler_after=compiler_after)
+    try:
+        parsed=responses(stdout)
+        raw=parsed['final']
+        if compiler_after: status='contaminated'
+        elif metadata['exit'] or metadata['stop']:
+            status=terminal_kind(metadata['exit'],metadata['stop'],stderr)
+            checkpoint=parsed['source']
+            if checkpoint and (problem,modulus) in refs:
+                identity=parsed['identity']
+                if not identity or identity.get('problem')!=problem: raise ValueError('missing input checkpoint')
+                load('mq10-profile').check_answer(dict(checkpoint,digest=identity['digest'],modulus=identity['modulus']),refs[(problem,modulus)])
+                details['source_basis_verified']=True
+        else:
+            if raw is None: raise ValueError('successful process has no final response')
+            validate_response(raw,refs.get((problem,modulus)),problem,modulus,route,arm)
+            status=('reported-resource-refusal' if raw.get('outcome') in ('basis-refusal','conversion-refusal','recovery-refusal') else
+                    'verified' if (problem,modulus) in refs and route!='direct' else 'complete-needs-independent-basis-check')
+    except (ValueError,KeyError,TypeError) as error:
+        status='failed'
+        details['failure']=str(error)
+    return status,details
+
+
+def measure(journal, offset, refs, launch, compilers, load_average, remaining_wall, output_remaining, native_amendment=False, log=print):
+    """The bounded window: each child is journaled durably before its output is parsed or checked."""
+    def stop(reason, **values):
+        with deferred_signals(): journal.record_stop(reason,**values)
+    plan=journal.header['plan']
+    for index in range(journal.next_index,len(plan)):
+        cell=plan[index]
+        before=compilers()
+        load_before=load_average()
+        wall=remaining_wall()
+        if before or load_before>4 or wall<1:
+            return stop('compiler' if before else 'load-or-aggregate',compilers=before,load=load_before,remaining_wall_seconds=wall)
+        output_left=output_remaining()
+        if output_left<=0: return stop('output-bytes',remaining_bytes=output_left)
+        child_wall_seconds,output_limit=child_wall(wall),min(128*1024**2,output_left)
+        result=launch(offset+index,cell,child_wall_seconds,output_limit)
+        stdout,stderr=result['stdout'],result['stderr']
+        metadata=attempt_metadata(result,cell,before,load_average(),child_wall_seconds,output_limit)
+        with deferred_signals(): journal.record_exit(index,cell,stdout.encode(),stderr.encode(),metadata)
+        status,details=classify(stdout,stderr,metadata,cell,refs,compilers())
+        with deferred_signals(): journal.record_verdict(index,status,details)
+        log(*cell,status,round(metadata['process_wall_ns']/1e6,2),flush=True)
+        if result.get('interrupt_exit'):
+            stop('launcher-signal',exit=result['interrupt_exit']);raise SystemExit(result['interrupt_exit'])
+        if status=='failed':
+            stop('failed-validation',index=offset+index,failure=details['failure']);raise RuntimeError('failed validation; raw attempt retained')
+        if status=='contaminated': return stop('compiler',compilers=details['compiler_after'],after_child=offset+index)
+        if native_amendment and status!='verified':
+            return stop('amended-child-refusal',status=status,stop=metadata['stop'])
+        output_left=output_remaining()
+        if output_left<0: return stop('output-bytes',remaining_bytes=output_left,after_child=offset+index)
+
+
+def render(directory, output):
+    """Offline, deterministic repack of a whole-route journal into the cohort shape the summarizer reads."""
+    journal=load('attempt_journal')
+    state=journal.load(directory)
+    header=dict(state['header'])
+    attempts=list(header.pop('prefix_attempts'))
+    for attempt in state['attempts']:
+        row=dict(attempt['metadata'],stdout=attempt['stdout'].decode(),stderr=attempt['stderr'].decode())
+        row.update(attempt['verdict'] or {})
+        row['status']=attempt['status']
+        try: row['responses']=responses(row['stdout'])
+        except (ValueError,KeyError,TypeError): pass
+        attempts.append(row)
+    plan,cohort_limits=header.pop('cohort_plan'),header.pop('cohort_limits')
+    cohort=dict(header,plan=plan,limits=cohort_limits,attempts=attempts,
+        journal=dict(storage='whole-route-journal-render-v1',journal_sha256=state['journal_sha256'],
+                     window_limits=state['limits'],window_plan=state['plan'],quarantined=state['quarantined']))
+    if state['stop']: cohort['refusal']=state['stop']
+    payload=(json.dumps(cohort,indent=2,sort_keys=True)+'\n').encode()
+    output=Path(output)
+    journal._atomic_write(output,gzip.compress(payload,compresslevel=9,mtime=0))
+    if gzip.decompress(output.read_bytes())!=payload: raise ValueError('rendered cohort did not round-trip')
+    return cohort
+
+
+def scratch_bytes(scratch):
+    return sum(p.stat().st_size for p in scratch.iterdir() if p.is_file())
+
+
 def main():
+    if sys.argv[1:2]==['render']:
+        parser=argparse.ArgumentParser(prog='whole-route-study.py render',description='repack a whole-route journal offline')
+        parser.add_argument('journal',type=Path)
+        parser.add_argument('output',type=Path)
+        args=parser.parse_args(sys.argv[2:])
+        render(args.journal,args.output)
+        return
     parser=argparse.ArgumentParser()
     for key in ('binary','scratch','output'): parser.add_argument('--'+key,type=Path,required=True)
+    parser.add_argument('--journal',type=Path,help='durable attempt journal (default: SCRATCH/<output name>.journal)')
     parser.add_argument('--phase',choices=('pilot','native'),default='pilot')
     parser.add_argument('--build-commit',required=True)
     continuation=parser.add_mutually_exclusive_group()
     continuation.add_argument('--resume-from',type=Path)
     continuation.add_argument('--native-amendment-from',type=Path)
     args=parser.parse_args()
+    args.journal=args.journal or args.scratch/(args.output.name.split('.')[0]+'.journal')
     if args.output.exists(): parser.error('retain existing campaign and choose new output')
+    if args.journal.exists(): parser.error('retain existing journal and choose new output')
     if args.resume_from and args.phase!='pilot': parser.error('native grid requires its explicit one-time amendment')
     if args.native_amendment_from:
         if args.phase!='native' or repository_path(args.native_amendment_from)!='research/m28-current-baseline/native.json.gz' or sha(args.native_amendment_from)!=NATIVE_PREFIX_SHA256:
@@ -219,7 +346,6 @@ def main():
     prefix_archive=args.native_amendment_from or args.resume_from
     prior_archive_bytes=0
     if prefix_archive:
-        import gzip
         previous=json.loads(gzip.decompress(prefix_archive.read_bytes()))
         prefix=resume_prefix(previous,cohort,native_amendment=bool(args.native_amendment_from))
         controller=cohort['identity']['commit']
@@ -227,63 +353,37 @@ def main():
         refusal=cohort.pop('refusal')
         cohort['resumptions']=[dict(controller=controller,prefix_archive=repository_path(prefix_archive),
             prefix_archive_sha256=sha(prefix_archive),accepted_prefix=prefix,refusal=refusal,aggregate_wall_seconds=campaign_limits['aggregate_wall_seconds'])]
+        if 'journal' in cohort: cohort['resumptions'][0]['prefix_journal']=cohort.pop('journal')
         if args.native_amendment_from:
             prior_archive_bytes=prefix_archive.stat().st_size
             cohort['resumptions'][0].update(kind='explicit-native-amendment-v1',prior_controller_charge_seconds=NATIVE_PRIOR_CHARGE_SECONDS,
                 original_aggregate_wall_seconds=limits()['aggregate_wall_seconds'],prefix_archive_bytes=prior_archive_bytes)
-    guard=load('grobx-work-study')
     supervisor=load('comparand-scaling')
     def interrupted(signum,_): raise SystemExit(128+signum)
     signal.signal(signal.SIGTERM,interrupted)
     runtime=load('worker-pool-study')
+    journal=open_journal(args.journal,cohort,campaign_limits)
     began=time.monotonic()
-    for repeat,problem,modulus,route,arm in cells[len(cohort['attempts']):]:
-        compilers=runtime.compiler_processes()
-        remaining_wall=campaign_limits['aggregate_wall_seconds']-(time.monotonic()-began)
-        if compilers or os.getloadavg()[0]>4 or remaining_wall<1:
-            cohort['refusal']=dict(reason='compiler' if compilers else 'load-or-aggregate',compilers=compilers,load=os.getloadavg()[0]);guard.write(args.output,cohort);return
+
+    def launch(index,cell,wall,output_limit):
+        _,problem,modulus,route,arm=cell
         if sha(args.binary)!=cohort['identity']['binary_sha256']: raise ValueError('binary changed')
         command=[str(args.binary.resolve()),str(modulus),'--problem='+problem]
         if route!='basis': command+=['--whole-route='+route]
         if arm!='stage-off': command+=['--stages']
         if arm=='work': command+=['--work']
         usage=resource.getrusage(resource.RUSAGE_CHILDREN)
-        remaining=limits()['output_bytes']-prior_archive_bytes-sum(p.stat().st_size for p in args.scratch.iterdir())-(args.output.stat().st_size if args.output.exists() else 0)
-        if remaining<=0: raise RuntimeError('output budget exhausted')
-        result=supervisor.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(len(cohort['attempts'])),sorted(os.sched_getaffinity(0)),child_wall(remaining_wall),limits()['rss_bytes'],min(128*1024**2,remaining))
-        result['observed_peak_rss_bytes']=result['observed_tree_peak_bytes']
+        result=supervisor.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(index),sorted(os.sched_getaffinity(0)),wall,limits()['rss_bytes'],output_limit)
         after=resource.getrusage(resource.RUSAGE_CHILDREN)
-        result.update(repeat=repeat,problem=problem,modulus=modulus,route=route,arm=arm,load=os.getloadavg()[0],cpu_seconds=after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime,
-            compiler_before=compilers,compiler_after=runtime.compiler_processes())
-        try:
-            result['responses']=responses(result['stdout'])
-            raw=result['responses']['final']
-            if result['compiler_after']: result['status']='contaminated'
-            elif result['exit'] or result['stop']:
-                result['status']=terminal_kind(result['exit'],result['stop'],result['stderr'])
-                checkpoint=result['responses']['source']
-                if checkpoint and (problem,modulus) in refs:
-                    identity=result['responses']['identity']
-                    if not identity or identity.get('problem')!=problem: raise ValueError('missing input checkpoint')
-                    load('mq10-profile').check_answer(dict(checkpoint,digest=identity['digest'],modulus=identity['modulus']),refs[(problem,modulus)])
-                    result['source_basis_verified']=True
-            else:
-                if raw is None: raise ValueError('successful process has no final response')
-                validate_response(raw,refs.get((problem,modulus)),problem,modulus,route,arm)
-                result['status']=('reported-resource-refusal' if raw.get('outcome') in ('basis-refusal','conversion-refusal','recovery-refusal') else
-                                  'verified' if (problem,modulus) in refs and route!='direct' else 'complete-needs-independent-basis-check')
-        except (ValueError,KeyError,TypeError) as error:
-            result.update(status='failed',failure=str(error))
-        cohort['attempts'].append(result)
-        guard.write(args.output,cohort)
-        print(repeat,problem,modulus,route,arm,result['status'],round(result['process_wall_ns']/1e6,2),flush=True)
-        if result.get('interrupt_exit'):
-            cohort['refusal']=dict(reason='launcher-signal',exit=result['interrupt_exit']);guard.write(args.output,cohort);raise SystemExit(result['interrupt_exit'])
-        if result['status']=='failed': raise RuntimeError('failed validation; raw attempt retained')
-        if result['status']=='contaminated': cohort['refusal']=dict(reason='compiler');guard.write(args.output,cohort);return
-        if args.native_amendment_from and result['status']!='verified':
-            cohort['refusal']=dict(reason='amended-child-refusal',status=result['status'],stop=result['stop']);guard.write(args.output,cohort);return
-        if prior_archive_bytes+sum(p.stat().st_size for p in args.scratch.iterdir())+args.output.stat().st_size>limits()['output_bytes']: raise RuntimeError('output budget exceeded; retained attempts')
+        result['cpu_seconds']=after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime
+        return result
+
+    measure(journal,len(cohort['attempts']),refs,launch,runtime.compiler_processes,lambda: os.getloadavg()[0],
+        lambda: campaign_limits['aggregate_wall_seconds']-(time.monotonic()-began),
+        lambda: limits()['output_bytes']-prior_archive_bytes-scratch_bytes(args.scratch)-journal.retained_bytes,
+        native_amendment=bool(args.native_amendment_from))
+    # Publication runs after the measured window; if the watchdog ends it, `render` reproduces it offline.
+    render(args.journal,args.output)
 
 
 if __name__=='__main__': main()

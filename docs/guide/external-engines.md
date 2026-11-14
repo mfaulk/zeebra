@@ -786,6 +786,15 @@ python3 tools/external/attempt_journal.py render DIR COHORT.json.gz
 records the journal's SHA-256 in the cohort. Existing journals in `comparand-scaling.py`
 (`comparand-attempt-journal-v1`) keep their format.
 
+`tools/external/whole-route-study.py` (#751) is the first controller wired to it. It journals each
+child with `record_exit` as soon as the supervisor returns, before `responses()` parses anything,
+then appends the verdict. Gate, budget, launcher-signal and validation stops become `record_stop`
+records, and appends hold SIGTERM/SIGINT until the line is complete. A resumed or amended window
+keeps its accepted prefix unchanged in the header and journals only the unattempted tail. The
+controller renders its legacy-shaped cohort after the window. If the watchdog ends the run first,
+`python3 tools/external/whole-route-study.py render JOURNAL COHORT.json.gz` reproduces the same
+bytes offline. See [the #751 README](../../research/m28-current-baseline/README.md#durable-attempt-journal).
+
 ## Giac modular grevlex comparand
 
 `GiacSolver` runs `icas` as a separate GPL-3.0 subprocess; it adds no linked

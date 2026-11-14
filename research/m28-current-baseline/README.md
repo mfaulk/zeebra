@@ -102,6 +102,36 @@ The existing comparand supervisor enforces process-tree wall/RSS and 128-MiB per
 bounded by remaining aggregate output allowance. Launcher signals drain owned processes and retain
 an interrupted attempt. Unexpected process failures are not reclassified as resource refusals.
 
+## Durable attempt journal
+
+Since #764 the controller no longer rewrites the growing `--output` cohort after every child, which
+is what spent the amended native window on publication. Each child goes into an append-only
+[attempt journal](../../docs/guide/external-engines.md#incremental-attempt-journals-for-bounded-controllers),
+by default `SCRATCH/<output name>.journal` (override with `--journal`). Its exact wall/CPU/RSS/exit/guard
+metadata and raw stdout/stderr are fsynced as soon as the supervisor returns, before any parsing or
+answer check. The verdict follows as a separate record. Compiler/load/aggregate-wall, contamination,
+launcher-signal and amendment stops are journaled with their previous `reason` values. Output-budget
+and validation failures, which used to raise without a refusal, now stop with `output-bytes` and
+`failed-validation`. Static identity, references, the full frozen plan, the original limits
+and any accepted resume/amendment prefix are written once in the journal header. Exits must follow
+the unattempted tail in plan order. The output budget counts retained scratch, the journal and any
+prior archive.
+
+After the window the controller renders `--output` in the previous cohort shape. That cohort
+carries the attempts, `refusal` and `resumptions`, plus a `journal` block holding the journal
+SHA-256 and window limits. A child killed between its exit record and its verdict renders as
+`unverified` with its durable metadata, and is never retimed or rerun. If the outer watchdog ends
+the run before or during publication, render the same bytes offline:
+
+```sh
+python3 tools/external/attempt_journal.py verify /buildcache/cargo-target/zeebra-751/native/native.journal
+python3 tools/external/whole-route-study.py render \
+  /buildcache/cargo-target/zeebra-751/native/native.journal COHORT.json.gz
+```
+
+Archives published before #764 (`pilot*.json.gz`, `native*.json.gz`) are unchanged and keep their
+original format. This change authorizes no new campaign.
+
 
 ## Reviewed native grid
 
