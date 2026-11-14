@@ -10,6 +10,30 @@ SPEC.loader.exec_module(study)
 
 
 class WholeRouteStudy(unittest.TestCase):
+    # The explicit native amendment keeps the verified two-cell prefix within its original budgets.
+    def test_native_amendment_is_one_time_and_cumulative(self):
+        cells=list(study.plan('native'))
+        identity={key:key for key in ('binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')}
+        identity['commit']=study.NATIVE_PREFIX_CONTROLLER
+        previous=dict(phase='native',plan=cells,identity=identity,references={},
+            refusal=dict(reason='compiler'),attempts=[dict(zip(('repeat','problem','modulus','route','arm'),cell),status='verified') for cell in cells[:2]])
+        current=dict(phase='native',plan=cells,identity=dict(identity),references={})
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current)
+        self.assertEqual(study.resume_prefix(previous,current,native_amendment=True),2)
+        self.assertEqual(study.native_remaining_seconds(),880)
+        self.assertLessEqual(study.native_remaining_seconds()+study.NATIVE_PRIOR_CHARGE_SECONDS,900)
+        current['identity']['binary_sha256']='changed'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+        current['identity']=dict(identity)
+        previous['attempts'][0]['problem']='wrong'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+        previous['attempts'][0]['problem']=cells[0][1]
+        previous['resumptions']=[{}]
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+        previous.pop('resumptions')
+        previous['attempts'][0]['status']='contaminated'
+        with self.assertRaises(ValueError): study.resume_prefix(previous,current,native_amendment=True)
+
     # Relative and absolute repository archive paths produce the same durable provenance path.
     def test_archive_path_is_normalized_before_relativizing(self):
         path=Path('research/m28-current-baseline/pilot.json.gz')

@@ -43,6 +43,15 @@ def summarize(path):
         if study.sha(prefix_path)!=resume['prefix_archive_sha256']: raise ValueError('continuation prefix archive changed')
         prefix=json.loads(gzip.decompress(prefix_path.read_bytes()))
         if cohort['attempts'][:resume['accepted_prefix']]!=prefix['attempts']: raise ValueError('continuation rewrote accepted samples')
+        if resume['refusal']!=prefix['refusal']: raise ValueError('continuation changed original refusal')
+        if cohort['phase']=='native':
+            study.resume_prefix(prefix,cohort,native_amendment=True)
+            if (resume.get('kind')!='explicit-native-amendment-v1' or resume['prefix_archive_sha256']!=study.NATIVE_PREFIX_SHA256
+                    or resume['prior_controller_charge_seconds']!=study.NATIVE_PRIOR_CHARGE_SECONDS
+                    or resume['aggregate_wall_seconds']!=study.native_remaining_seconds()
+                    or resume['original_aggregate_wall_seconds']!=900 or cohort['limits']!=prefix['limits']
+                    or resume['prefix_archive_bytes']!=prefix_path.stat().st_size):
+                raise ValueError('native amendment renewed or changed its original budgets')
     refs=study.references()
     if cohort['references']['katsura-11/2147483647']!=refs[('katsura-11',2147483647)]: raise ValueError('reference archive/provenance drift')
     groups=defaultdict(list)
@@ -104,7 +113,8 @@ def main():
     parser.add_argument('--check',action='store_true')
     args=parser.parse_args()
     pilot='pilot-completed.json.gz' if (HERE/'pilot-completed.json.gz').exists() else 'pilot.json.gz'
-    paths=[HERE/name for name in (pilot,'native.json.gz') if (HERE/name).exists()]
+    native='native-completed.json.gz' if (HERE/'native-completed.json.gz').exists() else 'native.json.gz'
+    paths=[HERE/name for name in (pilot,native) if (HERE/name).exists()]
     if not paths: raise ValueError('no retained cohort')
     encoded=json.dumps([summarize(path) for path in paths],indent=2)+'\n'
     output=HERE/'summary.json'

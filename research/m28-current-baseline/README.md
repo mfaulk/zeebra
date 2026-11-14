@@ -141,3 +141,46 @@ with the four pilot observations. Five-repeat distributions, work diagnostics, a
 Katsura-11 attempts and the two original pilot tail cells remain incomplete. Issue #751 is open;
 its PR is draft. The [current report](../../docs/research/m28-current-baseline.md) states the blocker
 and each acceptance item's incomplete status.
+
+
+## Explicit one-time native amendment
+
+A separately reviewed amendment permits only the **73 unexecuted cells** of the original native
+grid. It is not an automatic resumption or a fresh campaign allowance. Preserve `native.json.gz`,
+its two verified attempts and its compiler refusal unchanged. Its SHA-256 is
+`3a733e31cf1d70ad27d322f2e950cd736676b4726ccb8004a8fa0754d6b1bd8f` and its original controller is
+`9e2017806b95cbf88a904ad9213d324c2a1f5b0e`. The amended controller implementation pin is
+`AMENDED_CONTROLLER_PIN`; the actual launch HEAD is stamped separately in `resumptions.controller`.
+Rust/example/Cargo source and the executable remain exactly the frozen `65734435` build.
+
+The original native lock window records nine seconds. Conservatively charge **20 seconds** for
+that window, metadata and timestamp/cleanup granularity, leaving **880 seconds** under the original
+900-second aggregate allowance. The amendment's outer hard watchdog is 880 seconds, with child
+wall capped by the remaining allowance, 60 seconds maximum, and 2 GiB RSS. Shared original native
+scratch, the immutable original native archive **and** the amended archive count against the same
+256-MiB cumulative output allowance. The old two responses are copied without alteration or rerun.
+
+The explicit flag rejects altered identities/references, nonmatching or previously resumed prefixes,
+failed/contaminated prefixes, and a second amended output. A new environmental gate or child
+failure/refusal/contamination stops this last window and remains retained. No further amendment,
+retry or limit increase is authorized. The two original pilot tail cells stay separate and are not
+completed by native Katsura runs. The pilot and native cohorts are never pooled into repetitions.
+
+After the coordinator confirms the quiet gate, launch only this committed amended plan:
+
+```sh
+ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
+  tools/benchlock.sh m28-current-native-amendment-751 taskset -c 3 \
+  timeout --signal=TERM --kill-after=5 880 \
+  python3 tools/external/whole-route-study.py \
+    --binary /buildcache/cargo-target/zeebra-751/release/examples/mq10_profile \
+    --scratch /buildcache/cargo-target/zeebra-751/native \
+    --output research/m28-current-baseline/native-completed.json.gz \
+    --phase native --build-commit "$BUILD_COMMIT" \
+    --native-amendment-from research/m28-current-baseline/native.json.gz
+```
+
+The amendment is allowed once; any blocked or incomplete result remains draft. If it completes,
+offline validation checks all 75 cells while verifying the immutable original prefix, original
+refusal, source/reference identities and cumulative budget ledger. This documents the explicit
+exception to the original no-resumption plan without rewriting that plan or its first stop.

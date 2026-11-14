@@ -13,6 +13,9 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+NATIVE_PREFIX_CONTROLLER = '9e2017806b95cbf88a904ad9213d324c2a1f5b0e'
+NATIVE_PREFIX_SHA256 = '3a733e31cf1d70ad27d322f2e950cd736676b4726ccb8004a8fa0754d6b1bd8f'
+NATIVE_PRIOR_CHARGE_SECONDS = 20
 
 
 def load(name):
@@ -154,12 +157,21 @@ def repository_path(path):
     return str(path.resolve().relative_to(ROOT))
 
 
-def resume_prefix(previous,current):
+def native_remaining_seconds():
+    return limits()['aggregate_wall_seconds']-NATIVE_PRIOR_CHARGE_SECONDS
+
+
+def resume_prefix(previous,current,native_amendment=False):
     frozen=('binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')
     if (previous['phase']!=current['phase'] or [list(c) for c in previous['plan']]!=[list(c) for c in current['plan']]
             or previous.get('refusal',{}).get('reason') not in ('compiler','load-or-aggregate') or previous.get('resumptions')
             or previous['references']!=current['references']): raise ValueError('continuation identity or prior refusal differs')
     if any(previous['identity'][key]!=current['identity'][key] for key in frozen): raise ValueError('frozen executable/source/environment changed')
+    if previous['phase']=='native':
+        if not native_amendment or previous['identity']['commit']!=NATIVE_PREFIX_CONTROLLER or len(previous['attempts'])!=2:
+            raise ValueError('native continuation requires the explicit two-cell amendment')
+    elif native_amendment:
+        raise ValueError('native amendment cannot resume a pilot')
     attempts=previous['attempts']
     actual=[[a[k] for k in ('repeat','problem','modulus','route','arm')] for a in attempts]
     expected=[list(cell) for cell in current['plan']]
@@ -173,10 +185,18 @@ def main():
     for key in ('binary','scratch','output'): parser.add_argument('--'+key,type=Path,required=True)
     parser.add_argument('--phase',choices=('pilot','native'),default='pilot')
     parser.add_argument('--build-commit',required=True)
-    parser.add_argument('--resume-from',type=Path)
+    continuation=parser.add_mutually_exclusive_group()
+    continuation.add_argument('--resume-from',type=Path)
+    continuation.add_argument('--native-amendment-from',type=Path)
     args=parser.parse_args()
     if args.output.exists(): parser.error('retain existing campaign and choose new output')
-    if args.resume_from and args.phase!='pilot': parser.error('native grid has no authorized resumption')
+    if args.resume_from and args.phase!='pilot': parser.error('native grid requires its explicit one-time amendment')
+    if args.native_amendment_from:
+        if args.phase!='native' or repository_path(args.native_amendment_from)!='research/m28-current-baseline/native.json.gz' or sha(args.native_amendment_from)!=NATIVE_PREFIX_SHA256:
+            parser.error('native amendment requires the exact pinned original prefix')
+        amended=ROOT/'research/m28-current-baseline/native-completed.json.gz'
+        if amended.exists() or args.output.resolve()!=amended:
+            parser.error('native amendment has one immutable output and cannot be repeated')
     if subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip(): parser.error('commit instruments before measuring')
     if subprocess.call(['git','diff','--quiet',args.build_commit,'--','src','examples','Cargo.toml','Cargo.lock','.cargo'],cwd=ROOT): parser.error('build tree differs')
     affinity=','.join(map(str,sorted(os.sched_getaffinity(0))))
@@ -187,6 +207,7 @@ def main():
     campaign_limits=limits()
     if args.phase=='pilot': campaign_limits['aggregate_wall_seconds']=480
     if args.resume_from: campaign_limits['aggregate_wall_seconds']=180
+    if args.native_amendment_from: campaign_limits['aggregate_wall_seconds']=native_remaining_seconds()
     cohort=dict(schema=1,phase=args.phase,identity=dict(commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         build_commit=args.build_commit,binary_sha256=sha(args.binary),cargo_lock_sha256=sha(ROOT/'Cargo.lock'),
         cargo_config_sha256=sha(ROOT/'.cargo/config.toml'),rustc=subprocess.check_output(['rustc','-vV'],text=True),
@@ -195,15 +216,21 @@ def main():
         limits=campaign_limits,plan=cells,attempts=[],references={})
     refs=references()
     cohort['references']['katsura-11/2147483647']=refs[('katsura-11',2147483647)]
-    if args.resume_from:
+    prefix_archive=args.native_amendment_from or args.resume_from
+    prior_archive_bytes=0
+    if prefix_archive:
         import gzip
-        previous=json.loads(gzip.decompress(args.resume_from.read_bytes()))
-        prefix=resume_prefix(previous,cohort)
+        previous=json.loads(gzip.decompress(prefix_archive.read_bytes()))
+        prefix=resume_prefix(previous,cohort,native_amendment=bool(args.native_amendment_from))
         controller=cohort['identity']['commit']
         cohort=previous
         refusal=cohort.pop('refusal')
-        cohort['resumptions']=[dict(controller=controller,prefix_archive=repository_path(args.resume_from),
-            prefix_archive_sha256=sha(args.resume_from),accepted_prefix=prefix,refusal=refusal,aggregate_wall_seconds=180)]
+        cohort['resumptions']=[dict(controller=controller,prefix_archive=repository_path(prefix_archive),
+            prefix_archive_sha256=sha(prefix_archive),accepted_prefix=prefix,refusal=refusal,aggregate_wall_seconds=campaign_limits['aggregate_wall_seconds'])]
+        if args.native_amendment_from:
+            prior_archive_bytes=prefix_archive.stat().st_size
+            cohort['resumptions'][0].update(kind='explicit-native-amendment-v1',prior_controller_charge_seconds=NATIVE_PRIOR_CHARGE_SECONDS,
+                original_aggregate_wall_seconds=limits()['aggregate_wall_seconds'],prefix_archive_bytes=prior_archive_bytes)
     guard=load('grobx-work-study')
     supervisor=load('comparand-scaling')
     def interrupted(signum,_): raise SystemExit(128+signum)
@@ -221,7 +248,7 @@ def main():
         if arm!='stage-off': command+=['--stages']
         if arm=='work': command+=['--work']
         usage=resource.getrusage(resource.RUSAGE_CHILDREN)
-        remaining=limits()['output_bytes']-sum(p.stat().st_size for p in args.scratch.iterdir())-(args.output.stat().st_size if args.output.exists() else 0)
+        remaining=limits()['output_bytes']-prior_archive_bytes-sum(p.stat().st_size for p in args.scratch.iterdir())-(args.output.stat().st_size if args.output.exists() else 0)
         if remaining<=0: raise RuntimeError('output budget exhausted')
         result=supervisor.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(len(cohort['attempts'])),sorted(os.sched_getaffinity(0)),child_wall(remaining_wall),limits()['rss_bytes'],min(128*1024**2,remaining))
         result['observed_peak_rss_bytes']=result['observed_tree_peak_bytes']
@@ -254,7 +281,9 @@ def main():
             cohort['refusal']=dict(reason='launcher-signal',exit=result['interrupt_exit']);guard.write(args.output,cohort);raise SystemExit(result['interrupt_exit'])
         if result['status']=='failed': raise RuntimeError('failed validation; raw attempt retained')
         if result['status']=='contaminated': cohort['refusal']=dict(reason='compiler');guard.write(args.output,cohort);return
-        if sum(p.stat().st_size for p in args.scratch.iterdir())+args.output.stat().st_size>limits()['output_bytes']: raise RuntimeError('output budget exceeded; retained attempts')
+        if args.native_amendment_from and result['status']!='verified':
+            cohort['refusal']=dict(reason='amended-child-refusal',status=result['status'],stop=result['stop']);guard.write(args.output,cohort);return
+        if prior_archive_bytes+sum(p.stat().st_size for p in args.scratch.iterdir())+args.output.stat().st_size>limits()['output_bytes']: raise RuntimeError('output budget exceeded; retained attempts')
 
 
 if __name__=='__main__': main()
