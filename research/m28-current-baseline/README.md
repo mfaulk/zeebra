@@ -254,3 +254,66 @@ python3 research/m28-current-baseline/summarize.py --check
 bash tools/check-measurement-provenance.sh docs/research/m28-current-baseline.md
 git diff --check
 ```
+
+## Fresh current cohort at `2ec9d3af` (#751 completion)
+
+The historical archives above stay byte-for-byte unchanged and keep their 70/75 status. Completing
+#751 does not amend them a second time. Instead, one fresh, separately labelled pair of cohorts
+measures the shipping tree at `2ec9d3af362b1331c8118c7ce0e0505a391b4b49` (after #749/#757, #763,
+#772 and #774) with the journaled controller from #764/#770. They land under `current/` and
+`summarize.py` labels them `current`; they are never pooled with the historical cohorts.
+
+Declared before launch, unchanged from the reviewed plans: the six-cell pilot (480-second aggregate
+watchdog) and the 75-cell native grid (900-second aggregate watchdog), each child at most 60 seconds,
+2 GiB and 128 MiB of output, within a 256-MiB per-cohort scratch/journal allowance. Expected cost
+is about two minutes of child wall for the native grid, from the historical per-cell clocks. No
+child limit is raised. The executable is frozen as a copy outside the Cargo target so a later
+build cannot replace it mid-campaign.
+
+Three protocol points differ from the historical windows and are declared here:
+
+- **Build gate.** The gate counts `cargo`, `rustc`, `clippy-driver`, `rust-lld` and `ld.lld`, but
+  no longer a long-lived `rust-analyzer`, whose checks appear as those processes anyway. The first
+  current pilot window (13:11:19, 2 s) refused before any child because three IDE language servers,
+  alive for up to 13 hours, matched the old gate; that zero-attempt refusal is retained outside the
+  repository (SHA-256 `c778f44a9365c25ce89185b31ae262c24b3d7b14280e0bc7f673f83590bcfdbc`) and in
+  the benchlock log. The one-minute load gate (at most 4) is unchanged.
+- **Window starts.** Inside the lock, a launch waits up to 300 seconds for load below 3 and no build
+  process before the watchdog starts, because the load average lags the previous lock holder. If
+  the machine is still busy it leaves the lock without starting the controller (amended after the
+  second pilot window below, whose waiter started the controller anyway).
+- **Refused windows.** A window whose controller refuses before its first child holds no sample and
+  does not count. A refusal after one or more children is retained as its own archive and never
+  pooled; at most one further window per phase may follow it, from a fresh start. A solver failure,
+  validation failure or resource refusal is never relaunched.
+
+Zero-sample refusals so far, each retained outside the repository with its benchlock log line:
+pilot window 1 (above) and pilot window 2 at 13:17:35, which hit the build gate under a one-minute
+load of 1,242 from another session's link storm (SHA-256
+`ed10d7c624120813d47202042231f3bff7fafbe6a6845706ceebc70c4d68b0c1`). A native lock entry at
+13:17:58 was cancelled in its waiter and never started the controller.
+
+```sh
+ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=3 \
+  tools/benchlock.sh m28-current-native-751-2ec9d3af taskset -c 3 \
+  timeout --signal=TERM --kill-after=5 900 \
+  python3 tools/external/whole-route-study.py \
+    --binary /buildcache/cargo-target/zeebra-751/bin/mq10_profile-2ec9d3af \
+    --scratch /buildcache/cargo-target/zeebra-751/current-native \
+    --output research/m28-current-baseline/current/native-2ec9d3af.json.gz \
+    --phase native --build-commit 2ec9d3af362b1331c8118c7ce0e0505a391b4b49
+```
+
+The pilot uses the same command with `--phase pilot`, a 480-second watchdog and `pilot` in the
+names. Offline validation is unchanged: `summarize.py --check` replays every current cohort too.
+
+### Current cohort result
+
+Pilot window 3 accepted 6/6 (`current/pilot-2ec9d3af.json.gz`), including a reported basis refusal
+for direct-lex MQ10 at GF(32003). Native window 1 accepted 60/75 and native window 2 accepted 61/75.
+Both stopped at the load gate after repetition 3's Katsura-11 child, and every accepted child is
+verified. Window 2 is `current/native-2ec9d3af.json.gz`. Window 1 is kept off-repository at
+`/buildcache/cargo-target/zeebra-751/current-native-w1/` (SHA-256 `f6c432e5…4b45a09`) and is not
+pooled with window 2. No further native window is authorized under this protocol; #788 owns a
+complete fifth repetition. The [report](../../docs/research/m28-current-baseline.md#current-cohort-at-2ec9d3af)
+gives the figures.

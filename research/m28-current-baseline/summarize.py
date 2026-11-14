@@ -182,16 +182,22 @@ def validate_compilation_correction():
     validate_frozen_source(json.loads(source_path.read_text()),snapshot,correction,(ROOT/correction['patch_path']).read_text())
 
 
+def cohort_paths(here):
+    # Fresh cohorts under current/ are separate measurements and are never pooled with the historical ones.
+    pilot='pilot-completed.json.gz' if (here/'pilot-completed.json.gz').exists() else 'pilot.json.gz'
+    native='native-completed.json.gz' if (here/'native-completed.json.gz').exists() else 'native.json.gz'
+    historical=[('historical',here/name) for name in (pilot,native) if (here/name).exists()]
+    return historical+[('current',path) for path in sorted((here/'current').glob('*.json.gz'))]
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--check',action='store_true')
     args=parser.parse_args()
     validate_compilation_correction()
-    pilot='pilot-completed.json.gz' if (HERE/'pilot-completed.json.gz').exists() else 'pilot.json.gz'
-    native='native-completed.json.gz' if (HERE/'native-completed.json.gz').exists() else 'native.json.gz'
-    paths=[HERE/name for name in (pilot,native) if (HERE/name).exists()]
+    paths=cohort_paths(HERE)
     if not paths: raise ValueError('no retained cohort')
-    encoded=json.dumps([summarize(path) for path in paths],indent=2)+'\n'
+    encoded=json.dumps([dict(summarize(path),cohort=label,archive=path.relative_to(HERE).as_posix()) for label,path in paths],indent=2)+'\n'
     output=HERE/'summary.json'
     if args.check:
         if output.read_text()!=encoded: raise ValueError('retained summary differs')
