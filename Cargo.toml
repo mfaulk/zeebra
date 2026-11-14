@@ -104,6 +104,10 @@ name = "f4_live_budget"
 test = true
 
 [[example]]
+name = "field_reduction"
+test = true
+
+[[example]]
 name = "f4_matrix_files"
 test = true
 
