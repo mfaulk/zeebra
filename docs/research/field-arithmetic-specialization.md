@@ -6,6 +6,8 @@ binary was built from the same logic before the constant was named). The narrow-
 an uncommitted overlay of `9860988e` without the Mersenne branch. 2026-11-14 UTC. §3b (#780) at
 `a9421093` (before) and `fa27467a` (after: `a9421093` plus PR #791's `src/fields/prime_field_32.rs`,
 the only file in which the two trees differ; rebased as `f554babf` and squash-merged by #791).
+§6 (#779, Shoup in the elimination scatter) was measured at `45d129d2`, the base arm an overlay
+of it with Shoup switched off; 2026-11-15 UTC.
 
 ## Decision
 
@@ -14,7 +16,7 @@ the only file in which the two trees differ; rebased as `f554babf` and squash-me
 | 31-bit in `PrimeFieldElement64` (`Zp2147483647`, every `P < 2^32`) | Montgomery, R = 2^64 | **Adopted: canonical residues, `u64` remainder by the constant; shift-and-add for 2^31 − 1** | MQ10/2^31−1 F4 call **0.748x** paired, identical basis (§3) |
 | 31-bit in `PrimeFieldElement32` (32003, BabyBear, KoalaBear) | Montgomery, R = 2^32 | Keep | No candidate wins every kernel; Montgomery is the only one that vectorizes `map` well (§2.1) |
 | `Mersenne31` (`PrimeFieldElement32<2^31−1>`) | Montgomery, R = 2^32 | **Adopted (#780): canonical residues, shift-and-add** | Wins all four kernels (0.56–0.83x); F4 forward elimination 0.77–0.78x on the adaptive backend, identical RREFs (§3b) |
-| 62/64-bit, `P ≥ 2^32` | Montgomery, R = 2^64 | Keep the representation; **Shoup in the scatter kernel deferred: #779** | Shoup scatter 0.52–0.64x of Montgomery for `P < 2^63`, but it needs a prepared-factor API in `src/linalg` |
+| 62/64-bit, `P ≥ 2^32` | Montgomery, R = 2^64 | Keep the representation; **adopted: Shoup by a prepared factor in the row scatter for `P < 2^63` (#779)** | F4 call 0.81–0.97x paired across MQ10 and five public families at a 62-bit prime, identical bases (§6) |
 | Goldilocks 2^64 − 2^32 + 1 | Montgomery | Deferred: #781 | Special reduction 0.67x `map`, 0.69x `scatter`, 0.92x `chain` |
 | 2^64 − 59 and other top-bit primes | Montgomery | Keep | Möller–Granlund pre-inverse is 0.79x on throughput kernels and 1.22x on latency; mixed |
 | 68-bit (`PrimeFieldElement128`) | `u128` long division | Excluded: deprecated by #163 | `Proth68Fr` over `PrimeFieldElement256` is 9.8x faster; `docs/guide/finite-fields.md` |
@@ -140,7 +142,7 @@ already the Montgomery-form product, so it does not need a representation change
 prepared-factor hook on `FiniteField` and a change to `DenseAccumulator::subtract_scaled` in
 `src/linalg`, which several open issues touch, so it is filed as #779 rather than done here.
 It also has to be gated on #269's full-solve protocol, since an arithmetic win on that kernel has
-already failed to survive once.
+already failed to survive once. #779 did both; the gate is §6.
 
 ### 2.3 254 bits (`PrimeFieldElement256`, Bn254 Fr)
 
@@ -261,3 +263,56 @@ For the end-to-end gate, build `mq10_profile` and `field_width` (`--features ext
 once per variant of `src/fields/prime_field_64.rs`, then run the three binaries interleaved and
 pinned as in §3. §3b is the same with `field_width` and `elimination_kernel_study` built at
 `a9421093` and `fa27467a`.
+
+## 6. Shoup in the elimination scatter (#779)
+
+`FiniteField::prepare_factor` and `FiniteField::mul_prepared` are a defaulted hook: a field that
+does not override them multiplies by the element itself. `PrimeFieldElement64` overrides them for
+the Montgomery moduli below 2^63 (`P ≥ 2^32`, `2P < 2^64`), recording the canonical factor `f` and
+`floor(f * 2^64 / P)` once per row operation; each entry then costs one high product, two wrapping
+low products and a conditional subtraction. The coefficients stay in Montgomery form, since
+`(aR) * f mod P = (af)R`. The hook is a concrete `PreparedFactor<F>` with two words rather than an
+associated type, because associated-type defaults are unstable. `DenseAccumulator::subtract_scaled`
+(the adaptive backend, F4's default), the dense backend's row update and the sparse row merge use
+it. Below 2^32 nothing changes: those residues are canonical, and §2.2 has Shoup (1.11, 1.23 ns)
+no better than the canonical and Mersenne scatters that already ship. Goldilocks and 2^64 − 59
+are above the bound and keep Montgomery.
+
+**Gate.** `examples/shoup_scatter_gate.rs`: one F4 call (default options, grevlex) per process
+over `Zp4611624995532046337`, in-process minimum of 3, with a SHA-256 over the sorted reduced
+basis. MQ10 is the corpus generator's `mq-random-10` at that prime; the public families come from
+`grobner::benchmark_systems`. Two binaries from one tree, private `CARGO_TARGET_DIR`, no compiler
+wrapper: **cand** at `45d129d2` (SHA-256 `326899dc…`) and **base**, the same tree with
+`shoup::applies` forced false (`a654610b…`). Eight rounds, arm order alternated per round, pinned
+to CPU 3 under `tools/benchlock.sh` (owner `zb-779-gate`).
+
+**The machine was not quiet.** The one-minute load was 336,757 at START and 292,653 at END, from
+about 358,000 tasks in uninterruptible sleep and 300,000 zombies left by something outside this
+issue; 82 tasks were runnable on 64 cores. Absolute times are inflated against a trial an hour
+earlier (cand MQ10 1,241 ms then, 1,448 ms here) and are not comparable to §3. The ratios are
+paired within a round and interleaved, which is the part that survives load.
+
+| problem | base F4 ms, median (range) | cand F4 ms, median (range) | cand / base paired, median (range) |
+|---|---:|---:|---:|
+| mq-random-10 | 1798.0 (1766.8–1807.0) | 1447.5 (1429.8–1460.2) | **0.807** (0.796–0.823) |
+| katsura-8 | 218.7 (215.8–226.1) | 182.0 (177.0–187.3) | **0.828** (0.791–0.843) |
+| cyclic-7 | 374.4 (363.6–378.3) | 310.8 (301.5–321.8) | **0.836** (0.804–0.863) |
+| eco-10 | 289.2 (284.6–300.0) | 245.9 (240.4–248.4) | **0.848** (0.803–0.864) |
+| reimer-6 | 163.1 (159.8–171.0) | 141.7 (138.6–145.0) | **0.877** (0.816–0.907) |
+| noon-7 | 199.8 (191.2–203.1) | 193.3 (188.2–195.2) | **0.965** (0.941–0.988) |
+
+Every problem's 16 runs emit one basis digest (MQ10 `2d93d53a…`, 247 polynomials), and no paired
+range reaches parity. Noon gains least, as it did least in #269's delayed-reduction gate, where it
+regressed; here it does not. Unlike that remainder, this one survives the full-solve gate, so it
+ships. What is not measured: a quiet-machine repeat of the absolute figures, a prime near 2^63
+end to end (the oracle tests cover its arithmetic), and the effect on the dense and sparse
+backends, which are not F4's default.
+
+Reproduce:
+
+```text
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-779 RUSTC_WRAPPER=""
+cargo build --release -j24 --example shoup_scatter_gate          # cand; copy the binary aside
+# base: edit `shoup::applies` in src/fields/prime_field_64.rs to return false, rebuild, copy aside
+tools/benchlock.sh <owner> taskset -c 3 <arm> mq-random-10 --reps=3   # per arm, per problem, interleaved
+```

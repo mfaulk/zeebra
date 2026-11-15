@@ -21,6 +21,11 @@ Two consequences worth knowing:
   convert at the boundary rather than call `value()` per iteration.
 - `P = 2` is supported and takes the canonical path, because `2^64` is not invertible modulo
   an even number. The branch is on a const generic, so it is resolved at compile time.
+- A loop that multiplies many elements by one factor can call `factor.prepare_factor()` once and
+  `x.mul_prepared(&prepared)` per element. Every field supports it (the default is a plain
+  multiply); for Montgomery moduli below 2^63 it is Shoup's method, which takes F4's call
+  0.81–0.97x across MQ10 and five public families at a 62-bit prime (#779, §6 of the
+  measurements).
 
 `PrimeFieldElement128<P>` reduces a 256-bit product by allocating software long division, which
 made it the slowest field in the crate — slower than one four times as wide. It is **deprecated**
