@@ -129,6 +129,14 @@ tools/external/provision.sh          # ~5 min cold, 0.2 s warm; no root needed
 tools/external/smoke/smoke.sh        # all four on one system; non-zero exit on disagreement
 ```
 
+The same prefix's FLINT 3.6.0 (built for msolve) is also a **univariate-factoring comparand**
+(#784): `tools/external/provision-flint-factor.sh` builds a small C driver against it,
+`tools/external/smoke/flint-factor.sh` checks two hand-verified factorizations, and
+`tools/external/flint-factor-compare.sh` times Zeebra's `factorize` against FLINT's on identical
+inputs after checking the factorizations agree. The recipe is
+[`tools/external/flint-factor-driver/README.md`](../../tools/external/flint-factor-driver/README.md);
+the results are [`modular-composition.md`](../research/modular-composition.md) §6.
+
 **Magma remains outside the provisioned roster** (#430). Magma is the fastest engine in
 every column of the published comparisons and it cannot be provisioned: it is commercial and there
 is no licence here, so every Magma figure in this repository is read from a page or a paper and

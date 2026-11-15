@@ -1,8 +1,9 @@
 # Modular composition and the Frobenius step of univariate factoring (#271)
 
 **Measured at:** `f5c10079` for §2 (the composition kernel; `src/poly/univariate/compose_mod.rs`
-is unchanged from there to the merge), and `5c817106` for §3 (whole `factorize`, with the
-`Auto` route as shipped). `examples/modular_composition.rs` on the development workstation (AMD
+is unchanged from there to the merge), `5c817106` for §3 (whole `factorize`, with the `Auto`
+route as shipped), and `abf6dd0d` for §6 (the same-machine FLINT comparison).
+`examples/modular_composition.rs` on the development workstation (AMD
 Ryzen Threadripper PRO 5995WX), release profile with the repository's `-C target-cpu=x86-64-v3`,
 `RUSTC_WRAPPER=""`, a private `CARGO_TARGET_DIR`, every run under `tools/benchlock.sh` and
 `taskset -c 8`, arms interleaved within each repetition with the order rotated. Figures are the
@@ -154,9 +155,7 @@ linear. On random polynomials that is a 4.5x–13.9x speedup of the whole factor
 
 ## 5. What was not done
 
-- **The FLINT same-machine comparison** the issue asks for. `libflint.so.22` is installed here as a
-  runtime library (pulled in by Singular) but with no headers, no `pkg-config` entry and no
-  `python-flint`, so a harness would mean provisioning FLINT first. Filed as a follow-up.
+- **The FLINT same-machine comparison** the issue asks for was split out to #784 and is §6.
 - **`is_irreducible`** still iterates Frobenius by `pow_mod` (`frobenius_iterated`); the same
   composer would apply. Not measured, so not changed.
 - **Shoup's baby-step/giant-step distinct-degree factorization** (interval gcds over composed
@@ -166,3 +165,77 @@ linear. On random polynomials that is a 4.5x–13.9x speedup of the whole factor
   #668, so §2 and §3 use the recorded *degrees* over the recorded *field* with random polynomials
   of those degrees, not the eliminants. §4 argues why the root-finding tail is unaffected
   regardless.
+
+## 6. Same-machine comparison against FLINT (#784)
+
+**Measured at:** `abf6dd0d`, one run under `tools/benchlock.sh` (`load=` 28.5 at start, 17.8 at
+end), `taskset -c 8`, the four arms interleaved per repetition with the order rotated. FLINT 3.6.0
+and GMP 6.3.0 from the comparand prefix (`tools/external/provision.sh`), one FLINT thread, driven
+by `tools/external/flint-factor-driver` — a separate process; FLINT is never linked into Zeebra.
+Zeebra is §3's `factorize` with the default `Auto` route, from `modular_composition factor-file`.
+Each process times its own factorization call, so start-up and parsing are in neither column.
+
+The inputs are §3's, byte for byte: `modular_composition export` writes them and both sides read
+the same files. Before timing, the harness requires that Zeebra and all three FLINT arms return
+**the same multiset of monic irreducible factors with multiplicity** — they did, on all six inputs.
+
+| input | distinct factors | largest factor degree | reps | Zeebra (`Auto`) | FLINT default | FLINT CZ | FLINT KS | Zeebra / FLINT default |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| KoalaBear random 81 | 4 | 47 | 7 | 1.885 (1.876) | 1.343 (1.338) | 4.423 (4.390) | 1.346 (1.337) | 1.40x |
+| KoalaBear random 729 | 6 | 286 | 7 | 521.608 (521.073) | 68.803 (68.686) | 733.587 (732.529) | 68.976 (68.860) | **7.58x** |
+| Goldilocks random 81 | 5 | 49 | 7 | 8.980 (8.969) | 2.257 (2.256) | 21.988 (21.969) | 2.259 (2.252) | 3.98x |
+| BN254 Fr random 81 | 11 | 22 | 7 | 126.807 (126.630) | 65.945 (65.852) | 502.533 (501.101) | 65.881 (65.772) | 1.92x |
+| KoalaBear `n − 2` linear × quadratic 729 | 728 | 2 | 7 | 52.838 (52.789) | 58.770 (58.668) | 27.261 (27.135) | 58.732 (58.488) | 0.90x |
+| KoalaBear `n − 2` linear × quadratic 6 561 | 6 560 | 2 | 3 | 2 318.125 (2 317.936) | 1 266.840 (1 265.974) | 690.950 (680.402) | 1 268.838 (1 268.408) | 1.83x |
+
+Milliseconds, median (minimum). The last column is Zeebra's time over FLINT's: above 1 FLINT is
+faster. Zeebra's column reproduces §3's `Auto` column to within 2% on every row. "FLINT default" is
+`nmod_poly_factor` for the two word-size primes and `fmpz_mod_poly_factor` for BN254 Fr; "CZ" and
+"KS" force `*_factor_with_cantor_zassenhaus` / `*_factor_with_kaltofen_shoup` (nmod) and
+`fmpz_mod_poly_factor_cantor_zassenhaus` / `_kaltofen_shoup` (fmpz_mod).
+
+**Build floors differ, in FLINT's favour.** FLINT's configure picked `-march=znver3 -O3` for this
+host, and GMP is host-tuned; Zeebra is built at the repository's `x86-64-v3` floor. Matching the
+floors would make FLINT slower, not faster, so the asymmetry cannot flatter Zeebra.
+
+What FLINT picks, from its documentation (`doc/source/nmod_poly_factor.rst`,
+`fmpz_mod_poly_factor.rst`, `nmod_poly.rst` of the 3.6.0 release):
+
+- `nmod_poly_factor`: "first checks for small special cases, deflates `f` if it is of the form
+  `p(x^m)`, … performs a square-free factorisation, and finally runs either Cantor-Zassenhaus or
+  Berlekamp … Currently Cantor-Zassenhaus is used by default unless the modulus is 2".
+- `fmpz_mod_poly_factor`: "choosing the best algorithm for given modulo and degree. Choice is based
+  on heuristic measurements" — no algorithm or threshold is named.
+- Kaltofen–Shoup is documented as "the fast version of Cantor-Zassenhaus … a baby step/giant step
+  strategy for the distinct-degree factorization step"; the Brent–Kung composition entry points
+  (`*_compose_mod_brent_kung_precomp_preinv`, with a precomputed `√deg h × deg h` matrix of powers of
+  `g`) are documented as "particularly useful if one has to perform several modular composition of
+  the form `f(g)` modulo `h` for fixed `g` and `h`" — the Frobenius-iteration use. **No degree or
+  modulus threshold is documented** for either the factoring algorithm or the composition method.
+
+The timings contradict the `nmod_poly_factor` sentence: on every input, word-size or BN254, FLINT's
+default is within 0.3% of forced Kaltofen–Shoup and 2x–11x away from forced Cantor–Zassenhaus.
+At these degrees and moduli the default **behaves as Kaltofen–Shoup**, and the documented
+"Cantor-Zassenhaus by default" is evidently stale. That is an inference from timings, not a reading
+of FLINT's source, which this comparison deliberately did not consult.
+
+What the table says:
+
+1. **On random polynomials FLINT is 1.4x–7.6x faster**, and the gap grows with the largest factor's
+   degree: 1.4x at 81 over KoalaBear, 7.6x at 729. That is the gap between Zeebra's distinct-degree
+   loop — one Frobenius application per degree, however cheap the composer makes each — and
+   Kaltofen–Shoup's baby-step/giant-step distinct-degree factorization, which needs about `√d`
+   giant steps and interval gcds instead of `d` single-degree gcds. §5 already names Shoup's
+   baby-step/giant-step DDF as the next step; this is its measured price.
+2. **FLINT's own CZ arm is slower than Zeebra everywhere a random polynomial is factored** (1.4x at
+   KoalaBear 729, 2.3x–4.0x at degree 81): Zeebra's composition-driven Cantor–Zassenhaus is the
+   faster plain CZ. What it lacks is the algorithm, not the arithmetic.
+3. **On the one-application input the ranking reverses at 729 and returns at 6 561.** Zeebra beats
+   FLINT's default (KS) by 10% at 729 but loses 1.8x at 6 561, and FLINT's forced CZ is fastest of
+   all — 1.9x ahead of Zeebra at 729, 3.4x at 6 561. Here there is one Frobenius application, so
+   the difference is not composition: it is the root-splitting stage over 727 or 6 559 linear
+   factors, i.e. FLINT's base `nmod_poly` multiplication, division and gcd at degree 6 561 against
+   Zeebra's. KS's baby-step setup is the overhead its default pays on this shape.
+Reproduce with the recipe in `tools/external/flint-factor-driver/README.md`; the factor agreement
+check runs on every invocation.
+
