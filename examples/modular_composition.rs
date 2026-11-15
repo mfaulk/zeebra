@@ -12,6 +12,13 @@
 //!   (many Frobenius applications) and on `n - 2` linear factors times an irreducible quadratic
 //!   (one application). The routes' factorizations are compared and the run aborts if they differ.
 //!
+//! - `irreducible`: `is_irreducible` per `IrreducibilityRoute` (#785) on random irreducibles and
+//!   random polynomials.
+//! - `ddf`: whole `factorize` per `DistinctDegreeRoute` (#785): the iterated loop, Shoup's
+//!   baby-step/giant-step from degree one, and the default hybrid.
+//! - `defaults`: `factorize` and `is_irreducible` through the public API only, so the same source
+//!   builds against an older tree for a before/after comparison.
+//!
 //! Arms are interleaved within each repetition, with the order rotated per repetition; the figure
 //! is the median over repetitions, with the minimum beside it.
 //!
@@ -24,6 +31,9 @@
 //! ```text
 //! cargo run --release --example modular_composition -- steps
 //! cargo run --release --example modular_composition -- factor
+//! cargo run --release --example modular_composition -- irreducible max_n=729
+//! cargo run --release --example modular_composition -- ddf
+//! cargo run --release --example modular_composition -- defaults
 //! cargo run --release --example modular_composition -- steps max_n=729 reps=5
 //! cargo run --release --example modular_composition -- steps min_n=6561 field=koala reps=3
 //! cargo run --release --example modular_composition -- export dir=/path/to/inputs
@@ -39,8 +49,10 @@ use std::{
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     compose_mod, compose_mod_horner, factorize, factorize_with_route_unstable,
+    factorize_with_routes_unstable,
     fields::{Bn254Fr, KoalaBear, PrimeFieldElement64},
-    is_irreducible, pow_mod_limbs_unstable, FrobeniusRoute, KnownOrder, ModularComposer,
+    is_irreducible, is_irreducible_with_route_unstable, pow_mod_limbs_unstable,
+    DistinctDegreeRoute, FrobeniusRoute, IrreducibilityRoute, KnownOrder, ModularComposer,
     Polynomial, UnivariatePolynomial,
 };
 
@@ -408,6 +420,201 @@ fn factor_file(path: &Path, out: Option<&Path>) {
     }
 }
 
+/// A random irreducible of degree n, by rejection on the default `is_irreducible`.
+fn random_irreducible<F: KnownOrder>(n: usize) -> UnivariatePolynomial<F> {
+    let mut rng = StdRng::seed_from_u64(3000 + n as u64);
+    loop {
+        let candidate = monic::<F>(n, &mut rng);
+        if is_irreducible(&candidate) {
+            return candidate;
+        }
+    }
+}
+
+const IRREDUCIBILITY_ROUTES: [IrreducibilityRoute; 4] = [
+    IrreducibilityRoute::Iterate(FrobeniusRoute::PowMod),
+    IrreducibilityRoute::Iterate(FrobeniusRoute::Composition),
+    IrreducibilityRoute::Iterate(FrobeniusRoute::Auto),
+    IrreducibilityRoute::Doubling,
+];
+
+/// `is_irreducible` per route on one input; `routes` selects which of `IRREDUCIBILITY_ROUTES` run.
+fn irreducible<F: KnownOrder>(
+    field: &str,
+    label: &str,
+    n: usize,
+    make: fn(usize) -> UnivariatePolynomial<F>,
+    routes: &[usize],
+    options: &Options,
+) {
+    if !options.wants(field) || n < options.min_n || n > options.max_n {
+        return;
+    }
+    let f = make(n);
+    let verdicts: Vec<bool> = routes
+        .iter()
+        .map(|&r| is_irreducible_with_route_unstable(&f, IRREDUCIBILITY_ROUTES[r]))
+        .collect();
+    assert!(
+        verdicts.iter().all(|v| *v == verdicts[0]),
+        "routes disagree at n={n}: {verdicts:?}"
+    );
+
+    let mut sinks = vec![false; routes.len()];
+    let mut closures: Vec<Box<dyn FnMut() + '_>> = sinks
+        .iter_mut()
+        .zip(routes)
+        .map(|(sink, &r)| {
+            let f = &f;
+            Box::new(move || {
+                *sink ^= is_irreducible_with_route_unstable(f, IRREDUCIBILITY_ROUTES[r])
+            }) as Box<dyn FnMut()>
+        })
+        .collect();
+    let mut arms: Vec<&mut dyn FnMut()> = closures.iter_mut().map(|c| &mut **c as _).collect();
+    let reps = if n > 100 {
+        options.reps.min(3)
+    } else {
+        options.reps
+    };
+    let mut samples = interleaved(&mut arms, reps);
+    let mut cells = vec!["—".to_string(); IRREDUCIBILITY_ROUTES.len()];
+    let mut medians = vec![None; IRREDUCIBILITY_ROUTES.len()];
+    for (samples, &r) in samples.iter_mut().zip(routes) {
+        let (median, min) = summary(samples);
+        cells[r] = format!("{} ({})", ms(median), ms(min));
+        medians[r] = Some(median.as_secs_f64());
+    }
+    let ratio = |a: usize, b: usize| match (medians[a], medians[b]) {
+        (Some(a), Some(b)) => format!("{:.2}x", a / b),
+        _ => "—".to_string(),
+    };
+    println!(
+        "| {field} | {label} | {n} | {} | {reps} | {} | {} | {} | {} | {} | {} |",
+        verdicts[0],
+        cells[0],
+        cells[1],
+        cells[2],
+        cells[3],
+        ratio(0, 2),
+        ratio(0, 3),
+    );
+}
+
+const DISTINCT_DEGREE_ROUTES: [DistinctDegreeRoute; 3] = [
+    DistinctDegreeRoute::Iterated,
+    DistinctDegreeRoute::BabyStepGiantStep,
+    DistinctDegreeRoute::Auto,
+];
+
+/// Whole `factorize` per distinct-degree route, the Frobenius route left at its default.
+fn distinct_degree<F: KnownOrder>(
+    field: &str,
+    label: &str,
+    n: usize,
+    make: fn(usize) -> UnivariatePolynomial<F>,
+    routes: &[usize],
+    options: &Options,
+) {
+    if !options.wants(field) || n < options.min_n || n > options.max_n {
+        return;
+    }
+    let f = make(n);
+    let key = |factors: Vec<(UnivariatePolynomial<F>, usize)>| {
+        let mut keyed: Vec<(u32, String, usize)> = factors
+            .into_iter()
+            .map(|(p, m)| (p.degree(), format!("{p:?}"), m))
+            .collect();
+        keyed.sort();
+        keyed
+    };
+    let run = |r: usize, seed: u64| {
+        factorize_with_routes_unstable(
+            &f,
+            &mut StdRng::seed_from_u64(seed),
+            FrobeniusRoute::Auto,
+            DISTINCT_DEGREE_ROUTES[r],
+        )
+    };
+    let reference = key(run(routes[0], 1));
+    for &r in &routes[1..] {
+        assert_eq!(
+            reference,
+            key(run(r, 2)),
+            "{:?} disagrees at n={n}",
+            DISTINCT_DEGREE_ROUTES[r]
+        );
+    }
+    let mut degrees: Vec<u32> = reference.iter().map(|(d, _, _)| *d).collect();
+    degrees.dedup();
+    let largest = degrees.last().copied().unwrap_or(0);
+
+    let mut sinks = vec![0usize; routes.len()];
+    let mut closures: Vec<Box<dyn FnMut() + '_>> = sinks
+        .iter_mut()
+        .zip(routes)
+        .map(|(sink, &r)| Box::new(move || *sink ^= run(r, 3).len()) as Box<dyn FnMut()>)
+        .collect();
+    let mut arms: Vec<&mut dyn FnMut()> = closures.iter_mut().map(|c| &mut **c as _).collect();
+    let reps = if n > 100 {
+        options.reps.min(3)
+    } else {
+        options.reps
+    };
+    let mut samples = interleaved(&mut arms, reps);
+    let mut cells = vec!["—".to_string(); DISTINCT_DEGREE_ROUTES.len()];
+    let mut medians = vec![None; DISTINCT_DEGREE_ROUTES.len()];
+    for (samples, &r) in samples.iter_mut().zip(routes) {
+        let (median, min) = summary(samples);
+        cells[r] = format!("{} ({})", ms(median), ms(min));
+        medians[r] = Some(median.as_secs_f64());
+    }
+    let ratio = |a: usize, b: usize| match (medians[a], medians[b]) {
+        (Some(a), Some(b)) => format!("{:.2}x", a / b),
+        _ => "—".to_string(),
+    };
+    println!(
+        "| {field} | {label} | {n} | {} | {largest} | {reps} | {} | {} | {} | {} | {} |",
+        reference.len(),
+        cells[0],
+        cells[1],
+        cells[2],
+        ratio(0, 1),
+        ratio(0, 2),
+    );
+}
+
+/// The public entry points only, so the same source times both sides of a before/after build.
+fn defaults<F: KnownOrder>(field: &str, n: usize, options: &Options) {
+    if !options.wants(field) || n < options.min_n || n > options.max_n {
+        return;
+    }
+    let random = random_polynomial::<F>(n);
+    let roots = few_applications::<F>(n);
+    let mut s0 = 0usize;
+    let mut s1 = 0usize;
+    let mut s2 = false;
+    let mut a = || s0 ^= factorize(&random, &mut StdRng::seed_from_u64(3)).len();
+    let mut b = || s1 ^= factorize(&roots, &mut StdRng::seed_from_u64(3)).len();
+    let mut c = || s2 ^= is_irreducible(&random);
+    let reps = if n > 100 {
+        options.reps.min(3)
+    } else {
+        options.reps
+    };
+    let mut samples = interleaved(&mut [&mut a, &mut b, &mut c], reps);
+    let row: Vec<(Duration, Duration)> = samples.iter_mut().map(|s| summary(s)).collect();
+    println!(
+        "| {field} | {n} | {reps} | {} ({}) | {} ({}) | {} ({}) |",
+        ms(row[0].0),
+        ms(row[0].1),
+        ms(row[1].0),
+        ms(row[1].1),
+        ms(row[2].0),
+        ms(row[2].1),
+    );
+}
+
 fn main() {
     let mut mode = "steps".to_string();
     let mut dir: Option<PathBuf> = None;
@@ -476,6 +683,146 @@ fn main() {
             &path.expect("factor-file needs path=<file>"),
             out.as_deref(),
         ),
-        other => panic!("unknown mode {other}; expected steps, factor, export or factor-file"),
+        "irreducible" => {
+            println!("is_irreducible per route, ms: median (min)");
+            println!(
+                "| field | input | n | irreducible | reps | Iterate(PowMod) | Iterate(Composition) | Iterate(Auto) | Doubling (default) | PowMod / Iterate(Auto) | PowMod / Doubling |"
+            );
+            println!("|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|");
+            let all = [0, 1, 2, 3];
+            irreducible::<KoalaBear>(
+                "KoalaBear",
+                "irreducible",
+                81,
+                random_irreducible,
+                &all,
+                &options,
+            );
+            irreducible::<Goldilocks>(
+                "Goldilocks",
+                "irreducible",
+                81,
+                random_irreducible,
+                &all,
+                &options,
+            );
+            irreducible::<Bn254Fr>(
+                "BN254 Fr",
+                "irreducible",
+                81,
+                random_irreducible,
+                &all,
+                &options,
+            );
+            irreducible::<KoalaBear>(
+                "KoalaBear",
+                "irreducible",
+                729,
+                random_irreducible,
+                &all,
+                &options,
+            );
+            for n in [81, 729] {
+                irreducible::<KoalaBear>(
+                    "KoalaBear",
+                    "random",
+                    n,
+                    random_polynomial,
+                    &all,
+                    &options,
+                );
+                irreducible::<Goldilocks>(
+                    "Goldilocks",
+                    "random",
+                    n,
+                    random_polynomial,
+                    &all,
+                    &options,
+                );
+            }
+            irreducible::<Bn254Fr>("BN254 Fr", "random", 81, random_polynomial, &all, &options);
+            irreducible::<Bn254Fr>(
+                "BN254 Fr",
+                "random",
+                729,
+                random_polynomial,
+                &[2, 3],
+                &options,
+            );
+            irreducible::<KoalaBear>(
+                "KoalaBear",
+                "random",
+                6561,
+                random_polynomial,
+                &[3],
+                &options,
+            );
+        }
+        "ddf" => {
+            println!("whole factorize per distinct-degree route (Frobenius route Auto), ms: median (min)");
+            println!(
+                "| field | input | n | distinct factors | largest factor degree | reps | Iterated | BabyStepGiantStep | Auto (default) | Iterated / BSGS | Iterated / Auto |"
+            );
+            println!("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+            let all = [0, 1, 2];
+            for n in [81, 729] {
+                distinct_degree::<KoalaBear>(
+                    "KoalaBear",
+                    "random",
+                    n,
+                    random_polynomial,
+                    &all,
+                    &options,
+                );
+                distinct_degree::<Goldilocks>(
+                    "Goldilocks",
+                    "random",
+                    n,
+                    random_polynomial,
+                    &all,
+                    &options,
+                );
+            }
+            distinct_degree::<Bn254Fr>("BN254 Fr", "random", 81, random_polynomial, &all, &options);
+            distinct_degree::<Bn254Fr>(
+                "BN254 Fr",
+                "random",
+                729,
+                random_polynomial,
+                &[1, 2],
+                &options,
+            );
+            distinct_degree::<KoalaBear>(
+                "KoalaBear",
+                "random",
+                6561,
+                random_polynomial,
+                &[1, 2],
+                &options,
+            );
+            for n in [729, 6561] {
+                distinct_degree::<KoalaBear>(
+                    "KoalaBear",
+                    "n-2 linear x quadratic",
+                    n,
+                    few_applications,
+                    &all,
+                    &options,
+                );
+            }
+        }
+        "defaults" => {
+            println!("public factorize / is_irreducible, ms: median (min)");
+            println!("| field | n | reps | factorize random | factorize n-2 linear x quadratic | is_irreducible random |");
+            println!("|---|---:|---:|---:|---:|---:|");
+            for n in [81, 729] {
+                defaults::<KoalaBear>("KoalaBear", n, &options);
+                defaults::<Goldilocks>("Goldilocks", n, &options);
+            }
+            defaults::<Bn254Fr>("BN254 Fr", 81, &options);
+        }
+        other => panic!(
+            "unknown mode {other}; expected steps, factor, export, factor-file, irreducible, ddf or defaults"
+        ),
     }
 }
