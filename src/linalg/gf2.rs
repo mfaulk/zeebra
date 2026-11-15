@@ -118,7 +118,7 @@ impl BitMatrix {
         Some(packed)
     }
 
-    /// One row as a sparse row over `F`, every set bit becoming [`FiniteField::ONE`].
+    /// One row as a sparse row over `F`, every set bit becoming one.
     pub fn row_to_sparse<F: FiniteField>(&self, index: usize) -> SparseRow<F> {
         let words = self.row(index);
         let count = words.iter().map(|w| w.count_ones() as usize).sum();
