@@ -23,9 +23,11 @@
 //! ```
 //!
 //! The AVX2 kernel and the scalar kernel it is compared against both operate on raw `u32`
-//! Montgomery residues, because `PrimeFieldElement32`'s representation is private — the same
-//! arrangement #49 used. `montgomery_replica_agrees_with_the_field` checks the replica against the
-//! shipped type before any timing is taken, so a kernel that is fast and wrong cannot be reported.
+//! Montgomery residues, the arrangement #49 used. `Mersenne31` itself has held canonical residues
+//! with a shift-and-add reduction since #780, so the replica is the algorithm the type shipped
+//! before that, and the one every other odd 32-bit modulus still uses.
+//! `montgomery_replica_agrees_with_the_field` checks it against the shipped type's products before
+//! any timing is taken, so a kernel that is fast and wrong cannot be reported.
 
 use std::{
     hint::black_box,
@@ -79,10 +81,11 @@ fn axpy<F: FiniteField>(target: &mut [F], source: &[F], factor: F) -> (usize, us
     (gained, lost)
 }
 
-/// Montgomery arithmetic over raw `u32` residues, replicating `fields::prime_field_32`.
+/// Montgomery arithmetic over raw `u32` residues, as `fields::prime_field_32` does for odd moduli
+/// other than 2^31 - 1.
 ///
-/// Needed because the shipped representation is private and the AVX2 kernel has to see it. Checked
-/// against the shipped type by [`montgomery_replica_agrees_with_the_field`].
+/// Checked against the shipped type's canonical products by
+/// [`montgomery_replica_agrees_with_the_field`].
 mod replica {
     pub const fn n_prime(p: u32) -> u32 {
         let mut inverse: u32 = 1;

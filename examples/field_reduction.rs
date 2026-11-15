@@ -60,7 +60,7 @@ trait Repr {
 /// The shipped type, through its public operators.
 struct Shipped32<const P: u32>;
 impl<const P: u32> Repr for Shipped32<P> {
-    const NAME: &'static str = "shipped-montgomery";
+    const NAME: &'static str = "shipped";
     type E = PrimeFieldElement32<P>;
     fn modulus() -> u128 {
         P as u128
@@ -279,7 +279,7 @@ impl Repr for Mersenne31Repr {
 
 struct Shipped64<const P: u64>;
 impl<const P: u64> Repr for Shipped64<P> {
-    const NAME: &'static str = "shipped-montgomery";
+    const NAME: &'static str = "shipped";
     type E = PrimeFieldElement64<P>;
     fn modulus() -> u128 {
         P as u128

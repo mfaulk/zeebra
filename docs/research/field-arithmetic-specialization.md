@@ -3,7 +3,9 @@
 **Measured at:** `0dc61474` (microbenchmark binary, and the end-to-end baseline arm, whose
 `src/fields/prime_field_64.rs` is `2ec9d3af`'s) and `9860988e` (the adopted end-to-end arm; the
 binary was built from the same logic before the constant was named). The narrow-only middle arm is
-an uncommitted overlay of `9860988e` without the Mersenne branch. 2026-11-14 UTC.
+an uncommitted overlay of `9860988e` without the Mersenne branch. 2026-11-14 UTC. §3b (#780) at
+`a9421093` (before) and `fa27467a` (after: `a9421093` plus PR #791's `src/fields/prime_field_32.rs`,
+the only file in which the two trees differ; rebased as `f554babf` and squash-merged by #791).
 
 ## Decision
 
@@ -11,7 +13,7 @@ an uncommitted overlay of `9860988e` without the Mersenne branch. 2026-11-14 UTC
 |---|---|---|---|
 | 31-bit in `PrimeFieldElement64` (`Zp2147483647`, every `P < 2^32`) | Montgomery, R = 2^64 | **Adopted: canonical residues, `u64` remainder by the constant; shift-and-add for 2^31 − 1** | MQ10/2^31−1 F4 call **0.748x** paired, identical basis (§3) |
 | 31-bit in `PrimeFieldElement32` (32003, BabyBear, KoalaBear) | Montgomery, R = 2^32 | Keep | No candidate wins every kernel; Montgomery is the only one that vectorizes `map` well (§2.1) |
-| `Mersenne31` (`PrimeFieldElement32<2^31−1>`) | Montgomery, R = 2^32 | Deferred: #780 | Mersenne reduction wins all four kernels (0.56–0.83x); no end-to-end gate run here |
+| `Mersenne31` (`PrimeFieldElement32<2^31−1>`) | Montgomery, R = 2^32 | **Adopted (#780): canonical residues, shift-and-add** | Wins all four kernels (0.56–0.83x); F4 forward elimination 0.77–0.78x on the adaptive backend, identical RREFs (§3b) |
 | 62/64-bit, `P ≥ 2^32` | Montgomery, R = 2^64 | Keep the representation; **Shoup in the scatter kernel deferred: #779** | Shoup scatter 0.52–0.64x of Montgomery for `P < 2^63`, but it needs a prepared-factor API in `src/linalg` |
 | Goldilocks 2^64 − 2^32 + 1 | Montgomery | Deferred: #781 | Special reduction 0.67x `map`, 0.69x `scatter`, 0.92x `chain` |
 | 2^64 − 59 and other top-bit primes | Montgomery | Keep | Möller–Granlund pre-inverse is 0.79x on throughput kernels and 1.22x on latency; mixed |
@@ -82,7 +84,11 @@ multiplier buys nothing here: the product is already one 64-bit multiply. Delaye
 the fold comes every four products.
 
 The exception is **2^31 − 1**, where the Mersenne identity beats Montgomery on all four kernels.
-That is #780, the follow-up for `Mersenne31`, gated on an end-to-end measurement like §3's.
+#780 shipped it for `Mersenne31` after the end-to-end gate in §3b. In that build the shipped arm at
+2^31 − 1 reads 2.50 / 0.213 / 0.956 / 0.830 ns, against 2.50 / 0.187 / 0.996 / 0.835 for the
+candidate arm and 3.75 / 0.330 / 1.29 / 1.01 for the raw Montgomery replica (one process, same
+protocol, `fa27467a`). Its `map` kernel stays vectorized: `vpmuludq` and `vpsrlq` over `ymm`
+registers in the `map::<Shipped32<2147483647>>` symbol.
 
 The raw replica's 32003 `scatter` (1.51 against the shipped 1.26) is code layout, not
 representation: the two run the same algorithm, and the replica matches the shipped type to 1% in
@@ -190,6 +196,47 @@ The control stays flat, which puts the moves in the changed type. The dense back
 `Zp2147483647` now beats the 4-byte Montgomery `Mersenne31` on the shipping adaptive backend
 (1.74 against 1.99 ms on katsura-6). That is the argument for #780.
 
+## 3b. End-to-end gate: `Mersenne31` (#780)
+
+Two binaries of each example, **before** (`a9421093`, Montgomery) and **after** (`fa27467a`, the
+Mersenne branch), built from one worktree with the same flags as §1. Fifteen rounds, arm order
+alternating each round, every process pinned to CPU 3 under `tools/benchlock.sh` (owner
+`zb-780-ab`; 1-minute load 14.7 at start and 12.5 at end, so the absolute figures are noisier than
+§3's and the paired ratios are the evidence). Cells are medians over rounds; the ratio is the median
+of per-round after/before pairs, with its range.
+
+`examples/field_width f4`, elimination stage in ms. The `Zp2147483647` column is unchanged code and
+is the in-process control:
+
+| system, backend | `Mersenne31` before → after | paired | `Zp2147483647` control |
+|---|---:|---:|---:|
+| katsura-6, adaptive (shipping) | 2.02 → 1.73 | 0.856 (0.84–1.36) | 1.75 → 1.75 |
+| katsura-6, dense | 4.23 → 3.72 | 0.877 (0.86–1.16) | 4.78 → 4.79 |
+| katsura-6, sparse | 6.76 → 6.19 | 0.913 (0.82–1.38) | 6.52 → 6.53 |
+| katsura-5, adaptive | 0.27 → 0.24 | 0.889 (0.55–1.37) | 0.24 → 0.24 |
+| cyclic-5, adaptive | 0.16 → 0.15 | 0.938 (0.62–1.50) | 0.15 → 0.15 |
+
+`examples/elimination_kernel_study m31 <shape> 8 <backend>`, the density-curve sources at full
+density (8/8). Forward elimination ms, and the whole elimination including back-substitution:
+
+| m31 shape, backend | forward before → after | paired forward | elimination before → after |
+|---|---:|---:|---:|
+| k7, adaptive | 0.792 → 0.623 | 0.781 (0.76–1.25) | 1.807 → 1.606 |
+| k7, dense | 1.887 → 1.711 | 0.901 (0.86–1.23) | 2.891 → 2.702 |
+| k7, sparse | 2.574 → 2.544 | 0.988 (0.89–1.59) | 3.660 → 3.590 |
+| c6, adaptive | 0.315 → 0.245 | 0.767 (0.75–0.79) | 0.701 → 0.622 |
+| c6, dense | 0.344 → 0.306 | 0.890 (0.68–0.93) | 0.723 → 0.680 |
+| c6, sparse | 0.588 → 0.573 | 0.966 (0.70–1.00) | 0.992 → 0.972 |
+| k6lex, adaptive | 7.810 → 6.049 | 0.771 (0.70–0.80) | 10.884 → 9.004 |
+| k6lex, dense | 28.890 → 25.782 | 0.890 (0.88–0.93) | 31.969 → 28.760 |
+| k6lex, sparse | 19.661 → 19.325 | 0.982 (0.93–1.02) | 22.930 → 22.468 |
+
+Every source matched its pinned corpus fingerprint, and each shape and backend produced one RREF
+hash across all 30 runs. No median regressed; the control column moved by at most 1.8%. The
+4-byte type is back level with or ahead of the 8-byte one on the shipping backend (1.73 against
+1.75 ms on katsura-6), which §3 had inverted. The sparse backend gains least, as in §3, because its
+cost is index traversal rather than multiplication.
+
 ## 4. Dispositions
 
 - **#163** (closed): `PrimeFieldElement128` was deprecated rather than converted. This study
@@ -212,4 +259,5 @@ tools/benchlock.sh <owner> taskset -c 3 $CARGO_TARGET_DIR/release/examples/field
 
 For the end-to-end gate, build `mq10_profile` and `field_width` (`--features external-runners`)
 once per variant of `src/fields/prime_field_64.rs`, then run the three binaries interleaved and
-pinned as in §3.
+pinned as in §3. §3b is the same with `field_width` and `elimination_kernel_study` built at
+`a9421093` and `fa27467a`.
