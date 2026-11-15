@@ -2,7 +2,8 @@
 
 **Measured at:** `f5c10079` for §2 (the composition kernel; `src/poly/univariate/compose_mod.rs`
 is unchanged from there to the merge), `5c817106` for §3 (whole `factorize`, with the `Auto`
-route as shipped), and `abf6dd0d` for §6 (the same-machine FLINT comparison).
+route as shipped), `abf6dd0d` for §6 (the same-machine FLINT comparison), and `8b5608a3` for §7
+(baby-step/giant-step distinct-degree factorization and the composed irreducibility test, #785).
 `examples/modular_composition.rs` on the development workstation (AMD
 Ryzen Threadripper PRO 5995WX), release profile with the repository's `-C target-cpu=x86-64-v3`,
 `RUSTC_WRAPPER=""`, a private `CARGO_TARGET_DIR`, every run under `tools/benchlock.sh` and
@@ -156,11 +157,9 @@ linear. On random polynomials that is a 4.5x–13.9x speedup of the whole factor
 ## 5. What was not done
 
 - **The FLINT same-machine comparison** the issue asks for was split out to #784 and is §6.
-- **`is_irreducible`** still iterates Frobenius by `pow_mod` (`frobenius_iterated`); the same
-  composer would apply. Not measured, so not changed.
+- **`is_irreducible`** iterated Frobenius by `pow_mod`; #785 moved it onto composition (§7).
 - **Shoup's baby-step/giant-step distinct-degree factorization** (interval gcds over composed
-  Frobenius powers) and Kaltofen–Shoup equal-degree splitting are the next algorithmic step after
-  this one and were not attempted.
+  Frobenius powers) was done in #785 (§7). Kaltofen–Shoup equal-degree splitting was not attempted.
 - **The eliminants themselves.** The resultant route moved to the private analysis repository in
   #668, so §2 and §3 use the recorded *degrees* over the recorded *field* with random polynomials
   of those degrees, not the eliminants. §4 argues why the root-finding tail is unaffected
@@ -239,3 +238,111 @@ What the table says:
 Reproduce with the recipe in `tools/external/flint-factor-driver/README.md`; the factor agreement
 check runs on every invocation.
 
+
+## 7. Baby-step/giant-step distinct-degree factorization and a composed irreducibility test (#785)
+
+**Measured at:** `8b5608a3` (the branch before its rebase past #787, which changed only
+re-export lists in `src/lib.rs` and `src/poly/mod.rs`), `examples/modular_composition.rs` modes `irreducible`, `ddf` and
+`defaults`, one binary, three consecutive runs under `tools/benchlock.sh` (owner
+`zb-785-takeover`) and `taskset -c 8`, 2026-11-15 UTC. `load=` 1.12 at the first START and 1.11 at
+the last END. One `cargo clippy` ran niced on cores 32–47 for about ten seconds during `ddf`. Every
+mode asserts that all its routes agree (the same verdict, or the same factorization) before
+timing, and routes are interleaved within each repetition. A `—` marks an arm skipped because it
+would take minutes.
+
+### 7.1 `is_irreducible`
+
+Rabin's test needs `x^(q^(n/p))` for each prime `p | n` and `x^(q^n)`. `Iterate(route)` walks
+`k = 1, 2, …, n` with one Frobenius application per step by the given §3 route. `Doubling`, the
+new default, reaches `x^(q^k)` by an addition chain on `k`: `x^(q^(2a)) = x^(q^a) ∘ x^(q^a)` by one
+one-shot composition, and `x^(q^(a+1))` by one application, so about `2·log2 n` compositions per
+power instead of `n` applications. `irreducible` inputs are random irreducibles (by rejection),
+and `random` inputs are random monic polynomials.
+
+| field | input | n | reps | `Iterate(PowMod)` | `Iterate(Auto)` | `Doubling` (default) | `PowMod` / `Doubling` | `Iterate(Auto)` / `Doubling` |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| KoalaBear | irreducible | 81 | 7 | 11.306 (11.300) | 1.172 (1.168) | 0.945 (0.943) | 11.96x | 1.24x |
+| Goldilocks | irreducible | 81 | 7 | 144.375 (144.271) | 6.795 (6.779) | 5.702 (5.693) | 25.32x | 1.19x |
+| BN254 Fr | irreducible | 81 | 7 | 5 354.786 (5 328.444) | 123.594 (123.458) | 105.726 (105.649) | 50.65x | 1.17x |
+| KoalaBear | irreducible | 729 | 3 | 5 405.549 (5 388.344) | 584.676 (583.919) | 223.219 (223.090) | 24.22x | 2.62x |
+| KoalaBear | random | 81 | 7 | 3.775 (3.753) | 0.622 (0.618) | 0.591 (0.586) | 6.38x | 1.05x |
+| Goldilocks | random | 81 | 7 | 48.092 (48.042) | 4.089 (4.084) | 3.986 (3.984) | 12.07x | 1.03x |
+| BN254 Fr | random | 81 | 7 | 1 775.858 (1 774.597) | 90.824 (90.650) | 88.256 (88.149) | 20.12x | 1.03x |
+| KoalaBear | random | 729 | 3 | 5 406.245 (5 401.248) | 586.094 (585.799) | 130.819 (130.769) | 41.33x | 4.48x |
+| Goldilocks | random | 729 | 3 | 27 647.712 (27 561.651) | 1 636.787 (1 636.223) | 842.093 (841.929) | 32.83x | 1.94x |
+| BN254 Fr | random | 729 | 3 | — | 18 357.665 (18 355.484) | 9 852.281 (9 851.352) | — | 1.86x |
+| KoalaBear | random | 6 561 | 3 | — | — | 17 578.942 (17 556.672) | — | — |
+
+Milliseconds. `Iterate(Composition)` is within 1% of `Iterate(Auto)` except at KoalaBear 729, where it
+is 466.8 ms against 585 ms. That is §3's rent premium again, and `Doubling` beats both.
+
+`pow_mod` iteration, the route before this change, loses everywhere: 6.4x–51x. `Doubling` also
+beats the best iterated composition route, by 1.03x–1.24x at degree 81 and 1.9x–4.5x at 729,
+because its composition count grows as `log n` rather than `n`.
+
+### 7.2 Distinct-degree factorization
+
+`factorize` with each `DistinctDegreeRoute` forced (the Frobenius route is `Auto` throughout):
+
+- `Iterated` is the loop as it was: one application and one gcd per degree.
+- `BabyStepGiantStep` is Shoup's method from degree one: `l ≈ sqrt(n/2)` baby steps, then one gcd
+  per interval of `l` degrees against `∏ (x^(q^(lj)) − x^(q^i))`.
+- `Auto`, the new default, iterates until the degree reaches `sqrt(deg r / 2)` of what remains `r`.
+  It then switches to baby-step/giant-step, reusing the powers already computed as baby steps.
+
+| field | input | n | distinct factors | largest factor degree | reps | `Iterated` | `BabyStepGiantStep` | `Auto` (default) | `Iterated` / BSGS | `Iterated` / `Auto` |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| KoalaBear | random | 81 | 4 | 47 | 7 | 0.993 (0.991) | 0.726 (0.720) | 0.801 (0.795) | 1.37x | 1.24x |
+| Goldilocks | random | 81 | 5 | 49 | 7 | 5.476 (5.223) | 4.260 (4.119) | 4.420 (4.252) | 1.29x | 1.24x |
+| BN254 Fr | random | 81 | 11 | 22 | 7 | 102.156 (102.081) | 98.098 (98.001) | 97.640 (97.584) | 1.04x | 1.05x |
+| KoalaBear | random | 729 | 6 | 286 | 3 | 311.563 (311.323) | 178.885 (178.858) | 180.784 (180.355) | 1.74x | 1.72x |
+| Goldilocks | random | 729 | 8 | 568 | 3 | 2 029.451 (2 027.882) | 1 114.499 (1 112.219) | 1 090.337 (1 090.039) | 1.82x | 1.86x |
+| BN254 Fr | random | 729 | 6 | 653 | 3 | — | 13 262.918 (13 235.469) | 13 363.543 (13 319.696) | — | — |
+| KoalaBear | random | 6 561 | 8 | 2 734 | 3 | — | 45 852.307 (45 815.424) | 46 165.488 (46 147.818) | — | — |
+| KoalaBear | `n − 2` linear × quadratic | 729 | 728 | 2 | 3 | 36.181 (36.176) | 64.979 (64.964) | 36.243 (36.231) | **0.56x** | 1.00x |
+| KoalaBear | `n − 2` linear × quadratic | 6 561 | 6 560 | 2 | 3 | 1 449.798 (1 448.668) | 9 084.677 (9 078.646) | 1 448.437 (1 448.389) | **0.16x** | 1.00x |
+
+Milliseconds.
+
+1. **On random inputs baby-step/giant-step wins 1.04x–1.82x end to end.** The gain grows with the
+   largest factor's degree, which sets how many gcds the iterated loop takes: 22 at BN254 Fr 81
+   gains least, and 568 at Goldilocks 729 gains most.
+2. **Forced from degree one, it loses 1.8x–6.3x on the root-finding shape.** All factors there have
+   degree at most two, so the iterated loop is done after two steps, while baby-step/giant-step
+   still builds `sqrt(n/2)` baby steps and their giant steps.
+3. **`Auto` keeps both, as §3's `Auto` did.** It is at parity (1.00x) on the low-degree shape and
+   within 2% of baby-step/giant-step on random inputs. It is 10% behind at KoalaBear 81 (0.801 ms
+   against 0.726 ms) and 2% ahead at Goldilocks 729.
+
+Against §3's whole-factorization figures (at `5c817106`, with the iterated loop and Frobenius `Auto`),
+KoalaBear random 729 goes from 512 ms to 181 ms. That includes everything else that landed in
+between; the paired 1.72x in this table is the part #785 owns.
+
+### 7.3 The public defaults
+
+`defaults` times the public `factorize` and `is_irreducible` only: no route hooks, as a user
+would call them. It agrees with the tables above: KoalaBear random 729 is 181.1 ms to factor and
+130.8 ms to test, and the low-degree 729 input is 36.1 ms.
+
+| field | n | reps | `factorize` random | `factorize` `n − 2` linear × quadratic | `is_irreducible` random |
+|---|---:|---:|---:|---:|---:|
+| KoalaBear | 81 | 7 | 0.816 (0.803) | 1.581 (1.523) | 0.676 (0.667) |
+| Goldilocks | 81 | 7 | 4.268 (4.265) | 9.296 (9.233) | 4.022 (3.988) |
+| BN254 Fr | 81 | 7 | 97.977 (97.905) | 277.705 (277.316) | 88.315 (88.233) |
+| KoalaBear | 729 | 3 | 181.098 (180.916) | 36.104 (36.097) | 130.795 (130.701) |
+| Goldilocks | 729 | 3 | 1 090.699 (1 089.222) | 393.978 (393.746) | 845.616 (841.975) |
+
+**Recommendation: adopt.** `DistinctDegreeRoute::Auto` and `IrreducibilityRoute::Doubling` are the
+defaults as of this change. Not measured: a before/after of the public API against the tree before
+#785 (the `defaults` mode builds against an older tree only with the route modes removed). Also
+not measured: Kaltofen–Shoup equal-degree splitting, which remains the next step.
+
+Reproduce:
+
+```text
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-785 RUSTC_WRAPPER=""
+cargo build --release -j24 --example modular_composition
+for m in irreducible ddf defaults; do
+  tools/benchlock.sh <owner> taskset -c 8 "$CARGO_TARGET_DIR"/release/examples/modular_composition $m
+done
+```
