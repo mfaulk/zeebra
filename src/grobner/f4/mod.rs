@@ -14,6 +14,7 @@ pub mod matrix_corpus;
 pub mod membership;
 pub mod observer;
 pub mod options;
+mod packed;
 pub mod reduction;
 pub mod statistics;
 pub mod structured;
@@ -39,7 +40,8 @@ pub use membership::{
 };
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
-    F4Error, F4Options, InterreductionRoute, ReducerSelection, ReductionStrategy, StopKind,
+    F4Error, F4Options, Gf2Elimination, InterreductionRoute, ReducerSelection, ReductionStrategy,
+    StopKind,
 };
 pub use reduction::{
     build_batch_matrix, reduce_batch, reduce_batch_in, reduce_batch_observed_in, BatchOutcome,
@@ -47,7 +49,8 @@ pub use reduction::{
 };
 pub use statistics::{
     BatchStatistics, CandidateReductionStatistics, ConstructionTimings, F4Statistics,
-    HilbertCounts, MatrixInterreduction, MatrixRefusal, StageClock, StageTimings,
+    HilbertCounts, MatrixInterreduction, MatrixRefusal, PackedGf2Statistics, StageClock,
+    StageTimings,
 };
 pub use symbolic::{
     symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,

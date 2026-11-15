@@ -406,11 +406,44 @@ impl CandidateReductionStatistics {
     }
 }
 
+/// Bit-packed `GF(2)` elimination (#777): how often it ran, what it did, and what it held.
+///
+/// Row `xor`s are counted here rather than in [`EliminationStatistics::row_operations`]'s unit: a
+/// packed `xor` is a whole-row word sweep, a sparse row operation is a merge over the nonzeros, and
+/// a sum of the two would be a count of nothing. A packed batch's `row_operations` is its `xor`s.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PackedGf2Statistics {
+    /// Batches eliminated bit-packed.
+    pub batches: usize,
+    /// Batches the dispatch selected but that ran generic: a coefficient other than one, or a
+    /// packed working set that would not fit in `max_live_bytes` beside the sparse matrix.
+    pub declined_batches: usize,
+    /// Whole-row `xor`s, including those that build tables.
+    pub row_xors: usize,
+    /// Four Russians tables built.
+    pub tables: usize,
+    /// The largest packed working set of any batch: the bit matrix, tables and indices.
+    pub workspace_bytes: usize,
+}
+
+impl PackedGf2Statistics {
+    fn record(&mut self, other: &Self) {
+        self.batches += other.batches;
+        self.declined_batches += other.declined_batches;
+        self.row_xors = self.row_xors.saturating_add(other.row_xors);
+        self.tables = self.tables.saturating_add(other.tables);
+        self.workspace_bytes = self.workspace_bytes.max(other.workspace_bytes);
+    }
+}
+
 /// What one batch of critical pairs cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BatchStatistics {
     /// Candidate-only backward work; zero for echelon and research-override routes.
     pub candidate_reduction: CandidateReductionStatistics,
+
+    /// Bit-packed elimination; zero unless this batch was a `GF(2)` batch the dispatch selected.
+    pub packed_gf2: PackedGf2Statistics,
 
     /// Pairs reduced in this batch, after the product criterion.
     pub pairs: usize,
@@ -588,6 +621,7 @@ impl BatchStatistics {
         self.peak_live_bytes()
             .saturating_add(self.dense_buffer_bytes)
             .saturating_add(self.candidate_reduction.workspace_bytes)
+            .saturating_add(self.packed_gf2.workspace_bytes)
     }
 }
 
@@ -596,6 +630,9 @@ impl BatchStatistics {
 pub struct F4Statistics {
     /// Aggregate selected-target work and temporary reservations; mathematical peaks stay separate.
     pub candidate_reduction: CandidateReductionStatistics,
+
+    /// Aggregate bit-packed `GF(2)` elimination. See [`PackedGf2Statistics`].
+    pub packed_gf2: PackedGf2Statistics,
 
     /// Pairs taken off the queue.
     pub pairs_considered: usize,
@@ -942,6 +979,7 @@ impl F4Statistics {
     pub fn record(&mut self, batch: &BatchStatistics) {
         self.batches += 1;
         self.candidate_reduction.record(&batch.candidate_reduction);
+        self.packed_gf2.record(&batch.packed_gf2);
         self.max_pairs_per_batch = self.max_pairs_per_batch.max(batch.pairs);
         self.max_matrix_rows = self.max_matrix_rows.max(batch.rows);
         self.max_matrix_columns = self.max_matrix_columns.max(batch.columns);

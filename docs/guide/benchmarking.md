@@ -322,6 +322,8 @@ cargo run --release --example boolean_density      # what a GF(2) entry costs, a
 cargo run --release --example boolean_density -- 6 8
 cargo run --release --example gf2_packed_elimination -- f4 5      # bit-packed GF(2) vs generic, F4 matrices
 cargo run --release --example gf2_packed_elimination -- square 5  # Four Russians crossover
+cargo run --release --example gf2_f4_dispatch -- batches 5        # packed vs generic F4 batches
+cargo run --release --example gf2_f4_dispatch -- solve 7          # packed vs generic F4 solves
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -626,6 +628,13 @@ characteristic-two systems and times the generic sparse `reduced_row_echelon` ov
 to the generic one, and projects the end-to-end effect from F4's measured elimination stage.
 `square` sweeps dense square matrices for the Four Russians crossover. Results and the decision are in
 [`docs/research/characteristic-two-linear-algebra.md`](../research/characteristic-two-linear-algebra.md).
+
+`gf2_f4_dispatch` is #777's instrument for the packed route wired into F4: `batches` replays
+every batch of the #272 families under `Gf2Elimination::Generic` and `Packed` and prints each
+batch's shape, density and both elimination-stage times (what `Auto`'s thresholds were read from);
+`solve` times whole solves under `Generic`, `Auto` and `Packed`. Candidates and bases are asserted
+equal to the generic route's in every repetition. Results are in
+[`docs/research/characteristic-two-linear-algebra.md`](../research/characteristic-two-linear-algebra.md) §7.
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,

@@ -87,7 +87,7 @@ Every Rust example in this file and in [`docs/guide/`](docs/guide) is compiled a
 |---|---|
 | Finite fields: 31- to 256-bit primes, binary fields, extension fields | [`finite-fields.md`](docs/guide/finite-fields.md) |
 | Polynomials: multivariate arithmetic, GCD, squarefree decomposition, factorization, modular composition | [`polynomials.md`](docs/guide/polynomials.md) |
-| Linear algebra: dense and sparse matrices, echelon backends | [`linear-algebra.md`](docs/guide/linear-algebra.md) |
+| Linear algebra: dense and sparse matrices, echelon backends, bit-packed GF(2) with Four Russians | [`linear-algebra.md`](docs/guide/linear-algebra.md) |
 | NTT and fast univariate arithmetic, root finding | [`ntt.md`](docs/guide/ntt.md) |
 | Gröbner bases: Buchberger, monomial orders, FGLM conversion | [`grobner-bases.md`](docs/guide/grobner-bases.md) |
 | F4, its resource budgets, and Hilbert functions | [`f4.md`](docs/guide/f4.md) |

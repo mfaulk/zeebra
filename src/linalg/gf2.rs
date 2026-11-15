@@ -1,10 +1,10 @@
-//! Research prototype for #272; `docs/research/characteristic-two-linear-algebra.md` has the
-//! measurements and the decision. Not wired into F4.
+//! Bit-packed `GF(2)` elimination (#272), wired into F4 behind a density dispatch by #777;
+//! `docs/research/characteristic-two-linear-algebra.md` has the measurements and the threshold.
 
 use crate::{
     fields::Zp2,
     linalg::sparse::{SparseMatrix, SparseRow},
-    One,
+    FiniteField, One,
 };
 
 /// A dense matrix over `GF(2)`, one bit per coefficient, rows packed into `u64` words.
@@ -98,6 +98,50 @@ impl BitMatrix {
         SparseMatrix::new(self.num_columns, rows)
     }
 
+    /// Pack rows over any field whose coefficients are all one, or `None` if one is not.
+    ///
+    /// Over a field of characteristic two, a matrix whose entries are all zero or one has the same
+    /// row space and reduced form over `GF(2)` as over the field, because `GF(2)` is its prime
+    /// subfield and elimination never leaves it. That is what makes packing sound for `Zp2` and for
+    /// a binary-coefficient matrix over `GF(2^e)` alike; any other coefficient refuses.
+    pub fn pack_binary<F: FiniteField>(rows: &[SparseRow<F>], num_columns: usize) -> Option<Self> {
+        let mut packed = Self::zero(rows.len(), num_columns);
+        for (index, row) in rows.iter().enumerate() {
+            let words = packed.row_mut(index);
+            for (column, coefficient) in row.entries() {
+                if *coefficient != F::ONE {
+                    return None;
+                }
+                words[column / 64] |= 1 << (column % 64);
+            }
+        }
+        Some(packed)
+    }
+
+    /// One row as a sparse row over `F`, every set bit becoming one.
+    pub fn row_to_sparse<F: FiniteField>(&self, index: usize) -> SparseRow<F> {
+        let words = self.row(index);
+        let count = words.iter().map(|w| w.count_ones() as usize).sum();
+        let mut entries = Vec::with_capacity(count);
+        for (w, &word) in words.iter().enumerate() {
+            let mut bits = word;
+            while bits != 0 {
+                entries.push((w * 64 + bits.trailing_zeros() as usize, F::ONE));
+                bits &= bits - 1;
+            }
+        }
+        SparseRow::from_sorted_unchecked(entries)
+    }
+
+    /// The first set column of a row, or `None` for a zero row.
+    pub fn leading_column(&self, index: usize) -> Option<usize> {
+        self.row(index)
+            .iter()
+            .enumerate()
+            .find(|(_, &word)| word != 0)
+            .map(|(w, word)| w * 64 + word.trailing_zeros() as usize)
+    }
+
     fn row(&self, index: usize) -> &[u64] {
         &self.words[index * self.stride..(index + 1) * self.stride]
     }
@@ -188,6 +232,34 @@ pub fn reduced_row_echelon_packed(matrix: &mut BitMatrix) -> PackedStatistics {
 /// # Panics
 /// If `k` is not in `1..=MAX_TABLE_BITS`.
 pub fn reduced_row_echelon_four_russians(matrix: &mut BitMatrix, k: usize) -> PackedStatistics {
+    four_russians(matrix, k, None)
+}
+
+/// [`reduced_row_echelon_four_russians`], back-substituting only the pivot rows `selected` names.
+///
+/// `selected[c]` says whether the pivot row that leads with column `c` must end fully reduced.
+/// Every row still ends echelon, and the pivot set and rank are those of the full RREF; a selected
+/// pivot row is exactly the full RREF's row for its column, which is unique. An unselected pivot
+/// row keeps entries in later pivots' columns — the shape of F4's candidate-only backward
+/// reduction (#749), which only ever extracts the selected rows.
+///
+/// # Panics
+/// As [`reduced_row_echelon_four_russians`], and if `selected` is shorter than the columns.
+pub fn reduced_row_echelon_four_russians_selected(
+    matrix: &mut BitMatrix,
+    k: usize,
+    selected: &[bool],
+) -> PackedStatistics {
+    assert!(
+        selected.len() >= matrix.num_columns,
+        "{} selection flags for {} columns",
+        selected.len(),
+        matrix.num_columns
+    );
+    four_russians(matrix, k, Some(selected))
+}
+
+fn four_russians(matrix: &mut BitMatrix, k: usize, selected: Option<&[bool]>) -> PackedStatistics {
     assert!(
         (1..=MAX_TABLE_BITS).contains(&k),
         "table width {k} is outside 1..={MAX_TABLE_BITS}"
@@ -197,6 +269,9 @@ pub fn reduced_row_echelon_four_russians(matrix: &mut BitMatrix, k: usize) -> Pa
     let mut table: Vec<u64> = Vec::new();
     let mut window: Vec<u64> = Vec::new();
     let mut pivot_bits: Vec<u32> = Vec::with_capacity(64);
+    // Whether a later word's tables must still clear pivot row `i < rank`: all of them in a full
+    // RREF, only the selected ones otherwise.
+    let mut keep: Vec<bool> = Vec::new();
     let mut rank = 0;
 
     for word in 0..stride {
@@ -270,7 +345,7 @@ pub fn reduced_row_echelon_four_russians(matrix: &mut BitMatrix, k: usize) -> Pa
             let (shift, mask) = (bits[0], (entries - 1) as u64);
             let pivots = rank + group..rank + group + bits.len();
             for row in 0..matrix.num_rows {
-                if pivots.contains(&row) {
+                if pivots.contains(&row) || (row < rank && !keep[row]) {
                     continue;
                 }
                 let leading = matrix.word(row, word);
@@ -291,10 +366,150 @@ pub fn reduced_row_echelon_four_russians(matrix: &mut BitMatrix, k: usize) -> Pa
                 }
             }
         }
+        keep.extend(
+            pivot_bits
+                .iter()
+                .map(|&bit| selected.is_none_or(|selected| selected[word * 64 + bit as usize])),
+        );
         rank += found;
     }
     statistics.rank = rank;
     statistics
+}
+
+/// Clear every pivot's leading column from every row of `target`, up to `k` pivots per table.
+///
+/// `pivots` is F4's reducer block: nonzero sparse rows with every coefficient one and leading
+/// columns strictly ascending, so the block is unit upper triangular. The pivots are read, never
+/// written: a group of `k` is copied out, made the identity on its own leading columns, and applied
+/// through a `2^k`-entry table — or one pivot at a time when too few target rows touch the group
+/// for the table to pay for itself. Ascending order is what makes one pass enough: a pivot has no
+/// entry left of its lead, so it cannot restore a column an earlier group cleared.
+///
+/// # Panics
+/// If `k` is not in `1..=MAX_TABLE_BITS`, or a pivot row is zero. In debug builds, also if the
+/// leads do not ascend or a coefficient is not one.
+pub fn reduce_against_pivots<F: FiniteField>(
+    target: &mut BitMatrix,
+    pivots: &[SparseRow<F>],
+    k: usize,
+) -> PackedStatistics {
+    assert!(
+        (1..=MAX_TABLE_BITS).contains(&k),
+        "table width {k} is outside 1..={MAX_TABLE_BITS}"
+    );
+    let mut statistics = PackedStatistics::default();
+    let stride = target.stride;
+    let mut indices: Vec<usize> = vec![0; target.num_rows];
+    let mut group_rows: Vec<u64> = Vec::new();
+    let mut table: Vec<u64> = Vec::new();
+    let mut leads: Vec<usize> = Vec::with_capacity(k);
+
+    for group in pivots.chunks(k) {
+        leads.clear();
+        leads.extend(
+            group
+                .iter()
+                .map(|row| row.leading_column().expect("a pivot row is nonzero")),
+        );
+        debug_assert!(leads.windows(2).all(|pair| pair[0] < pair[1]));
+
+        let mut touched = 0usize;
+        let mut single_xors = 0usize;
+        for (row, index) in indices.iter_mut().enumerate() {
+            let words = target.row(row);
+            *index = leads.iter().enumerate().fold(0, |index, (b, &column)| {
+                index | ((((words[column / 64] >> (column % 64)) & 1) as usize) << b)
+            });
+            if *index != 0 {
+                touched += 1;
+                single_xors += index.count_ones() as usize;
+            }
+        }
+        if touched == 0 {
+            continue;
+        }
+
+        let first = leads[0] / 64;
+        let width = stride - first;
+        group_rows.clear();
+        group_rows.resize(group.len() * width, 0);
+        for (j, row) in group.iter().enumerate() {
+            let words = &mut group_rows[j * width..(j + 1) * width];
+            for (column, coefficient) in row.entries() {
+                debug_assert!(*coefficient == F::ONE, "pivot coefficients must be one");
+                words[column / 64 - first] |= 1 << (column % 64);
+            }
+        }
+        // The identity on the group's own leads, back to front, so that a row is already clear of
+        // every later lead by the time it is added to an earlier one.
+        for j in (0..group.len()).rev() {
+            for (l, &column) in leads.iter().enumerate().skip(j + 1) {
+                if (group_rows[j * width + column / 64 - first] >> (column % 64)) & 1 == 1 {
+                    let (head, tail) = group_rows.split_at_mut(l * width);
+                    xor_into(&mut head[j * width..(j + 1) * width], &tail[..width]);
+                    statistics.row_xors += 1;
+                }
+            }
+        }
+
+        let entries = 1usize << group.len();
+        if entries + touched < single_xors {
+            table.clear();
+            table.resize(entries * width, 0);
+            for index in 1..entries {
+                let (previous, pivot) = (index & (index - 1), index.trailing_zeros() as usize);
+                let (before, current) = table.split_at_mut(index * width);
+                let current = &mut current[..width];
+                current.copy_from_slice(&before[previous * width..(previous + 1) * width]);
+                xor_into(current, &group_rows[pivot * width..(pivot + 1) * width]);
+                statistics.row_xors += 1;
+            }
+            statistics.tables += 1;
+            for (row, &index) in indices.iter().enumerate() {
+                if index != 0 {
+                    let start = row * stride + first;
+                    xor_into(
+                        &mut target.words[start..start + width],
+                        &table[index * width..(index + 1) * width],
+                    );
+                    statistics.row_xors += 1;
+                }
+            }
+        } else {
+            for (row, &index) in indices.iter().enumerate() {
+                let mut bits = index;
+                while bits != 0 {
+                    let pivot = bits.trailing_zeros() as usize;
+                    let start = row * stride + first;
+                    xor_into(
+                        &mut target.words[start..start + width],
+                        &group_rows[pivot * width..(pivot + 1) * width],
+                    );
+                    statistics.row_xors += 1;
+                    bits &= bits - 1;
+                }
+            }
+        }
+    }
+    statistics
+}
+
+/// Bytes [`reduce_against_pivots`] allocates beyond `target`, for `rows` target rows at width `k`.
+pub fn reduce_against_pivots_workspace(rows: usize, num_columns: usize, k: usize) -> usize {
+    let words = ((1usize << k) + k).saturating_mul(num_columns.div_ceil(64));
+    words
+        .saturating_mul(size_of::<u64>())
+        .saturating_add(rows.saturating_mul(size_of::<usize>()))
+}
+
+/// Bytes [`reduced_row_echelon_four_russians`] allocates beyond the matrix, at width `k`.
+pub fn four_russians_workspace(rows: usize, num_columns: usize, k: usize) -> usize {
+    (1usize << k)
+        .saturating_mul(num_columns.div_ceil(64))
+        .saturating_add(rows)
+        .saturating_mul(size_of::<u64>())
+        .saturating_add(rows)
 }
 
 /// The largest supported table width: a table holds `2^k` rows.
@@ -541,5 +756,149 @@ mod tests {
         for matrix in &collect.0 {
             assert_all_kernels_agree(matrix);
         }
+    }
+
+    /// Unit upper triangular pivots: distinct ascending leads, entries only right of the lead.
+    fn random_pivots(
+        rng: &mut StdRng,
+        count: usize,
+        columns: usize,
+        density: f64,
+    ) -> Vec<SparseRow<Zp2>> {
+        let mut leads: Vec<usize> = (0..columns)
+            .filter(|_| rng.gen_bool((count as f64 / columns as f64).min(1.0)))
+            .collect();
+        leads.truncate(count);
+        leads
+            .into_iter()
+            .map(|lead| {
+                let mut entries = vec![(lead, Zp2::one())];
+                entries.extend(
+                    (lead + 1..columns)
+                        .filter(|_| rng.gen_bool(density))
+                        .map(|c| (c, Zp2::one())),
+                );
+                SparseRow::new(&entries)
+            })
+            .collect()
+    }
+
+    /// Forward reduction against sparse pivots clears every lead column and preserves the row space, at every table width and density.
+    #[test]
+    fn test_reduce_against_pivots_clears_leads_and_keeps_the_row_space() {
+        let mut rng = StdRng::seed_from_u64(777);
+        for &(pivots, targets, columns) in &[
+            (0, 5, 70),
+            (1, 3, 10),
+            (40, 30, 130),
+            (120, 200, 300),
+            (60, 2, 64),
+            (90, 400, 129),
+        ] {
+            for (pivot_density, target_density) in [(0.05, 0.02), (0.3, 0.5), (0.5, 0.01)] {
+                let pivot_rows = random_pivots(&mut rng, pivots, columns, pivot_density);
+                let original = random_sparse(&mut rng, targets, columns, target_density);
+                let mut together: Vec<SparseRow<Zp2>> = pivot_rows.clone();
+                together.extend(original.rows().iter().cloned());
+                let expected = generic_rref(&SparseMatrix::new(columns, together));
+                for k in [1, 2, 4, 8, MAX_TABLE_BITS] {
+                    let mut packed = BitMatrix::from_sparse(&original);
+                    super::reduce_against_pivots(&mut packed, &pivot_rows, k);
+                    for pivot in &pivot_rows {
+                        let lead = pivot.leading_column().unwrap();
+                        assert!(
+                            (0..targets).all(|row| !packed.get(row, lead)),
+                            "k={k}: lead {lead} survived"
+                        );
+                    }
+                    let mut reduced: Vec<SparseRow<Zp2>> = pivot_rows.clone();
+                    reduced.extend(packed.to_sparse().rows().iter().cloned());
+                    assert_eq!(
+                        generic_rref(&SparseMatrix::new(columns, reduced)),
+                        expected,
+                        "k={k}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Selective Four Russians finds the full RREF's pivots and leaves each selected pivot row equal to the full RREF's row.
+    #[test]
+    fn test_selected_rref_matches_full_rref_on_selected_rows() {
+        let mut rng = StdRng::seed_from_u64(7770);
+        let mut matrices: Vec<SparseMatrix<Zp2>> = Vec::new();
+        for &(rows, columns) in &[
+            (1, 1),
+            (20, 20),
+            (40, 130),
+            (130, 40),
+            (100, 200),
+            (65, 129),
+        ] {
+            for density in [0.02, 0.1, 0.5] {
+                matrices.push(random_sparse(&mut rng, rows, columns, density));
+            }
+        }
+        matrices.push(rank_deficient(&mut rng, 200, 150, 20));
+        matrices.push(rank_deficient(&mut rng, 90, 300, 65));
+        matrices.push(SparseMatrix::zero(4, 70));
+        for matrix in &matrices {
+            let (expected, rank) = generic_rref(matrix);
+            let columns = matrix.num_columns();
+            for selection in 0..3 {
+                let selected: Vec<bool> = (0..columns)
+                    .map(|_| match selection {
+                        0 => true,
+                        1 => false,
+                        _ => rng.gen_bool(0.5),
+                    })
+                    .collect();
+                for k in [1, 4, 8] {
+                    let mut packed = BitMatrix::from_sparse(matrix);
+                    let statistics = super::reduced_row_echelon_four_russians_selected(
+                        &mut packed,
+                        k,
+                        &selected,
+                    );
+                    assert_eq!(statistics.rank, rank);
+                    let leads: Vec<Option<usize>> = (0..packed.num_rows())
+                        .map(|row| packed.leading_column(row))
+                        .collect();
+                    assert!(
+                        leads[rank..].iter().all(Option::is_none),
+                        "zero rows follow the pivots"
+                    );
+                    let expected_leads: Vec<Option<usize>> =
+                        expected.iter().map(SparseRow::leading_column).collect();
+                    assert_eq!(&leads[..rank], &expected_leads[..], "the RREF's pivot set");
+                    for (row, reference) in expected.iter().enumerate() {
+                        if selected[reference.leading_column().unwrap()] {
+                            assert_eq!(
+                                &packed.row_to_sparse::<Zp2>(row),
+                                reference,
+                                "k={k} row {row}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Binary packing accepts all-one coefficients over GF(2) and GF(2^8), refuses any other, and unpacks to the same row.
+    #[test]
+    fn test_pack_binary_accepts_only_unit_coefficients() {
+        use crate::{fields::Gf256, FiniteField};
+        let row = SparseRow::new(&[(0, Gf256::one()), (64, Gf256::one()), (99, Gf256::one())]);
+        let packed = BitMatrix::pack_binary(std::slice::from_ref(&row), 100).expect("all ones");
+        assert_eq!(packed.row_to_sparse::<Gf256>(0), row);
+        assert_eq!(packed.leading_column(0), Some(0));
+        let other = SparseRow::new(&[
+            (3, <Gf256 as FiniteField>::from_str("2").unwrap()),
+            (5, Gf256::one()),
+        ]);
+        assert!(BitMatrix::pack_binary(&[row, other], 100).is_none());
+        assert_eq!(BitMatrix::zero(2, 70).leading_column(1), None);
     }
 }

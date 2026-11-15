@@ -94,8 +94,13 @@ that wants a `SquareMatrix<T>` type carrying the invariant rather than a runtime
 words, and converts to and from `SparseMatrix<Zp2>`. `reduced_row_echelon_packed` is plain
 Gauss-Jordan by row `xor`; `reduced_row_echelon_four_russians(matrix, k)` clears `k` pivots per
 `xor` from Gray-code tables (`1 <= k <= MAX_TABLE_BITS`). Both return the RREF with the nonzero rows
-first in pivot order, equal to the generic kernel's. It is a research prototype (#272) and is
-**not** used by F4; [`docs/research/characteristic-two-linear-algebra.md`](../research/characteristic-two-linear-algebra.md)
+first in pivot order, equal to the generic kernel's.
+`reduced_row_echelon_four_russians_selected(matrix, k, selected)` back-substitutes only the pivot
+rows whose leading column `selected` names, and `reduce_against_pivots(target, pivots, k)` clears a
+unit upper triangular block of sparse pivot rows out of a packed matrix without writing the pivots;
+`BitMatrix::pack_binary` packs rows over any characteristic-two field whose coefficients are all one.
+Those three are what F4 uses for `Gf2Elimination` (#777, see the F4 guide);
+[`docs/research/characteristic-two-linear-algebra.md`](../research/characteristic-two-linear-algebra.md)
 has the measurements.
 
 ```rust
