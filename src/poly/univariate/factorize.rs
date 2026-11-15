@@ -356,7 +356,7 @@ impl<F: KnownOrder> DegreeSearch<'_, F> {
 
 /// How `is_irreducible` reaches the Frobenius powers Rabin's test needs.
 #[doc(hidden)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum IrreducibilityRoute {
     /// `x^(q^k)` for k = 1, 2, … in one pass, one Frobenius application each by the given route,
     /// reading off `x^(q^(n/p))` on the way to `x^(q^n)`.
@@ -364,13 +364,8 @@ pub enum IrreducibilityRoute {
     /// `x^(q^k)` by an addition chain on k: `x^(q^(2a)) = x^(q^a) ∘ x^(q^a)`, one one-shot
     /// composition per doubling, and `x^(q^(a+1))` by one Frobenius application. About
     /// `2·log2 n` compositions per power instead of n applications.
+    #[default]
     Doubling,
-}
-
-impl Default for IrreducibilityRoute {
-    fn default() -> Self {
-        Self::Doubling
-    }
 }
 
 impl IrreducibilityRoute {
