@@ -4,7 +4,8 @@
 (`taskset -c 37`), serialized through `tools/benchlock.sh` (tag `272`; 1-minute load 4.2–4.4 at
 START and END of both runs on this 128-core machine). Each cell is the minimum of 5 repetitions,
 arms interleaved with a rotating order. §7 (#777) at `21acc4db` (per-batch table) and `db5c5c05`
-(solves) — commits on `perf/777-gf2-f4-dispatch`, squashed into the PR that closed #777 — same
+(solves) — commits on `perf/777-gf2-f4-dispatch` before a rebase onto `2e95420c` that touched no
+file they built from (the same trees are `760a9432` and `ad8b53ba`), squashed into the PR that closed #777 — same
 core, same lock (tag `777`, load 7.5–14.0), release build with the repository's `.cargo/config.toml`.
 
 Reference for #272 (H16), scoped to the **kernel** only — representation and solving route stay
