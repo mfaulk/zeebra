@@ -34,7 +34,8 @@ pub use univariate::{
     karatsuba_unstable, newton_crossover_unstable, newton_floor_unstable,
     newton_is_cheaper_at_unstable, newton_is_cheaper_unstable, pow_mod_limbs_unstable,
     product_of_factors_unstable, subproduct_evaluate_unstable, subproduct_interpolate_unstable,
-    tree_crossover_unstable, FrobeniusRoute,
+    transform_tree_interpolate_unstable, tree_crossover_unstable, FrobeniusRoute, TransformKernel,
+    TransformTree,
 };
 
 #[cfg(test)]

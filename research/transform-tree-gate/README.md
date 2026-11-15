@@ -41,5 +41,8 @@ The second table reports `n^(e-1)/log2(n)^2`, then divides it by explicit
 hypothetical transform/Karatsuba constant ratios. Its values are model ratios,
 not predicted or measured speedups. There is no fitted transform-tree constant.
 No absolute runtime extrapolation or production arithmetic change is made.
-The generic `FiniteField` route remains necessary. #606 stays open for the
-capability-design decision and, if justified, a bounded whole-route experiment.
+The generic `FiniteField` route remains necessary. The bounded experiment this
+gate called for is [fast-univariate §4.3.5](../../docs/research/fast-univariate.md#435-the-transform-tree-measured-606)
+(`examples/transform_tree_ab.rs`): it measured the transform tree 1.36x–2.94x
+faster at 13,123 points, so the sensitivity rows above with `C_N/C_K >= 2` did
+not occur. Production dispatch still awaits the capability design.

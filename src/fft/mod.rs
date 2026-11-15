@@ -6,7 +6,7 @@ mod evaluate;
 mod interpolate;
 pub(crate) mod multiply;
 pub(crate) mod prime_factor;
-mod transform;
+pub(crate) mod transform;
 
 use crate::FiniteField;
 
