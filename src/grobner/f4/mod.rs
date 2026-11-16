@@ -44,8 +44,8 @@ pub use membership::{
 };
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
-    BatchOrder, F4Error, F4Options, Gf2Elimination, InterreductionRoute, ParallelForward,
-    ReducerSelection, ReductionStrategy, StopKind,
+    BatchOrder, F4Error, F4Options, Gf2Elimination, InterreductionRoute, PairMultiples,
+    ParallelForward, ReducerSelection, ReductionStrategy, StopKind,
 };
 pub use reduction::{
     build_batch_matrix, reduce_batch, reduce_batch_in, reduce_batch_observed_in, BatchOutcome,
@@ -57,9 +57,9 @@ pub use statistics::{
     ParallelForwardStatistics, StageClock, StageTimings,
 };
 pub use symbolic::{
-    symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,
-    MonicBasis, MonicElement, MonomialHandle, Preprocessed, PreprocessedRow, ReducerCache,
-    RowBudgetExceeded, RowKind, SymbolicCounts,
+    symbolic_preprocessing, symbolic_preprocessing_seeded, symbolic_preprocessing_with,
+    symbolic_preprocessing_within, CacheMode, MonicBasis, MonicElement, MonomialHandle,
+    Preprocessed, PreprocessedRow, ReducerCache, RowBudgetExceeded, RowKind, SymbolicCounts,
 };
 
 use std::time::Instant;

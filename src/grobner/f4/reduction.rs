@@ -11,7 +11,7 @@ use crate::{
             statistics::{BatchStatistics, StageClock, StageTimings},
             structured::{eliminate_to, BlockPlan, RowForm},
             symbolic::{
-                symbolic_preprocessing_with, MonicBasis, Preprocessed, ReducerCache, RowKind,
+                symbolic_preprocessing_seeded, MonicBasis, Preprocessed, ReducerCache, RowKind,
             },
         },
         pairs::CriticalPair,
@@ -146,12 +146,13 @@ fn build_batch_matrix_in<const N: usize, F: FiniteField>(
 ) -> Result<BuiltMatrix<N, F>, F4Error> {
     // Preprocessing bounds rows as it discovers them; construction checks the completed
     // symbolic layout before allocating coefficient rows.
-    let mut preprocessed = symbolic_preprocessing_with(
+    let mut preprocessed = symbolic_preprocessing_seeded(
         basis,
         pairs,
         options.max_matrix_rows,
         options.reducer_selection,
         cache,
+        options.pair_multiples,
     )
     .map_err(|exceeded| F4Error::TooManyRows {
         limit: exceeded.limit,
@@ -487,6 +488,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         divmask_negative: preprocessed.counts.divmask_negative,
         divmask_decided: preprocessed.counts.divmask_decided,
         monomials_enqueued: preprocessed.counts.monomials_enqueued,
+        pair_multiples_removed: preprocessed.counts.pair_multiples_removed,
         max_pending_monomials: preprocessed.counts.max_pending_monomials,
         structured,
         // The unstructured path does not distinguish a pivot it found for free from one it worked
@@ -848,14 +850,27 @@ mod tests {
     ///
     /// Three generators with the same leading monomial give three pairs whose six matrix rows span
     /// only a two-dimensional space of new relations, so the elimination has dependencies to find.
+    /// Seeding every pair half keeps the six rows; seeding each distinct multiple once (#831)
+    /// reaches the same candidates from three.
     #[test]
     fn test_batch_with_dependent_rows() {
+        use crate::grobner::f4::PairMultiples;
+
         for order in ALL_ORDERS {
             let polynomials = system(&["x^2 + y", "x^2 + z", "x^2 + y + z"]);
             let basis = MonicBasis::new(&polynomials, order);
             let pairs = all_pairs(&polynomials, order);
-            let outcome =
-                reduce_batch(&basis, &pairs, order, &F4Options::default()).expect("within limits");
+            let run = |pair_multiples| {
+                let options = F4Options {
+                    pair_multiples,
+                    ..F4Options::default()
+                };
+                reduce_batch(&basis, &pairs, order, &options).expect("within limits")
+            };
+            let outcome = run(PairMultiples::Every);
+            let distinct = run(PairMultiples::Distinct);
+            assert_eq!(distinct.statistics.rows, 3, "{}", order.name());
+            assert_eq!(distinct.candidates, outcome.candidates, "{}", order.name());
 
             assert_eq!(outcome.statistics.pairs, 3, "{}", order.name());
             assert_eq!(outcome.statistics.rows, 6, "{}", order.name());

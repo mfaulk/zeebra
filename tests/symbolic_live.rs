@@ -10,7 +10,7 @@ use zeebra::{
             },
         },
         pairs::CriticalPair,
-        F4Options,
+        F4Options, PairMultiples,
     },
     BlockOrder, BlockOrderKind, FiniteField, MonomialOrder, MultivariatePolynomial,
     WeightedTieBreak,
@@ -20,44 +20,7 @@ fn parse<F: FiniteField>(s: &str) -> MultivariatePolynomial<3, F> {
     MultivariatePolynomial::parse(s, ["x", "y", "z"]).unwrap()
 }
 
-// Duplicate seed identities are removed while all pair leads and closure columns remain covered.
-#[test]
-fn duplicate_seeds_preserve_span_and_covered_leads() {
-    let order = MonomialOrder::GradedReverseLexicographic;
-    let input = [parse::<Zp13>("x^2 + y"), parse("x*y + z"), parse("y^2 + x")];
-    let basis = MonicBasis::new(&input, order);
-    let a = CriticalPair::new(&input, 0, 1, order);
-    let b = CriticalPair::new(&input, 0, 2, order);
-    let pairs = [a.clone(), a, b];
-    let original = symbolic_preprocessing(&basis, &pairs);
-    let selected = live_symbolic::with_policy(
-        Policy {
-            order_initial: false,
-            deduplicate: true,
-        },
-        input.len(),
-        || symbolic_preprocessing(&basis, &pairs),
-    );
-    assert!(selected.rows.len() < original.rows.len());
-    assert_eq!(selected.leading_monomials, original.leading_monomials);
-    assert_eq!(selected.monomials, original.monomials);
-    for row in &original.rows {
-        assert!(selected
-            .rows
-            .iter()
-            .any(|r| r.basis_index == row.basis_index && r.multiplier == row.multiplier));
-    }
-    assert!(
-        selected
-            .rows
-            .iter()
-            .filter(|r| matches!(r.kind, RowKind::PairComponent { .. }))
-            .count()
-            < 2 * pairs.len()
-    );
-}
-
-// Deduplicated preprocessing refuses at its own row limit and does not leak policy into a retry.
+// Ordered preprocessing refuses at its own row limit and does not leak policy into a retry.
 #[test]
 fn exact_row_budget_and_scope_reuse() {
     let order = MonomialOrder::Lexicographic;
@@ -69,7 +32,6 @@ fn exact_row_budget_and_scope_reuse() {
     live_symbolic::with_policy(
         Policy {
             order_initial: true,
-            deduplicate: true,
         },
         input.len(),
         || {
@@ -87,7 +49,6 @@ fn exact_row_budget_and_scope_reuse() {
         live_symbolic::with_policy(
             Policy {
                 order_initial: true,
-                deduplicate: true,
             },
             1,
             || panic!("scope unwind"),
@@ -122,26 +83,24 @@ fn complete<F: FiniteField>() {
         input.push(parse("0"));
         let expected = zeebra::grobner::buchberger(&input, order);
         for order_initial in [false, true] {
-            for deduplicate in [false, true] {
-                let actual = live_symbolic::with_policy(
-                    Policy {
-                        order_initial,
-                        deduplicate,
-                    },
-                    input.len(),
-                    || {
-                        zeebra::grobner::f4_with_options(&input, order, &F4Options::default())
+            for pair_multiples in [PairMultiples::Every, PairMultiples::Distinct] {
+                let options = F4Options {
+                    pair_multiples,
+                    ..F4Options::default()
+                };
+                let actual =
+                    live_symbolic::with_policy(Policy { order_initial }, input.len(), || {
+                        zeebra::grobner::f4_with_options(&input, order, &options)
                             .unwrap()
                             .0
-                    },
-                );
+                    });
                 assert_eq!(actual, expected);
             }
         }
     }
 }
 
-// All four live policies preserve complete reduced bases with zero/proportional inputs across field widths.
+// Every ordering and pair-multiple policy preserves complete reduced bases with zero/proportional inputs across field widths.
 #[test]
 fn complete_bases_match_independent_buchberger() {
     complete::<Zp13>();
@@ -170,7 +129,6 @@ fn ordering_preserves_pair_indices_and_appended_prefix_boundary() {
     let selected = live_symbolic::with_policy(
         Policy {
             order_initial: true,
-            deduplicate: false,
         },
         2,
         || symbolic_preprocessing(&basis, &pairs),
@@ -197,37 +155,6 @@ fn ordering_preserves_pair_indices_and_appended_prefix_boundary() {
     assert_eq!(selected_row.basis_index, 1);
 }
 
-// Equal leading monomials and proportional generators are never mistaken for a duplicate seed identity.
-#[test]
-fn distinct_seed_identities_with_equal_leads_are_retained() {
-    let order = MonomialOrder::GradedReverseLexicographic;
-    let input = [
-        parse::<Zp13>("2*x^2 + 2*y"),
-        parse("x^2 + y"),
-        parse("x^2 + z"),
-    ];
-    let basis = MonicBasis::new(&input, order);
-    let pairs = [
-        CriticalPair::new(&input, 0, 1, order),
-        CriticalPair::new(&input, 1, 2, order),
-    ];
-    let selected = live_symbolic::with_policy(
-        Policy {
-            order_initial: false,
-            deduplicate: true,
-        },
-        input.len(),
-        || symbolic_preprocessing(&basis, &pairs),
-    );
-    let seeds: Vec<_> = selected
-        .rows
-        .iter()
-        .filter(|row| matches!(row.kind, RowKind::PairComponent { .. }))
-        .map(|row| row.basis_index)
-        .collect();
-    assert_eq!(seeds, [0, 1, 2]);
-}
-
 // Live F4 freezes the normalized distinct input size before appended basis elements can enter the search.
 #[test]
 fn normalized_initial_prefix_is_frozen() {
@@ -243,7 +170,6 @@ fn normalized_initial_prefix_is_frozen() {
     let ((_, stats), report) = live_symbolic::observe(
         Policy {
             order_initial: true,
-            deduplicate: true,
         },
         input.len(),
         || zeebra::grobner::f4_with_options(&input, order, &F4Options::default()).unwrap(),

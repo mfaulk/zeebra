@@ -968,27 +968,33 @@ fn test_every_configuration_agrees_with_the_baseline() {
                                 PairCriteria::PRODUCT_ONLY,
                                 PairCriteria::ALL,
                             ] {
-                                let options = F4Options {
-                                    elimination,
-                                    reduction,
-                                    reducer_selection,
-                                    reducer_cache,
-                                    criteria,
-                                    ..F4Options::baseline()
-                                };
-                                let (actual, _) =
-                                    f4_with_options(f, order, &options).expect("within limits");
-                                assert_eq!(
-                                    actual,
-                                    expected,
-                                    "{} under {:?}/{:?}/{:?}/{:?}/{:?}",
-                                    order.name(),
-                                    elimination,
-                                    reduction,
-                                    reducer_selection,
-                                    reducer_cache,
-                                    criteria
-                                );
+                                for pair_multiples in
+                                    [super::PairMultiples::Every, super::PairMultiples::Distinct]
+                                {
+                                    let options = F4Options {
+                                        elimination,
+                                        reduction,
+                                        reducer_selection,
+                                        reducer_cache,
+                                        criteria,
+                                        pair_multiples,
+                                        ..F4Options::baseline()
+                                    };
+                                    let (actual, _) =
+                                        f4_with_options(f, order, &options).expect("within limits");
+                                    assert_eq!(
+                                        actual,
+                                        expected,
+                                        "{} under {:?}/{:?}/{:?}/{:?}/{:?}/{:?}",
+                                        order.name(),
+                                        elimination,
+                                        reduction,
+                                        reducer_selection,
+                                        reducer_cache,
+                                        criteria,
+                                        pair_multiples
+                                    );
+                                }
                             }
                         }
                     }
@@ -1976,9 +1982,11 @@ fn test_the_byte_budget_is_what_makes_a_budget_mean_the_same_at_every_field_widt
         "a wide entry is 2.5 narrow ones"
     );
 
-    // A byte budget sized for the narrow computation's peak admits it and refuses the wide one.
+    // A byte budget sized for the narrow computation's requirement admits it and refuses the
+    // wide one. The requirement, not the peak: candidate finishing reserves against the same
+    // allowance, and on katsura-5 its reservation is the larger of the two.
     let budget = F4Options {
-        max_live_bytes: narrow.peak_live_bytes(),
+        max_live_bytes: narrow.live_entry_requirement() * narrow.bytes_per_entry,
         ..F4Options::default()
     };
     assert!(f4_with_options(&katsura::<5, Narrow>(), order, &budget).is_ok());
@@ -1987,10 +1995,10 @@ fn test_the_byte_budget_is_what_makes_a_budget_mean_the_same_at_every_field_widt
         Err(F4Error::TooManyLiveBytes { .. })
     ));
 
-    // The entry budget at that same peak admits both, because it cannot tell them apart. This is
-    // the behaviour that was wrong, asserted so that it is not mistaken for the fix.
+    // The entry budget at that same requirement admits both, because it cannot tell them apart.
+    // This is the behaviour that was wrong, asserted so that it is not mistaken for the fix.
     let entries_only = F4Options {
-        max_live_nonzeros: narrow.max_live_nonzeros,
+        max_live_nonzeros: narrow.live_entry_requirement(),
         max_live_bytes: usize::MAX,
         ..F4Options::default()
     };
@@ -4214,4 +4222,192 @@ fn test_level_parallel_symbolic_preprocessing_matches_the_serial_closure() {
     }
     let compared = check("katsura-6", &katsura::<6, G>()) + check("cyclic-5", &cyclic::<5, G>());
     assert!(compared > 0, "no batch was compared");
+}
+
+/// The two halves of every pair in `pairs`, as `(basis_index, multiplier)` identities.
+fn seed_identities<const N: usize>(
+    preprocessed: &Preprocessed<N>,
+) -> Vec<(usize, crate::Monomial<N>)> {
+    preprocessed
+        .rows
+        .iter()
+        .filter(|row| matches!(row.kind, super::symbolic::RowKind::PairComponent { .. }))
+        .map(|row| (row.basis_index, row.multiplier))
+        .collect()
+}
+
+/// `Distinct` keeps one copy of each repeated pair multiple and leaves the columns, the leads and
+/// every distinct seed identity exactly as `Every` has them.
+#[test]
+fn test_distinct_pair_multiples_drop_only_identical_seeds() {
+    use super::{symbolic::symbolic_preprocessing_seeded, PairMultiples, ReducerSelection};
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let input = system(&["x^2 + y", "x*y + z", "y^2 + x"]);
+    let basis = MonicBasis::new(&input, order);
+    let a = CriticalPair::new(&input, 0, 1, order);
+    let b = CriticalPair::new(&input, 0, 2, order);
+    let pairs = [a.clone(), a, b];
+    let run = |multiples| {
+        symbolic_preprocessing_seeded(
+            &basis,
+            &pairs,
+            usize::MAX,
+            ReducerSelection::FirstApplicable,
+            &mut ReducerCache::disabled(),
+            multiples,
+        )
+        .unwrap()
+    };
+    let every = run(PairMultiples::Every);
+    let distinct = run(PairMultiples::Distinct);
+
+    let every_seeds = seed_identities(&every);
+    let distinct_seeds = seed_identities(&distinct);
+    assert_eq!(every_seeds.len(), 2 * pairs.len());
+    let unique: HashSet<_> = every_seeds.iter().cloned().collect();
+    assert_eq!(distinct_seeds.len(), unique.len());
+    assert_eq!(
+        distinct_seeds.iter().cloned().collect::<HashSet<_>>(),
+        unique
+    );
+    assert_eq!(
+        distinct.counts.pair_multiples_removed,
+        every_seeds.len() - unique.len()
+    );
+    assert_eq!(every.counts.pair_multiples_removed, 0);
+    assert_eq!(distinct.monomials, every.monomials);
+    assert_eq!(
+        distinct.leading_monomials.iter().collect::<HashSet<_>>(),
+        every.leading_monomials.iter().collect::<HashSet<_>>()
+    );
+}
+
+/// Equal leading monomials from different basis elements are distinct identities and both stay.
+#[test]
+fn test_distinct_pair_multiples_keep_equal_leads_from_different_elements() {
+    use super::{symbolic::symbolic_preprocessing_seeded, PairMultiples, ReducerSelection};
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let input = system(&["x^2 + y", "x^2 + z", "x*y + 1"]);
+    let basis = MonicBasis::new(&input, order);
+    let pairs = [
+        CriticalPair::new(&input, 0, 1, order),
+        CriticalPair::new(&input, 1, 2, order),
+    ];
+    let distinct = symbolic_preprocessing_seeded(
+        &basis,
+        &pairs,
+        usize::MAX,
+        ReducerSelection::FirstApplicable,
+        &mut ReducerCache::disabled(),
+        PairMultiples::Distinct,
+    )
+    .unwrap();
+    let seeds = seed_identities(&distinct);
+    assert_eq!(seeds.len(), 4, "{seeds:?}");
+    assert_eq!(distinct.counts.pair_multiples_removed, 0);
+}
+
+/// The row budget counts retained rows only, and refuses exactly one row short of the need.
+#[test]
+fn test_distinct_pair_multiples_respect_the_exact_row_budget() {
+    use super::{symbolic::symbolic_preprocessing_seeded, PairMultiples, ReducerSelection};
+
+    let order = MonomialOrder::Lexicographic;
+    let input = system(&["x^2 + y", "x*y + z", "y^2 + x"]);
+    let basis = MonicBasis::new(&input, order);
+    let pair = CriticalPair::new(&input, 0, 1, order);
+    let pairs = [pair.clone(), pair];
+    let run = |max_rows| {
+        symbolic_preprocessing_seeded(
+            &basis,
+            &pairs,
+            max_rows,
+            ReducerSelection::FirstApplicable,
+            &mut ReducerCache::disabled(),
+            PairMultiples::Distinct,
+        )
+    };
+    let needed = run(usize::MAX).unwrap().rows.len();
+    assert!(run(needed).is_ok());
+    assert!(run(needed - 1).is_err());
+}
+
+/// Pair-multiple deduplication is on by default and off in the frozen baseline.
+#[test]
+fn test_pair_multiples_default_is_distinct_and_baseline_is_every() {
+    use super::PairMultiples;
+
+    assert_eq!(F4Options::default().pair_multiples, PairMultiples::Distinct);
+    assert_eq!(
+        F4Options::recommended().pair_multiples,
+        PairMultiples::Distinct
+    );
+    assert_eq!(F4Options::baseline().pair_multiples, PairMultiples::Every);
+}
+
+/// Deduplicating pair multiples leaves the reduced basis unchanged, removes rows on the benchmark
+/// families, and reports what it removed; `Every` removes nothing.
+#[test]
+fn test_pair_multiple_deduplication_preserves_the_basis_and_removes_rows() {
+    use super::PairMultiples;
+    type G = Zp2147483647;
+
+    fn check<const N: usize>(name: &str, f: &[MultivariatePolynomial<N, G>]) -> usize {
+        let mut removed = 0;
+        for order in ALL_ORDERS {
+            let run = |pair_multiples| {
+                f4_with_options(
+                    f,
+                    order,
+                    &F4Options {
+                        pair_multiples,
+                        ..F4Options::default()
+                    },
+                )
+                .expect("within limits")
+            };
+            let (every, every_stats) = run(PairMultiples::Every);
+            let (distinct, distinct_stats) = run(PairMultiples::Distinct);
+            assert_eq!(distinct, every, "{name} under {}", order.name());
+            assert_eq!(every_stats.pair_multiples_removed, 0);
+            assert!(
+                distinct_stats.max_matrix_rows <= every_stats.max_matrix_rows,
+                "{name}"
+            );
+            removed += distinct_stats.pair_multiples_removed;
+        }
+        removed
+    }
+    let removed = check("katsura-5", &katsura::<5, G>()) + check("cyclic-5", &cyclic::<5, G>());
+    assert!(removed > 0, "no duplicate pair multiple was ever removed");
+}
+
+/// A run budgeted at its own `live_entry_requirement` is admitted under both pair-multiple
+/// policies, and the requirement never understates the reported elimination peak.
+#[test]
+fn test_a_run_budgeted_at_its_live_entry_requirement_is_admitted() {
+    use super::PairMultiples;
+    type Narrow = crate::fields::Zp18446744073709551557;
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    for pair_multiples in [PairMultiples::Every, PairMultiples::Distinct] {
+        for cap in [None, Some(16)] {
+            let options = F4Options {
+                pair_multiples,
+                max_pairs_per_batch: cap,
+                ..F4Options::default()
+            };
+            let system = katsura::<5, Narrow>();
+            let (_, measured) = f4_with_options(&system, order, &options).expect("within limits");
+            let requirement = measured.live_entry_requirement();
+            assert!(requirement >= measured.max_live_nonzeros);
+            let budgeted = options.clone().with_live_entries::<Narrow>(requirement);
+            assert!(
+                f4_with_options(&system, order, &budgeted).is_ok(),
+                "{pair_multiples:?}, cap {cap:?}: refused at its own requirement {requirement}"
+            );
+        }
+    }
 }

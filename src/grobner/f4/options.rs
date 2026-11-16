@@ -50,6 +50,27 @@ pub enum ReductionStrategy {
     Structured,
 }
 
+/// Whether symbolic preprocessing keeps a repeated pair multiple (#831).
+///
+/// Two pairs in one batch often share a half: `(i, j)` and `(i, k)` with equal lcms both seed the
+/// row `(lcm / lm(g_i)) * g_i`. The two seeds are the same polynomial, so the second adds nothing
+/// to the row space the batch reduces, and the batch's candidates — fully reduced rows of that
+/// space with new leading monomials — are unchanged. Both pairs' S-polynomials still lie in the
+/// span: each is the difference of two retained rows. The test is on the exact
+/// `(basis_index, multiplier)` identity, never on the leading monomial alone, so two different
+/// elements with an equal lead are both kept.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PairMultiples {
+    /// Seed both halves of every pair, repeats included. The pre-#831 behaviour.
+    Every,
+
+    /// Seed each distinct `(basis_index, multiplier)` once. Under benchlock at `9d3e45a7` (#841),
+    /// Katsura-11 over 2^31−1 took 0.80x the F4 call serially and 0.91x on 16 workers, and MQ10
+    /// 0.89–0.97x, mostly from forward elimination; small controls did not move.
+    #[default]
+    Distinct,
+}
+
 /// Whether a batch over `GF(2)` is eliminated as packed bits rather than sparse entries (#777).
 ///
 /// The packed path ([`crate::linalg::gf2`]) applies only where its answer is provably the generic
@@ -769,6 +790,12 @@ pub struct F4Options {
     /// [`BatchOrder::Forward`] at both [`baseline`](Self::baseline) and
     /// [`recommended`](Self::recommended).
     pub batch_order: BatchOrder,
+
+    /// Whether symbolic preprocessing seeds a repeated pair multiple once. See [`PairMultiples`].
+    ///
+    /// [`PairMultiples::Distinct`] at [`recommended`](Self::recommended);
+    /// [`PairMultiples::Every`] at [`baseline`](Self::baseline).
+    pub pair_multiples: PairMultiples,
 }
 
 impl F4Options {
@@ -804,6 +831,7 @@ impl F4Options {
             gf2_elimination: Gf2Elimination::Generic,
             parallel_forward: ParallelForward::Serial,
             batch_order: BatchOrder::Forward,
+            pair_multiples: PairMultiples::Every,
         }
     }
 
@@ -854,6 +882,7 @@ impl F4Options {
             // controls within 3.5% and RSS within 1.24x of serial. Sixteen, not the machine,
             // because 62 workers cost 1.35x RSS for a further 12%.
             parallel_forward: ParallelForward::Auto { max_workers: 16 },
+            pair_multiples: PairMultiples::Distinct,
             ..Self::baseline()
         }
     }

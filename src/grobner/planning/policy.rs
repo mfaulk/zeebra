@@ -1452,12 +1452,15 @@ mod tests {
         };
         let (_, lean) = crate::grobner::f4_reported(&system, order, &capped);
         let (_, full) = crate::grobner::f4_reported(&system, order, &F4Options::default());
-        assert!(lean.max_live_nonzeros < full.max_live_nonzeros, "premise");
+        assert!(
+            lean.live_entry_requirement() < full.live_entry_requirement(),
+            "premise"
+        );
 
         let solve = |objective| {
             let mut options = with_objective(SolvePolicy::ConservativeAuto, objective);
             options.attempt.f4 =
-                F4Options::default().with_live_entries::<F>(lean.max_live_nonzeros);
+                F4Options::default().with_live_entries::<F>(lean.live_entry_requirement());
             solve_one_planned(&system, &mut StdRng::seed_from_u64(3), &options)
         };
 
