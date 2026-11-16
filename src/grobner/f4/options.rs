@@ -277,7 +277,7 @@ pub enum BatchOrder {
     /// Pair rows never meet each other until every reducer column is gone, so pair-against-pair
     /// work is confined to the columns of `D'` and the backward pass never touches a reducer
     /// column. Both passes take workers under [`ParallelForward`], behind the forward order's
-    /// gate. Opt-in: 1.23-1.27x the 16-worker forward order on `katsura-11` but 0.94-0.97x on
+    /// gate. Opt-in: 1.23-1.28x the 16-worker forward order on `katsura-11` but 0.94-0.98x on
     /// `cyclic-7` (`docs/research/residual-split.md` §8).
     FaugereLachartre,
 }
