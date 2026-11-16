@@ -8,8 +8,6 @@ and then their median is taken, so a load drift between repetitions cancels (rat
 absolutes do not). Nothing is clock-normalized.
 """
 import gzip
-import hashlib
-import importlib.util
 import json
 from pathlib import Path
 import statistics
@@ -23,7 +21,9 @@ MQ10 = {'mq10-32003': '32003', 'mq10-m31': '2147483647'}
 
 
 def jsonl(path):
-    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()] if path.exists() else []
+    gz = path.with_name(path.name + '.gz')
+    text = path.read_text() if path.exists() else gzip.decompress(gz.read_bytes()).decode() if gz.exists() else ''
+    return [json.loads(l) for l in text.splitlines() if l.strip()]
 
 
 def med(xs):
@@ -191,68 +191,74 @@ def ab831(records, out):
     out.append('')
 
 
-def scaling_module():
-    spec = importlib.util.spec_from_file_location('scaling', ROOT / 'tools/external/comparand-scaling.py')
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
-    return m
-
-
 def mq10(directory, walls, out):
-    path = directory / 'mq10.json.gz'
+    path = directory / 'mq10-attempts.json'
     if not path.exists():
         out.append('## MQ10 comparands\n\nnot measured\n')
         return
-    cohort = scaling_module().load_cohort(path)
+    windows = json.loads(path.read_text())
     out.append('## MQ10 against the comparands (comparand-scaling.py, fresh process, I/O included)\n')
-    out.append('| Field | Engine | 1 worker ms | 4 workers ms | 8 workers ms | 16 workers ms | statuses |')
-    out.append('|---|---|---:|---:|---:|---:|---|')
-    groups = {}
-    for a in cohort['attempts']:
-        groups.setdefault((str(a['field']), a['engine'], a['workers']), []).append(a)
-    for field in ('32003', '2147483647'):
-        for engine in ('zeebra', 'msolve', 'groebner-rs', 'grobx'):
-            cells, statuses = [], set()
-            for w in WORKERS:
-                rows = groups.get((field, engine, w), [])
-                statuses |= {a['status'] for a in rows}
-                done = [a['process_wall_ns'] for a in rows if a['status'] in ('verified', 'complete') and a.get('process_wall_ns')]
-                cells.append(rng(done) + (f' n={len(done)}' if done else ''))
-            out.append(f"| {field} | {engine} | {' | '.join(cells)} | {', '.join(sorted(statuses))} |")
+    out.append('Each controller window is reported on its own and never pooled; a window ends when the '
+               'controller refuses because a compiler started elsewhere.\n')
+    out.append('| Window | Field | Engine | 1 worker ms | 4 workers ms | 8 workers ms | 16 workers ms |')
+    out.append('|---|---|---|---:|---:|---:|---:|')
+    for win in windows:
+        groups = {}
+        for a in win['attempts']:
+            groups.setdefault((str(a['field']), a['engine'], a['workers']), []).append(a)
+        for field in ('32003', '2147483647'):
+            for engine in ('zeebra', 'msolve', 'groebner-rs', 'grobx'):
+                cells = []
+                for w in WORKERS:
+                    rows = groups.get((field, engine, w), [])
+                    done = [a['process_wall_ns'] for a in rows if a['status'] == 'verified' and a.get('process_wall_ns')]
+                    other = sorted({a['status'] for a in rows if a['status'] != 'verified'})
+                    cells.append((rng(done) + f' n={len(done)}' if done else '—') + (f" ({', '.join(other)})" if other else ''))
+                out.append(f"| {win['archive'].split('.')[0]} | {field} | {engine} | {' | '.join(cells)} |")
     out.append('')
-    out.append('| Field | Zeebra 16w ms | best exact msolve ≤16 ms (workers) | Zeebra / msolve | Zeebra time needed for ≤1.5x |')
-    out.append('|---|---:|---:|---:|---:|')
-    for field in ('32003', '2147483647'):
-        z = med([a['process_wall_ns'] for a in groups.get((field, 'zeebra', 16), []) if a['status'] in ('verified', 'complete')])
-        best = min(((med([a['process_wall_ns'] for a in groups.get((field, 'msolve', w), []) if a['status'] in ('verified', 'complete')]), w)
-                     for w in WORKERS if groups.get((field, 'msolve', w))), key=lambda x: x[0] or 1e30, default=(None, None))
-        if z and best[0]:
-            out.append(f'| {field} | {z / 1e6:.1f} | {best[0] / 1e6:.1f} ({best[1]}) | {z / best[0]:.2f}x | ≤{1.5 * best[0] / 1e6:.1f} |')
+    out.append('| Window | Field | Zeebra 16w ms | best exact msolve ≤16 ms (workers) | Zeebra / msolve | Zeebra time needed for ≤1.5x |')
+    out.append('|---|---|---:|---:|---:|---:|')
+    for win in windows:
+        groups = {}
+        for a in win['attempts']:
+            if a['status'] == 'verified' and a.get('process_wall_ns'):
+                groups.setdefault((str(a['field']), a['engine'], a['workers']), []).append(a['process_wall_ns'])
+        for field in ('32003', '2147483647'):
+            z = med(groups.get((field, 'zeebra', 16), []))
+            ms = [(med(groups[(field, 'msolve', w)]), w) for w in WORKERS if (field, 'msolve', w) in groups]
+            if z and ms:
+                b, w = min(ms)
+                out.append(f"| {win['archive'].split('.')[0]} | {field} | {z / 1e6:.1f} | {b / 1e6:.1f} ({w}) | "
+                           f"{z / b:.2f}x | ≤{1.5 * b / 1e6:.1f} |")
     out.append('')
 
 
 def wide(directory, walls, out):
+    path = directory / 'wide-attempts.json'
     out.append('## Wide-field targets against grobx and groebner-rs (wide-corpus.py, one worker, three passes)\n')
-    out.append('| Target | engine | process wall ms (n) | basis agrees with Zeebra |')
+    if not path.exists():
+        out.append('not measured\n')
+        return
+    passes = json.loads(path.read_text())
+    out.append('| Target | engine | process wall ms (n) | basis against Zeebra |')
     out.append('|---|---|---:|---|')
     best = {}
     for t, (field, name) in WIDE.items():
         zsha = {r['report']['basis_sha256'] for r in by(walls, target=t) if ok(r)}
         for engine in ('grobx', 'groebner-rs'):
             walls_e, agree = [], set()
-            for path in sorted(directory.glob(f'wide-{field}-{name}-pass*.json.gz')):
-                cohort = json.loads(gzip.decompress(path.read_bytes()))
-                for a in cohort['attempts']:
-                    rep = a.get('report') or {}
-                    if a['engine'] == engine and rep.get('status') == 'complete':
-                        walls_e.append(rep['solver_process_wall_ns'])
-                        basis = rep.get('basis')
-                        if isinstance(basis, list):
-                            agree.add(hashlib.sha256('\n'.join(sorted(basis)).encode()).hexdigest() in zsha)
+            for p in passes:
+                for a in p['attempts']:
+                    if (a['field'], a['name'], a['engine']) == (field, name, engine) and a['status'] == 'complete':
+                        walls_e.append(a['solver_process_wall_ns'])
+                        agree.add(a['basis_text_sha256'] in zsha)
             if walls_e:
                 best.setdefault(t, []).append((med(walls_e), engine))
-            out.append(f"| {t} | {engine} | {rng(walls_e)} (n={len(walls_e)}) | "
-                       f"{'yes' if agree == {True} else 'no' if False in agree else 'unchecked'} |")
+            # groebner-rs prints a different term layout, so its text never hashes equal; the
+            # controller's verify_bases compared it canonically with grobx and would have raised.
+            verdict = ('identical text' if agree == {True} else
+                       'equal to grobx canonically (controller verify_bases)' if agree else 'unchecked')
+            out.append(f"| {t} | {engine} | {rng(walls_e)} (n={len(walls_e)}) | {verdict} |")
     out.append('')
     out.append('| Target | Zeebra 16w ms | best comparand ms (engine) | Zeebra / best | Zeebra time needed for a 10% lead |')
     out.append('|---|---:|---:|---:|---:|')

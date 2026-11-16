@@ -126,6 +126,19 @@ requires its own end-to-end evidence.
 
 **Owner:** [#834](https://github.com/mfaulk/zeebra/issues/834). **Priority:** P0. **Dependencies:** none.
 
+**Status: baseline frozen and cost model published**
+([report](research/m29-baseline-cost-model.md), measured at `847c4030`, production source
+`da5b658c`). It shows the following:
+
+- At 16 workers the F4 call is 63–76% serial. Forward elimination already scales 10.7–14.4×.
+- Serial candidate finishing is 14–27% of process wall, the largest single opportunity on both wide
+  targets, and is now [#845](https://github.com/mfaulk/zeebra/issues/845).
+- #828's 15% gate needs 45–68% of forward work removed, against a plausible 4–5%.
+- #831 measured 0.84–0.97× at 16 workers.
+- Distances: msolve 2.7× (32003) and 1.9× (2³¹−1); grobx 2.05× (Eco-12) and 2.36× (MQ11).
+
+The measurement policy below is §3 of the report, and `tools/cpu-context.sh` implements it.
+
 ### Tasks
 
 1. Freeze the current `main` source and executable identities for Zeebra, msolve, grobx and other
@@ -419,7 +432,8 @@ All rows are native sub-issues of #833 and carry the `M29` label.
 
 | Work package | Issue | Priority (board) | Status at planning | Immediate action |
 |---|---|---|---|---|
-| M29-0 — baselines and cost model | [#834](https://github.com/mfaulk/zeebra/issues/834) | P0 (High) | New | Freeze and remeasure before selecting new algorithms |
+| M29-0 — baselines and cost model | [#834](https://github.com/mfaulk/zeebra/issues/834) | P0 (High) | Published ([report](research/m29-baseline-cost-model.md)) | Use its §6 ceilings to approve or decline each mechanism |
+| Parallel candidate finishing | [#845](https://github.com/mfaulk/zeebra/issues/845) | Medium | New (from #834) | Largest single predicted gain on Eco-12/MQ11 (−19% / −25%); sequence with #828 |
 | M29-A — production symbolic dedup | [#831](https://github.com/mfaulk/zeebra/issues/831) | P0 (High) | Open | First production candidate |
 | Serial FL order (opt-in) | [#816](https://github.com/mfaulk/zeebra/issues/816) / PR #829 | P0 review (High) | PR open | Review/merge the corrected opt-in route; default unchanged |
 | M29-B — parallel FL order | [#828](https://github.com/mfaulk/zeebra/issues/828) | P1 (Medium) | Open | Bounded parallel feasibility only, after #829 and #831 |
