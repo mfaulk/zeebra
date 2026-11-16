@@ -276,6 +276,13 @@ is not odd, so it keeps the wide-remainder path rather than reaching Montgomery 
 | 16 / 32 MB | 1.783 | 0.753 | 15.9 | **0.262** | 45.8 |
 | 128 / 256 MB | 1.897 | 0.786 | 15.3 | **0.446** | 26.9 |
 
+*Measured at `59d29b94`, when both library columns were Montgomery multiplies.* #782 and #791 since
+moved `Zp2147483647` and `Mersenne31` to canonical residues, so the u64 and u32 columns no longer
+describe the shipped types; the AVX2 column and the example's `scalar u32 (replica)` row still do.
+Re-running before #795 also understated both library columns, because fat LTO folded the constant
+factor into the kernel and left no multiply in it (u64 0.44 ns/entry folded against 0.53-0.56 with
+the factor opaque, at `810b29c3`).
+
 Two things in that table correct the premise it was built on. **The scalar kernel is ALU-bound at
 both widths, not bandwidth-bound**: ns/entry is flat to within 7% over a working set spanning four
 orders of magnitude — the 256 MB row re-ran at 1.804 — and 15.9 GB/s is well under what one core
