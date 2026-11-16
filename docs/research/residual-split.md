@@ -14,8 +14,9 @@ times are not used. Raw output:
 
 > **Correction (#816).** The "production batch" arm below finished every pivot row outside the
 > reducer columns, including rows still leading at a pair lcm. F4 finishes only true candidates —
-> columns no input row led with — so this arm overstated the production backward pass about
-> tenfold, and the 1.76–2.14× figures in §3, §4 and §6 are against that overstated arm. Against
+> columns no input row led with — so this arm overstated the production backward pass (417 ms
+> against 6 ms on `mq-random-10`), and the 1.76–2.14× figures in §3, §4 and §6 are against that
+> overstated arm. Against
 > F4's own selection the Faugère–Lachartre order is **1.37×** on the `mq-random-10` batch, and
 > **1.05–1.25×** on whole single-threaded runs; it loses to the shipped 16-worker forward pass.
 > See §7. The tables above are kept as measured.

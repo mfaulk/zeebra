@@ -391,7 +391,7 @@ impl CorpusVisitor for Split {
         // A candidate leads with a monomial no input row led with: neither a reducer's lead nor a
         // pair's lcm, which is what every pair row leads with as built. Selecting only the
         // reducer leads (as #803 did) also finishes the rows left leading at an lcm, which F4
-        // never does, and overstated the production backward pass about tenfold (#816).
+        // never does: 417 ms of backward pass on mq-random-10 where F4 spends 6 ms (#816).
         let lcm_columns: Vec<usize> = pairs
             .iter()
             .filter_map(|row| row.leading_column())
