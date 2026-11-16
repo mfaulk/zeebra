@@ -170,6 +170,21 @@ class ComparandScalingTests(unittest.TestCase):
         report=dict(commit='a'*40,input_exporter={'sha256':'b'*64},binaries={'msolve':{'sha256':'c'*64}},cases=[c],references={},attempts=[a])
         with self.assertRaises(ValueError):scaling.validate_cohort(report)
 
+    # Zeebra takes multiworker cells now that its driver caps F4 at the request; grobx stays serial.
+    def test_zeebra_admits_multiworker_cells_and_grobx_does_not(self):
+        self.assertIsNone(scaling.capability('zeebra',16,32003))
+        self.assertIsNotNone(scaling.capability('grobx',16,32003))
+
+    # The Zeebra driver's answer is accepted only when it echoes the requested ring and workers.
+    def test_zeebra_response_must_echo_the_requested_ring(self):
+        request=dict(variables=['x1'],modulus=13,order='grevlex',generators=['x1+1'],workers=4,wall_ns=60*10**9)
+        raw=dict(contract=1,engine='zeebra',variables=['x1'],modulus='13',order='grevlex',workers=4,
+                 status='complete',basis=['x1+1'],solve_ns=5)
+        self.assertEqual(scaling.zeebra_basis(raw,request),['x1+1'])
+        self.assertIsNone(scaling.zeebra_basis(dict(raw,status='stopped-by-limit',basis=None),request))
+        for forged in (dict(raw,workers=1),dict(raw,modulus='17'),dict(raw,variables=['y']),dict(raw,status='failed')):
+            with self.assertRaises(ValueError):scaling.zeebra_basis(forged,request)
+
     # A zero-exit engine missing its basis keeps all timing and termination evidence as failure.
     def test_missing_basis_keeps_failed_attempt_measurements(self):
         with tempfile.TemporaryDirectory() as directory,mock.patch.object(scaling,'active_compilers',return_value=[]):
@@ -229,7 +244,6 @@ class ComparandScalingTests(unittest.TestCase):
     # Pinned serial-only engines keep capability refusals for multiple requested workers.
     def test_serial_engine_refusals_are_explicit(self):
         self.assertIn('serial', scaling.capability('grobx', 2, 32003))
-        self.assertIn('serial', scaling.capability('zeebra', 8, 32003))
         self.assertIn('31', scaling.capability('msolve', 1, 18446744073709551263))
         self.assertIsNone(scaling.capability('groebner-rs', 4, 18446744073709551263))
 

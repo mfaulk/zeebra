@@ -159,8 +159,8 @@ def cpu_activity(before, after):
 
 
 def capability(engine, workers, modulus):
-    if engine in ('zeebra', 'grobx') and workers != 1:
-        return 'current production backend is serial'
+    if engine == 'grobx' and workers != 1:
+        return 'pinned grobx driver is serial'
     if engine == 'msolve' and modulus >= 2**31:
         return 'msolve characteristic must be below 2^31'
     return None
@@ -172,6 +172,20 @@ def speedup(one, many):
     if min(one.get('process_wall_ns', 0), many.get('process_wall_ns', 0)) <= 0:
         return None
     return one['process_wall_ns'] / many['process_wall_ns']
+
+
+def zeebra_basis(raw, request):
+    """The basis from `examples/zeebra_driver`, or None for a limit stop; the ring must echo the request."""
+    if raw.get('contract') != 1 or raw.get('engine') != 'zeebra':
+        raise ValueError('unrecognized Zeebra driver contract')
+    if (raw.get('variables') != request['variables'] or raw.get('modulus') != str(request['modulus'])
+            or raw.get('order') != request['order'] or raw.get('workers') != request['workers']):
+        raise ValueError('Zeebra driver returned a different ring or worker cap')
+    if raw.get('status') == 'stopped-by-limit':
+        return None
+    if raw.get('status') != 'complete' or not isinstance(raw.get('basis'), list):
+        raise ValueError('Zeebra driver did not complete: ' + str(raw.get('detail')))
+    return raw['basis']
 
 
 def verify_basis(basis, reference, case):
@@ -382,11 +396,13 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
     refusal = capability(engine, workers, case['modulus'])
     if refusal:
         return dict(status='unsupported', detail=refusal)
-    if engine=='zeebra':
-        return dict(status='not-measured',detail='current serial whole-route baseline is owned by #751; no parallel shipping route')
     request = dict(variables=case['variables'], modulus=case['modulus'], order='grevlex',
                    generators=case['generators'], workers=workers)
-    if engine in ('groebner-rs', 'grobx', 'grobx-certified'):
+    if engine == 'zeebra':
+        request.update(wall_ns=wall*10**9)
+        stem.with_suffix('.request').write_text(json.dumps(request))
+        command = [binaries[engine]['path'], str(stem.with_suffix('.request'))]
+    elif engine in ('groebner-rs', 'grobx', 'grobx-certified'):
         native_engine = 'grobx' if engine == 'grobx-certified' else engine
         if engine == 'grobx':
             request.update(mode='raw', wall_ns=wall*10**9, rss_bytes=2*1024**3)
@@ -427,7 +443,19 @@ def execute(engine, case, workers, diagnostic, binaries, stem, cpus, wall):
     if attempt['status'] != 'complete':
         return attempt
     try:
-        if engine in ('groebner-rs','grobx','grobx-certified'):
+        if engine == 'zeebra':
+            raw = json.loads(attempt['stdout'])
+            basis = zeebra_basis(raw, request)
+            attempt.update(raw=raw, basis=basis, engine_wall_ns=raw.get('solve_ns'),
+                           concurrency_boundary='whole process CPU/wall; F4 forward workers capped at the request')
+            if basis is None:
+                attempt.update(status='stopped-by-limit', detail=raw.get('detail'))
+            kernel_peak = raw.get('kernel_peak_rss_bytes') or 0
+            attempt['observed_tree_peak_bytes'] = max(attempt['observed_tree_peak_bytes'], kernel_peak)
+            if kernel_peak > 2*1024**3:
+                attempt.update(status='stopped-by-limit', stop='rss-2GiB-kernel')
+            attempt['observed_cpu_parallelism'] = attempt['process_cpu_ns']/attempt['process_wall_ns']
+        elif engine in ('groebner-rs','grobx','grobx-certified'):
             raw = json.loads(attempt['stdout'])
             attempt['raw']=raw
             if engine == 'grobx-certified':
@@ -547,6 +575,10 @@ def validate_cohort(cohort):
             version=cohort['binaries'][a['engine']]['version']
             if any(a['raw'].get(k)!=version.get(k) for k in ('revision','build','build_metadata','isa')):
                 raise ValueError('native build identity changed inside cohort')
+        elif a['engine']=='zeebra':
+            request=dict(variables=case['variables'],modulus=int(case['modulus']),order='grevlex',
+                         workers=a['workers'],generators=case['generators'])
+            actual=zeebra_basis(a['raw'],request)
         elif a['engine']=='groebner.jl':
             output=a['stdout']
             if '@done 1' not in output or f'@workers {a["workers"]}\n' not in output:
@@ -836,6 +868,9 @@ def main():
         workers=[1]
         args.repeats=1
     binaries={engine:dict(path=shutil.which({'groebner.jl':'julia','groebner-rs':os.environ.get('ZEEBRA_GROEBNER_RS_DRIVER','groebner-rs-driver'),'grobx':'grobx-driver','singular':'Singular'}.get(engine,engine))) for engine in engines if engine!='zeebra'}
+    if 'zeebra' in engines:
+        binaries['zeebra']=dict(path=os.environ.get('ZEEBRA_DRIVER'),
+                                source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip())
     for engine,b in binaries.items():
         if not b['path']:parser.error('unprovisioned '+engine)
         b['sha256']=hashlib.sha256(Path(b['path']).read_bytes()).hexdigest()
