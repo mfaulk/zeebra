@@ -182,6 +182,21 @@ An `Err` from the planner means **inconclusive**, never "no solution".
 `cargo run --release --example solve_auto` compares all four policies against an offline
 best-of-two the planner was not allowed to see.
 
+`PlannedSolveOptions::objective` says what to optimize, because least time and least memory are
+different optima:
+
+| `PlanObjective` | what changes |
+|---|---|
+| `Time` (default) | nothing: the policy's routes under the caller's `F4Options` |
+| `PeakMemory` | every F4 batch capped at `PlanObjective::MEMORY_PAIR_CAP` (16) pairs, or the caller's tighter cap |
+| `CompletionWithinBudget` | as `Time`, but a route refused by a matrix limit (rows, columns, live entries or bytes) is attempted once more with capped batches, from the shared budget, before any fallback |
+
+`Explicit` ignores the objective. Each `Attempt` records the cap it ran under in `pair_cap`, and the
+plan's log prints the objective and the cap. The cap shrinks F4's matrices; it cannot shrink FGLM's
+dense blocks, so on an instance whose peak is the conversion it changes nothing. The measured table
+is in [strategy selection](../research/strategy-selection.md); `cargo run --release --example
+strategy_selection` reproduces it.
+
 To classify before paying for lex elimination, select `SolvePolicy::ClassifyThenDirectLex`:
 
 ```rust
