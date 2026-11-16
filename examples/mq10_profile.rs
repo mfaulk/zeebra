@@ -28,6 +28,15 @@ struct RunMode<'a> {
     whole_route: Option<&'a str>,
     symbolic: Option<&'a str>,
     multirow: Option<&'a str>,
+    forward_workers: Option<usize>,
+}
+
+fn forward_policy(workers: Option<usize>) -> zeebra::grobner::ParallelForward {
+    match workers {
+        Some(1) => zeebra::grobner::ParallelForward::Serial,
+        Some(max_workers) => zeebra::grobner::ParallelForward::Auto { max_workers },
+        None => F4Options::default().parallel_forward,
+    }
 }
 
 #[cfg(feature = "research-work")]
@@ -329,6 +338,7 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
         whole_route,
         symbolic,
         multirow,
+        forward_workers,
     } = mode;
     assert!(
         multirow.is_none() || (whole_route.is_none() && workers.is_none() && backward.is_none()),
@@ -357,8 +367,10 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
         .collect();
     let options = F4Options {
         measure_stages: measured,
+        parallel_forward: forward_policy(forward_workers),
         ..F4Options::default()
     };
+    let forward_report = forward_workers.map(Json::size).unwrap_or(Json::Null);
     if let Some(route) = whole_route {
         println!(
             "{}",
@@ -381,6 +393,7 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
             ("problem".into(), Json::string(problem)),
             ("digest".into(), Json::string(input.digest())),
             ("measured".into(), Json::Bool(measured)),
+            ("forward_workers".into(), forward_report.clone()),
             (
                 "field_type".into(),
                 Json::string(std::any::type_name::<F>()),
@@ -567,6 +580,7 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
             ("problem", Json::string(problem)),
             ("digest", Json::string(input.digest())),
             ("measured", Json::Bool(measured)),
+            ("forward_workers", forward_report),
             ("work", work),
             ("parallel", parallel),
             ("backward", backward_report),
@@ -633,7 +647,7 @@ fn main() {
     }
     let modulus: u64 = args
         .first()
-        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected] [--symbolic=original|order|dedup|both] [--whole-route=fglm|direct] [--multirow=single|band4|lanes4]")
+        .expect("usage: mq10_profile MODULUS [--stages] [--work | --discovery] [--workers=P] [--schedule=dynamic|static] [--backward=full|dense-all|dense-selected] [--symbolic=original|order|dedup|both] [--whole-route=fglm|direct] [--forward-workers=N] [--multirow=single|band4|lanes4]")
         .parse()
         .unwrap();
     assert!(
@@ -641,6 +655,7 @@ fn main() {
             || s == "--work"
             || s == "--discovery"
             || s.starts_with("--workers=")
+            || s.starts_with("--forward-workers=")
             || s.starts_with("--problem=")
             || s.starts_with("--backward=")
             || s.starts_with("--whole-route=")
@@ -714,7 +729,24 @@ fn main() {
         symbolic.is_none_or(|s| matches!(s, "original" | "order" | "dedup" | "both")),
         "unknown symbolic policy"
     );
+    let forward_args: Vec<_> = args
+        .iter()
+        .filter_map(|s| s.strip_prefix("--forward-workers="))
+        .collect();
+    assert!(forward_args.len() <= 1, "one forward worker count required");
+    let forward_workers = forward_args
+        .first()
+        .map(|s| s.parse::<usize>().expect("integer forward workers"));
+    assert!(
+        forward_workers != Some(0),
+        "forward workers must be positive"
+    );
+    assert!(
+        forward_workers.is_none() || workers.is_none(),
+        "--forward-workers sets production F4; --workers is the research observer"
+    );
     let mode = RunMode {
+        forward_workers,
         workers,
         dynamic,
         backward,
@@ -776,6 +808,18 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    // --forward-workers=1 is serial F4 and N caps the adaptive default; absent keeps the default.
+    #[test]
+    fn forward_workers_select_the_forward_policy() {
+        use zeebra::grobner::f4::ParallelForward;
+        assert_eq!(forward_policy(Some(1)), ParallelForward::Serial);
+        assert_eq!(
+            forward_policy(Some(16)),
+            ParallelForward::Auto { max_workers: 16 }
+        );
+        assert_eq!(forward_policy(None), F4Options::default().parallel_forward);
+    }
+
     // A whole-route request must reject a symbolic override rather than silently ignore it.
     #[test]
     #[should_panic(expected = "whole-route requires production symbolic policy")]
@@ -792,6 +836,7 @@ mod tests {
                 whole_route: Some("fglm"),
                 symbolic: Some("both"),
                 multirow: None,
+                forward_workers: None,
             },
             "public-noon-3",
         );
