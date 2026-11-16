@@ -206,7 +206,8 @@ specific fix is covered by a regression. Other signal boundaries retain their st
 wall is never used as a checker-cost measurement; published checker costs are original unpaused
 per-attempt observations.
 
-CI runs `python3 tools/external/comparand-scaling.py --replay research/comparand-scaling`.
+CI runs `python3 tools/external/comparand-scaling.py --replay research/comparand-scaling` on
+`main` and on PRs touching this directory or `tools/external/` (`tools/ci-scope.sh`).
 It launches no solver and validates retained bytes, inputs, complete coefficients, continuation
 identity and generated-board equality. It does not rerun native cofactor identities or reconstruct
 an independently certified ideal-membership proof from a successful native checker flag.
