@@ -316,6 +316,7 @@ cargo run --release --example f4_matrix_corpus -- pin      # re-derive the pinne
 cargo run --release --example f4_matrix_corpus -- predict  # does the corpus rank kernels as a run
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
+cargo run --release --example block_density        # dense 64x64 tiles in the corpus, and in D - C A^-1 B
 cargo run --release --example accumulator_span     # whether a vectorizable inner loop is available
 cargo run --release --example accumulator_span -- list
 cargo run --release --example boolean_density      # what a GF(2) entry costs, at two field widths
@@ -595,6 +596,14 @@ per-operation cost a change inside a row operation has to move, and states the p
 storage at the instance's widest matrix. `-- list` names the instances; the largest are excluded by
 default, because a dense representation of katsura-7 grevlex is 374 MB for a matrix holding 112k
 entries.
+
+`block_density` asks the GPU-tile question of the pinned matrix corpus rather than of a fixed
+instance list (#225; `docs/research/gpu-f4.md`). For each entry it tiles two matrices into 64x64
+cells: the matrix as built in the structured `[A B; C D]` arrangement, and the pair-row residual
+`D' = D - C A^-1 B` on the columns no reducer leads — the block a Faugère–Lachartre split would hand
+a dense kernel — before and after that residual's own echelon. It reports the fullest tile and the
+share of nonzeros lying in tiles at least half full. Nothing is timed, so every figure is exact and
+needs no benchmark lock; `-- large` walks the explicit large captures instead.
 
 `accumulator_span` answers whether the shipped elimination backend has a loop a SIMD kernel could
 go in. `Backend::Adaptive`'s inner operation walks the *pivot's* sparse entries and indexes a dense
