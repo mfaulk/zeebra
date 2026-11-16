@@ -103,6 +103,13 @@ mod tests {
         MonomialOrder, MultivariatePolynomial,
     };
 
+    fn serial() -> F4Options {
+        F4Options {
+            parallel_forward: ParallelForward::Serial,
+            ..F4Options::default()
+        }
+    }
+
     fn forced(workers: usize) -> F4Options {
         F4Options {
             parallel_forward: ParallelForward::Forced { workers },
@@ -115,9 +122,9 @@ mod tests {
         order: MonomialOrder,
         options: &F4Options,
     ) -> ParallelForwardStatistics {
-        let (serial, _) = f4_reported(system, order, &F4Options::default());
+        let (expected, _) = f4_reported(system, order, &serial());
         let (parallel, statistics) = f4_reported(system, order, options);
-        assert_eq!(parallel.unwrap(), serial.unwrap());
+        assert_eq!(parallel.unwrap(), expected.unwrap());
         statistics.parallel_forward
     }
 
@@ -180,7 +187,7 @@ mod tests {
         let system = katsura::<5, Zp32003>();
         let order = MonomialOrder::GradedReverseLexicographic;
         for options in [
-            F4Options::default(),
+            serial(),
             F4Options {
                 elimination: Backend::Sparse,
                 ..forced(4)
@@ -217,8 +224,8 @@ mod tests {
     fn a_tight_budget_falls_back_to_serial_admission() {
         let system = katsura::<6, Zp32003>();
         let order = MonomialOrder::GradedReverseLexicographic;
-        let (_, serial) = f4_reported(&system, order, &F4Options::default());
-        let peak = serial.max_live_nonzeros;
+        let (_, baseline) = f4_reported(&system, order, &serial());
+        let peak = baseline.max_live_nonzeros;
         let tight = |entries| forced(16).with_live_entries::<Zp32003>(entries);
         let statistics = agree(&system, order, &tight(peak));
         assert!(statistics.fallback_batches > 0, "{statistics:?}");
@@ -227,7 +234,7 @@ mod tests {
         let (expected, _) = f4_reported(
             &system,
             order,
-            &F4Options::default().with_live_entries::<Zp32003>(peak - 1),
+            &serial().with_live_entries::<Zp32003>(peak - 1),
         );
         assert!(matches!(refused, Err(F4Error::TooManyNonzeros { .. })));
         assert_eq!(refused.unwrap_err(), expected.unwrap_err());
