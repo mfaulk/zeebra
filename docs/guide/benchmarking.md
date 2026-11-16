@@ -316,6 +316,7 @@ cargo run --release --example f4_matrix_corpus -- pin      # re-derive the pinne
 cargo run --release --example f4_matrix_corpus -- predict  # does the corpus rank kernels as a run
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
+cargo run --release --example block_density        # dense 64x64 tiles in the corpus, and in D - C A^-1 B
 cargo run --release --example accumulator_span     # whether a vectorizable inner loop is available
 cargo run --release --example accumulator_span -- list
 cargo run --release --example boolean_density      # what a GF(2) entry costs, at two field widths
@@ -350,6 +351,7 @@ cargo run --release --example fglm_ablation -- list
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 cargo run --release --example solve_baseline       # both routes with resources and outcome class
 cargo run --release --example solve_auto           # four policies against an offline best-of-two
+cargo run --release --example strategy_selection   # #273: every route per instance, time and memory winners
 cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
 cargo run --release --example field_width          # what a 4-byte field element is worth, per
 cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
@@ -596,6 +598,14 @@ storage at the instance's widest matrix. `-- list` names the instances; the larg
 default, because a dense representation of katsura-7 grevlex is 374 MB for a matrix holding 112k
 entries.
 
+`block_density` asks the GPU-tile question of the pinned matrix corpus rather than of a fixed
+instance list (#225; `docs/research/gpu-f4.md`). For each entry it tiles two matrices into 64x64
+cells: the matrix as built in the structured `[A B; C D]` arrangement, and the pair-row residual
+`D' = D - C A^-1 B` on the columns no reducer leads — the block a Faugère–Lachartre split would hand
+a dense kernel — before and after that residual's own echelon. It reports the fullest tile and the
+share of nonzeros lying in tiles at least half full. Nothing is timed, so every figure is exact and
+needs no benchmark lock; `-- large` walks the explicit large captures instead.
+
 `accumulator_span` answers whether the shipped elimination backend has a loop a SIMD kernel could
 go in. `Backend::Adaptive`'s inner operation walks the *pivot's* sparse entries and indexes a dense
 buffer, which is a gather and a scatter; the only contiguous alternative updates the pivot's whole
@@ -713,6 +723,14 @@ Goldilocks, BN254), storage format, block width and thread count, with an L1 mul
 streaming-read bandwidth measured beside every repetition. Run the full sweep under
 `tools/benchlock.sh` and `taskset -c 0-63`; `--quick` is a seconds-long smoke test. Results and the
 #731 conclusion are in [`docs/research/sparse-matvec-throughput.md`](../research/sparse-matvec-throughput.md).
+
+`block_krylov_study` splits a forced scalar Wiedemann conversion into operator construction,
+sequence, reconstruction and certificate (`--mode stages`, one route per process for attributable
+RSS). It also times serial, batched, threaded and block-shaped Krylov sequences at widths 2/4/8 on
+the real operator (`--mode sequence`). Families: `cyclic`, `dense`, `powers` (non-shape) and
+`nonradical`. Fields: `zp65537`, `babybear`, `goldilocks`. Campaign scripts, raw output and the
+#731 reject/defer decision are in
+[`docs/research/block-krylov-conversion.md`](../research/block-krylov-conversion.md).
 
 `fglm_shape` is M18-4's dense research spike, measured. `grobner::fglm::shape` detects **shape
 position** — whether a single variable's powers `1, t, ..., t^{D-1}` are a basis of `R/I` — and

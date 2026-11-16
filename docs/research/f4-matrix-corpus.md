@@ -281,6 +281,11 @@ to implement it — comparing Zeebra's kernel against published GBLA results on 
 with a test fixture that has to be invented. **Not implemented, and the decision is recorded here so
 it does not have to be re-derived.**
 
+> **Correction (#267).** A fixture need not be invented: `ederc/gbla` at `2f8ebcf5` ships one real
+> F4 matrix in its tests, `test/examples/jcf-type-f4-kat12-mat1`, in the older format
+> `load_jcf_matrix` reads — 929 x 1657, p = 65521, 101 857 nonzeros. The decision stands: one small
+> LGPL matrix does not justify a reader. See `docs/research/specialized-gb-engines.md` §1.5.
+
 ---
 
 ## 4. What it costs

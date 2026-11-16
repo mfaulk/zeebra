@@ -60,8 +60,8 @@ pub use pairs::{
     CriterionCounts, CriticalPair, PairCriteria, PairQueue, PairQueueFootprint, PairSchedule,
 };
 pub use planning::{
-    analyze, solve_one_planned, Attempt, Choice, OutcomeClass, PlanBudget, PlannedSolveOptions,
-    SolvePlan, SolvePolicy, SystemShape,
+    analyze, solve_one_planned, Attempt, Choice, OutcomeClass, PlanBudget, PlanObjective,
+    PlannedSolveOptions, SolvePlan, SolvePolicy, SystemShape,
 };
 pub use s_polynomial::s_polynomial;
 pub use shape_certificate::{shape_position_hypotheses, HypothesisGap, PurePower, ShapeHypotheses};

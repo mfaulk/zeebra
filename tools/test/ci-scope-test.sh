@@ -13,17 +13,18 @@ check() {
     fi
     checks=$((checks + 1))
 }
-full=$'rust=true\ndocs=true'
-docs=$'rust=false\ndocs=true'
-prose=$'rust=false\ndocs=false'
+full=$'rust=true\ndocs=true\ncomparand=true'
+code=$'rust=true\ndocs=true\ncomparand=false'
+docs=$'rust=false\ndocs=true\ncomparand=false'
+prose=$'rust=false\ndocs=false\ncomparand=false'
 # Source changes require every Rust check.
-check "$full" src/lib.rs
+check "$code" src/lib.rs
 # Workflow changes exercise the full pipeline.
 check "$full" .github/workflows/rust.yml
 # Build configuration changes require every Rust check.
-check "$full" Cargo.toml Cargo.lock .cargo/config.toml
+check "$code" Cargo.toml Cargo.lock .cargo/config.toml
 # Unknown paths fail closed to the full suite.
-check "$full" new-file.txt
+check "$code" new-file.txt
 # README examples continue through Rustdoc and doctests.
 check "$docs" README.md
 # Guide examples continue through Rustdoc and doctests.
@@ -31,13 +32,23 @@ check "$docs" docs/guide/f4.md
 # Research prose needs provenance checks without compiling Rust.
 check "$prose" docs/research/classical-benchmarks.md research/competitive/CURATION.md
 # Changed measurement records still exercise their Rust validation.
-check "$full" research/competitive/results/history.json
+check "$code" research/competitive/results/history.json
 # Mixed source and prose changes retain full coverage.
-check "$full" README.md docs/research/notes.md src/util/json.rs
+check "$code" README.md docs/research/notes.md src/util/json.rs
 # Markdown in source directories cannot bypass the suite.
-check "$full" src/new.md
+check "$code" src/new.md
+# Retained comparand records select the comparand replay.
+check "$full" research/comparand-scaling/inventory.json
+# The replay checks the generated board, so comparand Markdown selects it too.
+check "$full" research/comparand-scaling/BOARD.md
+# The replay's Python modules select it.
+check "$full" tools/external/proof_artifacts.py
+# The replay's own tests select it.
+check "$full" tools/test/comparand-scaling-test.py
+# Changing the scope rules selects every check.
+check "$full" tools/ci-scope.sh
 # NUL separation preserves unusual filenames and prevents suffix spoofing.
-check "$full" $'docs/research/note.md\nsrc/lib.rs'
+check "$code" $'docs/research/note.md\nsrc/lib.rs'
 # An empty comparison cannot silently skip checks.
 actual="$(bash "$ROOT/tools/ci-scope.sh" < /dev/null)"
 [[ "$actual" == "$full" ]]
@@ -58,6 +69,6 @@ base="$(git -C "$scratch" rev-parse HEAD)"
 git -C "$scratch" mv src/lib.rs docs/research/archive.md
 git -C "$scratch" -c user.name=Test -c user.email=test@example.invalid commit -qm rename
 actual="$(git -C "$scratch" diff --no-renames --name-only -z "$base...HEAD" | bash "$ROOT/tools/ci-scope.sh")"
-[[ "$actual" == "$full" ]]
+[[ "$actual" == "$code" ]]
 checks=$((checks + 1))
 printf 'ok: %s CI scope checks passed\n' "$checks"

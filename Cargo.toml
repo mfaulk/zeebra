@@ -112,6 +112,10 @@ name = "f4_matrix_files"
 test = true
 
 [[example]]
+name = "block_density"
+test = true
+
+[[example]]
 name = "competitive"
 required-features = ["external-runners"]
 
@@ -318,6 +322,10 @@ required-features = ["external-runners", "research-work"]
 
 [[example]]
 name = "sparse_matvec_throughput"
+test = true
+
+[[example]]
+name = "block_krylov_study"
 test = true
 
 [[example]]
