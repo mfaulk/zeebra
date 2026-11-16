@@ -351,6 +351,7 @@ cargo run --release --example fglm_ablation -- list
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 cargo run --release --example solve_baseline       # both routes with resources and outcome class
 cargo run --release --example solve_auto           # four policies against an offline best-of-two
+cargo run --release --example strategy_selection   # #273: every route per instance, time and memory winners
 cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
 cargo run --release --example field_width          # what a 4-byte field element is worth, per
 cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4

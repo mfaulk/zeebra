@@ -17,7 +17,7 @@ use crate::{
         },
         solve_from_lex_basis,
         solve_zero_dimensional::explain_lex_failure,
-        SolveError, SolveOptions, SolveOutcome, SolveStrategy,
+        F4Error, SolveError, SolveOptions, SolveOutcome, SolveStrategy,
     },
     KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
@@ -46,6 +46,86 @@ pub enum SolvePolicy {
 
     /// As [`Self::ConservativeAuto`], plus one alternative attempt from the shared budget.
     AutoWithFallback,
+}
+
+/// What the planner optimizes where its policy leaves a choice.
+///
+/// Time and peak memory are different optima: capping F4's batches shrinks every matrix and pays
+/// for it in batches. `docs/research/strategy-selection.md` measures each variant. Ignored under
+/// [`SolvePolicy::Explicit`], which runs exactly the caller's options.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PlanObjective {
+    /// Least wall clock: the policy's routes under the caller's `F4Options`, unchanged.
+    #[default]
+    Time,
+
+    /// Smallest matrices: every F4 batch is capped at [`Self::MEMORY_PAIR_CAP`] pairs, or the
+    /// caller's tighter cap.
+    PeakMemory,
+
+    /// Finish inside the per-attempt matrix limits if a capped batch can.
+    ///
+    /// Runs as [`Self::Time`]; a route that crosses a matrix-size limit (rows, columns, live
+    /// entries or bytes) is attempted once more under [`Self::MEMORY_PAIR_CAP`] before the
+    /// policy's alternative, from the same shared budget. A batch or time refusal is not
+    /// retried, because a cap only adds batches.
+    CompletionWithinBudget,
+}
+
+impl PlanObjective {
+    /// Pairs per F4 batch under [`Self::PeakMemory`] and a capped re-attempt.
+    pub const MEMORY_PAIR_CAP: usize = 16;
+
+    /// The cap, never looser than one the caller already set.
+    fn cap(caller: Option<usize>) -> usize {
+        caller.map_or(Self::MEMORY_PAIR_CAP, |c| c.min(Self::MEMORY_PAIR_CAP))
+    }
+
+    /// The cap the opening attempt runs under, if this objective imposes one.
+    fn opening_cap(self, policy: SolvePolicy, caller: Option<usize>) -> Option<usize> {
+        match (self, policy) {
+            (_, SolvePolicy::Explicit(_)) => None,
+            (Self::PeakMemory, _) => Some(Self::cap(caller)),
+            _ => None,
+        }
+    }
+
+    /// The cap for re-attempting a route refused for its matrix size, when a cap would change
+    /// anything: not under an explicit policy, and not when the caller's cap is already as tight.
+    fn reattempt_cap(
+        self,
+        policy: SolvePolicy,
+        caller: Option<usize>,
+        error: &SolveError,
+    ) -> Option<(usize, &'static str)> {
+        if self != Self::CompletionWithinBudget || matches!(policy, SolvePolicy::Explicit(_)) {
+            return None;
+        }
+        let SolveError::Grobner(e) = error else {
+            return None;
+        };
+        let matrix = matches!(
+            e,
+            F4Error::TooManyRows { .. }
+                | F4Error::TooManyColumns { .. }
+                | F4Error::TooManyNonzeros { .. }
+                | F4Error::TooManyLiveBytes { .. }
+        );
+        let cap = Self::cap(caller);
+        (matrix && caller.is_none_or(|c| c > cap)).then(|| (cap, e.limit_name()))
+    }
+}
+
+impl std::fmt::Display for PlanObjective {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Time => "time — the caller's F4 options, unchanged",
+            Self::PeakMemory => "peak memory — every F4 batch capped, paying for it in batches",
+            Self::CompletionWithinBudget => {
+                "completion within budget — a matrix-size refusal is retried with capped batches"
+            }
+        })
+    }
 }
 
 /// What the whole plan may spend, across every attempt.
@@ -112,6 +192,9 @@ pub struct PlannedSolveOptions {
     /// What the whole plan may spend.
     pub budget: PlanBudget,
 
+    /// What to optimize where the policy leaves a choice.
+    pub objective: PlanObjective,
+
     /// The per-attempt budgets. [`SolveOptions::strategy`] is **ignored** — the policy decides it,
     /// and leaving the field to be silently overridden would be worse than saying so.
     pub attempt: SolveOptions,
@@ -167,6 +250,7 @@ pub fn solve_one_planned<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
         attempts: Vec::new(),
         declined: None,
         preflight: None,
+        objective: options.objective,
     };
 
     // Step 1. The only conclusion the input's shape licenses, and it costs nothing: a nonzero
@@ -195,10 +279,30 @@ pub fn solve_one_planned<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
         _ => Choice::ConservativeOpening,
     };
 
-    let outcome = run(system, first, opening, rng, options, &mut plan);
-    let Err(error) = outcome else {
+    let caller_cap = options.attempt.f4.max_pairs_per_batch;
+    let opening_cap = options.objective.opening_cap(options.policy, caller_cap);
+    let outcome = run(system, first, opening, opening_cap, rng, options, &mut plan);
+    let Err(mut error) = outcome else {
         return (outcome, plan);
     };
+
+    // A matrix-size refusal under the completion objective: the same route once more with capped
+    // batches, before any alternative, because a capped batch is the same computation in smaller
+    // matrices and the alternative route is a different computation altogether.
+    if let Some((cap, limit)) = options
+        .objective
+        .reattempt_cap(options.policy, caller_cap, &error)
+    {
+        if let Some(why) = budget_spent(options, started, &plan) {
+            plan.declined = Some((first, why));
+            return (Err(error), plan);
+        }
+        let choice = Choice::ReattemptUnderPairCap { limit };
+        match run(system, first, choice, Some(cap), rng, options, &mut plan) {
+            Err(e) => error = e,
+            outcome => return (outcome, plan),
+        }
+    }
 
     // A failure that is a property of the ideal — positive-dimensional, unsatisfiable options —
     // would be refused identically by the other route, so trying it is pure waste. A *predicted*
@@ -223,21 +327,44 @@ pub fn solve_one_planned<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     };
 
     // Step 6. The shared budget decides whether a second attempt starts at all.
-    if let Some(limit) = options.budget.max_elapsed {
-        if started.elapsed() >= limit {
-            plan.declined = Some((alternative, "the shared time budget was already spent"));
-            return (Err(error), plan);
-        }
-    }
-    if let Some(limit) = options.budget.max_total_batches {
-        if plan.total_batches() >= limit {
-            plan.declined = Some((alternative, "the shared batch budget was already spent"));
-            return (Err(error), plan);
-        }
+    if let Some(why) = budget_spent(options, started, &plan) {
+        plan.declined = Some((alternative, why));
+        return (Err(error), plan);
     }
 
-    let outcome = run(system, alternative, choice, rng, options, &mut plan);
+    let outcome = run(
+        system,
+        alternative,
+        choice,
+        opening_cap,
+        rng,
+        options,
+        &mut plan,
+    );
     (outcome, plan)
+}
+
+/// Why the shared budget forbids another attempt, if it does.
+fn budget_spent(
+    options: &PlannedSolveOptions,
+    started: Instant,
+    plan: &SolvePlan,
+) -> Option<&'static str> {
+    if options
+        .budget
+        .max_elapsed
+        .is_some_and(|limit| started.elapsed() >= limit)
+    {
+        return Some("the shared time budget was already spent");
+    }
+    if options
+        .budget
+        .max_total_batches
+        .is_some_and(|limit| plan.total_batches() >= limit)
+    {
+        return Some("the shared batch budget was already spent");
+    }
+    None
 }
 
 /// Run one route, recording the attempt whether it succeeds or not.
@@ -245,10 +372,21 @@ fn run<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     strategy: SolveStrategy,
     choice: Choice,
+    pair_cap: Option<usize>,
     rng: &mut R,
     options: &PlannedSolveOptions,
     plan: &mut SolvePlan,
 ) -> Result<SolveOutcome<N, F>, SolveError> {
+    let capped;
+    let options = match pair_cap {
+        Some(cap) => {
+            let mut with_cap = options.clone();
+            with_cap.attempt.f4.max_pairs_per_batch = Some(cap);
+            capped = with_cap;
+            &capped
+        }
+        None => options,
+    };
     // The shared batch allowance, minus what earlier attempts spent. Computed here rather than
     // inside `attempt`, which has no view of the plan.
     let batches = options
@@ -292,6 +430,7 @@ fn run<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     plan.attempts.push(Attempt {
         strategy,
         choice,
+        pair_cap,
         statistics,
         elapsed: at.elapsed(),
         result: outcome.as_ref().map(class).map_err(|e| *e),
@@ -450,11 +589,11 @@ mod tests {
 
     use rand::{prelude::StdRng, SeedableRng};
 
-    use super::{solve_one_planned, PlanBudget, PlannedSolveOptions, SolvePolicy};
+    use super::{solve_one_planned, PlanBudget, PlanObjective, PlannedSolveOptions, SolvePolicy};
     use crate::{
         fields::Zp2147483647,
         grobner::{
-            benchmark_systems::{cyclic, katsura, planted},
+            benchmark_systems::{cyclic, eco, katsura, planted},
             planning::report::{Choice, OutcomeClass},
             F4Options, FglmOptions, SolveError, SolveOptions, SolveOutcome, SolveStrategy,
         },
@@ -859,6 +998,7 @@ mod tests {
             &PlannedSolveOptions {
                 policy: SolvePolicy::AutoWithFallback,
                 budget: PlanBudget::default(),
+                objective: PlanObjective::Time,
                 attempt: SolveOptions {
                     f4: F4Options {
                         max_matrix_rows: 1,
@@ -891,6 +1031,7 @@ mod tests {
             &mut StdRng::seed_from_u64(8),
             &PlannedSolveOptions {
                 policy: SolvePolicy::AutoWithFallback,
+                objective: PlanObjective::Time,
                 // One batch is all the plan may spend, and the first attempt spends it.
                 budget: PlanBudget {
                     max_total_batches: Some(1),
@@ -933,6 +1074,7 @@ mod tests {
             &mut StdRng::seed_from_u64(20),
             &PlannedSolveOptions {
                 policy: SolvePolicy::AutoWithFallback,
+                objective: PlanObjective::Time,
                 budget: PlanBudget {
                     max_total_batches: Some(0),
                     ..PlanBudget::default()
@@ -954,6 +1096,7 @@ mod tests {
                 &mut StdRng::seed_from_u64(21),
                 &PlannedSolveOptions {
                     policy: SolvePolicy::AutoWithFallback,
+                    objective: PlanObjective::Time,
                     budget: PlanBudget {
                         max_total_batches: Some(limit),
                         ..PlanBudget::default()
@@ -999,6 +1142,7 @@ mod tests {
             &mut StdRng::seed_from_u64(22),
             &PlannedSolveOptions {
                 policy: SolvePolicy::AutoWithFallback,
+                objective: PlanObjective::Time,
                 budget: PlanBudget {
                     max_total_batches: Some(100),
                     ..PlanBudget::default()
@@ -1026,6 +1170,7 @@ mod tests {
             &mut StdRng::seed_from_u64(9),
             &PlannedSolveOptions {
                 policy: SolvePolicy::AutoWithFallback,
+                objective: PlanObjective::Time,
                 budget: PlanBudget {
                     max_elapsed: Some(Duration::ZERO),
                     ..PlanBudget::default()
@@ -1197,6 +1342,7 @@ mod tests {
             &PlannedSolveOptions {
                 policy: SolvePolicy::AutoWithFallback,
                 budget: PlanBudget::default(),
+                objective: PlanObjective::Time,
                 attempt: SolveOptions {
                     f4: F4Options {
                         max_pairs_per_batch: Some(0),
@@ -1212,6 +1358,197 @@ mod tests {
             plan.attempts.len(),
             1,
             "the same options would fail the same way on the other route"
+        );
+    }
+
+    fn with_objective(policy: SolvePolicy, objective: PlanObjective) -> PlannedSolveOptions {
+        PlannedSolveOptions {
+            objective,
+            ..PlannedSolveOptions::with_policy(policy)
+        }
+    }
+
+    /// Time is the default objective, so no existing caller's plan changes.
+    #[test]
+    fn test_the_default_objective_is_time() {
+        assert_eq!(PlanObjective::default(), PlanObjective::Time);
+        assert_eq!(
+            PlannedSolveOptions::default().objective,
+            PlanObjective::Time
+        );
+    }
+
+    /// On eco-6 the time and memory objectives run different configurations, the memory one
+    /// with strictly smaller matrices and no fewer batches. `strategy-selection.md` measures
+    /// the time side, which a unit test cannot assert without flaking.
+    #[test]
+    fn test_time_and_memory_objectives_choose_differently() {
+        let system = eco::<6, F>();
+        let solve = |objective| {
+            solve_one_planned(
+                &system,
+                &mut StdRng::seed_from_u64(273),
+                &with_objective(SolvePolicy::ConservativeAuto, objective),
+            )
+        };
+        let (fast, time) = solve(PlanObjective::Time);
+        let (lean, memory) = solve(PlanObjective::PeakMemory);
+        assert_eq!(super::class(&fast.unwrap()), super::class(&lean.unwrap()));
+
+        assert_eq!(time.attempts[0].pair_cap, None);
+        assert_eq!(
+            memory.attempts[0].pair_cap,
+            Some(PlanObjective::MEMORY_PAIR_CAP)
+        );
+        assert!(
+            memory.peak_estimated_bytes() < time.peak_estimated_bytes(),
+            "{} against {}",
+            memory.peak_estimated_bytes(),
+            time.peak_estimated_bytes()
+        );
+        let rows = |plan: &crate::grobner::SolvePlan| {
+            plan.attempts[0]
+                .statistics
+                .f4
+                .as_ref()
+                .unwrap()
+                .max_matrix_rows
+        };
+        assert!(rows(&memory) < rows(&time));
+        assert!(memory.total_batches() >= time.total_batches());
+    }
+
+    /// The memory objective never loosens a cap the caller already set tighter.
+    #[test]
+    fn test_peak_memory_keeps_a_tighter_caller_cap() {
+        let mut options = with_objective(SolvePolicy::ConservativeAuto, PlanObjective::PeakMemory);
+        options.attempt.f4.max_pairs_per_batch = Some(4);
+        let (outcome, plan) =
+            solve_one_planned(&katsura::<4, F>(), &mut StdRng::seed_from_u64(1), &options);
+        assert!(outcome.is_ok());
+        assert_eq!(plan.attempts[0].pair_cap, Some(4));
+    }
+
+    /// The explicit policy runs exactly the caller's options whatever the objective says.
+    #[test]
+    fn test_an_explicit_policy_ignores_the_objective() {
+        let options = with_objective(
+            SolvePolicy::Explicit(SolveStrategy::GrevlexF4ThenFglm),
+            PlanObjective::PeakMemory,
+        );
+        let (_, plan) =
+            solve_one_planned(&katsura::<5, F>(), &mut StdRng::seed_from_u64(2), &options);
+        assert_eq!(plan.attempts[0].pair_cap, None);
+    }
+
+    /// A route refused for its matrix size is re-attempted under the cap, and the cap fits.
+    #[test]
+    fn test_completion_retries_a_matrix_refusal_under_the_cap() {
+        let system = katsura::<6, F>();
+        let order = crate::MonomialOrder::GradedReverseLexicographic;
+        let capped = F4Options {
+            max_pairs_per_batch: Some(PlanObjective::MEMORY_PAIR_CAP),
+            ..F4Options::default()
+        };
+        let (_, lean) = crate::grobner::f4_reported(&system, order, &capped);
+        let (_, full) = crate::grobner::f4_reported(&system, order, &F4Options::default());
+        assert!(lean.max_live_nonzeros < full.max_live_nonzeros, "premise");
+
+        let solve = |objective| {
+            let mut options = with_objective(SolvePolicy::ConservativeAuto, objective);
+            options.attempt.f4 =
+                F4Options::default().with_live_entries::<F>(lean.max_live_nonzeros);
+            solve_one_planned(&system, &mut StdRng::seed_from_u64(3), &options)
+        };
+
+        let (refused, time) = solve(PlanObjective::Time);
+        assert!(refused.unwrap_err().is_resource_failure());
+        assert_eq!(time.attempts.len(), 1);
+
+        let (outcome, plan) = solve(PlanObjective::CompletionWithinBudget);
+        assert!(outcome.is_ok(), "{}", plan);
+        assert_eq!(plan.attempts.len(), 2);
+        assert_eq!(plan.attempts[0].pair_cap, None);
+        assert_eq!(
+            plan.attempts[1].pair_cap,
+            Some(PlanObjective::MEMORY_PAIR_CAP)
+        );
+        assert_eq!(plan.attempts[1].strategy, SolveStrategy::GrevlexF4ThenFglm);
+        assert!(matches!(
+            plan.attempts[1].choice,
+            Choice::ReattemptUnderPairCap { .. }
+        ));
+    }
+
+    /// A batch refusal is not retried under a cap, which could only spend more batches.
+    #[test]
+    fn test_completion_does_not_retry_a_batch_refusal() {
+        let mut options = with_objective(
+            SolvePolicy::ConservativeAuto,
+            PlanObjective::CompletionWithinBudget,
+        );
+        options.attempt.f4.max_batches = Some(1);
+        let (outcome, plan) =
+            solve_one_planned(&katsura::<6, F>(), &mut StdRng::seed_from_u64(4), &options);
+        assert!(outcome.unwrap_err().is_resource_failure());
+        assert_eq!(plan.attempts.len(), 1);
+    }
+
+    /// The capped re-attempt is gated by the shared budget, exactly like a fallback.
+    #[test]
+    fn test_completion_reattempt_draws_on_the_shared_budget() {
+        let mut options = with_objective(
+            SolvePolicy::ConservativeAuto,
+            PlanObjective::CompletionWithinBudget,
+        );
+        options.attempt.f4 = F4Options::default().with_live_entries::<F>(1);
+        options.budget.max_elapsed = Some(Duration::ZERO);
+        let (outcome, plan) =
+            solve_one_planned(&katsura::<6, F>(), &mut StdRng::seed_from_u64(5), &options);
+        assert!(outcome.unwrap_err().is_resource_failure());
+        assert_eq!(plan.attempts.len(), 1);
+        assert_eq!(
+            plan.declined,
+            Some((
+                SolveStrategy::GrevlexF4ThenFglm,
+                "the shared time budget was already spent"
+            ))
+        );
+    }
+
+    /// The decision log states the objective and what it changed.
+    #[test]
+    fn test_the_plan_reports_its_objective() {
+        let system = katsura::<5, F>();
+        for (objective, expected) in [
+            (PlanObjective::Time, "Objective: time"),
+            (PlanObjective::PeakMemory, "Objective: peak memory"),
+            (
+                PlanObjective::CompletionWithinBudget,
+                "Objective: completion within budget",
+            ),
+        ] {
+            let (_, plan) = solve_one_planned(
+                &system,
+                &mut StdRng::seed_from_u64(6),
+                &with_objective(SolvePolicy::ConservativeAuto, objective),
+            );
+            let log = plan.to_string();
+            assert!(log.contains(expected), "{}", log);
+        }
+        let (_, plan) = solve_one_planned(
+            &system,
+            &mut StdRng::seed_from_u64(6),
+            &with_objective(SolvePolicy::ConservativeAuto, PlanObjective::PeakMemory),
+        );
+        let log = plan.to_string();
+        assert!(
+            log.contains(&format!(
+                "F4 batches capped at {} pairs",
+                PlanObjective::MEMORY_PAIR_CAP
+            )),
+            "{}",
+            log
         );
     }
 }

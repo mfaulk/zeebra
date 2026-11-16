@@ -15,5 +15,5 @@ pub mod policy;
 pub mod report;
 
 pub use analysis::{analyze, SystemShape};
-pub use policy::{solve_one_planned, PlanBudget, PlannedSolveOptions, SolvePolicy};
+pub use policy::{solve_one_planned, PlanBudget, PlanObjective, PlannedSolveOptions, SolvePolicy};
 pub use report::{Attempt, Choice, OutcomeClass, SolvePlan};
