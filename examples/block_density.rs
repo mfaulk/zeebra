@@ -388,10 +388,21 @@ impl CorpusVisitor for Split {
 
         // The production backward pass finishes only candidate rows, so a reducer row keeps its
         // echelon tail; `eliminate_to(.., RowForm::Reduced, ..)` is the full-RREF route F4 left.
+        // A candidate leads with a monomial no input row led with: neither a reducer's lead nor a
+        // pair's lcm, which is what every pair row leads with as built. Selecting only the
+        // reducer leads (as #803 did) also finishes the rows left leading at an lcm, which F4
+        // never does, and overstated the production backward pass about tenfold (#816).
+        let lcm_columns: Vec<usize> = pairs
+            .iter()
+            .filter_map(|row| row.leading_column())
+            .collect();
         let selected: Vec<bool> = {
             let mut selected = vec![true; matrix.num_columns()];
             for row in &reducers {
                 selected[row.leading_column().expect("a reducer row is nonzero")] = false;
+            }
+            for &column in &lcm_columns {
+                selected[column] = false;
             }
             selected
         };
@@ -478,6 +489,7 @@ impl CorpusVisitor for Split {
                 spec.label,
                 shipped.matrix(),
                 &reducers,
+                &lcm_columns,
                 &faugere_lachartre(),
             );
         }
@@ -528,6 +540,7 @@ fn same_candidates<F: FiniteField>(
     label: &str,
     shipped: &SparseMatrix<F>,
     reducers: &[&SparseRow<F>],
+    lcm_columns: &[usize],
     ordered: &SparseMatrix<F>,
 ) {
     let mut led = vec![false; shipped.num_columns()];
@@ -535,17 +548,22 @@ fn same_candidates<F: FiniteField>(
         led[row.leading_column().expect("a reducer row is nonzero")] = true;
     }
     let free: Vec<usize> = (0..shipped.num_columns()).filter(|&c| !led[c]).collect();
+    // Rows still leading at an lcm are not candidates, and F4 leaves them unfinished.
+    let candidate = |c: usize| !led[c] && !lcm_columns.contains(&c);
     let mut from_shipped: Vec<Vec<(usize, F)>> = shipped
         .rows()
         .iter()
-        .filter(|row| row.leading_column().is_some_and(|c| !led[c]))
+        .filter(|row| row.leading_column().is_some_and(candidate))
         .map(|row| row.entries().to_vec())
         .collect();
     let mut from_ordered: Vec<Vec<(usize, F)>> = ordered
         .rows()
         .iter()
         .filter(|row| !row.is_zero())
-        .map(|row| row.entries().iter().map(|(c, v)| (free[*c], *v)).collect())
+        .map(|row| -> Vec<(usize, F)> {
+            row.entries().iter().map(|(c, v)| (free[*c], *v)).collect()
+        })
+        .filter(|row| candidate(row[0].0))
         .collect();
     from_shipped.sort_by_key(|row| row[0].0);
     from_ordered.sort_by_key(|row| row[0].0);
@@ -818,7 +836,7 @@ mod tests {
         let mut block = SparseMatrix::new(free, rows);
         let mut statistics = row_echelon_with(Backend::Adaptive, &mut block, usize::MAX).unwrap();
         back_substitute_pivots_within(&mut block, usize::MAX, &mut statistics).unwrap();
-        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &block);
+        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &[], &block);
     }
 
     // A candidate differing in one coefficient is a defect, not a tolerance.
@@ -828,7 +846,7 @@ mod tests {
         let r0 = row(&[(0, 1), (1, 1)]);
         let r2 = row(&[(2, 1), (3, 2)]);
         let wrong = SparseMatrix::new(2, vec![row(&[(0, 1), (1, 3)])]);
-        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &wrong);
+        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &[], &wrong);
     }
 
     // A full-rank 3x3 dense echelon: pivot 0 updates 2x2 cells, pivot 1 updates 1x1, pivot 2 none.
