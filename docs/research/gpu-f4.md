@@ -200,6 +200,11 @@ No hardware is rented or bought, and no GPU dependency is added. Before either, 
    best multicore CPU configuration). If the residual echelon is under **half** the batch's
    elimination time, no device can make that batch's elimination 2× faster, and the answer is no
    without renting.
+
+   *Result (#803, `docs/research/residual-split.md`):* the echelon of `D'` is 16.4% of the
+   production batch on `mq-random-14` (7.0% on `mq-random-10`), so the answer is no for an echelon
+   kernel. Reducing the batch in Faugère–Lachartre order gives the same candidates 1.76× faster on
+   the CPU (#816); against that baseline a device RREF of `D'` caps at 2.85× before transfers.
 2. **Named kernel and input.** Dense echelon of `D'` over a 31-bit prime (and GF(2^8) once a random
    MQ GF(2^8) entry is pinned), on that batch, verified against the CPU result row for row.
 3. **Threshold.** The whole batch — CPU sweep, both transfers of `D'`, device echelon, result

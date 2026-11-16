@@ -317,6 +317,7 @@ cargo run --release --example f4_matrix_corpus -- predict  # does the corpus ran
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
 cargo run --release --example block_density        # dense 64x64 tiles in the corpus, and in D - C A^-1 B
+tools/benchlock.sh zb-803 taskset -c 8 target/release/examples/block_density split mq-random-10  # timed phase split
 cargo run --release --example accumulator_span     # whether a vectorizable inner loop is available
 cargo run --release --example accumulator_span -- list
 cargo run --release --example boolean_density      # what a GF(2) entry costs, at two field widths
@@ -605,6 +606,16 @@ cells: the matrix as built in the structured `[A B; C D]` arrangement, and the p
 a dense kernel — before and after that residual's own echelon. It reports the fullest tile and the
 share of nonzeros lying in tiles at least half full. Nothing is timed, so every figure is exact and
 needs no benchmark lock; `-- large` walks the explicit large captures instead.
+
+`block_density -- split <label substring>` (and `split-large`) is its one timed mode (#803;
+`docs/research/residual-split.md`), so run it under the benchmark lock on a pinned core. Per entry
+it interleaves six arms: the production batch (echelon, then the candidate-only backward pass), the
+full-RREF route, the forward pass alone, the reference sweep producing `D'`, the echelon of `D'`,
+and the Faugère–Lachartre order (sweep, then reduce `D'` only), and it asserts that the last arm's
+candidate rows equal production's coefficient for coefficient. With `--features research-work` it
+also prices the sweep at the forward pass's own ns per coefficient product; take times from a stock
+build, since those hooks sit in the hot loop. An entry whose elimination crosses its own capture
+budget is reported as refused and then timed unbounded.
 
 `accumulator_span` answers whether the shipped elimination backend has a loop a SIMD kernel could
 go in. `Backend::Adaptive`'s inner operation walks the *pivot's* sparse entries and indexes a dense
