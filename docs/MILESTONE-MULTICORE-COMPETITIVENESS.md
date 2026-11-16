@@ -66,6 +66,7 @@ tasks, startup screening and current adapter restrictions.
 | [Matched msolve attribution](research/msolve-gap.md) | Zeebra `99a81844`, unchanged instrument content at `47161ee1`; msolve 0.11.0; single worker, process wall | GF(32003): about 13.9x wall gap, 4.14x batch products, 4.77x elimination ns/product. The last quantity averages different forward/backward mixtures and is not an isolated arithmetic-kernel ratio. GF(2^31−1) reports 13.7x/4.14x/4.86x separately. |
 | Same work study | Zeebra counts from `ff65d2b4`, applicability reconciled to row counts at the timing pin | About 579.7 M backward products versus msolve 0.64 M. Main opportunity: inherited reducer tails need not all be backward reduced. |
 | [Symbolic attribution](research/symbolic-attribution.md) | `575f59d9` frozen replay; `f80adee9` complete sorted-input check | Ordering plus duplicate-multiple removal changes forward products from 585.17 M to 486.42 M in replay. Combined live policy and end-to-end time were not measured. |
+| [Serial-stage slowdown](research/serial-stage-slowdown.md) | `de02e8d2` stage arms; `8912ce17` replay and live policies; exploratory, outside benchlock | The 16-worker arm's serial stages run at all-core boost for 200–500 ms after each burst. On Katsura-11, live `dedup` cuts the F4 call by 10%, and level-parallel symbolic runs the stage 1.38x faster at 16 workers. |
 | [Kernel study](research/elimination-kernels.md) | Prefix result `dd36652e`; delayed pilot `6578c0ab` with overlay hash retained there | Generic prefix merge shipped. Delayed small-prime pilot fails broader full-solve regression gates. Read-side fill counts are not measured physical controller bandwidth. |
 | [Multirow reuse](research/multirow-reuse.md) | Binaries `c45bf1eb`; controllers `ebebd9dc`, `65a616b5`; F4 forward stage and process wall | #715: four-row bands cut MQ10 pivot reads 2.47x at identical products but forward time only ~2% (paired 0.98x); interleaved lanes 1.11–1.15x slower and not vectorized. Reject integration; SIMD kernel deferred. |
 
@@ -742,6 +743,11 @@ Outcome (2026-11-16):
   operator construction at 38–40% of MQ10's 16-worker route, an Amdahl ceiling of 1.61–1.67x.
   Forward elimination is down to 14–15%. On the Katsura-11 basis, serial symbolic preprocessing is
   30% of the F4 call.
+- The serial-stage slowdown in the 16-worker arm (#827,
+  [report](research/serial-stage-slowdown.md)) comes mainly from the core clock: boost takes
+  200–500 ms to recover after a multicore burst. On Katsura-11, the live duplicate-multiple policy
+  is priced at −10% of the F4 call, and a result-identical level-parallel symbolic closure at 1.38x
+  of the stage (−8%) on 16 workers.
 - The wide ladder at current code (#821) completes six cells that previously stopped, and still
   trails grobx on every eligible rung, by 1.33–10.65x at 16 workers.
 - The matched multiworker cohort (#820) measures Zeebra at 16 workers 1.88–2.92x behind msolve's
