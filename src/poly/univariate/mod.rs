@@ -70,6 +70,7 @@ pub use graeffe::{
 // The schoolbook-or-Karatsuba route, which `fft::multiply` dispatches to below its own crossover.
 // Crate-internal: it is reached publicly through `fft::multiply`, and `Mul` is the operator a
 // caller reaches for otherwise.
+pub(crate) use div_with_remainder::PreparedDivisor;
 pub(crate) use karatsuba::multiply_dense;
 // Measurement hooks for `examples/karatsuba_crossover.rs`, not API.
 #[doc(hidden)]

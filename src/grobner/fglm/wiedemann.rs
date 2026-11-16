@@ -6,8 +6,8 @@ use super::{
     shape::shape_relations_vanish, ConversionStrategy, FglmOptions, FglmStatistics, QuotientAlgebra,
 };
 use crate::{
-    xgcd, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, Polynomial,
-    UnivariatePolynomial,
+    poly::PreparedDivisor, xgcd, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
+    Polynomial, UnivariatePolynomial,
 };
 
 /// The algorithm that returned a conversion result.
@@ -152,9 +152,11 @@ fn reconstruct<const N: usize, F: FiniteField>(
             if !gcd.is_one() {
                 return Err(WiedemannFallback::NonCyclicProjection);
             }
+            // Every product below has fewer than 2d coefficients, so one reciprocal serves them all.
+            let reducer = PreparedDivisor::new(&modulus, d);
             for (variable, values) in moments.iter().enumerate() {
                 let num = UnivariatePolynomial::new(&numerator_for(&p, values));
-                let h = &(&num * &inverse) % &modulus;
+                let h = reducer.rem(&(&num * &inverse));
                 let coefficients: Vec<_> = h.coefficients().iter().map(|c| -*c).collect();
                 result.push(shape_relation(variable, last, &coefficients));
             }
@@ -178,7 +180,22 @@ fn reconstruct<const N: usize, F: FiniteField>(
 }
 
 /// For moments s_k, [p(t) sum s_k t^(-k-1)]_+ has degree below deg(p).
+///
+/// Coefficient j is `sum_k p[j+1+k] s_k`, a correlation, so it is read off one product of the
+/// reversed recurrence with the first `deg p` moments: coefficient `deg p - 1 - j` of that product.
 fn numerator_for<F: FiniteField>(p: &[F], moments: &[F]) -> Vec<F> {
+    let d = p.len() - 1;
+    let reversed: Vec<F> = p.iter().rev().copied().collect();
+    let product = &UnivariatePolynomial::new(&reversed) * &UnivariatePolynomial::new(&moments[..d]);
+    let coefficients = product.coefficients();
+    (0..d)
+        .map(|j| coefficients.get(d - 1 - j).copied().unwrap_or(F::zero()))
+        .collect()
+}
+
+/// The quadratic definition [`numerator_for`] replaces, kept as its differential oracle.
+#[cfg(test)]
+fn numerator_for_classical<F: FiniteField>(p: &[F], moments: &[F]) -> Vec<F> {
     let d = p.len() - 1;
     (0..d)
         .map(|j| {
@@ -264,7 +281,7 @@ fn certify<const N: usize, F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{berlekamp_massey, certify, numerator_for, reconstruct};
+    use super::{berlekamp_massey, certify, numerator_for, numerator_for_classical, reconstruct};
     use crate::grobner::FglmStatistics;
     use crate::{
         fields::Zp13 as F,
@@ -315,6 +332,29 @@ mod tests {
             numerator_for(&p, &sequence[1..]),
             vec![-F::new(10), F::new(7)]
         );
+    }
+
+    // The product-based numerator equals the quadratic correlation on both sides of Karatsuba's base case.
+    #[test]
+    fn numerator_matches_the_classical_correlation() {
+        use rand::{rngs::StdRng, SeedableRng};
+        type W = crate::fields::Zp2147483647;
+        let mut rng = StdRng::seed_from_u64(806);
+        for d in [1, 2, 3, 17, 64, 65, 300, 1025] {
+            let mut p: Vec<W> = (0..d).map(|_| W::random(&mut rng)).collect();
+            p.push(W::one());
+            if d % 2 == 1 {
+                p[0] = W::zero();
+            }
+            let moments: Vec<W> = (0..2 * d).map(|_| W::random(&mut rng)).collect();
+            assert_eq!(
+                numerator_for(&p, &moments),
+                numerator_for_classical(&p, &moments),
+                "d = {d}"
+            );
+            let sparse = vec![W::zero(); d];
+            assert_eq!(numerator_for(&p, &sparse), vec![W::zero(); d]);
+        }
     }
 
     // Certification rejects a corrupted relation even when the leading shape is unchanged.
