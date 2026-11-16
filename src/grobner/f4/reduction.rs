@@ -850,14 +850,27 @@ mod tests {
     ///
     /// Three generators with the same leading monomial give three pairs whose six matrix rows span
     /// only a two-dimensional space of new relations, so the elimination has dependencies to find.
+    /// Seeding every pair half keeps the six rows; seeding each distinct multiple once (#831)
+    /// reaches the same candidates from three.
     #[test]
     fn test_batch_with_dependent_rows() {
+        use crate::grobner::f4::PairMultiples;
+
         for order in ALL_ORDERS {
             let polynomials = system(&["x^2 + y", "x^2 + z", "x^2 + y + z"]);
             let basis = MonicBasis::new(&polynomials, order);
             let pairs = all_pairs(&polynomials, order);
-            let outcome =
-                reduce_batch(&basis, &pairs, order, &F4Options::default()).expect("within limits");
+            let run = |pair_multiples| {
+                let options = F4Options {
+                    pair_multiples,
+                    ..F4Options::default()
+                };
+                reduce_batch(&basis, &pairs, order, &options).expect("within limits")
+            };
+            let outcome = run(PairMultiples::Every);
+            let distinct = run(PairMultiples::Distinct);
+            assert_eq!(distinct.statistics.rows, 3, "{}", order.name());
+            assert_eq!(distinct.candidates, outcome.candidates, "{}", order.name());
 
             assert_eq!(outcome.statistics.pairs, 3, "{}", order.name());
             assert_eq!(outcome.statistics.rows, 6, "{}", order.name());

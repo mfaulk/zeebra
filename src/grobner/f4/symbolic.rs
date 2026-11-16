@@ -902,10 +902,9 @@ pub fn symbolic_preprocessing_seeded<const N: usize, F: FiniteField>(
     let policy = super::live_symbolic::config();
     #[cfg(not(feature = "research-work"))]
     let policy: Option<((), usize)> = None;
-    let mut seed_keys: Option<HashSet<(usize, Monomial<N>), BuildMonomialHasher>> =
-        (multiples == PairMultiples::Distinct).then(|| {
-            HashSet::with_capacity_and_hasher(2 * pairs.len(), BuildMonomialHasher::default())
-        });
+    let mut seed_keys: Option<HashSet<(usize, Monomial<N>), BuildMonomialHasher>> = (multiples
+        == PairMultiples::Distinct)
+        .then(|| HashSet::with_capacity_and_hasher(2 * pairs.len(), BuildMonomialHasher));
     let reducer_order: Option<Vec<usize>> = {
         #[cfg(feature = "research-work")]
         {

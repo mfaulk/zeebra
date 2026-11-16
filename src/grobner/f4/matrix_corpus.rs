@@ -763,7 +763,7 @@ corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
     // --- 31-bit prime, Mersenne31 in a 32-bit representation -------------------------------
     "katsura-7/grevlex/m31/default": katsura::<7, Mersenne31>(),
         "katsura", 7, "Mersenne31", 31, Grevlex, Shipping, Largest, Mixed,
-        4, 361, 369, 263, 10546, "01c80075ca42a4c2";
+        4, 350, 369, 263, 9855, "b783eb16bb221b46";
     "katsura-7/grevlex/m31/baseline": katsura::<7, Mersenne31>(),
         "katsura", 7, "Mersenne31", 31, Grevlex, Baseline, Largest, Scaffolded,
         8, 6810, 6862, 6788, 112200, "746a1103c3b7c6fe";
@@ -772,7 +772,7 @@ corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
         21, 1954, 945, 828, 64756, "3f5824bd5619b32d";
     "cyclic-6/grevlex/m31/default": cyclic::<6, Mersenne31>(),
         "cyclic", 6, "Mersenne31", 31, Grevlex, Shipping, Largest, PairHeavy,
-        7, 159, 175, 57, 6529, "b059ff3c5e16302b";
+        7, 146, 175, 57, 5872, "f7132d615ad2ece5";
     "cyclic-6/lex/m31/default": cyclic::<6, Mersenne31>(),
         "cyclic", 6, "Mersenne31", 31, Lex, Shipping, Largest, Scaffolded,
         56, 1026, 1048, 1018, 29696, "b46c8477b7533630";
@@ -780,10 +780,10 @@ corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
     // --- 64-bit prime ----------------------------------------------------------------------
     "katsura-7/grevlex/p64/default": katsura::<7, Zp18446744073709551557>(),
         "katsura", 7, "Zp18446744073709551557", 64, Grevlex, Shipping, Largest, Mixed,
-        4, 361, 369, 263, 10546, "ee5963facafddbde";
+        4, 350, 369, 263, 9855, "2bad0a74dc97eff5";
     "cyclic-6/grevlex/p64/default": cyclic::<6, Zp18446744073709551557>(),
         "cyclic", 6, "Zp18446744073709551557", 64, Grevlex, Shipping, Largest, PairHeavy,
-        7, 159, 175, 57, 6529, "b851c4a0cbbbf7bd";
+        7, 146, 175, 57, 5872, "614f73436ff9b407";
     "katsura-6/lex/p64/baseline": katsura::<6, Zp18446744073709551557>(),
         "katsura", 6, "Zp18446744073709551557", 64, Lex, Baseline, Largest, Mixed,
         21, 1954, 945, 828, 64756, "43b5952f8a8b1bde";
@@ -791,7 +791,7 @@ corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
     // --- 254-bit prime, BN254's scalar field -----------------------------------------------
     "katsura-6/grevlex/bn254/default": katsura::<6, Bn254Fr>(),
         "katsura", 6, "Bn254Fr", 254, Grevlex, Shipping, Largest, Mixed,
-        3, 144, 152, 98, 2461, "7531e274c605e4dc";
+        3, 140, 152, 98, 2337, "1eb39c4c656146b5";
     "cyclic-5/grevlex/bn254/baseline": cyclic::<5, Bn254Fr>(),
         "cyclic", 5, "Bn254Fr", 254, Grevlex, Baseline, Largest, Mixed,
         18, 635, 379, 317, 8372, "3e2099571be467d7";
@@ -799,26 +799,26 @@ corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
     // --- Multivariate quadratics, the family where elimination IS the cost -----------------
     "mq-random-6/grevlex/p31x64/default": mq_random::<6, Zp2147483647>(REFERENCE_CHARACTERISTIC),
         "mq-random", 6, "Zp2147483647", 31, Grevlex, Shipping, Largest, Scaffolded,
-        5, 757, 756, 659, 16074, "62e9d2f6c591d1f6";
+        5, 745, 756, 659, 15378, "3da09490b773fab9";
     "mq-random-6/grevlex/p31x64/baseline": mq_random::<6, Zp2147483647>(REFERENCE_CHARACTERISTIC),
         "mq-random", 6, "Zp2147483647", 31, Grevlex, Baseline, Largest, Scaffolded,
         10, 3305, 3342, 3269, 66032, "13016bd535663e7d";
     "mq-random-10/grevlex/p31x64/default": mq_random::<10, Zp2147483647>(REFERENCE_CHARACTERISTIC),
         "mq-random", 10, "Zp2147483647", 31, Grevlex, Shipping, Largest, Scaffolded,
-        7, 12554, 12020, 11086, 783737, "f9a86d072bdc760f";
+        7, 12391, 12020, 11086, 726357, "88c567c10336c1f1";
 
     // --- GF(2) ------------------------------------------------------------------------------
     "cyclic-6/grevlex/gf2/default": cyclic::<6, Zp2>(),
-        "cyclic", 6, "Zp2", 1, Grevlex, Shipping, Largest, PairHeavy,
-        6, 130, 163, 50, 2314, "23a43be1462915fb";
+        "cyclic", 6, "Zp2", 1, Grevlex, Shipping, Largest, Mixed,
+        6, 124, 163, 50, 2218, "188dc15124d77a95";
     "cyclic-7/grevlex/gf2/default": cyclic::<7, Zp2>(),
         "cyclic", 7, "Zp2", 1, Grevlex, Shipping, Largest, PairHeavy,
-        16, 1146, 795, 372, 84450, "0058c956e245beff";
+        16, 977, 795, 372, 71090, "28283436d6f341bf";
 
     // --- GF(2^8), the Fukuoka modulus --------------------------------------------------------
     "cyclic-6/grevlex/gf256/default": cyclic::<6, Gf256Mq>(),
-        "cyclic", 6, "Gf256Mq", 8, Grevlex, Shipping, Largest, PairHeavy,
-        6, 130, 163, 50, 2314, "688436ee205fd305";
+        "cyclic", 6, "Gf256Mq", 8, Grevlex, Shipping, Largest, Mixed,
+        6, 124, 163, 50, 2218, "08d33533c696ed1c";
     "cyclic-5/lex/gf256/default": cyclic::<5, Gf256Mq>(),
         "cyclic", 5, "Gf256Mq", 8, Lex, Shipping, Largest, Scaffolded,
         14, 61, 72, 55, 438, "5d08ac9dd7acb1ce";
@@ -829,7 +829,7 @@ corpus! { large_corpus, walk_large_corpus, walk_large_corpus_with, visit_large_c
     "mq-random-14/grevlex/p31x64/default-64m": mq_random::<14, Zp2147483647>(REFERENCE_CHARACTERISTIC),
         "mq-random", 14, "Zp2147483647", 31, Grevlex, OptionsPreset::RaisedDefault { entries: 64_000_000, bytes: 1_024_000_000 },
         BatchSelector::Prefix(6), Scaffolded,
-        6, 75091, 76194, 67411, 24843682, "b6b0c2aa13296fec";
+        6, 74151, 76194, 67411, 21959918, "31a52b7aa09f00cd";
 }
 
 #[cfg(test)]

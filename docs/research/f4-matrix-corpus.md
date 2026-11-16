@@ -143,6 +143,10 @@ checked is a coverage claim that is not true.
 
 ## 2. The corpus
 
+The table below is the corpus as first pinned. #831 changed what the `default` preset builds, so the
+eleven entries it moved were re-pinned; [§2.2](#22-re-pinned-after-831) gives their current
+counters, and the timings in §4 and §5 describe the pre-#831 matrices.
+
 The default set has seventeen matrices. Six field types across five distinct field orders, three scaffolding regimes,
 both option presets, and shapes from 61x72 to 12554x12020. Every column but the last two is a
 **counter** rather than a timing, so none of it depends on the machine or the profile; `fill-in` is
@@ -235,6 +239,36 @@ skips dense elimination and uses one setup clone per iteration. Backend budget r
 reported rather than timed. Use a timeout, process RSS guard and benchmark lock for explicit runs.
 
 ---
+
+### 2.2 Re-pinned after #831
+
+`F4Options::pair_multiples` became `PairMultiples::Distinct` by default in #831: a batch seeds each
+repeated `(basis_index, multiplier)` pair half once. Every `default` and `default-raised-budget`
+entry therefore lost pair rows; every `baseline` entry is unchanged. Each moved entry keeps its batch
+index, its column count and its reducer-row count exactly; only pair rows and their entries went,
+which is what removing identical seed rows predicts. Counters from
+`f4_matrix_corpus pin` and `pin-large`, not timings:
+
+| label | rows before | rows after | nonzeros before | nonzeros after | digest after |
+|---|---:|---:|---:|---:|---|
+| `katsura-7/grevlex/m31/default` | 361 | 350 | 10 546 | 9 855 | `b783eb16bb221b46` |
+| `katsura-7/grevlex/p64/default` | 361 | 350 | 10 546 | 9 855 | `2bad0a74dc97eff5` |
+| `cyclic-6/grevlex/m31/default` | 159 | 146 | 6 529 | 5 872 | `f7132d615ad2ece5` |
+| `cyclic-6/grevlex/p64/default` | 159 | 146 | 6 529 | 5 872 | see `matrix_corpus.rs` |
+| `katsura-6/grevlex/bn254/default` | 144 | 140 | 2 461 | 2 337 | see `matrix_corpus.rs` |
+| `mq-random-6/grevlex/p31x64/default` | 757 | 745 | 16 074 | 15 378 | see `matrix_corpus.rs` |
+| `mq-random-10/grevlex/p31x64/default` | 12 554 | 12 391 | 783 737 | 726 357 | see `matrix_corpus.rs` |
+| `cyclic-6/grevlex/gf2/default` | 130 | 124 | 2 314 | 2 218 | see `matrix_corpus.rs` |
+| `cyclic-7/grevlex/gf2/default` | 1 146 | 977 | 84 450 | 71 090 | see `matrix_corpus.rs` |
+| `cyclic-6/grevlex/gf256/default` | 130 | 124 | 2 314 | 2 218 | see `matrix_corpus.rs` |
+| `mq-random-14/grevlex/p31x64/default-64m` | 75 091 | 74 151 | 24 843 682 | 21 959 918 | `31a52b7aa09f00cd` |
+
+`src/grobner/f4/matrix_corpus.rs` is authoritative for every digest. The largest relative drops are
+cyclic-7 over GF(2) (−14.7% rows, −15.8% entries) and MQ14's captured prefix batch (−11.6% entries).
+
+Two entries changed regime. cyclic-6 over GF(2) and over GF(256) keep their 50 reducer rows out of
+124 rather than 130, a reducer share of 0.403 against the pair-heavy band's 0.4 ceiling, so both are
+now `mixed`. Pair-heavy remains covered by cyclic-6 over the two odd primes and cyclic-7 over GF(2).
 
 ## 3. GBLA's published matrices: the catalogue survives, the data does not
 
