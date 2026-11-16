@@ -496,6 +496,31 @@ mod tests {
         assert_eq!(generic.stop_kind(), packed.stop_kind());
     }
 
+    /// Auto packs a large batch below the density threshold, down to the size arm's density floor (#794).
+    #[test]
+    fn test_dispatch_rule_packs_large_sparse_batches() {
+        // mq-16 (seed 794, density 0.15) batch 3: 1.5% dense, 13.8x faster packed.
+        assert!(Gf2Elimination::prefers_packed(
+            18_370, 12_840, 9_622, 2_663_797
+        ));
+        // mq-15 (density 0.05) batch 5: 0.79% dense, 4.9x faster packed.
+        assert!(Gf2Elimination::prefers_packed(3_596, 1_570, 2_858, 80_708));
+        // sparse-mq-12 batch 3 (#777's control): 1.6% dense but small, 0.78x packed.
+        assert!(!Gf2Elimination::prefers_packed(443, 314, 311, 2_239));
+        let (rows, columns) = (10_000, 1_000);
+        let floor = (Gf2Elimination::LARGE_MIN_DENSITY_PPM as usize * rows * columns) / 1_000_000;
+        assert!(floor >= Gf2Elimination::LARGE_ENTRIES);
+        assert!(Gf2Elimination::prefers_packed(rows, 16, columns, floor));
+        assert!(!Gf2Elimination::prefers_packed(
+            rows,
+            16,
+            columns,
+            floor - 1
+        ));
+        // The size arm still needs the column and pair-row floors.
+        assert!(!Gf2Elimination::prefers_packed(rows, 15, columns, floor));
+    }
+
     /// Auto packs dense, wide matrices and leaves sparse or narrow ones on the generic route.
     #[test]
     fn test_dispatch_rule() {
