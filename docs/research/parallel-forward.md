@@ -34,3 +34,26 @@ Declared at commit `8ccea616`, before any complete-task campaign:
 
 If gates 1–5 pass, `Auto { max_workers: 0 }` becomes the default in `F4Options::recommended`;
 otherwise the default stays `Serial` and the route remains opt-in, with the failing gate named.
+
+### Design 1 verdict (`Auto { max_workers: 0 }`, binary from `46867c14`): rejected
+
+Measured 2026-11-16 01:00 under one bench-lock window; gate 1 and gate 5 pass, **gates 2
+and 3 fail**:
+
+- Gate 2: cyclic-5 0.69 → 1.82 ms, katsura-6 0.94 → 1.47 ms, cyclic-6 4.20 → 5.66 ms,
+  katsura-7 4.42 → 5.11 ms, with **zero batches dispatched**. The cost is per batch, not
+  threading: the route called `std::thread::available_parallelism` (which reads cgroup files)
+  and permuted the matrix reducers-first on every batch before the gate said serial.
+- Gate 3: MQ10 peak RSS 37.28 → 48.96 MiB (1.31x) and 38.28 → 51.80 MiB (1.35x) at up to 62
+  workers per batch.
+
+### Design 2, declared at the commit that introduces it, before measurement
+
+Changes: the gate reads lower rows and entries off the row kinds without permuting, returns
+before asking for parallelism when a batch is below `MIN_LOWER_NONZEROS`, and caches the
+parallelism once per process. The candidate default is `Auto { max_workers: 16 }`, because
+`Forced { workers: 16 }` held MQ10 RSS to 1.19x/1.21x in design 1's scaling run.
+
+Gates 1–5 apply unchanged to `Auto { max_workers: 16 }` in a fresh campaign. If they pass it
+becomes the default; if they fail, the default stays `Serial`, the route ships opt-in and the
+investigation stops at two designs as #752 requires.

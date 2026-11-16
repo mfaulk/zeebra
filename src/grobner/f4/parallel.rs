@@ -5,6 +5,7 @@ use super::{
     options::ParallelForward,
     statistics::ParallelForwardStatistics,
     structured::{BlockOutcome, BlockPlan},
+    symbolic::RowKind,
 };
 use crate::{
     linalg::{concurrent, Backend},
@@ -35,16 +36,23 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
         return None;
     }
     let dispatch = F::concurrent_elimination()?;
-    let split = matrix.partition_reducers_first();
-    let rows = matrix.matrix().rows();
-    let lower_rows = rows.len() - split;
-    let lower_nonzeros = rows[split..].iter().map(|row| row.nonzeros()).sum();
+    // Read the gate's inputs off the row kinds, so a batch the gate leaves serial pays one pass
+    // over the rows and no permutation.
+    let (lower_rows, lower_nonzeros) = matrix
+        .row_origins()
+        .iter()
+        .zip(matrix.matrix().rows())
+        .filter(|(origin, _)| origin.kind != RowKind::Reducer)
+        .fold((0, 0), |(rows, nonzeros), (_, row)| {
+            (rows + 1, nonzeros + row.nonzeros())
+        });
     let workers = setting.workers(lower_rows, lower_nonzeros);
     // `Forced { workers: 1 }` still takes the concurrent kernel: the one-thread control that
     // separates algorithm from threading.
     if workers <= 1 && !matches!(setting, ParallelForward::Forced { .. }) {
         return None;
     }
+    let split = matrix.partition_reducers_first();
     debug_assert_eq!(
         super::structured::check_reducer_block(matrix.matrix(), split),
         Ok(())

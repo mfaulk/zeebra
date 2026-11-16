@@ -215,9 +215,10 @@ impl ParallelForward {
         match self {
             Self::Serial => 1,
             Self::Forced { workers } => workers.min(lower_rows).max(1),
+            Self::Auto { .. } if lower_nonzeros < Self::MIN_LOWER_NONZEROS => 1,
             Self::Auto { max_workers } => {
                 let max_workers = if max_workers == 0 {
-                    std::thread::available_parallelism().map_or(1, usize::from)
+                    available_parallelism()
                 } else {
                     max_workers
                 };
@@ -225,6 +226,16 @@ impl ParallelForward {
             }
         }
     }
+}
+
+/// The process's available parallelism, read once.
+///
+/// `std::thread::available_parallelism` reads cgroup files on every call — about a millisecond
+/// across a small computation's batches when it was asked per batch (#752) — so later changes to
+/// the process's affinity or quota are not seen.
+fn available_parallelism() -> usize {
+    static CPUS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CPUS.get_or_init(|| std::thread::available_parallelism().map_or(1, usize::from))
 }
 
 /// How final interreduction reduces each basis element against the others.
