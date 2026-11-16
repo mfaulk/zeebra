@@ -112,6 +112,10 @@ name = "f4_matrix_files"
 test = true
 
 [[example]]
+name = "batch_order_study"
+required-features = ["external-runners"]
+
+[[example]]
 name = "block_density"
 test = true
 
