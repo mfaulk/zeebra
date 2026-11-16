@@ -147,7 +147,7 @@ The table below is the corpus as first pinned. #831 changed what the `default` p
 eleven entries it moved were re-pinned; [§2.2](#22-re-pinned-after-831) gives their current
 counters, and the timings in §4 and §5 describe the pre-#831 matrices.
 
-The default set has seventeen matrices. Six field types across five distinct field orders, three scaffolding regimes,
+The default set had seventeen matrices when first pinned; #804 added an eighteenth (§2.3). Six field types across five distinct field orders, three scaffolding regimes,
 both option presets, and shapes from 61x72 to 12554x12020. Every column but the last two is a
 **counter** rather than a timing, so none of it depends on the machine or the profile; `fill-in` is
 the live entry count at elimination's high-water and at its end, over the count as built, under the
@@ -269,6 +269,22 @@ cyclic-7 over GF(2) (−14.7% rows, −15.8% entries) and MQ14's captured prefix
 Two entries changed regime. cyclic-6 over GF(2) and over GF(256) keep their 50 reducer rows out of
 124 rather than 130, a reducer share of 0.403 against the pair-heavy band's 0.4 ceiling, so both are
 now `mixed`. Pair-heavy remains covered by cyclic-6 over the two odd primes and cyclic-7 over GF(2).
+
+### 2.3 Added by #804: random MQ over GF(2^8)
+
+`mq-random-8/grevlex/gf256/default` runs the board's `mq-random` generator (seed `n`,
+`max_degree: 2`, `max_terms: 4n`) over `Gf256Mq`. This gives the corpus a random MQ residual in a
+small extension field, alongside the cyclic ones. `n = 8` keeps its capture inside the default
+corpus's cost; the whole ordinary walk still ran in under 5 s. Each generated coefficient is read
+as a GF(2^8) bit pattern via `from_str`. `F::new` is the integer embedding and would have flattened
+every draw to 0 or 1; `test_the_gf256_mq_conversion_keeps_bit_pattern_coefficients` guards against
+that.
+
+| label | field | bits | preset | batch | shape | reducer rows | nz | regime | digest |
+|---|---|---|---|---|---|---:|---:|---|---|
+| `mq-random-8/grevlex/gf256/default` | `Gf256Mq` | 8 | default | 8 | 8114x8236 | 7 924 | 337 009 | scaffolded | `28284550c86e765f` |
+
+Its tile density is in `docs/research/gpu-f4.md` §3.3.
 
 ## 3. GBLA's published matrices: the catalogue survives, the data does not
 
@@ -392,7 +408,7 @@ ZEEBRA_MACHINE=trpro-5995wx ZEEBRA_AFFINITY=0-15 tools/benchlock.sh f4-large-cap
 The separate ignored test `test_large_entry_is_pinned_and_rebuilds` also checks full matrix
 equality against a fresh construction from the captured inputs and verifies the declared regime.
 It is explicitly excluded from ordinary CI; use an optimized profile and the same memory guards
-when running it. The ordinary corpus test and benchmark smoke still visit only seventeen entries.
+when running it. The ordinary corpus test and benchmark smoke still visit only the default entries (eighteen since #804).
 
 ---
 
