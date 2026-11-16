@@ -140,12 +140,13 @@ class JournaledWindow(unittest.TestCase):
         self.scratch.cleanup()
 
     def window(self, launch=None, compilers=lambda: [], load=lambda: 0.5, remaining_wall=lambda: 500,
-               output_remaining=lambda: 1 << 30, cohort=None, native_amendment=False):
+               output_remaining=lambda: 1 << 30, cohort=None, native_amendment=False, sleep=lambda seconds: None):
         cohort = cohort or self.cohort
         self.journal = study.open_journal(self.dir, cohort, study.limits())
         launch = launch or (lambda index, cell, wall, limit: child(cell, index))
         study.measure(self.journal, len(cohort['attempts']), {}, launch, compilers, load,
-                      remaining_wall, output_remaining, native_amendment=native_amendment, log=lambda *_, **__: None)
+                      remaining_wall, output_remaining, native_amendment=native_amendment, log=lambda *_, **__: None,
+                      sleep=sleep)
         return self.journal
 
     def render(self, name='cohort.json.gz'):
@@ -224,6 +225,41 @@ class JournaledWindow(unittest.TestCase):
         self.window(remaining_wall=lambda: 0.5)
         self.assertEqual(aj.load(self.dir)['stop']['reason'], 'load-or-aggregate')
         self.assertEqual(aj.load(self.dir)['attempts'], [])
+
+    # A load above the gate that decays within the settle wait launches the child and records the wait it cost.
+    def test_settle_wait_clears_transient_load(self):
+        readings, slept = iter([4.5, 4.2, 3.9]), []
+        self.window(load=lambda: next(readings, 0.5), sleep=slept.append)
+        state = aj.load(self.dir)
+        self.assertIsNone(state['stop'])
+        self.assertEqual(slept, [study.SETTLE_POLL_SECONDS] * 2)
+        self.assertEqual(state['attempts'][0]['metadata']['settle_seconds'], 2 * study.SETTLE_POLL_SECONDS)
+        self.assertEqual(state['attempts'][1]['metadata']['settle_seconds'], 0)
+        self.assertEqual(len(state['attempts']), len(CELLS))
+
+    # A load that never clears is refused once the bounded settle wait is spent, with the wait in the stop record.
+    def test_settle_wait_is_bounded(self):
+        slept = []
+        self.window(load=lambda: 4.1, sleep=slept.append)
+        stop = aj.load(self.dir)['stop']
+        self.assertEqual(stop['reason'], 'load-or-aggregate')
+        self.assertEqual(sum(slept), study.SETTLE_SECONDS)
+        self.assertEqual(stop['settle_seconds'], study.SETTLE_SECONDS)
+
+    # The settle wait never sleeps past the remaining aggregate allowance.
+    def test_settle_wait_stays_inside_aggregate_wall(self):
+        slept = []
+        remaining = lambda: 12 - sum(slept)
+        self.window(load=lambda: 9.0, sleep=slept.append, remaining_wall=remaining)
+        self.assertLessEqual(sum(slept), 11)
+        self.assertEqual(aj.load(self.dir)['stop']['reason'], 'load-or-aggregate')
+
+    # A build process refuses at once; only the load gate settles.
+    def test_compiler_gate_does_not_settle(self):
+        slept = []
+        self.window(compilers=lambda: [('1', 'rustc')], load=lambda: 9.0, sleep=slept.append)
+        self.assertEqual(slept, [])
+        self.assertEqual(aj.load(self.dir)['stop']['reason'], 'compiler')
 
     # A launcher signal keeps the interrupted attempt and its verdict, then stops the window and exits.
     def test_launcher_signal_records_attempt_then_stop(self):

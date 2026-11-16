@@ -19,6 +19,11 @@ ROOT = Path(__file__).resolve().parents[2]
 NATIVE_PREFIX_CONTROLLER = '9e2017806b95cbf88a904ad9213d324c2a1f5b0e'
 NATIVE_PREFIX_SHA256 = '3a733e31cf1d70ad27d322f2e950cd736676b4726ccb8004a8fa0754d6b1bd8f'
 NATIVE_PRIOR_CHARGE_SECONDS = 20
+# #788: the one-minute average still carries the previous child's own runnable time when the next gate reads it.
+# Waiting lets that decay (to e^-2 after 120 s) instead of refusing on it; the wait is charged to the aggregate wall.
+LOAD_GATE = 4
+SETTLE_SECONDS = 120
+SETTLE_POLL_SECONDS = 5
 
 
 def load(name):
@@ -204,10 +209,19 @@ def open_journal(directory, cohort, window_limits):
     return load('attempt_journal').StudyJournal.create(directory,header,tail,window_limits)
 
 
-def attempt_metadata(result, cell, compilers, load_average, child_wall_seconds, output_limit):
+def settled_load(load_average, remaining_wall, sleep):
+    waited,value=0,load_average()
+    while value>LOAD_GATE and waited+SETTLE_POLL_SECONDS<=SETTLE_SECONDS and remaining_wall()-SETTLE_POLL_SECONDS>=1:
+        sleep(SETTLE_POLL_SECONDS)
+        waited+=SETTLE_POLL_SECONDS
+        value=load_average()
+    return value,waited
+
+
+def attempt_metadata(result, cell, compilers, load_average, child_wall_seconds, output_limit, settle_seconds=0):
     metadata={k:v for k,v in result.items() if k not in ('stdout','stderr')}
     metadata.update(zip(('repeat','problem','modulus','route','arm'),cell))
-    metadata.update(load=load_average,compiler_before=compilers,wall_seconds=result['process_wall_ns']/1e9,
+    metadata.update(load=load_average,settle_seconds=settle_seconds,compiler_before=compilers,wall_seconds=result['process_wall_ns']/1e9,
         observed_peak_rss_bytes=result['observed_tree_peak_bytes'],
         guard=dict(child_wall_seconds=child_wall_seconds,rss_bytes=limits()['rss_bytes'],output_limit_bytes=output_limit,
                    interrupt_exit=result.get('interrupt_exit')))
@@ -240,7 +254,8 @@ def classify(stdout, stderr, metadata, cell, refs, compiler_after):
     return status,details
 
 
-def measure(journal, offset, refs, launch, compilers, load_average, remaining_wall, output_remaining, native_amendment=False, log=print):
+def measure(journal, offset, refs, launch, compilers, load_average, remaining_wall, output_remaining, native_amendment=False, log=print,
+            sleep=time.sleep):
     """The bounded window: each child is journaled durably before its output is parsed or checked."""
     def stop(reason, **values):
         with deferred_signals(): journal.record_stop(reason,**values)
@@ -248,16 +263,17 @@ def measure(journal, offset, refs, launch, compilers, load_average, remaining_wa
     for index in range(journal.next_index,len(plan)):
         cell=plan[index]
         before=compilers()
-        load_before=load_average()
+        if before: return stop('compiler',compilers=before,load=load_average(),remaining_wall_seconds=remaining_wall())
+        load_before,settled=settled_load(load_average,remaining_wall,sleep)
         wall=remaining_wall()
-        if before or load_before>4 or wall<1:
-            return stop('compiler' if before else 'load-or-aggregate',compilers=before,load=load_before,remaining_wall_seconds=wall)
+        if load_before>LOAD_GATE or wall<1:
+            return stop('load-or-aggregate',compilers=before,load=load_before,remaining_wall_seconds=wall,settle_seconds=settled)
         output_left=output_remaining()
         if output_left<=0: return stop('output-bytes',remaining_bytes=output_left)
         child_wall_seconds,output_limit=child_wall(wall),min(128*1024**2,output_left)
         result=launch(offset+index,cell,child_wall_seconds,output_limit)
         stdout,stderr=result['stdout'],result['stderr']
-        metadata=attempt_metadata(result,cell,before,load_average(),child_wall_seconds,output_limit)
+        metadata=attempt_metadata(result,cell,before,load_average(),child_wall_seconds,output_limit,settled)
         with deferred_signals(): journal.record_exit(index,cell,stdout.encode(),stderr.encode(),metadata)
         status,details=classify(stdout,stderr,metadata,cell,refs,compilers())
         with deferred_signals(): journal.record_verdict(index,status,details)
