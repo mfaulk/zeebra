@@ -1,0 +1,72 @@
+=== stages
+Mon Nov 16 02:56:21 AM UTC 2026
+family=Cyclic field=zp65537 variables=5 source-sha256=ce36204a4bee3a3b958f9bf346005c3ead6d8eb91031b3691d511791c41d4653 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=1.63
+operator D=3125 entries=1250 standard-columns=2500 dense-columns=0 stored-bytes=95000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Wiedemann Wiedemann 1 None 3125 130.896 3.241 28.009 90.537 8.147 126.753 0.901 1.63 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+2 Wiedemann Wiedemann 1 None 3125 124.667 2.919 24.639 88.172 8.125 120.986 0.761 1.63 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+3 Wiedemann Wiedemann 1 None 3125 124.581 2.918 24.528 88.151 8.139 120.866 0.797 1.63 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+4 Wiedemann Wiedemann 1 None 3125 124.157 2.840 24.558 87.822 8.123 120.552 0.765 1.63 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+5 Wiedemann Wiedemann 1 None 3125 132.395 2.852 24.671 94.741 9.272 128.734 0.809 1.63 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+process-peak-rss-bytes=Some(6336512)
+exit=0
+family=Cyclic field=zp65537 variables=6 source-sha256=256c3bc7722eb67167f6a0e775654841a1be4c1615fda67c58bbe7086280d506 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=1.63
+operator D=15625 entries=6250 standard-columns=12500 dense-columns=0 stored-bytes=475000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Wiedemann Wiedemann 1 None 15625 2870.186 17.981 607.424 2043.235 196.389 2847.306 4.899 1.63 4c6b58d90453aa176f4f99ef1fd5f4e45a297067aef69bf42ae2eda20fc05984
+2 Wiedemann Wiedemann 1 None 15625 2888.894 17.021 616.433 2053.412 196.883 2866.984 4.889 1.82 4c6b58d90453aa176f4f99ef1fd5f4e45a297067aef69bf42ae2eda20fc05984
+3 Wiedemann Wiedemann 1 None 15625 2881.005 17.040 610.220 2051.348 197.247 2859.068 4.897 1.92 4c6b58d90453aa176f4f99ef1fd5f4e45a297067aef69bf42ae2eda20fc05984
+4 Wiedemann Wiedemann 1 None 15625 2893.418 16.917 613.033 2061.774 196.477 2871.543 4.957 1.92 4c6b58d90453aa176f4f99ef1fd5f4e45a297067aef69bf42ae2eda20fc05984
+5 Wiedemann Wiedemann 1 None 15625 2898.806 16.963 613.803 2065.693 197.219 2876.973 4.871 1.92 4c6b58d90453aa176f4f99ef1fd5f4e45a297067aef69bf42ae2eda20fc05984
+process-peak-rss-bytes=Some(14610432)
+exit=0
+family=Dense field=zp65537 variables=5 source-sha256=4451edfe7f540b473a9786e764f8096b30cb2a94c5025a35650a23c33d299daf isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=1.92
+operator D=3125 entries=13125 standard-columns=2500 dense-columns=0 stored-bytes=285000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Wiedemann Wiedemann 1 None 3125 307.131 6.104 120.737 88.786 90.561 300.273 0.754 1.92 f4c97c3e9a1e11b930516b3900c7c592d6e21148f3f1f22b1094a4aa235f8954
+2 Wiedemann Wiedemann 1 None 3125 327.284 6.004 124.061 98.004 98.279 320.530 0.750 1.92 f4c97c3e9a1e11b930516b3900c7c592d6e21148f3f1f22b1094a4aa235f8954
+3 Wiedemann Wiedemann 1 None 3125 300.486 5.847 114.508 88.507 90.670 293.889 0.749 1.92 f4c97c3e9a1e11b930516b3900c7c592d6e21148f3f1f22b1094a4aa235f8954
+4 Wiedemann Wiedemann 1 None 3125 300.626 5.861 113.964 88.410 91.456 294.016 0.749 1.92 f4c97c3e9a1e11b930516b3900c7c592d6e21148f3f1f22b1094a4aa235f8954
+5 Wiedemann Wiedemann 1 None 3125 308.041 5.820 114.253 88.339 98.663 301.458 0.763 1.92 f4c97c3e9a1e11b930516b3900c7c592d6e21148f3f1f22b1094a4aa235f8954
+process-peak-rss-bytes=Some(6610944)
+exit=0
+family=Dense field=zp65537 variables=6 source-sha256=8d780f4993c1dbeb247747fab01c69c6e66b8ade3f96ff5aedf1377932ccc118 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=1.92
+operator D=15625 entries=87500 standard-columns=12500 dense-columns=0 stored-bytes=1775000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Wiedemann Wiedemann 1 None 15625 8569.582 38.753 3662.352 2057.675 2804.218 8525.658 5.171 2.01 a106c9a3dd311e96c2c0e55763247ffc7a8ca1f6316e8c292f9bcc914dcdbc58
+2 Wiedemann Wiedemann 1 None 15625 8568.035 39.160 3659.169 2070.766 2792.470 8523.815 5.059 2.09 a106c9a3dd311e96c2c0e55763247ffc7a8ca1f6316e8c292f9bcc914dcdbc58
+3 Wiedemann Wiedemann 1 None 15625 8566.792 38.968 3652.082 2072.728 2796.417 8522.689 5.136 2.08 a106c9a3dd311e96c2c0e55763247ffc7a8ca1f6316e8c292f9bcc914dcdbc58
+process-peak-rss-bytes=Some(21598208)
+exit=0
+family=Powers field=zp65537 variables=5 source-sha256=47821a0cabf444b3473d5664d71de38f7f4e14089193c6366d40b0166eb87759 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=2.08
+operator D=3125 entries=625 standard-columns=2500 dense-columns=0 stored-bytes=85000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 149.252 2.364 58.937 0.127 0.000 145.420 1.468 2.08 47821a0cabf444b3473d5664d71de38f7f4e14089193c6366d40b0166eb87759
+2 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 90.831 2.649 60.222 0.127 0.000 86.664 1.518 2.08 47821a0cabf444b3473d5664d71de38f7f4e14089193c6366d40b0166eb87759
+3 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 88.886 2.326 59.063 0.127 0.000 85.179 1.381 2.08 47821a0cabf444b3473d5664d71de38f7f4e14089193c6366d40b0166eb87759
+4 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 88.235 2.285 58.378 0.127 0.000 84.564 1.386 2.08 47821a0cabf444b3473d5664d71de38f7f4e14089193c6366d40b0166eb87759
+5 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 87.817 2.351 58.331 0.132 0.000 84.128 1.338 2.08 47821a0cabf444b3473d5664d71de38f7f4e14089193c6366d40b0166eb87759
+process-peak-rss-bytes=Some(162697216)
+exit=0
+family=Nonradical field=zp65537 variables=5 source-sha256=255f4b57a6ea8519608f756f1e670d185b349e1181a9570f3ea5f284374b6762 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=2.08
+operator D=3125 entries=625 standard-columns=2500 dense-columns=0 stored-bytes=85000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 196.866 2.782 58.614 53.601 0.000 192.495 1.589 2.08 cc91f53fa5602a827e3cf65e1baf2a7b562eab424809ec310a73a8494bef0081
+2 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 142.555 2.655 58.647 53.101 0.000 138.380 1.520 2.08 cc91f53fa5602a827e3cf65e1baf2a7b562eab424809ec310a73a8494bef0081
+3 Wiedemann Classical 3 Some(NonCyclicProjection) 3125 142.433 2.653 58.750 53.195 0.000 138.268 1.512 2.08 cc91f53fa5602a827e3cf65e1baf2a7b562eab424809ec310a73a8494bef0081
+process-peak-rss-bytes=Some(162545664)
+exit=0
+family=Cyclic field=zp65537 variables=5 source-sha256=ce36204a4bee3a3b958f9bf346005c3ead6d8eb91031b3691d511791c41d4653 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=2.08
+operator D=3125 entries=1250 standard-columns=2500 dense-columns=0 stored-bytes=95000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Classical Classical 0 None 3125 2150.260 2.844 0.000 0.000 0.000 2145.958 1.458 2.07 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+2 Classical Classical 0 None 3125 2087.054 2.882 0.000 0.000 0.000 2082.773 1.399 2.07 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+3 Classical Classical 0 None 3125 2081.374 2.769 0.000 0.000 0.000 2077.306 1.300 2.07 169c280d0654de0e1bfdfacc1853526406d850d61adc24771c7280d82fee9064
+process-peak-rss-bytes=Some(162459648)
+exit=0
+family=Cyclic field=zp65537 variables=7 source-sha256=8bdfb811df3ed74321f374dc89948a0086d1ed81eb1ec85f3317cb743ed3f411 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8 load=2.07
+operator D=78125 entries=31250 standard-columns=62500 dense-columns=0 stored-bytes=2375000
+repeat route selected attempts fallback D wall-ms operator-ms sequence-ms reconstruction-ms certificate-ms dependence-ms other-ms load basis-sha256
+1 Wiedemann Wiedemann 1 None 78125 73264.797 123.540 15182.848 52914.348 5007.856 73106.296 34.962 2.33 9b0e28ba782517f243d9206e6222acf9cbd28288ea6adfc145e2e07c55fd80ec
+process-peak-rss-bytes=Some(57430016)
+exit=0

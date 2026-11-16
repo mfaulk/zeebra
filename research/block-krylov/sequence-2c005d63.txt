@@ -1,0 +1,143 @@
+=== sequence
+Mon Nov 16 03:03:46 AM UTC 2026
+family=Cyclic field=zp65537 variables=5 source-sha256=ce36204a4bee3a3b958f9bf346005c3ead6d8eb91031b3691d511791c41d4653 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8-15 load=2.13
+D=3125 steps-scalar=6250 left-classes-nnz=5
+repeat 1 done load=2.13
+repeat 2 done load=2.13
+repeat 3 done load=2.13
+repeat 4 done load=2.13
+repeat 5 done load=2.12
+| arm | median ms | min ms | max ms | median ratio to scalar |
+|---|---:|---:|---:|---:|
+| native-apply 1x2D | 35.174 | 35.104 | 35.197 | 1.311 |
+| scalar 1x2D | 26.848 | 26.121 | 26.907 | 1.000 |
+| indep-serial 2x2D | 51.045 | 47.553 | 53.685 | 1.901 |
+| indep-batched 2x2D | 33.640 | 33.319 | 36.746 | 1.288 |
+| indep-threads 2x2D | 24.312 | 23.883 | 26.415 | 0.906 |
+| block-batched 2x3126 | 16.771 | 16.602 | 17.437 | 0.625 |
+| block-threads 2x3126 | 12.082 | 11.957 | 12.193 | 0.453 |
+| indep-serial 4x2D | 98.773 | 94.875 | 100.305 | 3.699 |
+| indep-batched 4x2D | 42.198 | 41.963 | 42.666 | 1.568 |
+| indep-threads 4x2D | 24.456 | 23.774 | 26.336 | 0.911 |
+| block-batched 4x1564 | 10.926 | 10.817 | 11.695 | 0.407 |
+| block-threads 4x1564 | 6.274 | 6.185 | 6.802 | 0.234 |
+| indep-serial 8x2D | 191.740 | 190.484 | 200.908 | 7.201 |
+| indep-batched 8x2D | 72.378 | 71.910 | 75.376 | 2.734 |
+| indep-threads 8x2D | 27.447 | 27.279 | 27.890 | 1.022 |
+| block-batched 8x782 | 10.466 | 10.420 | 10.580 | 0.392 |
+| block-threads 8x782 | 3.725 | 3.712 | 3.758 | 0.139 |
+process-peak-rss-bytes=Some(8450048)
+exit=0
+family=Cyclic field=zp65537 variables=6 source-sha256=256c3bc7722eb67167f6a0e775654841a1be4c1615fda67c58bbe7086280d506 isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8-15 load=2.12
+D=15625 steps-scalar=31250 left-classes-nnz=6
+repeat 1 done load=2.09
+repeat 2 done load=2.21
+repeat 3 done load=2.22
+repeat 4 done load=2.31
+repeat 5 done load=2.24
+| arm | median ms | min ms | max ms | median ratio to scalar |
+|---|---:|---:|---:|---:|
+| native-apply 1x2D | 791.113 | 771.082 | 795.412 | 1.339 |
+| scalar 1x2D | 585.669 | 584.834 | 612.543 | 1.000 |
+| indep-serial 2x2D | 1183.551 | 1174.973 | 1196.308 | 2.021 |
+| indep-batched 2x2D | 832.824 | 826.647 | 836.041 | 1.413 |
+| indep-threads 2x2D | 594.292 | 588.218 | 606.614 | 1.015 |
+| block-batched 2x15626 | 420.520 | 418.518 | 425.477 | 0.715 |
+| block-threads 2x15626 | 299.719 | 294.802 | 310.753 | 0.512 |
+| indep-serial 4x2D | 2372.468 | 2357.862 | 2400.416 | 4.032 |
+| indep-batched 4x2D | 1091.937 | 1074.107 | 1115.949 | 1.836 |
+| indep-threads 4x2D | 615.252 | 609.795 | 646.781 | 1.048 |
+| block-batched 4x7814 | 284.339 | 275.053 | 295.474 | 0.482 |
+| block-threads 4x7814 | 157.287 | 152.025 | 166.475 | 0.269 |
+| indep-serial 8x2D | 4764.837 | 4752.138 | 4788.846 | 8.136 |
+| indep-batched 8x2D | 1844.899 | 1831.031 | 1869.180 | 3.137 |
+| indep-threads 8x2D | 669.472 | 668.666 | 675.640 | 1.143 |
+| block-batched 8x3908 | 255.644 | 252.635 | 256.110 | 0.432 |
+| block-threads 8x3908 | 84.128 | 83.920 | 84.187 | 0.143 |
+process-peak-rss-bytes=Some(40517632)
+exit=0
+family=Dense field=zp65537 variables=5 source-sha256=4451edfe7f540b473a9786e764f8096b30cb2a94c5025a35650a23c33d299daf isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8-15 load=2.24
+D=3125 steps-scalar=6250 left-classes-nnz=5
+repeat 1 done load=2.31
+repeat 2 done load=2.52
+repeat 3 done load=2.52
+repeat 4 done load=2.48
+repeat 5 done load=2.44
+| arm | median ms | min ms | max ms | median ratio to scalar |
+|---|---:|---:|---:|---:|
+| native-apply 1x2D | 129.879 | 120.425 | 130.142 | 1.113 |
+| scalar 1x2D | 116.447 | 114.372 | 128.950 | 1.000 |
+| indep-serial 2x2D | 231.817 | 226.687 | 238.618 | 1.991 |
+| indep-batched 2x2D | 163.212 | 162.991 | 167.245 | 1.406 |
+| indep-threads 2x2D | 118.748 | 113.306 | 124.183 | 0.974 |
+| block-batched 2x3126 | 84.945 | 81.996 | 87.863 | 0.706 |
+| block-threads 2x3126 | 57.579 | 56.608 | 64.317 | 0.495 |
+| indep-serial 4x2D | 454.959 | 453.268 | 470.674 | 3.900 |
+| indep-batched 4x2D | 272.210 | 272.088 | 278.570 | 2.343 |
+| indep-threads 4x2D | 117.389 | 113.672 | 123.137 | 1.009 |
+| block-batched 4x1564 | 74.226 | 70.879 | 76.561 | 0.625 |
+| block-threads 4x1564 | 30.044 | 28.466 | 32.386 | 0.258 |
+| indep-serial 8x2D | 920.292 | 910.267 | 922.915 | 7.903 |
+| indep-batched 8x2D | 490.620 | 486.641 | 495.847 | 4.232 |
+| indep-threads 8x2D | 128.909 | 128.817 | 129.035 | 1.107 |
+| block-batched 8x782 | 69.262 | 69.160 | 69.424 | 0.595 |
+| block-threads 8x782 | 16.356 | 16.271 | 16.368 | 0.140 |
+process-peak-rss-bytes=Some(9015296)
+exit=0
+family=Cyclic field=babybear variables=6 source-sha256=dde3898f7814fd19a47775aa8f5832002bb5011ad8da336835adb9bcbd8eea2e isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8-15 load=2.44
+D=15625 steps-scalar=31250 left-classes-nnz=6
+repeat 1 done load=2.56
+repeat 2 done load=2.66
+repeat 3 done load=2.58
+repeat 4 done load=2.61
+repeat 5 done load=3.10
+| arm | median ms | min ms | max ms | median ratio to scalar |
+|---|---:|---:|---:|---:|
+| native-apply 1x2D | 749.425 | 732.272 | 756.567 | 1.226 |
+| scalar 1x2D | 605.149 | 597.683 | 622.824 | 1.000 |
+| indep-serial 2x2D | 1206.002 | 1203.178 | 1218.497 | 1.993 |
+| indep-batched 2x2D | 810.903 | 804.109 | 816.294 | 1.336 |
+| indep-threads 2x2D | 612.902 | 600.682 | 635.418 | 1.013 |
+| block-batched 2x15626 | 410.983 | 403.987 | 420.283 | 0.686 |
+| block-threads 2x15626 | 303.160 | 299.703 | 321.538 | 0.497 |
+| indep-serial 4x2D | 2414.725 | 2406.407 | 2471.603 | 4.040 |
+| indep-batched 4x2D | 666.369 | 661.176 | 667.631 | 1.093 |
+| indep-threads 4x2D | 628.465 | 625.144 | 636.050 | 1.051 |
+| block-batched 4x7814 | 172.427 | 171.007 | 174.833 | 0.284 |
+| block-threads 4x7814 | 162.325 | 155.474 | 167.370 | 0.266 |
+| indep-serial 8x2D | 4845.394 | 4827.807 | 4884.806 | 7.978 |
+| indep-batched 8x2D | 929.744 | 920.415 | 931.044 | 1.536 |
+| indep-threads 8x2D | 681.982 | 680.903 | 705.255 | 1.127 |
+| block-batched 8x3908 | 130.999 | 130.109 | 131.097 | 0.216 |
+| block-threads 8x3908 | 85.563 | 85.446 | 85.699 | 0.141 |
+process-peak-rss-bytes=Some(25735168)
+exit=0
+family=Cyclic field=goldilocks variables=6 source-sha256=2a8fff60697f92f8bbd7fa6cefb0aef203f653d22422cc9fb46cabf8b12f4c7e isa=x86-64-v3 or better (AVX2) machine=5995wx affinity=8-15 load=3.10
+D=15625 steps-scalar=31250 left-classes-nnz=6
+repeat 1 done load=2.79
+repeat 2 done load=2.64
+repeat 3 done load=3.16
+repeat 4 done load=2.61
+repeat 5 done load=2.28
+| arm | median ms | min ms | max ms | median ratio to scalar |
+|---|---:|---:|---:|---:|
+| native-apply 1x2D | 973.229 | 957.976 | 977.456 | 1.363 |
+| scalar 1x2D | 714.579 | 706.779 | 733.847 | 1.000 |
+| indep-serial 2x2D | 1436.424 | 1429.134 | 1463.798 | 2.012 |
+| indep-batched 2x2D | 984.673 | 977.024 | 1001.511 | 1.378 |
+| indep-threads 2x2D | 717.974 | 713.355 | 738.959 | 1.001 |
+| block-batched 2x15626 | 489.110 | 486.770 | 503.381 | 0.686 |
+| block-threads 2x15626 | 360.961 | 356.137 | 386.258 | 0.505 |
+| indep-serial 4x2D | 2901.222 | 2854.279 | 2929.480 | 3.999 |
+| indep-batched 4x2D | 1355.115 | 1350.611 | 1368.246 | 1.892 |
+| indep-threads 4x2D | 750.676 | 720.386 | 753.582 | 1.027 |
+| block-batched 4x7814 | 348.593 | 337.714 | 361.399 | 0.483 |
+| block-threads 4x7814 | 184.319 | 178.867 | 196.154 | 0.256 |
+| indep-serial 8x2D | 5751.279 | 5708.053 | 5784.472 | 8.073 |
+| indep-batched 8x2D | 2562.101 | 2550.864 | 2568.023 | 3.589 |
+| indep-threads 8x2D | 808.327 | 807.089 | 808.832 | 1.131 |
+| block-batched 8x3908 | 345.056 | 344.940 | 355.675 | 0.483 |
+| block-threads 8x3908 | 101.479 | 101.237 | 101.922 | 0.142 |
+process-peak-rss-bytes=Some(42844160)
+exit=0
+Mon Nov 16 03:08:33 AM UTC 2026

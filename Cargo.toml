@@ -325,5 +325,9 @@ name = "sparse_matvec_throughput"
 test = true
 
 [[example]]
+name = "block_krylov_study"
+test = true
+
+[[example]]
 name = "shoup_scatter_gate"
 required-features = ["external-runners"]
