@@ -64,8 +64,9 @@ pub enum PairMultiples {
     /// Seed both halves of every pair, repeats included. The pre-#831 behaviour.
     Every,
 
-    /// Seed each distinct `(basis_index, multiplier)` once. Measured at −10% of the Katsura-11
-    /// F4 call over 2^31−1 on 16 workers (#827), mostly in forward elimination.
+    /// Seed each distinct `(basis_index, multiplier)` once. Under benchlock at `9d3e45a7` (#841),
+    /// Katsura-11 over 2^31−1 took 0.80x the F4 call serially and 0.91x on 16 workers, and MQ10
+    /// 0.89–0.97x, mostly from forward elimination; small controls did not move.
     #[default]
     Distinct,
 }
