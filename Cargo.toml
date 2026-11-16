@@ -306,6 +306,11 @@ test = true
 required-features = ["external-runners"]
 
 [[example]]
+name = "zeebra_driver"
+test = true
+required-features = ["external-runners"]
+
+[[example]]
 name = "public_corpus"
 required-features = ["external-runners"]
 
