@@ -161,7 +161,9 @@ class WideCorpusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             stem = Path(directory) / 'attempt'
             pidfile = Path(directory) / 'pid'
-            code = "import os,time;from pathlib import Path;Path("+repr(str(pidfile))+").write_text(str(os.getpid()));time.sleep(30)"
+            # Write-then-rename: the interrupt fires on the file existing, so it must never exist empty.
+            code = ("import os,time;from pathlib import Path;p=Path("+repr(str(pidfile))+");"
+                    "t=p.with_suffix('.tmp');t.write_text(str(os.getpid()));t.rename(p);time.sleep(30)")
             probe = wide.guard.tree_hwm
             def interrupt(pid):
                 if pidfile.exists():
