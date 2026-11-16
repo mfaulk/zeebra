@@ -245,6 +245,54 @@ pub(crate) fn accumulated_reduce_rows_against_pivots<F: FiniteField>(
     Ok(())
 }
 
+/// [`crate::linalg::echelon::sweep_rows_against_pivots`] through a dense working row.
+///
+/// Unlike [`eliminate_from`], a row does not stop at its first unpivoted column: it walks every
+/// column to its tail, so the result is free of every upper pivot column, not only those left of
+/// its own lead. A pivot's entries lie at or right of its lead, so one ascending walk suffices.
+pub(crate) fn accumulated_sweep_rows_against_pivots<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    pivot_of_column: &PivotIndex,
+    statistics: &mut EliminationStatistics,
+    max_nonzeros: usize,
+) -> Result<(), usize> {
+    let mut resident = statistics.initial_nonzeros;
+    let mut accumulator = DenseAccumulator::new(matrix.num_columns());
+    for index in split..matrix.num_rows() {
+        // Dropped once scattered, so the live count holds one copy of the row, not two.
+        let row = std::mem::take(&mut matrix.rows_mut()[index]);
+        resident -= row.nonzeros();
+        accumulator.load(&row);
+        drop(row);
+        let mut column = accumulator.lead;
+        while column < accumulator.tail {
+            let factor = accumulator.cells[column];
+            if !factor.is_zero() {
+                if let Some(pivot) = pivot_of_column.pivot_of(column) {
+                    accumulator.subtract_scaled(matrix.row(pivot), factor);
+                    statistics.row_operations += 1;
+                    let live = resident + accumulator.nonzeros();
+                    statistics.peak_nonzeros = statistics.peak_nonzeros.max(live);
+                    if live > max_nonzeros {
+                        return Err(live);
+                    }
+                }
+            }
+            column += 1;
+        }
+        let row = accumulator.take();
+        if row.is_zero() {
+            statistics.zero_rows += 1;
+        }
+        resident += row.nonzeros();
+        statistics.peak_nonzeros = statistics.peak_nonzeros.max(resident);
+        matrix.rows_mut()[index] = row;
+    }
+    statistics.final_nonzeros = resident;
+    Ok(())
+}
+
 /// Rows `[first..]` reduced through `accumulator` against `pivot_of_column`.
 fn eliminate_from<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,

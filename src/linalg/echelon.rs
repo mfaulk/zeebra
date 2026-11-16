@@ -4,7 +4,8 @@ use crate::{
     linalg::{
         dense::{
             accumulated_reduce_rows_against_pivots, accumulated_row_echelon,
-            dense_reduce_rows_against_pivots, dense_row_echelon,
+            accumulated_sweep_rows_against_pivots, dense_reduce_rows_against_pivots,
+            dense_row_echelon,
         },
         sparse::{row_echelon_within, EliminationStatistics, SparseMatrix, SparseRow},
         PivotIndex,
@@ -145,6 +146,57 @@ pub fn reduce_rows_against_pivots_with<F: FiniteField>(
     Ok(statistics)
 }
 
+/// Clear every column an upper row leads from every lower row, leaving the lower rows otherwise
+/// unreduced.
+///
+/// Rows `[..split]` are the pivots, with the preconditions of
+/// [`reduce_rows_against_pivots_with`]. Rows `[split..]` become `D - C A^-1 B` on the columns no
+/// upper row leads (still indexed by the original columns): the first half of the
+/// Faugère–Lachartre order, in which lower rows never meet each other until every upper column is
+/// gone. Lower rows are neither normalized nor reordered, and none is taken as a pivot, so the
+/// reported rank is the upper block's.
+///
+/// One kernel rather than one per [`Backend`]: lower rows are independent of each other here, so
+/// there is no pivot discovery for the representations to differ on, and a dense working row is
+/// what every measured backend already uses for the same subtraction.
+///
+/// # Panics
+/// As [`reduce_rows_against_pivots_with`].
+///
+/// # Errors
+/// The live entry count that crossed `max_nonzeros`.
+pub fn sweep_rows_against_pivots<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    max_nonzeros: usize,
+) -> Result<EliminationStatistics, usize> {
+    assert!(
+        split <= matrix.num_rows(),
+        "a split of {} in a matrix of {} rows",
+        split,
+        matrix.num_rows()
+    );
+    let initial_nonzeros = matrix.nonzeros();
+    let mut statistics = EliminationStatistics {
+        initial_nonzeros,
+        peak_nonzeros: initial_nonzeros,
+        ..Default::default()
+    };
+    if initial_nonzeros > max_nonzeros {
+        return Err(initial_nonzeros);
+    }
+    let pivot_of_column = upper_block_pivots(matrix, split, &mut statistics);
+    accumulated_sweep_rows_against_pivots(
+        matrix,
+        split,
+        &pivot_of_column,
+        &mut statistics,
+        max_nonzeros,
+    )?;
+    debug_assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
+    Ok(statistics)
+}
+
 /// The pivot map rows `[..split]` declare, with the preconditions enforced.
 ///
 /// Checked rather than trusted: a duplicated leading column would silently drop one of the two
@@ -264,7 +316,9 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{reduce_rows_against_pivots_with, row_echelon_with, Backend};
+    use super::{
+        reduce_rows_against_pivots_with, row_echelon_with, sweep_rows_against_pivots, Backend,
+    };
     use crate::{
         fields::{Gf256, Zp13, Zp18446744073709551557, Zp2, Zp2147483647, Zp541, Zp7},
         linalg::sparse::{
@@ -1020,5 +1074,95 @@ mod tests {
                 backend
             );
         }
+    }
+
+    // The sweep clears every upper-pivot column from a lower row and leaves the upper rows alone.
+    #[test]
+    fn test_sweep_leaves_the_schur_complement_on_free_columns() {
+        // Upper rows lead columns 0 and 2; the lower row is x0 + 2x1 + 3x2 + x3 over Z/13.
+        let mut matrix = matrix_of(
+            &[
+                &[(0, 1), (1, 1)],
+                &[(2, 1), (3, 2)],
+                &[(0, 1), (1, 2), (2, 3), (3, 1)],
+            ],
+            4,
+        );
+        let statistics = sweep_rows_against_pivots(&mut matrix, 2, usize::MAX).unwrap();
+        // Subtract r0: x1 + 3x2 + x3. Subtract 3 r2: x1 + (1 - 6) x3 = x1 + 8x3 mod 13.
+        let expected = matrix_of(
+            &[&[(0, 1), (1, 1)], &[(2, 1), (3, 2)], &[(1, 1), (3, 8)]],
+            4,
+        );
+        assert_eq!(matrix, expected);
+        assert_eq!(statistics.row_operations, 2);
+        assert_eq!(statistics.rank, 2);
+        assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
+    }
+
+    // A lower row in the upper rows' span sweeps to zero and is counted as a zero row.
+    #[test]
+    fn test_sweep_of_a_dependent_row_is_zero() {
+        let mut matrix = matrix_of(&[&[(0, 1), (1, 3)], &[(0, 2), (1, 6)]], 2);
+        let statistics = sweep_rows_against_pivots(&mut matrix, 1, usize::MAX).unwrap();
+        assert!(matrix.row(1).is_zero());
+        assert_eq!(statistics.zero_rows, 1);
+    }
+
+    // Swept rows hold no entry in an upper-pivot column, and the row space is unchanged.
+    #[test]
+    fn test_sweep_preserves_the_row_space_and_clears_pivot_columns() {
+        for seed in 0..20 {
+            let mut upper: SparseMatrix<F> = random_matrix(10, 24, 0.3, seed);
+            row_echelon(&mut upper);
+            let upper_rows: Vec<SparseRow<F>> = upper
+                .rows()
+                .iter()
+                .filter(|row| !row.is_zero())
+                .cloned()
+                .collect();
+            let split = upper_rows.len();
+            let lower: SparseMatrix<F> = random_matrix(8, 24, 0.4, seed + 100);
+            let mut rows = upper_rows.clone();
+            rows.extend(lower.rows().iter().cloned());
+            let original = SparseMatrix::new(24, rows);
+            let mut swept = original.clone();
+            sweep_rows_against_pivots(&mut swept, split, usize::MAX).unwrap();
+            let leads: Vec<usize> = upper_rows
+                .iter()
+                .filter_map(|row| row.leading_column())
+                .collect();
+            for row in &swept.rows()[split..] {
+                for (column, _) in row.entries() {
+                    assert!(
+                        !leads.contains(column),
+                        "seed {seed}: pivot column {column} survived"
+                    );
+                }
+            }
+            let (mut a, mut b) = (original.clone(), swept.clone());
+            reduced_row_echelon(&mut a);
+            reduced_row_echelon(&mut b);
+            a.sort_rows_by_leading_column();
+            b.sort_rows_by_leading_column();
+            assert_eq!(a, b, "seed {seed}");
+        }
+    }
+
+    // The sweep reports the live entry count that crossed the budget.
+    #[test]
+    fn test_sweep_enforces_the_budget() {
+        // Five entries in; one subtraction makes the lower row x1 + x2 + x3 alongside the
+        // four-entry pivot, seven live.
+        let mut matrix = matrix_of(&[&[(0, 1), (1, 1), (2, 1), (3, 1)], &[(0, 1)]], 4);
+        assert_eq!(sweep_rows_against_pivots(&mut matrix, 1, 6), Err(7));
+    }
+
+    // A malformed upper block is refused, as for the forward kernels.
+    #[test]
+    #[should_panic(expected = "not normalized")]
+    fn test_sweep_rejects_an_unnormalized_upper_pivot() {
+        let mut matrix = matrix_of(&[&[(0, 3), (1, 2)], &[(1, 1)]], 3);
+        let _ = sweep_rows_against_pivots(&mut matrix, 1, usize::MAX);
     }
 }

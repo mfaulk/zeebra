@@ -7,6 +7,7 @@ pub mod candidate;
 pub mod certify;
 pub mod degrees;
 pub mod divmask;
+mod faugere_lachartre;
 pub mod hilbert_driven;
 pub(crate) mod interreduce;
 #[cfg(feature = "research-work")]
@@ -43,8 +44,8 @@ pub use membership::{
 };
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
-    F4Error, F4Options, Gf2Elimination, InterreductionRoute, ParallelForward, ReducerSelection,
-    ReductionStrategy, StopKind,
+    BatchOrder, F4Error, F4Options, Gf2Elimination, InterreductionRoute, ParallelForward,
+    ReducerSelection, ReductionStrategy, StopKind,
 };
 pub use reduction::{
     build_batch_matrix, reduce_batch, reduce_batch_in, reduce_batch_observed_in, BatchOutcome,

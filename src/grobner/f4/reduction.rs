@@ -7,7 +7,7 @@ use crate::{
         f4::{
             macaulay::{BuildBudgetExceeded, MacaulayMatrix},
             observer::{BatchObserver, Ignore},
-            options::{F4Error, F4Options, ReductionStrategy},
+            options::{BatchOrder, F4Error, F4Options, ReductionStrategy},
             statistics::{BatchStatistics, StageClock, StageTimings},
             structured::{eliminate_to, BlockPlan, RowForm},
             symbolic::{
@@ -320,6 +320,32 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             }
         }
         let budget = |nonzeros| options.entry_budget_error::<F>(nonzeros);
+        if structured && options.batch_order == BatchOrder::FaugereLachartre {
+            let selected = candidate_columns(matrix);
+            let (block, report) = super::faugere_lachartre::eliminate(
+                options.elimination,
+                matrix,
+                &selected,
+                form == RowForm::Reduced,
+                allowance,
+                &mut split_clock,
+                &mut stages,
+            )
+            .map_err(budget)?;
+            if form == RowForm::Reduced {
+                candidate_reduction = super::statistics::CandidateReductionStatistics {
+                    batches: 1,
+                    targets: report.targets,
+                    coefficient_products: report.products,
+                    workspace_bytes: report.workspace_bytes,
+                    reserved_entries: report.reserved_entries,
+                    peak_sparse_capacity_entries: report.peak_capacity_entries,
+                    fallback_batches: usize::from(report.fell_back),
+                };
+            }
+            stages.backward = split_clock.lap();
+            return Ok(block);
+        }
         let parallel = super::parallel::forward(
             options.parallel_forward,
             plan,
@@ -546,7 +572,7 @@ mod tests {
             grobner::f4::{
                 structured::{eliminate_to, BlockPlan, RowForm},
                 symbolic::ReducerCache,
-                ReductionStrategy,
+                BatchOrder, ReductionStrategy,
             },
             linalg::Backend,
         };
@@ -556,7 +582,10 @@ mod tests {
                     ReductionStrategy::Structured,
                     ReductionStrategy::Unstructured,
                 ] {
-                    for strings in ROW_FORM_SYSTEMS {
+                    for (strings, batch_order) in ROW_FORM_SYSTEMS
+                        .iter()
+                        .flat_map(|s| BatchOrder::ALL.map(move |b| (s, b)))
+                    {
                         let polynomials: Vec<_> = strings
                             .iter()
                             .map(|s| MultivariatePolynomial::<3, G>::parse(s, VARS).unwrap())
@@ -566,6 +595,7 @@ mod tests {
                         let options = F4Options {
                             elimination: backend,
                             reduction,
+                            batch_order,
                             ..F4Options::default()
                         };
                         let actual = reduce_batch(&basis, &pairs, order, &options).unwrap();
@@ -603,7 +633,7 @@ mod tests {
                         expected.sort_by(|a, b| {
                             order.cmp(&b.leading_monomial(order), &a.leading_monomial(order))
                         });
-                        assert_eq!(actual.candidates, expected);
+                        assert_eq!(actual.candidates, expected, "{batch_order:?} {backend:?}");
                         assert_eq!(actual.statistics.candidate_reduction.batches, 1);
                         assert_eq!(
                             actual.statistics.candidate_reduction.targets,
@@ -616,7 +646,7 @@ mod tests {
         }
     }
 
-    // Production candidates equal public full RREF across all orders, backends, prime and extension fields.
+    // Production candidates, in either batch order, equal public full RREF across all orders, backends, prime and extension fields.
     #[test]
     fn candidate_output_contract_matches_full_rref() {
         use crate::fields::{Bn254Fr, Gf256, Zp18446744069414584321, Zp2};

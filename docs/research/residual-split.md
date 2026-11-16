@@ -8,6 +8,18 @@ per arm with rotated order; medians with [min, max]. Coefficient-product counts 
 times are not used. Raw output:
 [`research/residual-split/split.md`](../../research/residual-split/split.md) and
 [`research/residual-split/products.md`](../../research/residual-split/products.md).
+§7 was measured at `8a68368f` (the corrected split) and `f9bf3e55` (whole runs); raw output in
+[`split-corrected.md`](../../research/residual-split/split-corrected.md) and
+[`whole-runs.md`](../../research/residual-split/whole-runs.md).
+
+> **Correction (#816).** The "production batch" arm below finished every pivot row outside the
+> reducer columns, including rows still leading at a pair lcm. F4 finishes only true candidates —
+> columns no input row led with — so this arm overstated the production backward pass (417 ms
+> against 6 ms on `mq-random-10`), and the 1.76–2.14× figures in §3, §4 and §6 are against that
+> overstated arm. Against
+> F4's own selection the Faugère–Lachartre order is **1.37×** on the `mq-random-10` batch, and
+> **1.05–1.25×** on whole single-threaded runs; it loses to the shipped 16-worker forward pass.
+> See §7. The tables above are kept as measured.
 
 This is #803, the CPU phase split that `docs/research/gpu-f4.md` §5 step 1 asks for before any GPU
 proposal: on the largest batch of `mq-random-14`, how much of the batch's elimination is the echelon
@@ -120,3 +132,62 @@ measured across the corpus and on whole runs: #816. The existing note in
 `docs/research/elimination-kernels.md` that revisiting Faugère–Lachartre "requires a measured
 distinction" is answered by §3: the distinction is not the arrangement (production already puts
 reducers first) but the order of the passes.
+
+---
+
+## 7. Correction, and the order as a shipped F4 route (#816)
+
+### 7.1 What the production arm got wrong
+
+`split`'s production arm selected the columns no reducer leads and finished every pivot row there
+(`candidate::finish`). F4 selects the columns no *input* row leads: neither a reducer's lead nor a
+pair's lcm (`src/grobner/f4/reduction.rs`, `candidate_columns`). After the forward pass, many pair
+rows still lead at their lcm; F4 extracts no candidate from them and does not finish them, and the
+harness did. On `mq-random-10` the harness finished 579 rows; F4 finishes 8.
+
+`8a68368f` makes the harness select as F4 does, and compares only true candidates. Same batch, one
+pinned core, five interleaved repetitions, medians [min, max] in ms:
+
+| batch | production | full RREF | forward only | reference sweep | echelon of `D'` | Faugère–Lachartre order |
+|---|---:|---:|---:|---:|---:|---:|
+| `mq-random-10` | 752.1 [729.9, 756.9] | 1,481.6 [1,459.2, 1,499.7] | 746.1 [737.7, 751.2] | 393.0 [384.0, 396.0] | 87.1 [84.6, 87.5] | 548.3 [538.3, 549.5] |
+
+The production backward pass is 6 ms, not 417 ms; the FL order is **1.37×** production, not 2.14×.
+The load was 10.2 at the end of this run against 1.35 for §3, so absolute times are about 7% above
+§3's; the ratio is what to read. `mq-random-14` was not re-measured.
+
+### 7.2 Whole runs
+
+`F4Options::batch_order = BatchOrder::FaugereLachartre` (`f9bf3e55`) ships the order: a dense-row
+sweep kernel (`linalg::echelon::sweep_rows_against_pivots`), then the configured backend's echelon
+of `D'` renumbered onto its own columns, then `candidate::finish` over `D'` alone, under the live
+entry budget with the reducer block counted as resident. Whole F4 calls, `F4Options::default()`
+otherwise, grevlex, cores 32–47 under `tools/benchlock.sh`, five interleaved rotated repetitions,
+medians [min, max] in ms. Every run of an instance produced the same basis digest.
+
+| instance | forward order, serial | FL order, serial | forward order, 16 workers (shipped) | FL / forward, serial |
+|---|---:|---:|---:|---:|
+| `mq-random-10`, p = 2³¹−1 | 1,138.6 [1,127.9, 1,221.4] | 991.9 [986.5, 1,086.3] | 291.2 [288.3, 292.8] | 1.15× |
+| `katsura-11`, p = 2³¹−1 | 10,061.9 [9,980.2, 10,772.0] | 8,023.7 [7,985.1, 8,645.1] | 1,737.5 [1,724.0, 1,779.8] | 1.25× |
+| `cyclic-7`, p = 32003 | 284.8 [276.5, 296.1] | 270.4 [264.8, 289.9] | 139.5 [138.5, 141.7] | 1.05× |
+
+Peak live entries (`max_live_nonzeros`), deterministic: FL is 16% below the serial forward order on
+`mq-random-10` (978,506 against 1,164,559) and 14% and 25% above it on `katsura-11` (3,680,865
+against 3,225,484) and `cyclic-7` (267,878 against 213,585). Both stay below the 16-worker
+route's peaks, which reserve worker space.
+
+Load rose from 4.9 to 13.3 across the run; the serial pairs were interleaved, so their ratios are
+the figures to trust.
+
+### 7.3 Position
+
+- **The order is a real single-threaded gain, 1.05–1.25× on whole runs**, smaller than §4 claimed
+  because the backward pass it was to remove was mostly the harness's.
+- **It is not the default.** The FL route is serial in both its sweep and its `D'` elimination, so
+  it ignores `ParallelForward`, and the shipped 16-worker forward order is 1.9–4.6× faster than it.
+  It stays selectable as `BatchOrder::FaugereLachartre`.
+- **What would change that** is a parallel FL route: the sweep is row-independent and
+  deterministic, and `D'` could take the concurrent kernel. Whether it beats the 16-worker forward
+  order is unmeasured; it is #828.
+- §4 finding 4's GPU ceiling was computed against the overstated production arm and should be
+  re-derived before it is cited.

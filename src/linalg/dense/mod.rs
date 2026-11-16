@@ -21,5 +21,8 @@ mod rows;
 pub use accumulator::DenseAccumulator;
 pub use rows::DenseRows;
 
-pub(crate) use accumulator::{accumulated_reduce_rows_against_pivots, accumulated_row_echelon};
+pub(crate) use accumulator::{
+    accumulated_reduce_rows_against_pivots, accumulated_row_echelon,
+    accumulated_sweep_rows_against_pivots,
+};
 pub(crate) use rows::{dense_reduce_rows_against_pivots, dense_row_echelon};
