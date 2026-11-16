@@ -128,7 +128,7 @@ fn run<const N: usize>(args: &Args, input: Option<&str>) {
         env::var("ZEEBRA_AFFINITY").unwrap_or_else(|_| "unspecified".into()),
         zeebra::util::isa_floor()
     );
-    println!("repeat strategy selected attempts fallback D operators wall-ms operator-ms dependence-ms workspace-cells basis-sha256");
+    println!("repeat strategy selected attempts fallback D operators wall-ms operator-ms dependence-ms workspace-cells basis-sha256 sequence-ms reconstruction-ms certificate-ms");
     let mut reference = None;
     for repeat in 0..args.repeats {
         let strategies = if args.route == "compare" {
@@ -179,7 +179,7 @@ fn run<const N: usize>(args: &Args, input: Option<&str>) {
                 .collect::<Vec<_>>()
                 .join("\n");
             println!(
-                "{} {:?} {:?} {} {:?} {} {} {:.6} {:.6} {:.6} {} {}",
+                "{} {:?} {:?} {} {:?} {} {} {:.6} {:.6} {:.6} {} {} {:.6} {:.6} {:.6}",
                 repeat + 1,
                 strategy,
                 stats.conversion_route,
@@ -191,7 +191,10 @@ fn run<const N: usize>(args: &Args, input: Option<&str>) {
                 stats.timings.operator_construction().as_secs_f64() * 1000.,
                 stats.timings.dependence.as_secs_f64() * 1000.,
                 stats.memory.krylov_workspace_cells,
-                sha256_hex(text.as_bytes())
+                sha256_hex(text.as_bytes()),
+                stats.timings.scalar_sequence.as_secs_f64() * 1000.,
+                stats.timings.scalar_reconstruction.as_secs_f64() * 1000.,
+                stats.timings.scalar_certificate.as_secs_f64() * 1000.,
             );
         }
     }
