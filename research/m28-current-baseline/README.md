@@ -358,3 +358,15 @@ cohort by `summarize.py`, and not pooled with window 2. The
 [report](../../docs/research/m28-current-baseline.md#complete-native-window-4-788) replaces the
 four-repetition medians with its five-repetition medians.
 
+
+## Post-#813 forward cohort (#822)
+
+`--phase forward` pairs `--forward-workers=1` (serial) with `--forward-workers=16` (the
+production default) on every #751 cell, five repetitions each, alternating order per repetition.
+Each response echoes `forward_workers`, and `validate_response` rejects a mismatch with its arm. Build at
+the instruments' commit with `cargo build --release --features external-runners,research-work
+--example mq10_profile`, copy the binary to `/buildcache/cargo-target/zeebra-822/bin/mq10_profile-822`,
+commit, then run [current/run-forward-822.sh](current/run-forward-822.sh) (benchlock, CPUs 2–17,
+960 s hard stop inside the 900 s aggregate budget). `summarize.py` folds the archive into
+`summary.json` with the other current cohorts. Results:
+[report](../../docs/research/m28-current-baseline.md#post-813-cohort-822).

@@ -736,3 +736,13 @@ symbolic, interreduction and conversion stages now dominate, parallelize or redu
 Re-run the wide ladder at current `main` before carrying the wide-field hypothesis forward. Add a
 matched multiworker comparand cohort on one boundary to the board, so the Strong gap criterion can
 be scored directly. #268 reopens only on its stated memory condition.
+
+Outcome (2026-11-16):
+- The re-profile (#822, [report](research/m28-current-baseline.md#post-813-cohort-822)) puts FGLM
+  operator construction at 38–40% of MQ10's 16-worker route, an Amdahl ceiling of 1.61–1.67x.
+  Forward elimination is down to 14–15%. On the Katsura-11 basis, serial symbolic preprocessing is
+  30% of the F4 call.
+- The wide ladder at current code (#821) completes six cells that previously stopped, and still
+  trails grobx on every eligible rung, by 1.33–10.65x at 16 workers.
+- The matched multiworker cohort (#820) measures Zeebra at 16 workers 1.88–2.92x behind msolve's
+  exact target.
