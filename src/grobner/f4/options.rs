@@ -239,7 +239,7 @@ impl ParallelForward {
 /// `std::thread::available_parallelism` reads cgroup files on every call — about a millisecond
 /// across a small computation's batches when it was asked per batch (#752) — so later changes to
 /// the process's affinity or quota are not seen.
-fn available_parallelism() -> usize {
+pub(crate) fn available_parallelism() -> usize {
     static CPUS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
     *CPUS.get_or_init(|| std::thread::available_parallelism().map_or(1, usize::from))
 }

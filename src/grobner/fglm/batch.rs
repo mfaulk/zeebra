@@ -101,6 +101,16 @@ pub struct BorderBatch {
 
     /// How to run a batch's target loop. See [`BorderReduction`].
     pub reduction: BorderReduction,
+
+    /// Threads the batches are shared across, capped at the batch count and the process's
+    /// available parallelism. Zero and one both mean the calling thread alone.
+    ///
+    /// Batches are independent — each builds its own closure from the same basis — so this
+    /// parallelizes the closure and the reduction alike and changes no answer and no counter. It
+    /// does multiply the live closures: up to this many batches' reducer entries are held at once.
+    /// A field that cannot prove `Send + Sync` through
+    /// [`FiniteField::run_concurrent`](crate::FiniteField::run_concurrent) stays serial.
+    pub workers: usize,
 }
 
 /// How a batch's target loop is decomposed.
@@ -117,11 +127,9 @@ pub struct BorderBatch {
 /// widths where one pays one — counted exactly in
 /// [`BorderBatchStatistics::buffer_cells_zeroed`].
 ///
-/// **Neither variant is concurrent.** The decomposition is the half of parallelism that can be
-/// taken without putting `Send + Sync` on the conversion's whole public surface, and §6.8 of
-/// `docs/MILESTONE-FGLM-SCALABILITY.md` is why it was not worth paying for the other half:
-/// [`measure_border_reduction`] runs the groups on threads and the batches are too small for it to
-/// pay.
+/// **Neither variant is concurrent.** §6.8 of `docs/MILESTONE-FGLM-SCALABILITY.md` measured
+/// threads *within* a batch with [`measure_border_reduction`], and the batches are too small for it
+/// to pay. Concurrency is across batches instead: see [`BorderBatch::workers`].
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum BorderReduction {
     /// One group: the carry runs the length of the batch.
@@ -165,6 +173,9 @@ impl BorderBatch {
     /// 200,000 reducer rows and columns is about 30x the largest closure in the benchmark corpus,
     /// and 20 million entries is F4's live-nonzero figure. The point of them is to stop a batch
     /// whose closure is exploding, not to tune one that is not.
+    ///
+    /// **16 workers**, F4's forward-elimination ceiling (#813). After #813 this stage was 38–40% of
+    /// MQ10's whole route (#826); a border of one batch never spawns a thread.
     pub fn recommended() -> Self {
         Self {
             size: BorderBatchSize::Fixed(64),
@@ -173,6 +184,7 @@ impl BorderBatch {
             max_nonzeros: 20_000_000,
             on_overflow: BatchOverflow::Fail,
             reduction: BorderReduction::Sequential,
+            workers: 16,
         }
     }
 
@@ -185,7 +197,13 @@ impl BorderBatch {
             max_nonzeros: usize::MAX,
             on_overflow: BatchOverflow::Fail,
             reduction: BorderReduction::Sequential,
+            workers: 1,
         }
+    }
+
+    /// These limits with a different worker count. See [`Self::workers`].
+    pub fn with_workers(self, workers: usize) -> Self {
+        Self { workers, ..self }
     }
 
     /// These limits with a different batch size.
@@ -495,11 +513,10 @@ pub(super) fn reduce_targets<const N: usize, F: FiniteField>(
 
 /// [`reduce_targets`] with one contiguous group per worker, each on its own scoped thread.
 ///
-/// **Measurement only, and not reachable from a conversion.** Making the conversion able to call
-/// this means `F: Send + Sync` on `fglm_to_lex`, `QuotientAlgebra::new`,
-/// `solve_zero_dimensional_with_options` and the differential harness — the whole public surface
-/// that reaches a border batch — and §6.8 of `docs/MILESTONE-FGLM-SCALABILITY.md` measured that
-/// there is nothing to buy with it. The code is here because the refutation is a measurement rather
+/// **Measurement only, and not reachable from a conversion.** §6.8 of
+/// `docs/MILESTONE-FGLM-SCALABILITY.md` measured that splitting one batch's target loop buys
+/// nothing at the default batch size. The conversion parallelizes across whole batches instead
+/// (`BorderBatch::workers`, #826). The code is here because the refutation is a measurement rather
 /// than an argument, and it cannot be remeasured later from a path that does not exist.
 ///
 /// Zero and one worker both run on this thread with no thread spawned at all.

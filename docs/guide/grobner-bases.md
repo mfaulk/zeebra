@@ -349,6 +349,15 @@ size on both families and faster than scalar on every system.
 drops a target: `Fail` returns `FglmError::BorderBatchExceeded` naming the limit, and `Scalar`
 reduces that batch one target at a time and counts that it did.
 
+`BorderBatch::workers` (16 in `recommended()`, 1 in `unbounded()`) shares whole batches across
+scoped threads. Each batch builds its own closure from the same basis, so the closure and the
+reduction both parallelize, and the operators, the counters and the error a `Fail` batch returns are
+the serial path's exactly. A border of fewer than four batches stays on the calling thread, and so
+does any field that does not prove `Send + Sync` through `FiniteField::run_concurrent` (the
+extension fields). Up to `workers` closures are live at once. On MQ10 this took operator
+construction from 38–40% of the whole route to about 20% (#826); see
+[`docs/research/m28-current-baseline.md`](../research/m28-current-baseline.md).
+
 **`BatchedBorder` at a batch of 64 is the default**, chosen from the integration ablation in
 `docs/MILESTONE-FGLM-SCALABILITY.md` §9 rather than from katsura-7 alone: it is the one strategy
 that is at least as fast as M17's on every system in the corpus. `FglmOptions::baseline()` names
