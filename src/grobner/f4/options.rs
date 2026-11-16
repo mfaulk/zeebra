@@ -180,13 +180,22 @@ pub enum ParallelForward {
 
 impl ParallelForward {
     /// The fewest lower-block entries at which [`ParallelForward::Auto`] dispatches.
-    pub const MIN_LOWER_NONZEROS: usize = 100_000;
+    ///
+    /// Measured per batch in `docs/research/parallel-forward.md`: below about 8000 entries the
+    /// serial pass takes well under a millisecond and the 0.2–0.4 ms of spawning and joining
+    /// workers is most of what threading could save.
+    pub const MIN_LOWER_NONZEROS: usize = 8_000;
 
     /// Lower-block entries per worker [`ParallelForward::Auto`] asks for before adding another.
-    pub const LOWER_NONZEROS_PER_WORKER: usize = 25_000;
+    ///
+    /// 10 000 entries were fastest at eight workers and 30 000 at sixteen across the training
+    /// families; past that the measured batches kept scaling to the 32 measured.
+    pub const LOWER_NONZEROS_PER_WORKER: usize = 1_500;
 
     /// The fewest lower rows each worker gets under [`ParallelForward::Auto`].
-    pub const MIN_ROWS_PER_WORKER: usize = 16;
+    ///
+    /// Rows are the unit of dynamic scheduling, so a worker with fewer has nothing to balance.
+    pub const MIN_ROWS_PER_WORKER: usize = 8;
 
     /// Threads [`ParallelForward::Auto`] uses for a batch of this shape; one means serial.
     ///
