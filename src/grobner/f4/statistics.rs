@@ -552,6 +552,10 @@ pub struct BatchStatistics {
     /// Monomials symbolic preprocessing offered to its queue, before the deduplication test.
     pub monomials_enqueued: usize,
 
+    /// Repeated pair multiples symbolic preprocessing did not seed. See
+    /// [`SymbolicCounts::pair_multiples_removed`](super::SymbolicCounts::pair_multiples_removed).
+    pub pair_multiples_removed: usize,
+
     /// The largest the pending monomial queue grew, in monomials.
     ///
     /// Reported beside [`Self::dense_buffer_bytes`] and for the same reason: it is memory this
@@ -868,6 +872,10 @@ pub struct F4Statistics {
     /// saves rather than what the queue costs.
     pub monomials_enqueued: usize,
 
+    /// Summed over every batch: pair halves not seeded because the batch already held the
+    /// identical multiple (#831). Zero under [`PairMultiples::Every`](super::PairMultiples::Every).
+    pub pair_multiples_removed: usize,
+
     /// The largest the pending monomial queue grew in any batch, in monomials.
     ///
     /// Costs `size_of::<Monomial<N>>()` each — 80 bytes at twenty variables — and is still **not**
@@ -1066,6 +1074,7 @@ impl F4Statistics {
         self.divmask_negative += batch.divmask_negative;
         self.divmask_decided += batch.divmask_decided;
         self.monomials_enqueued += batch.monomials_enqueued;
+        self.pair_multiples_removed += batch.pair_multiples_removed;
         self.max_pending_monomials = self.max_pending_monomials.max(batch.max_pending_monomials);
         self.free_pivots += batch.free_pivots;
         if let Some(rows) = batch.back_substituted_rows {

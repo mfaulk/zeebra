@@ -273,6 +273,10 @@ fn statistics(s: &F4Statistics, measured: bool) -> Json {
         ("batches", Json::size(s.batches)),
         ("pairs_considered", Json::size(s.pairs_considered)),
         ("pairs_reduced", Json::size(s.pairs_reduced)),
+        (
+            "pair_multiples_removed",
+            Json::size(s.pair_multiples_removed),
+        ),
         ("elements_added", Json::size(s.elements_added)),
         ("empty_batches", Json::size(s.empty_batches)),
         ("max_matrix_rows", Json::size(s.max_matrix_rows)),
@@ -368,6 +372,12 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
     let options = F4Options {
         measure_stages: measured,
         parallel_forward: forward_policy(forward_workers),
+        // #831: `original` and `order` are the pre-dedup arm; no flag is the shipping default.
+        pair_multiples: match symbolic {
+            Some("original" | "order") => zeebra::grobner::PairMultiples::Every,
+            Some(_) => zeebra::grobner::PairMultiples::Distinct,
+            None => F4Options::default().pair_multiples,
+        },
         ..F4Options::default()
     };
     let forward_report = forward_workers.map(Json::size).unwrap_or(Json::Null);
@@ -469,7 +479,6 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
             let (result, report) = zeebra::grobner::f4::live_symbolic::observe(
                 zeebra::grobner::f4::live_symbolic::Policy {
                     order_initial: matches!(mode, "order" | "both"),
-                    deduplicate: matches!(mode, "dedup" | "both"),
                 },
                 system.len(),
                 solve,

@@ -8,7 +8,10 @@ use std::{
 
 use crate::{
     grobner::{
-        f4::{divmask::DivmaskCalibration, options::ReducerSelection},
+        f4::{
+            divmask::DivmaskCalibration,
+            options::{PairMultiples, ReducerSelection},
+        },
         pairs::CriticalPair,
     },
     poly::{MonomialMap, MonomialOrder},
@@ -77,6 +80,10 @@ pub struct SymbolicCounts {
     /// [`Self::divmask_negative`] when asking what a mask saves overall, because the positives are
     /// in the denominator of the stage's cost whether a mask exists or not.
     pub divmask_decided: usize,
+
+    /// Pair halves not seeded because the batch already held the identical
+    /// `(basis_index, multiplier)` multiple. Zero under [`PairMultiples::Every`].
+    pub pair_multiples_removed: usize,
 }
 
 impl SymbolicCounts {
@@ -93,6 +100,7 @@ impl SymbolicCounts {
         self.divmask_tests += other.divmask_tests;
         self.divmask_negative += other.divmask_negative;
         self.divmask_decided += other.divmask_decided;
+        self.pair_multiples_removed += other.pair_multiples_removed;
     }
 }
 
@@ -846,9 +854,12 @@ pub fn symbolic_preprocessing_within<const N: usize, F: FiniteField>(
 /// As [`symbolic_preprocessing_within`], under the given reducer-selection policy, consulting and
 /// populating `cache`.
 ///
-/// The frozen entry point the F4 reduction step calls. `cache` carries whatever a reducer-reuse
-/// implementation keeps between batches; a disabled cache stores nothing and misses every lookup,
-/// which is also how repetition is *measured* before anything is cached.
+/// Seeds every pair half, repeats included ([`PairMultiples::Every`]): the fixed reference the
+/// research comparators and stage benchmarks replay against. F4 itself calls
+/// [`symbolic_preprocessing_seeded`] with [`F4Options::pair_multiples`](super::F4Options).
+/// `cache` carries whatever a reducer-reuse implementation keeps between batches; a disabled cache
+/// stores nothing and misses every lookup, which is also how repetition is *measured* before
+/// anything is cached.
 ///
 /// # Errors
 /// As [`symbolic_preprocessing_within`].
@@ -859,18 +870,42 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
     selection: ReducerSelection,
     cache: &mut ReducerCache<N>,
 ) -> Result<Preprocessed<N>, RowBudgetExceeded> {
-    let counts = SymbolicCounts::default();
+    symbolic_preprocessing_seeded(
+        basis,
+        pairs,
+        max_rows,
+        selection,
+        cache,
+        PairMultiples::Every,
+    )
+}
+
+/// As [`symbolic_preprocessing_with`], seeding repeated pair multiples as `multiples` says.
+///
+/// The entry point the F4 reduction step calls. Why dropping a repeat is sound is on
+/// [`PairMultiples`]. The set that detects repeats holds at most `2 * pairs.len()` identities and
+/// is freed before the closure starts, so it never coexists with the queue's peak.
+///
+/// # Errors
+/// As [`symbolic_preprocessing_within`]; the row budget counts retained rows only.
+pub fn symbolic_preprocessing_seeded<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    max_rows: usize,
+    selection: ReducerSelection,
+    cache: &mut ReducerCache<N>,
+    multiples: PairMultiples,
+) -> Result<Preprocessed<N>, RowBudgetExceeded> {
+    let mut counts = SymbolicCounts::default();
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
     #[cfg(feature = "research-work")]
     let policy = super::live_symbolic::config();
     #[cfg(not(feature = "research-work"))]
     let policy: Option<((), usize)> = None;
-    #[cfg(feature = "research-work")]
-    let deduplicate = policy.is_some_and(|(p, _)| p.deduplicate);
-    #[cfg(not(feature = "research-work"))]
-    let deduplicate = false;
     let mut seed_keys: Option<HashSet<(usize, Monomial<N>), BuildMonomialHasher>> =
-        deduplicate.then(HashSet::default);
+        (multiples == PairMultiples::Distinct).then(|| {
+            HashSet::with_capacity_and_hasher(2 * pairs.len(), BuildMonomialHasher::default())
+        });
     let reducer_order: Option<Vec<usize>> = {
         #[cfg(feature = "research-work")]
         {
@@ -920,6 +955,7 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
                 .as_mut()
                 .is_some_and(|keys| !keys.insert((basis_index, multiplier)))
             {
+                counts.pair_multiples_removed += 1;
                 continue;
             }
             if rows.len() == max_rows {
@@ -982,6 +1018,7 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
         seed_keys.as_ref().map_or(0, HashSet::capacity),
         reducer_order.as_ref().map_or(0, Vec::capacity),
     );
+    drop(seed_keys);
     close_over_rows(
         basis,
         rows,

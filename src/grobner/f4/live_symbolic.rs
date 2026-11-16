@@ -3,7 +3,6 @@ use std::cell::Cell;
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Policy {
     pub order_initial: bool,
-    pub deduplicate: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
