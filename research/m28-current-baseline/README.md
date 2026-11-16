@@ -340,3 +340,12 @@ on that reading:
 Child limits, the plan, the frozen executable and the one-further-window rule are unchanged. A new
 native window under this gate is a fresh 75-cell window from repetition 0, never a tail appended to
 window 1 or 2, and is not pooled with them.
+
+Native window 3 (controller `6f0a4e1b`, branch `research/788-native-controller`, same frozen
+executable, benchlock START 2026-11-15T20:35:22-05:00 at load 2.81) accepted 14 verified children of
+repetition 0, then stopped as `compiler` contamination: another session's `cargo`/`rustc` started
+during child 15 (Katsura-11, basis, stage-on). The load never exceeded 2.66 before a child, so the
+settle wait did not engage. The archive is kept off-repository at
+`/buildcache/cargo-target/zeebra-788/native-w3/` (SHA-256 `f2126008…6f90c42`) and is not pooled.
+Under the one-further-window rule, one fresh native window remains; it needs builds paused as well
+as a quiet load, since the build gate, not the load gate, ended this one.
