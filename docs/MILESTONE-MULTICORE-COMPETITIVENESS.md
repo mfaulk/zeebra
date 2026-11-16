@@ -1,9 +1,9 @@
 # M28 — Competitive Multicore Algebra and Wide-Field Frontier
 
-**Status:** planned; no M28 implementation or benchmark campaign authorized by this document alone.
+**Status:** closed out 2026-11-16 by the §18 integration report (#754); Minimum and Strong met, Stretch not met.
 **Planning date:** 2026-11-13.
 **Source audit:** current `main`, `ae489ca33c00d49d906d33ee73e9dfea853b82a2` (#748).
-**Measured at:** not measured here. Numerical evidence below is attributed to its original
+**Measured at:** `0e060666` for §18.2 only (base `4eaa07f1`); §1–17 not measured here. Evidence is attributed to its original
 source/control revision and computational boundary; no timings were taken for this plan.
 **Tracking issue:** [#750](https://github.com/mfaulk/zeebra/issues/750).
 **Project:** [Zeebra #7](https://github.com/users/mfaulk/projects/7).
@@ -644,3 +644,95 @@ verified rung, use #268's measured layout opportunity before out-of-core or hard
 If block application dominates certified conversion and E succeeds, plan a separate bounded block
 reconstruction/integration milestone. If comparands still lead decisively, publish the exact gap
 and algorithmic cause; defer uneconomical integration and select the next milestone from evidence.
+
+## 18. Integration report, 2026-11-16
+
+Owner #754, PR #819. **Measured here:** only the Zeebra cohort in §18.2, at `0e060666` (base
+`4eaa07f1`); every other figure is quoted from the cited study at its own commit. Figures from
+different studies have different bases and timers and are not chained or multiplied.
+
+### 18.1 Acceptance, criterion by criterion
+
+| §11 item | Status | Evidence |
+|---|---|---|
+| Min 1 — profiles, weak Katsura, comparand curves | **measured** | `docs/research/m28-current-baseline.md` window 4 (#751/#776/#788/#797, 75/75 verified at `2ec9d3af`); weak Katsura-11/M31 repeated (n=5 and n=4). `docs/research/comparand-scaling.md` (#739/#756): 1–32-worker curves and ≤8/≤16-core targets; grobx serial-only, Rust p=16 hot diagnostics and wide Julia p=16 recorded as blockers. Only the one weak Katsura cell was repeated. |
+| Min 2 — necessary-backward decision | **measured + implemented** | #747 (`b1be4956`, `elimination-kernels.md`): adopt candidate-only, reject all-target dense and unconditional 4-worker default. Shipped by #749/#757 (`candidate-only-f4.md`). |
+| Min 3 — four complete configurations | **measured + implemented** | `parallel-forward.md` "Forward × backward, MQ10" (#813), with a one-worker concurrent control; previous default labelled. Measured on the pre-rebase tag `measured/752-parallel-forward`. |
+| Min 4 — hard wide ladder | **measured, with refusals** | `research/wide-corpus/` (#738/#746 `df6847a1`): 141 attempts, 74 complete, 67 stops; 70 shared 64-bit answers agree. Zeebra rows predate #749/#813 (`4ea1463a`); BN254 capability-only. |
+| Min 5 — alternatives ranked, one gate each | **decided** | #268 defer/reject ([comment](https://github.com/mfaulk/zeebra/issues/268#issuecomment-6919277179)); #270 adopt per width (#782/#790/#791/#800); #715 reject reuse, SIMD deferred; #753 defer; #729 defer; #730 reject/defer. E: #87 baseline, #731 no-go (1.22x ideal bound). |
+| Min 6 — artifacts and identities retained | **measured** | Per-study archives with hashes and offline `--check`; #751 windows 1 and 3 retained off-repo by hash only. |
+| Min 7 — this report, regenerated boards | **implemented** | This section; `research/competitive/COMPETITIVE.md` regenerated from history with `competitive -- --write`. |
+| Min 8 — negatives visible | **implemented** | §18.4. |
+| Strong — ≥2x complete F4 vs pinned serial default | **met (#749)** | MQ10 3173.462 → 1251.183 ms (2.536x) at 32003, 3406.818 → 1336.917 ms (2.548x) at M31, Singular-verified (`candidate-only-f4.md`). |
+| Strong — fewer coefficient operations, end-to-end gain | **met (#749)** | backward products 579.7 M → 23.57 M; F4 RSS 134.40 → 33.82 MiB. |
+| Strong — production adaptive parallel F4 | **met (#813)**, digest-checked | held-out Cyclic-8 3.16x, Katsura-10 3.86x; small controls −3.10% … +1.13%; worst RSS 1.24x. Check is basis-digest equality across arms. §18.2 reproduces the effect on the board. |
+| Strong — gap narrowed at equal concurrency | **measured, not certified** | §18.3: narrowed, but on a boundary that favours Zeebra. |
+| Strong — larger fixed-budget completion | **not met** | MQ-random-14 and Cyclic-9 still stop at 60 s in both cohorts. |
+| Stretch | **not met** | No comparand target beaten; 24/24 eligible wide ratios favour comparands at `4ea1463a`. |
+
+Hypotheses (§10): selected backward reduces cost — **supported** (#747/#749); narrower update
+arithmetic — **partly supported** (#782/#790/#800 adopted; delayed reduction and multirow reuse
+rejected; cycles per update unmeasured); concurrent forward worth more after selection —
+**supported** (#813 2×2: 1.4x with full backward, ~4x with selected); hard wide fields
+differentiate — **refuted at `4ea1463a`, unresolved on current code**; block Krylov improves
+conversion — **refuted** (#731, 1.22x ideal 8-core bound).
+
+### 18.2 Board regeneration: serial and 16-worker Zeebra cohorts
+
+The harness recorded `concurrency: 1` for Zeebra rows that, after #813, ran F4 on up to 16
+threads, and refused Zeebra multiworker cohorts as "serial". #754 caps `ParallelForward` at
+`Limits::workers` in the adapter (Red–Green tests in `src/grobner/external/zeebra.rs` and
+`examples/competitive_sweep.rs`), then measured 166 rows: 83 cells × {1 worker on CPU 2, 16 on
+CPUs 2–17}, one process per row, 60 s wall, one observation per cell. Protocol, logs and the full
+per-cell table: [`research/competitive/m28-754/`](../research/competitive/m28-754/README.md).
+
+| cell (reduced basis unless lex) | previous serial ms | serial ms | 16 workers ms | 16w / serial | RSS 16w / serial |
+|---|---:|---:|---:|---:|---:|
+| MQ-random-10, 32003 | 4326.3 | 1205.5 | 299.6 | 4.02x | 1.18x |
+| MQ-random-10, M31 | 4379.7 | 987.0 | 279.3 | 3.53x | 1.20x |
+| MQ-random-10 lex, 32003 | 4360.7 | 1450.1 | 582.1 | 2.49x | 1.23x |
+| Katsura-11, 32003 | — | 10091.3 | 1865.2 | 5.41x | 1.24x |
+| Katsura-11, M31 | 35359.5 | 8444.0 | 1614.7 | 5.23x | 1.28x |
+| Katsura-10, M31 | 3739.0 | 943.2 | 278.4 | 3.39x | 1.24x |
+| Cyclic-8, M31 | 27658.5 | 5121.8 | 1695.9 | 3.02x | 1.17x |
+| Katsura-8, M31 | 54.0 | 19.9 | 13.6 | 1.47x | 1.11x |
+
+138 of 166 complete; 20 stop at 60 s (Cyclic-9, MQ-random-14, MQ-planted-14 lex); 8 unsupported
+(Cyclic-4/8 lex). Outcome classes are identical across cohorts and to the previous rows. Small
+cells (≤ ~10 ms, including planted-wide) are flat within single-observation noise. "Previous
+serial" is the last serial board row (`c033f027` or `19ff732c`); the drop to the new serial column
+combines #749, #782/#790/#791/#800 and other merged work and is not attributed to any one change.
+Peak RSS rises with workers, up to 1.28x on a complete cell and 1.37x on a stopped Cyclic-9 row
+(a stopped row's peak depends on how far it got).
+
+### 18.3 Competitive position
+
+`COMPETITIVE.md`'s comparand rows are one-worker. Against #739's exact-mode ≤16-core targets
+(`comparand-scaling.md`, fresh-process wall including I/O), Zeebra's 16-worker in-process wall is
+2.57x behind on MQ10/32003 (299.6 vs 116.8 ms), 1.67x on MQ10/M31 (279.3 vs 167.0 ms) and 2.26x
+on Katsura-11/M31 (1614.7 vs 715.5 ms). The previous serial rows were 37x, 26x and 49x behind the
+same targets. The gap narrowed by an order of magnitude, but Zeebra's boundary excludes process
+startup and parsing, so the remaining gap is a lower bound and this is not the clear-of-boundary
+comparison Strong asks for. No matched multiworker comparand cohort exists on the board.
+
+### 18.4 Negatives, refusals and uncertainty
+
+- Zeebra remains slower than the best exact-mode comparand on every measured large cell, and on
+  every eligible wide ratio at `4ea1463a`; no wide-field rung has been re-measured since #749/#813.
+- MQ-random-14 and Cyclic-9 do not complete in 60 s at 16 workers; no fixed-budget frontier moved.
+- Delayed reduction, multirow reuse, design 1 parallel forward, all-target dense backward,
+  unconditional 4-worker dispatch and block Wiedemann were rejected; #729, #753 and SIMD deferred.
+- #813 and #790/#800 check basis-digest equality across arms; whether those digests equal the
+  Singular-verified MQ10 basis was not re-checked here. §18.2 rows are unverified harness answers.
+- `m28-current-baseline.md` predates #782–#813, so its stage shares (forward 69.0%/65.1%) describe
+  the serial route; the post-#813 stage split is unmeasured.
+- One machine (5995WX), one observation per §18.2 cell.
+
+### 18.5 Next-milestone recommendation
+
+Forward elimination now runs on 16 workers and the remaining exact-mode gap is 1.7–2.6x on a
+boundary that favours Zeebra. Re-profile the post-#813 route before choosing work: if the serial
+symbolic, interreduction and conversion stages now dominate, parallelize or reduce those next.
+Re-run the wide ladder at current `main` before carrying the wide-field hypothesis forward. Add a
+matched multiworker comparand cohort on one boundary to the board, so the Strong gap criterion can
+be scored directly. #268 reopens only on its stated memory condition.

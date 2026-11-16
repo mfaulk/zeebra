@@ -51,3 +51,9 @@ complete all three rungs; Singular, msolve and Sagebrush refuse the characterist
 and their limits. The family uses live-oracle provenance because the requested sole-comparand
 condition predates the newer wide-field engines. These easy structured inputs establish coverage;
 the board rejects their wall ratios as startup dominated.
+
+Issue #754 appends 166 Zeebra-only attempts measured at `0e060666` (base `4eaa07f1`): 83 cells
+as a serial cohort (CPU 2) and a 16-worker cohort (CPUs 2–17), after the adapter began capping
+F4's parallel forward elimination at the cohort's workers. The preceding 1,198 rows are unchanged,
+bringing the history to 1,364. The [cohort note](m28-754/README.md) retains the script, logs and
+per-cell table; the tag `measured/754-m28-cohort` keeps the measured commit reachable.
