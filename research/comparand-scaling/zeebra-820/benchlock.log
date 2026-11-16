@@ -1,0 +1,3 @@
+2026-11-16T10:24:22-05:00  QUEUED   zeebra-820      pid=3949658  bash research/comparand-scaling/zeebra-820/run.sh
+2026-11-16T10:24:22-05:00  START    zeebra-820      pid=3949658  waited=0s load=1.09 bash research/comparand-scaling/zeebra-820/run.sh
+2026-11-16T10:32:04-05:00  END      zeebra-820      pid=3949658  status=0 end=exited elapsed=462s load=1.46 bash research/comparand-scaling/zeebra-820/run.sh

@@ -388,6 +388,8 @@ cargo run --release --example batch_inversion -- f4   # and the F4 headroom left
 cargo run --release --example competitive          # render research/competitive/ from its history
 cargo run --release --example competitive -- --write   # and update COMPETITIVE.md in place
 cargo run --release --example competitive_sweep -- --list   # corpus x engines x tasks, exploratory
+cargo run --release --example zeebra_driver -- REQUEST.json   # one fresh-process Zeebra solve from a
+                                                   #   comparand request (#820); F4 capped at `workers`
 . tools/external/env.sh                            # REQUIRED FIRST, or the sweep sees one engine
 tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
     --row katsura-6 --task reduced-grobner-basis --measure --write   # one measured row

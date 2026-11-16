@@ -1,5 +1,6 @@
 # External worker scaling and the target for parallel F4 (#739)
 
+**Measured at:** comparands as below; the #820 Zeebra cohort at `cda4ef80` (see its section).
 **Measurement sources:** native prefix controller `d7d2bc8f043eead4add57e03d6d6b835c2646a4c`,
 controller-only continuation `2f661626` (full identities in the retained metadata),
 AMD Threadripper PRO 5995WX, one logical CPU per physical core, requested workers
@@ -206,3 +207,54 @@ ancestors. Required installed-adapter coverage runs with `ZEEBRA_REQUIRE_MSOLVE=
 external-library tests pass after that merge. The optional native driver tests/Clippy, exporter
 and retention protocol tests, focused Python guards and generated artifact replay cover this
 study's changed interfaces. No new solver algorithm or production parallel default is added.
+
+## Zeebra on the same boundary (#820)
+
+**Measured at:** Zeebra cohort `cda4ef80` (production source of `4eaa07f1`, the #813 default, plus
+the `zeebra_driver` example), 2026-11-16, `tools/benchlock.sh zeebra-820`, 10:24:22–10:32:04 EST,
+462 s, status 0, load 1.09 → 1.46. The comparand figures are the retained `native-resume-v1`
+cohort above, which was not re-measured.
+
+`examples/zeebra_driver.rs` reads the same request JSON as the native comparand drivers. It runs
+the shipping default with F4 forward workers capped at the request's `workers`, and prints the
+basis. The controller times it exactly like them: a fresh process, input and output included, on
+the first `p` physical cores. Evidence, script and the full per-cell table are in
+[research/comparand-scaling/zeebra-820](../../research/comparand-scaling/zeebra-820/README.md).
+
+**Outcomes.** 288 attempts: 16 inputs × workers 1/2/4/8/16/32 × 3 repetitions. Every attempt
+completed, with no stops.
+- 108 match a retained exact reference coefficient for coefficient: every 32003 and M31 cell
+  except 32003/Katsura-11 and M31/Cyclic-7.
+- The other 180 have no exact reference. Each matches a complete comparand answer coefficient for
+  coefficient; that is agreement between engines, not independent verification.
+
+**Against the exact-mode targets above.** These are Zeebra's 16-worker medians, on one boundary:
+
+| Input | Zeebra, 16 workers, s | Exact-mode target ≤16 cores, s | Zeebra / target | M28 §18.3 estimate (in-process) |
+|---|---:|---:|---:|---:|
+| GF(32003) MQ10 | 0.3407 | 0.1168 (msolve, 8) | 2.92x | 2.57x |
+| GF(2^31−1) MQ10 | 0.3141 | 0.1670 (msolve, 4) | 1.88x | 1.67x |
+| GF(2^31−1) Katsura-11 | 1.8036 | 0.7155 (msolve, 8) | 2.52x | 2.26x |
+
+The process boundary costs Zeebra about 0.03–0.04 s on MQ10, so M28's in-process estimate was
+nearly right. The exact-mode gap at equal concurrency is **1.9–2.9x**, measured rather than
+bounded.
+
+**Against every engine at the same worker count**, randomized raw modes included:
+- Zeebra trails on every input at every `p` except Katsura-4, where every engine sits at its ~6 ms
+  process-startup floor and the ratios (0.53–1.02x) carry no algebra.
+- At 16 workers the ratio to the fastest comparand at 16 is 1.9–2.0x on wide64 and Goldilocks
+  Cyclic-7 and Katsura-9, 2.4–2.8x on Cyclic-7 at M31 and 32003, 2.9–3.4x on MQ10 in every field,
+  and 4.8x and 6.5x on Katsura-11 (M31 and 32003).
+- Against the best comparand at any worker count up to 16, the ratio is 3.2–3.9x on MQ10.
+- Katsura-11 is the outlier. Serial Zeebra takes 8.5–10.0 s against grobx's serial 0.13–0.15 s,
+  57–80x. At 16 workers it is still 12–16x behind grobx's single worker.
+
+**Zeebra's own scaling.** Zeebra keeps improving through 16 workers; groebner-rs and msolve
+peak at 4–8. MQ10 at 32003 drops from 1.163 s at one worker to 0.341 s at 16 (3.41x). Katsura-11
+at M31 drops from 8.507 s to 1.804 s (4.72x). Nothing improves past 16, because the default caps
+forward elimination at 16 workers.
+
+**What this does not show.** Three repetitions are reported as medians. The comparands were
+measured at an earlier date on the same host and were not re-measured with Zeebra. No CPU-participation
+diagnostic was run for Zeebra.
