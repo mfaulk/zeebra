@@ -7,6 +7,9 @@ arms interleaved with a rotating order. §7 (#777) at `21acc4db` (per-batch tabl
 (solves) — commits on `perf/777-gf2-f4-dispatch` before a rebase onto `2e95420c` that touched no
 file they built from (the same trees are `760a9432` and `ad8b53ba`), squashed into the PR that closed #777 — same
 core, same lock (tag `777`, load 7.5–14.0), release build with the repository's `.cargo/config.toml`.
+§7.3 (#794): the sweep at `810b29c3` (`taskset -c 5`, lock tag `794`, load 79.4 at START and 28.0
+at END, so read it for ratios only); the two-binary A/Bs at `a55ded02` against `fe2d2f8e` and at
+`810b29c3` against `7d101c45`, same core and lock, load 13.5 at START and 5.4 at END.
 
 Reference for #272 (H16), scoped to the **kernel** only — representation and solving route stay
 with #218 and #196. The instrument is `examples/gf2_packed_elimination.rs`; the kernel is
@@ -192,7 +195,7 @@ budget the generic route refuses stays refused; the dispatch rule) and `linalg::
 
 `gf2_f4_dispatch batches 5`: every batch of each instance, replayed under both routes. The times are
 F4's elimination stage (`measure_stages`), conversion included, minimum of 5 interleaved
-repetitions. "auto picks" is the shipped rule applied to each row (recomputed from the row; the binary printed the first rule tried). The table was taken at `21acc4db`, whose
+repetitions. "auto picks" is #777's rule applied to each row (recomputed from the row; the binary printed the first rule tried). The table was taken at `21acc4db`, whose
 packed route is byte-identical to `db5c5c05`'s; only the rule changed between them.
 
 | instance | batch | rows | reducer rows | pair rows | columns | entries | density ppm | generic us | packed us | generic/packed | auto picks |
@@ -262,11 +265,11 @@ got both ends wrong. Every batch the packed route lost by more than 15% was eith
 words wide** (66–105 columns, 0.34x–0.59x, under 25 µs each) or a **two-pair-row batch** against
 hundreds of reducers (cyclic-8/9's late batches, 0.84x–0.87x), where the route is pure
 conversion. The rule admits one measured loss: cyclic-8's batch 6 (22 pair rows, 0.85x, 3.5 µs). Overdetermined-MQ-16's 6958x3146 batch is only 1.9% dense and is the largest win
-(7.9x, 181 ms saved). Shipped rule (`Gf2Elimination::prefers_packed`): **at least 128 columns, at
-least 16 pair rows, and at least 18 000 ppm density.** The density margin is narrow and is stated
+(7.9x, 181 ms saved). #777's rule (`Gf2Elimination::prefers_packed`): **at least 128 columns, at
+least 16 pair rows, and at least 18 000 ppm density.** §7.3 adds a size arm to it. The density margin is narrow and is stated
 rather than hidden: sparse-MQ-12's two largest batches (1.56%, 1.63%) lose at 0.98x and 0.78x and stay
 generic, while cyclic-9's 1.88% batch wins at 2.2x and packs. A family sitting between 1.6% and
-1.9% could land on the wrong side.
+1.9% could land on the wrong side. §7.3 found one, and it is much further from the margin.
 
 ### 7.2 End to end
 
@@ -298,3 +301,71 @@ Not measured here: the two-binary A/B of `main` against this branch at defaults.
 runs the same code as before, with only the closure around it reshaped, and the in-binary arms
 isolate the dispatch alone. Multicore XOR, cache blocking, GF(2^e) slicing and M4RI as a comparand
 are still out of scope (§6).
+
+### 7.3 Held-out sweep and the size arm (#794)
+
+`gf2_f4_dispatch sweep 5` replays every batch of random MQ at n = 12..16, square (n equations) and
+overdetermined (2n), at quadratic-monomial densities 0.05, 0.1, 0.15, 0.2 and 0.3. All 50 instances
+use seed 794, so none of the 299 batches were used to choose the rule. Candidates are asserted
+equal to `Generic` in every repetition. Raw table, instruments and scoring scripts:
+[`research/gf2-dispatch/`](../../research/gf2-dispatch/README.md).
+
+**#777's rule is wrong in the expensive direction.** The batches that matter most are big and only
+1.5%–1.7% dense, because a square MQ-16 solve's dominant batch has 12 840 pair rows over 9 000+
+columns. Density alone does not show the fill that generic elimination generates, and that fill
+grows with size. mq-16 at density 0.15 has a 12840x9622 batch at 15 070 ppm that runs generic
+for 2.78 s and takes 0.20 s packed (13.8x). Its siblings at 0.1/0.2/0.3 lose the same way.
+Overdetermined-MQ-15/16 at 1.4%–1.7% lose 4.3x–7.5x, and mq-15 at density 0.05 loses 4.9x at
+0.79%. Scored as time over the per-batch oracle (the faster route for every batch):
+
+| rule | #777 table (59 batches) | #794 sweep (299 batches) |
+| --- | ---: | ---: |
+| #777: ≥128 columns, ≥16 pair rows, ≥18 000 ppm | +0.22% | **+911%** |
+| **shipped: same, or ≥4000 entries at ≥7000 ppm** | +0.22% | **+0.23%** |
+| packed whenever the contract allows | +0.41% | +0.10% |
+| work model: `nnz·(nnz/rows) ≥ α·pair·words·(reducers/8 + pair/k + 4)`, best α | +477% | +960% |
+
+**The batches packing loses are cheap, and they share a shape.** All 102 batches packing loses in
+the two tables cost the generic route at most 160 µs. They are near-diagonal pair blocks with few reducers and 1–5
+entries per row, which leave elimination nothing to fill. Size therefore separates the two sides
+better than any finer shape term, and the size arm is a constant:
+`Gf2Elimination::LARGE_ENTRIES` = 4000 at `LARGE_MIN_DENSITY_PPM` = 7000. 4000 rather than the
+slightly better-scoring 2000 keeps #777's sparse-MQ-12 control, whose 2239-entry batch loses 0.78x,
+generic. The 7000 ppm floor is the edge of the data: the sparsest large batch measured
+(mq-16, density 0.05, 0.75%) won 2.6x, and a packed row operation walks every word however empty,
+so the rule does not extrapolate below it.
+
+**Rejected, scope item 2: a work model.** The table's fourth row compares a predicted generic merge
+cost (entries times mean row length) against the packed word work. Its best α is worse than #777's
+rule, because the packed term grows as pair rows squared and wrongly rejects the largest batches,
+which win by the most. A model good enough to beat a size cut would need the fill, and the fill is
+only known after elimination. **Kept, scope item 3: `MIN_COLUMNS` = 128.** The 96–127-column band
+holds 46 batches. Packing mostly wins there above about 60 000 ppm and loses below it, with 5
+exceptions on either side. Every one of the 46 costs under 85 µs. A lower floor would buy at most tens of
+microseconds per solve, and trimming the per-batch overhead was not attempted for that.
+
+**Solves, two binaries at defaults** (`research/gf2-dispatch/gf2_ab.rs`), minimum over 5 interleaved
+fresh processes of 3 in-process repetitions each. The binaries are separate, so bases are compared
+by size here. Equality with `Generic` is asserted by `batches`/`sweep` and by
+`grobner::f4::packed::tests`. "max/min" is the newer arm's spread over the five processes.
+
+| instance | basis | `810b29c3` ms | `7d101c45` ms | speedup | max/min |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| mq-16-d0.15 | 16 | 2786.16 | 427.69 | **6.51x** | 1.04 |
+| overdetermined-mq-16-d0.10 | 16 | 203.39 | 55.84 | **3.64x** | 1.01 |
+| overdetermined-mq-15-d0.15 | 15 | 92.82 | 33.56 | **2.77x** | 1.02 |
+| mq-15-d0.05 | 15 | 48.58 | 23.91 | **2.03x** | 1.01 |
+| mq-13-d0.05 | 16 | 18.42 | 14.07 | **1.31x** | 1.01 |
+| mq-14-d0.10 | 14 | 51.20 | 50.84 | 1.01x | 1.02 |
+| mq-12-d0.05 | 47 | 2.12 | 2.10 | 1.01x | 1.01 |
+| sparse-mq-12 | 12 | 1.73 | 1.71 | 1.01x | 1.02 |
+| cyclic-8 | 8 | 0.99 | 0.99 | 1.00x | 1.01 |
+| cyclic-9 | 1 | 3.45 | 3.42 | 1.01x | 1.01 |
+
+**Scope item 4, #777 itself as two binaries:** `a55ded02` (its parent) against `fe2d2f8e` (its
+merge), same protocol. Dense MQ-10/12/13 1.52x/1.90x/2.22x, overdetermined MQ-14/16 1.60x/3.83x,
+sparse-MQ-12 1.01x, cyclic-8 1.02x, cyclic-9 1.15x. That is within 5% of §7.2's in-binary
+`generic/auto` on every row, so the in-binary arms did isolate the dispatch.
+
+Still open: Boolean cryptanalytic ANF instances (none reachable in-tree), MQ at n ≥ 17, and
+densities below 0.75% at size.
