@@ -182,13 +182,29 @@ impl<F: FiniteField> Transition<F> {
         }
     }
 
-    /// One Euclidean step with quotient `q`: `[[0, 1], [1, -q]]`.
+    /// One Euclidean step with quotient `q`: `[[0, 1], [1, -q]]`; [`Transition::push_step`]'s
+    /// reference.
+    #[cfg(test)]
     fn step(quotient: &UnivariatePolynomial<F>) -> Self {
         Transition {
             rows: [
                 [UnivariatePolynomial::zero(), UnivariatePolynomial::one()],
                 [UnivariatePolynomial::one(), -quotient],
             ],
+        }
+    }
+
+    /// `step(quotient) * self` in place: the new top row is the old bottom row, and the new
+    /// bottom row is `top - quotient * bottom`.
+    ///
+    /// Two products where composing with [`Transition::step`] spends eight, four of them against
+    /// the step's constant zero and one entries. The base case takes one Euclidean step per
+    /// degree it drops, so this is the cost that dominates below the recursion.
+    fn push_step(&mut self, quotient: &UnivariatePolynomial<F>) {
+        let [top, bottom] = &mut self.rows;
+        for (upper, lower) in top.iter_mut().zip(bottom.iter_mut()) {
+            let next = &*upper - &(quotient * &*lower);
+            *upper = std::mem::replace(lower, next);
         }
     }
 
@@ -286,7 +302,7 @@ fn transition_for<F: FiniteField>(
 
     // One full-length division step, to cross the boundary the truncation could not see past.
     let (quotient, remainder) = c.div_with_remainder(&d);
-    matrix = Transition::step(&quotient).compose(&matrix);
+    matrix.push_step(&quotient);
     c = d;
     d = remainder;
     if signed_degree(&d) < target {
@@ -318,7 +334,7 @@ fn classical_transition<F: FiniteField>(
     let mut d = b.clone();
     while signed_degree(&d) >= target {
         let (quotient, remainder) = c.div_with_remainder(&d);
-        matrix = Transition::step(&quotient).compose(&matrix);
+        matrix.push_step(&quotient);
         c = d;
         d = remainder;
     }
@@ -639,7 +655,7 @@ mod tests {
         use super::*;
         use crate::fields::{Bn254Fr, KoalaBear, PrimeFieldElement64, Zp18446744069414584321};
         use crate::poly::univariate::gcd::{
-            gcd_classical_unstable, gcd_half_unstable, signed_degree, transition_for,
+            gcd_classical_unstable, gcd_half_unstable, signed_degree, transition_for, Transition,
             HALF_GCD_BASE_CASE,
         };
         use rand::{prelude::StdRng, SeedableRng};
@@ -754,6 +770,23 @@ mod tests {
                         assert_transition_contract(a, b, budget);
                     }
                 }
+            }
+        }
+
+        // Stepping a transition in place equals composing it with the elementary step matrix.
+        #[test]
+        fn test_push_step_equals_composing_with_the_step() {
+            let mut rng = StdRng::seed_from_u64(0x194_57e9);
+            for (quotient_degree, entry_degree) in [(0, 0), (1, 5), (3, 2), (8, 40)] {
+                let mut matrix = Transition::<KoalaBear>::identity();
+                for _ in 0..3 {
+                    matrix = Transition::step(&UnivariatePolynomial::rand(entry_degree, &mut rng))
+                        .compose(&matrix);
+                }
+                let quotient = UnivariatePolynomial::rand(quotient_degree, &mut rng);
+                let expected = Transition::step(&quotient).compose(&matrix);
+                matrix.push_step(&quotient);
+                assert_eq!(matrix.rows, expected.rows);
             }
         }
 
