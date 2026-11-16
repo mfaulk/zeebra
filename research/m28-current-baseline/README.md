@@ -349,3 +349,12 @@ settle wait did not engage. The archive is kept off-repository at
 `/buildcache/cargo-target/zeebra-788/native-w3/` (SHA-256 `f2126008…6f90c42`) and is not pooled.
 Under the one-further-window rule, one fresh native window remains; it needs builds paused as well
 as a quiet load, since the build gate, not the load gate, ended this one.
+
+Native window 4, the last window allowed, ran with the machine idle and builds paused
+(benchlock START 2026-11-15T21:39:08-05:00, load 0.26, 167 s). It accepted **75/75**, all verified,
+with a pre-child load of at most 1.47 and no settle wait. It is retained as
+`current/native-2ec9d3af-w4.json.gz` (SHA-256 `13c36e9c…c53f9b2b`), summarized as its own
+cohort by `summarize.py`, and not pooled with window 2. The
+[report](../../docs/research/m28-current-baseline.md#complete-native-window-4-788) replaces the
+four-repetition medians with its five-repetition medians.
+
