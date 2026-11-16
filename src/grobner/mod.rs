@@ -32,13 +32,13 @@ pub use buchberger::{
 pub use f4::{
     certify_f4_output, certify_submitted_basis, certify_submitted_basis_with_witnesses, f4,
     f4_observed, f4_observed_reported, f4_reported, f4_with_options, trace_batches,
-    verify_ideal_membership, Allowance, BatchObserver, BudgetApproach, BudgetLine, BudgetReport,
-    CacheMode, CertificationReport, ConstructionTimings, DegreeProfile, DegreeStatistics,
-    DivmaskCalibration, F4Error, F4Options, F4Statistics, Gf2Elimination, HilbertCounts,
-    HilbertSelection, InterreductionRoute, MatrixInterreduction, MatrixRefusal, MembershipLimits,
-    MembershipStatus, ParallelForward, Provenance, ReducerSelection, ReductionStrategy,
-    SelectionLimits, StopKind, SymbolicCounts, WitnessCertificationReport, WitnessError,
-    WitnessLimit, DIVMASK_BITS,
+    verify_ideal_membership, Allowance, BatchObserver, BatchOrder, BudgetApproach, BudgetLine,
+    BudgetReport, CacheMode, CertificationReport, ConstructionTimings, DegreeProfile,
+    DegreeStatistics, DivmaskCalibration, F4Error, F4Options, F4Statistics, Gf2Elimination,
+    HilbertCounts, HilbertSelection, InterreductionRoute, MatrixInterreduction, MatrixRefusal,
+    MembershipLimits, MembershipStatus, ParallelForward, Provenance, ReducerSelection,
+    ReductionStrategy, SelectionLimits, StopKind, SymbolicCounts, WitnessCertificationReport,
+    WitnessError, WitnessLimit, DIVMASK_BITS,
 };
 pub use fglm::{
     classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,

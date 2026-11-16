@@ -234,6 +234,37 @@ impl ParallelForward {
     }
 }
 
+/// The order a structured batch's elimination does its passes in (#816).
+///
+/// Both orders produce the same candidate rows, coefficient for coefficient, when batch rows are
+/// reduced: those are the reduced row echelon form of one row space restricted to the columns no
+/// reducer leads, which is unique. They differ in how much work reaching it takes.
+///
+/// Applies under [`ReductionStrategy::Structured`] only, and only to the generic route: a
+/// characteristic-two batch the packed route takes is unaffected (see [`Gf2Elimination`]).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BatchOrder {
+    /// Head-reduce each pair row against reducer and discovered pivots in one forward pass, then
+    /// clear pivot columns from the candidates. A pair row that becomes a pivot keeps its entries
+    /// in reducer columns right of its lead, and every later row it reduces inherits them.
+    #[default]
+    Forward,
+
+    /// Sweep every pair row against the whole reducer block first, giving
+    /// `D' = D - C A^-1 B` on the columns no reducer leads, then eliminate `D'` alone.
+    ///
+    /// Pair rows never meet each other until every reducer column is gone, so pair-against-pair
+    /// work is confined to the columns of `D'` and the backward pass never touches a reducer
+    /// column. Measured 1.76-2.14x faster per batch on one core in
+    /// `docs/research/residual-split.md`.
+    FaugereLachartre,
+}
+
+impl BatchOrder {
+    /// Every order, for tests and measurements that sweep them.
+    pub const ALL: [Self; 2] = [Self::Forward, Self::FaugereLachartre];
+}
+
 /// The process's available parallelism, read once.
 ///
 /// `std::thread::available_parallelism` reads cgroup files on every call — about a millisecond
@@ -732,6 +763,12 @@ pub struct F4Options {
     /// `Auto { max_workers: 16 }` at [`recommended`](Self::recommended);
     /// [`ParallelForward::Serial`] at [`baseline`](Self::baseline).
     pub parallel_forward: ParallelForward,
+
+    /// The order a structured batch's elimination runs its passes in. See [`BatchOrder`].
+    ///
+    /// [`BatchOrder::Forward`] at both [`baseline`](Self::baseline) and
+    /// [`recommended`](Self::recommended).
+    pub batch_order: BatchOrder,
 }
 
 impl F4Options {
@@ -766,6 +803,7 @@ impl F4Options {
             profile_degrees: false,
             gf2_elimination: Gf2Elimination::Generic,
             parallel_forward: ParallelForward::Serial,
+            batch_order: BatchOrder::Forward,
         }
     }
 
