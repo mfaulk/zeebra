@@ -80,6 +80,20 @@ impl From<FromDecStrErr> for ParseFieldElementError {
     }
 }
 
+/// Work that needs threads, run through [`FiniteField::run_concurrent`].
+///
+/// The `Send + Sync` bound sits on [`Self::run`] rather than on the trait, so generic code can build
+/// a job for any field and only a field that proves the bound can run it.
+pub trait ConcurrentJob<F> {
+    /// What the job computes.
+    type Output;
+
+    /// Does the work, free to share `F` across threads.
+    fn run(self) -> Self::Output
+    where
+        F: Send + Sync;
+}
+
 /// A Finite Field element.
 pub trait FiniteField:
     Ring
@@ -160,6 +174,18 @@ where
     /// dispatches to worker threads without carrying the bound on its own signature.
     fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
         None
+    }
+
+    /// Runs `job` with `Self: Send + Sync` in scope, or hands it back for a field without them.
+    ///
+    /// [`Self::concurrent_elimination`]'s proof, for work whose types carry more parameters than
+    /// a field — a const `N`, a lifetime — and so cannot be a stored function pointer. A field
+    /// that is `Send + Sync` overrides this with `Ok(job.run())`.
+    ///
+    /// # Errors
+    /// The job itself, unrun, for the caller's serial path.
+    fn run_concurrent<J: ConcurrentJob<Self>>(job: J) -> Result<J::Output, J> {
+        Err(job)
     }
 
     /// `self^b`. `0^0 = 1`.
@@ -709,6 +735,42 @@ mod tests {
         },
         FiniteField, KnownOrder, One, Zero,
     };
+
+    /// Sums field elements on a scoped thread, which only compiles under `F: Send + Sync`.
+    struct ThreadedSum<F>(Vec<F>);
+
+    impl<F: FiniteField> super::ConcurrentJob<F> for ThreadedSum<F> {
+        type Output = F;
+
+        fn run(self) -> F
+        where
+            F: Send + Sync,
+        {
+            std::thread::scope(|scope| {
+                scope
+                    .spawn(|| self.0.iter().fold(F::zero(), |a, b| a + *b))
+                    .join()
+                    .unwrap()
+            })
+        }
+    }
+
+    // A field runs concurrent jobs exactly when it offers concurrent elimination, and runs them right.
+    for_each_field!(
+        fn run_concurrent_agrees_with_concurrent_elimination<F>() {
+            let values = vec![F::one(), F::one(), F::zero()];
+            match F::run_concurrent(ThreadedSum(values.clone())) {
+                Ok(sum) => {
+                    assert!(F::concurrent_elimination().is_some());
+                    assert_eq!(sum, F::one() + F::one());
+                }
+                Err(job) => {
+                    assert!(F::concurrent_elimination().is_none());
+                    assert_eq!(job.0, values);
+                }
+            }
+        }
+    );
 
     // Inversion returns exactly what the pre-#160 recursive-pow route returned, over every field.
     for_each_field!(

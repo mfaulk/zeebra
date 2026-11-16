@@ -3,7 +3,9 @@
 **Status:** current cohort at `2ec9d3af` retained: pilot 6/6 and a complete native window 4 at
 **75/75** (five repetitions of every cell, #788). Native window 2 (61/75, four repetitions) is
 retained unpooled. The historical 70/75 is unchanged.
-**Measured at:** post-#813 forward cohort (#822): source `d7f0f3e6`, controller `19abb17c`
+**Measured at:** border-worker A/B (#826): `5e2b63e7` against `de02e8d2` (binary SHA-256
+`75e7241a40baee23…` against `3d095e463f6fe23a…`). `5e2b63e7` is the pre-rebase hash of
+`77a3218b`, the same diff rebased over #830's additive (+604/−0) F4 instrumentation. Post-#813 forward cohort (#822): source `d7f0f3e6`, controller `19abb17c`
 (binary SHA-256 `4aba5ec3e519e652…`). Current cohort: Rust/example source and executable `2ec9d3af362b1331c8118c7ce0e0505a391b4b49`
 (binary SHA-256 `cb7d3d475e586701…`), controllers `b241475b` (pilot), `680a8a12` (native windows 1–2) and `6f0a4e1b` (native windows 3–4,
 the #788 settle-wait load gate on the `680a8a12` tree).
@@ -238,6 +240,31 @@ batches are below the adaptive threshold, so the two arms run the same serial co
   placement of rows the workers wrote adds to it on MQ10, and glibc arenas add to Katsura-11's
   scatter.
 - Residual backward stays below a 1.2x ceiling everywhere, so #730's rejection stands.
+
+## Border batches on workers (#826)
+
+Operator construction was MQ10's largest stage after #813. Its border batches are independent, since
+each builds its own closure from the same basis. `BorderBatch::workers` (16 by default) therefore
+shares whole batches across threads, which parallelizes the ~100 ms closure and the ~136 ms reduction
+together. The operators and counters stay the serial path's exactly. This is a different
+decomposition from the within-batch split that §6.8 of `docs/MILESTONE-FGLM-SCALABILITY.md` refuted.
+
+The A/B ran `mq10_profile --whole-route=fglm --stages` at `5e2b63e7` against `de02e8d2` (main). It
+used five repetitions per arm and modulus, with arm order alternating per repetition, on CPUs 2–17
+under benchlock `mq10-826-ab-commit`. Launcher: `research/m28-current-baseline/current/ab-826.sh`.
+The lex bases were byte-identical across all 20 processes at each modulus. Medians in ms, with
+[min, max]:
+
+| Cell | main whole route | #826 whole route | gain | main operator | #826 operator |
+|---|---:|---:|---:|---:|---:|
+| MQ10, 32003 | 638.5 [615.2, 671.3] | 469.3 [465.2, 498.1] | **1.36x** | 268.6 | 93.8 |
+| MQ10, 2^31−1 | 616.2 [586.2, 629.5] | 463.7 [460.2, 487.5] | **1.33x** | 239.6 | 90.2 |
+
+The arms' ranges are disjoint at both moduli, so #826's gate is met. The in-route operator stage is
+~91 ms here against ~60 ms when `fglm_operator_probe` measures it alone. The in-route figure includes
+quotient enumeration and runs straight after F4's worker pool, the same cache effect noted above for
+symbolic preprocessing. Operator construction is now about 20% of the route, and symbolic
+preprocessing (~97 ms) is level with it.
 
 ## Historical cohort (superseded, retained unchanged)
 

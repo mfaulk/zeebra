@@ -218,6 +218,10 @@ impl<M: PrimeModulus256> FiniteField for PrimeFieldElement256<M> {
         Some(crate::linalg::concurrent::Dispatch::new())
     }
 
+    fn run_concurrent<J: crate::fields::ConcurrentJob<Self>>(job: J) -> Result<J::Output, J> {
+        Ok(job.run())
+    }
+
     fn new(val: u64) -> Self {
         let limbs = [val, 0, 0, 0];
         match Self::from_canonical_limbs(limbs) {
