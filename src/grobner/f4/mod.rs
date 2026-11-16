@@ -1,7 +1,9 @@
 //! F4 batch matrices span pair relations and reducer multiples; only new-leading rows enter the basis.
 
 pub mod budget;
-mod candidate;
+// Public only so `examples/block_density.rs` can time the production backward pass (#803).
+#[doc(hidden)]
+pub mod candidate;
 pub mod certify;
 pub mod degrees;
 pub mod divmask;

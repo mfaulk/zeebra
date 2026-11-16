@@ -4,7 +4,7 @@ use crate::{
 };
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(crate) struct Report {
+pub struct Report {
     pub targets: usize,
     pub products: usize,
     pub workspace_bytes: usize,
@@ -13,7 +13,7 @@ pub(crate) struct Report {
     pub fell_back: bool,
 }
 
-pub(crate) const WORKSPACE_LIMIT: usize = 64 * 1024 * 1024;
+pub const WORKSPACE_LIMIT: usize = 64 * 1024 * 1024;
 
 pub(crate) fn workspace_bytes<F>(columns: usize) -> Option<usize> {
     columns.checked_mul(
@@ -51,7 +51,7 @@ pub(crate) fn full<F: FiniteField>(
 /// Later echelon pivots stay immutable because targets run in increasing leading column.
 /// A checked whole-pass reservation precedes mutation; insufficient temporary space selects
 /// the original full-RREF pass, with its original admission and error semantics.
-pub(crate) fn finish<F: FiniteField>(
+pub fn finish<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     selected_columns: &[bool],
     max_entries: usize,

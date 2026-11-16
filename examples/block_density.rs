@@ -20,20 +20,42 @@
 //! ```text
 //! cargo run --release --example block_density          # the default corpus
 //! cargo run --release --example block_density -- large # the explicit large captures
+//! cargo run --release --example block_density -- split mq-random-10        # timed, see below
+//! cargo run --release --features research-work --example block_density -- split-large mq-random-14
 //! ```
+//!
+//! `split` is the one timed mode (#803), and its figures need the benchmark lock. It asks whether a
+//! device that did the residual's echelon for free could halve a batch: the CPU would still owe the
+//! sweep that produces `D'`, so the ceiling is the production batch time over the sweep time. Six
+//! arms per entry, interleaved with rotated order: the production route (echelon, then the
+//! candidate-only backward pass `F4Options::recommended` drives), the full-RREF route
+//! `eliminate_to(.., RowForm::Reduced, ..)`, the forward pass alone, the full sweep (this file's
+//! reference `residual`, not a shipped kernel), the shipped backend's echelon of `D'` alone, and the
+//! Faugère–Lachartre order (sweep, then echelon and back-substitution of `D'` only), whose candidate
+//! rows are asserted equal to production's. With `research-work` it also prices the sweep at the
+//! forward pass's own nanoseconds per coefficient product, since the reference sweep is not an
+//! optimized kernel; hooks sit in the hot loop, so take times from a stock build.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    hint::black_box,
+    time::{Duration, Instant},
+};
 
 use zeebra::{
     grobner::f4::{
+        candidate::{finish, WORKSPACE_LIMIT},
+        macaulay::MacaulayMatrix,
         matrix_corpus::{
             walk_corpus, walk_large_corpus, CapturedMatrix, CorpusVisitor, MatrixSpec,
         },
+        options::ReductionStrategy,
+        structured::{eliminate_to, BlockPlan, RowForm},
         symbolic::RowKind,
     },
     linalg::{
         row_echelon_with,
-        sparse::{SparseMatrix, SparseRow},
+        sparse::{back_substitute_pivots_within, SparseMatrix, SparseRow},
         Backend,
     },
     FiniteField,
@@ -277,12 +299,361 @@ impl CorpusVisitor for Collect {
     }
 }
 
+/// Repetitions per arm in `split` mode. Odd, so the median is an observation.
+const REPS: usize = 5;
+
+/// `split` mode's visitor: times the entries whose label contains `filter`.
+struct Split {
+    filter: String,
+    matched: usize,
+}
+
+fn median_range(samples: &mut [Duration]) -> (f64, f64, f64) {
+    samples.sort();
+    let ms = |d: Duration| d.as_secs_f64() * 1e3;
+    (
+        ms(samples[samples.len() / 2]),
+        ms(samples[0]),
+        ms(samples[samples.len() - 1]),
+    )
+}
+
+impl CorpusVisitor for Split {
+    fn visit<const N: usize, F: FiniteField>(
+        &mut self,
+        spec: &MatrixSpec,
+        captured: &CapturedMatrix<N, F>,
+    ) {
+        if !spec.label.contains(self.filter.as_str()) {
+            return;
+        }
+        self.matched += 1;
+        let options = spec.options.options();
+        let plan = match options.reduction {
+            ReductionStrategy::Unstructured => BlockPlan::Baseline,
+            ReductionStrategy::Structured => BlockPlan::ReducersFirstBlock,
+        };
+        let form = if options.reduce_batch_rows {
+            RowForm::Reduced
+        } else {
+            RowForm::Echelon
+        };
+        let budget = options.live_entry_allowance::<F>();
+        let backend = options.elimination;
+        // A refusal is a result, not a failure: the large entry is captured under a raised budget
+        // that its own elimination still crosses. It is reported, and the arms then run unbounded.
+        let allowance = match eliminate_to(
+            plan,
+            form,
+            backend,
+            &mut captured.matrix.clone(),
+            budget,
+        ) {
+            Ok(_) => budget,
+            Err(live) => {
+                println!(
+                    "|   | **refused** under its own {} live-entry budget at {} live entries; arms below run unbounded | | | | | |",
+                    budget, live
+                );
+                usize::MAX
+            }
+        };
+
+        let matrix = captured.matrix.matrix();
+        let mut reducers: Vec<&SparseRow<F>> = Vec::new();
+        let mut pairs: Vec<&SparseRow<F>> = Vec::new();
+        for (row, origin) in matrix.rows().iter().zip(captured.matrix.row_origins()) {
+            match origin.kind {
+                RowKind::Reducer => reducers.push(row),
+                RowKind::PairComponent { .. } => pairs.push(row),
+            }
+        }
+        reducers.sort_by_key(|row| row.leading_column());
+        let (residual_rows, free, sweep_products) =
+            residual(&reducers, &pairs, matrix.num_columns());
+
+        // The last arm is the Faugère–Lachartre order end to end: the full sweep, then the shipped
+        // backend's echelon of D' and the shipped back-substitution over D' alone. It produces the
+        // reduced candidate rows without touching a reducer row; `same_candidates` checks that they
+        // are the production batch's, coefficient for coefficient.
+        let faugere_lachartre = || {
+            let (rows, free, _) = residual(&reducers, &pairs, matrix.num_columns());
+            let mut block = SparseMatrix::new(free, rows);
+            let mut statistics = row_echelon_with(backend, &mut block, usize::MAX)
+                .expect("an unbounded echelon cannot refuse");
+            back_substitute_pivots_within(&mut block, usize::MAX, &mut statistics)
+                .expect("an unbounded pass cannot refuse");
+            block
+        };
+
+        // The production backward pass finishes only candidate rows, so a reducer row keeps its
+        // echelon tail; `eliminate_to(.., RowForm::Reduced, ..)` is the full-RREF route F4 left.
+        let selected: Vec<bool> = {
+            let mut selected = vec![true; matrix.num_columns()];
+            for row in &reducers {
+                selected[row.leading_column().expect("a reducer row is nonzero")] = false;
+            }
+            selected
+        };
+        let production = |copy: &mut MacaulayMatrix<N, F>| {
+            let mut outcome = eliminate_to(plan, RowForm::Echelon, backend, copy, allowance)
+                .expect("within the allowance the live run used");
+            if form == RowForm::Reduced {
+                finish(
+                    copy.matrix_mut(),
+                    &selected,
+                    allowance,
+                    WORKSPACE_LIMIT,
+                    &mut outcome.statistics,
+                )
+                .expect("within the allowance the live run used");
+            }
+            outcome.statistics.rank
+        };
+
+        // production, full RREF, forward only, reference sweep, echelon of D', Faugère–Lachartre
+        const ARMS: usize = 6;
+        let mut times: [Vec<Duration>; ARMS] = Default::default();
+        let mut ranks = [0usize; 2];
+        for repetition in 0..REPS {
+            for offset in 0..ARMS {
+                let arm = (repetition + offset) % ARMS;
+                match arm {
+                    0 => {
+                        let mut copy = captured.matrix.clone();
+                        let started = Instant::now();
+                        ranks[0] = production(&mut copy);
+                        times[0].push(started.elapsed());
+                        black_box(&copy);
+                    }
+                    1 | 2 => {
+                        let mut copy = captured.matrix.clone();
+                        let form = if arm == 1 {
+                            RowForm::Reduced
+                        } else {
+                            RowForm::Echelon
+                        };
+                        let started = Instant::now();
+                        eliminate_to(plan, form, backend, &mut copy, allowance)
+                            .expect("within the allowance the live run used");
+                        times[arm].push(started.elapsed());
+                        black_box(&copy);
+                    }
+                    3 => {
+                        let started = Instant::now();
+                        let swept = residual(&reducers, &pairs, matrix.num_columns());
+                        times[3].push(started.elapsed());
+                        black_box(&swept);
+                    }
+                    4 => {
+                        let mut block = SparseMatrix::new(free, residual_rows.clone());
+                        let started = Instant::now();
+                        let statistics = row_echelon_with(backend, &mut block, usize::MAX)
+                            .expect("an unbounded echelon cannot refuse");
+                        times[4].push(started.elapsed());
+                        ranks[1] = statistics.rank;
+                    }
+                    _ => {
+                        let started = Instant::now();
+                        let block = faugere_lachartre();
+                        times[5].push(started.elapsed());
+                        black_box(&block);
+                    }
+                }
+            }
+        }
+        // The pair rows' rank in the batch is the residual's rank: the reducer block is independent
+        // and every pair row's reducer-column content is in its span.
+        assert_eq!(
+            ranks[0],
+            reducers.len() + ranks[1],
+            "{}: residual rank disagrees with the batch",
+            spec.label
+        );
+
+        if form == RowForm::Reduced {
+            let mut shipped = captured.matrix.clone();
+            production(&mut shipped);
+            same_candidates(
+                spec.label,
+                shipped.matrix(),
+                &reducers,
+                &faugere_lachartre(),
+            );
+        }
+
+        let [shipped, full, forward, sweep, echelon, ordered] =
+            times.map(|mut arm| median_range(&mut arm));
+        let cell =
+            |(median, low, high): (f64, f64, f64)| format!("{median:.1} [{low:.1}, {high:.1}]");
+        println!(
+            "| {} | {} x {} | {:?} | {} | {} | {} | {} | {} | {} | {} |",
+            spec.label,
+            matrix.num_rows(),
+            matrix.num_columns(),
+            backend,
+            cell(shipped),
+            cell(full),
+            cell(forward),
+            cell(sweep),
+            cell(echelon),
+            cell(ordered),
+            sweep_products,
+        );
+        println!(
+            "|   | ceilings over production: reference sweep {:.2}x, Faugère–Lachartre order {:.2}x; full RREF is {:.2}x production | | | | | | | | | |",
+            shipped.0 / sweep.0,
+            shipped.0 / ordered.0,
+            full.0 / shipped.0,
+        );
+        products(
+            spec.label,
+            captured,
+            plan,
+            backend,
+            allowance,
+            sweep_products,
+            forward.0,
+            shipped.0,
+        );
+    }
+}
+
+/// Assert that the shipped reduced batch and the Faugère–Lachartre order yield the same candidates.
+///
+/// A candidate is a row whose leading column no reducer leads. Both forms are reduced row echelon
+/// over the same row space with the same pivot set, which is unique, so equality is required and
+/// not merely expected; anything less is a defect in one of the two routes.
+fn same_candidates<F: FiniteField>(
+    label: &str,
+    shipped: &SparseMatrix<F>,
+    reducers: &[&SparseRow<F>],
+    ordered: &SparseMatrix<F>,
+) {
+    let mut led = vec![false; shipped.num_columns()];
+    for row in reducers {
+        led[row.leading_column().expect("a reducer row is nonzero")] = true;
+    }
+    let free: Vec<usize> = (0..shipped.num_columns()).filter(|&c| !led[c]).collect();
+    let mut from_shipped: Vec<Vec<(usize, F)>> = shipped
+        .rows()
+        .iter()
+        .filter(|row| row.leading_column().is_some_and(|c| !led[c]))
+        .map(|row| row.entries().to_vec())
+        .collect();
+    let mut from_ordered: Vec<Vec<(usize, F)>> = ordered
+        .rows()
+        .iter()
+        .filter(|row| !row.is_zero())
+        .map(|row| row.entries().iter().map(|(c, v)| (free[*c], *v)).collect())
+        .collect();
+    from_shipped.sort_by_key(|row| row[0].0);
+    from_ordered.sort_by_key(|row| row[0].0);
+    assert!(
+        from_shipped == from_ordered,
+        "{}: the two routes' candidates differ ({} against {} rows)",
+        label,
+        from_shipped.len(),
+        from_ordered.len()
+    );
+    println!(
+        "|   | candidates identical: {} rows, coefficient for coefficient | | | | | |",
+        from_shipped.len()
+    );
+}
+
+/// The forward pass's coefficient products split by pivot origin, and the gate it implies.
+#[cfg(feature = "research-work")]
+#[allow(clippy::too_many_arguments)]
+fn products<const N: usize, F: FiniteField>(
+    label: &str,
+    captured: &CapturedMatrix<N, F>,
+    plan: BlockPlan,
+    backend: Backend,
+    allowance: usize,
+    sweep_products: usize,
+    forward_ms: f64,
+    shipped_ms: f64,
+) {
+    let mut copy = captured.matrix.clone();
+    let (_, report) = zeebra::linalg::work::measure_discovery(|| {
+        eliminate_to(plan, RowForm::Echelon, backend, &mut copy, allowance)
+            .expect("within the allowance the live run used")
+    });
+    let rows = report
+        .batches
+        .iter()
+        .chain(std::iter::once(&report.outside_batch))
+        .flat_map(|batch| batch.discovery.iter());
+    let (mut inherited, mut discovered) = (0usize, 0usize);
+    for row in rows {
+        inherited += row.inherited_products;
+        discovered += row.discovered_products;
+    }
+    let total = (inherited + discovered).max(1);
+    let per_product = forward_ms / total as f64;
+    let sweep_estimate = sweep_products as f64 * per_product;
+    println!(
+        "|   | forward products: inherited {} + discovered {} ({}); sweep at {:.3} ns/product = {:.1} ms; estimated ceiling {:.2}x | | | | | |",
+        inherited,
+        discovered,
+        pct(discovered as f64 / total as f64),
+        per_product * 1e6,
+        sweep_estimate,
+        shipped_ms / sweep_estimate,
+    );
+    let _ = label;
+}
+
+#[cfg(not(feature = "research-work"))]
+#[allow(clippy::too_many_arguments)]
+fn products<const N: usize, F: FiniteField>(
+    _label: &str,
+    _captured: &CapturedMatrix<N, F>,
+    _plan: BlockPlan,
+    _backend: Backend,
+    _allowance: usize,
+    _sweep_products: usize,
+    _forward_ms: f64,
+    _shipped_ms: f64,
+) {
+}
+
+fn split(large: bool, filter: String) {
+    println!("{REPS} interleaved repetitions per arm; medians [min, max] in ms.\n");
+    println!("| entry | rows x cols | backend | production batch | full RREF | forward only | reference sweep | echelon of D' | Faugère–Lachartre order | sweep multiply-adds |");
+    println!("|---|---|---|---:|---:|---:|---:|---:|---:|---:|");
+    let mut visitor = Split { filter, matched: 0 };
+    let walked = if large {
+        walk_large_corpus(&mut visitor)
+    } else {
+        walk_corpus(&mut visitor)
+    };
+    if let Err(error) = walked {
+        eprintln!("CORPUS DRIFTED: {}", error);
+        std::process::exit(1);
+    }
+    if visitor.matched == 0 {
+        eprintln!("no corpus entry matched");
+        std::process::exit(64);
+    }
+}
+
 fn pct(value: f64) -> String {
     format!("{:.1}%", 100.0 * value)
 }
 
 fn main() {
-    let large = std::env::args().nth(1).as_deref() == Some("large");
+    let mode = std::env::args().nth(1);
+    if let Some(large) = match mode.as_deref() {
+        Some("split") => Some(false),
+        Some("split-large") => Some(true),
+        _ => None,
+    } {
+        split(large, std::env::args().nth(2).unwrap_or_default());
+        return;
+    }
+    let large = mode.as_deref() == Some("large");
     let mut collect = Collect(Vec::new());
     let walked = if large {
         walk_large_corpus(&mut collect)
@@ -422,6 +793,42 @@ mod tests {
         let (out, free, _) = residual(&[&r0], &[&pair], 2);
         assert_eq!(free, 1);
         assert!(out[0].is_zero());
+    }
+
+    /// The fully reduced batch of `residual_is_the_schur_complement_on_free_columns`, by hand.
+    fn shipped_by_hand() -> SparseMatrix<Zp7> {
+        // Pivot x1 + 2x3 clears column 1 from r0: x0 + x1 - (x1 + 2x3) = x0 + 5x3.
+        SparseMatrix::new(
+            4,
+            vec![
+                row(&[(0, 1), (3, 5)]),
+                row(&[(2, 1), (3, 2)]),
+                row(&[(1, 1), (3, 2)]),
+            ],
+        )
+    }
+
+    // The sweep, echelon and back-substitution of D' alone reproduce the full reduction's candidate.
+    #[test]
+    fn faugere_lachartre_order_matches_the_full_reduction() {
+        let r0 = row(&[(0, 1), (1, 1)]);
+        let r2 = row(&[(2, 1), (3, 2)]);
+        let pair = row(&[(0, 1), (1, 2), (2, 3), (3, 1)]);
+        let (rows, free, _) = residual(&[&r0, &r2], &[&pair], 4);
+        let mut block = SparseMatrix::new(free, rows);
+        let mut statistics = row_echelon_with(Backend::Adaptive, &mut block, usize::MAX).unwrap();
+        back_substitute_pivots_within(&mut block, usize::MAX, &mut statistics).unwrap();
+        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &block);
+    }
+
+    // A candidate differing in one coefficient is a defect, not a tolerance.
+    #[test]
+    #[should_panic(expected = "candidates differ")]
+    fn a_differing_candidate_is_caught() {
+        let r0 = row(&[(0, 1), (1, 1)]);
+        let r2 = row(&[(2, 1), (3, 2)]);
+        let wrong = SparseMatrix::new(2, vec![row(&[(0, 1), (1, 3)])]);
+        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &wrong);
     }
 
     // A full-rank 3x3 dense echelon: pivot 0 updates 2x2 cells, pivot 1 updates 1x1, pivot 2 none.
