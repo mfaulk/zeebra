@@ -25,6 +25,7 @@ jobs:
     outputs:
       rust: ${{ steps.scope.outputs.rust }}
       docs: ${{ steps.scope.outputs.docs }}
+      comparand: ${{ steps.scope.outputs.comparand }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,16 +42,17 @@ jobs:
             git diff --no-renames --name-only -z "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/ci-paths"
             bash tools/ci-scope.sh < "$RUNNER_TEMP/ci-paths" >> "$GITHUB_OUTPUT"
           else
-            printf 'rust=true\ndocs=true\n' >> "$GITHUB_OUTPUT"
+            printf 'rust=true\ndocs=true\ncomparand=true\n' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Validate classification outputs
         env:
           RUST_CHECKS: ${{ steps.scope.outputs.rust }}
           DOC_CHECKS: ${{ steps.scope.outputs.docs }}
+          COMPARAND_CHECKS: ${{ steps.scope.outputs.comparand }}
         run: |
-          case "$RUST_CHECKS/$DOC_CHECKS" in
-            true/true|false/true|false/false) ;;
+          case "$RUST_CHECKS/$DOC_CHECKS/$COMPARAND_CHECKS" in
+            true/true/true|true/true/false|false/true/false|false/false/false) ;;
             *) echo "Invalid CI scope outputs" >&2; exit 1 ;;
           esac
 
@@ -65,6 +67,8 @@ jobs:
       - uses: taiki-e/install-action@nextest
         if: needs.changes.outputs.rust == 'true'
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # Nextest builds test binaries; Clippy checks examples and benchmarks on PRs.
       # Main, scheduled and manual runs also link every standalone target.
       - name: Build all targets
@@ -76,13 +80,34 @@ jobs:
       - name: Check guide inclusion
         if: needs.changes.outputs.rust != 'true'
         run: cargo test --test documentation
+      - name: Doc tests
+        run: cargo test --doc -- --test-threads=4
+      - name: Upload build timings
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-build-timings
+          path: target/cargo-timings/
+          if-no-files-found: ignore
+
+  # Split from `Build and test` so the two run in parallel; together they were the PR critical path.
+  research:
+    name: Research artifacts
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: MQ10 profiling instrument tests
         run: |
           cargo test --example mq10_profile
           cargo test --example wide_corpus
           python3 tools/test/wide-corpus-test.py
           python3 tools/test/comparand-scaling-test.py
-          python3 tools/external/comparand-scaling.py --replay research/comparand-scaling
           cargo test --example public_corpus
           cargo test --example elimination_kernel_study
           python3 tools/test/elimination-kernel-study-test.py
@@ -148,21 +173,16 @@ jobs:
           cargo test --features research-multirow --example mq10_profile
           python3 tools/test/multirow-study-test.py
           python3 tools/test/public-corpus-test.py
+      # About 12 minutes; it reads only its own records and tools/external/ (tools/ci-scope.sh).
+      - name: Retained comparand replay
+        if: needs.changes.outputs.comparand == 'true'
+        run: python3 tools/external/comparand-scaling.py --replay research/comparand-scaling
       - name: Isolated delayed-reduction pilot checks
         run: |
           git apply research/elimination-kernels/delayed.patch
           trap 'git apply -R research/elimination-kernels/delayed.patch' EXIT
           cargo test --example elimination_kernel_study
           cargo test --lib h13_pilot_selection_is_explicit
-      - name: Doc tests
-        run: cargo test --doc -- --test-threads=4
-      - name: Upload build timings
-        if: always() && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-build-timings
-          path: target/cargo-timings/
-          if-no-files-found: ignore
 
   release-tests:
     name: Tests (release)
@@ -178,6 +198,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # Separate build/execution so the logs distinguish compiler time from test time.
       - name: Build release tests
         run: cargo test --profile ci-release --no-run --timings
@@ -224,6 +246,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # Compilation alone misses setup panics (#586). Keep execution on code PRs.
       # This smoke test samples nothing and publishes no performance figures.
       - name: Benchmarks execute without panicking
@@ -242,6 +266,8 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Check formatting
         run: cargo fmt --all --check
@@ -296,6 +322,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.91.0
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Check the library on the declared MSRV
         run: cargo check --lib --all-features --locked
@@ -389,7 +417,7 @@ jobs:
 
   complete:
     name: CI complete
-    needs: [changes, test, release-tests, bench-smoke, lint, msrv, agent-scripts, merge-staleness]
+    needs: [changes, test, research, release-tests, bench-smoke, lint, msrv, agent-scripts, merge-staleness]
     if: always()
     runs-on: ubuntu-latest
     steps:

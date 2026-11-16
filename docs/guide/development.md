@@ -124,13 +124,20 @@ Pushes to `main`, scheduled runs and manual dispatch always use the full suite.
 
 | Change on a pull request | Checks |
 |---|---|
-| Code, config, workflows, scripts, records, or any unknown path | Debug and optimized tests, debug doctests, Clippy, Rustdoc, package, MSRV, benchmark smoke and shell/provenance checks |
-| `README.md` or Markdown under `docs/guide/`, with only other allowed prose changes | Debug doctests, guide-inclusion test, formatting, Rustdoc, shell/provenance checks |
+| Code, config, workflows, scripts, records, or any unknown path | Debug and optimized tests, debug doctests, research-artifact checks, Clippy, Rustdoc, package, MSRV, benchmark smoke and shell/provenance checks |
+| Additionally, anything under `research/comparand-scaling/` or `tools/external/`, `tools/test/comparand-scaling-test.py`, `tools/ci-scope.sh` or a workflow | The retained comparand replay (about 12 minutes) |
+| `README.md` or Markdown under `docs/guide/`, with only other allowed prose changes | Debug doctests, guide-inclusion test, research-artifact checks, formatting, Rustdoc, shell/provenance checks |
 | Only Markdown under `docs/` outside the guides, under `research/`, or root `CHANGELOG.md` / `CLAUDE.md` | Shell/provenance checks and merge-staleness notice |
 
 `CI complete` always runs and fails if any dependency failed or was cancelled. Intentionally
 skipped jobs are accepted. It is suitable as a required branch-protection check; changing repository
 branch-protection settings is a separate action. Existing job names remain stable.
+
+`Research artifacts` runs the research-instrument tests, artifact summaries and the delayed-reduction
+pilot in parallel with `Build and test`; serially they were the PR critical path (about 40 minutes).
+The comparand replay in it runs on every push to `main`, schedule and dispatch, and on PRs only when
+its inputs change. `Swatinem/rust-cache` saves caches only from `main`: PR saves overflowed the
+repository's 10 GB cache quota and evicted `main`'s, which every PR restores from.
 
 The full suite runs under Nextest in debug and under `ci-release` in a separate job. Both matter:
 release arithmetic has `debug-assertions` and `overflow-checks` disabled. The PR profile uses
