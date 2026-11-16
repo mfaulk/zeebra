@@ -50,7 +50,7 @@ use zeebra::{
     },
     linalg::{
         row_echelon_with,
-        sparse::{SparseMatrix, SparseRow},
+        sparse::{back_substitute_pivots_within, SparseMatrix, SparseRow},
         Backend,
     },
     FiniteField,
@@ -367,12 +367,26 @@ impl CorpusVisitor for Split {
         let (residual_rows, free, sweep_products) =
             residual(&reducers, &pairs, matrix.num_columns());
 
-        // shipped, forward only, reference sweep, shipped echelon of D'
-        let mut times: [Vec<Duration>; 4] = Default::default();
+        // Arm 4 is the Faugère–Lachartre order end to end: the full sweep, then the shipped
+        // backend's echelon of D' and the shipped back-substitution over D' alone. It produces the
+        // reduced candidate rows without touching a reducer row; `same_candidates` checks that they
+        // are the shipped batch's, coefficient for coefficient.
+        let faugere_lachartre = || {
+            let (rows, free, _) = residual(&reducers, &pairs, matrix.num_columns());
+            let mut block = SparseMatrix::new(free, rows);
+            let mut statistics = row_echelon_with(backend, &mut block, usize::MAX)
+                .expect("an unbounded echelon cannot refuse");
+            back_substitute_pivots_within(&mut block, usize::MAX, &mut statistics)
+                .expect("an unbounded pass cannot refuse");
+            block
+        };
+
+        // shipped, forward only, reference sweep, shipped echelon of D', Faugère–Lachartre order
+        let mut times: [Vec<Duration>; 5] = Default::default();
         let mut ranks = [0usize; 2];
         for repetition in 0..REPS {
-            for offset in 0..4 {
-                let arm = (repetition + offset) % 4;
+            for offset in 0..5 {
+                let arm = (repetition + offset) % 5;
                 match arm {
                     0 | 1 => {
                         let mut copy = captured.matrix.clone();
@@ -389,6 +403,12 @@ impl CorpusVisitor for Split {
                         let swept = residual(&reducers, &pairs, matrix.num_columns());
                         times[2].push(started.elapsed());
                         black_box(&swept);
+                    }
+                    4 => {
+                        let started = Instant::now();
+                        let block = faugere_lachartre();
+                        times[4].push(started.elapsed());
+                        black_box(&block);
                     }
                     _ => {
                         let mut block = SparseMatrix::new(free, residual_rows.clone());
@@ -410,7 +430,20 @@ impl CorpusVisitor for Split {
             spec.label
         );
 
-        let [shipped, forward, sweep, echelon] = times.map(|mut arm| median_range(&mut arm));
+        if form == RowForm::Reduced {
+            let mut shipped = captured.matrix.clone();
+            eliminate_to(plan, form, backend, &mut shipped, allowance)
+                .expect("within the allowance the live run used");
+            same_candidates(
+                spec.label,
+                shipped.matrix(),
+                &reducers,
+                &faugere_lachartre(),
+            );
+        }
+
+        let [shipped, forward, sweep, echelon, ordered] =
+            times.map(|mut arm| median_range(&mut arm));
         println!(
             "| {} | {} x {} | {:?} | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {} |",
             spec.label,
@@ -427,6 +460,13 @@ impl CorpusVisitor for Split {
             "|   | measured ceiling, shipped / reference sweep | {:.2}x | | | | | |",
             shipped.0 / sweep.0
         );
+        println!(
+            "|   | Faugère–Lachartre order, same candidates | {:.1} [{:.1}, {:.1}] ms | {:.2}x vs shipped | | | | |",
+            ordered.0,
+            ordered.1,
+            ordered.2,
+            shipped.0 / ordered.0
+        );
         products(
             spec.label,
             captured,
@@ -438,6 +478,49 @@ impl CorpusVisitor for Split {
             shipped.0,
         );
     }
+}
+
+/// Assert that the shipped reduced batch and the Faugère–Lachartre order yield the same candidates.
+///
+/// A candidate is a row whose leading column no reducer leads. Both forms are reduced row echelon
+/// over the same row space with the same pivot set, which is unique, so equality is required and
+/// not merely expected; anything less is a defect in one of the two routes.
+fn same_candidates<F: FiniteField>(
+    label: &str,
+    shipped: &SparseMatrix<F>,
+    reducers: &[&SparseRow<F>],
+    ordered: &SparseMatrix<F>,
+) {
+    let mut led = vec![false; shipped.num_columns()];
+    for row in reducers {
+        led[row.leading_column().expect("a reducer row is nonzero")] = true;
+    }
+    let free: Vec<usize> = (0..shipped.num_columns()).filter(|&c| !led[c]).collect();
+    let mut from_shipped: Vec<Vec<(usize, F)>> = shipped
+        .rows()
+        .iter()
+        .filter(|row| row.leading_column().is_some_and(|c| !led[c]))
+        .map(|row| row.entries().to_vec())
+        .collect();
+    let mut from_ordered: Vec<Vec<(usize, F)>> = ordered
+        .rows()
+        .iter()
+        .filter(|row| !row.is_zero())
+        .map(|row| row.entries().iter().map(|(c, v)| (free[*c], *v)).collect())
+        .collect();
+    from_shipped.sort_by_key(|row| row[0].0);
+    from_ordered.sort_by_key(|row| row[0].0);
+    assert!(
+        from_shipped == from_ordered,
+        "{}: the two routes' candidates differ ({} against {} rows)",
+        label,
+        from_shipped.len(),
+        from_ordered.len()
+    );
+    println!(
+        "|   | candidates identical: {} rows, coefficient for coefficient | | | | | |",
+        from_shipped.len()
+    );
 }
 
 /// The forward pass's coefficient products split by pivot origin, and the gate it implies.
@@ -671,6 +754,42 @@ mod tests {
         let (out, free, _) = residual(&[&r0], &[&pair], 2);
         assert_eq!(free, 1);
         assert!(out[0].is_zero());
+    }
+
+    /// The fully reduced batch of `residual_is_the_schur_complement_on_free_columns`, by hand.
+    fn shipped_by_hand() -> SparseMatrix<Zp7> {
+        // Pivot x1 + 2x3 clears column 1 from r0: x0 + x1 - (x1 + 2x3) = x0 + 5x3.
+        SparseMatrix::new(
+            4,
+            vec![
+                row(&[(0, 1), (3, 5)]),
+                row(&[(2, 1), (3, 2)]),
+                row(&[(1, 1), (3, 2)]),
+            ],
+        )
+    }
+
+    // The sweep, echelon and back-substitution of D' alone reproduce the full reduction's candidate.
+    #[test]
+    fn faugere_lachartre_order_matches_the_full_reduction() {
+        let r0 = row(&[(0, 1), (1, 1)]);
+        let r2 = row(&[(2, 1), (3, 2)]);
+        let pair = row(&[(0, 1), (1, 2), (2, 3), (3, 1)]);
+        let (rows, free, _) = residual(&[&r0, &r2], &[&pair], 4);
+        let mut block = SparseMatrix::new(free, rows);
+        let mut statistics = row_echelon_with(Backend::Adaptive, &mut block, usize::MAX).unwrap();
+        back_substitute_pivots_within(&mut block, usize::MAX, &mut statistics).unwrap();
+        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &block);
+    }
+
+    // A candidate differing in one coefficient is a defect, not a tolerance.
+    #[test]
+    #[should_panic(expected = "candidates differ")]
+    fn a_differing_candidate_is_caught() {
+        let r0 = row(&[(0, 1), (1, 1)]);
+        let r2 = row(&[(2, 1), (3, 2)]);
+        let wrong = SparseMatrix::new(2, vec![row(&[(0, 1), (1, 3)])]);
+        same_candidates("hand", &shipped_by_hand(), &[&r0, &r2], &wrong);
     }
 
     // A full-rank 3x3 dense echelon: pivot 0 updates 2x2 cells, pivot 1 updates 1x1, pivot 2 none.
