@@ -4411,3 +4411,30 @@ fn test_a_run_budgeted_at_its_live_entry_requirement_is_admitted() {
         }
     }
 }
+
+/// A katsura-5 run budgeted at its own requirement reports its live budget as fully used, so the
+/// pressure report sees the candidate-finishing reservation that binds above the peak (#840).
+#[test]
+fn test_pressure_at_the_live_entry_requirement_is_full() {
+    use super::PairMultiples;
+    type Narrow = crate::fields::Zp18446744073709551557;
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let options = F4Options {
+        pair_multiples: PairMultiples::Distinct,
+        ..F4Options::default()
+    };
+    let system = katsura::<5, Narrow>();
+    let (_, measured) = f4_with_options(&system, order, &options).expect("within limits");
+    let requirement = measured.live_entry_requirement();
+    let budgeted = options.with_live_entries::<Narrow>(requirement);
+    let (_, statistics) = f4_with_options(&system, order, &budgeted).expect("admitted");
+
+    let live = statistics
+        .budget_pressure(&budgeted)
+        .into_iter()
+        .find(|approach| approach.budget == "max_live_nonzeros")
+        .expect("the entry budget binds over a 64-bit field");
+    assert_eq!(live.observed, requirement);
+    assert_eq!(live.allowance, requirement);
+}

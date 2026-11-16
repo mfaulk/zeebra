@@ -643,7 +643,8 @@ impl BatchStatistics {
     }
     /// Bytes of matrix entries live at this batch's peak.
     ///
-    /// What [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes) is enforced on.
+    /// One of the figures [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes) is
+    /// enforced on; candidate finishing also checks its reservation against it, which this omits.
     pub fn peak_live_bytes(&self) -> usize {
         self.elimination
             .peak_nonzeros
@@ -742,7 +743,9 @@ pub struct F4Statistics {
     /// The largest number of nonzero entries live in any elimination.
     ///
     /// This is the memory question: how big did the biggest matrix get. It is deliberately not the
-    /// fill-in question — see `worst_fill_in_peak`.
+    /// fill-in question — see `worst_fill_in_peak`. Nor is it the budget a run needs, which can be
+    /// a candidate-finishing reservation above it — see
+    /// [`live_entry_requirement`](Self::live_entry_requirement).
     pub max_live_nonzeros: usize,
 
     /// Nonzero entries in the matrix that reached `max_live_nonzeros`, as it was built.
@@ -1203,6 +1206,9 @@ impl F4Statistics {
     /// [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes) is enforced in. This is the
     /// figure that differs between field widths on an otherwise identical computation, by the ratio
     /// of their [`bytes_per_entry`](Self::bytes_per_entry).
+    ///
+    /// A peak, not the byte budget a run needs: for that, multiply
+    /// [`live_entry_requirement`](Self::live_entry_requirement) by `bytes_per_entry`.
     pub fn peak_live_bytes(&self) -> usize {
         self.max_live_nonzeros.saturating_mul(self.bytes_per_entry)
     }
