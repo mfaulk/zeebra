@@ -230,7 +230,7 @@ where
 impl<const P: u64> PrimeFieldElement64<P> {
     /// The element's representative integer in [0,p-1].
     ///
-    /// For an odd modulus this is a Montgomery reduction, not a field read, so a hot loop should
+    /// For a Montgomery modulus this is a reduction, not a field read, so a hot loop should
     /// hold field elements rather than call this per iteration.
     pub fn value(&self) -> u64 {
         montgomery::to_canonical::<P>(self.value)
