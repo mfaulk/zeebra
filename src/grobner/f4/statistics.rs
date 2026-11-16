@@ -1207,6 +1207,19 @@ impl F4Statistics {
         self.max_live_nonzeros.saturating_mul(self.bytes_per_entry)
     }
 
+    /// The live-entry allowance this run's route needed: [`Self::max_live_nonzeros`], or the
+    /// largest candidate-finishing reservation where that is larger.
+    ///
+    /// Candidate finishing reserves its whole-pass growth against the allowance before mutating
+    /// and falls back to full RREF when the reservation does not fit, but the reservation is
+    /// reported apart from mathematical entries. So a budget of exactly `max_live_nonzeros` can
+    /// force the fallback and be refused (#831, katsura-5: peak 588, reservation 612). Parallel
+    /// forward already folds its reservation into the peak, so it needs no term here.
+    pub fn live_entry_requirement(&self) -> usize {
+        self.max_live_nonzeros
+            .max(self.candidate_reduction.reserved_entries)
+    }
+
     /// The fraction of matrix rows that were reduction scaffolding rather than pair halves.
     ///
     /// Zero when no matrix was built.

@@ -1982,9 +1982,11 @@ fn test_the_byte_budget_is_what_makes_a_budget_mean_the_same_at_every_field_widt
         "a wide entry is 2.5 narrow ones"
     );
 
-    // A byte budget sized for the narrow computation's peak admits it and refuses the wide one.
+    // A byte budget sized for the narrow computation's requirement admits it and refuses the
+    // wide one. The requirement, not the peak: candidate finishing reserves against the same
+    // allowance, and on katsura-5 its reservation is the larger of the two.
     let budget = F4Options {
-        max_live_bytes: narrow.peak_live_bytes(),
+        max_live_bytes: narrow.live_entry_requirement() * narrow.bytes_per_entry,
         ..F4Options::default()
     };
     assert!(f4_with_options(&katsura::<5, Narrow>(), order, &budget).is_ok());
@@ -1993,10 +1995,10 @@ fn test_the_byte_budget_is_what_makes_a_budget_mean_the_same_at_every_field_widt
         Err(F4Error::TooManyLiveBytes { .. })
     ));
 
-    // The entry budget at that same peak admits both, because it cannot tell them apart. This is
-    // the behaviour that was wrong, asserted so that it is not mistaken for the fix.
+    // The entry budget at that same requirement admits both, because it cannot tell them apart.
+    // This is the behaviour that was wrong, asserted so that it is not mistaken for the fix.
     let entries_only = F4Options {
-        max_live_nonzeros: narrow.max_live_nonzeros,
+        max_live_nonzeros: narrow.live_entry_requirement(),
         max_live_bytes: usize::MAX,
         ..F4Options::default()
     };
@@ -4380,4 +4382,32 @@ fn test_pair_multiple_deduplication_preserves_the_basis_and_removes_rows() {
     }
     let removed = check("katsura-5", &katsura::<5, G>()) + check("cyclic-5", &cyclic::<5, G>());
     assert!(removed > 0, "no duplicate pair multiple was ever removed");
+}
+
+/// A run budgeted at its own `live_entry_requirement` is admitted under both pair-multiple
+/// policies, and the requirement never understates the reported elimination peak.
+#[test]
+fn test_a_run_budgeted_at_its_live_entry_requirement_is_admitted() {
+    use super::PairMultiples;
+    type Narrow = crate::fields::Zp18446744073709551557;
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    for pair_multiples in [PairMultiples::Every, PairMultiples::Distinct] {
+        for cap in [None, Some(16)] {
+            let options = F4Options {
+                pair_multiples,
+                max_pairs_per_batch: cap,
+                ..F4Options::default()
+            };
+            let system = katsura::<5, Narrow>();
+            let (_, measured) = f4_with_options(&system, order, &options).expect("within limits");
+            let requirement = measured.live_entry_requirement();
+            assert!(requirement >= measured.max_live_nonzeros);
+            let budgeted = options.clone().with_live_entries::<Narrow>(requirement);
+            assert!(
+                f4_with_options(&system, order, &budgeted).is_ok(),
+                "{pair_multiples:?}, cap {cap:?}: refused at its own requirement {requirement}"
+            );
+        }
+    }
 }
