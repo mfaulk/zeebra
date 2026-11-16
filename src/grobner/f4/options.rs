@@ -276,8 +276,9 @@ pub enum BatchOrder {
     ///
     /// Pair rows never meet each other until every reducer column is gone, so pair-against-pair
     /// work is confined to the columns of `D'` and the backward pass never touches a reducer
-    /// column. Measured 1.76-2.14x faster per batch on one core in
-    /// `docs/research/residual-split.md`.
+    /// column. Both passes take workers under [`ParallelForward`], behind the forward order's
+    /// gate. Opt-in: 1.23-1.27x the 16-worker forward order on `katsura-11` but 0.94-0.97x on
+    /// `cyclic-7` (`docs/research/residual-split.md` §8).
     FaugereLachartre,
 }
 
