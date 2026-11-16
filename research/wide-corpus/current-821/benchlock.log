@@ -1,0 +1,6 @@
+2026-11-16T10:50:23-05:00  QUEUED   wide-821        pid=3999176  bash research/wide-corpus/current-821/run.sh
+2026-11-16T10:50:23-05:00  START    wide-821        pid=3999176  waited=0s load=2.03 bash research/wide-corpus/current-821/run.sh
+2026-11-16T11:07:30-05:00  END      wide-821        pid=3999176  status=1 end=exited elapsed=1027s load=2.51 bash research/wide-corpus/current-821/run.sh
+2026-11-16T11:07:49-05:00  QUEUED   wide-821-16     pid=4042609  bash /buildcache/cargo-target/zeebra-821/run16.sh
+2026-11-16T11:07:49-05:00  START    wide-821-16     pid=4042609  waited=0s load=2.17 bash /buildcache/cargo-target/zeebra-821/run16.sh
+2026-11-16T11:16:19-05:00  END      wide-821-16     pid=4042609  status=0 end=exited elapsed=510s load=2.76 bash /buildcache/cargo-target/zeebra-821/run16.sh

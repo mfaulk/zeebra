@@ -244,6 +244,22 @@ def pack(cohort, path, chunk_size=16*1024**2):
         raise ValueError('packing changed the retained campaign')
 
 
+def cohort_engines(selected, workers):
+    """The engines a cohort runs. The comparand drivers here are only ever asked for one worker, so a
+    multiworker cohort is Zeebra's alone and is read against a serial cohort's comparand rows."""
+    engines = ENGINES if selected is None else tuple(selected.split(','))
+    if any(e not in ENGINES for e in engines):
+        raise ValueError('unknown engine in ' + str(selected))
+    if workers != 1 and engines != ('zeebra',):
+        raise ValueError('only Zeebra runs a multiworker cohort')
+    return engines
+
+
+def runner_command(binary, case, engine, workers):
+    return [str(binary), '--field', case['field'], '--row', case['name'], '--engine', engine,
+            '--workers', str(workers)]
+
+
 def resume_cohort(previous, current, allow_controller_change=False):
     for key in ('binaries', 'affinity', 'machine', 'policy', 'workers', 'build', 'rustflags', 'cpu', 'platform', 'rustc'):
         if previous.get(key) != current.get(key):
@@ -370,6 +386,8 @@ def main():
     p.add_argument('--scratch', type=Path)
     p.add_argument('--fields', default='wide64,goldilocks,bn254')
     p.add_argument('--rows', help='comma separated; default all frozen rows')
+    p.add_argument('--engines', help='comma separated subset of ' + ','.join(ENGINES) + '; default all')
+    p.add_argument('--workers', type=int, default=1, help="Zeebra's F4 forward-worker cap; above 1, Zeebra only")
     p.add_argument('--continue-controller', action='store_true', help='allow an explicitly audited controller update with an identical native instrument')
     args = p.parse_args()
     if args.pack:
@@ -380,6 +398,10 @@ def main():
         return
     if not args.binary:
         p.error('--binary required')
+    try:
+        engines_run = cohort_engines(args.engines, args.workers)
+    except ValueError as error:
+        p.error(str(error))
     cases = json.loads(subprocess.check_output([str(args.binary), '--list'], text=True))
     validate_catalog(cases)
     if args.freeze:
@@ -398,7 +420,7 @@ def main():
     cohort = dict(schema=1, commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                   base_commit=subprocess.check_output(['git', 'merge-base', 'HEAD', 'origin/main'], cwd=ROOT, text=True).strip(),
                   patch_id=subprocess.check_output(['git', 'patch-id', '--stable'], input=subprocess.check_output(['git', 'diff', 'origin/main...HEAD'], cwd=ROOT), cwd=ROOT).decode().split()[0],
-                  machine=os.environ['ZEEBRA_MACHINE'], affinity=affinity, workers=1,
+                  machine=os.environ['ZEEBRA_MACHINE'], affinity=affinity, workers=args.workers,
                   started_at=datetime.now(timezone.utc).isoformat(),
                   platform=platform.platform(),
                   cpu=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')), 'unknown'),
@@ -420,7 +442,7 @@ def main():
     for c in cases:
         if c['field'] not in args.fields.split(',') or (args.rows and c['name'] not in args.rows.split(',')):
             continue
-        engines = ('zeebra',) if c['field'] == 'bn254' else ENGINES
+        engines = tuple(e for e in (('zeebra',) if c['field'] == 'bn254' else ENGINES) if e in engines_run)
         for engine in engines:
             if (c['field'], c['name'], engine) in done:
                 continue
@@ -434,7 +456,7 @@ def main():
                 stem.with_suffix('.request').write_text(json.dumps(request))
                 command = [cohort['binaries'][engine]['path'], str(stem.with_suffix('.request'))]
             else:
-                command = [str(args.binary), '--field', c['field'], '--row', c['name'], '--engine', engine]
+                command = runner_command(args.binary, c, engine, args.workers)
             wall_ns = 60_000_000_000 if direct else 65_000_000_000
             a = dict(field=c['field'], name=c['name'], engine=engine, digest=c['digest'],
                      controller_commit=controller_commit, **guarded(command, stem, wall_ns))

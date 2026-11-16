@@ -13,6 +13,17 @@ wide = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(wide)
 
 class WideCorpusTests(unittest.TestCase):
+    # The Zeebra runner is told its worker cap; the serial comparand drivers are never asked for more.
+    def test_worker_cohort_reaches_zeebra_and_refuses_serial_engines(self):
+        command = wide.runner_command('/bin/wide', dict(field='wide64', name='katsura-4'), 'zeebra', 16)
+        self.assertEqual(command[-2:], ['--workers', '16'])
+        self.assertEqual(wide.cohort_engines('zeebra', 16), ('zeebra',))
+        self.assertEqual(wide.cohort_engines(None, 1), wide.ENGINES)
+        with self.assertRaises(ValueError):
+            wide.cohort_engines('zeebra,grobx', 16)
+        with self.assertRaises(ValueError):
+            wide.cohort_engines('magma', 1)
+
     # Full basis equality rejects matching leading monomials with different tail coefficients.
     def test_changed_tail_is_rejected(self):
         with self.assertRaises(ValueError):
@@ -150,7 +161,9 @@ class WideCorpusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             stem = Path(directory) / 'attempt'
             pidfile = Path(directory) / 'pid'
-            code = "import os,time;from pathlib import Path;Path("+repr(str(pidfile))+").write_text(str(os.getpid()));time.sleep(30)"
+            # Write-then-rename: the interrupt fires on the file existing, so it must never exist empty.
+            code = ("import os,time;from pathlib import Path;p=Path("+repr(str(pidfile))+");"
+                    "t=p.with_suffix('.tmp');t.write_text(str(os.getpid()));t.rename(p);time.sleep(30)")
             probe = wide.guard.tree_hwm
             def interrupt(pid):
                 if pidfile.exists():

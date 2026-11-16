@@ -1,6 +1,7 @@
 # Hard wide-field corpus (#738)
 
-**Measured at:** `4ea1463a` and `fa7cc30d`; native binary source `4ea1463a`.
+**Measured at:** `4ea1463a` and `fa7cc30d`; native binary source `4ea1463a`. The current-code Zeebra
+cohorts (#821): `00aacbbf`.
 
 This opt-in catalog freezes `wide64` (`18446744073709551263`), `goldilocks`
 (`18446744069414584321`) and `bn254` (BN254 scalar r, decimal in the catalog).
@@ -63,6 +64,57 @@ The old controller was stopped between solver processes; no active engine was in
 this continuation. [Benchmark-lock records](benchmark-lock.log) retain the serialized run lifecycle,
 including the separate initial adapter failure. The final controller exits normally after all 141
 attempts and their full-basis checks.
+
+## Current code (#821)
+
+Zeebra was re-measured on this catalog at `00aacbbf` (production source of `7104d8bc`, after #749
+and #813) as a serial cohort and a 16-worker cohort. The comparand rows above were not re-run.
+Protocol, archives and the full table are in [current-821](current-821/README.md).
+
+**Outcomes.** Zeebra completed 17 rungs at `4ea1463a`, 20 serially now, and 23 at 16 workers.
+
+| | `4ea1463a` | serial | 16 workers |
+|---|---:|---:|---:|
+| Completions | 17 | 20 | 23 |
+| Internal-limit stops | | 13 | 14 |
+| Watchdog stops | | 6 | 2 |
+
+The new completions are:
+- Noon-8 at both 64-bit fields, at both worker counts.
+- 2^64−353 MQ-11 serially (59.9 s, inside the 60 s budget).
+- MQ-11 at both 64-bit fields at 16 workers (9.1 s and 9.2 s).
+- BN254 MQ-10 and Eco-12 at 16 workers (13.8 s and 28.2 s).
+
+Every new 64-bit completion agrees coefficient for coefficient with every other complete answer
+for its input. BN254 still has no oracle. Katsura-14, Cyclic-11, MQ-12/14/16, Eco-14/18 and
+Noon-11 still stop. At 16 workers, MQ-14 and Eco-14 now reach Zeebra's live-entry limits rather
+than the watchdog.
+
+**Ratios.** Zeebra/grobx wall time, through the board's 2× startup gate:
+
+| Rung | `4ea1463a`, 2^64−353 | 16 workers, 2^64−353 | `4ea1463a`, Goldilocks | 16 workers, Goldilocks |
+|---|---:|---:|---:|---:|
+| katsura-11 | 42.550x | 4.03x | 45.198x | 4.01x |
+| cyclic-7 | 4.322x | 1.33x | 4.838x | 1.40x |
+| mq-random-10 | 22.433x | 3.13x | 26.059x | 3.13x |
+| mq-random-11 | watchdog | 3.12x | watchdog | 2.78x |
+| eco-12 | 21.366x | 2.40x | 22.341x | 2.43x |
+| noon-7 | 20.414x | 8.03x | 21.064x | 8.22x |
+
+The serial cohort's ratios are 2.5x (Cyclic-7) to 22.7x (Katsura-11 at Goldilocks); see
+`current-821/cohort.md`.
+
+**What changed, and what did not.**
+- Zeebra still trails grobx on every eligible rung, from 1.33x to 10.65x at 16 workers.
+- The wide-field hypothesis, that hard wide fields differentiate Zeebra, is refuted on current
+  code as it was at `4ea1463a`.
+- What moved is Zeebra's own fixed-budget frontier: six rung/field cells that stopped at
+  `4ea1463a` now complete inside the same 60 s / 2 GiB.
+- MQ-12 remains grobx-only.
+- These are single observations against a comparand cohort measured on 2026-11-13 with unchanged
+  binaries.
+
+## Catalog definitions and provenance
 
 Katsura names count variables, so `katsura-9` is literature Katsura-8. Cyclic-7 and Cyclic-11
 are squarefree-size affine systems, without field equations or slicing. Eco and Noonburg use
@@ -140,6 +192,8 @@ python3 tools/external/wide-corpus.py --summarize research/wide-corpus/campaign.
 ```
 
 Use `--fields wide64,goldilocks` or `--rows katsura-4,mq-random-12` for bounded subsets.
+`--engines zeebra` runs one engine; `--workers N` caps Zeebra's F4 forward workers (serial at one,
+the default) and is refused for any other engine, whose drivers here are only asked for one.
 Retain Katsura-4 for each engine/field if publishing ratios. The board requires both operands ≥2×
 that engine's measured startup control. Native wall is the complete runner process (including
 input/output); external wall is the adapter's supervised engine process, excluding version probes.

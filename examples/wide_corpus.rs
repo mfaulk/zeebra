@@ -13,7 +13,7 @@ use zeebra::{
             ExternalSolver, FieldSpec, GrobxSolver, GroebnerJlSolver, GroebnerRsSolver, Instance,
             Limits, Task,
         },
-        f4_reported, F4Options,
+        f4_reported, F4Options, ParallelForward,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -134,12 +134,31 @@ fn build<const N: usize, F: FiniteField>(field: &str, modulus: &str, row: &str) 
     }
 }
 
+/// The shipping default under the campaign's 60 s / 2 GiB budget, forward elimination capped at
+/// `workers` and serial at one, so a cohort's recorded worker count bounds the threads it used.
+fn zeebra_options(workers: usize) -> F4Options {
+    F4Options {
+        max_wall_time: Some(Duration::from_secs(60)),
+        max_live_bytes: 2 * 1024 * 1024 * 1024,
+        measure_stages: true,
+        parallel_forward: if workers <= 1 {
+            ParallelForward::Serial
+        } else {
+            ParallelForward::Auto {
+                max_workers: workers,
+            }
+        },
+        ..F4Options::default()
+    }
+}
+
 fn run<const N: usize, F: FiniteField>(
     field: &str,
     modulus: &str,
     row: &str,
     engine: &str,
     list: bool,
+    workers: usize,
 ) -> Json {
     let WideInput {
         system,
@@ -155,12 +174,8 @@ fn run<const N: usize, F: FiniteField>(
     let names: [&str; N] = std::array::from_fn(|i| variables[i].as_str());
     fields.push(("engine", Json::string(engine)));
     if engine == "zeebra" {
-        let options = F4Options {
-            max_wall_time: Some(Duration::from_secs(60)),
-            max_live_bytes: 2 * 1024 * 1024 * 1024,
-            measure_stages: true,
-            ..F4Options::default()
-        };
+        let options = zeebra_options(workers);
+        fields.push(("workers", Json::int(workers as i128)));
         fields.push(("options", Json::string(format!("{options:?}"))));
         let started = Instant::now();
         let (result, stats) = f4_reported(&system, ORDER, &options);
@@ -280,8 +295,9 @@ fn dispatch<F: FiniteField>(
     row: &str,
     engine: &str,
     list: bool,
+    workers: usize,
 ) -> Json {
-    macro_rules! go { ($($n:literal),*) => { match row.rsplit_once('-').unwrap().1 { $(stringify!($n) => run::<$n,F>(field,modulus,row,engine,list),)* _ => panic!("unregistered width") } }; }
+    macro_rules! go { ($($n:literal),*) => { match row.rsplit_once('-').unwrap().1 { $(stringify!($n) => run::<$n,F>(field,modulus,row,engine,list,workers),)* _ => panic!("unregistered width") } }; }
     go!(4, 7, 8, 9, 10, 11, 12, 14, 16, 18)
 }
 fn main() {
@@ -309,10 +325,16 @@ fn main() {
                 panic!("--field and --row required");
             }
             let engine = value("--engine").unwrap_or("zeebra");
+            let workers = value("--workers").map_or(1, |w| {
+                w.parse::<usize>()
+                    .ok()
+                    .filter(|&w| w > 0)
+                    .expect("--workers takes a positive integer")
+            });
             rows.push(match field {
-                "wide64" => dispatch::<Wide>(field, modulus, row, engine, list),
-                "goldilocks" => dispatch::<Goldilocks>(field, modulus, row, engine, list),
-                "bn254" => dispatch::<Bn254Fr>(field, modulus, row, engine, list),
+                "wide64" => dispatch::<Wide>(field, modulus, row, engine, list, workers),
+                "goldilocks" => dispatch::<Goldilocks>(field, modulus, row, engine, list, workers),
+                "bn254" => dispatch::<Bn254Fr>(field, modulus, row, engine, list, workers),
                 _ => unreachable!(),
             });
         }
@@ -366,6 +388,22 @@ mod tests {
         let expected =
             Json::parse(&std::fs::read_to_string(path).expect("frozen catalog")).unwrap();
         assert_eq!(Json::Array(actual), expected);
+    }
+
+    // One worker is serial F4; more cap the adaptive forward dispatch; the budgets are unchanged.
+    #[test]
+    fn zeebra_options_cap_forward_workers() {
+        use zeebra::grobner::ParallelForward;
+        assert_eq!(zeebra_options(1).parallel_forward, ParallelForward::Serial);
+        assert_eq!(
+            zeebra_options(16).parallel_forward,
+            ParallelForward::Auto { max_workers: 16 }
+        );
+        assert_eq!(
+            zeebra_options(16).max_wall_time,
+            Some(Duration::from_secs(60))
+        );
+        assert_eq!(zeebra_options(16).max_live_bytes, 2 * 1024 * 1024 * 1024);
     }
 
     // Dense random MQ has every quadratic, linear and constant coefficient and is reproducible.
