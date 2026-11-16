@@ -337,7 +337,10 @@ fn time_field_axpy<F: FiniteField>(entries: usize, passes: usize) -> f64 {
     let mut rng = StdRng::seed_from_u64(7);
     let source: Vec<F> = (0..entries).map(|_| F::random(&mut rng)).collect();
     let mut target: Vec<F> = (0..entries).map(|_| F::random(&mut rng)).collect();
-    let factor = F::new(3);
+    // `black_box` because fat LTO otherwise specializes the `#[inline(never)]` kernel on a
+    // constant factor, and `3 * x` over canonical residues lowers to adds rather than a field
+    // multiply (#795).
+    let factor = black_box(F::new(3));
 
     // One untimed pass, so the first timed one is not paying for the first touch of the pages.
     axpy(&mut target, &source, factor);
@@ -364,7 +367,8 @@ fn time_replica_axpy(entries: usize, passes: usize, kernel: Kernel) -> f64 {
     let mut target: Vec<u32> = (0..entries)
         .map(|_| replica::to_internal(rng.gen_range(0..P), P))
         .collect();
-    let factor = replica::to_internal(3, P);
+    // Opaque for the same reason as `time_field_axpy`'s factor.
+    let factor = black_box(replica::to_internal(3, P));
 
     match kernel {
         Kernel::Scalar => {
