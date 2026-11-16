@@ -651,8 +651,9 @@ input digest without solving. For published fields use the existing Cyclic, Kats
 rungs at 32003 and 2147483647. `--row groebner-rs-wide-control` registers a focused two-variable
 known-root system at 18446744073709551263 and 18446744073709551557, with pinned digests; it does
 not expand the public ladder. The Zeebra adapter adds only a two-variable instantiation for the
-second prime. `--workers 4` forms a separate cohort; the configured serial Zeebra F4 records a
-capability refusal instead of pretending to supply four workers.
+second prime. `--workers 4` forms a separate cohort; Zeebra's adapter caps F4's parallel forward
+elimination at the cohort's workers (`ParallelForward::Serial` at one), so a row's recorded
+concurrency bounds the threads it used.
 
 On Linux, `Supervisor::with_max_rss_bytes` polls the direct child's RSS and kills/reaps it on a
 crossing, reporting `LimitStop::Memory`. It refuses enforcement if no process RSS reading is
@@ -861,8 +862,9 @@ ceiling). Unsupported tasks remain visible in its default task sweep. Use
 `--measure --row NAME --task reduced-grobner-basis` for an attributable single
 row and `--write` only when intentionally appending to competitive history.
 
-The configured serial Zeebra engine is refused in multiworker sweep cohorts,
-so a serial solve cannot be recorded under a parallel worker count.
+Zeebra runs every cohort: its adapter caps F4's parallel forward elimination at `--workers`
+and runs it serially at one, so a default (16-worker) build cannot be recorded as a one-worker
+row. Rows before #754 predate parallel F4 and ran serially whatever their recorded count.
 
 The [Giac acceptance study](../research/giac-comparand.md) retains the five-repeat
 MQ/Cyclic cohorts and the Katsura-11 60-second wall stops. These limit stops
