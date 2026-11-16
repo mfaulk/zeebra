@@ -1,11 +1,13 @@
 //! #779's full-solve gate: one F4 call per problem over a 62-bit Montgomery prime, where
 //! `PrimeFieldElement64::mul_prepared` takes Shoup's path. Prints the in-process minimum and a
 //! SHA-256 over the sorted reduced basis, so two builds can be compared for time and identity.
+//! `--field=goldilocks` runs the same problems over 2^64 - 2^32 + 1 instead, #781's gate for its
+//! canonical reduction.
 
 use std::time::Instant;
 
 use zeebra::{
-    fields::Zp4611624995532046337,
+    fields::PrimeFieldElement64,
     grobner::{
         benchmark_systems::{cyclic, eco, katsura, noon, reimer},
         differential::polynomial_to_string,
@@ -16,14 +18,18 @@ use zeebra::{
     MonomialOrder, MultivariatePolynomial,
 };
 
-type F = Zp4611624995532046337;
-const MODULUS: u64 = 4611624995532046337;
+const SHOUP_PRIME: u64 = 4611624995532046337;
+const GOLDILOCKS: u64 = 18446744069414584321;
 
 fn names<const N: usize>() -> [String; N] {
     std::array::from_fn(|i| format!("x{i}"))
 }
 
-fn run<const N: usize>(problem: &str, system: Vec<MultivariatePolynomial<N, F>>, reps: usize) {
+fn run<const MODULUS: u64, const N: usize>(
+    problem: &str,
+    system: Vec<MultivariatePolynomial<N, PrimeFieldElement64<MODULUS>>>,
+    reps: usize,
+) {
     let order = MonomialOrder::GradedReverseLexicographic;
     let options = F4Options::default();
     let mut best = f64::INFINITY;
@@ -53,17 +59,32 @@ fn run<const N: usize>(problem: &str, system: Vec<MultivariatePolynomial<N, F>>,
     );
 }
 
-fn mq10(reps: usize) {
+fn mq10<const MODULUS: u64>(reps: usize) {
     let order = MonomialOrder::GradedReverseLexicographic;
     let input = corpus::instance("mq-random-10", MODULUS, order).expect("random MQ at any prime");
     let names: [&str; 10] = std::array::from_fn(|i| input.variables[i].as_str());
     let system = input
         .system
         .iter()
-        .map(|s| MultivariatePolynomial::<10, F>::parse(s, names).unwrap())
+        .map(|s| {
+            MultivariatePolynomial::<10, PrimeFieldElement64<MODULUS>>::parse(s, names).unwrap()
+        })
         .collect::<Vec<_>>();
     // The corpus names its variables; the generic runner renames them, which the digest absorbs.
-    run::<10>("mq-random-10", system, reps);
+    run::<MODULUS, 10>("mq-random-10", system, reps);
+}
+
+fn solve<const MODULUS: u64>(problem: &str, reps: usize) {
+    type F<const M: u64> = PrimeFieldElement64<M>;
+    match problem {
+        "mq-random-10" => mq10::<MODULUS>(reps),
+        "katsura-8" => run::<MODULUS, 9>(problem, katsura::<9, F<MODULUS>>(), reps),
+        "cyclic-7" => run::<MODULUS, 7>(problem, cyclic::<7, F<MODULUS>>(), reps),
+        "eco-10" => run::<MODULUS, 10>(problem, eco::<10, F<MODULUS>>(), reps),
+        "noon-7" => run::<MODULUS, 7>(problem, noon::<7, F<MODULUS>>(), reps),
+        "reimer-6" => run::<MODULUS, 6>(problem, reimer::<6, F<MODULUS>>(), reps),
+        _ => panic!("problems: mq-random-10, katsura-8, cyclic-7, eco-10, noon-7, reimer-6"),
+    }
 }
 
 fn main() {
@@ -75,14 +96,10 @@ fn main() {
     let problem = args
         .iter()
         .find(|a| !a.starts_with("--"))
-        .expect("usage: shoup_scatter_gate PROBLEM [--reps=N]");
-    match problem.as_str() {
-        "mq-random-10" => mq10(reps),
-        "katsura-8" => run::<9>(problem, katsura::<9, F>(), reps),
-        "cyclic-7" => run::<7>(problem, cyclic::<7, F>(), reps),
-        "eco-10" => run::<10>(problem, eco::<10, F>(), reps),
-        "noon-7" => run::<7>(problem, noon::<7, F>(), reps),
-        "reimer-6" => run::<6>(problem, reimer::<6, F>(), reps),
-        _ => panic!("problems: mq-random-10, katsura-8, cyclic-7, eco-10, noon-7, reimer-6"),
+        .expect("usage: shoup_scatter_gate PROBLEM [--reps=N] [--field=shoup|goldilocks]");
+    match args.iter().find_map(|a| a.strip_prefix("--field=")) {
+        None | Some("shoup") => solve::<SHOUP_PRIME>(problem, reps),
+        Some("goldilocks") => solve::<GOLDILOCKS>(problem, reps),
+        Some(other) => panic!("--field={other}: expected shoup or goldilocks"),
     }
 }
