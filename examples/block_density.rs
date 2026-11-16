@@ -26,12 +26,15 @@
 //!
 //! `split` is the one timed mode (#803), and its figures need the benchmark lock. It asks whether a
 //! device that did the residual's echelon for free could halve a batch: the CPU would still owe the
-//! sweep that produces `D'`, so the ceiling is the shipped batch time over the sweep time. Four arms
-//! per entry, interleaved with rotated order: the shipped elimination exactly as `F4Options` drives
-//! it, its forward pass alone, the full sweep (this file's reference `residual`, not a shipped
-//! kernel), and the shipped backend's echelon of `D'` alone. With `research-work` it also prices the
-//! sweep at the shipped forward pass's own nanoseconds per coefficient product, which is the
-//! estimate the gate reads, since the reference sweep is not an optimized kernel.
+//! sweep that produces `D'`, so the ceiling is the production batch time over the sweep time. Six
+//! arms per entry, interleaved with rotated order: the production route (echelon, then the
+//! candidate-only backward pass `F4Options::recommended` drives), the full-RREF route
+//! `eliminate_to(.., RowForm::Reduced, ..)`, the forward pass alone, the full sweep (this file's
+//! reference `residual`, not a shipped kernel), the shipped backend's echelon of `D'` alone, and the
+//! Faugère–Lachartre order (sweep, then echelon and back-substitution of `D'` only), whose candidate
+//! rows are asserted equal to production's. With `research-work` it also prices the sweep at the
+//! forward pass's own nanoseconds per coefficient product, since the reference sweep is not an
+//! optimized kernel; hooks sit in the hot loop, so take times from a stock build.
 
 use std::{
     collections::HashMap,
@@ -41,6 +44,8 @@ use std::{
 
 use zeebra::{
     grobner::f4::{
+        candidate::{finish, WORKSPACE_LIMIT},
+        macaulay::MacaulayMatrix,
         matrix_corpus::{
             walk_corpus, walk_large_corpus, CapturedMatrix, CorpusVisitor, MatrixSpec,
         },
@@ -367,10 +372,10 @@ impl CorpusVisitor for Split {
         let (residual_rows, free, sweep_products) =
             residual(&reducers, &pairs, matrix.num_columns());
 
-        // Arm 4 is the Faugère–Lachartre order end to end: the full sweep, then the shipped
+        // The last arm is the Faugère–Lachartre order end to end: the full sweep, then the shipped
         // backend's echelon of D' and the shipped back-substitution over D' alone. It produces the
         // reduced candidate rows without touching a reducer row; `same_candidates` checks that they
-        // are the shipped batch's, coefficient for coefficient.
+        // are the production batch's, coefficient for coefficient.
         let faugere_lachartre = || {
             let (rows, free, _) = residual(&reducers, &pairs, matrix.num_columns());
             let mut block = SparseMatrix::new(free, rows);
@@ -381,42 +386,78 @@ impl CorpusVisitor for Split {
             block
         };
 
-        // shipped, forward only, reference sweep, shipped echelon of D', Faugère–Lachartre order
-        let mut times: [Vec<Duration>; 5] = Default::default();
+        // The production backward pass finishes only candidate rows, so a reducer row keeps its
+        // echelon tail; `eliminate_to(.., RowForm::Reduced, ..)` is the full-RREF route F4 left.
+        let selected: Vec<bool> = {
+            let mut selected = vec![true; matrix.num_columns()];
+            for row in &reducers {
+                selected[row.leading_column().expect("a reducer row is nonzero")] = false;
+            }
+            selected
+        };
+        let production = |copy: &mut MacaulayMatrix<N, F>| {
+            let mut outcome = eliminate_to(plan, RowForm::Echelon, backend, copy, allowance)
+                .expect("within the allowance the live run used");
+            if form == RowForm::Reduced {
+                finish(
+                    copy.matrix_mut(),
+                    &selected,
+                    allowance,
+                    WORKSPACE_LIMIT,
+                    &mut outcome.statistics,
+                )
+                .expect("within the allowance the live run used");
+            }
+            outcome.statistics.rank
+        };
+
+        // production, full RREF, forward only, reference sweep, echelon of D', Faugère–Lachartre
+        const ARMS: usize = 6;
+        let mut times: [Vec<Duration>; ARMS] = Default::default();
         let mut ranks = [0usize; 2];
         for repetition in 0..REPS {
-            for offset in 0..5 {
-                let arm = (repetition + offset) % 5;
+            for offset in 0..ARMS {
+                let arm = (repetition + offset) % ARMS;
                 match arm {
-                    0 | 1 => {
+                    0 => {
                         let mut copy = captured.matrix.clone();
-                        let form = if arm == 0 { form } else { RowForm::Echelon };
                         let started = Instant::now();
-                        let outcome = eliminate_to(plan, form, backend, &mut copy, allowance)
+                        ranks[0] = production(&mut copy);
+                        times[0].push(started.elapsed());
+                        black_box(&copy);
+                    }
+                    1 | 2 => {
+                        let mut copy = captured.matrix.clone();
+                        let form = if arm == 1 {
+                            RowForm::Reduced
+                        } else {
+                            RowForm::Echelon
+                        };
+                        let started = Instant::now();
+                        eliminate_to(plan, form, backend, &mut copy, allowance)
                             .expect("within the allowance the live run used");
                         times[arm].push(started.elapsed());
                         black_box(&copy);
-                        ranks[0] = outcome.statistics.rank;
                     }
-                    2 => {
+                    3 => {
                         let started = Instant::now();
                         let swept = residual(&reducers, &pairs, matrix.num_columns());
-                        times[2].push(started.elapsed());
+                        times[3].push(started.elapsed());
                         black_box(&swept);
                     }
                     4 => {
-                        let started = Instant::now();
-                        let block = faugere_lachartre();
-                        times[4].push(started.elapsed());
-                        black_box(&block);
-                    }
-                    _ => {
                         let mut block = SparseMatrix::new(free, residual_rows.clone());
                         let started = Instant::now();
                         let statistics = row_echelon_with(backend, &mut block, usize::MAX)
                             .expect("an unbounded echelon cannot refuse");
-                        times[3].push(started.elapsed());
+                        times[4].push(started.elapsed());
                         ranks[1] = statistics.rank;
+                    }
+                    _ => {
+                        let started = Instant::now();
+                        let block = faugere_lachartre();
+                        times[5].push(started.elapsed());
+                        black_box(&block);
                     }
                 }
             }
@@ -432,8 +473,7 @@ impl CorpusVisitor for Split {
 
         if form == RowForm::Reduced {
             let mut shipped = captured.matrix.clone();
-            eliminate_to(plan, form, backend, &mut shipped, allowance)
-                .expect("within the allowance the live run used");
+            production(&mut shipped);
             same_candidates(
                 spec.label,
                 shipped.matrix(),
@@ -442,30 +482,29 @@ impl CorpusVisitor for Split {
             );
         }
 
-        let [shipped, forward, sweep, echelon, ordered] =
+        let [shipped, full, forward, sweep, echelon, ordered] =
             times.map(|mut arm| median_range(&mut arm));
+        let cell =
+            |(median, low, high): (f64, f64, f64)| format!("{median:.1} [{low:.1}, {high:.1}]");
         println!(
-            "| {} | {} x {} | {:?} | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {} |",
+            "| {} | {} x {} | {:?} | {} | {} | {} | {} | {} | {} | {} |",
             spec.label,
             matrix.num_rows(),
             matrix.num_columns(),
             backend,
-            shipped.0, shipped.1, shipped.2,
-            forward.0, forward.1, forward.2,
-            sweep.0, sweep.1, sweep.2,
-            echelon.0, echelon.1, echelon.2,
+            cell(shipped),
+            cell(full),
+            cell(forward),
+            cell(sweep),
+            cell(echelon),
+            cell(ordered),
             sweep_products,
         );
         println!(
-            "|   | measured ceiling, shipped / reference sweep | {:.2}x | | | | | |",
-            shipped.0 / sweep.0
-        );
-        println!(
-            "|   | Faugère–Lachartre order, same candidates | {:.1} [{:.1}, {:.1}] ms | {:.2}x vs shipped | | | | |",
-            ordered.0,
-            ordered.1,
-            ordered.2,
-            shipped.0 / ordered.0
+            "|   | ceilings over production: reference sweep {:.2}x, Faugère–Lachartre order {:.2}x; full RREF is {:.2}x production | | | | | | | | | |",
+            shipped.0 / sweep.0,
+            shipped.0 / ordered.0,
+            full.0 / shipped.0,
         );
         products(
             spec.label,
@@ -582,8 +621,8 @@ fn products<const N: usize, F: FiniteField>(
 
 fn split(large: bool, filter: String) {
     println!("{REPS} interleaved repetitions per arm; medians [min, max] in ms.\n");
-    println!("| entry | rows x cols | backend | shipped batch | forward only | reference sweep | shipped echelon of D' | sweep multiply-adds |");
-    println!("|---|---|---|---:|---:|---:|---:|---:|");
+    println!("| entry | rows x cols | backend | production batch | full RREF | forward only | reference sweep | echelon of D' | Faugère–Lachartre order | sweep multiply-adds |");
+    println!("|---|---|---|---:|---:|---:|---:|---:|---:|---:|");
     let mut visitor = Split { filter, matched: 0 };
     let walked = if large {
         walk_large_corpus(&mut visitor)
