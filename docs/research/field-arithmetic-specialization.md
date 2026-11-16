@@ -7,7 +7,8 @@ an uncommitted overlay of `9860988e` without the Mersenne branch. 2026-11-14 UTC
 `a9421093` (before) and `fa27467a` (after: `a9421093` plus PR #791's `src/fields/prime_field_32.rs`,
 the only file in which the two trees differ; rebased as `f554babf` and squash-merged by #791).
 §6 (#779, Shoup in the elimination scatter) was measured at `45d129d2`, the base arm an overlay
-of it with Shoup switched off; 2026-11-15 UTC.
+of it with Shoup switched off; 2026-11-15 UTC. §7 (#781, Goldilocks) at `bdae53dc`, the base arm
+an overlay of it with Goldilocks returned to `uses_montgomery`; 2026-11-16 UTC.
 
 ## Decision
 
@@ -17,7 +18,7 @@ of it with Shoup switched off; 2026-11-15 UTC.
 | 31-bit in `PrimeFieldElement32` (32003, BabyBear, KoalaBear) | Montgomery, R = 2^32 | Keep | No candidate wins every kernel; Montgomery is the only one that vectorizes `map` well (§2.1) |
 | `Mersenne31` (`PrimeFieldElement32<2^31−1>`) | Montgomery, R = 2^32 | **Adopted (#780): canonical residues, shift-and-add** | Wins all four kernels (0.56–0.83x); F4 forward elimination 0.77–0.78x on the adaptive backend, identical RREFs (§3b) |
 | 62/64-bit, `P ≥ 2^32` | Montgomery, R = 2^64 | Keep the representation; **adopted: Shoup by a prepared factor in the row scatter for `P < 2^63` (#779)** | F4 call 0.81–0.97x paired across MQ10 and five public families at a 62-bit prime, identical bases (§6) |
-| Goldilocks 2^64 − 2^32 + 1 | Montgomery | Deferred: #781 | Special reduction 0.67x `map`, 0.69x `scatter`, 0.92x `chain` |
+| Goldilocks 2^64 − 2^32 + 1 | Montgomery | **Adopted (#781): canonical residues, 2^64 ≡ 2^32 − 1 and 2^96 ≡ −1** | `map` 0.63x, `scatter` 0.69x, `chain` 0.92x; F4 0.96–0.97x on five of six problems (Noon 1.00x) and NTT 0.96–0.98x, identical bases (§7) |
 | 2^64 − 59 and other top-bit primes | Montgomery | Keep | Möller–Granlund pre-inverse is 0.79x on throughput kernels and 1.22x on latency; mixed |
 | 68-bit (`PrimeFieldElement128`) | `u128` long division | Excluded: deprecated by #163 | `Proth68Fr` over `PrimeFieldElement256` is 9.8x faster; `docs/guide/finite-fields.md` |
 | 254/255-bit (`PrimeFieldElement256`) | 4-limb CIOS Montgomery | Keep | Within 4% of ark-ff 0.6 on every kernel (§2.3) |
@@ -275,7 +276,8 @@ low products and a conditional subtraction. The coefficients stay in Montgomery 
 associated type, because associated-type defaults are unstable. `DenseAccumulator::subtract_scaled`
 (the adaptive backend, F4's default), the dense backend's row update and the sparse row merge use
 it. Below 2^32 nothing changes: those residues are canonical, and §2.2 has Shoup (1.11, 1.23 ns)
-no better than the canonical and Mersenne scatters that already ship. Goldilocks and 2^64 − 59
+no better than the canonical and Mersenne scatters that already ship. Goldilocks (canonical since
+§7) and 2^64 − 59
 are above the bound and keep Montgomery.
 
 **Gate.** `examples/shoup_scatter_gate.rs`: one F4 call (default options, grevlex) per process
@@ -315,4 +317,84 @@ export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-779 RUSTC_WRAPPER=""
 cargo build --release -j24 --example shoup_scatter_gate          # cand; copy the binary aside
 # base: edit `shoup::applies` in src/fields/prime_field_64.rs to return false, rebuild, copy aside
 tools/benchlock.sh <owner> taskset -c 3 <arm> mq-random-10 --reps=3   # per arm, per problem, interleaved
+```
+
+## 7. Goldilocks reduction (#781)
+
+`montgomery::uses_montgomery` excludes 2^64 − 2^32 + 1, so `Zp18446744069414584321` holds canonical
+residues, and `mul` reduces the 128-bit product `hi_hi * 2^96 + hi_lo * 2^64 + lo` as
+`lo − hi_hi + hi_lo * (2^32 − 1)`, with one correction per wrap and one conditional subtraction
+(`reduce_goldilocks` in `src/fields/prime_field_64.rs`, the same arithmetic as the example's
+`GoldilocksRepr`). Every conversion in and out of the representation goes through
+`montgomery::to_internal` and `to_canonical`, which key on the same predicate, so nothing else
+changed: the field is private, no other module reads it, Shoup's hook was already off above 2^63,
+and add, sub and neg are representation-independent. The unit tests check mul, add, sub, neg, pow
+and inverse against `u128` arithmetic on all pairs of 19 edge values (0, 1, 2^32, p − 1 = 2^64 −
+2^32, the borrow-forcing 2^63 · 2^33, unreduced inputs up to `u64::MAX`), a seeded 40,000-pair sweep
+and a proptest, and pin the stored word, the wire format, `Display` and hashing.
+
+**Protocol.** Two binaries per example from one tree, private `CARGO_TARGET_DIR`, no compiler
+wrapper, flags as §1: **cand** at `bdae53dc` and **base**, the same tree with `&& p !=
+super::GOLDILOCKS` removed from `uses_montgomery` (the `mul` branch is then unreachable). SHA-256
+prefixes: `shoup_scatter_gate` cand `4475c97d`, base `baef02fe`; `ntt_access` cand `2de6e4bd`, base
+`ee27847c`; `field_reduction` cand `4bf7b488`, base `409a5406`. Every process pinned to CPU 3 under
+`tools/benchlock.sh`, arm order alternated per round. One-minute load 4.9 at START and 3.2 at END
+(owner `zb-781-gate`), 3.2 and 3.2 (owner `zb-781-ntt`).
+
+**Micro**, `examples/field_reduction`, the `shipped` arm at Goldilocks, which is the public type in
+each binary; median of four processes, ns per element:
+
+| kernel | base (Montgomery) | cand (Goldilocks) | cand / base |
+|---|---:|---:|---:|
+| chain | 4.06 | 3.74 | 0.921 |
+| map | 1.78 | 1.11 | 0.625 |
+| scatter | 2.09 | 1.44 | 0.687 |
+| dot | 1.55 | 1.51 | 0.974 |
+
+The cand binary's `shipped` row equals its `canonical-goldilocks` replica to within 1%, so the
+public operator inlines to the reduction measured in §2.2.
+
+**End to end, F4.** `examples/shoup_scatter_gate <problem> --field=goldilocks --reps=3`: one F4
+call (default options, grevlex) per process over Goldilocks, in-process minimum of 3. Eight rounds.
+
+| problem | base F4 ms, median (range) | cand F4 ms, median (range) | cand / base paired, median (range) |
+|---|---:|---:|---:|
+| mq-random-10 | 1361.6 (1349.4–1395.8) | 1309.1 (1296.7–1323.0) | **0.959** (0.942–0.976) |
+| katsura-8 | 170.0 (169.2–177.3) | 165.3 (163.6–187.9) | **0.970** (0.941–1.060) |
+| cyclic-7 | 288.9 (286.9–305.6) | 279.2 (278.1–296.0) | **0.968** (0.964–0.974) |
+| eco-10 | 223.7 (222.1–226.1) | 216.9 (215.8–229.8) | **0.973** (0.961–1.021) |
+| reimer-6 | 128.7 (128.0–129.6) | 124.7 (124.2–125.6) | **0.966** (0.963–0.980) |
+| noon-7 | 155.3 (153.9–159.4) | 156.8 (153.6–159.0) | 1.001 (0.987–1.034) |
+
+Every problem's 16 runs emit one basis digest (MQ10 `f43ac87d…`, 247 polynomials). The gain is
+3–4% where §6's Shoup scatter bought 12–19% at a 62-bit prime: Goldilocks is above Shoup's 2^63
+bound, so its scatter runs the plain product, and the F4 call spends most of its time outside the
+multiply. Noon is flat, as it was the weakest in §6.
+
+**End to end, NTT.** `examples/ntt_access goldilocks budget=0.25`, four rounds:
+
+| n | base ns/butterfly | cand ns/butterfly | cand / base paired, median (range) |
+|---|---:|---:|---:|
+| 2^12 (32 KB) | 2.59 | 2.50 | 0.967 (0.965–0.973) |
+| 2^16 (512 KB) | 2.75 | 2.65 | 0.964 (0.964–0.964) |
+| 2^20 (8 MB) | 2.83 | 2.74 | 0.963 (0.878–0.972) |
+| 2^23 (64 MB) | 4.39 | 4.30 | 0.978 (0.973–0.986) |
+
+The same binary's in-run multiply rate moved from 407 to 575 Mmul/s (0.71x per multiply), but the
+transform gains only 3–4%: its butterflies are bound by the dependent add/sub and the twiddle
+loads, not the reduction, and past L2 by memory, which is the reading `ntt_access` was built to
+make.
+
+**Verdict.** Adopted. The micro gain is large and reproduces §2.2; the end-to-end gain is small,
+but every F4 problem but Noon and every NTT size has a paired median below parity, with identical
+bases, and nothing regressed. The change is one predicate and one branch, on a const generic, so
+it costs no other modulus anything. Not measured: a quiet-machine absolute repeat, and the dense
+and sparse elimination backends, which F4 does not default to.
+
+```text
+export CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-781 RUSTC_WRAPPER=""
+cargo build --release -j24 --example shoup_scatter_gate --example ntt_access --example field_reduction
+# base: drop `&& p != super::GOLDILOCKS` from `uses_montgomery`, rebuild, copy the binaries aside
+tools/benchlock.sh <owner> taskset -c 3 <arm> mq-random-10 --field=goldilocks --reps=3
+tools/benchlock.sh <owner> taskset -c 3 <ntt-arm> goldilocks budget=0.25
 ```

@@ -2,8 +2,8 @@
 //!
 //! For each prime p, the finite field F_p is defined to be the quotient ring Z/pZ.
 //!
-//! Elements are held in Montgomery form when P is odd and at least 2^32, so that multiplication
-//! needs no division. `mul` used to compute `(a as u128 * b as u128) % P as u128`, and a
+//! Elements are held in Montgomery form when P is odd, at least 2^32 and not Goldilocks, so that
+//! multiplication needs no division. `mul` used to compute `(a as u128 * b as u128) % P as u128`, and a
 //! const-generic modulus does not save that: LLVM does not strength-reduce a 128-bit remainder, so
 //! every multiplication compiled to a call to `__umodti3`, compiler-rt's software 128-bit division.
 //! Montgomery reduction replaces it with two multiplications and a shift. See [`montgomery`] for
@@ -11,8 +11,10 @@
 //!
 //! Below 2^32 the product of two residues fits a `u64`, and a `u64` remainder by a constant *is*
 //! strength-reduced, to a multiply by a precomputed reciprocal. Those moduli keep canonical
-//! residues, and 2^31 - 1 reduces by shift and add instead. Measured in
-//! `docs/research/field-arithmetic-specialization.md` (#270).
+//! residues, and 2^31 - 1 reduces by shift and add instead. Goldilocks, 2^64 - 2^32 + 1, is also
+//! canonical: its modulus makes 2^64 = 2^32 - 1 and 2^96 = -1, which reduce a 128-bit product with
+//! one multiply by 2^32 - 1 and carry fixes (#781). Measured in
+//! `docs/research/field-arithmetic-specialization.md` (#270, #781).
 
 use std::{
     fmt::{Display, Formatter},
@@ -40,16 +42,18 @@ use crate::{
 ///
 /// R = 2^64 requires `gcd(P, R) = 1`, which for a power of two means P must be odd. P = 2 is a
 /// legitimate modulus for this type and is used by the GF(2) Gröbner tests, so an even modulus
-/// keeps a remainder path, as does every modulus below 2^32. [`uses_montgomery`] is the one predicate that decides, and
+/// keeps a remainder path, as does every modulus below 2^32, and Goldilocks has its own reduction.
+/// [`uses_montgomery`] is the one predicate that decides, and
 /// because P is a const generic every branch on it folds away at compile time.
 mod montgomery {
     /// Whether modulus `p` is represented in Montgomery form.
     ///
     /// Odd moduli only: R = 2^64 is not invertible modulo an even number. And only from 2^32 up:
     /// below that the product fits a `u64`, whose remainder by a constant is cheaper than a
-    /// reduction over a 128-bit product.
+    /// reduction over a 128-bit product. Goldilocks is excluded because its special form reduces
+    /// a canonical product more cheaply than Montgomery does (#781).
     pub const fn uses_montgomery(p: u64) -> bool {
-        p % 2 == 1 && p >> 32 != 0
+        p % 2 == 1 && p >> 32 != 0 && p != super::GOLDILOCKS
     }
 
     /// `-P^{-1} mod 2^64`, the factor that makes the low limb of `t + m*P` vanish.
@@ -170,8 +174,9 @@ mod shoup {
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, Deserialize, Serialize)]
 /// Element of a prime field with prime modulus P.
 pub struct PrimeFieldElement64<const P: u64> {
-    /// The element's internal representation: `a * 2^64 mod P` for odd P, and the canonical
-    /// residue `a` for even P. [`value`](Self::value) converts back; nothing else should read this
+    /// The element's internal representation: `a * 2^64 mod P` for the moduli
+    /// `montgomery::uses_montgomery` selects (odd, at least 2^32, not Goldilocks), and the
+    /// canonical residue `a` otherwise. [`value`](Self::value) converts back; nothing else should read this
     /// field expecting a residue.
     ///
     /// Private so that neither the reduced-residue invariant nor the choice of representation can
@@ -225,7 +230,7 @@ where
 impl<const P: u64> PrimeFieldElement64<P> {
     /// The element's representative integer in [0,p-1].
     ///
-    /// For an odd modulus this is a Montgomery reduction, not a field read, so a hot loop should
+    /// For a Montgomery modulus this is a reduction, not a field read, so a hot loop should
     /// hold field elements rather than call this per iteration.
     pub fn value(&self) -> u64 {
         montgomery::to_canonical::<P>(self.value)
@@ -388,6 +393,37 @@ impl_add_variants!([const P: u64], PrimeFieldElement64<P>);
 /// 7% (#270).
 const MERSENNE_31: u64 = (1 << 31) - 1;
 
+/// 2^64 - 2^32 + 1, held canonically and reduced by [`reduce_goldilocks`] (#781).
+const GOLDILOCKS: u64 = 0xFFFF_FFFF_0000_0001;
+
+/// `t mod (2^64 - 2^32 + 1)` for any `t < 2^128`, by 2^64 = 2^32 - 1 and 2^96 = -1.
+///
+/// Splitting `t = hi_hi * 2^96 + hi_lo * 2^64 + lo` gives `t = lo - hi_hi + hi_lo * (2^32 - 1)`.
+/// A borrow in the subtraction is a lost -2^64, corrected by subtracting 2^32 - 1; it cannot wrap
+/// again, because after a borrow the difference is at least `2^64 - 2^32`. A carry in the addition
+/// is a lost 2^64, corrected by adding 2^32 - 1; that cannot wrap either, because
+/// `hi_lo * (2^32 - 1) <= 2^64 - 2^33 + 1`. The result is then below 2^64 < 2P, so one
+/// conditional subtraction makes it canonical.
+#[inline(always)]
+const fn reduce_goldilocks(t: u128) -> u64 {
+    const EPSILON: u64 = 0xFFFF_FFFF;
+    let (lo, hi) = (t as u64, (t >> 64) as u64);
+    let (hi_hi, hi_lo) = (hi >> 32, hi & EPSILON);
+    let (mut r, borrow) = lo.overflowing_sub(hi_hi);
+    if borrow {
+        r = r.wrapping_sub(EPSILON);
+    }
+    let (mut r, carry) = r.overflowing_add(hi_lo * EPSILON);
+    if carry {
+        r = r.wrapping_add(EPSILON);
+    }
+    if r >= GOLDILOCKS {
+        r - GOLDILOCKS
+    } else {
+        r
+    }
+}
+
 /// Borrowed * Borrowed
 impl<const P: u64> ops::Mul<&PrimeFieldElement64<P>> for &PrimeFieldElement64<P> {
     type Output = PrimeFieldElement64<P>;
@@ -396,10 +432,13 @@ impl<const P: u64> ops::Mul<&PrimeFieldElement64<P>> for &PrimeFieldElement64<P>
         // Both operands carry the same factor of R, and Montgomery reduction removes exactly one
         // of them, so the product is in the same representation as the inputs. Below 2^32 the
         // residues are canonical and their product fits a u64, whose remainder by a constant LLVM
-        // lowers to a reciprocal multiply. The wide remainder survives only for an even modulus of
-        // 2^32 or more, which is never prime. Every branch is on a const generic.
+        // lowers to a reciprocal multiply. Goldilocks is canonical too, with its own reduction. The
+        // wide remainder survives only for an even modulus of 2^32 or more, which is never prime.
+        // Every branch is on a const generic.
         let value = if montgomery::uses_montgomery(P) {
             montgomery::mul::<P>(self.value, rhs.value)
+        } else if P == GOLDILOCKS {
+            reduce_goldilocks(self.value as u128 * rhs.value as u128)
         } else if P == MERSENNE_31 {
             // 2^31 = 1 mod P. With t <= (P-1)^2 < 2^62 the folded sum is at most 2P - 1, since
             // reaching 2P would need t = 2^62 - 1; one conditional subtraction finishes it.
@@ -1201,7 +1240,8 @@ mod tests {
         check::<4611624995532046337>();
         // The smallest prime above 2^32: the first Montgomery modulus.
         check::<4294967311>();
-        // Above the bound: Goldilocks and the largest 64-bit prime keep plain Montgomery.
+        // Above the bound: Goldilocks (canonical) and the largest 64-bit prime (Montgomery) keep
+        // the plain product.
         check::<18446744069414584321>();
         check::<18446744073709551557>();
         // Canonical residues below 2^32, including the Mersenne branch.
@@ -1224,5 +1264,167 @@ mod tests {
         assert_eq!(above.words(), [0, 0]);
         let narrow = Zp2147483647::new(5).prepare_factor();
         assert_eq!(narrow.words(), [0, 0]);
+    }
+
+    /// Goldilocks, 2^64 - 2^32 + 1, held canonically and reduced by 2^64 = 2^32 - 1, 2^96 = -1.
+    const GOLDILOCKS: u64 = 18446744069414584321;
+
+    /// `a^e mod GOLDILOCKS` by square-and-multiply over `u128`, the oracle for `pow` and `inverse`.
+    fn goldilocks_pow_reference(a: u64, mut e: u128) -> u64 {
+        let p = GOLDILOCKS as u128;
+        let (mut base, mut acc) = (a as u128 % p, 1u128);
+        while e != 0 {
+            if e & 1 == 1 {
+                acc = acc * base % p;
+            }
+            base = base * base % p;
+            e >>= 1;
+        }
+        acc as u64
+    }
+
+    /// Checks every operation on one Goldilocks pair against `u128` arithmetic.
+    fn check_goldilocks_pair(a: u64, b: u64) {
+        let p = GOLDILOCKS as u128;
+        let (x, y) = (
+            Zp18446744069414584321::new(a),
+            Zp18446744069414584321::new(b),
+        );
+        let (a, b) = (a as u128 % p, b as u128 % p);
+        assert_eq!((x * y).value() as u128, a * b % p, "{a} * {b}");
+        assert_eq!((x + y).value() as u128, (a + b) % p, "{a} + {b}");
+        assert_eq!((x - y).value() as u128, (a + p - b) % p, "{a} - {b}");
+        assert_eq!((-x).value() as u128, (p - a) % p, "-{a}");
+        assert_eq!(
+            x.pow(b).value(),
+            goldilocks_pow_reference(a as u64, b),
+            "{a}^{b}"
+        );
+        if a != 0 {
+            let inverse = x.inverse();
+            assert_eq!(
+                inverse.value(),
+                goldilocks_pow_reference(a as u64, p - 2),
+                "1/{a}"
+            );
+            assert!((x * inverse).is_one(), "{a} * 1/{a}");
+        }
+    }
+
+    /// Goldilocks elements are stored as their canonical residue, not in Montgomery form.
+    #[test]
+    fn test_goldilocks_is_held_canonically() {
+        assert!(!super::montgomery::uses_montgomery(GOLDILOCKS));
+        for value in [0, 1, 5, 1 << 32, GOLDILOCKS - 1] {
+            assert_eq!(Zp18446744069414584321::new(value).value, value);
+        }
+        assert_eq!(Zp18446744069414584321::one().value, 1);
+        assert_eq!(
+            Zp18446744069414584321::new(u64::MAX).value,
+            u64::MAX - GOLDILOCKS
+        );
+    }
+
+    /// The Goldilocks reduction is exact on its extreme products, including the largest.
+    #[test]
+    fn test_goldilocks_boundary_products() {
+        type G = Zp18446744069414584321;
+        // (p - 1)^2 = (-1)^2 = 1: the largest product the reduction ever sees.
+        assert_eq!((G::new(GOLDILOCKS - 1) * G::new(GOLDILOCKS - 1)).value(), 1);
+        // 2^32 * 2^32 = 2^64 = 2^32 - 1.
+        assert_eq!((G::new(1 << 32) * G::new(1 << 32)).value(), 0xFFFF_FFFF);
+        // 2^63 * 2^33 = 2^96 = -1: the low word is zero and the subtraction borrows.
+        assert_eq!((G::new(1 << 63) * G::new(1 << 33)).value(), GOLDILOCKS - 1);
+        // 2^48 * 2^48 = 2^96 = -1 again, reached through a different split of the product.
+        assert_eq!((G::new(1 << 48) * G::new(1 << 48)).value(), GOLDILOCKS - 1);
+    }
+
+    /// Every operation matches `u128` arithmetic on all pairs of Goldilocks edge values.
+    #[test]
+    fn test_goldilocks_edge_values_match_u128_reference() {
+        let edges = [
+            0,
+            1,
+            2,
+            3,
+            0xFFFF_FFFF,
+            1 << 32,
+            (1 << 32) + 1,
+            1 << 33,
+            1 << 48,
+            1 << 63,
+            (1 << 63) + 1,
+            GOLDILOCKS / 2,
+            GOLDILOCKS - (1 << 32),
+            GOLDILOCKS - 2,
+            GOLDILOCKS - 1,
+            // 2^64 - 2^32 = p - 1, and unreduced inputs at and above the modulus.
+            u64::MAX - 0xFFFF_FFFF,
+            GOLDILOCKS,
+            GOLDILOCKS + 1,
+            u64::MAX,
+        ];
+        for &a in &edges {
+            for &b in &edges {
+                check_goldilocks_pair(a, b);
+            }
+        }
+    }
+
+    /// Every operation matches `u128` arithmetic over a seeded random sweep of Goldilocks pairs.
+    #[test]
+    fn test_goldilocks_random_sweep_matches_u128_reference() {
+        use rand::Rng;
+        let mut rng = StdRng::seed_from_u64(781);
+        for _ in 0..20_000 {
+            let (a, b) = (rng.gen::<u64>(), rng.gen::<u64>());
+            check_goldilocks_pair(a, b);
+            // Operands concentrated near the top of the range, where the high word is largest.
+            check_goldilocks_pair(GOLDILOCKS - 1 - (a >> 40), GOLDILOCKS - 1 - (b >> 40));
+        }
+    }
+
+    /// Goldilocks elements built by every route compare, hash and serialize as the same element.
+    #[test]
+    fn test_goldilocks_construction_paths_agree() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        type G = Zp18446744069414584321;
+
+        fn hash_of<T: Hash>(value: &T) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        // Below 2^64 - p = 2^32 - 1, so `value + p` is a second u64 representative of it.
+        let value = 0xDEAD_BEEF;
+        let direct = G::new(value);
+        let wrapped = G::new(value + GOLDILOCKS);
+        let parsed = G::from_str(&(value as u128 + GOLDILOCKS as u128).to_string()).unwrap();
+        let summed = G::new(value - 7) + G::new(7);
+        let multiplied = G::new(value) * G::one();
+        let decoded: G = bincode::deserialize(&bincode::serialize(&value).unwrap()).unwrap();
+        for other in [wrapped, parsed, summed, multiplied, decoded] {
+            assert_eq!(direct, other);
+            assert_eq!(hash_of(&direct), hash_of(&other));
+            assert_eq!(other.value(), value);
+        }
+        assert_eq!(
+            bincode::serialize(&direct).unwrap(),
+            bincode::serialize(&value).unwrap()
+        );
+        assert_eq!(format!("{direct}"), value.to_string());
+        let rejected: Result<G, _> =
+            bincode::deserialize(&bincode::serialize(&GOLDILOCKS).unwrap());
+        assert!(rejected.is_err());
+    }
+
+    proptest! {
+        /// Every Goldilocks operation matches `u128` arithmetic on arbitrary operands.
+        #[test]
+        fn test_goldilocks_matches_u128_reference_randomly(a in any::<u64>(), b in any::<u64>()) {
+            check_goldilocks_pair(a, b);
+        }
     }
 }

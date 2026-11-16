@@ -6,9 +6,13 @@ Prime fields from 31 to 255 bits, binary and extension fields, and what their ar
 2^32, storing `a * 2^64 mod P` rather than `a`. Below 2^32 it stores the canonical residue: the
 product of two residues then fits a `u64`, whose remainder by a constant LLVM lowers to a
 reciprocal multiply, and `P = 2^31 - 1` reduces by shift and add. That made `Zp2147483647`'s F4
-call on MQ10 25% faster (#270; [the measurements](../research/field-arithmetic-specialization.md)). This is an internal representation and is not observable through
-the public API: `value()`, `Display`, and the serialized form all give the canonical residue in
-`[0, P)`, and the serialized bytes are unchanged by it.
+call on MQ10 25% faster (#270; [the measurements](../research/field-arithmetic-specialization.md)).
+Goldilocks (`Zp18446744069414584321`, 2^64 - 2^32 + 1) is the one modulus above 2^32 that is also
+canonical: 2^64 = 2^32 - 1 and 2^96 = -1 reduce its 128-bit product more cheaply than Montgomery
+does, 0.63x on a throughput multiply and 3-4% off an F4 call or an NTT (#781). This is an
+internal representation and is not observable through the public API: `value()`, `Display`, and
+the serialized form all give the canonical residue in `[0, P)`, and the serialized bytes are
+unchanged by it.
 
 The reason is that multiplication used to compute `(a as u128 * b as u128) % P as u128`. A
 const-generic modulus does not save that — LLVM does not strength-reduce a 128-bit remainder, so
@@ -17,8 +21,8 @@ division. Montgomery reduction replaces the division with two multiplications an
 
 Two consequences worth knowing:
 
-- `value()` is a Montgomery reduction, not a field read. A hot loop should hold field elements and
-  convert at the boundary rather than call `value()` per iteration.
+- For a Montgomery modulus, `value()` is a Montgomery reduction, not a field read. A hot loop
+  should hold field elements and convert at the boundary rather than call `value()` per iteration.
 - `P = 2` is supported and takes the canonical path, because `2^64` is not invertible modulo
   an even number. The branch is on a const generic, so it is resolved at compile time.
 - A loop that multiplies many elements by one factor can call `factor.prepare_factor()` once and
