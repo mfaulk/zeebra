@@ -25,7 +25,8 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     integers::highest_set_bit,
     poly::univariate::{
-        gcd, pow_mod, pow_mod::pow_mod_limbs, ModularComposer, Polynomial, UnivariatePolynomial,
+        compose_mod, gcd, pow_mod, pow_mod::pow_mod_limbs, subproduct_tree::derivative,
+        ModularComposer, Polynomial, UnivariatePolynomial,
     },
     FiniteField, KnownOrder,
 };
@@ -82,7 +83,12 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
     f: &UnivariatePolynomial<F>,
     rng: &mut R,
 ) -> Vec<(UnivariatePolynomial<F>, usize)> {
-    factorize_with_route(f, rng, FrobeniusRoute::default())
+    factorize_with_routes(
+        f,
+        rng,
+        FrobeniusRoute::default(),
+        DistinctDegreeRoute::default(),
+    )
 }
 
 /// How the Frobenius map `p ↦ p^q mod h` is applied after the first `x^q`.
@@ -105,6 +111,29 @@ pub enum FrobeniusRoute {
     Auto,
 }
 
+/// How `factorize` finds the degrees of the irreducible factors.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DistinctDegreeRoute {
+    /// One Frobenius application and one gcd per degree, until half the degree of what remains.
+    Iterated,
+    /// Shoup's baby-step/giant-step from degree one: `l ≈ sqrt(n/2)` baby steps `x^(q^i)`, then
+    /// one gcd per interval of `l` degrees against `∏ (x^(q^(lj)) - x^(q^i))`. Squarefree inputs
+    /// only; anything else takes the iterated route.
+    BabyStepGiantStep,
+    /// Iterated until the degree reaches `sqrt(deg r / 2)` for what remains `r`, then
+    /// baby-step/giant-step with the powers already computed as its baby steps. The iterated
+    /// phase is the rent: an input whose factors are all of low degree — the root-finding shape —
+    /// finishes inside it and never pays for giant steps.
+    #[default]
+    Auto,
+}
+
+impl DistinctDegreeRoute {
+    #[cfg(test)]
+    pub(crate) const ALL: [Self; 3] = [Self::Iterated, Self::BabyStepGiantStep, Self::Auto];
+}
+
 /// [`factorize`] with the Frobenius route forced. Measurement and differential-testing hook.
 #[doc(hidden)]
 pub fn factorize_with_route<F: KnownOrder, R: RngCore + CryptoRng>(
@@ -112,70 +141,241 @@ pub fn factorize_with_route<F: KnownOrder, R: RngCore + CryptoRng>(
     rng: &mut R,
     route: FrobeniusRoute,
 ) -> Vec<(UnivariatePolynomial<F>, usize)> {
+    factorize_with_routes(f, rng, route, DistinctDegreeRoute::default())
+}
+
+/// [`factorize`] with both routes forced. Measurement and differential-testing hook.
+#[doc(hidden)]
+pub fn factorize_with_routes<F: KnownOrder, R: RngCore + CryptoRng>(
+    f: &UnivariatePolynomial<F>,
+    rng: &mut R,
+    route: FrobeniusRoute,
+    distinct_degree: DistinctDegreeRoute,
+) -> Vec<(UnivariatePolynomial<F>, usize)> {
     assert!(!f.is_zero(), "the zero polynomial has no factorization");
 
     if f.degree() == 0 {
         return Vec::new();
     }
-
     let monic = make_monic(f);
-    let total_degree = monic.degree();
+    if monic.degree() == 1 {
+        return vec![(monic, 1)];
+    }
+
     let x = variable::<F>();
-    let q = F::order_limbs();
+    let x_to_the_q = pow_mod_limbs(&x, F::order_limbs(), &monic);
+    let mut search = DegreeSearch {
+        remaining: monic.clone(),
+        factors: Vec::new(),
+        split_route: SplitRoute {
+            route,
+            x_to_the_q: Some(&x_to_the_q),
+        },
+        squarefree_checked_at: None,
+    };
 
-    let mut factors: Vec<(UnivariatePolynomial<F>, usize)> = Vec::new();
-    let mut accounted = 0u32;
-
-    // Products of the distinct irreducible factors of each degree found so far, indexed by
-    // degree minus one. Needed because `gcd(f, x^(q^d) - x)` catches every degree dividing d,
-    // so the proper divisors have to be divided back out.
-    let mut distinct_of_degree: Vec<UnivariatePolynomial<F>> = Vec::new();
-
-    // x^(q^d), built by applying the Frobenius map repeatedly. Computing q^d as an integer would
-    // overflow for even modest q and d.
-    let x_to_the_q = pow_mod_limbs(&x, q, &monic);
+    // `powers[d]` is x^(q^d) mod f. Kept only while they may become baby steps; x^(q^(d+1)) is
+    // x^(q^d) under one more Frobenius application, since q^d would overflow as an exponent.
+    let keep_powers = distinct_degree != DistinctDegreeRoute::Iterated;
+    let max_baby_steps = ceil_sqrt(monic.degree() as usize / 2 + 1) + 1;
+    let mut powers = vec![x.clone(), x_to_the_q.clone()];
     let mut frobenius = Frobenius::new(route, &x_to_the_q, &monic);
+
+    if distinct_degree == DistinctDegreeRoute::BabyStepGiantStep && search.is_squarefree() {
+        let baby_steps = ceil_sqrt(search.remaining.degree() as usize / 2).max(1);
+        while powers.len() <= baby_steps {
+            let next = frobenius.apply(powers.last().expect("x is always present"));
+            powers.push(next);
+        }
+        search.baby_step_giant_step(&powers, &monic, 0, rng);
+        return search.factors;
+    }
+
+    // Invariant at the top of each pass: no factor of degree d or less divides `remaining`.
     let mut x_to_the_q_to_the_d = x_to_the_q.clone();
-
-    for d in 1..=total_degree {
-        // The distinct irreducible factors of f whose degree divides d.
-        let dividing_d = gcd(&monic, &(&x_to_the_q_to_the_d - &x));
-
-        let mut exactly_d = dividing_d;
-        for e in 1..d {
-            if d % e == 0 {
-                exactly_d = &exactly_d / &distinct_of_degree[(e - 1) as usize];
-            }
-        }
-        distinct_of_degree.push(exactly_d.clone());
-
+    let mut d = 1u32;
+    loop {
+        // The distinct irreducible factors of what remains whose degree divides d are those of
+        // degree exactly d, everything smaller having been divided out already.
+        let exactly_d = gcd(&search.remaining, &(&x_to_the_q_to_the_d - &x));
         if exactly_d.degree() > 0 {
-            let split_route = SplitRoute {
-                route,
-                x_to_the_q: Some(&x_to_the_q),
-            };
-            for irreducible in separate_equal_degree_by(&exactly_d, d, rng, &split_route) {
-                let multiplicity = multiplicity_in(&monic, &irreducible);
-                accounted += d * multiplicity as u32;
-                factors.push((irreducible, multiplicity));
-            }
+            search.take(&exactly_d, d, rng);
+        }
+        if search.finished(d) {
+            return search.factors;
         }
 
-        // Every factor is found once the degrees add up, which is usually long before d reaches
-        // the degree of f.
-        if accounted == total_degree {
-            break;
+        // The rent is paid once d reaches the baby-step count baby-step/giant-step would choose
+        // for what remains: the powers so far are its baby steps, and x^(q^d) its giant stride.
+        let wanted = ceil_sqrt(search.remaining.degree() as usize / 2);
+        if distinct_degree == DistinctDegreeRoute::Auto
+            && d as usize >= wanted
+            && powers.len() == d as usize + 1
+            && search.is_squarefree()
+        {
+            search.baby_step_giant_step(&powers, &monic, 1, rng);
+            return search.factors;
         }
 
         x_to_the_q_to_the_d = frobenius.apply(&x_to_the_q_to_the_d);
+        d += 1;
+        if keep_powers && powers.len() == d as usize && powers.len() <= max_baby_steps {
+            powers.push(x_to_the_q_to_the_d.clone());
+        }
+    }
+}
+
+/// The state of the distinct-degree stage: what is left of `f` and the factors taken from it.
+struct DegreeSearch<'a, F: FiniteField> {
+    /// `f` with every factor found so far divided out to its full multiplicity.
+    remaining: UnivariatePolynomial<F>,
+    factors: Vec<(UnivariatePolynomial<F>, usize)>,
+    split_route: SplitRoute<'a, F>,
+    /// The degree of `remaining` when it was last found not to be squarefree.
+    squarefree_checked_at: Option<u32>,
+}
+
+impl<F: KnownOrder> DegreeSearch<'_, F> {
+    /// Split `product`, a product of distinct irreducibles of degree `d` dividing `remaining`, and
+    /// divide each factor out of `remaining` as often as it divides.
+    fn take<R: RngCore + CryptoRng>(
+        &mut self,
+        product: &UnivariatePolynomial<F>,
+        d: u32,
+        rng: &mut R,
+    ) {
+        for irreducible in separate_equal_degree_by(product, d, rng, &self.split_route) {
+            let mut multiplicity = 0;
+            loop {
+                let (quotient, remainder) = self.remaining.div_with_remainder(&irreducible);
+                if !remainder.is_zero() {
+                    break;
+                }
+                self.remaining = quotient;
+                multiplicity += 1;
+            }
+            debug_assert!(multiplicity > 0, "{irreducible} does not divide f");
+            self.factors.push((irreducible, multiplicity));
+        }
     }
 
-    debug_assert_eq!(
-        accounted, total_degree,
-        "factor degrees did not account for all of {}",
-        monic
-    );
-    factors
+    /// True, and `remaining` recorded as a factor if it is not one, once no factor of degree `d` or
+    /// less divides `remaining` and that settles the rest. A reducible `remaining` would have a
+    /// factor of degree at most half its own, and every one of those is gone.
+    fn finished(&mut self, d: u32) -> bool {
+        let degree = self.remaining.degree();
+        if degree == 0 {
+            return true;
+        }
+        if degree < 2 * (d + 1) {
+            let last = std::mem::replace(&mut self.remaining, UnivariatePolynomial::one());
+            self.factors.push((last, 1));
+            return true;
+        }
+        false
+    }
+
+    /// True if `remaining` is squarefree, by `gcd(r, r') = 1`. A vanishing derivative — a p-th
+    /// power — gives `gcd(r, 0) = r`, so is not squarefree, as it should not be.
+    fn is_squarefree(&mut self) -> bool {
+        let degree = self.remaining.degree();
+        if self.squarefree_checked_at == Some(degree) {
+            return false;
+        }
+        let squarefree = gcd(&self.remaining, &derivative(&self.remaining)).degree() == 0;
+        if !squarefree {
+            self.squarefree_checked_at = Some(degree);
+        }
+        squarefree
+    }
+
+    /// Shoup's interval distinct-degree factorization of a squarefree `remaining`.
+    ///
+    /// `powers` holds `x^(q^i) mod f` for `i = 0..=l`. Interval `j` covers the degrees
+    /// `l·j + 1 ..= l·(j + 1)`: with `H = x^(q^(l(j+1)))`, an irreducible of degree `e` divides
+    /// `H - x^(q^i)` exactly when `e` divides `l(j+1) - i`, so one gcd against
+    /// `∏_{i<l} (H - x^(q^i))` collects every factor in the interval, and a gcd per `i`, ascending
+    /// in degree, separates them. Factors of degree `l·first_interval` or less must already be
+    /// gone from `remaining`.
+    fn baby_step_giant_step<R: RngCore + CryptoRng>(
+        &mut self,
+        powers: &[UnivariatePolynomial<F>],
+        f: &UnivariatePolynomial<F>,
+        first_interval: u32,
+        rng: &mut R,
+    ) {
+        debug_assert!(self.is_squarefree());
+        let l = powers.len() - 1;
+        let stride = l as u32;
+        // x^(q^(l(j+1))) = x^(q^(lj)) ∘ x^(q^l) mod f: one composition per interval, always with
+        // the same inner argument, which is the case `Frobenius`'s composer is for. `pow_mod` by
+        // q^l is never the cheaper route.
+        let mut giant = Frobenius::new(FrobeniusRoute::Composition, &powers[l], f);
+        let mut stride_power = powers[l].clone();
+        for _ in 0..first_interval {
+            stride_power = giant.apply(&stride_power);
+        }
+
+        let mut baby_steps: Vec<UnivariatePolynomial<F>> = Vec::new();
+        let mut reduced_for = None;
+        let mut j = first_interval;
+        loop {
+            if self.finished(stride * j) {
+                return;
+            }
+            if j > first_interval {
+                stride_power = giant.apply(&stride_power);
+            }
+            let degree = self.remaining.degree();
+            if reduced_for != Some(degree) {
+                baby_steps = powers[..l].iter().map(|p| p % &self.remaining).collect();
+                reduced_for = Some(degree);
+            }
+            let h = &stride_power % &self.remaining;
+
+            let mut interval = UnivariatePolynomial::one();
+            for baby in &baby_steps {
+                interval = &(&interval * &(&h - baby)) % &self.remaining;
+            }
+            let mut in_interval = gcd(&self.remaining, &interval);
+            for i in (0..l).rev() {
+                if in_interval.degree() == 0 {
+                    break;
+                }
+                let exactly = gcd(&in_interval, &(&h - &baby_steps[i]));
+                if exactly.degree() > 0 {
+                    in_interval = &in_interval / &exactly;
+                    self.take(&exactly, stride * (j + 1) - i as u32, rng);
+                }
+            }
+
+            j += 1;
+        }
+    }
+}
+
+/// How `is_irreducible` reaches the Frobenius powers Rabin's test needs.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum IrreducibilityRoute {
+    /// `x^(q^k)` for k = 1, 2, … in one pass, one Frobenius application each by the given route,
+    /// reading off `x^(q^(n/p))` on the way to `x^(q^n)`.
+    Iterate(FrobeniusRoute),
+    /// `x^(q^k)` by an addition chain on k: `x^(q^(2a)) = x^(q^a) ∘ x^(q^a)`, one one-shot
+    /// composition per doubling, and `x^(q^(a+1))` by one Frobenius application. About
+    /// `2·log2 n` compositions per power instead of n applications.
+    #[default]
+    Doubling,
+}
+
+impl IrreducibilityRoute {
+    #[cfg(test)]
+    pub(crate) const ALL: [Self; 4] = [
+        Self::Iterate(FrobeniusRoute::PowMod),
+        Self::Iterate(FrobeniusRoute::Composition),
+        Self::Iterate(FrobeniusRoute::Auto),
+        Self::Doubling,
+    ];
 }
 
 /// True if `f` is irreducible over F.
@@ -187,6 +387,15 @@ pub fn factorize_with_route<F: KnownOrder, R: RngCore + CryptoRng>(
 /// # Panics
 /// Panics if `f` is the zero polynomial.
 pub fn is_irreducible<F: KnownOrder>(f: &UnivariatePolynomial<F>) -> bool {
+    is_irreducible_with_route(f, IrreducibilityRoute::default())
+}
+
+/// [`is_irreducible`] with the route forced. Measurement and differential-testing hook.
+#[doc(hidden)]
+pub fn is_irreducible_with_route<F: KnownOrder>(
+    f: &UnivariatePolynomial<F>,
+    route: IrreducibilityRoute,
+) -> bool {
     assert!(!f.is_zero(), "the zero polynomial is not irreducible");
 
     let n = f.degree();
@@ -200,35 +409,54 @@ pub fn is_irreducible<F: KnownOrder>(f: &UnivariatePolynomial<F>) -> bool {
 
     let monic = make_monic(f);
     let x = variable::<F>();
-    let q = F::order_limbs();
+    let x_to_the_q = pow_mod_limbs(&x, F::order_limbs(), &monic);
+    let divisors = prime_divisors(n);
+    let shows_a_proper_factor = |x_to_the_q_to_the_k: &UnivariatePolynomial<F>| -> bool {
+        gcd(&monic, &(x_to_the_q_to_the_k - &x)).degree() > 0
+    };
 
-    if frobenius_iterated(&x, n, q, &monic) != x {
-        return false;
-    }
-
-    for p in prime_divisors(n) {
-        let candidate = frobenius_iterated(&x, n / p, q, &monic);
-        if gcd(&monic, &(&candidate - &x)).degree() > 0 {
-            return false;
+    match route {
+        IrreducibilityRoute::Iterate(route) => {
+            let mut frobenius = Frobenius::new(route, &x_to_the_q, &monic);
+            let mut power = x_to_the_q.clone();
+            for k in 1..n {
+                if divisors.iter().any(|p| n / p == k) && shows_a_proper_factor(&power) {
+                    return false;
+                }
+                power = frobenius.apply(&power);
+            }
+            power == x
+        }
+        IrreducibilityRoute::Doubling => {
+            let mut frobenius = Frobenius::new(FrobeniusRoute::Auto, &x_to_the_q, &monic);
+            // Most reducible inputs fail the cheaper-to-state test first.
+            if frobenius_power(n, &x_to_the_q, &monic, &mut frobenius) != x {
+                return false;
+            }
+            divisors.iter().all(|p| {
+                !shows_a_proper_factor(&frobenius_power(n / p, &x_to_the_q, &monic, &mut frobenius))
+            })
         }
     }
-    true
 }
 
-/// `base^(q^times) mod modulus`, by applying the Frobenius map `times` times.
-///
-/// Raising to `q^times` directly would overflow the exponent for all but the smallest inputs.
-fn frobenius_iterated<F: KnownOrder>(
-    base: &UnivariatePolynomial<F>,
-    times: u32,
-    q: &[u64],
-    modulus: &UnivariatePolynomial<F>,
+/// `x^(q^k) mod f` for `k >= 1`, left to right over the bits of k: doubling the exponent of q is a
+/// composition of the power so far with itself, and adding one is a Frobenius application.
+fn frobenius_power<F: KnownOrder>(
+    k: u32,
+    x_to_the_q: &UnivariatePolynomial<F>,
+    f: &UnivariatePolynomial<F>,
+    frobenius: &mut Frobenius<F>,
 ) -> UnivariatePolynomial<F> {
-    let mut result = base % modulus;
-    for _ in 0..times {
-        result = pow_mod_limbs(&result, q, modulus);
+    debug_assert!(k >= 1);
+    let mut power = x_to_the_q.clone();
+    for bit in (0..31 - k.leading_zeros()).rev() {
+        power = compose_mod(&power, &power, f);
+        if (k >> bit) & 1 == 1 {
+            power = frobenius.apply(&power);
+        }
     }
-    result
+    power
 }
 
 /// Separate a product of distinct monic irreducibles, each of degree `d`, into those factors.
@@ -339,11 +567,12 @@ fn frobenius_norm<F: KnownOrder>(
     norm
 }
 
-/// `p ↦ p^q mod h` for one fixed `h`, by the chosen route.
+/// `p ↦ p^q mod h` for one fixed `h`, by the chosen route — or, with `inner = x^(q^l) mod h` and
+/// the `Composition` route, `p ↦ p^(q^l)`.
 struct Frobenius<F: FiniteField> {
     route: FrobeniusRoute,
     modulus: UnivariatePolynomial<F>,
-    x_to_the_q: UnivariatePolynomial<F>,
+    inner: UnivariatePolynomial<F>,
     /// Built on first need, so a loop that stops before applying the map pays nothing for it.
     composer: Option<ModularComposer<F>>,
     uses: usize,
@@ -355,13 +584,13 @@ const MAX_BABY_STEP_BYTES: usize = 64 << 20;
 impl<F: KnownOrder> Frobenius<F> {
     fn new(
         route: FrobeniusRoute,
-        x_to_the_q: &UnivariatePolynomial<F>,
+        inner: &UnivariatePolynomial<F>,
         modulus: &UnivariatePolynomial<F>,
     ) -> Self {
         Self {
             route,
             modulus: modulus.clone(),
-            x_to_the_q: x_to_the_q.clone(),
+            inner: inner.clone(),
             composer: None,
             uses: 0,
         }
@@ -392,7 +621,7 @@ impl<F: KnownOrder> Frobenius<F> {
             match block {
                 Some(block) => {
                     self.composer = Some(ModularComposer::with_block(
-                        &self.x_to_the_q,
+                        &self.inner,
                         &self.modulus,
                         block,
                     ))
@@ -461,24 +690,6 @@ pub(crate) fn random_element_of_quotient<F: FiniteField, R: RngCore + CryptoRng>
 ) -> UnivariatePolynomial<F> {
     let coefficients: Vec<F> = (0..g.degree()).map(|_| F::random(rng)).collect();
     UnivariatePolynomial::new(&coefficients)
-}
-
-/// How many times `divisor` divides `p`.
-fn multiplicity_in<F: FiniteField>(
-    p: &UnivariatePolynomial<F>,
-    divisor: &UnivariatePolynomial<F>,
-) -> usize {
-    debug_assert!(divisor.degree() > 0, "a constant divides infinitely often");
-    let mut remaining = p.clone();
-    let mut multiplicity = 0;
-    loop {
-        let (quotient, remainder) = remaining.div_with_remainder(divisor);
-        if !remainder.is_zero() {
-            return multiplicity;
-        }
-        remaining = quotient;
-        multiplicity += 1;
-    }
 }
 
 /// `p` scaled so that its leading coefficient is one.
@@ -914,5 +1125,209 @@ mod tests {
             factors.iter().map(|(factor, _)| factor).collect();
         assert!(found.contains(&&linear_three), "x - 3 must be a factor");
         assert!(found.contains(&&linear_a), "x - a must be a factor");
+    }
+
+    /// Factors keyed by their debug form and sorted, so two factorizations compare as multisets.
+    fn keyed<F: crate::KnownOrder>(
+        factors: Vec<(UnivariatePolynomial<F>, usize)>,
+    ) -> Vec<(u32, String, usize)> {
+        let mut keyed: Vec<_> = factors
+            .into_iter()
+            .map(|(factor, multiplicity)| (factor.degree(), format!("{factor:?}"), multiplicity))
+            .collect();
+        keyed.sort();
+        keyed
+    }
+
+    /// A random irreducible of degree `d`, by rejection on `is_irreducible`'s `pow_mod` route.
+    fn irreducible_of_degree<F: crate::KnownOrder>(
+        d: u64,
+        rng: &mut StdRng,
+    ) -> UnivariatePolynomial<F> {
+        use crate::poly::univariate::factorize::{
+            is_irreducible_with_route, FrobeniusRoute, IrreducibilityRoute,
+        };
+        loop {
+            let candidate = UnivariatePolynomial::<F>::rand(d, rng);
+            if is_irreducible_with_route(
+                &candidate,
+                IrreducibilityRoute::Iterate(FrobeniusRoute::PowMod),
+            ) {
+                return candidate;
+            }
+        }
+    }
+
+    /// Every `is_irreducible` route agrees with trial division on all low-degree monic polynomials.
+    #[test]
+    fn test_is_irreducible_routes_agree_with_trial_division() {
+        use crate::poly::univariate::factorize::{is_irreducible_with_route, IrreducibilityRoute};
+        fn check<const P: u64>(max_degree: u32) {
+            for n in 1..=max_degree {
+                for f in monic_polynomials::<P>(n) {
+                    let expected = irreducible_by_trial_division::<P>(&f);
+                    for route in IrreducibilityRoute::ALL {
+                        assert_eq!(
+                            is_irreducible_with_route(&f, route),
+                            expected,
+                            "{f} over GF({P}) by {route:?}"
+                        );
+                    }
+                }
+            }
+        }
+        check::<2>(6);
+        check::<3>(4);
+        check::<5>(3);
+    }
+
+    /// Every `is_irreducible` route returns the same verdict on random, planted-irreducible and
+    /// planted-reducible inputs over wide and narrow fields.
+    #[test]
+    fn test_is_irreducible_routes_agree_on_wide_fields() {
+        use crate::{
+            fields::{Bn254Fr, Gf256, KoalaBear},
+            poly::univariate::factorize::{is_irreducible_with_route, IrreducibilityRoute},
+            KnownOrder,
+        };
+        type Goldilocks = PrimeFieldElement64<18_446_744_069_414_584_321>;
+
+        fn check<F: KnownOrder>(seed: u64, degrees: &[u64]) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for &d in degrees {
+                let irreducible = irreducible_of_degree::<F>(d, &mut rng);
+                let other = irreducible_of_degree::<F>(d.div_ceil(2), &mut rng);
+                let random = UnivariatePolynomial::<F>::rand(d, &mut rng);
+                let cases = [
+                    (irreducible.clone(), Some(true)),
+                    (&irreducible * &other, Some(false)),
+                    (&other * &other, Some(false)),
+                    // A nonmonic irreducible is still irreducible.
+                    (irreducible.scale(&F::new(3)), Some(true)),
+                    (random, None),
+                ];
+                for (f, expected) in cases {
+                    let verdicts: Vec<bool> = IrreducibilityRoute::ALL
+                        .iter()
+                        .map(|route| is_irreducible_with_route(&f, *route))
+                        .collect();
+                    assert!(
+                        verdicts.iter().all(|v| *v == verdicts[0]),
+                        "routes disagree on degree {d}: {verdicts:?}"
+                    );
+                    if let Some(expected) = expected {
+                        assert_eq!(verdicts[0], expected, "degree {d}");
+                    }
+                }
+            }
+        }
+
+        check::<PrimeFieldElement64<5>>(41, &[2, 6, 12, 30]);
+        check::<KoalaBear>(42, &[1, 2, 9, 16, 27]);
+        check::<Goldilocks>(43, &[3, 8, 20]);
+        check::<Bn254Fr>(44, &[2, 5, 12]);
+        check::<Gf256>(45, &[4, 9, 15]);
+    }
+
+    /// Every distinct-degree route returns the same factorization as the iterated one, on random,
+    /// squarefree-planted, repeated-factor and root-finding-shaped inputs.
+    #[test]
+    fn test_distinct_degree_routes_agree() {
+        use crate::{
+            fields::{Bn254Fr, Gf256, KoalaBear},
+            poly::univariate::factorize::{
+                factorize_with_routes, DistinctDegreeRoute, FrobeniusRoute,
+            },
+            KnownOrder,
+        };
+        type Goldilocks = PrimeFieldElement64<18_446_744_069_414_584_321>;
+
+        fn agree<F: KnownOrder>(f: &UnivariatePolynomial<F>, rng: &mut StdRng, label: &str) {
+            let reference = keyed(factorize_with_routes(
+                f,
+                rng,
+                FrobeniusRoute::PowMod,
+                DistinctDegreeRoute::Iterated,
+            ));
+            let total = reference
+                .iter()
+                .map(|(degree, _, multiplicity)| *degree as usize * multiplicity)
+                .sum::<usize>();
+            assert_eq!(total, f.degree() as usize, "{label}: degrees do not add up");
+            for ddf in DistinctDegreeRoute::ALL {
+                for route in [FrobeniusRoute::PowMod, FrobeniusRoute::Auto] {
+                    let other = keyed(factorize_with_routes(f, rng, route, ddf));
+                    assert_eq!(reference, other, "{label}: {ddf:?} with {route:?}");
+                }
+            }
+        }
+
+        fn check<F: KnownOrder>(seed: u64, degrees: &[u64]) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for &n in degrees {
+                let random = UnivariatePolynomial::<F>::rand(n, &mut rng);
+                agree(&random, &mut rng, &format!("random of degree {n}"));
+
+                // Distinct irreducibles of several degrees, two of them equal, so the interval
+                // gcds and their fine split both see more than one degree per interval.
+                let mut planted = UnivariatePolynomial::<F>::one();
+                for d in [1, 1, 2, 3, 3, n.max(4), n / 2 + 1] {
+                    planted = &planted * &irreducible_of_degree::<F>(d, &mut rng);
+                }
+                agree(&planted, &mut rng, &format!("planted around {n}"));
+
+                // A repeated factor above the degrees the iterated phase covers keeps the input
+                // off the squarefree-only baby-step route.
+                let high = irreducible_of_degree::<F>(n.max(3), &mut rng);
+                let repeated = &(&high * &high) * &UnivariatePolynomial::<F>::rand(3, &mut rng);
+                agree(&repeated, &mut rng, &format!("square of degree {n}"));
+
+                // Linear factors times one irreducible quadratic: the root-finding shape.
+                let zeros: Vec<F> = (0..n).map(|_| F::random(&mut rng)).collect();
+                let roots = &UnivariatePolynomial::from_zeros(&zeros)
+                    * &irreducible_of_degree::<F>(2, &mut rng);
+                agree(&roots, &mut rng, &format!("{n} linear x quadratic"));
+            }
+            agree(
+                &UnivariatePolynomial::<F>::rand(1, &mut rng),
+                &mut rng,
+                "degree 1",
+            );
+            agree(
+                &irreducible_of_degree::<F>(17, &mut rng),
+                &mut rng,
+                "irreducible of degree 17",
+            );
+        }
+
+        check::<PrimeFieldElement64<3>>(51, &[4, 9, 24]);
+        check::<PrimeFieldElement64<5>>(52, &[6, 20, 40]);
+        check::<KoalaBear>(53, &[5, 30, 60]);
+        check::<Goldilocks>(54, &[8, 40]);
+        check::<Bn254Fr>(55, &[6, 18]);
+        check::<Gf256>(56, &[7, 25]);
+    }
+
+    /// Every distinct-degree route finds the 3 linear, 3 quadratic and 18 quartic monic
+    /// irreducibles of `x^81 - x` over GF(3), each once.
+    #[test]
+    fn test_distinct_degree_routes_on_x_to_the_q_to_the_k_minus_x() {
+        use crate::poly::univariate::factorize::{
+            factorize_with_routes, DistinctDegreeRoute, FrobeniusRoute,
+        };
+        let mut coefficients = vec![0u64; 82];
+        coefficients[81] = 1;
+        coefficients[1] = 2;
+        let f = poly::<3>(&coefficients);
+        let mut rng = StdRng::seed_from_u64(57);
+        for ddf in DistinctDegreeRoute::ALL {
+            let factors = factorize_with_routes(&f, &mut rng, FrobeniusRoute::Auto, ddf);
+            let mut by_degree = [0usize; 5];
+            for (factor, multiplicity) in &factors {
+                assert_eq!(*multiplicity, 1);
+                by_degree[factor.degree() as usize] += 1;
+            }
+            assert_eq!(by_degree, [0, 3, 3, 0, 18], "{ddf:?}");
+        }
     }
 }

@@ -473,6 +473,12 @@ repay a composer. On random polynomials of degree 81 and 729 that made whole fac
 13.9x faster; [`modular-composition.md`](../research/modular-composition.md) has the measurements
 and the regime (few applications, narrow field, high degree) where it stays on `pow_mod`.
 
+The distinct-degree loop then switches to Shoup's baby-step/giant-step once the degree it has
+reached passes `sqrt(deg r / 2)` of what remains, taking one gcd per interval of degrees instead of
+one per degree: a further 1.05x–1.9x on random inputs, with nothing lost on inputs whose factors are
+all of low degree. `is_irreducible` reaches the Frobenius powers Rabin's test needs by an addition
+chain of compositions, 6x–51x faster than iterating `pow_mod` (§7 of the same document).
+
 
 ## Permutation Polynomials
 An arithmetization-friendly hash is built from a **power permutation**: Poseidon's S-box is
