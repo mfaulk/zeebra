@@ -252,6 +252,10 @@ impl<const P: u64> One for PrimeFieldElement64<P> {
 impl<const P: u64> Ring for PrimeFieldElement64<P> {}
 
 impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
+    fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
+        Some(crate::linalg::concurrent::Dispatch::new())
+    }
+
     fn new(val: u64) -> Self {
         Self {
             value: montgomery::to_internal::<P>(val % P),

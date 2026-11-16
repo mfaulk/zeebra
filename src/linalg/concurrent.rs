@@ -55,6 +55,7 @@ pub enum Error {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Report {
+    #[cfg(feature = "research-work")]
     pub work: super::work::PhaseWork,
     /// Algebraic counters are exact; `peak_nonzeros` is the conservative reservation upper bound.
     pub statistics: EliminationStatistics,
@@ -116,6 +117,50 @@ pub fn reduce<F: FiniteField + Send + Sync>(
     cancel: &AtomicBool,
 ) -> Result<Report, Error> {
     reduce_hooked(matrix, split, config, cancel, &|_| {})
+}
+
+/// [`reduce`], callable from code generic over [`FiniteField`] alone.
+///
+/// The `Send + Sync` bound is proved where a handle is made — by a concrete field, through
+/// [`FiniteField::concurrent_elimination`] — so generic callers such as F4 need not carry it and
+/// a field that cannot provide it gets the serial path rather than a compile error.
+pub struct Dispatch<F: FiniteField>(ReduceFn<F>);
+
+type ReduceFn<F> = fn(&mut SparseMatrix<F>, usize, &Config, &AtomicBool) -> Result<Report, Error>;
+
+impl<F: FiniteField> Clone for Dispatch<F> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<F: FiniteField> Copy for Dispatch<F> {}
+
+impl<F: FiniteField + Send + Sync> Dispatch<F> {
+    pub fn new() -> Self {
+        Self(reduce::<F>)
+    }
+}
+
+impl<F: FiniteField + Send + Sync> Default for Dispatch<F> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<F: FiniteField> Dispatch<F> {
+    /// As [`reduce`].
+    ///
+    /// # Errors
+    /// As [`reduce`].
+    pub fn reduce(
+        self,
+        matrix: &mut SparseMatrix<F>,
+        split: usize,
+        config: &Config,
+        cancel: &AtomicBool,
+    ) -> Result<Report, Error> {
+        (self.0)(matrix, split, config, cancel)
+    }
 }
 
 fn reduce_hooked<F: FiniteField + Send + Sync>(
@@ -322,15 +367,15 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
                             .push(started.elapsed().as_nanos().min(u64::MAX as u128) as u64);
                         Ok(report)
                     };
+                    #[cfg(feature = "research-work")]
                     if config.measure_work {
                         let (result, work) = super::work::measure(run);
-                        result.map(|mut report: Report| {
+                        return result.map(|mut report: Report| {
                             report.work = work.outside_batch.forward;
                             report
-                        })
-                    } else {
-                        run()
+                        });
                     }
+                    run()
                 }))
                 .unwrap_or(Err(Error::WorkerPanicked));
                 if result.is_err() {
@@ -372,6 +417,7 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
         report.products += worker.products;
         report.inherited_products += worker.inherited_products;
         report.discovered_products += worker.discovered_products;
+        #[cfg(feature = "research-work")]
         report.work.accumulate(&worker.work);
         report.scheduling_ns += worker.scheduling_ns;
         report.publication_ns += worker.publication_ns;
@@ -463,11 +509,14 @@ mod tests {
                         input.num_rows()
                     );
                     assert!(report.products > 0);
-                    assert_eq!(report.products, report.work.coefficient_products);
-                    assert_eq!(
-                        report.statistics.row_operations,
-                        report.work.pivot_applications
-                    );
+                    #[cfg(feature = "research-work")]
+                    {
+                        assert_eq!(report.products, report.work.coefficient_products);
+                        assert_eq!(
+                            report.statistics.row_operations,
+                            report.work.pivot_applications
+                        );
+                    }
                 }
             }
         }

@@ -292,6 +292,10 @@ impl<const P: u32> FiniteField for PrimeFieldElement32<P> {
         );
         self.pow_limbs(&Self::FERMAT_EXPONENT_LIMBS)
     }
+
+    fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
+        Some(crate::linalg::concurrent::Dispatch::new())
+    }
 }
 
 impl<const P: u32> PrimeFieldElement32<P> {

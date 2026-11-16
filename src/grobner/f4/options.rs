@@ -145,6 +145,105 @@ impl Gf2Elimination {
     }
 }
 
+/// Whether a batch's forward elimination runs on worker threads (#752).
+///
+/// Applies to [`ReductionStrategy::Structured`] with [`Backend::Adaptive`], over a field whose
+/// [`FiniteField::concurrent_elimination`] provides a handle; anywhere else a batch is serial
+/// whatever this says. Workers discover pivots concurrently against the reducer block and publish
+/// each once, immutably, so the echelon rows differ from the serial ones but the pivot columns and
+/// every candidate after [`F4Options::reduce_batch_rows`] do not: **the basis is identical**.
+///
+/// A dispatch that would cross the live-entry budget — workers reserve two full-width rows each —
+/// falls back to the serial kernel on the untouched matrix, so selecting parallelism never refuses
+/// a computation serial elimination admits.
+///
+/// A dispatched batch reports that reservation as its peak, so
+/// [`F4Statistics::max_live_nonzeros`](super::F4Statistics::max_live_nonzeros) is an upper bound
+/// that depends on thread timing and can differ between runs; pin peaks under
+/// [`ParallelForward::Serial`]. Process RSS rises with workers — 1.19x serial at sixteen on MQ10,
+/// 1.35x at 62 — which is why [`F4Options::recommended`] caps them at sixteen.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ParallelForward {
+    /// One thread for every batch.
+    #[default]
+    Serial,
+
+    /// [`ParallelForward::auto_workers`] picks per batch, never above `max_workers`; zero means
+    /// the machine's available parallelism.
+    Auto {
+        /// Upper bound on threads for one batch.
+        max_workers: usize,
+    },
+
+    /// Every eligible batch on `workers` threads, or one per lower row if fewer. For measurement;
+    /// unconditional dispatch loses on small batches. One worker still runs the concurrent kernel,
+    /// on the calling thread's behalf, as the control that separates algorithm from threading.
+    Forced {
+        /// Threads per batch.
+        workers: usize,
+    },
+}
+
+impl ParallelForward {
+    /// The fewest lower-block entries at which [`ParallelForward::Auto`] dispatches.
+    ///
+    /// Measured per batch in `docs/research/parallel-forward.md`: below about 8000 entries the
+    /// serial pass takes well under a millisecond and the 0.2–0.4 ms of spawning and joining
+    /// workers is most of what threading could save.
+    pub const MIN_LOWER_NONZEROS: usize = 8_000;
+
+    /// Lower-block entries per worker [`ParallelForward::Auto`] asks for before adding another.
+    ///
+    /// 10 000 entries were fastest at eight workers and 30 000 at sixteen across the training
+    /// families; past that the measured batches kept scaling to the 32 measured.
+    pub const LOWER_NONZEROS_PER_WORKER: usize = 1_500;
+
+    /// The fewest lower rows each worker gets under [`ParallelForward::Auto`].
+    ///
+    /// Rows are the unit of dynamic scheduling, so a worker with fewer has nothing to balance.
+    pub const MIN_ROWS_PER_WORKER: usize = 8;
+
+    /// Threads [`ParallelForward::Auto`] uses for a batch of this shape; one means serial.
+    ///
+    /// `lower_rows` and `lower_nonzeros` describe the rows reduced against the reducer block.
+    pub fn auto_workers(lower_rows: usize, lower_nonzeros: usize, max_workers: usize) -> usize {
+        if lower_nonzeros < Self::MIN_LOWER_NONZEROS {
+            return 1;
+        }
+        (lower_nonzeros / Self::LOWER_NONZEROS_PER_WORKER)
+            .min(lower_rows / Self::MIN_ROWS_PER_WORKER)
+            .min(max_workers)
+            .max(1)
+    }
+
+    /// Threads this setting uses for a batch of this shape; one means serial.
+    pub fn workers(self, lower_rows: usize, lower_nonzeros: usize) -> usize {
+        match self {
+            Self::Serial => 1,
+            Self::Forced { workers } => workers.min(lower_rows).max(1),
+            Self::Auto { .. } if lower_nonzeros < Self::MIN_LOWER_NONZEROS => 1,
+            Self::Auto { max_workers } => {
+                let max_workers = if max_workers == 0 {
+                    available_parallelism()
+                } else {
+                    max_workers
+                };
+                Self::auto_workers(lower_rows, lower_nonzeros, max_workers)
+            }
+        }
+    }
+}
+
+/// The process's available parallelism, read once.
+///
+/// `std::thread::available_parallelism` reads cgroup files on every call — about a millisecond
+/// across a small computation's batches when it was asked per batch (#752) — so later changes to
+/// the process's affinity or quota are not seen.
+fn available_parallelism() -> usize {
+    static CPUS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CPUS.get_or_init(|| std::thread::available_parallelism().map_or(1, usize::from))
+}
+
 /// How final interreduction reduces each basis element against the others.
 ///
 /// Both routes return the **same object**: a reduced Gröbner basis is determined by its leading
@@ -607,7 +706,8 @@ pub struct F4Options {
     /// row before mutation, with a separate 64-MiB dense/index/selection workspace ceiling.
     /// If either bound cannot be met, the original full-RREF pass preserves existing budget
     /// admission and error behavior. Statistics separate mathematical entries, reservations,
-    /// sparse capacities, workspace and fallback batches. No parallel dispatch is enabled here.
+    /// sparse capacities, workspace and fallback batches. Forward elimination before it may be
+    /// parallel; see [`Self::parallel_forward`].
     /// Still off in [`F4Options::baseline`] for historical ablations.
     pub reduce_batch_rows: bool,
 
@@ -626,6 +726,12 @@ pub struct F4Options {
     /// [`Gf2Elimination::Auto`] at [`recommended`](Self::recommended);
     /// [`Gf2Elimination::Generic`] at [`baseline`](Self::baseline), which is held fixed.
     pub gf2_elimination: Gf2Elimination,
+
+    /// Whether forward elimination may use worker threads. See [`ParallelForward`].
+    ///
+    /// `Auto { max_workers: 16 }` at [`recommended`](Self::recommended);
+    /// [`ParallelForward::Serial`] at [`baseline`](Self::baseline).
+    pub parallel_forward: ParallelForward,
 }
 
 impl F4Options {
@@ -659,6 +765,7 @@ impl F4Options {
             reduce_batch_rows: false,
             profile_degrees: false,
             gf2_elimination: Gf2Elimination::Generic,
+            parallel_forward: ParallelForward::Serial,
         }
     }
 
@@ -705,6 +812,10 @@ impl F4Options {
             reduce_batch_rows: true,
             interreduction: InterreductionRoute::ByOrder,
             gf2_elimination: Gf2Elimination::Auto,
+            // #752: 3.8-4.0x complete F4 on MQ10 and 1.5-4.3x on held-out families, small
+            // controls within 3.5% and RSS within 1.24x of serial. Sixteen, not the machine,
+            // because 62 workers cost 1.35x RSS for a further 12%.
+            parallel_forward: ParallelForward::Auto { max_workers: 16 },
             ..Self::baseline()
         }
     }

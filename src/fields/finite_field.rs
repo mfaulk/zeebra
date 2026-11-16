@@ -153,6 +153,15 @@ where
     /// A uniformly random field element.
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self;
 
+    /// A handle to multithreaded elimination over this field, or `None` for serial only.
+    ///
+    /// The trait does not require `Send + Sync`; a field that has them proves it by returning
+    /// `Some(Dispatch::new())`, which is where the bound is checked. Generic code such as F4 then
+    /// dispatches to worker threads without carrying the bound on its own signature.
+    fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
+        None
+    }
+
     /// `self^b`. `0^0 = 1`.
     ///
     /// Exponentiation by squaring through [`Self::pow_limbs`].
