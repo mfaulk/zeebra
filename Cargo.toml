@@ -263,6 +263,14 @@ test = false
 lto = "fat"
 codegen-units = 1
 
+# Full debuginfo makes every test and example binary ~1.4 GB, and `cargo test` links 110+ of them,
+# so linking dominated the edit loop. Measured 2026-11-16 (mold, no sccache): `cargo test
+# --no-run` after a one-line edit took 73-103 s with full debuginfo and 15-16 s with line tables;
+# `target/debug` shrank from 65 GB to 24 GB. Backtraces keep file:line. For a debugger session
+# that needs locals, set `CARGO_PROFILE_DEV_DEBUG=true`. `test` inherits this; release is unaffected.
+[profile.dev]
+debug = "line-tables-only"
+
 # Fast PR tests retain release arithmetic semantics but avoid whole-program optimization.
 # The workflow restores opt-level 3 and Thin LTO on main, scheduled and manual runs.
 # Production `release` and `bench` profiles remain unchanged; CI takes no algebra measurements.

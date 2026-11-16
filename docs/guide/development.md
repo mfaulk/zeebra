@@ -318,6 +318,20 @@ ISA: baseline x86-64, NO AVX2 — RUSTFLAGS probably displaced the ISA floor
 Neither is a test asserting AVX2, because the floor is deliberately not inherited by consumers and
 such a test would fail for every downstream build.
 
+`[profile.dev]` sets `debug = "line-tables-only"`, which `test` inherits. Full debuginfo made each
+test and example binary about 1.4 GB, and `cargo test` links over a hundred of them, so linking
+dominated the edit loop. On 2026-11-16, measured with mold and without sccache, `cargo test
+--no-run` after a one-line edit fell from 73–103 s to 15–16 s, and `target/debug` shrank from 65 GB
+to 24 GB. Backtraces still carry file and line. For a debugger session that needs local
+variables, restore full debuginfo for that invocation:
+
+```sh
+CARGO_PROFILE_DEV_DEBUG=true cargo test --lib -- <filter>
+```
+
+While iterating, `cargo test --lib` or `cargo nextest run --lib` also skips building the ~90
+examples that a plain `cargo test` compiles and links.
+
 **A consumer of this crate inherits none of this.** `.cargo/config.toml` applies only when cargo
 is invoked with this directory as the working directory, and profile settings come from the
 workspace being built. A downstream build gets whatever that build configures, so a dependent
