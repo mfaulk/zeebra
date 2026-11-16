@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# #834: the M29 frozen baseline, one suite per benchlock acquisition.
+#
+#   T=/buildcache/cargo-target/zeebra-834
+#   CARGO_TARGET_DIR=$T OUT=$T/m29 tools/benchlock.sh zb-834 \
+#     timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh SUITE
+#
+# SUITE is one of:
+#   identities   executable paths, versions and SHA-256s (no timing; no lock needed)
+#   mq10         comparand-scaling.py: Zeebra, msolve, grobx, groebner-rs on MQ10 at 32003 and
+#                2^31-1, workers 1/4/8/16, five repetitions, answers checked against #739's references
+#   wide         wide-corpus.py: grobx and groebner-rs on Eco-12/2^64-353 and MQ11/Goldilocks, one
+#                worker, three passes (the controller takes one attempt per cell)
+#   walls|stages|ab831|census
+#                costmodel.py over m29_cost_model on all four targets (see that file)
+#
+# Needs a clean committed tree (both controllers refuse otherwise) and, in $CARGO_TARGET_DIR/bin,
+# m29_cost_model, m29_cost_model_work (built with research-work), zeebra_driver, wide_corpus,
+# grobx-driver and groebner-rs-driver, plus the debug competitive_sweep input exporter.
+set -u
+: "${CARGO_TARGET_DIR:?}" "${OUT:?output directory}"
+suite="${1:?suite}"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root="$(cd "$here/../.." && pwd)"
+cd "$root" || exit 2
+# shellcheck source=../../tools/external/env.sh
+. tools/external/env.sh
+bin="$CARGO_TARGET_DIR/bin"
+export PATH="$bin:$PATH" TMPDIR="$CARGO_TARGET_DIR/tmp" ZEEBRA_MACHINE=5995wx
+export ZEEBRA_GROEBNER_RS_DRIVER="$bin/groebner-rs-driver" ZEEBRA_GROBX_DRIVER="$bin/grobx-driver"
+mkdir -p "$OUT" "$TMPDIR"
+
+# Settle: wait (bounded, 10 min) for builds elsewhere to stop and the load to fall, then record
+# what the suite actually started at. Inside the lock, because a pre-lock reading is stale (#827).
+settle() {
+  local waited=0
+  while [ "$waited" -lt 600 ]; do
+    ctx="$(bash tools/cpu-context.sh 8-23)" || return 2
+    load="$(printf '%s' "$ctx" | python3 -c 'import json,sys; print(json.load(sys.stdin)["load1"])')"
+    busy="$(printf '%s' "$ctx" | python3 -c 'import json,sys; print(json.load(sys.stdin)["compilers"])')"
+    if python3 -c "import sys; sys.exit(0 if float('$load') < 8 and int('$busy') == 0 else 1)"; then
+      break
+    fi
+    sleep 15
+    waited=$((waited + 15))
+  done
+  printf '%s\n' "{\"suite\":\"$suite\",\"settle_waited_s\":$waited,\"context\":$ctx}" >>"$OUT/suite-starts.jsonl"
+  echo "suite $suite: settled after ${waited}s at load $load, compilers $busy"
+}
+
+case "$suite" in
+identities)
+  python3 "$here/identities.py" --bin "$bin" --exporter "$CARGO_TARGET_DIR/debug/examples/competitive_sweep" \
+    >"$OUT/identities.json"
+  ;;
+mq10)
+  settle
+  references=research/comparand-scaling
+  python3 tools/external/comparand-scaling.py \
+    --binary "$CARGO_TARGET_DIR/debug/examples/competitive_sweep" --input-source "$(git rev-parse HEAD)" \
+    --scratch "$OUT/mq10-scratch" --output "$OUT/mq10.json.gz" --engines zeebra,msolve,grobx,groebner-rs \
+    --fields 32003,2147483647 --rows mq-random-10 --workers 1,4,8,16 --repeats 5 --campaign-wall 1800 \
+    --references "$references/references-v1.json.gz" "$references/singular-references-v1.json.gz" \
+    "$references/singular-reference31-v1.json.gz"
+  ;;
+wide)
+  settle
+  status=0
+  for pass in 1 2 3; do
+    for cell in "wide64 eco-12" "goldilocks mq-random-11"; do
+      set -- $cell
+      out="$OUT/wide-$1-$2-pass$pass.json.gz"
+      ZEEBRA_AFFINITY=8 taskset -c 8 python3 tools/external/wide-corpus.py --binary "$bin/wide_corpus" \
+        --scratch "$OUT/wide-scratch-$1-$2-$pass" --output "$out" --fields "$1" --rows "$2" \
+        --engines grobx,groebner-rs || status=$?
+      # The controller regenerates the published #738 board from this cohort; restore it.
+      git checkout -- research/wide-corpus/BOARD.md
+    done
+  done
+  exit "$status"
+  ;;
+walls | stages | ab831)
+  settle
+  python3 "$here/costmodel.py" --binary "$bin/m29_cost_model" --suite "$suite" --reps 3 \
+    --output "$OUT/$suite.jsonl"
+  ;;
+census)
+  settle
+  python3 "$here/costmodel.py" --binary "$bin/m29_cost_model_work" --suite census --reps 1 \
+    --output "$OUT/census.jsonl"
+  ;;
+*)
+  echo "unknown suite $suite" >&2
+  exit 64
+  ;;
+esac
