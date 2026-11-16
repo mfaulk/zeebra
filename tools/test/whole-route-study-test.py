@@ -109,6 +109,36 @@ class WholeRouteStudy(unittest.TestCase):
         self.assertEqual(study.child_wall(7.8),7)
         with self.assertRaises(ValueError): study.child_wall(.5)
 
+    # The post-#813 forward phase pairs serial and 16-worker staged arms on every #751 cell, alternating order.
+    def test_forward_phase_pairs_worker_arms(self):
+        cells = list(study.plan('forward'))
+        self.assertEqual(len(cells), len(set(cells)))
+        self.assertEqual({c[-1] for c in cells}, {'forward-1', 'forward-16'})
+        pairs = {}
+        for repeat, problem, modulus, route, arm in cells:
+            pairs.setdefault((repeat, problem, modulus, route), []).append(arm)
+        self.assertTrue(all(sorted(arms) == ['forward-1', 'forward-16'] for arms in pairs.values()))
+        self.assertEqual({k[0] for k in pairs}, set(range(5)))
+        self.assertIn((0, 'katsura-11', 2147483647, 'basis'), pairs)
+        self.assertNotEqual(pairs[(0, 'katsura-6', 32003, 'fglm')], pairs[(1, 'katsura-6', 32003, 'fglm')])
+
+    # A forward arm stages the run and passes its worker count; legacy arms pass none.
+    def test_forward_arm_command_carries_worker_count(self):
+        command = study.command(Path('/nonexistent/p'), (0, 'cyclic-5', 32003, 'fglm', 'forward-16'))
+        self.assertEqual(command, ['/nonexistent/p', '32003', '--problem=cyclic-5', '--whole-route=fglm', '--stages', '--forward-workers=16'])
+        command = study.command(Path('/nonexistent/p'), (0, 'katsura-11', 2147483647, 'basis', 'forward-1'))
+        self.assertEqual(command, ['/nonexistent/p', '2147483647', '--problem=katsura-11', '--stages', '--forward-workers=1'])
+        self.assertNotIn('--forward-workers', ' '.join(study.command(Path('/nonexistent/p'), (0, 'cyclic-5', 32003, 'fglm', 'work'))))
+
+    # A response whose echoed forward-worker count differs from its arm is rejected.
+    def test_forward_worker_echo_is_checked(self):
+        raw = dict(problem='katsura-11', modulus=2147483647, basis=None, measured=True, work=None, forward_workers=16)
+        study.validate_response(raw, None, 'katsura-11', 2147483647, 'basis', 'forward-16')
+        with self.assertRaises(ValueError):
+            study.validate_response(raw, None, 'katsura-11', 2147483647, 'basis', 'forward-1')
+        with self.assertRaises(ValueError):
+            study.validate_response(dict(raw, forward_workers=None), None, 'katsura-11', 2147483647, 'basis', 'forward-16')
+
 
 CELLS = [[r, 'katsura-6', 32003, 'basis', 'stage-on'] for r in range(6)]
 IDENTITY = {key: key for key in ('commit','binary_sha256','build_commit','cargo_lock_sha256','cargo_config_sha256','rustc','machine','affinity','build','topology')}

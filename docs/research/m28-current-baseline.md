@@ -3,7 +3,8 @@
 **Status:** current cohort at `2ec9d3af` retained: pilot 6/6 and a complete native window 4 at
 **75/75** (five repetitions of every cell, #788). Native window 2 (61/75, four repetitions) is
 retained unpooled. The historical 70/75 is unchanged.
-**Measured at:** current cohort: Rust/example source and executable `2ec9d3af362b1331c8118c7ce0e0505a391b4b49`
+**Measured at:** post-#813 forward cohort (#822): source `d7f0f3e6`, controller `19abb17c`
+(binary SHA-256 `4aba5ec3e519e652…`). Current cohort: Rust/example source and executable `2ec9d3af362b1331c8118c7ce0e0505a391b4b49`
 (binary SHA-256 `cb7d3d475e586701…`), controllers `b241475b` (pilot), `680a8a12` (native windows 1–2) and `6f0a4e1b` (native windows 3–4,
 the #788 settle-wait load gate on the `680a8a12` tree).
 Historical cohort: Rust/example source `657344357a9cee9fb8d9c8409005f32ac950a2c4` (full source identity
@@ -185,6 +186,54 @@ time against basis-only targets; it does not divide a whole-route wall by a basi
 | Arithmetic/layout / #268, #270, #715 | **Defer to isolated matched controls** | coefficient products alone do not price elapsed gains |
 | Direct lex route for MQ10 | **Reject** | refuses at the column cap after 9.2 s and 1.09 GiB; grevlex+FGLM completes in 1.7 s at 52 MiB |
 | Study publication / #764 | **Done** (#765, #770) | journaled windows published 6, 60, 61, 14 and 75 cells without loss; #788's complete window needed an idle machine with builds paused |
+
+## Post-#813 cohort (#822)
+
+Since #813, production F4 defaults to adaptive forward elimination on up to 16 workers, so the
+`2ec9d3af` ceilings above describe a route that no longer ships. The `forward` phase re-runs the
+#751 cells with `--forward-workers=1` (serial) against `--forward-workers=16` (the default),
+alternating order per repetition. It uses five repetitions per arm on 16 dedicated physical cores
+(CPUs 2–17), under benchlock `m28-forward-822`: 11:39:39–11:42:11 EST, 152 s, load 0.88 → 1.19.
+**70/70 attempts are verified** against the same independent references.
+Archive: `research/m28-current-baseline/current/forward-822.json.gz`. Launcher:
+`current/run-forward-822.sh`. Summary: `summary.json`. Medians in ms:
+
+| Cell | arm | process | F4 call | whole route | symbolic | forward | backward | FGLM operator | CPU |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| MQ10, 32003 | serial | 1649.1 | 1330.7 | 1633.2 | 81.3 | 1159.6 | 40.8 | 241.6 | 1634.1 |
+| MQ10, 32003 | 16 workers | 634.1 | 301.4 | 619.5 | 96.9 | 94.9 | 46.6 | 249.1 | 1729.5 |
+| MQ10, 2^31−1 | serial | 1355.3 | 1047.4 | 1338.8 | 81.5 | 879.8 | 35.0 | 215.2 | 1341.4 |
+| MQ10, 2^31−1 | 16 workers | 602.3 | 280.9 | 586.7 | 97.8 | 80.7 | 39.8 | 222.5 | 1489.2 |
+| Katsura-11 basis, 2^31−1 | serial | 8974.7 | 8799.3 | — | 431 | 7857 | 236 | — | 8905.1 |
+| Katsura-11 basis, 2^31−1 | 16 workers | 1818.2 | 1639.7 | — | 485 | 557 | 268 | — | 9601.8 |
+
+Katsura-6 and Cyclic-5 at both moduli stay at the ~6 ms process floor in both arms. Their
+batches are below the adaptive threshold, so the two arms run the same serial code.
+
+**Same-attempt Amdahl ceilings at 16 workers** (whole route ÷ (whole route − stage)):
+
+| Cell | Stage | Share | Ceiling |
+|---|---|---:|---:|
+| MQ10 | FGLM operator construction | 38–40% | **1.61–1.67x** |
+| MQ10 | symbolic preprocessing | 16–17% | 1.19–1.20x |
+| MQ10 | forward elimination | 14–15% | 1.16–1.18x (was 2.92–3.45x serial) |
+| MQ10 | backward | 7% | 1.07–1.08x |
+| Katsura-11 basis | forward elimination | 34% | 1.51x (F4 total) |
+| Katsura-11 basis | symbolic preprocessing | 30% | 1.42x (F4 total) |
+| Katsura-11 basis | backward | 16% | 1.20x (F4 total) |
+
+**What this changes.**
+- Parallel forward elimination removed the largest term: 10.9–12.2x on MQ10's forward stage and 14.1x
+  on Katsura-11's. The whole route gained 2.3–2.6x on MQ10 and the F4 call 5.4x on Katsura-11.
+- On MQ10, FGLM operator construction is now the largest stage. The decision table above predicted
+  37–39% after an 8-worker forward phase, and 38–40% was measured, so that prediction holds.
+  Operator construction is the next investment for the solve route.
+- On the Katsura-11 basis, serial symbolic preprocessing (485 ms) is now nearly as large as the
+  parallel forward phase (557 ms).
+- Symbolic preprocessing and construction are 12–19% and 30–50% slower in the 16-worker arm (MQ10
+  81 → 97 ms, Katsura-11 431 → 485 ms), even though both run serially. Cache and memory-bandwidth
+  sharing with the just-finished worker pool is the likely cause, but this has not been isolated.
+- Residual backward stays below a 1.2x ceiling everywhere, so #730's rejection stands.
 
 ## Historical cohort (superseded, retained unchanged)
 
