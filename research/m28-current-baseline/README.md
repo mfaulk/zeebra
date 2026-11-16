@@ -317,3 +317,44 @@ verified. Window 2 is `current/native-2ec9d3af.json.gz`. Window 1 is kept off-re
 pooled with window 2. No further native window is authorized under this protocol; #788 owns a
 complete fifth repetition. The [report](../../docs/research/m28-current-baseline.md#current-cohort-at-2ec9d3af)
 gives the figures.
+
+### Settle-wait load gate (#788)
+
+Declared before any further native window. Both refused windows stopped on a one-minute load of
+4.48 and 4.09 read straight after repetition 3's Katsura-11 child, against a background of about
+3–4 from other sessions. The one-minute average decays with a 60-second time constant, so the
+reading still carries the study's own just-finished child. The gate now waits instead of refusing
+on that reading:
+
+- **Build gate** is unchanged and still refuses at once; a build is contamination, not decay.
+- **Load gate** stays at a one-minute load of at most 4 (`LOAD_GATE`). When the pre-child reading
+  is above it, the controller re-reads every 5 seconds (`SETTLE_POLL_SECONDS`) for at most
+  120 seconds (`SETTLE_SECONDS`, two time constants) and launches as soon as it clears. A load still
+  above 4 after that is the same `load-or-aggregate` refusal as before.
+- **Charging.** The wait is wall time inside the window, so it is charged to the unchanged
+  900-second aggregate cap and never sleeps past it. Window 2 used 96 seconds of child wall for
+  61 cells, so the 75-cell grid leaves room for several full waits.
+- **Recording.** Every attempt's metadata carries `settle_seconds`, and a load refusal's stop record
+  carries the wait it spent, so a reader can see which children launched after a wait.
+
+Child limits, the plan, the frozen executable and the one-further-window rule are unchanged. A new
+native window under this gate is a fresh 75-cell window from repetition 0, never a tail appended to
+window 1 or 2, and is not pooled with them.
+
+Native window 3 (controller `6f0a4e1b`, branch `research/788-native-controller`, same frozen
+executable, benchlock START 2026-11-15T20:35:22-05:00 at load 2.81) accepted 14 verified children of
+repetition 0, then stopped as `compiler` contamination: another session's `cargo`/`rustc` started
+during child 15 (Katsura-11, basis, stage-on). The load never exceeded 2.66 before a child, so the
+settle wait did not engage. The archive is kept off-repository at
+`/buildcache/cargo-target/zeebra-788/native-w3/` (SHA-256 `f2126008…6f90c42`) and is not pooled.
+Under the one-further-window rule, one fresh native window remains; it needs builds paused as well
+as a quiet load, since the build gate, not the load gate, ended this one.
+
+Native window 4, the last window allowed, ran with the machine idle and builds paused
+(benchlock START 2026-11-15T21:39:08-05:00, load 0.26, 167 s). It accepted **75/75**, all verified,
+with a pre-child load of at most 1.47 and no settle wait. It is retained as
+`current/native-2ec9d3af-w4.json.gz` (SHA-256 `13c36e9c…c53f9b2b`), summarized as its own
+cohort by `summarize.py`, and not pooled with window 2. The
+[report](../../docs/research/m28-current-baseline.md#complete-native-window-4-788) replaces the
+four-repetition medians with its five-repetition medians.
+

@@ -1,9 +1,11 @@
 # M28 current whole-route baseline (#751)
 
-**Status:** current cohort at `2ec9d3af` retained: pilot 6/6, native 61/75 (four complete repetitions
-of every cell). The fifth native repetition is a precise deferral to #788. The historical 70/75 is unchanged.
+**Status:** current cohort at `2ec9d3af` retained: pilot 6/6 and a complete native window 4 at
+**75/75** (five repetitions of every cell, #788). Native window 2 (61/75, four repetitions) is
+retained unpooled. The historical 70/75 is unchanged.
 **Measured at:** current cohort: Rust/example source and executable `2ec9d3af362b1331c8118c7ce0e0505a391b4b49`
-(binary SHA-256 `cb7d3d475e586701…`), controllers `b241475b` (pilot) and `680a8a12` (native).
+(binary SHA-256 `cb7d3d475e586701…`), controllers `b241475b` (pilot), `680a8a12` (native windows 1–2) and `6f0a4e1b` (native windows 3–4,
+the #788 settle-wait load gate on the `680a8a12` tree).
 Historical cohort: Rust/example source `657344357a9cee9fb8d9c8409005f32ac950a2c4` (full source identity
 is authoritative in the retained compilation provenance); initial native controller `9e2017806b95cbf88a904ad9213d324c2a1f5b0e`,
 amended implementation `5e2bf3d8`, launch controller `9dafa38271b39f24496119df4b164e47175d1ba1`.
@@ -47,9 +49,47 @@ after a sampled refusal, so the native campaign stops here. Window 2 is the reta
 SHA-256 `45860857b39ff48816eb843e371cc1e79be51b4923d4e75053265de6afec6fa1`). Window 1 is retained
 outside the repository (SHA-256 `f6c432e5405a87d42df5b0f9dce2973d5632d55eecf40a8ea11ed64de4b45a09`,
 68 MB) as an independent replicate. It is never pooled, and its MQ10 and Katsura-11 medians agree
-with window 2 to within 1.3%. **Deferral:** the fifth repetition is missing for every cell except
-the first MQ10/GF(32003) stage-off. [#788](https://github.com/mfaulk/zeebra/issues/788) owns a single
-complete window. The figures below use four repetitions; none is presented as a five-repeat median.
+with window 2 to within 1.3%. The fifth repetition was then taken by
+[#788](https://github.com/mfaulk/zeebra/issues/788), as described next.
+
+### Complete native window 4 (#788)
+
+#788 declared a settle-wait load gate before relaunching
+([protocol](../../research/m28-current-baseline/README.md#settle-wait-load-gate-788)). Its first
+window, window 3, accepted 14 verified children and was then contaminated when another session
+started `cargo`/`rustc` during child 15. It is retained off-repository and not pooled. The
+protocol allowed one more window. **Window 4** ran with the machine idle and builds paused
+(benchlock START 2026-11-15T21:39:08-05:00 at load 0.26, 167 s elapsed). It accepted **75/75**,
+all independently verified, with a pre-child load of at most 1.47. No settle wait was needed. The
+archive is [`current/native-2ec9d3af-w4.json.gz`](../../research/m28-current-baseline/current/native-2ec9d3af-w4.json.gz)
+(SHA-256 `13c36e9c9b2779f38a814eed745a64be2ec61c6b19ac51b3db0ccbd9c53f9b2b`). It uses the same
+frozen executable, plan and limits as window 2 and is never pooled with it.
+
+Window 4's five-repetition medians **replace** window 2's four-repetition medians as the shipping
+baseline. They do not merely confirm them: every cell above 1 s is 2–4% faster, and most
+min–max ranges do not overlap. Window 2 ran against an ambient load of about 3–4 from other
+sessions, and window 4 ran on an idle machine. That difference is consistent with the offset, but
+it was not tested separately. The exact work counters are identical across windows, and so are
+the stage shares and per-attempt ceilings, to within 0.3 percentage points. The ranking and every
+decision below are therefore unchanged.
+
+| Window 4 cell (n=5) | Process ms, median [min,max] | Window 2 (n=4) | Whole-route ms | F4 ms | Conversion ms | Self RSS MiB |
+|---|---:|---:|---:|---:|---:|---:|
+| MQ10 / 32003 stage-off | 1632.174 [1623.630,1658.425] | 1705.130 (n=5) | 1618.430 | 1301.832 | 272.595 | 50.18 |
+| MQ10 / 32003 stage-on | 1634.421 [1621.382,1649.311] | 1703.760 | 1623.978 | 1299.147 | 273.376 | 50.21 |
+| MQ10 / M31 stage-off | 1866.543 [1857.849,1874.116] | 1938.946 | 1851.065 | 1393.245 | 393.591 | 52.70 |
+| MQ10 / M31 stage-on | 1867.166 [1848.565,1925.132] | 1909.365 | 1851.573 | 1388.612 | 393.788 | 52.61 |
+| Katsura-11 / M31 basis | 12214.356 [12164.949,12374.168] | 12582.089 | — | 12035.801 | — | 116.56 |
+
+| Window 4 stage-on median, ms | Symbolic | Construction | Forward | Backward | Extraction | Interreduction | Operators | Quotient | Dependence | Recovery | Checkpoint |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| MQ10 / 32003 | 83.414 | 17.982 | 1120.867 | 43.907 | 8.308 | 12.573 | 255.073 | 1.696 | 15.684 | 0.706 | 2.332 |
+| MQ10 / M31 | 84.554 | 17.735 | 1205.416 | 49.196 | 8.312 | 12.674 | 293.093 | 1.714 | 98.741 | 18.951 | 2.991 |
+
+In window 4, forward elimination is 69.0% / 65.1% of the stage-on whole route (ceilings 3.25x /
+2.88x), operators 15.7% / 15.8%, symbolic preprocessing 5.1% / 4.6% and candidate backward 2.7%.
+The Katsura-6 and Cyclic-5 controls are 7.3–7.6 ms of process wall around a whole route under
+2 ms. The figures from here to the cost model are window 2's, retained as its four-repetition record.
 
 **Pilot outcomes** ([archive](../../research/m28-current-baseline/current/pilot-2ec9d3af.json.gz)).
 The direct-lex MQ10/GF(32003) control, which was never attempted in the historical cohort, is now
@@ -128,8 +168,8 @@ are computed from medians. After an ideal 8-worker forward phase, operators beco
 37% (M31) of the remaining whole route, and symbolic preprocessing becomes 13% and 11%.
 
 Compare these with #739's ≤8- and ≤16-core complete-basis targets: 0.1168 s for MQ10 at GF(32003)
-and 0.1670 s at M31. Even a free forward phase leaves F4 at about 188 and 186 ms, above both
-targets. **Forward parallelism alone cannot meet #739's MQ10 targets.** Symbolic preprocessing and
+and 0.1670 s at M31. Even a free forward phase leaves F4 at about 188 and 186 ms (178 and 183 ms in
+window 4), above both targets. **Forward parallelism alone cannot meet #739's MQ10 targets.** Symbolic preprocessing and
 candidate backward, about 133–138 ms together, would also have to shrink. This comparison sets F4-call
 time against basis-only targets; it does not divide a whole-route wall by a basis wall.
 
@@ -144,7 +184,7 @@ time against basis-only targets; it does not divide a whole-route wall by a basi
 | Block/scalar reconstruction / #731 | **Defer** | adaptive selection made zero scalar attempts on these dense operators |
 | Arithmetic/layout / #268, #270, #715 | **Defer to isolated matched controls** | coefficient products alone do not price elapsed gains |
 | Direct lex route for MQ10 | **Reject** | refuses at the column cap after 9.2 s and 1.09 GiB; grevlex+FGLM completes in 1.7 s at 52 MiB |
-| Study publication / #764 | **Done** (#765, #770) | journaled windows published 6, 60 and 61 cells without loss; the binding limit is now the shared-machine load gate (#788) |
+| Study publication / #764 | **Done** (#765, #770) | journaled windows published 6, 60, 61, 14 and 75 cells without loss; #788's complete window needed an idle machine with builds paused |
 
 ## Historical cohort (superseded, retained unchanged)
 
@@ -353,4 +393,5 @@ The two originally unattempted pilot tail cells remain separate from this native
 | Adopt/reject/defer each next investment | Done (decision table) |
 
 The historical pilot's two tail cells are now superseded by the complete current pilot. #751's
-gates are met by measurement or by a named, precise deferral (#788).
+gates are met by measurement. The fifth native repetition, first deferred, was completed by #788's
+window 4.
