@@ -255,6 +255,10 @@ impl<const P: u32> One for PrimeFieldElement32<P> {
 impl<const P: u32> Ring for PrimeFieldElement32<P> {}
 
 impl<const P: u32> FiniteField for PrimeFieldElement32<P> {
+    fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
+        Some(crate::linalg::concurrent::Dispatch::new())
+    }
+
     fn new(val: u64) -> Self {
         // The argument is a `u64` because the trait says so; a value above P reduces, as it does
         // for every other prime field here.
