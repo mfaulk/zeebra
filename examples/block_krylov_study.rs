@@ -76,6 +76,24 @@ impl<F: FiniteField> Mirror<F> {
             }
         }
     }
+
+    /// `transpose_block` with a compile-time width, each coordinate's lanes held as one array.
+    fn transpose_lanes<const W: usize>(&self, x: &[[F; W]], y: &mut [[F; W]]) {
+        for (column, out) in self.columns.iter().zip(y.iter_mut()) {
+            *out = match column {
+                Column::Unit(k) => x[*k],
+                Column::Sparse(entries) => {
+                    let mut acc = [F::zero(); W];
+                    for (k, c) in entries.iter() {
+                        for (slot, value) in acc.iter_mut().zip(&x[*k]) {
+                            *slot += *c * *value;
+                        }
+                    }
+                    acc
+                }
+            };
+        }
+    }
 }
 
 /// Every projection's sequence `s[b][i][k] = <(A^T)^k r_b, u_i>` for `k < len`, `u_i` sparse.
@@ -96,6 +114,58 @@ pub fn serial<F: FiniteField>(
 
 /// One sweep of width `projections.len()`: each operator entry is loaded once per step.
 pub fn batched<F: FiniteField>(
+    a: &Mirror<F>,
+    projections: &[Vec<F>],
+    left: &[Vec<(usize, F)>],
+    len: usize,
+) -> Sequences<F> {
+    match projections.len() {
+        1 => lanes::<F, 1>(a, projections, left, len),
+        2 => lanes::<F, 2>(a, projections, left, len),
+        4 => lanes::<F, 4>(a, projections, left, len),
+        8 => lanes::<F, 8>(a, projections, left, len),
+        _ => runtime_width(a, projections, left, len),
+    }
+}
+
+/// The predeclared widths, with lanes the compiler can keep in registers.
+fn lanes<F: FiniteField, const W: usize>(
+    a: &Mirror<F>,
+    projections: &[Vec<F>],
+    left: &[Vec<(usize, F)>],
+    len: usize,
+) -> Sequences<F> {
+    let d = a.dimension();
+    let mut x = vec![[F::zero(); W]; d];
+    for (b, r) in projections.iter().enumerate() {
+        for (lanes, value) in x.iter_mut().zip(r) {
+            lanes[b] = *value;
+        }
+    }
+    let mut y = x.clone();
+    let mut out = vec![vec![Vec::with_capacity(len); left.len()]; W];
+    for step in 0..len {
+        for (i, u) in left.iter().enumerate() {
+            let mut dot = [F::zero(); W];
+            for (k, c) in u {
+                for (slot, value) in dot.iter_mut().zip(&x[*k]) {
+                    *slot += *c * *value;
+                }
+            }
+            for (sequence, value) in out.iter_mut().zip(dot) {
+                sequence[i].push(value);
+            }
+        }
+        if step + 1 < len {
+            a.transpose_lanes(&x, &mut y);
+            std::mem::swap(&mut x, &mut y);
+        }
+    }
+    out
+}
+
+/// Any other width, through the interleaved runtime-width kernel.
+fn runtime_width<F: FiniteField>(
     a: &Mirror<F>,
     projections: &[Vec<F>],
     left: &[Vec<(usize, F)>],
@@ -558,7 +628,7 @@ mod tests {
             let op = algebra.operator(2);
             let a = Mirror::new(op);
             let d = a.dimension();
-            let projections = random(d, 4, 2);
+            let projections = random(d, 8, 2);
             let left: Vec<Vec<(usize, Zp65537)>> = vec![
                 vec![(0, Zp65537::one())],
                 vec![(d - 1, Zp65537::new(5)), (1, Zp65537::new(3))],
@@ -582,7 +652,7 @@ mod tests {
                     }
                 }
             }
-            for width in [1, 2, 4] {
+            for width in [1, 2, 3, 4, 8] {
                 let p = &projections[..width];
                 assert_eq!(batched(&a, p, &left, len), reference[..width]);
                 assert_eq!(threaded(&a, p, &left, len), reference[..width]);
