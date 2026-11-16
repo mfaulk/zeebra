@@ -220,4 +220,4 @@ kernel is ever proposed for F4, it is the dense echelon of `D'` on instances at 
 `mq-random-14`, gated by §5 step 1, which needs no GPU.
 
 Handoffs: the density and work-share numbers to #86 (E1); the "mechanism unknown" finding to #69;
-the missing GF(2^8) random-MQ corpus entry and §5 step 1 as follow-up issues.
+the missing GF(2^8) random-MQ corpus entry and §5 step 1 as #804 and #803.
