@@ -159,6 +159,10 @@ impl<const P: u64> FiniteField for BinaryFieldElement<P> {
         Some(crate::linalg::concurrent::Dispatch::new())
     }
 
+    fn run_concurrent<J: crate::fields::ConcurrentJob<Self>>(job: J) -> Result<J::Output, J> {
+        Ok(job.run())
+    }
+
     /// `val mod 2`: the prime subfield GF(2), which is all the integers reach here.
     ///
     /// Not the inherent [`BinaryFieldElement::new`], which takes a bit pattern and reaches every

@@ -256,6 +256,10 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
         Some(crate::linalg::concurrent::Dispatch::new())
     }
 
+    fn run_concurrent<J: crate::fields::ConcurrentJob<Self>>(job: J) -> Result<J::Output, J> {
+        Ok(job.run())
+    }
+
     fn new(val: u64) -> Self {
         Self {
             value: montgomery::to_internal::<P>(val % P),

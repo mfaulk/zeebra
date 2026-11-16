@@ -443,6 +443,7 @@ mod tests {
         );
         assert_eq!(recommended.operator_storage, OperatorStorage::Adaptive);
         assert_eq!(recommended.border_batch.size, BorderBatchSize::Fixed(64));
+        assert_eq!(recommended.border_batch.workers, 16);
     }
 
     /// The baseline still names M17's strategies, so a figure quoted against it keeps its meaning.

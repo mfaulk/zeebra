@@ -4166,3 +4166,52 @@ fn test_reduced_batches_complete_the_measured_live_budget_regression() {
             if limit == binding_cap && nonzeros > limit
     ));
 }
+
+// === #827: level-synchronous parallel symbolic preprocessing ===
+
+/// Every traced batch's level-parallel closure equals the serial closure, at every worker count.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_level_parallel_symbolic_preprocessing_matches_the_serial_closure() {
+    use crate::grobner::f4::{
+        observer::trace_batches, symbolic::symbolic_preprocessing_level_parallel,
+    };
+    type G = Zp2147483647;
+    fn check<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, G>]) -> usize {
+        let options = F4Options::default();
+        let mut compared = 0;
+        for order in ALL_ORDERS {
+            let (_, _, trace) = trace_batches(system, order, &options).expect("within limits");
+            for (index, batch) in trace.batches().iter().enumerate() {
+                let serial = symbolic_preprocessing_with(
+                    &batch.basis,
+                    &batch.pairs,
+                    usize::MAX,
+                    options.reducer_selection,
+                    &mut ReducerCache::disabled(),
+                )
+                .unwrap();
+                for workers in [1, 2, 5, 16] {
+                    for min_frontier in [0, 64] {
+                        let parallel = symbolic_preprocessing_level_parallel(
+                            &batch.basis,
+                            &batch.pairs,
+                            options.reducer_selection,
+                            workers,
+                            min_frontier,
+                        );
+                        assert_eq!(
+                            parallel, serial,
+                            "{name} under {order:?}, batch {index}, {workers} workers, \
+                             min frontier {min_frontier}"
+                        );
+                        compared += 1;
+                    }
+                }
+            }
+        }
+        compared
+    }
+    let compared = check("katsura-6", &katsura::<6, G>()) + check("cyclic-5", &cyclic::<5, G>());
+    assert!(compared > 0, "no batch was compared");
+}

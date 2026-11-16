@@ -296,6 +296,10 @@ impl<const P: u32> FiniteField for PrimeFieldElement32<P> {
     fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
         Some(crate::linalg::concurrent::Dispatch::new())
     }
+
+    fn run_concurrent<J: crate::fields::ConcurrentJob<Self>>(job: J) -> Result<J::Output, J> {
+        Ok(job.run())
+    }
 }
 
 impl<const P: u32> PrimeFieldElement32<P> {

@@ -5,11 +5,14 @@
 //! provided, because the conversion never performs one: it starts from the class of 1 and reaches
 //! every candidate monomial by applying one variable at a time.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use crate::{
+    fields::ConcurrentJob,
     grobner::{
-        f4::{MonicBasis, StageClock},
+        f4::{options::available_parallelism, MonicBasis, StageClock},
         fglm::{
-            batch::{self, BatchOverflow, BorderBatchStatistics},
+            batch::{self, BatchOverflow, BorderBatch, BorderBatchStatistics},
             border::{BorderIndex, ColumnTarget},
             multiplication::{MultiplicationOperator, OperatorBuilder},
             options::OperatorConstruction,
@@ -387,23 +390,68 @@ fn batched_border<const N: usize, F: FiniteField>(
     let monic = MonicBasis::new(&nonzero, order);
 
     let chunk = options.border_batch.size.chunk(targets.len());
+    let groups: Vec<&[Monomial<N>]> = targets.chunks(chunk).collect();
+    let workers = if groups.len() < MIN_CONCURRENT_BATCHES {
+        1
+    } else {
+        options
+            .border_batch
+            .workers
+            .min(groups.len())
+            .min(available_parallelism())
+    };
+
+    // On workers, every batch is reduced and indexed before any is accounted for, and the
+    // accounting below then runs in batch order — so the answers, the counters and the error
+    // returned under `BatchOverflow::Fail` are the serial path's. The region's wall clock is
+    // charged to `border_symbolic`, column indexing included, since it ran inside it.
+    let mut precomputed = None;
+    if workers > 1 {
+        let job = BorderJob {
+            groups: &groups,
+            basis: &monic,
+            order,
+            quotient,
+            limits: &options.border_batch,
+            measure: options.measure_stages,
+            workers,
+        };
+        if let Ok(outcomes) = F::run_concurrent(job) {
+            statistics.timings.border_symbolic += clock.lap();
+            precomputed = Some(outcomes);
+        }
+    }
+    let mut precomputed = precomputed.map(Vec::into_iter);
+
     let mut shared: Vec<Vec<(usize, F)>> = Vec::with_capacity(targets.len());
 
-    for group in targets.chunks(chunk) {
-        let outcome = batch::reduce_batch(
-            group,
-            &monic,
-            order,
-            &options.border_batch,
-            options.measure_stages,
-        );
-        statistics.timings.border_symbolic += clock.lap();
+    for group in groups {
+        let outcome = match precomputed.as_mut() {
+            Some(outcomes) => outcomes.next().expect("one outcome per batch"),
+            None => {
+                let outcome = batch::reduce_batch(
+                    group,
+                    &monic,
+                    order,
+                    &options.border_batch,
+                    options.measure_stages,
+                );
+                statistics.timings.border_symbolic += clock.lap();
+                outcome.map(|(remainders, batch_statistics)| {
+                    let columns = remainders
+                        .iter()
+                        .map(|remainder| coordinates_of_monomials(remainder, quotient))
+                        .collect();
+                    (columns, batch_statistics)
+                })
+            }
+        };
 
-        let remainders = match outcome {
-            Ok((remainders, batch_statistics)) => {
+        let columns = match outcome {
+            Ok((columns, batch_statistics)) => {
                 batch::accumulate(&mut statistics.batches, &batch_statistics);
                 statistics.border.normal_form_calls += group.len();
-                remainders
+                columns
             }
             Err(e) => match options.border_batch.on_overflow {
                 BatchOverflow::Fail => return Err(e),
@@ -422,13 +470,89 @@ fn batched_border<const N: usize, F: FiniteField>(
             },
         };
 
-        for remainder in remainders {
-            shared.push(coordinates_of_monomials(&remainder, quotient));
-        }
+        shared.extend(columns);
         statistics.timings.column_assembly += clock.lap();
     }
 
     Ok(shared)
+}
+
+/// Fewer batches than this stay on the calling thread whatever `BorderBatch::workers` says.
+///
+/// Measured with `fglm_operator_probe` (#826): katsura-6's two batches lost 12–60 µs to the spawn,
+/// cyclic-5's three were even, and katsura-7's four gained 1.6x.
+const MIN_CONCURRENT_BATCHES: usize = 4;
+
+/// One batch's coordinate columns and figures, or the limit it crossed.
+type BatchOutcome<F> = Result<(Vec<Vec<(usize, F)>>, BorderBatchStatistics), FglmError>;
+
+/// Border batches shared out over scoped threads by [`batched_border`].
+struct BorderJob<'a, const N: usize, F: FiniteField> {
+    groups: &'a [&'a [Monomial<N>]],
+    basis: &'a MonicBasis<N, F>,
+    order: MonomialOrder,
+    quotient: &'a QuotientBasis<N>,
+    limits: &'a BorderBatch,
+    measure: bool,
+    workers: usize,
+}
+
+impl<const N: usize, F: FiniteField> ConcurrentJob<F> for BorderJob<'_, N, F> {
+    /// One outcome per batch, in batch order.
+    type Output = Vec<BatchOutcome<F>>;
+
+    fn run(self) -> Self::Output
+    where
+        F: Send + Sync,
+    {
+        // Claimed one at a time from a shared counter: closures differ in size across the border,
+        // so static blocks would leave the worker with the largest ones finishing alone.
+        let next = AtomicUsize::new(0);
+        let mut claimed: Vec<(usize, BatchOutcome<F>)> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..self.workers)
+                .map(|_| {
+                    let next = &next;
+                    let job = &self;
+                    scope.spawn(move || {
+                        let mut done = Vec::new();
+                        loop {
+                            let index = next.fetch_add(1, Ordering::Relaxed);
+                            let Some(group) = job.groups.get(index) else {
+                                return done;
+                            };
+                            let outcome = batch::reduce_batch(
+                                group,
+                                job.basis,
+                                job.order,
+                                job.limits,
+                                job.measure,
+                            )
+                            .map(|(remainders, batch_statistics)| {
+                                let columns = remainders
+                                    .iter()
+                                    .map(|remainder| {
+                                        coordinates_of_monomials(remainder, job.quotient)
+                                    })
+                                    .collect();
+                                (columns, batch_statistics)
+                            });
+                            done.push((index, outcome));
+                        }
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .flat_map(|handle| match handle.join() {
+                    Ok(done) => done,
+                    Err(panic) => std::panic::resume_unwind(panic),
+                })
+                .collect()
+        });
+        claimed.sort_unstable_by_key(|(index, _)| *index);
+        debug_assert_eq!(claimed.len(), self.groups.len());
+        claimed.into_iter().map(|(_, outcome)| outcome).collect()
+    }
 }
 
 /// `(monomial, coefficient)` pairs as a coordinate vector, ascending by index.
@@ -519,7 +643,10 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             f4,
-            fglm::{FglmError, FglmOptions, OperatorConstruction, OperatorStorage},
+            fglm::{
+                BatchOverflow, BorderBatch, BorderBatchSize, FglmError, FglmOptions,
+                OperatorConstruction, OperatorStorage,
+            },
         },
         FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
@@ -1060,6 +1187,100 @@ mod tests {
             .map(|v| F::new(*v))
             .collect();
         check("planted-6", &planted::<6, F>(&point), grevlex);
+    }
+
+    /// Batches spread over worker threads give the serial path's operators and counters exactly.
+    #[test]
+    fn test_border_workers_reproduce_the_serial_construction() {
+        fn check<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, F>]) {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let basis = f4(system, order).expect("within limits");
+            // Batches of four, so even a small border is several batches and the workers have
+            // something to share out.
+            let serial = FglmOptions::recommended().with_border_batch(
+                BorderBatch::recommended()
+                    .with_size(BorderBatchSize::Fixed(4))
+                    .with_workers(1),
+            );
+            let (reference, reference_statistics) =
+                QuotientAlgebra::new_with_statistics(&basis, order, &serial).expect("finite");
+            assert!(
+                reference_statistics.batches.batches >= super::MIN_CONCURRENT_BATCHES,
+                "{name}: too few batches to leave the calling thread"
+            );
+
+            for workers in [2, 3, 16] {
+                let options = serial.with_border_batch(serial.border_batch.with_workers(workers));
+                let (parallel, statistics) =
+                    QuotientAlgebra::new_with_statistics(&basis, order, &options).expect("finite");
+                assert_eq!(reference, parallel, "{name} at {workers} workers");
+                assert_eq!(reference_statistics.border, statistics.border);
+                let (a, b) = (reference_statistics.batches, statistics.batches);
+                assert_eq!(
+                    (
+                        a.batches,
+                        a.fallbacks,
+                        a.reducer_rows,
+                        a.columns,
+                        a.reducer_entries
+                    ),
+                    (
+                        b.batches,
+                        b.fallbacks,
+                        b.reducer_rows,
+                        b.columns,
+                        b.reducer_entries
+                    ),
+                    "{name} at {workers} workers"
+                );
+                assert_eq!(a.peak_reducer_entries, b.peak_reducer_entries);
+                assert_eq!(a.buffer_cells_zeroed, b.buffer_cells_zeroed);
+            }
+        }
+
+        check("katsura-5", &katsura::<5, F>());
+        check("cyclic-5", &cyclic::<5, F>());
+        let point: Vec<F> = [3u64, 5, 7, 11, 13, 17]
+            .iter()
+            .map(|v| F::new(*v))
+            .collect();
+        check("planted-6", &planted::<6, F>(&point));
+    }
+
+    /// A batch over its limits fails, or falls back to scalar, the same way on workers as serially.
+    #[test]
+    fn test_border_workers_keep_the_overflow_policy() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = f4(&katsura::<5, F>(), order).expect("within limits");
+        let tight = BorderBatch {
+            max_reducer_rows: 3,
+            ..BorderBatch::recommended().with_size(BorderBatchSize::Fixed(4))
+        };
+        for policy in [BatchOverflow::Fail, BatchOverflow::Scalar] {
+            let run = |workers| {
+                let options = FglmOptions::recommended()
+                    .with_border_batch(tight.with_overflow(policy).with_workers(workers));
+                QuotientAlgebra::new_with_statistics(&basis, order, &options)
+            };
+            match (run(1), run(8)) {
+                (Err(serial), Err(parallel)) => {
+                    assert_eq!(policy, BatchOverflow::Fail);
+                    assert_eq!(serial, parallel);
+                }
+                (Ok((serial, a)), Ok((parallel, b))) => {
+                    assert_eq!(policy, BatchOverflow::Scalar);
+                    assert_eq!(serial, parallel);
+                    assert!(a.batches.fallbacks > 0);
+                    assert_eq!(a.batches.fallbacks, b.batches.fallbacks);
+                    assert_eq!(a.border, b.border);
+                }
+                (serial, parallel) => panic!(
+                    "{policy:?}: serial {:?} against parallel {:?}",
+                    serial.err(),
+                    parallel.err()
+                ),
+            }
+        }
     }
 
     /// Deduplication reduces once per distinct border monomial, not once per column.

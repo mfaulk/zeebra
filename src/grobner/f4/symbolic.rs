@@ -1166,6 +1166,162 @@ fn close_over_rows<const N: usize, F: FiniteField>(
     })
 }
 
+/// Research prototype for #827: [`symbolic_preprocessing_with`]'s closure, level by level.
+///
+/// The FIFO queue processes the closure in breadth-first levels, and within a level no monomial's
+/// processing can change another's: the frontier holds distinct monomials, so `covered` gains only
+/// monomials the level is not about to test. Workers therefore test a frozen level in parallel —
+/// the covered check, the divisor search, the multiple's terms, and each term's handle if
+/// `examined` held it before the level — and the caller commits the results in frontier order,
+/// interning only the terms the level met first. The result, counters included, is the serial
+/// one; `test_level_parallel_symbolic_preprocessing_matches_the_serial_closure` checks it.
+///
+/// Unbudgeted and uncached, with no seed policy: a pricing instrument, not a shipping route.
+/// A level smaller than `min_frontier`, or `workers <= 1`, runs on the calling thread.
+#[cfg(feature = "research-work")]
+pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sync>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    selection: ReducerSelection,
+    workers: usize,
+    min_frontier: usize,
+) -> Preprocessed<N> {
+    /// A level slice's results: per monomial, the reducer and the range of its terms in `terms`.
+    struct Scanned<const N: usize> {
+        found: Vec<Option<(usize, Monomial<N>, usize, usize)>>,
+        terms: Vec<(Monomial<N>, Option<MonomialHandle>)>,
+        counts: SymbolicCounts,
+    }
+    fn scan<const N: usize, F: FiniteField>(
+        basis: &MonicBasis<N, F>,
+        selection: ReducerSelection,
+        covered: &MonomialSet<N>,
+        examined: &MonomialMap<N, MonomialHandle>,
+        slice: &[Monomial<N>],
+    ) -> Scanned<N> {
+        let mut scanned = Scanned {
+            found: Vec::with_capacity(slice.len()),
+            terms: Vec::new(),
+            counts: SymbolicCounts::default(),
+        };
+        for monomial in slice {
+            let divisor = if covered.contains(monomial) {
+                None
+            } else {
+                basis.find_divisor_with(monomial, selection, &mut scanned.counts)
+            };
+            scanned.found.push(divisor.map(|(index, multiplier)| {
+                let start = scanned.terms.len();
+                scanned.terms.extend(
+                    basis
+                        .shifted_terms(index, &multiplier)
+                        .map(|(term, _)| (term, examined.get(&term).copied())),
+                );
+                (index, multiplier, start, scanned.terms.len())
+            }));
+        }
+        scanned
+    }
+
+    let mut counts = SymbolicCounts::default();
+    let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
+    let mut covered: MonomialSet<N> = MonomialSet::default();
+    for (position, pair) in pairs.iter().enumerate() {
+        for basis_index in [pair.left, pair.right] {
+            let multiplier = pair
+                .lcm
+                .checked_div(&basis.element(basis_index).leading_monomial)
+                .expect("a pair's lcm is divisible by each of its leading monomials");
+            rows.push(PreprocessedRow {
+                multiplier,
+                basis_index,
+                kind: RowKind::PairComponent { pair: position },
+            });
+        }
+        covered.insert(pair.lcm);
+    }
+
+    let mut examined: MonomialMap<N, MonomialHandle> = MonomialMap::default();
+    let mut monomials: Vec<Monomial<N>> = Vec::new();
+    let mut term_handles: Vec<MonomialHandle> = Vec::new();
+    // A `VecDeque` only because `enqueue` takes one; it is drained whole, a level at a time.
+    let mut next: VecDeque<Monomial<N>> = VecDeque::new();
+    for row in &rows {
+        for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
+            term_handles.push(enqueue(
+                monomial,
+                &mut next,
+                &mut examined,
+                &mut monomials,
+                &mut counts,
+            ));
+        }
+    }
+    counts.max_pending_monomials = next.len();
+
+    while !next.is_empty() {
+        let frontier: Vec<Monomial<N>> = std::mem::take(&mut next).into();
+        let slices: Vec<Scanned<N>> = if workers <= 1 || frontier.len() < min_frontier {
+            vec![scan(basis, selection, &covered, &examined, &frontier)]
+        } else {
+            let chunk = frontier.len().div_ceil(workers);
+            let (covered, examined) = (&covered, &examined);
+            std::thread::scope(|scope| {
+                let handles: Vec<_> = frontier
+                    .chunks(chunk)
+                    .map(|slice| {
+                        scope.spawn(move || scan(basis, selection, covered, examined, slice))
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|handle| handle.join().expect("a symbolic worker panicked"))
+                    .collect()
+            })
+        };
+        let mut position = 0;
+        for scanned in slices {
+            counts.add(&scanned.counts);
+            for found in scanned.found {
+                let monomial = frontier[position];
+                position += 1;
+                let Some((basis_index, multiplier, start, end)) = found else {
+                    continue;
+                };
+                covered.insert(monomial);
+                for &(term, known) in &scanned.terms[start..end] {
+                    term_handles.push(match known {
+                        Some(handle) => {
+                            counts.monomials_enqueued += 1;
+                            handle
+                        }
+                        None => {
+                            enqueue(term, &mut next, &mut examined, &mut monomials, &mut counts)
+                        }
+                    });
+                }
+                // The serial queue here holds the rest of this level and what it has admitted.
+                counts.max_pending_monomials = counts
+                    .max_pending_monomials
+                    .max(frontier.len() - position + next.len());
+                rows.push(PreprocessedRow {
+                    multiplier,
+                    basis_index,
+                    kind: RowKind::Reducer,
+                });
+            }
+        }
+    }
+
+    Preprocessed {
+        rows,
+        leading_monomials: covered,
+        monomials,
+        term_handles,
+        counts,
+    }
+}
+
 /// Offer `monomial` to the pending queue, admitting it only if `examined` had not seen it, and
 /// return its handle either way.
 ///

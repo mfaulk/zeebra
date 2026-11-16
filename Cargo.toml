@@ -301,6 +301,10 @@ name = "mq10_profile"
 required-features = ["external-runners"]
 
 [[example]]
+name = "fglm_operator_probe"
+required-features = ["external-runners"]
+
+[[example]]
 name = "msolve_gap"
 required-features = ["external-runners"]
 
@@ -335,6 +339,10 @@ required-features = ["research-work"]
 [[example]]
 name = "symbolic_attribution"
 test = true
+required-features = ["external-runners", "research-work"]
+
+[[example]]
+name = "symbolic_parallel_price"
 required-features = ["external-runners", "research-work"]
 
 [[example]]

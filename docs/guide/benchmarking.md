@@ -708,7 +708,7 @@ reduction is worth avoiding: 0.07% to 0.38% of the reduction it precedes on the 
 reduction dominates, so no. `cargo bench --bench fglm -- fglm_operator_construction` is the same
 comparison under Criterion.
 
-`fglm_parallel` is why the batched border reduction is **not** parallelized, measured rather than
+`fglm_parallel` is why one border batch's target loop is **not** parallelized, measured rather than
 argued, and it is the entry point for anyone who wants to re-open that. Its target loop is the one
 loop in the project whose iterations are genuinely independent — the reducer pivots are fixed before
 any border monomial is touched — and that is not enough. Four tables, selected by name because they
@@ -722,6 +722,17 @@ worker is the fastest row on every system in the corpus. §6.8 of
 [`docs/MILESTONE-FGLM-SCALABILITY.md`](../MILESTONE-FGLM-SCALABILITY.md) has the figures and the
 decision; `BorderReduction::Grouped` is the decomposition without the threads, kept because the
 carry's cost is a measurement.
+
+That refutation is about splitting *one batch's* target loop. Sharing *whole batches* across
+threads is a different decomposition: each worker builds a closure and reduces it, so there is no
+carry to give up and one dispatch covers a batch's closure as well as its reduction. #826 ships it as
+`BorderBatch::workers`. `fglm_operator_probe` is its A/B. It builds one source basis per system,
+times `QuotientAlgebra` construction at each worker count given (fastest of `REPS`, default 7), and
+asserts that every count's operators equal the first count's:
+
+```bash
+cargo run --release --features external-runners --example fglm_operator_probe -- 1 16
+```
 
 `wiedemann_conversion` alternates classical and adaptive conversion on identical prepared bases,
 asserts exact basis equality, and prints the chosen route, projection attempts, fallback reason,

@@ -108,6 +108,10 @@ impl<const P: u128> FiniteField for PrimeFieldElement128<P> {
         Some(crate::linalg::concurrent::Dispatch::new())
     }
 
+    fn run_concurrent<J: crate::fields::ConcurrentJob<Self>>(job: J) -> Result<J::Output, J> {
+        Ok(job.run())
+    }
+
     fn new(val: u64) -> Self {
         Self {
             value: val as u128 % P,
