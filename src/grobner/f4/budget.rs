@@ -289,19 +289,21 @@ impl F4Statistics {
 
         // The live pair reports as one line under whichever name bound, matching the error
         // `F4Options::entry_budget_error` would have raised — in bytes when bytes bound, so the
-        // figure and the name are in the same unit.
+        // figure and the name are in the same unit. Observed is the requirement, not the peak:
+        // candidate finishing checks its reservation against the same allowance (#840).
         let entries = options.live_entry_allowance_for(self.bytes_per_entry);
+        let required = self.live_entry_requirement();
         let live = if options.bytes_bind_first_for(self.bytes_per_entry) {
             BudgetApproach {
                 budget: "max_live_bytes",
-                observed: self.max_live_nonzeros.saturating_mul(self.bytes_per_entry),
+                observed: required.saturating_mul(self.bytes_per_entry),
                 allowance: options.max_live_bytes,
                 unit: "bytes",
             }
         } else {
             BudgetApproach {
                 budget: "max_live_nonzeros",
-                observed: self.max_live_nonzeros,
+                observed: required,
                 allowance: entries,
                 unit: "entries",
             }
@@ -522,6 +524,41 @@ mod tests {
         assert_eq!(live.unit, "bytes");
         assert_eq!(live.observed, 19_000_000 * 16);
         assert_eq!(live.allowance, 512_000_000);
+    }
+
+    // Live pressure counts the candidate-finishing reservation when it exceeds the peak.
+    #[test]
+    fn test_live_pressure_counts_the_candidate_finishing_reservation() {
+        let mut statistics = statistics_at(10, 10, 588);
+        statistics.candidate_reduction.reserved_entries = 612;
+        let options = F4Options::default().with_live_entries::<Zp13>(612);
+
+        let live = statistics
+            .budget_pressure(&options)
+            .into_iter()
+            .find(|approach| approach.budget == "max_live_nonzeros")
+            .expect("the entry budget binds");
+        assert_eq!(live.observed, 612);
+        assert_eq!(live.allowance, 612);
+        assert!(statistics.near_budget(&options, 1.0).contains(&live));
+    }
+
+    // Live pressure in bytes is the reservation times the entry width when bytes bind.
+    #[test]
+    fn test_byte_pressure_counts_the_candidate_finishing_reservation() {
+        let mut statistics = statistics_at(10, 10, 588);
+        statistics.candidate_reduction.reserved_entries = 612;
+        let options = F4Options {
+            max_live_nonzeros: 100_000_000,
+            ..F4Options::recommended()
+        };
+
+        let live = statistics
+            .budget_pressure(&options)
+            .into_iter()
+            .find(|approach| approach.budget == "max_live_bytes")
+            .expect("bytes bind once the entry budget is lifted alone");
+        assert_eq!(live.observed, 612 * 16);
     }
 
     /// A run that built no matrix has nothing to report, rather than reporting zero pressure
