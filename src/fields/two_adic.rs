@@ -77,6 +77,31 @@ pub fn two_adic_root_of_unity<F: KnownOrder, R: RngCore + CryptoRng>(log_n: u32,
     try_two_adic_root_of_unity(log_n, rng).unwrap_or_else(|e| panic!("{e}"))
 }
 
+/// A primitive `2^log_n`-th root of unity, the same one on every call, with no rng.
+///
+/// [`try_two_adic_root_of_unity`] with its random draw replaced by a walk over
+/// [`KnownOrder::element_at`] from index 2: the first non-square z found gives `z^m`, squared down
+/// to order `2^log_n`. Over a prime field the least non-residue is small, so the walk is a few
+/// exponentiations — microseconds even at 254 bits, which is why no cache is kept.
+///
+/// `None` if `log_n` exceeds the two-adicity, or if the enumeration ends without a non-square.
+pub fn deterministic_two_adic_root<F: KnownOrder>(log_n: u32) -> Option<F> {
+    let (s, odd_part) = two_adic_decomposition(F::order_limbs());
+    if log_n > s {
+        return None;
+    }
+    if log_n == 0 {
+        return Some(F::one());
+    }
+    // As in `try_two_adic_root_of_unity`: `z^m` generates the 2-Sylow subgroup exactly when z is
+    // a non-square. `s >= 1` here, so q is odd and index 2 onward are not all squares.
+    let root = (2u128..)
+        .map_while(F::element_at)
+        .map(|z| z.pow_limbs(&odd_part))
+        .find(|w| repeated_squaring(*w, s - 1) != F::one())?;
+    Some(repeated_squaring(root, s - log_n))
+}
+
 /// `x^(2^times)`.
 pub(crate) fn repeated_squaring<F: FiniteField>(mut x: F, times: u32) -> F {
     for _ in 0..times {
@@ -151,14 +176,14 @@ pub(crate) fn shift_right(limbs: &[u64], bits: usize) -> Vec<u64> {
 mod tests {
     use rand::{prelude::StdRng, SeedableRng};
 
-    use super::{two_adic_decomposition, two_adic_root_of_unity};
+    use super::{deterministic_two_adic_root, two_adic_decomposition, two_adic_root_of_unity};
     use crate::{
         fields::{
-            BabyBear, Bls12_381Fr, Bn254Fr, KoalaBear, Mersenne31, PrimeFieldElement64, Zp13,
-            Zp18446744069414584321, Zp2147483647, Zp65537,
+            BabyBear, Bls12_381Fr, Bn254Fr, Gf13Pow4, Gf256, KoalaBear, Mersenne31,
+            PrimeFieldElement64, Proth68Fr, Zp13, Zp18446744069414584321, Zp2147483647, Zp65537,
         },
         integers::big_uint::BigUInt,
-        KnownOrder, One, Zero,
+        FiniteField, KnownOrder, One, Zero,
     };
 
     /// Goldilocks, `2^64 - 2^32 + 1`.
@@ -346,5 +371,71 @@ mod tests {
             assert!(power.is_one(), "w^{n} != 1");
             assert!(sum.is_zero(), "the powers of w do not sum to zero");
         }
+    }
+
+    /// Every power-of-two order the field holds, at its full two-adicity included, is served by
+    /// the `FiniteField` hook with a root of exactly that order, and no larger order is.
+    fn transform_roots_have_exact_order<F: KnownOrder>() {
+        let s = F::two_adicity();
+        for log_n in 0..=s {
+            let w = F::transform_root_of_unity(log_n)
+                .unwrap_or_else(|| panic!("no 2^{log_n}-th root in a field of two-adicity {s}"));
+            let mut x = w;
+            for _ in 0..log_n.saturating_sub(1) {
+                x = x * x;
+            }
+            if log_n == 0 {
+                assert!(w.is_one(), "the first root of unity is not 1");
+            } else {
+                assert!(!x.is_one(), "w is not a primitive 2^{log_n}-th root");
+                assert!((x * x).is_one(), "w^(2^{log_n}) != 1");
+            }
+        }
+        assert!(
+            F::transform_root_of_unity(s + 1).is_none(),
+            "a root above the two-adicity {s}"
+        );
+    }
+
+    #[test]
+    // The prime fields override the hook with exact-order roots up to and only up to their two-adicity.
+    fn test_the_transform_root_hook_over_every_prime_family() {
+        transform_roots_have_exact_order::<Zp13>();
+        transform_roots_have_exact_order::<Zp65537>();
+        transform_roots_have_exact_order::<Mersenne31>();
+        transform_roots_have_exact_order::<BabyBear>();
+        transform_roots_have_exact_order::<KoalaBear>();
+        transform_roots_have_exact_order::<KoalaBear64>();
+        transform_roots_have_exact_order::<Goldilocks>();
+        transform_roots_have_exact_order::<Proth68Fr>();
+        transform_roots_have_exact_order::<Bn254Fr>();
+        transform_roots_have_exact_order::<Bls12_381Fr>();
+    }
+
+    #[test]
+    // The hook is deterministic: two calls return the same root, unlike the rng-drawn one.
+    fn test_the_transform_root_is_the_same_on_every_call() {
+        assert_eq!(
+            Bn254Fr::transform_root_of_unity(20),
+            Bn254Fr::transform_root_of_unity(20)
+        );
+        assert_eq!(
+            Goldilocks::transform_root_of_unity(17),
+            deterministic_two_adic_root::<Goldilocks>(17)
+        );
+    }
+
+    #[test]
+    // Mersenne-31 has no root beyond order two, so it can never host a transform domain.
+    fn test_mersenne31_has_no_transform_root_beyond_order_two() {
+        assert!(Mersenne31::transform_root_of_unity(1).is_some());
+        assert!(Mersenne31::transform_root_of_unity(2).is_none());
+    }
+
+    #[test]
+    // Fields that do not override the hook report no root, characteristic two and extensions alike.
+    fn test_the_default_hook_reports_no_root() {
+        assert!(Gf256::transform_root_of_unity(0).is_none());
+        assert!(Gf13Pow4::transform_root_of_unity(1).is_none());
     }
 }
