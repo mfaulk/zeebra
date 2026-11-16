@@ -9,7 +9,10 @@ file they built from (the same trees are `760a9432` and `ad8b53ba`), squashed in
 core, same lock (tag `777`, load 7.5–14.0), release build with the repository's `.cargo/config.toml`.
 §7.3 (#794): the sweep at `810b29c3` (`taskset -c 5`, lock tag `794`, load 79.4 at START and 28.0
 at END, so read it for ratios only); the two-binary A/Bs at `a55ded02` against `fe2d2f8e` and at
-`810b29c3` against `7d101c45`, same core and lock, load 13.5 at START and 5.4 at END.
+`810b29c3` against `7d101c45`, same core and lock, load 13.5 at START and 5.4 at END. `7d101c45` is
+this change before its rebase onto `0308cd55` (as `1cdd85db`). The rebase added
+univariate-transform and prime-field work, plus a new `FiniteField` method, and no F4 or `GF(2)`
+code. It was not re-measured.
 
 Reference for #272 (H16), scoped to the **kernel** only — representation and solving route stay
 with #218 and #196. The instrument is `examples/gf2_packed_elimination.rs`; the kernel is
