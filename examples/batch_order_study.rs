@@ -53,9 +53,19 @@ fn run<const N: usize, F: FiniteField>(
     let f4_started = Instant::now();
     let (basis, statistics) = f4_reported(&system, order, &options);
     let f4_ns = f4_started.elapsed().as_nanos();
-    let basis = basis.expect("F4 completes");
-    let rendered: Vec<String> = basis.iter().map(|p| p.to_string()).collect();
-    let digest = sha256_hex(rendered.join("\n").as_bytes());
+    // A refusal is still a record: two arms that stop at the same limit after the same batches did
+    // the same work, so their times compare.
+    let (elements, digest, error) = match &basis {
+        Ok(basis) => {
+            let rendered: Vec<String> = basis.iter().map(|p| p.to_string()).collect();
+            (
+                Json::size(basis.len()),
+                Json::string(sha256_hex(rendered.join("\n").as_bytes())),
+                Json::Null,
+            )
+        }
+        Err(error) => (Json::Null, Json::Null, Json::string(format!("{error:?}"))),
+    };
     let stages = statistics.stages;
     println!(
         "{}",
@@ -72,8 +82,9 @@ fn run<const N: usize, F: FiniteField>(
                 "peak_rss_bytes",
                 peak_resident_bytes().map_or(Json::Null, Json::int)
             ),
-            ("basis_elements", Json::size(basis.len())),
-            ("basis_sha256", Json::string(digest)),
+            ("basis_elements", elements),
+            ("basis_sha256", digest),
+            ("error", error),
             ("batches", Json::size(statistics.batches)),
             (
                 "max_live_nonzeros",
