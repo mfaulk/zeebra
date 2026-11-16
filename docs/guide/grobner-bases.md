@@ -421,7 +421,8 @@ polynomial maps and allocator overhead are excluded.
 
 `cargo run --release --example wiedemann_conversion -- --variables 4 --degree 5` compares alternating
 classical and adaptive runs on a deterministic shape-position family. It asserts equal bases and
-reports operator construction separately. `--route adaptive` runs only that policy in a fresh
+reports operator construction separately, followed by the scalar sequence, reconstruction and certificate
+stage times. `--route adaptive` runs only that policy in a fresh
 process for attributable peak RSS. `--input FILE` reads a **precomputed grevlex basis**: variable
 names on line one, characteristic `65537` on line two, then comma-separated polynomials. The input
 precondition is the same as `fglm_to_lex_with_options`; the file path is not a claim of validation.

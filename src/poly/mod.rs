@@ -17,6 +17,7 @@ pub use multivariate::{
     WeightedOrder, WeightedOrderError, WeightedTieBreak,
 };
 pub(crate) use univariate::multiply_dense;
+pub(crate) use univariate::PreparedDivisor;
 pub use univariate::{
     compose_mod, compose_mod_horner, factorize, gcd, graeffe_2, graeffe_2_over_domain,
     graeffe_all_roots, graeffe_l, graeffe_root, graeffe_root_with_stats, inverse_exponent,

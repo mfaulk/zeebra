@@ -234,6 +234,58 @@ pub fn quotient<F: FiniteField>(
     UnivariatePolynomial::new(&quotient)
 }
 
+/// Repeated reduction modulo one fixed divisor, with the Newton reciprocal paid for once.
+///
+/// [`div_with_remainder`] inverts `rev(g)` on every call, which is most of the Newton route's
+/// cost. A caller reducing many products by the same modulus keeps the inverse to the precision
+/// its largest dividend needs, and each reduction is then two products.
+pub(crate) struct PreparedDivisor<F: FiniteField> {
+    divisor: Vec<F>,
+    reversed_inverse: Vec<F>,
+}
+
+impl<F: FiniteField> PreparedDivisor<F> {
+    /// Prepares `divisor` for dividends of fewer than `divisor.len() + precision` coefficients.
+    ///
+    /// # Panics
+    /// Panics if `divisor` is the zero polynomial or `precision` is zero.
+    pub(crate) fn new(divisor: &UnivariatePolynomial<F>, precision: usize) -> Self {
+        assert!(!divisor.is_zero(), "Divisor must not be zero");
+        let divisor = divisor.coefficients().to_vec();
+        let reversed: Vec<F> = divisor.iter().rev().copied().collect();
+        let reversed_inverse = invert_mod_xk(&reversed, precision);
+        Self {
+            divisor,
+            reversed_inverse,
+        }
+    }
+
+    /// `dividend mod divisor`.
+    ///
+    /// # Panics
+    /// Panics if the dividend exceeds the precision the divisor was prepared for.
+    pub(crate) fn rem(&self, dividend: &UnivariatePolynomial<F>) -> UnivariatePolynomial<F> {
+        let (f, g) = (dividend.coefficients(), self.divisor.as_slice());
+        if f.len() < g.len() {
+            return dividend.clone();
+        }
+        let k = f.len() - g.len() + 1;
+        assert!(
+            k <= self.reversed_inverse.len(),
+            "dividend of length {} exceeds the prepared precision",
+            f.len()
+        );
+        let reversed_dividend: Vec<F> = f.iter().rev().take(k).copied().collect();
+        let mut q = multiply_truncated(&reversed_dividend, &self.reversed_inverse[..k], k);
+        q.reverse();
+        // Only the coefficients below deg g survive; the rest cancel against the dividend.
+        let low = g.len() - 1;
+        let product = multiply_truncated(&q, g, low);
+        let remainder: Vec<F> = f[..low].iter().zip(product).map(|(a, b)| *a - b).collect();
+        UnivariatePolynomial::new(&remainder)
+    }
+}
+
 /// The two coefficient slices, or `None` when the dividend is already the remainder.
 ///
 /// Both routes need `deg(f) >= deg(g)` and a non-zero divisor, and both need the slices trimmed so
@@ -436,7 +488,7 @@ mod tests {
         div_with_remainder, div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
         invert_mod_xk, karatsuba_base_case, multiply_truncated, newton_crossover,
         newton_is_cheaper, newton_is_cheaper_at, newton_is_cheaper_within, quotient,
-        KARATSUBA_EXPONENT,
+        PreparedDivisor, KARATSUBA_EXPONENT,
     };
     use crate::{
         fields::{PrimeFieldElement64, Zp7},
@@ -568,6 +620,25 @@ mod tests {
     }
 
     /// Newton inversion satisfies `g*h = 1 mod x^k` at every precision, including `k = 1`.
+    // A prepared divisor reduces every dividend in its precision exactly as `%` does.
+    #[test]
+    fn test_prepared_divisor_agrees_with_rem() {
+        use rand::{rngs::StdRng, SeedableRng};
+        type W = crate::fields::Zp2147483647;
+        let mut rng = StdRng::seed_from_u64(806);
+        for degree in [1usize, 5, 64, 300] {
+            let mut g: Vec<W> = (0..degree).map(|_| W::random(&mut rng)).collect();
+            g.push(W::random(&mut rng) + W::one());
+            let g = UnivariatePolynomial::new(&g);
+            let prepared = PreparedDivisor::new(&g, degree);
+            for len in [0, 1, degree, degree + 1, 2 * degree] {
+                let f: Vec<W> = (0..len).map(|_| W::random(&mut rng)).collect();
+                let f = UnivariatePolynomial::new(&f);
+                assert_eq!(prepared.rem(&f), &f % &g, "degree {degree}, len {len}");
+            }
+        }
+    }
+
     #[test]
     fn test_invert_mod_xk_is_the_inverse_to_its_precision() {
         type F = PrimeFieldElement64<2_147_483_647>;
