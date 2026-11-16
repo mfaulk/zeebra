@@ -25,7 +25,7 @@ HELDOUT = [
     ("mq-planted-10", 2147483647),
     ("mq-planted-wide-10", 0),
 ]
-AUTO = "auto:0/selected"
+AUTO = "auto:16/selected"
 
 if plan == "scaling":
     cells = [
