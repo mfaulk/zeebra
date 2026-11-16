@@ -156,6 +156,12 @@ impl Gf2Elimination {
 /// A dispatch that would cross the live-entry budget — workers reserve two full-width rows each —
 /// falls back to the serial kernel on the untouched matrix, so selecting parallelism never refuses
 /// a computation serial elimination admits.
+///
+/// A dispatched batch reports that reservation as its peak, so
+/// [`F4Statistics::max_live_nonzeros`](super::F4Statistics::max_live_nonzeros) is an upper bound
+/// that depends on thread timing and can differ between runs; pin peaks under
+/// [`ParallelForward::Serial`]. Process RSS rises with workers — 1.19x serial at sixteen on MQ10,
+/// 1.35x at 62 — which is why [`F4Options::recommended`] caps them at sixteen.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ParallelForward {
     /// One thread for every batch.
@@ -700,7 +706,8 @@ pub struct F4Options {
     /// row before mutation, with a separate 64-MiB dense/index/selection workspace ceiling.
     /// If either bound cannot be met, the original full-RREF pass preserves existing budget
     /// admission and error behavior. Statistics separate mathematical entries, reservations,
-    /// sparse capacities, workspace and fallback batches. No parallel dispatch is enabled here.
+    /// sparse capacities, workspace and fallback batches. Forward elimination before it may be
+    /// parallel; see [`Self::parallel_forward`].
     /// Still off in [`F4Options::baseline`] for historical ablations.
     pub reduce_batch_rows: bool,
 
@@ -722,6 +729,7 @@ pub struct F4Options {
 
     /// Whether forward elimination may use worker threads. See [`ParallelForward`].
     ///
+    /// `Auto { max_workers: 16 }` at [`recommended`](Self::recommended);
     /// [`ParallelForward::Serial`] at [`baseline`](Self::baseline).
     pub parallel_forward: ParallelForward,
 }
@@ -804,6 +812,10 @@ impl F4Options {
             reduce_batch_rows: true,
             interreduction: InterreductionRoute::ByOrder,
             gf2_elimination: Gf2Elimination::Auto,
+            // #752: 3.8-4.0x complete F4 on MQ10 and 1.5-4.3x on held-out families, small
+            // controls within 3.5% and RSS within 1.24x of serial. Sixteen, not the machine,
+            // because 62 workers cost 1.35x RSS for a further 12%.
+            parallel_forward: ParallelForward::Auto { max_workers: 16 },
             ..Self::baseline()
         }
     }

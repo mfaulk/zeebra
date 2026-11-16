@@ -4127,7 +4127,13 @@ fn test_reduced_batches_complete_the_measured_live_budget_regression() {
         .map(|p| MultivariatePolynomial::parse(p, variables).unwrap())
         .collect();
     let order = MonomialOrder::GradedReverseLexicographic;
-    let (basis, stats) = f4_reported(&system, order, &F4Options::default());
+    // Peaks are pinned on the serial route: a parallel batch reports its workers' reservations,
+    // which depend on thread timing (#752), so its peak is an upper bound that varies by run.
+    let serial = F4Options {
+        parallel_forward: crate::grobner::f4::ParallelForward::Serial,
+        ..F4Options::default()
+    };
+    let (basis, stats) = f4_reported(&system, order, &serial);
     let basis = basis.expect("the default must admit the measured reduced-row workload");
     assert_eq!(basis.len(), 109);
     assert!(stats.max_live_nonzeros < 20_000_000);
@@ -4138,14 +4144,21 @@ fn test_reduced_batches_complete_the_measured_live_budget_regression() {
         crate::util::sha256_hex(canonical.join("\n").as_bytes()),
         "0e3f388bb4c88285a2f6f77c4b4b7d31d86d7ed315cfdd9359cf073b1e342512"
     );
-    let options = F4Options::default().with_live_entries::<G>(20_000_000);
-    let (result, capped_stats) = f4_reported(&system, order, &options);
-    let capped_basis = result.expect("candidate-only output must admit the formerly binding cap");
-    assert_eq!(capped_basis, basis);
-    assert_eq!(capped_stats.max_live_nonzeros, stats.max_live_nonzeros);
+    for options in [F4Options::default(), serial.clone()] {
+        let options = options.with_live_entries::<G>(20_000_000);
+        let (result, capped_stats) = f4_reported(&system, order, &options);
+        let capped_basis =
+            result.expect("candidate-only output must admit the formerly binding cap");
+        assert_eq!(capped_basis, basis);
+        if options.parallel_forward == crate::grobner::f4::ParallelForward::Serial {
+            assert_eq!(capped_stats.max_live_nonzeros, stats.max_live_nonzeros);
+        } else {
+            assert!(capped_stats.parallel_forward.batches > 0);
+        }
+    }
 
     let binding_cap = stats.max_live_nonzeros - 1;
-    let options = F4Options::default().with_live_entries::<G>(binding_cap);
+    let options = serial.with_live_entries::<G>(binding_cap);
     let (result, _) = f4_reported(&system, order, &options);
     assert!(matches!(
         result,
