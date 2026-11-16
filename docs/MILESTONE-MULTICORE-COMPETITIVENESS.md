@@ -752,3 +752,5 @@ Outcome (2026-11-16):
   trails grobx on every eligible rung, by 1.33–10.65x at 16 workers.
 - The matched multiworker cohort (#820) measures Zeebra at 16 workers 1.88–2.92x behind msolve's
   exact target.
+- The successor plan is M29 — Verified Competitive F4
+  ([`MILESTONE-COMPETITIVE-F4.md`](MILESTONE-COMPETITIVE-F4.md), tracking #833).
