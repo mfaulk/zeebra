@@ -52,6 +52,15 @@ def child_wall(remaining):
 
 
 def plan(phase='native'):
+    if phase == 'forward':
+        # #822: the #751 cells at current code, serial against the 16-worker default, order alternating per repeat.
+        for repeat in range(5):
+            arms=('forward-1','forward-16') if repeat%2 == 0 else ('forward-16','forward-1')
+            for problem in ('mq-random-10','katsura-6','cyclic-5'):
+                for modulus in (32003,2147483647):
+                    for arm in arms: yield repeat,problem,modulus,'fglm',arm
+            for arm in arms: yield repeat,'katsura-11',2147483647,'basis',arm
+        return
     if phase == 'pilot':
         for modulus in (32003,2147483647):
             yield 0,'mq-random-10',modulus,'fglm','stage-on'
@@ -139,6 +148,17 @@ def validate_response(raw, reference, problem, modulus, route, arm):
         elif raw['point'] is not None: raise ValueError('unsuccessful route contains point')
     if raw['measured'] != (arm!='stage-off'): raise ValueError('stage mode drift')
     if (raw.get('work') is not None) != (arm=='work'): raise ValueError('work mode drift')
+    if arm.startswith('forward-') and raw.get('forward_workers')!=int(arm.removeprefix('forward-')): raise ValueError('forward worker drift')
+
+
+def command(binary, cell):
+    _,problem,modulus,route,arm=cell
+    argv=[str(binary.resolve()),str(modulus),'--problem='+problem]
+    if route!='basis': argv+=['--whole-route='+route]
+    if arm!='stage-off': argv+=['--stages']
+    if arm=='work': argv+=['--work']
+    if arm.startswith('forward-'): argv+=['--forward-workers='+arm.removeprefix('forward-')]
+    return argv
 
 
 def terminal_kind(exit_code,stop,stderr):
@@ -329,7 +349,7 @@ def main():
     parser=argparse.ArgumentParser()
     for key in ('binary','scratch','output'): parser.add_argument('--'+key,type=Path,required=True)
     parser.add_argument('--journal',type=Path,help='durable attempt journal (default: SCRATCH/<output name>.journal)')
-    parser.add_argument('--phase',choices=('pilot','native'),default='pilot')
+    parser.add_argument('--phase',choices=('pilot','native','forward'),default='pilot')
     parser.add_argument('--build-commit',required=True)
     continuation=parser.add_mutually_exclusive_group()
     continuation.add_argument('--resume-from',type=Path)
@@ -387,14 +407,9 @@ def main():
     began=time.monotonic()
 
     def launch(index,cell,wall,output_limit):
-        _,problem,modulus,route,arm=cell
         if sha(args.binary)!=cohort['identity']['binary_sha256']: raise ValueError('binary changed')
-        command=[str(args.binary.resolve()),str(modulus),'--problem='+problem]
-        if route!='basis': command+=['--whole-route='+route]
-        if arm!='stage-off': command+=['--stages']
-        if arm=='work': command+=['--work']
         usage=resource.getrusage(resource.RUSAGE_CHILDREN)
-        result=supervisor.guarded(['timeout','--signal=KILL','185',*command],args.scratch/str(index),sorted(os.sched_getaffinity(0)),wall,limits()['rss_bytes'],output_limit)
+        result=supervisor.guarded(['timeout','--signal=KILL','185',*command(args.binary,cell)],args.scratch/str(index),sorted(os.sched_getaffinity(0)),wall,limits()['rss_bytes'],output_limit)
         after=resource.getrusage(resource.RUSAGE_CHILDREN)
         result['cpu_seconds']=after.ru_utime+after.ru_stime-usage.ru_utime-usage.ru_stime
         return result
