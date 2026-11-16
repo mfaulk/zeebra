@@ -401,9 +401,9 @@ const GOLDILOCKS: u64 = 0xFFFF_FFFF_0000_0001;
 /// Splitting `t = hi_hi * 2^96 + hi_lo * 2^64 + lo` gives `t = lo - hi_hi + hi_lo * (2^32 - 1)`.
 /// A borrow in the subtraction is a lost -2^64, corrected by subtracting 2^32 - 1; it cannot wrap
 /// again, because after a borrow the difference is at least `2^64 - 2^32`. A carry in the addition
-/// is a lost 2^64, corrected by adding 2^32 - 1; that cannot wrap either, because `hi_lo * (2^32 -
-/// 1) <= 2^64 - 2^33 + 1`. The result is then below 2^64 < 2P, so one conditional subtraction
-/// makes it canonical.
+/// is a lost 2^64, corrected by adding 2^32 - 1; that cannot wrap either, because
+/// `hi_lo * (2^32 - 1) <= 2^64 - 2^33 + 1`. The result is then below 2^64 < 2P, so one
+/// conditional subtraction makes it canonical.
 #[inline(always)]
 const fn reduce_goldilocks(t: u128) -> u64 {
     const EPSILON: u64 = 0xFFFF_FFFF;
