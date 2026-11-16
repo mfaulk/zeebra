@@ -6,13 +6,15 @@
 --check fails unless every attempt completed and every arm of a task produced one basis digest.
 """
 import collections
+import gzip
 import json
 import statistics
 import sys
 
 path = sys.argv[1]
 check = "--check" in sys.argv
-records = [json.loads(line) for line in open(path) if line.strip()]
+opener = gzip.open if path.endswith(".gz") else open
+records = [json.loads(line) for line in opener(path, "rt") if line.strip()]
 cells = collections.defaultdict(list)
 digests = collections.defaultdict(set)
 failures = []
