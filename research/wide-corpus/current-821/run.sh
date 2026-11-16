@@ -21,5 +21,8 @@ for cohort in "1 2" "16 2-17"; do
         --scratch "$CARGO_TARGET_DIR/campaign-$1" --output "$out" \
         --engines zeebra --workers "$1" || status=$?
     python3 tools/external/wide-corpus.py --pack "$out" --output "$out" || status=$?
+    # The controller rewrites the published #738 BOARD.md from this cohort when it finishes; restore
+    # it, or the next cohort refuses the dirty tree (as the first launch's 16-worker cohort did).
+    git checkout -- research/wide-corpus/BOARD.md
 done
 exit "$status"
