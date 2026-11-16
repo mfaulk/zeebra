@@ -98,16 +98,34 @@ impl Gf2Elimination {
     /// is pure conversion; cyclic-8/9's late batches are exactly that shape and lose 0.85x.
     pub const MIN_PAIR_ROWS: usize = 16;
 
+    /// The fewest entries at which [`Gf2Elimination::Auto`] packs a matrix below
+    /// [`MIN_DENSITY_PPM`](Self::MIN_DENSITY_PPM).
+    ///
+    /// Large batches win at any measured density, because generic fill grows with size and packed
+    /// work does not (#794): mq-16's 12840x9622 batch is 1.5% dense and 13.8x faster packed. 4000
+    /// keeps sparse-MQ-12's 2239-entry, 0.78x batch generic.
+    pub const LARGE_ENTRIES: usize = 4_000;
+
+    /// The least density, in entries per million cells, at which a batch of
+    /// [`LARGE_ENTRIES`](Self::LARGE_ENTRIES) or more packs.
+    ///
+    /// The sparsest large batch measured, mq-16 at 0.75%, won 2.6x. Nothing sparser is measured,
+    /// and a packed row operation walks every word however empty, so the rule stops there.
+    pub const LARGE_MIN_DENSITY_PPM: u64 = 7_000;
+
     /// Whether [`Gf2Elimination::Auto`] packs a matrix of this shape and entry count.
     ///
     /// A packed row operation costs one word per 64 columns whatever the row holds, and a sparse
-    /// one costs a merge over the nonzeros, so density is the axis the two cross on — once the
-    /// matrix is large enough for either to cost anything.
+    /// one costs a merge over the nonzeros, so on small batches density is the axis the two cross
+    /// on. On large ones the sparse rows fill in as elimination proceeds, which the input density
+    /// does not show, so size admits a batch down to a lower density floor (#794).
     pub fn prefers_packed(rows: usize, pair_rows: usize, columns: usize, nonzeros: usize) -> bool {
         let cells = (rows as u128) * (columns as u128);
+        let dense_at = |ppm: u64| (nonzeros as u128) * 1_000_000 >= cells * u128::from(ppm);
         columns >= Self::MIN_COLUMNS
             && pair_rows >= Self::MIN_PAIR_ROWS
-            && (nonzeros as u128) * 1_000_000 >= cells * u128::from(Self::MIN_DENSITY_PPM)
+            && (dense_at(Self::MIN_DENSITY_PPM)
+                || (nonzeros >= Self::LARGE_ENTRIES && dense_at(Self::LARGE_MIN_DENSITY_PPM)))
     }
 
     /// Whether this setting packs a matrix of this shape, before the field and coefficients are

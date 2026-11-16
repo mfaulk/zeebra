@@ -2,7 +2,8 @@
 //!
 //! `batches` replays every batch of each instance under `Gf2Elimination::Generic` and
 //! `Gf2Elimination::Packed` and prints one row per batch — shape, density, and each route's
-//! elimination stage — which is what the `Auto` threshold is read from. `solve` times whole F4 runs
+//! elimination stage — which is what the `Auto` threshold is read from. `sweep` does the same over
+//! #794's grid of MQ sizes and densities. `solve` times whole F4 runs
 //! under `Generic`, `Auto` and `Packed`. Every arm's candidates (per batch) or basis (per solve) is
 //! asserted equal to the generic route's before its time is kept.
 //!
@@ -12,6 +13,7 @@
 //! ```text
 //! taskset -c 5 tools/benchlock.sh 777 target/release/examples/gf2_f4_dispatch batches 5
 //! taskset -c 5 tools/benchlock.sh 777 target/release/examples/gf2_f4_dispatch solve 7
+//! taskset -c 5 tools/benchlock.sh 794 target/release/examples/gf2_f4_dispatch sweep 5
 //! ```
 
 use std::time::{Duration, Instant};
@@ -192,6 +194,21 @@ macro_rules! each_instance {
     }};
 }
 
+/// #794: random MQ over a grid of size and quadratic-monomial density, on a seed the shipped rule
+/// was not read from, so the threshold is tested on batches it has not seen.
+macro_rules! sweep_instances {
+    ($run:ident, $reps:expr, $($n:literal),+) => {{
+        $(
+            for density in [0.05, 0.1, 0.15, 0.2, 0.3] {
+                for (shape, equations) in [("mq", $n), ("overdetermined-mq", 2 * $n)] {
+                    let label = format!("{shape}-{}-d{density:.2}", $n);
+                    $run::<$n>(&label, &random_mq::<$n>(794, equations, density), $reps);
+                }
+            }
+        )+
+    }};
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let reps = args
@@ -203,13 +220,18 @@ fn main() {
             println!("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
             each_instance!(batches, reps);
         }
+        Some("sweep") => {
+            println!("| instance | batch | rows | reducer rows | pair rows | columns | entries | density ppm | generic us | packed us | generic/packed | auto picks |");
+            println!("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+            sweep_instances!(batches, reps, 12, 13, 14, 15, 16);
+        }
         Some("solve") => {
             println!("| instance | basis | batches | generic ms | generic elim ms | auto ms | auto packed batches | auto elim ms | packed ms | packed elim ms | generic/auto | generic/packed |");
             println!("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
             each_instance!(solve, reps);
         }
         _ => {
-            eprintln!("usage: gf2_f4_dispatch <batches|solve> [reps]");
+            eprintln!("usage: gf2_f4_dispatch <batches|sweep|solve> [reps]");
             std::process::exit(64);
         }
     }
