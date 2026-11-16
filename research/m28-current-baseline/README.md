@@ -317,3 +317,26 @@ verified. Window 2 is `current/native-2ec9d3af.json.gz`. Window 1 is kept off-re
 pooled with window 2. No further native window is authorized under this protocol; #788 owns a
 complete fifth repetition. The [report](../../docs/research/m28-current-baseline.md#current-cohort-at-2ec9d3af)
 gives the figures.
+
+### Settle-wait load gate (#788)
+
+Declared before any further native window. Both refused windows stopped on a one-minute load of
+4.48 and 4.09 read straight after repetition 3's Katsura-11 child, against a background of about
+3–4 from other sessions. The one-minute average decays with a 60-second time constant, so the
+reading still carries the study's own just-finished child. The gate now waits instead of refusing
+on that reading:
+
+- **Build gate** is unchanged and still refuses at once; a build is contamination, not decay.
+- **Load gate** stays at a one-minute load of at most 4 (`LOAD_GATE`). When the pre-child reading
+  is above it, the controller re-reads every 5 seconds (`SETTLE_POLL_SECONDS`) for at most
+  120 seconds (`SETTLE_SECONDS`, two time constants) and launches as soon as it clears. A load still
+  above 4 after that is the same `load-or-aggregate` refusal as before.
+- **Charging.** The wait is wall time inside the window, so it is charged to the unchanged
+  900-second aggregate cap and never sleeps past it. Window 2 used 96 seconds of child wall for
+  61 cells, so the 75-cell grid leaves room for several full waits.
+- **Recording.** Every attempt's metadata carries `settle_seconds`, and a load refusal's stop record
+  carries the wait it spent, so a reader can see which children launched after a wait.
+
+Child limits, the plan, the frozen executable and the one-further-window rule are unchanged. A new
+native window under this gate is a fresh 75-cell window from repetition 0, never a tail appended to
+window 1 or 2, and is not pooled with them.
