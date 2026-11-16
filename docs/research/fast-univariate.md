@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1800,6 +1800,45 @@ Entries are the minimum classical time divided by the minimum draft-dispatch tim
 Degree 64 uses classical Euclid in both builds and serves as a control. The measured
 KoalaBear callers took about 4–5% longer with the draft dispatch above the control.
 BN254 Fr was within 1% at both tested degrees.
+
+#### #194: the base case's Euclidean step, in place
+
+**Measured at `7e7de67e`, against its parent `810b29c3`.** The transition matrix took each
+classical Euclidean step by composing with the elementary matrix `[[0, 1], [1, -q]]`. That costs
+eight polynomial products, four of them against the constant zero and one entries.
+`Transition::push_step` makes the same update in place: the new top row is the old bottom row,
+and the new bottom row is `top - q * bottom`, so it needs two products. The base case below
+degree 64 takes one step per degree it drops, so this is the cost that dominates below the
+recursion. A unit test checks `push_step` against composing with the step matrix.
+
+`gcd_crossover all` from both commits (identical example source), 11 rounds, arm order
+alternated per round, under `tools/benchlock.sh` (owner `zb-194-push-step`) on `taskset -c 10`.
+The one-minute load ran from 3.15 to 8.61. Classical Euclid does not touch the transition
+matrix, so each binary's classical column is an in-process control. The first column divides the
+paired half-GCD ratio by the paired classical ratio. Degrees 32–65 never enter the recursion and
+are controls too: there the normalized ratio is 0.996–1.019.
+
+| Field | Degree | half-GCD new / old, control-normalized, median (IQR) | classical / half-GCD before | after |
+|:------|-------:|------------------------:|------:|------:|
+| KoalaBear | 96 | 0.717 (0.715–0.722) | 0.460 | 0.641 |
+| KoalaBear | 256 | 0.742 (0.739–0.744) | 0.351 | 0.472 |
+| KoalaBear | 1024 | 0.849 (0.845–0.853) | 0.368 | 0.432 |
+| KoalaBear | 4096 | 0.910 (0.895–0.913) | 0.504 | 0.553 |
+| Goldilocks | 96 | 0.783 (0.779–0.790) | 0.440 | 0.563 |
+| Goldilocks | 256 | 0.819 (0.809–0.823) | 0.395 | 0.484 |
+| Goldilocks | 1024 | 0.894 (0.889–0.901) | 0.451 | 0.505 |
+| Goldilocks | 4096 | 0.945 (0.940–0.948) | 0.706 | 0.747 |
+| BN254 Fr | 96 | 0.838 (0.837–0.846) | 0.539 | 0.642 |
+| BN254 Fr | 256 | 0.845 (0.832–0.851) | 0.429 | 0.508 |
+| BN254 Fr | 1024 | 0.922 (0.917–0.939) | 0.503 | 0.546 |
+| BN254 Fr | 4096 | 0.965 (0.939–0.992) | 0.804 | 0.832 |
+
+Half-GCD gets 3.5%–28% faster, most at the low degrees, where the base case is most of the
+work, and least at 4096, where the recursion's products dominate. **It is still slower than
+classical Euclid at every measured degree** (the last column stays below 1), so the public `gcd`
+remains classical and #194 stays open. The step was the cheapest lever, not the one that crosses
+over. The next candidates are the recursion's two `compose` calls per level, and a lower
+base-case cutoff now that the base case is cheaper.
 
 #### #527: the floor was mine and it was 16x-32x too high
 
