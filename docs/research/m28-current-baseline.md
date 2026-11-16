@@ -233,6 +233,10 @@ batches are below the adaptive threshold, so the two arms run the same serial co
 - Symbolic preprocessing and construction are 12–19% and 30–50% slower in the 16-worker arm (MQ10
   81 → 97 ms, Katsura-11 431 → 485 ms), even though both run serially. Cache and memory-bandwidth
   sharing with the just-finished worker pool is the likely cause, but this has not been isolated.
+  #827 isolated it ([report](serial-stage-slowdown.md)): the main cause is the core clock, which
+  stays at all-core boost (3.99 vs 4.54 GHz) for 200–500 ms after the worker burst. Cross-CCD
+  placement of rows the workers wrote adds to it on MQ10, and glibc arenas add to Katsura-11's
+  scatter.
 - Residual backward stays below a 1.2x ceiling everywhere, so #730's rejection stands.
 
 ## Historical cohort (superseded, retained unchanged)

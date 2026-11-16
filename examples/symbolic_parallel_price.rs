@@ -72,7 +72,10 @@ impl<const N: usize, F: FiniteField + Sync> BatchObserver<N, F> for Replay {
             ("rows", Json::size(s.rows.len())),
             ("columns", Json::size(s.monomials.len())),
             ("terms", Json::size(s.term_handles.len())),
-            ("divisor_scan_steps", Json::size(s.counts.divisor_scan_steps)),
+            (
+                "divisor_scan_steps",
+                Json::size(s.counts.divisor_scan_steps),
+            ),
             ("serial_ns", Json::nanos(serial_time)),
             ("parallel_ns", Json::nanos(parallel_time)),
         ]));
@@ -139,7 +142,8 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let usage = "usage: symbolic_parallel_price PROBLEM MODULUS WORKERS [MIN_FRONTIER] [FORWARD_WORKERS]";
+    let usage =
+        "usage: symbolic_parallel_price PROBLEM MODULUS WORKERS [MIN_FRONTIER] [FORWARD_WORKERS]";
     let problem = args.get(1).expect(usage).as_str();
     let modulus: u64 = args.get(2).expect(usage).parse().expect(usage);
     let workers: usize = args.get(3).expect(usage).parse().expect(usage);

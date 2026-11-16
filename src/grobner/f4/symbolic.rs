@@ -1295,13 +1295,9 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
                             counts.monomials_enqueued += 1;
                             handle
                         }
-                        None => enqueue(
-                            term,
-                            &mut next,
-                            &mut examined,
-                            &mut monomials,
-                            &mut counts,
-                        ),
+                        None => {
+                            enqueue(term, &mut next, &mut examined, &mut monomials, &mut counts)
+                        }
                     });
                 }
                 // The serial queue here holds the rest of this level and what it has admitted.
