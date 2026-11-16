@@ -172,6 +172,7 @@ impl<F: FiniteField> SparseRow<F> {
             return;
         }
 
+        let prepared = factor.prepare_factor();
         let first = other.entries[0].0;
         let lo = if self
             .entries
@@ -196,10 +197,10 @@ impl<F: FiniteField> SparseRow<F> {
                 scratch.push((own_column, own_coefficient));
                 i += 1;
             } else if own_column > other_column {
-                scratch.push((other_column, F::zero() - *factor * other_coefficient));
+                scratch.push((other_column, -other_coefficient.mul_prepared(&prepared)));
                 j += 1;
             } else {
-                let merged = own_coefficient - *factor * other_coefficient;
+                let merged = own_coefficient - other_coefficient.mul_prepared(&prepared);
                 if !merged.is_zero() {
                     scratch.push((own_column, merged));
                 }
@@ -209,7 +210,7 @@ impl<F: FiniteField> SparseRow<F> {
         }
         scratch.extend_from_slice(&self.entries[i..]);
         for (column, coefficient) in &other.entries[j..] {
-            scratch.push((*column, F::zero() - *factor * *coefficient));
+            scratch.push((*column, -coefficient.mul_prepared(&prepared)));
         }
 
         #[cfg(feature = "research-work")]

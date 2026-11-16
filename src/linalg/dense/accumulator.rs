@@ -116,12 +116,14 @@ impl<F: FiniteField> DenseAccumulator<F> {
         }
         #[cfg(feature = "research-work")]
         crate::linalg::work::pivot(row.nonzeros());
+        // Paid once per row operation; Shoup's quotient for a 64-bit modulus below 2^63 (#779).
+        let factor = factor.prepare_factor();
         for (column, coefficient) in row.entries() {
             // A field has no zero divisors and a sparse row stores no zero coefficient, so the
             // scaled entry is nonzero and the inner loop needs no test for it.
             debug_assert!(!coefficient.is_zero(), "a stored coefficient is zero");
             let before = self.cells[*column];
-            let after = before - factor * *coefficient;
+            let after = before - coefficient.mul_prepared(&factor);
             self.cells[*column] = after;
             self.nonzeros += usize::from(before.is_zero());
             self.nonzeros -= usize::from(after.is_zero());
@@ -389,6 +391,52 @@ mod tests {
         assert_eq!(accumulator.leading_column(), Some(2));
         assert_eq!(accumulator.nonzeros(), 3);
         assert_eq!(accumulator.take(), row(&[(2, 5), (3, 1), (5, 11)]));
+    }
+
+    /// At a modulus where the scatter takes Shoup's path, every boundary factor and coefficient
+    /// gives the `u128` result, and cells that cancel leave the support.
+    #[test]
+    fn test_subtract_scaled_matches_wide_reduction_below_2_63() {
+        use crate::fields::PrimeFieldElement64;
+        const P: u64 = 9223372036854775783;
+        type G = PrimeFieldElement64<P>;
+        let values = [1, 2, P / 2, P - 2, P - 1];
+        let pivot: Vec<(usize, u64)> = values
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (2 * i, *v))
+            .collect();
+        let pivot_row = SparseRow::new(
+            &pivot
+                .iter()
+                .map(|(c, v)| (*c, G::new(*v)))
+                .collect::<Vec<_>>(),
+        );
+        for factor in [0, 1, 2, P - 2, P - 1] {
+            for start in [0, 1, P - 1] {
+                let mut accumulator = DenseAccumulator::<G>::new(10);
+                let loaded: Vec<(usize, G)> = (0..10).map(|c| (c, G::new(start))).collect();
+                accumulator.load(&SparseRow::new(&loaded));
+                accumulator.subtract_scaled(&pivot_row, G::new(factor));
+                let mut expected = vec![start as u128; 10];
+                for (column, value) in &pivot {
+                    let product = (factor as u128 * *value as u128) % P as u128;
+                    expected[*column] = (expected[*column] + P as u128 - product) % P as u128;
+                }
+                let live = expected.iter().filter(|v| **v != 0).count();
+                assert_eq!(
+                    accumulator.nonzeros(),
+                    live,
+                    "factor {factor}, start {start}"
+                );
+                let got: Vec<u128> = accumulator
+                    .cells
+                    .iter()
+                    .map(|cell| cell.value() as u128)
+                    .collect();
+                assert_eq!(got, expected, "factor {factor}, start {start}");
+            }
+        }
     }
 
     /// Subtracting a row from itself with factor one empties the accumulator.
