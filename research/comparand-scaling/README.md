@@ -107,11 +107,14 @@ The Rust driver normally reports Rayon pool capacity, not actual solver particip
 call. This observer is absent from timing arms; the backend remains randomized with returned
 bases checked against independent exact references. Native msolve process CPU/wall can establish
 actual overlapping CPU execution (no JIT) but is not a count of active elimination workers.
-Grobx's pinned driver and production Zeebra refuse multiworker requests explicitly.
+Grobx's pinned driver refuses multiworker requests explicitly. Production Zeebra did too until
+#820: `--engines zeebra` now runs `examples/zeebra_driver` (set `ZEEBRA_DRIVER` to its release
+build), which caps F4's forward workers at the request. The cohorts above predate it and carry no
+Zeebra timings; the #820 cohort is in [zeebra-820](zeebra-820/README.md).
 
 These experimental cohort tables are retained research evidence, not new shipping Zeebra board
 rows. Final main-board integration must use existing CompetitiveRecord contracts and exact
-configuration/provenance gates; unsupported Zeebra multiworker rows remain capability refusals.
+configuration/provenance gates.
 
 ## Bounded controller continuation
 
