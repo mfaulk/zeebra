@@ -28,19 +28,22 @@ cd "$root" || exit 2
 bin="$CARGO_TARGET_DIR/bin"
 export PATH="$bin:$PATH" TMPDIR="$CARGO_TARGET_DIR/tmp" ZEEBRA_MACHINE=5995wx
 export ZEEBRA_GROEBNER_RS_DRIVER="$bin/groebner-rs-driver" ZEEBRA_GROBX_DRIVER="$bin/grobx-driver"
+export ZEEBRA_DRIVER="$bin/zeebra_driver"
 mkdir -p "$OUT" "$TMPDIR"
 
-# Settle: wait (bounded, 10 min) for builds elsewhere to stop and the load to fall, then record
-# what the suite actually started at. Inside the lock, because a pre-lock reading is stale (#827).
+# Settle: wait (bounded, 10 min) for the 1-minute load to fall under 8, then record what the suite
+# actually started at, compiler count included. Inside the lock, because a pre-lock reading is
+# stale. Compilers are logged rather than awaited: another worktree's fat-LTO `rustc` runs for 10+
+# minutes on one core. comparand-scaling.py refuses on its own while any compiler runs, so the
+# caller waits for zero compilers before taking the lock for that suite.
 settle() {
   local waited=0
-  while [ "$waited" -lt 600 ]; do
+  while :; do
     ctx="$(bash tools/cpu-context.sh 8-23)" || return 2
     load="$(printf '%s' "$ctx" | python3 -c 'import json,sys; print(json.load(sys.stdin)["load1"])')"
     busy="$(printf '%s' "$ctx" | python3 -c 'import json,sys; print(json.load(sys.stdin)["compilers"])')"
-    if python3 -c "import sys; sys.exit(0 if float('$load') < 8 and int('$busy') == 0 else 1)"; then
-      break
-    fi
+    python3 -c "import sys; sys.exit(0 if float('$load') < 8 else 1)" && break
+    [ "$waited" -ge 600 ] && break
     sleep 15
     waited=$((waited + 15))
   done
@@ -58,7 +61,7 @@ mq10)
   references=research/comparand-scaling
   python3 tools/external/comparand-scaling.py \
     --binary "$CARGO_TARGET_DIR/debug/examples/competitive_sweep" --input-source "$(git rev-parse HEAD)" \
-    --scratch "$OUT/mq10-scratch" --output "$OUT/mq10.json.gz" --engines zeebra,msolve,grobx,groebner-rs \
+    --scratch "$OUT/mq10-scratch-${MQ10_TRY:-1}" --output "$OUT/mq10-try${MQ10_TRY:-1}.json.gz" --engines zeebra,msolve,grobx,groebner-rs \
     --fields 32003,2147483647 --rows mq-random-10 --workers 1,4,8,16 --repeats 5 --campaign-wall 1800 \
     --references "$references/references-v1.json.gz" "$references/singular-references-v1.json.gz" \
     "$references/singular-reference31-v1.json.gz"
