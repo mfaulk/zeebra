@@ -104,6 +104,10 @@ impl<const P: u128> One for PrimeFieldElement128<P> {
 impl<const P: u128> Ring for PrimeFieldElement128<P> {}
 
 impl<const P: u128> FiniteField for PrimeFieldElement128<P> {
+    fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
+        Some(crate::linalg::concurrent::Dispatch::new())
+    }
+
     fn new(val: u64) -> Self {
         Self {
             value: val as u128 % P,

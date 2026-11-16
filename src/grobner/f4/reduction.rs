@@ -278,6 +278,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     });
     let mut candidate_reduction = super::statistics::CandidateReductionStatistics::default();
     let mut packed_gf2 = super::statistics::PackedGf2Statistics::default();
+    let mut parallel_forward = super::statistics::ParallelForwardStatistics::default();
     // Reduced rows are the only form whose candidates are unique, which is what lets the packed
     // route promise the generic route's answer; it is not offered for echelon output.
     let packed_eligible = structured
@@ -319,14 +320,25 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             }
         }
         let budget = |nonzeros| options.entry_budget_error::<F>(nonzeros);
-        let mut block = eliminate_to(
+        let parallel = super::parallel::forward(
+            options.parallel_forward,
             plan,
-            RowForm::Echelon,
             options.elimination,
             matrix,
             allowance,
-        )
-        .map_err(budget)?;
+            &mut parallel_forward,
+        );
+        let mut block = match parallel {
+            Some(block) => block,
+            None => eliminate_to(
+                plan,
+                RowForm::Echelon,
+                options.elimination,
+                matrix,
+                allowance,
+            )
+            .map_err(budget)?,
+        };
         stages.forward = split_clock.lap();
         if form == RowForm::Reduced {
             let has_candidates = matrix.matrix().rows().iter().any(|row| {
@@ -432,6 +444,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     let statistics = BatchStatistics {
         candidate_reduction,
         packed_gf2,
+        parallel_forward,
         pairs: pairs.len(),
         rows,
         reducer_rows,

@@ -145,6 +145,79 @@ impl Gf2Elimination {
     }
 }
 
+/// Whether a batch's forward elimination runs on worker threads (#752).
+///
+/// Applies to [`ReductionStrategy::Structured`] with [`Backend::Adaptive`], over a field whose
+/// [`FiniteField::concurrent_elimination`] provides a handle; anywhere else a batch is serial
+/// whatever this says. Workers discover pivots concurrently against the reducer block and publish
+/// each once, immutably, so the echelon rows differ from the serial ones but the pivot columns and
+/// every candidate after [`F4Options::reduce_batch_rows`] do not: **the basis is identical**.
+///
+/// A dispatch that would cross the live-entry budget — workers reserve two full-width rows each —
+/// falls back to the serial kernel on the untouched matrix, so selecting parallelism never refuses
+/// a computation serial elimination admits.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ParallelForward {
+    /// One thread for every batch.
+    #[default]
+    Serial,
+
+    /// [`ParallelForward::auto_workers`] picks per batch, never above `max_workers`; zero means
+    /// the machine's available parallelism.
+    Auto {
+        /// Upper bound on threads for one batch.
+        max_workers: usize,
+    },
+
+    /// Every eligible batch on `workers` threads, or one per lower row if fewer. For measurement;
+    /// unconditional dispatch loses on small batches. One worker still runs the concurrent kernel,
+    /// on the calling thread's behalf, as the control that separates algorithm from threading.
+    Forced {
+        /// Threads per batch.
+        workers: usize,
+    },
+}
+
+impl ParallelForward {
+    /// The fewest lower-block entries at which [`ParallelForward::Auto`] dispatches.
+    pub const MIN_LOWER_NONZEROS: usize = 100_000;
+
+    /// Lower-block entries per worker [`ParallelForward::Auto`] asks for before adding another.
+    pub const LOWER_NONZEROS_PER_WORKER: usize = 25_000;
+
+    /// The fewest lower rows each worker gets under [`ParallelForward::Auto`].
+    pub const MIN_ROWS_PER_WORKER: usize = 16;
+
+    /// Threads [`ParallelForward::Auto`] uses for a batch of this shape; one means serial.
+    ///
+    /// `lower_rows` and `lower_nonzeros` describe the rows reduced against the reducer block.
+    pub fn auto_workers(lower_rows: usize, lower_nonzeros: usize, max_workers: usize) -> usize {
+        if lower_nonzeros < Self::MIN_LOWER_NONZEROS {
+            return 1;
+        }
+        (lower_nonzeros / Self::LOWER_NONZEROS_PER_WORKER)
+            .min(lower_rows / Self::MIN_ROWS_PER_WORKER)
+            .min(max_workers)
+            .max(1)
+    }
+
+    /// Threads this setting uses for a batch of this shape; one means serial.
+    pub fn workers(self, lower_rows: usize, lower_nonzeros: usize) -> usize {
+        match self {
+            Self::Serial => 1,
+            Self::Forced { workers } => workers.min(lower_rows).max(1),
+            Self::Auto { max_workers } => {
+                let max_workers = if max_workers == 0 {
+                    std::thread::available_parallelism().map_or(1, usize::from)
+                } else {
+                    max_workers
+                };
+                Self::auto_workers(lower_rows, lower_nonzeros, max_workers)
+            }
+        }
+    }
+}
+
 /// How final interreduction reduces each basis element against the others.
 ///
 /// Both routes return the **same object**: a reduced Gröbner basis is determined by its leading
@@ -626,6 +699,11 @@ pub struct F4Options {
     /// [`Gf2Elimination::Auto`] at [`recommended`](Self::recommended);
     /// [`Gf2Elimination::Generic`] at [`baseline`](Self::baseline), which is held fixed.
     pub gf2_elimination: Gf2Elimination,
+
+    /// Whether forward elimination may use worker threads. See [`ParallelForward`].
+    ///
+    /// [`ParallelForward::Serial`] at [`baseline`](Self::baseline).
+    pub parallel_forward: ParallelForward,
 }
 
 impl F4Options {
@@ -659,6 +737,7 @@ impl F4Options {
             reduce_batch_rows: false,
             profile_degrees: false,
             gf2_elimination: Gf2Elimination::Generic,
+            parallel_forward: ParallelForward::Serial,
         }
     }
 

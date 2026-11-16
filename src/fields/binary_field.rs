@@ -155,6 +155,10 @@ impl<const P: u64> Ring for BinaryFieldElement<P> {}
 
 // impl FiniteField
 impl<const P: u64> FiniteField for BinaryFieldElement<P> {
+    fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
+        Some(crate::linalg::concurrent::Dispatch::new())
+    }
+
     /// `val mod 2`: the prime subfield GF(2), which is all the integers reach here.
     ///
     /// Not the inherent [`BinaryFieldElement::new`], which takes a bit pattern and reaches every

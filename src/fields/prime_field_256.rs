@@ -44,7 +44,9 @@ use crate::{
 /// `MODULUS` must be an odd prime. Oddness is what makes `R = 2^256` invertible modulo p, and the
 /// whole representation rests on it; a composite modulus yields a ring with zero divisors in which
 /// [`FiniteField::inverse`] returns a silently wrong value for the non-units.
-pub trait PrimeModulus256: Copy + Clone + Debug + Eq + PartialEq + Hash + 'static {
+pub trait PrimeModulus256:
+    Copy + Clone + Debug + Eq + PartialEq + Hash + Send + Sync + 'static
+{
     /// p, as little-endian 64-bit limbs.
     const MODULUS: [u64; LIMBS];
 }
@@ -212,6 +214,10 @@ impl<M: PrimeModulus256> One for PrimeFieldElement256<M> {
 impl<M: PrimeModulus256> Ring for PrimeFieldElement256<M> {}
 
 impl<M: PrimeModulus256> FiniteField for PrimeFieldElement256<M> {
+    fn concurrent_elimination() -> Option<crate::linalg::concurrent::Dispatch<Self>> {
+        Some(crate::linalg::concurrent::Dispatch::new())
+    }
+
     fn new(val: u64) -> Self {
         let limbs = [val, 0, 0, 0];
         match Self::from_canonical_limbs(limbs) {

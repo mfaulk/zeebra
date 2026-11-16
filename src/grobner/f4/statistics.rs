@@ -406,6 +406,37 @@ impl CandidateReductionStatistics {
     }
 }
 
+/// Multithreaded forward elimination (#752): where it ran, and what its workers held.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ParallelForwardStatistics {
+    /// Batches whose forward elimination ran on worker threads.
+    pub batches: usize,
+    /// Batches that asked for workers but ran serially because the workers' reservation would
+    /// have crossed the live-entry budget or the workspace cap.
+    pub fallback_batches: usize,
+    /// The most threads any one batch used.
+    pub max_workers: usize,
+    /// Rows a worker reduced to a pivot that another worker had already published, so it reduced
+    /// further. Summed over batches.
+    pub lost_publications: usize,
+    /// Maximum conservative entry reservation: published rows plus two full-width rows per
+    /// active worker. An upper bound, not a mathematical count.
+    pub reserved_entries: usize,
+    /// Maximum dense-row and publication-slot workspace bytes across workers.
+    pub workspace_bytes: usize,
+}
+
+impl ParallelForwardStatistics {
+    fn record(&mut self, other: &Self) {
+        self.batches += other.batches;
+        self.fallback_batches += other.fallback_batches;
+        self.max_workers = self.max_workers.max(other.max_workers);
+        self.lost_publications += other.lost_publications;
+        self.reserved_entries = self.reserved_entries.max(other.reserved_entries);
+        self.workspace_bytes = self.workspace_bytes.max(other.workspace_bytes);
+    }
+}
+
 /// Bit-packed `GF(2)` elimination (#777): how often it ran, what it did, and what it held.
 ///
 /// Row `xor`s are counted here rather than in [`EliminationStatistics::row_operations`]'s unit: a
@@ -444,6 +475,9 @@ pub struct BatchStatistics {
 
     /// Bit-packed elimination; zero unless this batch was a `GF(2)` batch the dispatch selected.
     pub packed_gf2: PackedGf2Statistics,
+
+    /// Multithreaded forward elimination; zero unless this batch was dispatched to workers.
+    pub parallel_forward: ParallelForwardStatistics,
 
     /// Pairs reduced in this batch, after the product criterion.
     pub pairs: usize,
@@ -622,6 +656,7 @@ impl BatchStatistics {
             .saturating_add(self.dense_buffer_bytes)
             .saturating_add(self.candidate_reduction.workspace_bytes)
             .saturating_add(self.packed_gf2.workspace_bytes)
+            .saturating_add(self.parallel_forward.workspace_bytes)
     }
 }
 
@@ -633,6 +668,9 @@ pub struct F4Statistics {
 
     /// Aggregate bit-packed `GF(2)` elimination. See [`PackedGf2Statistics`].
     pub packed_gf2: PackedGf2Statistics,
+
+    /// Aggregate multithreaded forward elimination. See [`ParallelForwardStatistics`].
+    pub parallel_forward: ParallelForwardStatistics,
 
     /// Pairs taken off the queue.
     pub pairs_considered: usize,
@@ -980,6 +1018,7 @@ impl F4Statistics {
         self.batches += 1;
         self.candidate_reduction.record(&batch.candidate_reduction);
         self.packed_gf2.record(&batch.packed_gf2);
+        self.parallel_forward.record(&batch.parallel_forward);
         self.max_pairs_per_batch = self.max_pairs_per_batch.max(batch.pairs);
         self.max_matrix_rows = self.max_matrix_rows.max(batch.rows);
         self.max_matrix_columns = self.max_matrix_columns.max(batch.columns);

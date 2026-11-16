@@ -323,3 +323,11 @@ test = true
 [[example]]
 name = "shoup_scatter_gate"
 required-features = ["external-runners"]
+
+[[example]]
+name = "parallel_forward_calibration"
+required-features = ["research-work"]
+
+[[example]]
+name = "parallel_forward_study"
+required-features = ["research-work"]
