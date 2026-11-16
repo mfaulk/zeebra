@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1531,11 +1531,86 @@ transform. That is the stage the unmeasured middle-product evaluation would targ
   each tier's measured threshold.
 - **The `FiniteField` path is kept** and remains the only path `lagrange_interpolate` and
   `multipoint_evaluate` take. Mersenne-31 has no domain (the kernel refuses it, tested).
+  *Superseded by #783 (§4.3.6): both now dispatch to the transform tree where the field serves a
+  root.*
 - **Production dispatch is #783**, not this change: it needs §4.3.4's capability hook from
   `FiniteField` to a root of unity and a randomness policy, which is a public-trait change in
-  `src/fields` and a design decision, not a measurement.
+  `src/fields` and a design decision, not a measurement. *Done in §4.3.6.*
 - **Nothing here moves §5's binding stage.** Interpolation is not root finding; a solve-level
   claim needs #82's real resultant caller, which §4.3.4 already required.
+
+#### 4.3.6 Production dispatch, and the `lagrange` row through it (#783)
+
+**Measured at `e7bef01c` (new) against `810b29c3` (old)**, the commit #783 branched from, both
+built from one source tree's two states with `examples/univariate_scaling.rs` (`points=`, which
+times `lagrange_interpolate` itself — the public entry, not an instrument arm), release profile,
+`x86-64-v3`, private target directories. `taskset -c 7`, serialized through `tools/benchlock.sh`
+(82 s, load 2.90 at START and 3.30 at END), five interleaved repetitions with the arm order
+alternating; each figure is the fastest of the five. Every run spot-checks four interpolation
+constraints.
+
+##### The capability, decided
+
+§4.3.4 left two shapes open: a defaulted hook on `FiniteField`, or a cached deterministic root per
+field. #783 takes **both halves of the second inside the first**:
+
+- `FiniteField::transform_root_of_unity(log_n: u32) -> Option<Self>`, **defaulting to `None`**.
+  Additive: no existing implementation has to change, and one that does not override it keeps
+  the Karatsuba tree exactly as before. The `KnownOrder` two-adic API (`two_adicity`,
+  `try_two_adic_root_of_unity`) is reused for the arithmetic, not duplicated: the prime families'
+  overrides call `two_adic::deterministic_two_adic_root`, which is the existing construction
+  (`z^m` for a non-square `z`, squared down) with the rng draw replaced by a walk over
+  `KnownOrder::element_at` from index 2.
+- **No randomness, and no cache.** The first non-square over a prime field is a small integer, so
+  the root costs a handful of exponentiations — well under the kernel's twiddle-table
+  construction, which §4.3.5 already timed inside the transform arm at most 5.6 ms. A per-type
+  cache would need a generic static, which Rust does not have; it is not worth a `TypeId` map.
+  The same root on every call also keeps the dispatch reproducible.
+- **Overridden** by `PrimeFieldElement32`, `PrimeFieldElement64`, `PrimeFieldElement128` and
+  `PrimeFieldElement256`, up to each field's two-adicity. **Not overridden** by the binary fields
+  (two-adicity 0) or the extension fields, whose non-squares need not lie at small indices; both
+  keep the default and the Karatsuba tree.
+- Dispatch is `TransformKernel::dispatched(max_len)`: `None` if `transform_tree_threshold` (§4.3.5's
+  2048 / 128 / 128) is at least `max_len`, or if the hook has no root for the
+  `next_power_of_two(max_len)` domain. `lagrange_interpolate` asks with `n + 1` above
+  `tree_crossover`; `multipoint_evaluate` with `n + 1`, or `2 len(f)` when `f` outgrows the
+  root, since the top Newton remainder's products reach that length. **Mersenne-31 keeps the
+  Karatsuba path**: its hook has no root past order two (tested, and the row below is 1.00x).
+
+Tested: the hook returns roots of exact order up to and only up to the two-adicity over every
+prime family; the public entry points reach the transform tree above threshold over Goldilocks
+and BN254 and not below the crossover, not over KoalaBear below 2048, not over Mersenne-31; their
+outputs equal the Karatsuba tree (interpolation) and Horner (evaluation, including `deg f >= n`).
+
+##### The `lagrange` row, old against new
+
+| field | element | `n` = 4096 | 8192 | **13 123** | 16 384 | 65 536 |
+|---|---:|---:|---:|---:|---:|---:|
+| Mersenne-31 (control) | 8 B | | | 1.00x | | |
+| KoalaBear | 4 B | 1.13x | 1.25x | **1.37x** | 1.46x | 2.17x |
+| KoalaBear in a `u64` | 8 B | 1.66x | 2.03x | **2.33x** | 2.59x | 4.29x |
+| Goldilocks | 8 B | 1.99x | 2.55x | **2.90x** | 3.30x | 5.51x |
+| BN254 `Fr` | 32 B | 1.99x | 2.53x | **2.80x** | 3.21x | — |
+
+Absolute seconds at 13 123 points, old → new: KoalaBear 0.0533 → 0.0388, KoalaBear in a `u64`
+0.1284 → 0.0552, Goldilocks 0.2244 → 0.0775, BN254 2.0484 → 0.7317, Mersenne-31 0.1136 →
+0.1137. At 65 536: KoalaBear 0.6029 → 0.2777, Goldilocks 2.6691 → 0.4843. BN254 at 65 536 was
+not run (about 25 s per old-arm repetition).
+
+**These reproduce §4.3.5's instrument figures through the public entry** — 1.36x / 2.94x / 2.80x
+there against 1.37x / 2.90x / 2.80x here at 13 123 — so the dispatch adds no measurable cost (root
+construction included) and the instrument's control was a faithful stand-in for the shipped tree.
+
+**KoalaBear in a `u64` takes the 8-byte threshold, 128, which was not swept for it** (§4.3.5 flagged
+this). It wins 1.66x – 4.29x at that threshold; whether a larger one would win more is unmeasured.
+
+##### What this does not establish
+
+**No solve-level figure.** #82's resultant caller (`interpolation_route`, `docs/guide/solving-systems.md`)
+was not re-measured here, so nothing in this section moves §5 or any whole-route ceiling; the
+interpolation stage's share of that route, and so what 2.8x on it is worth there, is the caller
+measurement §4.3.4 already required. `multipoint_evaluate` was not timed separately; it shares
+the tree and the kernel, and its correctness is tested, not its speed.
 
 ### 4.4 Root finding: quadratic, and it is the binding stage
 

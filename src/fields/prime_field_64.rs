@@ -270,6 +270,10 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
         Self::new(value)
     }
 
+    fn transform_root_of_unity(log_n: u32) -> Option<Self> {
+        crate::fields::two_adic::deterministic_two_adic_root(log_n)
+    }
+
     fn inverse(&self) -> Self {
         assert_ne!(
             *self,

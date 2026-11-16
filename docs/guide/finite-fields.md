@@ -460,6 +460,14 @@ that covers 64-, 128- and 256-bit orders without allocating — plus `order_u128
 `is_generator` and `is_primitive_nth_root`, and `sqrt`. For an extension field q = p^k, so the
 order and the characteristic are genuinely different; both are reported.
 
+`FiniteField::transform_root_of_unity(log_n)` is the one root-of-unity method on `FiniteField`
+itself, so algorithms bounded on `FiniteField` alone can use a transform (#783). It takes no rng,
+returns the same root on every call, and defaults to `None`; the prime-field families override it
+up to their two-adicity. `lagrange_interpolate` and `multipoint_evaluate` use it to move the
+subproduct tree's large products onto the transform. A field implemented outside the crate keeps
+the Karatsuba tree unless it overrides the hook, and any `Some` it returns must have order exactly
+`2^log_n`.
+
 Constructing a generator or a root of unity **fails as a value**. Whether `n` divides `q - 1`, and
 whether a field has a generator this crate will look for **without being asked**, are facts about
 the field and the requested order rather than programmer errors, so `try_primitive_element`,

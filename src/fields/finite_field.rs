@@ -261,6 +261,20 @@ where
     fn mul_prepared(&self, factor: &PreparedFactor<Self>) -> Self {
         *self * factor.element()
     }
+
+    /// A primitive `2^log_n`-th root of unity found without randomness, or `None`.
+    ///
+    /// The capability that lets algorithms bounded on `FiniteField` alone — `lagrange_interpolate`,
+    /// `multipoint_evaluate` — take a power-of-two transform when the field has one (#783). The
+    /// default is `None`, which keeps every such algorithm on its root-free path, so an
+    /// implementation outside the crate loses nothing by not overriding it. The crate's prime
+    /// fields override it with [`two_adic::deterministic_two_adic_root`], which returns the same
+    /// root on every call and `None` above the field's two-adicity.
+    ///
+    /// A `Some` must have order exactly `2^log_n`; callers trust it without re-checking.
+    fn transform_root_of_unity(_log_n: u32) -> Option<Self> {
+        None
+    }
 }
 
 /// A field element prepared as a repeated multiplier, with up to two words of precomputation.

@@ -1,10 +1,12 @@
 //! A research arm for #606: the subproduct tree with its large node products and remainders moved
 //! onto a power-of-two transform, kept beside [`super::subproduct_tree`] rather than replacing it.
 //!
-//! Not dispatched to. `multipoint_evaluate` and `lagrange_interpolate` are bounded on
-//! [`FiniteField`] alone and cannot reach a root of unity, and Mersenne-31 (two-adicity 1) has no
-//! large domain at all, so the shipped path stays the Karatsuba tree. This module exists so the
-//! A/B in `examples/transform_tree_ab.rs` runs both arithmetics through **one** tree: a
+//! Dispatched to by `multipoint_evaluate` and `lagrange_interpolate` (#783) through
+//! [`TransformKernel::dispatched`], which reaches a root through the `FiniteField` capability
+//! [`FiniteField::transform_root_of_unity`] rather than an rng. Mersenne-31 (two-adicity 1) and
+//! every field that does not override that hook stay on [`super::subproduct_tree`]'s Karatsuba
+//! tree, which is also the differential oracle. The A/B in `examples/transform_tree_ab.rs` runs
+//! both arithmetics through **one** tree: a
 //! [`TransformKernel`] whose threshold is `usize::MAX` takes the Karatsuba / long-division /
 //! Karatsuba-Newton route at every node, which is the control arm, and any finite threshold sends
 //! products of at least that degree through the transform.
@@ -90,9 +92,54 @@ impl<F: KnownOrder> TransformKernel<F> {
                 threshold: usize::MAX,
             });
         }
-        let size = max_len.next_power_of_two();
-        let log = size.trailing_zeros();
+        let log = max_len.next_power_of_two().trailing_zeros();
         let root = F::try_two_adic_root_of_unity(log, rng)?;
+        Ok(Self::from_root(root, log, threshold))
+    }
+
+    /// [`Self::new`] at the measured threshold for `F`'s width.
+    ///
+    /// # Errors
+    /// As [`Self::new`].
+    pub fn measured<R: RngCore + CryptoRng>(
+        max_len: usize,
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
+        Self::new(max_len, transform_tree_threshold::<F>(), rng)
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// How many dispatch kernels this thread has built: the tests' proof the public entry points
+    /// reached the transform tree, since its output is by design indistinguishable.
+    pub(crate) static TRANSFORM_DISPATCHES: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+impl<F: FiniteField> TransformKernel<F> {
+    /// The kernel `lagrange_interpolate` and `multipoint_evaluate` dispatch to, for products of up
+    /// to `max_len` coefficients, or `None` to keep them on the Karatsuba tree.
+    ///
+    /// `None` when no product could reach the measured threshold — the kernel would be the
+    /// Karatsuba control, which the shipped tree already is — or when
+    /// [`FiniteField::transform_root_of_unity`] has no root for the domain, which is every field
+    /// that does not override it, and Mersenne-31 above order two.
+    pub(crate) fn dispatched(max_len: usize) -> Option<Self> {
+        let threshold = transform_tree_threshold::<F>();
+        if threshold >= max_len {
+            return None;
+        }
+        let log = max_len.next_power_of_two().trailing_zeros();
+        let root = F::transform_root_of_unity(log)?;
+        #[cfg(test)]
+        TRANSFORM_DISPATCHES.with(|count| count.set(count.get() + 1));
+        Some(Self::from_root(root, log, threshold))
+    }
+
+    /// Twiddle tables for every size up to `2^log`, from a primitive `2^log`-th root.
+    fn from_root(root: F, log: u32, threshold: usize) -> Self {
+        let size = 1usize << log;
         let powers = crate::fft::powers_of(&root, size);
         let tables = (0..=log)
             .map(|j| {
@@ -105,18 +152,7 @@ impl<F: KnownOrder> TransformKernel<F> {
                 }
             })
             .collect();
-        Ok(Self { tables, threshold })
-    }
-
-    /// [`Self::new`] at the measured threshold for `F`'s width.
-    ///
-    /// # Errors
-    /// As [`Self::new`].
-    pub fn measured<R: RngCore + CryptoRng>(
-        max_len: usize,
-        rng: &mut R,
-    ) -> Result<Self, RootOfUnityError> {
-        Self::new(max_len, transform_tree_threshold::<F>(), rng)
+        Self { tables, threshold }
     }
 }
 
@@ -399,13 +435,13 @@ pub fn transform_tree_interpolate_unstable<F: FiniteField>(
 mod tests {
     use super::{
         transform_tree_interpolate_unstable, transform_tree_threshold, TransformKernel,
-        TransformTree,
+        TransformTree, TRANSFORM_DISPATCHES,
     };
     use crate::{
         fields::{Bn254Fr, KoalaBear, Mersenne31, PrimeFieldElement64},
-        multipoint_evaluate,
+        lagrange_interpolate, multipoint_evaluate,
         poly::univariate::subproduct_tree::interpolate as karatsuba_interpolate,
-        FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
+        FiniteField, KnownOrder, Polynomial, UnivariatePolynomial, Zero,
     };
     use rand::{prelude::StdRng, SeedableRng};
 
@@ -530,5 +566,95 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(611);
         assert!(TransformKernel::<Mersenne31>::new(1024, 0, &mut rng).is_err());
         assert!(TransformKernel::<Mersenne31>::new(1024, usize::MAX, &mut rng).is_ok());
+    }
+
+    /// Runs `f` and returns how many times it took the transform tree.
+    fn dispatches_during(f: impl FnOnce()) -> usize {
+        TRANSFORM_DISPATCHES.with(|count| count.set(0));
+        f();
+        TRANSFORM_DISPATCHES.with(|count| count.get())
+    }
+
+    #[test]
+    // The dispatch kernel exists exactly when the domain exceeds the width's threshold and the field has the root.
+    fn test_dispatch_kernel_follows_threshold_and_root() {
+        assert!(TransformKernel::<KoalaBear>::dispatched(2049).is_some());
+        assert!(TransformKernel::<KoalaBear>::dispatched(2048).is_none());
+        assert!(TransformKernel::<Goldilocks>::dispatched(129).is_some());
+        assert!(TransformKernel::<Goldilocks>::dispatched(128).is_none());
+        assert!(TransformKernel::<Bn254Fr>::dispatched(129).is_some());
+        assert!(TransformKernel::<Mersenne31>::dispatched(1 << 16).is_none());
+        // Beyond the two-adicity (28 for BN254) no domain exists, so there is no kernel either.
+        assert!(TransformKernel::<Bn254Fr>::dispatched((1 << 28) + 1).is_none());
+    }
+
+    #[test]
+    // `lagrange_interpolate` takes the transform tree over NTT-friendly fields above threshold only.
+    fn test_lagrange_interpolate_reaches_the_transform_tree() {
+        let mut rng = StdRng::seed_from_u64(783);
+        let goldilocks = random_points::<Goldilocks>(300, &mut rng);
+        assert_eq!(
+            dispatches_during(|| drop(lagrange_interpolate(goldilocks))),
+            1
+        );
+        let bn254 = random_points::<Bn254Fr>(200, &mut rng);
+        assert_eq!(dispatches_during(|| drop(lagrange_interpolate(bn254))), 1);
+        // Below the tree crossover the quadratic arm runs, transform or not.
+        let small = random_points::<Goldilocks>(100, &mut rng);
+        assert_eq!(dispatches_during(|| drop(lagrange_interpolate(small))), 0);
+        // KoalaBear's threshold is 2048, so 1000 points stay on the Karatsuba tree.
+        let koala = random_points::<KoalaBear>(1000, &mut rng);
+        assert_eq!(dispatches_during(|| drop(lagrange_interpolate(koala))), 0);
+        // Mersenne-31 has no domain at all.
+        let mersenne = random_points::<Mersenne31>(3000, &mut rng);
+        assert_eq!(
+            dispatches_during(|| drop(lagrange_interpolate(mersenne))),
+            0
+        );
+    }
+
+    #[test]
+    // Through the public entry, the interpolant equals the Karatsuba tree's on both sides of dispatch.
+    fn test_lagrange_interpolate_agrees_with_karatsuba_tree() {
+        fn check<F: KnownOrder>(sizes: &[usize], seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for &n in sizes {
+                let points = random_points::<F>(n, &mut rng);
+                assert_eq!(
+                    lagrange_interpolate(points.clone()),
+                    karatsuba_interpolate(&points),
+                    "n = {n}"
+                );
+            }
+        }
+        check::<Goldilocks>(&[129, 130, 256, 257, 777], 7830);
+        check::<Bn254Fr>(&[129, 300], 7831);
+        check::<KoalaBear>(&[2048, 2100], 7832);
+        check::<Mersenne31>(&[300], 7833);
+    }
+
+    #[test]
+    // `multipoint_evaluate` takes the transform tree and matches Horner, for `f` below and above `n` in degree.
+    fn test_multipoint_evaluate_agrees_with_horner() {
+        let mut rng = StdRng::seed_from_u64(7834);
+        let n = 300;
+        let xs: Vec<Goldilocks> = random_points::<Goldilocks>(n, &mut rng)
+            .into_iter()
+            .map(|(x, _)| x)
+            .collect();
+        for degree in [0usize, 10, n - 1, n, n + 1, 3 * n] {
+            let f = UnivariatePolynomial::new(
+                &(0..=degree)
+                    .map(|_| Goldilocks::random(&mut rng))
+                    .collect::<Vec<_>>(),
+            );
+            let expected: Vec<Goldilocks> = xs.iter().map(|x| f.eval(x)).collect();
+            let mut actual = Vec::new();
+            let count = dispatches_during(|| actual = multipoint_evaluate(&f, &xs));
+            assert_eq!(count, 1, "degree {degree}");
+            assert_eq!(actual, expected, "degree {degree}");
+        }
+        let zero = UnivariatePolynomial::new(&[Goldilocks::zero()]);
+        assert_eq!(multipoint_evaluate(&zero, &xs), vec![Goldilocks::zero(); n]);
     }
 }

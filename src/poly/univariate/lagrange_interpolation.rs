@@ -27,7 +27,10 @@ use crate::poly::univariate::Polynomial;
 /// Interpolate n points into a polynomial of degree n-1.
 ///
 /// `O(n^2)` field operations and `O(n)` memory below the subproduct tree's measured crossover,
-/// `O(M(n) log n)` above it — see `super::subproduct_tree`, which is #162 stage 2.
+/// `O(M(n) log n)` above it — see `super::subproduct_tree`, which is #162 stage 2. Where the field's
+/// [`FiniteField::transform_root_of_unity`] serves the domain and `n` passes the width's measured
+/// threshold, the tree's large products go through the transform (`super::transform_tree`, #783);
+/// the result is the same polynomial either way.
 ///
 /// # Arguments
 /// * `points` - Collection of (x,y) points.
@@ -37,6 +40,9 @@ use crate::poly::univariate::Polynomial;
 pub fn interpolate<F: FiniteField>(points: Vec<(F, F)>) -> UnivariatePolynomial<F> {
     assert!(!points.is_empty());
     if points.len() > super::subproduct_tree::tree_crossover::<F>() {
+        if let Some(kernel) = super::TransformKernel::dispatched(points.len() + 1) {
+            return super::transform_tree_interpolate_unstable(&points, &kernel);
+        }
         return super::subproduct_tree::interpolate(&points);
     }
     interpolate_quadratic(points)

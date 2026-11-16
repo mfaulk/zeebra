@@ -28,8 +28,10 @@
 //! not required ... the bound should stay `FiniteField`"). #559 settled those competing
 //! requirements in favour of the bound: the criterion now asks for the multiplication exponent,
 //! which the measured ~1.6 meets. Everything here needs nothing of the field but a ring. The
-//! `KnownOrder` transform arm (#606) is [`super::transform_tree`], beside this path rather than
-//! replacing it — Mersenne-31 has two-adicity 1, so Karatsuba is the only route that field has.
+//! transform arm (#606) is [`super::transform_tree`], beside this path rather than replacing it:
+//! the public entry points dispatch to it (#783) when the field's
+//! [`FiniteField::transform_root_of_unity`] serves the domain, and this tree is the fallback —
+//! Mersenne-31 has two-adicity 1, so Karatsuba is the only route that field has.
 //!
 //! # The three algorithms
 //!
@@ -52,7 +54,10 @@
 
 use crate::{
     fields::batch_invert,
-    poly::univariate::{div_with_remainder::div_with_remainder, Polynomial, UnivariatePolynomial},
+    poly::univariate::{
+        div_with_remainder::div_with_remainder, Polynomial, TransformKernel, TransformTree,
+        UnivariatePolynomial,
+    },
     FiniteField,
 };
 
@@ -248,6 +253,16 @@ pub fn multipoint_evaluate<F: FiniteField>(f: &UnivariatePolynomial<F>, points: 
     assert!(!points.is_empty(), "nothing to evaluate at");
     if points.len() <= tree_crossover::<F>() {
         return points.iter().map(|x| f.eval(x)).collect();
+    }
+    // The top remainder's Newton products reach twice `len f` when `f` outgrows the root.
+    let f_len = f.coefficients().len();
+    let max_len = if f_len <= points.len() + 1 {
+        points.len() + 1
+    } else {
+        2 * f_len
+    };
+    if let Some(kernel) = TransformKernel::dispatched(max_len) {
+        return TransformTree::build(points, &kernel).evaluate(f.coefficients());
     }
     SubproductTree::build(points).evaluate(f)
 }
