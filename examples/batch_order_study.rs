@@ -30,7 +30,10 @@ fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, s
         Some(("auto", w)) => ParallelForward::Auto {
             max_workers: w.parse().unwrap(),
         },
-        _ => panic!("forward: serial | auto:MAX"),
+        Some(("forced", w)) => ParallelForward::Forced {
+            workers: w.parse().unwrap(),
+        },
+        _ => panic!("forward: serial | auto:MAX | forced:WORKERS"),
     };
     let options = F4Options {
         batch_order,
@@ -65,6 +68,18 @@ fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, s
             (
                 "max_live_nonzeros",
                 Json::size(statistics.max_live_nonzeros)
+            ),
+            (
+                "parallel_batches",
+                Json::size(statistics.parallel_forward.batches)
+            ),
+            (
+                "parallel_fallbacks",
+                Json::size(statistics.parallel_forward.fallback_batches)
+            ),
+            (
+                "reserved_entries",
+                Json::size(statistics.parallel_forward.reserved_entries)
             ),
         ])
         .to_json()

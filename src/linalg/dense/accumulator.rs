@@ -136,6 +136,34 @@ impl<F: FiniteField> DenseAccumulator<F> {
         }
     }
 
+    /// Subtract from every column the multiple of its pivot that clears it, walking ascending to
+    /// the tail, and return the number of subtractions and the pivot entries they read.
+    ///
+    /// A pivot's entries lie at or right of its lead, so one ascending walk clears every pivoted
+    /// column, not only those left of the row's own lead.
+    pub(crate) fn sweep<'p>(
+        &mut self,
+        pivot_of: impl Fn(usize) -> Option<&'p SparseRow<F>>,
+    ) -> (usize, usize)
+    where
+        F: 'p,
+    {
+        let (mut operations, mut products) = (0, 0);
+        let mut column = self.lead;
+        while column < self.tail {
+            let factor = self.cells[column];
+            if !factor.is_zero() {
+                if let Some(pivot) = pivot_of(column) {
+                    self.subtract_scaled(pivot, factor);
+                    operations += 1;
+                    products += pivot.nonzeros();
+                }
+            }
+            column += 1;
+        }
+        (operations, products)
+    }
+
     /// Scale so the leading coefficient is one, reporting whether an inverse was needed.
     ///
     /// Scaling is unconditional, as in `crate::linalg::dense::rows`: zero times anything is
