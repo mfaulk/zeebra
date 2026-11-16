@@ -3,7 +3,11 @@
 **Measured at:** gate calibration from a binary built on the tree committed as `8ccea616`
 (SHA-256 in `research/parallel-forward/calibration/binary.sha256`); design 1 at `46867c14`;
 design 2 at `f45bcc47`. The adopting commit `394a9ca1` changes only the default value, docs
-and tests, not the measured route. Threadripper PRO 5995WX, 64 physical cores, one logical CPU
+and tests, not the measured route. All four commits sit on base `8dbf9bcf`. They are kept
+reachable by the tag `measured/752-parallel-forward` (`f0379bf6`) because the merged branch was
+rebased afterward. On the rebased branch they are `565f2ec3`, `24f7ec46`, `fe09f1d7` and
+`f856a003`. They make line-for-line the same `src/` changes, but that base also includes later
+merges to `main` that these measurements did not cover. Threadripper PRO 5995WX, 64 physical cores, one logical CPU
 per physical core (CPUs 2–65, no SMT); rustc 1.99.1, release, fat LTO, one codegen unit,
 x86-64-v3, system allocator.
 
