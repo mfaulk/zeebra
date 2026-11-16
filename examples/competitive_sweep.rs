@@ -476,21 +476,6 @@ fn unreachable_engine(
     board.add(CompetitiveRecord::of(&report, built, environment));
 }
 
-fn run_for_cohort(
-    solver: &mut dyn ExternalSolver,
-    built: &Instance,
-    task: Task,
-    limits: &Limits,
-) -> RunReport {
-    if solver.id() == "zeebra" && limits.workers != 1 {
-        return RunReport::unsupported("zeebra", built, task, limits,
-            zeebra::grobner::external::Unsupported::Representation {
-                detail: "the configured Zeebra F4 is serial; cannot supply the requested multiworker cohort".into(),
-            });
-    }
-    solver.run(built, task, limits)
-}
-
 /// Probe one engine, run it, and record whatever came back.
 ///
 /// Every outcome is recorded, including the ones with no answer: a board that kept only its
@@ -507,7 +492,7 @@ fn drive(
     environment: &Environment,
 ) {
     let _ = solver.probe_version();
-    let report = run_for_cohort(solver, built, task, limits);
+    let report = solver.run(built, task, limits);
     board.add(CompetitiveRecord::of(&report, built, environment));
 }
 
@@ -707,23 +692,26 @@ mod tests {
         }
     }
 
-    // A serial Zeebra answer cannot be mislabeled as a requested multiworker result.
+    // Zeebra answers a multiworker cohort now that F4 bounds its threads by the cohort's workers.
     #[test]
-    fn test_serial_zeebra_refuses_multiworker_cohort() {
+    fn test_zeebra_answers_multiworker_cohort() {
         let input = zeebra::grobner::external::corpus::instance(
             "katsura-4",
             32003,
             zeebra::MonomialOrder::GradedReverseLexicographic,
         )
         .unwrap();
-        let report = super::run_for_cohort(
+        let report = super::ExternalSolver::run(
             &mut super::ZeebraSolver::new(),
             &input,
             super::Task::ReducedGrobnerBasis,
-            &super::Limits::wall(std::time::Duration::ZERO).with_workers(4),
+            &super::Limits::wall(std::time::Duration::from_secs(60)).with_workers(4),
         );
-        assert!(matches!(report.status, super::RunStatus::Unsupported(_)));
-        assert_eq!(report.measurement.wall, std::time::Duration::ZERO);
+        assert!(
+            matches!(report.status, super::RunStatus::Complete(_)),
+            "{:?}",
+            report.status
+        );
     }
 
     // The default small-prime sweep includes the eliminant comparison task.

@@ -6,7 +6,7 @@ use zeebra::{
             corpus,
             groebner_rs::{control_entry, wide_control},
             CompetitiveBoard, CompetitiveRecord, ExternalSolver, GiacSolver, GroebnerRsSolver,
-            Limits, Measurement, RunReport, RunStatus, Task, Unsupported, ZeebraSolver,
+            Limits, RunStatus, Task, ZeebraSolver,
         },
         record::Environment,
     },
@@ -138,12 +138,14 @@ fn main() {
         environment.policy = format!("#740; one row per process; {wall}s per child; {rss}MiB RSS; {workers} workers; exact independent Singular verification");
     }
     let task = Task::ReducedGrobnerBasis;
-    let report=match engine.as_str(){
-        "groebner-rs"|"giac"=>driver.run(&instance,task,&limits),
-        "zeebra" if workers!=1=>RunReport::new("zeebra",&instance,task,&limits,
-            RunStatus::Unsupported(Unsupported::Representation{detail:"the configured Zeebra F4 is serial; cannot supply the requested multiworker cohort".into()}),Measurement::unmeasured()),
-        "zeebra"=>{let mut solver=ZeebraSolver::new().measuring_one_row();let _=solver.probe_version();solver.run(&instance,task,&limits)},
-        _=>panic!("unknown engine")
+    let report = match engine.as_str() {
+        "groebner-rs" | "giac" => driver.run(&instance, task, &limits),
+        "zeebra" => {
+            let mut solver = ZeebraSolver::new().measuring_one_row();
+            let _ = solver.probe_version();
+            solver.run(&instance, task, &limits)
+        }
+        _ => panic!("unknown engine"),
     };
     let mut board = CompetitiveBoard::new().with_corpus([control_entry()]);
     board.add(CompetitiveRecord::of(&report, &instance, &environment));

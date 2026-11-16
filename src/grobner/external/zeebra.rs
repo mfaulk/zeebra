@@ -28,7 +28,7 @@ use crate::{
         differential::polynomial_to_string,
         f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions, QuotientBasis},
-        F4Error, F4Options, IdealClass, InterreductionRoute,
+        F4Error, F4Options, IdealClass, InterreductionRoute, ParallelForward,
     },
     util::peak_resident_bytes,
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -111,6 +111,30 @@ impl ZeebraSolver {
     pub fn with_f4_options(mut self, options: F4Options) -> Self {
         self.f4_options = options;
         self
+    }
+
+    /// The F4 options a run under `limits` uses: forward elimination never takes more threads
+    /// than [`Limits::workers`], so a row's recorded concurrency is a bound on what it used.
+    fn f4_options_within(&self, limits: &Limits) -> F4Options {
+        let workers = limits.workers.max(1);
+        let parallel_forward = match self.f4_options.parallel_forward {
+            ParallelForward::Auto { .. } if workers == 1 => ParallelForward::Serial,
+            ParallelForward::Auto { max_workers } => ParallelForward::Auto {
+                max_workers: if max_workers == 0 {
+                    workers
+                } else {
+                    max_workers.min(workers)
+                },
+            },
+            ParallelForward::Forced { workers: forced } => ParallelForward::Forced {
+                workers: forced.min(workers),
+            },
+            ParallelForward::Serial => ParallelForward::Serial,
+        };
+        F4Options {
+            parallel_forward,
+            ..self.f4_options.clone()
+        }
     }
 
     /// Set the FGLM options.
@@ -527,20 +551,25 @@ macro_rules! dispatch {
 
 impl ZeebraSolver {
     /// Parse and solve, dispatching on the characteristic and then the variable count.
-    fn dispatch(&self, instance: &Instance, task: Task) -> Result<Solved, RunFailure> {
+    fn dispatch(
+        &self,
+        instance: &Instance,
+        task: Task,
+        f4: &F4Options,
+    ) -> Result<Solved, RunFailure> {
         if let Some(entry) = self
             .instantiations
             .iter()
             .find(|entry| entry.matches(instance))
         {
-            return (entry.solve)(instance, task, &self.f4_options, &self.fglm_options);
+            return (entry.solve)(instance, task, f4, &self.fglm_options);
         }
         match instance.field.characteristic {
             BINARY_CHARACTERISTIC => dispatch!(
                 Zp2,
                 instance,
                 task,
-                &self.f4_options,
+                f4,
                 &self.fglm_options,
                 4,
                 5,
@@ -554,7 +583,7 @@ impl ZeebraSolver {
                 Zp32003,
                 instance,
                 task,
-                &self.f4_options,
+                f4,
                 &self.fglm_options,
                 3,
                 4,
@@ -571,7 +600,7 @@ impl ZeebraSolver {
                 PrimeFieldElement64<ALTERNATE_CHARACTERISTIC>,
                 instance,
                 task,
-                &self.f4_options,
+                f4,
                 &self.fglm_options,
                 4,
                 5,
@@ -587,7 +616,7 @@ impl ZeebraSolver {
                 PrimeFieldElement64<REFERENCE_CHARACTERISTIC>,
                 instance,
                 task,
-                &self.f4_options,
+                f4,
                 &self.fglm_options,
                 4,
                 5,
@@ -603,7 +632,7 @@ impl ZeebraSolver {
                 PrimeFieldElement64<KOALABEAR_CHARACTERISTIC>,
                 instance,
                 task,
-                &self.f4_options,
+                f4,
                 &self.fglm_options,
                 5,
                 7,
@@ -613,7 +642,7 @@ impl ZeebraSolver {
                 crate::fields::Zp18446744073709551557,
                 instance,
                 task,
-                &self.f4_options,
+                f4,
                 &self.fglm_options,
                 2
             ),
@@ -621,7 +650,7 @@ impl ZeebraSolver {
                 PrimeFieldElement64<WIDE_64_CHARACTERISTIC>,
                 instance,
                 task,
-                &self.f4_options,
+                f4,
                 &self.fglm_options,
                 2,
                 4,
@@ -772,7 +801,7 @@ impl ExternalSolver for ZeebraSolver {
             return finish(RunStatus::Unsupported(reason), Measurement::unmeasured());
         }
 
-        match self.dispatch(instance, task) {
+        match self.dispatch(instance, task, &self.f4_options_within(limits)) {
             Ok(solved) => {
                 let (peak_rss_bytes, rss_basis) = self.memory();
                 finish(
@@ -822,6 +851,39 @@ mod tests {
             vec!["x^2 - 1".into(), "y - x".into()],
             GREVLEX,
         )
+    }
+
+    // A one-worker cohort runs serial F4 even though the default dispatches up to 16 workers.
+    #[test]
+    fn test_one_worker_limit_runs_serial_forward_elimination() {
+        use crate::grobner::ParallelForward;
+        let solver = ZeebraSolver::new();
+        let options = solver.f4_options_within(&limits().with_workers(1));
+        assert_eq!(options.parallel_forward, ParallelForward::Serial);
+    }
+
+    // A worker budget caps the adaptive dispatch rather than being ignored or exceeded.
+    #[test]
+    fn test_worker_limit_caps_adaptive_and_forced_dispatch() {
+        use crate::grobner::{F4Options, ParallelForward};
+        let within = |parallel_forward, workers| {
+            ZeebraSolver::new()
+                .with_f4_options(F4Options {
+                    parallel_forward,
+                    ..F4Options::default()
+                })
+                .f4_options_within(&limits().with_workers(workers))
+                .parallel_forward
+        };
+        let auto = |max_workers| ParallelForward::Auto { max_workers };
+        assert_eq!(within(auto(16), 4), auto(4));
+        assert_eq!(within(auto(16), 32), auto(16));
+        assert_eq!(within(auto(0), 8), auto(8));
+        assert_eq!(
+            within(ParallelForward::Forced { workers: 16 }, 4),
+            ParallelForward::Forced { workers: 4 }
+        );
+        assert_eq!(within(ParallelForward::Serial, 16), ParallelForward::Serial);
     }
 
     // Registration adds a previously uncompiled field and width as a measured board row.
