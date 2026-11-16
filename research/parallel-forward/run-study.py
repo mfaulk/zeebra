@@ -17,10 +17,11 @@ binary, out_path, plan = sys.argv[1:4]
 
 MQ = [("mq-random-10", 32003), ("mq-random-10", 2147483647)]
 SMALL = [(f, p) for f in ("cyclic-5", "katsura-6", "cyclic-6", "katsura-7") for p in (32003, 2147483647)]
+TRAINING = [("katsura-9", 32003), ("cyclic-7", 32003)]
 HELDOUT = [
     ("katsura-8", 2147483647),
-    ("katsura-9", 32003),
-    ("cyclic-7", 2147483647),
+    ("cyclic-8", 2147483647),
+    ("katsura-10", 32003),
     ("mq-planted-10", 2147483647),
     ("mq-planted-wide-10", 0),
 ]
@@ -35,7 +36,8 @@ if plan == "scaling":
         + [AUTO, "serial/full", "forced:16/full"]
     ]
 elif plan == "adoption":
-    cells = [(task, arm) for task in SMALL + HELDOUT for arm in ("serial/selected", AUTO)]
+    cells = [(task, arm) for task in SMALL + TRAINING + HELDOUT
+             for arm in ("serial/selected", AUTO)]
 else:
     sys.exit("PLAN: scaling | adoption")
 
