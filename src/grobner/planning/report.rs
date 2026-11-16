@@ -2,7 +2,7 @@
 
 use std::{fmt::Display, time::Duration};
 
-use crate::grobner::{SolveError, SolveStatistics, SolveStrategy, SystemShape};
+use crate::grobner::{PlanObjective, SolveError, SolveStatistics, SolveStrategy, SystemShape};
 
 /// Which mathematical fact an attempt established, without the point.
 ///
@@ -51,6 +51,13 @@ pub enum Choice {
         /// Which budget bound: `"span cells"` or `"span bytes"`.
         budget: &'static str,
     },
+
+    /// The same route again with F4's batches capped, after it crossed a matrix-size limit under
+    /// [`PlanObjective::CompletionWithinBudget`].
+    ReattemptUnderPairCap {
+        /// The `F4Options` field the uncapped attempt crossed.
+        limit: &'static str,
+    },
 }
 
 impl Display for Choice {
@@ -78,6 +85,11 @@ impl Display for Choice {
                 "conversion ruled out from a counted D = {} needing {} {}",
                 dimension, needed, budget
             ),
+            Self::ReattemptUnderPairCap { limit } => write!(
+                f,
+                "the same route crossed {}; a capped batch builds smaller matrices",
+                limit
+            ),
         }
     }
 }
@@ -90,6 +102,10 @@ pub struct Attempt {
 
     /// Why the planner picked it.
     pub choice: Choice,
+
+    /// The pairs-per-batch cap the objective imposed on F4, or `None` when the caller's
+    /// `F4Options` ran unchanged.
+    pub pair_cap: Option<usize>,
 
     /// What it spent. Present even when it failed — that is what M21-C's reported entry points
     /// are for, and a fallback that could not account for discarded work would misreport the
@@ -118,6 +134,9 @@ impl Attempt {
 pub struct SolvePlan {
     /// The cheap structural pass, before anything was computed.
     pub shape: SystemShape,
+
+    /// What the plan optimized.
+    pub objective: PlanObjective,
 
     /// Routes attempted or declined, oldest first. Empty only when the structural pass alone
     /// settled the question — a nonzero constant generator.
@@ -225,6 +244,7 @@ impl Display for SolvePlan {
                 ""
             }
         )?;
+        writeln!(f, "Objective: {}", self.objective)?;
 
         if let Some(class) = self.preflight {
             writeln!(
@@ -240,6 +260,13 @@ impl Display for SolvePlan {
             writeln!(f)?;
             writeln!(f, "Attempt {}: {:?}", index + 1, attempt.strategy)?;
             writeln!(f, "  Chosen because: {}", attempt.choice)?;
+            if let Some(cap) = attempt.pair_cap {
+                writeln!(
+                    f,
+                    "  F4 batches capped at {} pairs: smaller matrices, more batches",
+                    cap
+                )?;
+            }
             if let Some(stats) = attempt.statistics.f4.as_ref() {
                 writeln!(
                     f,
