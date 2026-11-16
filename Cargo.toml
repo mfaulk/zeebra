@@ -112,6 +112,10 @@ name = "f4_matrix_files"
 test = true
 
 [[example]]
+name = "block_density"
+test = true
+
+[[example]]
 name = "competitive"
 required-features = ["external-runners"]
 
