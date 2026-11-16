@@ -135,3 +135,6 @@ No all-field speedup, cryptanalytic frontier extension, or universal parity with
 The numerical policy evidence above concerns this public family; target-specific research stays
 with its instruments after #668. Small-field and nonradical correctness, fallback behavior,
 workspace refusals and independent tamper rejection are automated tests, not timing claims.
+
+A later stage split at `aa2638c2` ([block-krylov-conversion.md](block-krylov-conversion.md)) puts
+reconstruction at about 71% of this family's conversion and the scalar sequence at about 21%.

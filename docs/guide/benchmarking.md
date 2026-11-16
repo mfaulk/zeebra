@@ -714,6 +714,14 @@ streaming-read bandwidth measured beside every repetition. Run the full sweep un
 `tools/benchlock.sh` and `taskset -c 0-63`; `--quick` is a seconds-long smoke test. Results and the
 #731 conclusion are in [`docs/research/sparse-matvec-throughput.md`](../research/sparse-matvec-throughput.md).
 
+`block_krylov_study` splits a forced scalar Wiedemann conversion into operator construction,
+sequence, reconstruction and certificate (`--mode stages`, one route per process for attributable
+RSS). It also times serial, batched, threaded and block-shaped Krylov sequences at widths 2/4/8 on
+the real operator (`--mode sequence`). Families: `cyclic`, `dense`, `powers` (non-shape) and
+`nonradical`. Fields: `zp65537`, `babybear`, `goldilocks`. Campaign scripts, raw output and the
+#731 reject/defer decision are in
+[`docs/research/block-krylov-conversion.md`](../research/block-krylov-conversion.md).
+
 `fglm_shape` is M18-4's dense research spike, measured. `grobner::fglm::shape` detects **shape
 position** — whether a single variable's powers `1, t, ..., t^{D-1}` are a basis of `R/I` — and
 where the last variable qualifies it produces the lex basis `p(t), x_0 - h_0(t), ...` from that

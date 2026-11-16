@@ -341,6 +341,11 @@ the real operators, blocks raise per-vector matvec throughput only over GF(2) (b
 SIMD-friendly small primes (about 4x); for 64-bit, 254-bit and GF(2^8) the native scalar apply is
 already arithmetic-bound and no block CSR beats it.
 
+#731's conversion-level study is [block-krylov-conversion](research/block-krylov-conversion.md). The
+sequence is about 21% of a certified scalar conversion on the shape family, and reconstruction is
+71%. An idealized 8-core block recurrence is therefore bounded at 1.22x. Block Wiedemann is
+rejected for now, batched retries are deferred, and subquadratic reconstruction moves to #806.
+
 ### 7.7 M28-I — integration, scoreboards and report
 
 Owner: [#754](https://github.com/mfaulk/zeebra/issues/754). Maintain issue/decision matrix, ensure successful branches compose,

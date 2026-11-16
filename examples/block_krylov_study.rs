@@ -641,13 +641,14 @@ mod tests {
                     for (k, c) in u {
                         dense[*k] = *c;
                     }
-                    for k in 0..len {
+                    assert_eq!(reference[b][i].len(), len);
+                    for (k, expected) in reference[b][i].iter().enumerate() {
                         let value = r
                             .iter()
                             .zip(&dense)
                             .map(|(x, y)| *x * *y)
                             .fold(Zp65537::zero(), |p, q| p + q);
-                        assert_eq!(reference[b][i][k], value, "b={b} i={i} k={k}");
+                        assert_eq!(*expected, value, "b={b} i={i} k={k}");
                         dense = op.apply(&dense);
                     }
                 }
