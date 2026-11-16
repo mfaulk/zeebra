@@ -233,6 +233,53 @@ mod tests {
         assert_eq!(refused.unwrap_err(), expected.unwrap_err());
     }
 
+    // A batch the gate leaves serial is returned unpermuted, so declining costs no row movement.
+    #[test]
+    fn a_declined_batch_is_left_in_place() {
+        struct Capture(Vec<MacaulayMatrix<5, Zp32003>>);
+        impl crate::grobner::f4::BatchObserver<5, Zp32003> for Capture {
+            fn batch(
+                &mut self,
+                _: &crate::grobner::f4::MonicBasis<5, Zp32003>,
+                _: &[crate::grobner::CriticalPair<5>],
+            ) {
+            }
+            fn matrix(&mut self, matrix: &MacaulayMatrix<5, Zp32003>) {
+                self.0.push(matrix.clone());
+            }
+        }
+        let mut capture = Capture(Vec::new());
+        crate::grobner::f4::f4_observed(
+            &cyclic::<5, Zp32003>(),
+            MonomialOrder::GradedReverseLexicographic,
+            &F4Options::default(),
+            &mut capture,
+        )
+        .unwrap();
+        // At least one batch must be one that partitioning would reorder, or this proves nothing.
+        assert!(capture.0.iter().any(|matrix| {
+            let mut partitioned = matrix.clone();
+            partitioned.partition_reducers_first();
+            partitioned.row_origins() != matrix.row_origins()
+        }));
+        for mut matrix in capture.0 {
+            let before = matrix.clone();
+            let mut statistics = ParallelForwardStatistics::default();
+            let outcome = forward(
+                ParallelForward::Auto { max_workers: 16 },
+                BlockPlan::ReducersFirstBlock,
+                Backend::Adaptive,
+                &mut matrix,
+                usize::MAX,
+                &mut statistics,
+            );
+            assert!(outcome.is_none());
+            assert_eq!(matrix.row_origins(), before.row_origins());
+            assert_eq!(matrix.matrix(), before.matrix());
+            assert_eq!(statistics, ParallelForwardStatistics::default());
+        }
+    }
+
     // Worker counts follow the setting and never exceed the lower rows to reduce.
     #[test]
     fn worker_counts_respect_the_setting() {
