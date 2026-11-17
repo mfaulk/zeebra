@@ -9,18 +9,41 @@ cargo build
 cargo test
 ```
 
-Development checks, matching what CI enforces:
+Development checks, matching what CI enforces. The "Format and lint" job runs
+`scripts/ci-lint.sh`, one step per subcommand, so the same commands run locally:
 
 ```sh
-cargo fmt --all --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo clippy --all-targets --no-default-features -- -D warnings
-cargo tree --locked -e normal --prefix none | grep '^proptest '   # must print nothing
+scripts/ci-lint.sh all     # fmt clippy clippy-no-default proptest-graph rustdoc package
+scripts/ci-lint.sh fmt rustdoc   # or any subset, in order
 cargo test --doc
-RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features --locked
 cargo +1.91.0 check --lib --all-features --locked   # the declared MSRV
-cargo package --locked            # what crates.io would receive, built in isolation
 ```
+
+`ci-lint.sh` honors the caller's `CARGO_TARGET_DIR` and `TMPDIR`. Off CI, an unset
+`CARGO_TARGET_DIR` defaults to `/buildcache/cargo-target/zeebra-lint-<worktree>` when that
+directory exists, never to the worktree under `$HOME`.
+
+### Pre-push hook
+
+`.githooks/pre-push` runs the cheap half of that job before a push, judged by the pushed commits'
+diff against `origin/main`:
+
+| Pushed diff touches | Runs |
+|---|---|
+| any `*.rs` | `fmt`, `rustdoc` |
+| `Cargo.toml`, `Cargo.lock`, `.cargo/`, other files under `src/`, `README.md`, `docs/guide/*.md` | `rustdoc` |
+| none of these (research prose, scripts, records) | nothing; exits at once |
+
+Clippy is deliberately left out: it is too heavy to run on every push across concurrent agents,
+so run it yourself before pushing Rust changes. The checks run on the working tree, so push from
+a clean one. Enable the hook once per clone; the setting lives in the shared repository config,
+so every worktree picks it up:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+`git push --no-verify` skips it. `bash scripts/test/pre-push-test.sh` tests the classification.
 
 The shell tooling under `scripts/agent/` and `tools/` is invisible to every Rust job, so CI's
 `agent-scripts` job checks it separately. The shellcheck arguments are globs rather than a file
@@ -30,6 +53,7 @@ list, so a script added under either directory is checked without anyone remembe
 shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
   tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 bash scripts/agent/test/zb-claim-test.sh
+bash scripts/test/pre-push-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/merge-base-age-test.sh
 bash tools/test/benchlock-test.sh

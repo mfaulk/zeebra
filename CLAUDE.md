@@ -68,6 +68,13 @@ ends. If `taskset` fails with `Invalid argument`, run
 `tools/bench-reserve.sh status`: measure inside the reservation with
 `tools/bench-reserve.sh run`, or wait for it to be released.
 
+**Pre-push hook.** `.githooks/pre-push` runs `fmt` and `rustdoc -D warnings` (via
+`scripts/ci-lint.sh`, the same script CI's Format and lint job runs) when the pushed diff
+against `origin/main` can affect them, and exits at once for research-only pushes. It needs
+`git config core.hooksPath .githooks` once in the shared repo config. Clippy is not in it — run
+`scripts/ci-lint.sh clippy clippy-no-default` yourself before pushing Rust changes, with your
+private `CARGO_TARGET_DIR`. `--no-verify` is the escape hatch.
+
 `cargo test --doc` is the one suite that fails for reasons that are not the
 diff. `/tmp` here is a 252 G tmpfs, its pages are RAM, and when it is near full
 the linker dies on its mapped temporaries — dozens of doctests failing at
@@ -302,13 +309,14 @@ race resolution, and the lease arithmetic:
 ```bash
 bash scripts/agent/test/zb-claim-test.sh
 bash scripts/test/fetch-eprint-test.sh
+bash scripts/test/pre-push-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/cpu-context-test.sh
 bash tools/test/bench-reserve-test.sh
 bash tools/test/check-measurement-provenance-test.sh
 bash tools/check-measurement-provenance.sh
 shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
-  scripts/fetch-eprint scripts/test/*.sh \
+  scripts/fetch-eprint scripts/test/*.sh scripts/ci-lint.sh .githooks/pre-push \
   tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 ```
 
