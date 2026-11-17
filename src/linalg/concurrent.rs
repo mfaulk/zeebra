@@ -124,7 +124,10 @@ pub fn reduce<F: FiniteField + Send + Sync>(
 /// The `Send + Sync` bound is proved where a handle is made — by a concrete field, through
 /// [`FiniteField::concurrent_elimination`] — so generic callers such as F4 need not carry it and
 /// a field that cannot provide it gets the serial path rather than a compile error.
-pub struct Dispatch<F: FiniteField>(ReduceFn<F>);
+pub struct Dispatch<F: FiniteField> {
+    reduce: ReduceFn<F>,
+    sweep: ReduceFn<F>,
+}
 
 type ReduceFn<F> = fn(&mut SparseMatrix<F>, usize, &Config, &AtomicBool) -> Result<Report, Error>;
 
@@ -137,7 +140,10 @@ impl<F: FiniteField> Copy for Dispatch<F> {}
 
 impl<F: FiniteField + Send + Sync> Dispatch<F> {
     pub fn new() -> Self {
-        Self(reduce::<F>)
+        Self {
+            reduce: reduce::<F>,
+            sweep: sweep::<F>,
+        }
     }
 }
 
@@ -159,8 +165,223 @@ impl<F: FiniteField> Dispatch<F> {
         config: &Config,
         cancel: &AtomicBool,
     ) -> Result<Report, Error> {
-        (self.0)(matrix, split, config, cancel)
+        (self.reduce)(matrix, split, config, cancel)
     }
+
+    /// As [`sweep`].
+    ///
+    /// # Errors
+    /// As [`sweep`].
+    pub fn sweep(
+        self,
+        matrix: &mut SparseMatrix<F>,
+        split: usize,
+        config: &Config,
+        cancel: &AtomicBool,
+    ) -> Result<Report, Error> {
+        (self.sweep)(matrix, split, config, cancel)
+    }
+}
+
+/// [`crate::linalg::echelon::sweep_rows_against_pivots`] on worker threads, in place.
+///
+/// Lower rows never meet each other and the upper block is only read, so each lower row's result
+/// is the serial sweep's whatever the thread count or schedule. Unlike [`reduce`], rows are
+/// rewritten as they finish: at every instant a lower row is its input, or that row partway
+/// through its own ascending sweep, so after any refusal or cancellation the serial sweep
+/// finishes the matrix to the identical result. Upper rows are never written.
+///
+/// Reserves every resident entry plus one full-width row per active worker, so the reported peak
+/// is an upper bound on the live count; a reservation that would cross `max_entries` refuses.
+pub fn sweep<F: FiniteField + Send + Sync>(
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    config: &Config,
+    cancel: &AtomicBool,
+) -> Result<Report, Error> {
+    if config.workers == 0 {
+        return Err(Error::InvalidWorkers);
+    }
+    if split > matrix.num_rows() {
+        return Err(Error::InvalidPrefix);
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err(Error::Cancelled);
+    }
+    let columns = matrix.num_columns();
+    let initial = matrix.nonzeros();
+    let tasks = matrix.num_rows() - split;
+    let workers = config.workers.min(tasks).max(1);
+    let reserved_row = columns;
+    // Refuse up front when even one round of reservations cannot fit, before any row moves.
+    let first_round = workers
+        .checked_mul(reserved_row)
+        .and_then(|n| n.checked_add(initial))
+        .ok_or(Error::Entries {
+            required: usize::MAX,
+        })?;
+    if first_round > config.max_entries {
+        return Err(Error::Entries {
+            required: first_round,
+        });
+    }
+    let workspace_bytes = workers
+        .checked_mul(columns)
+        .and_then(|n| n.checked_mul(std::mem::size_of::<F>()))
+        .ok_or(Error::Workspace {
+            required: usize::MAX,
+        })?;
+    if workspace_bytes > config.max_workspace_bytes {
+        return Err(Error::Workspace {
+            required: workspace_bytes,
+        });
+    }
+    let mut known = vec![None; columns];
+    let mut rank = 0;
+    let mut zeros = 0;
+    for index in 0..split {
+        let row = matrix.row(index);
+        if let Some(column) = row.leading_column() {
+            if row.leading_coefficient() != Some(F::ONE) || known[column].replace(index).is_some() {
+                return Err(Error::InvalidPrefix);
+            }
+            rank += 1;
+        } else {
+            zeros += 1;
+        }
+    }
+    let (upper, lower) = matrix.rows_mut().split_at_mut(split);
+    let upper: &[SparseRow<F>] = upper;
+    // Small chunks under the dynamic schedule balance rows of very different cost; the static
+    // schedule hands each worker one contiguous share.
+    let chunk = match config.schedule {
+        Schedule::Static => tasks.div_ceil(workers).max(1),
+        Schedule::Dynamic => (tasks / (workers * 16)).clamp(1, 64),
+    };
+    let queue = Mutex::new(lower.chunks_mut(chunk));
+    let ledger = Mutex::new(Ledger {
+        next: 0,
+        live: initial,
+        peak: initial,
+    });
+    let failed = AtomicBool::new(false);
+    let results = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers)
+            .map(|_| {
+                let (queue, ledger, failed, known) = (&queue, &ledger, &failed, &known);
+                scope.spawn(move || {
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        sweep_worker(upper, known, queue, ledger, failed, cancel, config)
+                    }))
+                    .unwrap_or(Err(Error::WorkerPanicked));
+                    if result.is_err() {
+                        failed.store(true, Ordering::Relaxed);
+                    }
+                    result
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap_or(Err(Error::WorkerPanicked)))
+            .collect::<Vec<_>>()
+    });
+    if let Some(error) = results
+        .iter()
+        .filter_map(|result| result.as_ref().err())
+        .find(|error| **error != Error::Cancelled)
+    {
+        return Err(error.clone());
+    }
+    if cancel.load(Ordering::Relaxed) || results.iter().any(Result::is_err) {
+        return Err(Error::Cancelled);
+    }
+    let mut report = Report {
+        peak_reserved_entries: ledger.lock().unwrap().peak,
+        workspace_bytes,
+        statistics: EliminationStatistics {
+            initial_nonzeros: initial,
+            rank,
+            zero_rows: zeros,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    for worker in results.into_iter().map(Result::unwrap) {
+        report.products += worker.products;
+        report.statistics.row_operations += worker.statistics.row_operations;
+        report.statistics.zero_rows += worker.statistics.zero_rows;
+        report.worker_rows.extend(worker.worker_rows);
+        report.worker_ns.extend(worker.worker_ns);
+    }
+    report.statistics.final_nonzeros = matrix.nonzeros();
+    report.statistics.peak_nonzeros = report.peak_reserved_entries;
+    Ok(report)
+}
+
+/// One [`sweep`] worker: claim chunks of lower rows until none remain.
+fn sweep_worker<F: FiniteField>(
+    upper: &[SparseRow<F>],
+    known: &[Option<usize>],
+    queue: &Mutex<std::slice::ChunksMut<'_, SparseRow<F>>>,
+    ledger: &Mutex<Ledger>,
+    failed: &AtomicBool,
+    cancel: &AtomicBool,
+    config: &Config,
+) -> Result<Report, Error> {
+    let started = Instant::now();
+    let columns = known.len();
+    let mut accumulator = DenseAccumulator::new(columns);
+    let mut report = Report::default();
+    let mut rows = 0;
+    let stopped = || cancel.load(Ordering::Relaxed) || failed.load(Ordering::Relaxed);
+    loop {
+        let Some(chunk) = queue.lock().unwrap().next() else {
+            break;
+        };
+        for slot in chunk {
+            if stopped() {
+                return Err(Error::Cancelled);
+            }
+            let mut reservation = {
+                let mut state = ledger.lock().unwrap();
+                let required = state.live.checked_add(columns).ok_or(Error::Entries {
+                    required: usize::MAX,
+                })?;
+                if required > config.max_entries {
+                    return Err(Error::Entries { required });
+                }
+                state.live = required;
+                state.peak = state.peak.max(required);
+                Reservation {
+                    ledger,
+                    entries: columns,
+                }
+            };
+            let before = slot.nonzeros();
+            accumulator.load(slot);
+            let (operations, products) =
+                accumulator.sweep(|column| known[column].map(|pivot| &upper[pivot]));
+            report.statistics.row_operations += operations;
+            report.products += products;
+            let row = accumulator.take();
+            report.statistics.zero_rows += usize::from(row.is_zero());
+            // The input's entries leave as the result's arrive; the reservation is released.
+            let after = row.nonzeros();
+            *slot = row;
+            {
+                let mut state = ledger.lock().unwrap();
+                state.live = state.live - before + after;
+            }
+            reservation.publish(0);
+            rows += 1;
+        }
+    }
+    report.worker_rows.push(rows);
+    report
+        .worker_ns
+        .push(started.elapsed().as_nanos().min(u64::MAX as u128) as u64);
+    Ok(report)
 }
 
 fn reduce_hooked<F: FiniteField + Send + Sync>(
@@ -742,5 +963,144 @@ mod tests {
                 assert_eq!(canonical(matrix), expected);
             }
         }
+    }
+
+    /// An upper block in echelon form above random lower rows, over `columns` columns.
+    fn sweep_fixture(seed: u64, columns: usize) -> (SparseMatrix<Zp13>, usize) {
+        use crate::linalg::sparse::row_echelon;
+        use rand::{Rng, SeedableRng};
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        let mut random = |count: usize| {
+            (0..count)
+                .map(|_| {
+                    SparseRow::<Zp13>::new(
+                        &(0..columns)
+                            .filter_map(|column| {
+                                let value = rng.gen_range(0..13);
+                                (value != 0 && rng.gen_bool(0.4))
+                                    .then_some((column, Zp13::new(value)))
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut upper = SparseMatrix::new(columns, random(columns / 2));
+        row_echelon(&mut upper);
+        let mut rows: Vec<_> = upper
+            .rows()
+            .iter()
+            .filter(|row| !row.is_zero())
+            .cloned()
+            .collect();
+        let split = rows.len();
+        rows.extend(random(30));
+        (SparseMatrix::new(columns, rows), split)
+    }
+
+    // The concurrent sweep writes the serial sweep's rows, in place, for every worker count and schedule.
+    #[test]
+    fn sweep_matches_the_serial_sweep() {
+        use crate::linalg::echelon::sweep_rows_against_pivots;
+        for seed in 0..24 {
+            let (input, split) = sweep_fixture(seed, 1 + seed as usize % 20);
+            let mut expected = input.clone();
+            let serial = sweep_rows_against_pivots(&mut expected, split, usize::MAX).unwrap();
+            for schedule in [Schedule::Static, Schedule::Dynamic] {
+                for workers in [1, 2, 4, 16] {
+                    let mut matrix = input.clone();
+                    let report = sweep(
+                        &mut matrix,
+                        split,
+                        &Config {
+                            workers,
+                            schedule,
+                            ..Config::default()
+                        },
+                        &AtomicBool::new(false),
+                    )
+                    .unwrap();
+                    assert_eq!(matrix, expected, "seed {seed} {schedule:?} {workers}");
+                    assert_eq!(report.statistics.rank, serial.rank);
+                    assert_eq!(report.statistics.zero_rows, serial.zero_rows);
+                    assert_eq!(report.statistics.row_operations, serial.row_operations);
+                    assert_eq!(report.statistics.final_nonzeros, matrix.nonzeros());
+                    assert!(report.peak_reserved_entries >= serial.peak_nonzeros.min(1));
+                    assert_eq!(
+                        report.worker_rows.iter().sum::<usize>(),
+                        input.num_rows() - split
+                    );
+                }
+            }
+        }
+    }
+
+    // A refused or cancelled sweep leaves rows the serial sweep finishes to the identical result.
+    #[test]
+    fn sweep_refusals_leave_rows_the_serial_sweep_finishes() {
+        use crate::linalg::echelon::sweep_rows_against_pivots;
+        let (input, split) = sweep_fixture(7, 16);
+        let mut expected = input.clone();
+        sweep_rows_against_pivots(&mut expected, split, usize::MAX).unwrap();
+        for config in [
+            Config {
+                workers: 4,
+                max_entries: input.nonzeros() + 15,
+                ..Config::default()
+            },
+            Config {
+                workers: 4,
+                max_workspace_bytes: 0,
+                ..Config::default()
+            },
+            Config {
+                workers: 0,
+                ..Config::default()
+            },
+        ] {
+            let mut matrix = input.clone();
+            assert!(sweep(&mut matrix, split, &config, &AtomicBool::new(false)).is_err());
+            assert_eq!(&matrix.rows()[..split], &input.rows()[..split]);
+            sweep_rows_against_pivots(&mut matrix, split, usize::MAX).unwrap();
+            assert_eq!(matrix, expected);
+        }
+        let mut matrix = input.clone();
+        assert_eq!(
+            sweep(
+                &mut matrix,
+                split,
+                &Config::default(),
+                &AtomicBool::new(true)
+            ),
+            Err(Error::Cancelled)
+        );
+        assert_eq!(matrix, input);
+        let mut invalid = SparseMatrix::new(2, vec![SparseRow::<Zp13>::new(&[(0, Zp13::new(2))])]);
+        assert_eq!(
+            sweep(&mut invalid, 1, &Config::default(), &AtomicBool::new(false)),
+            Err(Error::InvalidPrefix)
+        );
+    }
+
+    // The sweep is reachable through a field's dispatch handle, as F4 reaches it.
+    #[test]
+    fn dispatch_reaches_the_sweep() {
+        let (input, split) = sweep_fixture(3, 12);
+        let mut expected = input.clone();
+        crate::linalg::echelon::sweep_rows_against_pivots(&mut expected, split, usize::MAX)
+            .unwrap();
+        let mut matrix = input;
+        Dispatch::<Zp13>::new()
+            .sweep(
+                &mut matrix,
+                split,
+                &Config {
+                    workers: 3,
+                    ..Config::default()
+                },
+                &AtomicBool::new(false),
+            )
+            .unwrap();
+        assert_eq!(matrix, expected);
     }
 }

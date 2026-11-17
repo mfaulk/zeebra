@@ -325,12 +325,14 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             let selected = candidate_columns(matrix);
             let (block, report) = super::faugere_lachartre::eliminate(
                 options.elimination,
+                options.parallel_forward,
                 matrix,
                 &selected,
                 form == RowForm::Reduced,
                 allowance,
                 &mut split_clock,
                 &mut stages,
+                &mut parallel_forward,
             )
             .map_err(budget)?;
             if form == RowForm::Reduced {

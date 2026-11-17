@@ -5,45 +5,120 @@
 //! `Dense` backend's buffer, span only those columns; the rows are mapped back afterwards, so the
 //! matrix the caller extracts candidates from is indexed as it was built. Reducer rows are never
 //! written.
+//!
+//! Under [`ParallelForward`] both passes may run on workers through the field's
+//! [`concurrent::Dispatch`], each behind the same gate as the forward order's pass. A pass whose
+//! workers' reservation does not fit falls back to its serial kernel; the sweep leaves rows the
+//! serial sweep finishes identically, and the concurrent echelon leaves `D'` untouched.
 
 use super::{
     candidate,
     macaulay::MacaulayMatrix,
-    statistics::{StageClock, StageTimings},
+    options::ParallelForward,
+    parallel,
+    statistics::{ParallelForwardStatistics, StageClock, StageTimings},
     structured::BlockOutcome,
 };
 use crate::{
     linalg::{
+        concurrent,
         echelon::{row_echelon_with, sweep_rows_against_pivots, Backend},
-        sparse::{SparseMatrix, SparseRow},
+        sparse::{EliminationStatistics, SparseMatrix, SparseRow},
     },
     FiniteField,
 };
+use std::sync::atomic::AtomicBool;
+
+/// Which concurrent kernel a pass asks for.
+#[derive(Clone, Copy)]
+enum Pass {
+    Sweep,
+    Echelon,
+}
+
+/// Rows `[split..]` of `matrix` through `pass` on workers, or `None` for the serial kernel.
+///
+/// `None` after a refusal is recorded as a fallback; a worker panic propagates, as for the
+/// forward order.
+fn on_workers<F: FiniteField>(
+    pass: Pass,
+    setting: ParallelForward,
+    backend: Backend,
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    allowance: usize,
+    record: &mut ParallelForwardStatistics,
+) -> Option<concurrent::Report> {
+    let lower = &matrix.rows()[split..];
+    let lower_nonzeros = lower.iter().map(SparseRow::nonzeros).sum();
+    let (dispatch, config) =
+        parallel::gate::<F>(setting, backend, lower.len(), lower_nonzeros, allowance)?;
+    let cancel = AtomicBool::new(false);
+    let result = match pass {
+        Pass::Sweep => dispatch.sweep(matrix, split, &config, &cancel),
+        Pass::Echelon => dispatch.reduce(matrix, split, &config, &cancel),
+    };
+    match result {
+        Ok(report) => {
+            record.batches = 1;
+            record.max_workers = record.max_workers.max(config.workers);
+            record.lost_publications += report.failed_publications;
+            record.workspace_bytes = record.workspace_bytes.max(report.workspace_bytes);
+            Some(report)
+        }
+        Err(concurrent::Error::Entries { .. } | concurrent::Error::Workspace { .. }) => {
+            record.fallback_batches = 1;
+            None
+        }
+        Err(concurrent::Error::WorkerPanicked) => panic!("a Faugère–Lachartre worker panicked"),
+        Err(error) => {
+            unreachable!("structured batch rejected by concurrent elimination: {error:?}")
+        }
+    }
+}
 
 /// Eliminate a batch in Faugère–Lachartre order.
 ///
 /// `candidate_columns[c]` says whether a pivot in original column `c` is a candidate; under
 /// `reduce`, exactly the candidate rows are then cleared of every other pivot column, the contract
 /// [`candidate::finish`] keeps for the forward order. The sweep and the echelon of `D'` are charged
-/// to `stages.forward`, the candidate pass to `stages.backward`.
+/// to `stages.forward`, the candidate pass to `stages.backward`. `setting` may put either pass
+/// on workers, recorded in `record`.
 ///
 /// # Errors
 /// The live entry count, reducer rows included, that crossed `allowance`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn eliminate<const N: usize, F: FiniteField>(
     backend: Backend,
+    setting: ParallelForward,
     matrix: &mut MacaulayMatrix<N, F>,
     candidate_columns: &[bool],
     reduce: bool,
     allowance: usize,
     clock: &mut StageClock,
     stages: &mut StageTimings,
+    record: &mut ParallelForwardStatistics,
 ) -> Result<(BlockOutcome, candidate::Report), usize> {
     let split = matrix.partition_reducers_first();
     debug_assert_eq!(
         super::structured::check_reducer_block(matrix.matrix(), split),
         Ok(())
     );
-    let mut statistics = sweep_rows_against_pivots(matrix.matrix_mut(), split, allowance)?;
+    let mut statistics = match on_workers(
+        Pass::Sweep,
+        setting,
+        backend,
+        matrix.matrix_mut(),
+        split,
+        allowance,
+        record,
+    ) {
+        Some(report) => {
+            record.reserved_entries = record.reserved_entries.max(report.peak_reserved_entries);
+            report.statistics
+        }
+        None => sweep_rows_against_pivots(matrix.matrix_mut(), split, allowance)?,
+    };
 
     let columns = matrix.num_columns();
     let mut reducer_led = vec![false; columns];
@@ -83,7 +158,23 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
     // `D'` is budgeted with the reducer block still resident beside it.
     let within = allowance.saturating_sub(upper);
     let lift = |live: usize| live.saturating_add(upper);
-    let mut inner = row_echelon_with(backend, &mut residual, within).map_err(lift)?;
+    let mut inner: EliminationStatistics = match on_workers(
+        Pass::Echelon,
+        setting,
+        backend,
+        &mut residual,
+        0,
+        within,
+        record,
+    ) {
+        Some(report) => {
+            record.reserved_entries = record
+                .reserved_entries
+                .max(lift(report.peak_reserved_entries));
+            report.statistics
+        }
+        None => row_echelon_with(backend, &mut residual, within).map_err(lift)?,
+    };
     stages.forward = clock.lap();
 
     let mut report = candidate::Report::default();
@@ -152,7 +243,7 @@ mod tests {
         fields::{Bn254Fr, Gf256, Zp13, Zp2, Zp2147483647, Zp32003},
         grobner::{
             benchmark_systems::{cyclic, katsura},
-            f4::{f4_reported, BatchOrder, F4Error, F4Options},
+            f4::{f4_reported, BatchOrder, F4Error, F4Options, ParallelForward},
         },
         linalg::Backend,
         FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -214,6 +305,117 @@ mod tests {
             MonomialOrder::GradedReverseLexicographic,
             &F4Options::default(),
         );
+    }
+
+    // Forced workers run the sweep and `D'` on threads and reach serial forward's basis at every
+    // thread count, over every field width that offers a concurrent handle.
+    #[test]
+    fn parallel_fl_reproduces_the_serial_basis() {
+        fn check<F: FiniteField>() {
+            for order in [
+                MonomialOrder::GradedReverseLexicographic,
+                MonomialOrder::Lexicographic,
+            ] {
+                let serial = F4Options {
+                    parallel_forward: ParallelForward::Serial,
+                    ..F4Options::default()
+                };
+                for workers in [1, 2, 4, 16] {
+                    let options = F4Options {
+                        parallel_forward: ParallelForward::Forced { workers },
+                        ..F4Options::default()
+                    };
+                    for system in [katsura::<5, F>(), cyclic::<5, F>()] {
+                        let fl = F4Options {
+                            batch_order: BatchOrder::FaugereLachartre,
+                            ..options.clone()
+                        };
+                        let (expected, _) = f4_reported(&system, order, &serial);
+                        let (actual, statistics) = f4_reported(&system, order, &fl);
+                        assert_eq!(actual.unwrap(), expected.unwrap(), "{order:?} {workers}");
+                        let parallel = statistics.parallel_forward;
+                        assert!(
+                            parallel.batches > 0,
+                            "{order:?} {workers}: nothing dispatched"
+                        );
+                        assert!(parallel.max_workers <= workers);
+                        assert_eq!(parallel.fallback_batches, 0);
+                    }
+                }
+            }
+        }
+        check::<Zp13>();
+        check::<Zp32003>();
+        check::<Zp2147483647>();
+        check::<Bn254Fr>();
+        check::<Gf256>();
+    }
+
+    // Sixteen forced workers on a batch large enough for them to race for `D'` pivots.
+    #[test]
+    fn parallel_fl_reproduces_katsura_7() {
+        let system = katsura::<7, Zp32003>();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (expected, _) = f4_reported(&system, order, &F4Options::default());
+        for parallel_forward in [
+            ParallelForward::Forced { workers: 16 },
+            ParallelForward::Auto { max_workers: 16 },
+        ] {
+            let options = F4Options {
+                batch_order: BatchOrder::FaugereLachartre,
+                parallel_forward,
+                ..F4Options::default()
+            };
+            let (actual, statistics) = f4_reported(&system, order, &options);
+            assert_eq!(actual.unwrap(), *expected.as_ref().unwrap());
+            if matches!(parallel_forward, ParallelForward::Forced { .. }) {
+                assert!(statistics.parallel_forward.batches > 0);
+                assert!(statistics.parallel_forward.reserved_entries > 0);
+            }
+        }
+    }
+
+    // A field with no concurrent handle runs the FL order serially under any setting.
+    #[test]
+    fn parallel_fl_without_a_handle_stays_serial() {
+        use crate::fields::Gf13Pow4;
+        let options = F4Options {
+            batch_order: BatchOrder::FaugereLachartre,
+            parallel_forward: ParallelForward::Forced { workers: 4 },
+            ..F4Options::default()
+        };
+        let system = katsura::<4, Gf13Pow4>();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (expected, _) = f4_reported(&system, order, &F4Options::default());
+        let (actual, statistics) = f4_reported(&system, order, &options);
+        assert_eq!(actual.unwrap(), expected.unwrap());
+        assert_eq!(statistics.parallel_forward.batches, 0);
+    }
+
+    // A budget the serial FL route fits but the workers' reservation does not falls back, not refuses.
+    #[test]
+    fn parallel_fl_falls_back_under_a_tight_budget() {
+        let system = katsura::<6, Zp32003>();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let at = |parallel_forward, entries: usize| F4Options {
+            batch_order: BatchOrder::FaugereLachartre,
+            parallel_forward,
+            ..F4Options::default().with_live_entries::<Zp32003>(entries)
+        };
+        let (_, serial) = f4_reported(
+            &system,
+            order,
+            &at(ParallelForward::Serial, usize::MAX / 64),
+        );
+        let peak = serial.max_live_nonzeros;
+        let (basis, statistics) = f4_reported(
+            &system,
+            order,
+            &at(ParallelForward::Forced { workers: 16 }, peak),
+        );
+        let (expected, _) = f4_reported(&system, order, &F4Options::default());
+        assert_eq!(basis.unwrap(), expected.unwrap());
+        assert!(statistics.parallel_forward.fallback_batches > 0);
     }
 
     // The route's reported peak is its budget boundary: admitted at the peak, refused one below.

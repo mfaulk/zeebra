@@ -11,6 +11,9 @@ times are not used. Raw output:
 §7 was measured at `8a68368f` (the corrected split) and `f9bf3e55` (whole runs); raw output in
 [`split-corrected.md`](../../research/residual-split/split-corrected.md) and
 [`whole-runs.md`](../../research/residual-split/whole-runs.md).
+§8 was measured at `86db23f7` and, for `mq-random-14`, `8313d77d` (the same route; the study
+example records a refusal instead of panicking), with a replication at `3077da88` (the same route
+before rebasing onto #842); raw output in [`parallel-fl.md`](../../research/residual-split/parallel-fl.md).
 
 > **Correction (#816).** The "production batch" arm below finished every pivot row outside the
 > reducer columns, including rows still leading at a pair lcm. F4 finishes only true candidates —
@@ -191,3 +194,102 @@ the figures to trust.
   order is unmeasured; it is #828.
 - §4 finding 4's GPU ceiling was computed against the overstated production arm and should be
   re-derived before it is cited.
+
+## 8. The order on workers, against the 16-worker forward pass (#828)
+
+`3f6afc34` puts both passes of the FL route on workers. The sweep is a second entry on
+`linalg::concurrent::Dispatch` (`concurrent::sweep`): lower rows are claimed in chunks and swept
+in place against the read-only reducer block, with one full-width row reserved per active worker.
+`D'` goes to the existing concurrent kernel (`concurrent::reduce`, `split = 0`). Both passes answer
+to the forward order's gate (`f4::parallel::gate`, the same `ParallelForward` setting, the
+`Adaptive` backend and a field with a concurrent handle) and fall back to their serial kernels when
+the workers' reservation does not fit. A swept row's value does not depend on the thread count, and
+every arm below produced one basis digest per instance.
+
+Whole F4 calls, `F4Options::default()` but for the two named fields, grevlex, release build of
+`86db23f7`, cores 32–47 under `tools/benchlock.sh`, five interleaved repetitions with arm order
+rotated each repetition, load 6.7 at the start and 3.1 at the end. An earlier identical suite at
+`3077da88` (load 3.4 → 3.0) agrees with every ratio below to within 0.05×. Medians [min, max] in
+ms; `auto:W` is `ParallelForward::Auto { max_workers: W }`. Raw output:
+[`parallel-fl.md`](../../research/residual-split/parallel-fl.md). One arm is one process:
+
+```bash
+tools/benchlock.sh <tag> taskset -c 32-47 target/release/examples/batch_order_study \
+  --problem=katsura-11 --modulus=32003 --arm=fl/auto:16   # ORDER/{serial|auto:W|forced:W}
+```
+
+### 8.1 Against the shipped 16-worker forward order
+
+| instance | forward, `auto:16` (shipped) | FL, `auto:16` | forward / FL | peak live entries, forward → FL | peak RSS, forward → FL |
+|---|---:|---:|---:|---:|---:|
+| `katsura-11`, p = 32003 | 1,722.7 [1,685.6, 1,762.1] | 1,349.7 [1,333.9, 1,372.7] | **1.28×** | 4.42 M → 4.26 M | 135 → 136 MiB |
+| `katsura-11`, p = 2³¹−1 | 1,544.0 [1,529.4, 1,549.0] | 1,256.9 [1,221.6, 1,277.0] | **1.23×** | 4.42 M → 4.26 M | 145 → 146 MiB |
+| `mq-random-10`, p = 32003 | 299.4 [293.8, 309.7] | 259.2 [245.8, 262.1] | 1.16× | 1.79 M → 1.22 M | 40 → 41 MiB |
+| `mq-random-10`, p = 2³¹−1 | 274.7 [267.7, 276.8] | 245.3 [235.4, 255.2] | 1.12× | 1.79 M → 1.22 M | 42 → 42 MiB |
+| `cyclic-8`, p = 32003 (held out) | 1,891.1 [1,876.9, 1,900.4] | 1,751.1 [1,729.4, 1,762.6] | 1.08× | 4.70 M → 5.27 M | 157 → 173 MiB |
+| `cyclic-7`, p = 32003 | 134.2 [131.4, 136.5] | 137.5 [136.7, 139.1] | 0.98× | 306 K → 343 K | 18.6 → 19.5 MiB |
+| `cyclic-7`, p = 2³¹−1 | 128.8 [127.4, 129.6] | 137.1 [134.5, 137.6] | **0.94×** | 306 K → 342 K | 21.3 → 22.2 MiB |
+| `mq-random-14`, p = 2³¹−1, to the row limit | 212.9 s, 210.1 s | 86.4 s, 85.5 s | **2.46×** | 220.8 M → 159.4 M | 4,099 → 3,801 MiB |
+
+Peak live entries are `max_live_nonzeros`, which under workers is the conservative reservation
+(published entries plus full-width rows per active worker), so it varies slightly run to run; the
+range is under 1% here. No arm fell back, and no arm refused but `mq-random-14`, below.
+
+**`mq-random-14` is bounded, not complete.** It refuses the default 32 M live-entry budget in either
+order, and with the budget raised to 400 M entries (`--live-entries=400000000`) both orders stop at
+`F4Error::TooManyRows { limit: 200000 }` after the same nine batches. The row count is fixed by
+symbolic preprocessing on identical intermediate bases, so the two arms did the same work up to the
+refusal, and the time to it is the comparison: two runs per arm, alternated, at `8313d77d`, load
+2.1 → 6.4 across the suite; an earlier pair at `86db23f7` gave 216 s and 87 s process wall. The
+gain comes from both stages: `forward_ns` (sweep plus `D'`, against the forward pass) is 61 s
+against 123 s, and `backward_ns` (candidate finishing, over `D'` alone against the whole matrix)
+is 13 s against 76–78 s. This is the case #828 predicted, with the largest `D'`.
+
+### 8.2 The worker factorial
+
+Same runs. Forward / FL ratio at each worker count, medians:
+
+| instance | serial | `auto:4` | `auto:8` | `auto:16` |
+|---|---:|---:|---:|---:|
+| `katsura-11`, p = 32003 | 1.24× | 1.21× | 1.26× | 1.28× |
+| `katsura-11`, p = 2³¹−1 | 1.23× | 1.20× | 1.22× | 1.23× |
+| `mq-random-10`, p = 32003 | 1.13× | 1.12× | 1.17× | 1.16× |
+| `mq-random-10`, p = 2³¹−1 | 1.12× | 1.11× | 1.12× | 1.12× |
+| `cyclic-7`, p = 32003 | 1.04× | 1.00× | 1.00× | 0.98× |
+| `cyclic-7`, p = 2³¹−1 | 1.00× | 0.99× | 0.95× | 0.94× |
+
+The serial gain carries over to workers nearly unchanged on the two cases where it was large: the
+FL route scales with workers as well as the forward route does. On `cyclic-7`, whose 26 batches are
+small, the serial gain is at most 4% and the parallel route is a little slower: each FL batch makes
+two dispatches, sweep and `D'`, where the forward route makes one.
+
+### 8.3 Against the M29-B stop/go gate
+
+`docs/MILESTONE-COMPETITIVE-F4.md` §6:
+
+- **≥15% complete-F4 improvement on one substantial case against the shipping parallel
+  baseline — met.** `katsura-11` is 1.23–1.28× at both moduli, with non-overlapping ranges, and
+  complete. `mq-random-14` is 2.46× to the same row-limit refusal, which is bounded rather than
+  complete F4.
+- **Held-out evidence that the gain is not specific to one MQ matrix — met in direction.**
+  `katsura-11` is not MQ; `cyclic-8` gains 1.08× and `mq-random-10` 1.12–1.16×.
+- **No material regression on small controls — not met.** `cyclic-7` is 2–6% slower at 16 workers,
+  beyond the run-to-run spread at p = 2³¹−1. Smaller controls are untouched in practice, since the
+  `Auto` gate leaves their batches serial, where FL is at least as fast (§7.2).
+- **No new budget refusals or unsupported outcomes — met on these runs.** Every digest matched and
+  no batch fell back; the fallback path is tested (`parallel_fl_falls_back_under_a_tight_budget`).
+- **Peak RSS ≤ 1.25× baseline — met.** At most 1.10× (`cyclic-8`); 0.93× on `mq-random-14`.
+- **Not covered:** 64-bit fields, and Eco-12, which is not in the corpus `batch_order_study`
+  reads.
+
+### 8.4 Position
+
+- **The parallel FL order is the fastest route measured on every substantial case**, 1.23–1.28×
+  over the shipped 16-worker forward order on `katsura-11`, 1.12–1.16× on `mq-random-10`, 1.08× on
+  `cyclic-8` and 2.46× on the bounded `mq-random-14` run, with lower peak live entries on all but
+  `cyclic-8`.
+- **It stays opt-in** (`BatchOrder::FaugereLachartre`): the gate's small-control clause fails on
+  `cyclic-7`, and 64-bit fields are unmeasured. Making it the default is a follow-up that should
+  first remove the per-batch double dispatch (one gate decision and one thread scope for both
+  passes, or the serial sweep below a size threshold) and re-measure `cyclic-7` and the 64-bit
+  fields.

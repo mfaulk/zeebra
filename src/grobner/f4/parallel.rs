@@ -35,7 +35,6 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
     {
         return None;
     }
-    let dispatch = F::concurrent_elimination()?;
     // Read the gate's inputs off the row kinds, so a batch the gate leaves serial pays one pass
     // over the rows and no permutation.
     let (lower_rows, lower_nonzeros) = matrix
@@ -46,24 +45,13 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
         .fold((0, 0), |(rows, nonzeros), (_, row)| {
             (rows + 1, nonzeros + row.nonzeros())
         });
-    let workers = setting.workers(lower_rows, lower_nonzeros);
-    // `Forced { workers: 1 }` still takes the concurrent kernel: the one-thread control that
-    // separates algorithm from threading.
-    if workers <= 1 && !matches!(setting, ParallelForward::Forced { .. }) {
-        return None;
-    }
+    let (dispatch, config) = gate::<F>(setting, backend, lower_rows, lower_nonzeros, allowance)?;
+    let workers = config.workers;
     let split = matrix.partition_reducers_first();
     debug_assert_eq!(
         super::structured::check_reducer_block(matrix.matrix(), split),
         Ok(())
     );
-    let config = concurrent::Config {
-        workers,
-        schedule: concurrent::Schedule::Dynamic,
-        max_entries: allowance,
-        max_workspace_bytes: WORKSPACE_LIMIT,
-        measure_work: false,
-    };
     match dispatch.reduce(matrix.matrix_mut(), split, &config, &AtomicBool::new(false)) {
         Ok(report) => {
             *statistics = ParallelForwardStatistics {
@@ -89,6 +77,39 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
             unreachable!("structured batch rejected by concurrent elimination: {error:?}")
         }
     }
+}
+
+/// The handle and configuration for a block of `lower_rows` rows and `lower_nonzeros` entries to
+/// go to workers, or `None` when the setting, the backend, the field or the gate keeps it serial.
+///
+/// Shared by the forward order and both passes of the Faugère–Lachartre order, so all three
+/// answer to one gate. `Forced { workers: 1 }` still takes the concurrent kernel: the one-thread
+/// control that separates algorithm from threading.
+pub(crate) fn gate<F: FiniteField>(
+    setting: ParallelForward,
+    backend: Backend,
+    lower_rows: usize,
+    lower_nonzeros: usize,
+    allowance: usize,
+) -> Option<(concurrent::Dispatch<F>, concurrent::Config)> {
+    if setting == ParallelForward::Serial || backend != Backend::Adaptive {
+        return None;
+    }
+    let dispatch = F::concurrent_elimination()?;
+    let workers = setting.workers(lower_rows, lower_nonzeros);
+    if workers <= 1 && !matches!(setting, ParallelForward::Forced { .. }) {
+        return None;
+    }
+    Some((
+        dispatch,
+        concurrent::Config {
+            workers,
+            schedule: concurrent::Schedule::Dynamic,
+            max_entries: allowance,
+            max_workspace_bytes: WORKSPACE_LIMIT,
+            measure_work: false,
+        },
+    ))
 }
 
 #[cfg(test)]

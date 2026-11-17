@@ -10,7 +10,13 @@ use zeebra::{
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
-fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, started: Instant) {
+fn run<const N: usize, F: FiniteField>(
+    problem: &str,
+    modulus: u64,
+    arm: &str,
+    live_entries: Option<usize>,
+    started: Instant,
+) {
     let order = MonomialOrder::GradedReverseLexicographic;
     let input = corpus::instance(problem, modulus, order).expect("corpus problem");
     let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
@@ -30,20 +36,36 @@ fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, s
         Some(("auto", w)) => ParallelForward::Auto {
             max_workers: w.parse().unwrap(),
         },
-        _ => panic!("forward: serial | auto:MAX"),
+        Some(("forced", w)) => ParallelForward::Forced {
+            workers: w.parse().unwrap(),
+        },
+        _ => panic!("forward: serial | auto:MAX | forced:WORKERS"),
     };
-    let options = F4Options {
+    let mut options = F4Options {
         batch_order,
         parallel_forward,
         measure_stages: true,
         ..F4Options::default()
     };
+    if let Some(entries) = live_entries {
+        options = options.with_live_entries::<F>(entries);
+    }
     let f4_started = Instant::now();
     let (basis, statistics) = f4_reported(&system, order, &options);
     let f4_ns = f4_started.elapsed().as_nanos();
-    let basis = basis.expect("F4 completes");
-    let rendered: Vec<String> = basis.iter().map(|p| p.to_string()).collect();
-    let digest = sha256_hex(rendered.join("\n").as_bytes());
+    // A refusal is still a record: two arms that stop at the same limit after the same batches did
+    // the same work, so their times compare.
+    let (elements, digest, error) = match &basis {
+        Ok(basis) => {
+            let rendered: Vec<String> = basis.iter().map(|p| p.to_string()).collect();
+            (
+                Json::size(basis.len()),
+                Json::string(sha256_hex(rendered.join("\n").as_bytes())),
+                Json::Null,
+            )
+        }
+        Err(error) => (Json::Null, Json::Null, Json::string(format!("{error:?}"))),
+    };
     let stages = statistics.stages;
     println!(
         "{}",
@@ -51,6 +73,7 @@ fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, s
             ("problem", Json::string(problem)),
             ("modulus", Json::int(modulus)),
             ("arm", Json::string(arm)),
+            ("live_entries_budget", Json::size(options.max_live_nonzeros)),
             ("f4_ns", Json::int(f4_ns as u64)),
             ("process_ns", Json::int(started.elapsed().as_nanos() as u64)),
             ("forward_ns", Json::int(stages.forward.as_nanos() as u64)),
@@ -59,12 +82,25 @@ fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, s
                 "peak_rss_bytes",
                 peak_resident_bytes().map_or(Json::Null, Json::int)
             ),
-            ("basis_elements", Json::size(basis.len())),
-            ("basis_sha256", Json::string(digest)),
+            ("basis_elements", elements),
+            ("basis_sha256", digest),
+            ("error", error),
             ("batches", Json::size(statistics.batches)),
             (
                 "max_live_nonzeros",
                 Json::size(statistics.max_live_nonzeros)
+            ),
+            (
+                "parallel_batches",
+                Json::size(statistics.parallel_forward.batches)
+            ),
+            (
+                "parallel_fallbacks",
+                Json::size(statistics.parallel_forward.fallback_batches)
+            ),
+            (
+                "reserved_entries",
+                Json::size(statistics.parallel_forward.reserved_entries)
             ),
         ])
         .to_json()
@@ -82,15 +118,25 @@ fn main() {
     let problem = get("--problem=").expect("--problem=NAME");
     let modulus: u64 = get("--modulus=").map_or(32003, |m| m.parse().unwrap());
     let arm = get("--arm=").expect("--arm=ORDER/FORWARD");
+    // Raises both live budgets, stated in entries; the default refuses `mq-random-14`.
+    let live_entries: Option<usize> = get("--live-entries=").map(|n| n.parse().unwrap());
     type Wide = PrimeFieldElement64<{ corpus::WIDE_64_CHARACTERISTIC }>;
     macro_rules! go {
         ($n:literal) => {
             if problem.starts_with("mq-planted-wide") {
-                run::<$n, Wide>(&problem, corpus::WIDE_64_CHARACTERISTIC, &arm, started)
+                run::<$n, Wide>(
+                    &problem,
+                    corpus::WIDE_64_CHARACTERISTIC,
+                    &arm,
+                    live_entries,
+                    started,
+                )
             } else {
                 match modulus {
-                    32003 => run::<$n, Zp32003>(&problem, modulus, &arm, started),
-                    2147483647 => run::<$n, Zp2147483647>(&problem, modulus, &arm, started),
+                    32003 => run::<$n, Zp32003>(&problem, modulus, &arm, live_entries, started),
+                    2147483647 => {
+                        run::<$n, Zp2147483647>(&problem, modulus, &arm, live_entries, started)
+                    }
                     _ => panic!("moduli: 32003, 2147483647"),
                 }
             }
