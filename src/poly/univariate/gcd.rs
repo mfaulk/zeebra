@@ -4,11 +4,11 @@
 use crate::{FiniteField, Polynomial, UnivariatePolynomial};
 
 /// Smallest degree at which `gcd` takes half-GCD, for a field element of at most 4 bytes.
-const HALF_GCD_CROSSOVER_32_BIT: u32 = 8192;
+const HALF_GCD_CROSSOVER_32_BIT: u32 = 6144;
 /// As [`HALF_GCD_CROSSOVER_32_BIT`], for 5 to 8 bytes.
-const HALF_GCD_CROSSOVER_64_BIT: u32 = 4096;
+const HALF_GCD_CROSSOVER_64_BIT: u32 = 3072;
 /// As [`HALF_GCD_CROSSOVER_32_BIT`], for wider elements.
-const HALF_GCD_CROSSOVER_WIDE: u32 = 2048;
+const HALF_GCD_CROSSOVER_WIDE: u32 = 1536;
 
 /// The degree of the smaller operand from which `gcd` takes half-GCD for `F`.
 ///
