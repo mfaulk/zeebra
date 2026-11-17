@@ -6,7 +6,7 @@
 //! Correctness rests on Lairez Thm 62 (Algorithm 8): every row is reduced only by rows of strictly
 //! smaller signature, a batch's rows are processed in increasing signature order, and its results
 //! join the basis only after the batch. The reduced basis is unique, so the output must equal
-//! [`crate::grobner::f4`]'s coefficient for coefficient.
+//! [`crate::grobner::f4()`]'s coefficient for coefficient.
 
 #[cfg(feature = "external-runners")]
 pub mod corpus;
@@ -144,7 +144,7 @@ pub struct SigF4Statistics {
 }
 
 /// The reduced Gröbner basis under a graded `order`, by the signature engine. Same contract as
-/// [`crate::grobner::f4`].
+/// [`crate::grobner::f4()`].
 ///
 /// # Errors
 /// [`SigF4Error::Unsupported`] for a non-graded order; [`SigF4Error::Budget`] for a crossed budget.
