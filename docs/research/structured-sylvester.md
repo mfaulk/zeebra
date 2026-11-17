@@ -885,8 +885,8 @@ absent and §6.3 argues against building it.
 ### 6.1 Half-GCD is not a new finding here
 
 `docs/research/fast-univariate.md` §4.5 measured half-GCD as **slower** than plain Euclid at Zeebra's
-current multiplication, and `src/poly/univariate/gcd.rs:9-12` records the same. Nothing here
-contradicts that. Sequencing: **classical Euclid now** (1 692× measured, already written); half-GCD only if
+then multiplication. #194 later moved the crossover to degree 1536–6144 by element width, still
+well above the degrees this document reaches, so nothing here changes. Sequencing: **classical Euclid now** (1 692× measured, already written); half-GCD only if
 determinants ever bind again, where that document's own model puts it at a further ~1.6× at
 `n = 729`. §8 does not depend on it.
 

@@ -237,7 +237,8 @@ route to ask for when the inputs are not known to be small.
   whether or not the answer has that many terms. Zippel's sparse variant is the standard improvement
   and is a different algorithm, not a tuning of this one.
 * **The univariate GCD underneath.** Every evaluation bottoms out in `poly::gcd`, classical Euclid at
-  `O(d^2)`; `fast-univariate.md` §4.5 records that half-GCD is deliberately not written. Brown's
+  `O(d^2)` at the degrees reached here; `fast-univariate.md` §4.5 has half-GCD crossing only at
+  degree 1536–6144 by element width. Brown's
   advantage here is measured against a quadratic base case and would widen if that base case
   improved.
 

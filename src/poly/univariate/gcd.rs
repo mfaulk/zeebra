@@ -1,16 +1,49 @@
-//! Half-GCD is exposed for benchmarking while the default GCD uses classical Euclid.
+//! `gcd` dispatches on the smaller operand's degree: classical Euclid below a width-indexed
+//! crossover, half-GCD above it (`docs/research/fast-univariate.md` §4.5 has the sweep).
 
 use crate::{FiniteField, Polynomial, UnivariatePolynomial};
 
-/// The monic greatest common divisor of two polynomials, computed by classical Euclid.
+/// Smallest degree at which `gcd` takes half-GCD, for a field element of at most 4 bytes.
+const HALF_GCD_CROSSOVER_32_BIT: u32 = 6144;
+/// As [`HALF_GCD_CROSSOVER_32_BIT`], for 5 to 8 bytes.
+const HALF_GCD_CROSSOVER_64_BIT: u32 = 3072;
+/// As [`HALF_GCD_CROSSOVER_32_BIT`], for wider elements.
+const HALF_GCD_CROSSOVER_WIDE: u32 = 1536;
+
+/// The degree of the smaller operand from which `gcd` takes half-GCD for `F`.
+///
+/// Tiered by element width like `karatsuba_base_case`, and for the same reason: half-GCD wins by
+/// trading multiplications for Karatsuba products, which pay off sooner the dearer one
+/// multiplication is.
+pub(crate) fn half_gcd_crossover<F: FiniteField>() -> u32 {
+    match std::mem::size_of::<F>() {
+        0..=4 => HALF_GCD_CROSSOVER_32_BIT,
+        5..=8 => HALF_GCD_CROSSOVER_64_BIT,
+        _ => HALF_GCD_CROSSOVER_WIDE,
+    }
+}
+
+/// The monic greatest common divisor of two polynomials: classical Euclid, or half-GCD once the
+/// smaller operand reaches degree 6144, 3072 or 1536 for 4-byte, 8-byte or wider elements.
 pub fn gcd<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
+    let smaller = signed_degree(a).min(signed_degree(b));
+    if smaller >= i64::from(half_gcd_crossover::<F>()) {
+        gcd_half_unstable(a, b)
+    } else {
+        gcd_classical_unstable(a, b)
+    }
+}
+
+/// The monic GCD by classical Euclid at every degree; [`gcd`]'s route below the crossover.
+pub fn gcd_classical_unstable<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
     let mut f = a.clone();
     let mut g = b.clone();
-
-    // Euclidean algorithm
     while !g.is_zero() {
         let remainder = &f % &g;
         f = g;
@@ -19,14 +52,6 @@ pub fn gcd<F: FiniteField>(
 
     // "The" GCD is chosen to be monic (i.e. the leading coefficient is 1).
     make_monic(&f)
-}
-
-/// Explicit classical route for comparison with [`gcd_half_unstable`].
-pub fn gcd_classical_unstable<F: FiniteField>(
-    a: &UnivariatePolynomial<F>,
-    b: &UnivariatePolynomial<F>,
-) -> UnivariatePolynomial<F> {
-    gcd(a, b)
 }
 
 /// The monic least common multiple of two polynomials, or zero if either is zero.
@@ -253,8 +278,55 @@ fn drop_low<F: FiniteField>(p: &UnivariatePolynomial<F>, shift: usize) -> Univar
     UnivariatePolynomial::new(&coefficients[shift..])
 }
 
-// Cutoff for the experimental algorithm's classical base case and tail.
+/// `p mod x^shift`: the coefficients a truncated recursion did not see.
+fn low_part<F: FiniteField>(p: &UnivariatePolynomial<F>, shift: usize) -> UnivariatePolynomial<F> {
+    let coefficients = p.coefficients();
+    UnivariatePolynomial::new(&coefficients[..shift.min(coefficients.len())])
+}
+
+/// `high * x^shift + low`.
+fn shifted_sum<F: FiniteField>(
+    high: &UnivariatePolynomial<F>,
+    shift: usize,
+    low: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
+    let (high, low) = (high.coefficients(), low.coefficients());
+    let mut out = vec![F::zero(); (high.len() + shift).max(low.len())];
+    out[..low.len()].copy_from_slice(low);
+    for (slot, value) in out[shift..].iter_mut().zip(high) {
+        *slot += *value;
+    }
+    UnivariatePolynomial::from_coefficients(out)
+}
+
+// Cutoff for the experimental algorithm's classical base case.
 const HALF_GCD_BASE_CASE: i64 = 64;
+
+/// A reduction's result: the pair `(c, d) = M * (a, b)` it reached, and `M` when it was asked for.
+struct Reduced<F: FiniteField> {
+    matrix: Option<Transition<F>>,
+    c: UnivariatePolynomial<F>,
+    d: UnivariatePolynomial<F>,
+}
+
+impl<F: FiniteField> Reduced<F> {
+    /// The reduction of `(a, b)` from that of its top coefficients `(a, b) / x^shift`.
+    ///
+    /// `M * (a, b) = x^shift * M * (a_high, b_high) + M * (a_low, b_low)`, and the first term is
+    /// the pair the truncated recursion already returned. Only the low `shift` coefficients are
+    /// multiplied, where re-applying `M` would multiply all `shift + 2 * budget + 1` of them.
+    fn lift(self, a: &UnivariatePolynomial<F>, b: &UnivariatePolynomial<F>, shift: usize) -> Self {
+        let matrix = self
+            .matrix
+            .expect("a truncated reduction is always asked for its matrix");
+        let (low_c, low_d) = matrix.apply(&low_part(a, shift), &low_part(b, shift));
+        Reduced {
+            c: shifted_sum(&self.c, shift, &low_c),
+            d: shifted_sum(&self.d, shift, &low_d),
+            matrix: Some(matrix),
+        }
+    }
+}
 
 /// The transition matrix that drops `budget` degrees from `a`, or as many as the sequence allows.
 ///
@@ -267,46 +339,91 @@ const HALF_GCD_BASE_CASE: i64 = 64;
 ///
 /// — that is, `M` takes the sequence to the **last** pair whose first entry has not yet dropped
 /// `budget` degrees. `budget = deg a` runs to the end and makes `c` the GCD up to a unit.
-///
-/// To recover the first half of the quotient sequence, truncate both inputs by the
-/// same number of low coefficients. At a degree drop of at most `half`, the
-/// transition entries have degree at most `half`. Thus a discarded coefficient
-/// can affect a remainder only below the retained degree boundary if we keep the
-/// top `2 * half + 1` coefficients. Apply the resulting transition to the full inputs.
+#[cfg(test)]
 fn transition_for<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
     budget: i64,
 ) -> Transition<F> {
+    reduce(a, b, budget, HALF_GCD_BASE_CASE, true)
+        .matrix
+        .expect("the matrix was asked for")
+}
+
+/// [`transition_for`]'s pair, with its matrix built only when `want_matrix` is set.
+///
+/// To recover the first half of the quotient sequence, truncate both inputs by the
+/// same number of low coefficients. At a degree drop of at most `half`, the
+/// transition entries have degree at most `half`. Thus a discarded coefficient
+/// can affect a remainder only below the retained degree boundary if we keep the
+/// top `2 * half + 1` coefficients. [`Reduced::lift`] then recovers the full-length pair.
+///
+/// A caller that reads only the pair skips every composition on the path where nothing was
+/// truncated, which with `budget = deg a` is the whole top of the recursion.
+fn reduce<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    budget: i64,
+    base_case: i64,
+    want_matrix: bool,
+) -> Reduced<F> {
     let degree = signed_degree(a);
     let target = degree - budget;
 
     // A zero budget still takes a step when a and b have the same degree.
     if signed_degree(b) < target {
-        return Transition::identity();
+        return Reduced {
+            matrix: want_matrix.then(Transition::identity),
+            c: a.clone(),
+            d: b.clone(),
+        };
     }
 
-    if budget <= HALF_GCD_BASE_CASE {
-        return classical_transition(a, b, target);
+    if budget <= base_case {
+        return classical_reduce(a, b, target, want_matrix);
     }
 
-    let half = budget / 2;
+    // The truncation below sizes itself off `deg a`, so it needs `deg a >= deg b`. Otherwise the
+    // sequence's first step has quotient zero and only swaps the pair: take it here, as the
+    // column swap it is, and reduce `(b, a)` to the same target.
+    if signed_degree(b) > degree {
+        let mut swapped = reduce(b, a, signed_degree(b) - target, base_case, want_matrix);
+        if let Some(matrix) = &mut swapped.matrix {
+            for row in &mut matrix.rows {
+                row.swap(0, 1);
+            }
+        }
+        return swapped;
+    }
+
+    // Rounded up, so that `budget = deg a` (the top of every `gcd`) truncates nothing at odd
+    // degree: rounding down leaves a one-coefficient shift, which buys nothing and forces the
+    // matrix to be built for the lift.
+    let half = (budget + 1) / 2;
     let shift = (degree - 2 * half).max(0) as usize;
 
     // First half, on the top `2 * half + 1` coefficients.
-    let mut matrix = transition_for(&drop_low(a, shift), &drop_low(b, shift), half);
-    let (mut c, mut d) = matrix.apply(a, b);
+    let Reduced {
+        mut matrix,
+        mut c,
+        mut d,
+    } = reduce_truncated(a, b, shift, half, base_case, want_matrix);
+    if !want_matrix {
+        matrix = None;
+    }
     if signed_degree(&d) < target {
-        return matrix;
+        return Reduced { matrix, c, d };
     }
 
     // One full-length division step, to cross the boundary the truncation could not see past.
     let (quotient, remainder) = c.div_with_remainder(&d);
-    matrix.push_step(&quotient);
+    if let Some(matrix) = &mut matrix {
+        matrix.push_step(&quotient);
+    }
     c = d;
     d = remainder;
     if signed_degree(&d) < target {
-        return matrix;
+        return Reduced { matrix, c, d };
     }
 
     // Second half, on what is left of the budget after the first half and the step.
@@ -316,67 +433,93 @@ fn transition_for<F: FiniteField>(
         // Unreachable: control only arrives here with `deg d >= target`, hence
         // `deg c > deg d >= target`, hence `spent = deg a - deg c < budget`. Kept as a guard
         // because the alternative to an impossible branch here is an infinite recursion.
-        return matrix;
+        return Reduced { matrix, c, d };
     }
     let shift = (signed_degree(&c) - 2 * remaining).max(0) as usize;
-    let tail = transition_for(&drop_low(&c, shift), &drop_low(&d, shift), remaining);
-    tail.compose(&matrix)
+    let tail = reduce_truncated(&c, &d, shift, remaining, base_case, want_matrix);
+    Reduced {
+        matrix: matrix.map(|head| {
+            tail.matrix
+                .as_ref()
+                .expect("a reduction that wants its matrix asks its parts for theirs")
+                .compose(&head)
+        }),
+        c: tail.c,
+        d: tail.d,
+    }
 }
 
-/// [`transition_for`] by classical Euclid, which is the recursion's base case and its reference.
-fn classical_transition<F: FiniteField>(
+/// [`reduce`] on `(a, b) / x^shift`, lifted back to the full-length pair.
+fn reduce_truncated<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    shift: usize,
+    budget: i64,
+    base_case: i64,
+    want_matrix: bool,
+) -> Reduced<F> {
+    if shift == 0 {
+        return reduce(a, b, budget, base_case, want_matrix);
+    }
+    reduce(
+        &drop_low(a, shift),
+        &drop_low(b, shift),
+        budget,
+        base_case,
+        true,
+    )
+    .lift(a, b, shift)
+}
+
+/// [`reduce`] by classical Euclid, which is the recursion's base case and its reference.
+fn classical_reduce<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
     target: i64,
-) -> Transition<F> {
-    let mut matrix = Transition::identity();
+    want_matrix: bool,
+) -> Reduced<F> {
+    let mut matrix = want_matrix.then(Transition::identity);
     let mut c = a.clone();
     let mut d = b.clone();
     while signed_degree(&d) >= target {
         let (quotient, remainder) = c.div_with_remainder(&d);
-        matrix.push_step(&quotient);
+        if let Some(matrix) = &mut matrix {
+            matrix.push_step(&quotient);
+        }
         c = d;
         d = remainder;
     }
-    matrix
+    Reduced { matrix, c, d }
 }
 
-/// Computes the monic GCD using recursive half-GCD and a classical tail.
+/// Computes the monic GCD using recursive half-GCD with a classical base case.
 ///
-/// This experimental route is exposed for benchmarking. The pinned sweep through
-/// degree 4096 favored [`gcd`] on all three measured fields.
+/// This experimental route is exposed for benchmarking; `docs/research/fast-univariate.md` §4.5
+/// records where it crosses [`gcd`].
 pub fn gcd_half_unstable<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
-    let mut f = a.clone();
-    let mut g = b.clone();
-    if signed_degree(&f) < signed_degree(&g) {
-        std::mem::swap(&mut f, &mut g);
-    }
+    gcd_half_with_base_case_unstable(a, b, HALF_GCD_BASE_CASE as u32)
+}
 
-    while signed_degree(&g) > HALF_GCD_BASE_CASE {
-        let budget = signed_degree(&f) / 2;
-        let matrix = transition_for(&f, &g, budget);
-        let (c, d) = matrix.apply(&f, &g);
-        f = c;
-        g = d;
-        if g.is_zero() {
-            break;
-        }
-        // The progress step. Without it a round whose transition is the identity would loop.
-        let remainder = &f % &g;
-        f = g;
-        g = remainder;
+/// [`gcd_half_unstable`] with the classical base case's budget as a parameter, for sweeping it.
+pub fn gcd_half_with_base_case_unstable<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    base_case: u32,
+) -> UnivariatePolynomial<F> {
+    let (f, g) = if signed_degree(a) < signed_degree(b) {
+        (b, a)
+    } else {
+        (a, b)
+    };
+    if g.is_zero() {
+        return make_monic(f);
     }
-
-    // Classical Euclid finishes, which is also what runs for every input below the threshold.
-    while !g.is_zero() {
-        let remainder = &f % &g;
-        f = g;
-        g = remainder;
-    }
-    make_monic(&f)
+    // `budget = deg f` runs the sequence to its end, leaving the last nonzero remainder in `c`.
+    let budget = signed_degree(f);
+    make_monic(&reduce(f, g, budget, i64::from(base_case.max(1)), false).c)
 }
 
 /// Scale a polynomial to be monic.
@@ -655,7 +798,8 @@ mod tests {
         use super::*;
         use crate::fields::{Bn254Fr, KoalaBear, PrimeFieldElement64, Zp18446744069414584321};
         use crate::poly::univariate::gcd::{
-            gcd_classical_unstable, gcd_half_unstable, signed_degree, transition_for, Transition,
+            gcd_classical_unstable, gcd_half_unstable, gcd_half_with_base_case_unstable,
+            half_gcd_crossover, reduce, signed_degree, transition_for, Transition,
             HALF_GCD_BASE_CASE,
         };
         use rand::{prelude::StdRng, SeedableRng};
@@ -697,6 +841,18 @@ mod tests {
             let fast = transition_for(a, b, budget);
             let target = signed_degree(a) - budget;
             let (fc, fd) = fast.apply(a, b);
+            // The pair the recursion lifts from its truncations is the matrix's pair, with or
+            // without the matrix being built.
+            for want_matrix in [true, false] {
+                let reduced = reduce(a, b, budget, HALF_GCD_BASE_CASE, want_matrix);
+                assert_eq!(
+                    (&reduced.c, &reduced.d),
+                    (&fc, &fd),
+                    "the lifted pair is not M * (a, b) on a = {a}, b = {b}, budget = {budget}, \
+                     want_matrix = {want_matrix}"
+                );
+                assert_eq!(reduced.matrix.is_some(), want_matrix);
+            }
             let (mut sc, mut sd) = (a.clone(), b.clone());
             while signed_degree(&sd) >= target {
                 let remainder = &sc % &sd;
@@ -773,6 +929,44 @@ mod tests {
             }
         }
 
+        // With base cases of one to three degrees, every small GF(2) pair and budget recurses, and
+        // both the lifted pair and the matrix land where classical Euclid does.
+        #[test]
+        fn test_the_recursion_matches_euclid_exhaustively_over_gf2_with_tiny_base_cases() {
+            let polynomials = all_polynomials::<Gf2>(6, 2);
+            for base_case in 1..=3 {
+                for a in &polynomials {
+                    for b in &polynomials {
+                        assert_eq!(
+                            gcd_half_with_base_case_unstable(a, b, base_case as u32),
+                            gcd_classical_unstable(a, b),
+                            "half-GCD disagrees on a = {a}, b = {b}, base case {base_case}"
+                        );
+                        if a.is_zero() {
+                            continue;
+                        }
+                        for budget in 0..=signed_degree(a) {
+                            let target = signed_degree(a) - budget;
+                            let (mut sc, mut sd) = (a.clone(), b.clone());
+                            while signed_degree(&sd) >= target {
+                                let remainder = &sc % &sd;
+                                sc = sd;
+                                sd = remainder;
+                            }
+                            let with = reduce(a, b, budget, base_case, true);
+                            let without = reduce(a, b, budget, base_case, false);
+                            let context =
+                                format!("a = {a}, b = {b}, budget {budget}, base {base_case}");
+                            assert_eq!((&with.c, &with.d), (&sc, &sd), "{context}");
+                            assert_eq!((&without.c, &without.d), (&sc, &sd), "{context}");
+                            let matrix = with.matrix.expect("asked for");
+                            assert_eq!(matrix.apply(a, b), (sc, sd), "{context}");
+                        }
+                    }
+                }
+            }
+        }
+
         // Stepping a transition in place equals composing it with the elementary step matrix.
         #[test]
         fn test_push_step_equals_composing_with_the_step() {
@@ -787,6 +981,28 @@ mod tests {
                 let expected = Transition::step(&quotient).compose(&matrix);
                 matrix.push_step(&quotient);
                 assert_eq!(matrix.rows, expected.rows);
+            }
+        }
+
+        // The public gcd agrees with classical Euclid on either side of the wide-field crossover,
+        // where it switches routes, on coprime pairs and with a planted common factor.
+        #[test]
+        fn test_gcd_agrees_with_euclid_across_its_dispatch() {
+            type F = Bn254Fr;
+            let crossover = u64::from(half_gcd_crossover::<F>());
+            let mut rng = StdRng::seed_from_u64(0x194_d15);
+            let shared = UnivariatePolynomial::<F>::rand(13, &mut rng);
+            for degree in [crossover - 1, crossover, crossover + 1] {
+                // `b` sets the smaller degree, which is what the dispatch reads.
+                let a = UnivariatePolynomial::<F>::rand(degree + 5, &mut rng);
+                let b = UnivariatePolynomial::<F>::rand(degree, &mut rng);
+                assert_eq!(
+                    gcd(&a, &b),
+                    gcd_classical_unstable(&a, &b),
+                    "degree {degree}"
+                );
+                let (f, g) = (&a * &shared, &b * &shared);
+                assert_eq!(gcd(&f, &g), make_monic(&shared), "degree {degree}, planted");
             }
         }
 

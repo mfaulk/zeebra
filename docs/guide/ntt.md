@@ -486,12 +486,11 @@ The floor is now **`karatsuba_base_case`** — 48 / 16 / 4 — which is not a ne
 iteration is schoolbook, so the route is long division with allocations. Re-measured with it
 shipped, the rule picks the slower route on **1 row of 44**.
 
-**`gcd` stays quadratic**, and that is now a smaller gap than it was. Half-GCD is `O(M(d) log d)`,
-which against Euclid's `d^2` is a real crossing rather than the `d^2 log d`-against-`d^2`
-non-crossing it was under a schoolbook `M`; it also needs a fast division to recurse on, and that
-now exists. It is #194. §4.5 of
-[`docs/research/fast-univariate.md`](../research/fast-univariate.md) has the arithmetic, the
-per-width constants and the one part of the rule that is still unmeasured (#527).
+**`gcd` is subquadratic above a crossover.** Half-GCD is `O(M(d) log d)`, which against Euclid's
+`d^2` is a real crossing under Karatsuba rather than the `d^2 log d`-against-`d^2` non-crossing it
+was under a schoolbook `M`. `gcd` takes it once the smaller operand reaches degree 6144, 3072 or
+1536 for 4-byte, 8-byte or wider elements (#194), and classical Euclid below. §4.5 of
+[`docs/research/fast-univariate.md`](../research/fast-univariate.md) has the sweep.
 
 The two transforms are the only quasi-linear stages, and they now cost the same: at a matched
 `2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be

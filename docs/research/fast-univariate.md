@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1626,7 +1626,7 @@ stage at the same size) — which together give 91x. The measurement is 1.4x abo
 residue is inversions again: the equal-degree splitter and the gcd both invert, and inversion is
 relatively dearer over the wide field than multiplication is.
 
-### 4.5 Fast division and experimental half-GCD
+### 4.5 Fast division and half-GCD
 
 **Closed by #193.** `div_with_remainder` dispatches between long division and Newton inversion of
 the reversed divisor on a measured crossover, and the `div` row of §3 is superseded: its exponent
@@ -1641,7 +1641,7 @@ division exponent moves the binding stage directly, and it did.
 | long division | `d^2` | `d^2` | 1.95 – 2.03 |
 | Newton inversion of `rev(g)` | `O(M(d))` | `O(d^1.585)` | **1.56 – 1.61** |
 | classical Euclid | `O(d^2)` | `O(d^2)` | not separately measured |
-| half-GCD (#194) | `O(M(d) log d)` | `O(d^1.585 log d)` | [crossover sweep](#194-experimental-half-gcd) |
+| half-GCD (#194) | `O(M(d) log d)` | `O(d^1.585 log d)` | [crossover sweep](#194-half-gcd-crosses-over-once-it-stops-redoing-its-own-work) |
 
 The exponent column is `examples/division_crossover.rs`'s fitted slope over the top half of its
 balanced sweep, which is the figure that compares the two routes at the same sizes; §3's per-row
@@ -1752,8 +1752,9 @@ The recursive route builds a unimodular transition matrix from truncated Euclide
 sequences. Differential tests check the resulting monic GCD against classical Euclid, and
 transition tests check where the matrix lands in the remainder sequence.
 
-The degree-64 base case belongs to the experimental algorithm. The public `gcd` uses
-classical Euclid at every degree. On the pinned sweep, every input pair that entered the
+The degree-64 base case belongs to the experimental algorithm. The public `gcd` used
+classical Euclid at every degree — **superseded**: see
+[the lifted reduction](#194-half-gcd-crosses-over-once-it-stops-redoing-its-own-work). On the pinned sweep, every input pair that entered the
 half-GCD path was slower through degree 4096.
 
 ```sh
@@ -1839,6 +1840,75 @@ classical Euclid at every measured degree** (the last column stays below 1), so 
 remains classical and #194 stays open. The step was the cheapest lever, not the one that crosses
 over. The next candidates are the recursion's two `compose` calls per level, and a lower
 base-case cutoff now that the base case is cheaper.
+
+#### #194: half-GCD crosses over once it stops redoing its own work
+
+**Measured at `8c51a8c6` against `92077561` (the `main` it branched from); callers at `8f2771a7`** — pre-rebase commits, rebased as `713a102c` and `d1ffa39e`.
+The two candidates the previous subsection named — the `compose` calls and the base-case cutoff —
+were not where the time went. The recursion was redoing work it had already done:
+
+- every level applied its first-half matrix to the **full-length** operands, although the
+  truncated recursion had already computed the top of that product. With
+  `M (a, b) = x^s M (a_hi, b_hi) + M (a_lo, b_lo)`, only the `s` discarded low coefficients need
+  multiplying (`Reduced::lift`), and the second half's pair comes back the same way instead of
+  being recomputed by the caller;
+- the top-level `gcd` loop composed a matrix it never read, then applied it to the full operands
+  a second time. `gcd` needs only the pair, and on the untruncated spine of the recursion
+  (`budget = deg a`, shift zero) no matrix is built at all;
+- `half = budget / 2` left a one-coefficient truncation at every odd degree, which bought nothing
+  and forced a matrix to be built for the lift. It rounds up now.
+
+Counting Karatsuba products of half the budget's size, a level went from 24 to 20 and the top of
+`gcd` from about 48 to 12 — the model predicted roughly 1.6x, and the measurement agrees.
+
+`gcd_crossover all` from both binaries, two rounds, arm order alternated, under
+`tools/benchlock.sh` on `taskset -c 10`; one-minute load 1.1–1.6. Entries are classical time over
+half-GCD time, the two rounds' range; classical Euclid is identical code in both binaries and is
+the in-process control.
+
+| Degree | KoalaBear before | after | Goldilocks before | after | BN254 Fr before | after |
+|-------:|-----:|-----:|-----:|-----:|-----:|-----:|
+| 256 | 0.47 | 0.76–0.78 | 0.46 | 0.83 | 0.51 | 0.86 |
+| 1024 | 0.43 | 0.74–0.75 | 0.44 | 0.81 | 0.54–0.55 | 0.97–0.99 |
+| 1536 | — | 0.75 | — | 0.86 | — | **1.11–1.12** |
+| 2048 | 0.47 | 0.78–0.82 | 0.49–0.51 | 0.94–0.96 | 0.65–0.66 | **1.18–1.19** |
+| 3072 | — | 0.88–0.91 | — | **1.06–1.13** | — | **1.38–1.40** |
+| 4096 | 0.55 | 0.88–0.98 | 0.63–0.64 | **1.14–1.18** | 0.83–0.86 | **1.49–1.50** |
+| 6144 | — | **1.11** | — | **1.36** | — | **1.80–1.82** |
+| 8192 | — | **1.29** | — | **1.51** | — | **1.98–2.00** |
+| 16384 | — | **1.68–1.71** | — | **1.95–2.09** | — | **2.60–2.62** |
+
+Degrees 32–128 never enter the recursion in the new build and read 0.98–1.03. **`gcd` now
+dispatches on the smaller operand's degree** at the first measured win: **6144, 3072 and 1536**
+for 4-byte, 8-byte and wider elements (`half_gcd_crossover`), the same tiering as
+`karatsuba_base_case` and for the same reason — dearer multiplications reward Karatsuba sooner.
+
+The base case was swept too (`gcd_crossover base`, budgets 16–128 at degrees 1024, 4096 and
+16384, one build before the odd-degree rounding). The spread is widest at 1024 — KoalaBear
+0.62–0.74, Goldilocks 0.69–0.77, BN254 0.89–0.93 — and under 4% at 16384. 128 was best over
+KoalaBear and worst over BN254 at 1024; 64 is within 6% of the best everywhere, so it stays.
+
+**Callers.** `roots` and `factorize` at the degrees `gcd_crossover callers` uses (64–1024) never
+reach the dispatch and were within 1%. Above it (`callers-high`, five rounds interleaved on
+`taskset -c 30`, load 1.2–4.5):
+
+| Field | Degree | `roots` old / new, paired median | `factorize` |
+|:------|-------:|-----:|-----:|
+| KoalaBear | 8192 | 1.006 | 1.008 |
+| Goldilocks | 4096 | **0.983** | **0.986** |
+
+KoalaBear is unchanged. **Goldilocks is about 1.5% slower, and that is not explained.** The sweep
+above times coprime pairs; `roots` and `factorize` hand `gcd` pairs with a large common factor,
+where Euclid halts early and the recursion's fixed overhead weighs more. `gcd_crossover planted`
+times exactly that shape and was not run. A single round at BN254 degrees 2048 and 4096 read
+0.99–1.04, inside its noise; `roots` there takes over a minute per call, so the stage is not
+gcd-bound.
+
+Two corrections to earlier text in this section. The `deg b > deg a` case was mishandled by the
+recursion — its truncation sizes itself off `deg a` — which `gcd` never reached because it swaps
+first; an exhaustive GF(2) test with base cases of 1–3 found it, and the recursion now takes the
+leading swap step itself. And `xgcd` and `partial_bezout` still run classical Euclid; the
+transition matrix carries their cofactors, so routing them is the next step, not new algorithm.
 
 #### #527: the floor was mine and it was 16x-32x too high
 
@@ -2008,7 +2078,7 @@ two of the three official 2026 CICO-2 solutions. Three things change for this se
 
 - the transform ceiling is set by the **smooth part** of `q - 1`, not the two-adicity alone, so
   KoalaBear reaches `2^24 · 127` with a mixed-radix FFT rather than stopping at `2^24`;
-- **half-GCD** is available experimentally (§4.5). The published univariate route
+- **half-GCD** is `gcd`'s route above a width-indexed crossover (§4.5). The published univariate route
   needs neither it nor Newton division nor a subproduct tree;
 - the `R_P = 8` challenge was solved by interpolation plus Graeffe root finding at degree `3^13`,
   which needs a `2^22` transform — **inside** the ceiling this document measured. That named an

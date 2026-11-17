@@ -111,7 +111,8 @@ reconstruction as:
 A buffer-swapping Berlekamp–Massey that drops the per-step clone of the connection polynomial was
 also tried and measured no faster — the loop is bound by field multiplication — so it was not kept.
 The two remaining pieces are the quadratic Euclidean pair; the subquadratic route for both is
-half-GCD, which #194 currently measures slower than classical Euclid at every degree it reached.
+half-GCD, which `gcd` takes only above degree 1536–6144 by element width (#194), and which
+`xgcd` and `partial_bezout` do not yet route through.
 
 Paired whole-conversion measurements with the committed instrument, `--route wiedemann`, one
 repeat per process, both arms interleaved on pinned core 2 under `benchlock`, three processes per
