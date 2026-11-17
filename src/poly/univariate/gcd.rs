@@ -24,7 +24,7 @@ pub(crate) fn half_gcd_crossover<F: FiniteField>() -> u32 {
 }
 
 /// The monic greatest common divisor of two polynomials: classical Euclid, or half-GCD once the
-/// smaller operand reaches [`half_gcd_crossover`].
+/// smaller operand reaches degree 6144, 3072 or 1536 for 4-byte, 8-byte or wider elements.
 pub fn gcd<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
