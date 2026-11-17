@@ -31,3 +31,6 @@
 2026-11-16T18:55:58-05:00  QUEUED   zb-834          pid=1801581  timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
 2026-11-16T18:55:58-05:00  START    zb-834          pid=1801581  waited=0s load=10.10 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
 2026-11-16T18:56:17-05:00  END      zb-834          pid=1801581  status=2 end=exited elapsed=19s load=7.57 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:56:52-05:00  QUEUED   zb-834          pid=1806444  timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:56:52-05:00  START    zb-834          pid=1806444  waited=0s load=4.48 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:59:29-05:00  END      zb-834          pid=1806444  status=0 end=exited elapsed=157s load=1.46 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10

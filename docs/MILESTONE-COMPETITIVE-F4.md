@@ -135,7 +135,7 @@ requires its own end-to-end evidence.
   targets, and is now [#845](https://github.com/mfaulk/zeebra/issues/845).
 - #828's 15% gate needs 45–68% of forward work removed, against a plausible 4–5%.
 - #831 measured 0.84–0.97× at 16 workers.
-- Distances: msolve 2.7× (32003) and 1.9× (2³¹−1); grobx 2.05× (Eco-12) and 2.36× (MQ11).
+- Distances: msolve 2.77× (32003) and 1.85× (2³¹−1); grobx 2.05× (Eco-12) and 2.36× (MQ11).
 
 The measurement policy below is §3 of the report, and `tools/cpu-context.sh` implements it.
 

@@ -1,9 +1,10 @@
 # M29 frozen baseline and 16-worker F4 cost model (#834)
 
-**Measured at:** `847c4030`. Its production source (`src/`, `Cargo.lock`) is byte-identical to
+**Measured at:** `847c4030` (cost model, wide comparands, MQ10 windows 1–2) and `772be618` (MQ10
+window 3, the one reported). The two commits share one production source (`src/`, `Cargo.lock`) is byte-identical to
 `main` at `da5b658c` (#841, pair-multiple dedup shipped). The instrument commits on top of it add
 only `examples/m29_cost_model.rs`, `tools/cpu-context.sh` and `research/m29-baseline/`. Campaign
-date: 2026-11-16, 17:00–18:45 EST. Each suite ran under its own `tools/benchlock.sh zb-834` window.
+date: 2026-11-16, 17:00–18:59 EST. Each suite ran under its own `tools/benchlock.sh zb-834` window.
 **Host:** Threadripper PRO 5995WX (`ZEEBRA_MACHINE=5995wx`), `amd-pstate-epp`, `performance`
 governor, boost on, kernel 7.3.3. Builds use Rust 1.99.1 (`58cf8f9c3`), release, fat LTO, one
 codegen unit, `x86-64-v3`, `RUSTC_WRAPPER=""`, `CARGO_INCREMENTAL=0`.
@@ -31,8 +32,8 @@ campaign scripts, the per-child records, the frozen identities and the generated
 5. **#831, measured here at the frozen commit**, is worth 0.71× of process wall on MQ11 serially and
    0.84× at 16 workers. Elsewhere it is 0.89–0.91× serially and 0.96–0.97× at 16 workers, with RSS
    unchanged (0.98–1.00×).
-6. **Distance to the goals** (process wall, 16 workers): MQ10 is 2.7× exact-mode msolve at 32003
-   and 1.9× at 2³¹−1 (target ≤1.5×). Eco-12 is 2.05× grobx and MQ11 2.36× (target ≤0.90×).
+6. **Distance to the goals** (process wall, 16 workers): MQ10 is 2.77× exact-mode msolve at 32003
+   and 1.85× at 2³¹−1 (target ≤1.5×). Eco-12 is 2.05× grobx and MQ11 2.36× (target ≤0.90×).
    Goal B needs a 2.28× / 2.63× Zeebra speedup. Against the serial-stage ceilings in §6, that
    needs finishing, symbolic and interreduction all parallelized *and* a real cut in forward work.
    No single mechanism suffices.
@@ -109,7 +110,28 @@ Against the earlier figures, the 16-worker cells moved from #820's 340.7/314.1 m
 
 **MQ10 against exact-mode msolve**: `comparand-scaling.py`, every answer verified against #739's
 exact references, fresh process with I/O. The controller stops a window the moment any compiler
-starts on the machine, and another worktree's builds ended windows 1 and 2 early. MQ10_WINDOWS
+starts on the machine, and another worktree's builds ended windows 1 and 2 early. Window 3 is the
+complete one, with five repetitions of every cell. It is reported here. Windows 1 and 2 are in
+[tables.md](../../research/m29-baseline/tables.md) and are not pooled with it.
+
+| Engine (window 3, n=5) | GF(32003) 1w | 4w | 8w | 16w | GF(2³¹−1) 1w | 4w | 8w | 16w |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Zeebra (`zeebra_driver`) | 1062.6 | 457.0 | 370.9 | 326.6 | 915.6 | 395.4 | 334.2 | 306.9 |
+| msolve 0.11.0 (exact) | 215.1 | 124.3 | **117.8** | 466.7 [123–1126] | 236.5 | **165.7** | 469.3 | 229.5 [202–740] |
+| groebner-rs (randomized) | 117.7 | 85.0 | 87.9 | 99.7 | 152.4 | 102.2 | 98.3 | 108.2 |
+| grobx (randomized raw, serial only) | 335.6 | — | — | — | 158.6 | — | — | — |
+
+Milliseconds, medians. Every answer was verified against #739's exact references. msolve at 16
+threads (and at 8 on 2³¹−1) is erratic, so its best configuration within 16 cores is taken, as plan
+§2.1 requires:
+
+| Field | Zeebra 16w ms | best exact msolve ≤16 cores ms | Zeebra / msolve | Zeebra needed for ≤1.5× | speedup needed |
+|---|---:|---:|---:|---:|---:|
+| GF(32003) | 326.6 | 117.8 (8 threads) | 2.77× | ≤176.7 | 1.85× |
+| GF(2³¹−1) | 306.9 | 165.7 (4 threads) | 1.85× | ≤248.5 | 1.24× |
+
+This reproduces #820 (Zeebra 340.7/314.1 ms, msolve 116.8/167.0 ms). The msolve figures agree to
+within 1%, and Zeebra is 2–4% faster.
 
 **Wide targets against grobx and groebner-rs** (`wide-corpus.py`, one worker, CPU 8, three passes).
 grobx's basis is text-identical to Zeebra's. groebner-rs's agrees with grobx under the controller's
@@ -204,10 +226,10 @@ merge (plan §11).
 
 **Reading against the goals.**
 
-- **Goal A, 2³¹−1** (needs about −22% to reach ≤1.5× of msolve's 158 ms best). Parallel
+- **Goal A, 2³¹−1** (needs about −19%: from 307 ms to ≤249 ms, 1.5× msolve's 165.7 ms best). Parallel
   finishing (−12.6%) plus prototype-grade parallel symbolic (−8.7%) roughly reaches it on paper.
   Re-measure after each, rather than add the two.
-- **Goal A, 32003** (needs about −45%, from about 325 ms to ≤179–184 ms). Even finishing, symbolic
+- **Goal A, 32003** (needs about −46%: from 327 ms to ≤177 ms, 1.5× msolve's 117.8 ms). Even finishing, symbolic
   with parallel interning, and plausible FL together sum to about −40% before interaction. Goal A
   at 32003 needs work reduction as well, not only parallelism.
 - **Goal B** (Eco-12 −56%, MQ11 −62%). The parallelism ceilings for finishing, symbolic and
@@ -243,8 +265,7 @@ and 0.91× at 16 workers. It adds the wide targets. MQ11 is the largest effect r
 
 ## 8. What this does not show
 
-- n=3 per Zeebra cell and n=3 per wide comparand, with MQ10 comparand cells split across controller
-  windows. That is enough to rank stages, not enough to grade a goal. #837's final protocol (≥9
+- n=3 per cost-model cell and per wide comparand, and n=5 per MQ10 comparand cell. That is enough to rank stages, not enough to grade a goal. #837's final protocol (≥9
   interleaved measurements) still applies.
 - The comparands were not re-run at 1/4/8/16 on the wide targets. grobx's pinned driver is serial,
   and wide-corpus refuses comparand workers above one.

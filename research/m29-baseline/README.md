@@ -1,6 +1,8 @@
 # #834 M29 frozen baseline: campaign and evidence
 
-**Measured at:** `847c4030`, whose production source is `main` at `da5b658c`. Run on 2026-11-16
+**Measured at:** `847c4030`, and `772be618` for MQ10 window 3. Both have the production source of
+`main` at `da5b658c`. The executables were built at `fde57ab4`, whose example and library sources
+are identical to both (`identities.json` records that build head). Run on 2026-11-16
 on host `5995wx`, one `tools/benchlock.sh zb-834` window per suite ([benchlock.log](benchlock.log)).
 Findings: [`docs/research/m29-baseline-cost-model.md`](../../docs/research/m29-baseline-cost-model.md).
 
