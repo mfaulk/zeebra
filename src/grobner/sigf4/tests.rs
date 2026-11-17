@@ -233,6 +233,18 @@ fn test_statistics_are_internally_consistent() {
     assert!(s.signature_metadata_bytes > 0);
 }
 
+/// Every criterion fires on Katsura-6, so the equality tests are not passing on a criterion-free
+/// engine, and fewer targets reduce to zero than pairs are rejected.
+#[test]
+fn test_every_criterion_rejects_something_on_katsura_6() {
+    let (result, s) = sig_f4_reported(&katsura::<6, Zp32003>(), GREVLEX, &SigF4Options::checked());
+    result.unwrap();
+    assert!(s.rejected_koszul > 0, "{s:?}");
+    assert!(s.rejected_rewrite > 0, "{s:?}");
+    assert!(s.rejected_product > 0, "{s:?}");
+    assert!(s.reductions_to_zero < s.rejected_rewrite + s.rejected_koszul);
+}
+
 fn polynomial_strategy<F: FiniteField + 'static>(
     modulus: u64,
 ) -> impl Strategy<Value = MultivariatePolynomial<3, F>> {

@@ -121,6 +121,10 @@ name = "batch_order_study"
 required-features = ["external-runners"]
 
 [[example]]
+name = "sig_f4_study"
+required-features = ["research-sigf4"]
+
+[[example]]
 name = "block_density"
 test = true
 
