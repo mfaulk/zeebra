@@ -8,7 +8,11 @@ use super::{
     symbolic::RowKind,
 };
 use crate::{
-    linalg::{concurrent, Backend},
+    linalg::{
+        concurrent,
+        sparse::{EliminationStatistics, SparseMatrix},
+        Backend,
+    },
     FiniteField,
 };
 use std::sync::atomic::AtomicBool;
@@ -77,6 +81,38 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
             unreachable!("structured batch rejected by concurrent elimination: {error:?}")
         }
     }
+}
+
+/// A batch's candidate finishing on worker threads (#845): the visits, the report and the worker
+/// count, or `None`, with the matrix untouched, for the caller's serial kernel.
+///
+/// Gated like the forward pass, with the selected targets as the rows and their entries as the
+/// work.
+pub(crate) fn finish<F: FiniteField>(
+    setting: ParallelForward,
+    backend: Backend,
+    matrix: &mut SparseMatrix<F>,
+    selected: &[bool],
+    allowance: usize,
+    statistics: &mut EliminationStatistics,
+) -> Option<(usize, super::candidate::Report, usize)> {
+    let (targets, entries) = matrix
+        .rows()
+        .iter()
+        .filter(|row| row.leading_column().is_some_and(|column| selected[column]))
+        .fold((0, 0), |(rows, entries), row| {
+            (rows + 1, entries + row.nonzeros())
+        });
+    let (_, config) = gate::<F>(setting, backend, targets, entries, allowance)?;
+    let (visits, report) = super::candidate::finish_parallel(
+        matrix,
+        selected,
+        allowance,
+        super::candidate::WORKSPACE_LIMIT,
+        config.workers,
+        statistics,
+    )?;
+    Some((visits, report, config.workers))
 }
 
 /// The handle and configuration for a block of `lower_rows` rows and `lower_nonzeros` entries to
@@ -174,6 +210,37 @@ mod tests {
         check::<Zp2147483647>();
         check::<Zp18446744073709551263>();
         check::<Bn254Fr>();
+        check::<Gf256>();
+    }
+
+    // Forced workers finish candidates on threads and still return the serial reduced basis.
+    #[test]
+    fn forced_workers_finish_candidates_to_the_serial_basis() {
+        fn check<F: FiniteField>() {
+            same(&katsura::<6, F>());
+            same(&cyclic::<5, F>());
+        }
+        fn same<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>]) {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let (expected, serial_statistics) = f4_reported(system, order, &serial());
+            let expected = expected.unwrap();
+            assert_eq!(serial_statistics.candidate_reduction.parallel_batches, 0);
+            for workers in [1, 2, 4, 16] {
+                let (basis, statistics) = f4_reported(system, order, &forced(workers));
+                assert_eq!(basis.unwrap(), expected);
+                // Forced forward elimination changes the echelon rows finishing starts from, so
+                // its counters are compared at the kernel (`candidate`'s tests), not here.
+                let finish = statistics.candidate_reduction;
+                assert!(
+                    finish.parallel_batches > 0,
+                    "{workers} workers: none parallel"
+                );
+                assert!(finish.max_workers <= workers);
+                assert_eq!(finish.fallback_batches, 0);
+            }
+        }
+        check::<Zp32003>();
+        check::<Zp18446744073709551263>();
         check::<Gf256>();
     }
 

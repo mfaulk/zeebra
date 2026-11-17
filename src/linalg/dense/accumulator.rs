@@ -148,7 +148,20 @@ impl<F: FiniteField> DenseAccumulator<F> {
     where
         F: 'p,
     {
-        let (mut operations, mut products) = (0, 0);
+        let (operations, products, _) = self.sweep_with_peak(pivot_of);
+        (operations, products)
+    }
+
+    /// [`Self::sweep`], also returning the most nonzeros held after any one subtraction, or zero
+    /// when there was none.
+    pub(crate) fn sweep_with_peak<'p>(
+        &mut self,
+        pivot_of: impl Fn(usize) -> Option<&'p SparseRow<F>>,
+    ) -> (usize, usize, usize)
+    where
+        F: 'p,
+    {
+        let (mut operations, mut products, mut peak) = (0, 0, 0);
         let mut column = self.lead;
         while column < self.tail {
             let factor = self.cells[column];
@@ -157,11 +170,12 @@ impl<F: FiniteField> DenseAccumulator<F> {
                     self.subtract_scaled(pivot, factor);
                     operations += 1;
                     products += pivot.nonzeros();
+                    peak = peak.max(self.nonzeros);
                 }
             }
             column += 1;
         }
-        (operations, products)
+        (operations, products, peak)
     }
 
     /// Scale so the leading coefficient is one, reporting whether an inverse was needed.

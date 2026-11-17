@@ -276,6 +276,8 @@ fn statistics(s: &F4Statistics, stages: bool) -> Json {
                     Json::size(cr.peak_sparse_capacity_entries),
                 ),
                 ("fallback_batches", Json::size(cr.fallback_batches)),
+                ("parallel_batches", Json::size(cr.parallel_batches)),
+                ("max_workers", Json::size(cr.max_workers)),
             ]),
         ),
         (
