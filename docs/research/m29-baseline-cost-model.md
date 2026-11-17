@@ -1,7 +1,9 @@
 # M29 frozen baseline and 16-worker F4 cost model (#834)
 
 **Measured at:** `847c4030` (cost model, wide comparands, MQ10 windows 1–2) and `772be618` (MQ10
-window 3, the one reported). The two commits share one production source (`src/`, `Cargo.lock`) is byte-identical to
+window 3, the one reported). These are the branch hashes recorded in the archives, taken before the
+branch was rebased over #842. #842 changes only live-budget accounting, and no run here came near
+a budget. The two commits share one production source (`src/`, `Cargo.lock`) is byte-identical to
 `main` at `da5b658c` (#841, pair-multiple dedup shipped). The instrument commits on top of it add
 only `examples/m29_cost_model.rs`, `tools/cpu-context.sh` and `research/m29-baseline/`. Campaign
 date: 2026-11-16, 17:00–18:59 EST. Each suite ran under its own `tools/benchlock.sh zb-834` window.
