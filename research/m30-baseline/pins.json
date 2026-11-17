@@ -1,0 +1,81 @@
+{
+ "schema": 1,
+ "issue": 855,
+ "pinned_before_execution": true,
+ "freeze_commit": "4f5784c535818f6607d640af2d458c6a460da749",
+ "freeze_note": "origin/main at M30 start (#863, the plan merge). src/, examples/ and Cargo.lock are identical to adfa6a60 (M29 close) and to 7e18d089 (#851). M29's final cohort (#837) was measured at 88bc45de with the same production source.",
+ "f4_options_shipping": "F4Options::default() with parallel_forward = Serial at 1 worker and Auto { max_workers: w } above, max_wall_time = 180 s (examples/m29_cost_model.rs options()). Every child records the full Debug form in its report.",
+ "primary": [
+  {
+   "target": "mq10-32003",
+   "row": "mq-random-10",
+   "modulus": "32003",
+   "input_sha256": "16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f",
+   "source": "zeebra::grobner::external::corpus (examples/m29_cost_model.rs mq10())",
+   "m29_basis_sha256": "ccee8a5618352232385d9e47697f29bb4ed553e8950e3cc62ab16de6c5886201",
+   "verification": "coefficient for coefficient against the Singular reference (research/comparand-scaling/singular-references-v1.json.gz), by comparand-scaling.py"
+  },
+  {
+   "target": "mq10-m31",
+   "row": "mq-random-10",
+   "modulus": "2147483647",
+   "input_sha256": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+   "source": "zeebra::grobner::external::corpus (examples/m29_cost_model.rs mq10())",
+   "m29_basis_sha256": "deb2802f97eeee19a5f62a769fd5957bc0a1a6539d2b3b8cc29008a1b5f60c34",
+   "verification": "coefficient for coefficient against the Singular reference (research/comparand-scaling/singular-reference31-v1.json.gz), by comparand-scaling.py"
+  },
+  {
+   "target": "eco12-wide64",
+   "row": "eco-12",
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "input_sha256": "e9ef0fecf3906d9283e1ce003c4489d6921fb8718f2956c39c4aaa79e52a93cb",
+   "source": "research/wide-corpus/cases.json (#738)",
+   "m29_basis_sha256": "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984",
+   "verification": "Zeebra's certify_f4_output (input in <G>, Buchberger's criterion, reduced; reverse inclusion by F4 provenance) and grobx certified mode (independent exact checker with cofactors) on the same input; both outside the timed campaign"
+  },
+  {
+   "target": "mq11-goldilocks",
+   "row": "mq-random-11",
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "input_sha256": "ee76de455c5ea571d6e8286152a4b4380b9d1ea323ee63dc8f889ffa11a92af5",
+   "source": "research/wide-corpus/cases.json (#738)",
+   "m29_basis_sha256": "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41",
+   "verification": "as eco12-wide64"
+  }
+ ],
+ "held_out": [
+  {
+   "row": "katsura-11",
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "input_sha256": "c08214c56a6654ab7a376c61df339b2e7cc65a225d027cc3a3fc3bec9876a4a2",
+   "source": "research/wide-corpus/cases.json (#738)"
+  },
+  {
+   "row": "cyclic-7",
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "input_sha256": "1da97cb3fe0eff34f224caaa8f029579d5f7252d910b78a3d5021baec41386bc",
+   "source": "research/wide-corpus/cases.json (#738)"
+  }
+ ],
+ "held_out_note": "Pinned, not executed by M30-0. Every engine gets the primary rows' budgets below. An M30 issue reads them only after its decision on the primary rows is recorded.",
+ "budgets": {
+  "zeebra_cost_model": "180 s F4 wall per child (F4Options::max_wall_time)",
+  "wide_corpus_comparands": "60 s / 2 GiB per solver attempt (wide-corpus.py contract)",
+  "comparand_scaling_mq10": "60 s / 2 GiB per child; 3600 s campaign wall per window",
+  "certification": "one run per wide target, 600 s wall, outside the timed campaign",
+  "suite": "timeout --signal=INT --kill-after=60s 5400 per suite"
+ },
+ "cohort": {
+  "script": "research/m29-baseline/run.sh",
+  "suites": ["identities", "walls", "wide", "mq10"],
+  "REPS": 9,
+  "MQ10_REPS": 9,
+  "MQ10_WALL": 3600,
+  "workers": [1, 4, 8, 16],
+  "placement": "tools/bench-reserve.sh reserve 1,2 (CPUs 8-23 + siblings 72-87). costmodel.py pins w workers to CPUs 8..8+w-1; wide-corpus.py runs on CPU 8; comparand-scaling.py takes the first w physical CPUs of its affinity, which the reservation makes 8..8+w-1"
+ }
+}
