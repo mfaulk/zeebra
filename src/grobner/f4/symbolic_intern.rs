@@ -23,6 +23,11 @@
 //! a team. Pair count does not predict closure size (an 11-pair Eco-12 batch needs 11 137 rows, a
 //! 326-pair one 916), which is why the frontier starts the team and the seed does not.
 //!
+//! Step scratch is the caller's ([`InternScratch`], #871): workers write only within capacity the
+//! caller allocated, so nothing they touch lands in a glibc per-thread arena, and the scratch is
+//! sized to what a step touches (16-byte candidates, 8-byte index slots) because the symbolic
+//! stage, not the matrix, is where a wide batch peaks.
+//!
 //! Matrix construction sorts columns by monomial and reducer rows by leading column, so only the
 //! *set* of reducer rows and the pair rows' order reach the matrix; exact handle identity is kept
 //! here so the result can be compared with `==`, not because the matrix needs it.
@@ -70,6 +75,8 @@ pub struct InternConfig {
     /// A batch with fewer seed rows takes the shipping serial closure; 0 disables the test. Kept
     /// to reproduce the first #860 campaign, which set 512 and lost most batches to it.
     pub min_seed_rows: usize,
+    /// How long the step scratch outlives a batch (#871).
+    pub retain: Retain,
 }
 
 /// Where a prototype's time went. Clocks are read per phase, never per monomial.
@@ -160,10 +167,10 @@ struct Slice<const N: usize> {
     /// One per term: a handle, or `LOCAL | id` into `candidates`; after emit, handles only.
     refs: Vec<u32>,
     /// Pre-step misses, deduplicated within the slice, in first-occurrence order.
-    candidates: Vec<Keyed<N>>,
+    candidates: Vec<Candidate>,
     /// Per shard, the candidate ids it holds, ascending. The sharded merge's only.
     by_shard: Vec<Vec<u32>>,
-    local: Table<N>,
+    local: LocalIndex,
     counts: SymbolicCounts,
     /// Local id to handle, filled by the merge.
     translate: Vec<AtomicU32>,
@@ -171,12 +178,185 @@ struct Slice<const N: usize> {
     owner: Vec<AtomicBool>,
     /// Emit output: max over rows of (owners so far in the slice - frontier position).
     pending_peak: i64,
+    /// Owners this step: the monomials the merge admitted from this slice.
+    admitted: usize,
     /// Owners in local order, written by the sharded merge's ranking.
     new: Vec<Monomial<N>>,
     /// The scan finished this step.
     scanned: bool,
     /// The scan stopped short of a buffer this step.
     overflow: Option<Overflow>,
+}
+
+/// A pre-step miss, named by where the slice first met it — row and term — rather than by its
+/// monomial: 16 bytes instead of 8 plus a monomial (56 at twelve variables), and the candidate
+/// list is most of the scratch.
+#[derive(Clone, Copy, Debug)]
+struct Candidate {
+    hash: u64,
+    row: u32,
+    term: u32,
+}
+
+/// The monomial `candidate` stands for: term `term` of row `row`'s shifted basis element.
+fn candidate_monomial<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    rows: &[(usize, Monomial<N>, usize, usize)],
+    candidate: &Candidate,
+) -> Monomial<N> {
+    let (index, multiplier, _, _) = &rows[candidate.row as usize];
+    &basis.element(*index).terms[candidate.term as usize].0 * multiplier
+}
+
+/// `candidate` with its monomial, for the interner.
+fn candidate_key<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    rows: &[(usize, Monomial<N>, usize, usize)],
+    candidate: &Candidate,
+) -> Keyed<N> {
+    Keyed {
+        hash: candidate.hash,
+        monomial: candidate_monomial(basis, rows, candidate),
+    }
+}
+
+/// A slice's deduplication table: open addressing over candidate ids, 8 bytes a slot.
+///
+/// A hash table's inserts land all over its bucket array, so every page of it is resident however
+/// few entries it holds. A table kept at the run's widest step would be resident at that size in
+/// every step: 63 MiB of `HashMap<Keyed, u32>` on Eco-12 at 16 workers. This one holds ids only
+/// (the keys are in `candidates`), starts every step small, and doubles in place within the
+/// capacity the caller reserved, so only the slots a step needs are ever touched.
+#[derive(Default)]
+struct LocalIndex {
+    /// `tag << 32 | (id + 1)`, the tag being the hash's top 32 bits; 0 is empty. The length in
+    /// use is a power of two at least twice the entries.
+    slots: Vec<u64>,
+    len: usize,
+}
+
+impl LocalIndex {
+    const FIRST: usize = 256;
+
+    /// Slots ever usable without the caller growing the table.
+    fn capacity(&self) -> usize {
+        self.slots.capacity()
+    }
+
+    /// Entries the table can take before it needs [`Self::capacity`] to grow.
+    fn room(&self) -> usize {
+        prev_power_of_two(self.slots.capacity()) / 2
+    }
+
+    fn clear(&mut self) {
+        self.len = 0;
+        self.slots.clear();
+        let first = Self::FIRST.min(prev_power_of_two(self.slots.capacity()));
+        self.slots.resize(first, 0);
+    }
+
+    /// The id of the entry with `hash` for which `is` holds, or `None` after inserting one as id
+    /// `len`, the entries so far, whose hashes `hash_of` gives; `Err` when the table would have
+    /// to outgrow its capacity.
+    fn find_or_insert(
+        &mut self,
+        hash: u64,
+        is: impl Fn(u32) -> bool,
+        hash_of: impl Fn(usize) -> u64,
+        len: usize,
+    ) -> Result<Option<u32>, ()> {
+        debug_assert_eq!(len, self.len);
+        if self.slots.is_empty() {
+            return Err(());
+        }
+        let tag = hash >> 32;
+        let mut mask = self.slots.len() - 1;
+        let mut i = hash as usize & mask;
+        loop {
+            let slot = self.slots[i];
+            if slot == 0 {
+                break;
+            }
+            let id = (slot as u32) - 1;
+            if slot >> 32 == tag && is(id) {
+                return Ok(Some(id));
+            }
+            i = (i + 1) & mask;
+        }
+        if 2 * (len + 1) > self.slots.len() {
+            let doubled = 2 * self.slots.len();
+            if doubled > self.slots.capacity() {
+                return Err(());
+            }
+            self.slots.clear();
+            self.slots.resize(doubled, 0);
+            mask = doubled - 1;
+            for id in 0..len {
+                self.place(hash_of(id), id, mask);
+            }
+            self.place(hash, len, mask);
+        } else {
+            self.slots[i] = tag << 32 | (len as u64 + 1);
+        }
+        self.len += 1;
+        Ok(None)
+    }
+
+    /// The id of the entry with `hash` for which `is` holds.
+    fn find(&self, hash: u64, is: impl Fn(u32) -> bool) -> Option<u32> {
+        if self.slots.is_empty() {
+            return None;
+        }
+        let (tag, mask) = (hash >> 32, self.slots.len() - 1);
+        let mut i = hash as usize & mask;
+        loop {
+            let slot = self.slots[i];
+            if slot == 0 {
+                return None;
+            }
+            let id = (slot as u32) - 1;
+            if slot >> 32 == tag && is(id) {
+                return Some(id);
+            }
+            i = (i + 1) & mask;
+        }
+    }
+
+    /// [`Self::find_or_insert`], growing the capacity when it must: for the caller's own table.
+    fn find_or_insert_growing(
+        &mut self,
+        hash: u64,
+        is: impl Fn(u32) -> bool,
+        hash_of: impl Fn(usize) -> u64,
+        len: usize,
+    ) -> Option<u32> {
+        if self.slots.is_empty() {
+            self.slots.reserve_exact(Self::FIRST);
+            self.slots.resize(Self::FIRST, 0);
+        }
+        if 2 * (len + 1) > self.slots.len() && 2 * self.slots.len() > self.slots.capacity() {
+            self.slots
+                .reserve_exact(2 * self.slots.len() - self.slots.len());
+        }
+        self.find_or_insert(hash, is, hash_of, len)
+            .expect("capacity reserved above")
+    }
+
+    fn place(&mut self, hash: u64, id: usize, mask: usize) {
+        let mut i = hash as usize & mask;
+        while self.slots[i] != 0 {
+            i = (i + 1) & mask;
+        }
+        self.slots[i] = (hash >> 32) << 32 | (id as u64 + 1);
+    }
+}
+
+fn prev_power_of_two(n: usize) -> usize {
+    if n == 0 {
+        0
+    } else {
+        1 << (usize::BITS - 1 - n.leading_zeros())
+    }
 }
 
 /// A buffer a slice's scan ran out of. Workers never grow scratch: a scan that would stops,
@@ -201,9 +381,13 @@ impl<const N: usize> Slice<N> {
         use std::mem::size_of;
         self.rows.capacity() * size_of::<(usize, Monomial<N>, usize, usize)>()
             + self.refs.capacity() * 4
-            + self.candidates.capacity() * size_of::<Keyed<N>>()
-            + self.by_shard.iter().map(|v| v.capacity() * 4).sum::<usize>()
-            + self.local.capacity() * (size_of::<(Keyed<N>, u32)>() + 1)
+            + self.candidates.capacity() * size_of::<Candidate>()
+            + self
+                .by_shard
+                .iter()
+                .map(|v| v.capacity() * 4)
+                .sum::<usize>()
+            + self.local.capacity() * 8
             + self.translate.capacity() * 4
             + self.owner.capacity()
             + self.new.capacity() * size_of::<Monomial<N>>()
@@ -222,14 +406,17 @@ impl<const N: usize> Slice<N> {
                 self.refs.reserve_exact(want - self.refs.len());
             }
             Buffer::Candidates => {
-                let want = want(self.candidates.len(), self.local.capacity());
+                let want = want(self.candidates.len(), self.candidates.capacity());
                 self.candidates.reserve_exact(want - self.candidates.len());
-                self.local.reserve(want - self.local.len());
+                let slots = (2 * want).next_power_of_two();
+                let slots_now = self.local.slots.len();
+                self.local.slots.reserve_exact(slots - slots_now);
                 // The scan's resizes of these must never outgrow them.
-                let most = self.candidates.capacity().min(self.local.capacity());
+                let most = self.candidates.capacity().min(self.local.room());
                 self.translate
                     .reserve_exact(most.saturating_sub(self.translate.len()));
-                self.owner.reserve_exact(most.saturating_sub(self.owner.len()));
+                self.owner
+                    .reserve_exact(most.saturating_sub(self.owner.len()));
             }
             Buffer::ByShard(s) => {
                 let v = &mut self.by_shard[s];
@@ -240,24 +427,114 @@ impl<const N: usize> Slice<N> {
     }
 }
 
+/// A slice's buffer capacities, carried from one batch to the next when the buffers are not.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct Hint {
+    rows: usize,
+    refs: usize,
+    candidates: usize,
+    local: usize,
+    by_shard: Vec<usize>,
+    new: usize,
+}
+
+impl<const N: usize> Slice<N> {
+    fn hint(&self) -> Hint {
+        Hint {
+            rows: self.rows.capacity(),
+            refs: self.refs.capacity(),
+            candidates: self.candidates.capacity(),
+            local: self.local.capacity(),
+            by_shard: self.by_shard.iter().map(Vec::capacity).collect(),
+            new: self.new.capacity(),
+        }
+    }
+
+    /// Fresh buffers of the hinted capacities, allocated on the calling thread.
+    fn hinted(hint: &Hint) -> Self {
+        let most = hint.candidates.min(prev_power_of_two(hint.local) / 2);
+        Self {
+            rows: Vec::with_capacity(hint.rows),
+            refs: Vec::with_capacity(hint.refs),
+            candidates: Vec::with_capacity(hint.candidates),
+            by_shard: hint
+                .by_shard
+                .iter()
+                .map(|&c| Vec::with_capacity(c))
+                .collect(),
+            local: LocalIndex {
+                slots: Vec::with_capacity(hint.local),
+                len: 0,
+            },
+            translate: Vec::with_capacity(most),
+            owner: Vec::with_capacity(most),
+            new: Vec::with_capacity(hint.new),
+            ..Self::default()
+        }
+    }
+}
+
+/// How long [`InternScratch`] keeps its buffers.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Retain {
+    /// Free the buffers after each batch and keep only their capacities, which the next batch
+    /// allocates up front. Freed on the caller, the memory is reused by the batch's matrix.
+    #[default]
+    Batch,
+    /// Keep the buffers for the whole run: no allocation at all after warm-up, but the scratch
+    /// is resident through every matrix, on top of the shipping peak.
+    Run,
+}
+
 /// Step scratch owned by the caller and reused across steps and batches (#871).
 ///
 /// glibc gives each thread its own arena and keeps what is freed there, so scratch a worker grows
 /// stays resident after the batch where the caller's next allocations cannot reuse it: #860's
 /// 1.20–1.31× peak RSS at 16 workers. Workers here write only within capacity the caller
 /// allocated; a scan that needs more stops, and the caller grows the buffer and rescans the slice.
-/// Kept from batch to batch, the scratch stops growing once the widest step has been seen.
+/// Capacities persist from batch to batch under either [`Retain`], so growth and rescans stop
+/// once the widest step has been seen.
 #[derive(Default)]
 pub struct InternScratch<const N: usize> {
     slices: Vec<RwLock<Slice<N>>>,
+    hints: Vec<Hint>,
     growths: usize,
     rescans: usize,
 }
 
 impl<const N: usize> InternScratch<N> {
-    /// Empty scratch; the first batches grow it.
+    /// Empty scratch; the first batches size it.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Before a batch: `count` slices, allocated to the hinted capacities where they were freed.
+    fn open(&mut self, count: usize) {
+        if self.slices.len() < count {
+            let have = self.slices.len();
+            let hints = &self.hints;
+            self.slices.extend(
+                (have..count)
+                    .map(|k| RwLock::new(hints.get(k).map_or_else(Slice::default, Slice::hinted))),
+            );
+        }
+    }
+
+    /// After a batch: remember every slice's capacities, and free the buffers unless kept.
+    fn close(&mut self, retain: Retain) {
+        let hints: Vec<Hint> = self
+            .slices
+            .iter()
+            .map(|s| s.read().unwrap().hint())
+            .collect();
+        if hints.len() >= self.hints.len() {
+            self.hints = hints;
+        } else {
+            self.hints[..hints.len()].clone_from_slice(&hints);
+        }
+        if retain == Retain::Batch {
+            self.slices = Vec::new();
+        }
     }
 
     /// Buffer growths so far, all made on the calling thread.
@@ -275,31 +552,27 @@ impl<const N: usize> InternScratch<N> {
         self.slices.iter().map(|s| s.read().unwrap().bytes()).sum()
     }
 
-    /// Each slice's buffer capacities.
+    /// Each slice's buffer capacities as of the last batch.
     #[cfg(test)]
-    pub(crate) fn capacities(&self) -> Vec<[usize; 7]> {
-        self.slices
-            .iter()
-            .map(|s| {
-                let s = s.read().unwrap();
-                [
-                    s.rows.capacity(),
-                    s.refs.capacity(),
-                    s.candidates.capacity(),
-                    s.by_shard.iter().map(Vec::capacity).sum(),
-                    s.local.capacity(),
-                    s.translate.capacity(),
-                    s.new.capacity(),
-                ]
-            })
-            .collect()
+    pub(crate) fn capacities(&self) -> Vec<impl Eq + std::fmt::Debug> {
+        self.hints.clone()
+    }
+
+    /// Whether buffers are held between batches.
+    #[cfg(test)]
+    pub(crate) fn holds_buffers(&self) -> bool {
+        !self.slices.is_empty()
     }
 }
 
 /// One shard of the interner: monomial to an index into `handles`.
 #[derive(Default)]
 struct Shard<const N: usize> {
+    /// The sharded merge's: monomial to an index into `handles`.
     table: Table<N>,
+    /// The serial merge's: handles into `Step::monomials`, 8 bytes a slot where `table` takes
+    /// a monomial, its hash and an index, which is what kept MQ10 over budget.
+    index: LocalIndex,
     handles: Vec<MonomialHandle>,
     /// This step: owners as (slice, local id), and repeats as (slice, local id, owner index).
     owners: Vec<(u32, u32)>,
@@ -322,6 +595,8 @@ struct Step<'a, const N: usize, F: FiniteField> {
     slices: &'a [RwLock<Slice<N>>],
     /// Whether scans fill `by_shard` (the sharded merge).
     route: bool,
+    /// The columns so far, in handle order; the serial merge appends, between phases.
+    monomials: Vec<Monomial<N>>,
     /// Owners in earlier slices, for the sharded ranking.
     bases: Vec<u32>,
 }
@@ -384,6 +659,11 @@ fn scan<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, task: usize) {
     let rest: Vec<_> = step.shards[1..].iter().map(|s| s.read().unwrap()).collect();
     let shard_count = step.shards.len();
     let lookup = |key: &Keyed<N>| {
+        if !step.route {
+            return first
+                .index
+                .find(key.hash, |h| step.monomials[h as usize] == key.monomial);
+        }
         let s = shard_of(key.hash, shard_count);
         let shard: &Shard<N> = if s == 0 { &first } else { &rest[s - 1] };
         shard.table.get(key).map(|&j| shard.handles[j as usize])
@@ -398,13 +678,15 @@ fn scan<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, task: usize) {
     let start = task * step.chunk;
     // Every write below stays within the capacity the caller gave; `Err` names the buffer that
     // would have had to grow.
+    // The row is pushed before its terms, so a candidate can name the row it was first met in.
     let push_terms =
         |slice: &mut Slice<N>, index: usize, multiplier: &Monomial<N>| -> Result<(), Buffer> {
             let length = step.basis.element(index).terms.len();
             if slice.refs.capacity() - slice.refs.len() < length {
                 return Err(Buffer::Refs);
             }
-            for (term, _) in step.basis.shifted_terms(index, multiplier) {
+            let row = (slice.rows.len() - 1) as u32;
+            for (t, (term, _)) in step.basis.shifted_terms(index, multiplier).enumerate() {
                 let key = Keyed {
                     hash: BuildMonomialHasher.hash_one(term),
                     monomial: term,
@@ -412,31 +694,41 @@ fn scan<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, task: usize) {
                 let r = match lookup(&key) {
                     Some(handle) => handle,
                     None => {
-                        let next = slice.candidates.len() as u32;
-                        if slice.local.len() == slice.local.capacity()
-                            || slice.candidates.len() == slice.candidates.capacity()
-                        {
-                            match slice.local.get(&key) {
-                                Some(&id) => {
-                                    slice.refs.push(LOCAL | id);
-                                    continue;
-                                }
-                                None => return Err(Buffer::Candidates),
-                            }
+                        // Room for one more candidate is checked before the lookup, which may
+                        // insert; a full buffer stops the scan a little early, never wrongly.
+                        if slice.candidates.len() == slice.candidates.capacity() {
+                            return Err(Buffer::Candidates);
                         }
-                        let id = *slice.local.entry(key).or_insert(next);
-                        if id == next {
-                            if step.route {
-                                let s = shard_of(key.hash, shard_count);
-                                let routed = &mut slice.by_shard[s];
-                                if routed.len() == routed.capacity() {
-                                    return Err(Buffer::ByShard(s));
-                                }
-                                routed.push(id);
-                            }
-                            slice.candidates.push(key);
+                        let s = shard_of(key.hash, shard_count);
+                        if step.route && slice.by_shard[s].len() == slice.by_shard[s].capacity() {
+                            return Err(Buffer::ByShard(s));
                         }
-                        LOCAL | id
+                        let (candidates, rows) = (&slice.candidates, &slice.rows);
+                        let is = |id: u32| {
+                            candidate_monomial(step.basis, rows, &candidates[id as usize])
+                                == key.monomial
+                        };
+                        match slice.local.find_or_insert(
+                            key.hash,
+                            is,
+                            |id| candidates[id].hash,
+                            candidates.len(),
+                        ) {
+                            Ok(Some(id)) => LOCAL | id,
+                            Ok(None) => {
+                                let id = slice.candidates.len() as u32;
+                                if step.route {
+                                    slice.by_shard[s].push(id);
+                                }
+                                slice.candidates.push(Candidate {
+                                    hash: key.hash,
+                                    row,
+                                    term: t as u32,
+                                });
+                                LOCAL | id
+                            }
+                            Err(()) => return Err(Buffer::Candidates),
+                        }
                     }
                 };
                 slice.refs.push(r);
@@ -467,6 +759,9 @@ fn scan<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, task: usize) {
             };
             found
         };
+        // The caller reserved a row per item.
+        debug_assert!(slice.rows.len() < slice.rows.capacity());
+        slice.rows.push((index, multiplier, position, 0));
         if let Err(buffer) = push_terms(slice, index, &multiplier) {
             slice.overflow = Some(Overflow {
                 buffer,
@@ -475,11 +770,8 @@ fn scan<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, task: usize) {
             });
             return;
         }
-        // The caller reserved a row per item.
-        debug_assert!(slice.rows.len() < slice.rows.capacity());
-        slice
-            .rows
-            .push((index, multiplier, position, slice.refs.len()));
+        let end = slice.refs.len();
+        slice.rows.last_mut().expect("pushed above").3 = end;
     }
     let n = slice.candidates.len();
     // `grow` keeps these at least as long as `candidates` can be.
@@ -502,7 +794,7 @@ fn own<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, s: usize) {
     for (k, slice) in step.slices.iter().enumerate() {
         let slice = slice.read().unwrap();
         for &id in &slice.by_shard[s] {
-            let key = slice.candidates[id as usize];
+            let key = candidate_key(step.basis, &slice.rows, &slice.candidates[id as usize]);
             let next = first + shard.owners.len() as u32;
             let j = *shard.table.entry(key).or_insert(next);
             if j == next {
@@ -525,7 +817,8 @@ fn rank<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, k: usize) {
     for (id, owner) in slice.owner.iter().enumerate() {
         if owner.load(Relaxed) {
             slice.translate[id].store(handle, Relaxed);
-            slice.new.push(slice.candidates[id].monomial);
+            let monomial = candidate_monomial(step.basis, &slice.rows, &slice.candidates[id]);
+            slice.new.push(monomial);
             handle += 1;
         }
     }
@@ -668,9 +961,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
     };
     let seeds: Vec<(usize, Monomial<N>)> =
         rows.iter().map(|r| (r.basis_index, r.multiplier)).collect();
-    if scratch.slices.len() < slice_count {
-        scratch.slices.resize_with(slice_count, RwLock::default);
-    }
+    scratch.open(slice_count);
     let route = config.merge == Merge::Sharded;
     for slice in &mut scratch.slices[..slice_count] {
         let slice = slice.get_mut().unwrap();
@@ -684,7 +975,8 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         slices: scratch_slices,
         growths,
         rescans,
-    } = scratch;
+        hints: _,
+    } = &mut *scratch;
     let step = RwLock::new(Step {
         basis,
         selection,
@@ -695,6 +987,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         shards: (0..shard_count).map(|_| RwLock::default()).collect(),
         slices: &scratch_slices[..slice_count],
         route,
+        monomials: Vec::new(),
         bases: vec![0; slice_count],
     });
     let team = Team {
@@ -773,6 +1066,8 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                 }
                 dispatched = size >= config.min_frontier;
                 s.chunk = size.div_ceil(if dispatched { slice_count } else { 1 });
+                // Scans read the columns so far; the caller has them back before the merge.
+                s.monomials = std::mem::take(&mut monomials);
                 // A slice finds at most one row per item it scans.
                 for slice in s.slices {
                     let mut slice = slice.write().unwrap();
@@ -808,6 +1103,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                 *rescans += short;
                 run(Job::Scan, dispatched, &mut report.scan);
             }
+            monomials = std::mem::take(&mut step.write().unwrap().monomials);
 
             // Merge.
             let merging = Instant::now();
@@ -820,26 +1116,30 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                         let mut slice = slice.write().unwrap();
                         let slice = &mut *slice;
                         report.candidates += slice.candidates.len();
-                        slice.new.clear();
-                        for (id, key) in slice.candidates.iter().enumerate() {
-                            let next = shard.handles.len() as u32;
-                            let j = *shard.table.entry(*key).or_insert(next);
-                            if j == next {
-                                let handle =
-                                    MonomialHandle::try_from(monomials.len() + slice.new.len())
-                                        .ok()
-                                        .filter(|h| h & LOCAL == 0)
-                                        .expect("fewer distinct monomials than a handle can name");
-                                shard.handles.push(handle);
+                        let before = monomials.len();
+                        for (id, candidate) in slice.candidates.iter().enumerate() {
+                            let monomial = candidate_monomial(basis, &slice.rows, candidate);
+                            let arena = &monomials;
+                            let found = shard.index.find_or_insert_growing(
+                                candidate.hash,
+                                |h| arena[h as usize] == monomial,
+                                |h| BuildMonomialHasher.hash_one(arena[h]),
+                                arena.len(),
+                            );
+                            if let Some(handle) = found {
+                                slice.owner[id].store(false, Relaxed);
+                                slice.translate[id].store(handle, Relaxed);
+                            } else {
+                                let handle = MonomialHandle::try_from(monomials.len())
+                                    .ok()
+                                    .filter(|h| h & LOCAL == 0)
+                                    .expect("fewer distinct monomials than a handle can name");
                                 slice.owner[id].store(true, Relaxed);
                                 slice.translate[id].store(handle, Relaxed);
-                                slice.new.push(key.monomial);
-                            } else {
-                                slice.owner[id].store(false, Relaxed);
-                                slice.translate[id].store(shard.handles[j as usize], Relaxed);
+                                monomials.push(monomial);
                             }
                         }
-                        monomials.extend_from_slice(&slice.new);
+                        slice.admitted = monomials.len() - before;
                     }
                     report.merge += merging.elapsed();
                 }
@@ -898,7 +1198,9 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                     let stitching = Instant::now();
                     let s = step.read().unwrap();
                     for slice in s.slices {
-                        monomials.extend_from_slice(&slice.read().unwrap().new);
+                        let mut slice = slice.write().unwrap();
+                        slice.admitted = slice.new.len();
+                        monomials.extend_from_slice(&slice.new);
                     }
                     report.stitch += stitching.elapsed();
                 }
@@ -949,7 +1251,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                         peak = peak.max(width + admitted_before + slice.pending_peak);
                     }
                 }
-                admitted_before += slice.new.len() as i64;
+                admitted_before += slice.admitted as i64;
             }
             report.owners += monomials.len() - level_start;
             if seed_step {
@@ -979,6 +1281,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         .iter()
         .map(|s| s.read().unwrap().bytes())
         .sum();
+    scratch.close(config.retain);
 
     if refused {
         return (Err(RowBudgetExceeded { limit: max_rows }), report);

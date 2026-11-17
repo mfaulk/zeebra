@@ -17,7 +17,7 @@ _spec.loader.exec_module(costmodel)
 
 TARGETS = costmodel.TARGETS + ('katsura11-m31',)
 WORKERS = costmodel.WORKERS
-SUITES = ('walls', 'stages', 'components', 'level', 'intern', 'live')
+SUITES = ('walls', 'stages', 'components', 'level', 'intern', 'live', 'scratch')
 MERGES = ('serial', 'sharded')
 # #860: 0 = the team starts lazily at the first wide level. The first intern campaign (retained as
 # intern-seed512) used 512, which sent 17 of 23 Eco-12 batches down the serial path: pair count does
@@ -52,6 +52,18 @@ def plan(suite, reps, targets=TARGETS):
                 merges = ('off', 'serial', 'sharded') if w == 16 else ('off', 'serial')
                 arms += [(t, w, ['--replay', 'live', '--merge', m, '--level-workers', str(w),
                                  '--min-seed-rows', str(MIN_SEED_ROWS)], f'{m}{w}') for m in merges]
+    elif suite == 'scratch':
+        # #871: caller-owned scratch. Shipping and the serial merge at 1 and 16 workers; at 16 the
+        # run-long retention too, which keeps the scratch resident through every matrix.
+        live = ['--replay', 'live', '--min-seed-rows', str(MIN_SEED_ROWS)]
+        arms = []
+        for t in targets:
+            for w in (1, 16):
+                arms.append((t, w, live + ['--merge', 'off', '--level-workers', str(w)], f'off{w}'))
+                arms.append((t, w, live + ['--merge', 'serial', '--level-workers', str(w),
+                                           '--retain', 'batch'], f'serial{w}'))
+            arms.append((t, 16, live + ['--merge', 'serial', '--level-workers', '16',
+                                        '--retain', 'run'], 'serialrun16'))
     else:
         raise ValueError(suite)
     out = []
