@@ -388,6 +388,10 @@ pub struct CandidateReductionStatistics {
     pub peak_sparse_capacity_entries: usize,
     /// Batches preserving the old full-RREF route because the temporary reservation was unavailable.
     pub fallback_batches: usize,
+    /// Batches whose targets were finished on worker threads (#845).
+    pub parallel_batches: usize,
+    /// The most threads any one batch's finishing used; zero when none ran in parallel.
+    pub max_workers: usize,
 }
 
 impl CandidateReductionStatistics {
@@ -403,6 +407,8 @@ impl CandidateReductionStatistics {
             .peak_sparse_capacity_entries
             .max(other.peak_sparse_capacity_entries);
         self.fallback_batches += other.fallback_batches;
+        self.parallel_batches += other.parallel_batches;
+        self.max_workers = self.max_workers.max(other.max_workers);
     }
 }
 

@@ -221,7 +221,7 @@ merge (plan §11).
 | **#832** parallel symbolic — plausible as prototyped | symbolic | −8.0% | −8.7% | −7.4% | −4.7% | #827's 1.38× stage speedup at 16 workers |
 | #832 — with parallel interning (≈4×) | symbolic | −21.8% | −23.6% | −20.1% | −12.7% | hypothetical; the commit is ~⅔ of the stage today |
 | #832 — ceiling | symbolic | −29.1% | −31.5% | −26.8% | −16.9% | symbolic → 0 |
-| **parallel candidate finishing** (#845) | backward | −15.5% | −12.6% | −18.9% | −25.8% | targets are independent over read-only pivots; at the forward stage's measured efficiency. **#843 already captures most of this (§6a)** |
+| **parallel candidate finishing** (#845) | backward | −15.5% | −12.6% | −18.9% | −25.8% | targets are independent over read-only pivots; at the forward stage's measured efficiency. **Measured (§6b): −11.2% / −8.5% / −13.9% / −22.6%, shipped in the default order** |
 | — ceiling | backward | −17.1% | −13.8% | −20.6% | −27.7% | finishing → 0 |
 | **C2-1** work-avoiding exact reduction (#836) | forward + finishing products | −4.2% per 10% of products removed | −3.7% | −4.3% | −6.2% | linear in products at unchanged efficiency |
 | **C2-2** #809 Simplify, reducer reuse — ceiling | inherited forward work (+ part of symbolic) | −13.2% | −11.9% | −18.4% | −25.8% | all inherited-pivot products removed. Unattainable in full, because Simplify shortens reducers and does not delete them. Needs #835's ledger |
@@ -291,6 +291,47 @@ extraction under FL (+30 to +60 ms), which the model does not cover.
 The model's stage table was right; the attribution of FL to a stage was wrong. Two lessons for the
 M29 gate: price a mechanism by the stages it actually moves, measured with stage clocks, and
 expect #843 and #845 to compete for the same 21–28% of process wall.
+
+## 6b. #845 measured: parallel candidate finishing in the default order
+
+**Measured at:** base `6a78e91a`, new `6efb70a5` (records and provenance in
+[`research/m29-845/`](../../research/m29-845/README.md)). Same host and 16-worker pinning as §6a,
+fresh process per run, three arms interleaved with rotated order in two `benchlock zb-845`
+windows: base, new (both the default forward order) and base with `--batch-order fl` (#843).
+Load was 1.2–7.4 with no compiler running, so absolute walls are slightly above §4's quiet figures;
+ratios are paired per window. Every run returned the production basis.
+
+Process wall, n=5, median [min, max], ms:
+
+| Target | base | #845 | base / #845 | base FL | base / FL | RSS #845 / base | RSS FL / base |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| MQ10 / GF(32003) | 326.5 [324.6, 327.3] | 290.0 [288.4, 323.5] | **1.126×** | 285.1 | 1.145× | 1.00× | 0.98× |
+| MQ10 / GF(2³¹−1) | 301.4 [300.3, 304.5] | 275.8 [275.0, 277.6] | **1.093×** | 272.0 | 1.108× | 1.02× | 1.02× |
+| Eco-12 / 2⁶⁴−353 | 3585.1 [3575.3, 3658.9] | 3087.9 [3077.6, 3096.1] | **1.161×** | 3158.3 | 1.135× | 1.00× | 1.14× |
+| MQ11 / Goldilocks | 7383.4 [7371.2, 7400.7] | 5716.2 [5707.7, 5725.0] | **1.292×** | 5937.5 | 1.244× | 1.00× | 1.12× |
+
+Stage clocks on, n=3, medians, ms:
+
+| Target | arm | symbolic | forward | backward (finishing) | interreduction |
+|---|---|---:|---:|---:|---:|
+| MQ10 / 32003 | base / #845 / FL | 94 / 93 / 91 | 81 / 80 / 89 | 54.4 / **17.8** / 7.9 | 14 / 14 / 14 |
+| Eco-12 | base / #845 / FL | 953 / 991 / 987 | 811 / 808 / 1034 | 768 / **207** / 83 | 505 / 520 / 511 |
+| MQ11 | base / #845 / FL | 1254 / 1316 / 1312 | 2555 / 2558 / 2779 | 2033 / **262** / 171 | 336 / 346 / 365 |
+
+**Reading.** #845 takes finishing off the serial path without moving work anywhere else: forward is
+unchanged (FL grows it by 220–230 ms on the wide targets), and the finishing stage runs 3.7× (Eco-12)
+to 7.8× (MQ11) faster at 16 workers. That is why it beats parallel FL on both Goal B targets
+(−13.9% / −22.6% process wall against −11.9% / −19.6% for FL), and with no RSS growth, where FL
+costs 12–14%. On MQ10, FL is still 1–2% ahead: its finishing stage is smaller still, and MQ10's
+forward stage absorbs FL's growth less visibly. #845 meets its gate (≥10% on a wide target, no MQ10
+regression, RSS ≤1.15×) and ships in the default order. The §6 row predicted −18.9% / −25.8% at the
+forward stage's efficiency; finishing's measured efficiency is lower (a wave barrier and targets of
+very uneven cost), so the measured gain is 74% (Eco-12) to 88% (MQ11) of that prediction.
+
+**Distance to the goals after #845** (16-worker process wall against §4's comparand figures): MQ10
+is 290.0 / 117.8 = 2.46× msolve at 32003 and 275.8 / 157.9 = 1.75× at 2³¹−1 (target ≤1.5×). Eco-12 is
+3087.9 / 1623.5 = 1.90× grobx and MQ11 5716.2 / 2935.4 = 1.95× (target ≤0.90×), so Goal B still
+needs 2.11× / 2.16×. Symbolic preprocessing is now the largest stage on every target but MQ11.
 
 ## 7. #831, measured at this commit
 

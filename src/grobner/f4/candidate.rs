@@ -1,7 +1,12 @@
 use crate::{
-    linalg::sparse::{EliminationStatistics, SparseMatrix},
+    fields::ConcurrentJob,
+    linalg::{
+        sparse::{EliminationStatistics, SparseMatrix, SparseRow},
+        DenseAccumulator,
+    },
     FiniteField,
 };
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Report {
@@ -58,7 +63,6 @@ pub fn finish<F: FiniteField>(
     max_workspace: usize,
     statistics: &mut EliminationStatistics,
 ) -> Result<(usize, Report), usize> {
-    use crate::linalg::sparse::SparseRow;
     #[cfg(feature = "research-work")]
     use std::mem::size_of;
     debug_assert_eq!(selected_columns.len(), matrix.num_columns());
@@ -172,6 +176,208 @@ pub fn finish<F: FiniteField>(
     }
     statistics.final_nonzeros = resident;
     Ok((report.targets, report))
+}
+
+/// [`finish`] with its targets reduced on `workers` threads (#845), or `None`, before any row
+/// changes, when the field cannot share rows across threads or the reservation does not fit.
+/// The caller then runs [`finish`].
+///
+/// A target reads only pivots right of its lead, and in [`finish`]'s increasing-lead order those
+/// are still unfinished when it runs. So every target is a function of the input alone and the
+/// targets are independent. They run in waves of consecutive leads, each wave's results written
+/// back only after the whole wave has read, which keeps every read an input row: rows, products,
+/// row operations and `peak_nonzeros` are [`finish`]'s exactly, at every worker count.
+///
+/// A wave holds its targets' inputs beside their results until it is written back. The waves are
+/// cut so that retention stays under a sixteenth of the resident entries (or one dense row per
+/// worker, if larger), and the reservation is [`finish`]'s plus that retention plus one dense row
+/// per further worker.
+pub(crate) fn finish_parallel<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    selected_columns: &[bool],
+    max_entries: usize,
+    max_workspace: usize,
+    workers: usize,
+    statistics: &mut EliminationStatistics,
+) -> Option<(usize, Report)> {
+    debug_assert_eq!(selected_columns.len(), matrix.num_columns());
+    F::concurrent_elimination()?;
+    let columns = matrix.num_columns();
+    let workers = workers.max(1);
+    let mut pivots = vec![usize::MAX; columns];
+    for (index, row) in matrix.rows().iter().enumerate() {
+        if let Some(lead) = row.leading_column() {
+            debug_assert_eq!(row.leading_coefficient(), Some(F::ONE));
+            pivots[lead] = index;
+        }
+    }
+    let targets: Vec<usize> = (0..columns)
+        .filter(|&lead| selected_columns[lead] && pivots[lead] != usize::MAX)
+        .map(|lead| pivots[lead])
+        .collect();
+    if targets.is_empty() {
+        return Some((0, Report::default()));
+    }
+    let retention_cap = (matrix.nonzeros() / 16).max(columns.saturating_mul(workers));
+    let mut waves = vec![0];
+    let mut retained = 0usize;
+    let mut max_retained = 0usize;
+    for (position, &index) in targets.iter().enumerate() {
+        let entries = matrix.row(index).nonzeros();
+        if retained > 0 && retained.saturating_add(entries) > retention_cap {
+            waves.push(position);
+            retained = 0;
+        }
+        retained = retained.saturating_add(entries);
+        max_retained = max_retained.max(retained);
+    }
+    waves.push(targets.len());
+    let reservation = targets
+        .iter()
+        .try_fold(matrix.nonzeros(), |bound, &index| {
+            let row = matrix.row(index);
+            let suffix = columns - row.leading_column().unwrap();
+            bound.checked_add(suffix.saturating_sub(row.nonzeros()))
+        })
+        .and_then(|bound| bound.checked_add(columns.checked_mul(workers)?))
+        .and_then(|bound| bound.checked_add(max_retained));
+    let workspace = columns
+        .checked_mul(std::mem::size_of::<F>())
+        .and_then(|row| row.checked_mul(workers))
+        .and_then(|rows| rows.checked_add(columns.checked_mul(std::mem::size_of::<usize>())?));
+    if reservation.is_none_or(|n| n > max_entries) || workspace.is_none_or(|n| n > max_workspace) {
+        return None;
+    }
+    let mut report = Report {
+        workspace_bytes: workspace.unwrap(),
+        reserved_entries: reservation.unwrap(),
+        peak_capacity_entries: matrix.entry_capacity(),
+        ..Report::default()
+    };
+    let mut resident = matrix.nonzeros();
+    let mut capacity = matrix.entry_capacity();
+    for wave in waves.windows(2) {
+        let wave = &targets[wave[0]..wave[1]];
+        let job = Wave {
+            matrix: &*matrix,
+            pivots: &pivots,
+            targets: wave,
+            workers,
+        };
+        let Ok(finished) = F::run_concurrent(job) else {
+            unreachable!("a field with concurrent elimination runs concurrent jobs")
+        };
+        let held: usize = finished.iter().map(|f| f.row.capacity()).sum();
+        report.peak_capacity_entries = report
+            .peak_capacity_entries
+            .max(capacity.saturating_add(held));
+        for (&index, finished) in wave.iter().zip(finished) {
+            let original = matrix.row(index);
+            let (original_len, original_capacity) = (original.nonzeros(), original.capacity());
+            if finished.operations > 0 {
+                statistics.peak_nonzeros = statistics
+                    .peak_nonzeros
+                    .max(resident - original_len + finished.peak);
+            }
+            statistics.row_operations += finished.operations;
+            report.products = report.products.saturating_add(finished.products);
+            report.targets += 1;
+            resident = resident - original_len + finished.row.nonzeros();
+            capacity = capacity - original_capacity + finished.row.capacity();
+            matrix.rows_mut()[index] = finished.row;
+        }
+    }
+    statistics.final_nonzeros = resident;
+    Some((report.targets, report))
+}
+
+/// One target's finished row and what reducing it cost.
+struct Finished<F: FiniteField> {
+    row: SparseRow<F>,
+    operations: usize,
+    products: usize,
+    peak: usize,
+}
+
+/// A wave of [`finish_parallel`]'s targets, reduced against the unchanged matrix.
+struct Wave<'a, F: FiniteField> {
+    matrix: &'a SparseMatrix<F>,
+    pivots: &'a [usize],
+    targets: &'a [usize],
+    workers: usize,
+}
+
+impl<F: FiniteField> Wave<'_, F> {
+    fn reduce(&self, accumulator: &mut DenseAccumulator<F>, index: usize) -> Finished<F> {
+        let row = self.matrix.row(index);
+        let lead = row.leading_column().unwrap();
+        accumulator.load(row);
+        let (operations, products, peak) = accumulator.sweep_with_peak(|column| {
+            let source = self.pivots[column];
+            (column != lead && source != usize::MAX).then(|| self.matrix.row(source))
+        });
+        Finished {
+            row: accumulator.take(),
+            operations,
+            products,
+            peak,
+        }
+    }
+}
+
+impl<F: FiniteField> ConcurrentJob<F> for Wave<'_, F> {
+    type Output = Vec<Finished<F>>;
+
+    fn run(self) -> Self::Output
+    where
+        F: Send + Sync,
+    {
+        let columns = self.matrix.num_columns();
+        let workers = self.workers.min(self.targets.len());
+        if workers <= 1 {
+            let mut accumulator = DenseAccumulator::new(columns);
+            return self
+                .targets
+                .iter()
+                .map(|&index| self.reduce(&mut accumulator, index))
+                .collect();
+        }
+        // Targets differ widely in cost (a lower lead has a longer suffix), so each is claimed
+        // singly.
+        let next = AtomicUsize::new(0);
+        let mut slots: Vec<Option<Finished<F>>> = Vec::new();
+        slots.resize_with(self.targets.len(), || None);
+        let parts = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..workers)
+                .map(|_| {
+                    let (wave, next) = (&self, &next);
+                    scope.spawn(move || {
+                        let mut accumulator = DenseAccumulator::new(columns);
+                        let mut done = Vec::new();
+                        loop {
+                            let position = next.fetch_add(1, Ordering::Relaxed);
+                            let Some(&index) = wave.targets.get(position) else {
+                                break done;
+                            };
+                            done.push((position, wave.reduce(&mut accumulator, index)));
+                        }
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|handle| {
+                    handle
+                        .join()
+                        .unwrap_or_else(|_| panic!("a candidate-finishing worker panicked"))
+                })
+                .collect::<Vec<_>>()
+        });
+        for (position, finished) in parts.into_iter().flatten() {
+            slots[position] = Some(finished);
+        }
+        slots.into_iter().map(Option::unwrap).collect()
+    }
 }
 
 #[cfg(test)]
@@ -316,6 +522,109 @@ mod tests {
         let (_, r) = finish(&mut matrix, &[true; 6], 20, usize::MAX, &mut stats).unwrap();
         assert!(r.fell_back);
         assert_eq!(matrix, full);
+    }
+
+    /// A random echelon matrix of `rows` rows over `columns` columns, with monic pivots.
+    fn random_echelon<F: FiniteField>(seed: u64, rows: usize, columns: usize) -> SparseMatrix<F> {
+        let mut state = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+        let mut next = move || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            state >> 33
+        };
+        let input = (0..rows)
+            .map(|_| {
+                let mut entries = Vec::new();
+                for c in 0..columns {
+                    let value = <F as FiniteField>::new(1 + next() % 11);
+                    if next() % 3 == 0 && !value.is_zero() {
+                        entries.push((c, value));
+                    }
+                }
+                SparseRow::new(&entries)
+            })
+            .collect();
+        let mut matrix = SparseMatrix::new(columns, input);
+        row_echelon(&mut matrix);
+        matrix
+    }
+
+    // Parallel finishing reproduces the serial kernel's rows and counters at every worker count.
+    #[test]
+    fn parallel_finish_matches_serial_finish() {
+        fn check<F: FiniteField + Send + Sync>() {
+            for seed in 0..24 {
+                let columns = 4 + seed as usize % 37;
+                let matrix = random_echelon::<F>(seed, 3 + seed as usize % 29, columns);
+                let selected: Vec<_> = (0..columns)
+                    .map(|c| !(c * 7 + seed as usize).is_multiple_of(3))
+                    .collect();
+                let mut expected = matrix.clone();
+                let mut expected_stats = EliminationStatistics::default();
+                let (visits, serial) = finish(
+                    &mut expected,
+                    &selected,
+                    usize::MAX,
+                    usize::MAX,
+                    &mut expected_stats,
+                )
+                .unwrap();
+                for workers in [1, 2, 4, 16] {
+                    let mut actual = matrix.clone();
+                    let mut stats = EliminationStatistics::default();
+                    let (targets, report) = finish_parallel(
+                        &mut actual,
+                        &selected,
+                        usize::MAX,
+                        usize::MAX,
+                        workers,
+                        &mut stats,
+                    )
+                    .unwrap();
+                    assert_eq!(actual, expected, "seed {seed}, {workers} workers");
+                    assert_eq!(targets, visits);
+                    assert_eq!(report.targets, serial.targets);
+                    assert_eq!(report.products, serial.products);
+                    assert_eq!(stats, expected_stats, "seed {seed}, {workers} workers");
+                    assert!(!report.fell_back);
+                    assert!(report.reserved_entries >= serial.reserved_entries);
+                    assert!(report.peak_capacity_entries >= serial.peak_capacity_entries);
+                }
+            }
+        }
+        check::<Zp13>();
+        check::<Gf256>();
+        check::<Zp18446744069414584321>();
+        check::<Bn254Fr>();
+    }
+
+    // A parallel reservation that cannot fit declines before any row changes.
+    #[test]
+    fn parallel_finish_declines_a_tight_allowance() {
+        let matrix = random_echelon::<Zp13>(3, 12, 20);
+        let selected = vec![true; 20];
+        let mut serial = matrix.clone();
+        let (_, report) = finish(
+            &mut serial,
+            &selected,
+            usize::MAX,
+            usize::MAX,
+            &mut EliminationStatistics::default(),
+        )
+        .unwrap();
+        assert!(report.targets > 1);
+        let mut actual = matrix.clone();
+        let declined = finish_parallel(
+            &mut actual,
+            &selected,
+            report.reserved_entries,
+            usize::MAX,
+            4,
+            &mut EliminationStatistics::default(),
+        );
+        assert!(declined.is_none());
+        assert_eq!(actual, matrix);
     }
 
     // Scratch reservations stay separate from mathematical nonzeros and are never the final count.

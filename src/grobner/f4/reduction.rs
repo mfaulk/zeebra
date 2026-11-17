@@ -344,6 +344,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
                     reserved_entries: report.reserved_entries,
                     peak_sparse_capacity_entries: report.peak_capacity_entries,
                     fallback_batches: usize::from(report.fell_back),
+                    ..Default::default()
                 };
             }
             stages.backward = split_clock.lap();
@@ -379,19 +380,33 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             });
             let workspace_fits = super::candidate::workspace_bytes::<F>(matrix.num_columns())
                 .is_some_and(|bytes| bytes <= super::candidate::WORKSPACE_LIMIT);
+            let mut finishing_workers = 0;
             let (visits, report) = if has_candidates && !workspace_fits {
                 super::candidate::full(matrix.matrix_mut(), allowance, 0, &mut block.statistics)
                     .map_err(budget)?
             } else if has_candidates {
                 let selected = candidate_columns(matrix);
-                super::candidate::finish(
+                match super::parallel::finish(
+                    options.parallel_forward,
+                    options.elimination,
                     matrix.matrix_mut(),
                     &selected,
                     allowance,
-                    super::candidate::WORKSPACE_LIMIT,
                     &mut block.statistics,
-                )
-                .map_err(budget)?
+                ) {
+                    Some((visits, report, workers)) => {
+                        finishing_workers = workers;
+                        (visits, report)
+                    }
+                    None => super::candidate::finish(
+                        matrix.matrix_mut(),
+                        &selected,
+                        allowance,
+                        super::candidate::WORKSPACE_LIMIT,
+                        &mut block.statistics,
+                    )
+                    .map_err(budget)?,
+                }
             } else {
                 (0, super::candidate::Report::default())
             };
@@ -404,6 +419,8 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
                 reserved_entries: report.reserved_entries,
                 peak_sparse_capacity_entries: report.peak_capacity_entries,
                 fallback_batches: usize::from(report.fell_back),
+                parallel_batches: usize::from(finishing_workers > 0),
+                max_workers: finishing_workers,
             };
         }
         stages.backward = split_clock.lap();
