@@ -458,6 +458,14 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
                 });
             }
         }
+        // #872: a parallel interning prototype checks the same budget at its step boundaries,
+        // under the same one-batch rule.
+        #[cfg(feature = "research-work")]
+        symbolic_intern::arm_deadline(
+            wall_clock
+                .zip(options.max_wall_time)
+                .filter(|_| statistics.batches > 0),
+        );
 
         // The structures no budget bounds, sampled once per batch. Every figure here is a field
         // read or a maintained running total, so this is not a scan; see

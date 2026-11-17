@@ -131,10 +131,20 @@ pub fn build_batch_matrix<const N: usize, F: FiniteField>(
 ) -> Result<BuiltMatrix<N, F>, F4Error> {
     let mut clock = StageClock::new(false);
     let mut stages = StageTimings::default();
-    build_batch_matrix_in(basis, pairs, order, options, cache, &mut clock, &mut stages)
+    build_batch_matrix_in(
+        basis,
+        pairs,
+        order,
+        options,
+        cache,
+        &mut clock,
+        &mut stages,
+        &|| false,
+    )
 }
 
 /// As [`build_batch_matrix`], charging its stages to a clock the caller already started.
+#[allow(clippy::too_many_arguments)]
 fn build_batch_matrix_in<const N: usize, F: FiniteField>(
     basis: &MonicBasis<N, F>,
     pairs: &[CriticalPair<N>],
@@ -143,6 +153,7 @@ fn build_batch_matrix_in<const N: usize, F: FiniteField>(
     cache: &mut ReducerCache<N>,
     clock: &mut StageClock,
     stages: &mut StageTimings,
+    observer_stop: &dyn Fn() -> bool,
 ) -> Result<BuiltMatrix<N, F>, F4Error> {
     // Preprocessing bounds rows as it discovers them; construction checks the completed
     // symbolic layout before allocating coefficient rows.
@@ -155,23 +166,27 @@ fn build_batch_matrix_in<const N: usize, F: FiniteField>(
             cache,
             options.pair_multiples,
         )
+        .map_err(|exceeded| F4Error::TooManyRows {
+            limit: exceeded.limit,
+        })
     };
-    // #860: a research prototype may serve the batch when one is in force on this thread.
+    // #860: a research prototype may serve the batch when one is in force on this thread; it
+    // also honors the live-entry budget and `observer_stop` at its step boundaries (#872).
     #[cfg(feature = "research-work")]
     let preprocessed = super::symbolic_intern::live(
         basis,
         pairs,
-        options.max_matrix_rows,
-        options.reducer_selection,
-        options.pair_multiples,
+        options,
         cache.mode() != super::symbolic::CacheMode::Off,
+        observer_stop,
     )
     .unwrap_or_else(|| shipping(cache));
     #[cfg(not(feature = "research-work"))]
-    let preprocessed = shipping(cache);
-    let mut preprocessed = preprocessed.map_err(|exceeded| F4Error::TooManyRows {
-        limit: exceeded.limit,
-    })?;
+    let preprocessed = {
+        let _ = observer_stop;
+        shipping(cache)
+    };
+    let mut preprocessed = preprocessed?;
     stages.symbolic = clock.lap();
 
     let (matrix, construction_split) = MacaulayMatrix::build_measured(
@@ -234,7 +249,16 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         mut matrix,
         preprocessed,
         reducer_rows,
-    } = build_batch_matrix_in(basis, pairs, order, options, cache, &mut clock, &mut stages)?;
+    } = build_batch_matrix_in(
+        basis,
+        pairs,
+        order,
+        options,
+        cache,
+        &mut clock,
+        &mut stages,
+        &|| observer.should_stop(),
+    )?;
 
     // Before elimination, which is in place: an observer that took the matrix afterwards would
     // take the echelon form and call it the input.

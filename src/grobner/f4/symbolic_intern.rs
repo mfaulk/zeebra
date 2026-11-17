@@ -79,6 +79,48 @@ pub struct InternConfig {
     pub retain: Retain,
 }
 
+/// What bounds a parallel closure besides its row budget (#872).
+pub struct Limits<'a> {
+    /// Live entries the step scratch may be charged, as
+    /// [`F4Options::live_entry_allowance`](super::F4Options::live_entry_allowance).
+    pub entry_allowance: usize,
+    /// Bytes one live entry stands for, as
+    /// [`F4Options::bytes_per_entry`](super::F4Options::bytes_per_entry).
+    pub bytes_per_entry: usize,
+    /// Consulted at every step boundary; true returns [`Refusal::Stopped`].
+    pub stop: &'a dyn Fn() -> bool,
+}
+
+impl Limits<'_> {
+    /// No allowance and no stop.
+    pub fn none() -> Limits<'static> {
+        Limits {
+            entry_allowance: usize::MAX,
+            bytes_per_entry: 16,
+            stop: &|| false,
+        }
+    }
+
+    /// `bytes` of scratch as live entries, rounded up.
+    fn entries(&self, bytes: usize) -> usize {
+        bytes.div_ceil(self.bytes_per_entry.max(1))
+    }
+}
+
+/// Why a parallel closure returned without a result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Refusal {
+    /// The row budget, refused exactly where the serial closure refuses.
+    Rows(RowBudgetExceeded),
+    /// The step scratch would hold more than [`Limits::entry_allowance`], charged by capacity.
+    LiveEntries {
+        /// The charge that crossed the allowance.
+        entries: usize,
+    },
+    /// [`Limits::stop`] asked for it at a step boundary.
+    Stopped,
+}
+
 /// Where a prototype's time went. Clocks are read per phase, never per monomial.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct InternReport {
@@ -114,6 +156,8 @@ pub struct InternReport {
     pub rescans: usize,
     /// Scratch held after the batch, in bytes of capacity; maximized when summed.
     pub scratch_bytes: usize,
+    /// The largest live-entry charge the step scratch made (#872); maximized when summed.
+    pub charged_entries: usize,
 }
 
 /// A monomial carrying the hash a worker already computed, so the merge does not hash it again.
@@ -880,7 +924,7 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
     multiples: PairMultiples,
     config: &InternConfig,
 ) -> (Result<Preprocessed<N>, RowBudgetExceeded>, InternReport) {
-    symbolic_preprocessing_interned_in(
+    let (result, report) = symbolic_preprocessing_interned_in(
         basis,
         pairs,
         max_rows,
@@ -888,14 +932,27 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
         multiples,
         config,
         &mut InternScratch::new(),
-    )
+        &Limits::none(),
+    );
+    let result = result.map_err(|refusal| match refusal {
+        Refusal::Rows(exceeded) => exceeded,
+        Refusal::LiveEntries { .. } | Refusal::Stopped => unreachable!("no limits were set"),
+    });
+    (result, report)
 }
 
 /// [`symbolic_preprocessing_interned`] in the caller's `scratch`, which a run of batches shares
-/// (#871).
+/// (#871), under `limits` (#872).
+///
+/// The scratch is charged to `limits.entry_allowance` by capacity whenever it is allocated or
+/// grown, for the duration of the call; the caller frees or keeps it per [`Retain`], and nothing
+/// is charged once the call returns. A batch whose scratch would exceed the allowance is refused
+/// before the step that needs it runs. `limits.stop` is consulted before every step, the
+/// granularity at which a closure can stop without a partial result to undo.
 ///
 /// # Panics
 /// As [`symbolic_preprocessing_seeded`].
+#[allow(clippy::too_many_arguments)]
 pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>(
     basis: &MonicBasis<N, F>,
     pairs: &[CriticalPair<N>],
@@ -904,7 +961,8 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
     multiples: PairMultiples,
     config: &InternConfig,
     scratch: &mut InternScratch<N>,
-) -> (Result<Preprocessed<N>, RowBudgetExceeded>, InternReport) {
+    limits: &Limits<'_>,
+) -> (Result<Preprocessed<N>, Refusal>, InternReport) {
     let mut report = InternReport::default();
     let seeding = Instant::now();
     let mut keys: Option<HashSet<(usize, Monomial<N>), BuildMonomialHasher>> = (multiples
@@ -947,10 +1005,13 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
             &mut ReducerCache::disabled(),
             multiples,
         );
-        return (result, report);
+        return (result.map_err(Refusal::Rows), report);
     }
     if rows.len() > max_rows {
-        return (Err(RowBudgetExceeded { limit: max_rows }), report);
+        return (
+            Err(Refusal::Rows(RowBudgetExceeded { limit: max_rows })),
+            report,
+        );
     }
 
     let workers = config.workers;
@@ -1004,7 +1065,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
     let mut monomials: Vec<Monomial<N>> = Vec::new();
     let mut term_handles: Vec<MonomialHandle> = Vec::new();
     let mut leads = lcms.clone();
-    let mut refused = false;
+    let mut refused: Option<Refusal> = None;
 
     std::thread::scope(|scope| {
         // The team starts at the first step wide enough to dispatch, so a closure whose levels all
@@ -1051,7 +1112,10 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         };
 
         let mut seed_step = true;
-        loop {
+        let charge = |slices: &[RwLock<Slice<N>>]| {
+            limits.entries(slices.iter().map(|s| s.read().unwrap().bytes()).sum())
+        };
+        'steps: loop {
             let level_start = monomials.len();
             let dispatched;
             {
@@ -1062,6 +1126,12 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                     s.frontier.len()
                 };
                 if size == 0 {
+                    break;
+                }
+                // A step boundary: nothing of this step has run, so stopping leaves nothing to
+                // undo (#872).
+                if (limits.stop)() {
+                    refused = Some(Refusal::Stopped);
                     break;
                 }
                 dispatched = size >= config.min_frontier;
@@ -1077,6 +1147,13 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                         slice.rows.reserve_exact(s.chunk);
                         *growths += 1;
                     }
+                }
+                // Charged before the scan, so a step whose scratch would not fit never runs.
+                let entries = charge(s.slices);
+                report.charged_entries = report.charged_entries.max(entries);
+                if entries > limits.entry_allowance {
+                    refused = Some(Refusal::LiveEntries { entries });
+                    break;
                 }
             }
             report.steps += 1;
@@ -1101,6 +1178,12 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                 }
                 *growths += short;
                 *rescans += short;
+                let entries = charge(step.read().unwrap().slices);
+                report.charged_entries = report.charged_entries.max(entries);
+                if entries > limits.entry_allowance {
+                    refused = Some(Refusal::LiveEntries { entries });
+                    break 'steps;
+                }
                 run(Job::Scan, dispatched, &mut report.scan);
             }
             monomials = std::mem::take(&mut step.write().unwrap().monomials);
@@ -1264,7 +1347,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
             s.frontier.extend_from_slice(&monomials[level_start..]);
             report.stitch += stitching.elapsed();
             if rows.len() > max_rows {
-                refused = true;
+                refused = Some(Refusal::Rows(RowBudgetExceeded { limit: max_rows }));
                 break;
             }
         }
@@ -1283,8 +1366,8 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         .sum();
     scratch.close(config.retain);
 
-    if refused {
-        return (Err(RowBudgetExceeded { limit: max_rows }), report);
+    if let Some(refusal) = refused {
+        return (Err(refusal), report);
     }
     (
         Ok(Preprocessed {
@@ -1346,6 +1429,7 @@ fn accumulate(total: &mut InternReport, batch: &InternReport) {
     total.growths += batch.growths;
     total.rescans += batch.rescans;
     total.scratch_bytes = total.scratch_bytes.max(batch.scratch_bytes);
+    total.charged_entries = total.charged_entries.max(batch.charged_entries);
 }
 
 struct LiveJob<'a, const N: usize, F: FiniteField> {
@@ -1356,10 +1440,11 @@ struct LiveJob<'a, const N: usize, F: FiniteField> {
     multiples: PairMultiples,
     config: InternConfig,
     scratch: &'a mut InternScratch<N>,
+    limits: Limits<'a>,
 }
 
 impl<const N: usize, F: FiniteField> crate::fields::ConcurrentJob<F> for LiveJob<'_, N, F> {
-    type Output = (Result<Preprocessed<N>, RowBudgetExceeded>, InternReport);
+    type Output = (Result<Preprocessed<N>, Refusal>, InternReport);
     fn run(self) -> Self::Output
     where
         F: Send + Sync,
@@ -1372,24 +1457,48 @@ impl<const N: usize, F: FiniteField> crate::fields::ConcurrentJob<F> for LiveJob
             self.multiples,
             &self.config,
             self.scratch,
+            &self.limits,
         )
     }
 }
 
+thread_local! {
+    /// The running F4 call's wall clock and budget, once its time check is armed (#872).
+    static DEADLINE: std::cell::Cell<Option<(Instant, Duration)>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Called by the F4 batch loop where it checks [`F4Options::max_wall_time`]: `Some` once a batch
+/// has been reduced, which is when the loop's own check starts to apply, so the parallel closure
+/// honors the budget under the same rule; `None` before that.
+///
+/// [`F4Options::max_wall_time`]: super::F4Options::max_wall_time
+pub(crate) fn arm_deadline(armed: Option<(Instant, Duration)>) {
+    DEADLINE.set(armed);
+}
+
 /// The live F4 hook: `Some` when [`with_live`] is in force on this thread, the batch is uncached
 /// and the field can be shared across threads; `None` sends the caller down the shipping path.
+///
+/// Beyond the row budget the closure is held to `options`' live-entry allowance, its scratch
+/// charged as entries of `F`, and stopped at a step boundary by `observer_stop` (as
+/// [`F4Error::StoppedByObserver`]) or by the armed wall-time budget (as
+/// [`F4Error::TimeBudgetExceeded`]).
 pub(crate) fn live<const N: usize, F: FiniteField>(
     basis: &MonicBasis<N, F>,
     pairs: &[CriticalPair<N>],
-    max_rows: usize,
-    selection: ReducerSelection,
-    multiples: PairMultiples,
+    options: &super::F4Options,
     cached: bool,
-) -> Option<Result<Preprocessed<N>, RowBudgetExceeded>> {
+    observer_stop: &dyn Fn() -> bool,
+) -> Option<Result<Preprocessed<N>, super::F4Error>> {
+    use super::{F4Error, F4Options};
     let (config, mut total) = LIVE.get()?;
     if cached {
         return None;
     }
+    let deadline = DEADLINE.get();
+    let late = || deadline.is_some_and(|(clock, budget)| clock.elapsed() >= budget);
+    let stop = || observer_stop() || late();
     let mut scratch = SCRATCH
         .take()
         .and_then(|any| any.downcast::<InternScratch<N>>().ok())
@@ -1397,16 +1506,36 @@ pub(crate) fn live<const N: usize, F: FiniteField>(
     let job = LiveJob {
         basis,
         pairs,
-        max_rows,
-        selection,
-        multiples,
+        max_rows: options.max_matrix_rows,
+        selection: options.reducer_selection,
+        multiples: options.pair_multiples,
         config,
         scratch: &mut scratch,
+        limits: Limits {
+            entry_allowance: options.live_entry_allowance::<F>(),
+            bytes_per_entry: F4Options::bytes_per_entry::<F>(),
+            stop: &stop,
+        },
     };
     let outcome = F::run_concurrent(job).ok();
     SCRATCH.set(Some(scratch));
     let (result, report) = outcome?;
     accumulate(&mut total, &report);
     LIVE.set(Some((config, total)));
-    Some(result)
+    let millis = |d: Duration| d.as_millis().min(u128::from(u64::MAX)) as u64;
+    Some(result.map_err(|refusal| match refusal {
+        Refusal::Rows(exceeded) => F4Error::TooManyRows {
+            limit: exceeded.limit,
+        },
+        Refusal::LiveEntries { entries } => options.entry_budget_error::<F>(entries),
+        Refusal::Stopped if observer_stop() => F4Error::StoppedByObserver,
+        Refusal::Stopped => {
+            let (clock, budget) = deadline.expect("only the deadline or the observer stops");
+            F4Error::TimeBudgetExceeded {
+                degree: pairs.iter().map(|pair| pair.degree).max().unwrap_or(0),
+                elapsed_millis: millis(clock.elapsed()),
+                budget_millis: millis(budget),
+            }
+        }
+    }))
 }
