@@ -23,8 +23,15 @@ type Goldilocks = PrimeFieldElement64<18446744069414584321>;
 type Wide = PrimeFieldElement64<18446744073709551263>;
 const ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
 
-/// The four M29 targets: MQ10 at both #820 primes, and #821's preferred wide-field rows.
-const TARGETS: &[&str] = &["mq10-32003", "mq10-m31", "eco12-wide64", "mq11-goldilocks"];
+/// The four M29 targets — MQ10 at both #820 primes, #821's preferred wide-field rows — and
+/// #859's Katsura-11 / 2^31-1, the instance #827 priced level-parallel symbolic on.
+const TARGETS: &[&str] = &[
+    "mq10-32003",
+    "mq10-m31",
+    "eco12-wide64",
+    "mq11-goldilocks",
+    "katsura11-m31",
+];
 
 #[derive(Debug, PartialEq)]
 struct Args {
@@ -151,8 +158,8 @@ struct Input {
     generators: Vec<String>,
 }
 
-fn mq10(modulus: u64) -> Input {
-    let input = corpus::instance("mq-random-10", modulus, ORDER).expect("published MQ10");
+fn ladder(problem: &str, modulus: u64) -> Input {
+    let input = corpus::instance(problem, modulus, ORDER).expect("published ladder row");
     let entry = corpus::ladder()
         .into_iter()
         .find(|e| e.name == input.name)
@@ -464,8 +471,9 @@ fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let args = parse_args(&raw).unwrap_or_else(|e| panic!("{e}"));
     let report = match args.target.as_str() {
-        "mq10-32003" => run::<10, Zp32003>(mq10(32003), &args),
-        "mq10-m31" => run::<10, Zp2147483647>(mq10(2147483647), &args),
+        "mq10-32003" => run::<10, Zp32003>(ladder("mq-random-10", 32003), &args),
+        "mq10-m31" => run::<10, Zp2147483647>(ladder("mq-random-10", 2147483647), &args),
+        "katsura11-m31" => run::<11, Zp2147483647>(ladder("katsura-11", 2147483647), &args),
         "eco12-wide64" => run::<12, Wide>(wide("wide64", "eco-12"), &args),
         "mq11-goldilocks" => run::<11, Goldilocks>(wide("goldilocks", "mq-random-11"), &args),
         _ => unreachable!(),
@@ -515,6 +523,7 @@ mod tests {
         assert_eq!(options(&every).pair_multiples, PairMultiples::Every);
         assert!(options(&every).measure_stages);
         assert!(args(&["--target", "katsura-11", "--workers", "1"]).is_err());
+        assert!(args(&["--target", "katsura11-m31", "--workers", "1"]).is_ok());
         assert!(args(&["--target", "mq10-32003", "--workers", "0"]).is_err());
         assert!(args(&["--target", "mq10-32003"]).is_err());
         assert!(args(&[
@@ -599,5 +608,13 @@ mod tests {
             "ee76de455c5ea571d6e8286152a4b4380b9d1ea323ee63dc8f889ffa11a92af5"
         );
         assert_eq!(mq.generators.len(), 11);
+    }
+
+    // #859's Katsura-11 row is the published ladder row at 2^31-1, checked against its digest.
+    #[test]
+    fn katsura_target_matches_its_ladder_digest() {
+        let k = ladder("katsura-11", 2147483647);
+        assert_eq!(k.variables.len(), 11);
+        assert_eq!(k.modulus, "2147483647");
     }
 }

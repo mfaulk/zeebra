@@ -358,6 +358,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m29-baseline -p 'test_*.py'
 
+      - name: M30 symbolic cost-model campaign helpers
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s research/m30-symbolic -p 'test_*.py'
+
       - name: Giac comparand artifacts
         if: ${{ !cancelled() }}
         run: |
