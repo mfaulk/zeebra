@@ -24,8 +24,9 @@ taken while something else ran is not a measurement of the change. The script ta
 `flock`, appends `QUEUED` / `START` / `END` lines with the owner tag and a timestamp to
 `$HOME/.zeebra/benchlock.log` (override the directory with `ZEEBRA_BENCHLOCK_DIR`; it must be
 outside every worktree), and exits with the command's status so a failing measurement fails the
-caller. Two records whose `START`..`END` windows overlap were not taken under this protocol, and
-the log is what says so — which is what makes figures taken weeks apart, such as the pre- and
+caller. Two records whose `START`..`END` windows overlap were not taken under this protocol —
+unless both carry `lock=ccd:` with disjoint CCDs (see *Reserved CCDs* below) — and the log is what
+says so — which is what makes figures taken weeks apart, such as the pre- and
 post-#161 revisions in [`docs/research/graeffe-root-finding.md`](../research/graeffe-root-finding.md)
 §4.4, comparable with each other.
 
@@ -47,6 +48,92 @@ The lock handles contention and nothing else. Also needed, per invocation:
   crate built outside this worktree, which is a third route to losing `-C target-cpu=x86-64-v3`
   with no `RUSTFLAGS` mistake to avoid (#352); `tools/benchlock.sh` lists it among the hazards the
   lock does not handle.
+
+### Reserved CCDs: measuring beside builds
+
+The exclusive lock asks the whole 128-thread box to be quiet even for a one-thread subject.
+`tools/bench-reserve.sh` (#848) instead fences whole CCDs off with a cgroup cpuset. On the 5995WX
+each CCD (8 cores plus their SMT siblings) has its **own** 32 MB L3, so a reserved CCD shares no
+cache, no core and no scheduler placement with the builds on the other six. It does not fence DRAM
+bandwidth, the Infinity Fabric, the package power budget (the boost clock of #827) or `system.slice`
+daemons; *Calibration* below records what that leaves.
+
+One-time root step (prints the commands; it never runs `sudo` itself):
+
+```sh
+tools/bench-reserve.sh setup   # a user@.service drop-in delegating `cpuset` to your user manager
+```
+
+After that, nothing needs root:
+
+```sh
+tools/bench-reserve.sh reserve          # CCDs 1-2: CPUs 8-23 + siblings 72-87, the M29 placement
+tools/bench-reserve.sh status           # rc 0 reserved, 1 released, 2 failed read or not enforced
+tools/bench-reserve.sh run zb-848 8-23 env RUSTC_WRAPPER="" timeout --signal=INT --kill-after=60s 1200 \
+  "$CARGO_TARGET_DIR/release/examples/m29_cost_model" ...
+tools/bench-reserve.sh release          # refuses while a reserved run is in flight; --force overrides
+```
+
+`reserve` restricts the user manager's `app.slice`, `background.slice` and `session.slice` (where
+terminals, editors and every agent's `cargo` run) to the other CCDs, and `status` checks the
+kernel's `cpuset.cpus.effective` against the recorded plan rather than trusting the state file.
+`run` refuses unless `status` is `reserved` and the CPU list lies inside the reservation, then runs
+the command in `zbbench.slice`, pinned with `taskset`, under `benchlock` with
+`ZEEBRA_BENCHLOCK_CPUS` set. In that mode `benchlock` takes `benchlock.lock` **shared** plus an
+exclusive `benchlock.ccd<N>.lock` per CCD the list touches: two runs on disjoint reserved CCDs
+proceed together, a run on a held CCD queues, and an ordinary unscoped `benchlock` run still
+excludes all of them. A reservation is `--runtime` and dies with the login session.
+
+**A reservation is a machine-wide act.** It takes the reserved CPUs out of every other session's
+cpuset — every agent, every terminal — so their builds lose a quarter of the box and a `taskset`
+onto those CPUs fails with `Invalid argument`. That is not hypothetical: the calibration below
+broke a concurrent #194 measurement pinned to CPU 10, which saw its cpuset change mid-run with no
+explanation. So: reserve for a measurement session and `release` when it ends, never as a standing
+state; an unscoped `benchlock` run now warns and records `reserved=<cpus>` on START while one is
+up; and when a pin fails with `Invalid argument`, run `tools/bench-reserve.sh status` before
+anything else.
+
+Placement is part of a figure. A 16-worker run means 16 physical cores, CPUs 8-23 across CCDs 1-2
+with their siblings idle — not one CCD's 16 hardware threads, which would pair every worker with
+another on one core and measure something else.
+
+#### Calibration
+
+Measured at `faa015e6` (library source of `527a105e`), 2026-11-16/17; data, scripts and the full
+tables are in [`research/bench-reserve/`](../../research/bench-reserve/README.md). Seven fresh
+processes per cell, median wall against the reserved-and-idle arm A1:
+
+| subject | builds, reserved | DRAM hogs, reserved | builds, **no fence** | idle again (A2) |
+|---|---:|---:|---:|---:|
+| MQ10, 1 worker (CPU 8) | 1.093x, spread 6% | 1.100x, 1% | 1.154x, 39% | 0.985x |
+| MQ10, 16 workers (8-23) | 1.006x, 16% | 1.020x, 1% | 1.028x, 35% | 0.997x |
+| Eco-12 wide, 16 workers | 1.056x, 19% | 1.114x, 4% | 1.095x, 48% | 1.000x |
+
+(spread = (max − min) / median.) And an A/A test — the same binary twice back to back, nine pairs:
+
+| subject | box | median wall ms | A/A ratio [min, max] |
+|---|---|---:|---|
+| MQ10, 1 worker | idle | 1074.7 | 0.997 [0.993, 1.025] |
+| MQ10, 1 worker | builds on the other CCDs | 1197.1 | 0.998 [0.976, 1.007] |
+| Eco-12 wide, 16 workers | idle | 3612.4 | 1.001 [0.994, 1.006] |
+| Eco-12 wide, 16 workers | builds on the other CCDs | 3779.9 | 0.998 [0.987, 1.008] |
+
+What that sets:
+
+- **The fence is worth having.** Against no fence it cuts the run-to-run spread under builds from
+  35–48% to 6–19%, and the median shift by 40–80%.
+- **It does not make a reserved CCD a quiet box.** Absolute walls still move 1–11% with what the
+  rest of the machine does, and DRAM traffic alone (arm D, load 13) costs as much as a full build
+  load: the shared memory system, not cache or cores, is what is left. An **absolute figure for
+  publication** — a baseline, a scoreboard row, a figure compared against one taken another day —
+  still takes an unscoped `benchlock` on a quiet box.
+- **Paired ratios survive.** An A/B with the arms interleaved pair by pair on a reserved CCD
+  carries the same noise loaded as idle (worst A/A pair within 2.5% either way), because both arms
+  share whatever the box was doing. That is the use reservation is for:
+  deciding whether a change is faster while the rest of the machine keeps building. Quote the
+  ratio, and label any absolute wall as taken beside builds.
+- A frequency cap was not added. It would need root on every boot, and the ratio result does not
+  call for it.
 
 ### Why a run ended
 

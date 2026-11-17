@@ -288,6 +288,90 @@ else
   printf 'FAIL  usr1: the reproduction never started\n' >&2
 fi
 
+# --- CCD-scoped locking (#848) ---------------------------------------------
+#
+# A synthetic two-CCD topology: CPUs 0-1 (siblings 4-5) share L3 id 0, CPUs 2-3 (siblings 6-7)
+# share L3 id 1.
+
+SYSDIR="$DIR/sys"
+for c in 0 1 4 5; do mkdir -p "$SYSDIR/cpu$c/cache/index3" && echo 0 >"$SYSDIR/cpu$c/cache/index3/id"; done
+for c in 2 3 6 7; do mkdir -p "$SYSDIR/cpu$c/cache/index3" && echo 1 >"$SYSDIR/cpu$c/cache/index3/id"; done
+export ZEEBRA_BENCHLOCK_SYS="$SYSDIR"
+
+# One CPU maps to the L3 domain it belongs to.
+check "ccds: a single CPU maps to its L3 domain" "1" "$(bl_ccds 3)"
+# A list spanning both domains names each once, ascending, siblings included.
+check "ccds: a spanning list names each domain once, ascending" "0 1" "$(bl_ccds 6,0-2,7)"
+# A malformed list is a usage error, not an empty set of locks.
+bl_ccds 'x-' >/dev/null
+check_rc "ccds: a malformed list is rc 64" 64 $?
+# A CPU with no readable topology fails rather than silently taking fewer locks.
+bl_ccds 9 >/dev/null
+check_rc "ccds: an unknown CPU is rc 2" 2 $?
+
+hold() { # <lock-file> <flock-flag>  -- hold the lock for 4 s in the background, return once held
+  rm -f "$DIR/held"
+  flock "$2" "$1" -c "touch '$DIR/held'; sleep 4" &
+  HOLDER=$!
+  for _ in $(seq 50); do [ -e "$DIR/held" ] && return 0; sleep 0.1; done
+  return 1
+}
+
+# CPU-scoped runs go through without waiting when another run holds a different CCD.
+hold "$DIR/benchlock.ccd0.lock" -x
+ZEEBRA_BENCHLOCK_CPUS=2-3 timeout 2 bash -c "ZEEBRA_BENCHLOCK_DIR='$DIR' bash '$BENCHLOCK' t-ccd-other true" >/dev/null 2>&1
+check_rc "ccd: a run on a free CCD is not blocked by another CCD's holder" 0 $?
+contains "ccd: START records the CCD locks and the CPU list" "lock=ccd:1 cpus=2-3" "$(log_line START)"
+# A run on the held CCD waits for it.
+ZEEBRA_BENCHLOCK_CPUS=1 timeout 1 bash -c "ZEEBRA_BENCHLOCK_DIR='$DIR' bash '$BENCHLOCK' t-ccd-same true" >/dev/null 2>&1
+check_rc "ccd: a run on a held CCD waits" 124 $?
+check "ccd: the waiting run never STARTed" 0 "$(grep -c '  START  *t-ccd-same ' "$DIR/benchlock.log")"
+kill "$HOLDER" 2>/dev/null; wait "$HOLDER" 2>/dev/null
+
+# An exclusive (unscoped) run excludes every CCD-scoped run, so the old protocol's guarantee holds.
+hold "$DIR/benchlock.lock" -x
+ZEEBRA_BENCHLOCK_CPUS=2 timeout 1 bash -c "ZEEBRA_BENCHLOCK_DIR='$DIR' bash '$BENCHLOCK' t-ccd-vs-excl true" >/dev/null 2>&1
+check_rc "ccd: a scoped run waits for an exclusive holder" 124 $?
+kill "$HOLDER" 2>/dev/null; wait "$HOLDER" 2>/dev/null
+
+# And an exclusive run waits for any scoped run, which holds the machine lock shared.
+hold "$DIR/benchlock.lock" -s
+timeout 1 bash -c "ZEEBRA_BENCHLOCK_DIR='$DIR' bash '$BENCHLOCK' t-excl-vs-ccd true" >/dev/null 2>&1
+check_rc "ccd: an exclusive run waits for a scoped holder" 124 $?
+kill "$HOLDER" 2>/dev/null; wait "$HOLDER" 2>/dev/null
+
+# An unscoped run says so on its START line.
+run_benchlock t-excl-start true >/dev/null 2>&1
+contains "ccd: an unscoped START records lock=exclusive" "lock=exclusive" "$(log_line START)"
+
+# A malformed scope is refused before anything is queued.
+ZEEBRA_BENCHLOCK_CPUS='8-' run_benchlock t-bad-scope true >/dev/null 2>&1
+check_rc "ccd: a malformed ZEEBRA_BENCHLOCK_CPUS is a usage error" 64 $?
+unset ZEEBRA_BENCHLOCK_SYS
+
+# --- a reservation is visible to runs that did not make it (#848) ----------
+#
+# A reservation removes CPUs from every other agent's cpuset, so their `taskset` onto those CPUs
+# fails with "Invalid argument" and nothing said why (#194 hit exactly this).
+
+printf 'ccds=1,2\nbench=8-23,72-87\nrest=0-7\n' >"$DIR/reserve-state"
+export ZEEBRA_BENCH_RESERVE_STATE="$DIR/reserve-state"
+# An unscoped run under a reservation records it on START.
+err="$(run_benchlock t-under-reserve true 2>&1 >/dev/null)"
+contains "reserve: an unscoped START records the reservation" "reserved=8-23,72-87" "$(log_line START)"
+# And tells the caller on stderr, naming the way through.
+contains "reserve: an unscoped run is warned" "bench-reserve.sh run" "$err"
+# A scoped run is the reservation's own client and is not warned.
+export ZEEBRA_BENCHLOCK_SYS="$SYSDIR"
+err="$(ZEEBRA_BENCHLOCK_CPUS=2 run_benchlock t-scoped-reserve true 2>&1 >/dev/null)"
+lacks "reserve: a scoped run is not warned" "bench-reserve.sh run" "$err"
+unset ZEEBRA_BENCHLOCK_SYS
+# No state file, no field.
+rm "$DIR/reserve-state"
+run_benchlock t-no-reserve true >/dev/null 2>&1
+lacks "reserve: no reservation, no field" "reserved=" "$(log_line START)"
+unset ZEEBRA_BENCH_RESERVE_STATE
+
 # --- usage -----------------------------------------------------------------
 
 run_benchlock >/dev/null 2>&1

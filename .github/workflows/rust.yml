@@ -352,6 +352,7 @@ jobs:
           bash tools/test/check-measurement-provenance-test.sh
           bash tools/test/ci-scope-test.sh
           bash tools/test/cpu-context-test.sh
+          bash tools/test/bench-reserve-test.sh
 
       - name: M29 baseline campaign helpers
         if: ${{ !cancelled() }}

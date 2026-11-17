@@ -61,6 +61,13 @@ isolation for concurrent writers. Rules:
   `.gitignore` still covers `/target-*`; prefer an explicit file list to
   `git add -A` regardless.
 
+**CPU reservations are shared state.** `tools/bench-reserve.sh reserve` removes
+CCDs from every agent's cpuset until `release` (see `docs/guide/benchmarking.md`,
+*Reserved CCDs*). Reserve only for a measurement session and release when it
+ends. If `taskset` fails with `Invalid argument`, run
+`tools/bench-reserve.sh status`: measure inside the reservation with
+`tools/bench-reserve.sh run`, or wait for it to be released.
+
 `cargo test --doc` is the one suite that fails for reasons that are not the
 diff. `/tmp` here is a 252 G tmpfs, its pages are RAM, and when it is near full
 the linker dies on its mapped temporaries — dozens of doctests failing at
@@ -279,6 +286,7 @@ race resolution, and the lease arithmetic:
 bash scripts/agent/test/zb-claim-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/cpu-context-test.sh
+bash tools/test/bench-reserve-test.sh
 bash tools/test/check-measurement-provenance-test.sh
 bash tools/check-measurement-provenance.sh
 shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
