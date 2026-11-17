@@ -41,5 +41,22 @@ class PlanTest(unittest.TestCase):
         self.assertEqual({t for _, t, *_ in plan}, {'mq10-m31'})
 
 
+sspec = importlib.util.spec_from_file_location('summarize', Path(__file__).with_name('summarize.py'))
+summarize = importlib.util.module_from_spec(sspec)
+sspec.loader.exec_module(summarize)
+
+
+class AmdahlTest(unittest.TestCase):
+    def test_needed_speedup_reproduces_the_plan_figures(self):
+        # Plan §8.2: f = 0.32, 0.34, 0.23 need 1.45x, 1.42x, 1.77x for -10% process wall.
+        got = [round(summarize.needed_speedup(f), 2) for f in (0.32, 0.34, 0.23)]
+        self.assertEqual(got, [1.45, 1.42, 1.77])
+
+    def test_no_speedup_suffices_when_the_share_is_below_the_gain(self):
+        # A stage under 10% of the wall cannot deliver -10% even if it vanishes.
+        self.assertIsNone(summarize.needed_speedup(0.10))
+        self.assertIsNone(summarize.needed_speedup(0.05))
+
+
 if __name__ == '__main__':
     unittest.main()
