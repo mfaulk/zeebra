@@ -146,32 +146,32 @@ fn build_batch_matrix_in<const N: usize, F: FiniteField>(
 ) -> Result<BuiltMatrix<N, F>, F4Error> {
     // Preprocessing bounds rows as it discovers them; construction checks the completed
     // symbolic layout before allocating coefficient rows.
+    let shipping = |cache: &mut ReducerCache<N>| {
+        symbolic_preprocessing_seeded(
+            basis,
+            pairs,
+            options.max_matrix_rows,
+            options.reducer_selection,
+            cache,
+            options.pair_multiples,
+        )
+    };
     // #860: a research prototype may serve the batch when one is in force on this thread.
     #[cfg(feature = "research-work")]
-    let interned = super::symbolic_intern::live(
+    let preprocessed = super::symbolic_intern::live(
         basis,
         pairs,
         options.max_matrix_rows,
         options.reducer_selection,
         options.pair_multiples,
         cache.mode() != super::symbolic::CacheMode::Off,
-    );
+    )
+    .unwrap_or_else(|| shipping(cache));
     #[cfg(not(feature = "research-work"))]
-    let interned: Option<Result<Preprocessed<N>, super::symbolic::RowBudgetExceeded>> = None;
-    let mut preprocessed = interned
-        .unwrap_or_else(|| {
-            symbolic_preprocessing_seeded(
-                basis,
-                pairs,
-                options.max_matrix_rows,
-                options.reducer_selection,
-                cache,
-                options.pair_multiples,
-            )
-        })
-        .map_err(|exceeded| F4Error::TooManyRows {
-            limit: exceeded.limit,
-        })?;
+    let preprocessed = shipping(cache);
+    let mut preprocessed = preprocessed.map_err(|exceeded| F4Error::TooManyRows {
+        limit: exceeded.limit,
+    })?;
     stages.symbolic = clock.lap();
 
     let (matrix, construction_split) = MacaulayMatrix::build_measured(
