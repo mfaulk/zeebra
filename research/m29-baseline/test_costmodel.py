@@ -40,6 +40,12 @@ class PlanTest(unittest.TestCase):
                          {(t, o) for t in ('eco12-wide64', 'mq11-goldilocks') for o in ('forward', 'fl')})
         self.assertTrue(all(w == 16 for _, _, w, _, _ in plan))
 
+    def test_fl_stages_suite_clocks_the_same_pairs(self):
+        # `flstages` runs the same order pairs as `fl`, each with stage clocks on.
+        plan = costmodel.plan('flstages', 3)
+        self.assertEqual({(t, a) for _, t, _, _, a in plan}, {(t, a) for _, t, _, _, a in costmodel.plan('fl', 3)})
+        self.assertTrue(all('--stages' in extra for _, _, _, extra, _ in plan))
+
     def test_frequency_summary(self):
         # Clock samples reduce to count, mean and extremes; no samples is no summary rather than zeros.
         self.assertIsNone(costmodel.summarize_freq([]))

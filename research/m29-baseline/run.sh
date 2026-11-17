@@ -13,8 +13,8 @@
 #                worker, three passes (the controller takes one attempt per cell)
 #   walls|stages|ab831|census
 #                costmodel.py over m29_cost_model on all four targets (see that file)
-#   fl           #828 cross-check: FL_BIN (m29_cost_model built on the #843 library), forward
-#                against Faugère–Lachartre on Eco-12 and MQ11 at 16 workers
+#   fl|flstages  #828 cross-check: FL_BIN (m29_cost_model built on the #843 library), forward
+#                against Faugère–Lachartre on Eco-12 and MQ11 at 16 workers; `flstages` adds stage clocks
 #
 # REPS sets the repetitions (wide passes included); 3 by default, 5 for `fl`.
 #
@@ -97,6 +97,12 @@ fl)
   settle
   python3 "$here/costmodel.py" --binary "$FL_BIN" --suite fl --reps "${REPS:-5}" \
     --output "$OUT/fl.jsonl"
+  ;;
+flstages)
+  : "${FL_BIN:?m29_cost_model built at the #843 head}"
+  settle
+  python3 "$here/costmodel.py" --binary "$FL_BIN" --suite flstages --reps "${REPS:-3}" \
+    --output "$OUT/flstages.jsonl"
   ;;
 census)
   settle
