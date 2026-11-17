@@ -135,6 +135,8 @@ jobs:
           git diff --exit-code -- research/concurrent-pivots/summary.json research/concurrent-pivots/matrix-census.csv research/concurrent-pivots/parallel.csv research/concurrent-pivots/matrix-scaling.csv research/concurrent-pivots/dispatch.csv research/concurrent-pivots/controls.csv
           python3 tools/test/grobx-randomization-test.py
           python3 tools/external/grobx-driver/research/randomization/test_policy.py
+          python3 tools/external/grobx-driver/research/signature/test_overlay.py
+          python3 tools/test/grobx-signature-study-test.py
           python3 tools/test/proof-artifacts-test.py
           python3 tools/test/attempt-journal-test.py
           python3 research/grobx-randomization/summarize.py
@@ -171,6 +173,10 @@ jobs:
           cargo test --features research-work --example mq10_profile
           cargo test --features research-multirow --lib linalg::dense::band
           cargo test --features research-multirow --example mq10_profile
+          cargo test --features research-sigf4 --lib grobner::sigf4
+          cargo test --features research-sigf4 --example sig_f4_study
+          python3 research/m30-sigf4/test_run.py
+          python3 research/m30-sigf4/summarize.py research/m30-sigf4/{gate,controls,gate2,controls2}.jsonl.gz | diff - research/m30-sigf4/tables.md
           python3 tools/test/multirow-study-test.py
           python3 tools/test/public-corpus-test.py
       # About 12 minutes; it reads only its own records and tools/external/ (tools/ci-scope.sh).
@@ -338,6 +344,7 @@ jobs:
         run: |
           shellcheck -S warning \
             scripts/agent/*.sh scripts/agent/test/*.sh \
+            scripts/fetch-eprint scripts/test/*.sh \
             tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 
       # `!cancelled()` for the same reason as the lint job: a shellcheck finding should not hide
@@ -346,6 +353,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           bash scripts/agent/test/zb-claim-test.sh
+          bash scripts/test/fetch-eprint-test.sh
           bash tools/test/rss-guard-test.sh
           bash tools/test/merge-base-age-test.sh
           bash tools/test/benchlock-test.sh
@@ -357,6 +365,10 @@ jobs:
       - name: M29 baseline campaign helpers
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m29-baseline -p 'test_*.py'
+
+      - name: M30 symbolic cost-model campaign helpers
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s research/m30-symbolic -p 'test_*.py'
 
       - name: Giac comparand artifacts
         if: ${{ !cancelled() }}

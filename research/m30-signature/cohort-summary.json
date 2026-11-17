@@ -1,0 +1,2827 @@
+{
+ "attempts": 150,
+ "binaries": {
+  "research": "f2cb4ce618c7a02f42432b0c44430ed38ffe2b1a257e2d57c9dee3935e0d5169",
+  "stock": "ba541087d3f411fb0767601308af5ae12dd16f0fa5f2164bca1e2f810c5b0f93"
+ },
+ "cells": [
+  {
+   "answers": [
+    "8724df30fffa08766874616c5122d0a210f1596a3aadb66f25091ec6d2517980"
+   ],
+   "arm": "default",
+   "attempts": 5,
+   "case": "cyclic7-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 349,
+    "kept": 2997,
+    "lcm_redundant_skipped": 80768,
+    "product_skipped": 3867,
+    "updates": 592
+   },
+   "rss_mib_max": 12.69140625,
+   "rss_mib_median": 12.51171875,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 227954,
+     "given": 250,
+     "inter_subtracted": 0,
+     "max_columns": 1017,
+     "max_rows": 687,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 22578,
+      "equal": 70,
+      "high": 675,
+      "koszul": 20,
+      "low": 2693,
+      "queued": 11053,
+      "syzygy": 8067
+     },
+     "pivots": 310,
+     "reduce": "tests",
+     "reductions": 343,
+     "round_subtracted": 6804577,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 1865,
+     "zero_reductions": 30,
+     "zero_rows": 30
+    },
+    {
+     "echelon_subtracted": 0,
+     "engine": "plain",
+     "entries": 1255765,
+     "given": 4511,
+     "inter_subtracted": 6438,
+     "max_columns": 1091,
+     "max_rows": 1120,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 585,
+     "reduce": "combinations",
+     "reductions": 683,
+     "round_subtracted": 21105189,
+     "rounds": 26,
+     "rounds_without_zero_rows": 26,
+     "rows": 10402,
+     "zero_reductions": 98,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 2.1e-05,
+     "encode": 0.000185,
+     "record": 7.000000000000001e-06,
+     "reduce": 0.019272,
+     "select": 0.000165,
+     "symbolic": 0.0018909999999999999,
+     "update": 0.001305
+    },
+    {
+     "backsub": 0.005561,
+     "decode": 2.9e-05,
+     "encode": 0.000817,
+     "record": 0.0,
+     "reduce": 0.076404,
+     "select": 0.000141,
+     "symbolic": 0.005354,
+     "update": 0.001903
+    }
+   ],
+   "subtracted_discarded": [
+    6804577
+   ],
+   "subtracted_total": [
+    27916204
+   ],
+   "wall_max_ms": 119.91244,
+   "wall_median_ms": 119.586122,
+   "wall_min_ms": 117.194434,
+   "wall_ms": [
+    119.586122,
+    117.194434,
+    117.305134,
+    119.670312,
+    119.91244
+   ]
+  },
+  {
+   "answers": [
+    "8724df30fffa08766874616c5122d0a210f1596a3aadb66f25091ec6d2517980"
+   ],
+   "arm": "no-handover",
+   "attempts": 5,
+   "case": "cyclic7-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 13.8671875,
+   "rss_mib_median": 13.734375,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 880699,
+     "given": 657,
+     "inter_subtracted": 382253,
+     "max_columns": 1256,
+     "max_rows": 917,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 364231,
+      "equal": 900,
+      "high": 9302,
+      "koszul": 51,
+      "low": 97279,
+      "queued": 32683,
+      "syzygy": 224016
+     },
+     "pivots": 847,
+     "reduce": "tests",
+     "reductions": 1036,
+     "round_subtracted": 19339436,
+     "rounds": 22,
+     "rounds_without_zero_rows": 0,
+     "rows": 6215,
+     "zero_reductions": 177,
+     "zero_rows": 187
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 8.6e-05,
+     "encode": 0.000593,
+     "record": 1.1e-05,
+     "reduce": 0.055588,
+     "select": 0.00112,
+     "symbolic": 0.005014,
+     "update": 0.012398000000000001
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    19721689
+   ],
+   "wall_max_ms": 85.078606,
+   "wall_median_ms": 81.533764,
+   "wall_min_ms": 81.023258,
+   "wall_ms": [
+    81.023258,
+    81.396134,
+    81.533764,
+    85.078606,
+    81.840897
+   ]
+  },
+  {
+   "answers": [
+    "8724df30fffa08766874616c5122d0a210f1596a3aadb66f25091ec6d2517980"
+   ],
+   "arm": "sig-off",
+   "attempts": 5,
+   "case": "cyclic7-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 349,
+    "kept": 2997,
+    "lcm_redundant_skipped": 80768,
+    "product_skipped": 3867,
+    "updates": 592
+   },
+   "rss_mib_max": 12.87890625,
+   "rss_mib_median": 12.796875,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "plain",
+     "entries": 1255765,
+     "given": 4511,
+     "inter_subtracted": 6438,
+     "max_columns": 1091,
+     "max_rows": 1120,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 585,
+     "reduce": "combinations",
+     "reductions": 683,
+     "round_subtracted": 21105189,
+     "rounds": 26,
+     "rounds_without_zero_rows": 26,
+     "rows": 10402,
+     "zero_reductions": 98,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.005643,
+     "decode": 3.2e-05,
+     "encode": 0.000835,
+     "record": 0.0,
+     "reduce": 0.07725800000000001,
+     "select": 0.000153,
+     "symbolic": 0.005901,
+     "update": 0.001939
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    21111627
+   ],
+   "wall_max_ms": 103.926212,
+   "wall_median_ms": 97.828337,
+   "wall_min_ms": 97.118442,
+   "wall_ms": [
+    103.926212,
+    97.118442,
+    97.536384,
+    100.254501,
+    97.828337
+   ]
+  },
+  {
+   "answers": [
+    "8724df30fffa08766874616c5122d0a210f1596a3aadb66f25091ec6d2517980"
+   ],
+   "arm": "stock",
+   "attempts": 5,
+   "case": "cyclic7-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": null,
+   "rss_mib_max": 12.33203125,
+   "rss_mib_median": 12.109375,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 227954,
+     "given": 250,
+     "inter_subtracted": 0,
+     "max_columns": 1017,
+     "max_rows": 687,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 22578,
+      "equal": 70,
+      "high": 675,
+      "koszul": 20,
+      "low": 2693,
+      "queued": 11053,
+      "syzygy": 8067
+     },
+     "pivots": 310,
+     "reduce": "tests",
+     "reductions": 343,
+     "round_subtracted": 6804577,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 1865,
+     "zero_reductions": 30,
+     "zero_rows": 30
+    },
+    {
+     "echelon_subtracted": 0,
+     "engine": "plain",
+     "entries": 1255765,
+     "given": 4511,
+     "inter_subtracted": 6438,
+     "max_columns": 1091,
+     "max_rows": 1120,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 585,
+     "reduce": "combinations",
+     "reductions": 683,
+     "round_subtracted": 21105189,
+     "rounds": 26,
+     "rounds_without_zero_rows": 26,
+     "rows": 10402,
+     "zero_reductions": 98,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 3.2e-05,
+     "encode": 0.000183,
+     "record": 8e-06,
+     "reduce": 0.019337,
+     "select": 0.000157,
+     "symbolic": 0.001856,
+     "update": 0.0013729999999999999
+    },
+    {
+     "backsub": 0.005521,
+     "decode": 2.9e-05,
+     "encode": 0.000816,
+     "record": 0.0,
+     "reduce": 0.076361,
+     "select": 0.000144,
+     "symbolic": 0.005248,
+     "update": 0.001909
+    }
+   ],
+   "subtracted_discarded": [
+    6804577
+   ],
+   "subtracted_total": [
+    27916204
+   ],
+   "wall_max_ms": 119.793044,
+   "wall_median_ms": 119.46855,
+   "wall_min_ms": 117.059418,
+   "wall_ms": [
+    117.261681,
+    117.059418,
+    119.71169,
+    119.46855,
+    119.793044
+   ]
+  },
+  {
+   "answers": [
+    "231fae14063b503a5a7a06c6ad7fc18436ad18420c0c4b28bfd57e12b0a61ab8"
+   ],
+   "arm": "default",
+   "attempts": 5,
+   "case": "eco12-wide64",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.37841796875,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 809,
+    "kept": 8011,
+    "lcm_redundant_skipped": 255066,
+    "product_skipped": 74064,
+    "updates": 888
+   },
+   "rss_mib_max": 45.0703125,
+   "rss_mib_median": 44.875,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 2814,
+     "given": 57,
+     "inter_subtracted": 0,
+     "max_columns": 400,
+     "max_rows": 224,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 231,
+      "equal": 36,
+      "high": 0,
+      "koszul": 1,
+      "low": 18,
+      "queued": 84,
+      "syzygy": 92
+     },
+     "pivots": 65,
+     "reduce": "tests",
+     "reductions": 65,
+     "round_subtracted": 35724,
+     "rounds": 2,
+     "rounds_without_zero_rows": 0,
+     "rows": 256,
+     "zero_reductions": 0,
+     "zero_rows": 0
+    },
+    {
+     "echelon_subtracted": 0,
+     "engine": "plain",
+     "entries": 20501916,
+     "given": 12990,
+     "inter_subtracted": 54032506,
+     "max_columns": 28055,
+     "max_rows": 27187,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 876,
+     "reduce": "combinations",
+     "reductions": 1102,
+     "round_subtracted": 474759862,
+     "rounds": 23,
+     "rounds_without_zero_rows": 23,
+     "rows": 179262,
+     "zero_reductions": 226,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 1e-06,
+     "encode": 1.3000000000000001e-05,
+     "record": 8e-06,
+     "reduce": 0.000148,
+     "select": 1.4999999999999999e-05,
+     "symbolic": 8.900000000000001e-05,
+     "update": 1.2e-05
+    },
+    {
+     "backsub": 0.014044,
+     "decode": 0.000148,
+     "encode": 0.015205999999999999,
+     "record": 6e-06,
+     "reduce": 1.340944,
+     "select": 0.000365,
+     "symbolic": 0.113296,
+     "update": 0.007439
+    }
+   ],
+   "subtracted_discarded": [
+    35724
+   ],
+   "subtracted_total": [
+    528828092
+   ],
+   "wall_max_ms": 1695.82172,
+   "wall_median_ms": 1689.455236,
+   "wall_min_ms": 1678.792728,
+   "wall_ms": [
+    1695.82172,
+    1678.792728,
+    1680.782445,
+    1689.970512,
+    1689.455236
+   ]
+  },
+  {
+   "answers": [
+    "231fae14063b503a5a7a06c6ad7fc18436ad18420c0c4b28bfd57e12b0a61ab8"
+   ],
+   "arm": "default-nocomb",
+   "attempts": 5,
+   "case": "eco12-wide64",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.34375,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 51.4140625,
+   "rss_mib_median": 51.20703125,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 11360814,
+     "given": 2913,
+     "inter_subtracted": 68728862,
+     "max_columns": 8312,
+     "max_rows": 7307,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 1773786,
+      "equal": 109,
+      "high": 106053,
+      "koszul": 3557,
+      "low": 565050,
+      "queued": 163348,
+      "syzygy": 935669
+     },
+     "pivots": 1872,
+     "reduce": "rows",
+     "reductions": 3051,
+     "round_subtracted": 522738473,
+     "rounds": 17,
+     "rounds_without_zero_rows": 0,
+     "rows": 56807,
+     "zero_reductions": 1179,
+     "zero_rows": 1179
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000898,
+     "encode": 0.007394,
+     "record": 1.5e-05,
+     "reduce": 1.362552,
+     "select": 0.00461,
+     "symbolic": 0.063538,
+     "update": 0.068667
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    591467335
+   ],
+   "wall_max_ms": 1818.241978,
+   "wall_median_ms": 1739.47904,
+   "wall_min_ms": 1727.02991,
+   "wall_ms": [
+    1739.47904,
+    1802.708768,
+    1818.241978,
+    1727.02991,
+    1736.55803
+   ]
+  },
+  {
+   "answers": [
+    "231fae14063b503a5a7a06c6ad7fc18436ad18420c0c4b28bfd57e12b0a61ab8"
+   ],
+   "arm": "no-handover",
+   "attempts": 5,
+   "case": "eco12-wide64",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.31591796875,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 45.83203125,
+   "rss_mib_median": 45.828125,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 11360814,
+     "given": 2913,
+     "inter_subtracted": 68728862,
+     "max_columns": 8312,
+     "max_rows": 7307,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 1773786,
+      "equal": 109,
+      "high": 106053,
+      "koszul": 3557,
+      "low": 565050,
+      "queued": 163348,
+      "syzygy": 935669
+     },
+     "pivots": 1872,
+     "reduce": "tests",
+     "reductions": 3058,
+     "round_subtracted": 513242605,
+     "rounds": 17,
+     "rounds_without_zero_rows": 0,
+     "rows": 56807,
+     "zero_reductions": 1155,
+     "zero_rows": 1179
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000772,
+     "encode": 0.00756,
+     "record": 1.3e-05,
+     "reduce": 1.324316,
+     "select": 0.004423,
+     "symbolic": 0.063375,
+     "update": 0.066096
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    581971467
+   ],
+   "wall_max_ms": 1719.803046,
+   "wall_median_ms": 1702.590786,
+   "wall_min_ms": 1690.236405,
+   "wall_ms": [
+    1690.236405,
+    1690.455079,
+    1719.803046,
+    1702.590786,
+    1710.89514
+   ]
+  },
+  {
+   "answers": [
+    "231fae14063b503a5a7a06c6ad7fc18436ad18420c0c4b28bfd57e12b0a61ab8"
+   ],
+   "arm": "no-handover-nocomb",
+   "attempts": 5,
+   "case": "eco12-wide64",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.37841796875,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 45.6953125,
+   "rss_mib_median": 45.5859375,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 11360814,
+     "given": 2913,
+     "inter_subtracted": 68728862,
+     "max_columns": 8312,
+     "max_rows": 7307,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 1773786,
+      "equal": 109,
+      "high": 106053,
+      "koszul": 3557,
+      "low": 565050,
+      "queued": 163348,
+      "syzygy": 935669
+     },
+     "pivots": 1872,
+     "reduce": "rows",
+     "reductions": 3051,
+     "round_subtracted": 522738473,
+     "rounds": 17,
+     "rounds_without_zero_rows": 0,
+     "rows": 56807,
+     "zero_reductions": 1179,
+     "zero_rows": 1179
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000782,
+     "encode": 0.007273,
+     "record": 1.2e-05,
+     "reduce": 1.3475570000000001,
+     "select": 0.004612,
+     "symbolic": 0.063492,
+     "update": 0.066852
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    591467335
+   ],
+   "wall_max_ms": 1931.333684,
+   "wall_median_ms": 1724.142743,
+   "wall_min_ms": 1721.406512,
+   "wall_ms": [
+    1721.406512,
+    1726.142589,
+    1724.142593,
+    1724.142743,
+    1931.333684
+   ]
+  },
+  {
+   "answers": [
+    "231fae14063b503a5a7a06c6ad7fc18436ad18420c0c4b28bfd57e12b0a61ab8"
+   ],
+   "arm": "sig-off",
+   "attempts": 5,
+   "case": "eco12-wide64",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.34765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 809,
+    "kept": 8011,
+    "lcm_redundant_skipped": 255066,
+    "product_skipped": 74064,
+    "updates": 888
+   },
+   "rss_mib_max": 44.8046875,
+   "rss_mib_median": 44.25,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "plain",
+     "entries": 20501916,
+     "given": 12990,
+     "inter_subtracted": 54032506,
+     "max_columns": 28055,
+     "max_rows": 27187,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 876,
+     "reduce": "combinations",
+     "reductions": 1102,
+     "round_subtracted": 474759862,
+     "rounds": 23,
+     "rounds_without_zero_rows": 23,
+     "rows": 179262,
+     "zero_reductions": 226,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.014198,
+     "decode": 0.000149,
+     "encode": 0.015353,
+     "record": 7e-06,
+     "reduce": 1.3402159999999999,
+     "select": 0.000387,
+     "symbolic": 0.113878,
+     "update": 0.0074470000000000005
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    528792368
+   ],
+   "wall_max_ms": 1704.212557,
+   "wall_median_ms": 1687.283093,
+   "wall_min_ms": 1682.100631,
+   "wall_ms": [
+    1692.163534,
+    1682.100631,
+    1704.212557,
+    1687.283093,
+    1687.138009
+   ]
+  },
+  {
+   "answers": [
+    "231fae14063b503a5a7a06c6ad7fc18436ad18420c0c4b28bfd57e12b0a61ab8"
+   ],
+   "arm": "sig-off-nocomb",
+   "attempts": 5,
+   "case": "eco12-wide64",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.3505859375,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 809,
+    "kept": 8011,
+    "lcm_redundant_skipped": 255066,
+    "product_skipped": 74064,
+    "updates": 888
+   },
+   "rss_mib_max": 44.890625,
+   "rss_mib_median": 44.4375,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "plain",
+     "entries": 20501916,
+     "given": 12990,
+     "inter_subtracted": 54032506,
+     "max_columns": 28055,
+     "max_rows": 27187,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 876,
+     "reduce": "rows",
+     "reductions": 7207,
+     "round_subtracted": 3691966324,
+     "rounds": 23,
+     "rounds_without_zero_rows": 0,
+     "rows": 179262,
+     "zero_reductions": 6331,
+     "zero_rows": 6331
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.006722,
+     "decode": 0.00015099999999999998,
+     "encode": 0.015212,
+     "record": 9e-06,
+     "reduce": 9.75976,
+     "select": 0.000392,
+     "symbolic": 0.11428,
+     "update": 0.007586
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    3745998830
+   ],
+   "wall_max_ms": 10140.342152,
+   "wall_median_ms": 10103.914311,
+   "wall_min_ms": 10073.097703,
+   "wall_ms": [
+    10103.914311,
+    10090.401035,
+    10140.342152,
+    10073.097703,
+    10125.577157
+   ]
+  },
+  {
+   "answers": [
+    "231fae14063b503a5a7a06c6ad7fc18436ad18420c0c4b28bfd57e12b0a61ab8"
+   ],
+   "arm": "stock",
+   "attempts": 5,
+   "case": "eco12-wide64",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": null,
+   "rss_mib_max": 44.56640625,
+   "rss_mib_median": 44.25390625,
+   "runs": [
+    {
+     "echelon_subtracted": 0,
+     "engine": "signature",
+     "entries": 2814,
+     "given": 57,
+     "inter_subtracted": 0,
+     "max_columns": 400,
+     "max_rows": 224,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 231,
+      "equal": 36,
+      "high": 0,
+      "koszul": 1,
+      "low": 18,
+      "queued": 84,
+      "syzygy": 92
+     },
+     "pivots": 65,
+     "reduce": "tests",
+     "reductions": 65,
+     "round_subtracted": 35724,
+     "rounds": 2,
+     "rounds_without_zero_rows": 0,
+     "rows": 256,
+     "zero_reductions": 0,
+     "zero_rows": 0
+    },
+    {
+     "echelon_subtracted": 0,
+     "engine": "plain",
+     "entries": 20501916,
+     "given": 12990,
+     "inter_subtracted": 54032506,
+     "max_columns": 28055,
+     "max_rows": 27187,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 876,
+     "reduce": "combinations",
+     "reductions": 1102,
+     "round_subtracted": 474759862,
+     "rounds": 23,
+     "rounds_without_zero_rows": 23,
+     "rows": 179262,
+     "zero_reductions": 226,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 4e-06,
+     "encode": 2.6000000000000002e-05,
+     "record": 5e-06,
+     "reduce": 0.000135,
+     "select": 9e-06,
+     "symbolic": 8.1e-05,
+     "update": 1.2e-05
+    },
+    {
+     "backsub": 0.014138,
+     "decode": 0.000153,
+     "encode": 0.015243,
+     "record": 7e-06,
+     "reduce": 1.311649,
+     "select": 0.00036899999999999997,
+     "symbolic": 0.11415,
+     "update": 0.007398
+    }
+   ],
+   "subtracted_discarded": [
+    35724
+   ],
+   "subtracted_total": [
+    528828092
+   ],
+   "wall_max_ms": 1663.307207,
+   "wall_median_ms": 1655.674927,
+   "wall_min_ms": 1650.069193,
+   "wall_ms": [
+    1655.674927,
+    1653.675321,
+    1663.307207,
+    1650.069193,
+    1656.330328
+   ]
+  },
+  {
+   "answers": [
+    "0b6891867d850a31f1b9435522233db47f7a1a9594660a7f39d5d5338fce8c75"
+   ],
+   "arm": "default",
+   "attempts": 5,
+   "case": "katsura11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 37.46875,
+   "rss_mib_median": 37.3359375,
+   "runs": [
+    {
+     "echelon_subtracted": 84,
+     "engine": "signature",
+     "entries": 5605199,
+     "given": 772,
+     "inter_subtracted": 1432527,
+     "max_columns": 5332,
+     "max_rows": 4343,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 153181,
+      "equal": 830,
+      "high": 243,
+      "koszul": 448,
+      "low": 75815,
+      "queued": 12689,
+      "syzygy": 63156
+     },
+     "pivots": 543,
+     "reduce": "tests",
+     "reductions": 693,
+     "round_subtracted": 165063608,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 19275,
+     "zero_reductions": 124,
+     "zero_rows": 242
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000177,
+     "encode": 0.003317,
+     "record": 0.0,
+     "reduce": 0.473576,
+     "select": 0.000326,
+     "symbolic": 0.026003,
+     "update": 0.005416
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    166496219
+   ],
+   "wall_max_ms": 571.068702,
+   "wall_median_ms": 558.47653,
+   "wall_min_ms": 554.512585,
+   "wall_ms": [
+    571.068702,
+    560.781545,
+    554.512585,
+    558.47653,
+    554.593057
+   ]
+  },
+  {
+   "answers": [
+    "0b6891867d850a31f1b9435522233db47f7a1a9594660a7f39d5d5338fce8c75"
+   ],
+   "arm": "no-handover",
+   "attempts": 5,
+   "case": "katsura11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 35.77734375,
+   "rss_mib_median": 35.72265625,
+   "runs": [
+    {
+     "echelon_subtracted": 84,
+     "engine": "signature",
+     "entries": 5605199,
+     "given": 772,
+     "inter_subtracted": 1432527,
+     "max_columns": 5332,
+     "max_rows": 4343,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 153181,
+      "equal": 830,
+      "high": 243,
+      "koszul": 448,
+      "low": 75815,
+      "queued": 12689,
+      "syzygy": 63156
+     },
+     "pivots": 543,
+     "reduce": "tests",
+     "reductions": 693,
+     "round_subtracted": 165063608,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 19275,
+     "zero_reductions": 124,
+     "zero_rows": 242
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000167,
+     "encode": 0.00324,
+     "record": 0.0,
+     "reduce": 0.47509,
+     "select": 0.000326,
+     "symbolic": 0.02597,
+     "update": 0.005459
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    166496219
+   ],
+   "wall_max_ms": 564.713679,
+   "wall_median_ms": 557.925386,
+   "wall_min_ms": 553.808332,
+   "wall_ms": [
+    559.026912,
+    555.982007,
+    564.713679,
+    557.925386,
+    553.808332
+   ]
+  },
+  {
+   "answers": [
+    "0b6891867d850a31f1b9435522233db47f7a1a9594660a7f39d5d5338fce8c75"
+   ],
+   "arm": "sig-off",
+   "attempts": 5,
+   "case": "katsura11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 1,
+    "kept": 4465,
+    "lcm_redundant_skipped": 119139,
+    "product_skipped": 20331,
+    "updates": 539
+   },
+   "rss_mib_max": 37.48828125,
+   "rss_mib_median": 36.85546875,
+   "runs": [
+    {
+     "echelon_subtracted": 84,
+     "engine": "plain",
+     "entries": 11961856,
+     "given": 7438,
+     "inter_subtracted": 683,
+     "max_columns": 13219,
+     "max_rows": 13229,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 528,
+     "reduce": "combinations",
+     "reductions": 656,
+     "round_subtracted": 312486520,
+     "rounds": 11,
+     "rounds_without_zero_rows": 11,
+     "rows": 77041,
+     "zero_reductions": 128,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.012407,
+     "decode": 0.000122,
+     "encode": 0.007818,
+     "record": 4.9999999999999996e-06,
+     "reduce": 0.958929,
+     "select": 0.00022899999999999998,
+     "symbolic": 0.060639,
+     "update": 0.0036119999999999998
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    312487287
+   ],
+   "wall_max_ms": 1097.133033,
+   "wall_median_ms": 1088.750312,
+   "wall_min_ms": 1087.293563,
+   "wall_ms": [
+    1088.750312,
+    1087.293563,
+    1088.488555,
+    1097.133033,
+    1095.382047
+   ]
+  },
+  {
+   "answers": [
+    "0b6891867d850a31f1b9435522233db47f7a1a9594660a7f39d5d5338fce8c75"
+   ],
+   "arm": "stock",
+   "attempts": 5,
+   "case": "katsura11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.4150390625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": null,
+   "rss_mib_max": 42.6328125,
+   "rss_mib_median": 42.09765625,
+   "runs": [
+    {
+     "echelon_subtracted": 84,
+     "engine": "signature",
+     "entries": 5605199,
+     "given": 772,
+     "inter_subtracted": 1432527,
+     "max_columns": 5332,
+     "max_rows": 4343,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 153181,
+      "equal": 830,
+      "high": 243,
+      "koszul": 448,
+      "low": 75815,
+      "queued": 12689,
+      "syzygy": 63156
+     },
+     "pivots": 543,
+     "reduce": "tests",
+     "reductions": 693,
+     "round_subtracted": 165063608,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 19275,
+     "zero_reductions": 124,
+     "zero_rows": 242
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000245,
+     "encode": 0.003268,
+     "record": 0.0,
+     "reduce": 0.47499800000000003,
+     "select": 0.000322,
+     "symbolic": 0.026559,
+     "update": 0.005497
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    166496219
+   ],
+   "wall_max_ms": 584.189294,
+   "wall_median_ms": 565.013467,
+   "wall_min_ms": 558.0329,
+   "wall_ms": [
+    558.0329,
+    565.013467,
+    565.723802,
+    584.189294,
+    560.227966
+   ]
+  },
+  {
+   "answers": [
+    "02f546593d51f3ed610c0bd10db703a2ae2bc14a27ee4a52df2aa32db8722c07"
+   ],
+   "arm": "default",
+   "attempts": 5,
+   "case": "mq10-32003",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 55,
+    "kept": 1830,
+    "lcm_redundant_skipped": 19027,
+    "product_skipped": 11363,
+    "updates": 256
+   },
+   "rss_mib_max": 16.44140625,
+   "rss_mib_median": 16.33203125,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 1844098,
+     "given": 528,
+     "inter_subtracted": 0,
+     "max_columns": 16217,
+     "max_rows": 15882,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 77028,
+      "equal": 87,
+      "high": 3025,
+      "koszul": 518,
+      "low": 30941,
+      "queued": 8270,
+      "syzygy": 34187
+     },
+     "pivots": 386,
+     "reduce": "tests",
+     "reductions": 659,
+     "round_subtracted": 83846548,
+     "rounds": 9,
+     "rounds_without_zero_rows": 0,
+     "rows": 37572,
+     "zero_reductions": 250,
+     "zero_rows": 268
+    },
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2445736,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11380,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "rows",
+     "reductions": 1775,
+     "round_subtracted": 294668951,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 47955,
+     "zero_reductions": 1529,
+     "zero_rows": 1529
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 7.1e-05,
+     "encode": 0.001843,
+     "record": 3e-06,
+     "reduce": 0.07249799999999999,
+     "select": 0.000311,
+     "symbolic": 0.01645,
+     "update": 0.003435
+    },
+    {
+     "backsub": 0.000964,
+     "decode": 2.2e-05,
+     "encode": 0.002323,
+     "record": 2e-06,
+     "reduce": 0.263735,
+     "select": 9.1e-05,
+     "symbolic": 0.016039,
+     "update": 0.000843
+    }
+   ],
+   "subtracted_discarded": [
+    83846783
+   ],
+   "subtracted_total": [
+    378609170
+   ],
+   "wall_max_ms": 389.830989,
+   "wall_median_ms": 385.761504,
+   "wall_min_ms": 384.350613,
+   "wall_ms": [
+    384.350613,
+    389.830989,
+    385.761504,
+    386.32451,
+    385.127204
+   ]
+  },
+  {
+   "answers": [
+    "02f546593d51f3ed610c0bd10db703a2ae2bc14a27ee4a52df2aa32db8722c07"
+   ],
+   "arm": "no-handover",
+   "attempts": 5,
+   "case": "mq10-32003",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 20.1484375,
+   "rss_mib_median": 20.015625,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 3049872,
+     "given": 530,
+     "inter_subtracted": 2467360,
+     "max_columns": 30871,
+     "max_rows": 30519,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 78210,
+      "equal": 87,
+      "high": 3041,
+      "koszul": 518,
+      "low": 31750,
+      "queued": 8291,
+      "syzygy": 34523
+     },
+     "pivots": 386,
+     "reduce": "tests",
+     "reductions": 661,
+     "round_subtracted": 85494850,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 68091,
+     "zero_reductions": 252,
+     "zero_rows": 270
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 6.2e-05,
+     "encode": 0.003241,
+     "record": 3e-06,
+     "reduce": 0.075321,
+     "select": 0.000368,
+     "symbolic": 0.02953,
+     "update": 0.0034
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    87962445
+   ],
+   "wall_max_ms": 122.381234,
+   "wall_median_ms": 122.064355,
+   "wall_min_ms": 121.472243,
+   "wall_ms": [
+    122.381234,
+    122.064355,
+    121.472243,
+    122.246689,
+    122.059706
+   ]
+  },
+  {
+   "answers": [
+    "02f546593d51f3ed610c0bd10db703a2ae2bc14a27ee4a52df2aa32db8722c07"
+   ],
+   "arm": "sig-off",
+   "attempts": 5,
+   "case": "mq10-32003",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 55,
+    "kept": 1830,
+    "lcm_redundant_skipped": 19027,
+    "product_skipped": 11363,
+    "updates": 256
+   },
+   "rss_mib_max": 14.98046875,
+   "rss_mib_median": 14.80078125,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2445736,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11380,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "rows",
+     "reductions": 1775,
+     "round_subtracted": 294668951,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 47955,
+     "zero_reductions": 1529,
+     "zero_rows": 1529
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.000986,
+     "decode": 2.2e-05,
+     "encode": 0.002467,
+     "record": 2e-06,
+     "reduce": 0.264142,
+     "select": 9.9e-05,
+     "symbolic": 0.017419,
+     "update": 0.000796
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    294762387
+   ],
+   "wall_max_ms": 295.700484,
+   "wall_median_ms": 292.368706,
+   "wall_min_ms": 291.519028,
+   "wall_ms": [
+    295.700484,
+    295.266763,
+    292.368706,
+    291.519028,
+    291.823623
+   ]
+  },
+  {
+   "answers": [
+    "02f546593d51f3ed610c0bd10db703a2ae2bc14a27ee4a52df2aa32db8722c07"
+   ],
+   "arm": "stock",
+   "attempts": 5,
+   "case": "mq10-32003",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": null,
+   "rss_mib_max": 15.609375,
+   "rss_mib_median": 15.34765625,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 1844098,
+     "given": 528,
+     "inter_subtracted": 0,
+     "max_columns": 16217,
+     "max_rows": 15882,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 77028,
+      "equal": 87,
+      "high": 3025,
+      "koszul": 518,
+      "low": 30941,
+      "queued": 8270,
+      "syzygy": 34187
+     },
+     "pivots": 386,
+     "reduce": "tests",
+     "reductions": 659,
+     "round_subtracted": 83846548,
+     "rounds": 9,
+     "rounds_without_zero_rows": 0,
+     "rows": 37572,
+     "zero_reductions": 250,
+     "zero_rows": 268
+    },
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2445736,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11380,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "rows",
+     "reductions": 1775,
+     "round_subtracted": 294668951,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 47955,
+     "zero_reductions": 1529,
+     "zero_rows": 1529
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 7.2e-05,
+     "encode": 0.001873,
+     "record": 3e-06,
+     "reduce": 0.063404,
+     "select": 0.000299,
+     "symbolic": 0.016672,
+     "update": 0.003402
+    },
+    {
+     "backsub": 0.000727,
+     "decode": 2.2e-05,
+     "encode": 0.002301,
+     "record": 0.0,
+     "reduce": 0.233455,
+     "select": 9.499999999999999e-05,
+     "symbolic": 0.016238,
+     "update": 0.0007779999999999999
+    }
+   ],
+   "subtracted_discarded": [
+    83846783
+   ],
+   "subtracted_total": [
+    378609170
+   ],
+   "wall_max_ms": 348.488222,
+   "wall_median_ms": 347.685361,
+   "wall_min_ms": 343.084931,
+   "wall_ms": [
+    343.084931,
+    347.679941,
+    347.685361,
+    347.912051,
+    348.488222
+   ]
+  },
+  {
+   "answers": [
+    "4f1b8d33ff44ae79ca4cd416e77618aa3bd73b173d6325326f5ea5e137588391"
+   ],
+   "arm": "default",
+   "attempts": 5,
+   "case": "mq10-m31",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 55,
+    "kept": 1830,
+    "lcm_redundant_skipped": 19027,
+    "product_skipped": 11363,
+    "updates": 256
+   },
+   "rss_mib_max": 16.53515625,
+   "rss_mib_median": 16.46484375,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 1844129,
+     "given": 528,
+     "inter_subtracted": 0,
+     "max_columns": 16217,
+     "max_rows": 15882,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 77028,
+      "equal": 87,
+      "high": 3025,
+      "koszul": 518,
+      "low": 30941,
+      "queued": 8270,
+      "syzygy": 34187
+     },
+     "pivots": 386,
+     "reduce": "tests",
+     "reductions": 662,
+     "round_subtracted": 82182398,
+     "rounds": 9,
+     "rounds_without_zero_rows": 0,
+     "rows": 37572,
+     "zero_reductions": 244,
+     "zero_rows": 268
+    },
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2431925,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11052,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "combinations",
+     "reductions": 306,
+     "round_subtracted": 36826594,
+     "rounds": 10,
+     "rounds_without_zero_rows": 10,
+     "rows": 47265,
+     "zero_reductions": 60,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 7.000000000000001e-05,
+     "encode": 0.001935,
+     "record": 3e-06,
+     "reduce": 0.088313,
+     "select": 0.00030900000000000003,
+     "symbolic": 0.016628,
+     "update": 0.003284
+    },
+    {
+     "backsub": 0.0015249999999999999,
+     "decode": 2.2e-05,
+     "encode": 0.00227,
+     "record": 1e-06,
+     "reduce": 0.035729000000000004,
+     "select": 8.999999999999999e-05,
+     "symbolic": 0.015782,
+     "update": 0.000748
+    }
+   ],
+   "subtracted_discarded": [
+    82182633
+   ],
+   "subtracted_total": [
+    119102663
+   ],
+   "wall_max_ms": 175.746786,
+   "wall_median_ms": 174.721615,
+   "wall_min_ms": 173.397568,
+   "wall_ms": [
+    174.721615,
+    173.397568,
+    175.556376,
+    175.746786,
+    173.938282
+   ]
+  },
+  {
+   "answers": [
+    "4f1b8d33ff44ae79ca4cd416e77618aa3bd73b173d6325326f5ea5e137588391"
+   ],
+   "arm": "default-nocomb",
+   "attempts": 5,
+   "case": "mq10-m31",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 55,
+    "kept": 1830,
+    "lcm_redundant_skipped": 19027,
+    "product_skipped": 11363,
+    "updates": 256
+   },
+   "rss_mib_max": 16.52734375,
+   "rss_mib_median": 16.29296875,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 1844129,
+     "given": 528,
+     "inter_subtracted": 0,
+     "max_columns": 16217,
+     "max_rows": 15882,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 77028,
+      "equal": 87,
+      "high": 3025,
+      "koszul": 518,
+      "low": 30941,
+      "queued": 8270,
+      "syzygy": 34187
+     },
+     "pivots": 386,
+     "reduce": "rows",
+     "reductions": 654,
+     "round_subtracted": 87002098,
+     "rounds": 9,
+     "rounds_without_zero_rows": 0,
+     "rows": 37572,
+     "zero_reductions": 268,
+     "zero_rows": 268
+    },
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2431925,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11052,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "rows",
+     "reductions": 1775,
+     "round_subtracted": 284776015,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 47265,
+     "zero_reductions": 1529,
+     "zero_rows": 1529
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 7.4e-05,
+     "encode": 0.001916,
+     "record": 3e-06,
+     "reduce": 0.092979,
+     "select": 0.000315,
+     "symbolic": 0.016588,
+     "update": 0.003377
+    },
+    {
+     "backsub": 0.00119,
+     "decode": 2.2e-05,
+     "encode": 0.002425,
+     "record": 1e-06,
+     "reduce": 0.310925,
+     "select": 9.1e-05,
+     "symbolic": 0.015794,
+     "update": 0.000768
+    }
+   ],
+   "subtracted_discarded": [
+    87002333
+   ],
+   "subtracted_total": [
+    371871784
+   ],
+   "wall_max_ms": 459.344516,
+   "wall_median_ms": 457.10263,
+   "wall_min_ms": 452.715444,
+   "wall_ms": [
+    459.344516,
+    457.10263,
+    452.715444,
+    459.185614,
+    453.847187
+   ]
+  },
+  {
+   "answers": [
+    "4f1b8d33ff44ae79ca4cd416e77618aa3bd73b173d6325326f5ea5e137588391"
+   ],
+   "arm": "no-handover",
+   "attempts": 5,
+   "case": "mq10-m31",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 19.953125,
+   "rss_mib_median": 19.8359375,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 3049922,
+     "given": 530,
+     "inter_subtracted": 2467394,
+     "max_columns": 30871,
+     "max_rows": 30519,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 78210,
+      "equal": 87,
+      "high": 3041,
+      "koszul": 518,
+      "low": 31750,
+      "queued": 8291,
+      "syzygy": 34523
+     },
+     "pivots": 386,
+     "reduce": "tests",
+     "reductions": 664,
+     "round_subtracted": 83832205,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 68091,
+     "zero_reductions": 246,
+     "zero_rows": 270
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 6.3e-05,
+     "encode": 0.003356,
+     "record": 3e-06,
+     "reduce": 0.09152,
+     "select": 0.00038,
+     "symbolic": 0.02964,
+     "update": 0.0034200000000000003
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    86299834
+   ],
+   "wall_max_ms": 145.103888,
+   "wall_median_ms": 140.032365,
+   "wall_min_ms": 139.21147,
+   "wall_ms": [
+    140.032365,
+    139.829811,
+    145.103888,
+    142.973514,
+    139.21147
+   ]
+  },
+  {
+   "answers": [
+    "4f1b8d33ff44ae79ca4cd416e77618aa3bd73b173d6325326f5ea5e137588391"
+   ],
+   "arm": "no-handover-nocomb",
+   "attempts": 5,
+   "case": "mq10-m31",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 19.88671875,
+   "rss_mib_median": 19.7734375,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 3049922,
+     "given": 530,
+     "inter_subtracted": 2467394,
+     "max_columns": 30871,
+     "max_rows": 30519,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 78210,
+      "equal": 87,
+      "high": 3041,
+      "koszul": 518,
+      "low": 31750,
+      "queued": 8291,
+      "syzygy": 34523
+     },
+     "pivots": 386,
+     "reduce": "rows",
+     "reductions": 656,
+     "round_subtracted": 88651905,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 68091,
+     "zero_reductions": 270,
+     "zero_rows": 270
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 6.2e-05,
+     "encode": 0.003221,
+     "record": 3e-06,
+     "reduce": 0.09632299999999999,
+     "select": 0.00037,
+     "symbolic": 0.029606,
+     "update": 0.003386
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    91119534
+   ],
+   "wall_max_ms": 147.737604,
+   "wall_median_ms": 144.393582,
+   "wall_min_ms": 144.03344,
+   "wall_ms": [
+    144.325464,
+    146.820958,
+    144.393582,
+    147.737604,
+    144.03344
+   ]
+  },
+  {
+   "answers": [
+    "4f1b8d33ff44ae79ca4cd416e77618aa3bd73b173d6325326f5ea5e137588391"
+   ],
+   "arm": "sig-off",
+   "attempts": 5,
+   "case": "mq10-m31",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 55,
+    "kept": 1830,
+    "lcm_redundant_skipped": 19027,
+    "product_skipped": 11363,
+    "updates": 256
+   },
+   "rss_mib_max": 15.07421875,
+   "rss_mib_median": 15.02734375,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2431925,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11052,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "combinations",
+     "reductions": 306,
+     "round_subtracted": 36826594,
+     "rounds": 10,
+     "rounds_without_zero_rows": 10,
+     "rows": 47265,
+     "zero_reductions": 60,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.001567,
+     "decode": 2.2e-05,
+     "encode": 0.002284,
+     "record": 1e-06,
+     "reduce": 0.035899,
+     "select": 9.6e-05,
+     "symbolic": 0.017507,
+     "update": 0.000785
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    36920030
+   ],
+   "wall_max_ms": 66.405801,
+   "wall_median_ms": 65.432879,
+   "wall_min_ms": 65.281934,
+   "wall_ms": [
+    65.363849,
+    65.597522,
+    65.281934,
+    66.405801,
+    65.432879
+   ]
+  },
+  {
+   "answers": [
+    "4f1b8d33ff44ae79ca4cd416e77618aa3bd73b173d6325326f5ea5e137588391"
+   ],
+   "arm": "sig-off-nocomb",
+   "attempts": 5,
+   "case": "mq10-m31",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 55,
+    "kept": 1830,
+    "lcm_redundant_skipped": 19027,
+    "product_skipped": 11363,
+    "updates": 256
+   },
+   "rss_mib_max": 14.9765625,
+   "rss_mib_median": 14.8671875,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2431925,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11052,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "rows",
+     "reductions": 1775,
+     "round_subtracted": 284776015,
+     "rounds": 10,
+     "rounds_without_zero_rows": 0,
+     "rows": 47265,
+     "zero_reductions": 1529,
+     "zero_rows": 1529
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.001214,
+     "decode": 2.5e-05,
+     "encode": 0.002443,
+     "record": 2e-06,
+     "reduce": 0.309381,
+     "select": 9.999999999999999e-05,
+     "symbolic": 0.017326,
+     "update": 0.0007999999999999999
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    284869451
+   ],
+   "wall_max_ms": 344.569632,
+   "wall_median_ms": 339.846931,
+   "wall_min_ms": 338.453732,
+   "wall_ms": [
+    343.025278,
+    339.846931,
+    338.453732,
+    339.809048,
+    344.569632
+   ]
+  },
+  {
+   "answers": [
+    "4f1b8d33ff44ae79ca4cd416e77618aa3bd73b173d6325326f5ea5e137588391"
+   ],
+   "arm": "stock",
+   "attempts": 5,
+   "case": "mq10-m31",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.38134765625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": null,
+   "rss_mib_max": 15.6328125,
+   "rss_mib_median": 15.50390625,
+   "runs": [
+    {
+     "echelon_subtracted": 235,
+     "engine": "signature",
+     "entries": 1844129,
+     "given": 528,
+     "inter_subtracted": 0,
+     "max_columns": 16217,
+     "max_rows": 15882,
+     "outcome": "handover",
+     "pair_decisions": {
+      "considered": 77028,
+      "equal": 87,
+      "high": 3025,
+      "koszul": 518,
+      "low": 30941,
+      "queued": 8270,
+      "syzygy": 34187
+     },
+     "pivots": 386,
+     "reduce": "tests",
+     "reductions": 662,
+     "round_subtracted": 82182398,
+     "rounds": 9,
+     "rounds_without_zero_rows": 0,
+     "rows": 37572,
+     "zero_reductions": 244,
+     "zero_rows": 268
+    },
+    {
+     "echelon_subtracted": 235,
+     "engine": "plain",
+     "entries": 2431925,
+     "given": 3213,
+     "inter_subtracted": 93201,
+     "max_columns": 11052,
+     "max_rows": 11423,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 246,
+     "reduce": "combinations",
+     "reductions": 306,
+     "round_subtracted": 36826594,
+     "rounds": 10,
+     "rounds_without_zero_rows": 10,
+     "rows": 47265,
+     "zero_reductions": 60,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 7.4e-05,
+     "encode": 0.001931,
+     "record": 4e-06,
+     "reduce": 0.078133,
+     "select": 0.00030000000000000003,
+     "symbolic": 0.016829,
+     "update": 0.00348
+    },
+    {
+     "backsub": 0.00122,
+     "decode": 2.2e-05,
+     "encode": 0.0021939999999999998,
+     "record": 1e-06,
+     "reduce": 0.032396,
+     "select": 9.6e-05,
+     "symbolic": 0.015823,
+     "update": 0.0008230000000000001
+    }
+   ],
+   "subtracted_discarded": [
+    82182633
+   ],
+   "subtracted_total": [
+    119102663
+   ],
+   "wall_max_ms": 160.669018,
+   "wall_median_ms": 160.51679,
+   "wall_min_ms": 160.2265,
+   "wall_ms": [
+    160.53821,
+    160.2265,
+    160.447949,
+    160.51679,
+    160.669018
+   ]
+  },
+  {
+   "answers": [
+    "5d87dc9b5eeb5d84fb4c7b18bcae216736b9a4499d8410f62ff0a2ae15fb89ae"
+   ],
+   "arm": "default",
+   "attempts": 5,
+   "case": "mq11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.45166015625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 117.703125,
+   "rss_mib_median": 117.265625,
+   "runs": [
+    {
+     "echelon_subtracted": 7865,
+     "engine": "signature",
+     "entries": 18542398,
+     "given": 1318,
+     "inter_subtracted": 76146949,
+     "max_columns": 3836,
+     "max_rows": 2130,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 293761,
+      "equal": 0,
+      "high": 0,
+      "koszul": 782,
+      "low": 124617,
+      "queued": 15708,
+      "syzygy": 152654
+     },
+     "pivots": 756,
+     "reduce": "tests",
+     "reductions": 782,
+     "round_subtracted": 894517126,
+     "rounds": 11,
+     "rounds_without_zero_rows": 0,
+     "rows": 14425,
+     "zero_reductions": 26,
+     "zero_rows": 562
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000518,
+     "encode": 0.009592999999999999,
+     "record": 4.9999999999999996e-06,
+     "reduce": 2.530856,
+     "select": 0.000718,
+     "symbolic": 0.071211,
+     "update": 0.009402
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    970671940
+   ],
+   "wall_max_ms": 2994.695325,
+   "wall_median_ms": 2991.222791,
+   "wall_min_ms": 2985.969644,
+   "wall_ms": [
+    2994.459599,
+    2985.969644,
+    2994.695325,
+    2987.102199,
+    2991.222791
+   ]
+  },
+  {
+   "answers": [
+    "5d87dc9b5eeb5d84fb4c7b18bcae216736b9a4499d8410f62ff0a2ae15fb89ae"
+   ],
+   "arm": "no-handover",
+   "attempts": 5,
+   "case": "mq11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.40380859375,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 116.4921875,
+   "rss_mib_median": 115.90625,
+   "runs": [
+    {
+     "echelon_subtracted": 7865,
+     "engine": "signature",
+     "entries": 18542398,
+     "given": 1318,
+     "inter_subtracted": 76146949,
+     "max_columns": 3836,
+     "max_rows": 2130,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 293761,
+      "equal": 0,
+      "high": 0,
+      "koszul": 782,
+      "low": 124617,
+      "queued": 15708,
+      "syzygy": 152654
+     },
+     "pivots": 756,
+     "reduce": "tests",
+     "reductions": 782,
+     "round_subtracted": 894517126,
+     "rounds": 11,
+     "rounds_without_zero_rows": 0,
+     "rows": 14425,
+     "zero_reductions": 26,
+     "zero_rows": 562
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000476,
+     "encode": 0.009651999999999999,
+     "record": 4.9999999999999996e-06,
+     "reduce": 2.525292,
+     "select": 0.000722,
+     "symbolic": 0.071877,
+     "update": 0.009354
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    970671940
+   ],
+   "wall_max_ms": 3002.547482,
+   "wall_median_ms": 2991.424172,
+   "wall_min_ms": 2980.26328,
+   "wall_ms": [
+    2987.390164,
+    2991.424172,
+    2980.26328,
+    3002.547482,
+    2995.829372
+   ]
+  },
+  {
+   "answers": [
+    "5d87dc9b5eeb5d84fb4c7b18bcae216736b9a4499d8410f62ff0a2ae15fb89ae"
+   ],
+   "arm": "sig-off",
+   "attempts": 5,
+   "case": "mq11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.45166015625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 7049,
+    "lcm_redundant_skipped": 240529,
+    "product_skipped": 46183,
+    "updates": 767
+   },
+   "rss_mib_max": 116.4140625,
+   "rss_mib_median": 116.15234375,
+   "runs": [
+    {
+     "echelon_subtracted": 7865,
+     "engine": "plain",
+     "entries": 36549373,
+     "given": 10354,
+     "inter_subtracted": 0,
+     "max_columns": 9436,
+     "max_rows": 8904,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 756,
+     "reduce": "combinations",
+     "reductions": 840,
+     "round_subtracted": 1636275401,
+     "rounds": 11,
+     "rounds_without_zero_rows": 11,
+     "rows": 60184,
+     "zero_reductions": 84,
+     "zero_rows": 0
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.212978,
+     "decode": 0.000377,
+     "encode": 0.020029,
+     "record": 1.2e-05,
+     "reduce": 4.694306,
+     "select": 0.000374,
+     "symbolic": 0.160582,
+     "update": 0.007141
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    1636283266
+   ],
+   "wall_max_ms": 5261.682441,
+   "wall_median_ms": 5253.459631,
+   "wall_min_ms": 5249.078607,
+   "wall_ms": [
+    5253.468268,
+    5252.76694,
+    5249.078607,
+    5261.682441,
+    5253.459631
+   ]
+  },
+  {
+   "answers": [
+    "5d87dc9b5eeb5d84fb4c7b18bcae216736b9a4499d8410f62ff0a2ae15fb89ae"
+   ],
+   "arm": "stock",
+   "attempts": 5,
+   "case": "mq11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.3515625,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": null,
+   "rss_mib_max": 117.63671875,
+   "rss_mib_median": 117.01953125,
+   "runs": [
+    {
+     "echelon_subtracted": 7865,
+     "engine": "signature",
+     "entries": 18542398,
+     "given": 1318,
+     "inter_subtracted": 76146949,
+     "max_columns": 3836,
+     "max_rows": 2130,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 293761,
+      "equal": 0,
+      "high": 0,
+      "koszul": 782,
+      "low": 124617,
+      "queued": 15708,
+      "syzygy": 152654
+     },
+     "pivots": 756,
+     "reduce": "tests",
+     "reductions": 782,
+     "round_subtracted": 894517126,
+     "rounds": 11,
+     "rounds_without_zero_rows": 0,
+     "rows": 14425,
+     "zero_reductions": 26,
+     "zero_rows": 562
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.000739,
+     "encode": 0.009707,
+     "record": 4e-06,
+     "reduce": 2.52325,
+     "select": 0.000715,
+     "symbolic": 0.071906,
+     "update": 0.009514
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    970671940
+   ],
+   "wall_max_ms": 3153.760436,
+   "wall_median_ms": 2992.793485,
+   "wall_min_ms": 2982.448918,
+   "wall_ms": [
+    3153.760436,
+    2992.793485,
+    2982.448918,
+    2984.227356,
+    3027.938708
+   ]
+  }
+ ],
+ "cohort": "primary",
+ "commit": "c143b178ad5d6d2f51760003f7eba8116301417d",
+ "controls": [
+  {
+   "case": "cyclic7-goldilocks",
+   "ci95": [
+    0.9792315987896593,
+    1.0223040063295035
+   ],
+   "research_over_stock": 1.000984125110751,
+   "same_answer": true,
+   "same_path": true
+  },
+  {
+   "case": "eco12-wide64",
+   "ci95": [
+    1.0135615460396254,
+    1.0242479923717538
+   ],
+   "research_over_stock": 1.0204027423796338,
+   "same_answer": true,
+   "same_path": true
+  },
+  {
+   "case": "katsura11-goldilocks",
+   "ci95": [
+    0.9559855610773997,
+    1.0107169746451372
+   ],
+   "research_over_stock": 0.9884304757642175,
+   "same_answer": true,
+   "same_path": true
+  },
+  {
+   "case": "mq10-32003",
+   "ci95": [
+    1.105136930567484,
+    1.1243906949675968
+   ],
+   "research_over_stock": 1.109513218763329,
+   "same_answer": true,
+   "same_path": true
+  },
+  {
+   "case": "mq10-m31",
+   "ci95": [
+    1.0802456739883723,
+    1.0953507794605712
+   ],
+   "research_over_stock": 1.0884943251107877,
+   "same_answer": true,
+   "same_path": true
+  },
+  {
+   "case": "mq11-goldilocks",
+   "ci95": [
+    0.948462272801497,
+    1.003507765244144
+   ],
+   "research_over_stock": 0.9994751746126579,
+   "same_answer": true,
+   "same_path": true
+  }
+ ],
+ "gate_a1": [
+  {
+   "against": "sig-off",
+   "arm": "default",
+   "case": "mq11-goldilocks",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": false,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 1.0095846645367412,
+   "wall_bar": true,
+   "wall_bar_interval": true,
+   "wall_ci95": [
+    0.5683806376424086,
+    0.5701176844903002
+   ],
+   "wall_ratio_sig_over_off": 0.5693815125844259,
+   "work_bar": false,
+   "work_ratio_off_over_sig": 1.6857222286656397
+  },
+  {
+   "against": "sig-off",
+   "arm": "no-handover",
+   "case": "mq11-goldilocks",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": false,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 0.997881284681352,
+   "wall_bar": true,
+   "wall_bar_interval": true,
+   "wall_ci95": [
+    0.5672953614060046,
+    0.5715371760510631
+   ],
+   "wall_ratio_sig_over_off": 0.5694198456095455,
+   "work_bar": false,
+   "work_ratio_off_over_sig": 1.6857222286656397
+  },
+  {
+   "against": "sig-off",
+   "arm": "default",
+   "case": "eco12-wide64",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": false,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 1.0141242937853108,
+   "wall_bar": false,
+   "wall_bar_interval": false,
+   "wall_ci95": [
+    0.9913406805158284,
+    1.0050605775850088
+   ],
+   "wall_ratio_sig_over_off": 1.0012873613260345,
+   "work_bar": false,
+   "work_ratio_off_over_sig": 0.999932446856473
+  },
+  {
+   "against": "sig-off",
+   "arm": "no-handover",
+   "case": "eco12-wide64",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": false,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 1.0356638418079096,
+   "wall_bar": false,
+   "wall_bar_interval": false,
+   "wall_ci95": [
+    0.9988611449417986,
+    1.0192735606342023
+   ],
+   "wall_ratio_sig_over_off": 1.0090723916238518,
+   "work_bar": false,
+   "work_ratio_off_over_sig": 0.9086224978105327
+  },
+  {
+   "against": "sig-off-nocomb",
+   "arm": "default-nocomb",
+   "case": "eco12-wide64",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": true,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 1.1523382559774964,
+   "wall_bar": true,
+   "wall_bar_interval": true,
+   "wall_ci95": [
+    0.170926816760491,
+    0.1799542159636591
+   ],
+   "wall_ratio_sig_over_off": 0.17215892637829,
+   "work_bar": true,
+   "work_ratio_off_over_sig": 6.3333993414868806
+  },
+  {
+   "against": "sig-off-nocomb",
+   "arm": "no-handover-nocomb",
+   "case": "eco12-wide64",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": true,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 1.02584388185654,
+   "wall_bar": true,
+   "wall_bar_interval": true,
+   "wall_ci95": [
+    0.17002804906932495,
+    0.19114707672227407
+   ],
+   "wall_ratio_sig_over_off": 0.170641069384659,
+   "work_bar": true,
+   "work_ratio_off_over_sig": 6.3333993414868806
+  }
+ ],
+ "planned": 150,
+ "refusal": null
+}

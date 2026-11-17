@@ -1222,11 +1222,66 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
     workers: usize,
     min_frontier: usize,
 ) -> Preprocessed<N> {
+    symbolic_preprocessing_level_parallel_measured(basis, pairs, selection, workers, min_frontier).0
+}
+
+/// Where [`symbolic_preprocessing_level_parallel`]'s time went (#859).
+///
+/// Clocks are read per level and per worker slice, never per monomial. `scan` is the wall of each
+/// level's scan phase, spawn and join included; `slowest_slice` sums each dispatched level's
+/// longest worker slice, so `parallel_scan - slowest_slice` is what the team cost beyond its
+/// critical path.
+#[cfg(feature = "research-work")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct LevelParallelReport {
+    /// Breadth-first levels the closure took.
+    pub levels: usize,
+    /// Of those, the levels dispatched to a worker team rather than scanned on the caller.
+    pub parallel_levels: usize,
+    /// The widest frontier.
+    pub max_frontier: usize,
+    /// Monomials across every frontier: each distinct monomial is in exactly one.
+    pub frontier_monomials: usize,
+    /// Monomials in dispatched frontiers.
+    pub parallel_frontier_monomials: usize,
+    /// Seed-row terms, interned before the first level.
+    pub seed_terms: usize,
+    /// Reducer-row terms whose handle a worker found in `examined` before the level began.
+    pub terms_known: usize,
+    /// Reducer-row terms the serial commit had to intern: new to the level, or first met in it.
+    pub terms_interned: usize,
+    /// Of [`Self::terms_interned`], the new monomials; the rest the level's own commit met first.
+    pub terms_admitted: usize,
+    /// Seeding, and interning the seed rows' terms.
+    pub seed: std::time::Duration,
+    /// Every level's scan phase: worker dispatch, scans and join, or the caller's own scan.
+    pub scan: std::time::Duration,
+    /// Of [`Self::scan`], the dispatched levels only.
+    pub parallel_scan: std::time::Duration,
+    /// Per dispatched level, the longest worker slice's own scan time, summed.
+    pub slowest_slice: std::time::Duration,
+    /// Per dispatched level, every worker slice's scan time, summed.
+    pub slice_busy: std::time::Duration,
+    /// The serial in-order commit of every level.
+    pub commit: std::time::Duration,
+}
+
+/// As [`symbolic_preprocessing_level_parallel`], with its [`LevelParallelReport`].
+#[cfg(feature = "research-work")]
+pub fn symbolic_preprocessing_level_parallel_measured<const N: usize, F: FiniteField + Sync>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    selection: ReducerSelection,
+    workers: usize,
+    min_frontier: usize,
+) -> (Preprocessed<N>, LevelParallelReport) {
+    use std::time::{Duration, Instant};
     /// A level slice's results: per monomial, the reducer and the range of its terms in `terms`.
     struct Scanned<const N: usize> {
         found: Vec<Option<(usize, Monomial<N>, usize, usize)>>,
         terms: Vec<(Monomial<N>, Option<MonomialHandle>)>,
         counts: SymbolicCounts,
+        busy: Duration,
     }
     fn scan<const N: usize, F: FiniteField>(
         basis: &MonicBasis<N, F>,
@@ -1235,10 +1290,12 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
         examined: &MonomialMap<N, MonomialHandle>,
         slice: &[Monomial<N>],
     ) -> Scanned<N> {
+        let started = Instant::now();
         let mut scanned = Scanned {
             found: Vec::with_capacity(slice.len()),
             terms: Vec::new(),
             counts: SymbolicCounts::default(),
+            busy: Duration::ZERO,
         };
         for monomial in slice {
             let divisor = if covered.contains(monomial) {
@@ -1256,9 +1313,12 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
                 (index, multiplier, start, scanned.terms.len())
             }));
         }
+        scanned.busy = started.elapsed();
         scanned
     }
 
+    let mut report = LevelParallelReport::default();
+    let seeding = Instant::now();
     let mut counts = SymbolicCounts::default();
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
     let mut covered: MonomialSet<N> = MonomialSet::default();
@@ -1294,10 +1354,17 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
         }
     }
     counts.max_pending_monomials = next.len();
+    report.seed_terms = term_handles.len();
+    report.seed = seeding.elapsed();
 
     while !next.is_empty() {
         let frontier: Vec<Monomial<N>> = std::mem::take(&mut next).into();
-        let slices: Vec<Scanned<N>> = if workers <= 1 || frontier.len() < min_frontier {
+        let dispatched = workers > 1 && frontier.len() >= min_frontier;
+        report.levels += 1;
+        report.max_frontier = report.max_frontier.max(frontier.len());
+        report.frontier_monomials += frontier.len();
+        let scanning = Instant::now();
+        let slices: Vec<Scanned<N>> = if !dispatched {
             vec![scan(basis, selection, &covered, &examined, &frontier)]
         } else {
             let chunk = frontier.len().div_ceil(workers);
@@ -1315,6 +1382,16 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
                     .collect()
             })
         };
+        let scanned_in = scanning.elapsed();
+        report.scan += scanned_in;
+        if dispatched {
+            report.parallel_levels += 1;
+            report.parallel_frontier_monomials += frontier.len();
+            report.parallel_scan += scanned_in;
+            report.slowest_slice += slices.iter().map(|s| s.busy).max().unwrap_or_default();
+            report.slice_busy += slices.iter().map(|s| s.busy).sum::<Duration>();
+        }
+        let committing = Instant::now();
         let mut position = 0;
         for scanned in slices {
             counts.add(&scanned.counts);
@@ -1329,10 +1406,21 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
                     term_handles.push(match known {
                         Some(handle) => {
                             counts.monomials_enqueued += 1;
+                            report.terms_known += 1;
                             handle
                         }
                         None => {
-                            enqueue(term, &mut next, &mut examined, &mut monomials, &mut counts)
+                            report.terms_interned += 1;
+                            let before = monomials.len();
+                            let handle = enqueue(
+                                term,
+                                &mut next,
+                                &mut examined,
+                                &mut monomials,
+                                &mut counts,
+                            );
+                            report.terms_admitted += monomials.len() - before;
+                            handle
                         }
                     });
                 }
@@ -1347,15 +1435,19 @@ pub fn symbolic_preprocessing_level_parallel<const N: usize, F: FiniteField + Sy
                 });
             }
         }
+        report.commit += committing.elapsed();
     }
 
-    Preprocessed {
-        rows,
-        leading_monomials: covered,
-        monomials,
-        term_handles,
-        counts,
-    }
+    (
+        Preprocessed {
+            rows,
+            leading_monomials: covered,
+            monomials,
+            term_handles,
+            counts,
+        },
+        report,
+    )
 }
 
 /// Offer `monomial` to the pending queue, admitting it only if `examined` had not seen it, and

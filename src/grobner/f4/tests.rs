@@ -4224,6 +4224,154 @@ fn test_level_parallel_symbolic_preprocessing_matches_the_serial_closure() {
     assert!(compared > 0, "no batch was compared");
 }
 
+/// #860: both interning prototypes — serial canonical merge and sharded merge — equal the serial
+/// closure under both seed policies, at every worker count, slice count and dispatch threshold,
+/// counters included, and refuse a row budget exactly when the serial closure does.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_parallel_interning_matches_the_serial_closure() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic::symbolic_preprocessing_seeded,
+        symbolic_intern::{symbolic_preprocessing_interned, InternConfig, Merge},
+        PairMultiples,
+    };
+    type G = Zp2147483647;
+    fn check<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, G>]) -> usize {
+        let options = F4Options::default();
+        let mut compared = 0;
+        for order in ALL_ORDERS {
+            let (_, _, trace) = trace_batches(system, order, &options).expect("within limits");
+            for (index, batch) in trace.batches().iter().enumerate() {
+                for multiples in [PairMultiples::Every, PairMultiples::Distinct] {
+                    let serial = |max_rows| {
+                        symbolic_preprocessing_seeded(
+                            &batch.basis,
+                            &batch.pairs,
+                            max_rows,
+                            options.reducer_selection,
+                            &mut ReducerCache::disabled(),
+                            multiples,
+                        )
+                    };
+                    let reference = serial(usize::MAX).unwrap();
+                    let budgets = [usize::MAX, reference.rows.len(), reference.rows.len() / 2];
+                    for merge in [Merge::Serial, Merge::Sharded] {
+                        for (workers, slices) in [(1, 1), (2, 3), (5, 4), (16, 2)] {
+                            for min_frontier in [0, 64] {
+                                for &max_rows in &budgets {
+                                    let config = InternConfig {
+                                        workers,
+                                        merge,
+                                        min_frontier,
+                                        slices_per_worker: slices,
+                                        min_seed_rows: 0,
+                                    };
+                                    let (got, _) = symbolic_preprocessing_interned(
+                                        &batch.basis,
+                                        &batch.pairs,
+                                        max_rows,
+                                        options.reducer_selection,
+                                        multiples,
+                                        &config,
+                                    );
+                                    assert_eq!(
+                                        got,
+                                        serial(max_rows),
+                                        "{name} under {order:?}, batch {index}, {multiples:?}, \
+                                         {merge:?}, {workers} workers x {slices}, min frontier \
+                                         {min_frontier}, budget {max_rows}"
+                                    );
+                                    compared += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        compared
+    }
+    let compared = check("katsura-6", &katsura::<6, G>()) + check("cyclic-5", &cyclic::<5, G>());
+    assert!(compared > 0, "no batch was compared");
+}
+
+/// #860: live F4 with either interning prototype in force returns the shipping basis and the
+/// shipping symbolic counters, and the prototype actually served its batches.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_live_interning_prototypes_leave_f4_unchanged() {
+    use crate::grobner::f4::symbolic_intern::{with_live, InternConfig, Merge};
+    type G = Zp2147483647;
+    let system = katsura::<6, G>();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let options = F4Options::default();
+    let (basis, stats) = super::f4_reported(&system, order, &options);
+    let basis = basis.unwrap();
+    for merge in [Merge::Serial, Merge::Sharded] {
+        let config = InternConfig {
+            workers: 4,
+            merge,
+            min_frontier: 0,
+            slices_per_worker: 2,
+            min_seed_rows: 0,
+        };
+        let ((got, got_stats), report) =
+            with_live(config, || super::f4_reported(&system, order, &options));
+        assert_eq!(got.unwrap(), basis, "{merge:?}");
+        assert_eq!(got_stats.monomials_enqueued, stats.monomials_enqueued);
+        assert_eq!(got_stats.divisor_queries, stats.divisor_queries);
+        assert!(report.steps > 0 && report.dispatched_steps > 0, "{merge:?}");
+    }
+}
+
+/// The #859 level report accounts for every column once, every row term once, and parallel levels
+/// only where a team was actually dispatched; the measured closure is the serial one.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_level_parallel_report_accounts_for_every_column_and_term() {
+    use crate::grobner::f4::{
+        observer::trace_batches, symbolic::symbolic_preprocessing_level_parallel_measured,
+    };
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&katsura::<6, G>(), order, &options).expect("within limits");
+    let mut dispatched = 0;
+    for batch in trace.batches() {
+        let serial = symbolic_preprocessing_with(
+            &batch.basis,
+            &batch.pairs,
+            usize::MAX,
+            options.reducer_selection,
+            &mut ReducerCache::disabled(),
+        )
+        .unwrap();
+        for (workers, min_frontier) in [(1, 0), (4, 0), (4, usize::MAX)] {
+            let (parallel, report) = symbolic_preprocessing_level_parallel_measured(
+                &batch.basis,
+                &batch.pairs,
+                options.reducer_selection,
+                workers,
+                min_frontier,
+            );
+            assert_eq!(parallel, serial);
+            assert_eq!(report.frontier_monomials, serial.monomials.len());
+            assert_eq!(
+                report.terms_known + report.terms_interned + report.seed_terms,
+                serial.term_handles.len()
+            );
+            assert!(report.max_frontier <= report.frontier_monomials);
+            assert!(report.parallel_levels <= report.levels);
+            if workers == 1 || min_frontier == usize::MAX {
+                assert_eq!(report.parallel_levels, 0);
+            }
+            dispatched += report.parallel_levels;
+        }
+    }
+    assert!(dispatched > 0, "no level ran on a worker team");
+}
+
 /// The two halves of every pair in `pairs`, as `(basis_index, multiplier)` identities.
 fn seed_identities<const N: usize>(
     preprocessed: &Preprocessed<N>,

@@ -79,6 +79,11 @@ research-work = []
 # feature on, the production single-row path stays selected unless a caller opts in per thread.
 research-multirow = []
 
+# Research-only signature-compatible F4 engine for #857 (RFC `docs/research/signature-f4-rfc.md`).
+# An isolated module behind its own entry point; the shipping F4 never reads it. Needs the
+# dependency-free `external-runners` corpus types for its pinned correctness constructions.
+research-sigf4 = ["external-runners"]
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
@@ -114,6 +119,10 @@ test = true
 [[example]]
 name = "batch_order_study"
 required-features = ["external-runners"]
+
+[[example]]
+name = "sig_f4_study"
+required-features = ["research-sigf4"]
 
 [[example]]
 name = "block_density"
@@ -348,6 +357,11 @@ required-features = ["external-runners", "research-work"]
 
 [[example]]
 name = "symbolic_parallel_price"
+required-features = ["external-runners", "research-work"]
+
+[[example]]
+name = "symbolic_cost_model"
+test = true
 required-features = ["external-runners", "research-work"]
 
 [[example]]

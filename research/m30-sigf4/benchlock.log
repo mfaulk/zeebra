@@ -1,0 +1,15 @@
+2026-11-17T13:19:30-05:00  QUEUED   zb-857          pid=1445690  timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh gate
+2026-11-17T13:19:30-05:00  START    zb-857          pid=1445690  waited=0s load=1.96 lock=exclusive reserved=8-23,72-87 timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh gate
+2026-11-17T13:24:22-05:00  END      zb-857          pid=1445690  status=0 end=exited elapsed=292s load=2.27 timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh gate
+2026-11-17T13:24:33-05:00  QUEUED   zb-857          pid=1453996  timeout --signal=INT --kill-after=60s 5400 bash research/m30-sigf4/campaign.sh controls
+2026-11-17T13:24:33-05:00  START    zb-857          pid=1453996  waited=0s load=2.07 lock=exclusive reserved=8-23,72-87 timeout --signal=INT --kill-after=60s 5400 bash research/m30-sigf4/campaign.sh controls
+2026-11-17T13:29:15-05:00  END      zb-857          pid=1453996  status=0 end=exited elapsed=282s load=3.60 timeout --signal=INT --kill-after=60s 5400 bash research/m30-sigf4/campaign.sh controls
+2026-11-17T13:29:15-05:00  QUEUED   zb-857          pid=1461545  timeout --signal=INT --kill-after=60s 5400 bash research/m30-sigf4/campaign.sh census
+2026-11-17T13:29:16-05:00  START    zb-857          pid=1461545  waited=0s load=3.60 lock=exclusive reserved=8-23,72-87 timeout --signal=INT --kill-after=60s 5400 bash research/m30-sigf4/campaign.sh census
+2026-11-17T13:30:18-05:00  END      zb-857          pid=1461545  status=0 end=exited elapsed=63s load=2.71 timeout --signal=INT --kill-after=60s 5400 bash research/m30-sigf4/campaign.sh census
+2026-11-17T13:41:57-05:00  QUEUED   zb-857          pid=1538407  timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh gate2
+2026-11-17T13:41:57-05:00  START    zb-857          pid=1538407  waited=0s load=2.39 lock=exclusive reserved=8-23,72-87 timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh gate2
+2026-11-17T13:43:18-05:00  END      zb-857          pid=1538407  status=0 end=exited elapsed=81s load=4.30 timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh gate2
+2026-11-17T13:43:18-05:00  QUEUED   zb-857          pid=1548626  timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh controls2
+2026-11-17T13:43:18-05:00  START    zb-857          pid=1548626  waited=0s load=4.30 lock=exclusive reserved=8-23,72-87 timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh controls2
+2026-11-17T13:44:11-05:00  END      zb-857          pid=1548626  status=0 end=exited elapsed=53s load=6.40 timeout --signal=INT --kill-after=60s 3600 bash research/m30-sigf4/campaign.sh controls2

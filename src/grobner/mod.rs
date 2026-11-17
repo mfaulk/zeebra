@@ -15,6 +15,8 @@ pub mod reference;
 pub mod resultant;
 mod s_polynomial;
 pub mod shape_certificate;
+#[cfg(feature = "research-sigf4")]
+pub mod sigf4;
 mod solve;
 mod solve_zero_dimensional;
 pub mod transform;
