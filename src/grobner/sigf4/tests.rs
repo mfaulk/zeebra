@@ -245,6 +245,25 @@ fn test_every_criterion_rejects_something_on_katsura_6() {
     assert!(s.reductions_to_zero < s.rejected_rewrite + s.rejected_koszul);
 }
 
+/// Design 2's parallel pre-reduction returns the same basis and does the same work-avoiding
+/// decisions as the serial design 1, on a field that crosses threads.
+#[test]
+fn test_parallel_pre_reduction_matches_the_serial_engine() {
+    let system = katsura::<6, Goldilocks>();
+    let (serial, s) = sig_f4_reported(&system, GREVLEX, &SigF4Options::checked());
+    let options = SigF4Options {
+        workers: 4,
+        ..SigF4Options::checked()
+    };
+    let (parallel, p) = sig_f4_reported(&system, GREVLEX, &options);
+    assert_eq!(parallel.unwrap(), serial.unwrap());
+    assert_eq!(
+        (p.targets, p.reductions_to_zero, p.elements_added),
+        (s.targets, s.reductions_to_zero, s.elements_added)
+    );
+    assert_eq!(p.rejected_rewrite, s.rejected_rewrite);
+}
+
 fn polynomial_strategy<F: FiniteField + 'static>(
     modulus: u64,
 ) -> impl Strategy<Value = MultivariatePolynomial<3, F>> {

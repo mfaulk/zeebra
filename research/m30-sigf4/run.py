@@ -5,7 +5,7 @@ Run under `tools/benchlock.sh` with every binary already built. Each child gets
 process, which is the authoritative figure (plan §10.2).
 
     python3 research/m30-sigf4/run.py --bin BIN --out OUT.jsonl --reps 5 \
-        --rows wide64/eco-12 goldilocks/katsura-11 --arms sigf4:1 f4:1 f4:16 [--cpus 0-15]
+        --rows wide64/eco-12 goldilocks/katsura-11 --arms sigf4:1 f4:1 f4:16 [--first 24]
 """
 import argparse
 import json
@@ -26,13 +26,16 @@ def plan(rows, arms, reps):
     return order
 
 
-def command(binary, row, arm, cap, cpus):
+def command(binary, row, arm, cap, first):
+    """Pinned to CPUs first..first+workers-1, CCD-aligned as in m29-baseline/costmodel.py."""
     field, name = row.split('/')
     engine, workers = arm.split(':')
     cmd = ['timeout', '--signal=INT', '--kill-after=60s', str(cap), binary,
            '--field', field, '--name', name, '--engine', engine, '--workers', workers,
            '--wall-s', str(cap)]
-    return (['taskset', '-c', cpus] if cpus else []) + cmd
+    if first is None:
+        return cmd
+    return ['taskset', '-c', f'{first}-{first + int(workers) - 1}'] + cmd
 
 
 def main(argv):
@@ -43,11 +46,11 @@ def main(argv):
     parser.add_argument('--rows', nargs='+', required=True)
     parser.add_argument('--arms', nargs='+', required=True)
     parser.add_argument('--cap', type=int, default=900)
-    parser.add_argument('--cpus', default=None)
+    parser.add_argument('--first', type=int, default=None)
     args = parser.parse_args(argv)
     with open(args.out, 'a') as out:
         for rep, row, arm in plan(args.rows, args.arms, args.reps):
-            cmd = command(args.bin, row, arm, args.cap, args.cpus)
+            cmd = command(args.bin, row, arm, args.cap, args.first)
             load = os.getloadavg()[0]
             started = time.perf_counter_ns()
             child = subprocess.run(cmd, capture_output=True, text=True)

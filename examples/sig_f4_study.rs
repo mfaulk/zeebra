@@ -75,9 +75,6 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     if !["sigf4", "f4"].contains(&parsed.engine.as_str()) {
         return Err("--engine must be sigf4 or f4".into());
     }
-    if parsed.engine == "sigf4" && parsed.workers != 1 {
-        return Err("design 1 is serial: sigf4 takes --workers 1".into());
-    }
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
     }
@@ -209,6 +206,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let (result, statistics, work) = if args.engine == "sigf4" {
         let options = SigF4Options {
             max_wall_time: Some(args.wall),
+            workers: args.workers,
             ..SigF4Options::default()
         };
         let (result, stats) = sig_f4_reported(&system, ORDER, &options);
@@ -320,12 +318,12 @@ mod tests {
         parse_args(&list.iter().map(|s| s.to_string()).collect::<Vec<_>>())
     }
 
-    // Design 1 is serial, the census is serial-F4-only, and unknown fields or engines are refused.
+    // Both engines take workers, the census is serial-F4-only, and unknown fields or engines fail.
     #[test]
     fn arguments_are_validated() {
         let base = ["--field", "wide64", "--name", "eco-12", "--engine"];
         assert!(args(&[&base[..], &["sigf4"]].concat()).is_ok());
-        assert!(args(&[&base[..], &["sigf4", "--workers", "16"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16", "--discovery"]].concat()).is_err());
         assert!(args(&[&base[..], &["magma"]].concat()).is_err());

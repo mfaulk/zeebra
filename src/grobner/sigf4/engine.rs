@@ -4,6 +4,10 @@ use std::{
     cmp::Ordering,
     collections::BTreeMap,
     mem::size_of,
+    sync::{
+        atomic::{AtomicUsize, Ordering as AtomicOrdering},
+        Mutex,
+    },
     time::{Duration, Instant},
 };
 
@@ -12,6 +16,7 @@ use super::{
     SigF4Error, SigF4Options, SigF4Statistics,
 };
 use crate::{
+    fields::ConcurrentJob,
     grobner::{
         buchberger::{minimal_basis_for_interreduction, reduce_grobner_basis_until},
         f4::{
@@ -475,9 +480,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
     }
 
-    /// Serial regular elimination: each target, in increasing signature order, is fully reduced
-    /// by pivots of strictly smaller signature — reducer multiples, or earlier targets of this
-    /// batch (Lairez Algorithm 8 line 98). Returns the new elements in signature order.
+    /// Regular elimination: each target, in increasing signature order, is fully reduced by
+    /// pivots of strictly smaller signature — reducer multiples, or earlier targets of this batch
+    /// (Lairez Algorithm 8 line 98). Returns the new elements in signature order.
+    ///
+    /// With `workers > 1` (design 2, RFC §6.1 item 1) every target is first reduced against the
+    /// reducer block alone, in parallel: targets are independent there, and each pivot use is
+    /// still checked against the target's signature. The serial pass then finishes each target in
+    /// signature order against earlier targets' results, in place of §6.1 item 2's displacement
+    /// claim. Both passes perform only permitted operations, so leads are those of the serial
+    /// order (EF Lemma 4.10) and the engine stays deterministic.
     #[allow(clippy::type_complexity)]
     fn eliminate(
         &mut self,
@@ -487,6 +499,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         target_count: usize,
     ) -> Vec<(Signature<N>, Vec<(Monomial<N>, F)>)> {
         let clock = Instant::now();
+        let order = self.order;
         let index: MonomialMap<N, u32> = columns
             .iter()
             .enumerate()
@@ -501,70 +514,60 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let ncols = columns.len();
         let mut reducer_at: Vec<u32> = vec![NONE; ncols];
         let reducer_rows: Vec<Vec<(u32, F)>> = rows[target_count..].iter().map(sparse).collect();
-        let target_rows: Vec<Vec<(u32, F)>> = rows[..target_count].iter().map(sparse).collect();
+        let reducer_sigs: Vec<Signature<N>> = rows[target_count..].iter().map(|r| r.sig).collect();
+        let targets: Vec<(Signature<N>, Vec<(u32, F)>)> = rows[..target_count]
+            .iter()
+            .map(|r| (r.sig, sparse(r)))
+            .collect();
         debug_assert_eq!(reducer_rows.len(), reducer_count);
         for (k, entries) in reducer_rows.iter().enumerate() {
             reducer_at[entries[0].0 as usize] = k as u32;
         }
+
+        let block = ReducerBlock {
+            order,
+            rows: &reducer_rows,
+            sigs: &reducer_sigs,
+            at: &reducer_at,
+            ncols,
+        };
+        let prereduced: Vec<(Vec<(u32, F)>, u64)> = if self.options.workers > 1 {
+            let job = PhaseA {
+                block: &block,
+                targets: &targets,
+                workers: self.options.workers,
+            };
+            match F::run_concurrent(job) {
+                Ok(done) => done,
+                Err(job) => job.serial(),
+            }
+        } else {
+            Vec::new()
+        };
+        let mut prereduced = prereduced.into_iter();
+
         let mut target_at: Vec<u32> = vec![NONE; ncols];
         let mut results: Vec<(Signature<N>, Vec<(u32, F)>)> = Vec::new();
-        let mut acc: Vec<F> = vec![F::zero(); ncols];
-        let words = ncols.div_ceil(64);
-        let mut touched: Vec<u64> = vec![0; words];
-
-        for (target, entries) in rows[..target_count].iter().zip(target_rows) {
-            let t = target.sig;
-            let mut first = usize::MAX;
-            for (c, v) in entries {
-                let c = c as usize;
-                acc[c] = v;
-                touched[c >> 6] |= 1 << (c & 63);
-                first = first.min(c);
-            }
-            let mut products: u64 = 0;
-            let mut out: Vec<(u32, F)> = Vec::new();
-            let mut w = first >> 6;
-            while w < words {
-                let bits = touched[w];
-                if bits == 0 {
-                    w += 1;
-                    continue;
-                }
-                let c = (w << 6) | bits.trailing_zeros() as usize;
-                touched[w] &= touched[w] - 1;
-                let coefficient = std::mem::replace(&mut acc[c], F::zero());
-                if coefficient.is_zero() {
-                    continue;
-                }
-                let r = reducer_at[c];
-                let pivot: Option<&[(u32, F)]> = if r != NONE
-                    && rows[target_count + r as usize].sig.cmp_in(&t, self.order) == Ordering::Less
-                {
-                    Some(&reducer_rows[r as usize])
+        let mut workspace = Workspace::new(ncols);
+        let check = self.options.check_signatures;
+        for (t, raw) in &targets {
+            let t = *t;
+            let (entries, earlier) = prereduced.next().unwrap_or_else(|| (raw.clone(), 0));
+            let (mut out, later) = workspace.reduce(&entries, |c| {
+                if let Some(pivot) = block.admissible(c, &t) {
+                    Some(pivot)
                 } else if target_at[c] != NONE {
                     let (s, entries) = &results[target_at[c] as usize];
                     assert!(
-                        !self.options.check_signatures
-                            || s.cmp_in(&t, self.order) == Ordering::Less,
+                        !check || s.cmp_in(&t, order) == Ordering::Less,
                         "an earlier target must have a smaller signature"
                     );
                     Some(entries)
                 } else {
                     None
-                };
-                match pivot {
-                    Some(entries) => {
-                        let factor = coefficient.prepare_factor();
-                        for (cc, v) in &entries[1..] {
-                            let cc = *cc as usize;
-                            acc[cc] -= v.mul_prepared(&factor);
-                            touched[cc >> 6] |= 1 << (cc & 63);
-                        }
-                        products += (entries.len() - 1) as u64;
-                    }
-                    None => out.push((c as u32, coefficient)),
                 }
-            }
+            });
+            let products = earlier + later;
             self.stats.coefficient_products += products;
             if out.is_empty() {
                 self.stats.reductions_to_zero += 1;
@@ -576,7 +579,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
             let lead = out[0].0 as usize;
             let r = reducer_at[lead];
-            if r != NONE && rows[target_count + r as usize].sig == t {
+            if r != NONE && reducer_sigs[r as usize] == t {
                 self.stats.singular_rows += 1;
                 self.stats.rows_adding_no_rank += 1;
                 self.stats.products_on_singular_rows += products;
@@ -691,5 +694,149 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 );
             }
         }
+    }
+}
+
+/// The batch's reducer multiples, one per lead column, with their signatures.
+struct ReducerBlock<'a, const N: usize, F> {
+    order: MonomialOrder,
+    rows: &'a [Vec<(u32, F)>],
+    sigs: &'a [Signature<N>],
+    at: &'a [u32],
+    ncols: usize,
+}
+
+impl<const N: usize, F> ReducerBlock<'_, N, F> {
+    /// The reducer at column `c` if its signature is strictly below `t`.
+    fn admissible(&self, c: usize, t: &Signature<N>) -> Option<&[(u32, F)]> {
+        let r = self.at[c];
+        (r != NONE && self.sigs[r as usize].cmp_in(t, self.order) == Ordering::Less)
+            .then(|| self.rows[r as usize].as_slice())
+    }
+}
+
+/// A dense accumulator with a bitset of possibly-nonzero columns, reused across rows.
+struct Workspace<F> {
+    acc: Vec<F>,
+    touched: Vec<u64>,
+}
+
+impl<F: FiniteField> Workspace<F> {
+    fn new(ncols: usize) -> Self {
+        Self {
+            acc: vec![F::zero(); ncols],
+            touched: vec![0; ncols.div_ceil(64)],
+        }
+    }
+
+    /// Reduces `entries` column by column with whatever `pivot` offers (monic rows, lead first);
+    /// returns the remaining entries in column order and the multiply-accumulates spent. Pivot
+    /// tails only reach columns to the right, so a column is final once passed.
+    fn reduce<'p>(
+        &mut self,
+        entries: &[(u32, F)],
+        mut pivot: impl FnMut(usize) -> Option<&'p [(u32, F)]>,
+    ) -> (Vec<(u32, F)>, u64)
+    where
+        F: 'p,
+    {
+        let Some(&(first, _)) = entries.first() else {
+            return (Vec::new(), 0);
+        };
+        for &(c, v) in entries {
+            let c = c as usize;
+            self.acc[c] = v;
+            self.touched[c >> 6] |= 1 << (c & 63);
+        }
+        let words = self.touched.len();
+        let mut products = 0u64;
+        let mut out = Vec::new();
+        let mut w = first as usize >> 6;
+        while w < words {
+            let bits = self.touched[w];
+            if bits == 0 {
+                w += 1;
+                continue;
+            }
+            let c = (w << 6) | bits.trailing_zeros() as usize;
+            self.touched[w] &= bits - 1;
+            let coefficient = std::mem::replace(&mut self.acc[c], F::zero());
+            if coefficient.is_zero() {
+                continue;
+            }
+            match pivot(c) {
+                Some(row) => {
+                    let factor = coefficient.prepare_factor();
+                    for (cc, v) in &row[1..] {
+                        let cc = *cc as usize;
+                        self.acc[cc] -= v.mul_prepared(&factor);
+                        self.touched[cc >> 6] |= 1 << (cc & 63);
+                    }
+                    products += (row.len() - 1) as u64;
+                }
+                None => out.push((c as u32, coefficient)),
+            }
+        }
+        (out, products)
+    }
+}
+
+/// Design 2's parallel pass: every target reduced against the reducer block only.
+struct PhaseA<'a, const N: usize, F> {
+    block: &'a ReducerBlock<'a, N, F>,
+    targets: &'a [(Signature<N>, Vec<(u32, F)>)],
+    workers: usize,
+}
+
+impl<const N: usize, F: FiniteField> PhaseA<'_, N, F> {
+    fn reduce_one(&self, workspace: &mut Workspace<F>, k: usize) -> (Vec<(u32, F)>, u64) {
+        let (t, entries) = &self.targets[k];
+        workspace.reduce(entries, |c| self.block.admissible(c, t))
+    }
+
+    /// The same pass on one thread, for a field that cannot cross threads.
+    fn serial(self) -> Vec<(Vec<(u32, F)>, u64)> {
+        let mut workspace = Workspace::new(self.block.ncols);
+        (0..self.targets.len())
+            .map(|k| self.reduce_one(&mut workspace, k))
+            .collect()
+    }
+}
+
+impl<const N: usize, F: FiniteField> ConcurrentJob<F> for PhaseA<'_, N, F> {
+    type Output = Vec<(Vec<(u32, F)>, u64)>;
+
+    fn run(self) -> Self::Output
+    where
+        F: Send + Sync,
+    {
+        let n = self.targets.len();
+        let workers = self.workers.min(n).max(1);
+        let next = AtomicUsize::new(0);
+        let slots: Vec<Mutex<Option<(Vec<(u32, F)>, u64)>>> =
+            (0..n).map(|_| Mutex::new(None)).collect();
+        std::thread::scope(|scope| {
+            for _ in 0..workers {
+                scope.spawn(|| {
+                    let mut workspace = Workspace::new(self.block.ncols);
+                    loop {
+                        let k = next.fetch_add(1, AtomicOrdering::Relaxed);
+                        if k >= n {
+                            break;
+                        }
+                        let done = self.reduce_one(&mut workspace, k);
+                        *slots[k].lock().expect("a slot is never poisoned") = Some(done);
+                    }
+                });
+            }
+        });
+        slots
+            .into_iter()
+            .map(|slot| {
+                slot.into_inner()
+                    .expect("a slot is never poisoned")
+                    .expect("every target was reduced")
+            })
+            .collect()
     }
 }

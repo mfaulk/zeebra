@@ -36,6 +36,10 @@ pub struct SigF4Options {
     /// Assert the signature discipline on every row operation and re-verify each new element's
     /// signature invariants. Expensive; for tests.
     pub check_signatures: bool,
+    /// Threads for design 2's parallel pre-reduction against each batch's reducer block (RFC
+    /// §6.1 item 1). `1` is design 1, fully serial. A field that is not `Send + Sync` runs the
+    /// same pass serially.
+    pub workers: usize,
 }
 
 impl Default for SigF4Options {
@@ -47,6 +51,7 @@ impl Default for SigF4Options {
             max_matrix_columns: 2_000_000,
             certify: false,
             check_signatures: false,
+            workers: 1,
         }
     }
 }
