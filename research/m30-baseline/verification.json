@@ -1,0 +1,43 @@
+[
+ {
+  "target": "eco12-wide64",
+  "timed_digests": [
+   "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984"
+  ],
+  "timed_runs": 36,
+  "zeebra_certify": {
+   "status": "not run"
+  },
+  "grobx_certified": {
+   "admitted": false,
+   "error": "grobx exact certificate absent or rejected",
+   "exit": 0,
+   "process_wall_ns": 94202771401,
+   "response_sha256": "e5c4848b3feae7988a40aeb940754f0cbd7332de7ede36a3b4df4f340de1b2d8",
+   "stderr": ""
+  },
+  "zeebra_certified": false,
+  "verified": false
+ },
+ {
+  "target": "mq11-goldilocks",
+  "timed_digests": [
+   "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41"
+  ],
+  "timed_runs": 36,
+  "zeebra_certify": {
+   "status": "not run"
+  },
+  "grobx_certified": {
+   "admitted": true,
+   "basis_text_sha256": "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41",
+   "elements": 767,
+   "exit": 0,
+   "process_wall_ns": 456211330888,
+   "response_sha256": "0b058ceb6ede7d075730207ff91e8ab44abefa1453173306a14369fe6d7caf26",
+   "stderr": ""
+  },
+  "zeebra_certified": false,
+  "verified": true
+ }
+]

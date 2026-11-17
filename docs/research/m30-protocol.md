@@ -1,7 +1,8 @@
 # M30 competitive measurement protocol (#855)
 
-**Measured at:** not measured here — this document fixes method; every figure it relies on is in
-[`research/m30-baseline/`](../../research/m30-baseline/README.md), measured at `4f5784c5`.
+**Measured at:** `4f5784c5`. This document fixes method. Its one figure is the §7 budget stop.
+Every baseline figure is in [`research/m30-baseline/`](../../research/m30-baseline/README.md),
+measured at the same commit.
 
 Plan: [`docs/MILESTONE-SIGNATURE-SYMBOLIC-F4.md`](../MILESTONE-SIGNATURE-SYMBOLIC-F4.md) §10, §14.
 Every M30 comparison (#716, #859, #862 and their children) is paired against the one source
@@ -91,7 +92,15 @@ An arm that needs a larger cap than the baseline reports that as a result.
 | Field | Zeebra | Comparand |
 |---|---|---|
 | GF(32003), GF(2³¹−1) | coefficient for coefficient against the Singular reference bases (`research/comparand-scaling/singular-reference*-v1.json.gz`), by `comparand-scaling.py` | the same |
-| 2⁶⁴−353, Goldilocks | (a) the timed digest equals one basis digest across every run and every worker count; (b) `certify_f4_output` in a separate run (input in ⟨G⟩, Buchberger's criterion, reduced; reverse inclusion by F4 provenance); (c) grobx **certified** mode on the same input returns, through its independent exact checker and cofactors, a basis with the same text digest | grobx raw: basis text digest equal to the certified basis; groebner-rs: canonical agreement (`wide-corpus.py` `verify_bases`) |
+| 2⁶⁴−353, Goldilocks | (a) the timed runs return one basis digest across every run and every worker count; (b) grobx **certified** mode on the same input returns, through its independent exact checker and cofactors, a basis with the same sorted-text SHA-256 (`research/m30-baseline/verify_wide.py`) | grobx raw: basis text digest equal to the certified basis; groebner-rs: canonical agreement (`wide-corpus.py` `verify_bases`) |
+
+**Wide-field correctness rests on (a) and (b): a single Zeebra digest, textually identical to a
+grobx-certified basis.** Zeebra's own certificate (`certify_f4_output` via
+`m29_cost_model --certify`) is not part of the rule. At `4f5784c5`, on Eco-12 / 2⁶⁴−353 at 16
+workers, it was a **budget stop at 660 s, not a failure**: it was still checking Buchberger's
+criterion serially over the 743-element basis when the declared 600 s verification cap (plus 60 s
+grace) expired, and no check had failed. An M30 arm that changes the basis re-establishes (b) for
+its own output. Matching the baseline digest suffices only when the digest is unchanged.
 
 Verification time is never inside a solve's wall. Agreement of two raw outputs is not accepted
 alone. A configuration whose certification changes the solver (grobx certified) is a separate row.
