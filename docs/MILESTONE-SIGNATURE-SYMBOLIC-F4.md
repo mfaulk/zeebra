@@ -240,7 +240,7 @@ that they will pay in Zeebra. If A1 fails, the result is recorded and S3/S4 clos
 ### 6.2 M30-S2 — invariants, architecture and implementation RFC (#856)
 
 Runs in parallel with #716; its go / no-go depends on #716's gate. Deliverable:
-`docs/research/signature-f4-rfc.md`.
+[`docs/research/signature-f4-rfc.md`](research/signature-f4-rfc.md) (published; it recommends the isolated architecture, F4-RB under Schreyer order, and keys its go / no-go to Gate A1).
 
 Must cover, from the papers rather than their abstracts: F5 and Matrix-F5; F4/5 and F4-RB;
 Schreyer and position-over-term module orders, and signature representation; signature-safe
