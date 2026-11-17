@@ -20,8 +20,10 @@
 # assumption. Reserve the CCDs a measurement's placement is defined on: M29 pins w workers to
 # CPUs 8..8+w-1, which is why the default is CCDs 1-2.
 #
-# Everything is --runtime: a reboot or logout releases the reservation along with the state file
-# in $XDG_RUNTIME_DIR.
+# A reservation is shared state: it takes the CPUs out of every other session's cpuset, so their
+# `taskset` onto them fails with "Invalid argument" (#194 hit this during the calibration). Reserve
+# for a measurement session and release when it ends. Everything is --runtime: a reboot or logout
+# also releases it, along with the state file in $XDG_RUNTIME_DIR.
 #
 # Test seams (tools/test/bench-reserve-test.sh): ZEEBRA_BENCH_RESERVE_SYS relocates
 # /sys/devices/system/cpu, ZEEBRA_BENCH_RESERVE_CGROUP the user manager's cgroup, and

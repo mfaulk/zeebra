@@ -349,6 +349,29 @@ ZEEBRA_BENCHLOCK_CPUS='8-' run_benchlock t-bad-scope true >/dev/null 2>&1
 check_rc "ccd: a malformed ZEEBRA_BENCHLOCK_CPUS is a usage error" 64 $?
 unset ZEEBRA_BENCHLOCK_SYS
 
+# --- a reservation is visible to runs that did not make it (#848) ----------
+#
+# A reservation removes CPUs from every other agent's cpuset, so their `taskset` onto those CPUs
+# fails with "Invalid argument" and nothing said why (#194 hit exactly this).
+
+printf 'ccds=1,2\nbench=8-23,72-87\nrest=0-7\n' >"$DIR/reserve-state"
+export ZEEBRA_BENCH_RESERVE_STATE="$DIR/reserve-state"
+# An unscoped run under a reservation records it on START.
+err="$(run_benchlock t-under-reserve true 2>&1 >/dev/null)"
+contains "reserve: an unscoped START records the reservation" "reserved=8-23,72-87" "$(log_line START)"
+# And tells the caller on stderr, naming the way through.
+contains "reserve: an unscoped run is warned" "bench-reserve.sh run" "$err"
+# A scoped run is the reservation's own client and is not warned.
+export ZEEBRA_BENCHLOCK_SYS="$SYSDIR"
+err="$(ZEEBRA_BENCHLOCK_CPUS=2 run_benchlock t-scoped-reserve true 2>&1 >/dev/null)"
+lacks "reserve: a scoped run is not warned" "bench-reserve.sh run" "$err"
+unset ZEEBRA_BENCHLOCK_SYS
+# No state file, no field.
+rm "$DIR/reserve-state"
+run_benchlock t-no-reserve true >/dev/null 2>&1
+lacks "reserve: no reservation, no field" "reserved=" "$(log_line START)"
+unset ZEEBRA_BENCH_RESERVE_STATE
+
 # --- usage -----------------------------------------------------------------
 
 run_benchlock >/dev/null 2>&1

@@ -373,6 +373,18 @@ bl_main() {
       return "$rc"
     fi
     lock_desc="ccd:${ccds// /,} cpus=$scope"
+  else
+    # A reservation (`tools/bench-reserve.sh`) takes CPUs out of every other session's cpuset, so
+    # a `taskset` onto them fails with "Invalid argument" and the rest of the box is carrying the
+    # displaced builds. Neither is visible from here unless it is said (#848; #194 hit it blind).
+    local reserved_file reserved
+    reserved_file="${ZEEBRA_BENCH_RESERVE_STATE:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/zeebra-bench-reserve}"
+    reserved="$(sed -n 's/^bench=//p' "$reserved_file" 2>/dev/null)"
+    if [ -n "$reserved" ]; then
+      lock_desc="exclusive reserved=$reserved"
+      printf 'benchlock: CPUs %s are reserved for benchmarks (tools/bench-reserve.sh status); this\n' "$reserved" >&2
+      printf 'benchlock: session cannot pin to them. Measure there with tools/bench-reserve.sh run.\n' >&2
+    fi
   fi
 
   exec 9>"$lock_file" || {
