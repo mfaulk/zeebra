@@ -169,7 +169,10 @@ fn test_non_graded_orders_are_unsupported() {
 #[test]
 fn test_degenerate_inputs_follow_the_f4_contract() {
     let zero = MultivariatePolynomial::<2, Zp13>::zero();
-    assert_eq!(sig_f4(&[zero.clone()], GREVLEX).unwrap(), Vec::new());
+    assert_eq!(
+        sig_f4(std::slice::from_ref(&zero), GREVLEX).unwrap(),
+        Vec::new()
+    );
     let x = MultivariatePolynomial::<2, Zp13>::parse("x", ["x", "y"]).unwrap();
     let x_minus_one = MultivariatePolynomial::<2, Zp13>::parse("x - 1", ["x", "y"]).unwrap();
     assert_eq!(

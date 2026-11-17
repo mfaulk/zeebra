@@ -31,6 +31,9 @@ use crate::{
 
 const NONE: u32 = u32::MAX;
 
+/// A row after reduction: its remaining entries in column order, and the products spent.
+type Reduced<F> = (Vec<(u32, F)>, u64);
+
 /// A signed basis element: `(s(α), ᾱ)` with `ᾱ` monic, terms in descending order.
 struct Element<const N: usize, F> {
     sig: Signature<N>,
@@ -531,7 +534,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             at: &reducer_at,
             ncols,
         };
-        let prereduced: Vec<(Vec<(u32, F)>, u64)> = if self.options.workers > 1 {
+        let prereduced: Vec<Reduced<F>> = if self.options.workers > 1 {
             let job = PhaseA {
                 block: &block,
                 targets: &targets,
@@ -736,7 +739,7 @@ impl<F: FiniteField> Workspace<F> {
         &mut self,
         entries: &[(u32, F)],
         mut pivot: impl FnMut(usize) -> Option<&'p [(u32, F)]>,
-    ) -> (Vec<(u32, F)>, u64)
+    ) -> Reduced<F>
     where
         F: 'p,
     {
@@ -789,13 +792,13 @@ struct PhaseA<'a, const N: usize, F> {
 }
 
 impl<const N: usize, F: FiniteField> PhaseA<'_, N, F> {
-    fn reduce_one(&self, workspace: &mut Workspace<F>, k: usize) -> (Vec<(u32, F)>, u64) {
+    fn reduce_one(&self, workspace: &mut Workspace<F>, k: usize) -> Reduced<F> {
         let (t, entries) = &self.targets[k];
         workspace.reduce(entries, |c| self.block.admissible(c, t))
     }
 
     /// The same pass on one thread, for a field that cannot cross threads.
-    fn serial(self) -> Vec<(Vec<(u32, F)>, u64)> {
+    fn serial(self) -> Vec<Reduced<F>> {
         let mut workspace = Workspace::new(self.block.ncols);
         (0..self.targets.len())
             .map(|k| self.reduce_one(&mut workspace, k))
@@ -804,7 +807,7 @@ impl<const N: usize, F: FiniteField> PhaseA<'_, N, F> {
 }
 
 impl<const N: usize, F: FiniteField> ConcurrentJob<F> for PhaseA<'_, N, F> {
-    type Output = Vec<(Vec<(u32, F)>, u64)>;
+    type Output = Vec<Reduced<F>>;
 
     fn run(self) -> Self::Output
     where
@@ -813,8 +816,7 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for PhaseA<'_, N, F> {
         let n = self.targets.len();
         let workers = self.workers.min(n).max(1);
         let next = AtomicUsize::new(0);
-        let slots: Vec<Mutex<Option<(Vec<(u32, F)>, u64)>>> =
-            (0..n).map(|_| Mutex::new(None)).collect();
+        let slots: Vec<Mutex<Option<Reduced<F>>>> = (0..n).map(|_| Mutex::new(None)).collect();
         std::thread::scope(|scope| {
             for _ in 0..workers {
                 scope.spawn(|| {

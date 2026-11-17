@@ -96,6 +96,10 @@ impl<const N: usize> SyzygyStore<N> {
         self.len
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// The source of a stored signature dividing `t`, if any.
     pub fn covering(&self, t: &Signature<N>) -> Option<SyzygySource> {
         let m = mask(&t.mono);

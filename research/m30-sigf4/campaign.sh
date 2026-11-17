@@ -14,6 +14,13 @@ case "${1:?suite}" in
     python3 "$here/run.py" --bin "$BIN" --out "$OUT/controls.jsonl" --reps "${REPS:-5}" --first "$first" \
       --cap 900 --rows goldilocks/katsura-4 wide64/katsura-4 goldilocks/noon-7 goldilocks/cyclic-7 \
       goldilocks/mq-random-11 --arms sigf4:1 f4:1 f4:16 ;;
+  gate2)
+    python3 "$here/run.py" --bin "$BIN" --out "$OUT/gate2.jsonl" --reps "${REPS:-9}" --first "$first" \
+      --cap 900 --rows wide64/eco-12 goldilocks/katsura-11 --arms sigf4:16 f4:16 ;;
+  controls2)
+    python3 "$here/run.py" --bin "$BIN" --out "$OUT/controls2.jsonl" --reps "${REPS:-5}" --first "$first" \
+      --cap 900 --rows goldilocks/katsura-4 wide64/katsura-4 goldilocks/noon-7 goldilocks/cyclic-7 \
+      goldilocks/mq-random-11 --arms sigf4:16 f4:16 ;;
   census)
     : "${WORK_BIN:?}"
     for row in "wide64 eco-12" "goldilocks katsura-11" "goldilocks mq-random-11"; do

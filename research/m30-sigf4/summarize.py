@@ -53,19 +53,19 @@ def tables(records):
     for (row, arm), w in sorted(walls.items()):
         lines.append(f'| {row} | {arm} | {len(w)} | {failures[(row, arm)]} | '
                      f'{statistics.median(w):.3f} | {statistics.median(rss[(row, arm)]):.0f} |')
-    lines += ['', '| row | sigf4:1 ÷ arm | wall ratio [95%] | RSS ratio | bases identical |',
+    lines += ['', '| row | sigf4 arm ÷ f4 arm | wall ratio [95%] | RSS ratio | bases identical |',
               '|---|---|---:|---:|---|']
-    for row in sorted({row for row, _ in walls}):
-        sig = walls.get((row, 'sigf4:1'))
-        if not sig:
+    for (row, sig_arm), sig in sorted(walls.items()):
+        if not sig_arm.startswith('sigf4:'):
             continue
-        for arm in sorted(arm for r, arm in walls if r == row and arm != 'sigf4:1'):
+        for arm in sorted(arm for r, arm in walls if r == row and arm.startswith('f4:')):
             base = walls[(row, arm)]
             low, high = interval(sig, base)
             ratio = statistics.median(sig) / statistics.median(base)
-            mem = statistics.median(rss[(row, 'sigf4:1')]) / statistics.median(rss[(row, arm)])
+            mem = statistics.median(rss[(row, sig_arm)]) / statistics.median(rss[(row, arm)])
             same = 'yes' if len(digests[row]) == 1 else f'NO ({len(digests[row])} digests)'
-            lines.append(f'| {row} | {arm} | {ratio:.3f} [{low:.3f}, {high:.3f}] | {mem:.2f} | {same} |')
+            lines.append(f'| {row} | {sig_arm} ÷ {arm} | {ratio:.3f} [{low:.3f}, {high:.3f}] | '
+                         f'{mem:.2f} | {same} |')
     return '\n'.join(lines)
 
 

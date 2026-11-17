@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 81ddcac55c8576e70592191ab293187de893c178652b127a2e6a8a862c6fbdf4 # shrinks to system = [SparseMultiPoly { terms: {Monomial { exponents: [0, 0, 0] }: PrimeFieldElement64 { value: 1 }} }], grlex = false
+cc 3221e1282df0293ac17d7e67ac852f66b50a83aa678002f83e28ece76ed8d41c # shrinks to system = [SparseMultiPoly { terms: {Monomial { exponents: [0, 0, 0] }: PrimeFieldElement32 { value: 4681 }} }, SparseMultiPoly { terms: {Monomial { exponents: [0, 0, 0] }: PrimeFieldElement32 { value: 4681 }} }]
