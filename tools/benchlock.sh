@@ -112,13 +112,40 @@
 #     timeout --signal=INT --kill-after=60s 1200 \
 #     taskset --cpu-list 8 ./target/release/examples/univariate_scaling koalabear budget=1.0
 #
-# Test seam, used by `tools/test/benchlock-test.sh` and not meant for callers:
-# `ZEEBRA_BENCHLOCK_PROC` relocates `/proc`.
+# CCD-scoped runs (#848). With `ZEEBRA_BENCHLOCK_CPUS=<cpulist>` set, the lock is no longer
+# machine-wide: the run takes `benchlock.lock` **shared** plus one exclusive `benchlock.ccd<N>.lock`
+# per L3 domain the list touches. On the 5995WX each CCD has its own L3, so two runs on disjoint
+# CCDs share no cache, and an unscoped run still takes `benchlock.lock` exclusively and so excludes
+# every scoped one. START records `lock=ccd:<ids> cpus=<list>` or `lock=exclusive`, so two
+# overlapping windows in the log are legitimate exactly when both are scoped and name disjoint
+# CCDs. Scoping changes what is locked, not where the command runs: `tools/bench-reserve.sh run`
+# is what pins it to a reserved CCD and keeps other work off it.
+#
+# Test seams, used by `tools/test/benchlock-test.sh` and not meant for callers:
+# `ZEEBRA_BENCHLOCK_PROC` relocates `/proc`, `ZEEBRA_BENCHLOCK_SYS` relocates
+# `/sys/devices/system/cpu`.
 
 # Deliberately not `set -e`: the file is sourced by its tests, and the executed path checks the
 # commands whose failure matters by hand rather than relying on an option that interacts badly with
 # both functions and traps.
 set -uo pipefail
+
+# shellcheck source=cpu-context.sh
+. "$(dirname "${BASH_SOURCE[0]}")/cpu-context.sh"
+
+# The L3 domains (CCDs) a CPU list touches, ascending and once each. rc 64 on a malformed list,
+# rc 2 when a CPU's topology cannot be read: taking fewer locks than the list needs is the failure
+# this guards, so an unknown CPU is never skipped.
+bl_ccds() { # <cpulist>
+  local cpus c id ids=()
+  cpus="$(ctx_expand_cpulist "$1")" || return 64
+  for c in $cpus; do
+    read -r id 2>/dev/null <"${ZEEBRA_BENCHLOCK_SYS:-/sys/devices/system/cpu}/cpu$c/cache/index3/id" || return 2
+    case "$id" in '' | *[!0-9]*) return 2 ;; esac
+    ids+=("$id")
+  done
+  printf '%s\n' "${ids[@]}" | sort -nu | paste -sd' '
+}
 
 # ---------------------------------------------------------------------------------------------
 # The pure half: what an END line says, and why.
@@ -296,7 +323,8 @@ bl_usage() {
   cat >&2 <<'USAGE'
 usage: tools/benchlock.sh <owner-tag> <command> [args...]
 
-Runs <command> under an exclusive machine-wide benchmark lock, logging QUEUED / START / END
+Runs <command> under an exclusive machine-wide benchmark lock (or, with ZEEBRA_BENCHLOCK_CPUS set,
+a lock on just the CCDs that CPU list touches), logging QUEUED / START / END
 against <owner-tag> and exiting with the command's status. The END line names why the run ended;
 `end=exited` and not `status=0` is what says a measurement completed.
 USAGE
@@ -335,6 +363,18 @@ bl_main() {
   trap 'bl_on_signal 14' ALRM
   trap bl_on_exit EXIT
 
+  # Resolved before QUEUED, so a bad scope is refused rather than queued.
+  local scope="${ZEEBRA_BENCHLOCK_CPUS:-}" ccds="" lock_desc=exclusive rc=0
+  if [ -n "$scope" ]; then
+    ccds="$(bl_ccds "$scope")" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      printf 'benchlock: ZEEBRA_BENCHLOCK_CPUS=%s does not resolve to CCDs (rc %s)\n' "$scope" "$rc" >&2
+      trap - EXIT
+      return "$rc"
+    fi
+    lock_desc="ccd:${ccds// /,} cpus=$scope"
+  fi
+
   exec 9>"$lock_file" || {
     printf 'benchlock: cannot open %s\n' "$lock_file" >&2
     return 2
@@ -343,16 +383,24 @@ bl_main() {
   local queued_at
   queued_at=$(date +%s)
   bl_note QUEUED "$BL_COMMAND_LINE"
-  flock 9 || {
+  # Machine lock first, then CCD locks ascending: one global order, so no two waiters deadlock.
+  if [ -n "$scope" ]; then flock -s 9; else flock 9; fi || {
     printf 'benchlock: did not acquire the lock\n' >&2
     return 2
   }
+  local id fd
+  for id in $ccds; do
+    exec {fd}>"$state_dir/benchlock.ccd$id.lock" && flock "$fd" || {
+      printf 'benchlock: did not acquire the CCD %s lock\n' "$id" >&2
+      return 2
+    }
+  done
 
   BL_STARTED_AT=$(date +%s)
   # Captured at START and not before: `setsid nohup ... &` reparents the run to init immediately,
   # so a launcher read any earlier would be the one that was always going to go away.
   BL_LAUNCH_PPID="$(bl_ppid)" || BL_LAUNCH_PPID=""
-  bl_note START "waited=$((BL_STARTED_AT - queued_at))s load=$(bl_load) $BL_COMMAND_LINE"
+  bl_note START "waited=$((BL_STARTED_AT - queued_at))s load=$(bl_load) lock=$lock_desc $BL_COMMAND_LINE"
 
   local child_status=0
   "$@" || child_status=$?

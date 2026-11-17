@@ -279,6 +279,7 @@ race resolution, and the lease arithmetic:
 bash scripts/agent/test/zb-claim-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/cpu-context-test.sh
+bash tools/test/bench-reserve-test.sh
 bash tools/test/check-measurement-provenance-test.sh
 bash tools/check-measurement-provenance.sh
 shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
