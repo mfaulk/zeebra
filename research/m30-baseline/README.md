@@ -71,11 +71,15 @@ here and not folded into a new figure. An M30 experiment compares against a base
   one run per target) returns a basis whose sorted text has the same SHA-256. **Wide-field
   correctness rests on (a) and (b): one Zeebra digest across every run, textually identical to a
   grobx-certified basis.** MQ11 / Goldilocks meets this: 767 elements, admitted, digest identical,
-  456 s. **Eco-12 / 2⁶⁴−353 does not.** Its certified run hit the declared 8 GiB cap
-  (`"stopped":"memory"` at 94 s, kernel peak 8.59 GB) and returned no basis. That is a resource
-  stop, recorded in `verification.json` as `admitted: false`. Eco-12's answer is therefore
-  supported only by (a) and by text identity with grobx **raw**, which the protocol does not accept
-  alone. grobx raw matches the Zeebra digest in all 18 passes, and groebner-rs agrees
+  456 s. **Eco-12 / 2⁶⁴−353 meets it at a raised cap: the cap was raised after a resource stop at 8
+  GiB.** The first certified run, at the declared 600 s / 8 GiB, stopped on memory
+  (`"stopped":"memory"` at 94 s, kernel peak 8.59 GB) and returned no basis. It is retained in
+  `verification.json` as `admitted: false`. The one permitted retry ran at 600 s / 32 GiB outside
+  any reservation, under an unscoped `benchlock` (17:33–17:38 EST). It was admitted with 743
+  elements and the same digest, took 287 s, and peaked at 11.4 GB
+  ([verification-eco12-32g.json](verification-eco12-32g.json)). Certifying Eco-12 in grobx needs
+  more than the declared cap, and that is a result.
+  grobx raw matches the Zeebra digest in all 18 passes, and groebner-rs agrees
   canonically (`wide-corpus.py` `verify_bases`). Certification walls in `verification.json` are
   verification cost and are never part of a solve's wall.
 - **Zeebra's own certificate.** `m29_cost_model --certify` (`certify_f4_output`, a serial check of
@@ -100,7 +104,7 @@ here and not folded into a new figure. An M30 experiment compares against a base
 | [tables.md](tables.md) | `research/m29-baseline/summarize.py` (its wide heading still says "three passes"; this cohort has nine) |
 | [verdicts.md](verdicts.md) | `research/m29-final/verdicts.py`, unchanged |
 | [drift.py](drift.py) → [drift.md](drift.md) | the per-cell comparison above |
-| [verify_wide.py](verify_wide.py) → [verification.json](verification.json) | wide-field certification |
+| [verify_wide.py](verify_wide.py) → [verification.json](verification.json), [verification-eco12-32g.json](verification-eco12-32g.json) | wide-field certification: both targets at 8 GiB, then Eco-12 at 32 GiB after its memory stop |
 
 Executable notes. `zeebra_driver` and `wide_corpus` are byte-identical to #837's.
 `m29_cost_model` differs only because `env!("CARGO_MANIFEST_DIR")` embeds the worktree path of
@@ -127,6 +131,9 @@ tools/bench-reserve.sh run zb-855 8-23 env CARGO_TARGET_DIR=$T OUT=$T/m30 MQ10_R
 tools/bench-reserve.sh run zb-855 8-23 env TMPDIR=$T/tmp timeout --signal=INT --kill-after=60s 1800 \
   python3 research/m30-baseline/verify_wide.py --walls $T/m30/walls.jsonl \
   --grobx $T/bin/grobx-driver --scratch $T/m30/verify > research/m30-baseline/verification.json
+tools/benchlock.sh zb-855 python3 research/m30-baseline/verify_wide.py --walls $T/m30/walls.jsonl \
+  --grobx $T/bin/grobx-driver --scratch $T/m30/verify --targets eco12-wide64 --grobx-rss-gib 32 \
+  > research/m30-baseline/verification-eco12-32g.json     # after release; the 8 GiB run stops on memory
 # add --certifier $T/bin/m29_cost_model_certify for Zeebra's own certificate (over budget on Eco-12)
 tools/bench-reserve.sh release
 python3 research/m29-baseline/extract.py $T/m30 research/m30-baseline

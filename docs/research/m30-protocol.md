@@ -101,6 +101,9 @@ workers, it was a **budget stop at 660 s, not a failure**: it was still checking
 criterion serially over the 743-element basis when the declared 600 s verification cap (plus 60 s
 grace) expired, and no check had failed. An M30 arm that changes the basis re-establishes (b) for
 its own output. Matching the baseline digest suffices only when the digest is unchanged.
+grobx certified mode needs more than 8 GiB on Eco-12. At `4f5784c5` it stopped on memory at 8 GiB,
+and at 32 GiB, the cap raised after that resource stop, it peaked at 11.4 GB. A new certified run on
+Eco-12 declares 32 GiB in advance.
 
 Verification time is never inside a solve's wall. Agreement of two raw outputs is not accepted
 alone. A configuration whose certification changes the solver (grobx certified) is a separate row.
