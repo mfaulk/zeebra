@@ -35,6 +35,8 @@ bash tools/test/merge-base-age-test.sh
 bash tools/test/benchlock-test.sh
 bash tools/test/check-measurement-provenance-test.sh
 bash tools/test/ci-scope-test.sh
+bash tools/test/cpu-context-test.sh
+bash tools/test/bench-reserve-test.sh
 bash tools/check-measurement-provenance.sh      # the documents, not the script
 ```
 
@@ -166,6 +168,8 @@ CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3 CARGO_PROFILE_CI_RELEASE_LTO=thin \
 cargo build --all-targets --timings                       # full runs outside PRs
 cargo bench --profile ci-release -- --test
 bash tools/test/ci-scope-test.sh
+bash tools/test/cpu-context-test.sh
+bash tools/test/bench-reserve-test.sh
 ```
 
 Release compilation and execution are separate steps. Cargo's HTML build-timing reports are
@@ -268,7 +272,9 @@ runnable when its commit becomes a measurement baseline. Documentation-only PRs 
 to the allowlist above; a changed benchmark source always selects the full suite.
 
 CI never publishes benchmark figures: `--test` executes each case once without sampling. Real
-measurements still use the production profile, a quiet machine and `tools/benchlock.sh`.
+measurements still use the production profile and `tools/benchlock.sh`: a quiet machine for an
+absolute figure, or a reserved CCD (`tools/bench-reserve.sh`) for an interleaved A/B ratio — see
+`docs/guide/benchmarking.md`, *Reserved CCDs*.
 
 ## Build configuration
 
