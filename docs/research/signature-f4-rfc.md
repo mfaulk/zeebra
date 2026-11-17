@@ -42,6 +42,7 @@ Read in full from the PDF or document, with equations and algorithms checked in 
 
 | Key | Source | Read |
 |---|---|---|
+| **F5** | Faugère, *A new efficient algorithm for computing Gröbner bases without reduction to zero (F5)*, ISSAC 2002, Ver 1.2 (copy supplied by the owner) | all 9 pp. |
 | **EF** | Eder, Faugère, *A survey on signature-based Gröbner basis computations*, arXiv 1404.1774 (J. Symbolic Comput. 2017) | all 53 pp. |
 | **Lz** | Lairez, *Axioms for a theory of signature bases*, arXiv 2210.13788 (v3) | full |
 | **RS** | Roune, Stillman, *Practical Gröbner basis computation*, ISSAC 2012, arXiv 1206.6940 | full |
@@ -53,11 +54,9 @@ Read in full from the PDF or document, with equations and algorithms checked in 
 | **GX** | grobx `MANUAL.md` at `1854835d` (documentation only; no grobx code was read, per [§4 of the plan](../MILESTONE-SIGNATURE-SYMBOLIC-F4.md) and [`external-provenance-policy.md`](external-provenance-policy.md)) | all 2,931 lines |
 | — | [`signature-based.md`](signature-based.md), #223 with comments, [C1](m29-grobx-attribution.md), #716 | full |
 
-**Faugère's F5 paper (ISSAC 2002) was not re-read.** `www-polsys.lip6.fr` refused connections
-from this host on 2026-11-17, and the archive copies were blocked. Statements here about F5 itself
-come through EF §8 (F5 as a special case of RB), St §3 (a line-by-line reconstruction) and AP §1,
-plus #223's own reading of the paper in [`signature-based.md`](signature-based.md) §4.4. No claim
-in this RFC rests on F5's text alone.
+Where F5's own paper covers a claim it is cited directly (F5 §, Definition, Theorem, Corollary,
+algorithm or figure). The survey is cited where F5 is silent, chiefly on non-`<pot` orders, F4-style
+reduction and termination outside the no-zero-reduction case.
 
 A note on citations. EF states the compatibility requirement and the rule for Matrix-F5 row
 operations in prose, with no Definition number, so they are cited by section and page. F45's
@@ -130,14 +129,20 @@ divisibility at equal index. Both are operations Zeebra already has for monomial
 | T3 | RB with pairs in increasing signature order (`≼_s`) and **any** rewrite order computes a rewrite basis (hence a signature GB) and a GB of the syzygy module's initial terms, and terminates | EF Thm 7.6 (proofs: EF ref. [31] Thm 7, Thm 20) | compatible order; `≼_s` (EF Property 7.7(c)) |
 | T4 | **Batched (F4-style) RB is correct and terminates**: take any subset `S` of the signature queue, reduce each reductant modulo `AG^{<σ} ∪ N` in increasing signature order, where `N` holds this batch's earlier results (unmultiplied), and insert `N` into `G` only after the batch | Lz Thm 62, Algorithm 8, §5.7 | compatible order; Lz's axioms, which hold in the polynomial ring (Lz §6.1) |
 | T5 | The matrix arrangement "does not change what is computed" relative to the naive per-pair reductions | Lz §5.7 | as T4 |
-| T6 | A reduction to zero at `σ` means `σ` is the signature of a syzygy | AP Thm 10; EF Thm 5.3, Algorithm 4 lines 17–18 | regular reduction at `σ` |
-| T7 | No reduction to zero for a regular sequence | EF Cor 7.16 (`<pot`), Cor 7.17 (`<d-pot`, homogeneous); BFS Thm 9 (matrices of full rank); AP §7.2 | regular sequence; **not** Schreyer order |
+| T6 | A reduction to zero at `σ` means `σ` is the signature of a syzygy | AP Thm 10; EF Thm 5.3, Algorithm 4 lines 17–18; in F5, a **non-principal** syzygy `s ∈ Syz \ PSyz` with `HT(s) = S(r)` (F5 Thm 4) | regular reduction at `σ` |
+| T7 | No reduction to zero for a regular sequence | F5 Cor 3 (via Thm 4: a zero reduction exhibits a syzygy outside the principal ones, and for a regular sequence `Syz = PSyz`, F5 §4); EF Cor 7.16 (`<pot`), Cor 7.17 (`<d-pot`, homogeneous); BFS Thm 9 (matrices of full rank); AP §7.2 | regular sequence; F5 also assumes **homogeneous** input (F5 §3: "we suppose that all the polynomials are homogeneous") and its incremental position-over-term order; **not** Schreyer order |
 
 T4 is the load-bearing theorem. F45 proves correctness only *if* the algorithm terminates (F45
 Thm 4.4: "does not imply that F4/5 terminates for all inputs"). Lairez calls earlier F4-signature
 descriptions unsatisfactory: "Albrecht and Perry (2010) do not prove termination and Eder and
 Faugère (2017, §13) are superficial" (Lz §1). St §3.7 reports that a hybrid F4/F5 "turned out not
 to be correct". The design therefore follows Lz Algorithm 8's invariant, not F45's pseudocode.
+
+F5 itself points to the F4 route without specifying it: "from the efficiency point of view, it is
+recommended to translate the algorithm in a F4 fashion" (F5 §7, before Algorithm F5). It proves
+termination only "in a restricted case (when there is no reduction to zero)", for homogeneous input
+(F5 §7.4, Thm 3, Cor 2), and says its proofs of correctness and termination are "only sketched"
+(F5 §1). F5's own guarantees therefore cover less than T3/T4.
 
 ### 3.4 Criteria, and why they are not a pass over unsigned pairs
 
@@ -149,8 +154,16 @@ to be correct". The design therefore follows Lz Algorithm 8's invariant, not F45
 - **Singular / rewrite criterion.** Exactly one multiple per signature needs handling (EF Lemma
   6.6). The canonical rewriter is the `⊴`-maximal element whose signature divides `T` (EF Def 7.1),
   and a pair is skipped if either generator is rewritable (EF Algorithm 3; Lemma 7.18).
-- **They are the same family as F5's criteria.** F5's criterion and its Rewritten criterion are
-  special cases of the syzygy and singular criteria (EF Property 8.3; Remark 6.5 for `<pot`).
+- **They are the same family as F5's criteria.** F5's criterion is stated on *normalized* labelled
+  polynomials: `r` with `S(r) = eF_k` is normalized if `e` is not top-reducible by
+  `Id(f_{k+1},…,f_m)` (F5 Def 2). Only normalized critical pairs need to reduce (F5 Thm 1;
+  `CritPair`, §7.2). It uses only the principal ("trivial") syzygies `f_i F_j − f_j F_i`: "take into
+  account only the trivial syzygies … but not to compute the module of syzygies" (F5 §1). Its
+  Rewritten criterion keeps one rule list per index and rejects a product `u·r_k` when a more
+  recently added rule's signature divides it (F5 §6: `Add Rule` prepends, `Rewritten?`; applied in
+  `Spol`, §7.2, and as condition (c) of `IsReducible`, §7.3). Both are special cases of the syzygy
+  and singular criteria (EF Property 8.3; Remark 6.5 for `<pot`). F5's rewrite order is therefore
+  EF's `⊴_add` (newest wins), not `⊴_rat`.
 - **Rewrite order.** `⊴_add` takes the newest element. `⊴_rat` takes the least sig-lead ratio
   `s(α)/lt(ᾱ)` (EF Def 7.13; RS §3.4). With `⊴_rat`, RB computes a minimal signature GB (EF Lemma
   7.19, Cor 7.20). EF finds the difference between the two "vanish[es] for bigger computations"
@@ -170,7 +183,11 @@ reduction from signed inputs.** That is #223 §5.1's conclusion, and the survey'
 
 ### 3.5 Incremental against non-incremental
 
-- `<pot` is incremental by index (EF Property 7.7(b); F5, EF §8). Each step can interreduce the
+- `<pot` is incremental by index (EF Property 7.7(b)). F5 is the original instance: "since the
+  algorithm is *incremental* the main loop … iterates on the number of polynomials". It computes
+  Gröbner bases of `(f_m)`, `(f_{m−1}, f_m)`, …, `(f_1,…,f_m)` with `F_1 ≻ F_2 ≻ … ≻ F_m`, i.e.
+  position over term with the index order reversed (F5 §1, §4, §7.1 "Algorithm incremental F5";
+  EF §8 footnote 5). Each step can interreduce the
   previous basis (F5R/F5C, EF §8.1–8.2), but `H` grows enormous (§3.1 table).
 - `<d-pot` and Schreyer proceed by degree, which is how Zeebra's F4 already selects (EF Property
   13.1(a) for F4/5).
@@ -204,9 +221,9 @@ is how much work the criteria avoid:
 | Input class | What the theory says | Source |
 |---|---|---|
 | Regular sequence | no reduction to zero under `<pot` / `<d-pot` (homogeneous); some under Schreyer | T7; EF Table 2 |
-| **Overdetermined** (`m > n`) | cannot be regular ("no overdetermined sequence can be regular"), so T7 never applies. F5's author expects "bad performance … when the system is overconstrained" | St Remark 3.3; [`signature-based.md`](signature-based.md) §4.4 quoting F5 §9 |
+| **Overdetermined** (`m > n`) | cannot be regular ("no overdetermined sequence can be regular"), so T7 never applies. "bad performance is expected when the system is overconstrained"; F5's suggested remedy is to compute a total-degree basis first and rerun F5 on it. Reductions to zero are "unavoidable for Trinks7 (7 equations, 6 variables)": 4 useless pairs in F5 | F5 §9.2, §9.1, Fig 9.1; St Remark 3.3 |
 | Non-regular, square | zero reductions remain: Cyclic-6 still has 8 under AP's algorithm, against 16 for F5 | AP Table 1 |
-| Underdetermined (`m < n`) | can be regular; F5's "maximal efficiency" is expected at `m ≤ n` | [`signature-based.md`](signature-based.md) §4.4; BFS treats `m ≤ n` only (Thm 2) |
+| Underdetermined (`m < n`) | can be regular; "the maximal efficiency of the F5 algorithm is expected when the number of equation is less or equal than the number of variables" | F5 §9.2; BFS treats `m ≤ n` only (Thm 2) |
 | Non-radical | regularity does not depend on radicality; nothing in T1–T7 uses it | (follows from the statements) |
 | Positive characteristic, field equations | over F₂, adding `x_i² − x_i` to `H` strengthens the rewrite criterion | EF §9.1 (F5/2) |
 | Inhomogeneous (Zeebra's corpus is affine) | select by signature degree (`≼_s` with a degree-compatible order refines sugar degree), or homogenize | EF Property 7.7(d); Remark 8.1(b); V&S 8.4(a) |
@@ -296,10 +313,10 @@ terms. Plan §6.3 requires this.
 | Instance | Correctness assumptions (T1–T6) | Regular-sequence guarantee (T7) | Note |
 |---|---|---|---|
 | `mq-random-10/11` (dense random quadratic, `m = n`) | met | generically expected for the homogenization; not proven per instance; and T7 does not hold under Schreyer anyway | grobx: 26 zero reductions of 782 on MQ11 (C1 §3) |
-| `katsura-n` | met | expected (Bezout count attained); unverified here | |
+| `katsura-n` | met | expected (Bezout count attained); F5 finds 0 useless pairs on Katsura 3, 4, 5 and 10 (F5 Fig 9.1); unverified for `katsura-11` | |
 | `cyclic-7` | met | **no**: the family is not regular (AP Table 1 for Cyclic-6) | non-regular control |
-| `eco-12` | met | not established | grobx hands over at round 2 (C1 §1) |
-| `noon-7` | met | not established | |
+| `eco-12` | met | **doubtful**: F5 finds 7 useless pairs on Eco-6 as stated, and 0 after factorizing ("Eco 6 fact"; F5 Fig 9.1, §9.1) | grobx hands over at round 2 (C1 §1) |
+| `noon-7` | met | not established; F5 finds 0 useless pairs on Noon8 (F5 Fig 9.1) | |
 | overdetermined MQ (`m = 2n`) | met | **impossible** (St Remark 3.3) | correctness-only in #857 |
 
 Every corpus input meets the correctness assumptions, because they ask nothing of the input. The
@@ -311,7 +328,7 @@ test.
 
 | Item | Per | Size (Zeebra `Monomial` is `[u32; N]`) | Source |
 |---|---|---|---|
-| shifted signature (monomial + index) | basis element, matrix row, pending signature | `4N + 4` bytes; 48 B at `N = 11` | Lz Remark 25 |
+| shifted signature (monomial + index) | basis element, matrix row, pending signature | `4N + 4` bytes; 48 B at `N = 11` | Lz Remark 25. F5 adds "an integer (the index k of r) and a power product t" per polynomial: "the extra memory cost is very small" (F5 §9.2) |
 | sig-lead ratio rank | basis element | 4–8 B | RS §3.4 |
 | syzygy-signature store (minimal generators) + 32-bit divmask | syzygy | `4N + 8` B | RS §4.2; GX "Syzygies from three sources" |
 | Koszul queue | pending | lazily materialized, "almost nothing" | RS §3.3 |
@@ -592,7 +609,8 @@ Plan §6.4's thresholds are confirmed, and none is loosened. Four are tightened,
 |---|---|
 | F4 and F5 reach the same `D_reg`; signatures remove rows, not columns (DZD §4.1; [`signature-based.md`](signature-based.md) §4.0) | **holds**. Nothing in EF, Lz, RS or BFS changes the degree reached. |
 | 33–60% of pair rows add no rank, hence a ≈2× *row* bound | **holds as a row bound**. **#835 changes its weight:** zero-ending rows carry ~93% of coefficient products, because they are reduced across their whole width (C1 §1). A row bound is not a work bound (plan §2.2). |
-| "bad performance is expected when the system is overconstrained" (F5, via [`signature-based.md`](signature-based.md) §4.4) | **holds**; reinforced by St Remark 3.3. |
+| "bad performance is expected when the system is overconstrained" ([`signature-based.md`](signature-based.md) §4.4) | **holds**, now checked against the source (F5 §9.2); reinforced by St Remark 3.3 and F5 Fig 9.1 (Trinks7). |
+| basic F5 is only 1.26–1.29× faster than F4 on Cyclic 7–8 ([`signature-based.md`](signature-based.md) §4.4) | **holds for Cyclic** (F5 Fig 9.2, Cyclic table), **but it is not F5's whole record.** The Katsura table #223 left unquoted is legible in the PDF. Its F4/F5 CPU-time ratios are 2.7, 3.3, 5.6, 8.6, 12.0, 17.2 and 22.4 for Katsura 7–13 (F5 Fig 9.2, "Katsura n PII 400 Mhz (Speedup)"; e.g. F4 2097 s against F5 174.2 s at n = 11). These compare one author's two implementations on one machine, so they say nothing about Zeebra's engine. They do confirm that a ≈2× **row** bound is not a **time** bound, the point #835 makes with coefficient products. |
 | F5's guarantee does not cover non-regular inputs | **holds** (T7); also absent under Schreyer order. |
 | the GVW rewritable criterion is not a standalone pair criterion | **holds** (§3.4). |
 | signatures constrain reducer choice; policies "may become invalid rather than merely suboptimal" | **refined.** The constraint is real (EF Algorithm 5), but within the admissible set any choice remains correct (EF Property 13.3(c)). The M16/M19 pricing does not carry over; the policies themselves are not invalid. |
