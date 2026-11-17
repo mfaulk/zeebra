@@ -1,0 +1,43 @@
+{
+ "schema": 1,
+ "freeze_commit": "4f5784c535818f6607d640af2d458c6a460da749",
+ "grobx_upstream_revision": "1854835dbc25f24dc9a9ba017024d5030e99da1c",
+ "grobx_version": "0.73.3",
+ "stock_driver": {
+  "note": "The timing comparand. Its build_metadata (identities.json) carries these three source SHA-256s, so the binary was built from the freeze's driver source.",
+  "tools/external/grobx-driver/Cargo.toml": "3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39",
+  "tools/external/grobx-driver/Cargo.lock": "b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b",
+  "tools/external/grobx-driver/src/main.rs": "70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104"
+ },
+ "overlays": {
+  "work-counters (#713)": {
+   "recipe": "tools/external/grobx-driver/research/provision.py",
+   "use": "passive coefficient-work and matrix counters; Gf31 only (refuses characteristics at or above 2^31)",
+   "files": {
+    "tools/external/grobx-driver/research/provision.py": "e1a16f7367fb8886b15406b3e15c0070152d83ded841d1ed50c6c4cf7c026ccd",
+    "tools/external/grobx-driver/research/instrument.py": "73ca75bd16b90b1f6995df31b31ad51ab82b2675f2c04c6f01e42f4525fba33d",
+    "tools/external/grobx-driver/research/work.rs": "8fcb8d3e82d78ec17c9fd8b352b857bdcc453cce81f1110f0e5e35de32c0a21c",
+    "tools/external/grobx-driver/research/driver-tests.rs": "c10deba8d784c3d3145c38de11cd22f3aff834433b025d38c3eae9a71e1729ae",
+    "tools/external/grobx-driver/research/test_instrument.py": "30b7036fa27b2ca716e9c87780f118d8ecf58af5338e68413dc6547edc838108"
+   }
+  },
+  "randomization": {
+   "recipe": "tools/external/grobx-driver/research/randomization/overlay.py",
+   "use": "#716 arm 4: plain combinations on and off, crossed with the signature arms",
+   "files": {
+    "tools/external/grobx-driver/research/randomization/overlay.py": "3357fd8bedfa33c55b966284e7532947725c20f03e8d3b19bea46aca8d9a3b01",
+    "tools/external/grobx-driver/research/randomization/policy.rs": "2844de7ce2c873bd31e6d9bfc246737b8af10df04dbbc96e6fc9270063611616",
+    "tools/external/grobx-driver/research/randomization/driver-tests.rs": "80c19fc41a8088b8334a44a4258f54c761d699c91cecdf50506ef42866c74a81",
+    "tools/external/grobx-driver/research/randomization/test_policy.py": "aa4fd2c243995f8233e1dfecd08ee93109d33aece344787b55a915271bb9d25b"
+   }
+  },
+  "signatures-without-handover (#716 arm 3)": {
+   "recipe": null,
+   "use": "not in the tree at the freeze; #716 writes it and records its recipe SHA-256s and executable SHA-256 against this freeze before any timed run"
+  },
+  "Params.signatures=false (#716 arm 2)": {
+   "recipe": "public upstream parameter, no overlay",
+   "use": "the stock upstream at the pinned revision with one public parameter changed; #716 records the executable it runs"
+  }
+ }
+}

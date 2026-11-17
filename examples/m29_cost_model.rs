@@ -5,6 +5,10 @@
 //! cargo run --release --features external-runners --example m29_cost_model -- \
 //!     --target mq10-32003 --workers 16 [--stages] [--pair-multiples every|distinct]
 //!     [--batch-order forward|fl] [--hilbert off|observe|limited+N|deferred+N] [--wall-s 180]
+//!     [--certify]
+//!
+//! `--certify` runs F4's own certificate after the solve (#855). It is verification, not timing:
+//! its cost is inside the process wall, so it never runs in a timed campaign.
 //!
 //! With `--features research-work`, `--work` adds the serial thread-local entry-operation census
 //! and `--discovery` splits forward products into inherited-pivot and newly-discovered-pivot work.
@@ -47,6 +51,7 @@ struct Args {
     work: bool,
     discovery: bool,
     hilbert: HilbertSelection,
+    certify: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -60,6 +65,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         work: false,
         discovery: false,
         hilbert: HilbertSelection::Off,
+        certify: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -115,6 +121,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                 )
             }
             "--work" => parsed.work = true,
+            "--certify" => parsed.certify = true,
             "--discovery" => parsed.discovery = true,
             other => return Err(format!("unexpected argument {other}")),
         }
@@ -143,6 +150,7 @@ fn options(args: &Args) -> F4Options {
         pair_multiples: args.pair_multiples,
         batch_order: args.batch_order,
         hilbert: args.hilbert,
+        certify: args.certify,
         parallel_forward: if args.workers == 1 {
             ParallelForward::Serial
         } else {
@@ -394,6 +402,24 @@ fn census(report: &zeebra::linalg::work::WorkReport) -> Json {
     ])
 }
 
+fn certification(s: &F4Statistics) -> Json {
+    s.certification.as_ref().map_or(Json::Null, |c| {
+        Json::object([
+            ("complete", Json::Bool(c.is_complete())),
+            ("generators_in_basis", Json::Bool(c.generators_in_basis)),
+            ("buchberger_criterion", Json::Bool(c.buchberger_criterion)),
+            ("reduced", Json::Bool(c.reduced)),
+            ("generators_checked", Json::size(c.generators_checked)),
+            ("s_polynomials_checked", Json::size(c.s_polynomials_checked)),
+            (
+                "s_polynomials_discarded",
+                Json::size(c.s_polynomials_discarded),
+            ),
+            ("elapsed_ns", Json::nanos(c.elapsed)),
+        ])
+    })
+}
+
 fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
     let system: Vec<MultivariatePolynomial<N, F>> = input
@@ -466,6 +492,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 Json::string(sha256_hex(b.join("\n").as_bytes()))
             }),
         ),
+        ("certification", certification(&stats)),
         ("statistics", statistics(&stats, args.stages)),
         ("work", work),
     ])
@@ -511,6 +538,18 @@ mod tests {
         assert_eq!(sixteen.elimination, default.elimination);
         assert_eq!(sixteen.max_live_bytes, default.max_live_bytes);
         assert!(!sixteen.measure_stages);
+    }
+
+    // `--certify` turns on F4's own certificate and nothing else; timed runs leave it off.
+    #[test]
+    fn certify_is_opt_in() {
+        let plain = options(&args(&["--target", "eco12-wide64", "--workers", "16"]).unwrap());
+        assert!(!plain.certify);
+        let certified =
+            options(&args(&["--target", "eco12-wide64", "--workers", "16", "--certify"]).unwrap());
+        assert!(certified.certify);
+        assert_eq!(certified.parallel_forward, plain.parallel_forward);
+        assert_eq!(certified.pair_multiples, plain.pair_multiples);
     }
 
     // The pre-#831 arm is selectable, and an unknown policy, target or worker count is refused.
