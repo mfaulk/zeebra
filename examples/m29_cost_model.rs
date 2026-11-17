@@ -4,7 +4,7 @@
 //!
 //! cargo run --release --features external-runners --example m29_cost_model -- \
 //!     --target mq10-32003 --workers 16 [--stages] [--pair-multiples every|distinct]
-//!     [--batch-order forward|fl] [--wall-s 180]
+//!     [--batch-order forward|fl] [--hilbert off|observe|limited+N|deferred+N] [--wall-s 180]
 //!
 //! With `--features research-work`, `--work` adds the serial thread-local entry-operation census
 //! and `--discovery` splits forward products into inherited-pivot and newly-discovered-pivot work.
@@ -13,7 +13,7 @@ use zeebra::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
         differential::polynomial_to_string, external::corpus, f4_reported, BatchOrder, F4Options,
-        F4Statistics, PairMultiples, ParallelForward,
+        F4Statistics, HilbertSelection, PairMultiples, ParallelForward,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -36,6 +36,7 @@ struct Args {
     wall: Duration,
     work: bool,
     discovery: bool,
+    hilbert: HilbertSelection,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -48,6 +49,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         wall: Duration::from_secs(180),
         work: false,
         discovery: false,
+        hilbert: HilbertSelection::Off,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -74,6 +76,25 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                     "forward" => BatchOrder::Forward,
                     "fl" => BatchOrder::FaugereLachartre,
                     other => return Err(format!("unknown batch order {other}")),
+                }
+            }
+            "--hilbert" => {
+                let mode = value()?;
+                let slack = |prefix: &str| {
+                    mode[prefix.len()..]
+                        .parse()
+                        .map_err(|_| format!("{prefix}N takes a whole slack"))
+                };
+                parsed.hilbert = match mode.as_str() {
+                    "off" => HilbertSelection::Off,
+                    "observe" => HilbertSelection::Observe,
+                    m if m.starts_with("limited+") => HilbertSelection::CertifiedLimited {
+                        slack: slack("limited+")?,
+                    },
+                    m if m.starts_with("deferred+") => HilbertSelection::Deferred {
+                        slack: slack("deferred+")?,
+                    },
+                    other => return Err(format!("unknown Hilbert selection {other}")),
                 }
             }
             "--wall-s" => {
@@ -111,6 +132,7 @@ fn options(args: &Args) -> F4Options {
         max_wall_time: Some(args.wall),
         pair_multiples: args.pair_multiples,
         batch_order: args.batch_order,
+        hilbert: args.hilbert,
         parallel_forward: if args.workers == 1 {
             ParallelForward::Serial
         } else {
@@ -305,7 +327,23 @@ fn census(report: &zeebra::linalg::work::WorkReport) -> Json {
             let d: usize = b.discovery.iter().map(|r| r.discovered_products).sum();
             inherited += i;
             discovered += d;
+            // Rows that end zero: work a criterion that predicted the dependency would not pay.
+            let zero =
+                |r: &&zeebra::linalg::work::DiscoveryRow| r.completed && r.pivot_column.is_none();
+            let zero_rows = b.discovery.iter().filter(zero).count();
+            let zero_products: usize = b
+                .discovery
+                .iter()
+                .filter(zero)
+                .map(|r| r.inherited_products + r.discovered_products)
+                .sum();
+            let zero_ns: u64 = b.discovery.iter().filter(zero).map(|r| r.elapsed_ns).sum();
+            let row_ns: u64 = b.discovery.iter().map(|r| r.elapsed_ns).sum();
             Json::object([
+                ("zero_rows", Json::size(zero_rows)),
+                ("zero_row_products", Json::size(zero_products)),
+                ("zero_row_ns", Json::int(zero_ns)),
+                ("row_ns", Json::int(row_ns)),
                 ("degree", Json::int(b.degree)),
                 ("pairs", Json::size(b.pairs)),
                 ("rows", Json::size(b.rows)),
@@ -488,6 +526,31 @@ mod tests {
             "x"
         ])
         .is_err());
+    }
+
+    // Each Hilbert selection mode parses to its policy with its slack, and off is the default.
+    #[test]
+    fn hilbert_selection_is_selectable() {
+        let base = ["--target", "mq11-goldilocks", "--workers", "1"];
+        let with = |mode: &str| args(&[&base[..], &["--hilbert", mode]].concat());
+        assert_eq!(
+            options(&args(&base).unwrap()).hilbert,
+            HilbertSelection::Off
+        );
+        assert_eq!(
+            options(&with("observe").unwrap()).hilbert,
+            HilbertSelection::Observe
+        );
+        assert_eq!(
+            options(&with("limited+100").unwrap()).hilbert,
+            HilbertSelection::CertifiedLimited { slack: 100 }
+        );
+        assert_eq!(
+            options(&with("deferred+0").unwrap()).hilbert,
+            HilbertSelection::Deferred { slack: 0 }
+        );
+        assert!(with("limited+x").is_err());
+        assert!(with("sometimes").is_err());
     }
 
     // The opt-in Faugère–Lachartre order is selectable for #828's cross-check; forward is the default.
