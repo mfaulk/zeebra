@@ -492,3 +492,58 @@ checks the measured 109-element basis under the recommended live budget and conf
 explicit historical 20-million-entry cap still refuses. The debug suite leaves that workload
 ignored for cost; run it locally with the command in
 [`src/grobner/f4/test-data/README.md`](../../src/grobner/f4/test-data/README.md).
+
+## Retrieving IACR ePrint papers
+
+`eprint.iacr.org` answers HTTP 403 to automated PDF requests from agent sessions (its HTML abstract
+pages still load). [`scripts/fetch-eprint`](../../scripts/fetch-eprint) fetches the PDF from the
+public read-only mirror [eprint.iacr.asia](https://eprint.iacr.asia/about.html) instead, whose
+`robots.txt` disallows only `/archive/`, and caches it for every checkout on the machine.
+
+```bash
+scripts/fetch-eprint 2025/2340                              # prints ~/.cache/eprint/2025-2340.pdf
+scripts/fetch-eprint https://eprint.iacr.org/2025/2340.pdf  # same paper, same file
+scripts/fetch-eprint --text 2025/2340                       # prints a cached pdftotext -layout file
+scripts/fetch-eprint --refresh 2025/2340                    # download again (a newer revision)
+scripts/fetch-eprint --import ~/Downloads/paper.pdf 2025/2340  # install a copy found elsewhere
+```
+
+Accepted inputs are `YYYY/N` and `http(s)://eprint.iacr.org/YYYY/N[.pdf]` or the same on
+`eprint.iacr.asia`; anything else is refused with status 64 before any request. The PDF path (or
+text path) is the only stdout; diagnostics go to stderr.
+
+**Cache.** `$XDG_CACHE_HOME/eprint/` (default `~/.cache/eprint/`), named `YYYY-NNN.pdf` with the
+number zero-padded to three digits, so `2021/51` and `2021/051` are one file. A valid cached copy is
+returned without a network request, including when the mirror is down. Downloads go to a `.part`
+file in the cache directory, are validated, and are renamed into place, so a reader never sees a
+partial file. A per-paper `flock` makes concurrent fetches of one paper download it once; the empty
+`.YYYY-NNN.lock` files it leaves are harmless. A cached file that is not a complete PDF is discarded
+and fetched again. Inspect with `ls ~/.cache/eprint`; clear with `rm -r ~/.cache/eprint`.
+`EPRINT_CACHE_DIR` overrides the location.
+
+**Validation and retries.** A download is accepted only on HTTP 200 with a body that starts with
+`%PDF-` and has `%%EOF` in its last 2 KiB. An HTML body served with 200 (an error or challenge
+page) is rejected at once. 429, 5xx, timeouts, connection failures and truncated PDFs are retried up
+to three attempts with 2 s / 4 s back-off (`EPRINT_RETRIES`, `EPRINT_RETRY_DELAY`); 403 and 404 are
+not retried.
+
+| Exit | Meaning |
+|---:|---|
+| 0 | path printed |
+| 1 | the mirror does not have it (403, 404, HTML, not a PDF) |
+| 2 | network or lock failure after the bounded retries |
+| 3 | `--text` requested but `pdftotext` is missing or produced nothing; the PDF is cached |
+| 64 | malformed id, URL, host or option |
+
+On status 1 or 2 the diagnostic gives the paper's abstract URL and the next step: find an authorized
+copy (arXiv, `tosc.iacr.org` / `tches.iacr.org`, HAL, an author's page) and install it with
+`--import`, which validates it like a download.
+
+**Dependencies.** `bash`, `curl`, `flock` (util-linux); `pdftotext` (poppler-utils) only for
+`--text`. Tests: `bash scripts/test/fetch-eprint-test.sh` (needs `python3` for a local fixture
+server; never touches the network).
+
+**Text extraction is lossy.** `pdftotext -layout` keeps tables and paragraph layout well enough to
+grep, but equations, subscripts, finite-field notation, algorithms set in pseudo-code and figures
+come out mangled or missing. Read the PDF itself before quoting a formula, a complexity estimate or
+a table entry.

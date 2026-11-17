@@ -21,7 +21,10 @@ def main():
     p.add_argument('--target', type=Path, required=True, help='private buildcache root')
     p.add_argument('--test', action='store_true', help='run driver and hand-computable counter tests')
     p.add_argument('--randomization', action='store_true', help='add isolated #714 feature gates and plain residual checks')
+    p.add_argument('--signature', action='store_true', help='add the #716 handover switch and plain pair tallies (needs --randomization)')
     args = p.parse_args()
+    if args.signature and not args.randomization:
+        p.error('--signature layers on --randomization')
     target = args.target.resolve()
     if not str(target).startswith('/buildcache/'):
         p.error('--target must be on /buildcache')
@@ -60,6 +63,11 @@ def main():
         overlay = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(overlay)
         overlay.apply(source, driver)
+    if args.signature:
+        spec = importlib.util.spec_from_file_location('signature_overlay', HERE / 'signature/overlay.py')
+        overlay = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(overlay)
+        overlay.apply(source, driver)
     # Hash all changed upstream bytes and the original instrumentation recipe, never just the pin.
     patch = {str(path.relative_to(source)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in source.rglob('*') if path.is_file()
@@ -67,6 +75,8 @@ def main():
     recipes = ['instrument.py', 'work.rs', 'driver-tests.rs', 'provision.py']
     if args.randomization:
         recipes += ['randomization/overlay.py', 'randomization/policy.rs', 'randomization/driver-tests.rs']
+    if args.signature:
+        recipes += ['signature/overlay.py', 'signature/policy.rs', 'signature/driver-tests.rs']
     identity = {'upstream_revision': PIN, 'modified_upstream_files': patch,
         'recipe': {name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
             for name in recipes}}
@@ -87,6 +97,9 @@ def main():
         if args.randomization:
             subprocess.run(['cargo', 'test', '--locked', '--manifest-path', str(source / 'Cargo.toml'),
                             '--lib', 'research_random::tests'], cwd=driver, env=env, check=True)
+        if args.signature:
+            subprocess.run(['cargo', 'test', '--locked', '--manifest-path', str(source / 'Cargo.toml'),
+                            '--lib', 'research_sig::tests'], cwd=driver, env=env, check=True)
     print(json.dumps({'binary': str(target / 'build/release/grobx-driver'), 'identity': identity}, indent=2))
 
 
