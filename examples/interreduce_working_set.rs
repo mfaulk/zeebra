@@ -20,8 +20,17 @@
 //!   that already looked fine.
 //! - `default` is the shipped allowance, where the pass refuses and falls back.
 //! - `division` is the comparand the memory ratio is against.
+//! - `tails` is `unbounded` with `F4Options::tail_only_interreduction` (#808): each element's tail
+//!   reduced against the fixed reducer rows, with no reduced row echelon form.
+//!
+//! `--echelon-batches` turns `reduce_batch_rows` off, the regime #536's fill-in was measured in.
+//! Every row prints a digest of the reduced basis, so arms run in separate processes can be checked
+//! for coefficient-for-coefficient agreement.
 
-use std::time::{Duration, Instant};
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    time::{Duration, Instant},
+};
 
 use zeebra::{
     fields::Zp2147483647,
@@ -54,9 +63,11 @@ enum Arm {
     Default,
     /// The division route, which is what the memory ratio is against.
     Division,
+    /// `Unbounded` with tail-only reduction against fixed reducer rows (#808).
+    Tails,
 }
 
-fn options(arm: Arm, wall: Option<Duration>) -> F4Options {
+fn options(arm: Arm, wall: Option<Duration>, echelon_batches: bool) -> F4Options {
     let mut options = F4Options {
         measure_stages: true,
         interreduction: if arm == Arm::Division {
@@ -65,9 +76,13 @@ fn options(arm: Arm, wall: Option<Duration>) -> F4Options {
             InterreductionRoute::Matrix
         },
         max_wall_time: wall,
+        tail_only_interreduction: arm == Arm::Tails,
         ..F4Options::default()
     };
-    if arm == Arm::Unbounded {
+    if echelon_batches {
+        options.reduce_batch_rows = false;
+    }
+    if matches!(arm, Arm::Unbounded | Arm::Tails) {
         // Both halves of the coupled pair, because `live_entry_allowance` is their `min` and
         // lifting one alone moves nothing (#322).
         options.max_live_nonzeros = usize::MAX;
@@ -154,14 +169,23 @@ fn run<const N: usize>(
     arm: Arm,
     order: MonomialOrder,
     wall: Option<Duration>,
+    echelon_batches: bool,
 ) {
-    let options = options(arm, wall);
+    let options = options(arm, wall, echelon_batches);
     print!("{}", options.budget_report::<F>());
     let start = Instant::now();
     let (basis, statistics) = f4_reported(system, order, &options);
     let elapsed = start.elapsed();
     match basis {
-        Ok(basis) => emit(label, arm, &statistics, elapsed, basis.len()),
+        Ok(basis) => {
+            emit(label, arm, &statistics, elapsed, basis.len());
+            // `Display` sorts terms under the order, so the digest is a function of the basis.
+            let mut hasher = DefaultHasher::new();
+            for element in &basis {
+                element.to_string().hash(&mut hasher);
+            }
+            println!("  basis digest {:016x}", hasher.finish());
+        }
         Err(stopped) => {
             println!("- {label}, {arm:?}: stopped ({stopped})");
             emit(label, arm, &statistics, elapsed, 0);
@@ -222,9 +246,10 @@ fn main() {
     let arm = match value("--arm").as_deref() {
         Some("unbounded") => Arm::Unbounded,
         Some("division") => Arm::Division,
+        Some("tails") => Arm::Tails,
         None | Some("default") => Arm::Default,
         Some(other) => {
-            eprintln!("--arm is unbounded, default or division, not {other}");
+            eprintln!("--arm is unbounded, default, division or tails, not {other}");
             return;
         }
     };
@@ -237,6 +262,7 @@ fn main() {
             return;
         }
     };
+    let echelon_batches = arguments.iter().any(|a| a == "--echelon-batches");
     let wall = value("--wall")
         .and_then(|s| s.parse().ok())
         .map(Duration::from_secs);
@@ -246,24 +272,89 @@ fn main() {
             !a.starts_with("--")
                 && !matches!(
                     a.as_str(),
-                    "unbounded" | "default" | "division" | "grevlex" | "grlex" | "lex"
+                    "unbounded" | "default" | "division" | "tails" | "grevlex" | "grlex" | "lex"
                 )
         })
         .cloned()
         .unwrap_or_else(|| "katsura-8".to_string());
 
-    println!("- rung {rung}, {order:?}, arm {arm:?}, wall {wall:?}\n");
+    println!(
+        "- rung {rung}, {order:?}, arm {arm:?}, wall {wall:?}, echelon batches {echelon_batches}\n"
+    );
 
     match rung.as_str() {
-        "katsura-6" => run("katsura-6", &katsura::<6, F>(), arm, order, wall),
-        "katsura-7" => run("katsura-7", &katsura::<7, F>(), arm, order, wall),
-        "katsura-8" => run("katsura-8", &katsura::<8, F>(), arm, order, wall),
-        "katsura-9" => run("katsura-9", &katsura::<9, F>(), arm, order, wall),
-        "katsura-10" => run("katsura-10", &katsura::<10, F>(), arm, order, wall),
-        "katsura-11" => run("katsura-11", &katsura::<11, F>(), arm, order, wall),
-        "cyclic-6" => run("cyclic-6", &cyclic::<6, F>(), arm, order, wall),
-        "cyclic-7" => run("cyclic-7", &cyclic::<7, F>(), arm, order, wall),
-        "mq-random-10" => run("mq-random-10", &mq_random_10(), arm, order, wall),
+        "katsura-6" => run(
+            "katsura-6",
+            &katsura::<6, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "katsura-7" => run(
+            "katsura-7",
+            &katsura::<7, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "katsura-8" => run(
+            "katsura-8",
+            &katsura::<8, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "katsura-9" => run(
+            "katsura-9",
+            &katsura::<9, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "katsura-10" => run(
+            "katsura-10",
+            &katsura::<10, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "katsura-11" => run(
+            "katsura-11",
+            &katsura::<11, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "cyclic-6" => run(
+            "cyclic-6",
+            &cyclic::<6, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "cyclic-7" => run(
+            "cyclic-7",
+            &cyclic::<7, F>(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
+        "mq-random-10" => run(
+            "mq-random-10",
+            &mq_random_10(),
+            arm,
+            order,
+            wall,
+            echelon_batches,
+        ),
         other => eprintln!("{other} is not a rung this example compiles"),
     }
 }

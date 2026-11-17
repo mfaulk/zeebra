@@ -4674,3 +4674,47 @@ fn test_pressure_at_the_live_entry_requirement_is_full() {
     assert_eq!(live.observed, requirement);
     assert_eq!(live.allowance, requirement);
 }
+
+/// `tail_only_interreduction` returns the same reduced basis as the full echelon matrix route and
+/// as division, under both batch-row configurations, and records its pass.
+#[test]
+fn test_tail_only_interreduction_matches_the_other_routes() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<6, Zp2147483647>();
+    for reduce_batch_rows in [false, true] {
+        let run = |interreduction, tail_only_interreduction| {
+            f4_with_options(
+                &system,
+                order,
+                &F4Options {
+                    interreduction,
+                    tail_only_interreduction,
+                    reduce_batch_rows,
+                    ..F4Options::default()
+                },
+            )
+            .expect("katsura-6 completes")
+        };
+        let (division, _) = run(InterreductionRoute::Division, false);
+        let (echelon, echelon_statistics) = run(InterreductionRoute::Matrix, false);
+        let (tails, tails_statistics) = run(InterreductionRoute::Matrix, true);
+        assert_eq!(tails, division, "reduce_batch_rows = {reduce_batch_rows}");
+        assert_eq!(tails, echelon, "reduce_batch_rows = {reduce_batch_rows}");
+        let tails_pass = tails_statistics
+            .interreduction_matrix
+            .expect("the tail-only pass is recorded");
+        let echelon_pass = echelon_statistics
+            .interreduction_matrix
+            .expect("the echelon pass is recorded");
+        assert!(!tails_pass.fell_back);
+        assert_eq!(
+            (tails_pass.rows, tails_pass.columns, tails_pass.nonzeros),
+            (
+                echelon_pass.rows,
+                echelon_pass.columns,
+                echelon_pass.nonzeros
+            ),
+            "both methods reduce the same matrix"
+        );
+    }
+}
