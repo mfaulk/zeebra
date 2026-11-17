@@ -1,0 +1,462 @@
+[
+ {
+  "archive": "wide-goldilocks-mq-random-11-pass1.json.gz",
+  "sha256": "5e097c8e8d0a4753c6f4f1b5a4de467d2f632bef21d2c70dd87db9f4fadd3a1a",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   2.31787109375,
+   1.93994140625,
+   1.8291015625
+  ],
+  "attempts": [
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 9056570524,
+    "basis_text_sha256": "a44a1a83e3aee37423f5d49ab5059c7f6c8005111548b03c74f28a443004a85f"
+   },
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 2935915677,
+    "basis_text_sha256": "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41"
+   }
+  ]
+ },
+ {
+  "archive": "wide-goldilocks-mq-random-11-pass2.json.gz",
+  "sha256": "101300d25641dddff4bb7c68e40ac3fec629dddc9982ba728a54d21a09e3cf14",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.4931640625,
+   1.77294921875,
+   1.779296875
+  ],
+  "attempts": [
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 9046371379,
+    "basis_text_sha256": "a44a1a83e3aee37423f5d49ab5059c7f6c8005111548b03c74f28a443004a85f"
+   },
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 2933909398,
+    "basis_text_sha256": "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41"
+   }
+  ]
+ },
+ {
+  "archive": "wide-goldilocks-mq-random-11-pass3.json.gz",
+  "sha256": "8065cc195b891478a634c328b4bc3c86c672557edea0ae2e3d6ad909e4e2aa5c",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.24560546875,
+   1.63134765625,
+   1.72607421875
+  ],
+  "attempts": [
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 9015805435,
+    "basis_text_sha256": "a44a1a83e3aee37423f5d49ab5059c7f6c8005111548b03c74f28a443004a85f"
+   },
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 2931047190,
+    "basis_text_sha256": "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41"
+   }
+  ]
+ },
+ {
+  "archive": "wide-goldilocks-mq-random-11-pass4.json.gz",
+  "sha256": "f215d0d7bedf5a88f3f3949aab21532b22ef0387d5366e934bcab9b5687a61a7",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.0615234375,
+   1.47900390625,
+   1.66357421875
+  ],
+  "attempts": [
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 9032408807,
+    "basis_text_sha256": "a44a1a83e3aee37423f5d49ab5059c7f6c8005111548b03c74f28a443004a85f"
+   },
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 2941897420,
+    "basis_text_sha256": "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41"
+   }
+  ]
+ },
+ {
+  "archive": "wide-goldilocks-mq-random-11-pass5.json.gz",
+  "sha256": "57abe83c9f314cad6d6e7089598a0bc00bdffa83023b2d564f6e15b8d3be5226",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.34765625,
+   1.45703125,
+   1.63818359375
+  ],
+  "attempts": [
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 9046577800,
+    "basis_text_sha256": "a44a1a83e3aee37423f5d49ab5059c7f6c8005111548b03c74f28a443004a85f"
+   },
+   {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 2935433995,
+    "basis_text_sha256": "ddef89cb69323c4ee9fb3d706dac4bcb50b1888130b309b6ef675461be072d41"
+   }
+  ]
+ },
+ {
+  "archive": "wide-wide64-eco-12-pass1.json.gz",
+  "sha256": "f868e3b346202390b0badded8b8c2ef0d931ac93922a25b354263f41252d5d3d",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   2.8408203125,
+   2.00634765625,
+   1.8486328125
+  ],
+  "attempts": [
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 2936114550,
+    "basis_text_sha256": "d13147875a25162d0dc89e4551f64dfebda1ee8f7aa193512155f4ad486a0233"
+   },
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 1623461631,
+    "basis_text_sha256": "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984"
+   }
+  ]
+ },
+ {
+  "archive": "wide-wide64-eco-12-pass2.json.gz",
+  "sha256": "5278e62b0346102180452103bc67cdbbc977a7ffdb0714629ebee992dad30e74",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.59423828125,
+   1.81005859375,
+   1.791015625
+  ],
+  "attempts": [
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 3031950380,
+    "basis_text_sha256": "d13147875a25162d0dc89e4551f64dfebda1ee8f7aa193512155f4ad486a0233"
+   },
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 1622826635,
+    "basis_text_sha256": "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984"
+   }
+  ]
+ },
+ {
+  "archive": "wide-wide64-eco-12-pass3.json.gz",
+  "sha256": "a5e32530985e30b429005146949eb90da5b67d2cff16462c07344d4833c21ec0",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.24853515625,
+   1.658203125,
+   1.73779296875
+  ],
+  "attempts": [
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 3037786417,
+    "basis_text_sha256": "d13147875a25162d0dc89e4551f64dfebda1ee8f7aa193512155f4ad486a0233"
+   },
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 1636031593,
+    "basis_text_sha256": "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984"
+   }
+  ]
+ },
+ {
+  "archive": "wide-wide64-eco-12-pass4.json.gz",
+  "sha256": "473752cf95421344b4dc5261459f814a37f7152b1446196cbda04eb4c09407f2",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.087890625,
+   1.51318359375,
+   1.67919921875
+  ],
+  "attempts": [
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 3036976294,
+    "basis_text_sha256": "d13147875a25162d0dc89e4551f64dfebda1ee8f7aa193512155f4ad486a0233"
+   },
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 1618864033,
+    "basis_text_sha256": "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984"
+   }
+  ]
+ },
+ {
+  "archive": "wide-wide64-eco-12-pass5.json.gz",
+  "sha256": "19a027ff72c5e2047404e7626e172c5f85a4aac48ca2419e62baa35d8a2ed700",
+  "commit": "7251e775a7d999fb40d1adb18b85783c7216515d",
+  "binaries": {
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/wide_corpus",
+    "sha256": "ce3453311bdacf8b1a4b0d10602265cd205a34387225845ae73ac45a55d95326"
+   },
+   "groebner.jl": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/julia",
+    "sha256": "0ae4f4b3ab931de6ec3522ce48dc2f161e35064411d24440ccdbbe12adc7d465"
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-834/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c"
+   }
+  },
+  "load_start": [
+   1.19140625,
+   1.4365234375,
+   1.63525390625
+  ],
+  "attempts": [
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "groebner-rs",
+    "status": "complete",
+    "solver_process_wall_ns": 3055333025,
+    "basis_text_sha256": "d13147875a25162d0dc89e4551f64dfebda1ee8f7aa193512155f4ad486a0233"
+   },
+   {
+    "field": "wide64",
+    "name": "eco-12",
+    "engine": "grobx",
+    "status": "complete",
+    "solver_process_wall_ns": 1633868798,
+    "basis_text_sha256": "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984"
+   }
+  ]
+ }
+]

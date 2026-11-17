@@ -160,6 +160,25 @@ the pid from `$!` and pass it with `--kill-pid`.
 where both wrappers' command lines contain the row id and only the binary is matched — and runs in
 CI's `agent-scripts` job.
 
+### Recording the CPU context of a multicore timing
+
+A 16-worker burst holds the 5995WX at its all-core clock (about 3.99 GHz rather than 4.54) for
+200–500 ms afterwards, and CCD placement moves serial-stage timings (#827). Both change a wall time
+without changing the work. Since M29 (#834), a timing records its context beside the figure and is
+**never** corrected for it. Process wall stays authoritative, and a clock-normalized figure is an
+inference, not a measurement:
+
+```sh
+tools/cpu-context.sh 8-23   # one JSON line: load, each CPU's L3 domain/core/clock, governor, boost, compilers
+```
+
+Take a snapshot before and after each child, pin the child with `taskset` to the same list, and
+publish the load, the number of L3 domains the list spans and the compiler count with the figure.
+Compare a serial stage only between arms run in the same parallel context. The
+M29 campaign ([`research/m29-baseline/costmodel.py`](../../research/m29-baseline/costmodel.py)) also
+samples `scaling_cur_freq` every 25 ms during each child. `tools/test/cpu-context-test.sh` covers
+the script against a synthetic `/sys` and `/proc`.
+
 ## Which commit a figure came from
 
 A measurement published under `docs/` states the commit it was taken at. The field has always

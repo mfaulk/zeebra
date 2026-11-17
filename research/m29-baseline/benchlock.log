@@ -1,0 +1,36 @@
+2026-11-16T16:47:48-05:00  QUEUED   zb-834          pid=851329   timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T16:47:48-05:00  START    zb-834          pid=851329   waited=0s load=2.54 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T16:58:52-05:00  END      zb-834          pid=851329   status=2 end=exited elapsed=664s load=2.40 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T16:58:52-05:00  QUEUED   zb-834          pid=953723   timeout --signal=INT --kill-after=60s 1200 bash research/m29-baseline/run.sh wide
+2026-11-16T16:58:52-05:00  START    zb-834          pid=953723   waited=0s load=2.40 timeout --signal=INT --kill-after=60s 1200 bash research/m29-baseline/run.sh wide
+2026-11-16T16:59:06-05:00  END      zb-834          pid=953723   status=130 end=signalled-child(INT) elapsed=14s load=2.52 timeout --signal=INT --kill-after=60s 1200 bash research/m29-baseline/run.sh wide
+2026-11-16T16:59:06-05:00  QUEUED   zb-834          pid=955706   timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh walls
+2026-11-16T16:59:06-05:00  START    zb-834          pid=955706   waited=0s load=2.52 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh walls
+2026-11-16T16:59:13-05:00  END      zb-834          pid=955706   status=130 end=signalled-child(INT) launcher=gone elapsed=7s load=2.48 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh walls
+2026-11-16T17:00:05-05:00  QUEUED   zb-834          pid=958252   timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh walls
+2026-11-16T17:00:05-05:00  START    zb-834          pid=958252   waited=0s load=2.82 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh walls
+2026-11-16T17:07:51-05:00  END      zb-834          pid=958252   status=0 end=exited elapsed=466s load=4.08 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh walls
+2026-11-16T17:07:51-05:00  QUEUED   zb-834          pid=1142071  timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh stages
+2026-11-16T17:07:51-05:00  START    zb-834          pid=1142071  waited=0s load=4.08 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh stages
+2026-11-16T17:15:30-05:00  END      zb-834          pid=1142071  status=0 end=exited elapsed=459s load=4.81 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh stages
+2026-11-16T17:15:30-05:00  QUEUED   zb-834          pid=1331874  timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh ab831
+2026-11-16T17:15:30-05:00  START    zb-834          pid=1331874  waited=0s load=4.81 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh ab831
+2026-11-16T17:25:52-05:00  END      zb-834          pid=1331874  status=0 end=exited elapsed=622s load=3.42 timeout --signal=INT --kill-after=60s 3600 bash research/m29-baseline/run.sh ab831
+2026-11-16T17:25:52-05:00  QUEUED   zb-834          pid=1507703  timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh census
+2026-11-16T17:32:02-05:00  START    zb-834          pid=1507703  waited=370s load=3.03 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh census
+2026-11-16T17:34:26-05:00  END      zb-834          pid=1507703  status=0 end=exited elapsed=144s load=4.47 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh census
+2026-11-16T17:34:26-05:00  QUEUED   zb-834          pid=1579272  timeout --signal=INT --kill-after=60s 1200 bash research/m29-baseline/run.sh wide
+2026-11-16T17:42:54-05:00  START    zb-834          pid=1579272  waited=508s load=3.43 timeout --signal=INT --kill-after=60s 1200 bash research/m29-baseline/run.sh wide
+2026-11-16T17:47:25-05:00  END      zb-834          pid=1579272  status=0 end=exited elapsed=271s load=6.67 timeout --signal=INT --kill-after=60s 1200 bash research/m29-baseline/run.sh wide
+2026-11-16T17:47:25-05:00  QUEUED   zb-834          pid=1649025  timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:03:37-05:00  START    zb-834          pid=1649025  waited=972s load=6.01 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:04:02-05:00  END      zb-834          pid=1649025  status=75 end=exited elapsed=25s load=5.83 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:06:23-05:00  QUEUED   zb-834          pid=1706547  timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:16:04-05:00  START    zb-834          pid=1706547  waited=581s load=6.43 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:16:51-05:00  END      zb-834          pid=1706547  status=75 end=exited elapsed=47s load=3.74 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:55:58-05:00  QUEUED   zb-834          pid=1801581  timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:55:58-05:00  START    zb-834          pid=1801581  waited=0s load=10.10 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:56:17-05:00  END      zb-834          pid=1801581  status=2 end=exited elapsed=19s load=7.57 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:56:52-05:00  QUEUED   zb-834          pid=1806444  timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:56:52-05:00  START    zb-834          pid=1806444  waited=0s load=4.48 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10
+2026-11-16T18:59:29-05:00  END      zb-834          pid=1806444  status=0 end=exited elapsed=157s load=1.46 timeout --signal=INT --kill-after=60s 1800 bash research/m29-baseline/run.sh mq10

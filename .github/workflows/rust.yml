@@ -351,6 +351,11 @@ jobs:
           bash tools/test/benchlock-test.sh
           bash tools/test/check-measurement-provenance-test.sh
           bash tools/test/ci-scope-test.sh
+          bash tools/test/cpu-context-test.sh
+
+      - name: M29 baseline campaign helpers
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s research/m29-baseline -p 'test_*.py'
 
       - name: Giac comparand artifacts
         if: ${{ !cancelled() }}

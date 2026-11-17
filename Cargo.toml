@@ -314,6 +314,11 @@ test = true
 required-features = ["external-runners"]
 
 [[example]]
+name = "m29_cost_model"
+test = true
+required-features = ["external-runners"]
+
+[[example]]
 name = "zeebra_driver"
 test = true
 required-features = ["external-runners"]
