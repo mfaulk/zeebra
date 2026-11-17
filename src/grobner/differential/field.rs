@@ -195,7 +195,9 @@ impl CaseField {
     /// rather than by XOR would produce a polynomial neither side was sent.
     pub const fn add(&self, a: u64, b: u64) -> u64 {
         match self {
-            Self::Prime { characteristic } => (a + b) % *characteristic,
+            Self::Prime { characteristic } => {
+                ((a as u128 + b as u128) % *characteristic as u128) as u64
+            }
             Self::Binary { .. } => a ^ b,
         }
     }
@@ -533,6 +535,14 @@ mod tests {
         assert_eq!(GF256.order(), 256);
         assert_eq!(CaseField::binary(0x25).degree(), 5);
         assert_eq!(CaseField::binary(0x25).order(), 32);
+    }
+
+    /// Residue addition near a 64-bit prime wraps modulo the prime, not modulo `2^64`.
+    #[test]
+    fn test_prime_addition_does_not_overflow_a_64_bit_characteristic() {
+        let p = 18_446_744_069_414_584_321u64;
+        let field = CaseField::prime(p);
+        assert_eq!(field.add(p - 1, p - 2), p - 3);
     }
 
     /// A prime field reports its characteristic as both characteristic and order.

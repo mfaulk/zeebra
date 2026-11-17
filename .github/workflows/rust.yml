@@ -173,6 +173,10 @@ jobs:
           cargo test --features research-work --example mq10_profile
           cargo test --features research-multirow --lib linalg::dense::band
           cargo test --features research-multirow --example mq10_profile
+          cargo test --features research-sigf4 --lib grobner::sigf4
+          cargo test --features research-sigf4 --example sig_f4_study
+          python3 research/m30-sigf4/test_run.py
+          python3 research/m30-sigf4/summarize.py research/m30-sigf4/{gate,controls,gate2,controls2}.jsonl.gz | diff - research/m30-sigf4/tables.md
           python3 tools/test/multirow-study-test.py
           python3 tools/test/public-corpus-test.py
       # About 12 minutes; it reads only its own records and tools/external/ (tools/ci-scope.sh).
