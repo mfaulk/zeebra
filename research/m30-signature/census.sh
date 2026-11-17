@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One serial --discovery record per target from one cost-model binary: the C1 zero-row census and
 # #223's pair-row fraction, read from the same run (plan §6.1 reconciliation).
-#   tools/benchlock.sh zb-716 taskset -c 2 research/m30-signature/census.sh <binary> <out.jsonl>
+#   tools/bench-reserve.sh run zb-716 8 research/m30-signature/census.sh <binary> <out.jsonl>
 set -euo pipefail
 binary=$1
 out=$2
