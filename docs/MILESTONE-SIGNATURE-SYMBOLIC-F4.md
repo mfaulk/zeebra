@@ -432,6 +432,10 @@ binaries and research overlays; Rust toolchain, profile (release, fat LTO, one c
 that commit with M29's scripts and publish `research/m30-baseline/`. Comparisons across hardware
 or compiler conditions are never treated as paired.
 
+#855 froze this at `4f5784c5`. [`research/m30-baseline/`](../research/m30-baseline/README.md) holds
+the cohort, identities, drift and verification. [`docs/research/m30-protocol.md`](research/m30-protocol.md)
+is the protocol every M30 issue follows.
+
 ### 10.2 Performance method
 
 - Fresh process per run; interleaved, rotated arms; same input and output contract; same resource
