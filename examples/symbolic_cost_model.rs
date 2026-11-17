@@ -748,6 +748,9 @@ fn live<const N: usize, F: FiniteField + Sync>(
         ("served_steps", Json::size(report.steps)),
         ("dispatched_steps", Json::size(report.dispatched_steps)),
         ("fallback", Json::Bool(report.serial_fallback)),
+        ("scratch_growths", Json::size(report.growths)),
+        ("scratch_rescans", Json::size(report.rescans)),
+        ("scratch_bytes", Json::size(report.scratch_bytes)),
     ])
 }
 

@@ -101,6 +101,12 @@ pub struct InternReport {
     pub emit: Duration,
     /// The caller's serial stitching between phases: rows, leads, arena, `term_handles` appends.
     pub stitch: Duration,
+    /// Scratch buffers grown, all on the caller (#871).
+    pub growths: usize,
+    /// Slice scans repeated after a growth.
+    pub rescans: usize,
+    /// Scratch held after the batch, in bytes of capacity; maximized when summed.
+    pub scratch_bytes: usize,
 }
 
 /// A monomial carrying the hash a worker already computed, so the merge does not hash it again.
@@ -151,11 +157,11 @@ const LOCAL: u32 = 1 << 31;
 struct Slice<const N: usize> {
     /// Rows found: basis index, multiplier, frontier position + 1, end of its run in `refs`.
     rows: Vec<(usize, Monomial<N>, usize, usize)>,
-    /// One per term: a handle, or `LOCAL | id` into `candidates`.
+    /// One per term: a handle, or `LOCAL | id` into `candidates`; after emit, handles only.
     refs: Vec<u32>,
     /// Pre-step misses, deduplicated within the slice, in first-occurrence order.
     candidates: Vec<Keyed<N>>,
-    /// Per shard, the candidate ids it holds, ascending.
+    /// Per shard, the candidate ids it holds, ascending. The sharded merge's only.
     by_shard: Vec<Vec<u32>>,
     local: Table<N>,
     counts: SymbolicCounts,
@@ -163,12 +169,131 @@ struct Slice<const N: usize> {
     translate: Vec<AtomicU32>,
     /// Whether this slice holds the step's first occurrence of the candidate.
     owner: Vec<AtomicBool>,
-    /// Emit output: this slice's run of `term_handles`.
-    handles: Vec<MonomialHandle>,
     /// Emit output: max over rows of (owners so far in the slice - frontier position).
     pending_peak: i64,
     /// Owners in local order, written by the sharded merge's ranking.
     new: Vec<Monomial<N>>,
+    /// The scan finished this step.
+    scanned: bool,
+    /// The scan stopped short of a buffer this step.
+    overflow: Option<Overflow>,
+}
+
+/// A buffer a slice's scan ran out of. Workers never grow scratch: a scan that would stops,
+/// names the buffer, and the caller grows it and scans the slice again (#871).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Buffer {
+    Refs,
+    Candidates,
+    ByShard(usize),
+}
+
+/// Where a slice's scan stopped: the buffer, and how many of the slice's items it had finished.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Overflow {
+    buffer: Buffer,
+    done: usize,
+    total: usize,
+}
+
+impl<const N: usize> Slice<N> {
+    fn bytes(&self) -> usize {
+        use std::mem::size_of;
+        self.rows.capacity() * size_of::<(usize, Monomial<N>, usize, usize)>()
+            + self.refs.capacity() * 4
+            + self.candidates.capacity() * size_of::<Keyed<N>>()
+            + self.by_shard.iter().map(|v| v.capacity() * 4).sum::<usize>()
+            + self.local.capacity() * (size_of::<(Keyed<N>, u32)>() + 1)
+            + self.translate.capacity() * 4
+            + self.owner.capacity()
+            + self.new.capacity() * size_of::<Monomial<N>>()
+    }
+
+    /// Grow, on the calling thread, the buffer `overflow` names. The new capacity extrapolates
+    /// from how far the scan got, so one more scan usually suffices.
+    fn grow(&mut self, overflow: Overflow) {
+        let want = |len: usize, cap: usize| {
+            let projected = (len * overflow.total).div_ceil(overflow.done.max(1)) + len / 8;
+            projected.max(2 * cap).max(64)
+        };
+        match overflow.buffer {
+            Buffer::Refs => {
+                let want = want(self.refs.len(), self.refs.capacity());
+                self.refs.reserve_exact(want - self.refs.len());
+            }
+            Buffer::Candidates => {
+                let want = want(self.candidates.len(), self.local.capacity());
+                self.candidates.reserve_exact(want - self.candidates.len());
+                self.local.reserve(want - self.local.len());
+                // The scan's resizes of these must never outgrow them.
+                let most = self.candidates.capacity().min(self.local.capacity());
+                self.translate
+                    .reserve_exact(most.saturating_sub(self.translate.len()));
+                self.owner.reserve_exact(most.saturating_sub(self.owner.len()));
+            }
+            Buffer::ByShard(s) => {
+                let v = &mut self.by_shard[s];
+                let want = want(v.len(), v.capacity());
+                v.reserve_exact(want - v.len());
+            }
+        }
+    }
+}
+
+/// Step scratch owned by the caller and reused across steps and batches (#871).
+///
+/// glibc gives each thread its own arena and keeps what is freed there, so scratch a worker grows
+/// stays resident after the batch where the caller's next allocations cannot reuse it: #860's
+/// 1.20–1.31× peak RSS at 16 workers. Workers here write only within capacity the caller
+/// allocated; a scan that needs more stops, and the caller grows the buffer and rescans the slice.
+/// Kept from batch to batch, the scratch stops growing once the widest step has been seen.
+#[derive(Default)]
+pub struct InternScratch<const N: usize> {
+    slices: Vec<RwLock<Slice<N>>>,
+    growths: usize,
+    rescans: usize,
+}
+
+impl<const N: usize> InternScratch<N> {
+    /// Empty scratch; the first batches grow it.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Buffer growths so far, all made on the calling thread.
+    pub fn growths(&self) -> usize {
+        self.growths
+    }
+
+    /// Slice scans repeated after a growth.
+    pub fn rescans(&self) -> usize {
+        self.rescans
+    }
+
+    /// Scratch held, in bytes of capacity.
+    pub fn bytes(&self) -> usize {
+        self.slices.iter().map(|s| s.read().unwrap().bytes()).sum()
+    }
+
+    /// Each slice's buffer capacities.
+    #[cfg(test)]
+    pub(crate) fn capacities(&self) -> Vec<[usize; 7]> {
+        self.slices
+            .iter()
+            .map(|s| {
+                let s = s.read().unwrap();
+                [
+                    s.rows.capacity(),
+                    s.refs.capacity(),
+                    s.candidates.capacity(),
+                    s.by_shard.iter().map(Vec::capacity).sum(),
+                    s.local.capacity(),
+                    s.translate.capacity(),
+                    s.new.capacity(),
+                ]
+            })
+            .collect()
+    }
 }
 
 /// One shard of the interner: monomial to an index into `handles`.
@@ -193,7 +318,10 @@ struct Step<'a, const N: usize, F: FiniteField> {
     seeds: Vec<(usize, Monomial<N>)>,
     chunk: usize,
     shards: Vec<RwLock<Shard<N>>>,
-    slices: Vec<RwLock<Slice<N>>>,
+    /// The caller's scratch; a step uses the first `slice_count`.
+    slices: &'a [RwLock<Slice<N>>],
+    /// Whether scans fill `by_shard` (the sharded merge).
+    route: bool,
     /// Owners in earlier slices, for the sharded ranking.
     bases: Vec<u32>,
 }
@@ -244,77 +372,122 @@ fn work<const N: usize, F: FiniteField>(team: &Team, step: &RwLock<Step<'_, N, F
     }
 }
 
-fn lookup<const N: usize>(shards: &[&Shard<N>], key: &Keyed<N>) -> Option<MonomialHandle> {
-    let shard = shards[shard_of(key.hash, shards.len())];
-    shard.table.get(key).map(|&j| shard.handles[j as usize])
-}
-
 /// Scan one slice: rows, their terms, pre-step lookups, local deduplication.
 fn scan<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, task: usize) {
     let mut slice = step.slices[task].write().unwrap();
     let slice = &mut *slice;
-    let shards: Vec<_> = step.shards.iter().map(|s| s.read().unwrap()).collect();
-    let shards: Vec<&Shard<N>> = shards.iter().map(|g| &**g).collect();
+    if slice.scanned {
+        return;
+    }
+    // One shard (the serial merge) needs no guard vector, so the common scan allocates nothing.
+    let first = step.shards[0].read().unwrap();
+    let rest: Vec<_> = step.shards[1..].iter().map(|s| s.read().unwrap()).collect();
+    let shard_count = step.shards.len();
+    let lookup = |key: &Keyed<N>| {
+        let s = shard_of(key.hash, shard_count);
+        let shard: &Shard<N> = if s == 0 { &first } else { &rest[s - 1] };
+        shard.table.get(key).map(|&j| shard.handles[j as usize])
+    };
     slice.rows.clear();
     slice.refs.clear();
     slice.candidates.clear();
     slice.local.clear();
-    slice.by_shard.resize_with(shards.len(), Vec::new);
     slice.by_shard.iter_mut().for_each(Vec::clear);
     slice.counts = SymbolicCounts::default();
+    slice.overflow = None;
     let start = task * step.chunk;
-    let push_terms = |slice: &mut Slice<N>, index: usize, multiplier: &Monomial<N>| {
-        for (term, _) in step.basis.shifted_terms(index, multiplier) {
-            let key = Keyed {
-                hash: BuildMonomialHasher.hash_one(term),
-                monomial: term,
-            };
-            let r = match lookup(&shards, &key) {
-                Some(handle) => handle,
-                None => {
-                    let next = slice.candidates.len() as u32;
-                    let id = *slice.local.entry(key).or_insert(next);
-                    if id == next {
-                        slice.candidates.push(key);
-                        slice.by_shard[shard_of(key.hash, shards.len())].push(id);
+    // Every write below stays within the capacity the caller gave; `Err` names the buffer that
+    // would have had to grow.
+    let push_terms =
+        |slice: &mut Slice<N>, index: usize, multiplier: &Monomial<N>| -> Result<(), Buffer> {
+            let length = step.basis.element(index).terms.len();
+            if slice.refs.capacity() - slice.refs.len() < length {
+                return Err(Buffer::Refs);
+            }
+            for (term, _) in step.basis.shifted_terms(index, multiplier) {
+                let key = Keyed {
+                    hash: BuildMonomialHasher.hash_one(term),
+                    monomial: term,
+                };
+                let r = match lookup(&key) {
+                    Some(handle) => handle,
+                    None => {
+                        let next = slice.candidates.len() as u32;
+                        if slice.local.len() == slice.local.capacity()
+                            || slice.candidates.len() == slice.candidates.capacity()
+                        {
+                            match slice.local.get(&key) {
+                                Some(&id) => {
+                                    slice.refs.push(LOCAL | id);
+                                    continue;
+                                }
+                                None => return Err(Buffer::Candidates),
+                            }
+                        }
+                        let id = *slice.local.entry(key).or_insert(next);
+                        if id == next {
+                            if step.route {
+                                let s = shard_of(key.hash, shard_count);
+                                let routed = &mut slice.by_shard[s];
+                                if routed.len() == routed.capacity() {
+                                    return Err(Buffer::ByShard(s));
+                                }
+                                routed.push(id);
+                            }
+                            slice.candidates.push(key);
+                        }
+                        LOCAL | id
                     }
-                    LOCAL | id
-                }
-            };
-            slice.refs.push(r);
-        }
-    };
-    if step.frontier.is_empty() {
-        let end = (start + step.chunk).min(step.seeds.len());
-        for (offset, (index, multiplier)) in step.seeds[start.min(end)..end].iter().enumerate() {
-            push_terms(slice, *index, multiplier);
-            slice
-                .rows
-                .push((*index, *multiplier, start + offset + 1, slice.refs.len()));
-        }
+                };
+                slice.refs.push(r);
+            }
+            Ok(())
+        };
+    let seeds = step.frontier.is_empty();
+    let end = (start + step.chunk).min(if seeds {
+        step.seeds.len()
     } else {
-        let end = (start + step.chunk).min(step.frontier.len());
-        for (offset, monomial) in step.frontier[start.min(end)..end].iter().enumerate() {
+        step.frontier.len()
+    });
+    let total = end.saturating_sub(start);
+    for offset in 0..total {
+        let position = start + offset + 1;
+        let (index, multiplier) = if seeds {
+            step.seeds[start + offset]
+        } else {
+            let monomial = &step.frontier[start + offset];
             if step.lcms.contains(monomial) {
                 continue;
             }
-            let Some((index, multiplier)) =
+            let Some(found) =
                 step.basis
                     .find_divisor_with(monomial, step.selection, &mut slice.counts)
             else {
                 continue;
             };
-            push_terms(slice, index, &multiplier);
-            slice
-                .rows
-                .push((index, multiplier, start + offset + 1, slice.refs.len()));
+            found
+        };
+        if let Err(buffer) = push_terms(slice, index, &multiplier) {
+            slice.overflow = Some(Overflow {
+                buffer,
+                done: offset,
+                total,
+            });
+            return;
         }
+        // The caller reserved a row per item.
+        debug_assert!(slice.rows.len() < slice.rows.capacity());
+        slice
+            .rows
+            .push((index, multiplier, position, slice.refs.len()));
     }
     let n = slice.candidates.len();
+    // `grow` keeps these at least as long as `candidates` can be.
     slice.translate.clear();
     slice.translate.resize_with(n, || AtomicU32::new(0));
     slice.owner.clear();
     slice.owner.resize_with(n, || AtomicBool::new(false));
+    slice.scanned = true;
 }
 
 /// Sharded merge, phase one: within shard `s`, find each new monomial's first occurrence.
@@ -374,25 +547,23 @@ fn record<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, s: usize) {
     }
 }
 
-/// Write slice `k`'s run of `term_handles`, and its contribution to the pending-queue peak.
+/// Resolve slice `k`'s `refs` to handles in place — its run of `term_handles` — and its
+/// contribution to the pending-queue peak.
 fn emit<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, k: usize) {
     let mut slice = step.slices[k].write().unwrap();
     let slice = &mut *slice;
-    slice.handles.clear();
     slice.pending_peak = i64::MIN;
     let (mut seen, mut owned, mut at) = (0u32, 0i64, 0usize);
     for &(_, _, position, end) in &slice.rows {
-        for &r in &slice.refs[at..end] {
-            slice.handles.push(if r & LOCAL == 0 {
-                r
-            } else {
-                let id = r & !LOCAL;
+        for r in &mut slice.refs[at..end] {
+            if *r & LOCAL != 0 {
+                let id = *r & !LOCAL;
                 if id == seen {
                     seen += 1;
                     owned += i64::from(slice.owner[id as usize].load(Relaxed));
                 }
-                slice.translate[id as usize].load(Relaxed)
-            });
+                *r = slice.translate[id as usize].load(Relaxed);
+            }
         }
         at = end;
         slice.pending_peak = slice.pending_peak.max(owned - position as i64);
@@ -415,6 +586,31 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
     selection: ReducerSelection,
     multiples: PairMultiples,
     config: &InternConfig,
+) -> (Result<Preprocessed<N>, RowBudgetExceeded>, InternReport) {
+    symbolic_preprocessing_interned_in(
+        basis,
+        pairs,
+        max_rows,
+        selection,
+        multiples,
+        config,
+        &mut InternScratch::new(),
+    )
+}
+
+/// [`symbolic_preprocessing_interned`] in the caller's `scratch`, which a run of batches shares
+/// (#871).
+///
+/// # Panics
+/// As [`symbolic_preprocessing_seeded`].
+pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    max_rows: usize,
+    selection: ReducerSelection,
+    multiples: PairMultiples,
+    config: &InternConfig,
+    scratch: &mut InternScratch<N>,
 ) -> (Result<Preprocessed<N>, RowBudgetExceeded>, InternReport) {
     let mut report = InternReport::default();
     let seeding = Instant::now();
@@ -472,6 +668,23 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
     };
     let seeds: Vec<(usize, Monomial<N>)> =
         rows.iter().map(|r| (r.basis_index, r.multiplier)).collect();
+    if scratch.slices.len() < slice_count {
+        scratch.slices.resize_with(slice_count, RwLock::default);
+    }
+    let route = config.merge == Merge::Sharded;
+    for slice in &mut scratch.slices[..slice_count] {
+        let slice = slice.get_mut().unwrap();
+        let wanted = if route { shard_count } else { 0 };
+        if slice.by_shard.len() != wanted {
+            slice.by_shard.resize_with(wanted, Vec::new);
+        }
+    }
+    let (growths_before, rescans_before) = (scratch.growths, scratch.rescans);
+    let InternScratch {
+        slices: scratch_slices,
+        growths,
+        rescans,
+    } = scratch;
     let step = RwLock::new(Step {
         basis,
         selection,
@@ -480,7 +693,8 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
         seeds,
         chunk: 0,
         shards: (0..shard_count).map(|_| RwLock::default()).collect(),
-        slices: (0..slice_count).map(|_| RwLock::default()).collect(),
+        slices: &scratch_slices[..slice_count],
+        route,
         bases: vec![0; slice_count],
     });
     let team = Team {
@@ -559,6 +773,16 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
                 }
                 dispatched = size >= config.min_frontier;
                 s.chunk = size.div_ceil(if dispatched { slice_count } else { 1 });
+                // A slice finds at most one row per item it scans.
+                for slice in s.slices {
+                    let mut slice = slice.write().unwrap();
+                    slice.scanned = false;
+                    if slice.rows.capacity() < s.chunk {
+                        slice.rows.clear();
+                        slice.rows.reserve_exact(s.chunk);
+                        *growths += 1;
+                    }
+                }
             }
             report.steps += 1;
             report.dispatched_steps += usize::from(dispatched);
@@ -567,6 +791,23 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
             }
 
             run(Job::Scan, dispatched, &mut report.scan);
+            // Grow on this thread whatever a scan ran out of, and scan those slices again.
+            loop {
+                let mut short = 0;
+                for slice in step.read().unwrap().slices {
+                    let mut slice = slice.write().unwrap();
+                    if let Some(overflow) = slice.overflow.take() {
+                        slice.grow(overflow);
+                        short += 1;
+                    }
+                }
+                if short == 0 {
+                    break;
+                }
+                *growths += short;
+                *rescans += short;
+                run(Job::Scan, dispatched, &mut report.scan);
+            }
 
             // Merge.
             let merging = Instant::now();
@@ -575,7 +816,7 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
                     let s = step.read().unwrap();
                     let mut shard = s.shards[0].write().unwrap();
                     let shard = &mut *shard;
-                    for slice in &s.slices {
+                    for slice in s.slices {
                         let mut slice = slice.write().unwrap();
                         let slice = &mut *slice;
                         report.candidates += slice.candidates.len();
@@ -605,7 +846,7 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
                 Merge::Sharded => {
                     {
                         let s = step.read().unwrap();
-                        for slice in &s.slices {
+                        for slice in s.slices {
                             report.candidates += slice.read().unwrap().candidates.len();
                         }
                     }
@@ -640,13 +881,23 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
                                 .map(|sh| sh.read().unwrap().per_slice[k] as usize)
                                 .sum::<usize>();
                         }
+                        // Ranking writes a slice's owners to `new`; at most its candidates.
+                        for slice in s.slices {
+                            let mut slice = slice.write().unwrap();
+                            if slice.new.capacity() < slice.candidates.len() {
+                                let wanted = slice.candidates.len();
+                                slice.new.clear();
+                                slice.new.reserve_exact(wanted);
+                                *growths += 1;
+                            }
+                        }
                     }
                     run(Job::Rank, dispatched, &mut clock);
                     run(Job::Record, dispatched, &mut clock);
                     report.merge += merging.elapsed();
                     let stitching = Instant::now();
                     let s = step.read().unwrap();
-                    for slice in &s.slices {
+                    for slice in s.slices {
                         monomials.extend_from_slice(&slice.read().unwrap().new);
                     }
                     report.stitch += stitching.elapsed();
@@ -667,7 +918,7 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
             // One amortized growth per step rather than one per slice.
             let (step_terms, step_rows) = s.slices.iter().fold((0, 0), |(t, r), slice| {
                 let slice = slice.read().unwrap();
-                (t + slice.handles.len(), r + slice.rows.len())
+                (t + slice.refs.len(), r + slice.rows.len())
             });
             term_handles.reserve(step_terms);
             if !seed_step {
@@ -680,11 +931,11 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
             } else {
                 counts.max_pending_monomials as i64
             };
-            for slice in &s.slices {
+            for slice in s.slices {
                 let slice = slice.read().unwrap();
                 counts.add(&slice.counts);
                 counts.monomials_enqueued += slice.refs.len();
-                term_handles.extend_from_slice(&slice.handles);
+                term_handles.extend_from_slice(&slice.refs);
                 if !seed_step {
                     for &(basis_index, multiplier, position, _) in &slice.rows {
                         leads.insert(s.frontier[position - 1]);
@@ -721,6 +972,13 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
             team.barrier.as_ref().unwrap().wait();
         }
     });
+    drop(step);
+    report.growths = *growths - growths_before;
+    report.rescans = *rescans - rescans_before;
+    report.scratch_bytes = scratch_slices
+        .iter()
+        .map(|s| s.read().unwrap().bytes())
+        .sum();
 
     if refused {
         return (Err(RowBudgetExceeded { limit: max_rows }), report);
@@ -737,21 +995,30 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
     )
 }
 
+type AnyScratch = Option<Box<dyn std::any::Any>>;
+
 thread_local! {
     static LIVE: std::cell::Cell<Option<(InternConfig, InternReport)>> =
         const { std::cell::Cell::new(None) };
+    /// The run's [`InternScratch`], typed by the batches' `N`.
+    static SCRATCH: std::cell::RefCell<AnyScratch> = const { std::cell::RefCell::new(None) };
 }
 
 /// Run `f` with live F4 on this thread taking [`symbolic_preprocessing_interned`] under `config`,
-/// and return the reports of every batch it served, summed.
+/// and return the reports of every batch it served, summed. The batches share one
+/// [`InternScratch`], freed when `f` returns.
 pub fn with_live<R>(config: InternConfig, f: impl FnOnce() -> R) -> (R, InternReport) {
-    struct Reset(Option<(InternConfig, InternReport)>);
+    struct Reset(Option<(InternConfig, InternReport)>, AnyScratch);
     impl Drop for Reset {
         fn drop(&mut self) {
             LIVE.set(self.0);
+            SCRATCH.set(self.1.take());
         }
     }
-    let reset = Reset(LIVE.replace(Some((config, InternReport::default()))));
+    let reset = Reset(
+        LIVE.replace(Some((config, InternReport::default()))),
+        SCRATCH.take(),
+    );
     let result = f();
     let report = LIVE.get().expect("set above").1;
     drop(reset);
@@ -773,6 +1040,9 @@ fn accumulate(total: &mut InternReport, batch: &InternReport) {
     total.merge += batch.merge;
     total.emit += batch.emit;
     total.stitch += batch.stitch;
+    total.growths += batch.growths;
+    total.rescans += batch.rescans;
+    total.scratch_bytes = total.scratch_bytes.max(batch.scratch_bytes);
 }
 
 struct LiveJob<'a, const N: usize, F: FiniteField> {
@@ -782,6 +1052,7 @@ struct LiveJob<'a, const N: usize, F: FiniteField> {
     selection: ReducerSelection,
     multiples: PairMultiples,
     config: InternConfig,
+    scratch: &'a mut InternScratch<N>,
 }
 
 impl<const N: usize, F: FiniteField> crate::fields::ConcurrentJob<F> for LiveJob<'_, N, F> {
@@ -790,13 +1061,14 @@ impl<const N: usize, F: FiniteField> crate::fields::ConcurrentJob<F> for LiveJob
     where
         F: Send + Sync,
     {
-        symbolic_preprocessing_interned(
+        symbolic_preprocessing_interned_in(
             self.basis,
             self.pairs,
             self.max_rows,
             self.selection,
             self.multiples,
             &self.config,
+            self.scratch,
         )
     }
 }
@@ -815,6 +1087,10 @@ pub(crate) fn live<const N: usize, F: FiniteField>(
     if cached {
         return None;
     }
+    let mut scratch = SCRATCH
+        .take()
+        .and_then(|any| any.downcast::<InternScratch<N>>().ok())
+        .unwrap_or_default();
     let job = LiveJob {
         basis,
         pairs,
@@ -822,8 +1098,11 @@ pub(crate) fn live<const N: usize, F: FiniteField>(
         selection,
         multiples,
         config,
+        scratch: &mut scratch,
     };
-    let (result, report) = F::run_concurrent(job).ok()?;
+    let outcome = F::run_concurrent(job).ok();
+    SCRATCH.set(Some(scratch));
+    let (result, report) = outcome?;
     accumulate(&mut total, &report);
     LIVE.set(Some((config, total)));
     Some(result)
