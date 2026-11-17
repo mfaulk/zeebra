@@ -1,0 +1,18 @@
+2026-11-17T01:51:12-05:00  QUEUED   zb-837          pid=4153185  timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh walls
+2026-11-17T01:51:12-05:00  START    zb-837          pid=4153185  waited=0s load=1.95 lock=exclusive timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh walls
+2026-11-17T02:12:42-05:00  END      zb-837          pid=4153185  status=0 end=exited elapsed=1290s load=2.76 timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh walls
+2026-11-17T02:12:42-05:00  QUEUED   zb-837          pid=517163   timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh wide
+2026-11-17T02:12:42-05:00  START    zb-837          pid=517163   waited=0s load=2.76 lock=exclusive timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh wide
+2026-11-17T02:25:31-05:00  END      zb-837          pid=517163   status=0 end=exited elapsed=769s load=1.39 timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh wide
+2026-11-17T02:25:31-05:00  QUEUED   zb-837          pid=623581   timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:25:31-05:00  START    zb-837          pid=623581   waited=0s load=1.39 lock=exclusive timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:29:59-05:00  END      zb-837          pid=623581   status=75 end=exited elapsed=268s load=1.61 timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:29:59-05:00  QUEUED   zb-837          pid=636439   timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:29:59-05:00  START    zb-837          pid=636439   waited=0s load=1.61 lock=exclusive timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:30:03-05:00  END      zb-837          pid=636439   status=75 end=exited elapsed=4s load=1.72 timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:30:03-05:00  QUEUED   zb-837          pid=638299   timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:30:03-05:00  START    zb-837          pid=638299   waited=0s load=1.72 lock=exclusive timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:30:06-05:00  END      zb-837          pid=638299   status=75 end=exited elapsed=3s load=1.90 timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:32:12-05:00  QUEUED   zb-837          pid=690760   timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:32:12-05:00  START    zb-837          pid=690760   waited=0s load=0.94 lock=exclusive timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
+2026-11-17T02:32:21-05:00  END      zb-837          pid=690760   status=75 end=exited elapsed=9s load=1.03 timeout --signal=INT --kill-after=60s 5400 bash research/m29-baseline/run.sh mq10
