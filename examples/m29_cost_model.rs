@@ -3,7 +3,8 @@
 //! belongs to the caller: stage clocks cost MQ10 3.8–11.5%, so timed and clocked runs are separate.
 //!
 //! cargo run --release --features external-runners --example m29_cost_model -- \
-//!     --target mq10-32003 --workers 16 [--stages] [--pair-multiples every|distinct] [--wall-s 180]
+//!     --target mq10-32003 --workers 16 [--stages] [--pair-multiples every|distinct]
+//!     [--batch-order forward|fl] [--wall-s 180]
 //!
 //! With `--features research-work`, `--work` adds the serial thread-local entry-operation census
 //! and `--discovery` splits forward products into inherited-pivot and newly-discovered-pivot work.
@@ -11,8 +12,8 @@ use std::time::{Duration, Instant};
 use zeebra::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
-        differential::polynomial_to_string, external::corpus, f4_reported, F4Options, F4Statistics,
-        PairMultiples, ParallelForward,
+        differential::polynomial_to_string, external::corpus, f4_reported, BatchOrder, F4Options,
+        F4Statistics, PairMultiples, ParallelForward,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -31,6 +32,7 @@ struct Args {
     workers: usize,
     stages: bool,
     pair_multiples: PairMultiples,
+    batch_order: BatchOrder,
     wall: Duration,
     work: bool,
     discovery: bool,
@@ -42,6 +44,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         workers: 0,
         stages: false,
         pair_multiples: F4Options::default().pair_multiples,
+        batch_order: F4Options::default().batch_order,
         wall: Duration::from_secs(180),
         work: false,
         discovery: false,
@@ -64,6 +67,13 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                     "every" => PairMultiples::Every,
                     "distinct" => PairMultiples::Distinct,
                     other => return Err(format!("unknown pair-multiple policy {other}")),
+                }
+            }
+            "--batch-order" => {
+                parsed.batch_order = match value()?.as_str() {
+                    "forward" => BatchOrder::Forward,
+                    "fl" => BatchOrder::FaugereLachartre,
+                    other => return Err(format!("unknown batch order {other}")),
                 }
             }
             "--wall-s" => {
@@ -100,6 +110,7 @@ fn options(args: &Args) -> F4Options {
         measure_stages: args.stages,
         max_wall_time: Some(args.wall),
         pair_multiples: args.pair_multiples,
+        batch_order: args.batch_order,
         parallel_forward: if args.workers == 1 {
             ParallelForward::Serial
         } else {
@@ -383,6 +394,10 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             "pair_multiples",
             Json::string(format!("{:?}", args.pair_multiples)),
         ),
+        (
+            "batch_order",
+            Json::string(format!("{:?}", args.batch_order)),
+        ),
         ("options", Json::string(format!("{options:?}"))),
         ("status", Json::string(status)),
         ("f4_call_ns", Json::nanos(elapsed)),
@@ -471,6 +486,21 @@ mod tests {
             "x"
         ])
         .is_err());
+    }
+
+    // The opt-in Faugère–Lachartre order is selectable for #828's cross-check; forward is the default.
+    #[test]
+    fn batch_order_is_selectable() {
+        let base = ["--target", "eco12-wide64", "--workers", "16"];
+        assert_eq!(
+            options(&args(&base).unwrap()).batch_order,
+            F4Options::default().batch_order
+        );
+        let fl = args(&[&base[..], &["--batch-order", "fl"]].concat()).unwrap();
+        assert_eq!(options(&fl).batch_order, BatchOrder::FaugereLachartre);
+        let fwd = args(&[&base[..], &["--batch-order", "forward"]].concat()).unwrap();
+        assert_eq!(options(&fwd).batch_order, BatchOrder::Forward);
+        assert!(args(&[&base[..], &["--batch-order", "x"]].concat()).is_err());
     }
 
     // The thread-local census would miss worker threads, so it is refused above one worker.

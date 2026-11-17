@@ -13,6 +13,10 @@
 #                worker, three passes (the controller takes one attempt per cell)
 #   walls|stages|ab831|census
 #                costmodel.py over m29_cost_model on all four targets (see that file)
+#   fl           #828 cross-check: FL_BIN (m29_cost_model built on the #843 library), forward
+#                against Faugère–Lachartre on Eco-12 and MQ11 at 16 workers
+#
+# REPS sets the repetitions (wide passes included); 3 by default, 5 for `fl`.
 #
 # Needs a clean committed tree (both controllers refuse otherwise) and, in $CARGO_TARGET_DIR/bin,
 # m29_cost_model, m29_cost_model_work (built with research-work), zeebra_driver, wide_corpus,
@@ -69,7 +73,7 @@ mq10)
 wide)
   settle
   status=0
-  for pass in 1 2 3; do
+  for pass in $(seq 1 "${REPS:-3}"); do
     for cell in "wide64 eco-12" "goldilocks mq-random-11"; do
       set -- $cell
       out="$OUT/wide-$1-$2-pass$pass.json.gz"
@@ -84,8 +88,15 @@ wide)
   ;;
 walls | stages | ab831)
   settle
-  python3 "$here/costmodel.py" --binary "$bin/m29_cost_model" --suite "$suite" --reps 3 \
+  python3 "$here/costmodel.py" --binary "$bin/m29_cost_model" --suite "$suite" --reps "${REPS:-3}" \
     --output "$OUT/$suite.jsonl"
+  ;;
+fl)
+  # #828 cross-check: FL_BIN is m29_cost_model built against the parallel-FL branch's library.
+  : "${FL_BIN:?m29_cost_model built at the #843 head}"
+  settle
+  python3 "$here/costmodel.py" --binary "$FL_BIN" --suite fl --reps "${REPS:-5}" \
+    --output "$OUT/fl.jsonl"
   ;;
 census)
   settle

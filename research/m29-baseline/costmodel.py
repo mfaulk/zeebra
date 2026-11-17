@@ -33,6 +33,10 @@ def plan(suite, reps):
     elif suite == 'ab831':
         arms = [(t, w, ['--pair-multiples', p], p) for t in TARGETS for w in (1, 16)
                 for p in ('every', 'distinct')]
+    elif suite == 'fl':
+        # #828 cross-check: one parallel-FL build, its own default order against FL, 16 workers.
+        arms = [(t, 16, ['--batch-order', o], o) for t in ('eco12-wide64', 'mq11-goldilocks')
+                for o in ('forward', 'fl')]
     elif suite == 'census':
         arms = [(t, 1, [m], m.lstrip('-')) for t in TARGETS for m in ('--work', '--discovery')]
     else:
@@ -108,7 +112,7 @@ def run_one(binary, target, workers, extra, child_wall):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--binary', type=Path, required=True)
-    p.add_argument('--suite', choices=('walls', 'stages', 'ab831', 'census'), required=True)
+    p.add_argument('--suite', choices=('walls', 'stages', 'ab831', 'census', 'fl'), required=True)
     p.add_argument('--reps', type=int, default=3)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--child-wall', type=float, default=240)

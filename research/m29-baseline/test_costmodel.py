@@ -32,6 +32,14 @@ class PlanTest(unittest.TestCase):
         self.assertEqual({a for *_, a in ab}, {'every', 'distinct'})
         self.assertEqual({w for _, _, w, _, _ in ab}, {1, 16})
 
+    def test_fl_cross_check_pairs_both_orders_at_16_workers(self):
+        # The #828 cross-check runs forward and FL on each wide target at 16 workers, every repetition.
+        plan = costmodel.plan('fl', 5)
+        self.assertEqual(len(plan), 20)
+        self.assertEqual({(t, a) for _, t, _, _, a in plan},
+                         {(t, o) for t in ('eco12-wide64', 'mq11-goldilocks') for o in ('forward', 'fl')})
+        self.assertTrue(all(w == 16 for _, _, w, _, _ in plan))
+
     def test_frequency_summary(self):
         # Clock samples reduce to count, mean and extremes; no samples is no summary rather than zeros.
         self.assertIsNone(costmodel.summarize_freq([]))
