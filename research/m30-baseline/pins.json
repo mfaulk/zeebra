@@ -66,7 +66,7 @@
   "zeebra_cost_model": "180 s F4 wall per child (F4Options::max_wall_time)",
   "wide_corpus_comparands": "60 s / 2 GiB per solver attempt (wide-corpus.py contract)",
   "comparand_scaling_mq10": "60 s / 2 GiB per child; 3600 s campaign wall per window",
-  "certification": "one run per wide target, 600 s wall, outside the timed campaign",
+  "certification": "one run per wide target and verifier, outside the timed campaign: m29_cost_model --certify at 16 workers with a 600 s F4 wall; grobx certified mode with 600 s and 8 GiB",
   "suite": "timeout --signal=INT --kill-after=60s 5400 per suite"
  },
  "cohort": {
