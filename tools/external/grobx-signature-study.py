@@ -180,7 +180,8 @@ def ledger(trajectory):
         runs.append(dict(
             engine=run['config']['engine'], reduce=run['config']['reduce'], outcome=s['outcome'],
             rounds=len(rounds), reductions=s['reduced'], zero_reductions=s['zero'],
-            zero_rows=sum(r['zero-rows'] for r in rounds), rows=sum(r['rows'] for r in rounds),
+            zero_rows=sum(r.get('zero-rows', 0) for r in rounds),
+            rounds_without_zero_rows=sum('zero-rows' not in r for r in rounds), rows=sum(r['rows'] for r in rounds),
             given=sum(r['given'] for r in rounds), pivots=sum(r['pivots'] for r in rounds),
             entries=sum(r['entries'] for r in rounds),
             max_rows=max((r['rows'] for r in rounds), default=0),
@@ -286,10 +287,9 @@ def main():
             result['status'] = 'verified'
         except (ValueError, KeyError, TypeError) as error:
             result['failure'] = str(error)
-        if result.get('raw') is not None and result['status'] == 'verified':
+        # Every returned answer is kept, deduplicated by content, whatever the verdict.
+        if result.get('raw') is not None and isinstance(result['raw'].get('basis'), str):
             result = STORAGE.pack_attempt(result, args.output, keys=('basis',))
-        else:
-            result.pop('raw', None)
         cohort['attempts'].append(result)
         BASE.write(args.output, cohort)
         print(len(cohort['attempts']) - 1, case, arm, result['status'],

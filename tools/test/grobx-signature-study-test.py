@@ -78,6 +78,15 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(ledger['subtracted_discarded'], 13)
         self.assertEqual([r['outcome'] for r in ledger['runs']], ['handover', 'basis'])
 
+    # Plain combination rounds report no zero-rows field; they count as missing, not as a failure.
+    def test_rounds_without_zero_rows(self):
+        study = load()
+        r = run('plain', 'basis', handover='off', rounds=(3,), inter=1)
+        del r['rounds'][0]['zero-rows']
+        ledger = study.ledger({'runs': [r]})
+        self.assertEqual(ledger['runs'][0]['rounds_without_zero_rows'], 1)
+        self.assertEqual(ledger['runs'][0]['zero_rows'], 0)
+
 
 if __name__ == '__main__':
     unittest.main()
