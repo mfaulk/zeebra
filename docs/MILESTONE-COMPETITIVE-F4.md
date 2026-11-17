@@ -442,10 +442,10 @@ All rows are native sub-issues of #833 and carry the `M29` label.
 | Serial FL order (opt-in) | [#816](https://github.com/mfaulk/zeebra/issues/816) / PR #829 | P0 review (High) | PR open | Review/merge the corrected opt-in route; default unchanged |
 | M29-B — parallel FL order | [#828](https://github.com/mfaulk/zeebra/issues/828) | P1 (Medium) | Open | Bounded parallel feasibility only, after #829 and #831 |
 | M29-C1 — current grobx attribution | [#835](https://github.com/mfaulk/zeebra/issues/835) | P0 (High) | Done ([note](research/m29-grobx-attribution.md)) | 93% of Zeebra's products are on pairs that reduce to zero; grobx avoids them by signature criteria (MQ11) and randomized combinations (Eco-12). Recommends no C2 in M29 |
-| M29-C2/C3 — one exact-work improvement | [#836](https://github.com/mfaulk/zeebra/issues/836) | P1 (Medium) | New, `blocked` | Start only after #835 justifies a candidate |
+| M29-C2/C3 — one exact-work improvement | [#836](https://github.com/mfaulk/zeebra/issues/836) | P1 (Medium) | Closed, none selected | #835 found no in-scope candidate above the bar (C1 note §5) |
 | C2 option — Faugère Simplify | [#809](https://github.com/mfaulk/zeebra/issues/809) | Optional (Low) | Open | Only if #835's ledger shows repeated reducer work |
 | M29-D — parallel symbolic | [#832](https://github.com/mfaulk/zeebra/issues/832) | P2 (Low) | Open | Defer until #831's post-adoption cost model |
-| M29-I — comparison and integration | [#837](https://github.com/mfaulk/zeebra/issues/837) | P0 closeout (High) | New | Publish the two target verdicts |
+| M29-I — comparison and integration | [#837](https://github.com/mfaulk/zeebra/issues/837) | P0 closeout (High) | Done (§14) | Both goals **target missed**; Minimum met |
 
 #827 and #803 are completed prerequisites and are not recreated. #753 remains closed. #808 and
 #826 are deferred and not labelled M29.
@@ -522,3 +522,82 @@ The strongest immediate priorities:
 
 The success criteria are demanding by intent: M29 should produce either genuine competitive results
 or a precise, reproducible explanation of what still prevents them.
+
+## 14. Integration report (#837)
+
+**Measured at:** `88bc45de` (production source identical to `main` at `438c0816`). Evidence and
+provenance: [`research/m29-final/`](../research/m29-final/README.md), with tables in
+[`tables.md`](../research/m29-final/tables.md) and verdicts from
+[`verdicts.py`](../research/m29-final/verdicts.py). The final cohort ran 2026-11-17 under
+`benchlock zb-837`, n=9 per cell, fresh processes, answers verified outside the timed region
+(Singular references for MQ10; grobx text identity and groebner-rs canonical agreement on the wide
+targets). The MQ10 window is `mq10-try1`: its 2³¹−1 cells at 4–16 workers have n=8, because a
+compiler started elsewhere on the last repetition (see the evidence README).
+
+### Status: Minimum met; Target missed (both goals); Stretch not met
+
+### Primary leaderboard (process wall, final source)
+
+| Task | Field | Zeebra (best ≤16 workers) | Best exact comparand | Fastest checked-output comparand | Zeebra / goal comparand [95%] | Zeebra RSS | Verification |
+|---|---|---:|---:|---:|---:|---:|---|
+| MQ10 | 32003 | 292.8 ms (16w) | msolve 116.6 ms (8w) | groebner-rs 87.2 ms (4w/8w) | **2.51×** [2.47, 2.55] vs msolve | 39 MiB | Singular reference |
+| MQ10 | 2³¹−1 | 278.7 ms (16w) | msolve 165.8 ms (4w) | groebner-rs 98.4 ms (8w) | **1.68×** [1.64, 1.78] vs msolve | 41 MiB | Singular reference |
+| Eco-12 | 2⁶⁴−353 | 3,071 ms (16w) | grobx 1,634 ms (1w, raw randomized; output identical) | grobx | **1.88×** [1.67, 1.89] vs grobx | 199 MiB | grobx text identical; groebner-rs canonical |
+| MQ11 | Goldilocks | 5,720 ms (16w) | grobx 2,970 ms (1w, raw randomized; output identical) | grobx | **1.93×** [1.80, 1.94] vs grobx | 392 MiB | grobx text identical; groebner-rs canonical |
+
+Comparand RSS is not extracted into the retained attempt summaries; the controller archives
+(named by SHA-256 in the attempts files) hold it. grobx and groebner-rs run one worker only (their
+adapters refuse more), and grobx's MQ10 runs are one-worker only for the same reason. Zeebra beats
+groebner-rs on MQ11 (5,720 against 9,088 ms) and matches it on Eco-12 (3,071 against 3,076 ms). It
+trails every comparand on MQ10.
+
+**Movement over M29** (16-worker process wall, #834 quiet baseline → final): MQ10/32003 321.6 →
+286.2 ms, MQ10/2³¹−1 296.2 → 270.6, Eco-12 3,582 → 3,071, MQ11 7,433 → 5,720 (1.12× / 1.09× /
+1.17× / 1.30×). Goal ratios moved from 2.77× / 1.93× (A) and 2.21× / 2.53× (B) to the table's
+figures. Nearly all of it is #851. #841's dedup preceded the #834 baseline.
+
+### Minimum, criterion by criterion
+
+| Criterion | Status | Where |
+|---|---|---|
+| M29-0 baseline and cost model | **met** | #834, [cost model](research/m29-baseline-cost-model.md) |
+| #831 evaluated and integrated or rejected | **met**, integrated (`PairMultiples::Distinct` default, #841) | cost model §7 |
+| #829/#816 reconciled; #828 evaluated or deferred | **met**: serial FL opt-in (#829); parallel FL shipped opt-in (#843), and the small-control gate failed for the default. After #851 it trails default-order parallel finishing on both wide targets | cost model §6a, §6b |
+| #832 priced after dedup | **met**: −8 to −9% as prototyped, −17 to −24% with parallel interning (hypothetical). Not implemented | cost model §6; [C1 note](research/m29-grobx-attribution.md) §5 |
+| Current grobx attribution (#835) | **met** | [C1 note](research/m29-grobx-attribution.md) |
+| Every attempted route scored | **met**: #841 shipped; #843 opt-in; #845/#851 shipped (−14% / −23% on Eco-12 / MQ11); Hilbert-limited selection rejected (C1 §4); C2 none selected (#836, closed with rationale) | below |
+| Boards, tests and final report | **met**: this section and `research/m29-final/`; tests in #851 | — |
+
+### Target
+
+1. **Goal A, MQ10 ≤1.5× exact msolve on both fields: target missed.** 2.51× at 32003 and 1.68×
+   at 2³¹−1, with neither interval near 1.5. At 2³¹−1 the remaining gap is about 11% (≤248.7 ms
+   needed). The largest stage there is symbolic preprocessing (34% of wall), so #832 with parallel
+   interning is the only open item whose plausible gain could reach it. At 32003 the gap is −40%,
+   which needs work reduction, not only parallelism.
+2. **Goal B, ≥10% verified lead over grobx: target missed.** 1.88× and 1.93×; a lead needs −52% /
+   −53%. C1 attributes the gap: 88–89% of Zeebra's reduced pairs reduce to zero, carrying about 93%
+   of its coefficient products. grobx avoids them by signature criteria on MQ11 and by randomized
+   combinations on Eco-12. Removing them exactly needs signature-compatible criteria, which §7 and
+   §12 exclude from M29.
+
+### Stretch
+
+Not met. No win on any instance against the best comparand. No 64-bit lead. No equal-worker win:
+Zeebra at one worker is 7.7× (Eco-12) and 13.5× (MQ11) grobx's one-worker wall.
+
+### Negative results retained
+
+- Serial FL's apparent 2× (a benchmark error, #816); parallel FL loses small controls (#843).
+- Parallel symbolic preprocessing as prototyped: 1.38× stage at 16 workers, short of the gate (#827).
+- Hilbert-limited selection: product cuts of 9–45% with no 16-worker gain, and the Eco-12
+  prediction is wrong (C1 §4).
+- The cost model's original #828 prediction was misattributed (§6a); corrected and measured.
+
+### Follow-ups
+
+- **#832** (parallel symbolic with parallel interning): the one in-scope item that could close the
+  2³¹−1 half of Goal A. Left open.
+- **#716** (signature-compatible criteria): the only mechanism C1 found with enough reach for Goal B.
+  It belongs in a successor milestone. First test: grobx `signatures=false` on MQ11.
+- #809 (Simplify): low expected value per C1 §2, because it cannot remove a zero row.
