@@ -16,7 +16,8 @@
 #   fl|flstages  #828 cross-check: FL_BIN (m29_cost_model built on the #843 library), forward
 #                against Faugère–Lachartre on Eco-12 and MQ11 at 16 workers; `flstages` adds stage clocks
 #
-# REPS sets the repetitions (wide passes included); 3 by default, 5 for `fl`.
+# REPS sets the repetitions (wide passes included); 3 by default, 5 for `fl`. MQ10_REPS sets
+# `mq10`'s repeats (5 by default) and MQ10_WALL its campaign wall in seconds (1800).
 #
 # Needs a clean committed tree (both controllers refuse otherwise) and, in $CARGO_TARGET_DIR/bin,
 # m29_cost_model, m29_cost_model_work (built with research-work), zeebra_driver, wide_corpus,
@@ -66,7 +67,7 @@ mq10)
   python3 tools/external/comparand-scaling.py \
     --binary "$CARGO_TARGET_DIR/debug/examples/competitive_sweep" --input-source "$(git rev-parse HEAD)" \
     --scratch "$OUT/mq10-scratch-${MQ10_TRY:-1}" --output "$OUT/mq10-try${MQ10_TRY:-1}.json.gz" --engines zeebra,msolve,grobx,groebner-rs \
-    --fields 32003,2147483647 --rows mq-random-10 --workers 1,4,8,16 --repeats 5 --campaign-wall 1800 \
+    --fields 32003,2147483647 --rows mq-random-10 --workers 1,4,8,16 --repeats "${MQ10_REPS:-5}" --campaign-wall "${MQ10_WALL:-1800}" \
     --references "$references/references-v1.json.gz" "$references/singular-references-v1.json.gz" \
     "$references/singular-reference31-v1.json.gz"
   ;;
