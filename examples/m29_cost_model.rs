@@ -23,8 +23,16 @@ type Goldilocks = PrimeFieldElement64<18446744069414584321>;
 type Wide = PrimeFieldElement64<18446744073709551263>;
 const ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
 
-/// The four M29 targets: MQ10 at both #820 primes, and #821's preferred wide-field rows.
-const TARGETS: &[&str] = &["mq10-32003", "mq10-m31", "eco12-wide64", "mq11-goldilocks"];
+/// The four M29 targets: MQ10 at both #820 primes, and #821's preferred wide-field rows; plus two
+/// of #223's generic instances, which #716 reruns beside them to reconcile the row fractions.
+const TARGETS: &[&str] = &[
+    "mq10-32003",
+    "mq10-m31",
+    "eco12-wide64",
+    "mq11-goldilocks",
+    "katsura5-m31",
+    "cyclic5-m31",
+];
 
 #[derive(Debug, PartialEq)]
 struct Args {
@@ -152,7 +160,12 @@ struct Input {
 }
 
 fn mq10(modulus: u64) -> Input {
-    let input = corpus::instance("mq-random-10", modulus, ORDER).expect("published MQ10");
+    ladder("mq-random-10", modulus)
+}
+
+/// A published ladder entry, refused unless its digest at `modulus` is the pinned one.
+fn ladder(name: &str, modulus: u64) -> Input {
+    let input = corpus::instance(name, modulus, ORDER).expect("published ladder entry");
     let entry = corpus::ladder()
         .into_iter()
         .find(|e| e.name == input.name)
@@ -468,6 +481,8 @@ fn main() {
         "mq10-m31" => run::<10, Zp2147483647>(mq10(2147483647), &args),
         "eco12-wide64" => run::<12, Wide>(wide("wide64", "eco-12"), &args),
         "mq11-goldilocks" => run::<11, Goldilocks>(wide("goldilocks", "mq-random-11"), &args),
+        "katsura5-m31" => run::<5, Zp2147483647>(ladder("katsura-5", 2147483647), &args),
+        "cyclic5-m31" => run::<5, Zp2147483647>(ladder("cyclic-5", 2147483647), &args),
         _ => unreachable!(),
     };
     println!("{}", report.to_json().replace('\n', ""));
@@ -599,5 +614,15 @@ mod tests {
             "ee76de455c5ea571d6e8286152a4b4380b9d1ea323ee63dc8f889ffa11a92af5"
         );
         assert_eq!(mq.generators.len(), 11);
+    }
+
+    // #223's generic instances are selectable for the census and come from the pinned ladder.
+    #[test]
+    fn reconciliation_targets_are_ladder_entries() {
+        assert!(args(&["--target", "katsura5-m31", "--workers", "1", "--discovery"]).is_ok());
+        assert!(args(&["--target", "cyclic5-m31", "--workers", "1", "--discovery"]).is_ok());
+        let katsura = ladder("katsura-5", 2147483647);
+        assert_eq!(katsura.variables.len(), 5);
+        assert_eq!(ladder("cyclic-5", 2147483647).generators.len(), 5);
     }
 }

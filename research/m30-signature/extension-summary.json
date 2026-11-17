@@ -1,0 +1,294 @@
+{
+ "attempts": 15,
+ "binaries": {
+  "research": "f2cb4ce618c7a02f42432b0c44430ed38ffe2b1a257e2d57c9dee3935e0d5169",
+  "stock": "ba541087d3f411fb0767601308af5ae12dd16f0fa5f2164bca1e2f810c5b0f93"
+ },
+ "cells": [
+  {
+   "answers": [
+    "5d87dc9b5eeb5d84fb4c7b18bcae216736b9a4499d8410f62ff0a2ae15fb89ae"
+   ],
+   "arm": "default-nocomb",
+   "attempts": 5,
+   "case": "mq11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 2.58935546875,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 118.13671875,
+   "rss_mib_median": 117.7265625,
+   "runs": [
+    {
+     "echelon_subtracted": 7865,
+     "engine": "signature",
+     "entries": 18542398,
+     "given": 1318,
+     "inter_subtracted": 76146949,
+     "max_columns": 3836,
+     "max_rows": 2130,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 293761,
+      "equal": 0,
+      "high": 0,
+      "koszul": 782,
+      "low": 124617,
+      "queued": 15708,
+      "syzygy": 152654
+     },
+     "pivots": 756,
+     "reduce": "rows",
+     "reductions": 1318,
+     "round_subtracted": 1764887038,
+     "rounds": 11,
+     "rounds_without_zero_rows": 0,
+     "rows": 14425,
+     "zero_reductions": 562,
+     "zero_rows": 562
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.00053,
+     "encode": 0.009693,
+     "record": 4.9999999999999996e-06,
+     "reduce": 4.989649,
+     "select": 0.000735,
+     "symbolic": 0.069473,
+     "update": 0.00963
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    1841041852
+   ],
+   "wall_max_ms": 5472.813809,
+   "wall_median_ms": 5448.753345,
+   "wall_min_ms": 5437.990057,
+   "wall_ms": [
+    5440.083841,
+    5448.753345,
+    5462.034851,
+    5472.813809,
+    5437.990057
+   ]
+  },
+  {
+   "answers": [
+    "5d87dc9b5eeb5d84fb4c7b18bcae216736b9a4499d8410f62ff0a2ae15fb89ae"
+   ],
+   "arm": "no-handover-nocomb",
+   "attempts": 5,
+   "case": "mq11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 1.6474609375,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 0,
+    "lcm_redundant_skipped": 0,
+    "product_skipped": 0,
+    "updates": 0
+   },
+   "rss_mib_max": 116.546875,
+   "rss_mib_median": 115.89453125,
+   "runs": [
+    {
+     "echelon_subtracted": 7865,
+     "engine": "signature",
+     "entries": 18542398,
+     "given": 1318,
+     "inter_subtracted": 76146949,
+     "max_columns": 3836,
+     "max_rows": 2130,
+     "outcome": "basis",
+     "pair_decisions": {
+      "considered": 293761,
+      "equal": 0,
+      "high": 0,
+      "koszul": 782,
+      "low": 124617,
+      "queued": 15708,
+      "syzygy": 152654
+     },
+     "pivots": 756,
+     "reduce": "rows",
+     "reductions": 1318,
+     "round_subtracted": 1764887038,
+     "rounds": 11,
+     "rounds_without_zero_rows": 0,
+     "rows": 14425,
+     "zero_reductions": 562,
+     "zero_rows": 562
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.0,
+     "decode": 0.00048,
+     "encode": 0.00965,
+     "record": 4.9999999999999996e-06,
+     "reduce": 4.979433,
+     "select": 0.000742,
+     "symbolic": 0.069731,
+     "update": 0.009408
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    1841041852
+   ],
+   "wall_max_ms": 5478.723397,
+   "wall_median_ms": 5447.607897,
+   "wall_min_ms": 5435.135222,
+   "wall_ms": [
+    5447.607897,
+    5435.135222,
+    5435.964431,
+    5478.723397,
+    5460.833646
+   ]
+  },
+  {
+   "answers": [
+    "5d87dc9b5eeb5d84fb4c7b18bcae216736b9a4499d8410f62ff0a2ae15fb89ae"
+   ],
+   "arm": "sig-off-nocomb",
+   "attempts": 5,
+   "case": "mq11-goldilocks",
+   "deterministic_path": true,
+   "failures": [],
+   "load_max": 2.267578125,
+   "n": 5,
+   "outcomes": {
+    "verified": 5
+   },
+   "plain_pairs": {
+    "chain_dropped": 0,
+    "kept": 7049,
+    "lcm_redundant_skipped": 240529,
+    "product_skipped": 46183,
+    "updates": 767
+   },
+   "rss_mib_max": 106.1796875,
+   "rss_mib_median": 105.86328125,
+   "runs": [
+    {
+     "echelon_subtracted": 7865,
+     "engine": "plain",
+     "entries": 36549373,
+     "given": 10354,
+     "inter_subtracted": 0,
+     "max_columns": 9436,
+     "max_rows": 8904,
+     "outcome": "basis",
+     "pair_decisions": {},
+     "pivots": 756,
+     "reduce": "rows",
+     "reductions": 7049,
+     "round_subtracted": 16415106049,
+     "rounds": 11,
+     "rounds_without_zero_rows": 0,
+     "rows": 60184,
+     "zero_reductions": 6293,
+     "zero_rows": 6293
+    }
+   ],
+   "stage_seconds_median": [
+    {
+     "backsub": 0.21284,
+     "decode": 0.000381,
+     "encode": 0.019862,
+     "record": 1.8e-05,
+     "reduce": 46.337534,
+     "select": 0.000384,
+     "symbolic": 0.160959,
+     "update": 0.007286
+    }
+   ],
+   "subtracted_discarded": [
+    0
+   ],
+   "subtracted_total": [
+    16415113914
+   ],
+   "wall_max_ms": 47090.589318,
+   "wall_median_ms": 46905.422138,
+   "wall_min_ms": 46875.491561,
+   "wall_ms": [
+    46905.422138,
+    46894.608786,
+    47046.948552,
+    46875.491561,
+    47090.589318
+   ]
+  }
+ ],
+ "cohort": "extension",
+ "commit": "dd9519278a05b8c2cd827e7d0e54fd566f89da43",
+ "controls": [],
+ "gate_a1": [
+  {
+   "against": "sig-off-nocomb",
+   "arm": "default-nocomb",
+   "case": "mq11-goldilocks",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": true,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 1.1120622855245195,
+   "wall_bar": true,
+   "wall_bar_interval": true,
+   "wall_ci95": [
+    0.11558645617556905,
+    0.11667763681773263
+   ],
+   "wall_ratio_sig_over_off": 0.11616467983102836,
+   "work_bar": true,
+   "work_ratio_off_over_sig": 8.916208991212004
+  },
+  {
+   "against": "sig-off-nocomb",
+   "arm": "no-handover-nocomb",
+   "case": "mq11-goldilocks",
+   "complete": true,
+   "deterministic_work": true,
+   "identical_output": true,
+   "passes": true,
+   "rss_bar": true,
+   "rss_ratio_sig_over_off": 1.0947566510460869,
+   "wall_bar": true,
+   "wall_bar_interval": true,
+   "wall_ci95": [
+    0.1155257756194891,
+    0.11680362626054402
+   ],
+   "wall_ratio_sig_over_off": 0.11614025945598877,
+   "work_bar": true,
+   "work_ratio_off_over_sig": 8.916208991212004
+  }
+ ],
+ "planned": 15,
+ "refusal": null
+}
