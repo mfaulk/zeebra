@@ -441,7 +441,7 @@ All rows are native sub-issues of #833 and carry the `M29` label.
 | M29-A — production symbolic dedup | [#831](https://github.com/mfaulk/zeebra/issues/831) | P0 (High) | Open | First production candidate |
 | Serial FL order (opt-in) | [#816](https://github.com/mfaulk/zeebra/issues/816) / PR #829 | P0 review (High) | PR open | Review/merge the corrected opt-in route; default unchanged |
 | M29-B — parallel FL order | [#828](https://github.com/mfaulk/zeebra/issues/828) | P1 (Medium) | Open | Bounded parallel feasibility only, after #829 and #831 |
-| M29-C1 — current grobx attribution | [#835](https://github.com/mfaulk/zeebra/issues/835) | P0 (High) | New | Analyze Eco-12 and MQ11 at current source |
+| M29-C1 — current grobx attribution | [#835](https://github.com/mfaulk/zeebra/issues/835) | P0 (High) | Done ([note](research/m29-grobx-attribution.md)) | 93% of Zeebra's products are on pairs that reduce to zero; grobx avoids them by signature criteria (MQ11) and randomized combinations (Eco-12). Recommends no C2 in M29 |
 | M29-C2/C3 — one exact-work improvement | [#836](https://github.com/mfaulk/zeebra/issues/836) | P1 (Medium) | New, `blocked` | Start only after #835 justifies a candidate |
 | C2 option — Faugère Simplify | [#809](https://github.com/mfaulk/zeebra/issues/809) | Optional (Low) | Open | Only if #835's ledger shows repeated reducer work |
 | M29-D — parallel symbolic | [#832](https://github.com/mfaulk/zeebra/issues/832) | P2 (Low) | Open | Defer until #831's post-adoption cost model |
