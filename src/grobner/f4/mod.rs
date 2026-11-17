@@ -23,6 +23,8 @@ pub mod reduction;
 pub mod statistics;
 pub mod structured;
 pub mod symbolic;
+#[cfg(feature = "research-work")]
+pub mod symbolic_intern;
 
 #[cfg(test)]
 mod tests;

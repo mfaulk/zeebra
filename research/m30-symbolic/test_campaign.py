@@ -34,6 +34,21 @@ class PlanTest(unittest.TestCase):
         half = len(plan) // 2
         self.assertNotEqual(plan[0][1:], plan[half][1:])
 
+    def test_intern_arms_pair_both_merges_at_every_team_size(self):
+        # #860 replays: serial and sharded merges at teams 4, 8, 16, all on the 16-CPU placement.
+        plan = campaign.plan('intern', 1, ('mq10-m31',))
+        self.assertEqual({a for *_, a in plan}, {f'{m}{w}' for m in campaign.MERGES for w in (4, 8, 16)})
+        self.assertTrue(all(w == 16 for _, _, w, _, _ in plan))
+
+    def test_live_arms_have_a_shipping_control_at_every_worker_count(self):
+        # Every worker count runs the shipping path (`off`) beside the prototype in the same binary.
+        plan = campaign.plan('live', 1, ('eco12-wide64',))
+        for w in campaign.WORKERS:
+            arms = {a for _, _, ww, _, a in plan if ww == w}
+            self.assertIn(f'off{w}', arms)
+            self.assertIn(f'serial{w}', arms)
+        self.assertIn('sharded16', {a for *_, a in plan})
+
     def test_a_target_subset_is_respected(self):
         # Restricting targets restricts the plan and nothing else.
         plan = campaign.plan('components', 3, ('mq10-m31',))

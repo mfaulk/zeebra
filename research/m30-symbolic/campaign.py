@@ -17,7 +17,12 @@ _spec.loader.exec_module(costmodel)
 
 TARGETS = costmodel.TARGETS + ('katsura11-m31',)
 WORKERS = costmodel.WORKERS
-SUITES = ('walls', 'stages', 'components', 'level')
+SUITES = ('walls', 'stages', 'components', 'level', 'intern', 'live')
+MERGES = ('serial', 'sharded')
+# #860: 0 = the team starts lazily at the first wide level. The first intern campaign (retained as
+# intern-seed512) used 512, which sent 17 of 23 Eco-12 batches down the serial path: pair count does
+# not predict closure size.
+MIN_SEED_ROWS = 0
 
 
 def plan(suite, reps, targets=TARGETS):
@@ -33,6 +38,20 @@ def plan(suite, reps, targets=TARGETS):
         # Every team size runs on the 16-CPU placement, so only the team differs between arms.
         arms = [(t, 16, ['--replay', 'level', '--level-workers', str(lw)], f'level{lw}')
                 for t in targets for lw in WORKERS]
+    elif suite == 'intern':
+        # #860: both prototypes replayed against the serial closure on every live batch.
+        arms = [(t, 16, ['--replay', 'intern', '--merge', m, '--level-workers', str(lw),
+                         '--min-seed-rows', str(MIN_SEED_ROWS)], f'{m}{lw}')
+                for t in targets for m in MERGES for lw in WORKERS[1:]]
+    elif suite == 'live':
+        # #860: complete F4 with a prototype serving every batch, against the shipping path in
+        # the same binary; the team is the forward worker budget.
+        arms = []
+        for t in targets:
+            for w in WORKERS:
+                merges = ('off', 'serial', 'sharded') if w == 16 else ('off', 'serial')
+                arms += [(t, w, ['--replay', 'live', '--merge', m, '--level-workers', str(w),
+                                 '--min-seed-rows', str(MIN_SEED_ROWS)], f'{m}{w}') for m in merges]
     else:
         raise ValueError(suite)
     out = []

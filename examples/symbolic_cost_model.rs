@@ -21,13 +21,17 @@ use std::{
 use zeebra::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
+        differential::polynomial_to_string,
         external::corpus,
         f4::{
-            f4_observed,
+            f4_observed, f4_reported,
             symbolic::{
                 symbolic_preprocessing_level_parallel_measured, symbolic_preprocessing_seeded,
                 symbolic_preprocessing_with, BuildMonomialHasher, MonicBasis, MonomialHandle,
                 MonomialSet, Preprocessed, ReducerCache, SymbolicCounts,
+            },
+            symbolic_intern::{
+                symbolic_preprocessing_interned, with_live, InternConfig, InternReport, Merge,
             },
             BatchObserver,
         },
@@ -77,6 +81,10 @@ static GLOBAL: Counting = Counting;
 enum Replay {
     Components,
     Level,
+    /// #860: replay each batch serially and through an interning prototype.
+    Intern,
+    /// #860: no replay; live F4 with the prototype serving every batch (`--merge off`: shipping).
+    Live,
 }
 
 #[derive(Debug, PartialEq)]
@@ -86,6 +94,10 @@ struct Args {
     replay: Replay,
     level_workers: usize,
     min_frontier: usize,
+    merge: Option<Merge>,
+    slices: usize,
+    min_seed_rows: usize,
+    stages: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -95,6 +107,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         replay: Replay::Components,
         level_workers: 16,
         min_frontier: 256,
+        merge: Some(Merge::Serial),
+        slices: 4,
+        min_seed_rows: 0,
+        stages: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -112,10 +128,25 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--min-frontier" => {
                 parsed.min_frontier = value()?.parse().map_err(|_| "--min-frontier: integer")?
             }
+            "--merge" => {
+                parsed.merge = match value()?.as_str() {
+                    "off" => None,
+                    "serial" => Some(Merge::Serial),
+                    "sharded" => Some(Merge::Sharded),
+                    other => return Err(format!("unknown merge {other}")),
+                }
+            }
+            "--slices" => parsed.slices = positive(value()?, "--slices")?,
+            "--min-seed-rows" => {
+                parsed.min_seed_rows = value()?.parse().map_err(|_| "--min-seed-rows: integer")?
+            }
+            "--stages" => parsed.stages = true,
             "--replay" => {
                 parsed.replay = match value()?.as_str() {
                     "components" => Replay::Components,
                     "level" => Replay::Level,
+                    "intern" => Replay::Intern,
+                    "live" => Replay::Live,
                     other => return Err(format!("unknown replay {other}")),
                 }
             }
@@ -127,6 +158,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     }
     if parsed.workers == 0 {
         return Err("--workers is required".into());
+    }
+    if parsed.replay == Replay::Intern && parsed.merge.is_none() {
+        return Err("--replay intern needs a merge".into());
     }
     Ok(parsed)
 }
@@ -222,6 +256,7 @@ fn table_bytes(capacity: usize, entry: usize) -> usize {
 
 struct Observer {
     replay: Replay,
+    intern: Option<InternConfig>,
     options: F4Options,
     level_workers: usize,
     min_frontier: usize,
@@ -415,6 +450,80 @@ impl Observer {
         ])
     }
 
+    fn intern<const N: usize, F: FiniteField + Sync>(
+        &self,
+        basis: &MonicBasis<N, F>,
+        pairs: &[CriticalPair<N>],
+    ) -> (Json, Duration, Duration) {
+        let selection = self.options.reducer_selection;
+        let multiples = self.options.pair_multiples;
+        let config = self.intern.expect("intern replay has a config");
+        let serial = || {
+            timed(|| {
+                symbolic_preprocessing_seeded(
+                    basis,
+                    pairs,
+                    usize::MAX,
+                    selection,
+                    &mut ReducerCache::disabled(),
+                    multiples,
+                )
+                .unwrap()
+            })
+        };
+        let parallel = || {
+            timed(|| {
+                let (result, report) = symbolic_preprocessing_interned(
+                    basis,
+                    pairs,
+                    usize::MAX,
+                    selection,
+                    multiples,
+                    &config,
+                );
+                (result.unwrap(), report)
+            })
+        };
+        let ((s, s_time, ..), ((p, report), p_time, p_allocs, p_bytes)) =
+            if self.batches.len().is_multiple_of(2) {
+                let s = serial();
+                (s, parallel())
+            } else {
+                let p = parallel();
+                (serial(), p)
+            };
+        assert_eq!(s, p, "batch {}: closures differ", self.batches.len());
+        (
+            Json::object([
+                ("pairs", Json::size(pairs.len())),
+                ("rows", Json::size(s.rows.len())),
+                ("columns", Json::size(s.monomials.len())),
+                ("terms", Json::size(s.term_handles.len())),
+                ("serial_ns", Json::nanos(s_time)),
+                ("parallel_ns", Json::nanos(p_time)),
+                ("fallback", Json::Bool(report.serial_fallback)),
+                ("steps", Json::size(report.steps)),
+                ("dispatched_steps", Json::size(report.dispatched_steps)),
+                ("candidates", Json::size(report.candidates)),
+                ("owners", Json::size(report.owners)),
+                (
+                    "worst_shard_imbalance_milli",
+                    Json::size(report.worst_shard_imbalance_milli),
+                ),
+                ("spawn_ns", Json::nanos(report.spawn)),
+                ("seed_ns", Json::nanos(report.seed)),
+                ("scan_ns", Json::nanos(report.scan)),
+                ("merge_ns", Json::nanos(report.merge)),
+                ("emit_ns", Json::nanos(report.emit)),
+                ("stitch_ns", Json::nanos(report.stitch)),
+                ("allocations", Json::size(p_allocs)),
+                ("allocated_bytes", Json::size(p_bytes)),
+            ]),
+            s_time,
+            p_time,
+        )
+    }
+
     fn level<const N: usize, F: FiniteField + Sync>(
         &self,
         basis: &MonicBasis<N, F>,
@@ -505,6 +614,13 @@ impl<const N: usize, F: FiniteField + Sync> BatchObserver<N, F> for Observer {
                 self.totals[1] += p;
                 json
             }
+            Replay::Intern => {
+                let (json, s, p) = self.intern(basis, pairs);
+                self.totals[0] += s;
+                self.totals[1] += p;
+                json
+            }
+            Replay::Live => unreachable!("live runs observe nothing"),
         };
         self.batches.push(json);
     }
@@ -518,9 +634,23 @@ fn run<const N: usize, F: FiniteField + Sync>(input: Input, args: &Args) -> Json
         .iter()
         .map(|s| MultivariatePolynomial::parse(s, names).expect("generator parses"))
         .collect();
-    let options = options(args.workers);
+    let options = F4Options {
+        measure_stages: args.stages,
+        ..options(args.workers)
+    };
+    let intern = args.merge.map(|merge| InternConfig {
+        workers: args.level_workers,
+        merge,
+        min_frontier: args.min_frontier,
+        slices_per_worker: args.slices,
+        min_seed_rows: args.min_seed_rows,
+    });
+    if args.replay == Replay::Live {
+        return live(&system, &options, intern, &input, args);
+    }
     let mut observer = Observer {
         replay: args.replay,
+        intern,
         options: options.clone(),
         level_workers: args.level_workers,
         min_frontier: args.min_frontier,
@@ -551,6 +681,73 @@ fn run<const N: usize, F: FiniteField + Sync>(input: Input, args: &Args) -> Json
             peak_resident_bytes().map(Json::int).unwrap_or(Json::Null),
         ),
         ("batches", Json::Array(observer.batches)),
+    ])
+}
+
+/// One live F4 call with the prototype serving every batch (or the shipping path), for walls.
+fn live<const N: usize, F: FiniteField + Sync>(
+    system: &[MultivariatePolynomial<N, F>],
+    options: &F4Options,
+    intern: Option<InternConfig>,
+    input: &Input,
+    args: &Args,
+) -> Json {
+    let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
+    let solve = || f4_reported(system, ORDER, options);
+    let started = Instant::now();
+    let ((result, stats), report) = match intern {
+        Some(config) => with_live(config, solve),
+        None => (solve(), InternReport::default()),
+    };
+    let elapsed = started.elapsed();
+    let basis = result.expect("F4");
+    let mut text: Vec<_> = basis
+        .iter()
+        .map(|p| polynomial_to_string(p, &names, ORDER))
+        .collect();
+    text.sort();
+    let time = |d: Duration| {
+        if args.stages {
+            Json::nanos(d)
+        } else {
+            Json::Null
+        }
+    };
+    Json::object([
+        ("target", Json::string(&args.target)),
+        ("modulus", Json::string(&input.modulus)),
+        ("digest", Json::string(&input.digest)),
+        ("workers", Json::size(args.workers)),
+        ("replay", Json::string("live")),
+        (
+            "merge",
+            Json::string(
+                args.merge
+                    .map_or("off".into(), |m| format!("{m:?}").to_lowercase()),
+            ),
+        ),
+        ("level_workers", Json::size(args.level_workers)),
+        ("min_frontier", Json::size(args.min_frontier)),
+        ("slices", Json::size(args.slices)),
+        ("min_seed_rows", Json::size(args.min_seed_rows)),
+        ("status", Json::string("complete")),
+        ("f4_call_ns", Json::nanos(elapsed)),
+        ("total_ns", time(stats.total)),
+        ("symbolic_ns", time(stats.stages.symbolic)),
+        (
+            "peak_rss_bytes",
+            peak_resident_bytes().map(Json::int).unwrap_or(Json::Null),
+        ),
+        ("basis_elements", Json::size(basis.len())),
+        (
+            "basis_sha256",
+            Json::string(sha256_hex(text.join("\n").as_bytes())),
+        ),
+        ("monomials_enqueued", Json::size(stats.monomials_enqueued)),
+        ("divisor_queries", Json::size(stats.divisor_queries)),
+        ("served_steps", Json::size(report.steps)),
+        ("dispatched_steps", Json::size(report.dispatched_steps)),
+        ("fallback", Json::Bool(report.serial_fallback)),
     ])
 }
 
@@ -597,6 +794,22 @@ mod tests {
         assert!(args(&["--target", "katsura-11", "--workers", "1"]).is_err());
         assert!(args(&["--target", "mq10-m31"]).is_err());
         assert!(args(&["--target", "mq10-m31", "--workers", "1", "--replay", "x"]).is_err());
+    }
+
+    /// #860 arms: the live control is `--merge off`, and an intern replay needs a merge.
+    #[test]
+    fn intern_and_live_arms_parse() {
+        let base = ["--target", "mq10-m31", "--workers", "16"];
+        let with = |extra: &[&str]| args(&[&base[..], extra].concat());
+        let live = with(&["--replay", "live", "--merge", "off", "--stages"]).unwrap();
+        assert_eq!(
+            (live.replay, live.merge, live.stages),
+            (Replay::Live, None, true)
+        );
+        let sharded = with(&["--replay", "intern", "--merge", "sharded", "--slices", "8"]).unwrap();
+        assert_eq!((sharded.merge, sharded.slices), (Some(Merge::Sharded), 8));
+        assert!(with(&["--replay", "intern", "--merge", "off"]).is_err());
+        assert!(with(&["--merge", "parallel"]).is_err());
     }
 
     /// A table's byte estimate rounds its slots up to a power of two with one control byte each.

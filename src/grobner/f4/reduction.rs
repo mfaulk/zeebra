@@ -146,15 +146,30 @@ fn build_batch_matrix_in<const N: usize, F: FiniteField>(
 ) -> Result<BuiltMatrix<N, F>, F4Error> {
     // Preprocessing bounds rows as it discovers them; construction checks the completed
     // symbolic layout before allocating coefficient rows.
-    let mut preprocessed = symbolic_preprocessing_seeded(
+    let shipping = |cache: &mut ReducerCache<N>| {
+        symbolic_preprocessing_seeded(
+            basis,
+            pairs,
+            options.max_matrix_rows,
+            options.reducer_selection,
+            cache,
+            options.pair_multiples,
+        )
+    };
+    // #860: a research prototype may serve the batch when one is in force on this thread.
+    #[cfg(feature = "research-work")]
+    let preprocessed = super::symbolic_intern::live(
         basis,
         pairs,
         options.max_matrix_rows,
         options.reducer_selection,
-        cache,
         options.pair_multiples,
+        cache.mode() != super::symbolic::CacheMode::Off,
     )
-    .map_err(|exceeded| F4Error::TooManyRows {
+    .unwrap_or_else(|| shipping(cache));
+    #[cfg(not(feature = "research-work"))]
+    let preprocessed = shipping(cache);
+    let mut preprocessed = preprocessed.map_err(|exceeded| F4Error::TooManyRows {
         limit: exceeded.limit,
     })?;
     stages.symbolic = clock.lap();
