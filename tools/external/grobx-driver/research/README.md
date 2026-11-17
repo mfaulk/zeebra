@@ -82,3 +82,26 @@ controls, optional public plain-only engine selection, solver seeds and a budget
 check restricted to plain F4. This option does not change the normal provisioner path or install a
 replacement stock binary. See the [experiment contract](../../../../research/grobx-randomization/README.md)
 for requests, observation limits and the predeclared campaign.
+
+## Signature handover switch and plain pair tallies (#716)
+
+Add `--signature` (with `--randomization`) for the M30-S1 attribution driver. Its
+[overlay and tests](signature/) add one request key and one passive output:
+
+| Key / field | Meaning |
+|---|---|
+| `research_handover` | Boolean, default true. False takes the engine's own no-handover path, the one a cofactor-tracking call already selects (`handover=off` in the run line), so the signature run computes to the end. Handover thresholds are not edited. |
+| `research_signature.plain_pairs` | Plain-F4 pair updates tallied by criterion: `chain_dropped` (Gebauer–Möller B on queued pairs), `product_skipped` (coprime leads), `lcm_redundant_skipped` (M/F on the new pairs), `kept`. Passive; zero for a run that never enters plain F4. |
+
+Signature-run pair decisions need no overlay: the stock `ran` line already reports `considered`,
+`equal`, `high`/`low` (base-divisor eliminations), `syzygy`, `koszul` and `queued`.
+
+```sh
+python3 tools/external/grobx-driver/research/signature/test_overlay.py
+python3 tools/external/grobx-driver/research/provision.py \
+  --source /path/to/pinned/grobx/checkout \
+  --target /buildcache/cargo-target/zeebra-716/grobx --randomization --signature --test
+```
+
+The campaign controller is `tools/external/grobx-signature-study.py`; the evidence and report are
+[`research/m30-signature/`](../../../../research/m30-signature/README.md).
