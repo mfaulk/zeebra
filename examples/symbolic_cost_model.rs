@@ -32,6 +32,7 @@ use zeebra::{
             },
             symbolic_intern::{
                 symbolic_preprocessing_interned, with_live, InternConfig, InternReport, Merge,
+                Retain,
             },
             BatchObserver,
         },
@@ -97,6 +98,7 @@ struct Args {
     merge: Option<Merge>,
     slices: usize,
     min_seed_rows: usize,
+    retain: Retain,
     stages: bool,
 }
 
@@ -110,6 +112,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         merge: Some(Merge::Serial),
         slices: 4,
         min_seed_rows: 0,
+        retain: Retain::Batch,
         stages: false,
     };
     let mut it = args.iter();
@@ -139,6 +142,13 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--slices" => parsed.slices = positive(value()?, "--slices")?,
             "--min-seed-rows" => {
                 parsed.min_seed_rows = value()?.parse().map_err(|_| "--min-seed-rows: integer")?
+            }
+            "--retain" => {
+                parsed.retain = match value()?.as_str() {
+                    "batch" => Retain::Batch,
+                    "run" => Retain::Run,
+                    other => return Err(format!("unknown retain {other}")),
+                }
             }
             "--stages" => parsed.stages = true,
             "--replay" => {
@@ -644,6 +654,7 @@ fn run<const N: usize, F: FiniteField + Sync>(input: Input, args: &Args) -> Json
         min_frontier: args.min_frontier,
         slices_per_worker: args.slices,
         min_seed_rows: args.min_seed_rows,
+        retain: args.retain,
     });
     if args.replay == Replay::Live {
         return live(&system, &options, intern, &input, args);
@@ -730,6 +741,10 @@ fn live<const N: usize, F: FiniteField + Sync>(
         ("min_frontier", Json::size(args.min_frontier)),
         ("slices", Json::size(args.slices)),
         ("min_seed_rows", Json::size(args.min_seed_rows)),
+        (
+            "retain",
+            Json::string(format!("{:?}", args.retain).to_lowercase()),
+        ),
         ("status", Json::string("complete")),
         ("f4_call_ns", Json::nanos(elapsed)),
         ("total_ns", time(stats.total)),
@@ -748,6 +763,9 @@ fn live<const N: usize, F: FiniteField + Sync>(
         ("served_steps", Json::size(report.steps)),
         ("dispatched_steps", Json::size(report.dispatched_steps)),
         ("fallback", Json::Bool(report.serial_fallback)),
+        ("scratch_growths", Json::size(report.growths)),
+        ("scratch_rescans", Json::size(report.rescans)),
+        ("scratch_bytes", Json::size(report.scratch_bytes)),
     ])
 }
 

@@ -6,7 +6,9 @@ outside `research-work` is the M30 freeze `4f5784c5` plus a refactor of one call
 to the same shipping path (`ed6f5fd7`). 2026-11-17, 11:08–12:30 EST, inside the CCD 1–2 reservation
 (CPUs 8–23) held by #855, one `tools/bench-reserve.sh run zb-860 8-23` window per suite, 1-minute
 load up to 7.2 at child starts, at most three compilers running on other CCDs. The §5 RSS diagnosis is
-a single unlocked run per arm on CPUs 96–111 and reports memory only.
+a single unlocked run per arm on CPUs 96–111 and reports memory only. §9 (#871) was measured at
+`7d0ac698` (executable SHA-256 `3d509058…`), 2026-11-17 17:15–17:32 EST, under `tools/benchlock.sh`
+on CPUs 8–23, 1-minute load up to 4.7 at child starts.
 **Host:** as [`m30-symbolic-cost-model.md`](m30-symbolic-cost-model.md).
 **Evidence:** [`research/m30-symbolic/`](../../research/m30-symbolic/README.md) (`intern.jsonl.gz`,
 `intern-seed512.jsonl.gz`, `live.jsonl.gz`, [`tables.md`](../../research/m30-symbolic/tables.md)).
@@ -33,7 +35,8 @@ the shipping path in the same executable (`--merge off`), which is the #855 conf
    not live data.** With `MALLOC_ARENA_MAX=1` the prototype's peak equals the shipping path's (Eco-12
    183 / 183 MiB, MQ11 360 / 360 MiB): glibc keeps the worker threads' freed scratch in per-thread
    arenas. A P3 implementation must allocate step scratch on the caller (or on the F4 pool's
-   existing threads) and reuse it, and show RSS ≤1.15× as its first acceptance test.
+   existing threads) and reuse it, and show RSS ≤1.15× as its first acceptance test. **Done in §9
+   (#871): 1.00–1.13× with caller-owned scratch sized to what a step touches.**
 5. **The two merges are close; the serial merge is simpler.** On the wide targets the sharded merge
    is 3–6% faster in the stage and under 1% faster in process wall; on MQ10 the serial merge is
    6–10% faster in the stage and 1–3% faster in process wall. The serial merge's walk costs 10–31 ms
@@ -243,3 +246,73 @@ reused across batches or run the team on the F4 worker pool, and show peak RSS �
 cancellation at step boundaries and account scratch in the live-entry budget; (3) measure small
 tasks (Katsura-6/7, cyclic-6) for the ≤5% criterion. Next serial targets after that are the
 stitch (rows, leads and the handle append: 21–62 ms) and the merge walk (10–31 ms).
+
+## 9. Caller-owned scratch and the RSS gate (#871, 2026-11-17, `7d0ac698`)
+
+**Result: peak RSS is at most 1.13× shipping at 16 workers on every target, and the process-wall
+savings are unchanged.** Same `live` method as §4 and §5: shipping (`--merge off`) and the serial
+merge in one executable, n = 5 per arm, paired by repetition and interleaved with rotated arm order
+(`scratch` suite, [`tables.md`](../../research/m30-symbolic/tables.md), `scratch.jsonl.gz`). Every
+run's basis digest equals the shipping one.
+
+| Target | shipping RSS 16w | serial merge | RSS ratio, paired [min, max] | §5 ratio | wall ratio [95% CI] | §4 ratio | 1 worker: wall / RSS |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| MQ10 / 32003 | 40 MiB | 46 MiB | **1.130** [1.121, 1.137] | 1.24 | 0.819 [0.814, 0.827] | 0.817 | 0.997 / 1.003 |
+| MQ10 / 2³¹−1 | 42 MiB | 47 MiB | **1.125** [1.117, 1.134] | 1.21 | 0.811 [0.801, 0.817] | 0.802 | 1.002 / 1.005 |
+| Eco-12 | 200 MiB | 200 MiB | **1.002** [1.001, 1.006] | 1.27 | 0.740 [0.734, 0.744] | 0.743 | 1.000 / 1.001 |
+| MQ11 | 393 MiB | 393 MiB | **1.000** [0.998, 1.002] | 1.27 | 0.800 [0.786, 0.803] | 0.806 | 1.004 / 0.991 |
+| Katsura-11 | 144 MiB | 144 MiB | **0.998** [0.993, 1.006] | 1.20 | 0.767 [0.764, 0.792] | 0.768 | 0.998 / 1.001 |
+
+Process-wall savings at 16 workers are Eco-12 −26.0%, MQ11 −20.0% and Katsura-11 −23.3%, against
+§4's −25.7%, −19.4% and −23.2%. Each interval contains the §4 figure, so the difference is noise.
+
+**What the fix is, and what it is not.** The issue proposed allocating the scratch once per F4 run
+and clearing it instead of freeing it. That alone made peak RSS worse. The `serialrun` arm keeps
+the buffers for the whole run (`--retain run`) and measures 1.16–1.25×; an earlier unlocked probe
+with the #860 data layout read 1.50× on Eco-12. Instrumenting RSS at the close of each batch showed
+why. On Katsura-11 the process high-water mark is set *inside the symbolic stage* of the widest
+batch, not in its matrix. Any scratch still resident at that moment adds to the peak, and that
+includes scratch held over from earlier batches. The arena diagnosis of §5 holds: with
+`MALLOC_ARENA_MAX=1` the excess shrank but did not vanish once the scratch was no longer freed into
+worker arenas. But arenas were only part of the cause. The rest was the size of the scratch itself.
+Three changes closed the gap, each measured unlocked before the campaign:
+
+1. **Workers never allocate.** Every buffer a scan writes is caller-allocated. A scan that would
+   outgrow a buffer stops and records which buffer and how far it got. The caller grows that buffer
+   by extrapolating from the scan's progress, then rescans the slice. Buffers are freed after each
+   batch, on the caller, where the batch's matrix reuses the memory. Their capacities carry over as
+   hints, so a later batch allocates what it needs up front (`Retain::Batch`, the default). Rescans
+   happen while the scratch warms up, about 670–850 per F4 call. They are included in the walls
+   above.
+2. **Candidates name a position, not a monomial.** A pre-step miss is stored as (hash, row, term)
+   in 16 bytes. Before, it was the hash plus the monomial: 56 bytes at twelve variables. The
+   monomial is recomputed (a shift of one basis term) when the merge or a local probe needs it. The
+   candidate list was the largest buffer, at 35 MiB of capacity on Eco-12.
+3. **Both deduplication tables hold 8-byte ids.** A hash table's inserts land across its whole
+   bucket array, so its full size is resident however few entries it holds. The per-slice
+   `HashMap<Keyed, u32>` (64 bytes an entry, 63 MiB on Eco-12) became an open-addressing table of
+   `tag | id` slots. It starts each step small and doubles in place within the caller's capacity.
+   The serial merge's interner uses the same structure over the column arena. That took MQ10 from
+   1.15× to 1.13×; the per-batch `HashMap<Keyed, u32>` was what kept MQ10 over budget.
+
+The bound is `research-work`-only and applies to the serial merge. The sharded merge's shard tables
+are still grown by its workers, so its RSS is not covered here. §8 already recommends the serial
+merge for #861.
+
+**Scratch-reuse invariant.** `test_interning_scratch_is_not_reallocated_after_warm_up` runs every
+cyclic-6 batch twice through one `InternScratch`, under both merges and both retentions. On the
+second pass no buffer grows, no slice is rescanned and no capacity changes, and every batch equals
+the serial closure. The existing exact-equality tests (`test_parallel_interning_matches_the_serial_closure`,
+`test_live_interning_prototypes_leave_f4_unchanged`) pass unchanged.
+
+### Gate (plan §9.4) re-read
+
+| Criterion | Status after #871 |
+|---|---|
+| ≥2× symbolic stage | met (§3; the scan is unchanged in kind) |
+| ≥10% complete F4 process wall | **met**: Eco-12 −26.0%, MQ11 −20.0% |
+| held-out instance | **met**: Katsura-11 −23.3% |
+| ≤5% regression at one worker / small tasks | **met at one worker** (wall 0.997–1.004, RSS 0.991–1.005); small tasks below MQ10 are still unmeasured (precondition 3) |
+| peak RSS ≤1.15× | **met**: 1.000–1.130× (serial merge, paired medians; worst single repetition 1.137×) |
+| identical deterministic output | met: every run identical |
+| budget and cancellation | row budget met; scratch charged to `max_live_nonzeros` and wall-time cancellation are #872 |

@@ -4233,7 +4233,7 @@ fn test_parallel_interning_matches_the_serial_closure() {
     use crate::grobner::f4::{
         observer::trace_batches,
         symbolic::symbolic_preprocessing_seeded,
-        symbolic_intern::{symbolic_preprocessing_interned, InternConfig, Merge},
+        symbolic_intern::{symbolic_preprocessing_interned, InternConfig, Merge, Retain},
         PairMultiples,
     };
     type G = Zp2147483647;
@@ -4266,6 +4266,7 @@ fn test_parallel_interning_matches_the_serial_closure() {
                                         min_frontier,
                                         slices_per_worker: slices,
                                         min_seed_rows: 0,
+                                        retain: Retain::default(),
                                     };
                                     let (got, _) = symbolic_preprocessing_interned(
                                         &batch.basis,
@@ -4296,12 +4297,98 @@ fn test_parallel_interning_matches_the_serial_closure() {
     assert!(compared > 0, "no batch was compared");
 }
 
+/// #871: once a run of batches has warmed the caller-owned interning scratch, running the same
+/// batches again through it grows no buffer, rescans no slice and changes no capacity, under
+/// either retention, and still equals the serial closure; only `Retain::Run` holds buffers
+/// between batches.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_interning_scratch_is_not_reallocated_after_warm_up() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic::symbolic_preprocessing_seeded,
+        symbolic_intern::{
+            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Merge, Retain,
+        },
+        PairMultiples,
+    };
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&cyclic::<6, G>(), order, &options).expect("within limits");
+    for (merge, retain) in [Merge::Serial, Merge::Sharded]
+        .into_iter()
+        .flat_map(|m| [(m, Retain::Batch), (m, Retain::Run)])
+    {
+        let merge_and_retain = (merge, retain);
+        let config = InternConfig {
+            workers: 4,
+            merge,
+            min_frontier: 0,
+            slices_per_worker: 2,
+            min_seed_rows: 0,
+            retain,
+        };
+        let mut scratch = InternScratch::new();
+        let pass = |scratch: &mut InternScratch<6>| {
+            for batch in trace.batches() {
+                let (got, _) = symbolic_preprocessing_interned_in(
+                    &batch.basis,
+                    &batch.pairs,
+                    usize::MAX,
+                    options.reducer_selection,
+                    PairMultiples::Distinct,
+                    &config,
+                    scratch,
+                );
+                let reference = symbolic_preprocessing_seeded(
+                    &batch.basis,
+                    &batch.pairs,
+                    usize::MAX,
+                    options.reducer_selection,
+                    &mut ReducerCache::disabled(),
+                    PairMultiples::Distinct,
+                );
+                assert_eq!(got, reference, "{merge_and_retain:?}");
+            }
+        };
+        pass(&mut scratch);
+        let (growths, rescans, capacities) =
+            (scratch.growths(), scratch.rescans(), scratch.capacities());
+        assert!(
+            growths > 0 && rescans > 0,
+            "{merge_and_retain:?}: the warm-up grew nothing"
+        );
+        pass(&mut scratch);
+        assert_eq!(
+            scratch.growths(),
+            growths,
+            "{merge_and_retain:?}: grew after warm-up"
+        );
+        assert_eq!(
+            scratch.rescans(),
+            rescans,
+            "{merge_and_retain:?}: rescanned after warm-up"
+        );
+        assert_eq!(
+            scratch.capacities(),
+            capacities,
+            "{merge_and_retain:?}: reallocated"
+        );
+        assert_eq!(
+            scratch.holds_buffers(),
+            retain == Retain::Run,
+            "{merge_and_retain:?}: buffers outlived the batch"
+        );
+    }
+}
+
 /// #860: live F4 with either interning prototype in force returns the shipping basis and the
 /// shipping symbolic counters, and the prototype actually served its batches.
 #[cfg(feature = "research-work")]
 #[test]
 fn test_live_interning_prototypes_leave_f4_unchanged() {
-    use crate::grobner::f4::symbolic_intern::{with_live, InternConfig, Merge};
+    use crate::grobner::f4::symbolic_intern::{with_live, InternConfig, Merge, Retain};
     type G = Zp2147483647;
     let system = katsura::<6, G>();
     let order = MonomialOrder::GradedReverseLexicographic;
@@ -4315,6 +4402,7 @@ fn test_live_interning_prototypes_leave_f4_unchanged() {
             min_frontier: 0,
             slices_per_worker: 2,
             min_seed_rows: 0,
+            retain: Retain::default(),
         };
         let ((got, got_stats), report) =
             with_live(config, || super::f4_reported(&system, order, &options));

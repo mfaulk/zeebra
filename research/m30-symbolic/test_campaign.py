@@ -49,6 +49,14 @@ class PlanTest(unittest.TestCase):
             self.assertIn(f'serial{w}', arms)
         self.assertIn('sharded16', {a for *_, a in plan})
 
+    def test_scratch_arms_pair_shipping_with_both_retentions(self):
+        # #871: shipping and the serial merge at 1 and 16 workers, plus the run-long retention at 16.
+        plan = campaign.plan('scratch', 1, ('mq10-m31',))
+        self.assertEqual(sorted(a for *_, a in plan),
+                         sorted(['off1', 'serial1', 'off16', 'serial16', 'serialrun16']))
+        retains = {a: extra[extra.index('--retain') + 1] for *_, extra, a in plan if '--retain' in extra}
+        self.assertEqual(retains, {'serial1': 'batch', 'serial16': 'batch', 'serialrun16': 'run'})
+
     def test_a_target_subset_is_respected(self):
         # Restricting targets restricts the plan and nothing else.
         plan = campaign.plan('components', 3, ('mq10-m31',))

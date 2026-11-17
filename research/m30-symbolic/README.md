@@ -1,4 +1,4 @@
-# M30 symbolic preprocessing: cost model (#859) and parallel interning (#860)
+# M30 symbolic preprocessing: cost model (#859), parallel interning (#860) and its scratch (#871)
 
 Findings: [`docs/research/m30-symbolic-cost-model.md`](../../docs/research/m30-symbolic-cost-model.md)
 (#859) and [`docs/research/m30-parallel-interning.md`](../../docs/research/m30-parallel-interning.md)
@@ -11,6 +11,7 @@ Findings: [`docs/research/m30-symbolic-cost-model.md`](../../docs/research/m30-s
 | [summarize.py](summarize.py) → [tables.md](tables.md) | every #859 and #860 table |
 | [test_campaign.py](test_campaign.py) | plan and Amdahl unit tests; run in CI |
 | `*.jsonl.gz` | one record per child: CPU context, process wall, the instrument's full JSON |
+| `scratch.jsonl.gz` | #871's `scratch` suite (7d0ac698) |
 | `intern-seed512.jsonl.gz` | the first `intern` pass, with a 512-seed-row team threshold (bcf5af6a); retained as a negative ablation |
 | `suite-starts.jsonl` | `tools/cpu-context.sh` at each suite's lock acquisition |
 
@@ -24,6 +25,7 @@ Suites:
 | `level` | `symbolic_cost_model --replay level` | #827's level-parallel prototype per live batch, teams 1/4/8/16 |
 | `intern` | `symbolic_cost_model --replay intern` | #860's two interning prototypes per live batch, teams 4/8/16 |
 | `live` | `symbolic_cost_model --replay live` | complete F4 with a prototype serving every batch, against `--merge off` in the same binary |
+| `scratch` | `symbolic_cost_model --replay live` | #871: shipping and the serial merge at 1 and 16 workers with caller-owned scratch, and `--retain run` at 16 |
 
 Targets: the four M29 targets of `m29_cost_model` plus `katsura11-m31` (Katsura-11 / 2³¹−1, the
 instance #827 priced on).
@@ -39,6 +41,8 @@ mkdir -p $T/bin && cp $T/release/examples/{m29_cost_model,symbolic_cost_model} $
 T=$T OUT=$T/m30 REPS=5 setsid bash research/m30-symbolic/run.sh walls stages components level
 # #860: build symbolic_cost_model at the #860 head into its own target dir, then
 T=$T860 T860=$T860 TAG=zb-860 OUT=$T860/m30 REPS=5 setsid bash research/m30-symbolic/run.sh intern live
+# #871: likewise at the #871 head
+T=$T871 T860=$T871 TAG=zb-871 OUT=$T871/out REPS=5 setsid bash research/m30-symbolic/run.sh scratch
 gzip -k $T/m30/*.jsonl && cp $T/m30/*.jsonl.gz research/m30-symbolic/
 python3 research/m30-symbolic/summarize.py research/m30-symbolic > research/m30-symbolic/tables.md
 ```

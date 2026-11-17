@@ -185,3 +185,35 @@ Ratio = prototype median / shipping (`off`) median at the same worker count, wit
 | katsura11-m31 | 16 | serial | 5 | 1117.4 [1110.7, 1119.7] | 0.768 [0.759, 0.770] | 172 | 1.20 | identical |
 | katsura11-m31 | 16 | sharded | 5 | 1110.1 [1104.2, 1115.8] | 0.763 [0.755, 0.767] | 184 | 1.28 | identical |
 
+## #871 caller-owned interning scratch (process wall and peak RSS, same binary)
+
+As the #860 table, plus the RSS ratio paired per repetition (arm ÷ the same repetition's `off`; median [min, max]). `serial` frees its scratch after every batch and keeps the capacities; `serialrun` keeps the buffers for the whole run.
+
+| Target | workers | arm | n | wall ms [95% CI] | ratio to off [95% CI] | peak RSS MiB | RSS ratio, paired | scratch MiB | rescans | basis |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---|
+| mq10-32003 | 1 | off | 5 | 1152.1 [1146.9, 1154.0] | — | 34 | — | 0 | 0 | identical |
+| mq10-32003 | 1 | serial | 5 | 1148.9 [1146.0, 1151.9] | 0.997 [0.995, 1.003] | 34 | 1.003 [1.001, 1.011] | 0 | 0 | identical |
+| mq10-32003 | 16 | off | 5 | 293.7 [291.8, 294.4] | — | 40 | — | 0 | 0 | identical |
+| mq10-32003 | 16 | serial | 5 | 240.4 [239.1, 242.8] | 0.819 [0.814, 0.827] | 46 | 1.130 [1.121, 1.137] | 13 | 672 | identical |
+| mq10-32003 | 16 | serialrun | 5 | 241.7 [240.5, 243.1] | 0.823 [0.819, 0.832] | 51 | 1.253 [1.245, 1.259] | 13 | 672 | identical |
+| mq10-m31 | 1 | off | 5 | 983.0 [979.6, 991.7] | — | 35 | — | 0 | 0 | identical |
+| mq10-m31 | 1 | serial | 5 | 985.0 [981.5, 989.4] | 1.002 [0.992, 1.009] | 35 | 1.005 [0.995, 1.006] | 0 | 0 | identical |
+| mq10-m31 | 16 | off | 5 | 278.2 [277.2, 281.1] | — | 42 | — | 0 | 0 | identical |
+| mq10-m31 | 16 | serial | 5 | 225.7 [223.8, 227.3] | 0.811 [0.801, 0.817] | 47 | 1.125 [1.117, 1.134] | 13 | 672 | identical |
+| mq10-m31 | 16 | serialrun | 5 | 227.9 [225.7, 229.0] | 0.819 [0.808, 0.824] | 52 | 1.238 [1.232, 1.253] | 13 | 672 | identical |
+| eco12-wide64 | 1 | off | 5 | 12877.1 [12835.4, 12920.1] | — | 183 | — | 0 | 0 | identical |
+| eco12-wide64 | 1 | serial | 5 | 12876.1 [12858.4, 12903.8] | 1.000 [0.997, 1.003] | 183 | 1.001 [1.000, 1.001] | 0 | 0 | identical |
+| eco12-wide64 | 16 | off | 5 | 3140.8 [3126.4, 3163.1] | — | 200 | — | 0 | 0 | identical |
+| eco12-wide64 | 16 | serial | 5 | 2324.9 [2306.2, 2333.6] | 0.740 [0.734, 0.744] | 200 | 1.002 [1.001, 1.006] | 49 | 771 | identical |
+| eco12-wide64 | 16 | serialrun | 5 | 2340.4 [2335.1, 2344.4] | 0.745 [0.740, 0.749] | 239 | 1.198 [1.195, 1.204] | 49 | 771 | identical |
+| mq11-goldilocks | 1 | off | 5 | 38990.0 [38978.3, 39744.3] | — | 360 | — | 0 | 0 | identical |
+| mq11-goldilocks | 1 | serial | 5 | 39142.7 [39125.1, 39225.4] | 1.004 [0.985, 1.006] | 357 | 0.991 [0.990, 0.991] | 0 | 0 | identical |
+| mq11-goldilocks | 16 | off | 5 | 5665.2 [5652.3, 5760.2] | — | 393 | — | 0 | 0 | identical |
+| mq11-goldilocks | 16 | serial | 5 | 4533.1 [4511.7, 4542.9] | 0.800 [0.786, 0.803] | 393 | 1.000 [0.998, 1.002] | 75 | 845 | identical |
+| mq11-goldilocks | 16 | serialrun | 5 | 4572.6 [4553.5, 4582.0] | 0.807 [0.793, 0.810] | 466 | 1.185 [1.184, 1.189] | 75 | 845 | identical |
+| katsura11-m31 | 1 | off | 5 | 7196.5 [7170.5, 7219.4] | — | 119 | — | 0 | 0 | identical |
+| katsura11-m31 | 1 | serial | 5 | 7179.7 [7168.2, 7229.7] | 0.998 [0.995, 1.007] | 119 | 1.001 [1.000, 1.002] | 0 | 0 | identical |
+| katsura11-m31 | 16 | off | 5 | 1453.0 [1446.7, 1455.8] | — | 144 | — | 0 | 0 | identical |
+| katsura11-m31 | 16 | serial | 5 | 1114.7 [1111.6, 1150.8] | 0.767 [0.764, 0.792] | 144 | 0.998 [0.993, 1.006] | 39 | 801 | identical |
+| katsura11-m31 | 16 | serialrun | 5 | 1126.4 [1119.5, 1131.4] | 0.775 [0.770, 0.779] | 167 | 1.156 [1.146, 1.164] | 39 | 801 | identical |
+
