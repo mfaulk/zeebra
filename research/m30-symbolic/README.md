@@ -8,9 +8,11 @@ Findings: [`docs/research/m30-symbolic-cost-model.md`](../../docs/research/m30-s
 |---|---|
 | [campaign.py](campaign.py) | the suites below, run through #834's `costmodel.run_one` (fresh process, CCD-aligned `taskset` from CPU 8, `tools/cpu-context.sh` before/after, clock sampling, rotated arm order) |
 | [run.sh](run.sh) | one lock acquisition per suite: `bench-reserve.sh run` when CCDs 1-2 are reserved, `benchlock.sh` otherwise |
-| [summarize.py](summarize.py) → [tables.md](tables.md) | every #859 table |
+| [summarize.py](summarize.py) → [tables.md](tables.md) | every #859 and #860 table |
 | [test_campaign.py](test_campaign.py) | plan and Amdahl unit tests; run in CI |
 | `*.jsonl.gz` | one record per child: CPU context, process wall, the instrument's full JSON |
+| `intern-seed512.jsonl.gz` | the first `intern` pass, with a 512-seed-row team threshold (bcf5af6a); retained as a negative ablation |
+| `suite-starts.jsonl` | `tools/cpu-context.sh` at each suite's lock acquisition |
 
 Suites:
 

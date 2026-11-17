@@ -78,8 +78,8 @@ def shares(stage_records, wall_records, out):
                'unclocked process wall. *s*<sub>10%</sub> is the stage speedup for −10% process wall, '
                '*f*(1 − 1/*s*) = 0.10; "—" means even an infinitely fast stage saves less than 10%. '
                'The ceiling is *f* itself (*s* → ∞).\n')
-    out.append('| Target | Workers | symbolic ms | F4 total ms | *f* | *f*<sub>wall</sub> | *s*<sub>10%</sub> | ceiling | 2× stage saves |')
-    out.append('|---|---:|---:|---:|---:|---:|---:|---:|---:|')
+    out.append('| Target | Workers | symbolic ms | F4 total ms | *f* | *f*<sub>wall</sub> | *s*<sub>10%</sub> by *f* | *s*<sub>10%</sub> by *f*<sub>wall</sub> | ceiling (*f*<sub>wall</sub>) | 2× stage saves |')
+    out.append('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|')
     for t in TARGETS:
         for w in WORKERS:
             rs = [r for r in cells(stage_records, target=t, workers=w) if ok(r)]
@@ -92,10 +92,10 @@ def shares(stage_records, wall_records, out):
             f = med(fs)
             plain = [r['process_wall_ns'] for r in cells(wall_records, target=t, workers=w) if ok(r)]
             fw = sym / med(plain) if plain else None
-            s10 = needed_speedup(f)
+            s10, s10w = needed_speedup(f), (needed_speedup(fw) if fw else None)
             out.append(f'| {t} | {w} | {sym / 1e6:.1f} | {tot / 1e6:.1f} | {f:.3f} [{min(fs):.3f}, {max(fs):.3f}] | '
-                       + (f'{fw:.3f}' if fw else '—') + f' | {"%.2f×" % s10 if s10 else "—"} | '
-                       f'−{100 * f:.1f}% | −{50 * f:.1f}% |')
+                       + (f'{fw:.3f}' if fw else '—') + f' | {"%.2f×" % s10 if s10 else "—"} | {"%.2f×" % s10w if s10w else "—"} | '
+                       f'−{100 * (fw or f):.1f}% | −{50 * (fw or f):.1f}% |')
     out.append('')
 
 
