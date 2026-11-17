@@ -73,7 +73,8 @@ use crate::{
             reduce_grobner_basis_measured, reduce_grobner_basis_until, InterreductionReport,
         },
         f4::interreduce::{
-            interreduce_by_matrix, MatrixInterreductionAborted, MatrixInterreductionRefused,
+            interreduce_by_matrix_with, MatrixInterreductionAborted, MatrixInterreductionMethod,
+            MatrixInterreductionRefused,
         },
         pairs::{CriterionCounts, PairQueue},
     },
@@ -583,12 +584,18 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         // fallback costs no clone. #304/#437 took this stage from three live copies of the basis
         // to one, and a fallback written with `minimal.clone()` would put a second one back for
         // the whole matrix pass.
-        match interreduce_by_matrix(
+        let method = if options.tail_only_interreduction {
+            MatrixInterreductionMethod::TailsOnly
+        } else {
+            MatrixInterreductionMethod::FullEchelon
+        };
+        match interreduce_by_matrix_with(
             minimal,
             order,
             options.max_matrix_rows,
             options.max_matrix_columns,
             options.live_entry_allowance::<F>(),
+            method,
             should_stop,
         ) {
             Ok((reduced, matrix)) => {
