@@ -166,14 +166,36 @@ What this shows:
    the n = 14 rung is in the regime where a device kernel could plausibly amortize its transfer.
 4. **GF(2) and GF(2^8) residuals are sparser** (24–28%) on the cyclic systems the corpus holds, but
    the dense model still puts 97–98% of the multiply-adds there, because those residuals are wide
-   relative to their sweep. Whether a GF(2^8) *random MQ* residual — the record's actual shape —
-   looks like the prime-field MQ rows or like these cyclic rows is not measured; the corpus has no
-   such entry.
+   relative to their sweep. A GF(2^8) *random MQ* residual — the record's actual shape — looks
+   like the prime-field MQ rows, not these cyclic ones; see §3.3.
 
 The counts compare a sparse sweep with a dense echelon model, not two measured times. Zeebra's
 shipped elimination does the `D'` part sparsely and does fewer multiply-adds than the dense count
 whenever `D'` has zeros, so §3.2's shares are **not** a CPU time split and support no speedup
 figure.
+
+### 3.3 GF(2^8) random MQ (#804)
+
+**Measured at:** `60e99587` plus #804, which pins `mq-random-8/grevlex/gf256/default` (`Gf256Mq`,
+modulus `0x11D`, generated the same way as the prime-field `mq-random` entries, with each draw read as a
+bit pattern). Exact counts, from `cargo run --release --example block_density`; raw output:
+[`research/gpu-f4/block-density-default-804.md`](../../research/gpu-f4/block-density-default-804.md).
+The prime-field rows below come from the same run. They reflect the matrices as re-pinned
+after #831, so they differ slightly from the `8dbf9bcf` figures in §3.1–§3.2.
+
+| entry | rows × cols | D' rows × cols | D' density | D' nz in dense tiles | rank | sweep multiply-adds | dense `D'` multiply-adds | dense share |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| mq-random-6/grevlex/p31x64/default | 745 × 756 | 86 × 97 | 69.6% | 100.0% | 39 | 502,379 | 203,138 | 28.8% |
+| mq-random-10/grevlex/p31x64/default | 12391 × 12020 | 1305 × 934 | 44.4% | 85.2% | 579 | 239,473,690 | 394,644,470 | 62.2% |
+| mq-random-8/grevlex/gf256/default | 8114 × 8236 | 190 × 312 | 78.5% | 97.7% | 74 | 25,413,498 | 3,131,495 | 11.0% |
+| cyclic-6/grevlex/gf256/default | 124 × 163 | 74 × 113 | 24.4% | 0.0% | 44 | 7,222 | 212,168 | 96.7% |
+
+The GF(2^8) MQ residual is **as dense as the prime-field MQ residuals**: 78.5%, with 97.7% of
+its nonzeros in dense tiles. The cyclic GF(2^8) entry is 24% dense with no nonzeros in dense tiles.
+So §3.2's 24–28% figure comes from the cyclic systems, not from the small field. The dense share
+is lower than on the prime-field rungs (11.0%), because at n = 8 the residual is narrow (190 × 312)
+beside a 7924-row reducer block. This is a single rung, so it does not yet show how the share
+grows with n over GF(2^8).
 
 ## 4. The prior a GPU proposal must address
 

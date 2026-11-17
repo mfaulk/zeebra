@@ -328,16 +328,17 @@ impl std::error::Error for CorpusError {}
 /// comparing the generated system's rendered text against the registry's own, so a drift in either
 /// generator fails rather than quietly producing a different ideal.
 ///
-/// `F` must be the field of `characteristic`: the coefficients are residues of that prime, and
-/// instantiating them over a different one is a different ideal with no error to say so.
+/// `F` must be the field `field` names: the coefficients are its elements in `Display` form
+/// (a residue, or a GF(2^m) bit pattern), and instantiating them over a different field is a
+/// different ideal with no error to say so.
 fn mq_random<const N: usize, F: FiniteField>(
-    characteristic: u64,
+    field: CaseField,
 ) -> Vec<MultivariatePolynomial<N, F>> {
-    terms_as_system(&generated_mq::<N>(characteristic))
+    terms_as_system(&generated_mq::<N>(field))
 }
 
 /// The `GeneratedSystem` behind [`mq_random`], exactly as `random_mq_instance` builds it.
-fn generated_mq<const N: usize>(characteristic: u64) -> GeneratedSystem {
+fn generated_mq<const N: usize>(field: CaseField) -> GeneratedSystem {
     GeneratedSystem::generate(
         N as u64,
         SystemShape {
@@ -345,11 +346,14 @@ fn generated_mq<const N: usize>(characteristic: u64) -> GeneratedSystem {
             max_degree: 2,
             max_terms: 4 * N,
         },
-        CaseField::prime(characteristic),
+        field,
     )
 }
 
 /// A generated system's terms as polynomials, one for one.
+///
+/// Coefficients go through `from_str`, not `F::new`: over GF(2^m) `new` is the integer embedding
+/// (`k mod 2`), which would flatten a bit pattern to 0 or 1 and drop the even draws as zero terms.
 ///
 /// No merging happens here, because `GeneratedSystem::generate` has already merged duplicate
 /// monomials; `test_the_mq_conversion_keeps_every_term` asserts the term counts survive, which is
@@ -371,7 +375,9 @@ fn terms_as_system<const N: usize, F: FiniteField>(
                 .map(|term| {
                     let mut exponents = [0u32; N];
                     exponents.copy_from_slice(&term.exponents);
-                    (Monomial::new(&exponents), F::new(term.coefficient))
+                    let coefficient = F::from_str(&term.coefficient.to_string())
+                        .expect("a generated coefficient is an element of its field");
+                    (Monomial::new(&exponents), coefficient)
                 })
                 .collect();
             MultivariatePolynomial::new(&entries)
@@ -753,6 +759,10 @@ macro_rules! corpus {
 /// pins the two equal whenever the harness is compiled, so a corpus entry's field and a board
 /// row's field still cannot drift apart.
 const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
+const REFERENCE_FIELD: CaseField = CaseField::prime(REFERENCE_CHARACTERISTIC);
+
+/// [`Gf256Mq`]'s modulus, `x^8+x^4+x^3+x^2+1`.
+const GF256MQ_FIELD: CaseField = CaseField::binary(0x11D);
 use BatchSelector::Largest;
 use MonomialOrder::GradedReverseLexicographic as Grevlex;
 use MonomialOrder::Lexicographic as Lex;
@@ -797,13 +807,13 @@ corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
         18, 635, 379, 317, 8372, "3e2099571be467d7";
 
     // --- Multivariate quadratics, the family where elimination IS the cost -----------------
-    "mq-random-6/grevlex/p31x64/default": mq_random::<6, Zp2147483647>(REFERENCE_CHARACTERISTIC),
+    "mq-random-6/grevlex/p31x64/default": mq_random::<6, Zp2147483647>(REFERENCE_FIELD),
         "mq-random", 6, "Zp2147483647", 31, Grevlex, Shipping, Largest, Scaffolded,
         5, 745, 756, 659, 15378, "3da09490b773fab9";
-    "mq-random-6/grevlex/p31x64/baseline": mq_random::<6, Zp2147483647>(REFERENCE_CHARACTERISTIC),
+    "mq-random-6/grevlex/p31x64/baseline": mq_random::<6, Zp2147483647>(REFERENCE_FIELD),
         "mq-random", 6, "Zp2147483647", 31, Grevlex, Baseline, Largest, Scaffolded,
         10, 3305, 3342, 3269, 66032, "13016bd535663e7d";
-    "mq-random-10/grevlex/p31x64/default": mq_random::<10, Zp2147483647>(REFERENCE_CHARACTERISTIC),
+    "mq-random-10/grevlex/p31x64/default": mq_random::<10, Zp2147483647>(REFERENCE_FIELD),
         "mq-random", 10, "Zp2147483647", 31, Grevlex, Shipping, Largest, Scaffolded,
         7, 12391, 12020, 11086, 726357, "88c567c10336c1f1";
 
@@ -822,11 +832,14 @@ corpus! { corpus, walk_corpus, walk_corpus_with, visit_corpus_entry;
     "cyclic-5/lex/gf256/default": cyclic::<5, Gf256Mq>(),
         "cyclic", 5, "Gf256Mq", 8, Lex, Shipping, Largest, Scaffolded,
         14, 61, 72, 55, 438, "5d08ac9dd7acb1ce";
+    "mq-random-8/grevlex/gf256/default": mq_random::<8, Gf256Mq>(GF256MQ_FIELD),
+        "mq-random", 8, "Gf256Mq", 8, Grevlex, Shipping, Largest, Scaffolded,
+        8, 8114, 8236, 7924, 337009, "28284550c86e765f";
 }
 
 // Large captures use the same spec/dispatch generator, but are never part of walk_corpus.
 corpus! { large_corpus, walk_large_corpus, walk_large_corpus_with, visit_large_corpus_entry;
-    "mq-random-14/grevlex/p31x64/default-64m": mq_random::<14, Zp2147483647>(REFERENCE_CHARACTERISTIC),
+    "mq-random-14/grevlex/p31x64/default-64m": mq_random::<14, Zp2147483647>(REFERENCE_FIELD),
         "mq-random", 14, "Zp2147483647", 31, Grevlex, OptionsPreset::RaisedDefault { entries: 64_000_000, bytes: 1_024_000_000 },
         BatchSelector::Prefix(6), Scaffolded,
         6, 74151, 76194, 67411, 21959918, "31a52b7aa09f00cd";
@@ -891,7 +904,7 @@ mod tests {
     fn test_large_corpus_is_explicit_and_above_ten_million_entries() {
         let small = corpus();
         let large = super::large_corpus();
-        assert_eq!(small.len(), 17);
+        assert_eq!(small.len(), 18);
         assert!(!large.is_empty());
         for spec in large {
             assert!(spec.fingerprint.nonzeros > 10_000_000);
@@ -1169,9 +1182,9 @@ mod tests {
         for n in [6usize, 10, 14] {
             let board = random_mq_instance(n, n as u64, REFERENCE_CHARACTERISTIC, GREVLEX);
             let mine = match n {
-                6 => super::generated_mq::<6>(REFERENCE_CHARACTERISTIC),
-                10 => super::generated_mq::<10>(REFERENCE_CHARACTERISTIC),
-                14 => super::generated_mq::<14>(REFERENCE_CHARACTERISTIC),
+                6 => super::generated_mq::<6>(super::REFERENCE_FIELD),
+                10 => super::generated_mq::<10>(super::REFERENCE_FIELD),
+                14 => super::generated_mq::<14>(super::REFERENCE_FIELD),
                 _ => unreachable!(),
             };
             assert_eq!(mine.render(), board.system, "mq-random-{}", n);
@@ -1186,15 +1199,35 @@ mod tests {
     /// the same name.
     #[test]
     fn test_the_mq_conversion_keeps_every_term() {
-        let generated = super::generated_mq::<10>(super::REFERENCE_CHARACTERISTIC);
+        let generated = super::generated_mq::<10>(super::REFERENCE_FIELD);
         let system: Vec<_> =
-            super::mq_random::<10, crate::fields::Zp2147483647>(super::REFERENCE_CHARACTERISTIC);
+            super::mq_random::<10, crate::fields::Zp2147483647>(super::REFERENCE_FIELD);
 
         assert_eq!(system.len(), generated.polynomials.len());
         for (polynomial, terms) in system.iter().zip(generated.polynomials.iter()) {
             assert_eq!(polynomial.terms.len(), terms.len());
             assert!(polynomial.degree() <= 2, "max_degree 2 is what makes it MQ");
         }
+    }
+
+    // Over GF(2^8) each generated coefficient is read as a bit pattern, so no term collapses to 0/1.
+    #[test]
+    fn test_the_gf256_mq_conversion_keeps_bit_pattern_coefficients() {
+        use crate::fields::Gf256Mq;
+        let generated = super::generated_mq::<8>(super::GF256MQ_FIELD);
+        let system = super::mq_random::<8, Gf256Mq>(super::GF256MQ_FIELD);
+
+        assert_eq!(system.len(), generated.polynomials.len());
+        let mut above_one = 0;
+        for (polynomial, terms) in system.iter().zip(generated.polynomials.iter()) {
+            assert_eq!(polynomial.terms.len(), terms.len());
+            for term in terms {
+                let expected = Gf256Mq::from_str(&term.coefficient.to_string()).unwrap();
+                assert!(polynomial.terms.iter().any(|(_, c)| *c == expected));
+                above_one += usize::from(term.coefficient > 1);
+            }
+        }
+        assert!(above_one > 0, "a GF(2^8) draw is not confined to GF(2)");
     }
 
     /// A batch index past the end of the run is refused rather than silently clamped.
