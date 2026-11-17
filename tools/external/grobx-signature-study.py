@@ -53,7 +53,14 @@ CROSSED_ARMS = {name + '-nocomb': dict(options, research_policy='none')
 CAPS = {'default': (60, 2 * 1024**3)}
 
 
-def arms(case):
+# Declared after the primary cohort, before running it: MQ11's exact (combination-free) arms, which
+# the plan crossed only on Eco-12 and MQ10/2^31-1. Supplementary; Gate A1 rows keep their pairing.
+EXTENSION = {'mq11-goldilocks': list(CROSSED_ARMS)}
+
+
+def arms(case, cohort='primary'):
+    if cohort == 'extension':
+        return EXTENSION[case]
     names = list(BASE_ARMS)
     if CASES[case].get('crossed'):
         names += list(CROSSED_ARMS)
@@ -68,13 +75,13 @@ def cap(case, arm):
     return CAPS.get((case, arm), CAPS['default'])
 
 
-def plan(repeats, cases):
+def plan(repeats, cases, cohort='primary'):
     """Fresh, rotated, alternately reversed order: no arm or case always runs first or warm."""
     result = []
     for repeat in range(repeats):
         order = cases[repeat % len(cases):] + cases[:repeat % len(cases)]
         for case in order if repeat % 2 == 0 else reversed(order):
-            names = arms(case)
+            names = arms(case, cohort)
             names = names[repeat % len(names):] + names[:repeat % len(names)]
             for arm in names if repeat % 2 == 0 else reversed(names):
                 result.append(dict(repeat=repeat, case=case, arm=arm))
@@ -202,7 +209,7 @@ def main():
     parser.add_argument('--prepare', action='store_true', help='freeze wide references, then exit')
     for name in ('grobx-stock', 'grobx-research', 'scratch', 'output'):
         parser.add_argument('--' + name, type=Path)
-    parser.add_argument('--cohort', choices=('pilot', 'primary'), default='primary')
+    parser.add_argument('--cohort', choices=('pilot', 'primary', 'extension'), default='primary')
     parser.add_argument('--cases', default=','.join(CASES))
     parser.add_argument('--repeats', type=int, default=5)
     parser.add_argument('--max-load', type=float, default=8)
@@ -211,7 +218,9 @@ def main():
     if args.prepare:
         prepare(refs_path)
         return
-    if args.cohort == 'primary' and args.repeats < 5:
+    if args.cohort == 'extension' and args.cases not in EXTENSION:
+        parser.error('the declared extension covers ' + ','.join(EXTENSION))
+    if args.cohort != 'pilot' and args.repeats < 5:
         parser.error('the primary cohort needs at least five repetitions per arm')
     if args.cohort == 'pilot' and args.repeats != 1:
         parser.error('the pilot is one attempt per arm')
@@ -233,7 +242,7 @@ def main():
                   for key, path in binaries.items()}
     args.scratch.mkdir(parents=True, exist_ok=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    cohort = {'schema': 1, 'issue': 716, 'cohort': args.cohort, 'attempt_plan': plan(args.repeats, cases),
+    cohort = {'schema': 1, 'issue': 716, 'cohort': args.cohort, 'attempt_plan': plan(args.repeats, cases, args.cohort),
               'attempts': [], 'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'rustc': subprocess.check_output(['rustc', '-vV'], text=True),
               'cpu': next(line.split(':', 1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')),

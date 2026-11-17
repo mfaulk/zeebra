@@ -50,6 +50,14 @@ class PlanTests(unittest.TestCase):
                          {'research_handover': False, 'research_policy': 'none'})
 
 
+    # The declared extension runs only MQ11's combination-free arms, five times each.
+    def test_extension_plan(self):
+        study = load()
+        plan = study.plan(5, ['mq11-goldilocks'], 'extension')
+        self.assertEqual(Counter(p['arm'] for p in plan),
+                         {'default-nocomb': 5, 'sig-off-nocomb': 5, 'no-handover-nocomb': 5})
+
+
 class RouteTests(unittest.TestCase):
     # A handover-off request must stay one signature run; a signatures-off request must be plain only.
     def test_route_matches_request(self):
