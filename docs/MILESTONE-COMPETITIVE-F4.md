@@ -437,7 +437,7 @@ All rows are native sub-issues of #833 and carry the `M29` label.
 | Work package | Issue | Priority (board) | Status at planning | Immediate action |
 |---|---|---|---|---|
 | M29-0 — baselines and cost model | [#834](https://github.com/mfaulk/zeebra/issues/834) | P0 (High) | Published ([report](research/m29-baseline-cost-model.md)) | Use its §6 ceilings to approve or decline each mechanism |
-| Parallel candidate finishing | [#845](https://github.com/mfaulk/zeebra/issues/845) | Medium | New (from #834) | Largest single predicted gain on Eco-12/MQ11 (−19% / −26%); #843 (parallel FL) already removes most of this stage, so re-scope against #843 |
+| Parallel candidate finishing | [#845](https://github.com/mfaulk/zeebra/issues/845) | Medium | Shipped (default order) | Measured −13.9% / −22.6% process wall on Eco-12 / MQ11 and −8 to −11% on MQ10, ahead of #843's opt-in FL on both wide targets with no RSS growth ([report §6b](research/m29-baseline-cost-model.md)) |
 | M29-A — production symbolic dedup | [#831](https://github.com/mfaulk/zeebra/issues/831) | P0 (High) | Open | First production candidate |
 | Serial FL order (opt-in) | [#816](https://github.com/mfaulk/zeebra/issues/816) / PR #829 | P0 review (High) | PR open | Review/merge the corrected opt-in route; default unchanged |
 | M29-B — parallel FL order | [#828](https://github.com/mfaulk/zeebra/issues/828) | P1 (Medium) | Open | Bounded parallel feasibility only, after #829 and #831 |
