@@ -62,7 +62,10 @@ pub use factorize::{
     is_irreducible_with_route as is_irreducible_with_route_unstable, DistinctDegreeRoute,
     FrobeniusRoute, IrreducibilityRoute,
 };
-pub use gcd::{gcd, gcd_classical_unstable, gcd_half_unstable, lcm, partial_bezout, xgcd};
+pub use gcd::{
+    gcd, gcd_classical_unstable, gcd_half_unstable, gcd_half_with_base_case_unstable, lcm,
+    partial_bezout, xgcd,
+};
 pub use graeffe::{
     graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
     graeffe_root_with_stats, GraeffeError, GraeffeStats, SubgroupRoute,
