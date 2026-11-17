@@ -261,6 +261,23 @@ The next agent's orientation is only as good as the state you leave behind. File
 issues for follow-ups, bugs, and scope creep you discover, add them to the board
 explicitly, set Priority, and link parent ↔ sub-issue both ways.
 
+## Research-paper retrieval (IACR ePrint)
+
+`eprint.iacr.org/*.pdf` returns 403 to agents; its HTML abstract pages still load. For a paper:
+
+1. Run `scripts/fetch-eprint <YYYY/N or ePrint URL>`. It prints the path of a copy in the
+   machine-wide cache (`~/.cache/eprint/`, shared by every worktree), downloading from the
+   eprint.iacr.asia mirror only if it is not cached. `--text` prints a `pdftotext -layout`
+   extraction instead.
+2. Do not `WebFetch` an `eprint.iacr.org/….pdf` URL, and never retry a URL that returned 403.
+3. Read the whole paper, not the abstract or a search snippet. Grep the text extraction, but read
+   equations, algorithms, figures and tables in the PDF: extraction mangles mathematical notation.
+4. On failure (exit 1 or 2), find an authorized copy (arXiv, tosc/tches.iacr.org, HAL, an author's
+   page) and install it with `scripts/fetch-eprint --import <file.pdf> <id>`. Ask the user only
+   after that, and check `~/Downloads` for a copy they supplied first.
+
+Details: [`docs/guide/development.md`](docs/guide/development.md#retrieving-iacr-eprint-papers).
+
 ## Board reference
 
 | Thing | Value |
@@ -284,12 +301,14 @@ race resolution, and the lease arithmetic:
 
 ```bash
 bash scripts/agent/test/zb-claim-test.sh
+bash scripts/test/fetch-eprint-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/cpu-context-test.sh
 bash tools/test/bench-reserve-test.sh
 bash tools/test/check-measurement-provenance-test.sh
 bash tools/check-measurement-provenance.sh
 shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
+  scripts/fetch-eprint scripts/test/*.sh \
   tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 ```
 

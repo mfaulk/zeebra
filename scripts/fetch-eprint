@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+#
+# Fetch an IACR ePrint paper into a machine-wide cache and print its path.
+#
+# eprint.iacr.org answers 403 to automated PDF requests from this environment, so PDFs come from
+# the public read-only mirror eprint.iacr.asia, whose robots.txt disallows only /archive/. The
+# cache is shared by every checkout and worktree; installs are atomic (temp file + rename in the
+# cache directory) and a per-paper flock serializes concurrent fetches of one paper.
+#
+# Exit status: 0 path printed; 1 the source does not have it (403/404/not a PDF); 2 network or
+# lock failure after bounded retries; 3 text extraction unavailable or failed; 64 usage.
+set -uo pipefail
+
+PROG=fetch-eprint
+CACHE_DIR="${EPRINT_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/eprint}"
+# Test hook: the suite points this at a local fixture server. Users' input never chooses a host.
+MIRROR_BASE="${EPRINT_MIRROR_BASE:-https://eprint.iacr.asia}"
+RETRIES="${EPRINT_RETRIES:-3}"
+RETRY_DELAY="${EPRINT_RETRY_DELAY:-2}"
+CONNECT_TIMEOUT="${EPRINT_CONNECT_TIMEOUT:-10}"
+MAX_TIME="${EPRINT_MAX_TIME:-120}"
+LOCK_WAIT="${EPRINT_LOCK_WAIT:-300}"
+PDFTOTEXT="${EPRINT_PDFTOTEXT:-pdftotext}"
+USER_AGENT="fetch-eprint/1.0 (curl)"
+
+die() { local rc=$1; shift; printf '%s: %s\n' "$PROG" "$*" >&2; exit "$rc"; }
+note() { printf '%s: %s\n' "$PROG" "$*" >&2; }
+
+usage() {
+  cat >&2 <<'EOF'
+usage: fetch-eprint [--text] [--refresh] <id-or-url>
+       fetch-eprint --import <file.pdf> <id-or-url>
+
+  <id-or-url>  2025/2340, https://eprint.iacr.org/2025/2340[.pdf], or the eprint.iacr.asia form
+  --text       print the path of a cached `pdftotext -layout` extraction instead of the PDF
+  --refresh    download again even if a valid copy is cached (e.g. a newer revision)
+  --import F   validate F as a PDF and install it as this paper (an authorized copy found elsewhere)
+
+Prints the absolute cached path on stdout; diagnostics go to stderr.
+Cache: ${EPRINT_CACHE_DIR:-${XDG_CACHE_HOME:-~/.cache}/eprint}
+EOF
+  exit 64
+}
+
+# Prints "<year> <number>" for an accepted id or URL, number zero-padded to three digits as ePrint
+# writes it, so 2021/51, 2021/051 and https://eprint.iacr.org/2021/051.pdf are one paper.
+parse_id() {
+  local input=$1 year num
+  [ "${#input}" -le 200 ] || return 1
+  if [[ $input =~ ^([0-9]{4})/([0-9]{1,5})$ ]]; then
+    year=${BASH_REMATCH[1]} num=${BASH_REMATCH[2]}
+  elif [[ $input =~ ^https?://eprint\.iacr\.(org|asia)/([0-9]{4})/([0-9]{1,5})(\.pdf)?/?$ ]]; then
+    year=${BASH_REMATCH[2]} num=${BASH_REMATCH[3]}
+  else
+    return 1
+  fi
+  num=$((10#$num))
+  [ "$num" -ge 1 ] || return 1
+  [ "$year" -ge 1996 ] && [ "$year" -le 2099 ] || return 1
+  printf '%s %03d\n' "$year" "$num"
+}
+
+# 0 = a complete PDF: the %PDF- signature, and %%EOF near the end (catches truncation).
+valid_pdf() {
+  local f=$1
+  [ -f "$f" ] && [ -s "$f" ] || return 1
+  [ "$(LC_ALL=C head -c 5 -- "$f")" = "%PDF-" ] || return 1
+  LC_ALL=C tail -c 2048 -- "$f" | LC_ALL=C grep -aq '%%EOF'
+}
+
+looks_like_html() {
+  LC_ALL=C head -c 2048 -- "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C grep -aqE '<!doctype html|<html|<head|<body'
+}
+
+text_fresh() { # <txt> <pdf>
+  [ -s "$1" ] && ! [ "$1" -ot "$2" ]
+}
+
+TMP=""
+cleanup() { [ -n "$TMP" ] && rm -f -- "$TMP"; }
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+install_atomically() { # <validated temp file in CACHE_DIR> <dest>
+  chmod 0644 -- "$1" && mv -f -- "$1" "$2" && TMP=""
+}
+
+# One HTTP attempt. Sets HTTP_CODE and CURL_RC; body lands in $1.
+attempt() {
+  local out=$1 url=$2 proto=${MIRROR_BASE%%://*}
+  HTTP_CODE=$(curl -sS --proto "=$proto" --proto-redir "=$proto" --location --max-redirs 3 \
+    --connect-timeout "$CONNECT_TIMEOUT" --max-time "$MAX_TIME" -A "$USER_AGENT" \
+    -o "$out" -w '%{http_code}' -- "$url")
+  CURL_RC=$?
+}
+
+failure_help() { # <year> <num> <reason>
+  local id="$1/$2"
+  cat >&2 <<EOF
+$PROG: could not retrieve $id from $MIRROR_BASE: $3
+  Metadata (title, authors, revisions): https://eprint.iacr.org/$id  (the HTML page is fetchable;
+    the .pdf path 403s, so do not WebFetch https://eprint.iacr.org/$id.pdf)
+  Next: find an authorized copy (arXiv, the venue's proceedings such as tosc.iacr.org or
+    tches.iacr.org, HAL, an author's page), then install it with
+    scripts/fetch-eprint --import /path/to/paper.pdf $id
+  Do not retry this source in a loop.
+EOF
+}
+
+# Downloads into the cache under the caller's lock. Returns the script's exit codes.
+download() { # <year> <num> <dest>
+  local year=$1 num=$2 dest=$3 url="$MIRROR_BASE/$1/$2.pdf" i delay reason=""
+  for ((i = 1; i <= RETRIES; i++)); do
+    TMP=$(mktemp "$CACHE_DIR/.$year-$num.XXXXXX.part") || die 2 "cannot create a temp file in $CACHE_DIR"
+    attempt "$TMP" "$url"
+    local transient=0
+    if [ "$CURL_RC" -ne 0 ]; then
+      case $CURL_RC in
+        6 | 7 | 18 | 28 | 35 | 52 | 55 | 56) transient=1 ;;
+      esac
+      reason="network error (curl exit $CURL_RC)"
+      [ "$transient" -eq 1 ] || { failure_help "$year" "$num" "$reason"; return 2; }
+    elif [ "$HTTP_CODE" = 200 ]; then
+      if valid_pdf "$TMP"; then
+        install_atomically "$TMP" "$dest" || die 2 "could not install $dest"
+        return 0
+      elif looks_like_html "$TMP"; then
+        failure_help "$year" "$num" "HTTP 200 but the body is an HTML page (error or challenge page), not a PDF"
+        return 1
+      elif [ "$(LC_ALL=C head -c 5 -- "$TMP")" = "%PDF-" ]; then
+        reason="truncated PDF (no %%EOF trailer)"
+        transient=1
+      else
+        failure_help "$year" "$num" "HTTP 200 but the body is not a PDF"
+        return 1
+      fi
+    elif [ "$HTTP_CODE" = 429 ] || [[ $HTTP_CODE == 5?? ]]; then
+      reason="HTTP $HTTP_CODE"
+      transient=1
+    else
+      failure_help "$year" "$num" "HTTP $HTTP_CODE"
+      return 1
+    fi
+    rm -f -- "$TMP"; TMP=""
+    if [ "$i" -lt "$RETRIES" ]; then
+      delay=$((RETRY_DELAY * (1 << (i - 1))))
+      note "attempt $i/$RETRIES failed ($reason); retrying in ${delay}s"
+      sleep "$delay"
+    fi
+  done
+  failure_help "$year" "$num" "$reason after $RETRIES attempts"
+  if [[ $reason == truncated* ]]; then return 1; fi
+  return 2
+}
+
+main() {
+  local want_text=0 refresh=0 import="" input=""
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --text) want_text=1 ;;
+      --refresh) refresh=1 ;;
+      --import) [ $# -ge 2 ] || usage; import=$2; shift ;;
+      -h | --help) usage ;;
+      --) shift; break ;;
+      -*) note "unknown option: $1"; usage ;;
+      *) [ -z "$input" ] || usage; input=$1 ;;
+    esac
+    shift
+  done
+  if [ $# -gt 0 ]; then [ -z "$input" ] && [ $# -eq 1 ] || usage; input=$1; fi
+  [ -n "$input" ] || usage
+
+  [[ $MIRROR_BASE =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] ||
+    die 64 "EPRINT_MIRROR_BASE must be a scheme and host only, got '$MIRROR_BASE'"
+  [[ $RETRIES =~ ^[1-9][0-9]?$ ]] || die 64 "EPRINT_RETRIES must be 1-99"
+
+  local parsed year num
+  parsed=$(parse_id "$input") ||
+    die 64 "not an ePrint id or eprint.iacr.org/eprint.iacr.asia URL: '$input' (expected e.g. 2025/2340)"
+  read -r year num <<<"$parsed"
+
+  mkdir -p -- "$CACHE_DIR" || die 2 "cannot create cache directory $CACHE_DIR"
+  CACHE_DIR=$(cd -- "$CACHE_DIR" && pwd -P) || die 2 "cannot resolve $CACHE_DIR"
+  local pdf="$CACHE_DIR/$year-$num.pdf" txt="$CACHE_DIR/$year-$num.txt"
+
+  # Fast path, lock-free: installs are renames, so a valid file is a complete file.
+  if [ -z "$import" ] && [ "$refresh" -eq 0 ] && valid_pdf "$pdf"; then
+    if [ "$want_text" -eq 0 ]; then printf '%s\n' "$pdf"; return 0; fi
+    if text_fresh "$txt" "$pdf"; then printf '%s\n' "$txt"; return 0; fi
+  fi
+
+  exec 9>"$CACHE_DIR/.$year-$num.lock" || die 2 "cannot open lock file in $CACHE_DIR"
+  flock -w "$LOCK_WAIT" 9 || die 2 "timed out after ${LOCK_WAIT}s waiting for another fetch of $year/$num"
+
+  if [ -n "$import" ]; then
+    valid_pdf "$import" || die 1 "--import: '$import' is not a complete PDF"
+    TMP=$(mktemp "$CACHE_DIR/.$year-$num.XXXXXX.part") || die 2 "cannot create a temp file"
+    cp -- "$import" "$TMP" && valid_pdf "$TMP" || die 2 "--import: copy failed"
+    install_atomically "$TMP" "$pdf" || die 2 "could not install $pdf"
+    rm -f -- "$txt"
+    note "imported $import as $year/$num"
+  elif [ "$refresh" -eq 1 ] || ! valid_pdf "$pdf"; then
+    if [ -e "$pdf" ] && [ "$refresh" -eq 0 ]; then
+      note "cached $pdf is not a complete PDF; discarding it and fetching again"
+      rm -f -- "$pdf"
+    fi
+    local rc=0
+    download "$year" "$num" "$pdf" || rc=$?
+    [ "$rc" -eq 0 ] || return "$rc"
+    rm -f -- "$txt"
+  fi
+
+  if [ "$want_text" -eq 0 ]; then printf '%s\n' "$pdf"; return 0; fi
+  if ! text_fresh "$txt" "$pdf"; then
+    command -v -- "$PDFTOTEXT" >/dev/null 2>&1 ||
+      die 3 "'$PDFTOTEXT' not found (install poppler-utils); the PDF is at $pdf"
+    TMP=$(mktemp "$CACHE_DIR/.$year-$num.XXXXXX.txt.part") || die 2 "cannot create a temp file"
+    # $pdf is absolute, so it cannot be read as an option.
+    "$PDFTOTEXT" -layout "$pdf" "$TMP" && [ -s "$TMP" ] ||
+      die 3 "text extraction failed or produced nothing (scanned PDF?); the PDF is at $pdf"
+    install_atomically "$TMP" "$txt" || die 2 "could not install $txt"
+  fi
+  printf '%s\n' "$txt"
+}
+
+# Sourcing (the test suite) defines the functions without running anything.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi
