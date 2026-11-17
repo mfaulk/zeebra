@@ -17,10 +17,11 @@
 //!   handles for the monomials it holds. The global order is restored by arithmetic, not by a
 //!   serial walk.
 //!
-//! Either way a final per-slice pass writes `term_handles` from the translation arrays. One worker
-//! team is spawned per batch, not per level; levels smaller than `min_frontier` run on the caller
-//! alone with the team parked, and batches with fewer than `min_seed_rows` seed rows never start
-//! a team and take the shipping serial closure.
+//! Either way a final per-slice pass writes `term_handles` from the translation arrays. At most
+//! one worker team is spawned per batch, at the first step with at least `min_frontier`
+//! monomials; narrower steps run on the caller alone, so a closure that never widens never starts
+//! a team. Pair count does not predict closure size (an 11-pair Eco-12 batch needs 11 137 rows, a
+//! 326-pair one 916), which is why the frontier starts the team and the seed does not.
 //!
 //! Matrix construction sorts columns by monomial and reducer rows by leading column, so only the
 //! *set* of reducer rows and the pair rows' order reach the matrix; exact handle identity is kept
@@ -66,7 +67,8 @@ pub struct InternConfig {
     /// Slices per worker, claimed dynamically, so an uneven frontier does not leave the team
     /// waiting on one slice.
     pub slices_per_worker: usize,
-    /// A batch with fewer seed rows takes the shipping serial closure.
+    /// A batch with fewer seed rows takes the shipping serial closure; 0 disables the test. Kept
+    /// to reproduce the first #860 campaign, which set 512 and lost most batches to it.
     pub min_seed_rows: usize,
 }
 
@@ -498,23 +500,32 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
     let mut refused = false;
 
     std::thread::scope(|scope| {
-        let spawning = Instant::now();
-        for _ in 1..workers {
-            let (team, step) = (&team, &step);
-            scope.spawn(move || {
-                let barrier = team.barrier.as_ref().unwrap();
-                loop {
-                    barrier.wait();
-                    let job = *team.job.lock().unwrap();
-                    if job == Job::Exit {
-                        return;
+        // The team starts at the first step wide enough to dispatch, so a closure whose levels all
+        // stay under `min_frontier` never pays for threads it would not use.
+        let mut spawned = false;
+        let mut spawn = |report: &mut InternReport| {
+            if spawned {
+                return;
+            }
+            spawned = true;
+            let spawning = Instant::now();
+            for _ in 1..workers {
+                let (team, step) = (&team, &step);
+                scope.spawn(move || {
+                    let barrier = team.barrier.as_ref().unwrap();
+                    loop {
+                        barrier.wait();
+                        let job = *team.job.lock().unwrap();
+                        if job == Job::Exit {
+                            return;
+                        }
+                        work(team, step, job);
+                        barrier.wait();
                     }
-                    work(team, step, job);
-                    barrier.wait();
-                }
-            });
-        }
-        report.spawn = spawning.elapsed();
+                });
+            }
+            report.spawn = spawning.elapsed();
+        };
 
         // Run `job` on the team (dispatched) or on the caller alone.
         let run = |job: Job, dispatched: bool, clock: &mut Duration| {
@@ -551,6 +562,9 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
             }
             report.steps += 1;
             report.dispatched_steps += usize::from(dispatched);
+            if dispatched {
+                spawn(&mut report);
+            }
 
             run(Job::Scan, dispatched, &mut report.scan);
 
@@ -650,6 +664,16 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
             } else {
                 s.frontier.len()
             } as i64;
+            // One amortized growth per step rather than one per slice.
+            let (step_terms, step_rows) = s.slices.iter().fold((0, 0), |(t, r), slice| {
+                let slice = slice.read().unwrap();
+                (t + slice.handles.len(), r + slice.rows.len())
+            });
+            term_handles.reserve(step_terms);
+            if !seed_step {
+                rows.reserve(step_rows);
+                leads.reserve(step_rows);
+            }
             let mut admitted_before = 0i64;
             let mut peak = if seed_step {
                 0
@@ -693,7 +717,7 @@ pub fn symbolic_preprocessing_interned<const N: usize, F: FiniteField + Sync>(
         }
 
         *team.job.lock().unwrap() = Job::Exit;
-        if workers > 1 {
+        if report.dispatched_steps > 0 {
             team.barrier.as_ref().unwrap().wait();
         }
     });

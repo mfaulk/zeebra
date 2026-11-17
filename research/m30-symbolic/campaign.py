@@ -19,9 +19,10 @@ TARGETS = costmodel.TARGETS + ('katsura11-m31',)
 WORKERS = costmodel.WORKERS
 SUITES = ('walls', 'stages', 'components', 'level', 'intern', 'live')
 MERGES = ('serial', 'sharded')
-# #860: below this many seed rows a batch takes the shipping serial closure (crossover measured on
-# Eco-12 and MQ10 replays: team start-up outweighs the closure under ~300 pairs).
-MIN_SEED_ROWS = 512
+# #860: 0 = the team starts lazily at the first wide level. The first intern campaign (retained as
+# intern-seed512) used 512, which sent 17 of 23 Eco-12 batches down the serial path: pair count does
+# not predict closure size.
+MIN_SEED_ROWS = 0
 
 
 def plan(suite, reps, targets=TARGETS):
