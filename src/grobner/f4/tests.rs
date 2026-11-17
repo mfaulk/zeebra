@@ -4296,6 +4296,66 @@ fn test_parallel_interning_matches_the_serial_closure() {
     assert!(compared > 0, "no batch was compared");
 }
 
+/// #871: once a run of batches has warmed the caller-owned interning scratch, running the same
+/// batches again through it grows no buffer and rescans no slice, and still equals the serial
+/// closure.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_interning_scratch_is_not_reallocated_after_warm_up() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic::symbolic_preprocessing_seeded,
+        symbolic_intern::{
+            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Merge,
+        },
+        PairMultiples,
+    };
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&cyclic::<6, G>(), order, &options).expect("within limits");
+    for merge in [Merge::Serial, Merge::Sharded] {
+        let config = InternConfig {
+            workers: 4,
+            merge,
+            min_frontier: 0,
+            slices_per_worker: 2,
+            min_seed_rows: 0,
+        };
+        let mut scratch = InternScratch::new();
+        let pass = |scratch: &mut InternScratch<6>| {
+            for batch in trace.batches() {
+                let (got, _) = symbolic_preprocessing_interned_in(
+                    &batch.basis,
+                    &batch.pairs,
+                    usize::MAX,
+                    options.reducer_selection,
+                    PairMultiples::Distinct,
+                    &config,
+                    scratch,
+                );
+                let reference = symbolic_preprocessing_seeded(
+                    &batch.basis,
+                    &batch.pairs,
+                    usize::MAX,
+                    options.reducer_selection,
+                    &mut ReducerCache::disabled(),
+                    PairMultiples::Distinct,
+                );
+                assert_eq!(got, reference, "{merge:?}");
+            }
+        };
+        pass(&mut scratch);
+        let (growths, rescans, capacities) =
+            (scratch.growths(), scratch.rescans(), scratch.capacities());
+        assert!(growths > 0 && rescans > 0, "{merge:?}: the warm-up grew nothing");
+        pass(&mut scratch);
+        assert_eq!(scratch.growths(), growths, "{merge:?}: grew after warm-up");
+        assert_eq!(scratch.rescans(), rescans, "{merge:?}: rescanned after warm-up");
+        assert_eq!(scratch.capacities(), capacities, "{merge:?}: reallocated");
+    }
+}
+
 /// #860: live F4 with either interning prototype in force returns the shipping basis and the
 /// shipping symbolic counters, and the prototype actually served its batches.
 #[cfg(feature = "research-work")]
