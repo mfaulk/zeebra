@@ -4224,6 +4224,53 @@ fn test_level_parallel_symbolic_preprocessing_matches_the_serial_closure() {
     assert!(compared > 0, "no batch was compared");
 }
 
+/// The #859 level report accounts for every column once, every row term once, and parallel levels
+/// only where a team was actually dispatched; the measured closure is the serial one.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_level_parallel_report_accounts_for_every_column_and_term() {
+    use crate::grobner::f4::{
+        observer::trace_batches, symbolic::symbolic_preprocessing_level_parallel_measured,
+    };
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&katsura::<6, G>(), order, &options).expect("within limits");
+    let mut dispatched = 0;
+    for batch in trace.batches() {
+        let serial = symbolic_preprocessing_with(
+            &batch.basis,
+            &batch.pairs,
+            usize::MAX,
+            options.reducer_selection,
+            &mut ReducerCache::disabled(),
+        )
+        .unwrap();
+        for (workers, min_frontier) in [(1, 0), (4, 0), (4, usize::MAX)] {
+            let (parallel, report) = symbolic_preprocessing_level_parallel_measured(
+                &batch.basis,
+                &batch.pairs,
+                options.reducer_selection,
+                workers,
+                min_frontier,
+            );
+            assert_eq!(parallel, serial);
+            assert_eq!(report.frontier_monomials, serial.monomials.len());
+            assert_eq!(
+                report.terms_known + report.terms_interned + report.seed_terms,
+                serial.term_handles.len()
+            );
+            assert!(report.max_frontier <= report.frontier_monomials);
+            assert!(report.parallel_levels <= report.levels);
+            if workers == 1 || min_frontier == usize::MAX {
+                assert_eq!(report.parallel_levels, 0);
+            }
+            dispatched += report.parallel_levels;
+        }
+    }
+    assert!(dispatched > 0, "no level ran on a worker team");
+}
+
 /// The two halves of every pair in `pairs`, as `(basis_index, multiplier)` identities.
 fn seed_identities<const N: usize>(
     preprocessed: &Preprocessed<N>,

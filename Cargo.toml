@@ -351,6 +351,11 @@ name = "symbolic_parallel_price"
 required-features = ["external-runners", "research-work"]
 
 [[example]]
+name = "symbolic_cost_model"
+test = true
+required-features = ["external-runners", "research-work"]
+
+[[example]]
 name = "sparse_matvec_throughput"
 test = true
 
