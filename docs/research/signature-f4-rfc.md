@@ -3,10 +3,13 @@
 **Status:** RFC, 2026-11-17. Documents only: no code under `src/` was written or changed.
 **Measured at:** not measured here. Every figure is quoted from a source that carries its own commit:
 the [C1 attribution](m29-grobx-attribution.md) (`7e18d089`), [#223's note](signature-based.md),
-and the [M30 plan](../MILESTONE-SIGNATURE-SYMBOLIC-F4.md) (planning base `adfa6a60`). Code
+the [M30 plan](../MILESTONE-SIGNATURE-SYMBOLIC-F4.md) (planning base `adfa6a60`), and §12.1's Gate A1
+figures, from #716's report (PR #867, head `d2e7e5c0`; grobx pinned at `1854835d`). Code
 references are to `main` at `4f5784c5`.
 **Plan:** [`MILESTONE-SIGNATURE-SYMBOLIC-F4.md`](../MILESTONE-SIGNATURE-SYMBOLIC-F4.md) §6.2.
-**Gate dependency:** the go/no-go (§12) reads #716's Gate A1 (plan §6.1).
+**Gate dependency:** the go/no-go (§12) reads #716's Gate A1 (plan §6.1). A1 was posted on
+2026-11-17 ([verdict](https://github.com/mfaulk/zeebra/issues/716#issuecomment-6955121982), PR #867).
+**Decision: GO, narrowed to Eco-12 primary** (§12).
 
 ## 0. Summary
 
@@ -31,9 +34,10 @@ references are to `main` at `4f5784c5`.
    degree, Koszul and zero-row syzygies, and no handover in design 1** (§9).
 5. **#223's findings stand** (§11). The ≤2× row bound is now read as a bound on *rows*, not on
    *coefficient products*, which is what #835 changed.
-6. **Go/no-go is conditional on Gate A1** (§12). On the RFC's own evidence there is no
-   theoretical or architectural blocker. When this RFC was written A1 had not been posted, so
-   §12 states the decision rule for each possible A1 outcome.
+6. **Go, narrowed** (§12). On the RFC's own evidence there is no theoretical or architectural
+   blocker. The decision rule was fixed before A1 reported. A1 then passed on Eco-12 only, in
+   the exact pairing: 6.33× less work, 0.171 of the wall, RSS 1.03×. The rule therefore gives
+   **GO, with Eco-12 primary and `katsura-11` as the second family**.
 
 ## 1. Sources read, and how
 
@@ -565,9 +569,9 @@ Zeebra's matrices are a fraction of a percent dense (#223 §4.2).
 
 | Role | Instance | Field | SHA-256 |
 |---|---|---|---|
-| primary | `mq-random-11` | Goldilocks | `ee76de455c5ea571d6e8286152a4b4380b9d1ea323ee63dc8f889ffa11a92af5` |
-| second family | `eco-12` | 2⁶⁴−353 | `e9ef0fecf3906d9283e1ce003c4489d6921fb8718f2956c39c4aaa79e52a93cb` |
-| second family (alternate) | `katsura-11` | Goldilocks | `036f0a35884e82d7bc3e3bc930ee9ccbe38fbddfc81e56fa8bf190a05ae1b955` |
+| primary (by §12.1: **reported, not gating**) | `mq-random-11` | Goldilocks | `ee76de455c5ea571d6e8286152a4b4380b9d1ea323ee63dc8f889ffa11a92af5` |
+| second family (by §12.1: **primary, gating**) | `eco-12` | 2⁶⁴−353 | `e9ef0fecf3906d9283e1ce003c4489d6921fb8718f2956c39c4aaa79e52a93cb` |
+| second family (alternate; by §12.1: **the second family**) | `katsura-11` | Goldilocks | `036f0a35884e82d7bc3e3bc930ee9ccbe38fbddfc81e56fa8bf190a05ae1b955` |
 | same family as primary | `mq-random-10` | GF(32003) | `16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f` |
 | same family as primary | `mq-random-10` | GF(2³¹−1) | `72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2` |
 | non-regular control | `cyclic-7` | Goldilocks | `274e9a533b788e6e440803ad61ee44d2e0c691cec045c8c3bd6607ad8c42cb11` |
@@ -637,9 +641,87 @@ signature-disabled arm shows ≥2× less coefficient work **and** ≥25% less pr
 | **Inconclusive** (noise overlap, incomplete or failed arms) | **DEFER** | #857 stays blocked. If not resolved within M30, it is recorded as no-go for M30 |
 | **RSS >1.5× or a verified-output mismatch** in the passing arm | **NO-GO** for that arm | if no other arm passes, as for work <2× |
 
-**Status when this RFC was written (2026-11-17):** #716 had posted no A1 result, only its claim.
-The go/no-go is therefore **pending**, and #857/#858 are untouched. The rule above is applied
-when A1 is posted, and the outcome is recorded on #856.
+**Status when the rule was written (2026-11-17):** #716 had posted no A1 result. The rule above
+was committed (`4d04e5bc`) before A1 reported, and it is applied below without reinterpretation.
+
+### 12.1 Outcome: A1 passes on Eco-12 only → **GO, narrowed**
+
+A1's results, from the #716
+[verdict](https://github.com/mfaulk/zeebra/issues/716#issuecomment-6955121982) and PR #867. Setup:
+pinned grobx `1854835d`, one worker, seed 0, n = 5 per arm, every attempt verified coefficient for
+coefficient. Work is grobx's `subtracted` charge over the whole call.
+
+| Instance | Signature arm against signatures off (same combination policy) | Work off ÷ on | Wall on ÷ off [95%] | RSS | A1 |
+|---|---|---:|---:|---:|---|
+| MQ11 / Goldilocks | default (never hands over), combinations on | 1.69× | 0.569 [0.568, 0.570] | 1.01× | fail (work) |
+| Eco-12 / 2⁶⁴−353 | default (hands over at round 2), combinations on | 1.00× | 1.001 | 1.01× | fail |
+| Eco-12 / 2⁶⁴−353 | no handover, combinations on | 0.91× | 1.009 | 1.04× | fail |
+| **Eco-12 / 2⁶⁴−353** | **no handover, combinations and zero tests off (exact)** | **6.33×** | **0.171 [0.170, 0.191]** | **1.03×** | **pass** |
+| MQ11 / Goldilocks | same exact pairing; a declared extension **outside the gate** | 8.92× | 0.116 | 1.09× | not counted |
+
+**Mechanical application.** MQ11 fails inside the gate. Eco-12 passes on a no-handover arm with
+RSS ≤1.5× and verified output. That is the row "**Pass on Eco-12 only** (the no-handover arm) →
+**GO, narrowed**: #857 proceeds with Eco-12 primary. The second-family criterion must then use
+`katsura-11`, not MQ."
+
+- **#857 is unblocked.** It runs §9's design 1, the §10.1 corpus and caps, with `eco-12` / 2⁶⁴−353
+  (`e9ef0fec…`) as the primary instance and `katsura-11` / Goldilocks (`036f0a35…`) as the
+  second-family instance for #858's second-instance criterion.
+- **#858 stays blocked** on #857.
+- **Neither the predeclared corpus nor any threshold changes.**
+
+**What the passing arm does and does not show.** It is the exact pairing: both sides use
+deterministic reduction and no randomized row combinations or zero tests. That is the only route
+Zeebra may take (plan §13; #714), and it matches design 1 (§9 item 7: no randomization, no
+handover). With grobx's randomized combinations on, plain F4 already recovers most of the saving
+(0.91–1.69×). So the gain A1 measured is signatures against **exact** plain F4, which is Zeebra's
+route. The gate remains grobx-relative: it shows signatures pay in an exact engine, not that they
+will pay in Zeebra (plan §6.1).
+
+**Handover.** Handover lost time on every instance where it fired (#716 verdict: MQ10 at both
+primes, Cyclic-7). That confirms §3.8's choice of no handover in design 1, and it weakens the case
+for handover as design 2. If design 2 is needed, the parallel claim of §6.1 is the candidate.
+
+### 12.2 Reconciling the pass with Eco's doubtful regularity (§4.1)
+
+F5 finds 7 useless pairs on Eco-6 as stated, against 0 after factorizing (F5 Fig 9.1, §9.1). So
+the Eco family may well not be a regular sequence, and T7's no-zero-reduction guarantee does not
+apply to it. Under Schreyer order T7 would not apply anyway (§3.1).
+
+**The measurement is the evidence, not the theorem.** Correctness (§4) does not depend on
+regularity. Regularity only predicted how much the criteria save, and on Eco-12 A1 *measured* the
+saving directly: 6.33× less work against exact plain F4.
+
+The risks for #857's evaluation:
+
+1. **The saving may not transfer.** grobx's signature engine, with base divisors and
+   randomization-free reduction, is not design 1. Eco-12 is not shown to be regular, so there is
+   no theorem guaranteeing that a different correct signature engine sees a comparable reduction.
+   #857 must report the §2.2 quantities on Eco-12 before any wall comparison, so that a shortfall
+   can be attributed to the criteria rather than to engine speed.
+2. **Residual zero reductions are expected on Eco-12.** Non-regular input plus Schreyer order
+   leaves some (§3.7). #857 records them as reductions to zero, not as defects.
+3. **Signature-basis growth.** On non-regular input the signature basis can outgrow the reduced
+   basis (RS §B.4). This is open question 2, and it is now gating in practice for the primary
+   instance.
+4. **`katsura-11` is the second family.** F5 finds 0 useless pairs on Katsura 3–5 and 10 (F5 Fig
+   9.1), and Faugère's own Katsura F4/F5 time ratios are 2.7–22.4× (§11). That is a favourable
+   prior, but grobx has not been measured on `katsura-11`, so it is a prior, not evidence.
+
+**MQ11 as a secondary, reported-not-gating instance.** The extra exact cohort (8.92× work, 0.116
+wall, outside the gate) justifies keeping `mq-random-11` / Goldilocks in #857's runs. It is
+already in the §10.1 corpus as "primary", and **that row is not changed here**. It is annotated:
+
+- by the §12 rule it is **reported, not gating**;
+- the pass is credited to Eco-12, and MQ results cannot satisfy #858's second-family criterion
+  (plan §6.4);
+- an MQ11 result in #857 is evidence for a later decision, not for this gate.
+
+This is an annotation, not a change to the predeclared corpus or thresholds.
+
+**Counter naming.** grobx's `low` counter counts eliminations by the low-ratio base divisor
+(#716), not "low signatures" as plan §2.2's example reads. #857 reports its own rejections by
+mechanism (§10.1). A base-divisor count only appears if design 2 adds base divisors (RS §3.5).
 
 ## 13. Open questions for #857
 
