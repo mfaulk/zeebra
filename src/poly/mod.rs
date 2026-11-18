@@ -5,6 +5,7 @@ mod univariate;
 #[cfg(feature = "research-work")]
 pub use multivariate::gcd_profile;
 
+pub(crate) use multivariate::PreparedDivisors;
 #[doc(hidden)]
 pub use multivariate::{
     multiply_multivariate_sorted_unstable, multiply_multivariate_unstable,

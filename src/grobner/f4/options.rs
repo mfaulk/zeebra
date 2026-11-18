@@ -237,6 +237,16 @@ impl ParallelForward {
             .max(1)
     }
 
+    /// The most threads this setting uses for any batch; one means serial.
+    pub fn max_workers(self) -> usize {
+        match self {
+            Self::Serial => 1,
+            Self::Forced { workers } => workers.max(1),
+            Self::Auto { max_workers: 0 } => available_parallelism(),
+            Self::Auto { max_workers } => max_workers,
+        }
+    }
+
     /// Threads this setting uses for a batch of this shape; one means serial.
     pub fn workers(self, lower_rows: usize, lower_nonzeros: usize) -> usize {
         match self {

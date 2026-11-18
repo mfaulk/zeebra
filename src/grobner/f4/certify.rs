@@ -7,15 +7,22 @@
 //! Product and Gebauer–Möller criteria depend only on leading monomials and are safe to replay.
 //! The engine's chain criterion relies on already processed pairs, unavailable to a verifier;
 //! enabling it here could silently accept a non-basis. Certification costs are reported separately.
+//!
+//! The reductions are independent, so [`certify_f4_output_with_workers`] spreads them over threads;
+//! its report, counts included, is the serial one at every worker count (#887).
 
-use std::time::{Duration, Instant};
+use std::{
+    sync::atomic::{AtomicUsize, Ordering},
+    time::{Duration, Instant},
+};
 
 use crate::{
+    fields::ConcurrentJob,
     grobner::{
         pairs::{are_relatively_prime, divides, CriterionCounts, PairCriteria, PairQueue},
         s_polynomial,
     },
-    poly::MonomialOrder,
+    poly::{DivisionRoute, MonomialOrder, PreparedDivisors},
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
@@ -157,12 +164,30 @@ impl CertificationReport {
 /// therefore what lets [`CertificationReport::is_complete`] mean "a reduced Gröbner basis of the
 /// ideal `generators` generates". Passing a basis from elsewhere here would claim something the
 /// checks do not establish — use [`certify_submitted_basis`].
+///
+/// Runs on the calling thread; [`certify_f4_output_with_workers`] spreads the reductions.
 pub fn certify_f4_output<const N: usize, F: FiniteField>(
     generators: &[MultivariatePolynomial<N, F>],
     basis: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> CertificationReport {
-    certify_with(generators, basis, order, Provenance::F4Output)
+    certify_with(generators, basis, order, Provenance::F4Output, 1)
+}
+
+/// [`certify_f4_output`] with its normal forms spread over up to `workers` threads.
+///
+/// The report is [`certify_f4_output`]'s, field for field except [`CertificationReport::elapsed`],
+/// at every worker count and under any scheduling: the reductions are independent, and a failure
+/// is reported at the earliest position in the serial order, after exactly the work the serial
+/// check would have done (#887). Zero means one worker. A field that cannot be shared across
+/// threads runs on the calling thread.
+pub fn certify_f4_output_with_workers<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    workers: usize,
+) -> CertificationReport {
+    certify_with(generators, basis, order, Provenance::F4Output, workers)
 }
 
 /// Check a basis of unknown provenance.
@@ -176,8 +201,15 @@ pub fn certify_submitted_basis<const N: usize, F: FiniteField>(
     basis: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> CertificationReport {
-    certify_with(generators, basis, order, Provenance::Submitted)
+    certify_with(generators, basis, order, Provenance::Submitted, 1)
 }
+
+/// The division route the certificate reduces by.
+///
+/// Both routes return the same remainder bit for bit, so this is a cost choice only. With divisors
+/// prepared once, the merge certified Eco-12 at sixteen workers in 58 s against the heap's 66 s,
+/// and Cyclic-7 in 30 ms against 68 ms (#887).
+const CERTIFICATE_ROUTE: DivisionRoute = DivisionRoute::Merge;
 
 /// The checks, under a stated provenance.
 ///
@@ -190,31 +222,36 @@ fn certify_with<const N: usize, F: FiniteField>(
     basis: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     provenance: Provenance,
+    workers: usize,
 ) -> CertificationReport {
     let at = Instant::now();
     let mut report = CertificationReport {
         provenance,
         ..CertificationReport::default()
     };
+    let divisors = PreparedDivisors::new(basis, order);
 
     // (2) F in <G>. First, because it is linear in the generators and it is the check a truncated
     // basis fails for sure.
-    let mut generators_checked = 0;
-    for generator in generators.iter().filter(|p| !p.is_zero()) {
-        generators_checked += 1;
-        if !generator.normal_form(basis, order).is_zero() {
-            report.generators_checked = generators_checked;
-            report.elapsed = at.elapsed();
-            return report;
-        }
+    let nonzero_generators: Vec<&MultivariatePolynomial<N, F>> =
+        generators.iter().filter(|p| !p.is_zero()).collect();
+    let failure = first_irreducible(
+        &divisors,
+        Dividends::Generators(&nonzero_generators),
+        workers,
+    );
+    report.generators_checked = failure.map_or(nonzero_generators.len(), |at| at + 1);
+    if failure.is_some() {
+        report.elapsed = at.elapsed();
+        return report;
     }
     report.generators_in_basis = true;
-    report.generators_checked = generators_checked;
 
     // (3) Buchberger's criterion, over the pairs no criterion proves redundant.
     let nonzero: Vec<&MultivariatePolynomial<N, F>> =
         basis.iter().filter(|p| !p.is_zero()).collect();
-    let check = check_buchberger_criterion(&nonzero, basis, order, &CERTIFICATION_CRITERIA);
+    let check =
+        check_buchberger_criterion(&nonzero, &divisors, order, &CERTIFICATION_CRITERIA, workers);
     report.s_polynomials_checked = check.checked;
     report.s_polynomials_discarded = check.discarded;
     if !check.held {
@@ -224,7 +261,7 @@ fn certify_with<const N: usize, F: FiniteField>(
     report.buchberger_criterion = true;
 
     // (4) Reducedness.
-    report.reduced = is_reduced(&nonzero, basis, order);
+    report.reduced = is_reduced(&nonzero, order);
     report.elapsed = at.elapsed();
     report
 }
@@ -245,13 +282,14 @@ struct PairCheck {
 ///
 /// `criteria` is a parameter only so that the tests can exercise each criterion on its own and
 /// against the unpruned reference; the one production caller passes
-/// [`CERTIFICATION_CRITERIA`]. Stops at the first S-polynomial that does not reduce to zero, so the
-/// counts describe the work performed.
+/// [`CERTIFICATION_CRITERIA`]. Stops at the first S-polynomial, in the queue's order, that does not
+/// reduce to zero, so the counts describe the work a serial pass performs at every worker count.
 fn check_buchberger_criterion<const N: usize, F: FiniteField>(
     nonzero: &[&MultivariatePolynomial<N, F>],
-    basis: &[MultivariatePolynomial<N, F>],
+    divisors: &PreparedDivisors<N, F>,
     order: MonomialOrder,
     criteria: &PairCriteria,
+    workers: usize,
 ) -> PairCheck {
     debug_assert!(
         !criteria.chain,
@@ -262,8 +300,12 @@ fn check_buchberger_criterion<const N: usize, F: FiniteField>(
     let leads: Vec<Monomial<N>> = nonzero.iter().map(|p| p.leading_monomial(order)).collect();
     let mut counts = CriterionCounts::default();
     let mut queue = PairQueue::<N>::seeded_from_leads(&leads, criteria, &mut counts);
-    let mut checked = 0;
 
+    // The pairs to reduce, in the order a serial pass reduces them, each with the discards counted
+    // before it: the queue is drained first so that the reductions can run in any order and a
+    // failure can still be reported with exactly the serial pass's counts.
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    let mut discarded_before: Vec<usize> = Vec::new();
     while let Some(pair) = queue.pop() {
         // Gebauer–Möller's criterion F already applies this at insertion, so with both criteria on
         // it never fires. It is here so that the product criterion also stands alone.
@@ -271,32 +313,146 @@ fn check_buchberger_criterion<const N: usize, F: FiniteField>(
             counts.product += 1;
             continue;
         }
+        pairs.push((pair.left, pair.right));
+        discarded_before.push(counts.total());
+    }
 
-        checked += 1;
-        if !s_polynomial(nonzero[pair.left], nonzero[pair.right], order)
-            .normal_form(basis, order)
-            .is_zero()
-        {
-            return PairCheck {
-                held: false,
-                checked,
-                discarded: counts.total(),
-            };
+    match first_irreducible(
+        divisors,
+        Dividends::SPolynomials {
+            nonzero,
+            pairs: &pairs,
+            order,
+        },
+        workers,
+    ) {
+        Some(at) => PairCheck {
+            held: false,
+            checked: at + 1,
+            discarded: discarded_before[at],
+        },
+        None => PairCheck {
+            held: true,
+            checked: pairs.len(),
+            discarded: counts.total(),
+        },
+    }
+}
+
+/// The polynomials a certificate check reduces, by position in the serial order.
+#[derive(Clone, Copy)]
+enum Dividends<'a, const N: usize, F: FiniteField> {
+    Generators(&'a [&'a MultivariatePolynomial<N, F>]),
+    SPolynomials {
+        nonzero: &'a [&'a MultivariatePolynomial<N, F>],
+        pairs: &'a [(usize, usize)],
+        order: MonomialOrder,
+    },
+}
+
+impl<const N: usize, F: FiniteField> Dividends<'_, N, F> {
+    fn len(&self) -> usize {
+        match self {
+            Self::Generators(generators) => generators.len(),
+            Self::SPolynomials { pairs, .. } => pairs.len(),
         }
     }
 
-    PairCheck {
-        held: true,
-        checked,
-        discarded: counts.total(),
+    /// True if the dividend at `position` has a nonzero normal form.
+    fn irreducible(&self, position: usize, divisors: &PreparedDivisors<N, F>) -> bool {
+        let remainder = match *self {
+            Self::Generators(generators) => {
+                divisors.normal_form(generators[position], CERTIFICATE_ROUTE)
+            }
+            Self::SPolynomials {
+                nonzero,
+                pairs,
+                order,
+            } => {
+                let (left, right) = pairs[position];
+                divisors.normal_form(
+                    &s_polynomial(nonzero[left], nonzero[right], order),
+                    CERTIFICATE_ROUTE,
+                )
+            }
+        };
+        !remainder.is_zero()
+    }
+}
+
+/// The earliest position whose dividend does not reduce to zero, or `None` if every one does.
+///
+/// With one worker, or a field that cannot be shared across threads, this is the serial scan.
+fn first_irreducible<const N: usize, F: FiniteField>(
+    divisors: &PreparedDivisors<N, F>,
+    dividends: Dividends<'_, N, F>,
+    workers: usize,
+) -> Option<usize> {
+    let search = Search {
+        divisors,
+        dividends,
+        workers: workers.min(dividends.len()),
+    };
+    if search.workers <= 1 {
+        return search.serial();
+    }
+    F::run_concurrent(search).unwrap_or_else(|search| search.serial())
+}
+
+/// [`first_irreducible`] as a job a thread-safe field can run on a team.
+struct Search<'a, const N: usize, F: FiniteField> {
+    divisors: &'a PreparedDivisors<N, F>,
+    dividends: Dividends<'a, N, F>,
+    workers: usize,
+}
+
+impl<const N: usize, F: FiniteField> Search<'_, N, F> {
+    fn serial(&self) -> Option<usize> {
+        (0..self.dividends.len()).find(|&at| self.dividends.irreducible(at, self.divisors))
+    }
+}
+
+impl<const N: usize, F: FiniteField> ConcurrentJob<F> for Search<'_, N, F> {
+    type Output = Option<usize>;
+
+    /// Workers claim positions in increasing order, one at a time because a reduction's cost
+    /// varies by orders of magnitude, and skip any position past the earliest failure found so far.
+    ///
+    /// The result is deterministic: a position below the final minimum is never skipped, since
+    /// skipping it would need a failure below it, so every position below the minimum was reduced
+    /// and found to reduce to zero.
+    fn run(self) -> Self::Output
+    where
+        F: Send + Sync,
+    {
+        let next = AtomicUsize::new(0);
+        let earliest = AtomicUsize::new(usize::MAX);
+        std::thread::scope(|scope| {
+            for _ in 0..self.workers {
+                scope.spawn(|| loop {
+                    let at = next.fetch_add(1, Ordering::Relaxed);
+                    if at >= self.dividends.len() || at > earliest.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    if self.dividends.irreducible(at, self.divisors) {
+                        earliest.fetch_min(at, Ordering::Relaxed);
+                    }
+                });
+            }
+        });
+        Some(earliest.into_inner()).filter(|&at| at != usize::MAX)
     }
 }
 
 /// True if the basis is monic, no leading monomial divides another's, and each element is its own
 /// normal form modulo the others.
+///
+/// The last condition is tested as "no term of an element is divisible by another element's
+/// leading monomial", which is the same condition: a normal form never holds such a term, and an
+/// element without one is left unchanged by reduction. Testing monomials avoids cloning the basis
+/// and rebuilding its reducers once per element, which is quadratic in the basis (#887).
 fn is_reduced<const N: usize, F: FiniteField>(
     nonzero: &[&MultivariatePolynomial<N, F>],
-    basis: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> bool {
     let leads: Vec<_> = nonzero.iter().map(|p| p.leading_monomial(order)).collect();
@@ -313,13 +469,14 @@ fn is_reduced<const N: usize, F: FiniteField>(
         {
             return false;
         }
-        // Interreduced: reducing modulo the others changes nothing.
-        let others: Vec<MultivariatePolynomial<N, F>> = basis
-            .iter()
-            .filter(|p| !p.is_zero() && *p != *polynomial)
-            .cloned()
-            .collect();
-        if polynomial.normal_form(&others, order) != **polynomial {
+        // Interreduced: no other element's leading monomial divides any term. Minimality has just
+        // cleared the leading term, so this tests the tail.
+        if polynomial.terms().iter().any(|(monomial, _)| {
+            leads
+                .iter()
+                .enumerate()
+                .any(|(other, lead)| other != index && divides(lead, monomial))
+        }) {
             return false;
         }
     }
@@ -338,8 +495,8 @@ mod tests {
     use std::collections::HashSet;
 
     use super::{
-        certify_f4_output, certify_submitted_basis, check_buchberger_criterion, Provenance,
-        CERTIFICATION_CRITERIA,
+        certify_f4_output, certify_f4_output_with_workers, certify_submitted_basis,
+        CertificationReport, PairCheck, Provenance, CERTIFICATION_CRITERIA,
     };
     use crate::{
         fields::Zp2147483647,
@@ -349,11 +506,27 @@ mod tests {
             pairs::{are_relatively_prime, CriterionCounts, PairCriteria, PairQueue},
             s_polynomial,
         },
-        poly::MonomialOrder,
+        poly::{MonomialOrder, PreparedDivisors},
         FiniteField, Monomial, MultivariatePolynomial,
     };
 
     type F = Zp2147483647;
+
+    /// The pruned check against `basis`, on the calling thread, for tests that vary the criteria.
+    fn check_buchberger_criterion<const N: usize>(
+        nonzero: &[&MultivariatePolynomial<N, F>],
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        criteria: &PairCriteria,
+    ) -> PairCheck {
+        super::check_buchberger_criterion(
+            nonzero,
+            &PreparedDivisors::new(basis, order),
+            order,
+            criteria,
+            1,
+        )
+    }
     const ALL_ORDERS: [MonomialOrder; 3] = [
         MonomialOrder::Lexicographic,
         MonomialOrder::GradedLexicographic,
@@ -944,5 +1117,106 @@ mod tests {
             report.first_failure(),
             Some("an input generator does not reduce to zero modulo the basis")
         );
+    }
+
+    /// Worker counts the parallel certificate is compared at; seven does not divide the work evenly.
+    const WORKER_COUNTS: [usize; 4] = [1, 2, 7, 16];
+
+    /// A report with its timing removed, which is the only field allowed to vary between runs.
+    fn untimed(report: CertificationReport) -> CertificationReport {
+        CertificationReport {
+            elapsed: std::time::Duration::ZERO,
+            ..report
+        }
+    }
+
+    /// The certificate's report, timing aside, is the serial one at every worker count on a basis
+    /// that certifies.
+    #[test]
+    fn test_the_parallel_certificate_agrees_with_the_serial_one() {
+        for order in ALL_ORDERS {
+            let system: Vec<MultivariatePolynomial<5, F>> = katsura::<5, F>();
+            let basis = f4(&system, order).expect("within limits");
+            let serial = untimed(certify_f4_output(&system, &basis, order));
+            assert!(serial.is_complete());
+            for workers in WORKER_COUNTS {
+                assert_eq!(
+                    untimed(certify_f4_output_with_workers(
+                        &system, &basis, order, workers
+                    )),
+                    serial,
+                    "{} workers under {}",
+                    workers,
+                    order.name()
+                );
+            }
+        }
+    }
+
+    /// Every planted defect is rejected at every worker count with the serial report's counts, so
+    /// the verdict and the work it describes do not depend on scheduling.
+    #[test]
+    fn test_the_parallel_certificate_rejects_what_the_serial_one_rejects() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let system: Vec<MultivariatePolynomial<4, F>> = cyclic::<4, F>();
+        let basis = f4(&system, order).expect("within limits");
+        let mut rejected = 0;
+        for defect in planted_defects(&basis) {
+            let serial = untimed(certify_f4_output(&system, &defect, order));
+            if !serial.is_complete() {
+                rejected += 1;
+            }
+            for workers in WORKER_COUNTS {
+                assert_eq!(
+                    untimed(certify_f4_output_with_workers(
+                        &system, &defect, order, workers
+                    )),
+                    serial,
+                    "{workers} workers"
+                );
+            }
+        }
+        assert!(rejected > 0, "the corpus must contain a rejected basis");
+    }
+
+    /// A non-Gröbner basis whose generators all reduce to zero is rejected on Buchberger's
+    /// criterion itself, after the same number of S-polynomials at every worker count.
+    #[test]
+    fn test_the_parallel_certificate_rejects_a_non_groebner_basis() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let vars = ["x", "y", "z"];
+        // The generators as their own basis: each reduces to zero modulo itself, and the pair's
+        // S-polynomial reduces to y^2 - x, which no leading monomial divides.
+        let system: Vec<MultivariatePolynomial<3, F>> =
+            vec![parse("x^2 - y", vars), parse("x*y - 1", vars)];
+        let serial = untimed(certify_f4_output(&system, &system, order));
+        assert!(serial.generators_in_basis);
+        assert!(!serial.buchberger_criterion);
+        assert_eq!(serial.s_polynomials_checked, 1);
+        for workers in WORKER_COUNTS {
+            assert_eq!(
+                untimed(certify_f4_output_with_workers(
+                    &system, &system, order, workers
+                )),
+                serial
+            );
+        }
+    }
+
+    /// A basis with a tail term another element's leading monomial divides is not reduced, however
+    /// minimal and monic it is.
+    #[test]
+    fn test_certification_detects_a_tail_that_is_not_interreduced() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let vars = ["x", "y", "z"];
+        // {y, x + y}: a Gröbner basis of <x, y> with minimal monic leads whose second element's
+        // tail is divisible by the first element's lead.
+        let system: Vec<MultivariatePolynomial<3, F>> = vec![parse("x", vars), parse("y", vars)];
+        let basis = vec![parse("y", vars), parse("x + y", vars)];
+        for workers in WORKER_COUNTS {
+            let report = certify_f4_output_with_workers(&system, &basis, order, workers);
+            assert!(report.generators_in_basis && report.buchberger_criterion);
+            assert!(!report.reduced, "{workers} workers");
+        }
     }
 }

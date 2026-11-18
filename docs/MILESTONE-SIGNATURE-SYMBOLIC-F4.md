@@ -12,7 +12,8 @@ and the commits in its §6a/§6b), the [C1 attribution](research/m29-grobx-attri
 (`7e18d089`), [#827's report](research/serial-stage-slowdown.md) and
 [#223's ceiling](research/signature-based.md), each of which carries its own commit. No timings
 were taken for this plan. §15's figures were measured at `e4826153` (instrument `5515c412`)
-beside the freeze `4f5784c5` (`research/m30-final/`). It also quotes #716, #857 and #861, each at
+beside the freeze `4f5784c5` (`research/m30-final/`). The #887 follow-up in §15.6 was measured at `9548555d`
+against `b1d8e36a`. It also quotes #716, #857 and #861, each at
 the commits its own report names.
 **Tracking issue:** [#854](https://github.com/mfaulk/zeebra/issues/854).
 **Project:** [Zeebra #7](https://github.com/users/mfaulk/projects/7); label `M30`. Priority is the
@@ -750,6 +751,22 @@ Every attempt below is retained in its evidence directory.
    was retried at the final `main`. On the held-out rows the certificate completed. Cyclic-7 took
    2 s. Katsura-11 / 2⁶⁴−353 took 606 s, which is past the declared 600 s but inside the harness's
    660 s stop, and that overrun is recorded rather than rounded away.
+   **Follow-up (#887), measured at `9548555d` (tag `measured/887-parallel-certificate`) against
+   `b1d8e36a`:** the certificate now prepares the basis's divisors once and runs its reductions on
+   the call's workers. With `m29_cost_model --certify --workers 16`, one fresh process each under
+   `tools/benchlock.sh` and a 660 s stop, 2026-11-18:
+
+   | row | `b1d8e36a` | `9548555d`, 1 worker | `9548555d`, 16 workers |
+   | --- | --- | --- | --- |
+   | Eco-12 / 2⁶⁴−353 | stopped at 660 s | stopped at 660 s | 65.5 s, 65.5 s |
+   | MQ11 / Goldilocks | stopped at 660 s | not run | 60.8 s, 60.7 s |
+   | Katsura-11 / 2⁶⁴−353 | not run | not run | 27.1 s |
+   | Cyclic-7 / 2⁶⁴−353 | not run | not run | 0.03 s |
+
+   Each completed certificate passed, on the basis digest recorded in `research/m30-final/`, and
+   is reported in `F4Statistics::certification` apart from the solve. Preparing the divisors alone
+   is not enough: one worker still stopped at 660 s, so the budget is met by the parallel
+   reductions. The certificate is still not bounded by `max_wall_time`.
 2. **grobx certified mode on Eco-12 stopped on memory at the declared 8 GiB** (#855): at 94 s, with
    a kernel peak of 8.59 GB and no basis. The one approved retry at 32 GiB admitted it, with 743
    elements, the same digest, 287 s and an 11.4 GB peak. **The cap was raised once, for that row

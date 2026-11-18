@@ -34,7 +34,10 @@ mod symbolic_intern;
 mod tests;
 
 pub use budget::{Allowance, BudgetApproach, BudgetLine, BudgetReport};
-pub use certify::{certify_f4_output, certify_submitted_basis, CertificationReport, Provenance};
+pub use certify::{
+    certify_f4_output, certify_f4_output_with_workers, certify_submitted_basis,
+    CertificationReport, Provenance,
+};
 pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use divmask::{DivmaskCalibration, DIVMASK_BITS};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
@@ -715,7 +718,14 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         // `certify_f4_output` and not the submitted-basis entry point: this *is* F4's output,
         // run on these generators, so the derivation invariant holds and `is_complete` means what
         // it says. A caller certifying a basis from elsewhere gets the weaker conclusion.
-        let report = certify::certify_f4_output(generators, &reduced, order);
+        //
+        // On as many workers as the options let either parallel stage use: the report does not
+        // depend on the count, and serially Eco-12's certificate outran its 600 s budget (#887).
+        let workers = options
+            .parallel_forward
+            .max_workers()
+            .max(options.parallel_symbolic.workers());
+        let report = certify::certify_f4_output_with_workers(generators, &reduced, order, workers);
         statistics.certification = Some(report);
         if let Some(reason) = report.first_failure() {
             // Deliberately before `statistics.total` is set: a refusal has no total, and the
