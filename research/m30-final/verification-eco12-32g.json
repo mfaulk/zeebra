@@ -1,0 +1,24 @@
+[
+ {
+  "target": "eco12-wide64",
+  "timed_digests": [
+   "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984"
+  ],
+  "timed_runs": 72,
+  "zeebra_certify": {
+   "status": "not run"
+  },
+  "grobx_certified": {
+   "admitted": true,
+   "basis_text_sha256": "3bf17412e9d0902cc1b67511e11207c8219ff756ed9a72fd7369300c2fbbb984",
+   "elements": 743,
+   "exit": 0,
+   "process_wall_ns": 282655370890,
+   "response_sha256": "6ee97fc286dbd27fbb34e4f1ec41583adf6db4366f78ef86f7387e957398278e",
+   "stderr": "",
+   "rss_cap_gib": 32
+  },
+  "zeebra_certified": false,
+  "verified": true
+ }
+]

@@ -1,0 +1,74 @@
+[
+ {
+  "target": "katsura11-wide64",
+  "timed_digests": [
+   "c673510949d6676c48a9284bbf4290045786939f51118845417ae2fde3b8a637"
+  ],
+  "timed_runs": 72,
+  "zeebra_certify": {
+   "exit": 0,
+   "process_wall_ns": 606080345551,
+   "status": "complete",
+   "basis_sha256": "c673510949d6676c48a9284bbf4290045786939f51118845417ae2fde3b8a637",
+   "certification": {
+    "complete": true,
+    "generators_in_basis": true,
+    "buchberger_criterion": true,
+    "reduced": true,
+    "generators_checked": 11,
+    "s_polynomials_checked": 4460,
+    "s_polynomials_discarded": 139456,
+    "elapsed_ns": 604733636595
+   },
+   "stderr": ""
+  },
+  "grobx_certified": {
+   "admitted": true,
+   "basis_text_sha256": "c673510949d6676c48a9284bbf4290045786939f51118845417ae2fde3b8a637",
+   "elements": 537,
+   "exit": 0,
+   "process_wall_ns": 80232505697,
+   "response_sha256": "d81c52c4f4ce38957850e8b3f4bb17222489a74a440e5045a9860c03fa484859",
+   "stderr": "",
+   "rss_cap_gib": 8
+  },
+  "zeebra_certified": true,
+  "verified": true
+ },
+ {
+  "target": "cyclic7-wide64",
+  "timed_digests": [
+   "31c838c1df12307110124e249e6a632bcb6a99faa39c58ec33bbd191055e6bff"
+  ],
+  "timed_runs": 72,
+  "zeebra_certify": {
+   "exit": 0,
+   "process_wall_ns": 2287734157,
+   "status": "complete",
+   "basis_sha256": "31c838c1df12307110124e249e6a632bcb6a99faa39c58ec33bbd191055e6bff",
+   "certification": {
+    "complete": true,
+    "generators_in_basis": true,
+    "buchberger_criterion": true,
+    "reduced": true,
+    "generators_checked": 7,
+    "s_polynomials_checked": 923,
+    "s_polynomials_discarded": 20813,
+    "elapsed_ns": 2139603844
+   },
+   "stderr": ""
+  },
+  "grobx_certified": {
+   "admitted": true,
+   "basis_text_sha256": "31c838c1df12307110124e249e6a632bcb6a99faa39c58ec33bbd191055e6bff",
+   "elements": 209,
+   "exit": 0,
+   "process_wall_ns": 3145903964,
+   "response_sha256": "0a63be221724804a958134b084c559f5792db66ec99cb75ace294561311d69f6",
+   "stderr": "",
+   "rss_cap_gib": 8
+  },
+  "zeebra_certified": true,
+  "verified": true
+ }
+]
