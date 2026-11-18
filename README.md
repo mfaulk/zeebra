@@ -104,7 +104,7 @@ Every Rust example in this file and in [`docs/guide/`](docs/guide) is compiled a
 | `proptest` | off | `Arbitrary` implementations for the public types, for property-testing downstream code. |
 | `research-work` | off | Research counters and opt-in experiments. Shipping defaults are unaffected. |
 | `research-multirow` | off | Research-only four-row band elimination ([#715](docs/research/multirow-reuse.md)), selected per thread; single-row stays the default even when enabled. |
-| `research-sigf4` | off | Research-only signature-compatible F4 (`grobner::sigf4::sig_f4`, [#857](docs/research/m30-sigf4-prototype.md)), a separate engine for graded orders; the shipping `f4` never calls it. Implies `external-runners`. |
+| `research-sigf4` | off | Research-only signature-compatible F4 (`grobner::sigf4::sig_f4`, [#857](docs/research/m30-sigf4-prototype.md)), a separate engine for graded orders; the shipping `f4` never calls it. `SigF4Options::parallel_cascade` (`sig_f4_study --claim`) runs #904's parallel cross-target cascade, exact to design 1's rows ([results](docs/research/m31-sigf4-parallel.md)). Implies `external-runners`. |
 | `research-sigf4-replay` | off | #902's replay of the signature engine's cross-target cascade (`grobner::sigf4::replay`, `sig_f4_study --replay`; [findings](docs/research/m31-parallel-signature-elimination.md)). Observes only. Implies `research-sigf4`. |
 | `research-sigf4-split` | off | #901's instrument on the signature engine: per-batch elimination split into reducer-block and cross-target-cascade work, and clocks on the engine's unstaged glue ([m31-baseline](docs/research/m31-baseline.md)). Never in a timed binary. Implies `research-sigf4`. |
 
