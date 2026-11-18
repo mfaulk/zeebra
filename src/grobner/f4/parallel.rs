@@ -386,7 +386,10 @@ mod tests {
             auto.workers(10_000, ParallelForward::MIN_LOWER_NONZEROS - 1),
             1
         );
-        assert_eq!(auto.workers(10_000, usize::MAX / 2), 4);
+        assert_eq!(
+            auto.workers(10_000, usize::MAX / 2),
+            4.min(crate::grobner::f4::options::available_parallelism())
+        );
         assert!(ParallelForward::Auto { max_workers: 0 }.workers(10_000, usize::MAX / 2) >= 1);
     }
 }

@@ -924,7 +924,10 @@ mod tests {
         };
         let auto = |max_workers| ParallelSymbolic::Auto { max_workers };
         assert_eq!(within(auto(16), 4), auto(4));
-        assert_eq!(within(auto(16), 4).workers(), 4);
+        assert_eq!(
+            within(auto(16), 4).workers(),
+            4.min(crate::grobner::f4::options::available_parallelism())
+        );
         assert_eq!(within(auto(16), 32), auto(16));
         assert_eq!(within(auto(0), 8), auto(8));
         assert_eq!(
