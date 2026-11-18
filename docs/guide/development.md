@@ -167,8 +167,12 @@ branch-protection settings is a separate action. Existing job names remain stabl
 
 `Research artifacts` runs the research-instrument tests, artifact summaries and the delayed-reduction
 pilot in parallel with `Build and test`; serially they were the PR critical path (about 40 minutes).
-The comparand replay in it runs on every push to `main`, schedule and dispatch, and on PRs only when
-its inputs change. `Swatinem/rust-cache` saves caches only from `main`: PR saves overflowed the
+It is a matrix with one runner per set in `tools/ci-research.sh` — `default`, `delayed-reduction`,
+`comparand-replay` and one per `research-*` feature — because every feature set recompiles the
+whole crate, and run in one job they took 15–38 minutes (#922). A set compiles only under its own
+feature, and a new `research-*` feature needs a set of its own; `tools/test/ci-research-test.sh`
+enforces both and that the workflow matrix matches the script. The comparand replay runs on every
+push to `main`, schedule and dispatch, and on PRs only when its inputs change. `Swatinem/rust-cache` saves caches only from `main`: PR saves overflowed the
 repository's 10 GB cache quota and evicted `main`'s, which every PR restores from.
 
 The full suite runs under Nextest in debug and under `ci-release` in a separate job. Both matter:
@@ -187,10 +191,17 @@ manual dispatch. Debug doctests run on code and guide/README PRs; optimized doct
 ignored engine/corpus tests run on main, schedules and manual dispatch. This trades immediate
 example-link and optimized-doctest feedback for shorter PR latency without dropping those checks.
 
+The optimized job selects `--tests`: the library, binary, integration tests and the examples marked
+`test = true`. A bare `cargo test` also compiles every `test = false` example, which runs nothing
+there and was 60% of that job's compile time on `main` (#921); the debug job and Clippy still
+compile them.
+
 ```sh
 cargo nextest run --profile ci
-cargo test --profile ci-release --no-run --timings
-cargo nextest run --profile ci --cargo-profile ci-release
+cargo test --profile ci-release --tests --no-run --timings
+cargo nextest run --profile ci --cargo-profile ci-release --tests
+bash tools/ci-research.sh --sets                          # then: bash tools/ci-research.sh <set>
+bash tools/test/ci-research-test.sh
 cargo test --doc -- --test-threads=4
 # Match the optimized checks outside PRs:
 CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3 CARGO_PROFILE_CI_RELEASE_LTO=thin \
