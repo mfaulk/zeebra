@@ -211,6 +211,8 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ),
         ("claim_final_waits", Json::int(s.claim_final_waits)),
         ("claim_peak_live_bytes", size(s.claim_peak_live_bytes)),
+        ("claim_phase_a_ns", Json::nanos(s.claim_phase_a)),
+        ("claim_cascade_ns", Json::nanos(s.claim_cascade)),
         #[cfg(feature = "research-sigf4-split")]
         ("split", split(&s.split)),
     ])
@@ -587,6 +589,17 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--workers", "2"]].concat()).is_ok());
         assert!(args(&[&base[..], &["sigf4"]].concat()).is_err());
         assert!(args(&[&base[..], &["f4", "--workers", "2"]].concat()).is_err());
+    }
+
+    // The parallel cascade belongs to the signature engine and is not a replay arm.
+    #[test]
+    fn claim_needs_the_signature_engine() {
+        let base = [
+            "--field", "wide64", "--name", "eco-12", "--claim", "--engine",
+        ];
+        assert!(args(&[&base[..], &["sigf4", "--workers", "16"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["f4", "--workers", "16"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--workers", "2", "--replay"]].concat()).is_err());
     }
 
     // The shipping F4 arm caps the symbolic team at the worker count, as forward is (#883).
