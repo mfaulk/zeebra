@@ -431,7 +431,17 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
             .filter(|d| !d.is_zero())
             .map(|d| Reducer::new(d, order))
             .collect();
+        self.reduce_by::<COUNT>(&reducers, order, counts, repeats)
+    }
 
+    /// The merge route's reduction loop, against reducers already built.
+    pub(super) fn reduce_by<const COUNT: bool>(
+        &self,
+        reducers: &[Reducer<N, F>],
+        order: MonomialOrder,
+        counts: &mut NormalFormCounts,
+        repeats: &mut CrossCallRepeats<N>,
+    ) -> Self {
         if reducers.is_empty() {
             return self.clone();
         }
@@ -1023,6 +1033,48 @@ impl<const N: usize, F: FiniteField> Reducer<N, F> {
             lead_monomial,
             lead_inverse,
             tail,
+        }
+    }
+}
+
+/// A divisor set prepared once for many reductions against it.
+///
+/// [`SparseMultiPoly::normal_form`] rebuilds every divisor's sorted tail on each call, which is a
+/// sort of the whole divisor set per reduction. Certifying a basis reduces tens of thousands of
+/// S-polynomials against the same basis, and on Eco-12's 743 elements that rebuild, not the
+/// reduction, was most of each call (#887). The remainder is the one `normal_form` returns from the
+/// same divisors in the same order, bit for bit, on either route.
+pub(crate) struct PreparedDivisors<const N: usize, F: FiniteField> {
+    reducers: Vec<Reducer<N, F>>,
+    order: MonomialOrder,
+}
+
+impl<const N: usize, F: FiniteField> PreparedDivisors<N, F> {
+    pub(crate) fn new(divisors: &[SparseMultiPoly<N, F>], order: MonomialOrder) -> Self {
+        Self {
+            reducers: divisors
+                .iter()
+                .filter(|d| !d.is_zero())
+                .map(|d| Reducer::new(d, order))
+                .collect(),
+            order,
+        }
+    }
+
+    /// The normal form of `p` by `route`, equal to `p.normal_form_with(divisors, order, route)`.
+    pub(crate) fn normal_form(
+        &self,
+        p: &SparseMultiPoly<N, F>,
+        route: DivisionRoute,
+    ) -> SparseMultiPoly<N, F> {
+        match route {
+            DivisionRoute::Merge => p.reduce_by::<false>(
+                &self.reducers,
+                self.order,
+                &mut NormalFormCounts::default(),
+                &mut CrossCallRepeats::default(),
+            ),
+            DivisionRoute::Heap => heap_division::normal_form_by(p, &self.reducers, self.order),
         }
     }
 }
