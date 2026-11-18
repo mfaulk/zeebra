@@ -29,7 +29,8 @@ const ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
 
 /// The four M29 targets: MQ10 at both #820 primes, and #821's preferred wide-field rows; two of
 /// #223's generic instances, which #716 reruns beside them to reconcile the row fractions; and
-/// #859's Katsura-11 / 2^31-1, the instance #827 priced level-parallel symbolic on.
+/// #859's Katsura-11 / 2^31-1, the instance #827 priced level-parallel symbolic on; and the two
+/// held-out rows #855 pinned (`research/m30-baseline/pins.json`), which #862 runs.
 const TARGETS: &[&str] = &[
     "mq10-32003",
     "mq10-m31",
@@ -38,6 +39,8 @@ const TARGETS: &[&str] = &[
     "katsura5-m31",
     "cyclic5-m31",
     "katsura11-m31",
+    "katsura11-wide64",
+    "cyclic7-wide64",
 ];
 
 #[derive(Debug, PartialEq)]
@@ -517,6 +520,8 @@ fn main() {
         "mq11-goldilocks" => run::<11, Goldilocks>(wide("goldilocks", "mq-random-11"), &args),
         "katsura5-m31" => run::<5, Zp2147483647>(ladder("katsura-5", 2147483647), &args),
         "cyclic5-m31" => run::<5, Zp2147483647>(ladder("cyclic-5", 2147483647), &args),
+        "katsura11-wide64" => run::<11, Wide>(wide("wide64", "katsura-11"), &args),
+        "cyclic7-wide64" => run::<7, Wide>(wide("wide64", "cyclic-7"), &args),
         _ => unreachable!(),
     };
     println!("{}", report.to_json().replace('\n', ""));
@@ -683,6 +688,21 @@ mod tests {
         let katsura = ladder("katsura-5", 2147483647);
         assert_eq!(katsura.variables.len(), 5);
         assert_eq!(ladder("cyclic-5", 2147483647).generators.len(), 5);
+    }
+
+    // #862's held-out rows are the frozen wide rows whose digests #855 pinned before any run.
+    #[test]
+    fn held_out_wide_targets_are_the_pinned_rows() {
+        assert!(args(&["--target", "katsura11-wide64", "--workers", "16"]).is_ok());
+        assert!(args(&["--target", "cyclic7-wide64", "--workers", "16"]).is_ok());
+        assert_eq!(
+            wide("wide64", "katsura-11").digest,
+            "c08214c56a6654ab7a376c61df339b2e7cc65a225d027cc3a3fc3bec9876a4a2"
+        );
+        assert_eq!(
+            wide("wide64", "cyclic-7").digest,
+            "1da97cb3fe0eff34f224caaa8f029579d5f7252d910b78a3d5021baec41386bc"
+        );
     }
 
     // #859's Katsura-11 row is the published ladder row at 2^31-1, checked against its digest.
