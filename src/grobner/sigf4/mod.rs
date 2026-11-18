@@ -8,16 +8,22 @@
 //! join the basis only after the batch. The reduced basis is unique, so the output must equal
 //! [`crate::grobner::f4()`]'s coefficient for coefficient.
 
-#[cfg(test)]
+//!
+//! Compiled into every build for [`crate::grobner::f4_signature`], the supported opt-in entry
+//! (#905); this module and its research knobs are public only under `research-sigf4`.
+#![cfg_attr(not(feature = "research-sigf4"), allow(dead_code))]
+
+#[cfg(all(test, feature = "research-sigf4"))]
 mod cascade_tests;
 mod claim;
-#[cfg(feature = "external-runners")]
+#[cfg(feature = "research-sigf4")]
 pub mod corpus;
+pub mod dispatch;
 mod engine;
 #[cfg(feature = "research-sigf4-replay")]
 pub mod replay;
 pub mod signature;
-#[cfg(test)]
+#[cfg(all(test, feature = "research-sigf4"))]
 mod tests;
 
 use std::time::Duration;
@@ -36,8 +42,12 @@ pub struct SigF4Options {
     pub max_matrix_rows: usize,
     /// Columns per batch matrix.
     pub max_matrix_columns: usize,
-    /// Run [`crate::grobner::f4::certify_f4_output`] on the result and refuse a failure.
+    /// Run [`crate::grobner::f4::certify_f4_output`] on the result, on `workers` threads, and
+    /// refuse a failure.
     pub certify: bool,
+    /// The certificate's own wall budget, as [`crate::grobner::F4Options::max_certify_time`]: a
+    /// stop is [`F4Error::CertificationTimeBudgetExceeded`], never a rejection.
+    pub max_certify_time: Option<Duration>,
     /// Assert the signature discipline on every row operation and re-verify each new element's
     /// signature invariants. Expensive; for tests.
     pub check_signatures: bool,
@@ -64,6 +74,7 @@ impl Default for SigF4Options {
             max_matrix_rows: 2_000_000,
             max_matrix_columns: 2_000_000,
             certify: false,
+            max_certify_time: None,
             check_signatures: false,
             workers: 1,
             parallel_cascade: false,

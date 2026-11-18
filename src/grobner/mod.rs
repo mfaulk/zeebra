@@ -17,6 +17,8 @@ mod s_polynomial;
 pub mod shape_certificate;
 #[cfg(feature = "research-sigf4")]
 pub mod sigf4;
+#[cfg(not(feature = "research-sigf4"))]
+mod sigf4;
 mod solve;
 mod solve_zero_dimensional;
 pub mod transform;
@@ -69,6 +71,13 @@ pub use planning::{
 };
 pub use s_polynomial::s_polynomial;
 pub use shape_certificate::{shape_position_hypotheses, HypothesisGap, PurePower, ShapeHypotheses};
+pub use sigf4::{
+    dispatch::{
+        f4_signature, f4_signature_reported, signature_route, DispatchFeatures, ShippingReason,
+        SignatureDispatch, SignatureRoute, SIGNATURE_MAX_DEGREE_SPREAD, SIGNATURE_MIN_VARIABLES,
+    },
+    SigF4Error,
+};
 pub use solve::solve;
 pub use solve_zero_dimensional::{
     solve_from_lex_basis, solve_one, solve_one_reported, solve_one_with_options,
