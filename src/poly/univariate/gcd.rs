@@ -84,7 +84,23 @@ pub fn lcm<F: FiniteField>(
 /// Reed-Solomon decoding solves the key equation `Λ(x)S(x) ≡ Ω(x) mod x^{2t}` by running this on
 /// `(x^{2t}, S(x))` with `degree_bound = t`, which yields `Ω` as the remainder and `Λ` as the
 /// cofactor. Rational reconstruction and Padé approximation want the same primitive.
+///
+/// Classical Euclid, or half-GCD's transition matrix once the sequence spans
+/// [`bezout_half_crossover`] degrees; both return the same pair.
 pub fn partial_bezout<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    degree_bound: u32,
+) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
+    if bezout_takes_half::<F>(a, b, degree_bound) {
+        partial_bezout_half_unstable(a, b, degree_bound)
+    } else {
+        partial_bezout_classical_unstable(a, b, degree_bound)
+    }
+}
+
+/// [`partial_bezout`] by classical Euclid at every size; its route below the crossover.
+pub fn partial_bezout_classical_unstable<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
     degree_bound: u32,
@@ -93,35 +109,125 @@ pub fn partial_bezout<F: FiniteField>(
     (current.cofactor, current.remainder)
 }
 
+/// [`partial_bezout`] by half-GCD at every size: the halted pair is `M * (a, b)`, so its
+/// cofactor of `b` is the matrix's bottom-right entry.
+pub fn partial_bezout_half_unstable<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    degree_bound: u32,
+) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
+    partial_bezout_half_with_base_case(a, b, degree_bound, HALF_GCD_BASE_CASE)
+}
+
+pub(crate) fn partial_bezout_half_with_base_case<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    degree_bound: u32,
+    base_case: i64,
+) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
+    let budget = signed_degree(a) - i64::from(degree_bound);
+    let Reduced { matrix, d, .. } = reduce(a, b, budget, base_case.max(1), true);
+    let [_, [_, cofactor]] = matrix.expect("the matrix was asked for").rows;
+    (cofactor, d)
+}
+
+/// Smallest span, in degrees, from which `partial_bezout` and `xgcd` take half-GCD, for a field
+/// element of at most 4 bytes. Above `gcd`'s, because these routes must build the matrix.
+const BEZOUT_HALF_CROSSOVER_32_BIT: u32 = 6144;
+/// As [`BEZOUT_HALF_CROSSOVER_32_BIT`], for 5 to 8 bytes.
+const BEZOUT_HALF_CROSSOVER_64_BIT: u32 = 3072;
+/// As [`BEZOUT_HALF_CROSSOVER_32_BIT`], for wider elements.
+const BEZOUT_HALF_CROSSOVER_WIDE: u32 = 1536;
+
+/// The span from which [`partial_bezout`] and [`xgcd`] take half-GCD for `F`, tiered by element
+/// width as [`half_gcd_crossover`] is.
+pub(crate) fn bezout_half_crossover<F: FiniteField>() -> u32 {
+    match std::mem::size_of::<F>() {
+        0..=4 => BEZOUT_HALF_CROSSOVER_32_BIT,
+        5..=8 => BEZOUT_HALF_CROSSOVER_64_BIT,
+        _ => BEZOUT_HALF_CROSSOVER_WIDE,
+    }
+}
+
+/// Whether the sequence from `(a, b)` down to `degree_bound` spans the crossover: the smaller
+/// operand's degree above the bound, which is the degree Euclid has to drop.
+fn bezout_takes_half<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    degree_bound: u32,
+) -> bool {
+    let span = signed_degree(a).min(signed_degree(b)) - i64::from(degree_bound);
+    span >= i64::from(bezout_half_crossover::<F>())
+}
+
 /// The monic greatest common divisor of two polynomials together with cofactors witnessing it:
 /// `(g, u, v)` with `g = u*a + v*b`.
 ///
 /// Running [`partial_bezout`]'s sequence to completion rather than halting it: the last nonzero
 /// remainder is the gcd, and `degree_bound = 0` is what "run to completion" means, since every
-/// nonzero remainder has degree at least zero.
-pub fn xgcd<F: FiniteField>(
+/// nonzero remainder has degree at least zero. Dispatches as [`partial_bezout`] does.
+pub fn xgcd<F: FiniteField>(a: &UnivariatePolynomial<F>, b: &UnivariatePolynomial<F>) -> Xgcd<F> {
+    if bezout_takes_half::<F>(a, b, 0) {
+        xgcd_half_unstable(a, b)
+    } else {
+        xgcd_classical_unstable(a, b)
+    }
+}
+
+/// `(g, u, v)` with `g = u*a + v*b`, as [`xgcd`] returns it.
+pub type Xgcd<F> = (
+    UnivariatePolynomial<F>,
+    UnivariatePolynomial<F>,
+    UnivariatePolynomial<F>,
+);
+
+/// gcd(a, 0) = monic(a), which neither sequence produces: with b zero no step is taken, so the
+/// last nonzero remainder is `a` itself, in a row that carries no cofactor. The normalization is
+/// the whole content of `u` here. gcd(0, 0) = 0 falls out with zero cofactors.
+fn xgcd_with_zero<F: FiniteField>(a: &UnivariatePolynomial<F>) -> Xgcd<F> {
+    if a.is_zero() {
+        let zero = UnivariatePolynomial::zero();
+        return (zero.clone(), zero.clone(), zero);
+    }
+    let scale = a.coefficients().last().unwrap().inverse();
+    (
+        a.scale(&scale),
+        UnivariatePolynomial::new(&[scale]),
+        UnivariatePolynomial::zero(),
+    )
+}
+
+/// [`xgcd`] by half-GCD at every size. The matrix's top row carries both cofactors of the last
+/// nonzero remainder, so `u` costs no division here.
+pub fn xgcd_half_unstable<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
-) -> (
-    UnivariatePolynomial<F>,
-    UnivariatePolynomial<F>,
-    UnivariatePolynomial<F>,
-) {
-    // gcd(a, 0) = monic(a), and the sequence below cannot produce it: with b zero the loop takes
-    // no step, so the last nonzero remainder is `a` itself, sitting in a row that carries no
-    // cofactor. The normalization is the whole content of `u` here. gcd(0, 0) = 0 falls out with
-    // zero cofactors, which is also what keeps the `/ a` below away from a zero divisor.
+) -> Xgcd<F> {
+    xgcd_half_with_base_case(a, b, HALF_GCD_BASE_CASE)
+}
+
+pub(crate) fn xgcd_half_with_base_case<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    base_case: i64,
+) -> Xgcd<F> {
     if b.is_zero() {
-        if a.is_zero() {
-            let zero = UnivariatePolynomial::zero();
-            return (zero.clone(), zero.clone(), zero);
-        }
-        let scale = a.coefficients().last().unwrap().inverse();
-        return (
-            a.scale(&scale),
-            UnivariatePolynomial::new(&[scale]),
-            UnivariatePolynomial::zero(),
-        );
+        return xgcd_with_zero(a);
+    }
+    // Target degree zero runs the sequence until `d` is zero, leaving the gcd in `c`.
+    let Reduced { matrix, c, .. } = reduce(a, b, signed_degree(a), base_case.max(1), true);
+    let [[u, v], _] = matrix.expect("the matrix was asked for").rows;
+    let scale = c.coefficients().last().unwrap().inverse();
+    (c.scale(&scale), u.scale(&scale), v.scale(&scale))
+}
+
+/// [`xgcd`] by classical Euclid at every size; its route below the crossover.
+pub fn xgcd_classical_unstable<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+) -> Xgcd<F> {
+    if b.is_zero() {
+        return xgcd_with_zero(a);
     }
 
     let (previous, _) = bezout_rows(a, b, 0);
@@ -300,7 +406,7 @@ fn shifted_sum<F: FiniteField>(
 }
 
 // Cutoff for the experimental algorithm's classical base case.
-const HALF_GCD_BASE_CASE: i64 = 64;
+pub(crate) const HALF_GCD_BASE_CASE: i64 = 64;
 
 /// A reduction's result: the pair `(c, d) = M * (a, b)` it reached, and `M` when it was asked for.
 struct Reduced<F: FiniteField> {
@@ -1090,6 +1196,194 @@ mod tests {
                     gcd_half_unstable(&f, &g),
                     gcd(&f, &g),
                     "half-GCD disagrees at degree {degree}"
+                );
+            }
+        }
+    }
+
+    mod bezout {
+        use super::*;
+        use crate::fields::{Bn254Fr, KoalaBear, PrimeFieldElement64, Zp18446744069414584321};
+        use crate::poly::univariate::gcd::{
+            bezout_half_crossover, partial_bezout_classical_unstable, partial_bezout_half_unstable,
+            partial_bezout_half_with_base_case, signed_degree, xgcd_classical_unstable,
+            xgcd_half_unstable, xgcd_half_with_base_case, HALF_GCD_BASE_CASE,
+        };
+        use rand::{prelude::StdRng, SeedableRng};
+
+        type Gf2 = PrimeFieldElement64<2>;
+
+        /// Every polynomial over GF(2) of degree at most `max_degree`.
+        fn all_gf2(max_degree: usize) -> Vec<UnivariatePolynomial<Gf2>> {
+            (0..1u64 << (max_degree + 1))
+                .map(|bits| {
+                    let coefficients: Vec<Gf2> = (0..=max_degree)
+                        .map(|i| Gf2::new((bits >> i) & 1))
+                        .collect();
+                    UnivariatePolynomial::new(&coefficients)
+                })
+                .collect()
+        }
+
+        /// Both routes agree exactly, and the half route's cofactors witness its answers.
+        fn assert_routes_agree<F: FiniteField>(
+            a: &UnivariatePolynomial<F>,
+            b: &UnivariatePolynomial<F>,
+            bound: u32,
+        ) {
+            let classical = xgcd_classical_unstable(a, b);
+            let half = xgcd_half_unstable(a, b);
+            assert_eq!(half, classical, "xgcd routes disagree on a = {a}, b = {b}");
+            let (g, u, v) = half;
+            assert_eq!(
+                &(&u * a) + &(&v * b),
+                g,
+                "u*a + v*b != g on a = {a}, b = {b}"
+            );
+            assert_eq!(g, gcd(a, b));
+
+            let classical = partial_bezout_classical_unstable(a, b, bound);
+            let half = partial_bezout_half_unstable(a, b, bound);
+            assert_eq!(
+                half, classical,
+                "partial_bezout routes disagree on a = {a}, b = {b}, bound {bound}"
+            );
+        }
+
+        // Over every GF(2) pair of degree at most four, base cases of one to three make both
+        // half-GCD Bezout routes recurse, and each returns exactly what classical Euclid does.
+        #[test]
+        fn test_bezout_routes_match_euclid_exhaustively_over_gf2_with_tiny_base_cases() {
+            let polynomials = all_gf2(4);
+            for base_case in 1..=3 {
+                for a in &polynomials {
+                    for b in &polynomials {
+                        let context = format!("a = {a}, b = {b}, base {base_case}");
+                        assert_eq!(
+                            xgcd_half_with_base_case(a, b, base_case),
+                            xgcd_classical_unstable(a, b),
+                            "xgcd: {context}"
+                        );
+                        for bound in 0..=6 {
+                            assert_eq!(
+                                partial_bezout_half_with_base_case(a, b, bound, base_case),
+                                partial_bezout_classical_unstable(a, b, bound),
+                                "partial_bezout: {context}, bound {bound}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Above the base case, on three element widths, the half-GCD Bezout routes agree with
+        // classical Euclid on coprime pairs, planted common factors and either operand larger.
+        #[test]
+        fn test_bezout_routes_agree_above_the_base_case() {
+            check_recursive_bezout::<KoalaBear>();
+            check_recursive_bezout::<Zp18446744069414584321>();
+            check_recursive_bezout::<Bn254Fr>();
+        }
+
+        fn check_recursive_bezout<F: FiniteField>() {
+            let mut rng = StdRng::seed_from_u64(0x815);
+            for degree in [
+                HALF_GCD_BASE_CASE + 1,
+                2 * HALF_GCD_BASE_CASE + 1,
+                4 * HALF_GCD_BASE_CASE + 3,
+            ] {
+                let degree = degree as u64;
+                for offset in [0, 1, 7] {
+                    let a = UnivariatePolynomial::<F>::rand(degree, &mut rng);
+                    let b = UnivariatePolynomial::<F>::rand(degree - offset, &mut rng);
+                    for bound in [0, 1, degree as u32 / 3, degree as u32 / 2, degree as u32] {
+                        assert_routes_agree(&a, &b, bound);
+                        assert_routes_agree(&b, &a, bound);
+                    }
+                    let shared = UnivariatePolynomial::<F>::rand(23, &mut rng);
+                    let (f, g) = (&a * &shared, &b * &shared);
+                    assert_routes_agree(&f, &g, degree as u32 / 2);
+                }
+            }
+        }
+
+        // The key-equation shape (x^{2n}, S) halted at n, which is how Berlekamp-Massey and
+        // Reed-Solomon decoding call it, agrees with classical Euclid at sizes that recurse.
+        #[test]
+        fn test_partial_bezout_agrees_on_the_key_equation_shape() {
+            type F = Zp18446744069414584321;
+            let mut rng = StdRng::seed_from_u64(0x815_4e7);
+            for n in [70u32, 129, 300] {
+                let mut power = vec![F::zero(); 2 * n as usize + 1];
+                power[2 * n as usize] = F::one();
+                let a = UnivariatePolynomial::new(&power);
+                let s = UnivariatePolynomial::<F>::rand(u64::from(2 * n - 1), &mut rng);
+                let (v, r) = partial_bezout_half_unstable(&a, &s, n);
+                assert_eq!(
+                    (v.clone(), r.clone()),
+                    partial_bezout_classical_unstable(&a, &s, n)
+                );
+                assert!(signed_degree(&r) < i64::from(n));
+                assert!((&(&r - &(&v * &s)) % &a).is_zero());
+            }
+        }
+
+        // Zero, constant, equal and divisible operands take the same degenerate sequences on both
+        // routes, including bounds above both degrees.
+        #[test]
+        fn test_bezout_routes_agree_on_degenerate_inputs() {
+            type F = Zp13;
+            let mut rng = StdRng::seed_from_u64(0x815_dead);
+            let big = 3 * HALF_GCD_BASE_CASE as u64;
+            let a = UnivariatePolynomial::<F>::rand(big, &mut rng);
+            let zero = UnivariatePolynomial::<F>::zero();
+            let seven = UnivariatePolynomial::<F>::new(&[F::new(7)]);
+            let multiple = &a * &UnivariatePolynomial::<F>::rand(17, &mut rng);
+            let factor = UnivariatePolynomial::<F>::rand(9, &mut rng);
+            let squared = &factor * &factor;
+            let f = &squared * &UnivariatePolynomial::<F>::rand(big, &mut rng);
+            let g = &squared * &UnivariatePolynomial::<F>::rand(big + 3, &mut rng);
+            let pairs = [
+                (&a, &zero),
+                (&zero, &a),
+                (&zero, &zero),
+                (&a, &seven),
+                (&seven, &a),
+                (&a, &a),
+                (&multiple, &a),
+                (&a, &multiple),
+                (&f, &g),
+            ];
+            for (x, y) in pairs {
+                for bound in [0, 1, 5, big as u32 / 2, big as u32, big as u32 + 40, 1000] {
+                    assert_routes_agree(x, y, bound);
+                }
+            }
+        }
+
+        // The public entry points agree with classical Euclid on either side of their dispatch.
+        #[test]
+        fn test_bezout_entry_points_agree_across_their_dispatch() {
+            type F = Bn254Fr;
+            let crossover = u64::from(bezout_half_crossover::<F>());
+            let mut rng = StdRng::seed_from_u64(0x815_d15);
+            for degree in [crossover - 1, crossover, crossover + 1] {
+                let a = UnivariatePolynomial::<F>::rand(degree + 3, &mut rng);
+                let b = UnivariatePolynomial::<F>::rand(degree, &mut rng);
+                assert_eq!(
+                    xgcd(&a, &b),
+                    xgcd_classical_unstable(&a, &b),
+                    "degree {degree}"
+                );
+                let mut power = vec![F::zero(); 2 * degree as usize + 1];
+                power[2 * degree as usize] = F::one();
+                let x_power = UnivariatePolynomial::new(&power);
+                let s = UnivariatePolynomial::<F>::rand(2 * degree - 1, &mut rng);
+                let bound = degree as u32 - 1;
+                assert_eq!(
+                    partial_bezout(&x_power, &s, bound),
+                    partial_bezout_classical_unstable(&x_power, &s, bound),
+                    "degree {degree}"
                 );
             }
         }

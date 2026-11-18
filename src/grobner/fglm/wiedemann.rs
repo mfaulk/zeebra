@@ -6,8 +6,8 @@ use super::{
     shape::shape_relations_vanish, ConversionStrategy, FglmOptions, FglmStatistics, QuotientAlgebra,
 };
 use crate::{
-    poly::PreparedDivisor, xgcd, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
-    Polynomial, UnivariatePolynomial,
+    berlekamp_massey, poly::PreparedDivisor, xgcd, FiniteField, Monomial, MonomialOrder,
+    MultivariatePolynomial, Polynomial, UnivariatePolynomial,
 };
 
 /// The algorithm that returned a conversion result.
@@ -206,42 +206,6 @@ fn numerator_for_classical<F: FiniteField>(p: &[F], moments: &[F]) -> Vec<F> {
         .collect()
 }
 
-/// The monic recurrence polynomial in ascending powers, including nilpotent factors.
-fn berlekamp_massey<F: FiniteField>(sequence: &[F]) -> Vec<F> {
-    let mut c = vec![F::one()];
-    let mut b = c.clone();
-    let mut degree = 0;
-    let mut shift = 1;
-    let mut previous = F::one();
-    for (n, value) in sequence.iter().enumerate() {
-        let discrepancy = *value
-            + (1..=degree)
-                .map(|i| c.get(i).copied().unwrap_or(F::zero()) * sequence[n - i])
-                .fold(F::zero(), |a, b| a + b);
-        if discrepancy.is_zero() {
-            shift += 1;
-            continue;
-        }
-        let saved = c.clone();
-        let factor = discrepancy / previous;
-        c.resize(c.len().max(b.len() + shift), F::zero());
-        for (i, coefficient) in b.iter().enumerate() {
-            c[i + shift] -= factor * *coefficient;
-        }
-        if 2 * degree <= n {
-            degree = n + 1 - degree;
-            b = saved;
-            previous = discrepancy;
-            shift = 1;
-        } else {
-            shift += 1;
-        }
-    }
-    c.resize(degree + 1, F::zero());
-    c.reverse();
-    c
-}
-
 fn shape_relation<const N: usize, F: FiniteField>(
     variable: usize,
     last: usize,
@@ -281,7 +245,7 @@ fn certify<const N: usize, F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{berlekamp_massey, certify, numerator_for, numerator_for_classical, reconstruct};
+    use super::{certify, numerator_for, numerator_for_classical, reconstruct};
     use crate::grobner::FglmStatistics;
     use crate::{
         fields::Zp13 as F,
@@ -291,32 +255,6 @@ mod tests {
         },
         FiniteField, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
-
-    // A finite impulse retains its nilpotent factor instead of collapsing to a squarefree relation.
-    #[test]
-    fn recurrence_preserves_nilpotents_and_zero_sequences() {
-        let sequence = [F::zero(), F::one(), F::zero(), F::zero()];
-        assert_eq!(
-            berlekamp_massey(&sequence),
-            vec![F::zero(), F::zero(), F::one()]
-        );
-        assert_eq!(berlekamp_massey(&[F::zero(); 6]), vec![F::one()]);
-    }
-
-    // Every term of a known order-three recurrence agrees with the recovered ascending polynomial.
-    #[test]
-    fn recurrence_matches_a_known_polynomial() {
-        let p = [F::new(2), F::new(3), F::new(4), F::one()];
-        let mut values = vec![F::new(5), F::new(7), F::new(11)];
-        for k in 3..12 {
-            values.push(
-                -(0..3)
-                    .map(|i| p[i] * values[k - 3 + i])
-                    .fold(F::zero(), |a, b| a + b),
-            );
-        }
-        assert_eq!(berlekamp_massey(&values), p);
-    }
 
     // Rational numerators reconstruct a shifted moment series modulo its recurrence polynomial.
     #[test]

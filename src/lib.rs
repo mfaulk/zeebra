@@ -45,19 +45,20 @@ pub use fft::{bluestein_crossover_unstable, dft_unstable};
 pub use fields::{FiniteField, KnownOrder, ParseFieldElementError};
 pub use identities::{One, Zero};
 pub use poly::{
-    compose_mod, compose_mod_horner, factorize, gcd, graeffe_2, graeffe_2_over_domain,
-    graeffe_all_roots, graeffe_l, graeffe_root, graeffe_root_with_stats, inverse_exponent,
-    is_irreducible, is_permutation_exponent, is_permutation_polynomial, lagrange_interpolate, lcm,
-    multipoint_evaluate, partial_bezout, permutation_exponents, pow_mod, resultant,
-    resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd, BlockOrder,
+    berlekamp_massey, compose_mod, compose_mod_horner, factorize, gcd, graeffe_2,
+    graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root, graeffe_root_with_stats,
+    inverse_exponent, is_irreducible, is_permutation_exponent, is_permutation_polynomial,
+    lagrange_interpolate, lcm, multipoint_evaluate, partial_bezout, permutation_exponents, pow_mod,
+    resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd, BlockOrder,
     BlockOrderError, BlockOrderKind, BuildMonomialHasher, DivisionRoute, GcdError, GcdRoute,
     GraeffeError, GraeffeStats, ModularComposer, Monomial, MonomialHasher, MonomialMap,
     MonomialOrder, MonomialSet, MultivariatePolynomial, NormalFormError, Polynomial,
     PolynomialParams, PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
-    WeightedOrder, WeightedOrderError, WeightedTieBreak,
+    WeightedOrder, WeightedOrderError, WeightedTieBreak, Xgcd,
 };
 #[doc(hidden)]
 pub use poly::{
+    berlekamp_massey_classical_unstable, berlekamp_massey_euclid_unstable,
     div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
     factorize_with_route_unstable, factorize_with_routes_unstable, from_zeros_crossover_unstable,
     gcd_classical_unstable, gcd_half_unstable, gcd_half_with_base_case_unstable,
@@ -65,10 +66,11 @@ pub use poly::{
     karatsuba_base_case_unstable, karatsuba_unstable, multiply_multivariate_sorted_unstable,
     multiply_multivariate_unstable, multivariate_multiply_route_unstable,
     newton_crossover_unstable, newton_floor_unstable, newton_is_cheaper_at_unstable,
-    newton_is_cheaper_unstable, pow_mod_limbs_unstable, product_of_factors_unstable,
-    subproduct_evaluate_unstable, subproduct_interpolate_unstable,
-    transform_tree_interpolate_unstable, tree_crossover_unstable, DistinctDegreeRoute,
-    FrobeniusRoute, IrreducibilityRoute, MultiplyRoute, TransformKernel, TransformTree,
+    newton_is_cheaper_unstable, partial_bezout_classical_unstable, partial_bezout_half_unstable,
+    pow_mod_limbs_unstable, product_of_factors_unstable, subproduct_evaluate_unstable,
+    subproduct_interpolate_unstable, transform_tree_interpolate_unstable, tree_crossover_unstable,
+    xgcd_classical_unstable, xgcd_half_unstable, DistinctDegreeRoute, FrobeniusRoute,
+    IrreducibilityRoute, MultiplyRoute, TransformKernel, TransformTree,
 };
 pub use rings::Ring;
 

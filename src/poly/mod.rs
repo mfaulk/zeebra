@@ -19,25 +19,28 @@ pub use multivariate::{
 pub(crate) use univariate::multiply_dense;
 pub(crate) use univariate::PreparedDivisor;
 pub use univariate::{
-    compose_mod, compose_mod_horner, factorize, gcd, graeffe_2, graeffe_2_over_domain,
-    graeffe_all_roots, graeffe_l, graeffe_root, graeffe_root_with_stats, inverse_exponent,
-    is_irreducible, is_permutation_exponent, is_permutation_polynomial, lagrange_interpolate, lcm,
-    multipoint_evaluate, partial_bezout, permutation_exponents, pow_mod, resultant,
-    resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd, GraeffeError,
+    berlekamp_massey, compose_mod, compose_mod_horner, factorize, gcd, graeffe_2,
+    graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root, graeffe_root_with_stats,
+    inverse_exponent, is_irreducible, is_permutation_exponent, is_permutation_polynomial,
+    lagrange_interpolate, lcm, multipoint_evaluate, partial_bezout, permutation_exponents, pow_mod,
+    resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd, GraeffeError,
     GraeffeStats, ModularComposer, Polynomial, PolynomialParams, PowerPermutation, SubgroupRoute,
-    UnivariatePolynomial,
+    UnivariatePolynomial, Xgcd,
 };
 #[doc(hidden)]
 pub use univariate::{
+    berlekamp_massey_classical_unstable, berlekamp_massey_euclid_unstable,
     div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
     factorize_with_route_unstable, factorize_with_routes_unstable, from_zeros_crossover_unstable,
     gcd_classical_unstable, gcd_half_unstable, gcd_half_with_base_case_unstable,
     interpolate_quadratic_unstable, is_irreducible_with_route_unstable,
     karatsuba_base_case_unstable, karatsuba_unstable, newton_crossover_unstable,
     newton_floor_unstable, newton_is_cheaper_at_unstable, newton_is_cheaper_unstable,
-    pow_mod_limbs_unstable, product_of_factors_unstable, subproduct_evaluate_unstable,
-    subproduct_interpolate_unstable, transform_tree_interpolate_unstable, tree_crossover_unstable,
-    DistinctDegreeRoute, FrobeniusRoute, IrreducibilityRoute, TransformKernel, TransformTree,
+    partial_bezout_classical_unstable, partial_bezout_half_unstable, pow_mod_limbs_unstable,
+    product_of_factors_unstable, subproduct_evaluate_unstable, subproduct_interpolate_unstable,
+    transform_tree_interpolate_unstable, tree_crossover_unstable, xgcd_classical_unstable,
+    xgcd_half_unstable, DistinctDegreeRoute, FrobeniusRoute, IrreducibilityRoute, TransformKernel,
+    TransformTree,
 };
 
 #[cfg(test)]
