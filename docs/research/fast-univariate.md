@@ -1910,7 +1910,9 @@ Two corrections to earlier text in this section. The `deg b > deg a` case was mi
 recursion — its truncation sizes itself off `deg a` — which `gcd` never reached because it swaps
 first; an exhaustive GF(2) test with base cases of 1–3 found it, and the recursion now takes the
 leading swap step itself. And `xgcd` and `partial_bezout` still run classical Euclid; the
-transition matrix carries their cofactors, so routing them is the next step, not new algorithm.
+transition matrix carries their cofactors, so routing them is the next step, not new algorithm —
+**done in #815**, above crossovers of 192–768 by width; the sweep is in
+`docs/research/certified-wiedemann.md` § Reconstruction through half-GCD.
 
 #### #850: the Goldilocks caller gap is not the dispatch
 

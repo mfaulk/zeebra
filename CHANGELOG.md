@@ -9,6 +9,9 @@ change to `y` may break the public API.
 
 ### Added
 
+- `berlekamp_massey`, the minimal recurrence of a sequence, and half-GCD routes for `xgcd` and
+  `partial_bezout` above measured per-width crossovers; Wiedemann reconstruction uses both (#815).
+
 - `MultiplicationOperator::column_entries`, a sparse view of one operator column, and the
   `sparse_matvec_throughput` example measuring CPU sparse matvec throughput per field, storage
   format, block width and thread count (#87).

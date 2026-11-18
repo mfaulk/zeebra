@@ -7,6 +7,8 @@
 //!
 //! The zero polynomial contains the single monomial '0'. Its degree is undefined.
 
+mod berlekamp_massey;
+pub use berlekamp_massey::berlekamp_massey;
 mod compose_mod;
 pub use compose_mod::{compose_mod, compose_mod_horner, ModularComposer};
 mod dense_polynomial;
@@ -64,7 +66,15 @@ pub use factorize::{
 };
 pub use gcd::{
     gcd, gcd_classical_unstable, gcd_half_unstable, gcd_half_with_base_case_unstable, lcm,
-    partial_bezout, xgcd,
+    partial_bezout, xgcd, Xgcd,
+};
+// Measurement and differential-testing hooks for `examples/gcd_crossover.rs`, not API.
+#[doc(hidden)]
+pub use berlekamp_massey::{berlekamp_massey_classical_unstable, berlekamp_massey_euclid_unstable};
+#[doc(hidden)]
+pub use gcd::{
+    partial_bezout_classical_unstable, partial_bezout_half_unstable, xgcd_classical_unstable,
+    xgcd_half_unstable,
 };
 pub use graeffe::{
     graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
