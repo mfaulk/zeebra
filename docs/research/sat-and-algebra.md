@@ -13,7 +13,8 @@ rests on.
 | 3. **Hybrid**: algebra before SAT, or SAT-style learning inside F4 | **Preprocessing: deferred**, with a measured trigger (§4). **Learning in F4: won't do** (§5) | affine elimination before kissat won on 13 of 15 instances (§4), but the hybrid belongs with whoever runs SAT, not in this crate; a zero reduction has no CDCL-style explanation, and the one it does have is a signature, which M31 already owns |
 
 **Measured at:** `e6b04c24` (§2 clause counts, §3 GF(2) replay) and `60c50d7a` (§4 preprocessing;
-the only change between the two is in `preprocess`'s reporting of an F4 refusal). Raw outputs, with
+the only change between the two is in `preprocess`'s reporting of an F4 refusal). Both are
+tagged (`measured/220-sat-replay`, `measured/220-sat-preprocess`) so they survive the squash merge. Raw outputs, with
 `uptime` before and after each run, are in [`research/sat-and-algebra/`](../../research/sat-and-algebra/).
 One shared 128-thread machine with other work on it (load average 2–4 on 128 hardware threads
 throughout), unpinned, `--release` (fat LTO, `target-cpu=x86-64-v3`). Timings are secondary here and
