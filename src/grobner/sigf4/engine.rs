@@ -21,7 +21,10 @@ use crate::{
         buchberger::{minimal_basis_for_interreduction, reduce_grobner_basis_until},
         f4::{
             certify_f4_output,
-            interreduce::{interreduce_by_matrix, MatrixInterreductionAborted},
+            interreduce::{
+                interreduce_by_matrix_with, MatrixInterreductionAborted,
+                MatrixInterreductionMethod, MatrixInterreductionReport,
+            },
             F4Error, F4Options,
         },
     },
@@ -174,8 +177,11 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     drop(engine);
 
     let interreduction = Instant::now();
-    let reduced = interreduce(basis, order, wall)?;
+    let (reduced, matrix) = interreduce(basis, order, wall)?;
     stats.interreduction = interreduction.elapsed();
+    stats.interreduction_columns = matrix.columns;
+    stats.interreduction_nonzeros = matrix.nonzeros;
+    stats.interreduction_peak_nonzeros = matrix.peak_nonzeros;
     stats.reduced_basis_elements = reduced.len();
 
     if options.certify {
@@ -190,11 +196,22 @@ pub(super) fn run<const N: usize, F: FiniteField>(
 
 /// The shipping F4's final stage: minimal basis, then matrix interreduction with the division
 /// route as fallback (`f4/mod.rs`), under F4's default limits.
+///
+/// Tails only (#879): each element's tail is swept against the matrix's unreduced rows, skipping
+/// the back-substitution among reducer multiples that the full echelon form performs and then
+/// discards. Its precondition — monic rows at distinct leads — holds for every closure of a
+/// minimal basis, so the reduced basis is the same. The fallback reports an empty matrix.
 fn interreduce<const N: usize, F: FiniteField>(
     basis: Vec<MultivariatePolynomial<N, F>>,
     order: MonomialOrder,
     wall: Option<(Instant, Duration)>,
-) -> Result<Vec<MultivariatePolynomial<N, F>>, SigF4Error> {
+) -> Result<
+    (
+        Vec<MultivariatePolynomial<N, F>>,
+        MatrixInterreductionReport,
+    ),
+    SigF4Error,
+> {
     let defaults = F4Options::default();
     let should_stop = || wall.is_some_and(|(clock, budget)| clock.elapsed() >= budget);
     let stopped = |elements_reduced, elements| {
@@ -207,17 +224,19 @@ fn interreduce<const N: usize, F: FiniteField>(
         })
     };
     let minimal = minimal_basis_for_interreduction(basis, order);
-    match interreduce_by_matrix(
+    match interreduce_by_matrix_with(
         minimal,
         order,
         defaults.max_matrix_rows,
         defaults.max_matrix_columns,
         defaults.live_entry_allowance::<F>(),
+        MatrixInterreductionMethod::TailsOnly,
         should_stop,
     ) {
-        Ok((reduced, _)) => Ok(reduced),
+        Ok(done) => Ok(done),
         Err(MatrixInterreductionAborted::Refused(_, minimal, _)) => {
             reduce_grobner_basis_until(minimal, order, should_stop)
+                .map(|reduced| (reduced, MatrixInterreductionReport::default()))
                 .map_err(|s| stopped(s.elements_reduced, s.elements))
         }
         Err(MatrixInterreductionAborted::Stopped(s)) => {
