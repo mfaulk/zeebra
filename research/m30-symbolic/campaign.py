@@ -19,6 +19,8 @@ TARGETS = costmodel.TARGETS + ('katsura11-m31',)
 # #861: the small tasks the plan's <=5% regression limit is read on. Not in TARGETS, so no earlier
 # suite's default plan changes; the `small` suite runs these unless --targets narrows them.
 SMALL_TARGETS = ('katsura6-m31', 'katsura7-m31', 'cyclic6-m31')
+# #861: mid-size controls for the gate, run at every worker count like the small tasks.
+MID_TARGETS = ('katsura8-m31', 'cyclic7-m31')
 WORKERS = costmodel.WORKERS
 SUITES = ('walls', 'stages', 'components', 'level', 'intern', 'live', 'scratch', 'small', 'gate')
 MERGES = ('serial', 'sharded')
@@ -77,7 +79,7 @@ def plan(suite, reps, targets=TARGETS):
         # small targets at every worker count, substantial ones at 1 and 16.
         live = ['--replay', 'live', '--min-seed-rows', str(MIN_SEED_ROWS)]
         arms = [(t, w, live + ['--merge', m, '--level-workers', str(w)], f'{m}{w}')
-                for t in targets for w in (WORKERS if t in SMALL_TARGETS else (1, 16))
+                for t in targets for w in (WORKERS if t in SMALL_TARGETS + MID_TARGETS else (1, 16))
                 for m in ('off', 'auto')]
     else:
         raise ValueError(suite)
@@ -97,9 +99,9 @@ def main():
     p.add_argument('--child-wall', type=float, default=600)
     p.add_argument('--targets')
     args = p.parse_args()
-    default = {'small': SMALL_TARGETS, 'gate': TARGETS + SMALL_TARGETS}.get(args.suite, TARGETS)
+    default = {'small': SMALL_TARGETS, 'gate': TARGETS + SMALL_TARGETS + MID_TARGETS}.get(args.suite, TARGETS)
     targets = tuple(args.targets.split(',')) if args.targets else default
-    unknown = set(targets) - set(TARGETS) - set(SMALL_TARGETS)
+    unknown = set(targets) - set(TARGETS) - set(SMALL_TARGETS) - set(MID_TARGETS)
     if unknown:
         p.error(f'unknown targets {sorted(unknown)}')
     with args.output.open('a') as out:

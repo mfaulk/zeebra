@@ -56,6 +56,9 @@ const TARGETS: &[&str] = &[
     "katsura6-m31",
     "katsura7-m31",
     "cyclic6-m31",
+    // #861: mid-size controls, between the small tasks and MQ10.
+    "katsura8-m31",
+    "cyclic7-m31",
 ];
 
 /// Counts every allocation the process makes; the replay reads the difference across one call.
@@ -799,6 +802,8 @@ fn main() {
         "katsura6-m31" => run::<6, Zp2147483647>(ladder("katsura-6", 2147483647), &args),
         "katsura7-m31" => run::<7, Zp2147483647>(ladder("katsura-7", 2147483647), &args),
         "cyclic6-m31" => run::<6, Zp2147483647>(ladder("cyclic-6", 2147483647), &args),
+        "katsura8-m31" => run::<8, Zp2147483647>(ladder("katsura-8", 2147483647), &args),
+        "cyclic7-m31" => run::<7, Zp2147483647>(ladder("cyclic-7", 2147483647), &args),
         _ => unreachable!("validated"),
     };
     println!("{}", report.to_json().replace('\n', ""));

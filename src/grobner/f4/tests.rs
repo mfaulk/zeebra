@@ -5036,7 +5036,8 @@ fn test_parallel_symbolic_configuration_selects_the_serial_fallback() {
     let config = configured(&with(ParallelSymbolic::Auto { max_workers: 16 })).unwrap();
     assert_eq!(config.workers, 16);
     assert_eq!(config.merge, Merge::Serial);
-    assert_eq!(config.min_frontier, ParallelSymbolic::MIN_FRONTIER);
+    // 512, not #860's 256: one 256-wide Katsura-7 step cost 1.18x at 16 workers (#861).
+    assert_eq!(config.min_frontier, 512);
     assert_eq!(config.retain, Retain::Batch);
     assert_eq!(
         ParallelSymbolic::Auto { max_workers: 0 }.workers(),
@@ -5056,7 +5057,8 @@ fn test_parallel_symbolic_f4_is_identical_to_serial_across_worker_counts() {
     use crate::grobner::f4::{symbolic::CacheMode, ParallelSymbolic};
     type G = Zp2147483647;
     let order = MonomialOrder::GradedReverseLexicographic;
-    for system in [katsura::<7, G>()] {
+    // Katsura-8 has steps past `ParallelSymbolic::MIN_FRONTIER`, so the team runs.
+    for system in [katsura::<8, G>()] {
         let serial = F4Options {
             parallel_symbolic: ParallelSymbolic::Serial,
             ..F4Options::default()

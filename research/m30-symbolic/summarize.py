@@ -349,7 +349,7 @@ def main():
             section(records, out)
     records = jsonl(d / 'gate.jsonl')
     if records:
-        small(records, out, 'auto', TARGETS + SMALL_TARGETS,
+        small(records, out, 'auto', TARGETS + SMALL_TARGETS + ('katsura8-m31', 'cyclic7-m31'),
               '## #861 acceptance: the shipped `ParallelSymbolic::Auto` (`auto`) against the serial closure\n')
     print('\n'.join(out))
 

@@ -282,8 +282,14 @@ pub enum ParallelSymbolic {
 }
 
 impl ParallelSymbolic {
-    /// The narrowest step a team scans (#827's measured best, kept by #860).
-    pub const MIN_FRONTIER: usize = 256;
+    /// The narrowest step a team scans.
+    ///
+    /// #860 started teams at 256 (#827's best on the substantial targets). Starting one costs
+    /// a run's first dispatch its spawn and a cold scratch, about 1.5 ms at 16 workers, which one
+    /// 256-wide Katsura-7 step turned into 1.18x process wall (#861). 512 leaves Katsura-7 with
+    /// no team and moves Eco-12 and Katsura-11 by under 1% and MQ10 by 3% against 256
+    /// (`docs/research/m30-parallel-interning.md` §11).
+    pub const MIN_FRONTIER: usize = 512;
 
     /// Slices per worker in a dispatched step, claimed dynamically (#860).
     pub const SLICES_PER_WORKER: usize = 4;
