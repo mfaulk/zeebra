@@ -9,6 +9,10 @@ change to `y` may break the public API.
 
 ### Added
 
+- `certify_f4_output_with_workers` and `ParallelForward::max_workers`. F4's `certify` option now
+  reduces against divisors prepared once and spreads the reductions over the call's workers, with
+  the serial report at every worker count; Eco-12 and MQ11 certify inside the 600 s budget (#887).
+
 - `berlekamp_massey`, the minimal recurrence of a sequence, and half-GCD routes for `xgcd` and
   `partial_bezout` above measured per-width crossovers; Wiedemann reconstruction uses both (#815).
 
