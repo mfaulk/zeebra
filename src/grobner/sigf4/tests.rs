@@ -6,7 +6,7 @@ use proptest::prelude::*;
 use super::{
     corpus::{correctness_constructions, Construction},
     sig_f4, sig_f4_reported,
-    signature::{Signature, SyzygySource, SyzygyStore},
+    signature::{mask, Signature, SyzygySource, SyzygyStore},
     SigF4Error, SigF4Options,
 };
 use crate::{
@@ -84,6 +84,111 @@ fn test_syzygy_store_is_minimal_and_attributes_sources() {
     );
     assert_eq!(store.covering(&Signature::new(monomial([4, 4]), 1)), None);
 }
+
+/// When two stored signatures cover a query, the earlier-inserted one names the source, also after
+/// a removal compacts the bucket.
+#[test]
+fn test_syzygy_store_attributes_the_earliest_covering_entry() {
+    let mut store = SyzygyStore::<3>::new(1);
+    assert!(store.insert(Signature::new(monomial([5, 0, 0]), 0), SyzygySource::Koszul));
+    assert!(store.insert(
+        Signature::new(monomial([0, 1, 0]), 0),
+        SyzygySource::ZeroRow
+    ));
+    assert!(store.insert(Signature::new(monomial([0, 0, 1]), 0), SyzygySource::Koszul));
+    // Removes the first entry, so the zero-row entry becomes the earliest.
+    assert!(store.insert(Signature::new(monomial([4, 0, 0]), 0), SyzygySource::Koszul));
+    assert_eq!(store.len(), 3);
+    let both = Signature::new(monomial([0, 1, 1]), 0);
+    assert_eq!(store.covering(&both), Some(SyzygySource::ZeroRow));
+    assert_eq!(
+        store.covering(&Signature::new(monomial([4, 0, 1]), 0)),
+        Some(SyzygySource::Koszul)
+    );
+}
+
+/// Across more entries than one filter word holds, covering still names the earliest entry, in
+/// the first word, a later word and the remainder.
+#[test]
+fn test_syzygy_store_finds_the_earliest_cover_past_one_word() {
+    let mut store = SyzygyStore::<2>::new(1);
+    for i in 0..20u32 {
+        let source = if i % 3 == 0 {
+            SyzygySource::ZeroRow
+        } else {
+            SyzygySource::Koszul
+        };
+        assert!(store.insert(Signature::new(monomial([i, 19 - i]), 0), source));
+    }
+    assert_eq!(store.len(), 20, "the entries are pairwise incomparable");
+    let cover = |a, b| store.covering(&Signature::new(monomial([a, b]), 0));
+    assert_eq!(cover(19, 19), Some(SyzygySource::ZeroRow), "entry 0");
+    assert_eq!(cover(19, 18), Some(SyzygySource::Koszul), "entry 1");
+    assert_eq!(cover(19, 10), Some(SyzygySource::ZeroRow), "entry 9");
+    assert_eq!(cover(19, 1), Some(SyzygySource::ZeroRow), "entry 18");
+    assert_eq!(cover(19, 0), Some(SyzygySource::Koszul), "entry 19");
+    assert_eq!(cover(8, 9), None);
+}
+
+/// The divisibility mask sets, per variable band, one bit per exponent level up to the band width.
+#[test]
+fn test_mask_matches_its_per_level_definition() {
+    fn reference<const N: usize>(m: &Monomial<N>) -> u64 {
+        let band = (64 / N.max(1)).max(1);
+        let mut mask = 0u64;
+        for (v, &e) in m.exponents().iter().enumerate() {
+            for k in 0..(e as usize).min(band) {
+                if v * band + k < 64 {
+                    mask |= 1 << (v * band + k);
+                }
+            }
+        }
+        mask
+    }
+    for e in 0..9u32 {
+        let twelve = monomial([e, 0, 1, 2, 3, 4, 5, 6, 7, 8, e, 9]);
+        assert_eq!(mask(&twelve), reference(&twelve));
+        let one = monomial([e * 9]);
+        assert_eq!(mask(&one), reference(&one));
+        let seventy = Monomial::<70>::new(&[e; 70]);
+        assert_eq!(mask(&seventy), reference(&seventy));
+    }
+}
+
+/// Pair and rejection counts by mechanism on Eco-7 and Katsura-7 stay at the values the M30
+/// engine produced, so bookkeeping changes cannot move which pairs are rejected or why.
+#[test]
+fn test_rejection_counts_by_mechanism_are_pinned() {
+    let counts = |s: &super::SigF4Statistics| {
+        [
+            s.pairs_created,
+            s.pairs_singular,
+            s.rejected_product,
+            s.rejected_koszul,
+            s.rejected_zero_row,
+            s.rejected_rewrite,
+            s.rejected_duplicate,
+            s.targets,
+            s.reducer_rows,
+            s.reductions_to_zero,
+            s.coefficient_products as usize,
+            s.signature_basis_elements,
+            s.syzygy_signatures,
+        ]
+    };
+    let eco = sig_f4_reported(&eco::<7, Goldilocks>(), GREVLEX, &SigF4Options::default()).1;
+    let katsura = sig_f4_reported(
+        &katsura::<7, Goldilocks>(),
+        GREVLEX,
+        &SigF4Options::default(),
+    )
+    .1;
+    assert_eq!(counts(&eco), ECO_7);
+    assert_eq!(counts(&katsura), KATSURA_7);
+}
+
+const ECO_7: [usize; 13] = [2192, 19, 807, 643, 486, 118, 52, 93, 528, 26, 31033, 67, 57];
+const KATSURA_7: [usize; 13] = [1270, 5, 507, 471, 149, 62, 25, 63, 427, 12, 79774, 51, 54];
 
 /// Katsura-4 agrees with the shipping F4 over GF(32003) and Goldilocks under both graded orders.
 #[test]

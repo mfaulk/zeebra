@@ -40,28 +40,24 @@ type Reduced<F> = (Vec<(u32, F)>, u64);
 /// A signed basis element: `(s(α), ᾱ)` with `ᾱ` monic, terms in descending order.
 struct Element<const N: usize, F> {
     sig: Signature<N>,
-    sig_mask: u64,
     lead: Monomial<N>,
     lead_mask: u64,
     terms: Vec<(Monomial<N>, F)>,
 }
 
-/// What a pending signature reduces: an input, or `mult·element` (the pair's larger half).
+/// What a pending signature reduces: an input, or `mult·element` (the pair's larger half), where
+/// `mult = sig / s(element)` and the smaller half is `(lcm / lm(other))·other`. Multipliers are
+/// recomputed when the batch reads them, which keeps a pending entry at a third of its size.
 #[derive(Clone, Copy)]
-enum Source<const N: usize> {
-    Input(usize),
-    Pair {
-        mult: Monomial<N>,
-        element: u32,
-        other_mult: Monomial<N>,
-        other: u32,
-    },
+enum Source {
+    Input(u32),
+    Pair { element: u32, other: u32 },
 }
 
 #[derive(Clone, Copy)]
 struct Pending<const N: usize> {
     sig: Signature<N>,
-    source: Source<N>,
+    source: Source,
 }
 
 /// One row of a batch matrix: `mult · source` with signature `sig`.
@@ -82,7 +78,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     options: &'a SigF4Options,
     inputs: Vec<Vec<(Monomial<N>, F)>>,
     basis: Vec<Element<N, F>>,
-    by_index: Vec<Vec<u32>>,
+    /// Per signature index, the elements in insertion order with their signature masks.
+    by_index: Vec<Vec<(u64, u32)>>,
     syzygies: SyzygyStore<N>,
     queue: BTreeMap<u64, Vec<Pending<N>>>,
     pending: usize,
@@ -134,7 +131,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         let sig = Signature::new(engine.inputs[i][0].0, i as u32);
         engine.push(Pending {
             sig,
-            source: Source::Input(i),
+            source: Source::Input(i as u32),
         });
     }
 
@@ -295,9 +292,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     fn rewriter(&self, t: &Signature<N>) -> u32 {
         let m = mask(&t.mono);
         let mut best = NONE;
-        for &id in &self.by_index[t.index as usize] {
-            let e = &self.basis[id as usize];
-            if e.sig_mask & !m != 0 || !divides(&e.sig.mono, &t.mono) {
+        for &(sig_mask, id) in &self.by_index[t.index as usize] {
+            if sig_mask & !m != 0 || !divides(&self.basis[id as usize].sig.mono, &t.mono) {
                 continue;
             }
             if best == NONE || self.ratio_cmp(id, best) != Ordering::Less {
@@ -358,7 +354,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 continue;
             }
             if let Some(i) = group.iter().find_map(|p| match p.source {
-                Source::Input(i) => Some(i),
+                Source::Input(i) => Some(i as usize),
                 Source::Pair { .. } => None,
             }) {
                 self.stats.rejected_duplicate += group.len() - 1;
@@ -372,17 +368,15 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             let rewriter = self.rewriter(&t);
             let mut kept = None;
             for p in group {
-                let Source::Pair {
-                    mult,
-                    element,
-                    other_mult,
-                    other,
-                } = p.source
-                else {
+                let Source::Pair { element, other } = p.source else {
                     continue;
                 };
                 let passes = element == rewriter && {
-                    let other_sig = self.basis[other as usize].sig.times(&other_mult);
+                    let (e, o) = (&self.basis[element as usize], &self.basis[other as usize]);
+                    let other_mult = Monomial::lcm(&e.lead, &o.lead)
+                        .checked_div(&o.lead)
+                        .expect("lcm");
+                    let other_sig = o.sig.times(&other_mult);
                     self.rewriter(&other_sig) == other
                 };
                 if !passes {
@@ -390,10 +384,14 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 } else if kept.is_some() {
                     self.stats.rejected_duplicate += 1;
                 } else {
-                    kept = Some((mult, element));
+                    kept = Some(element);
                 }
             }
-            if let Some((mult, element)) = kept {
+            if let Some(element) = kept {
+                let mult = t
+                    .mono
+                    .checked_div(&self.basis[element as usize].sig.mono)
+                    .expect("the element's signature divides the pair's");
                 targets.push(Row {
                     sig: t,
                     mult,
@@ -655,32 +653,26 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                     self.stats.pairs_singular += 1;
                     continue;
                 }
-                Ordering::Greater => (su, u, id, v, g as u32),
-                Ordering::Less => (sv, v, g as u32, u, id),
+                Ordering::Greater => (su, id, g as u32),
+                Ordering::Less => (sv, g as u32, id),
             };
             self.stats.pairs_created += 1;
             if gcd_is_one(&lead, &g_lead) {
                 self.stats.rejected_product += 1;
                 continue;
             }
-            let (t, mult, element, other_mult, other) = source;
+            let (t, element, other) = source;
             if self.reject_by_syzygy(&t) {
                 continue;
             }
             self.push(Pending {
                 sig: t,
-                source: Source::Pair {
-                    mult,
-                    element,
-                    other_mult,
-                    other,
-                },
+                source: Source::Pair { element, other },
             });
         }
-        self.by_index[sig.index as usize].push(id);
+        self.by_index[sig.index as usize].push((mask(&sig.mono), id));
         self.basis.push(Element {
             sig,
-            sig_mask: mask(&sig.mono),
             lead,
             lead_mask: mask(&lead),
             terms,

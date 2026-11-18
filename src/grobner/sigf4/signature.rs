@@ -48,15 +48,24 @@ pub fn divides<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
 /// from the input, and at `N = 12` the wider band keeps five exponent levels per variable.
 pub fn mask<const N: usize>(m: &Monomial<N>) -> u64 {
     let band = (64 / N.max(1)).max(1);
+    let full = if band >= 64 {
+        u64::MAX
+    } else {
+        (1u64 << band) - 1
+    };
     let mut mask = 0u64;
     for (v, &e) in m.exponents().iter().enumerate().take(64) {
-        let levels = (e as usize).min(band);
-        for k in 0..levels {
-            let bit = v * band + k;
-            if bit < 64 {
-                mask |= 1 << bit;
-            }
+        let shift = v * band;
+        if shift >= 64 {
+            break;
         }
+        let levels = (e as usize).min(band);
+        let bits = if levels >= 64 {
+            full
+        } else {
+            (1u64 << levels) - 1
+        };
+        mask |= bits << shift;
     }
     mask
 }
@@ -70,24 +79,68 @@ pub enum SyzygySource {
     ZeroRow,
 }
 
-#[derive(Clone, Debug)]
-struct Entry<const N: usize> {
-    mono: Monomial<N>,
-    mask: u64,
-    source: SyzygySource,
+/// One index's minimal syzygy signatures in insertion order, masks apart from monomials so the
+/// filter scans eight bytes per entry rather than the whole entry.
+#[derive(Clone, Debug, Default)]
+struct Bucket<const N: usize> {
+    masks: Vec<u64>,
+    monos: Vec<Monomial<N>>,
+    sources: Vec<SyzygySource>,
+}
+
+impl<const N: usize> Bucket<N> {
+    /// The first entry, in insertion order, dividing `mono` (whose mask is `m`).
+    fn first_dividing(&self, mono: &Monomial<N>, m: u64) -> Option<usize> {
+        first_hit(
+            &self.masks,
+            |e| e & !m == 0,
+            |k| divides(&self.monos[k], mono),
+        )
+    }
+}
+
+/// The first `k` in order with `filter(masks[k])` and `confirm(k)`. The filter is evaluated
+/// eight masks at a time into a hit word, which the compiler vectorizes; only hits are confirmed.
+fn first_hit(
+    masks: &[u64],
+    filter: impl Fn(u64) -> bool,
+    mut confirm: impl FnMut(usize) -> bool,
+) -> Option<usize> {
+    const LANES: usize = 8;
+    let (chunks, remainder) = masks.as_chunks::<LANES>();
+    let mut base = 0;
+    for chunk in chunks {
+        let mut hits = 0u32;
+        for (j, &e) in chunk.iter().enumerate() {
+            hits |= u32::from(filter(e)) << j;
+        }
+        while hits != 0 {
+            let k = base + hits.trailing_zeros() as usize;
+            if confirm(k) {
+                return Some(k);
+            }
+            hits &= hits - 1;
+        }
+        base += LANES;
+    }
+    remainder
+        .iter()
+        .enumerate()
+        .find(|&(j, &e)| filter(e) && confirm(base + j))
+        .map(|(j, _)| base + j)
 }
 
 /// Minimal generators of the known syzygy signatures, bucketed by index.
 #[derive(Clone, Debug)]
 pub struct SyzygyStore<const N: usize> {
-    buckets: Vec<Vec<Entry<N>>>,
+    buckets: Vec<Bucket<N>>,
     len: usize,
 }
 
 impl<const N: usize> SyzygyStore<N> {
     pub fn new(indices: usize) -> Self {
         Self {
-            buckets: vec![Vec::new(); indices],
+            buckets: vec![Bucket::default(); indices],
             len: 0,
         }
     }
@@ -100,30 +153,51 @@ impl<const N: usize> SyzygyStore<N> {
         self.len == 0
     }
 
-    /// The source of a stored signature dividing `t`, if any.
+    /// The source of the earliest-inserted stored signature dividing `t`, if any. Earliest, so
+    /// the rejection counts by mechanism do not depend on the store's layout.
     pub fn covering(&self, t: &Signature<N>) -> Option<SyzygySource> {
-        let m = mask(&t.mono);
-        self.buckets[t.index as usize]
-            .iter()
-            .find(|e| e.mask & !m == 0 && divides(&e.mono, &t.mono))
-            .map(|e| e.source)
+        self.covering_masked(t, mask(&t.mono))
+    }
+
+    fn covering_masked(&self, t: &Signature<N>, m: u64) -> Option<SyzygySource> {
+        let bucket = &self.buckets[t.index as usize];
+        bucket.first_dividing(&t.mono, m).map(|k| bucket.sources[k])
     }
 
     /// Insert `s` unless it is already covered; drops entries `s` divides. True if kept.
     pub fn insert(&mut self, s: Signature<N>, source: SyzygySource) -> bool {
-        if self.covering(&s).is_some() {
+        let m = mask(&s.mono);
+        if self.covering_masked(&s, m).is_some() {
             return false;
         }
-        let m = mask(&s.mono);
         let bucket = &mut self.buckets[s.index as usize];
-        let before = bucket.len();
-        bucket.retain(|e| !(m & !e.mask == 0 && divides(&s.mono, &e.mono)));
-        self.len -= before - bucket.len();
-        bucket.push(Entry {
-            mono: s.mono,
-            mask: m,
-            source,
-        });
+        let before = bucket.masks.len();
+        let dropped = |bucket: &Bucket<N>, k: usize| {
+            m & !bucket.masks[k] == 0 && divides(&s.mono, &bucket.monos[k])
+        };
+        let first = first_hit(
+            &bucket.masks,
+            |e| m & !e == 0,
+            |k| divides(&s.mono, &bucket.monos[k]),
+        );
+        if let Some(first) = first {
+            let mut kept = first;
+            for k in first + 1..before {
+                if !dropped(bucket, k) {
+                    bucket.masks.swap(kept, k);
+                    bucket.monos.swap(kept, k);
+                    bucket.sources.swap(kept, k);
+                    kept += 1;
+                }
+            }
+            bucket.masks.truncate(kept);
+            bucket.monos.truncate(kept);
+            bucket.sources.truncate(kept);
+            self.len -= before - kept;
+        }
+        bucket.masks.push(m);
+        bucket.monos.push(s.mono);
+        bucket.sources.push(source);
         self.len += 1;
         true
     }
