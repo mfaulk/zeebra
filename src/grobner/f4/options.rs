@@ -255,6 +255,65 @@ impl ParallelForward {
     }
 }
 
+/// Whether symbolic preprocessing may intern a batch's monomials on worker threads (#861).
+///
+/// The closure runs as breadth-first steps. A step at least
+/// [`ParallelSymbolic::min_frontier`] monomials wide is scanned by a worker team in slices and
+/// merged on the caller in slice order, which is the serial closure's first-occurrence order, so
+/// rows, columns, handles and counters are the serial closure's exactly, at every worker count and
+/// under any scheduling. Narrower steps run on the caller alone, and a batch with no wide step
+/// never starts a thread. The team's scratch is allocated by the caller, charged to the live-entry
+/// budget, and checked against [`F4Options::max_wall_time`] and an observer's stop at every step
+/// boundary. Batches under a reducer cache, and fields that cannot be shared across threads, take
+/// the serial closure.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ParallelSymbolic {
+    /// The serial closure for every batch.
+    #[default]
+    Serial,
+
+    /// A team of up to `max_workers` threads, the caller included, for each batch with a step at
+    /// least [`ParallelSymbolic::min_frontier`] wide; zero means the available parallelism. One
+    /// worker is the serial closure.
+    Auto {
+        /// Threads in one batch's team.
+        max_workers: usize,
+    },
+}
+
+impl ParallelSymbolic {
+    /// The narrowest step any team scans; see [`Self::min_frontier`].
+    pub const MIN_FRONTIER: usize = 512;
+
+    /// Step width a team needs per worker, above [`Self::MIN_FRONTIER`]; see
+    /// [`Self::min_frontier`].
+    pub const FRONTIER_PER_WORKER: usize = 48;
+
+    /// The narrowest step a team of `workers` scans: `max(512, 48 * workers)`.
+    ///
+    /// #860 started teams at 256 (#827's best on the substantial targets). Starting one costs a
+    /// spawn and a cold scratch, which grow with the team: one 256-wide Katsura-7 step cost
+    /// 1.18x process wall at 16 workers, and a 512-wide Katsura-8 step 1.06x (#861). A team of
+    /// 16 therefore starts at 768, smaller teams at 512, which leaves both with no team and costs
+    /// Eco-12, MQ10 and Katsura-11 1–3% of the stage's saving against 256
+    /// (`docs/research/m30-parallel-interning.md` §11).
+    pub fn min_frontier(workers: usize) -> usize {
+        Self::MIN_FRONTIER.max(Self::FRONTIER_PER_WORKER.saturating_mul(workers))
+    }
+
+    /// Slices per worker in a dispatched step, claimed dynamically (#860).
+    pub const SLICES_PER_WORKER: usize = 4;
+
+    /// Threads one batch's team may use; one means the serial closure.
+    pub fn workers(self) -> usize {
+        match self {
+            Self::Serial => 1,
+            Self::Auto { max_workers: 0 } => available_parallelism(),
+            Self::Auto { max_workers } => max_workers,
+        }
+    }
+}
+
 /// The order a structured batch's elimination does its passes in (#816).
 ///
 /// Both orders produce the same candidate rows, coefficient for coefficient, when batch rows are
@@ -808,6 +867,12 @@ pub struct F4Options {
     /// [`PairMultiples::Distinct`] at [`recommended`](Self::recommended);
     /// [`PairMultiples::Every`] at [`baseline`](Self::baseline).
     pub pair_multiples: PairMultiples,
+
+    /// Whether symbolic preprocessing interns on worker threads. See [`ParallelSymbolic`].
+    ///
+    /// `Auto { max_workers: 16 }` at [`recommended`](Self::recommended);
+    /// [`ParallelSymbolic::Serial`] at [`baseline`](Self::baseline).
+    pub parallel_symbolic: ParallelSymbolic,
 }
 
 impl F4Options {
@@ -845,6 +910,7 @@ impl F4Options {
             parallel_forward: ParallelForward::Serial,
             batch_order: BatchOrder::Forward,
             pair_multiples: PairMultiples::Every,
+            parallel_symbolic: ParallelSymbolic::Serial,
         }
     }
 
@@ -896,6 +962,9 @@ impl F4Options {
             // because 62 workers cost 1.35x RSS for a further 12%.
             parallel_forward: ParallelForward::Auto { max_workers: 16 },
             pair_multiples: PairMultiples::Distinct,
+            // #861: 0.74-0.81x complete F4 at 16 workers on Eco-12, MQ11, MQ10 and Katsura-11,
+            // small tasks and one worker within noise, peak RSS within 1.08x, bases identical.
+            parallel_symbolic: ParallelSymbolic::Auto { max_workers: 16 },
             ..Self::baseline()
         }
     }

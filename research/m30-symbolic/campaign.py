@@ -16,8 +16,13 @@ costmodel = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(costmodel)
 
 TARGETS = costmodel.TARGETS + ('katsura11-m31',)
+# #861: the small tasks the plan's <=5% regression limit is read on. Not in TARGETS, so no earlier
+# suite's default plan changes; the `small` suite runs these unless --targets narrows them.
+SMALL_TARGETS = ('katsura6-m31', 'katsura7-m31', 'cyclic6-m31')
+# #861: mid-size controls for the gate, run at every worker count like the small tasks.
+MID_TARGETS = ('katsura8-m31', 'cyclic7-m31')
 WORKERS = costmodel.WORKERS
-SUITES = ('walls', 'stages', 'components', 'level', 'intern', 'live', 'scratch')
+SUITES = ('walls', 'stages', 'components', 'level', 'intern', 'live', 'scratch', 'small', 'gate')
 MERGES = ('serial', 'sharded')
 # #860: 0 = the team starts lazily at the first wide level. The first intern campaign (retained as
 # intern-seed512) used 512, which sent 17 of 23 Eco-12 batches down the serial path: pair count does
@@ -64,6 +69,18 @@ def plan(suite, reps, targets=TARGETS):
                                            '--retain', 'batch'], f'serial{w}'))
             arms.append((t, 16, live + ['--merge', 'serial', '--level-workers', '16',
                                         '--retain', 'run'], 'serialrun16'))
+    elif suite == 'small':
+        # #861 precondition: shipping and the serial merge, paired at every worker count.
+        live = ['--replay', 'live', '--min-seed-rows', str(MIN_SEED_ROWS)]
+        arms = [(t, w, live + ['--merge', m, '--level-workers', str(w)], f'{m}{w}')
+                for t in targets for w in WORKERS for m in ('off', 'serial')]
+    elif suite == 'gate':
+        # #861 acceptance: the shipped option (`--merge auto`) against the serial closure (`off`),
+        # small targets at every worker count, substantial ones at 1 and 16.
+        live = ['--replay', 'live', '--min-seed-rows', str(MIN_SEED_ROWS)]
+        arms = [(t, w, live + ['--merge', m, '--level-workers', str(w)], f'{m}{w}')
+                for t in targets for w in (WORKERS if t in SMALL_TARGETS + MID_TARGETS else (1, 16))
+                for m in ('off', 'auto')]
     else:
         raise ValueError(suite)
     out = []
@@ -80,10 +97,11 @@ def main():
     p.add_argument('--reps', type=int, default=5)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--child-wall', type=float, default=600)
-    p.add_argument('--targets', default=','.join(TARGETS))
+    p.add_argument('--targets')
     args = p.parse_args()
-    targets = tuple(args.targets.split(','))
-    unknown = set(targets) - set(TARGETS)
+    default = {'small': SMALL_TARGETS, 'gate': TARGETS + SMALL_TARGETS + MID_TARGETS}.get(args.suite, TARGETS)
+    targets = tuple(args.targets.split(',')) if args.targets else default
+    unknown = set(targets) - set(TARGETS) - set(SMALL_TARGETS) - set(MID_TARGETS)
     if unknown:
         p.error(f'unknown targets {sorted(unknown)}')
     with args.output.open('a') as out:

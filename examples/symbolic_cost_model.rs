@@ -37,7 +37,7 @@ use zeebra::{
             BatchObserver,
         },
         pairs::CriticalPair,
-        F4Options, PairMultiples, ParallelForward,
+        F4Options, PairMultiples, ParallelForward, ParallelSymbolic,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, Monomial, MonomialMap, MonomialOrder, MultivariatePolynomial,
@@ -52,6 +52,13 @@ const TARGETS: &[&str] = &[
     "eco12-wide64",
     "mq11-goldilocks",
     "katsura11-m31",
+    // #861: the small tasks the <=5% regression limit is read on.
+    "katsura6-m31",
+    "katsura7-m31",
+    "cyclic6-m31",
+    // #861: mid-size controls, between the small tasks and MQ10.
+    "katsura8-m31",
+    "cyclic7-m31",
 ];
 
 /// Counts every allocation the process makes; the replay reads the difference across one call.
@@ -100,6 +107,8 @@ struct Args {
     min_seed_rows: usize,
     retain: Retain,
     stages: bool,
+    /// #861: `--merge auto`, the shipped `F4Options::parallel_symbolic` with `--level-workers`.
+    auto: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -114,6 +123,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         min_seed_rows: 0,
         retain: Retain::Batch,
         stages: false,
+        auto: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -132,8 +142,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                 parsed.min_frontier = value()?.parse().map_err(|_| "--min-frontier: integer")?
             }
             "--merge" => {
-                parsed.merge = match value()?.as_str() {
-                    "off" => None,
+                let merge = value()?;
+                parsed.auto = merge == "auto";
+                parsed.merge = match merge.as_str() {
+                    "off" | "auto" => None,
                     "serial" => Some(Merge::Serial),
                     "sharded" => Some(Merge::Sharded),
                     other => return Err(format!("unknown merge {other}")),
@@ -646,6 +658,13 @@ fn run<const N: usize, F: FiniteField + Sync>(input: Input, args: &Args) -> Json
         .collect();
     let options = F4Options {
         measure_stages: args.stages,
+        parallel_symbolic: if args.auto {
+            ParallelSymbolic::Auto {
+                max_workers: args.level_workers,
+            }
+        } else {
+            ParallelSymbolic::Serial
+        },
         ..options(args.workers)
     };
     let intern = args.merge.map(|merge| InternConfig {
@@ -734,7 +753,9 @@ fn live<const N: usize, F: FiniteField + Sync>(
             "merge",
             Json::string(
                 args.merge
-                    .map_or("off".into(), |m| format!("{m:?}").to_lowercase()),
+                    .map_or(if args.auto { "auto" } else { "off" }.into(), |m| {
+                        format!("{m:?}").to_lowercase()
+                    }),
             ),
         ),
         ("level_workers", Json::size(args.level_workers)),
@@ -778,6 +799,11 @@ fn main() {
         "eco12-wide64" => run::<12, Wide>(wide("wide64", "eco-12"), &args),
         "mq11-goldilocks" => run::<11, Goldilocks>(wide("goldilocks", "mq-random-11"), &args),
         "katsura11-m31" => run::<11, Zp2147483647>(ladder("katsura-11", 2147483647), &args),
+        "katsura6-m31" => run::<6, Zp2147483647>(ladder("katsura-6", 2147483647), &args),
+        "katsura7-m31" => run::<7, Zp2147483647>(ladder("katsura-7", 2147483647), &args),
+        "cyclic6-m31" => run::<6, Zp2147483647>(ladder("cyclic-6", 2147483647), &args),
+        "katsura8-m31" => run::<8, Zp2147483647>(ladder("katsura-8", 2147483647), &args),
+        "cyclic7-m31" => run::<7, Zp2147483647>(ladder("cyclic-7", 2147483647), &args),
         _ => unreachable!("validated"),
     };
     println!("{}", report.to_json().replace('\n', ""));
@@ -827,6 +853,8 @@ mod tests {
         let sharded = with(&["--replay", "intern", "--merge", "sharded", "--slices", "8"]).unwrap();
         assert_eq!((sharded.merge, sharded.slices), (Some(Merge::Sharded), 8));
         assert!(with(&["--replay", "intern", "--merge", "off"]).is_err());
+        let auto = with(&["--replay", "live", "--merge", "auto"]).unwrap();
+        assert_eq!((auto.merge, auto.auto), (None, true));
         assert!(with(&["--merge", "parallel"]).is_err());
     }
 
