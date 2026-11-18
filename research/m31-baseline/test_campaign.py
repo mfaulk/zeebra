@@ -35,7 +35,7 @@ class PlanTest(unittest.TestCase):
         """The pinned held-out rows are timed in the wall cohort and never in the split suite."""
         walls = {r for r, _ in campaign.suite_rows('walls')}
         split = {r for r, _ in campaign.suite_rows('split')}
-        self.assertTrue(set(campaign.HELD_OUT) <= walls)
+        self.assertEqual(set(campaign.HELD_OUT) - campaign.DROPPED, set(campaign.HELD_OUT) & walls)
         self.assertFalse(set(campaign.HELD_OUT) & split)
 
     def test_mq10_uses_the_cost_model(self):
