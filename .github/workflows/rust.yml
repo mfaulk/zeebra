@@ -276,13 +276,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Check formatting
-        run: cargo fmt --all --check
+        run: scripts/ci-lint.sh fmt
 
       # `!cancelled()` rather than the default: formatting and linting are independent, and a
       # misplaced brace should not hide every clippy finding behind a second round trip.
       - name: Lint
         if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: scripts/ci-lint.sh clippy
 
       # The crate as a consumer gets it with `default-features = false`. Every other job builds
       # the default, which is how `f4::matrix_corpus` came to import from the feature-gated
@@ -290,30 +290,24 @@ jobs:
       # Targets that drive the harness declare `required-features` and are skipped here.
       - name: Lint without default features
         if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
-        run: cargo clippy --all-targets --no-default-features -- -D warnings
+        run: scripts/ci-lint.sh clippy-no-default
 
       # proptest and its 17 transitive crates belong behind the `proptest` feature (#676). A
       # stray un-gated `use proptest` would fail the lint above. A dependency entry that loses its
       # `optional = true` would not, so this step checks the graph a default consumer gets.
       - name: proptest stays out of the default dependency graph
         if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
-        run: |
-          if cargo tree --locked -e normal --prefix none | grep -q '^proptest '; then
-            echo "proptest is a normal dependency of a default build; gate it behind the feature" >&2
-            exit 1
-          fi
+        run: scripts/ci-lint.sh proptest-graph
 
       # docs.rs renders these pages for every published version, so a broken intra-doc link is a
       # dead link in the published docs. All features, matching `package.metadata.docs.rs`.
       - name: Rustdoc
         if: ${{ !cancelled() }}
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps --all-features --locked
+        run: scripts/ci-lint.sh rustdoc
 
       - name: Package
         if: ${{ !cancelled() && needs.changes.outputs.rust == 'true' }}
-        run: cargo package --locked
+        run: scripts/ci-lint.sh package
 
   # `rust-version` in Cargo.toml is a promise to consumers; this is what keeps it true. Library
   # only: dev-dependencies and benches may use a newer toolchain without breaking a consumer.
@@ -344,7 +338,7 @@ jobs:
         run: |
           shellcheck -S warning \
             scripts/agent/*.sh scripts/agent/test/*.sh \
-            scripts/fetch-eprint scripts/test/*.sh \
+            scripts/fetch-eprint scripts/test/*.sh scripts/ci-lint.sh .githooks/pre-push \
             tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 
       # `!cancelled()` for the same reason as the lint job: a shellcheck finding should not hide
@@ -354,6 +348,7 @@ jobs:
         run: |
           bash scripts/agent/test/zb-claim-test.sh
           bash scripts/test/fetch-eprint-test.sh
+          bash scripts/test/pre-push-test.sh
           bash tools/test/rss-guard-test.sh
           bash tools/test/merge-base-age-test.sh
           bash tools/test/benchlock-test.sh

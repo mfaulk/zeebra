@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Runs the cheap half of CI's "Format and lint" job (fmt, rustdoc) when the pushed commits can
+# affect it, judged by their diff against origin/main. Clippy is left to the agent and to CI: it
+# is too heavy for every push across concurrent agents. Bypass with `git push --no-verify`.
+#
+# The checks run on the working tree, not the pushed commits; push from a clean tree.
+#
+# `--classify` reads NUL-separated paths on stdin and prints the decision; it is the tested half.
+set -euo pipefail
+
+classify() {
+    local fmt=false rustdoc=false path=
+    while IFS= read -r -d '' path; do
+        case "$path" in
+            *.rs) fmt=true; rustdoc=true ;;
+            rustfmt.toml|.rustfmt.toml) fmt=true ;;
+            # Everything rustdoc compiles or includes: lib.rs pulls in README.md and the guides.
+            Cargo.toml|Cargo.lock|.cargo/*|rust-toolchain*|src/*|README.md|docs/guide/*.md)
+                rustdoc=true ;;
+        esac
+    done
+    # Truncated input is not evidence that nothing relevant changed.
+    if [[ -n "$path" ]]; then
+        fmt=true
+        rustdoc=true
+    fi
+    printf 'fmt=%s\nrustdoc=%s\n' "$fmt" "$rustdoc"
+}
+
+if [[ "${1:-}" == --classify ]]; then
+    classify
+    exit 0
+fi
+
+root="$(git rev-parse --show-toplevel)"
+
+# pre-push stdin: <local ref> <local sha> <remote ref> <remote sha>, one line per ref.
+pushed_paths() {
+    local local_sha base
+    while read -r _ local_sha _ _; do
+        [[ "$local_sha" =~ ^0+$ ]] && continue   # branch deletion
+        if base="$(git merge-base origin/main "$local_sha" 2>/dev/null)"; then
+            git diff --no-renames --name-only -z "$base" "$local_sha"
+        else
+            # No origin/main to compare with: fail closed to running the checks.
+            printf 'unknown-base.rs\0'
+        fi
+    done
+}
+
+decision="$(pushed_paths | classify)"
+steps=()
+[[ "$decision" == *fmt=true* ]] && steps+=(fmt)
+[[ "$decision" == *rustdoc=true* ]] && steps+=(rustdoc)
+
+if [[ ${#steps[@]} -eq 0 ]]; then
+    exit 0
+fi
+echo "pre-push: running ${steps[*]} (skip with --no-verify)" >&2
+exec bash "$root/scripts/ci-lint.sh" "${steps[@]}"
