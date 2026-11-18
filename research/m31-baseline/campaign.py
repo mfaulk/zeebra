@@ -52,7 +52,7 @@ def suite_rows(suite):
     if suite == 'split':
         return [(r, SIG_ARMS) for r in SPLIT_ROWS]
     if suite == 'probe':
-        return [('wide64/eco-14', ['f4:16', 'sigf4:1'])]
+        return [('wide64/eco-14', ['f4:16', 'sigf4:1', 'f4:1'])]
     raise ValueError(suite)
 
 
