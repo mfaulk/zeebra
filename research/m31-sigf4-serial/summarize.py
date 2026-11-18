@@ -39,10 +39,19 @@ def complete(record):
     return record['returncode'] == 0 and report.get('status') == 'complete'
 
 
+def untimed(value):
+    """Drops every `*_ns` clock, at any depth: #901's `split` nests per-batch clocks beside
+    per-batch counts, and the counts are algebra."""
+    if isinstance(value, dict):
+        return {k: untimed(v) for k, v in value.items()
+                if not k.endswith('_ns') and k not in INSTRUMENT}
+    if isinstance(value, list):
+        return [untimed(v) for v in value]
+    return value
+
+
 def algebra(report):
-    stats = {k: v for k, v in report['statistics'].items()
-             if not k.endswith('_ns') and k not in INSTRUMENT}
-    return json.dumps(stats, sort_keys=True), report.get('basis_sha256')
+    return json.dumps(untimed(report['statistics']), sort_keys=True), report.get('basis_sha256')
 
 
 def main():

@@ -384,6 +384,11 @@ improve Eco-12 complete design-1 wall by ≥ 3% with the interval excluding 1.0,
 corpus row beyond 1.05 upper bound, is recorded and not merged. Signature-basis outgrowth (§4.3
 item 5) is in scope only as measurement, unless a provenance-preserving reduction is found.
 
+A **fourth** change, reducing per-batch setup in the signature engine (#901 measured 0.484 s of
+Eco-12 design-1 elimination there, serial in both designs), was authorized by the owner on #900,
+under the same line and session cap and the same gate. Its outcome is recorded in
+[`research/m31-sigf4-serial.md`](research/m31-sigf4-serial.md) §5.2.
+
 ### 7.5 M31-S4 — adaptive dispatch and opt-in production qualification (#905, conditional)
 
 **Blocked** until the combined S2 + S3 engine, measured on #904/#903's final commits, meets Target
