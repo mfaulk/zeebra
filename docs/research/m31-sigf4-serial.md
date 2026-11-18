@@ -1,13 +1,16 @@
 # M31-S3: signature-F4 serial overhead — results (#903)
 
 **Status:** measured, 2026-11-18. All three changes pass §7.4's bar and merge in order (#911, #913,
-#914); on Eco-12 the stack takes design 1 from 3,594 to 2,481 ms (0.693×) with identical algebra on every row.
-**Measured at:** `acbaf12c` (the #901 freeze, parent of change 1), `f903e087` (change 1,
-interreduction), `56fe5fea` (change 2, bookkeeping) and `f9f8a18c` (change 3, symbolic), each built
-from a `git archive` of that commit; binary SHA-256s in
+#914); on Eco-12 the stack takes design 1 from 3,594 to 2,481 ms (0.693×) with identical algebra on
+every row. Re-measured on #901's merged parent (§5.1): 0.675×. The authorized fourth change
+(setup) was not built: change 3 already left 45 ms of setup, below the gate's 3% (§5.2).
+**Measured at:** §3: `acbaf12c` (the #901 freeze, parent of change 1), `f903e087` (change 1,
+interreduction), `56fe5fea` (change 2, bookkeeping) and `f9f8a18c` (change 3, symbolic). §5.1:
+`fb4348a9` (#901 merged, the new parent), `f7f2f7eb`, `dda25ffd` and `2d71c051` (the three changes
+rebased onto it). Each built from a `git archive` of that commit; binary SHA-256s in
 [`research/m31-sigf4-serial/binaries.sha256`](../../research/m31-sigf4-serial/binaries.sha256).
-The measured commits are tagged `measured/903-interreduce`, `measured/903-bookkeeping` and
-`measured/903-symbolic`.
+The measured commits are tagged `measured/903-interreduce`, `measured/903-bookkeeping`,
+`measured/903-symbolic` (§3) and `measured/903-rebased-{interreduce,bookkeeping,symbolic}` (§5.1).
 **Plan:** [`MILESTONE-COMPETITIVE-SIGNATURE-F4.md`](../MILESTONE-COMPETITIVE-SIGNATURE-F4.md) §4.1
 H3, §6.3, §7.4, §8.5, §10.
 
@@ -177,6 +180,42 @@ Signature-basis outgrowth (§4.3 item 5) was measured only: Eco-12 still builds 
 elements for 743 reduced ones and Cyclic-7 3,083 for 209 (identical counts in every arm, as the
 algebra check requires). No provenance-preserving reduction was attempted.
 
-## 5. Stage table for Gate A
+## 5. Stage table for Gate A, and the fourth change
 
-Re-measured on `main` once #914 merges, and posted on #904.
+### 5.1 The stack on #901's parent
+
+#901 merged while this ran (`fb4348a9`). Its only engine change is the `research-sigf4-split`
+clocks, so the three changes were rebased onto it unchanged and all four arms rebuilt from it with
+that feature on, which adds #901's per-batch **setup** clock (row construction at the head of
+elimination; included in the elimination column, not beside it). Same placement and protocol,
+n = 9 interleaved, 108 children, load 1.43–3.45; algebra identical across all four arms, including
+#901's per-batch product counts. Records: `stages.jsonl.gz`; arms `fb4348a9-split`,
+`f7f2f7eb-split`, `dda25ffd-split`, `2d71c051-split` in `binaries.sha256` (the last three are the
+stack's pre-merge heads, source-identical to what merged).
+
+| Row | Arm | n | Elimination | Interreduction | Bookkeeping | Symbolic | Sum | Call | Process wall | Peak RSS MiB | Setup (in elimination) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| wide64/eco-12 | parent `fb4348a9` | 9 | 1,709.9 | 740.0 | 562.7 | 463.2 | 3,475.8 | 3,553.8 | 3,755.8 | 208.6 | 451.6 |
+| wide64/eco-12 | stack `2d71c051` | 9 | 1,307.3 | 256.6 | 222.2 | 456.2 | 2,242.3 | 2,336.5 | 2,525.2 | 163.4 | 44.8 |
+| goldilocks/katsura-11 | parent `fb4348a9` | 9 | 570.9 | 110.2 | 19.4 | 158.4 | 858.9 | 883.6 | 1,069.1 | 106.2 | 158.6 |
+| goldilocks/katsura-11 | stack `2d71c051` | 9 | 450.7 | 108.9 | 15.3 | 158.3 | 733.2 | 766.0 | 942.2 | 109.2 | 16.9 |
+| goldilocks/mq-random-11 | parent `fb4348a9` | 9 | 3,872.3 | 563.5 | 33.8 | 447.8 | 4,917.4 | 5,025.6 | 5,615.0 | 357.2 | 453.5 |
+| goldilocks/mq-random-11 | stack `2d71c051` | 9 | 3,626.4 | 499.4 | 25.6 | 443.6 | 4,595.0 | 4,687.3 | 5,279.3 | 358.1 | 50.4 |
+
+Stack ÷ parent, process wall [95%]: Eco-12 **0.675** [0.664, 0.684], Katsura-11 0.883 [0.864,
+0.900], MQ11 0.940 [0.928, 0.957]. Each change against its parent on this build reproduces §3.1:
+0.841, 0.927, 0.877 on Eco-12.
+
+Against #901's own Eco-12 design-1 figure (3.976 s process), the 0.675 ratio is about **1.29 s**
+cut. Gate A needs 2.165 s; **S3 alone leaves about 0.87 s** for the cascade work #904 owns.
+
+Setup moved with change 3, not separately: Eco-12 463 → **45 ms**, Katsura-11 164 → 17, MQ11
+454 → 50. #901's 0.484 s was the second hash of every term, which change 3 removed (§3.3).
+
+### 5.2 The fourth change (setup), authorized on #900: not attempted, ceiling below the gate
+
+The owner authorized a fourth change to cut per-batch setup, under the same gate. After change 3,
+Eco-12's setup is 44.8 ms of a 2,525 ms process wall: removing **all** of it would give a ratio of
+0.982, short of the ≥ 3% the gate requires. What remains is the target/reducer split, the
+reducer-at table and one copy of each row's coefficients, so a real change would recover a fraction
+of that 1.8%. It was therefore recorded rather than built; no code, no PR.

@@ -41,7 +41,6 @@ type Reduced<F> = (Vec<(u32, F)>, u64);
 struct Element<const N: usize, F> {
     sig: Signature<N>,
     lead: Monomial<N>,
-    lead_mask: u64,
     terms: Vec<(Monomial<N>, F)>,
 }
 
@@ -78,6 +77,9 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     options: &'a SigF4Options,
     inputs: Vec<Vec<(Monomial<N>, F)>>,
     basis: Vec<Element<N, F>>,
+    /// `mask(lead)` per basis element, apart from the elements so the reducer scan reads eight
+    /// bytes per element.
+    lead_masks: Vec<u64>,
     /// Per signature index, the elements in insertion order with their signature masks.
     by_index: Vec<Vec<(u64, u32)>>,
     syzygies: SyzygyStore<N>,
@@ -123,6 +125,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         by_index: vec![Vec::new(); inputs.len()],
         syzygies: SyzygyStore::new(inputs.len()),
         basis: Vec::new(),
+        lead_masks: Vec::new(),
         queue: BTreeMap::new(),
         pending: 0,
         reducers: MonomialMap::default(),
@@ -327,9 +330,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let total = self.basis.len() as u32;
         if scanned < total {
             let mm = mask(m);
-            for id in scanned..total {
-                let e = &self.basis[id as usize];
-                if e.lead_mask & !mm != 0 || !divides(&e.lead, m) {
+            for (offset, &lead_mask) in self.lead_masks[scanned as usize..].iter().enumerate() {
+                let id = scanned + offset as u32;
+                if lead_mask & !mm != 0 || !divides(&self.basis[id as usize].lead, m) {
                     continue;
                 }
                 if best == NONE || self.ratio_cmp(id, best) != Ordering::Greater {
@@ -423,8 +426,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats.batches += 1;
         self.stats.targets += targets.len();
 
-        let (columns, rows, reducer_count) = self.symbolic(&targets)?;
-        let new = self.eliminate(&columns, &rows, reducer_count, targets.len());
+        let (columns, rows, handles, reducer_count) = self.symbolic(&targets)?;
+        let new = self.eliminate(&columns, &rows, handles, reducer_count, targets.len());
 
         let clock = Instant::now();
         if self.options.check_signatures {
@@ -443,33 +446,50 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         Ok(false)
     }
 
-    /// Columns (descending), and rows: targets first in signature order, then reducers.
+    /// Columns (descending); rows, targets first in signature order, then reducers; and each
+    /// row's column per term, in term order.
+    ///
+    /// Every term is looked up once, here, and keeps the handle the lookup gave it, so elimination
+    /// builds its sparse rows by array lookup rather than hashing every term a second time.
+    /// Handles are first-occurrence ids until the columns are sorted, then column positions.
     #[allow(clippy::type_complexity)]
     fn symbolic(
         &mut self,
         targets: &[Row<N>],
-    ) -> Result<(Vec<Monomial<N>>, Vec<Row<N>>, usize), SigF4Error> {
+    ) -> Result<(Vec<Monomial<N>>, Vec<Row<N>>, Vec<Vec<u32>>, usize), SigF4Error> {
         let clock = Instant::now();
-        let mut seen: MonomialMap<N, ()> = MonomialMap::default();
+        let mut seen: MonomialMap<N, u32> = MonomialMap::default();
         let mut work: Vec<Monomial<N>> = Vec::new();
         let mut rows: Vec<Row<N>> = Vec::with_capacity(targets.len());
+        let mut handles: Vec<Vec<u32>> = Vec::with_capacity(targets.len());
+        let mut intern = |m: Monomial<N>, work: &mut Vec<Monomial<N>>| -> u32 {
+            *seen.entry(m).or_insert_with(|| {
+                work.push(m);
+                (work.len() - 1) as u32
+            })
+        };
         for t in targets {
             rows.push(Row {
                 sig: t.sig,
                 mult: t.mult,
                 source: t.source,
             });
-            for (m, _) in self.terms_of(t.source) {
-                let m = *m * t.mult;
-                if seen.insert(m, ()).is_none() {
-                    work.push(m);
-                }
-            }
+            let terms = match t.source {
+                RowSource::Input(i) => &self.inputs[i],
+                RowSource::Element(id) => &self.basis[id as usize].terms,
+            };
+            handles.push(
+                terms
+                    .iter()
+                    .map(|(m, _)| intern(*m * t.mult, &mut work))
+                    .collect(),
+            );
         }
         let mut reducers = 0;
         let mut next = 0;
         while next < work.len() {
             let m = work[next];
+            let lead = next as u32;
             next += 1;
             let id = self.reducer(&m);
             if id == NONE {
@@ -478,12 +498,12 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             let e = &self.basis[id as usize];
             let mult = m.checked_div(&e.lead).expect("the lead divides the column");
             let sig = e.sig.times(&mult);
+            let mut row = Vec::with_capacity(e.terms.len());
+            row.push(lead);
             for (tm, _) in &e.terms[1..] {
-                let tm = *tm * mult;
-                if seen.insert(tm, ()).is_none() {
-                    work.push(tm);
-                }
+                row.push(intern(*tm * mult, &mut work));
             }
+            handles.push(row);
             rows.push(Row {
                 sig,
                 mult,
@@ -492,22 +512,33 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             reducers += 1;
         }
         let order = self.order;
-        work.sort_unstable_by(|a, b| order.cmp(b, a));
+        let mut by_position: Vec<u32> = (0..work.len() as u32).collect();
+        by_position.sort_unstable_by(|&a, &b| order.cmp(&work[b as usize], &work[a as usize]));
+        let mut position = vec![0u32; work.len()];
+        for (k, &id) in by_position.iter().enumerate() {
+            position[id as usize] = k as u32;
+        }
+        for row in &mut handles {
+            for h in row.iter_mut() {
+                *h = position[*h as usize];
+            }
+        }
+        let columns: Vec<Monomial<N>> = by_position.iter().map(|&id| work[id as usize]).collect();
         self.stats.reducer_rows += reducers;
         self.stats.max_matrix_rows = self.stats.max_matrix_rows.max(rows.len());
-        self.stats.max_matrix_columns = self.stats.max_matrix_columns.max(work.len());
+        self.stats.max_matrix_columns = self.stats.max_matrix_columns.max(columns.len());
         self.stats.symbolic += clock.elapsed();
         if rows.len() > self.options.max_matrix_rows {
             return Err(SigF4Error::Budget(F4Error::TooManyRows {
                 limit: self.options.max_matrix_rows,
             }));
         }
-        if work.len() > self.options.max_matrix_columns {
+        if columns.len() > self.options.max_matrix_columns {
             return Err(SigF4Error::Budget(F4Error::TooManyColumns {
                 limit: self.options.max_matrix_columns,
             }));
         }
-        Ok((work, rows, reducers))
+        Ok((columns, rows, handles, reducers))
     }
 
     fn terms_of(&self, source: RowSource) -> &[(Monomial<N>, F)] {
@@ -532,29 +563,44 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         &mut self,
         columns: &[Monomial<N>],
         rows: &[Row<N>],
+        handles: Vec<Vec<u32>>,
         reducer_count: usize,
         target_count: usize,
     ) -> Vec<(Signature<N>, Vec<(Monomial<N>, F)>)> {
         let clock = Instant::now();
         let order = self.order;
-        let index: MonomialMap<N, u32> = columns
+        if self.options.check_signatures {
+            for (row, handles) in rows.iter().zip(&handles) {
+                let terms = self.terms_of(row.source);
+                assert_eq!(terms.len(), handles.len(), "one handle per term");
+                for ((m, _), &h) in terms.iter().zip(handles) {
+                    assert_eq!(
+                        columns[h as usize],
+                        *m * row.mult,
+                        "a handle names its column"
+                    );
+                }
+            }
+        }
+        let mut sparse_rows: Vec<Vec<(u32, F)>> = rows
             .iter()
-            .enumerate()
-            .map(|(i, m)| (*m, i as u32))
+            .zip(handles)
+            .map(|(row, handles)| {
+                handles
+                    .into_iter()
+                    .zip(self.terms_of(row.source))
+                    .map(|(h, (_, c))| (h, *c))
+                    .collect()
+            })
             .collect();
-        let sparse = |row: &Row<N>| -> Vec<(u32, F)> {
-            self.terms_of(row.source)
-                .iter()
-                .map(|(m, c)| (index[&(*m * row.mult)], *c))
-                .collect()
-        };
         let ncols = columns.len();
         let mut reducer_at: Vec<u32> = vec![NONE; ncols];
-        let reducer_rows: Vec<Vec<(u32, F)>> = rows[target_count..].iter().map(sparse).collect();
+        let reducer_rows: Vec<Vec<(u32, F)>> = sparse_rows.split_off(target_count);
         let reducer_sigs: Vec<Signature<N>> = rows[target_count..].iter().map(|r| r.sig).collect();
         let targets: Vec<(Signature<N>, Vec<(u32, F)>)> = rows[..target_count]
             .iter()
-            .map(|r| (r.sig, sparse(r)))
+            .map(|r| r.sig)
+            .zip(sparse_rows)
             .collect();
         debug_assert_eq!(reducer_rows.len(), reducer_count);
         for (k, entries) in reducer_rows.iter().enumerate() {
@@ -735,12 +781,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             });
         }
         self.by_index[sig.index as usize].push((mask(&sig.mono), id));
-        self.basis.push(Element {
-            sig,
-            lead,
-            lead_mask: mask(&lead),
-            terms,
-        });
+        self.lead_masks.push(mask(&lead));
+        self.basis.push(Element { sig, lead, terms });
         self.stats.elements_added += 1;
         if let Some(limit) = self.options.max_basis_elements {
             if self.basis.len() > limit {
