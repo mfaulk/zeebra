@@ -26,6 +26,8 @@ jobs:
       rust: ${{ steps.scope.outputs.rust }}
       docs: ${{ steps.scope.outputs.docs }}
       comparand: ${{ steps.scope.outputs.comparand }}
+      # The slow checks run nightly and on manual dispatch only, never on PRs or pushes (#924).
+      nightly: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -69,34 +71,33 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      # Nextest builds test binaries; Clippy checks examples and benchmarks on PRs.
-      # Main, scheduled and manual runs also link every standalone target.
+      # `--tests` builds only targets that run tests; Clippy checks that the rest compile, and the
+      # nightly run links every standalone target.
       - name: Build all targets
-        if: github.event_name != 'pull_request'
+        if: needs.changes.outputs.nightly == 'true'
         run: cargo build --all-targets --timings
       - name: Test
         if: needs.changes.outputs.rust == 'true'
-        run: cargo nextest run --profile ci
+        run: cargo nextest run --profile ci --tests
       - name: Check guide inclusion
         if: needs.changes.outputs.rust != 'true'
         run: cargo test --test documentation
       - name: Doc tests
         run: cargo test --doc -- --test-threads=4
       - name: Upload build timings
-        if: always() && github.event_name != 'pull_request'
+        if: always() && needs.changes.outputs.nightly == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: debug-build-timings
           path: target/cargo-timings/
           if-no-files-found: ignore
 
-  # Split from `Build and test` so the two run in parallel; together they were the PR critical path.
-  # One runner per set because each feature set recompiles the whole crate; run serially they were
-  # 15-38 minutes (#922). Sets share one rust-cache key: their dependencies are identical.
+  # Nightly (#924). One runner per set because each feature set recompiles the whole crate; run
+  # serially they were 15-38 minutes (#922). Sets share one rust-cache key: their dependencies match.
   research:
     name: Research artifacts (${{ matrix.set }})
     needs: changes
-    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true'
+    if: needs.changes.outputs.nightly == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -122,12 +123,12 @@ jobs:
   release-tests:
     name: Tests (release)
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.nightly == 'true'
     runs-on: ubuntu-latest
-    # Keep the previous optimizer coverage on full runs outside PRs.
+    # Nightly, so it can afford the optimizer coverage `ci-release` drops: opt-level 3 and thin LTO.
     env:
-      CARGO_PROFILE_CI_RELEASE_LTO: ${{ github.event_name == 'pull_request' && 'off' || 'thin' }}
-      CARGO_PROFILE_CI_RELEASE_OPT_LEVEL: ${{ github.event_name == 'pull_request' && '2' || '3' }}
+      CARGO_PROFILE_CI_RELEASE_LTO: thin
+      CARGO_PROFILE_CI_RELEASE_OPT_LEVEL: '3'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -142,23 +143,20 @@ jobs:
         run: cargo test --profile ci-release --tests --no-run --timings
       - name: Test (release)
         run: cargo nextest run --profile ci --cargo-profile ci-release --tests
-      # This workload regressed when reduced batch rows raised the live-entry demand.
-      # Run it on PRs too; the debug build keeps it ignored for cost.
+      # This workload regressed when reduced batch rows raised the live-entry demand; the debug
+      # build keeps it ignored for cost.
       - name: Reduced batch live-budget regression
         run: |
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::f4::tests::test_reduced_batches_complete_the_measured_live_budget_regression)'
       - name: Doc tests (release)
-        if: github.event_name != 'pull_request'
         run: cargo test --profile ci-release --doc -- --test-threads=4
       - name: Gröbner engines agree on the slow systems
-        if: github.event_name != 'pull_request'
         run: |
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems) + test(=grobner::f4::tests::test_f4_on_larger_systems)'
       # The opt-in large corpus is excluded; its capture gate is run explicitly off CI.
       - name: The F4 matrix corpus is as pinned
-        if: github.event_name != 'pull_request'
         run: |
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::f4::matrix_corpus::tests::test_every_entry_is_pinned_and_in_its_regime)'
@@ -173,19 +171,19 @@ jobs:
   bench-smoke:
     name: Benchmarks run
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.nightly == 'true'
     runs-on: ubuntu-latest
-    # Keep the previous optimizer coverage on full runs outside PRs.
+    # Nightly, so it can afford the optimizer coverage `ci-release` drops: opt-level 3 and thin LTO.
     env:
-      CARGO_PROFILE_CI_RELEASE_LTO: ${{ github.event_name == 'pull_request' && 'off' || 'thin' }}
-      CARGO_PROFILE_CI_RELEASE_OPT_LEVEL: ${{ github.event_name == 'pull_request' && '2' || '3' }}
+      CARGO_PROFILE_CI_RELEASE_LTO: thin
+      CARGO_PROFILE_CI_RELEASE_OPT_LEVEL: '3'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      # Compilation alone misses setup panics (#586). Keep execution on code PRs.
+      # Compilation alone misses setup panics (#586), so the nightly run executes each case once.
       # This smoke test samples nothing and publishes no performance figures.
       - name: Benchmarks execute without panicking
         run: cargo bench --profile ci-release -- --test
@@ -359,6 +357,32 @@ jobs:
               exit 1
               ;;
           esac
+
+  # A scheduled failure would otherwise reach only the owner's email; an open issue reaches `orient`.
+  nightly-report:
+    name: Report nightly failure
+    needs: [changes, test, research, release-tests, bench-smoke, lint, msrv, agent-scripts]
+    if: always() && github.event_name == 'schedule' && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the nightly-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='Nightly CI failed'
+          body="Nightly CI failed on \`${GITHUB_SHA::8}\`: $RUN_URL"
+          number="$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" \
+            --json number,title --jq "map(select(.title == \"$title\")) | .[0].number // empty")"
+          if [[ -n "$number" ]]; then
+            gh issue comment "$number" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body"
+          fi
 
   complete:
     name: CI complete

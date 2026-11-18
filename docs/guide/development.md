@@ -149,78 +149,92 @@ pass.
 
 ## CI coverage and runtime
 
-`Classify changes` reads the full PR diff with NUL-separated paths. `tools/ci-scope.sh` uses a
-conservative allowlist; unknown paths, code, config, scripts and measurement JSON require the full
-suite. Empty or malformed input also selects the full suite, and a failed git read fails CI.
-Pushes to `main`, scheduled runs and manual dispatch always use the full suite.
+PR CI is kept fast so agents are not blocked on it (#924). Agents build and test locally before
+opening a PR (see *Before opening a PR* below), so PR CI is a backstop, and the slow checks run in
+the nightly scheduled run (`17 9 * * *`, UTC) and on manual dispatch instead.
 
-| Change on a pull request | Checks |
+| Run | Checks |
 |---|---|
-| Code, config, workflows, scripts, records, or any unknown path | Debug and optimized tests, debug doctests, research-artifact checks, Clippy, Rustdoc, package, MSRV, benchmark smoke and shell/provenance checks |
-| Additionally, anything under `research/comparand-scaling/` or `tools/external/`, `tools/test/comparand-scaling-test.py`, `tools/ci-scope.sh` or a workflow | The retained comparand replay (about 12 minutes) |
-| `README.md` or Markdown under `docs/guide/`, with only other allowed prose changes | Debug doctests, guide-inclusion test, research-artifact checks, formatting, Rustdoc, shell/provenance checks |
-| Only Markdown under `docs/` outside the guides, under `research/`, or root `CHANGELOG.md` / `CLAUDE.md` | Shell/provenance checks and merge-staleness notice |
+| PR or push to `main`, code change | Debug tests (`--tests`), debug doctests, Clippy, Rustdoc, package, MSRV and shell/provenance checks |
+| PR or push to `main`, only `README.md` or guide Markdown | Debug doctests, guide-inclusion test, formatting, Rustdoc, shell/provenance checks |
+| PR or push to `main`, only other prose (`docs/` outside the guides, `research/` Markdown, `CHANGELOG.md`, `CLAUDE.md`) | Shell/provenance checks and merge-staleness notice |
+| Nightly and manual dispatch | Everything above, plus `cargo build --all-targets`, the optimized tests, the research-artifact checks, the comparand replay and the benchmark smoke run |
+
+`Classify changes` reads the full PR diff with NUL-separated paths. `tools/ci-scope.sh` uses a
+conservative allowlist; unknown paths, code, config, scripts and measurement JSON select the code
+row. Empty or malformed input also selects it, and a failed git read fails CI. Pushes to `main`
+select the code row; its `nightly` output is true only for the schedule and manual dispatch.
+
+To run the nightly checks on a branch before merging — worth it for a change to release-only
+arithmetic, a research feature or a benchmark — dispatch the workflow on it:
+`gh workflow run rust.yml --ref <branch>`.
+
+A scheduled run with a failed job opens an issue titled `Nightly CI failed`, or comments on the
+open one, so the failure reaches `orient` rather than only the owner's email. Close it when main is
+green again.
 
 `CI complete` always runs and fails if any dependency failed or was cancelled. Intentionally
 skipped jobs are accepted. It is suitable as a required branch-protection check; changing repository
-branch-protection settings is a separate action. Existing job names remain stable.
+branch-protection settings is a separate action.
 
 `Research artifacts` runs the research-instrument tests, artifact summaries and the delayed-reduction
-pilot in parallel with `Build and test`; serially they were the PR critical path (about 40 minutes).
-It is a matrix with one runner per set in `tools/ci-research.sh` — `default`, `delayed-reduction`,
-`comparand-replay` and one per `research-*` feature — because every feature set recompiles the
-whole crate, and run in one job they took 15–38 minutes (#922). A set compiles only under its own
-feature, and a new `research-*` feature needs a set of its own; `tools/test/ci-research-test.sh`
-enforces both and that the workflow matrix matches the script. The comparand replay runs on every
-push to `main`, schedule and dispatch, and on PRs only when its inputs change. `Swatinem/rust-cache` saves caches only from `main`: PR saves overflowed the
-repository's 10 GB cache quota and evicted `main`'s, which every PR restores from.
+pilot. It is a matrix with one runner per set in `tools/ci-research.sh` — `default`,
+`delayed-reduction`, `comparand-replay` and one per `research-*` feature — because every feature set
+recompiles the whole crate, and run in one job they took 15–38 minutes (#922). A set compiles only
+under its own feature, and a new `research-*` feature needs a set of its own;
+`tools/test/ci-research-test.sh` enforces both and that the workflow matrix matches the script.
+`Swatinem/rust-cache` saves caches only from `main` (scheduled runs included): PR saves overflowed
+the repository's 10 GB cache quota and evicted `main`'s, which every PR restores from.
 
-The full suite runs under Nextest in debug and under `ci-release` in a separate job. Both matter:
-release arithmetic has `debug-assertions` and `overflow-checks` disabled. The PR profile uses
-`opt-level = 2`, `lto = "off"` and 16 codegen units. Outside PRs, the release and smoke jobs override
-it with `CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3` and `CARGO_PROFILE_CI_RELEASE_LTO=thin`, retaining the
-previous optimizer coverage. In debug, F4 additionally
-recomputes basis leaders, monicity and ordering and validates the critical-pair queue each batch;
-optimized tests do not run those checks.
+The suite runs under Nextest in debug on every code change and under `ci-release` nightly. Both
+matter: release arithmetic has `debug-assertions` and `overflow-checks` disabled. The nightly
+optimized and smoke jobs override `ci-release` with `CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3` and
+`CARGO_PROFILE_CI_RELEASE_LTO=thin`. In debug, F4 additionally recomputes basis leaders, monicity and
+ordering and validates the critical-pair queue each batch; optimized tests do not run those checks.
 
-On code PRs, Nextest builds the test binaries it runs. Clippy checks all targets with all features
-and again without default features, and the benchmark job links and executes Criterion targets.
-The debug job does not additionally link every standalone example on PRs. Full runs outside PRs
-retain `cargo build --all-targets --timings`, catching example-only linker errors after merge or on
-manual dispatch. Debug doctests run on code and guide/README PRs; optimized doctests and the named
-ignored engine/corpus tests run on main, schedules and manual dispatch. This trades immediate
-example-link and optimized-doctest feedback for shorter PR latency without dropping those checks.
-
-The optimized job selects `--tests`: the library, binary, integration tests and the examples marked
+Both test jobs select `--tests`: the library, binary, integration tests and the examples marked
 `test = true`. A bare `cargo test` also compiles every `test = false` example, which runs nothing
-there and was 60% of that job's compile time on `main` (#921); the debug job and Clippy still
-compile them.
+and was 60% of the optimized job's compile time (#921). Clippy checks all targets with all features
+and again without default features, so those examples still compile-check on every code change;
+the nightly `cargo build --all-targets --timings` catches example-only linker errors.
+
+### Before opening a PR
+
+Run locally what PR CI no longer runs for the change at hand, with a private `CARGO_TARGET_DIR`:
 
 ```sh
-cargo nextest run --profile ci
-cargo test --profile ci-release --tests --no-run --timings
+cargo nextest run --profile ci --tests                    # always, for a code change
+cargo test --doc -j24 -- --test-threads=16
+scripts/ci-lint.sh clippy clippy-no-default
+# Arithmetic, F4 or linear-algebra kernels: the optimized suite
 cargo nextest run --profile ci --cargo-profile ci-release --tests
-bash tools/ci-research.sh --sets                          # then: bash tools/ci-research.sh <set>
-bash tools/test/ci-research-test.sh
-cargo test --doc -- --test-threads=4
-# Match the optimized checks outside PRs:
+# A research feature, record or summary: its set (list them with --sets)
+bash tools/ci-research.sh <set>
+# A benchmark target
+cargo bench --profile ci-release -- --test
+```
+
+Other CI commands:
+
+```sh
+cargo test --profile ci-release --tests --no-run --timings
 CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3 CARGO_PROFILE_CI_RELEASE_LTO=thin \
   cargo test --profile ci-release --doc -- --test-threads=4
-cargo build --all-targets --timings                       # full runs outside PRs
-cargo bench --profile ci-release -- --test
+cargo build --all-targets --timings
+bash tools/test/ci-research-test.sh
 bash tools/test/ci-scope-test.sh
 bash tools/test/cpu-context-test.sh
 bash tools/test/bench-reserve-test.sh
 ```
 
 Release compilation and execution are separate steps. Cargo's HTML build-timing reports are
-uploaded as `release-build-timings`; full non-PR builds also upload `debug-build-timings`. Compare
-compiler time plus test time when tuning a CI profile. Shared runners provide CI latency evidence,
-not publishable algebra benchmark measurements. Local `cargo bench` and `cargo test --release`
-still use the production release profile, with fat LTO and one codegen unit.
+uploaded as `release-build-timings` and `debug-build-timings` from nightly runs. Compare compiler
+time plus test time when tuning a CI profile. Shared runners provide CI latency evidence, not
+publishable algebra benchmark measurements. Local `cargo bench` and `cargo test --release` still use
+the production release profile, with fat LTO and one codegen unit.
 
-Benchmark smoke execution remains on code PRs because compilation alone missed a setup panic in
-#586. `cargo bench --profile ci-release -- --test` executes each case once and takes no samples;
+The benchmark smoke run executes because compilation alone missed a setup panic in #586.
+`cargo bench --profile ci-release -- --test` executes each case once and takes no samples;
 `cargo test --benches` instead uses the unoptimized dev profile. `test = false` excludes benches
 from a plain `cargo test`, while `bench = false` on the library and binary prevents duplicate unit
 runs in the benchmark job. The isolated Nextest tests are important for process-wide peak-memory
@@ -232,7 +246,7 @@ to validate the packaged source in isolation. The MSRV job checks only the libra
 tests, benches and dev-dependencies may use newer Rust. Raising that MSRV belongs in `CHANGELOG.md`.
 
 Each PR and branch has one run per event in flight; a newer push cancels its predecessor. Main
-still receives push checks and the daily retest. The suite is not sharded: duplicate compilation
+receives the fast push checks and the nightly run. The suite is not sharded: duplicate compilation
 would be the dominant cost, so splitting test execution is not the first optimization to apply.
 
 ## Testing the merged result
