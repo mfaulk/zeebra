@@ -91,114 +91,33 @@ jobs:
           if-no-files-found: ignore
 
   # Split from `Build and test` so the two run in parallel; together they were the PR critical path.
+  # One runner per set because each feature set recompiles the whole crate; run serially they were
+  # 15-38 minutes (#922). Sets share one rust-cache key: their dependencies are identical.
   research:
-    name: Research artifacts
+    name: Research artifacts (${{ matrix.set }})
     needs: changes
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        set: [default, delayed-reduction, comparand-replay, research-work, research-multirow, research-sigf4, research-sigf4-replay, research-sigf4-split]
+    env:
+      # The replay builds nothing and runs only when its inputs change (tools/ci-scope.sh).
+      ACTIVE: ${{ matrix.set != 'comparand-replay' || needs.changes.outputs.comparand == 'true' }}
+      RUST: ${{ matrix.set != 'comparand-replay' }}
     steps:
       - uses: actions/checkout@v4
+        if: env.ACTIVE == 'true'
       - uses: dtolnay/rust-toolchain@stable
+        if: env.ACTIVE == 'true' && env.RUST == 'true'
       - uses: Swatinem/rust-cache@v2
+        if: env.ACTIVE == 'true' && env.RUST == 'true'
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: MQ10 profiling instrument tests
-        run: |
-          cargo test --example mq10_profile
-          cargo test --example batch_order_study
-          cargo test --example wide_corpus
-          python3 tools/test/wide-corpus-test.py
-          python3 tools/test/comparand-scaling-test.py
-          cargo test --example public_corpus
-          cargo test --example elimination_kernel_study
-          python3 tools/test/elimination-kernel-study-test.py
-          python3 research/elimination-kernels/summarize.py
-          git diff --exit-code -- research/elimination-kernels/summary.json research/elimination-kernels/curves.csv
-          cargo test --example row_merge_study
-          python3 tools/test/row-merge-study-test.py
-          python3 tools/test/batch-splitting-study-test.py
-          python3 tools/test/mq10-profile-test.py
-          python3 tools/test/whole-route-study-test.py
-          python3 tools/test/whole-route-summary-test.py
-          python3 research/m28-current-baseline/summarize.py --check
-          cargo test --test stage_refinements
-          cargo test --features research-work --test symbolic_live
-          python3 tools/test/symbolic-live-study-test.py
-          python3 tools/external/symbolic-live-study.py --replay research/symbolic-live
-          python3 tools/test/msolve-count-test.py
-          python3 tools/test/grobx-trajectory-test.py
-          python3 tools/test/grobx-work-study-test.py
-          python3 tools/test/pivot-discovery-study-test.py
-          python3 research/concurrent-pivots/summarize.py
-          python3 -m unittest discover -s research/waiting-row -p 'test_*.py'
-          python3 research/waiting-row/evidence.py > /tmp/waiting-row-evidence.json
-          diff -u research/waiting-row/evidence.json /tmp/waiting-row-evidence.json
-          git diff --exit-code -- research/concurrent-pivots/summary.json research/concurrent-pivots/matrix-census.csv research/concurrent-pivots/parallel.csv research/concurrent-pivots/matrix-scaling.csv research/concurrent-pivots/dispatch.csv research/concurrent-pivots/controls.csv
-          python3 tools/test/grobx-randomization-test.py
-          python3 tools/external/grobx-driver/research/randomization/test_policy.py
-          python3 tools/external/grobx-driver/research/signature/test_overlay.py
-          python3 tools/test/grobx-signature-study-test.py
-          python3 tools/test/proof-artifacts-test.py
-          python3 tools/test/attempt-journal-test.py
-          python3 research/grobx-randomization/summarize.py
-          git diff --exit-code -- research/grobx-randomization/summary.json research/grobx-randomization/summary.csv
-          python3 research/grobx-trajectory/summarize.py
-          git diff --exit-code -- research/grobx-trajectory/summary.json research/grobx-trajectory/summary.csv research/grobx-trajectory/summary-rounds.csv
-          cargo test --features research-work --example symbolic_attribution
-          python3 research/symbolic-attribution/summarize.py | diff - research/symbolic-attribution/totals.tsv
-          cargo test --features research-work --example worker_pool_study
-          cargo test --features research-work --example parallel_forward_study
-          cargo test --features research-work --lib dispatch_tests
-          python3 tools/test/worker-pool-study-test.py
-          python3 research/worker-pool/summarize.py
-          git diff --exit-code -- research/worker-pool/summary.json research/worker-pool/summary.csv
-          cargo test --features research-work --lib linalg::work
-          cargo test --features research-work --test gcd_profile
-          cargo test --features research-work --lib gcd_profile
-          python3 tools/test/gcd-size-study-test.py
-          python3 research/gcd-size/summarize.py
-          git diff --exit-code -- research/gcd-size/summary.json research/gcd-size/summary.csv research/gcd-size/table.md
-          cargo test --features research-work --lib linalg::concurrent
-          cargo test --features research-work --lib linalg::selective
-          python3 tools/test/selective-backward-study-test.py
-          python3 tools/test/candidate-adoption-summary-test.py
-          python3 tools/test/residual-backward-model-test.py
-          python3 research/residual-backward/model.py --check
-          python3 research/candidate-adoption/summary.py --check
-          python3 tools/test/selective-backward-summary-test.py
-          python3 tools/test/selective-backward-cross-test.py
-          python3 tools/test/selective-backward-combined-summary-test.py
-          python3 research/selective-backward/combined_summary.py
-          git diff --exit-code -- research/selective-backward/combined-summary.json
-          python3 research/selective-backward/summarize.py
-          git diff --exit-code -- research/selective-backward/summary.json research/selective-backward/native.csv research/selective-backward/inventory.json
-          cargo test --features research-work --example mq10_profile
-          cargo test --features research-multirow --lib linalg::dense::band
-          cargo test --features research-multirow --example mq10_profile
-          cargo test --features research-sigf4 --lib grobner::sigf4
-          cargo test --features research-sigf4 --example sig_f4_study
-          cargo test --features research-sigf4-replay --lib grobner::sigf4::replay
-          cargo test --features research-sigf4-replay --example sig_f4_study
-          cargo test --features research-sigf4-split --lib grobner::sigf4
-          cargo test --features research-sigf4-split --example sig_f4_study
-          python3 research/m30-sigf4/test_run.py
-          python3 research/m30-sigf4/summarize.py research/m30-sigf4/{gate,controls,gate2,controls2}.jsonl.gz | diff - research/m30-sigf4/tables.md
-          python3 research/m30-final/test_campaign.py
-          python3 research/m31-baseline/test_campaign.py
-          python3 research/m31-baseline/summarize.py research/m31-baseline/walls.jsonl.gz research/m31-baseline/split.jsonl.gz | diff - research/m31-baseline/tables.md
-          python3 research/m30-final/summarize.py research/m30-final | diff - research/m30-final/tables.md
-          python3 tools/test/multirow-study-test.py
-          python3 tools/test/public-corpus-test.py
-      # About 12 minutes; it reads only its own records and tools/external/ (tools/ci-scope.sh).
-      - name: Retained comparand replay
-        if: needs.changes.outputs.comparand == 'true'
-        run: python3 tools/external/comparand-scaling.py --replay research/comparand-scaling
-      - name: Isolated delayed-reduction pilot checks
-        run: |
-          git apply research/elimination-kernels/delayed.patch
-          trap 'git apply -R research/elimination-kernels/delayed.patch' EXIT
-          cargo test --example elimination_kernel_study
-          cargo test --lib h13_pilot_selection_is_explicit
+      - name: Research checks
+        if: env.ACTIVE == 'true'
+        run: bash tools/ci-research.sh ${{ matrix.set }}
 
   release-tests:
     name: Tests (release)
@@ -366,6 +285,7 @@ jobs:
           bash tools/test/benchlock-test.sh
           bash tools/test/check-measurement-provenance-test.sh
           bash tools/test/ci-scope-test.sh
+          bash tools/test/ci-research-test.sh
           bash tools/test/cpu-context-test.sh
           bash tools/test/bench-reserve-test.sh
 
