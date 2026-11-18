@@ -12,6 +12,7 @@ use std::{
 };
 
 use super::{
+    claim::{Claim, Kind, Stop},
     signature::{divides, mask, Signature, SyzygySource, SyzygyStore},
     SigF4Error, SigF4Options, SigF4Statistics,
 };
@@ -32,10 +33,10 @@ use crate::{
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
-const NONE: u32 = u32::MAX;
+pub(super) const NONE: u32 = u32::MAX;
 
 /// A row after reduction: its remaining entries in column order, and the products spent.
-type Reduced<F> = (Vec<(u32, F)>, u64);
+pub(super) type Reduced<F> = (Vec<(u32, F)>, u64);
 
 /// A signed basis element: `(s(α), ᾱ)` with `ᾱ` monic, terms in descending order.
 struct Element<const N: usize, F> {
@@ -87,6 +88,7 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     pending: usize,
     /// Least-ratio basis element whose lead divides the key, and how much of the basis was scanned.
     reducers: MonomialMap<N, (u32, u32)>,
+    wall: Option<(Instant, Duration)>,
     stats: &'a mut SigF4Statistics,
 }
 
@@ -129,6 +131,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         queue: BTreeMap::new(),
         pending: 0,
         reducers: MonomialMap::default(),
+        wall: options.max_wall_time.map(|budget| (started, budget)),
         inputs,
         stats,
     };
@@ -427,7 +430,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats.targets += targets.len();
 
         let (columns, rows, handles, reducer_count) = self.symbolic(&targets)?;
-        let new = self.eliminate(&columns, &rows, handles, reducer_count, targets.len());
+        let new = self.eliminate(&columns, &rows, handles, reducer_count, targets.len())?;
 
         let clock = Instant::now();
         if self.options.check_signatures {
@@ -566,7 +569,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         handles: Vec<Vec<u32>>,
         reducer_count: usize,
         target_count: usize,
-    ) -> Vec<(Signature<N>, Vec<(Monomial<N>, F)>)> {
+    ) -> Result<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>, SigF4Error> {
         let clock = Instant::now();
         let order = self.order;
         if self.options.check_signatures {
@@ -614,6 +617,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             at: &reducer_at,
             ncols,
         };
+        if self.options.parallel_cascade {
+            return self.claim(&block, &targets, columns, clock);
+        }
         #[cfg(feature = "research-sigf4-split")]
         let mut split = super::BatchSplit {
             targets: target_count,
@@ -690,30 +696,18 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 split.serial_reducer_products += later - cascade;
                 split.cascading_targets += usize::from(cascade > 0);
             }
-            let products = earlier + later;
-            self.stats.coefficient_products += products;
-            if out.is_empty() {
-                self.stats.reductions_to_zero += 1;
-                self.stats.zero_rows += 1;
-                self.stats.rows_adding_no_rank += 1;
-                self.stats.products_on_zero_rows += products;
-                self.syzygies.insert(t, SyzygySource::ZeroRow);
-                continue;
+            let kind = block.classify(&t, &out);
+            if kind == Kind::Element {
+                let inverse = out[0].1.inverse();
+                for (_, v) in &mut out {
+                    *v *= inverse;
+                }
             }
-            let lead = out[0].0 as usize;
-            let r = reducer_at[lead];
-            if r != NONE && reducer_sigs[r as usize] == t {
-                self.stats.singular_rows += 1;
-                self.stats.rows_adding_no_rank += 1;
-                self.stats.products_on_singular_rows += products;
-                continue;
+            self.settle(t, kind, &out, earlier + later, columns);
+            if kind == Kind::Element {
+                target_at[out[0].0 as usize] = results.len() as u32;
+                results.push((t, out));
             }
-            let inverse = out[0].1.inverse();
-            for (_, v) in &mut out {
-                *v *= inverse;
-            }
-            target_at[lead] = results.len() as u32;
-            results.push((t, out));
         }
         #[cfg(feature = "research-sigf4-replay")]
         replay.finish();
@@ -723,16 +717,116 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             self.stats.split.batches.push(split);
         }
         self.stats.elimination += clock.elapsed();
-        results
-            .into_iter()
-            .map(|(sig, entries)| {
-                let terms = entries
-                    .into_iter()
-                    .map(|(c, v)| (columns[c as usize], v))
-                    .collect();
-                (sig, terms)
-            })
-            .collect()
+        Ok(finish_batch(results, columns))
+    }
+
+    /// The parallel cascade (M31-S2): #902's prereduce + claim schedule, then design 1's
+    /// accounting in signature order. A stopped batch is abandoned whole, before any insertion.
+    #[allow(clippy::type_complexity)]
+    fn claim(
+        &mut self,
+        block: &ReducerBlock<'_, N, F>,
+        targets: &[(Signature<N>, Vec<(u32, F)>)],
+        columns: &[Monomial<N>],
+        clock: Instant,
+    ) -> Result<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>, SigF4Error> {
+        let entry = size_of::<(u32, F)>();
+        let rows_bytes = (targets.iter().map(|(_, r)| r.len()).sum::<usize>()
+            + block.rows.iter().map(Vec::len).sum::<usize>())
+            * entry;
+        let job = Claim {
+            block,
+            targets,
+            workers: self.options.workers.max(1),
+            check: self.options.check_signatures,
+            deadline: self.wall.map(|(start, budget)| start + budget),
+            live_limit: self.options.max_live_bytes,
+            fixed_bytes: rows_bytes,
+            #[cfg(test)]
+            adversary: self.options.adversary,
+        };
+        let done = match F::run_concurrent(job) {
+            Ok(done) => done,
+            Err(job) => job.serial(),
+        };
+        let report = match done {
+            Ok(report) => report,
+            Err(stop) => {
+                self.stats.elimination += clock.elapsed();
+                return Err(SigF4Error::Budget(match stop {
+                    Stop::Wall => {
+                        // Without a budget only the tests' adversary stops a batch on the wall.
+                        let (start, budget) = self.wall.unwrap_or((clock, Duration::ZERO));
+                        F4Error::TimeBudgetExceeded {
+                            degree: targets[0].0.degree(),
+                            elapsed_millis: millis(start.elapsed()),
+                            budget_millis: millis(budget),
+                        }
+                    }
+                    Stop::LiveBytes { bytes, limit } => F4Error::TooManyLiveBytes { bytes, limit },
+                }));
+            }
+        };
+        self.stats.claim_announcement_waits += report.announcement_waits;
+        self.stats.claim_final_waits += report.final_waits;
+        self.stats.claim_phase_a += report.phase_a;
+        self.stats.claim_cascade += report.cascade;
+        self.stats.claim_peak_live_bytes =
+            self.stats.claim_peak_live_bytes.max(report.peak_live_bytes);
+        let mut results = Vec::new();
+        for ((t, _), outcome) in targets.iter().zip(report.outcomes) {
+            self.settle(*t, outcome.kind, &outcome.row, outcome.products, columns);
+            if outcome.kind == Kind::Element {
+                results.push((*t, outcome.row));
+            }
+        }
+        self.stats.elimination += clock.elapsed();
+        Ok(finish_batch(results, columns))
+    }
+
+    /// Design 1's per-target accounting: a zero row records its syzygy signature (RFC T6), a
+    /// singular row is discarded (EF Lemma 5.1), an element joins the batch's results.
+    fn settle(
+        &mut self,
+        t: Signature<N>,
+        kind: Kind,
+        row: &[(u32, F)],
+        products: u64,
+        columns: &[Monomial<N>],
+    ) {
+        self.stats.coefficient_products += products;
+        match kind {
+            Kind::Zero => {
+                self.stats.reductions_to_zero += 1;
+                self.stats.zero_rows += 1;
+                self.stats.rows_adding_no_rank += 1;
+                self.stats.products_on_zero_rows += products;
+                self.syzygies.insert(t, SyzygySource::ZeroRow);
+            }
+            Kind::Singular => {
+                self.stats.singular_rows += 1;
+                self.stats.rows_adding_no_rank += 1;
+                self.stats.products_on_singular_rows += products;
+            }
+            Kind::Element => {}
+        }
+        #[cfg(test)]
+        {
+            let terms: Vec<String> = row
+                .iter()
+                .map(|(c, v)| format!("{v}*{:?}", columns[*c as usize]))
+                .collect();
+            if self.stats.batch_trace.len() < self.stats.batches {
+                self.stats.batch_trace.push(Vec::new());
+            }
+            self.stats
+                .batch_trace
+                .last_mut()
+                .expect("pushed above")
+                .push(format!("{t:?} {kind:?} [{}]", terms.join(", ")));
+        }
+        #[cfg(not(test))]
+        let _ = (row, columns);
     }
 
     /// Adds `(sig, terms)` to the basis, recording Koszul syzygies and the new pairs.
@@ -817,18 +911,49 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     }
 }
 
+#[allow(clippy::type_complexity)]
+fn finish_batch<const N: usize, F: FiniteField>(
+    results: Vec<(Signature<N>, Vec<(u32, F)>)>,
+    columns: &[Monomial<N>],
+) -> Vec<(Signature<N>, Vec<(Monomial<N>, F)>)> {
+    results
+        .into_iter()
+        .map(|(sig, entries)| {
+            let terms = entries
+                .into_iter()
+                .map(|(c, v)| (columns[c as usize], v))
+                .collect();
+            (sig, terms)
+        })
+        .collect()
+}
+
 /// The batch's reducer multiples, one per lead column, with their signatures.
-struct ReducerBlock<'a, const N: usize, F> {
-    order: MonomialOrder,
-    rows: &'a [Vec<(u32, F)>],
-    sigs: &'a [Signature<N>],
-    at: &'a [u32],
-    ncols: usize,
+pub(super) struct ReducerBlock<'a, const N: usize, F> {
+    pub(super) order: MonomialOrder,
+    pub(super) rows: &'a [Vec<(u32, F)>],
+    pub(super) sigs: &'a [Signature<N>],
+    pub(super) at: &'a [u32],
+    pub(super) ncols: usize,
 }
 
 impl<const N: usize, F> ReducerBlock<'_, N, F> {
+    /// How target `t` ended with `row`: zero, singular (its lead's reducer has signature exactly
+    /// `t`, EF Lemma 5.1) or a new element.
+    pub(super) fn classify(&self, t: &Signature<N>, row: &[(u32, F)]) -> Kind {
+        let Some(&(lead, _)) = row.first() else {
+            return Kind::Zero;
+        };
+        let r = self.at[lead as usize];
+        if r != NONE && self.sigs[r as usize] == *t {
+            Kind::Singular
+        } else {
+            Kind::Element
+        }
+    }
+
     /// The reducer at column `c` if its signature is strictly below `t`.
-    fn admissible(&self, c: usize, t: &Signature<N>) -> Option<&[(u32, F)]> {
+    pub(super) fn admissible(&self, c: usize, t: &Signature<N>) -> Option<&[(u32, F)]> {
         let r = self.at[c];
         (r != NONE && self.sigs[r as usize].cmp_in(t, self.order) == Ordering::Less)
             .then(|| self.rows[r as usize].as_slice())
@@ -836,13 +961,13 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
 }
 
 /// A dense accumulator with a bitset of possibly-nonzero columns, reused across rows.
-struct Workspace<F> {
+pub(super) struct Workspace<F> {
     acc: Vec<F>,
     touched: Vec<u64>,
 }
 
 impl<F: FiniteField> Workspace<F> {
-    fn new(ncols: usize) -> Self {
+    pub(super) fn new(ncols: usize) -> Self {
         Self {
             acc: vec![F::zero(); ncols],
             touched: vec![0; ncols.div_ceil(64)],
@@ -852,7 +977,7 @@ impl<F: FiniteField> Workspace<F> {
     /// Reduces `entries` column by column with whatever `pivot` offers (monic rows, lead first);
     /// returns the remaining entries in column order and the multiply-accumulates spent. Pivot
     /// tails only reach columns to the right, so a column is final once passed.
-    fn reduce<'p>(
+    pub(super) fn reduce<'p>(
         &mut self,
         entries: &[(u32, F)],
         mut pivot: impl FnMut(usize) -> Option<&'p [(u32, F)]>,

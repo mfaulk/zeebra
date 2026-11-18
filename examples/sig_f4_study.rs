@@ -3,6 +3,10 @@
 //!
 //! cargo run --release --features research-sigf4 --example sig_f4_study -- \
 //!     --field wide64 --name eco-12 --engine sigf4|f4 [--workers 16] [--wall-s 600] [--certify]
+//!     [--claim]
+//!
+//! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
+//! `--workers` threads instead of design 2's serial cascade pass.
 //!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
@@ -41,6 +45,7 @@ struct Args {
     certify: bool,
     discovery: bool,
     replay: bool,
+    claim: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -53,6 +58,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         certify: false,
         discovery: false,
         replay: false,
+        claim: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -74,6 +80,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--certify" => parsed.certify = true,
             "--discovery" => parsed.discovery = true,
             "--replay" => parsed.replay = true,
+            "--claim" => parsed.claim = true,
             other => return Err(format!("unexpected argument {other}")),
         }
     }
@@ -85,6 +92,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     }
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
+    }
+    if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
+        return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
     }
     if parsed.replay && (parsed.engine != "sigf4" || parsed.workers < 2) {
         return Err("--replay runs design 1 and design 2: --engine sigf4 --workers ≥ 2".into());
@@ -195,6 +205,14 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("elimination_ns", Json::nanos(s.elimination)),
         ("interreduction_ns", Json::nanos(s.interreduction)),
         ("total_ns", Json::nanos(s.total)),
+        (
+            "claim_announcement_waits",
+            Json::int(s.claim_announcement_waits),
+        ),
+        ("claim_final_waits", Json::int(s.claim_final_waits)),
+        ("claim_peak_live_bytes", size(s.claim_peak_live_bytes)),
+        ("claim_phase_a_ns", Json::nanos(s.claim_phase_a)),
+        ("claim_cascade_ns", Json::nanos(s.claim_cascade)),
         #[cfg(feature = "research-sigf4-split")]
         ("split", split(&s.split)),
     ])
@@ -426,6 +444,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         let options = SigF4Options {
             max_wall_time: Some(args.wall),
             workers: args.workers,
+            parallel_cascade: args.claim,
             ..SigF4Options::default()
         };
         let (result, stats) = sig_f4_reported(&system, ORDER, &options);
@@ -570,6 +589,17 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--workers", "2"]].concat()).is_ok());
         assert!(args(&[&base[..], &["sigf4"]].concat()).is_err());
         assert!(args(&[&base[..], &["f4", "--workers", "2"]].concat()).is_err());
+    }
+
+    // The parallel cascade belongs to the signature engine and is not a replay arm.
+    #[test]
+    fn claim_needs_the_signature_engine() {
+        let base = [
+            "--field", "wide64", "--name", "eco-12", "--claim", "--engine",
+        ];
+        assert!(args(&[&base[..], &["sigf4", "--workers", "16"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["f4", "--workers", "16"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--workers", "2", "--replay"]].concat()).is_err());
     }
 
     // The shipping F4 arm caps the symbolic team at the worker count, as forward is (#883).
