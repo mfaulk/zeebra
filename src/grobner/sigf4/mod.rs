@@ -170,6 +170,9 @@ pub struct SigF4Statistics {
     pub claim_announcement_waits: u64,
     pub claim_final_waits: u64,
     pub claim_peak_live_bytes: usize,
+    /// Parallel cascade only: phase A's wall and the cascade pass's, summed over batches.
+    pub claim_phase_a: Duration,
+    pub claim_cascade: Duration,
     /// Per completed batch, each target's outcome and exact row in signature order: the oracle
     /// Theorem 1 of #902 makes per-batch.
     #[cfg(test)]

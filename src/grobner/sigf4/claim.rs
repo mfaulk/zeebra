@@ -28,7 +28,7 @@ use std::{
         },
         Barrier, Mutex, OnceLock,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use super::{
@@ -64,6 +64,9 @@ pub(super) struct Report<F> {
     pub(super) announcement_waits: u64,
     pub(super) final_waits: u64,
     pub(super) peak_live_bytes: usize,
+    /// Wall of phase A (to the barrier) and of the cascade pass.
+    pub(super) phase_a: Duration,
+    pub(super) cascade: Duration,
 }
 
 pub(super) struct Claim<'a, const N: usize, F> {
@@ -85,10 +88,14 @@ const LIVE: u8 = 2;
 /// Safe points between deadline reads.
 const POLL: u32 = 1024;
 
+/// One value per cache line, so a worker polling a slot does not share a line another writes.
+#[repr(align(128))]
+struct Padded<T>(T);
+
 /// State the workers share for one batch.
 struct Shared<F> {
     pre: Vec<Mutex<Option<Reduced<F>>>>,
-    finals: Vec<OnceLock<Outcome<F>>>,
+    finals: Vec<Padded<OnceLock<Outcome<F>>>>,
     owner: Vec<AtomicU32>,
     announced: Vec<AtomicBool>,
     /// Every target below this rank has announced.
@@ -101,6 +108,7 @@ struct Shared<F> {
     peak: AtomicUsize,
     announcement_waits: AtomicU64,
     final_waits: AtomicU64,
+    barrier_passed: OnceLock<Instant>,
     #[cfg(test)]
     safe_points: AtomicU64,
 }
@@ -145,7 +153,7 @@ fn backoff<F>(shared: &Shared<F>, round: &mut u32, deadline: Option<Instant>) ->
     } else {
         std::thread::yield_now();
     }
-    if *round % POLL == 0 && deadline.is_some_and(|d| Instant::now() >= d) {
+    if round.is_multiple_of(POLL) && deadline.is_some_and(|d| Instant::now() >= d) {
         shared.halt(WALL);
     }
     !shared.stopped()
@@ -153,7 +161,7 @@ fn backoff<F>(shared: &Shared<F>, round: &mut u32, deadline: Option<Instant>) ->
 
 impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
     fn entry_bytes(row: &[(u32, F)]) -> usize {
-        row.len() * size_of::<(u32, F)>()
+        std::mem::size_of_val(row)
     }
 
     fn run_with(
@@ -165,7 +173,7 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
         let ncols = self.block.ncols;
         let shared = Shared {
             pre: (0..m).map(|_| Mutex::new(None)).collect(),
-            finals: (0..m).map(|_| OnceLock::new()).collect(),
+            finals: (0..m).map(|_| Padded(OnceLock::new())).collect(),
             owner: (0..ncols).map(|_| AtomicU32::new(NONE)).collect(),
             announced: (0..m).map(|_| AtomicBool::new(false)).collect(),
             counter: AtomicUsize::new(0),
@@ -177,12 +185,13 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             peak: AtomicUsize::new(0),
             announcement_waits: AtomicU64::new(0),
             final_waits: AtomicU64::new(0),
+            barrier_passed: OnceLock::new(),
             #[cfg(test)]
             safe_points: AtomicU64::new(0),
         };
         let metadata = m
             * (size_of::<Mutex<Option<Reduced<F>>>>()
-                + size_of::<OnceLock<Outcome<F>>>()
+                + size_of::<Padded<OnceLock<Outcome<F>>>>()
                 + size_of::<AtomicBool>())
             + ncols * size_of::<AtomicU32>();
         let workspaces = workers * (ncols * size_of::<F>() + ncols.div_ceil(64) * 8);
@@ -191,7 +200,10 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             shared.halt(WALL);
         }
         let barrier = Barrier::new(workers);
+        let started = Instant::now();
         spawn(&shared, &barrier);
+        let ended = Instant::now();
+        let passed = shared.barrier_passed.get().copied().unwrap_or(ended);
         match shared.stop.load(SeqCst) {
             RUNNING => {}
             WALL => return Err(Stop::Wall),
@@ -206,11 +218,13 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             outcomes: shared
                 .finals
                 .into_iter()
-                .map(|f| f.into_inner().expect("every target finished"))
+                .map(|f| f.0.into_inner().expect("every target finished"))
                 .collect(),
             announcement_waits: shared.announcement_waits.into_inner(),
             final_waits: shared.final_waits.into_inner(),
             peak_live_bytes: shared.peak.into_inner(),
+            phase_a: passed - started,
+            cascade: ended - passed,
         })
     }
 
@@ -242,7 +256,9 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             shared.charge(Self::entry_bytes(&done.0), self.live_limit);
             *shared.pre[k].lock().expect("never poisoned") = Some(done);
         }
-        barrier.wait();
+        if barrier.wait().is_leader() {
+            let _ = shared.barrier_passed.set(Instant::now());
+        }
         loop {
             let k = shared.next_c.fetch_add(1, Relaxed);
             if k >= m || shared.stopped() {
@@ -266,7 +282,7 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
         }
         #[cfg(not(test))]
         let _ = k;
-        if *polls % POLL == 0 && self.deadline.is_some_and(|d| Instant::now() >= d) {
+        if polls.is_multiple_of(POLL) && self.deadline.is_some_and(|d| Instant::now() >= d) {
             shared.halt(WALL);
         }
         shared.stopped()
@@ -308,26 +324,38 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             }
             let mut j = shared.owner[c].load(Acquire);
             if !known && (j == NONE || j as usize > k) {
+                // Either the slot fills with an earlier owner (write-once, so authoritative at
+                // once) or every earlier target announces and an empty slot means no owner. A
+                // later target cannot fill the slot first: it announces only after `k` does.
                 let mut round = 0;
-                if shared.counter.load(Acquire) < k {
-                    shared.announcement_waits.fetch_add(1, Relaxed);
-                }
-                while shared.counter.load(Acquire) < k {
+                let mut waited = false;
+                loop {
+                    if shared.counter.load(Acquire) >= k {
+                        known = true;
+                        j = shared.owner[c].load(Acquire);
+                        break;
+                    }
+                    j = shared.owner[c].load(Acquire);
+                    if j != NONE && (j as usize) < k {
+                        break;
+                    }
+                    if !waited {
+                        waited = true;
+                        shared.announcement_waits.fetch_add(1, Relaxed);
+                    }
                     if !backoff(shared, &mut round, self.deadline) {
                         return None;
                     }
                 }
-                known = true;
-                j = shared.owner[c].load(Acquire);
             }
             if j != NONE && (j as usize) < k {
                 let j = j as usize;
                 let mut round = 0;
-                if shared.finals[j].get().is_none() {
+                if shared.finals[j].0.get().is_none() {
                     shared.final_waits.fetch_add(1, Relaxed);
                 }
                 let pivot = loop {
-                    if let Some(done) = shared.finals[j].get() {
+                    if let Some(done) = shared.finals[j].0.get() {
                         break done;
                     }
                     if !backoff(shared, &mut round, self.deadline) {
@@ -373,7 +401,7 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             }
         }
         shared.charge(Self::entry_bytes(&row), self.live_limit);
-        let published = shared.finals[k].set(Outcome {
+        let published = shared.finals[k].0.set(Outcome {
             kind,
             row,
             products: early + later,

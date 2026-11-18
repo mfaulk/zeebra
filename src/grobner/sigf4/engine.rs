@@ -769,6 +769,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         };
         self.stats.claim_announcement_waits += report.announcement_waits;
         self.stats.claim_final_waits += report.final_waits;
+        self.stats.claim_phase_a += report.phase_a;
+        self.stats.claim_cascade += report.cascade;
         self.stats.claim_peak_live_bytes =
             self.stats.claim_peak_live_bytes.max(report.peak_live_bytes);
         let mut results = Vec::new();
