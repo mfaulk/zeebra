@@ -449,25 +449,30 @@ fn xor_text(xor: &Xor) -> String {
 }
 
 struct DriverRun {
-    sat: bool,
+    /// `None` when CMS hit `--max-time` undecided.
+    sat: Option<bool>,
     solve: Duration,
     rank: Option<usize>,
     dimension: Option<usize>,
+    /// Gauss-Jordan matrices CMS reports building, read from its own log under `--verbose`.
+    matrices: Option<usize>,
 }
 
-fn cms(driver: &Path, file: &Path, gauss: bool, dimension: bool) -> DriverRun {
+const CMS_SECONDS: u64 = 30;
+
+fn cms(driver: &Path, file: &Path, gauss: bool, check: bool) -> DriverRun {
     let mut command = Command::new(driver);
-    command.args(["--max-time", "30"]);
+    command.args(["--max-time", &CMS_SECONDS.to_string()]);
     if !gauss {
         command.arg("--no-gauss");
     }
-    if dimension {
-        command.arg("--dimension");
+    if check {
+        command.args(["--dimension", "--verbose"]);
     }
     let output = command.arg(file).output().expect("cms-xor-driver runs");
     let text = String::from_utf8_lossy(&output.stdout);
     assert!(
-        output.status.success(),
+        matches!(output.status.code(), Some(0 | 3)),
         "cms-xor-driver failed on {}: {text}",
         file.display()
     );
@@ -475,12 +480,27 @@ fn cms(driver: &Path, file: &Path, gauss: bool, dimension: bool) -> DriverRun {
         text.lines()
             .find_map(|l| l.strip_prefix(key)?.strip_prefix(' ').map(str::to_owned))
     };
+    let matrices = text.lines().find_map(|l| {
+        let rest = l.strip_prefix("c [matrix] Using ")?;
+        rest.split_whitespace().next()?.parse().ok()
+    });
     DriverRun {
-        sat: field("status").as_deref() == Some("sat"),
+        sat: match field("status").as_deref() {
+            Some("sat") => Some(true),
+            Some("unsat") => Some(false),
+            _ => None,
+        },
         solve: Duration::from_nanos(field("solve_ns").expect("solve_ns").parse().unwrap()),
         rank: field("rank").map(|v| v.parse().unwrap()),
         dimension: field("dimension").map(|v| v.parse().unwrap()),
+        matrices,
     }
+}
+
+fn shown(run: Option<Duration>) -> String {
+    run.map_or(format!("undecided at {CMS_SECONDS} s"), |d| {
+        format!("{:.0}", micros(d))
+    })
 }
 
 const BACKENDS: [Backend; 3] = [Backend::Dense, Backend::Sparse, Backend::Adaptive];
@@ -496,8 +516,8 @@ struct Replayed {
     pack: Duration,
     packed: Duration,
     export: Duration,
-    cms_gauss: Option<Duration>,
-    cms_plain: Option<Duration>,
+    /// Matrices built, Gauss time, no-Gauss time; `None` when no driver was found.
+    cms: Option<(String, String, String)>,
 }
 
 fn replay_matrix<const N: usize>(
@@ -552,29 +572,39 @@ fn replay_matrix<const N: usize>(
     let rank = statistics.rank;
     let dimension = export(macaulay).variables - rank;
 
-    // The independent check comes before any CMS time is kept.
-    let (mut cms_gauss, mut cms_plain) = (None, None);
-    if let Some(driver) = driver {
+    // The independent check comes before any CMS time is kept: a matrix CMS cannot decide gets
+    // no agreement and no time, rather than a time without the agreement.
+    let cms_columns = driver.map(|driver| {
         let checked = cms(driver, file, true, true);
-        assert!(
-            checked.sat,
-            "a planted system's linearization is consistent"
-        );
+        let Some(sat) = checked.sat else {
+            let undecided = shown(None);
+            return ("-".into(), undecided.clone(), undecided);
+        };
+        assert!(sat, "a planted system's linearization is consistent");
         assert_eq!(checked.rank, Some(rank), "CMS and Zeebra disagree on rank");
         assert_eq!(
             checked.dimension,
             Some(dimension),
             "CMS and Zeebra disagree on dimension"
         );
-        let mut best = Duration::MAX;
+        let mut best = Some(Duration::MAX);
         for _ in 0..reps {
-            best = best.min(cms(driver, file, true, false).solve);
+            let run = cms(driver, file, true, false);
+            best = match (best, run.sat) {
+                (Some(b), Some(true)) => Some(b.min(run.solve)),
+                (_, Some(false)) => panic!("CMS contradicted itself on satisfiability"),
+                _ => None,
+            };
         }
-        cms_gauss = Some(best);
         let plain = cms(driver, file, false, false);
-        assert!(plain.sat, "Gauss-off CMS must agree on satisfiability");
-        cms_plain = Some(plain.solve);
-    }
+        assert_ne!(
+            plain.sat,
+            Some(false),
+            "Gauss-off CMS must agree on satisfiability"
+        );
+        let matrices = checked.matrices.map_or("?".into(), |m| m.to_string());
+        (matrices, shown(best), shown(plain.sat.map(|_| plain.solve)))
+    });
     Replayed {
         shape: (matrix.num_rows(), matrix.num_columns(), matrix.nonzeros()),
         rank,
@@ -586,21 +616,21 @@ fn replay_matrix<const N: usize>(
         pack,
         packed,
         export: export_time,
-        cms_gauss,
-        cms_plain,
+        cms: cms_columns,
     }
 }
 
 fn replay_instance<const N: usize>(reps: usize, driver: Option<&Path>, dir: &Path) {
     let (system, _) = planted::<N>(220, N, 0, 0.5);
     let system = with_field_equations(&system).expect("GF(2) has an order");
-    let shown = |d: Option<Duration>| d.map_or("not run".into(), |d| format!("{:.0}", micros(d)));
     for (index, macaulay) in macaulay_matrices(&system).iter().enumerate() {
         let file = dir.join(format!("mq{N}-{index}.xor"));
         let r = replay_matrix(macaulay, reps, driver, &file);
         let per_op = |d: Duration| d.as_nanos() as f64 / r.row_operations.max(1) as f64;
+        let not_run = || "not run".to_string();
+        let (matrices, gauss, plain) = r.cms.unwrap_or_else(|| (not_run(), not_run(), not_run()));
         println!(
-            "| n={N} #{index} | {}x{} | {} | {} | {} | {} | {} | {} | {:.0} | {:.0} | {:.0} | {:.1} | {:.1} | {:.0} + {:.0} | {:.0} | {} | {} |",
+            "| n={N} #{index} | {}x{} | {} | {} | {} | {} | {} | {} | {:.0} | {:.0} | {:.0} | {:.1} | {:.1} | {:.0} + {:.0} | {:.0} | {matrices} | {gauss} | {plain} |",
             r.shape.0,
             r.shape.1,
             r.shape.2,
@@ -617,8 +647,6 @@ fn replay_instance<const N: usize>(reps: usize, driver: Option<&Path>, dir: &Pat
             micros(r.pack),
             micros(r.packed),
             micros(r.export),
-            shown(r.cms_gauss),
-            shown(r.cms_plain),
         );
     }
 }
@@ -634,8 +662,8 @@ fn replay(reps: usize) {
         None => println!("no cms-xor-driver found (ZEEBRA_EXT_PREFIX); CMS columns not run\n"),
     }
     println!("Microseconds, minimum of {reps}; CMS is its first solve() only, in-process.\n");
-    println!("| matrix | rows x cols | nonzeros | rank | dimension | row ops | packed row xors | peak live | Dense | Sparse | Adaptive | Sparse ns/op | Adaptive ns/op | packed: pack + RREF | XOR export | CMS Gauss | CMS no Gauss |");
-    println!("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+    println!("| matrix | rows x cols | nonzeros | rank | dimension | row ops | packed row xors | peak live | Dense | Sparse | Adaptive | Sparse ns/op | Adaptive ns/op | packed: pack + RREF | XOR export | CMS GJ matrices | CMS Gauss | CMS no Gauss |");
+    println!("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
     replay_instance::<8>(reps, driver.as_deref(), &dir);
     replay_instance::<10>(reps, driver.as_deref(), &dir);
     replay_instance::<12>(reps, driver.as_deref(), &dir);
@@ -785,17 +813,20 @@ fn preprocess(reps: usize) {
         "kissat: {}; every model checked against the original system\n",
         kissat_bin.display()
     );
-    println!("Wall milliseconds, minimum of {reps}, one kissat process per run; CNF cut at 4.\n");
+    println!("Wall milliseconds, minimum of {reps} (one run at n = 24), one kissat process per run; CNF cut at 4.\n");
     println!("| instance | CNF clauses / vars | after elimination | kissat alone | eliminate + kissat | of which eliminate | ratio | F4 solve_one alone | F4 after elimination |");
     println!("|---|---|---|---|---|---|---|---|---|");
-    for seed in [1u64, 2, 3] {
-        preprocess_instance::<16, 12>(seed, reps, &kissat_bin, &dir, true);
+    // CDCL time varies across instances far more than across repetitions, so seeds, not reps,
+    // are what the larger sizes spend their budget on. n = 28 took 94 s alone on one seed.
+    let f4 = env::var_os("ZEEBRA_SAT_SKIP_F4").is_none();
+    for seed in 1..=5 {
+        preprocess_instance::<16, 12>(seed, reps, &kissat_bin, &dir, f4);
     }
-    for seed in [1u64, 2, 3] {
-        preprocess_instance::<24, 18>(seed, reps, &kissat_bin, &dir, false);
+    for seed in 1..=5 {
+        preprocess_instance::<20, 15>(seed, reps, &kissat_bin, &dir, f4);
     }
-    for seed in [1u64, 2, 3] {
-        preprocess_instance::<28, 21>(seed, reps, &kissat_bin, &dir, false);
+    for seed in 1..=5 {
+        preprocess_instance::<24, 18>(seed, 1, &kissat_bin, &dir, false);
     }
     let _ = fs::remove_dir_all(&dir);
 }

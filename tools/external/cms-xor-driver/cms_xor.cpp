@@ -57,9 +57,11 @@ bool read_system(const char* path, System& out) {
   return out.rows.size() == expected;
 }
 
+// Gauss is on by default. set_allow_otf_gauss() is deliberately not called: combined with
+// autodisablegauss off it left a 430 x 676 system undecided after 60 s that the defaults decide in
+// 13 ms, with the same matrix built.
 void load(SATSolver& solver, const System& system, bool gauss) {
   if (gauss) {
-    solver.set_allow_otf_gauss();
     solver.set_option("autodisablegauss", "0");
   } else {
     solver.set_max_num_matrices(0);
@@ -77,7 +79,7 @@ const char* name(CMSat::lbool value) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  bool gauss = true, dimension = false;
+  bool gauss = true, dimension = false, verbose = false;
   double max_time = 60.0;
   const char* path = nullptr;
   for (int i = 1; i < argc; i++) {
@@ -86,6 +88,8 @@ int main(int argc, char** argv) {
       return 0;
     } else if (!std::strcmp(argv[i], "--no-gauss")) {
       gauss = false;
+    } else if (!std::strcmp(argv[i], "--verbose")) {
+      verbose = true;
     } else if (!std::strcmp(argv[i], "--dimension")) {
       dimension = true;
     } else if (!std::strcmp(argv[i], "--max-time") && i + 1 < argc) {
@@ -96,12 +100,14 @@ int main(int argc, char** argv) {
   }
   System system;
   if (!path || !read_system(path, system)) {
-    std::fprintf(stderr, "usage: cms-xor-driver [--no-gauss] [--dimension] [--max-time s] <in.xor>\n");
+    std::fprintf(stderr, "usage: cms-xor-driver [--no-gauss] [--dimension] [--verbose] [--max-time s] <in.xor>\n");
     return 2;
   }
 
   SATSolver solver;
   solver.set_max_time(max_time);
+  // CMS's own log, "c "-prefixed, says whether a Gauss-Jordan matrix was built.
+  if (verbose) solver.set_verbosity(1);
   load(solver, system, gauss);
   auto start = std::chrono::steady_clock::now();
   CMSat::lbool status = solver.solve();
