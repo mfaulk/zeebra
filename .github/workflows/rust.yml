@@ -179,9 +179,13 @@ jobs:
           cargo test --features research-sigf4 --example sig_f4_study
           cargo test --features research-sigf4-replay --lib grobner::sigf4::replay
           cargo test --features research-sigf4-replay --example sig_f4_study
+          cargo test --features research-sigf4-split --lib grobner::sigf4
+          cargo test --features research-sigf4-split --example sig_f4_study
           python3 research/m30-sigf4/test_run.py
           python3 research/m30-sigf4/summarize.py research/m30-sigf4/{gate,controls,gate2,controls2}.jsonl.gz | diff - research/m30-sigf4/tables.md
           python3 research/m30-final/test_campaign.py
+          python3 research/m31-baseline/test_campaign.py
+          python3 research/m31-baseline/summarize.py research/m31-baseline/walls.jsonl.gz research/m31-baseline/split.jsonl.gz | diff - research/m31-baseline/tables.md
           python3 research/m30-final/summarize.py research/m30-final | diff - research/m30-final/tables.md
           python3 tools/test/multirow-study-test.py
           python3 tools/test/public-corpus-test.py

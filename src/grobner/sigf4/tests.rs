@@ -304,3 +304,35 @@ proptest! {
         prop_assert_eq!(actual, expected);
     }
 }
+
+/// The #901 split accounts for every coefficient product, per batch, at one and four workers.
+#[cfg(feature = "research-sigf4-split")]
+#[test]
+fn test_elimination_split_accounts_for_every_product() {
+    let system = katsura::<6, Goldilocks>();
+    for workers in [1, 4] {
+        let options = SigF4Options {
+            workers,
+            ..SigF4Options::checked()
+        };
+        let (_, s) = sig_f4_reported(&system, GREVLEX, &options);
+        let log = &s.split;
+        assert_eq!(log.batches.len(), s.batches);
+        let sum: u64 = log
+            .batches
+            .iter()
+            .map(|b| b.parallel_products + b.serial_reducer_products + b.cascade_products)
+            .sum();
+        assert_eq!(sum, s.coefficient_products);
+        assert_eq!(
+            log.batches.iter().map(|b| b.targets).sum::<usize>(),
+            s.targets
+        );
+        assert!(log.batches.iter().any(|b| b.cascade_products > 0));
+        if workers == 1 {
+            assert!(log.batches.iter().all(|b| b.parallel_products == 0));
+        } else {
+            assert!(log.batches.iter().any(|b| b.parallel_products > 0));
+        }
+    }
+}
