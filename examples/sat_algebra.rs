@@ -765,29 +765,38 @@ fn preprocess_instance<const N: usize, const M: usize>(
         }
     }
 
-    let timed = |run: &dyn Fn() -> bool| {
+    // A typed refusal under the default budget is a result, and is reported as one.
+    let timed = |run: &dyn Fn() -> Result<bool, String>| {
         if !run_f4 {
             return "not run".to_string();
         }
         let start = Instant::now();
-        assert!(run(), "solve_one's point fails the original system");
-        format!("{:.1}", millis(start.elapsed()))
+        match run() {
+            Ok(verified) => {
+                assert!(verified, "solve_one's point fails the original system");
+                format!("{:.1}", millis(start.elapsed()))
+            }
+            Err(refusal) => format!("refused: {refusal}"),
+        }
     };
     let f4_alone = timed(&|| {
         let closed = with_field_equations(&system).expect("GF(2) has an order");
         let mut rng = StdRng::seed_from_u64(seed);
         let x = solve_one(&closed, &mut rng)
-            .expect("solvable")
+            .map_err(|e| format!("{e:?}"))?
             .expect("a point");
-        vanishes(&system, &x)
+        Ok(vanishes(&system, &x))
     });
     let f4_after = timed(&|| {
         let closed = with_field_equations(&projected).expect("GF(2) has an order");
         let mut rng = StdRng::seed_from_u64(seed);
         let x = solve_one(&closed, &mut rng)
-            .expect("solvable")
+            .map_err(|e| format!("{e:?}"))?
             .expect("a point");
-        vanishes(&system, &record.lift(&x).expect("M kept variables"))
+        Ok(vanishes(
+            &system,
+            &record.lift(&x).expect("M kept variables"),
+        ))
     });
 
     println!(
