@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use zeebra::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
-        certify_f4_output,
+        certify_f4_output_with_workers,
         differential::polynomial_to_string,
         external::corpus,
         f4_reported, f4_signature_reported,
@@ -534,9 +534,11 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let certification = match (&result, args.certify) {
         (Ok(basis), true) => {
             let clock = Instant::now();
-            let report = certify_f4_output(&system, basis, ORDER);
+            // On the run's workers: serially, Eco-12's certificate outran its 600 s budget (#887).
+            let report = certify_f4_output_with_workers(&system, basis, ORDER, args.workers);
             Json::object([
                 ("checks_passed", Json::Bool(report.checks_passed())),
+                ("complete", Json::Bool(report.is_complete())),
                 ("ns", Json::nanos(clock.elapsed())),
             ])
         }
