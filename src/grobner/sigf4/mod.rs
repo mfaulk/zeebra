@@ -11,6 +11,8 @@
 #[cfg(feature = "external-runners")]
 pub mod corpus;
 mod engine;
+#[cfg(feature = "research-sigf4-replay")]
+pub mod replay;
 pub mod signature;
 #[cfg(test)]
 mod tests;

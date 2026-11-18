@@ -553,11 +553,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let mut results: Vec<(Signature<N>, Vec<(u32, F)>)> = Vec::new();
         let mut workspace = Workspace::new(ncols);
         let check = self.options.check_signatures;
+        #[cfg(feature = "research-sigf4-replay")]
+        let mut replay = super::replay::Recorder::new(ncols);
         for (t, raw) in &targets {
             let t = *t;
             let (entries, earlier) = prereduced.next().unwrap_or_else(|| (raw.clone(), 0));
             let (mut out, later) = workspace.reduce(&entries, |c| {
-                if let Some(pivot) = block.admissible(c, &t) {
+                let pivot = if let Some(pivot) = block.admissible(c, &t) {
                     Some(pivot)
                 } else if target_at[c] != NONE {
                     let (s, entries) = &results[target_at[c] as usize];
@@ -565,11 +567,20 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                         !check || s.cmp_in(&t, order) == Ordering::Less,
                         "an earlier target must have a smaller signature"
                     );
-                    Some(entries)
+                    Some(entries.as_slice())
                 } else {
                     None
-                }
+                };
+                #[cfg(feature = "research-sigf4-replay")]
+                replay.step(
+                    c,
+                    pivot.map(<[_]>::len),
+                    pivot.is_some() && block.admissible(c, &t).is_none(),
+                );
+                pivot
             });
+            #[cfg(feature = "research-sigf4-replay")]
+            replay.end(earlier, out.first().map(|e| e.0));
             let products = earlier + later;
             self.stats.coefficient_products += products;
             if out.is_empty() {
@@ -595,6 +606,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             target_at[lead] = results.len() as u32;
             results.push((t, out));
         }
+        #[cfg(feature = "research-sigf4-replay")]
+        replay.finish();
         self.stats.elimination += clock.elapsed();
         results
             .into_iter()

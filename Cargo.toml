@@ -84,6 +84,11 @@ research-multirow = []
 # dependency-free `external-runners` corpus types for its pinned correctness constructions.
 research-sigf4 = ["external-runners"]
 
+# #902's replay of the cross-target cascade (`sigf4::replay`): engine call sites that record each
+# batch's dependency trace when a recording is active. Separate so the plain research engine
+# compiles none of it.
+research-sigf4-replay = ["research-sigf4"]
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
