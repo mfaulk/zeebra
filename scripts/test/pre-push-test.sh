@@ -99,4 +99,17 @@ rm -f "$scratch/ran"
 [[ ! -f "$scratch/ran" ]] || { echo "FAIL: deletion ran ci-lint" >&2; exit 1; }
 checks=$((checks + 1))
 
+# A branch that predates scripts/ci-lint.sh exits 0 with a notice instead of failing the push.
+git -C "$repo" rm -q scripts/ci-lint.sh
+echo 'fn f() {}' > "$repo/lib2.rs"
+git -C "$repo" add lib2.rs
+git -C "$repo" commit -q -m old-branch
+sha="$(git -C "$repo" rev-parse HEAD)"
+rc=0
+notice="$(cd "$repo" && printf 'refs/heads/x %s refs/heads/x %040d\n' "$sha" 0 | bash "$HOOK" 2>&1)" || rc=$?
+[[ $rc -eq 0 ]] || { echo "FAIL: missing ci-lint.sh exited $rc: $notice" >&2; exit 1; }
+[[ "$notice" == *"predates scripts/ci-lint.sh"* ]] \
+    || { echo "FAIL: missing ci-lint.sh gave no notice: $notice" >&2; exit 1; }
+checks=$((checks + 1))
+
 echo "pre-push: $checks checks passed"
