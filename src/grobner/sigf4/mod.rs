@@ -8,6 +8,9 @@
 //! join the basis only after the batch. The reduced basis is unique, so the output must equal
 //! [`crate::grobner::f4()`]'s coefficient for coefficient.
 
+#[cfg(test)]
+mod cascade_tests;
+mod claim;
 #[cfg(feature = "external-runners")]
 pub mod corpus;
 mod engine;
@@ -42,6 +45,15 @@ pub struct SigF4Options {
     /// §6.1 item 1). `1` is design 1, fully serial. A field that is not `Send + Sync` runs the
     /// same pass serially.
     pub workers: usize,
+    /// Finish each batch's cascade on `workers` threads under #902's "prereduce + claim" schedule
+    /// (M31-S2, #904) instead of design 2's serial pass. Every result row equals design 1's.
+    pub parallel_cascade: bool,
+    /// Bytes one batch of the parallel cascade may hold: its sparse rows, pre-reduced and final
+    /// rows, per-worker workspaces and coordination metadata. Crossing it abandons the batch with
+    /// [`F4Error::TooManyLiveBytes`]. `None` is unbounded; the serial designs do not read it.
+    pub max_live_bytes: Option<usize>,
+    #[cfg(test)]
+    pub(crate) adversary: Option<claim::Adversary>,
 }
 
 impl Default for SigF4Options {
@@ -54,6 +66,10 @@ impl Default for SigF4Options {
             certify: false,
             check_signatures: false,
             workers: 1,
+            parallel_cascade: false,
+            max_live_bytes: Some(crate::grobner::F4Options::default().max_live_bytes),
+            #[cfg(test)]
+            adversary: None,
         }
     }
 }
@@ -149,6 +165,15 @@ pub struct SigF4Statistics {
     pub elimination: Duration,
     pub interreduction: Duration,
     pub total: Duration,
+    /// Parallel cascade only: times a target waited for every earlier target's announcement, and
+    /// for an earlier target's final row; and the most live bytes any batch held.
+    pub claim_announcement_waits: u64,
+    pub claim_final_waits: u64,
+    pub claim_peak_live_bytes: usize,
+    /// Per completed batch, each target's outcome and exact row in signature order: the oracle
+    /// Theorem 1 of #902 makes per-batch.
+    #[cfg(test)]
+    pub(crate) batch_trace: Vec<Vec<String>>,
     /// #901's elimination split and glue clocks; collected only under `research-sigf4-split`.
     #[cfg(feature = "research-sigf4-split")]
     pub split: SplitLog,
