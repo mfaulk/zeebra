@@ -97,6 +97,8 @@ fn eliminate<F: FiniteField>(acc: &mut [F], rows: &[(usize, F)], factors: &[F]) 
 }
 
 /// `y[i] -= x[i] * factor` over 1,024 L1-resident cells: the step's arithmetic ceiling.
+// `a - b` rather than `-=`: the same `Sub` the shipped step calls, and the code `25d9588a` measured.
+#[allow(clippy::assign_op_pattern)]
 fn l1_axpy<F: FiniteField>(steps: usize) -> (usize, Duration) {
     let mut mix = Mix(7);
     let x: Vec<F> = (0..1024).map(|_| mix.element()).collect();

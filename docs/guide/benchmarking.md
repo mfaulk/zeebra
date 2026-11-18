@@ -729,6 +729,26 @@ also prices the sweep at the forward pass's own ns per coefficient product; take
 build, since those hooks sit in the hot loop. An entry whose elimination crosses its own capture
 budget is reported as refused and then timed unbounded.
 
+`block_density -- residual-work <label substring>` (and `residual-work-large`; #86, needs
+`--features research-work`) is untimed. It counts the shipped backend's coefficient products and
+dense-row cell traffic on the echelon and back-substitution of `D'` alone, beside the sweep's exact
+count and the dense model's, so it needs no benchmark lock.
+
+`gpu_kernel_census` is #86's instrument (`docs/research/gpu-kernel-classification.md`). Its
+`ceilings` mode times the shipped elimination step `acc[c] -= v * factor` per field, with the pivot
+entries resident in L2, L3 and DRAM, against a contiguous L1 loop and one core's streaming read.
+That separates arithmetic-, index- and bandwidth-bound fields. `f4 --system S --field F --workers W`
+runs one public system (Katsura, Cyclic, seeded MQ) over GF(2^31-1), Goldilocks, BN254 Fr or
+`Gf256Mq` with stage clocks. Add `--work` (with `--features research-work`) for the entry census
+that gives logical bytes per product. `research/gpu-kernels/run.sh` drives both, timing under the
+benchmark lock, and `research/gpu-kernels/analyze.py` prints the tables.
+
+```bash
+cargo run --release --example gpu_kernel_census -- ceilings --reps 5
+cargo run --release --features research-work --example gpu_kernel_census -- \
+  f4 --system katsura-9 --field bn254 --workers 1 --work
+```
+
 `accumulator_span` answers whether the shipped elimination backend has a loop a SIMD kernel could
 go in. `Backend::Adaptive`'s inner operation walks the *pivot's* sparse entries and indexes a dense
 buffer, which is a gather and a scatter; the only contiguous alternative updates the pivot's whole

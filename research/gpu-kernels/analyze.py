@@ -69,7 +69,8 @@ def new_rows():
                 continue
             key = f'{r["system"]}/{r["field"]}'
             if r.get("work"):
-                census[key] = r
+                if r["work"]["forward"]["coefficient_products"] > 0:
+                    census[key] = r
             else:
                 stats = dict(r["statistics"])
                 rep = {"statistics": stats, "f4_call_ns": r["f4_call_ns"],

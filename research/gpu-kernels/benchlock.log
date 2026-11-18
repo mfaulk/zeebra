@@ -1,0 +1,6 @@
+2026-11-18T16:11:05-05:00  QUEUED   zb-86           pid=2678648  taskset -c 48 /buildcache/cargo-target/zeebra-86/bin/stock/gpu_kernel_censu
+2026-11-18T16:11:05-05:00  START    zb-86           pid=2678648  waited=0s load=1.90 lock=exclusive taskset -c 48 /buildcache/cargo-target/z
+2026-11-18T16:11:54-05:00  END      zb-86           pid=2678648  status=0 end=exited elapsed=49s load=2.02 taskset -c 48 /buildcache/cargo-t
+2026-11-18T16:12:05-05:00  QUEUED   zb-86           pid=2679413  bash /tmp/tmp.sNnqnryV9N
+2026-11-18T16:12:05-05:00  START    zb-86           pid=2679413  waited=0s load=1.94 lock=exclusive bash /tmp/tmp.sNnqnryV9N
+2026-11-18T16:14:06-05:00  END      zb-86           pid=2679413  status=0 end=exited elapsed=121s load=2.20 bash /tmp/tmp.sNnqnryV9N

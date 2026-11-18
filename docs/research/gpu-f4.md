@@ -250,3 +250,9 @@ kernel is ever proposed for F4, it is the dense echelon of `D'` on instances at 
 
 Handoffs: the density and work-share numbers to #86 (E1); the "mechanism unknown" finding to #69;
 the missing GF(2^8) random-MQ corpus entry and §5 step 1 as #804 and #803.
+
+#86's answer is [`gpu-kernel-classification.md`](gpu-kernel-classification.md). On every field
+width, no F4 kernel is bandwidth-bound on the CPU. The `D'` block has the crate's only
+transfer intensity in the hundreds (267 multiply-adds per byte on `mq-random-14`), but it is about
+6% of a complete `mq-random-10` run and an estimated ~48% of the bounded `mq-random-14` run, so E4
+is **no-go** until #918 measures a complete instance at or above half.
