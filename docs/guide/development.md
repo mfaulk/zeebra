@@ -187,10 +187,15 @@ manual dispatch. Debug doctests run on code and guide/README PRs; optimized doct
 ignored engine/corpus tests run on main, schedules and manual dispatch. This trades immediate
 example-link and optimized-doctest feedback for shorter PR latency without dropping those checks.
 
+The optimized job selects `--tests`: the library, binary, integration tests and the examples marked
+`test = true`. A bare `cargo test` also compiles every `test = false` example, which runs nothing
+there and was 60% of that job's compile time on `main` (#921); the debug job and Clippy still
+compile them.
+
 ```sh
 cargo nextest run --profile ci
-cargo test --profile ci-release --no-run --timings
-cargo nextest run --profile ci --cargo-profile ci-release
+cargo test --profile ci-release --tests --no-run --timings
+cargo nextest run --profile ci --cargo-profile ci-release --tests
 cargo test --doc -- --test-threads=4
 # Match the optimized checks outside PRs:
 CARGO_PROFILE_CI_RELEASE_OPT_LEVEL=3 CARGO_PROFILE_CI_RELEASE_LTO=thin \

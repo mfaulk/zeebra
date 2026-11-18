@@ -217,10 +217,12 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       # Separate build/execution so the logs distinguish compiler time from test time.
+      # `--tests` skips the `test = false` examples: they run nothing here, the debug job and Clippy
+      # check they compile, and building them optimized was 60% of this job's compile time (#921).
       - name: Build release tests
-        run: cargo test --profile ci-release --no-run --timings
+        run: cargo test --profile ci-release --tests --no-run --timings
       - name: Test (release)
-        run: cargo nextest run --profile ci --cargo-profile ci-release
+        run: cargo nextest run --profile ci --cargo-profile ci-release --tests
       # This workload regressed when reduced batch rows raised the live-entry demand.
       # Run it on PRs too; the debug build keeps it ignored for cost.
       - name: Reduced batch live-budget regression
