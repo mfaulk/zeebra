@@ -1,6 +1,7 @@
 //! Fresh-process Zeebra for `tools/external/comparand-scaling.py` (#820): reads the request JSON the
 //! native comparand drivers read and prints one result object, so Zeebra's process wall is taken on
-//! the same boundary as theirs. F4 never uses more forward workers than the request's `workers`.
+//! the same boundary as theirs. F4 never uses more forward or symbolic workers than the
+//! request's `workers`.
 //!
 //! cargo run --release --example zeebra_driver -- REQUEST.json
 use std::time::{Duration, Instant};

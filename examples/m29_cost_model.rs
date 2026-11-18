@@ -17,7 +17,7 @@ use zeebra::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
         differential::polynomial_to_string, external::corpus, f4_reported, BatchOrder, F4Options,
-        F4Statistics, HilbertSelection, PairMultiples, ParallelForward,
+        F4Statistics, HilbertSelection, PairMultiples, ParallelForward, ParallelSymbolic,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -142,7 +142,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     Ok(parsed)
 }
 
-/// Shipping defaults with forward elimination serial at one worker and capped at `workers` above.
+/// Shipping defaults with forward elimination and the symbolic team serial at one worker and capped
+/// at `workers` above.
 fn options(args: &Args) -> F4Options {
     F4Options {
         measure_stages: args.stages,
@@ -155,6 +156,13 @@ fn options(args: &Args) -> F4Options {
             ParallelForward::Serial
         } else {
             ParallelForward::Auto {
+                max_workers: args.workers,
+            }
+        },
+        parallel_symbolic: if args.workers == 1 {
+            ParallelSymbolic::Serial
+        } else {
+            ParallelSymbolic::Auto {
                 max_workers: args.workers,
             }
         },
@@ -538,6 +546,18 @@ mod tests {
         assert_eq!(sixteen.elimination, default.elimination);
         assert_eq!(sixteen.max_live_bytes, default.max_live_bytes);
         assert!(!sixteen.measure_stages);
+    }
+
+    // The symbolic team is capped at the worker count, as forward elimination is (#883).
+    #[test]
+    fn workers_cap_the_symbolic_team() {
+        let one = options(&args(&["--target", "eco12-wide64", "--workers", "1"]).unwrap());
+        assert_eq!(one.parallel_symbolic, ParallelSymbolic::Serial);
+        let four = options(&args(&["--target", "eco12-wide64", "--workers", "4"]).unwrap());
+        assert_eq!(
+            four.parallel_symbolic,
+            ParallelSymbolic::Auto { max_workers: 4 }
+        );
     }
 
     // `--certify` turns on F4's own certificate and nothing else; timed runs leave it off.
