@@ -5033,19 +5033,26 @@ fn test_parallel_symbolic_configuration_selects_the_serial_fallback() {
         configured(&with(ParallelSymbolic::Auto { max_workers: 1 })),
         None
     );
-    let config = configured(&with(ParallelSymbolic::Auto { max_workers: 16 })).unwrap();
-    assert_eq!(config.workers, 16);
-    assert_eq!(config.merge, Merge::Serial);
+    // The team is clamped to the CPUs this process may use (#886), so a runner with fewer than
+    // sixteen gets fewer, and one with a single CPU takes the serial closure.
+    let team = 16.min(available_parallelism());
+    match configured(&with(ParallelSymbolic::Auto { max_workers: 16 })) {
+        None => assert_eq!(team, 1),
+        Some(config) => {
+            assert_eq!(config.workers, team);
+            assert_eq!(config.merge, Merge::Serial);
+            assert_eq!(config.min_frontier, ParallelSymbolic::min_frontier(team));
+            assert_eq!(config.retain, Retain::Batch);
+        }
+    }
     // Not #860's 256: one 256-wide Katsura-7 step cost 1.18x at 16 workers, and a team of 16 needs
     // 768, because a 512-wide Katsura-8 step still cost it 1.06x (#861). Smaller teams start at 512.
-    assert_eq!(config.min_frontier, 768);
-    assert_eq!(config.retain, Retain::Batch);
-    for (workers, frontier) in [(2, 512), (4, 512), (8, 512), (32, 1536)] {
-        let config = configured(&with(ParallelSymbolic::Auto {
-            max_workers: workers,
-        }))
-        .unwrap();
-        assert_eq!(config.min_frontier, frontier, "{workers} workers");
+    for (workers, frontier) in [(2, 512), (4, 512), (8, 512), (16, 768), (32, 1536)] {
+        assert_eq!(
+            ParallelSymbolic::min_frontier(workers),
+            frontier,
+            "{workers} workers"
+        );
     }
     assert_eq!(
         ParallelSymbolic::Auto { max_workers: 0 }.workers(),

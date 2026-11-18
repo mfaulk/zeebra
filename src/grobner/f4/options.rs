@@ -189,8 +189,8 @@ pub enum ParallelForward {
     #[default]
     Serial,
 
-    /// [`ParallelForward::auto_workers`] picks per batch, never above `max_workers`; zero means
-    /// the machine's available parallelism.
+    /// [`ParallelForward::auto_workers`] picks per batch, never above `max_workers` or the
+    /// process's available parallelism; zero means the available parallelism.
     Auto {
         /// Upper bound on threads for one batch.
         max_workers: usize,
@@ -243,14 +243,11 @@ impl ParallelForward {
             Self::Serial => 1,
             Self::Forced { workers } => workers.min(lower_rows).max(1),
             Self::Auto { .. } if lower_nonzeros < Self::MIN_LOWER_NONZEROS => 1,
-            Self::Auto { max_workers } => {
-                let max_workers = if max_workers == 0 {
-                    available_parallelism()
-                } else {
-                    max_workers
-                };
-                Self::auto_workers(lower_rows, lower_nonzeros, max_workers)
-            }
+            Self::Auto { max_workers } => Self::auto_workers(
+                lower_rows,
+                lower_nonzeros,
+                clamp_workers(max_workers, available_parallelism()),
+            ),
         }
     }
 }
@@ -273,8 +270,8 @@ pub enum ParallelSymbolic {
     Serial,
 
     /// A team of up to `max_workers` threads, the caller included, for each batch with a step at
-    /// least [`ParallelSymbolic::min_frontier`] wide; zero means the available parallelism. One
-    /// worker is the serial closure.
+    /// least [`ParallelSymbolic::min_frontier`] wide; zero means the available parallelism, and a
+    /// nonzero cap is clamped to it. One worker is the serial closure.
     Auto {
         /// Threads in one batch's team.
         max_workers: usize,
@@ -308,8 +305,7 @@ impl ParallelSymbolic {
     pub fn workers(self) -> usize {
         match self {
             Self::Serial => 1,
-            Self::Auto { max_workers: 0 } => available_parallelism(),
-            Self::Auto { max_workers } => max_workers,
+            Self::Auto { max_workers } => clamp_workers(max_workers, available_parallelism()),
         }
     }
 }
@@ -354,6 +350,18 @@ impl BatchOrder {
 pub(crate) fn available_parallelism() -> usize {
     static CPUS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
     *CPUS.get_or_init(|| std::thread::available_parallelism().map_or(1, usize::from))
+}
+
+/// The team an `Auto` policy may use given `available` CPUs: zero means all of them, and a nonzero
+/// cap never exceeds them (#886), so the default sixteen does not oversubscribe a process that
+/// `taskset` or a cgroup quota restricts.
+pub(crate) fn clamp_workers(max_workers: usize, available: usize) -> usize {
+    let available = available.max(1);
+    if max_workers == 0 {
+        available
+    } else {
+        max_workers.min(available)
+    }
 }
 
 /// How final interreduction reduces each basis element against the others.
@@ -1746,6 +1754,40 @@ mod tests {
                 bytes: usize::MAX,
                 limit: 16
             }
+        );
+    }
+
+    /// A nonzero `Auto` cap is clamped to the available CPUs, zero means all of them, and a
+    /// reported parallelism of zero still yields one worker (#886).
+    #[test]
+    fn test_auto_worker_cap_clamps_to_available_parallelism() {
+        use super::clamp_workers;
+        assert_eq!(clamp_workers(16, 2), 2);
+        assert_eq!(clamp_workers(16, 1), 1);
+        assert_eq!(clamp_workers(16, 128), 16);
+        assert_eq!(clamp_workers(4, 4), 4);
+        assert_eq!(clamp_workers(0, 6), 6);
+        assert_eq!(clamp_workers(1, 64), 1);
+        assert_eq!(clamp_workers(0, 0), 1);
+        assert_eq!(clamp_workers(16, 0), 1);
+    }
+
+    /// Both `Auto` policies resolve the default sixteen through the clamp, never above the
+    /// process's available parallelism (#886).
+    #[test]
+    fn test_default_auto_policies_do_not_exceed_available_parallelism() {
+        use super::{available_parallelism, ParallelForward, ParallelSymbolic};
+        let cpus = available_parallelism();
+        let options = F4Options::default();
+        assert_eq!(options.parallel_symbolic.workers(), 16.min(cpus));
+        assert_eq!(
+            options.parallel_forward.workers(1_000_000, usize::MAX / 2),
+            16.min(cpus)
+        );
+        assert_eq!(ParallelSymbolic::Auto { max_workers: 0 }.workers(), cpus);
+        assert_eq!(
+            ParallelForward::Auto { max_workers: 0 }.workers(1_000_000, usize::MAX / 2),
+            cpus
         );
     }
 }
