@@ -8,6 +8,11 @@
 //! outputs are compared coefficient for coefficient without holding both in one process. With
 //! `--features research-work`, `--discovery` adds the shipping F4's serial census: forward and
 //! backward coefficient products and those on rows that end zero (#835's instrument).
+//!
+//! With `--features research-sigf4-replay`, `--replay` (sigf4, `--workers ≥ 2`) runs design 1
+//! twice, without and with recording, then design 2 recorded, and prints #902's cascade records
+//! and schedule ceilings instead of a timing row; it refuses if recording moved any algebraic
+//! quantity (`docs/research/m31-parallel-signature-elimination.md`).
 use std::time::{Duration, Instant};
 use zeebra::{
     fields::PrimeFieldElement64,
@@ -35,6 +40,7 @@ struct Args {
     wall: Duration,
     certify: bool,
     discovery: bool,
+    replay: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -46,6 +52,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         wall: Duration::from_secs(600),
         certify: false,
         discovery: false,
+        replay: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -66,6 +73,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             }
             "--certify" => parsed.certify = true,
             "--discovery" => parsed.discovery = true,
+            "--replay" => parsed.replay = true,
             other => return Err(format!("unexpected argument {other}")),
         }
     }
@@ -77,6 +85,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     }
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
+    }
+    if parsed.replay && (parsed.engine != "sigf4" || parsed.workers < 2) {
+        return Err("--replay runs design 1 and design 2: --engine sigf4 --workers ≥ 2".into());
     }
     Ok(parsed)
 }
@@ -202,6 +213,157 @@ fn discovery(report: &zeebra::linalg::work::WorkReport) -> Json {
     ])
 }
 
+#[cfg(feature = "research-sigf4-replay")]
+fn basis_sha256<const N: usize, F: FiniteField>(
+    basis: &[MultivariatePolynomial<N, F>],
+    names: &[&str; N],
+) -> String {
+    let mut text: Vec<_> = basis
+        .iter()
+        .map(|p| polynomial_to_string(p, names, ORDER))
+        .collect();
+    text.sort();
+    sha256_hex(text.join("\n").as_bytes())
+}
+
+#[cfg(feature = "research-sigf4-replay")]
+mod cascade {
+    use super::*;
+    use zeebra::grobner::sigf4::replay::{ceiling, record, BatchRecord, SCHEDULES};
+
+    /// Every count the plan's validation names; timings excluded.
+    fn algebraic(s: &SigF4Statistics) -> Vec<u64> {
+        let counts = [
+            s.batches,
+            s.pairs_created,
+            s.pairs_singular,
+            s.rejected_product,
+            s.rejected_koszul,
+            s.rejected_zero_row,
+            s.rejected_rewrite,
+            s.rejected_duplicate,
+            s.targets,
+            s.reducer_rows,
+            s.reductions_to_zero,
+            s.singular_rows,
+            s.elements_added,
+            s.signature_basis_elements,
+            s.reduced_basis_elements,
+            s.syzygy_signatures,
+        ];
+        counts
+            .iter()
+            .map(|&v| v as u64)
+            .chain([
+                s.coefficient_products,
+                s.products_on_zero_rows,
+                s.products_on_singular_rows,
+            ])
+            .collect()
+    }
+
+    fn batch(r: &BatchRecord) -> Json {
+        let int = |v: u64| Json::int(v);
+        let size = |v: usize| Json::size(v);
+        Json::object([
+            ("columns", size(r.columns)),
+            ("targets", size(r.targets)),
+            ("zero_targets", size(r.zero_targets)),
+            ("reducer_steps", int(r.reducer_steps)),
+            ("target_steps", int(r.target_steps)),
+            ("surviving", int(r.surviving)),
+            ("shadowed", int(r.shadowed)),
+            ("phase_a", int(r.phase_a)),
+            ("max_phase_a", int(r.max_phase_a)),
+            ("cascade", int(r.cascade)),
+            ("max_target", int(r.max_target)),
+            ("dependent_targets", size(r.dependent_targets)),
+            ("edges", size(r.edges)),
+            ("depth", size(r.depth)),
+            ("width", size(r.width)),
+            ("cp_dag", int(r.critical[0])),
+            ("cp_frontier", int(r.critical[1])),
+            ("cp_claim", int(r.critical[2])),
+            ("would_displace", int(r.would_displace)),
+            ("displaced_suffix", int(r.displaced_suffix)),
+        ])
+    }
+
+    fn ratio(x: f64) -> Json {
+        Json::string(format!("{x:.3}"))
+    }
+
+    /// Ceilings at 4/8/16 workers against design 1's products, per arm and schedule.
+    fn ceilings(d1: &[BatchRecord], d2: &[BatchRecord]) -> Json {
+        let base: u64 = d1.iter().map(BatchRecord::work).sum();
+        let d2_work: u64 = d2.iter().map(BatchRecord::work).sum();
+        let mut rows = Vec::new();
+        for workers in [4, 8, 16] {
+            let mut row = |arm: &str, schedule: &str, records: &[BatchRecord], s, work: u64| {
+                let (bound, greedy) = ceiling(records, base, s, workers);
+                rows.push(Json::object([
+                    ("workers", Json::size(workers)),
+                    ("arm", Json::string(arm)),
+                    ("schedule", Json::string(schedule)),
+                    ("ceiling", ratio(bound)),
+                    ("greedy", ratio(greedy)),
+                    ("products_ratio", ratio(work as f64 / base as f64)),
+                ]));
+            };
+            for s in SCHEDULES {
+                row("exact", s.name(), d1, Some(s), base);
+                row("prereduce", s.name(), d2, Some(s), d2_work);
+            }
+            row("prereduce", "serial-cascade", d2, None, d2_work);
+        }
+        Json::Array(rows)
+    }
+
+    pub(super) fn report<const N: usize, F: FiniteField>(
+        system: &[MultivariatePolynomial<N, F>],
+        names: &[&str; N],
+        digest: &str,
+        args: &Args,
+    ) -> Json {
+        let options = |workers| SigF4Options {
+            max_wall_time: Some(args.wall),
+            workers,
+            ..SigF4Options::default()
+        };
+        let (plain, plain_stats) = sig_f4_reported(system, ORDER, &options(1));
+        let ((d1, d1_stats), d1_records) = record(|| sig_f4_reported(system, ORDER, &options(1)));
+        let ((d2, d2_stats), d2_records) =
+            record(|| sig_f4_reported(system, ORDER, &options(args.workers)));
+        let (plain, d1, d2) = (
+            plain.expect("design 1 finishes"),
+            d1.expect("recorded design 1 finishes"),
+            d2.expect("recorded design 2 finishes"),
+        );
+        let digest_of = |b: &[MultivariatePolynomial<N, F>]| basis_sha256(b, names);
+        assert_eq!(
+            algebraic(&d1_stats),
+            algebraic(&plain_stats),
+            "recording moved an algebraic quantity"
+        );
+        assert_eq!(digest_of(&d1), digest_of(&plain), "recording moved the basis");
+        assert_eq!(digest_of(&d2), digest_of(&plain), "design 2 moved the basis");
+        let all = |records: &[BatchRecord]| Json::Array(records.iter().map(batch).collect());
+        Json::object([
+            ("field", Json::string(&args.field)),
+            ("name", Json::string(&args.name)),
+            ("digest", Json::string(digest)),
+            ("design2_workers", Json::size(args.workers)),
+            ("basis_sha256", Json::string(digest_of(&plain))),
+            ("replay_invariant", Json::Bool(true)),
+            ("design1_statistics", sig_statistics(&plain_stats)),
+            ("design2_statistics", sig_statistics(&d2_stats)),
+            ("ceilings", ceilings(&d1_records, &d2_records)),
+            ("design1_batches", all(&d1_records)),
+            ("design2_batches", all(&d2_records)),
+        ])
+    }
+}
+
 fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
     let system: Vec<MultivariatePolynomial<N, F>> = input
@@ -209,6 +371,12 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         .iter()
         .map(|s| MultivariatePolynomial::parse(s, names).expect("generator parses"))
         .collect();
+    if args.replay {
+        #[cfg(feature = "research-sigf4-replay")]
+        return cascade::report(&system, &names, &input.digest, args);
+        #[cfg(not(feature = "research-sigf4-replay"))]
+        panic!("--replay requires --features research-sigf4-replay");
+    }
     let started = Instant::now();
     let (result, statistics, work) = if args.engine == "sigf4" {
         let options = SigF4Options {
