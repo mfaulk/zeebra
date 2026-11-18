@@ -302,18 +302,20 @@ def scratch(records, out):
 SMALL_TARGETS = ('katsura6-m31', 'katsura7-m31', 'cyclic6-m31')
 
 
-def small(records, out):
-    out.append('## #861 small tasks: shipping (`off`) and the serial merge, same binary\n')
+def small(records, out, arm='serial', targets=SMALL_TARGETS,
+          title='## #861 small tasks: shipping (`off`) and the serial merge, same binary\n'):
+    out.append(title)
+    name = arm
     out.append('Process wall ms (median [95% CI]); ratio = median(serial) / median(off) with a 95% bootstrap '
                'interval, each arm resampled independently; paired = median of per-repetition ratios. The F4 '
                'call column is the in-process `f4_call_ns` ratio, which leaves out process start-up.\n')
-    out.append('| Target | workers | n | off ms | serial ms | ratio [95% CI] | paired | F4 call ratio | '
-               'dispatched steps | basis |')
-    out.append('|---|---:|---:|---:|---:|---:|---:|---:|---:|---|')
-    for t in SMALL_TARGETS:
+    out.append(f'| Target | workers | n | off ms | {name} ms | ratio [95% CI] | paired | F4 call ratio | '
+               'RSS ratio, paired | dispatched steps | basis |')
+    out.append('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|')
+    for t in targets:
         for w in WORKERS:
             base = [r for r in cells(records, target=t, workers=w, arm=f'off{w}') if ok(r)]
-            arm = [r for r in cells(records, target=t, workers=w, arm=f'serial{w}') if ok(r)]
+            arm = [r for r in cells(records, target=t, workers=w, arm=f'{name}{w}') if ok(r)]
             if not base or not arm:
                 continue
             bw = [r['process_wall_ns'] / 1e6 for r in base]
@@ -324,10 +326,12 @@ def small(records, out):
             call = med([r['report']['f4_call_ns'] for r in arm]) / med([r['report']['f4_call_ns'] for r in base])
             digests = {r['report']['basis_sha256'] for r in base + arm}
             steps = med([r['report'].get('dispatched_steps', 0) for r in arm])
-            fail = len(cells(records, target=t, workers=w, arm=f'serial{w}')) - len(arm)
+            fail = len(cells(records, target=t, workers=w, arm=f'{name}{w}')) - len(arm)
+            by_rss = {r['rep']: r['report']['peak_rss_bytes'] for r in base}
+            rss = med([r['report']['peak_rss_bytes'] / by_rss[r['rep']] for r in arm if r['rep'] in by_rss])
             out.append(f"| {t} | {w} | {len(arm)}{f' ({fail} failed)' if fail else ''} | {med(bw):.2f} | "
                        f'{med(xs):.2f} | {med(xs) / med(bw):.3f} [{lo:.3f}, {hi:.3f}] | {med(paired):.3f} | '
-                       f"{call:.3f} | {steps:.0f} | {'identical' if len(digests) == 1 else 'DIFFERS'} |")
+                       f"{call:.3f} | {rss:.3f} | {steps:.0f} | {'identical' if len(digests) == 1 else 'DIFFERS'} |")
     out.append('')
 
 
@@ -343,6 +347,10 @@ def main():
         records = jsonl(d / f'{name}.jsonl')
         if records:
             section(records, out)
+    records = jsonl(d / 'gate.jsonl')
+    if records:
+        small(records, out, 'auto', TARGETS + SMALL_TARGETS,
+              '## #861 acceptance: the shipped `ParallelSymbolic::Auto` (`auto`) against the serial closure\n')
     print('\n'.join(out))
 
 

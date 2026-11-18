@@ -255,6 +255,49 @@ impl ParallelForward {
     }
 }
 
+/// Whether symbolic preprocessing may intern a batch's monomials on worker threads (#861).
+///
+/// The closure runs as breadth-first steps. A step at least
+/// [`ParallelSymbolic::MIN_FRONTIER`] monomials wide is scanned by a worker team in slices and
+/// merged on the caller in slice order, which is the serial closure's first-occurrence order, so
+/// rows, columns, handles and counters are the serial closure's exactly, at every worker count and
+/// under any scheduling. Narrower steps run on the caller alone, and a batch with no wide step
+/// never starts a thread. The team's scratch is allocated by the caller, charged to the live-entry
+/// budget, and checked against [`F4Options::max_wall_time`] and an observer's stop at every step
+/// boundary. Batches under a reducer cache, and fields that cannot be shared across threads, take
+/// the serial closure.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ParallelSymbolic {
+    /// The serial closure for every batch.
+    #[default]
+    Serial,
+
+    /// A team of up to `max_workers` threads, the caller included, for each batch with a step at
+    /// least [`ParallelSymbolic::MIN_FRONTIER`] wide; zero means the available parallelism. One
+    /// worker is the serial closure.
+    Auto {
+        /// Threads in one batch's team.
+        max_workers: usize,
+    },
+}
+
+impl ParallelSymbolic {
+    /// The narrowest step a team scans (#827's measured best, kept by #860).
+    pub const MIN_FRONTIER: usize = 256;
+
+    /// Slices per worker in a dispatched step, claimed dynamically (#860).
+    pub const SLICES_PER_WORKER: usize = 4;
+
+    /// Threads one batch's team may use; one means the serial closure.
+    pub fn workers(self) -> usize {
+        match self {
+            Self::Serial => 1,
+            Self::Auto { max_workers: 0 } => available_parallelism(),
+            Self::Auto { max_workers } => max_workers,
+        }
+    }
+}
+
 /// The order a structured batch's elimination does its passes in (#816).
 ///
 /// Both orders produce the same candidate rows, coefficient for coefficient, when batch rows are
@@ -797,6 +840,12 @@ pub struct F4Options {
     /// [`PairMultiples::Distinct`] at [`recommended`](Self::recommended);
     /// [`PairMultiples::Every`] at [`baseline`](Self::baseline).
     pub pair_multiples: PairMultiples,
+
+    /// Whether symbolic preprocessing interns on worker threads. See [`ParallelSymbolic`].
+    ///
+    /// [`ParallelSymbolic::Serial`] at [`baseline`](Self::baseline) and
+    /// [`recommended`](Self::recommended).
+    pub parallel_symbolic: ParallelSymbolic,
 }
 
 impl F4Options {
@@ -833,6 +882,7 @@ impl F4Options {
             parallel_forward: ParallelForward::Serial,
             batch_order: BatchOrder::Forward,
             pair_multiples: PairMultiples::Every,
+            parallel_symbolic: ParallelSymbolic::Serial,
         }
     }
 

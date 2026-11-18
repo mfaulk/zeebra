@@ -4905,3 +4905,181 @@ fn test_pressure_at_the_live_entry_requirement_is_full() {
     assert_eq!(live.observed, requirement);
     assert_eq!(live.allowance, requirement);
 }
+
+/// #861: the shipped parallel closure equals the serial closure on every batch — rows, columns,
+/// handles and counters, and row-budget refusals — at 1, 4, 8 and 16 workers, with every step on
+/// the team, none (the caller-alone path), or the production threshold deciding.
+#[test]
+fn test_parallel_symbolic_closure_matches_the_serial_closure_at_every_worker_count() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic::symbolic_preprocessing_seeded,
+        symbolic_intern::{symbolic_preprocessing_interned, InternConfig, Merge, Retain},
+        PairMultiples, ParallelSymbolic,
+    };
+    type G = Zp2147483647;
+    fn check<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, G>]) -> usize {
+        let options = F4Options::default();
+        let mut compared = 0;
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (_, _, trace) = trace_batches(system, order, &options).expect("within limits");
+        for (index, batch) in trace.batches().iter().enumerate() {
+            let multiples = PairMultiples::Distinct;
+            let serial = |max_rows| {
+                symbolic_preprocessing_seeded(
+                    &batch.basis,
+                    &batch.pairs,
+                    max_rows,
+                    options.reducer_selection,
+                    &mut ReducerCache::disabled(),
+                    multiples,
+                )
+            };
+            let reference = serial(usize::MAX).unwrap();
+            for max_rows in [usize::MAX, reference.rows.len() / 2] {
+                for workers in [1, 4, 8, 16] {
+                    for min_frontier in [0, ParallelSymbolic::MIN_FRONTIER, usize::MAX] {
+                        let config = InternConfig {
+                            workers,
+                            merge: Merge::Serial,
+                            min_frontier,
+                            slices_per_worker: ParallelSymbolic::SLICES_PER_WORKER,
+                            min_seed_rows: 0,
+                            retain: Retain::Batch,
+                        };
+                        let (got, _) = symbolic_preprocessing_interned(
+                            &batch.basis,
+                            &batch.pairs,
+                            max_rows,
+                            options.reducer_selection,
+                            multiples,
+                            &config,
+                        );
+                        assert_eq!(
+                            got,
+                            serial(max_rows),
+                            "{name}, batch {index}, {workers} workers, min frontier \
+                             {min_frontier}, budget {max_rows}"
+                        );
+                        compared += 1;
+                    }
+                }
+            }
+        }
+        compared
+    }
+    let compared = check("katsura-6", &katsura::<6, G>()) + check("cyclic-5", &cyclic::<5, G>());
+    assert!(compared > 0, "no batch was compared");
+}
+
+/// #861: a batch none of whose steps reaches the frontier threshold runs on the caller alone,
+/// starts no team and allocates no step scratch.
+#[test]
+fn test_parallel_symbolic_without_a_wide_step_starts_no_team_and_holds_no_scratch() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic_intern::{
+            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Limits, Merge, Retain,
+        },
+        PairMultiples,
+    };
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&katsura::<6, G>(), order, &options).expect("within limits");
+    let config = InternConfig {
+        workers: 16,
+        merge: Merge::Serial,
+        min_frontier: usize::MAX,
+        slices_per_worker: 4,
+        min_seed_rows: 0,
+        retain: Retain::Batch,
+    };
+    let mut scratch = InternScratch::new();
+    for batch in trace.batches() {
+        let (got, report) = symbolic_preprocessing_interned_in(
+            &batch.basis,
+            &batch.pairs,
+            usize::MAX,
+            options.reducer_selection,
+            PairMultiples::Distinct,
+            &config,
+            &mut scratch,
+            &Limits::none(),
+        );
+        assert!(got.is_ok());
+        assert!(report.steps > 0);
+        assert_eq!(report.dispatched_steps, 0);
+        assert_eq!(report.spawn, std::time::Duration::ZERO);
+        assert_eq!((report.scratch_bytes, report.charged_entries), (0, 0));
+    }
+}
+
+/// #861: `ParallelSymbolic::Serial` and one worker take the serial closure, `Auto` asks for the
+/// serial merge at the shipped threshold, and zero workers means the available parallelism.
+#[test]
+fn test_parallel_symbolic_configuration_selects_the_serial_fallback() {
+    use crate::grobner::f4::{
+        options::available_parallelism,
+        symbolic_intern::{configured, Merge, Retain},
+        ParallelSymbolic,
+    };
+    let with = |parallel_symbolic| F4Options {
+        parallel_symbolic,
+        ..F4Options::default()
+    };
+    assert_eq!(configured(&with(ParallelSymbolic::Serial)), None);
+    assert_eq!(
+        configured(&with(ParallelSymbolic::Auto { max_workers: 1 })),
+        None
+    );
+    let config = configured(&with(ParallelSymbolic::Auto { max_workers: 16 })).unwrap();
+    assert_eq!(config.workers, 16);
+    assert_eq!(config.merge, Merge::Serial);
+    assert_eq!(config.min_frontier, ParallelSymbolic::MIN_FRONTIER);
+    assert_eq!(config.retain, Retain::Batch);
+    assert_eq!(
+        ParallelSymbolic::Auto { max_workers: 0 }.workers(),
+        available_parallelism()
+    );
+    assert_eq!(
+        F4Options::baseline().parallel_symbolic,
+        ParallelSymbolic::Serial
+    );
+}
+
+/// #861: complete F4 under `ParallelSymbolic::Auto` returns the serial basis and the serial
+/// symbolic counters at 1, 4, 8 and 16 workers, run to run, on a system with a step the team
+/// scans; under a reducer cache it takes the serial closure and still agrees.
+#[test]
+fn test_parallel_symbolic_f4_is_identical_to_serial_across_worker_counts() {
+    use crate::grobner::f4::{symbolic::CacheMode, ParallelSymbolic};
+    type G = Zp2147483647;
+    let order = MonomialOrder::GradedReverseLexicographic;
+    for system in [katsura::<7, G>()] {
+        let serial = F4Options {
+            parallel_symbolic: ParallelSymbolic::Serial,
+            ..F4Options::default()
+        };
+        let (basis, stats) = f4_reported(&system, order, &serial);
+        let basis = basis.unwrap();
+        for workers in [1, 4, 8, 16] {
+            for cache in [CacheMode::Off, CacheMode::Count] {
+                let options = F4Options {
+                    parallel_symbolic: ParallelSymbolic::Auto {
+                        max_workers: workers,
+                    },
+                    reducer_cache: cache,
+                    ..F4Options::default()
+                };
+                for _ in 0..2 {
+                    let (got, got_stats) = f4_reported(&system, order, &options);
+                    assert_eq!(got.unwrap(), basis, "{workers} workers, {cache:?}");
+                    assert_eq!(got_stats.monomials_enqueued, stats.monomials_enqueued);
+                    assert_eq!(got_stats.divisor_queries, stats.divisor_queries);
+                    assert_eq!(got_stats.batches, stats.batches);
+                }
+            }
+        }
+    }
+}

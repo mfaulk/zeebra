@@ -66,6 +66,14 @@ class PlanTest(unittest.TestCase):
         for _, _, w, extra, _ in plan:
             self.assertEqual(extra[extra.index('--level-workers') + 1], str(w))
 
+    def test_gate_arms_pair_the_shipped_option_with_the_serial_closure(self):
+        # #861: `auto` beside `off` at every worker count on small targets, at 1 and 16 elsewhere.
+        plan = campaign.plan('gate', 1, ('katsura6-m31', 'eco12-wide64'))
+        small = sorted(a for _, t, _, _, a in plan if t == 'katsura6-m31')
+        self.assertEqual(small, sorted(f'{m}{w}' for w in campaign.WORKERS for m in ('off', 'auto')))
+        wide = sorted(a for _, t, _, _, a in plan if t == 'eco12-wide64')
+        self.assertEqual(wide, sorted(['off1', 'auto1', 'off16', 'auto16']))
+
     def test_a_target_subset_is_respected(self):
         # Restricting targets restricts the plan and nothing else.
         plan = campaign.plan('components', 3, ('mq10-m31',))

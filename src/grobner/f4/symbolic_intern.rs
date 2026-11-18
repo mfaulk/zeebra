@@ -31,6 +31,11 @@
 //! Matrix construction sorts columns by monomial and reducer rows by leading column, so only the
 //! *set* of reducer rows and the pair rows' order reach the matrix; exact handle identity is kept
 //! here so the result can be compared with `==`, not because the matrix needs it.
+//!
+//! #861 ships the serial merge behind `F4Options::parallel_symbolic`, with steps below
+//! `min_frontier` interned straight into the columns on the caller (no candidates, no scratch).
+//! The sharded merge and the replay entry points remain `research-work` instruments.
+#![cfg_attr(not(feature = "research-work"), allow(dead_code))]
 use std::{
     collections::{HashMap, HashSet},
     hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
@@ -230,6 +235,8 @@ struct Slice<const N: usize> {
     scanned: bool,
     /// The scan stopped short of a buffer this step.
     overflow: Option<Overflow>,
+    /// Allocated to its hint for this batch: only a prepared slice's capacities are remembered.
+    hinted: bool,
 }
 
 /// A pre-step miss, named by where the slice first met it — row and term — rather than by its
@@ -513,6 +520,7 @@ impl<const N: usize> Slice<N> {
             translate: Vec::with_capacity(most),
             owner: Vec::with_capacity(most),
             new: Vec::with_capacity(hint.new),
+            hinted: true,
             ..Self::default()
         }
     }
@@ -555,12 +563,7 @@ impl<const N: usize> InternScratch<N> {
     /// Before a batch: `count` slices, allocated to the hinted capacities where they were freed.
     fn open(&mut self, count: usize) {
         if self.slices.len() < count {
-            let have = self.slices.len();
-            let hints = &self.hints;
-            self.slices.extend(
-                (have..count)
-                    .map(|k| RwLock::new(hints.get(k).map_or_else(Slice::default, Slice::hinted))),
-            );
+            self.slices.resize_with(count, RwLock::default);
         }
     }
 
@@ -569,7 +572,15 @@ impl<const N: usize> InternScratch<N> {
         let hints: Vec<Hint> = self
             .slices
             .iter()
-            .map(|s| s.read().unwrap().hint())
+            .enumerate()
+            .map(|(k, s)| {
+                let s = s.read().unwrap();
+                if s.hinted {
+                    s.hint()
+                } else {
+                    self.hints.get(k).cloned().unwrap_or_default()
+                }
+            })
             .collect();
         if hints.len() >= self.hints.len() {
             self.hints = hints;
@@ -884,6 +895,86 @@ fn record<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, s: usize) {
     }
 }
 
+/// A step below `min_frontier`, on the caller alone (#861): every term is interned straight into
+/// the columns in scan order, which is the serial closure's first-occurrence order, so there are
+/// no candidates, no merge and no emit, and no scratch is touched. Returns the step's
+/// pending-queue contribution as emit computes it for one slice: the largest count of monomials
+/// admitted so far less the frontier position, over the rows found; `None` without rows.
+fn solo_step<const N: usize, F: FiniteField>(
+    step: &mut Step<'_, N, F>,
+    seed_step: bool,
+    monomials: &mut Vec<Monomial<N>>,
+    rows: &mut Vec<PreprocessedRow<N>>,
+    leads: &mut MonomialSet<N>,
+    term_handles: &mut Vec<MonomialHandle>,
+    counts: &mut SymbolicCounts,
+) -> Option<i64> {
+    let Step {
+        basis,
+        selection,
+        lcms,
+        frontier,
+        seeds,
+        shards,
+        ..
+    } = step;
+    let index = &mut shards[0].get_mut().unwrap().index;
+    let width = if seed_step {
+        seeds.len()
+    } else {
+        frontier.len()
+    };
+    let mut found = SymbolicCounts::default();
+    let (mut peak, mut admitted) = (None, 0i64);
+    for offset in 0..width {
+        let (basis_index, multiplier) = if seed_step {
+            seeds[offset]
+        } else {
+            let monomial = &frontier[offset];
+            if lcms.contains(monomial) {
+                continue;
+            }
+            let Some(divisor) = basis.find_divisor_with(monomial, *selection, &mut found) else {
+                continue;
+            };
+            divisor
+        };
+        for (term, _) in basis.shifted_terms(basis_index, &multiplier) {
+            let hash = BuildMonomialHasher.hash_one(term);
+            let arena = &*monomials;
+            let known = index.find_or_insert_growing(
+                hash,
+                |h| arena[h as usize] == term,
+                |h| BuildMonomialHasher.hash_one(arena[h]),
+                arena.len(),
+            );
+            let handle = known.unwrap_or_else(|| {
+                let handle = MonomialHandle::try_from(monomials.len())
+                    .ok()
+                    .filter(|h| h & LOCAL == 0)
+                    .expect("fewer distinct monomials than a handle can name");
+                monomials.push(term);
+                admitted += 1;
+                handle
+            });
+            term_handles.push(handle);
+            found.monomials_enqueued += 1;
+        }
+        if !seed_step {
+            leads.insert(frontier[offset]);
+            rows.push(PreprocessedRow {
+                multiplier,
+                basis_index,
+                kind: RowKind::Reducer,
+            });
+            let here = admitted - (offset as i64 + 1);
+            peak = Some(peak.map_or(here, |p: i64| p.max(here)));
+        }
+    }
+    counts.add(&found);
+    peak
+}
+
 /// Resolve slice `k`'s `refs` to handles in place — its run of `term_handles` — and its
 /// contribution to the pending-queue peak.
 fn emit<const N: usize, F: FiniteField>(step: &Step<'_, N, F>, k: usize) {
@@ -1024,20 +1115,14 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         rows.iter().map(|r| (r.basis_index, r.multiplier)).collect();
     scratch.open(slice_count);
     let route = config.merge == Merge::Sharded;
-    for slice in &mut scratch.slices[..slice_count] {
-        let slice = slice.get_mut().unwrap();
-        let wanted = if route { shard_count } else { 0 };
-        if slice.by_shard.len() != wanted {
-            slice.by_shard.resize_with(wanted, Vec::new);
-        }
-    }
     let (growths_before, rescans_before) = (scratch.growths, scratch.rescans);
     let InternScratch {
         slices: scratch_slices,
         growths,
         rescans,
-        hints: _,
+        hints,
     } = &mut *scratch;
+    let hints: &[Hint] = hints;
     let step = RwLock::new(Step {
         basis,
         selection,
@@ -1115,9 +1200,11 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         let charge = |slices: &[RwLock<Slice<N>>]| {
             limits.entries(slices.iter().map(|s| s.read().unwrap().bytes()).sum())
         };
+        let mut prepared = false;
         'steps: loop {
             let level_start = monomials.len();
             let dispatched;
+            let solo;
             {
                 let mut s = step.write().unwrap();
                 let size = if seed_step {
@@ -1135,29 +1222,84 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                     break;
                 }
                 dispatched = size >= config.min_frontier;
-                s.chunk = size.div_ceil(if dispatched { slice_count } else { 1 });
-                // Scans read the columns so far; the caller has them back before the merge.
-                s.monomials = std::mem::take(&mut monomials);
-                // A slice finds at most one row per item it scans.
-                for slice in s.slices {
-                    let mut slice = slice.write().unwrap();
-                    slice.scanned = false;
-                    if slice.rows.capacity() < s.chunk {
-                        slice.rows.clear();
-                        slice.rows.reserve_exact(s.chunk);
-                        *growths += 1;
+                solo = !dispatched && config.merge == Merge::Serial;
+                if !solo {
+                    // The slices take their hinted capacities only once a step needs them, so a
+                    // batch whose steps all run solo allocates no scratch at all (#861).
+                    if !prepared {
+                        prepared = true;
+                        let wanted = if route { shard_count } else { 0 };
+                        for (k, slice) in s.slices.iter().enumerate() {
+                            let mut slice = slice.write().unwrap();
+                            if !slice.hinted {
+                                *slice = Slice::hinted(hints.get(k).unwrap_or(&Hint::default()));
+                            }
+                            if slice.by_shard.len() != wanted {
+                                slice.by_shard.resize_with(wanted, Vec::new);
+                            }
+                        }
                     }
-                }
-                // Charged before the scan, so a step whose scratch would not fit never runs.
-                let entries = charge(s.slices);
-                report.charged_entries = report.charged_entries.max(entries);
-                if entries > limits.entry_allowance {
-                    refused = Some(Refusal::LiveEntries { entries });
-                    break;
+                    s.chunk = size.div_ceil(if dispatched { slice_count } else { 1 });
+                    // Scans read the columns so far; the caller has them back before the merge.
+                    s.monomials = std::mem::take(&mut monomials);
+                    // A slice finds at most one row per item it scans.
+                    for slice in s.slices {
+                        let mut slice = slice.write().unwrap();
+                        slice.scanned = false;
+                        if slice.rows.capacity() < s.chunk {
+                            slice.rows.clear();
+                            slice.rows.reserve_exact(s.chunk);
+                            *growths += 1;
+                        }
+                    }
+                    // Charged before the scan, so a step whose scratch would not fit never runs.
+                    let entries = charge(s.slices);
+                    report.charged_entries = report.charged_entries.max(entries);
+                    if entries > limits.entry_allowance {
+                        refused = Some(Refusal::LiveEntries { entries });
+                        break;
+                    }
                 }
             }
             report.steps += 1;
             report.dispatched_steps += usize::from(dispatched);
+            if solo {
+                let started = Instant::now();
+                let mut s = step.write().unwrap();
+                let s = &mut *s;
+                let width = if seed_step {
+                    s.seeds.len()
+                } else {
+                    s.frontier.len()
+                } as i64;
+                let peak = solo_step(
+                    s,
+                    seed_step,
+                    &mut monomials,
+                    &mut rows,
+                    &mut leads,
+                    &mut term_handles,
+                    &mut counts,
+                );
+                let admitted = monomials.len() - level_start;
+                report.candidates += admitted;
+                report.owners += admitted;
+                if seed_step {
+                    counts.max_pending_monomials = admitted;
+                    seed_step = false;
+                } else if let Some(peak) = peak {
+                    counts.max_pending_monomials =
+                        counts.max_pending_monomials.max((width + peak) as usize);
+                }
+                s.frontier.clear();
+                s.frontier.extend_from_slice(&monomials[level_start..]);
+                report.scan += started.elapsed();
+                if rows.len() > max_rows {
+                    refused = Some(Refusal::Rows(RowBudgetExceeded { limit: max_rows }));
+                    break;
+                }
+                continue;
+            }
             if dispatched {
                 spawn(&mut report);
             }
@@ -1381,36 +1523,32 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
     )
 }
 
-type AnyScratch = Option<Box<dyn std::any::Any>>;
-
+#[cfg(feature = "research-work")]
 thread_local! {
     static LIVE: std::cell::Cell<Option<(InternConfig, InternReport)>> =
         const { std::cell::Cell::new(None) };
-    /// The run's [`InternScratch`], typed by the batches' `N`.
-    static SCRATCH: std::cell::RefCell<AnyScratch> = const { std::cell::RefCell::new(None) };
 }
 
 /// Run `f` with live F4 on this thread taking [`symbolic_preprocessing_interned`] under `config`,
-/// and return the reports of every batch it served, summed. The batches share one
-/// [`InternScratch`], freed when `f` returns.
+/// whatever [`F4Options::parallel_symbolic`](super::F4Options::parallel_symbolic) says, and return
+/// the reports of every batch it served, summed. Each F4 run's batches share one
+/// [`InternScratch`], freed when the run returns.
+#[cfg(feature = "research-work")]
 pub fn with_live<R>(config: InternConfig, f: impl FnOnce() -> R) -> (R, InternReport) {
-    struct Reset(Option<(InternConfig, InternReport)>, AnyScratch);
+    struct Reset(Option<(InternConfig, InternReport)>);
     impl Drop for Reset {
         fn drop(&mut self) {
             LIVE.set(self.0);
-            SCRATCH.set(self.1.take());
         }
     }
-    let reset = Reset(
-        LIVE.replace(Some((config, InternReport::default()))),
-        SCRATCH.take(),
-    );
+    let reset = Reset(LIVE.replace(Some((config, InternReport::default()))));
     let result = f();
     let report = LIVE.get().expect("set above").1;
     drop(reset);
     (result, report)
 }
 
+#[cfg(feature = "research-work")]
 fn accumulate(total: &mut InternReport, batch: &InternReport) {
     total.serial_fallback |= batch.serial_fallback;
     total.steps += batch.steps;
@@ -1477,32 +1615,52 @@ pub(crate) fn arm_deadline(armed: Option<(Instant, Duration)>) {
     DEADLINE.set(armed);
 }
 
-/// The live F4 hook: `Some` when [`with_live`] is in force on this thread, the batch is uncached
-/// and the field can be shared across threads; `None` sends the caller down the shipping path.
+/// The configuration `options` asks for, or `None` for the serial closure (#861).
+pub(crate) fn configured(options: &super::F4Options) -> Option<InternConfig> {
+    use super::ParallelSymbolic;
+    let workers = options.parallel_symbolic.workers();
+    (workers > 1).then_some(InternConfig {
+        workers,
+        merge: Merge::Serial,
+        min_frontier: ParallelSymbolic::MIN_FRONTIER,
+        slices_per_worker: ParallelSymbolic::SLICES_PER_WORKER,
+        min_seed_rows: 0,
+        retain: Retain::Batch,
+    })
+}
+
+/// The live F4 hook: `Some` when [`F4Options::parallel_symbolic`] (or, under `research-work`, a
+/// [`with_live`] override on this thread) asks for a team, the batch is uncached and the field can
+/// be shared across threads; `None` sends the caller down the serial closure.
 ///
 /// Beyond the row budget the closure is held to `options`' live-entry allowance, its scratch
 /// charged as entries of `F`, and stopped at a step boundary by `observer_stop` (as
 /// [`F4Error::StoppedByObserver`]) or by the armed wall-time budget (as
 /// [`F4Error::TimeBudgetExceeded`]).
+///
+/// [`F4Options::parallel_symbolic`]: super::F4Options::parallel_symbolic
 pub(crate) fn live<const N: usize, F: FiniteField>(
     basis: &MonicBasis<N, F>,
     pairs: &[CriticalPair<N>],
     options: &super::F4Options,
-    cached: bool,
+    cache: &mut ReducerCache<N>,
     observer_stop: &dyn Fn() -> bool,
 ) -> Option<Result<Preprocessed<N>, super::F4Error>> {
-    use super::{F4Error, F4Options};
-    let (config, mut total) = LIVE.get()?;
-    if cached {
+    use super::{symbolic::CacheMode, F4Error, F4Options};
+    #[cfg(feature = "research-work")]
+    let research = LIVE.get();
+    #[cfg(feature = "research-work")]
+    let config = research
+        .map(|(config, _)| config)
+        .or_else(|| configured(options))?;
+    #[cfg(not(feature = "research-work"))]
+    let config = configured(options)?;
+    if cache.mode() != CacheMode::Off {
         return None;
     }
     let deadline = DEADLINE.get();
     let late = || deadline.is_some_and(|(clock, budget)| clock.elapsed() >= budget);
     let stop = || observer_stop() || late();
-    let mut scratch = SCRATCH
-        .take()
-        .and_then(|any| any.downcast::<InternScratch<N>>().ok())
-        .unwrap_or_default();
     let job = LiveJob {
         basis,
         pairs,
@@ -1510,18 +1668,19 @@ pub(crate) fn live<const N: usize, F: FiniteField>(
         selection: options.reducer_selection,
         multiples: options.pair_multiples,
         config,
-        scratch: &mut scratch,
+        scratch: &mut cache.intern,
         limits: Limits {
             entry_allowance: options.live_entry_allowance::<F>(),
             bytes_per_entry: F4Options::bytes_per_entry::<F>(),
             stop: &stop,
         },
     };
-    let outcome = F::run_concurrent(job).ok();
-    SCRATCH.set(Some(scratch));
-    let (result, report) = outcome?;
-    accumulate(&mut total, &report);
-    LIVE.set(Some((config, total)));
+    let (result, _report) = F::run_concurrent(job).ok()?;
+    #[cfg(feature = "research-work")]
+    if let Some((config, mut total)) = research {
+        accumulate(&mut total, &_report);
+        LIVE.set(Some((config, total)));
+    }
     let millis = |d: Duration| d.as_millis().min(u128::from(u64::MAX)) as u64;
     Some(result.map_err(|refusal| match refusal {
         Refusal::Rows(exceeded) => F4Error::TooManyRows {

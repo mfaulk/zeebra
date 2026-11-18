@@ -38,8 +38,8 @@ pub use f4::{
     BudgetReport, CacheMode, CertificationReport, ConstructionTimings, DegreeProfile,
     DegreeStatistics, DivmaskCalibration, F4Error, F4Options, F4Statistics, Gf2Elimination,
     HilbertCounts, HilbertSelection, InterreductionRoute, MatrixInterreduction, MatrixRefusal,
-    MembershipLimits, MembershipStatus, PairMultiples, ParallelForward, Provenance,
-    ReducerSelection, ReductionStrategy, SelectionLimits, StopKind, SymbolicCounts,
+    MembershipLimits, MembershipStatus, PairMultiples, ParallelForward, ParallelSymbolic,
+    Provenance, ReducerSelection, ReductionStrategy, SelectionLimits, StopKind, SymbolicCounts,
     WitnessCertificationReport, WitnessError, WitnessLimit, DIVMASK_BITS,
 };
 pub use fglm::{

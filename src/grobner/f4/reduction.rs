@@ -170,22 +170,11 @@ fn build_batch_matrix_in<const N: usize, F: FiniteField>(
             limit: exceeded.limit,
         })
     };
-    // #860: a research prototype may serve the batch when one is in force on this thread; it
-    // also honors the live-entry budget and `observer_stop` at its step boundaries (#872).
-    #[cfg(feature = "research-work")]
-    let preprocessed = super::symbolic_intern::live(
-        basis,
-        pairs,
-        options,
-        cache.mode() != super::symbolic::CacheMode::Off,
-        observer_stop,
-    )
-    .unwrap_or_else(|| shipping(cache));
-    #[cfg(not(feature = "research-work"))]
-    let preprocessed = {
-        let _ = observer_stop;
-        shipping(cache)
-    };
+    // #861: the parallel closure serves the batch under `options.parallel_symbolic` (or a
+    // research override, #860); it honors the live-entry budget and `observer_stop` at its step
+    // boundaries (#872).
+    let preprocessed = super::symbolic_intern::live(basis, pairs, options, cache, observer_stop)
+        .unwrap_or_else(|| shipping(cache));
     let mut preprocessed = preprocessed?;
     stages.symbolic = clock.lap();
 

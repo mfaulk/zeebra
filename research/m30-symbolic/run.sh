@@ -18,7 +18,7 @@ for suite in "$@"; do
   case "$suite" in
   walls | stages) bin="$T/bin/m29_cost_model" ;;
   components | level) bin="$T/bin/symbolic_cost_model" ;;
-  intern | live | scratch | small) bin="${T860:-$T}/bin/symbolic_cost_model" ;;
+  intern | live | scratch | small | gate) bin="${T860:-$T}/bin/symbolic_cost_model" ;;
   *) echo "unknown suite $suite" >&2; exit 64 ;;
   esac
   printf '%s\n' "{\"suite\":\"$suite\",\"context\":$(bash tools/cpu-context.sh 8-23)}" >>"$OUT/suite-starts.jsonl"

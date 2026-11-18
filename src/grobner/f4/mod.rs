@@ -23,8 +23,12 @@ pub mod reduction;
 pub mod statistics;
 pub mod structured;
 pub mod symbolic;
+// The serial-merge path ships behind `F4Options::parallel_symbolic` (#861); the rest of the
+// module — the sharded merge, the live override, the replay entry points — is #860's research.
 #[cfg(feature = "research-work")]
 pub mod symbolic_intern;
+#[cfg(not(feature = "research-work"))]
+mod symbolic_intern;
 
 #[cfg(test)]
 mod tests;
@@ -47,7 +51,7 @@ pub use membership::{
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
     BatchOrder, F4Error, F4Options, Gf2Elimination, InterreductionRoute, PairMultiples,
-    ParallelForward, ReducerSelection, ReductionStrategy, StopKind,
+    ParallelForward, ParallelSymbolic, ReducerSelection, ReductionStrategy, StopKind,
 };
 pub use reduction::{
     build_batch_matrix, reduce_batch, reduce_batch_in, reduce_batch_observed_in, BatchOutcome,
@@ -458,9 +462,8 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
                 });
             }
         }
-        // #872: a parallel interning prototype checks the same budget at its step boundaries,
-        // under the same one-batch rule.
-        #[cfg(feature = "research-work")]
+        // #872: the parallel closure checks the same budget at its step boundaries, under the
+        // same one-batch rule.
         symbolic_intern::arm_deadline(
             wall_clock
                 .zip(options.max_wall_time)

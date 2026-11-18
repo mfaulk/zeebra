@@ -142,9 +142,13 @@ pub enum CacheMode {
 /// multiplied by the multiplier, which is where the monomial arithmetic goes. The built *sparse
 /// row* is not: its column indices are relative to the batch's own column set, and no two batches
 /// have the same one. An implementation that expected to cache rows would find that out late.
-#[derive(Clone, Debug, Default)]
+#[derive(Default)]
 pub struct ReducerCache<const N: usize> {
     mode: CacheMode,
+
+    /// The parallel closure's step scratch, reused from batch to batch of one run (#861). It is
+    /// allocation only — capacities, never content a batch reads — so a clone starts without it.
+    pub(crate) intern: super::symbolic_intern::InternScratch<N>,
 
     /// Every multiple needed so far, for the repetition measurement. Empty when off.
     seen: HashSet<(usize, Monomial<N>), BuildMonomialHasher>,
@@ -156,10 +160,34 @@ pub struct ReducerCache<const N: usize> {
     firsts: usize,
 }
 
+impl<const N: usize> Clone for ReducerCache<N> {
+    fn clone(&self) -> Self {
+        Self {
+            mode: self.mode,
+            intern: Default::default(),
+            seen: self.seen.clone(),
+            repeats: self.repeats,
+            firsts: self.firsts,
+        }
+    }
+}
+
+impl<const N: usize> std::fmt::Debug for ReducerCache<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReducerCache")
+            .field("mode", &self.mode)
+            .field("seen", &self.seen)
+            .field("repeats", &self.repeats)
+            .field("firsts", &self.firsts)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<const N: usize> ReducerCache<N> {
     pub fn new(mode: CacheMode) -> Self {
         Self {
             mode,
+            intern: Default::default(),
             seen: HashSet::default(),
             repeats: 0,
             firsts: 0,
