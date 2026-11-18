@@ -10,9 +10,13 @@
 //!
 //! The reductions are independent, so [`certify_f4_output_with_workers`] spreads them over threads;
 //! its report, counts included, is the serial one at every worker count (#887).
+//!
+//! [`certify_f4_output_within`] bounds the checks by their own wall budget, checked between
+//! reductions. A stop is a [`CertificationStopped`], a separate type from the report, so running out
+//! of time can never be read as a rejection; it says how far the serial order was verified (#899).
 
 use std::{
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
 
@@ -116,6 +120,64 @@ impl Default for CertificationReport {
     }
 }
 
+/// The check a budgeted certification was in when its budget ran out.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CertificationStage {
+    /// Reducing the input generators modulo the basis.
+    Generators,
+    /// Reducing the S-polynomials Buchberger's criterion names.
+    BuchbergerCriterion,
+    /// Checking that the basis is reduced. Every normal form had been checked.
+    Reducedness,
+}
+
+/// How far a certification got before its wall budget ran out. **Not a verdict.**
+///
+/// Returned by [`certify_f4_output_within`] in place of a [`CertificationReport`], so that a stop
+/// has no `first_failure` to misread: nothing in it says the basis failed. A defect found before the
+/// budget ran out is reported as a stop too unless every reduction before it in the serial order had
+/// finished, because only then are the rejection's counts the serial pass's (#887).
+///
+/// The counts are verified prefixes of the serial order: the first `generators_checked` nonzero
+/// generators, and the first `s_polynomials_checked` kept pairs, all reduced to zero. Parallel
+/// workers may have finished reductions past the prefix; those are not counted, because they do
+/// not extend what is established.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CertificationStopped {
+    /// The check in progress when the budget was noticed.
+    pub stage: CertificationStage,
+
+    /// Leading nonzero generators verified to reduce to zero.
+    pub generators_checked: usize,
+
+    /// Nonzero generators the first check had to reduce.
+    pub generators: usize,
+
+    /// Leading S-polynomials, in the serial order, verified to reduce to zero.
+    pub s_polynomials_checked: usize,
+
+    /// S-polynomials Buchberger's criterion had to reduce after the criteria pruned the pairs.
+    ///
+    /// Zero when the stop came before [`CertificationStage::BuchbergerCriterion`]: the pairs are
+    /// not formed until the generators pass.
+    pub s_polynomials: usize,
+
+    /// Pairs a criterion proved redundant, counted when the pairs were formed.
+    pub s_polynomials_discarded: usize,
+
+    /// Wall time from the start of certification to the stop.
+    ///
+    /// At least `budget`, and may exceed it by one reduction per worker: the deadline is checked
+    /// between reductions, and a single normal form is not interruptible.
+    pub elapsed: Duration,
+
+    /// The budget that ran out.
+    pub budget: Duration,
+
+    /// Where the basis came from, as the caller stated it.
+    pub provenance: Provenance,
+}
+
 impl CertificationReport {
     /// True if every check this function performs passed.
     ///
@@ -190,6 +252,33 @@ pub fn certify_f4_output_with_workers<const N: usize, F: FiniteField>(
     certify_with(generators, basis, order, Provenance::F4Output, workers)
 }
 
+/// [`certify_f4_output_with_workers`] bounded by its own wall budget.
+///
+/// `Ok` carries exactly the report the unbudgeted call returns, timing aside, including a
+/// rejection. `Err` means the budget ran out before a verdict, and says how far the checks got; it
+/// is never a rejection. The deadline is checked before every reduction, on every worker, so a
+/// stop overshoots `budget` by at most one normal form per worker, and every worker is joined
+/// before this returns.
+///
+/// The budget is the certificate's own and starts when this is called; it is independent of
+/// [`F4Options::max_wall_time`](super::F4Options::max_wall_time), which bounds the computation.
+pub fn certify_f4_output_within<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    workers: usize,
+    budget: Duration,
+) -> Result<CertificationReport, CertificationStopped> {
+    certify_budgeted(
+        generators,
+        basis,
+        order,
+        Provenance::F4Output,
+        workers,
+        Some(budget),
+    )
+}
+
 /// Check a basis of unknown provenance.
 ///
 /// Runs exactly the same checks as [`certify_f4_output`] and reports them the same way. What differs
@@ -224,46 +313,139 @@ fn certify_with<const N: usize, F: FiniteField>(
     provenance: Provenance,
     workers: usize,
 ) -> CertificationReport {
+    certify_budgeted(generators, basis, order, provenance, workers, None)
+        .unwrap_or_else(|_| unreachable!("a certification without a budget cannot run out of one"))
+}
+
+/// [`certify_with`], stopping between reductions once `budget` has elapsed.
+fn certify_budgeted<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    provenance: Provenance,
+    workers: usize,
+    budget: Option<Duration>,
+) -> Result<CertificationReport, CertificationStopped> {
     let at = Instant::now();
+    let deadline = Deadline {
+        at: budget.and_then(|budget| at.checked_add(budget)),
+        budgeted: budget.is_some(),
+    };
     let mut report = CertificationReport {
         provenance,
         ..CertificationReport::default()
+    };
+    let nonzero_generators: Vec<&MultivariatePolynomial<N, F>> =
+        generators.iter().filter(|p| !p.is_zero()).collect();
+    let mut stopped = CertificationStopped {
+        stage: CertificationStage::Generators,
+        generators_checked: 0,
+        generators: nonzero_generators.len(),
+        s_polynomials_checked: 0,
+        s_polynomials: 0,
+        s_polynomials_discarded: 0,
+        elapsed: Duration::ZERO,
+        budget: budget.unwrap_or_default(),
+        provenance,
+    };
+    let stop = |mut stopped: CertificationStopped| {
+        stopped.elapsed = at.elapsed();
+        Err(stopped)
     };
     let divisors = PreparedDivisors::new(basis, order);
 
     // (2) F in <G>. First, because it is linear in the generators and it is the check a truncated
     // basis fails for sure.
-    let nonzero_generators: Vec<&MultivariatePolynomial<N, F>> =
-        generators.iter().filter(|p| !p.is_zero()).collect();
-    let failure = first_irreducible(
+    match first_irreducible(
         &divisors,
         Dividends::Generators(&nonzero_generators),
         workers,
-    );
-    report.generators_checked = failure.map_or(nonzero_generators.len(), |at| at + 1);
-    if failure.is_some() {
-        report.elapsed = at.elapsed();
-        return report;
+        deadline,
+    ) {
+        Scan::Clean => report.generators_checked = nonzero_generators.len(),
+        Scan::Irreducible(failure) => {
+            report.generators_checked = failure + 1;
+            report.elapsed = at.elapsed();
+            return Ok(report);
+        }
+        Scan::Stopped { verified } => {
+            stopped.generators_checked = verified;
+            return stop(stopped);
+        }
     }
     report.generators_in_basis = true;
+    stopped.generators_checked = nonzero_generators.len();
 
     // (3) Buchberger's criterion, over the pairs no criterion proves redundant.
+    stopped.stage = CertificationStage::BuchbergerCriterion;
     let nonzero: Vec<&MultivariatePolynomial<N, F>> =
         basis.iter().filter(|p| !p.is_zero()).collect();
-    let check =
-        check_buchberger_criterion(&nonzero, &divisors, order, &CERTIFICATION_CRITERIA, workers);
+    let check = check_buchberger_criterion(
+        &nonzero,
+        &divisors,
+        order,
+        &CERTIFICATION_CRITERIA,
+        workers,
+        deadline,
+    );
+    if let Some(verified) = check.stopped_at {
+        stopped.s_polynomials_checked = verified;
+        stopped.s_polynomials = check.checked;
+        stopped.s_polynomials_discarded = check.discarded;
+        return stop(stopped);
+    }
     report.s_polynomials_checked = check.checked;
     report.s_polynomials_discarded = check.discarded;
     if !check.held {
         report.elapsed = at.elapsed();
-        return report;
+        return Ok(report);
     }
     report.buchberger_criterion = true;
 
-    // (4) Reducedness.
+    // (4) Reducedness. Not interruptible, but it forms no normal form.
+    if deadline.expired() {
+        stopped.stage = CertificationStage::Reducedness;
+        stopped.s_polynomials_checked = check.checked;
+        stopped.s_polynomials = check.checked;
+        stopped.s_polynomials_discarded = check.discarded;
+        return stop(stopped);
+    }
     report.reduced = is_reduced(&nonzero, order);
     report.elapsed = at.elapsed();
-    report
+    Ok(report)
+}
+
+/// When a budgeted certification must stop, checked between reductions.
+#[derive(Clone, Copy)]
+struct Deadline {
+    /// `None` with `budgeted` set means the budget is too large to represent, so never expires.
+    at: Option<Instant>,
+    budgeted: bool,
+}
+
+impl Deadline {
+    /// No deadline: [`Self::expired`] is always false, and no clock is read.
+    #[cfg(test)]
+    const NONE: Self = Self {
+        at: None,
+        budgeted: false,
+    };
+
+    fn expired(&self) -> bool {
+        self.at.is_some_and(|at| Instant::now() >= at)
+    }
+}
+
+/// How a scan over the dividends ended.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Scan {
+    /// Every dividend reduced to zero.
+    Clean,
+    /// The earliest dividend, in the serial order, whose normal form is nonzero; every one before
+    /// it reduced to zero.
+    Irreducible(usize),
+    /// The deadline passed first. The first `verified` dividends reduced to zero.
+    Stopped { verified: usize },
 }
 
 /// What Buchberger's criterion cost and whether it held.
@@ -276,6 +458,10 @@ struct PairCheck {
 
     /// Pairs a criterion proved redundant.
     discarded: usize,
+
+    /// Set when the deadline passed first, to the verified prefix of the pairs; `checked` is then
+    /// the number of pairs there were to reduce, and `held` is meaningless.
+    stopped_at: Option<usize>,
 }
 
 /// Buchberger's criterion over the pairs `criteria` does not prove redundant.
@@ -290,6 +476,7 @@ fn check_buchberger_criterion<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     criteria: &PairCriteria,
     workers: usize,
+    deadline: Deadline,
 ) -> PairCheck {
     debug_assert!(
         !criteria.chain,
@@ -325,16 +512,25 @@ fn check_buchberger_criterion<const N: usize, F: FiniteField>(
             order,
         },
         workers,
+        deadline,
     ) {
-        Some(at) => PairCheck {
+        Scan::Irreducible(at) => PairCheck {
             held: false,
             checked: at + 1,
             discarded: discarded_before[at],
+            stopped_at: None,
         },
-        None => PairCheck {
+        Scan::Clean => PairCheck {
             held: true,
             checked: pairs.len(),
             discarded: counts.total(),
+            stopped_at: None,
+        },
+        Scan::Stopped { verified } => PairCheck {
+            held: false,
+            checked: pairs.len(),
+            discarded: counts.total(),
+            stopped_at: Some(verified),
         },
     }
 }
@@ -380,18 +576,20 @@ impl<const N: usize, F: FiniteField> Dividends<'_, N, F> {
     }
 }
 
-/// The earliest position whose dividend does not reduce to zero, or `None` if every one does.
+/// The earliest position whose dividend does not reduce to zero, unless the deadline passes first.
 ///
 /// With one worker, or a field that cannot be shared across threads, this is the serial scan.
 fn first_irreducible<const N: usize, F: FiniteField>(
     divisors: &PreparedDivisors<N, F>,
     dividends: Dividends<'_, N, F>,
     workers: usize,
-) -> Option<usize> {
+    deadline: Deadline,
+) -> Scan {
     let search = Search {
         divisors,
         dividends,
         workers: workers.min(dividends.len()),
+        deadline,
     };
     if search.workers <= 1 {
         return search.serial();
@@ -404,16 +602,25 @@ struct Search<'a, const N: usize, F: FiniteField> {
     divisors: &'a PreparedDivisors<N, F>,
     dividends: Dividends<'a, N, F>,
     workers: usize,
+    deadline: Deadline,
 }
 
 impl<const N: usize, F: FiniteField> Search<'_, N, F> {
-    fn serial(&self) -> Option<usize> {
-        (0..self.dividends.len()).find(|&at| self.dividends.irreducible(at, self.divisors))
+    fn serial(&self) -> Scan {
+        for at in 0..self.dividends.len() {
+            if self.deadline.expired() {
+                return Scan::Stopped { verified: at };
+            }
+            if self.dividends.irreducible(at, self.divisors) {
+                return Scan::Irreducible(at);
+            }
+        }
+        Scan::Clean
     }
 }
 
 impl<const N: usize, F: FiniteField> ConcurrentJob<F> for Search<'_, N, F> {
-    type Output = Option<usize>;
+    type Output = Scan;
 
     /// Workers claim positions in increasing order, one at a time because a reduction's cost
     /// varies by orders of magnitude, and skip any position past the earliest failure found so far.
@@ -421,26 +628,67 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for Search<'_, N, F> {
     /// The result is deterministic: a position below the final minimum is never skipped, since
     /// skipping it would need a failure below it, so every position below the minimum was reduced
     /// and found to reduce to zero.
+    ///
+    /// Under a deadline each worker checks it before claiming, and the first to see it expired
+    /// stops the rest at their next claim. Each position is marked when its reduction finishes, so
+    /// the verified prefix is read off the marks once the scope has joined every worker. A failure
+    /// is reported only if every position below it finished, which is exactly the unbudgeted
+    /// result; otherwise the scan is a stop, since a failure whose serial counts are unknown is not
+    /// reported as a rejection.
     fn run(self) -> Self::Output
     where
         F: Send + Sync,
     {
+        let length = self.dividends.len();
         let next = AtomicUsize::new(0);
         let earliest = AtomicUsize::new(usize::MAX);
+        let stopped = AtomicBool::new(false);
+        let finished: Vec<AtomicBool> = if self.deadline.budgeted {
+            (0..length).map(|_| AtomicBool::new(false)).collect()
+        } else {
+            Vec::new()
+        };
         std::thread::scope(|scope| {
             for _ in 0..self.workers {
                 scope.spawn(|| loop {
+                    if stopped.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    if self.deadline.expired() {
+                        stopped.store(true, Ordering::Relaxed);
+                        break;
+                    }
                     let at = next.fetch_add(1, Ordering::Relaxed);
-                    if at >= self.dividends.len() || at > earliest.load(Ordering::Relaxed) {
+                    if at >= length || at > earliest.load(Ordering::Relaxed) {
                         break;
                     }
                     if self.dividends.irreducible(at, self.divisors) {
                         earliest.fetch_min(at, Ordering::Relaxed);
                     }
+                    if let Some(mark) = finished.get(at) {
+                        mark.store(true, Ordering::Relaxed);
+                    }
                 });
             }
         });
-        Some(earliest.into_inner()).filter(|&at| at != usize::MAX)
+        let earliest = earliest.into_inner();
+        if stopped.into_inner() {
+            let verified = finished
+                .iter()
+                .take_while(|mark| mark.load(Ordering::Relaxed))
+                .count();
+            if earliest < verified {
+                Scan::Irreducible(earliest)
+            } else if verified == length {
+                Scan::Clean
+            } else {
+                Scan::Stopped { verified }
+            }
+        } else if earliest == usize::MAX {
+            Scan::Clean
+        } else {
+            Scan::Irreducible(earliest)
+        }
     }
 }
 
@@ -492,14 +740,15 @@ fn is_reduced<const N: usize, F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, time::Duration};
 
     use super::{
-        certify_f4_output, certify_f4_output_with_workers, certify_submitted_basis,
-        CertificationReport, PairCheck, Provenance, CERTIFICATION_CRITERIA,
+        certify_f4_output, certify_f4_output_with_workers, certify_f4_output_within,
+        certify_submitted_basis, CertificationReport, CertificationStage, PairCheck, Provenance,
+        CERTIFICATION_CRITERIA,
     };
     use crate::{
-        fields::Zp2147483647,
+        fields::{Zp2147483647, Zp32003},
         grobner::{
             benchmark_systems::{cyclic, katsura},
             buchberger, f4,
@@ -525,6 +774,7 @@ mod tests {
             order,
             criteria,
             1,
+            super::Deadline::NONE,
         )
     }
     const ALL_ORDERS: [MonomialOrder; 3] = [
@@ -597,10 +847,10 @@ mod tests {
     /// The shift leaves every leading monomial alone, so the criteria prune exactly the pairs they
     /// prune on the correct basis while the S-polynomials are no longer those of a Gröbner basis —
     /// which is the configuration a silent false pass would need.
-    fn planted_defects<const N: usize>(
-        basis: &[MultivariatePolynomial<N, F>],
-    ) -> Vec<Vec<MultivariatePolynomial<N, F>>> {
-        let one = MultivariatePolynomial::<N, F>::one();
+    fn planted_defects<const N: usize, G: FiniteField>(
+        basis: &[MultivariatePolynomial<N, G>],
+    ) -> Vec<Vec<MultivariatePolynomial<N, G>>> {
+        let one = MultivariatePolynomial::<N, G>::one();
         let mut out = Vec::new();
         for dropped in 0..basis.len() {
             let mut defect = basis.to_vec();
@@ -1125,7 +1375,7 @@ mod tests {
     /// A report with its timing removed, which is the only field allowed to vary between runs.
     fn untimed(report: CertificationReport) -> CertificationReport {
         CertificationReport {
-            elapsed: std::time::Duration::ZERO,
+            elapsed: Duration::ZERO,
             ..report
         }
     }
@@ -1217,6 +1467,126 @@ mod tests {
             let report = certify_f4_output_with_workers(&system, &basis, order, workers);
             assert!(report.generators_in_basis && report.buchberger_criterion);
             assert!(!report.reduced, "{workers} workers");
+        }
+    }
+
+    /// A zero certification budget on a basis that certifies is a typed stop before any reduction,
+    /// never a rejection, at every worker count and in two fields.
+    #[test]
+    fn test_a_zero_budget_stops_rather_than_rejects() {
+        fn check<G: FiniteField>() {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let system: Vec<MultivariatePolynomial<4, G>> = cyclic::<4, G>();
+            let basis = f4(&system, order).expect("within limits");
+            for workers in WORKER_COUNTS {
+                let stopped =
+                    certify_f4_output_within(&system, &basis, order, workers, Duration::ZERO)
+                        .expect_err("a zero budget cannot finish a certificate");
+                assert_eq!(
+                    stopped.stage,
+                    CertificationStage::Generators,
+                    "{workers} workers"
+                );
+                assert_eq!(stopped.generators_checked, 0, "{workers} workers");
+                assert_eq!(stopped.generators, system.len());
+                assert_eq!(stopped.s_polynomials_checked, 0);
+                assert_eq!(stopped.budget, Duration::ZERO);
+                assert!(stopped.elapsed >= stopped.budget);
+                assert_eq!(stopped.provenance, Provenance::F4Output);
+            }
+        }
+        check::<F>();
+        check::<Zp32003>();
+    }
+
+    /// A zero budget on a defective basis is still a stop and not a rejection: the verdict was
+    /// never reached, so it is not reported.
+    #[test]
+    fn test_a_zero_budget_does_not_reject_a_defective_basis() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let system: Vec<MultivariatePolynomial<4, F>> = cyclic::<4, F>();
+        let basis = f4(&system, order).expect("within limits");
+        for defect in planted_defects(&basis) {
+            for workers in WORKER_COUNTS {
+                assert!(
+                    certify_f4_output_within(&system, &defect, order, workers, Duration::ZERO)
+                        .is_err(),
+                    "{workers} workers"
+                );
+            }
+        }
+    }
+
+    /// An ample budget returns exactly the unbudgeted report, timing aside, for passing and
+    /// rejected bases at every worker count and in two fields.
+    #[test]
+    fn test_an_ample_budget_leaves_the_report_unchanged() {
+        fn check<G: FiniteField>() {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let system: Vec<MultivariatePolynomial<4, G>> = cyclic::<4, G>();
+            let basis = f4(&system, order).expect("within limits");
+            let mut bases = planted_defects(&basis);
+            bases.push(basis);
+            for candidate in &bases {
+                let unbudgeted = untimed(certify_f4_output(&system, candidate, order));
+                for workers in WORKER_COUNTS {
+                    let budgeted = certify_f4_output_within(
+                        &system,
+                        candidate,
+                        order,
+                        workers,
+                        Duration::from_secs(3600),
+                    )
+                    .expect("an hour is ample");
+                    assert_eq!(untimed(budgeted), unbudgeted, "{workers} workers");
+                }
+            }
+        }
+        check::<F>();
+        check::<Zp32003>();
+    }
+
+    /// Whatever a short budget allows, the outcome is either the unbudgeted report or a stop whose
+    /// progress is a consistent prefix of the serial order, and a later run on the same inputs is
+    /// unaffected (the scoped team was joined, not abandoned).
+    #[test]
+    fn test_a_short_budget_reports_a_consistent_prefix() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let system: Vec<MultivariatePolynomial<5, F>> = katsura::<5, F>();
+        let basis = f4(&system, order).expect("within limits");
+        let unbudgeted = untimed(certify_f4_output(&system, &basis, order));
+        for budget in [1, 20, 200, 2000].map(Duration::from_micros) {
+            for workers in WORKER_COUNTS {
+                match certify_f4_output_within(&system, &basis, order, workers, budget) {
+                    Ok(report) => assert_eq!(untimed(report), unbudgeted),
+                    Err(stopped) => {
+                        assert!(stopped.elapsed >= budget);
+                        assert!(stopped.generators_checked <= stopped.generators);
+                        assert!(stopped.s_polynomials_checked <= stopped.s_polynomials);
+                        match stopped.stage {
+                            CertificationStage::Generators => {
+                                assert!(stopped.generators_checked < stopped.generators);
+                                assert_eq!(stopped.s_polynomials, 0);
+                            }
+                            CertificationStage::BuchbergerCriterion => {
+                                assert_eq!(stopped.generators_checked, stopped.generators);
+                                assert_eq!(stopped.s_polynomials, unbudgeted.s_polynomials_checked);
+                                assert!(stopped.s_polynomials_checked < stopped.s_polynomials);
+                            }
+                            CertificationStage::Reducedness => {
+                                assert_eq!(stopped.s_polynomials_checked, stopped.s_polynomials);
+                            }
+                        }
+                    }
+                }
+                assert_eq!(
+                    untimed(certify_f4_output_with_workers(
+                        &system, &basis, order, workers
+                    )),
+                    unbudgeted,
+                    "{workers} workers after a budgeted run"
+                );
+            }
         }
     }
 }

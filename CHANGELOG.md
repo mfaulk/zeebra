@@ -9,6 +9,14 @@ change to `y` may break the public API.
 
 ### Added
 
+- `F4Options::max_certify_time`, a wall budget for the `certify` check separate from
+  `max_wall_time`, checked between reductions. Running out is the new
+  `F4Error::CertificationTimeBudgetExceeded { progress }` (`StopKind::Time`), never
+  `CertificationFailed`; `progress` is a `CertificationStopped` saying which check was running and how
+  far it got. `certify_f4_output_within` is the direct entry point (#899). Breaking: an exhaustive
+  match on `F4Error` or an exhaustive `F4Options` literal needs the new variant or field;
+  `CertificationReport` is unchanged.
+
 - `certify_f4_output_with_workers` and `ParallelForward::max_workers`. F4's `certify` option now
   reduces against divisors prepared once and spreads the reductions over the call's workers, with
   the serial report at every worker count; Eco-12 and MQ11 certify inside the 600 s budget (#887).

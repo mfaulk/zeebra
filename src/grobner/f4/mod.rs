@@ -35,8 +35,9 @@ mod tests;
 
 pub use budget::{Allowance, BudgetApproach, BudgetLine, BudgetReport};
 pub use certify::{
-    certify_f4_output, certify_f4_output_with_workers, certify_submitted_basis,
-    CertificationReport, Provenance,
+    certify_f4_output, certify_f4_output_with_workers, certify_f4_output_within,
+    certify_submitted_basis, CertificationReport, CertificationStage, CertificationStopped,
+    Provenance,
 };
 pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use divmask::{DivmaskCalibration, DIVMASK_BITS};
@@ -725,7 +726,24 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             .parallel_forward
             .max_workers()
             .max(options.parallel_symbolic.workers());
-        let report = certify::certify_f4_output_with_workers(generators, &reduced, order, workers);
+        //
+        // Under its own budget when one is set, started here: the solver's `max_wall_time` clock
+        // is not consulted, so verification time is never charged to the solver's budget. A stop
+        // is its own error and leaves `statistics.certification` empty, so no partial report can
+        // be read as a verdict (#899).
+        let report = match options.max_certify_time {
+            None => certify::certify_f4_output_with_workers(generators, &reduced, order, workers),
+            Some(budget) => {
+                match certify::certify_f4_output_within(
+                    generators, &reduced, order, workers, budget,
+                ) {
+                    Ok(report) => report,
+                    Err(progress) => {
+                        return Err(F4Error::CertificationTimeBudgetExceeded { progress })
+                    }
+                }
+            }
+        };
         statistics.certification = Some(report);
         if let Some(reason) = report.first_failure() {
             // Deliberately before `statistics.total` is set: a refusal has no total, and the
