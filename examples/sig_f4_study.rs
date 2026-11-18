@@ -16,7 +16,7 @@ use zeebra::{
         differential::polynomial_to_string,
         f4_reported,
         sigf4::{sig_f4_reported, SigF4Options, SigF4Statistics},
-        F4Options, ParallelForward,
+        F4Options, ParallelForward, ParallelSymbolic,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -81,7 +81,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     Ok(parsed)
 }
 
-/// Shipping defaults; only the forward-worker cap varies, as in `m29_cost_model`.
+/// Shipping defaults; only the forward and symbolic worker caps vary, as in `m29_cost_model`.
 fn f4_options(args: &Args) -> F4Options {
     F4Options {
         max_wall_time: Some(args.wall),
@@ -89,6 +89,13 @@ fn f4_options(args: &Args) -> F4Options {
             ParallelForward::Serial
         } else {
             ParallelForward::Auto {
+                max_workers: args.workers,
+            }
+        },
+        parallel_symbolic: if args.workers == 1 {
+            ParallelSymbolic::Serial
+        } else {
+            ParallelSymbolic::Auto {
                 max_workers: args.workers,
             }
         },
@@ -328,6 +335,20 @@ mod tests {
         assert!(args(&[&base[..], &["f4", "--workers", "16", "--discovery"]].concat()).is_err());
         assert!(args(&[&base[..], &["magma"]].concat()).is_err());
         assert!(args(&["--field", "bn254", "--name", "eco-12", "--engine", "f4"]).is_err());
+    }
+
+    // The shipping F4 arm caps the symbolic team at the worker count, as forward is (#883).
+    #[test]
+    fn f4_arm_caps_the_symbolic_team() {
+        use zeebra::grobner::ParallelSymbolic;
+        let base = ["--field", "wide64", "--name", "eco-12", "--engine", "f4"];
+        let one = f4_options(&args(&base).unwrap());
+        assert_eq!(one.parallel_symbolic, ParallelSymbolic::Serial);
+        let four = f4_options(&args(&[&base[..], &["--workers", "4"]].concat()).unwrap());
+        assert_eq!(
+            four.parallel_symbolic,
+            ParallelSymbolic::Auto { max_workers: 4 }
+        );
     }
 
     // The two engines agree on a small frozen row, which is what the basis digest relies on.
