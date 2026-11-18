@@ -10,7 +10,8 @@
 #   mq10         comparand-scaling.py: Zeebra, msolve, grobx, groebner-rs on MQ10 at 32003 and
 #                2^31-1, workers 1/4/8/16, five repetitions, answers checked against #739's references
 #   wide         wide-corpus.py: grobx and groebner-rs on Eco-12/2^64-353 and MQ11/Goldilocks, one
-#                worker, three passes (the controller takes one attempt per cell)
+#                worker, three passes (the controller takes one attempt per cell); WIDE_CELLS overrides
+#                the cells as field:row words
 #   walls|stages|ab831|census
 #                costmodel.py over m29_cost_model on all four targets (see that file)
 #   fl|flstages  #828 cross-check: FL_BIN (m29_cost_model built on the #843 library), forward
@@ -75,7 +76,9 @@ wide)
   settle
   status=0
   for pass in $(seq 1 "${REPS:-3}"); do
-    for cell in "wide64 eco-12" "goldilocks mq-random-11"; do
+    # WIDE_CELLS (#862) replaces the two primary cells, e.g. "wide64:katsura-11 wide64:cyclic-7".
+    for cell in ${WIDE_CELLS:-wide64:eco-12 goldilocks:mq-random-11}; do
+      cell="${cell/:/ }"
       set -- $cell
       out="$OUT/wide-$1-$2-pass$pass.json.gz"
       ZEEBRA_AFFINITY=8 taskset -c 8 python3 tools/external/wide-corpus.py --binary "$bin/wide_corpus" \
