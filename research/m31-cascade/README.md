@@ -1,7 +1,7 @@
 # #902 cross-target cascade replay: records
 
 Findings: [`docs/research/m31-parallel-signature-elimination.md`](../../docs/research/m31-parallel-signature-elimination.md).
-**Measured at:** `0e75b3b6`, 2026-11-18. Counts only: no wall time is taken or recorded here, so
+**Measured at:** `0e75b3b6` (tag `measured/902-cascade-replay`), 2026-11-18. Counts only: no wall time is taken or recorded here, so
 no benchlock window was needed. The counts are deterministic (identical across the two fields of
 each family, and independent of design 2's worker count).
 

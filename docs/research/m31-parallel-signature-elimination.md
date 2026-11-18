@@ -2,7 +2,7 @@
 
 **Status:** complete, 2026-11-18. Recommends one exact schedule; Gate A items 1–2 pass, item 3
 waits on #901's re-derived §6.3 table and on #903 (§11).
-**Measured at:** `0e75b3b6` (replay records in [`research/m31-cascade/`](../../research/m31-cascade/);
+**Measured at:** `0e75b3b6`, tag `measured/902-cascade-replay` (replay records in [`research/m31-cascade/`](../../research/m31-cascade/);
 coefficient-product counts only, no wall time taken). The only timings in this document are
 quoted from #857 §3.2 at `2d589a80` / `7d85eee5` via plan §2.4.
 **Plan:** [`MILESTONE-COMPETITIVE-SIGNATURE-F4.md`](../MILESTONE-COMPETITIVE-SIGNATURE-F4.md)
