@@ -57,6 +57,15 @@ class PlanTest(unittest.TestCase):
         retains = {a: extra[extra.index('--retain') + 1] for *_, extra, a in plan if '--retain' in extra}
         self.assertEqual(retains, {'serial1': 'batch', 'serial16': 'batch', 'serialrun16': 'run'})
 
+    def test_small_arms_pair_shipping_with_the_serial_merge_at_every_worker_count(self):
+        # #861: every small target runs `off` and `serial` at 1, 4, 8 and 16 workers, team = workers.
+        plan = campaign.plan('small', 1, campaign.SMALL_TARGETS)
+        self.assertEqual(sorted((t, a) for _, t, _, _, a in plan),
+                         sorted((t, f'{m}{w}') for t in campaign.SMALL_TARGETS
+                                for w in campaign.WORKERS for m in ('off', 'serial')))
+        for _, _, w, extra, _ in plan:
+            self.assertEqual(extra[extra.index('--level-workers') + 1], str(w))
+
     def test_a_target_subset_is_respected(self):
         # Restricting targets restricts the plan and nothing else.
         plan = campaign.plan('components', 3, ('mq10-m31',))
