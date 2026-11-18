@@ -85,6 +85,7 @@ fn anf<const N: usize>(polynomial: &MultivariatePolynomial<N, Zp2>) -> Anf {
 }
 
 /// Whether the equation `p = 0` holds at the point whose bit `i` is `x_i`.
+#[cfg(test)]
 fn holds(equation: &Anf, point: u64) -> bool {
     let odd = equation
         .monomials
