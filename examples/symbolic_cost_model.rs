@@ -52,6 +52,10 @@ const TARGETS: &[&str] = &[
     "eco12-wide64",
     "mq11-goldilocks",
     "katsura11-m31",
+    // #861: the small tasks the <=5% regression limit is read on.
+    "katsura6-m31",
+    "katsura7-m31",
+    "cyclic6-m31",
 ];
 
 /// Counts every allocation the process makes; the replay reads the difference across one call.
@@ -778,6 +782,9 @@ fn main() {
         "eco12-wide64" => run::<12, Wide>(wide("wide64", "eco-12"), &args),
         "mq11-goldilocks" => run::<11, Goldilocks>(wide("goldilocks", "mq-random-11"), &args),
         "katsura11-m31" => run::<11, Zp2147483647>(ladder("katsura-11", 2147483647), &args),
+        "katsura6-m31" => run::<6, Zp2147483647>(ladder("katsura-6", 2147483647), &args),
+        "katsura7-m31" => run::<7, Zp2147483647>(ladder("katsura-7", 2147483647), &args),
+        "cyclic6-m31" => run::<6, Zp2147483647>(ladder("cyclic-6", 2147483647), &args),
         _ => unreachable!("validated"),
     };
     println!("{}", report.to_json().replace('\n', ""));
