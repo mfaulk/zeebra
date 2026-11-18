@@ -118,6 +118,10 @@ name = "f4_live_budget"
 test = true
 
 [[example]]
+name = "sat_algebra"
+test = true
+
+[[example]]
 name = "field_reduction"
 test = true
 
