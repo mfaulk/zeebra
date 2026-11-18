@@ -6,10 +6,10 @@ use crate::{
     grobner::buchberger::InterreductionStopped,
     grobner::f4::{
         macaulay::{BuildBudgetExceeded, MacaulayMatrix},
-        symbolic::{interreduction_rows, MonicBasis, ReducerCache, RowBudgetExceeded},
+        symbolic::{interreduction_rows, MonicBasis, ReducerCache, RowBudgetExceeded, RowKind},
         ReducerSelection,
     },
-    linalg::sparse::reduced_row_echelon_tracked,
+    linalg::{sparse::reduced_row_echelon_tracked, DenseAccumulator},
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
@@ -90,6 +90,22 @@ pub(crate) struct MatrixInterreductionReport {
     pub elements: usize,
 }
 
+/// How the interreduction matrix is reduced once built.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum MatrixInterreductionMethod {
+    /// Reduced row echelon form over every row, reducer multiples included.
+    #[default]
+    FullEchelon,
+    /// Each seed's tail reduced against the fixed, never-reduced rows (#808).
+    ///
+    /// Every row is monic and the rows lead at distinct columns, so the rows are already an
+    /// echelon basis of the closure. One ascending sweep of a seed's tail against them clears every
+    /// pivot column, which is every monomial divisible by a leading monomial: that is the seed's
+    /// reduced tail. The back-substitution among reducer rows that the full echelon form performs
+    /// and then discards is never done, so the matrix never grows past its construction.
+    TailsOnly,
+}
+
 /// Interreduce a minimized basis through one Macaulay matrix.
 ///
 /// `minimal` must be **minimized** — monic, deduplicated, and with no leading monomial dividing
@@ -107,6 +123,37 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
     max_rows: usize,
     max_columns: usize,
     max_nonzeros: usize,
+    should_stop: impl FnMut() -> bool,
+) -> Result<
+    (
+        Vec<MultivariatePolynomial<N, F>>,
+        MatrixInterreductionReport,
+    ),
+    MatrixInterreductionAborted<N, F>,
+> {
+    interreduce_by_matrix_with(
+        minimal,
+        order,
+        max_rows,
+        max_columns,
+        max_nonzeros,
+        MatrixInterreductionMethod::FullEchelon,
+        should_stop,
+    )
+}
+
+/// [`interreduce_by_matrix`] with the elimination chosen by `method`.
+///
+/// Under [`MatrixInterreductionMethod::TailsOnly`] the live-entry count is the built matrix and one
+/// working row, and `max_nonzeros` bounds that sum. The extracted elements are outside it, as they are
+/// outside the full echelon form's high-water, so the two reports count the same things.
+pub(crate) fn interreduce_by_matrix_with<const N: usize, F: FiniteField>(
+    minimal: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    max_rows: usize,
+    max_columns: usize,
+    max_nonzeros: usize,
+    method: MatrixInterreductionMethod,
     mut should_stop: impl FnMut() -> bool,
 ) -> Result<
     (
@@ -222,6 +269,10 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
     // are what bound how long it can run.
     stop_if_asked!(elements);
 
+    if method == MatrixInterreductionMethod::TailsOnly {
+        return reduce_tails_against_fixed_rows(matrix, minimal, order, max_nonzeros, report);
+    }
+
     // # The budget that binds, and why construction's is not it (#536)
     //
     // `max_nonzeros` bounded the entries the matrix was **built** with, and that is the smaller
@@ -283,9 +334,89 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
     Ok((reduced, report))
 }
 
+/// [`MatrixInterreductionMethod::TailsOnly`]: sweep each seed row's tail against the unreduced
+/// rows of `matrix`.
+///
+/// Sound because every row is monic (a multiple of a monic element) and the leads are distinct
+/// (the closure adds at most one row per monomial, and `interreduction_rows` documents why no
+/// reducer shares a seed's lead), so `pivots[c]` names the one row leading at column `c` and the
+/// sweep in [`DenseAccumulator`] clears every pivot column right of the seed's lead. Those are
+/// exactly the closure's reducible monomials, so what is left is the reduced tail. Seeds are
+/// independent of one another, so each reads the same fixed matrix.
+fn reduce_tails_against_fixed_rows<const N: usize, F: FiniteField>(
+    matrix: MacaulayMatrix<N, F>,
+    minimal: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    max_nonzeros: usize,
+    mut report: MatrixInterreductionReport,
+) -> Result<
+    (
+        Vec<MultivariatePolynomial<N, F>>,
+        MatrixInterreductionReport,
+    ),
+    MatrixInterreductionAborted<N, F>,
+> {
+    let columns = matrix.num_columns();
+    let mut pivots = vec![usize::MAX; columns];
+    for (index, row) in matrix.matrix().rows().iter().enumerate() {
+        let lead = row
+            .leading_column()
+            .expect("a multiple of a nonzero element is nonzero");
+        debug_assert_eq!(
+            row.leading_coefficient(),
+            Some(F::one()),
+            "every row is a multiple of a monic element"
+        );
+        debug_assert_eq!(pivots[lead], usize::MAX, "the closure's leads are distinct");
+        pivots[lead] = index;
+    }
+
+    let built = report.nonzeros;
+    let mut accumulator = DenseAccumulator::new(columns);
+    let mut reduced: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(report.elements);
+    for (index, origin) in matrix.row_origins().iter().enumerate() {
+        if origin.kind == RowKind::Reducer {
+            continue;
+        }
+        let row = matrix.matrix().row(index);
+        let lead = row.leading_column().expect("a seed is nonzero");
+        accumulator.load(row);
+        let (_, _, sweep_peak) = accumulator.sweep_with_peak(|column| {
+            let source = pivots[column];
+            (column != lead && source != usize::MAX).then(|| matrix.matrix().row(source))
+        });
+        let live = built + sweep_peak.max(row.nonzeros());
+        report.peak_nonzeros = report.peak_nonzeros.max(live);
+        if live > max_nonzeros {
+            drop(reduced);
+            drop(matrix);
+            return Err(MatrixInterreductionAborted::Refused(
+                MatrixInterreductionRefused::LiveEntries { nonzeros: live },
+                minimal,
+                report,
+            ));
+        }
+        let tail = accumulator.take();
+        reduced.push(matrix.sparse_row_polynomial(&tail));
+    }
+    // The fixed rows' buffers and the dense working row.
+    report.peak_entry_capacity = matrix.matrix().entry_capacity() + columns;
+
+    debug_assert_eq!(
+        reduced.len(),
+        report.elements,
+        "every seed row yields its element"
+    );
+    reduced.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
+    Ok((reduced, report))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{interreduce_by_matrix, MatrixInterreductionAborted, MatrixInterreductionRefused};
+    use super::{
+        interreduce_by_matrix, interreduce_by_matrix_with, MatrixInterreductionAborted,
+        MatrixInterreductionMethod, MatrixInterreductionRefused,
+    };
     use crate::grobner::f4::InterreductionRoute;
     use crate::{
         fields::{Zp13, Zp2147483647},
@@ -316,11 +447,22 @@ mod tests {
         system: &[MultivariatePolynomial<N, F>],
         order: MonomialOrder,
     ) -> Vec<MultivariatePolynomial<N, F>> {
+        before_interreduction_with(label, system, order, F4Options::default().reduce_batch_rows)
+    }
+
+    /// [`before_interreduction`] with batch rows left as echelon tails or fully reduced.
+    fn before_interreduction_with<const N: usize, F: FiniteField>(
+        label: &str,
+        system: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        reduce_batch_rows: bool,
+    ) -> Vec<MultivariatePolynomial<N, F>> {
         let (_, _, trace) = trace_batches(
             system,
             order,
             &F4Options {
                 interreduction: InterreductionRoute::Division,
+                reduce_batch_rows,
                 ..F4Options::default()
             },
         )
@@ -607,5 +749,109 @@ mod tests {
             matches!(result, Err(MatrixInterreductionAborted::Stopped(_))),
             "a predicate firing at the second check point must still abort"
         );
+    }
+
+    /// The tail-only route over a minimized basis, with only the live-entry allowance bounded.
+    fn by_tails<const N: usize, F: FiniteField>(
+        minimal: Vec<MultivariatePolynomial<N, F>>,
+        order: MonomialOrder,
+        max_nonzeros: usize,
+    ) -> Result<
+        (
+            Vec<MultivariatePolynomial<N, F>>,
+            super::MatrixInterreductionReport,
+        ),
+        MatrixInterreductionAborted<N, F>,
+    > {
+        interreduce_by_matrix_with(
+            minimal,
+            order,
+            usize::MAX,
+            usize::MAX,
+            max_nonzeros,
+            MatrixInterreductionMethod::TailsOnly,
+            || false,
+        )
+    }
+
+    /// The tail-only route returns the division route's reduced basis coefficient for coefficient.
+    #[test]
+    fn test_the_tail_only_route_reproduces_the_division_route() {
+        fn check<const N: usize, F: FiniteField>(
+            label: &str,
+            system: &[MultivariatePolynomial<N, F>],
+            order: MonomialOrder,
+        ) {
+            let minimal = before_interreduction(label, system, order);
+            let expected = reduce_grobner_basis(minimal.clone(), order);
+            let (reduced, report) = by_tails(minimal, order, usize::MAX)
+                .unwrap_or_else(|_| panic!("an unbounded interreduction cannot abort"));
+            assert_eq!(reduced, expected, "{label} under {order:?}");
+            assert_eq!(report.elements, expected.len());
+        }
+        for order in ORDERS {
+            check("katsura-4", &katsura::<4, Zp2147483647>(), order);
+            check("katsura-5", &katsura::<5, Zp2147483647>(), order);
+            check("cyclic-4", &cyclic::<4, Zp2147483647>(), order);
+            check("cyclic-5", &cyclic::<5, Zp2147483647>(), order);
+            check("katsura-4/13", &katsura::<4, Zp13>(), order);
+        }
+    }
+
+    /// The tail-only route has no fill-in: its live entries stay below the full echelon form's.
+    #[test]
+    fn test_the_tail_only_route_avoids_the_echelon_fill_in() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        // Echelon batch tails, the regime #536's fill-in was measured in.
+        let minimal =
+            before_interreduction_with("katsura-6", &katsura::<6, Zp2147483647>(), order, false);
+        let (by_echelon, echelon) = interreduce_by_matrix(
+            minimal.clone(),
+            order,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            || false,
+        )
+        .unwrap_or_else(|_| panic!("cannot abort"));
+        let (reduced, tails) =
+            by_tails(minimal, order, usize::MAX).unwrap_or_else(|_| panic!("cannot abort"));
+        assert_eq!(reduced, by_echelon);
+        assert_eq!(
+            (tails.rows, tails.columns, tails.nonzeros),
+            (echelon.rows, echelon.columns, echelon.nonzeros),
+            "both routes reduce the same matrix"
+        );
+        assert!(
+            tails.peak_nonzeros <= tails.nonzeros + tails.columns,
+            "live entries are the matrix as built and one working row: {tails:?}"
+        );
+        assert!(
+            tails.peak_nonzeros < echelon.peak_nonzeros,
+            "tails {} against echelon {}",
+            tails.peak_nonzeros,
+            echelon.peak_nonzeros
+        );
+    }
+
+    /// The tail-only route honors the live-entry allowance and hands the basis back.
+    #[test]
+    fn test_the_tail_only_route_refuses_past_its_allowance() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let minimal = before_interreduction("katsura-6", &katsura::<6, Zp2147483647>(), order);
+        let (_, report) =
+            by_tails(minimal.clone(), order, usize::MAX).unwrap_or_else(|_| panic!("cannot abort"));
+        match by_tails(minimal.clone(), order, report.peak_nonzeros - 1) {
+            Err(MatrixInterreductionAborted::Refused(
+                MatrixInterreductionRefused::LiveEntries { nonzeros },
+                returned,
+                _,
+            )) => {
+                assert!(nonzeros >= report.peak_nonzeros);
+                assert_eq!(returned, minimal, "the basis comes back for the fallback");
+            }
+            _ => panic!("expected a live-entry refusal"),
+        }
+        assert!(by_tails(minimal, order, report.peak_nonzeros).is_ok());
     }
 }
