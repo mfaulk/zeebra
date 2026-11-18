@@ -21,7 +21,14 @@ A running record of what Zeebra implements. The short version is in the [README]
 - [x] F4 symbolic preprocessing on up to 16 worker threads, deterministic by a serial canonical
       merge: 0.748x complete F4 on Eco-12 and 0.78–0.82x on MQ11, MQ10 and held-out Katsura-11 at
       16 workers, small systems within 3%, peak RSS within 1.07x, bases identical (measured at
-      `ad61fb15`; [#861](../research/m30-parallel-interning.md))
+      `ad61fb15`; [#861](../research/m30-parallel-interning.md)). In the M30 final cohort, against
+      the M30 freeze run interleaved: 0.767x on Eco-12, 0.81x on MQ11 and MQ10, 0.78–0.81x on the
+      held-out Katsura-11 rows, one worker 0.975–1.000x, identical algebra and bases (measured at
+      `e4826153`; [M30 report](../MILESTONE-SIGNATURE-SYMBOLIC-F4.md) §15)
+- [x] A research-only signature F4 (`research-sigf4`, a separate engine for graded orders): sound
+      criteria cut coefficient work 9.7x on Eco-12, 11.7x on MQ11 and 22.8x on Katsura-11 against
+      shipping F4, with identical bases. It is not faster in wall time on Eco-12 at 16 workers and
+      does not ship ([#857](../research/m30-sigf4-prototype.md); M30 report §15.4)
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] That oracle over an extension field: a differential case names a field rather than a

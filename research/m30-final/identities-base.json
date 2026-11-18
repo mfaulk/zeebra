@@ -1,0 +1,88 @@
+{
+ "comparands": {
+  "grobx_driver": {
+   "path": "/buildcache/cargo-target/zeebra-862/bin/base/grobx-driver",
+   "present": false
+  },
+  "grobx_driver_source": "9b9d5fd7953883cd949822a05d1a9c3fb2903c84",
+  "groebner_rs_driver": {
+   "path": "/buildcache/cargo-target/zeebra-862/bin/base/groebner-rs-driver",
+   "present": false
+  },
+  "groebner_rs_driver_source": "fbecb5ec7666d32beca60f33bc5ea86e67e4674b",
+  "julia": {
+   "path": "None",
+   "present": false
+  },
+  "julia_manifests": {
+   "/home/mfaulk/.local/opt/zeebra-ext/julia-depot/environments/v1.11/Manifest.toml": "2a715d97fcd3252876146beda0dc4ac9708ceff5cf7a498fbe7ef8a03b42ca7d"
+  },
+  "msolve": {
+   "path": "None",
+   "present": false
+  },
+  "sagebrush_gb_driver": {
+   "bytes": 1398656,
+   "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/sagebrush-gb-driver",
+   "present": true,
+   "resolved": "/home/mfaulk/.local/opt/zeebra-ext/cargo-target/release/sagebrush-gb-driver",
+   "sha256": "83cfc6a292432a364d032ba83c4bd2051ff552bd59c58dc37d78976416cfdab9"
+  },
+  "singular": {
+   "bytes": 118,
+   "path": "/usr/bin/Singular",
+   "present": true,
+   "resolved": "/usr/bin/Singular",
+   "sha256": "08a5400c9d29834271bd29e02a76d27dff5eff835d99063357a0afb73c29bbb4",
+   "version": "Singular for x86_64-Linux version 4.4.1 (44105, 64 bit) Jun 20 2026 00:00:00"
+  }
+ },
+ "host": {
+  "boost": "1",
+  "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores",
+  "governor": "performance",
+  "kernel": "7.3.3-200.fc44.x86_64",
+  "machine": "5995wx",
+  "scaling_driver": "amd-pstate-epp"
+ },
+ "schema": 1,
+ "zeebra": {
+  "build": "release; fat LTO; codegen-units=1; x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\"; CARGO_INCREMENTAL=0",
+  "executables": {
+   "m29_cost_model": {
+    "bytes": 4313096,
+    "path": "/buildcache/cargo-target/zeebra-862/bin/base/m29_cost_model",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-862/bin/base/m29_cost_model",
+    "sha256": "c3dd2276d00bc7097109ecea3e5592de955d6b88950bfa37b7c2edb641c1d1ab"
+   },
+   "m29_cost_model_work": {
+    "bytes": 4563856,
+    "path": "/buildcache/cargo-target/zeebra-862/bin/base/m29_cost_model_work",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-862/bin/base/m29_cost_model_work",
+    "sha256": "c5f2dbdc801a64ecd0c7776fadc1c9e2c769b9db9f5c45fb42d899191e01723f"
+   },
+   "wide_corpus": {
+    "path": "/buildcache/cargo-target/zeebra-862/bin/base/wide_corpus",
+    "present": false
+   },
+   "zeebra_driver": {
+    "path": "/buildcache/cargo-target/zeebra-862/bin/base/zeebra_driver",
+    "present": false
+   }
+  },
+  "head": "5515c4123ae2d29e6edb8f26979e99d24904ea26",
+  "input_exporter": {
+   "bytes": 334436976,
+   "path": "/buildcache/cargo-target/zeebra-862/debug/examples/competitive_sweep",
+   "present": true,
+   "resolved": "/buildcache/cargo-target/zeebra-862/debug/examples/competitive_sweep",
+   "sha256": "7033c339fbdfcabcc504fa1992575e6a0b5a5409be3edf693195c711d9fa7545"
+  },
+  "merge_base": "e4826153bb5d18ef562ec5484ca8737b6e4279ac",
+  "origin_main": "e4826153bb5d18ef562ec5484ca8737b6e4279ac",
+  "production_diff_vs_merge_base": "",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1"
+ }
+}

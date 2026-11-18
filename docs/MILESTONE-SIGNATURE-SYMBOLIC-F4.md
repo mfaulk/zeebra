@@ -1,6 +1,8 @@
 # M30 — Signature-Based Work Avoidance and Parallel Symbolic F4
 
-**Status:** planning, 2026-11-17. No M30 work has started and no M30 benchmark has been run.
+**Status:** complete, 2026-11-18. Minimum met; Target met on both workstreams; Stretch clause 1
+missed and clause 2 met by an opt-in research prototype. The integration report is §15 (#862).
+§§1–14 are the plan as fixed before measurement, except the outcome notes each gate's issue added.
 **Predecessor:** M29 — Verified Competitive F4
 ([`MILESTONE-COMPETITIVE-F4.md`](MILESTONE-COMPETITIVE-F4.md), §14 integration report).
 **Planning base:** `main` at `adfa6a60`.
@@ -9,7 +11,9 @@
 and the commits in its §6a/§6b), the [C1 attribution](research/m29-grobx-attribution.md)
 (`7e18d089`), [#827's report](research/serial-stage-slowdown.md) and
 [#223's ceiling](research/signature-based.md), each of which carries its own commit. No timings
-were taken for this plan.
+were taken for this plan. §15's figures were measured at `e4826153` (instrument `5515c412`)
+beside the freeze `4f5784c5` (`research/m30-final/`). It also quotes #716, #857 and #861, each at
+the commits its own report names.
 **Tracking issue:** [#854](https://github.com/mfaulk/zeebra/issues/854).
 **Project:** [Zeebra #7](https://github.com/users/mfaulk/projects/7); label `M30`. Priority is the
 Project field (P0 → High, P1 → Medium, conditional P1 → Medium plus the `blocked` label until its
@@ -563,3 +567,269 @@ Two verdicts, kept apart: **faster execution of existing F4** (Workstream P, sco
 **less algebraic work** (Workstream S, scored on the §2.2 quantities and then on wall). M30
 succeeds scientifically only with credible evidence on both, and technically only if accepted
 changes improve complete, verified computations under controlled resource budgets.
+
+## 15. Integration report (#862)
+
+**Measured at:** final `main` `e4826153` (instrument `5515c412`; `src/` and `Cargo.lock`
+identical), interleaved in one campaign with the M30-0 freeze `4f5784c5`. Evidence and
+provenance: [`research/m30-final/`](../research/m30-final/README.md), every table in
+[`tables.md`](../research/m30-final/tables.md). 2026-11-18, 00:24–02:06 EST, inside a CCD 1–2
+reservation. n = 9 per cell, fresh processes, every attempt retained. No child failed, timed out or
+was refused. No compiler was running when any of the 672 Zeebra children started. Medians with 95%
+bootstrap intervals (`research/m29-final/verdicts.py`). A ratio is median ÷ median.
+
+**The final `main` is `e4826153`, not `d6aa0526`.** Preparing this cohort found #883. Since #861,
+the default 16-thread interning team was not capped by `Limits::workers` in the comparand adapter,
+nor by `m29_cost_model`, `wide_corpus` or `sig_f4_study`. `ParallelSymbolic::Auto { max_workers: 16 }`
+does not clamp itself to the affinity mask, so a "1-worker" row from those paths could run 16
+threads on one CPU. #884 fixed this, and the cohort runs at the fixed `main`. **No published row is
+affected.** Every M30 figure before `d6aa0526` ran with `Serial` interning, and #861's gate set the
+team explicitly (`--level-workers w`). The library default itself still does not clamp (#886).
+
+### 15.1 Status: Minimum met; Target met on both workstreams; Stretch clause 1 missed, clause 2 met by a research prototype
+
+**Two verdicts, kept apart (§14).**
+
+1. **Workstream P (faster execution of existing F4): success, shipped.** Adaptive parallel interning
+   (`ParallelSymbolic::Auto { max_workers: 16 }`, #861) brings complete F4 at 16 workers to
+   **0.767×** the freeze on Eco-12 and 0.81× on MQ11. On the held-out instances it is 0.78–0.81×,
+   and on Cyclic-7 0.985×. The algebra is unchanged: pairs, reductions to zero, zero rows,
+   coefficient products and bases are identical (§15.3).
+2. **Workstream S (less algebraic work): positive on work, negative on wall.** A sound,
+   independently implemented signature-F4 prototype does 9.7× (Eco-12), 11.7× (MQ11) and 22.8×
+   (Katsura-11) fewer coefficient products than shipping F4. Its bases are identical coefficient
+   for coefficient. On the primary instance that saving does not become wall time. #858's gate
+   (≤0.80 on Eco-12) was missed at 1.010. At the final `main`, design 1 is 1.550× shipping F4 on
+   Eco-12, because P made the reference faster. Nothing from S ships.
+
+By §14, M30 succeeds **scientifically**: there is credible evidence on both workstreams. It
+succeeds **technically** on Workstream P only. P's accepted change improves complete, verified
+computations under the declared budgets. S changed no shipping code.
+
+### 15.2 Primary scoreboard (process wall, final `main`)
+
+Each row gives Zeebra at 16 workers against the comparand each M29/M30 goal names. grobx always runs
+one worker, because its adapter refuses more. **Every grobx row is therefore 16 Zeebra workers
+against one grobx worker, and none is an equal-worker comparison.** The equal-worker figure is
+alongside it. msolve and groebner-rs under `comparand-scaling.py` run at 1, 4, 8 and 16 workers; the
+fastest median is used. groebner-rs under `wide-corpus.py` runs one worker.
+
+| Task | Zeebra M30-0 → final (16w) | final ÷ M30-0 [95%] | Comparand (mode, workers) | Zeebra 16w ÷ comparand [95%] | Equal-worker: Zeebra 1w ÷ grobx 1w | Zeebra RSS 16w | Verification |
+|---|---:|---:|---|---:|---:|---:|---|
+| MQ10 / 32003 | 288.3 → 237.7 ms | 0.825 [0.822, 0.828] | msolve exact 117.0 ms (8w) | **2.03×** [2.00, 2.06] | 3.17× | 43 MiB | Singular reference, every answer |
+| MQ10 / 2³¹−1 | 271.9 → 219.8 ms | 0.808 [0.803, 0.816] | msolve exact 158.5 ms (4w) | **1.39×** [1.38, 1.41] | 5.78× | 45 MiB | Singular reference, every answer |
+| Eco-12 / 2⁶⁴−353 | 3,065.5 → 2,350.5 ms | **0.767** [0.764, 0.770] | grobx raw randomized 1,613.7 ms (1w) | **1.46×** [1.45, 1.46], 16w vs 1w | 7.76× | 199 MiB | **verified**: one digest across 72 runs, textually identical to grobx certified (743 elements, 283 s, 32 GiB cap, peak 11.4 GB) |
+| MQ11 / Goldilocks | 5,728.5 → 4,642.5 ms | 0.810 [0.807, 0.812] | grobx raw randomized 2,914.0 ms (1w) | **1.59×** [1.59, 1.60], 16w vs 1w | 13.6× | 393 MiB | **verified**: one digest across 72 runs, textually identical to grobx certified (767 elements, 456 s, 8 GiB, peak 2.1 GB) |
+| Katsura-11 / 2³¹−1 (held out, #861) | 1,426.4 → 1,108.8 ms | 0.777 [0.774, 0.781] | n/a: no comparand reference for this row | — | — | 149 MiB | one digest across all 72 runs |
+| Katsura-11 / 2⁶⁴−353 (held out, pinned) | 1,639.5 → 1,326.5 ms | 0.809 [0.806, 0.813] | grobx raw randomized 547.0 ms (1w) | **2.43×** [2.40, 2.43], 16w vs 1w | 16.1× | 149 MiB | **verified**: grobx certified (537 elements, 80 s, 8 GiB) and Zeebra's own certificate (606 s) |
+| Cyclic-7 / 2⁶⁴−353 (held out, pinned) | 142.7 → 140.5 ms | 0.985 [0.973, 0.996] | grobx raw randomized 116.3 ms (1w) | **1.21×** [1.20, 1.22], 16w vs 1w | 2.27× | 21 MiB | **verified**: grobx certified (209 elements, 3 s) and Zeebra's own certificate (2 s) |
+
+**The fastest verified comparand on MQ10 is groebner-rs, not msolve.** groebner-rs uses randomized
+modular row combinations, and its answers are verified. It takes 83.3 ms at 4 workers on 32003
+(Zeebra is 2.85× slower) and 97.6 ms at 4 workers on 2³¹−1 (2.25×). On the wide targets
+groebner-rs at one worker is slower than Zeebra at 16. Zeebra ÷ groebner-rs is 0.80 on Eco-12, 0.52
+on MQ11, 0.61 on Katsura-11 and 0.81 on Cyclic-7. These are not equal-worker comparisons either. At
+one worker Zeebra is 4.1–4.5× slower than groebner-rs on the large wide rows and 1.5× slower on
+Cyclic-7. Plan §10.5 says grobx and groebner-rs run one worker only. That holds for grobx
+everywhere, but for groebner-rs only under `wide-corpus.py`. This is reported as found, and no
+target is changed. The comparand-scaling window has its own Zeebra row, from `zeebra_driver`. It
+agrees with the cost-model row within 2%: 240.0 and 224.2 ms at 16 workers.
+
+**Movement over M30.** Against M29's §14 ratios (§2.1), Eco-12 went from 1.88× to 1.46× grobx and
+MQ11 from 1.93× to 1.59×. MQ10/32003 went from 2.51× to 2.03× msolve, and MQ10/2³¹−1 from 1.68× to
+1.39×. All of this movement is Workstream P. The freeze-to-final figure is the interleaved column.
+It is not a comparison against a wall published from another session.
+
+### 15.3 Workstream P, measured
+
+Worker scaling at the final `main`, in ms. The last column is the 16-worker speedup over one worker,
+with the freeze in parentheses.
+
+| Instance | 1 | 4 | 8 | 16 | speedup |
+|---|---:|---:|---:|---:|---:|
+| MQ10 / 32003 | 1,064.9 | 375.6 | 279.3 | 237.7 | 4.48× (3.70×) |
+| MQ10 / 2³¹−1 | 910.7 | 321.0 | 246.3 | 219.8 | 4.14× (3.42×) |
+| Eco-12 | 12,518.4 | 4,178.0 | 3,014.6 | 2,350.5 | 5.33× (4.11×) |
+| MQ11 | 39,669.1 | 11,151.8 | 7,140.7 | 4,642.5 | 8.54× (7.08×) |
+| Katsura-11 / 2³¹−1 | 6,795.6 | 2,053.4 | 1,444.4 | 1,108.8 | 6.13× (4.89×) |
+| Katsura-11 / 2⁶⁴−353 | 8,810.4 | 2,733.6 | 1,841.9 | 1,326.5 | 6.64× (5.47×) |
+| Cyclic-7 / 2⁶⁴−353 | 264.3 | 148.8 | 133.3 | 140.5 | 1.88× (1.87×) |
+
+Final ÷ freeze is 0.975–1.000 at one worker, 0.86–0.96 at 4, 0.81–0.94 at 8 and 0.77–0.99 at 16.
+Peak RSS at 16 workers is 1.00× on Eco-12 and MQ11, 1.03× on Katsura-11 and 1.07× on MQ10. All are
+inside §9.4's 1.15×.
+
+Symbolic preprocessing comes from a separate stage-clock campaign (n = 5, 16 workers):
+
+- Eco-12: 992.6 → 256.6 ms (3.87×)
+- MQ11: 1,315.5 → 297.0 ms (4.43×)
+- MQ10: 92.6 → 45.0 ms and 93.4 → 45.3 ms (2.06×)
+- Katsura-11: 454.2 → 141.3 ms and 453.5 → 144.4 ms (3.1–3.2×)
+- Cyclic-7: 39.9 → 37.3 ms
+
+Its share of 16-worker process wall fell from 32.4% to 10.9% on Eco-12, from 23.0% to 6.4% on MQ11,
+and from 32–34% to 19–21% on MQ10.
+
+The serial `research-work` census ran once per build. **Its algebraic quantities are identical at
+the freeze and the final `main` on all seven targets.** That covers pairs considered, pair rejections
+by mechanism, pairs reduced, reductions to zero, zero rows, pair rows adding no rank, coefficient
+products, and products on zero-ending rows. On Eco-12, for example, there are 7,202 pairs reduced,
+6,326 reductions to zero and 6,331 zero rows. Coefficient products are 5.924 G, 93.0% of them on
+zero-ending rows. Gebauer–Möller rejects 386,626 pairs; product and chain reject none. Workstream P
+changed no algebra, as §1 requires.
+
+§9.4's gate, re-read at the final `main`:
+
+| Criterion | Final cohort | Met? |
+|---|---|---|
+| ≥2× symbolic stage at 16 workers, substantial target | 3.87× Eco-12, 4.43× MQ11 | yes |
+| ≥10% complete F4 process wall, substantial public benchmark | −23.3% Eco-12 [−23.6, −23.0], −19.0% MQ11 | yes |
+| improvement on a held-out instance or family | Katsura-11 −19.1% (2⁶⁴−353) and −22.3% (2³¹−1); Cyclic-7 −1.5% at 16w, −5.7% at 8w | yes |
+| no regression beyond 5% on small tasks or at one worker | one worker 0.975–1.000 on all seven targets; small tasks (Katsura-6/7, cyclic-6) not re-run here, #861's `gate` measured 0.965–1.022 | yes at one worker; small tasks rest on #861 |
+| peak RSS ≤1.15× | ≤1.075× | yes |
+| identical, deterministic output | one basis digest per target across all 72 runs of both builds | yes |
+| budget and cancellation | #872's and #876's tests unchanged and in CI | yes (tests, not timing) |
+
+### 15.4 Workstream S, measured
+
+These figures come from #716, #857 and #858. Only the wall comparison was re-run here, because P
+invalidated it.
+
+| Quantity (§2.2) | Eco-12 | MQ11 | Katsura-11 | Source |
+|---|---:|---:|---:|---|
+| shipping F4: reductions to zero / zero rows | 6,326 / 6,331 | 6,293 / 6,293 | 3,936 / 3,936 | §15.3 census, `e4826153` |
+| shipping F4: coefficient products | 5.924 G (93.0% on zero-ending rows) | 20.377 G (92.9%) | 4.556 G (93.1%) | §15.3 census |
+| sig-F4 design 1: reductions to zero (= zero rows) | 1,013 | 540 | 145 | #857 §3.1, `2d589a80` |
+| sig-F4 design 1: coefficient products | 0.611 G (**9.7×** fewer) | 1.745 G (**11.7×**) | 0.200 G (**22.8×**) | #857 §3.1 |
+| sig-F4 pair rejections: product / Koszul / zero-row syzygy / rewrite | 353,641 / 597,883 / 689,359 / 27,951 | 46,183 / 129,273 / 108,247 / 3,293 | 26,177 / 88,498 / 32,474 / 4,577 | #857 §3.1 |
+| grobx exact pairing: work with signatures off ÷ on | 6.33× | 8.92× (declared extension) | — | #716 §1, §3.2 |
+| grobx default signature run: work | 528.8 M (hands over) | 970.7 M | 166.5 M | #716 §3.1 |
+
+The Katsura-11 rows are at 2³¹−1 or 2⁶⁴−353 for shipping F4 (both give the same counts) and at
+Goldilocks for sig-F4 and grobx. These are #857's and #716's rows.
+
+The wall comparison: sig-F4 design 1 (serial) against shipping F4 at 16 workers. `sig_f4_study` was
+built at the final `main`, n = 9 (`sigf4-gate.jsonl.gz`).
+
+| Row | design 1 | F4, 1 worker | F4, 16 workers | design 1 ÷ F4-16, final `main` [95%] | at the freeze (#857) |
+|---|---:|---:|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 (primary) | 3,625.5 ms | 12,636.0 ms | 2,338.6 ms | **1.550** [1.545, 1.561] | 1.148 |
+| Katsura-11 / Goldilocks (second family) | 1,049.2 ms | 9,577.5 ms | 1,342.0 ms | **0.782** [0.774, 0.788] | 0.619 |
+
+Every run's basis equals shipping F4's. Against one-worker F4, design 1 is 0.287× on Eco-12 and
+0.110× on Katsura-11, so at equal workers the work saving is real. The S verdict is that sound
+criteria remove most of Zeebra's zero-reduction work, and that turning the saving into wall time
+needs a signature engine's serial parts parallelized. Those parts are bookkeeping, symbolic
+preprocessing, interreduction of a signature basis 2.5× the size of the reduced one, and the
+cross-target elimination cascade (#857 §5). Workstream P's speedup of the reference widened the gap.
+
+### 15.5 Success tiers, criterion by criterion (§3, targets as written)
+
+| Tier | Criterion | Status | Evidence |
+|---|---|---|---|
+| Minimum 1 | M30-0 freezes baseline, protocol, identities | **met** | #855, PR #865, `4f5784c5`; [`m30-protocol.md`](research/m30-protocol.md) |
+| Minimum 2 | #716 grobx signature on / off / no-handover ablation with §2.2 quantities, wall, RSS, verification per arm | **met** | PR #867; [`m30-signature-attribution.md`](research/m30-signature-attribution.md), 150 attempts all verified |
+| Minimum 3 | M30-S2 RFC with go / no-go | **met**: go, narrowed (Eco-12 primary, `katsura-11` second family) | #856, PR #866; [`signature-f4-rfc.md`](research/signature-f4-rfc.md) §12.1 |
+| Minimum 4 | M30-P1 symbolic cost model and Amdahl ceiling | **met** | #859, PR #868; [`m30-symbolic-cost-model.md`](research/m30-symbolic-cost-model.md) |
+| Minimum 5 | M30-P2 evaluates ≥1 bounded parallel-interning strategy | **met**: two (serial canonical merge, sharded) | #860, PR #869; [`m30-parallel-interning.md`](research/m30-parallel-interning.md) |
+| Minimum 6 | M30-I reproducible decision report | **met**: this section and `research/m30-final/` | #862 |
+| Target 1 (P) | a parallel symbolic path passes the §9.4 gate, including ≥10% complete F4 wall on a substantial public benchmark, and ships | **met** | #861, PR #878; re-read in §15.3 (−23.3% Eco-12) |
+| Target 2 (S) | a credible, sound reduction in necessary algebraic work, preferably an independent bounded prototype recording reductions to zero and products avoided by sound criteria on ≥1 substantial instance | **met** on work; not shipped | #857: Eco-12 reductions to zero 6,326 → 1,013 and 9.7× fewer products, bases identical; #858 closed not planned |
+| Stretch, clause 1 | parity or a reproducible lead over the best comparand on a substantial public benchmark under the same declared compute budget | **missed** | no task at parity. Closest are Cyclic-7 at 1.21× grobx (16w vs 1w) and MQ10/2³¹−1 at 1.39× msolve. At equal workers Zeebra is 2.3–16× behind grobx |
+| Stretch, clause 2 | an independently certified algorithmic result that materially moves the work frontier (for example MQ11 work within 3× of grobx's signature run, exactly verified) | **met by the opt-in research prototype, not by shipping code** | #857 design 1 on MQ11 does 1.745 G products against 970.7 M for grobx's default signature run (1.80×) and 1,841.0 M for its exact run (0.95×). Shipping F4 does 20.377 G (21.0×). Its basis digest `ddef89cb` equals the grobx-certified MQ11 basis (§15.2; re-certified in this cohort). Counts are compared as #716 §3.2 compared them: Zeebra coefficient products against grobx `subtracted` charges |
+
+### 15.6 Negative, inconclusive and stopped results
+
+Every attempt below is retained in its evidence directory.
+
+**Stopped at a budget or resource cap.**
+
+1. **Zeebra's own certificate on Eco-12 stopped at the verification budget.** At `4f5784c5`,
+   `certify_f4_output` was still checking Buchberger's criterion serially over 743 elements at
+   660 s (the 600 s budget plus 60 s grace). No check had failed. MQ11 was not attempted. Neither
+   was retried at the final `main`. On the held-out rows the certificate completed. Cyclic-7 took
+   2 s. Katsura-11 / 2⁶⁴−353 took 606 s, which is past the declared 600 s but inside the harness's
+   660 s stop, and that overrun is recorded rather than rounded away.
+2. **grobx certified mode on Eco-12 stopped on memory at the declared 8 GiB** (#855): at 94 s, with
+   a kernel peak of 8.59 GB and no basis. The one approved retry at 32 GiB admitted it, with 743
+   elements, the same digest, 287 s and an 11.4 GB peak. **The cap was raised once, for that row
+   only.** This cohort re-ran Eco-12 at the same 32 GiB (admitted again: 743 elements, same digest, 283 s, peak 11.4 GB). No other cap was
+   raised, and no other row needed it: MQ11 and both held-out rows were admitted at 8 GiB.
+
+**Gates missed.**
+
+3. **#858 (S4) entry gate missed; closed not planned.** The best design reached 1.010 [1.003, 1.018]
+   on Eco-12 against a limit of ≤0.80. The katsura-4 controls' upper bounds were 1.10–1.21 against
+   1.05. cyclic-7 ran 5.6–7.0× slower with 3.5× RSS. Both designs the RFC allows were tried, and the
+   owner declined a third. At the final `main`, design 1 is 1.550× on Eco-12 (§15.4).
+4. **#716 Gate A1 failed on MQ11**: with randomized mechanisms on, the work ratio was 1.69×, below
+   the 2× bar. It also failed on every Eco-12 arm except the exact pairing. **Handover was
+   net-negative** wherever it fired: MQ10 at both primes (386 against 122 ms, and 175 against 140)
+   and Cyclic-7 (120 against 82).
+5. **#860's prototypes failed the RSS line** at 1.20–1.31× against 1.15×, which was traced to glibc
+   arenas. `MALLOC_ARENA_MAX=1` was not a fix, because it slowed the shipping path 7% on Eco-12.
+   #860's wall-time cancellation was not wired; #872 closed that gap.
+6. **#861 Step 0: the merged #871 prototype failed the ≤5% small-task line.** At 16 workers,
+   Katsura-7 ran 1.330 [1.307, 1.364], Katsura-6 1.163 and cyclic-6 1.068. The fallback threshold
+   then went 256 → 512 → `max(512, 48 × workers)`. At 256, Katsura-7 at 16 workers was 1.180. At a
+   flat 512, Katsura-8 at 16 workers was 1.064 [1.050, 1.078]. The shipped threshold brings that to
+   0.968.
+
+**Approaches that did worse.**
+
+7. **#871's first attempt made memory worse.** Run-long scratch reuse (`--retain run`) measured
+   1.16–1.25× RSS, and an earlier unlocked probe with #860's layout read 1.50× on Eco-12. The
+   high-water mark is set inside the widest batch's symbolic stage, so any retained scratch adds to
+   it.
+8. **#860's first `intern` pass** used a 512-seed-row team threshold, and that sent 17 of 23 Eco-12
+   batches down the serial path. It is retained as `intern-seed512`.
+9. **#827's level-parallel prototype, re-priced by #859**, sped the stage up 1.17–2.01× at 16
+   workers but slowed it to 0.56–0.71× at one. That is −3% to −16% of process wall. Parallel
+   interning superseded it.
+10. **#857 design 2** pre-reduced against the reducer block in parallel. Elimination fell from
+    1.70 to 1.22 s, but products rose from 0.611 to 0.743 G. It parallelized the wrong half: the
+    cross-target cascade stays serial.
+
+**Errors found and corrected.**
+
+11. **RFC rewrite order.** Taking the least sig-lead ratio lost pairs on katsura-4 (red test,
+    `2d589a80`). The canonical rewriter takes the greatest ratio.
+12. **#716's pilot.** 11 of its 30 attempts failed on a ledger decoder bug in the study, not in
+    grobx. It is retained as a diagnostic.
+13. **#883.** The adapters and three instruments did not cap the symbolic team (see the top of
+    §15). #884 fixed it, and no published row is affected.
+
+**Inconclusive or unexplained.**
+
+14. **#855's drift against M29.** 15 of 46 cells were slower than M29's intervals. The cause is
+    compiler overlap on unreserved CCDs (56% of children, against 6% in M29) and the package power
+    budget. The drift is not folded into any figure.
+15. **One-worker drift between the freeze and the final `main`, unexplained.** At one worker both
+    builds run the serial closure. Even so, process wall is 0.975–0.993× on six of the seven targets
+    (MQ10/32003 is 1.000). Yet the serial symbolic stage is 1.035× [1.031, 1.049] on Eco-12 and
+    1.011× on MQ11. The suspects are the other source changes between the two commits. This is
+    #890.
+16. **Not attempted.** #857's open questions 1 (displacement scaling) and 4 (Hilbert-series check),
+    and the RFC §6.1 item 2 displacement design, which would have been the third design.
+
+### 15.7 Issue dispositions
+
+| Issue | Disposition |
+|---|---|
+| #855, #856, #716, #859, #860, #857, #871, #872, #861 | closed, completed |
+| #858 | closed, not planned (gate missed; item 3) |
+| #832 (P0 anchor) | **closed, completed.** Its condition was parallel interning that passes ~1.5×. In the final cohort the stage runs 3.9× faster on Eco-12 and 4.4× faster on MQ11 at 16 workers, and the shipped default takes 19–23% off complete F4 |
+| #883 | found and fixed during this closeout (#884) |
+| #862 | closed by this report's PR |
+| #854 | closes after that PR merges |
+
+### 15.8 Follow-ups (Project #7, sub-issues of #854)
+
+| Issue | Priority | What |
+|---|---|---|
+| #886 | Medium | the library default's `Auto { max_workers: 16 }`, forward and symbolic, does not clamp to `available_parallelism()`; measure what oversubscription costs, then decide |
+| #887 | Medium | Zeebra's own certificate cannot finish Eco-12 in 600 s, and took 606 s on Katsura-11; wide-field verification still rests on grobx certified mode, which needs 32 GiB on Eco-12 |
+| #888 | Medium | symbolic preprocessing after #861: the caller's stitch and the merge walk are the serial remainder; the stage is still 19–21% of MQ10's 16-worker wall, and Cyclic-7 gains nothing |
+| #889 | Low (`opportunity`) | signature F4 beyond M30: what turning #857's 9.7–22.8× work saving into wall time would take (the cross-target cascade, parallel bookkeeping and interreduction) |
+| #890 | Low | attribute the one-worker drift between `4f5784c5` and `e4826153` (item 15) |
+| #891 | Low | `batch_order_study`, `parallel_forward_study` and `mq10_profile` still inherit the 16-thread symbolic team |

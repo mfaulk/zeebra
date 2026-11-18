@@ -23,7 +23,10 @@ spec = importlib.util.spec_from_file_location('scaling', ROOT / 'tools/external/
 scaling = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scaling)
 
-TARGETS = {'eco12-wide64': ('wide64', 'eco-12'), 'mq11-goldilocks': ('goldilocks', 'mq-random-11')}
+TARGETS = {'eco12-wide64': ('wide64', 'eco-12'), 'mq11-goldilocks': ('goldilocks', 'mq-random-11'),
+           # #862: the held-out rows pins.json declared; not run by #855.
+           'katsura11-wide64': ('wide64', 'katsura-11'), 'cyclic7-wide64': ('wide64', 'cyclic-7')}
+DEFAULT_TARGETS = ('eco12-wide64', 'mq11-goldilocks')
 WALL_S = 600
 
 
@@ -37,7 +40,7 @@ def main():
     p.add_argument('--certifier', type=Path, help='m29_cost_model with --certify; omitted, not run')
     p.add_argument('--grobx', type=Path, required=True)
     p.add_argument('--scratch', type=Path, required=True)
-    p.add_argument('--targets', default=','.join(TARGETS), help='comma-separated subset of the wide targets')
+    p.add_argument('--targets', default=','.join(DEFAULT_TARGETS), help='comma-separated subset of the wide targets')
     p.add_argument('--grobx-rss-gib', type=int, default=8, help='grobx certified memory cap (declared: 8)')
     a = p.parse_args()
     a.scratch.mkdir(parents=True, exist_ok=True)
