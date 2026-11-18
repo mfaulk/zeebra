@@ -95,6 +95,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     stats: &mut SigF4Statistics,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, SigF4Error> {
     let started = Instant::now();
+    #[cfg(feature = "research-sigf4-split")]
+    let inputs_clock = Instant::now();
     if !matches!(
         order,
         MonomialOrder::GradedReverseLexicographic | MonomialOrder::GradedLexicographic
@@ -127,6 +129,10 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         inputs,
         stats,
     };
+    #[cfg(feature = "research-sigf4-split")]
+    {
+        engine.stats.split.inputs = inputs_clock.elapsed();
+    }
     for i in 0..engine.inputs.len() {
         let sig = Signature::new(engine.inputs[i][0].0, i as u32);
         engine.push(Pending {
@@ -155,6 +161,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         }
     }
 
+    #[cfg(feature = "research-sigf4-split")]
+    let materialize_clock = Instant::now();
     let basis: Vec<MultivariatePolynomial<N, F>> = if inconsistent {
         vec![MultivariatePolynomial::one()]
     } else {
@@ -171,7 +179,16 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         + engine.syzygies.len() * (size_of::<Monomial<N>>() + size_of::<u64>() + 1)
         + engine.stats.peak_pending * size_of::<Pending<N>>()
         + engine.reducers.len() * (size_of::<Monomial<N>>() + 8);
+    #[cfg(feature = "research-sigf4-split")]
+    let drop_clock = {
+        engine.stats.split.materialize = materialize_clock.elapsed();
+        Instant::now()
+    };
     drop(engine);
+    #[cfg(feature = "research-sigf4-split")]
+    {
+        stats.split.drop = drop_clock.elapsed();
+    }
 
     let interreduction = Instant::now();
     let reduced = interreduce(basis, order, wall)?;
@@ -534,6 +551,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             at: &reducer_at,
             ncols,
         };
+        #[cfg(feature = "research-sigf4-split")]
+        let mut split = super::BatchSplit {
+            targets: target_count,
+            reducers: reducer_count,
+            columns: ncols,
+            setup: clock.elapsed(),
+            ..Default::default()
+        };
+        #[cfg(feature = "research-sigf4-split")]
+        let pass_clock = Instant::now();
         let prereduced: Vec<Reduced<F>> = if self.options.workers > 1 {
             let job = PhaseA {
                 block: &block,
@@ -547,6 +574,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         } else {
             Vec::new()
         };
+        #[cfg(feature = "research-sigf4-split")]
+        {
+            split.parallel_pass = pass_clock.elapsed();
+            split.parallel_products = prereduced.iter().map(|r| r.1).sum();
+        }
+        #[cfg(feature = "research-sigf4-split")]
+        let pass_clock = Instant::now();
         let mut prereduced = prereduced.into_iter();
 
         let mut target_at: Vec<u32> = vec![NONE; ncols];
@@ -556,6 +590,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         for (t, raw) in &targets {
             let t = *t;
             let (entries, earlier) = prereduced.next().unwrap_or_else(|| (raw.clone(), 0));
+            #[cfg(feature = "research-sigf4-split")]
+            let mut cascade = 0u64;
             let (mut out, later) = workspace.reduce(&entries, |c| {
                 if let Some(pivot) = block.admissible(c, &t) {
                     Some(pivot)
@@ -565,11 +601,21 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                         !check || s.cmp_in(&t, order) == Ordering::Less,
                         "an earlier target must have a smaller signature"
                     );
+                    #[cfg(feature = "research-sigf4-split")]
+                    {
+                        cascade += (entries.len() - 1) as u64;
+                    }
                     Some(entries)
                 } else {
                     None
                 }
             });
+            #[cfg(feature = "research-sigf4-split")]
+            {
+                split.cascade_products += cascade;
+                split.serial_reducer_products += later - cascade;
+                split.cascading_targets += usize::from(cascade > 0);
+            }
             let products = earlier + later;
             self.stats.coefficient_products += products;
             if out.is_empty() {
@@ -594,6 +640,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
             target_at[lead] = results.len() as u32;
             results.push((t, out));
+        }
+        #[cfg(feature = "research-sigf4-split")]
+        {
+            split.serial_pass = pass_clock.elapsed();
+            self.stats.split.batches.push(split);
         }
         self.stats.elimination += clock.elapsed();
         results

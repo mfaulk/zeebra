@@ -141,6 +141,40 @@ pub struct SigF4Statistics {
     pub elimination: Duration,
     pub interreduction: Duration,
     pub total: Duration,
+    /// #901's elimination split and glue clocks; collected only under `research-sigf4-split`.
+    #[cfg(feature = "research-sigf4-split")]
+    pub split: SplitLog,
+}
+
+/// One batch's elimination, split by pivot source. `reducer_*` is work against the batch's reducer
+/// block (design 2's parallel pass, plus reducer pivots met in the serial pass); `cascade_products`
+/// is work against earlier targets of the same batch, which no design yet parallelizes.
+#[cfg(feature = "research-sigf4-split")]
+#[derive(Clone, Debug, Default)]
+pub struct BatchSplit {
+    pub targets: usize,
+    pub reducers: usize,
+    pub columns: usize,
+    /// Column index and sparse-row construction before either pass.
+    pub setup: Duration,
+    pub parallel_pass: Duration,
+    pub serial_pass: Duration,
+    pub parallel_products: u64,
+    pub serial_reducer_products: u64,
+    pub cascade_products: u64,
+    /// Serial-pass targets that used at least one earlier-target pivot.
+    pub cascading_targets: usize,
+}
+
+#[cfg(feature = "research-sigf4-split")]
+#[derive(Clone, Debug, Default)]
+pub struct SplitLog {
+    pub batches: Vec<BatchSplit>,
+    /// Input normalization before the first batch.
+    pub inputs: Duration,
+    /// Converting the signature basis to polynomials, and dropping the engine.
+    pub materialize: Duration,
+    pub drop: Duration,
 }
 
 /// The reduced Gröbner basis under a graded `order`, by the signature engine. Same contract as

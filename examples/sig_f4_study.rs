@@ -178,6 +178,36 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("elimination_ns", Json::nanos(s.elimination)),
         ("interreduction_ns", Json::nanos(s.interreduction)),
         ("total_ns", Json::nanos(s.total)),
+        #[cfg(feature = "research-sigf4-split")]
+        ("split", split(&s.split)),
+    ])
+}
+
+/// #901: per-batch reducer-block / cascade split and the engine's glue clocks.
+#[cfg(feature = "research-sigf4-split")]
+fn split(log: &zeebra::grobner::sigf4::SplitLog) -> Json {
+    let batches = log.batches.iter().map(|b| {
+        Json::object([
+            ("targets", Json::size(b.targets)),
+            ("reducers", Json::size(b.reducers)),
+            ("columns", Json::size(b.columns)),
+            ("setup_ns", Json::nanos(b.setup)),
+            ("parallel_pass_ns", Json::nanos(b.parallel_pass)),
+            ("serial_pass_ns", Json::nanos(b.serial_pass)),
+            ("parallel_products", Json::int(b.parallel_products)),
+            (
+                "serial_reducer_products",
+                Json::int(b.serial_reducer_products),
+            ),
+            ("cascade_products", Json::int(b.cascade_products)),
+            ("cascading_targets", Json::size(b.cascading_targets)),
+        ])
+    });
+    Json::object([
+        ("inputs_ns", Json::nanos(log.inputs)),
+        ("materialize_ns", Json::nanos(log.materialize)),
+        ("drop_ns", Json::nanos(log.drop)),
+        ("batches", Json::Array(batches.collect())),
     ])
 }
 
@@ -248,6 +278,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         (result.map_err(|e| e.to_string()), summary, work)
     };
     let elapsed = started.elapsed();
+    let render = Instant::now();
     let (status, basis) = match &result {
         Ok(basis) => {
             let mut text: Vec<_> = basis
@@ -259,6 +290,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         }
         Err(error) => (format!("stopped: {error}"), None),
     };
+    let render = render.elapsed();
     let certification = match (&result, args.certify) {
         (Ok(basis), true) => {
             let clock = Instant::now();
@@ -278,6 +310,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("workers", Json::size(args.workers)),
         ("status", Json::string(status)),
         ("call_ns", Json::nanos(elapsed)),
+        ("render_ns", Json::nanos(render)),
         (
             "peak_rss_bytes",
             peak_resident_bytes().map(Json::int).unwrap_or(Json::Null),
@@ -299,21 +332,30 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
 }
 
 fn main() {
+    let started = Instant::now();
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let args = parse_args(&raw).unwrap_or_else(|e| panic!("{e}"));
     let input = wide(&args.field, &args.name);
     let n = input.variables.len();
-    let report = match (args.field.as_str(), n) {
+    let mut report = match (args.field.as_str(), n) {
         ("goldilocks", 4) => run::<4, Goldilocks>(input, &args),
         ("goldilocks", 7) => run::<7, Goldilocks>(input, &args),
         ("goldilocks", 11) => run::<11, Goldilocks>(input, &args),
         ("goldilocks", 12) => run::<12, Goldilocks>(input, &args),
+        ("wide64", 8) => run::<8, Wide>(input, &args),
+        ("wide64", 9) => run::<9, Wide>(input, &args),
+        ("wide64", 14) => run::<14, Wide>(input, &args),
         ("wide64", 4) => run::<4, Wide>(input, &args),
         ("wide64", 7) => run::<7, Wide>(input, &args),
         ("wide64", 11) => run::<11, Wide>(input, &args),
         ("wide64", 12) => run::<12, Wide>(input, &args),
         (field, n) => panic!("no instantiation for {field} with {n} variables"),
     };
+    // In-process time before and after the solve: with `call_ns` and `render_ns` this leaves only
+    // exec and exit to the caller's process wall.
+    if let Json::Object(fields) = &mut report {
+        fields.push(("main_ns".into(), Json::nanos(started.elapsed())));
+    }
     println!("{}", report.to_json().replace('\n', ""));
 }
 
