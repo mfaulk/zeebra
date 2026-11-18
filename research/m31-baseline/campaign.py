@@ -38,6 +38,9 @@ GATING = ['wide64/eco-12', 'goldilocks/katsura-11']
 REPORTED = ['wide64/katsura-11', 'goldilocks/mq-random-11', 'goldilocks/cyclic-7', 'wide64/cyclic-7',
             'goldilocks/katsura-4', 'wide64/katsura-4', 'goldilocks/noon-7']
 HELD_OUT = ['wide64/katsura-9', 'wide64/noon-8', 'wide64/eco-14']
+# Plan §10.3's drop rule, read off the `probe` suite: shipping F4-16 stops on eco-14 at its default
+# 32,000,000 live-nonzero limit (37,152,044 needed), so it leaves the cohort and is not replaced.
+DROPPED = {'wide64/eco-14'}
 MQ10 = ['mq10-32003', 'mq10-m31']
 F4_ARMS = ['f4:1', 'f4:4', 'f4:8', 'f4:16']
 SIG_ARMS = ['sigf4:1', 'sigf4:16']
@@ -47,7 +50,7 @@ SPLIT_ROWS = ['wide64/eco-12', 'goldilocks/katsura-11', 'wide64/katsura-11', 'go
 def suite_rows(suite):
     """[(row, arms)] per suite. `walls` is plan §7.1's cohort; `split` is the stage-clock campaign."""
     if suite == 'walls':
-        return ([(r, F4_ARMS + SIG_ARMS) for r in GATING + REPORTED + HELD_OUT]
+        return ([(r, F4_ARMS + SIG_ARMS) for r in GATING + REPORTED + HELD_OUT if r not in DROPPED]
                 + [(t, F4_ARMS) for t in MQ10])
     if suite == 'split':
         return [(r, SIG_ARMS) for r in SPLIT_ROWS]
