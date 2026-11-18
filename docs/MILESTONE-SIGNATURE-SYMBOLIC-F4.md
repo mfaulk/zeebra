@@ -825,7 +825,11 @@ Every attempt below is retained in its evidence directory.
     builds run the serial closure. Even so, process wall is 0.975–0.993× on six of the seven targets
     (MQ10/32003 is 1.000). Yet the serial symbolic stage is 1.035× [1.031, 1.049] on Eco-12 and
     1.011× on MQ11. The suspects are the other source changes between the two commits. This is
-    #890.
+    #890. **Attributed** ([`m30-one-worker-drift.md`](research/m30-one-worker-drift.md)): a
+    per-commit bisect puts the Eco-12 step at #878 (`d6aa0526`, 1.026–1.035× in three runs). There,
+    process wall is unchanged and the serial closure's source is untouched. Forcing the closure
+    inline does not recover it. MQ11's +1.1% does not reproduce. The effect is code placement and
+    does not matter.
 16. **Not attempted.** #857's open questions 1 (displacement scaling) and 4 (Hilbert-series check),
     and the RFC §6.1 item 2 displacement design, which would have been the third design.
 
@@ -848,5 +852,5 @@ Every attempt below is retained in its evidence directory.
 | #887 | Medium | Zeebra's own certificate cannot finish Eco-12 in 600 s, and took 606 s on Katsura-11; wide-field verification still rests on grobx certified mode, which needs 32 GiB on Eco-12 |
 | #888 | Medium | symbolic preprocessing after #861: the caller's stitch and the merge walk are the serial remainder; the stage is still 19–21% of MQ10's 16-worker wall, and Cyclic-7 gains nothing. Split by component in [`m30-symbolic-remainder.md`](research/m30-symbolic-remainder.md): stitch and merge walk together are 6.6% of MQ10's F4 call, the seed step and the solo steps are larger, and no target cleared the bar |
 | #889 | Low (`opportunity`) | signature F4 beyond M30: what turning #857's 9.7–22.8× work saving into wall time would take (the cross-target cascade, parallel bookkeeping and interreduction) |
-| #890 | Low | attribute the one-worker drift between `4f5784c5` and `e4826153` (item 15) |
+| #890 | Low | attribute the one-worker drift between `4f5784c5` and `e4826153` (item 15). Done: #878, code placement, immaterial ([`m30-one-worker-drift.md`](research/m30-one-worker-drift.md)) |
 | #891 | Low | `batch_order_study`, `parallel_forward_study` and `mq10_profile` still inherit the 16-thread symbolic team |
