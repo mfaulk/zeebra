@@ -132,6 +132,12 @@ pub struct SigF4Statistics {
     pub elements_added: usize,
     pub signature_basis_elements: usize,
     pub reduced_basis_elements: usize,
+    /// Columns of the final interreduction matrix (0 when no matrix was needed).
+    pub interreduction_columns: usize,
+    /// Nonzero entries the interreduction matrix was built with.
+    pub interreduction_nonzeros: usize,
+    /// Live entries at the interreduction's high-water mark.
+    pub interreduction_peak_nonzeros: usize,
     /// Minimal syzygy signatures held at the end.
     pub syzygy_signatures: usize,
     pub peak_pending: usize,

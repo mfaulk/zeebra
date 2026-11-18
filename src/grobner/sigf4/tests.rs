@@ -279,6 +279,26 @@ fn polynomial_strategy<F: FiniteField + 'static>(
     })
 }
 
+/// Interreduction sweeps tails against the fixed closure (#879), so its live entries never exceed
+/// the built matrix plus one dense working row, and the basis still equals F4's.
+#[test]
+fn test_interreduction_never_grows_past_its_construction() {
+    for system in [eco::<7, Goldilocks>(), katsura::<7, Goldilocks>()] {
+        let expected = f4(&system, GREVLEX).unwrap();
+        let (result, statistics) = sig_f4_reported(&system, GREVLEX, &SigF4Options::checked());
+        assert_eq!(result.unwrap(), expected);
+        assert!(statistics.interreduction_nonzeros > 0, "a matrix was built");
+        assert!(
+            statistics.interreduction_peak_nonzeros
+                <= statistics.interreduction_nonzeros + statistics.interreduction_columns,
+            "peak {} against {} built over {} columns",
+            statistics.interreduction_peak_nonzeros,
+            statistics.interreduction_nonzeros,
+            statistics.interreduction_columns
+        );
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(96))]
 

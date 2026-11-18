@@ -181,6 +181,12 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("elements_added", size(s.elements_added)),
         ("signature_basis_elements", size(s.signature_basis_elements)),
         ("reduced_basis_elements", size(s.reduced_basis_elements)),
+        ("interreduction_columns", size(s.interreduction_columns)),
+        ("interreduction_nonzeros", size(s.interreduction_nonzeros)),
+        (
+            "interreduction_peak_nonzeros",
+            size(s.interreduction_peak_nonzeros),
+        ),
         ("syzygy_signatures", size(s.syzygy_signatures)),
         ("peak_pending", size(s.peak_pending)),
         ("signature_metadata_bytes", size(s.signature_metadata_bytes)),
