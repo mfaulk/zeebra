@@ -1650,6 +1650,11 @@ pub(crate) fn live<const N: usize, F: FiniteField>(
     use super::{symbolic::CacheMode, F4Error, F4Options};
     #[cfg(feature = "research-work")]
     let research = LIVE.get();
+    // A `live_symbolic` research policy modifies the serial closure, so it keeps the batch there.
+    #[cfg(feature = "research-work")]
+    if research.is_none() && super::live_symbolic::config().is_some() {
+        return None;
+    }
     #[cfg(feature = "research-work")]
     let config = research
         .map(|(config, _)| config)
