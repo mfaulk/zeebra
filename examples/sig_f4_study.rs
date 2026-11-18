@@ -529,6 +529,9 @@ fn main() {
         ("wide64", 14) => run::<14, Wide>(input, &args),
         ("wide64", 4) => run::<4, Wide>(input, &args),
         ("wide64", 7) => run::<7, Wide>(input, &args),
+        // The §10.3 held-out rows katsura-9 and noon-8 (#903).
+        ("wide64", 8) => run::<8, Wide>(input, &args),
+        ("wide64", 9) => run::<9, Wide>(input, &args),
         ("wide64", 11) => run::<11, Wide>(input, &args),
         ("wide64", 12) => run::<12, Wide>(input, &args),
         (field, n) => panic!("no instantiation for {field} with {n} variables"),
