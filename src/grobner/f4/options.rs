@@ -807,6 +807,17 @@ pub struct F4Options {
     /// How final interreduction is performed. See [`InterreductionRoute`].
     pub interreduction: InterreductionRoute,
 
+    /// When final interreduction builds a matrix, reduce only each element's tail against the
+    /// fixed, never-reduced reducer rows instead of taking the whole matrix to reduced row echelon
+    /// form (#808).
+    ///
+    /// The basis is identical either way. The full echelon form also back-substitutes among the
+    /// reducer rows and then discards them, which is where the route's fill-in comes from; this
+    /// route's live entries never exceed the matrix as built plus one working row. A research option,
+    /// off by default and in [`F4Options::baseline`]; no effect when
+    /// [`Self::interreduction`] runs the division route.
+    pub tail_only_interreduction: bool,
+
     /// Fully reduce every extracted candidate against batch pivots, rather than emit echelon tails.
     ///
     /// Enabled by default with `InterreductionRoute::ByOrder`. Candidate leading columns do not
@@ -892,6 +903,7 @@ impl F4Options {
             measure_divmask: false,
             count_interreduction: false,
             interreduction: InterreductionRoute::Division,
+            tail_only_interreduction: false,
             reduce_batch_rows: false,
             profile_degrees: false,
             gf2_elimination: Gf2Elimination::Generic,
