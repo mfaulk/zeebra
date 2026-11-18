@@ -10,8 +10,8 @@ use rand::{rngs::StdRng, SeedableRng};
 use zeebra::{
     factorize,
     fields::{Bn254Fr, KoalaBear, Zp18446744069414584321},
-    gcd_classical_unstable, gcd_half_with_base_case_unstable, is_irreducible, roots, FiniteField,
-    KnownOrder, Polynomial, UnivariatePolynomial,
+    gcd_classical_unstable, gcd_half_with_base_case_unstable, is_irreducible,
+    pow_mod_limbs_unstable, roots, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
 };
 
 const DEGREES: [u64; 20] = [
@@ -110,16 +110,17 @@ fn measure_base_cases<F: FiniteField>(name: &str, seed: u64) {
     }
 }
 
-/// Pairs of degree `d` and `d - 1` sharing a monic factor of degree `d / 4`, `d / 2` and `3d / 4`:
-/// the shape `roots` and `factorize` hand `gcd`, where Euclid halts early at the common factor.
+/// Pairs of degree `d` and `d - 1` sharing a monic factor of degree `d / 4`, `d / 2`, `3d / 4` and
+/// `d - 2`: the shapes `roots` and `factorize` hand `gcd`, where Euclid halts early at the common
+/// factor. `d - 2` is `roots`'s first gcd on the `callers` input, two steps for Euclid.
 fn measure_planted<F: FiniteField>(name: &str, seed: u64, degrees: &[u64]) {
     println!("\n## {name}: classical / half-GCD with a planted common factor\n");
-    println!("| Degree | gcd d/4 | gcd d/2 | gcd 3d/4 |");
-    println!("|-------:|--------:|--------:|---------:|");
+    println!("| Degree | gcd d/4 | gcd d/2 | gcd 3d/4 | gcd d-2 |");
+    println!("|-------:|--------:|--------:|---------:|--------:|");
     let mut rng = StdRng::seed_from_u64(seed);
     for &degree in degrees {
         print!("| {degree} |");
-        for shared_degree in [degree / 4, degree / 2, 3 * degree / 4] {
+        for shared_degree in [degree / 4, degree / 2, 3 * degree / 4, degree - 2] {
             let mut shared = UnivariatePolynomial::<F>::rand(shared_degree, &mut rng);
             let lead = shared.coefficients().last().copied().expect("nonzero");
             shared = shared.scale(&lead.inverse());
@@ -135,7 +136,16 @@ fn measure_planted<F: FiniteField>(name: &str, seed: u64, degrees: &[u64]) {
     }
 }
 
-fn measure_callers<F: KnownOrder>(name: &str, degree: u64) {
+/// `callers`' input `f`: `d - 2` distinct linear factors times one irreducible quadratic. Returns
+/// `(roots, product of the linear factors, quadratic, f)`.
+type CallerInput<F> = (
+    Vec<F>,
+    UnivariatePolynomial<F>,
+    UnivariatePolynomial<F>,
+    UnivariatePolynomial<F>,
+);
+
+fn caller_input<F: KnownOrder>(degree: u64) -> CallerInput<F> {
     let planted: Vec<_> = (1..degree - 1).map(F::new).collect();
     let linears = UnivariatePolynomial::from_zeros(&planted);
     let quadratic = (1..)
@@ -144,6 +154,47 @@ fn measure_callers<F: KnownOrder>(name: &str, degree: u64) {
         .expect("the field has a nonsquare");
     let f = &linears * &quadratic;
     assert_eq!(u64::from(f.degree()), degree);
+    (planted, linears, quadratic, f)
+}
+
+/// The two gcds at the top of `roots` on the `callers` input, timed by both routes:
+/// `gcd(f, x^q - x mod f)`, whose answer has degree `d - 2`, and the first equal-degree split,
+/// `gcd(g, h^((q-1)/2) - 1 mod g)` for a random `h`, whose answer has degree near `deg g / 2`.
+fn measure_roots_shapes<F: KnownOrder>(name: &str, degree: u64, seed: u64) {
+    let (_, linears, _, f) = caller_input::<F>(degree);
+    let x = UnivariatePolynomial::new(&[F::zero(), F::one()]);
+    let x_to_the_q = pow_mod_limbs_unstable(&x, F::order_limbs(), &f);
+    let label = format!("{name}, degree {degree}, gcd(f, x^q - x)");
+    let image = &x_to_the_q - &x;
+    let (classical, half, _) = compare(&label, &f, &image, SHIPPED_BASE_CASE, &linears);
+    println!(
+        "| {name} | {degree} | x^q - x | {} | {classical:.6} | {half:.6} | {:.3} |",
+        linears.degree(),
+        classical / half
+    );
+
+    // (q - 1) / 2 from the order's limbs: q is odd, so halving it drops exactly the one.
+    let limbs = F::order_limbs();
+    let half_order: Vec<u64> = (0..limbs.len())
+        .map(|i| (limbs[i] >> 1) | limbs.get(i + 1).map_or(0, |next| next << 63))
+        .collect();
+    let mut rng = StdRng::seed_from_u64(seed);
+    let g = &linears;
+    let h = UnivariatePolynomial::<F>::rand(u64::from(g.degree()) - 1, &mut rng);
+    let candidate = &pow_mod_limbs_unstable(&h, &half_order, g) - &UnivariatePolynomial::one();
+    let expected = gcd_classical_unstable(g, &candidate);
+    let label = format!("{name}, degree {degree}, first split");
+    let (classical, half, _) = compare(&label, g, &candidate, SHIPPED_BASE_CASE, &expected);
+    println!(
+        "| {name} | {} | first split | {} | {classical:.6} | {half:.6} | {:.3} |",
+        g.degree(),
+        expected.degree(),
+        classical / half
+    );
+}
+
+fn measure_callers<F: KnownOrder>(name: &str, degree: u64) {
+    let (planted, _, quadratic, f) = caller_input::<F>(degree);
 
     let mut rng = StdRng::seed_from_u64(0x0194_5001);
     let (found, roots_time) = timed(|| roots(black_box(&f), &mut rng));
@@ -165,7 +216,7 @@ fn measure_callers<F: KnownOrder>(name: &str, degree: u64) {
 }
 
 const USAGE: &str =
-    "usage: gcd_crossover [all|koalabear|goldilocks|bn254|base|planted|callers|callers-high]";
+    "usage: gcd_crossover [all|koalabear|goldilocks|bn254|base|planted|roots-shapes|callers|callers-high]";
 
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
@@ -196,6 +247,14 @@ fn main() -> ExitCode {
                 &[2048, 4096, 8192],
             );
             measure_planted::<Bn254Fr>("BN254 Fr", 0x0194_3003, &[1024, 2048, 4096]);
+        }
+        "roots-shapes" => {
+            println!(
+                "| Field | Degree | gcd | Answer degree | Classical (s) | Half-GCD (s) | Ratio |"
+            );
+            println!("|:--|--:|:--|--:|--:|--:|--:|");
+            measure_roots_shapes::<KoalaBear>("KoalaBear", 8192, 0x0850_0001);
+            measure_roots_shapes::<Zp18446744069414584321>("Goldilocks", 4096, 0x0850_0002);
         }
         "callers" => {
             println!("field,degree,roots_ns,factorize_ns");

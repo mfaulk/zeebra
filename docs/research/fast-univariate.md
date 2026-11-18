@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its #850 planted, call-site and caller A/B were measured at `f3de297b`, the caller A/B against that tree with the dispatch disabled. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1897,7 +1897,9 @@ reach the dispatch and were within 1%. Above it (`callers-high`, five rounds int
 | KoalaBear | 8192 | 1.006 | 1.008 |
 | Goldilocks | 4096 | **0.983** | **0.986** |
 
-KoalaBear is unchanged. **Goldilocks is about 1.5% slower, and that is not explained.** The sweep
+KoalaBear is unchanged. **Goldilocks is about 1.5% slower, and that is not explained** —
+[explained by #850](#850-the-goldilocks-caller-gap-is-not-the-dispatch): it does not reproduce, and
+the gcd calls cannot carry it. The sweep
 above times coprime pairs; `roots` and `factorize` hand `gcd` pairs with a large common factor,
 where Euclid halts early and the recursion's fixed overhead weighs more. `gcd_crossover planted`
 times exactly that shape and was not run. A single round at BN254 degrees 2048 and 4096 read
@@ -1909,6 +1911,81 @@ recursion — its truncation sizes itself off `deg a` — which `gcd` never reac
 first; an exhaustive GF(2) test with base cases of 1–3 found it, and the recursion now takes the
 leading swap step itself. And `xgcd` and `partial_bezout` still run classical Euclid; the
 transition matrix carries their cofactors, so routing them is the next step, not new algorithm.
+
+#### #850: the Goldilocks caller gap is not the dispatch
+
+**Measured at `f3de297b`** (the #850 branch: `origin/main` `5452ae13` plus the harness change below),
+`gcd_crossover`, release, `taskset -c 30`, under `tools/benchlock.sh`. The control arm for the
+caller A/B is that tree with the three `HALF_GCD_CROSSOVER_*` constants set to `u32::MAX`, so
+`gcd` is classical everywhere — two binaries from one tree, nothing else different.
+
+The hypothesis was that `roots` and `factorize` hand `gcd` pairs with a large common factor, where
+Euclid halts early and the recursion's overhead weighs more. `gcd_crossover planted` times that
+shape, and now also a common factor of degree `d - 2`; `gcd_crossover roots-shapes` times the two
+gcds at the top of `roots` on the `callers-high` input itself. In-process, both routes in one
+binary, best of up to five; two rounds, which agreed within 0.05 (BN254 `d/4` at 2048: 1.22–1.26).
+Entries are classical time over half-GCD time, so above 1 half-GCD wins.
+
+| Field | Degree | gcd `d/4` | `d/2` | `3d/4` | `d - 2` |
+|:------|-------:|-----:|-----:|-----:|-----:|
+| KoalaBear | 4096 | 1.02 | 1.09 | 1.20 | 0.58 |
+| KoalaBear | 8192 | 1.35 | 1.45 | 1.57 | 0.29 |
+| KoalaBear | 16384 | 1.83 | 1.95 | 2.09 | 0.52 |
+| Goldilocks | 2048 | 0.96 | 1.00 | 1.07 | 0.51–0.52 |
+| Goldilocks | 4096 | 1.25 | 1.30 | 1.39–1.40 | 0.44 |
+| Goldilocks | 8192 | 1.62 | 1.72–1.73 | 1.82 | 0.49 |
+| BN254 Fr | 1024 | 0.98–0.99 | 1.02–1.06 | 1.09–1.12 | 0.50–0.51 |
+| BN254 Fr | 2048 | 1.22–1.26 | 1.28–1.33 | 1.38–1.43 | 0.50 |
+| BN254 Fr | 4096 | 1.57–1.62 | 1.66–1.73 | 1.79–1.83 | 0.45–0.46 |
+
+**A common factor helps half-GCD, it does not hurt it**, up to `3d/4`: every row at or above its
+width's dispatch (KoalaBear 4096 is below 6144, Goldilocks 2048 below 3072) is a win, and a larger
+one than the coprime sweep's at the same degree. The recursion stops spending as soon as the pair
+it reaches is the gcd, and Euclid still walks every degree from `d` down to it. The one losing
+shape is `d - 2`, which Euclid finishes in two division steps, each `O(d)` because the quotient is
+linear; the recursion pays its log-depth of full-length steps and lifts, about twice as long.
+
+Whether that loss matters is what the call-site timing answers:
+
+| Field | gcd at the top of `roots` | Answer degree | Classical | Half-GCD | Classical / half |
+|:------|:---|-----:|-----:|-----:|-----:|
+| KoalaBear | `gcd(f, x^q - x)`, `deg f = 8192` | 8190 | 18 µs | 31–32 µs | 0.58 |
+| KoalaBear | first equal-degree split, `deg g = 8190` | 4043 | 17.2–17.3 ms | 11.7–11.8 ms | 1.47 |
+| Goldilocks | `gcd(f, x^q - x)`, `deg f = 4096` | 4094 | 26–27 µs | 50 µs | 0.53–0.54 |
+| Goldilocks | first equal-degree split, `deg g = 4094` | 2000 | 14.5 ms | 11.0 ms | 1.31 |
+
+Every later split is below the dispatch and unchanged. So on Goldilocks the dispatch **loses
+24 µs and saves 3.4 ms** of a `roots` call whose whole wall is **3.87 s**: a predicted *speedup* of
+about 0.09%, which no caller-level measurement here can resolve. A 1.5% *slowdown* is 58 ms and
+cannot come from these two calls.
+
+**The caller A/B**, re-taken against the dispatch-off control rather than against a different
+commit: `callers-high`, two runs of nine pairs each, arm order alternated per pair. Entries are the
+paired off / on ratio, so above 1 the shipped dispatch is faster.
+
+| Field | Degree | `roots` off / on, median (IQR), run 1 | run 2 | `factorize`, run 1 | run 2 | wall, on (`roots` / `factorize`) |
+|:------|-------:|-----:|-----:|-----:|-----:|-----:|
+| KoalaBear | 8192 | 1.001 (0.980–1.007) | 1.002 (0.984–1.008) | 0.994 (0.987–0.999) | 0.991 (0.976–1.003) | 1.44 s / 2.09 s |
+| Goldilocks | 4096 | 1.007 (1.004–1.009) | 1.002 (0.976–1.007) | 1.005 (0.948–1.016) | 1.006 (1.002–1.014) | 3.87 s / 3.93 s |
+
+One-minute load ran 17 → 8.6 across run 1 and 2.5 → 3.4 across run 2 (builds in other sessions;
+paired ratios survive it, `docs/guide/benchmarking.md`). Every median is within 1% of parity, and
+Goldilocks `roots` reads 0.2–0.7% *faster* with the dispatch on, against #194's 1.7% slower. Both
+are inside what a caller of this length moves between two binaries, and the gcd model above says
+the true effect is about +0.1%. The #194 figure compared a binary built
+before #847 with one built after it, so code placement across the whole of `roots` differed
+between its arms; this A/B holds everything but the three constants fixed.
+
+```sh
+cargo build --release --example gcd_crossover
+tools/benchlock.sh zb-850 taskset -c 30 target/release/examples/gcd_crossover planted
+tools/benchlock.sh zb-850 taskset -c 30 target/release/examples/gcd_crossover roots-shapes
+tools/benchlock.sh zb-850 taskset -c 30 target/release/examples/gcd_crossover callers-high
+```
+
+**Decision: no change to the dispatch.** The only losing shape costs 24 µs per `roots` call and
+gains nothing a caller can see. Peeling two Euclid steps before the recursion would recover it, at
+the same 24 µs on every coprime pair above the crossover — a wash, so it was not added.
 
 #### #527: the floor was mine and it was 16x-32x too high
 
