@@ -293,7 +293,7 @@ unambiguous rather than a close call.
   bind on the cryptanalytic families.
 - **Boolean setting:** #220 asks whether Zeebra's sparse `GF(2)` elimination beats
   CryptoMiniSat's Gaussian-elimination-over-XOR module on matched matrices. A narrow measurement, and
-  explicitly not a reopening of §1.
+  explicitly not a reopening of §1. Answered in [`sat-and-algebra.md`](sat-and-algebra.md) §3.
 - **XL:** #76 investigates XL as a differently-posed problem whose output is a kernel vector rather
   than an echelon form, and cites §1 for why block Wiedemann is not a replacement for F4
   echelonization.

@@ -137,6 +137,14 @@ inputs after checking the factorizations agree. The recipe is
 [`tools/external/flint-factor-driver/README.md`](../../tools/external/flint-factor-driver/README.md);
 the results are [`modular-composition.md`](../research/modular-composition.md) §6.
 
+Two **SAT solvers** are provisioned as oracles for #220, never as components:
+`tools/external/provision-sat.sh` builds kissat 4.0.4 and CryptoMiniSat 5.18.0 (with GMP, and with
+CaDiCaL/CadiBack disabled so configure fetches nothing over git) from pinned tarballs, plus the
+small CMS XOR driver in
+[`tools/external/cms-xor-driver/`](../../tools/external/cms-xor-driver/README.md).
+`examples/sat_algebra.rs` runs them; the decision they informed is
+[`sat-and-algebra.md`](../research/sat-and-algebra.md).
+
 **Magma remains outside the provisioned roster** (#430). Magma is the fastest engine in
 every column of the published comparisons and it cannot be provisioned: it is commercial and there
 is no licence here, so every Magma figure in this repository is read from a page or a paper and
