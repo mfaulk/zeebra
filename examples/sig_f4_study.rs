@@ -345,8 +345,16 @@ mod cascade {
             algebraic(&plain_stats),
             "recording moved an algebraic quantity"
         );
-        assert_eq!(digest_of(&d1), digest_of(&plain), "recording moved the basis");
-        assert_eq!(digest_of(&d2), digest_of(&plain), "design 2 moved the basis");
+        assert_eq!(
+            digest_of(&d1),
+            digest_of(&plain),
+            "recording moved the basis"
+        );
+        assert_eq!(
+            digest_of(&d2),
+            digest_of(&plain),
+            "design 2 moved the basis"
+        );
         let all = |records: &[BatchRecord]| Json::Array(records.iter().map(batch).collect());
         Json::object([
             ("field", Json::string(&args.field)),

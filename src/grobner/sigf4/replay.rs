@@ -339,7 +339,12 @@ impl Recorder {
 }
 
 /// Totals over a run, and ceilings against a design-1 `baseline` work at `workers`.
-pub fn ceiling(records: &[BatchRecord], baseline: u64, schedule: Option<Schedule>, workers: usize) -> (f64, f64) {
+pub fn ceiling(
+    records: &[BatchRecord],
+    baseline: u64,
+    schedule: Option<Schedule>,
+    workers: usize,
+) -> (f64, f64) {
     let (mut bound, mut greedy) = (0.0, 0.0);
     for r in records {
         let (b, g) = match schedule {
@@ -405,8 +410,7 @@ mod tests {
                 ..SigF4Options::default()
             };
             let (plain, plain_stats) = sig_f4_reported(system, order, &options);
-            let ((recorded, stats), records) =
-                record(|| sig_f4_reported(system, order, &options));
+            let ((recorded, stats), records) = record(|| sig_f4_reported(system, order, &options));
             assert_eq!(recorded.unwrap(), plain.unwrap());
             assert_eq!(algebraic(&stats), algebraic(&plain_stats));
             assert_eq!(records.len(), stats.batches);
