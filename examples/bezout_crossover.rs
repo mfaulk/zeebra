@@ -15,8 +15,9 @@ use zeebra::{
     xgcd_half_unstable, FiniteField, Polynomial, UnivariatePolynomial,
 };
 
-const DEGREES: [u64; 13] = [
-    256, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 32768,
+const DEGREES: [u64; 19] = [
+    64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 2560, 3072, 4096, 6144, 8192, 12288,
+    16384, 32768,
 ];
 const MAX_REPETITIONS: usize = 5;
 const BUDGET: Duration = Duration::from_millis(1500);

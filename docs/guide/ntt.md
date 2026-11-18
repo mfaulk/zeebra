@@ -439,7 +439,10 @@ on `(x^{2t}, S(x))` with `degree_bound = t`, taking `Ω` as the remainder and `�
 and rational reconstruction and Padé approximation want the same thing. Only the cofactor of the
 second argument is carried through the loop, because that is the one those consumers read; `xgcd`
 recovers `u` from the identity with one exact division rather than paying for a second cofactor row
-at every step.
+at every step. Above a measured span both run on half-GCD instead (#815): its transition matrix
+*is* the cofactor table, so the halted pair and both cofactors come out of it with no division.
+`berlekamp_massey` is the same halted sequence on `(x^{2n}, S)` and takes the same route; see
+`docs/research/certified-wiedemann.md` § Reconstruction.
 
 ```rust
 use zeebra::{fields::Zp13, gcd, partial_bezout, xgcd, Polynomial, UnivariatePolynomial};
