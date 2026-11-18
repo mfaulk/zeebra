@@ -89,6 +89,10 @@ research-sigf4 = ["external-runners"]
 # compiles none of it.
 research-sigf4-replay = ["research-sigf4"]
 
+# #901's instrument: per-batch reducer-block / cross-target-cascade split of the signature engine's
+# elimination, and clocks on the engine's unstaged glue. Off in every timed binary.
+research-sigf4-split = ["research-sigf4"]
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
