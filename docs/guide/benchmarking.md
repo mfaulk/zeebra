@@ -433,6 +433,9 @@ cargo run --release --example gf2_packed_elimination -- square 5  # Four Russian
 cargo run --release --example gf2_f4_dispatch -- batches 5        # packed vs generic F4 batches
 cargo run --release --example gf2_f4_dispatch -- sweep 5          # same, MQ n=12..16 x density grid
 cargo run --release --example gf2_f4_dispatch -- solve 7          # packed vs generic F4 solves
+cargo run --release --example sat_algebra -- clauses             # ANF->CNF clause blow-up (#220)
+cargo run --release --example sat_algebra -- replay 3            # GF(2) F4 matrices vs CryptoMiniSat Gauss
+cargo run --release --example sat_algebra -- preprocess 3        # kissat with and without affine elimination
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -772,6 +775,18 @@ batch's shape, density and both elimination-stage times (what `Auto`'s threshold
 quadratic-monomial densities on a held-out seed (#794); `solve` times whole solves under `Generic`, `Auto` and `Packed`. Candidates and bases are asserted
 equal to the generic route's in every repetition. Results are in
 [`docs/research/characteristic-two-linear-algebra.md`](../research/characteristic-two-linear-algebra.md) §7.
+
+`sat_algebra` is #220's instrument for the SAT decision record. `clauses` counts the CNF an
+ANF→CNF conversion emits (Tseitin ANDs, XORs cut at 3–6) for planted random MQ systems and for the
+Macaulay rows a real `GF(2)` F4 run builds. `replay` eliminates every one of those matrices with
+`Dense`, `Sparse`, `Adaptive` and the bit-packed kernel, exports each as XOR constraints, and has
+CryptoMiniSat solve them; rank and solution-space dimension are asserted equal to CMS's before any
+time is printed. `preprocess` times kissat on a planted system with an affine layer, alone and after
+`transform::eliminate_affine`, and checks every model against the original equations. The solvers
+are external oracles from `tools/external/provision-sat.sh`, found through `$ZEEBRA_EXT_PREFIX`;
+without them the solver columns print `not run`. `ZEEBRA_SAT_SKIP_F4=1` drops the F4 columns from
+`preprocess`. Results and the decision are in
+[`docs/research/sat-and-algebra.md`](../research/sat-and-algebra.md).
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,
