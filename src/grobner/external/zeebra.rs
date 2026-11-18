@@ -28,7 +28,7 @@ use crate::{
         differential::polynomial_to_string,
         f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions, QuotientBasis},
-        F4Error, F4Options, IdealClass, InterreductionRoute, ParallelForward,
+        F4Error, F4Options, IdealClass, InterreductionRoute, ParallelForward, ParallelSymbolic,
     },
     util::peak_resident_bytes,
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -113,8 +113,10 @@ impl ZeebraSolver {
         self
     }
 
-    /// The F4 options a run under `limits` uses: forward elimination never takes more threads
-    /// than [`Limits::workers`], so a row's recorded concurrency is a bound on what it used.
+    /// The F4 options a run under `limits` uses: neither forward elimination nor the symbolic
+    /// team takes more threads than [`Limits::workers`], so a row's recorded concurrency is a
+    /// bound on what it used. `ParallelSymbolic::Auto { max_workers: 16 }` does not clamp itself
+    /// to the affinity mask (#883).
     fn f4_options_within(&self, limits: &Limits) -> F4Options {
         let workers = limits.workers.max(1);
         let parallel_forward = match self.f4_options.parallel_forward {
@@ -131,8 +133,20 @@ impl ZeebraSolver {
             },
             ParallelForward::Serial => ParallelForward::Serial,
         };
+        let parallel_symbolic = match self.f4_options.parallel_symbolic {
+            ParallelSymbolic::Auto { .. } if workers == 1 => ParallelSymbolic::Serial,
+            ParallelSymbolic::Auto { max_workers } => ParallelSymbolic::Auto {
+                max_workers: if max_workers == 0 {
+                    workers
+                } else {
+                    max_workers.min(workers)
+                },
+            },
+            ParallelSymbolic::Serial => ParallelSymbolic::Serial,
+        };
         F4Options {
             parallel_forward,
+            parallel_symbolic,
             ..self.f4_options.clone()
         }
     }
@@ -884,6 +898,45 @@ mod tests {
             ParallelForward::Forced { workers: 4 }
         );
         assert_eq!(within(ParallelForward::Serial, 16), ParallelForward::Serial);
+    }
+
+    // A one-worker cohort also interns serially, although the default team is 16 (#883).
+    #[test]
+    fn test_one_worker_limit_runs_the_serial_symbolic_closure() {
+        use crate::grobner::ParallelSymbolic;
+        let options = ZeebraSolver::new().f4_options_within(&limits().with_workers(1));
+        assert_eq!(options.parallel_symbolic, ParallelSymbolic::Serial);
+        assert_eq!(options.parallel_symbolic.workers(), 1);
+    }
+
+    // A worker budget caps the symbolic team as it caps forward dispatch (#883).
+    #[test]
+    fn test_worker_limit_caps_the_symbolic_team() {
+        use crate::grobner::{F4Options, ParallelSymbolic};
+        let within = |parallel_symbolic, workers| {
+            ZeebraSolver::new()
+                .with_f4_options(F4Options {
+                    parallel_symbolic,
+                    ..F4Options::default()
+                })
+                .f4_options_within(&limits().with_workers(workers))
+                .parallel_symbolic
+        };
+        let auto = |max_workers| ParallelSymbolic::Auto { max_workers };
+        assert_eq!(within(auto(16), 4), auto(4));
+        assert_eq!(within(auto(16), 4).workers(), 4);
+        assert_eq!(within(auto(16), 32), auto(16));
+        assert_eq!(within(auto(0), 8), auto(8));
+        assert_eq!(
+            within(ParallelSymbolic::Serial, 16),
+            ParallelSymbolic::Serial
+        );
+        assert_eq!(
+            ZeebraSolver::new()
+                .f4_options_within(&limits().with_workers(4))
+                .parallel_symbolic,
+            auto(4)
+        );
     }
 
     // Registration adds a previously uncompiled field and width as a measured board row.

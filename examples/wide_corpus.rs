@@ -13,7 +13,7 @@ use zeebra::{
             ExternalSolver, FieldSpec, GrobxSolver, GroebnerJlSolver, GroebnerRsSolver, Instance,
             Limits, Task,
         },
-        f4_reported, F4Options, ParallelForward,
+        f4_reported, F4Options, ParallelForward, ParallelSymbolic,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -134,8 +134,8 @@ fn build<const N: usize, F: FiniteField>(field: &str, modulus: &str, row: &str) 
     }
 }
 
-/// The shipping default under the campaign's 60 s / 2 GiB budget, forward elimination capped at
-/// `workers` and serial at one, so a cohort's recorded worker count bounds the threads it used.
+/// The shipping default under the campaign's 60 s / 2 GiB budget, forward elimination and the
+/// symbolic team capped at `workers` and serial at one, so a cohort's recorded worker count bounds the threads it used.
 fn zeebra_options(workers: usize) -> F4Options {
     F4Options {
         max_wall_time: Some(Duration::from_secs(60)),
@@ -145,6 +145,13 @@ fn zeebra_options(workers: usize) -> F4Options {
             ParallelForward::Serial
         } else {
             ParallelForward::Auto {
+                max_workers: workers,
+            }
+        },
+        parallel_symbolic: if workers <= 1 {
+            ParallelSymbolic::Serial
+        } else {
+            ParallelSymbolic::Auto {
                 max_workers: workers,
             }
         },
@@ -404,6 +411,20 @@ mod tests {
             Some(Duration::from_secs(60))
         );
         assert_eq!(zeebra_options(16).max_live_bytes, 2 * 1024 * 1024 * 1024);
+    }
+
+    // The symbolic team is capped at the worker count too: serial at one, `w` above (#883).
+    #[test]
+    fn zeebra_options_cap_the_symbolic_team() {
+        use zeebra::grobner::ParallelSymbolic;
+        assert_eq!(
+            zeebra_options(1).parallel_symbolic,
+            ParallelSymbolic::Serial
+        );
+        assert_eq!(
+            zeebra_options(4).parallel_symbolic,
+            ParallelSymbolic::Auto { max_workers: 4 }
+        );
     }
 
     // Dense random MQ has every quadratic, linear and constant coefficient and is reproducible.
