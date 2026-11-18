@@ -10,6 +10,29 @@ use zeebra::{
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
+#[path = "support/symbolic_team.rs"]
+mod symbolic_team;
+
+fn options(batch_order: BatchOrder, forward: &str) -> F4Options {
+    let parallel_forward = match forward.split_once(':') {
+        None if forward == "serial" => ParallelForward::Serial,
+        Some(("auto", w)) => ParallelForward::Auto {
+            max_workers: w.parse().unwrap(),
+        },
+        Some(("forced", w)) => ParallelForward::Forced {
+            workers: w.parse().unwrap(),
+        },
+        _ => panic!("forward: serial | auto:MAX | forced:WORKERS"),
+    };
+    F4Options {
+        batch_order,
+        parallel_forward,
+        parallel_symbolic: symbolic_team::capped_to(parallel_forward),
+        measure_stages: true,
+        ..F4Options::default()
+    }
+}
+
 fn run<const N: usize, F: FiniteField>(
     problem: &str,
     modulus: u64,
@@ -31,22 +54,7 @@ fn run<const N: usize, F: FiniteField>(
         "fl" => BatchOrder::FaugereLachartre,
         _ => panic!("order: forward | fl"),
     };
-    let parallel_forward = match forward.split_once(':') {
-        None if forward == "serial" => ParallelForward::Serial,
-        Some(("auto", w)) => ParallelForward::Auto {
-            max_workers: w.parse().unwrap(),
-        },
-        Some(("forced", w)) => ParallelForward::Forced {
-            workers: w.parse().unwrap(),
-        },
-        _ => panic!("forward: serial | auto:MAX | forced:WORKERS"),
-    };
-    let mut options = F4Options {
-        batch_order,
-        parallel_forward,
-        measure_stages: true,
-        ..F4Options::default()
-    };
+    let mut options = options(batch_order, forward);
     if let Some(entries) = live_entries {
         options = options.with_live_entries::<F>(entries);
     }
@@ -158,5 +166,28 @@ fn main() {
         12 => go!(12),
         14 => go!(14),
         _ => panic!("unsupported size {n}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zeebra::grobner::ParallelSymbolic;
+
+    // A w-worker forward arm caps the symbolic team at w, and a serial arm runs it serially (#891).
+    #[test]
+    fn forward_arm_caps_the_symbolic_team() {
+        let serial = options(BatchOrder::Forward, "serial");
+        assert_eq!(serial.parallel_symbolic, ParallelSymbolic::Serial);
+        let auto = options(BatchOrder::Forward, "auto:4");
+        assert_eq!(
+            auto.parallel_symbolic,
+            ParallelSymbolic::Auto { max_workers: 4 }
+        );
+        let forced = options(BatchOrder::FaugereLachartre, "forced:8");
+        assert_eq!(
+            forced.parallel_symbolic,
+            ParallelSymbolic::Auto { max_workers: 8 }
+        );
     }
 }

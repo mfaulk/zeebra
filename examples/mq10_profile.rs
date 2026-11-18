@@ -20,6 +20,9 @@ mod selective_backward;
 #[path = "support/whole_route.rs"]
 mod whole_route;
 
+#[path = "support/symbolic_team.rs"]
+mod symbolic_team;
+
 #[derive(Clone, Copy)]
 struct RunMode<'a> {
     workers: Option<usize>,
@@ -36,6 +39,13 @@ fn forward_policy(workers: Option<usize>) -> zeebra::grobner::ParallelForward {
         Some(1) => zeebra::grobner::ParallelForward::Serial,
         Some(max_workers) => zeebra::grobner::ParallelForward::Auto { max_workers },
         None => F4Options::default().parallel_forward,
+    }
+}
+
+fn symbolic_policy(workers: Option<usize>) -> zeebra::grobner::ParallelSymbolic {
+    match workers {
+        Some(_) => symbolic_team::capped_to(forward_policy(workers)),
+        None => F4Options::default().parallel_symbolic,
     }
 }
 
@@ -372,6 +382,7 @@ fn run<const N: usize, F: KnownOrder + Send + Sync>(
     let options = F4Options {
         measure_stages: measured,
         parallel_forward: forward_policy(forward_workers),
+        parallel_symbolic: symbolic_policy(forward_workers),
         // #831: `original` and `order` are the pre-dedup arm; no flag is the shipping default.
         pair_multiples: match symbolic {
             Some("original" | "order") => zeebra::grobner::PairMultiples::Every,
@@ -827,6 +838,21 @@ mod tests {
             ParallelForward::Auto { max_workers: 16 }
         );
         assert_eq!(forward_policy(None), F4Options::default().parallel_forward);
+    }
+
+    // --forward-workers=N caps the symbolic team at N as well; absent keeps the default (#891).
+    #[test]
+    fn forward_workers_cap_the_symbolic_team() {
+        use zeebra::grobner::ParallelSymbolic;
+        assert_eq!(symbolic_policy(Some(1)), ParallelSymbolic::Serial);
+        assert_eq!(
+            symbolic_policy(Some(4)),
+            ParallelSymbolic::Auto { max_workers: 4 }
+        );
+        assert_eq!(
+            symbolic_policy(None),
+            F4Options::default().parallel_symbolic
+        );
     }
 
     // A whole-route request must reject a symbolic override rather than silently ignore it.
