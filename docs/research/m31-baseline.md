@@ -30,7 +30,8 @@ CCDs 1–2 under `benchlock` (`zb-901`). Executable SHA-256s, toolchain and opti
   serial in both designs) is 0.484 s of design 1's 1.831 s and 0.568 s of design 2's 1.170 s, and
   design 2's serial pass is 0.502 s against a 0.100 s parallel pass.
 - **Consequence for Gate A:** a schedule that made the cascade free and left setup as it is caps
-  the Eco-12 elimination stage at **2.74×–3.14×** design 1, below Gate A item 2's 3.5×. Re-derived
+  the Eco-12 elimination stage at **2.74×–3.14×** design 1, below Gate A item 2's 3.5×; #902's
+  product-only 6.70× bound becomes 2.38×–2.67× once measured setup is added (§5.2). Re-derived
   §6.3: the "required shape" projects **0.717×** F4-16, above Gate A item 3's 0.70; reaching 0.70
   with the other stages at that shape needs elimination **≥ 3.79×**. Setup must be in #902's and
   #903's scope, or Gate A cannot pass on Eco-12.
@@ -202,6 +203,27 @@ that leaves setup serial. **Gate A item 2 asks ≥ 3.5× on Eco-12; neither setu
 reaches it.** A schedule that passes item 2 must also parallelize or shrink setup (0.484–0.568 s,
 the column `MonomialMap` and the monomial-product row conversion in `engine.rs::eliminate`), which
 is equally a #903 serial-overhead target.
+
+### 5.2 Reconciling with #902's replay ceilings
+
+[#902's replay](m31-parallel-signature-elimination.md) (#910) models the elimination stage by
+coefficient products, so its ceilings (Eco-12 "prereduce + claim": 4.63× greedy, 6.70× bound at 16
+workers) apply to the part of the stage that spends products — design 1's 1.347 s serial pass —
+and not to setup, which spends none. Its own calibration gap is the same effect: the model gives
+design 2 2.39× where design 2 measures 1.56× here; adding the measured setup to the modelled pass,
+1.831 ÷ (1.347 ÷ 2.39 + setup) is **1.62×–1.75×** (design 2's or design 1's setup), which accounts
+for most of that gap. On the same basis the recommended schedule's ceilings become:
+
+| #902 product ceiling (16 workers) | with design 1's setup (0.484 s) | with design 2's setup (0.568 s) |
+|---|---:|---:|
+| 2.39× (design 2 as modelled) | 1.75× | 1.62× |
+| 4.63× (greedy-achievable) | 2.36× | 2.13× |
+| 6.70× (bound) | 2.67× | 2.38× |
+
+So Gate A item 2 (≥ 3.5× on the elimination stage) holds only for the product-spending part; for
+the stage as the engine clocks it, it needs setup cut as well. Setup is two pieces:
+building one `MonomialMap` from the batch's columns, and converting each row's terms to sparse
+column indices, which reads only that map and the row, so it is independent across rows.
 
 ## 6. Plan §6.3 re-derived at the freeze
 
