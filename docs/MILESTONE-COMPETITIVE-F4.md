@@ -97,7 +97,7 @@ randomized-versus-deterministic guarantees are never implied.
 | [#831](https://github.com/mfaulk/zeebra/issues/831) | Open | P0 production candidate: exact duplicate pair-multiple elimination. |
 | [#828](https://github.com/mfaulk/zeebra/issues/828) | Open | P1 conditional: parallel Faugère–Lachartre reduction. |
 | [#832](https://github.com/mfaulk/zeebra/issues/832) | Open | P2 research, dependent on #831 and a new opportunity calculation. |
-| [#809](https://github.com/mfaulk/zeebra/issues/809) | Open | Optional Faugère Simplify investigation, only if the wide-field cost model justifies it (a C2 option). |
+| [#809](https://github.com/mfaulk/zeebra/issues/809) | Deferred | Optional Faugère Simplify investigation, only if the wide-field cost model justifies it (a C2 option). Deferred with reopen evidence in [the Simplify note](research/simplify-reducer-reuse.md). |
 | [#808](https://github.com/mfaulk/zeebra/issues/808) | Open | Deferred: mainly final-interreduction memory, not a proven speed bottleneck. Not labelled M29. |
 | [#826](https://github.com/mfaulk/zeebra/issues/826) | Open | Deferred to whole-solving optimization; outside M29's reduced-basis objectives. Not labelled M29. |
 
@@ -443,7 +443,7 @@ All rows are native sub-issues of #833 and carry the `M29` label.
 | M29-B — parallel FL order | [#828](https://github.com/mfaulk/zeebra/issues/828) | P1 (Medium) | Open | Bounded parallel feasibility only, after #829 and #831 |
 | M29-C1 — current grobx attribution | [#835](https://github.com/mfaulk/zeebra/issues/835) | P0 (High) | Done ([note](research/m29-grobx-attribution.md)) | 93% of Zeebra's products are on pairs that reduce to zero; grobx avoids them by signature criteria (MQ11) and randomized combinations (Eco-12). Recommends no C2 in M29 |
 | M29-C2/C3 — one exact-work improvement | [#836](https://github.com/mfaulk/zeebra/issues/836) | P1 (Medium) | Closed, none selected | #835 found no in-scope candidate above the bar (C1 note §5) |
-| C2 option — Faugère Simplify | [#809](https://github.com/mfaulk/zeebra/issues/809) | Optional (Low) | Open | Only if #835's ledger shows repeated reducer work |
+| C2 option — Faugère Simplify | [#809](https://github.com/mfaulk/zeebra/issues/809) | Optional (Low) | Deferred ([note](research/simplify-reducer-reuse.md)) | Gate not met: reducer rows receive no work (`reducer_target_operations` = 0), so there is no repeated reducer computation to reuse |
 | M29-D — parallel symbolic | [#832](https://github.com/mfaulk/zeebra/issues/832) | P2 (Low) | Open | Defer until #831's post-adoption cost model |
 | M29-I — comparison and integration | [#837](https://github.com/mfaulk/zeebra/issues/837) | P0 closeout (High) | Done (§14) | Both goals **target missed**; Minimum met |
 
@@ -600,4 +600,5 @@ Zeebra at one worker is 7.7× (Eco-12) and 13.5× (MQ11) grobx's one-worker wall
   2³¹−1 half of Goal A. Left open.
 - **#716** (signature-compatible criteria): the only mechanism C1 found with enough reach for Goal B.
   It belongs in a successor milestone. First test: grobx `signatures=false` on MQ11.
-- #809 (Simplify): low expected value per C1 §2, because it cannot remove a zero row.
+- #809 (Simplify): low expected value per C1 §2, because it cannot remove a zero row. Deferred in
+  [the Simplify note](research/simplify-reducer-reuse.md), which records what would reopen it.
