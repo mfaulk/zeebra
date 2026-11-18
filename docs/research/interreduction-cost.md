@@ -21,7 +21,7 @@ introduces** and **re-taken, unchanged to the digit, at base `19ff732c`** after 
 `reduce_batch` and the external contract under it; it publishes **counts only**, so unlike every
 other section here it is independent of the machine and of the load it ran under. **§3j was taken at
 `c41cc7bc`**, one binary built at that commit with a runtime switch between the two routes, recorded
-at the time.
+at the time. **§3k was taken at `13c7aa5d`**, the commit that introduces the tail route, recorded at the time. Its `unbounded` and `division` rows ran from the uncommitted tree just before it, base `7e6aba06` plus this change. That tree differed only in the tail route's peak accounting, which no other arm reads.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -1750,6 +1750,89 @@ replace.
 `multi_div_rem`'s 6.4x is recorded and not acted on, for the reason above: its fix is to stop
 rebuilding a polynomial per step, and either division structure does that.
 
+## 3k. #808: tail-only reduction against fixed reducer rows — the fill-in is gone, and the default never had it
+
+The matrix route takes the whole interreduction matrix to reduced row echelon form and keeps only
+the rows led by some `lm(g_i)`. The back-substitution among the reducer rows is work that is
+thrown away, and it is where #536's fill-in came from. Giac and msolve (`reduce_final_basis`) do it
+differently. They reduce each element's **tail** against the fixed, never-reduced reducer rows, and
+the targets are independent of one another. `F4Options::tail_only_interreduction` is an
+independent implementation of that route: algorithm reference only, no GPL code. It builds the same
+closure and the same matrix. It then sweeps each seed row once through a `DenseAccumulator`
+against the rows as built. Every row is monic and the leads are distinct, so the rows are already
+an echelon basis of the closure, and one ascending sweep clears every pivot column. The sweep is
+the one `candidate.rs` uses for batch rows.
+
+### 3k.0 The A/B
+
+The instrument is `examples/interreduce_working_set` (§4), with one process per row, so VmHWM is
+the row's own. All rows use grevlex over `2^31−1`. `tails` and `unbounded` both lift the
+live-entry allowance, so neither falls back; `division` is the comparand. "peak live" is the
+pass's own high-water mark. For `unbounded` it is the elimination's. For `tails` it is the built
+matrix plus the working row's high-water. Neither figure counts the extracted elements, so the two
+count the same things. **Every one of the 36 rows prints the same basis digest per rung**, so all
+three routes return the same reduced basis, coefficient for coefficient. The unit tests assert
+the same equality against division in-process, over three orders and two fields.
+
+**The shipping default** (`reduce_batch_rows` on):
+
+| rung | arm | interreduction ms | matrix | built | peak live | VmHWM MB |
+|---|---|---:|---|---:|---:|---:|
+| katsura-9 | tails | 5.0 | 149 x 405 | 26 078 | 26 334 | 12.2 |
+| katsura-9 | rref | 6.0 | 149 x 405 | 26 078 | 26 284 | 12.3 |
+| katsura-11 | tails | 95.1 | 545 x 1569 | 383 343 | 384 367 | 142.6 |
+| katsura-11 | rref | 108.1 | 545 x 1569 | 383 343 | 383 733 | 142.7 |
+| katsura-11 | division | 25 573.9 | — | — | — | 142.4 |
+| mq-random-10 | tails | 13.9 | 252 x 606 | 68 325 | 68 688 | 40.6 |
+| mq-random-10 | rref | 14.2 | 252 x 606 | 68 325 | 68 367 | 40.6 |
+| mq-random-10 | division | 1 360.5 | — | — | — | 40.6 |
+
+**Echelon batch tails** (`reduce_batch_rows` off, the regime #536 measured):
+
+| rung | arm | interreduction ms | F4 ms | built | peak live | VmHWM MB |
+|---|---|---:|---:|---:|---:|---:|
+| katsura-7 | tails | 1.2 | 9.3 | 15 951 | 16 216 | 4.8 |
+| katsura-7 | rref | 4.3 | 12.7 | 15 951 | 44 627 | 5.7 |
+| katsura-8 | tails | 6.3 | 38.3 | 81 600 | 82 355 | 10.1 |
+| katsura-8 | rref | 34.9 | 66.7 | 81 421 | 293 487 | 14.5 |
+| katsura-9 | tails | 38.9 | 203.2 | 409 989 | 412 239 | 32.4 |
+| katsura-9 | rref | 282.8 | 449.9 | 412 524 | 1 950 324 | 71.2 |
+| katsura-10 | tails | 222.7 | 1 115.6 | 2 130 790 | 2 138 516 | 131.9 |
+| katsura-10 | rref | 2 610.3 | 3 505.4 | 2 127 684 | 13 298 794 | 420.6 |
+| katsura-11 | tails | 1 645.9 | 8 437.1 | 11 320 439 | 11 344 791 | **635.6** |
+| katsura-11 | rref | 27 071.9 | 34 203.9 | 11 308 807 | 104 598 142 | **2 879.6** |
+| katsura-11 | division | 192 114.3 | 198 987.3 | — | — | 645.0 |
+| mq-random-10 | tails | 175.6 | 1 133.0 | 894 356 | 901 356 | 191.4 |
+| mq-random-10 | rref | 753.9 | 1 723.1 | 892 889 | 2 453 778 | 189.3 |
+| mq-random-10 | division | 21 583.9 | 22 547.9 | — | — | 191.5 |
+
+`rref` is the `unbounded` arm. The full table, with katsura-8 and katsura-10 on the default and
+every division row, is reproducible from §4. The echelon matrices differ by about 1% in shape
+between arms. That is not the route: under `reduce_batch_rows` off the batch tails are not
+canonical, and `ParallelForward::Auto` discovers pivots concurrently, so the pre-interreduction
+basis varies between processes. The default-regime matrices are identical across arms.
+
+### 3k.1 What it says
+
+- **The fill-in is removed entirely.** The tail route's peak stays within 3.4% of the matrix as
+  built on every rung, and within 0.2% on katsura-11. There the full echelon form takes 9.25x the entries it was built
+  with. VmHWM goes from 2 879.6 MB to 635.6 MB, below the division route's 645.0 MB, which was
+  #536's comparand. The stage runs **16.4x** faster than RREF and **117x** faster than division.
+- **Under the shipping default, there is nothing left to remove.** `reduce_batch_rows` leaves the
+  candidates already reduced. The matrix is then nearly all seed rows (545 rows for 537 elements on
+  katsura-11), and there RREF's peak is already within 0.1% of construction. The tail route is equal on
+  memory and level on time. Its 1.02x–1.20x stage-time edge is one unpinned rep per arm with the
+  load average at 2–4, so it is not claimed.
+
+### 3k.2 The decision
+
+#808 says to adopt the route only if it removes the katsura-11 blow-up without a time regression.
+It does both, but only in the configuration that had the blow-up. In the shipping configuration it
+changes nothing measurable. **It ships opt-in, and the default does not move.** Moving the default
+needs an interleaved, pinned, multi-rep A/B. It also needs a lex rerun: `ByOrder` routes lex to
+division because the RREF matrix lost there (§3h.3), and the tail route removes the
+back-substitution that the loss came from. Both are left to #877, not settled here.
+
 ---
 
 ## 4. Reproducing
@@ -1825,6 +1908,16 @@ ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
 ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
   tools/benchlock.sh <tag> taskset -c 0-7 \
   cargo run --release --example f4_profile -- mq-counts
+
+# §3k's tail-only A/B: one process per row, so VmHWM is the row's own. Compare the
+# `basis digest` lines across arms of one rung. `--echelon-batches` is #536's regime.
+for batches in "" --echelon-batches; do
+  for rung in katsura-7 katsura-8 katsura-9 katsura-10 katsura-11 mq-random-10; do
+    for arm in tails unbounded division; do
+      cargo run --release --example interreduce_working_set -- "$rung" --arm "$arm" $batches
+    done
+  done
+done
 
 # §3e's board rows. One row per process, so the peak-RSS figure is attributable; the
 # memory figures in §3e.3 come from here and not from the sweep above.

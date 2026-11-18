@@ -645,7 +645,11 @@ size is a per-process reading: `--arm unbounded` lifts the live-entry allowance 
 runs to completion and reports its elimination's own high-water mark, `--arm default` is the shipped
 allowance where that pass refuses and falls back, and `--arm division` is the comparand the memory
 ratio is against. It is the instrument [#536](https://github.com/mfaulk/zeebra/issues/536) was
-settled with; `docs/research/f4-resource-scaling.md` §12 has the table it produced.
+settled with; `docs/research/f4-resource-scaling.md` §12 has the table it produced. `--arm tails`
+is `unbounded` with `F4Options::tail_only_interreduction` (#808), and `--echelon-batches` turns
+`reduce_batch_rows` off, the regime #536 was measured in. Each row prints a `basis digest`, so arms
+run in separate processes can be checked for agreement; `docs/research/interreduction-cost.md` §3k
+has that A/B.
 
 `interreduction_repeats` asks a third question about the same stage, and it is a **count** rather
 than a measurement: how much of the division route's work is work an earlier basis element's
