@@ -43,6 +43,12 @@ so every worktree picks it up:
 git config core.hooksPath .githooks
 ```
 
+Keep the path relative. Git resolves it against the pushing worktree, so each branch runs its own
+copy of the hook. An absolute path (`/…/zeebra/.githooks`) makes every worktree run the main
+checkout's copy instead, and the hook stops running altogether when the main checkout is on a
+branch without `.githooks/`. If the pushing branch predates `scripts/ci-lint.sh`, the hook prints
+a notice and lets the push through, since CI runs the same checks.
+
 `git push --no-verify` skips it. `bash scripts/test/pre-push-test.sh` tests the classification.
 
 The shell tooling under `scripts/agent/` and `tools/` is invisible to every Rust job, so CI's
