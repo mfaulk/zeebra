@@ -5196,3 +5196,82 @@ fn test_tail_only_interreduction_matches_the_other_routes() {
         );
     }
 }
+
+/// A zero certification budget under `certify` is a time stop carrying the check's progress, not
+/// `CertificationFailed`, at one worker and at many, in two fields.
+#[test]
+fn test_a_certification_budget_stops_as_time_not_rejection() {
+    use crate::grobner::{f4_reported, CertificationStage, StopKind};
+    use std::time::Duration;
+
+    fn check<G: crate::FiniteField>() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let system = cyclic::<4, G>();
+        for options in [F4Options::baseline(), F4Options::default()] {
+            let options = F4Options {
+                certify: true,
+                max_certify_time: Some(Duration::ZERO),
+                ..options
+            };
+            let (result, statistics) = f4_reported(&system, order, &options);
+            let Err(error @ F4Error::CertificationTimeBudgetExceeded { progress }) = result else {
+                panic!("a zero certification budget must stop the check, not {result:?}");
+            };
+            assert_eq!(error.stop_kind(), StopKind::Time);
+            assert_eq!(error.limit_name(), "max_certify_time");
+            assert_eq!(progress.stage, CertificationStage::Generators);
+            assert_eq!(progress.generators_checked, 0);
+            assert!(
+                statistics.certification.is_none(),
+                "a stop must leave no report that could be read as a verdict"
+            );
+        }
+    }
+    check::<Zp2147483647>();
+    check::<Zp541>();
+}
+
+/// An ample certification budget returns the same basis and a complete report, and the
+/// computation's own `max_wall_time` is not charged for the check.
+#[test]
+fn test_an_ample_certification_budget_changes_nothing() {
+    use std::time::Duration;
+
+    fn check<G: crate::FiniteField>() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let system = cyclic::<4, G>();
+        let unbudgeted = f4_with_options(
+            &system,
+            order,
+            &F4Options {
+                certify: true,
+                ..F4Options::default()
+            },
+        )
+        .expect("certifies");
+        let budgeted = f4_with_options(
+            &system,
+            order,
+            &F4Options {
+                certify: true,
+                max_certify_time: Some(Duration::from_secs(3600)),
+                max_wall_time: Some(Duration::from_secs(3600)),
+                ..F4Options::default()
+            },
+        )
+        .expect("an hour is ample for both clocks");
+        assert_eq!(budgeted.0, unbudgeted.0);
+        let report = budgeted.1.certification.expect("certify was on");
+        assert!(report.is_complete());
+        assert_eq!(
+            report.s_polynomials_checked,
+            unbudgeted
+                .1
+                .certification
+                .expect("certify was on")
+                .s_polynomials_checked
+        );
+    }
+    check::<Zp2147483647>();
+    check::<Zp541>();
+}

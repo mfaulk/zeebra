@@ -768,7 +768,19 @@ pub struct F4Options {
     /// rather than an inference from the strategy having run — and whenever a measurement needs
     /// §8.5's total-including-the-check figure. A failed check is
     /// [`F4Error::CertificationFailed`], never a returned basis.
+    ///
+    /// [`Self::max_wall_time`] does not bound the check; [`Self::max_certify_time`] does.
     pub certify: bool,
+
+    /// The most wall time [`Self::certify`]'s check may take, or `None` for no limit.
+    ///
+    /// The certificate's own budget, separate from [`Self::max_wall_time`]: its clock starts when
+    /// the check does, so verification time is never charged to the computation's budget, nor the
+    /// computation's to the check's. Checked before every normal form on every worker, so a stop
+    /// overshoots by at most one reduction per worker. Running out is
+    /// [`F4Error::CertificationTimeBudgetExceeded`], which carries how far the check got and is
+    /// never a rejection. Ignored unless [`Self::certify`] is set.
+    pub max_certify_time: Option<Duration>,
 
     /// In what order the pairs of one degree are taken. See [`PairSchedule`].
     ///
@@ -916,6 +928,7 @@ impl F4Options {
             schedule: PairSchedule::DegreeThenLcm,
             hilbert: HilbertSelection::Off,
             certify: false,
+            max_certify_time: None,
             reducer_cache: CacheMode::Off,
             measure_stages: false,
             measure_divmask: false,
@@ -1141,7 +1154,8 @@ pub enum StopKind {
     /// basis elements. Reproducible, and rankable against another resource stop.
     Resource,
 
-    /// [`F4Options::max_wall_time`] elapsed. **Never rankable against a [`Self::Resource`] stop.**
+    /// [`F4Options::max_wall_time`] or [`F4Options::max_certify_time`] elapsed. **Never rankable
+    /// against a [`Self::Resource`] stop.**
     Time,
 
     /// Invalid options or an explicit observer stop, rather than a resource outcome.
@@ -1264,6 +1278,17 @@ pub enum F4Error {
     /// discards a critical pair on heuristic grounds. It is wired up because a correctness claim
     /// that cannot fail is not a check.
     CertificationFailed { reason: &'static str },
+
+    /// [`F4Options::max_certify_time`] elapsed before the check reached a verdict.
+    ///
+    /// **Not a rejection**, and deliberately not [`Self::CertificationFailed`]: the basis was
+    /// computed and may well be correct; the check that would establish it ran out of time.
+    /// [`Self::stop_kind`] reports [`StopKind::Time`]. `progress` says which check was running and
+    /// the prefix of each that was verified. The basis is not returned, because returning it would
+    /// claim an established result the check did not establish.
+    CertificationTimeBudgetExceeded {
+        progress: super::certify::CertificationStopped,
+    },
 }
 
 impl F4Error {
@@ -1279,9 +1304,9 @@ impl F4Error {
             | Self::TooManyLiveBytes { .. }
             | Self::TooManyBatches { .. }
             | Self::TooManyBasisElements { .. } => StopKind::Resource,
-            Self::TimeBudgetExceeded { .. } | Self::InterreductionTimeBudgetExceeded { .. } => {
-                StopKind::Time
-            }
+            Self::TimeBudgetExceeded { .. }
+            | Self::InterreductionTimeBudgetExceeded { .. }
+            | Self::CertificationTimeBudgetExceeded { .. } => StopKind::Time,
             Self::InvalidOptions { .. } | Self::StoppedByObserver => StopKind::Caller,
             Self::CertificationFailed { .. } => StopKind::Certification,
         }
@@ -1305,6 +1330,7 @@ impl F4Error {
             Self::InvalidOptions { .. } => "invalid_options",
             Self::StoppedByObserver => "observer",
             Self::CertificationFailed { .. } => "certification",
+            Self::CertificationTimeBudgetExceeded { .. } => "max_certify_time",
         }
     }
 }
@@ -1368,6 +1394,18 @@ impl Display for F4Error {
                 f,
                 "the computed basis failed its independent check: {}",
                 reason
+            ),
+            Self::CertificationTimeBudgetExceeded { progress } => write!(
+                f,
+                "certification ran {} ms against its {} ms budget without a verdict, during {:?} \
+                 ({} of {} generators, {} of {} S-polynomials verified)",
+                progress.elapsed.as_millis(),
+                progress.budget.as_millis(),
+                progress.stage,
+                progress.generators_checked,
+                progress.generators,
+                progress.s_polynomials_checked,
+                progress.s_polynomials
             ),
         }
     }

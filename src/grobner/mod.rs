@@ -32,10 +32,11 @@ pub use buchberger::{
     leading_monomials_are_pairwise_coprime, Statistics,
 };
 pub use f4::{
-    certify_f4_output, certify_f4_output_with_workers, certify_submitted_basis,
-    certify_submitted_basis_with_witnesses, f4, f4_observed, f4_observed_reported, f4_reported,
-    f4_with_options, trace_batches, verify_ideal_membership, Allowance, BatchObserver, BatchOrder,
-    BudgetApproach, BudgetLine, BudgetReport, CacheMode, CertificationReport, ConstructionTimings,
+    certify_f4_output, certify_f4_output_with_workers, certify_f4_output_within,
+    certify_submitted_basis, certify_submitted_basis_with_witnesses, f4, f4_observed,
+    f4_observed_reported, f4_reported, f4_with_options, trace_batches, verify_ideal_membership,
+    Allowance, BatchObserver, BatchOrder, BudgetApproach, BudgetLine, BudgetReport, CacheMode,
+    CertificationReport, CertificationStage, CertificationStopped, ConstructionTimings,
     DegreeProfile, DegreeStatistics, DivmaskCalibration, F4Error, F4Options, F4Statistics,
     Gf2Elimination, HilbertCounts, HilbertSelection, InterreductionRoute, MatrixInterreduction,
     MatrixRefusal, MembershipLimits, MembershipStatus, PairMultiples, ParallelForward,
