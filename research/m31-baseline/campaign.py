@@ -91,7 +91,10 @@ def run_one(bins, row, arm):
                               str(CAP_S + 30), *argv],
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     guard = subprocess.Popen(['bash', str(ROOT / 'tools/rss-guard.sh'), comm, row.split('/')[-1],
-                              str(RSS_KB), '--poll', '0.2', '--signal', 'INT'],
+                              # Integer seconds only: a fractional poll is an arithmetic error in
+                              # the guard, which then exits 1 having guarded nothing (the walls
+                              # session's records show it).
+                              str(RSS_KB), '--poll', '1', '--wait', '3', '--signal', 'INT'],
                              stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     stdout, stderr = child.communicate()
     wall = time.perf_counter_ns() - started
@@ -100,6 +103,7 @@ def run_one(bins, row, arm):
     except subprocess.TimeoutExpired:
         guard.kill()
         guard_rc = 'hung'
+    guard_err = guard.stderr.read()[-500:]
     sampler.stop.set()
     sampler.join()
     after = costmodel.snapshot(cpus)
@@ -107,7 +111,7 @@ def run_one(bins, row, arm):
         report = json.loads(stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):
         report = None
-    return dict(cpus=cpus, process_wall_ns=wall, returncode=child.returncode, rss_guard_rc=guard_rc,
+    return dict(cpus=cpus, process_wall_ns=wall, returncode=child.returncode, rss_guard_rc=guard_rc, rss_guard_stderr=guard_err,
                 before=before, after=after, freq=costmodel.summarize_freq(sampler.samples),
                 report=report, stderr=stderr[-2000:])
 
