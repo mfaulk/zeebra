@@ -316,3 +316,27 @@ the serial closure. The existing exact-equality tests (`test_parallel_interning_
 | peak RSS ≤1.15× | **met**: 1.000–1.130× (serial merge, paired medians; worst single repetition 1.137×) |
 | identical deterministic output | met: every run identical |
 | budget and cancellation | row budget met; scratch charged to `max_live_nonzeros` and wall-time cancellation are #872 |
+
+## 10. Live-entry budget and cancellation (#872, 2026-11-17)
+
+No timing or memory figures; behaviour only.
+
+- **Budget.** The parallel closure charges its step scratch to the configured live-entry allowance
+  (`F4Options::live_entry_allowance`, entries of `F`), measured by capacity in bytes and rounded up
+  to whole entries. The charge is taken before every scan and after every growth, so a step whose
+  scratch would not fit is refused before it runs, with the same error a matrix over the budget
+  gets (`TooManyNonzeros` or `TooManyLiveBytes`, whichever budget binds). Nothing is charged after
+  the call returns. Under the default `Retain::Batch` the scratch is freed before the batch's
+  matrix is built and never coexists with it, so the scratch is charged on its own, not added to
+  the matrix peak. A budget between the shipping peak and the shipping peak plus the scratch
+  therefore trips the parallel path exactly when the scratch alone exceeds it. The live test
+  chooses a fixture where it does.
+- **Cancellation.** Two stops are checked at every step boundary, before a step's scan: the
+  observer's `should_stop` and `max_wall_time`. The wall-time check uses the batch loop's own
+  clock, armed under the loop's rule that one batch is always reduced. A stop requested before a
+  step returns after exactly the steps before it, with no partial result. The serial closure has
+  no stop inside the symbolic stage; it is checked between batches and after construction.
+
+| Criterion (plan §9.4) | Status after #872 |
+|---|---|
+| budget and cancellation | row budget, live-entry budget and step-boundary stops tested (`test_parallel_interning_charges_its_scratch_to_the_live_entry_budget`, `test_live_interning_trips_a_live_budget_the_shipping_path_meets`, `test_parallel_interning_stops_at_a_step_boundary`, `test_live_interning_honors_an_observer_stop_at_the_first_step`) |

@@ -4308,7 +4308,7 @@ fn test_interning_scratch_is_not_reallocated_after_warm_up() {
         observer::trace_batches,
         symbolic::symbolic_preprocessing_seeded,
         symbolic_intern::{
-            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Merge, Retain,
+            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Limits, Merge, Retain,
         },
         PairMultiples,
     };
@@ -4340,6 +4340,7 @@ fn test_interning_scratch_is_not_reallocated_after_warm_up() {
                     PairMultiples::Distinct,
                     &config,
                     scratch,
+                    &Limits::none(),
                 );
                 let reference = symbolic_preprocessing_seeded(
                     &batch.basis,
@@ -4349,7 +4350,7 @@ fn test_interning_scratch_is_not_reallocated_after_warm_up() {
                     &mut ReducerCache::disabled(),
                     PairMultiples::Distinct,
                 );
-                assert_eq!(got, reference, "{merge_and_retain:?}");
+                assert_eq!(got.ok(), reference.ok(), "{merge_and_retain:?}");
             }
         };
         pass(&mut scratch);
@@ -4381,6 +4382,236 @@ fn test_interning_scratch_is_not_reallocated_after_warm_up() {
             "{merge_and_retain:?}: buffers outlived the batch"
         );
     }
+}
+
+/// #872: the parallel closure refuses a live-entry allowance one entry below the scratch it
+/// charged, and with exactly that allowance returns the serial closure's result.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_parallel_interning_charges_its_scratch_to_the_live_entry_budget() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic::symbolic_preprocessing_seeded,
+        symbolic_intern::{
+            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Limits, Merge,
+            Refusal, Retain,
+        },
+        PairMultiples,
+    };
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&katsura::<6, G>(), order, &options).expect("within limits");
+    let config = InternConfig {
+        workers: 4,
+        merge: Merge::Serial,
+        min_frontier: 0,
+        slices_per_worker: 2,
+        min_seed_rows: 0,
+        retain: Retain::Batch,
+    };
+    let run = |batch: &crate::grobner::f4::observer::TracedBatch<6, G>, allowance| {
+        symbolic_preprocessing_interned_in(
+            &batch.basis,
+            &batch.pairs,
+            usize::MAX,
+            options.reducer_selection,
+            PairMultiples::Distinct,
+            &config,
+            &mut InternScratch::new(),
+            &Limits {
+                entry_allowance: allowance,
+                bytes_per_entry: F4Options::bytes_per_entry::<G>(),
+                stop: &|| false,
+            },
+        )
+    };
+    let mut charged_batches = 0;
+    for (index, batch) in trace.batches().iter().enumerate() {
+        let (_, report) = run(batch, usize::MAX);
+        let charged = report.charged_entries;
+        if report.serial_fallback {
+            continue;
+        }
+        assert!(
+            charged > 0,
+            "batch {index}: a dispatched closure charged nothing"
+        );
+        charged_batches += 1;
+        let (refused, _) = run(batch, charged - 1);
+        assert_eq!(
+            refused.unwrap_err(),
+            Refusal::LiveEntries { entries: charged },
+            "batch {index}"
+        );
+        let (admitted, _) = run(batch, charged);
+        let reference = symbolic_preprocessing_seeded(
+            &batch.basis,
+            &batch.pairs,
+            usize::MAX,
+            options.reducer_selection,
+            &mut ReducerCache::disabled(),
+            PairMultiples::Distinct,
+        );
+        assert_eq!(admitted.ok(), reference.ok(), "batch {index}");
+    }
+    assert!(charged_batches > 0, "no batch reached the parallel closure");
+}
+
+/// #872: live F4 under a live-entry budget the shipping path meets, but below the interning
+/// scratch, refuses with the entry-budget error; a budget covering both returns the shipping
+/// basis.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_live_interning_trips_a_live_budget_the_shipping_path_meets() {
+    use crate::grobner::f4::symbolic_intern::{with_live, InternConfig, Merge, Retain};
+    type G = Zp2147483647;
+    let system = katsura::<6, G>();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let config = InternConfig {
+        workers: 16,
+        merge: Merge::Serial,
+        min_frontier: 0,
+        slices_per_worker: 4,
+        min_seed_rows: 0,
+        retain: Retain::Batch,
+    };
+    let (shipping, stats) = super::f4_reported(&system, order, &F4Options::default());
+    let shipping = shipping.unwrap();
+    let peak = stats.max_live_nonzeros;
+    let ((_, _), report) = with_live(config, || {
+        super::f4_reported(&system, order, &F4Options::default())
+    });
+    let charged = report.charged_entries;
+    assert!(
+        charged > peak,
+        "the fixture needs scratch ({charged}) above the shipping peak ({peak})"
+    );
+    let between = F4Options::default().with_live_entries::<G>(peak.max(charged - 1));
+    let (ship, _) = super::f4_reported(&system, order, &between);
+    assert_eq!(
+        ship.unwrap(),
+        shipping,
+        "the shipping path meets the budget"
+    );
+    let ((tripped, _), _) = with_live(config, || super::f4_reported(&system, order, &between));
+    assert_eq!(
+        tripped.unwrap_err(),
+        between.entry_budget_error::<G>(charged)
+    );
+    let both = F4Options::default().with_live_entries::<G>(charged.max(peak));
+    let ((admitted, _), _) = with_live(config, || super::f4_reported(&system, order, &both));
+    assert_eq!(admitted.unwrap(), shipping);
+}
+
+/// #872: a stop requested before a step returns from the parallel closure at that step
+/// boundary, having run exactly the steps before it.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_parallel_interning_stops_at_a_step_boundary() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic_intern::{
+            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Limits, Merge,
+            Refusal, Retain,
+        },
+        PairMultiples,
+    };
+    use std::cell::Cell;
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&katsura::<6, G>(), order, &options).expect("within limits");
+    let config = InternConfig {
+        workers: 4,
+        merge: Merge::Serial,
+        min_frontier: 0,
+        slices_per_worker: 2,
+        min_seed_rows: 0,
+        retain: Retain::Batch,
+    };
+    let batch = trace
+        .batches()
+        .iter()
+        .max_by_key(|b| b.pairs.len())
+        .expect("batches");
+    let run = |stop_at: usize| {
+        let checks = Cell::new(0);
+        let stop = || {
+            checks.set(checks.get() + 1);
+            checks.get() > stop_at
+        };
+        symbolic_preprocessing_interned_in(
+            &batch.basis,
+            &batch.pairs,
+            usize::MAX,
+            options.reducer_selection,
+            PairMultiples::Distinct,
+            &config,
+            &mut InternScratch::new(),
+            &Limits {
+                entry_allowance: usize::MAX,
+                bytes_per_entry: F4Options::bytes_per_entry::<G>(),
+                stop: &stop,
+            },
+        )
+    };
+    let (complete, full) = run(usize::MAX);
+    assert!(complete.is_ok() && full.steps > 2);
+    for stop_at in [0, 1, full.steps / 2] {
+        let (stopped, report) = run(stop_at);
+        assert_eq!(stopped.unwrap_err(), Refusal::Stopped, "stop at {stop_at}");
+        assert_eq!(
+            report.steps, stop_at,
+            "steps run before stopping at {stop_at}"
+        );
+    }
+}
+
+/// #872: live F4 with an observer that asks to stop returns `StoppedByObserver` from the first
+/// step boundary of the first parallel batch, before any matrix is built.
+#[cfg(feature = "research-work")]
+#[test]
+fn test_live_interning_honors_an_observer_stop_at_the_first_step() {
+    use crate::grobner::f4::{
+        observer::BatchObserver,
+        symbolic_intern::{with_live, InternConfig, Merge, Retain},
+        MacaulayMatrix, MonicBasis,
+    };
+    use crate::grobner::CriticalPair;
+    type G = Zp2147483647;
+    struct Stop {
+        matrices: usize,
+    }
+    impl BatchObserver<6, G> for Stop {
+        fn batch(&mut self, _: &MonicBasis<6, G>, _: &[CriticalPair<6>]) {}
+        fn matrix(&mut self, _: &MacaulayMatrix<6, G>) {
+            self.matrices += 1;
+        }
+        fn should_stop(&self) -> bool {
+            true
+        }
+    }
+    let config = InternConfig {
+        workers: 4,
+        merge: Merge::Serial,
+        min_frontier: 0,
+        slices_per_worker: 2,
+        min_seed_rows: 0,
+        retain: Retain::Batch,
+    };
+    let mut observer = Stop { matrices: 0 };
+    let (result, report) = with_live(config, || {
+        crate::grobner::f4::f4_observed(
+            &katsura::<6, G>(),
+            MonomialOrder::GradedReverseLexicographic,
+            &F4Options::default(),
+            &mut observer,
+        )
+    });
+    assert_eq!(result.unwrap_err(), F4Error::StoppedByObserver);
+    assert_eq!(observer.matrices, 0, "a matrix was built after the stop");
+    assert_eq!(report.steps, 0, "a step ran after the stop");
 }
 
 /// #860: live F4 with either interning prototype in force returns the shipping basis and the
