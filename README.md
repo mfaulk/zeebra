@@ -105,6 +105,7 @@ Every Rust example in this file and in [`docs/guide/`](docs/guide) is compiled a
 | `research-work` | off | Research counters and opt-in experiments. Shipping defaults are unaffected. |
 | `research-multirow` | off | Research-only four-row band elimination ([#715](docs/research/multirow-reuse.md)), selected per thread; single-row stays the default even when enabled. |
 | `research-sigf4` | off | Research-only signature-compatible F4 (`grobner::sigf4::sig_f4`, [#857](docs/research/m30-sigf4-prototype.md)), a separate engine for graded orders; the shipping `f4` never calls it. Implies `external-runners`. |
+| `research-sigf4-replay` | off | #902's replay of the signature engine's cross-target cascade (`grobner::sigf4::replay`, `sig_f4_study --replay`; [findings](docs/research/m31-parallel-signature-elimination.md)). Observes only. Implies `research-sigf4`. |
 
 ## How Zeebra relates to existing systems
 
