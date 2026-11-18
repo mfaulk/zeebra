@@ -22,7 +22,13 @@
 //! cargo run --release --example block_density -- large # the explicit large captures
 //! cargo run --release --example block_density -- split mq-random-10        # timed, see below
 //! cargo run --release --features research-work --example block_density -- split-large mq-random-14
+//! cargo run --release --features research-work --example block_density -- residual-work mq-random-10
 //! ```
+//!
+//! `residual-work` (#86) is untimed: it counts the coefficient products and dense-row cell traffic
+//! of the shipped backend's echelon and back-substitution of `D'` alone, beside the sweep's exact
+//! count and the dense model's, so a dense kernel's arithmetic intensity comes from measured work.
+//! `residual-work-large` walks the large captures.
 //!
 //! `split` is the one timed mode (#803), and its figures need the benchmark lock. It asks whether a
 //! device that did the residual's echelon for free could halve a batch: the CPU would still owe the
@@ -306,6 +312,8 @@ const REPS: usize = 5;
 struct Split {
     filter: String,
     matched: usize,
+    /// `residual-work`: count the work of `D'` and skip every timed arm.
+    counts_only: bool,
 }
 
 fn median_range(samples: &mut [Duration]) -> (f64, f64, f64) {
@@ -329,6 +337,10 @@ impl CorpusVisitor for Split {
         }
         self.matched += 1;
         let options = spec.options.options();
+        if self.counts_only {
+            residual_work(spec, captured, options.elimination);
+            return;
+        }
         let plan = match options.reduction {
             ReductionStrategy::Unstructured => BlockPlan::Baseline,
             ReductionStrategy::Structured => BlockPlan::ReducersFirstBlock,
@@ -637,11 +649,90 @@ fn products<const N: usize, F: FiniteField>(
 ) {
 }
 
-fn split(large: bool, filter: String) {
-    println!("{REPS} interleaved repetitions per arm; medians [min, max] in ms.\n");
-    println!("| entry | rows x cols | backend | production batch | full RREF | forward only | reference sweep | echelon of D' | Faugère–Lachartre order | sweep multiply-adds |");
-    println!("|---|---|---|---:|---:|---:|---:|---:|---:|---:|");
-    let mut visitor = Split { filter, matched: 0 };
+/// Exact work of the shipped backend on `D'` alone: its echelon, then its back-substitution.
+#[cfg(feature = "research-work")]
+fn residual_work<const N: usize, F: FiniteField>(
+    spec: &MatrixSpec,
+    captured: &CapturedMatrix<N, F>,
+    backend: Backend,
+) {
+    let matrix = captured.matrix.matrix();
+    let mut reducers: Vec<&SparseRow<F>> = Vec::new();
+    let mut pairs: Vec<&SparseRow<F>> = Vec::new();
+    for (row, origin) in matrix.rows().iter().zip(captured.matrix.row_origins()) {
+        match origin.kind {
+            RowKind::Reducer => reducers.push(row),
+            RowKind::PairComponent { .. } => pairs.push(row),
+        }
+    }
+    reducers.sort_by_key(|row| row.leading_column());
+    let (rows, free, sweep_products) = residual(&reducers, &pairs, matrix.num_columns());
+    let residual_rows = rows.len();
+    let residual_entries: usize = rows.iter().map(SparseRow::nonzeros).sum();
+    let mut block = SparseMatrix::new(free, rows);
+    let (mut statistics, echelon) = zeebra::linalg::work::measure(|| {
+        row_echelon_with(backend, &mut block, usize::MAX)
+            .expect("an unbounded echelon cannot refuse")
+    });
+    let rank = statistics.rank;
+    let (_, back) = zeebra::linalg::work::measure(|| {
+        back_substitute_pivots_within(&mut block, usize::MAX, &mut statistics)
+            .expect("an unbounded pass cannot refuse")
+    });
+    let total = |report: &zeebra::linalg::work::WorkReport| {
+        let mut phase = report.outside_batch.forward;
+        phase.accumulate(&report.outside_batch.backward);
+        for batch in &report.batches {
+            phase.accumulate(&batch.forward);
+            phase.accumulate(&batch.backward);
+        }
+        phase
+    };
+    let (echelon, back) = (total(&echelon), total(&back));
+    println!(
+        "| {} | {:?} | {} x {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+        spec.label,
+        backend,
+        residual_rows,
+        free,
+        residual_entries,
+        rank,
+        sweep_products,
+        dense_echelon_work(residual_rows, free, rank),
+        echelon.coefficient_products,
+        echelon.dense_load_entries,
+        echelon.dense_scan_cells,
+        echelon.dense_gather_cells,
+        back.coefficient_products,
+        std::mem::size_of::<F>(),
+    );
+}
+
+#[cfg(not(feature = "research-work"))]
+fn residual_work<const N: usize, F: FiniteField>(
+    _spec: &MatrixSpec,
+    _captured: &CapturedMatrix<N, F>,
+    _backend: Backend,
+) {
+    eprintln!("residual-work counts need --features research-work");
+    std::process::exit(64);
+}
+
+fn split(large: bool, filter: String, counts_only: bool) {
+    if counts_only {
+        println!("Exact counts; nothing is timed. Products are coefficient multiply-adds.\n");
+        println!("| entry | backend | D' rows x cols | D' entries | rank | sweep products | dense-model echelon products | shipped echelon products | echelon dense loads | echelon scan cells | echelon gather cells | back-substitution products | cell bytes |");
+        println!("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+    } else {
+        println!("{REPS} interleaved repetitions per arm; medians [min, max] in ms.\n");
+        println!("| entry | rows x cols | backend | production batch | full RREF | forward only | reference sweep | echelon of D' | Faugère–Lachartre order | sweep multiply-adds |");
+        println!("|---|---|---|---:|---:|---:|---:|---:|---:|---:|");
+    }
+    let mut visitor = Split {
+        filter,
+        matched: 0,
+        counts_only,
+    };
     let walked = if large {
         walk_large_corpus(&mut visitor)
     } else {
@@ -663,12 +754,18 @@ fn pct(value: f64) -> String {
 
 fn main() {
     let mode = std::env::args().nth(1);
-    if let Some(large) = match mode.as_deref() {
-        Some("split") => Some(false),
-        Some("split-large") => Some(true),
+    if let Some((large, counts_only)) = match mode.as_deref() {
+        Some("split") => Some((false, false)),
+        Some("split-large") => Some((true, false)),
+        Some("residual-work") => Some((false, true)),
+        Some("residual-work-large") => Some((true, true)),
         _ => None,
     } {
-        split(large, std::env::args().nth(2).unwrap_or_default());
+        split(
+            large,
+            std::env::args().nth(2).unwrap_or_default(),
+            counts_only,
+        );
         return;
     }
     let large = mode.as_deref() == Some("large");
