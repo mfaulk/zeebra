@@ -4938,7 +4938,7 @@ fn test_parallel_symbolic_closure_matches_the_serial_closure_at_every_worker_cou
             let reference = serial(usize::MAX).unwrap();
             for max_rows in [usize::MAX, reference.rows.len() / 2] {
                 for workers in [1, 4, 8, 16] {
-                    for min_frontier in [0, ParallelSymbolic::MIN_FRONTIER, usize::MAX] {
+                    for min_frontier in [0, ParallelSymbolic::min_frontier(workers), usize::MAX] {
                         let config = InternConfig {
                             workers,
                             merge: Merge::Serial,
@@ -5036,9 +5036,17 @@ fn test_parallel_symbolic_configuration_selects_the_serial_fallback() {
     let config = configured(&with(ParallelSymbolic::Auto { max_workers: 16 })).unwrap();
     assert_eq!(config.workers, 16);
     assert_eq!(config.merge, Merge::Serial);
-    // 512, not #860's 256: one 256-wide Katsura-7 step cost 1.18x at 16 workers (#861).
-    assert_eq!(config.min_frontier, 512);
+    // Not #860's 256: one 256-wide Katsura-7 step cost 1.18x at 16 workers, and a team of 16 needs
+    // 768, because a 512-wide Katsura-8 step still cost it 1.06x (#861). Smaller teams start at 512.
+    assert_eq!(config.min_frontier, 768);
     assert_eq!(config.retain, Retain::Batch);
+    for (workers, frontier) in [(2, 512), (4, 512), (8, 512), (32, 1536)] {
+        let config = configured(&with(ParallelSymbolic::Auto {
+            max_workers: workers,
+        }))
+        .unwrap();
+        assert_eq!(config.min_frontier, frontier, "{workers} workers");
+    }
     assert_eq!(
         ParallelSymbolic::Auto { max_workers: 0 }.workers(),
         available_parallelism()
@@ -5046,6 +5054,10 @@ fn test_parallel_symbolic_configuration_selects_the_serial_fallback() {
     assert_eq!(
         F4Options::baseline().parallel_symbolic,
         ParallelSymbolic::Serial
+    );
+    assert_eq!(
+        F4Options::default().parallel_symbolic,
+        ParallelSymbolic::Auto { max_workers: 16 }
     );
 }
 
@@ -5057,7 +5069,7 @@ fn test_parallel_symbolic_f4_is_identical_to_serial_across_worker_counts() {
     use crate::grobner::f4::{symbolic::CacheMode, ParallelSymbolic};
     type G = Zp2147483647;
     let order = MonomialOrder::GradedReverseLexicographic;
-    // Katsura-8 has steps past `ParallelSymbolic::MIN_FRONTIER`, so the team runs.
+    // Katsura-8 has 512-wide steps, so a team of 4 or 8 runs (16 needs 768 and stays serial).
     for system in [katsura::<8, G>()] {
         let serial = F4Options {
             parallel_symbolic: ParallelSymbolic::Serial,

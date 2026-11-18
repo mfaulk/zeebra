@@ -1622,7 +1622,7 @@ pub(crate) fn configured(options: &super::F4Options) -> Option<InternConfig> {
     (workers > 1).then_some(InternConfig {
         workers,
         merge: Merge::Serial,
-        min_frontier: ParallelSymbolic::MIN_FRONTIER,
+        min_frontier: ParallelSymbolic::min_frontier(workers),
         slices_per_worker: ParallelSymbolic::SLICES_PER_WORKER,
         min_seed_rows: 0,
         retain: Retain::Batch,
@@ -1634,7 +1634,8 @@ pub(crate) fn configured(options: &super::F4Options) -> Option<InternConfig> {
 /// be shared across threads; `None` sends the caller down the serial closure.
 ///
 /// Beyond the row budget the closure is held to `options`' live-entry allowance, its scratch
-/// charged as entries of `F`, and stopped at a step boundary by `observer_stop` (as
+/// charged as entries of `F`: a batch whose scratch would not fit takes the serial closure (a
+/// research override refuses it instead). It is stopped at a step boundary by `observer_stop` (as
 /// [`F4Error::StoppedByObserver`]) or by the armed wall-time budget (as
 /// [`F4Error::TimeBudgetExceeded`]).
 ///
@@ -1680,6 +1681,17 @@ pub(crate) fn live<const N: usize, F: FiniteField>(
     if let Some((config, mut total)) = research {
         accumulate(&mut total, &_report);
         LIVE.set(Some((config, total)));
+    }
+    // Under the shipped option a batch whose scratch does not fit the allowance takes the serial
+    // closure, as a forward-elimination reservation that does not fit runs serially (#752): the
+    // parallel path never refuses what the serial path admits. A research override refuses, so
+    // the #872 charge stays observable.
+    #[cfg(feature = "research-work")]
+    let overridden = research.is_some();
+    #[cfg(not(feature = "research-work"))]
+    let overridden = false;
+    if !overridden && matches!(result, Err(Refusal::LiveEntries { .. })) {
+        return None;
     }
     let millis = |d: Duration| d.as_millis().min(u128::from(u64::MAX)) as u64;
     Some(result.map_err(|refusal| match refusal {
