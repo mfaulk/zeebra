@@ -389,4 +389,14 @@ mod tests {
         assert_eq!(auto.workers(10_000, usize::MAX / 2), 4);
         assert!(ParallelForward::Auto { max_workers: 0 }.workers(10_000, usize::MAX / 2) >= 1);
     }
+
+    /// `max_workers` is the largest count any batch shape can get, and never zero.
+    #[test]
+    fn max_workers_bounds_every_batch() {
+        assert_eq!(ParallelForward::Serial.max_workers(), 1);
+        assert_eq!(ParallelForward::Forced { workers: 8 }.max_workers(), 8);
+        assert_eq!(ParallelForward::Forced { workers: 0 }.max_workers(), 1);
+        assert_eq!(ParallelForward::Auto { max_workers: 4 }.max_workers(), 4);
+        assert!(ParallelForward::Auto { max_workers: 0 }.max_workers() >= 1);
+    }
 }

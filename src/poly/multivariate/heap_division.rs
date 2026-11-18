@@ -231,10 +231,19 @@ pub(super) fn normal_form<const N: usize, F: FiniteField>(
         .filter(|d| !d.is_zero())
         .map(|d| Reducer::new(d, order))
         .collect();
+    normal_form_by(dividend, &reducers, order)
+}
+
+/// [`normal_form`] against reducers already built.
+pub(super) fn normal_form_by<const N: usize, F: FiniteField>(
+    dividend: &SparseMultiPoly<N, F>,
+    reducers: &[Reducer<N, F>],
+    order: MonomialOrder,
+) -> SparseMultiPoly<N, F> {
     if reducers.is_empty() {
         return dividend.clone();
     }
-    SparseMultiPoly::new(&divide(dividend, &reducers, order, |_, _, _| {}))
+    SparseMultiPoly::new(&divide(dividend, reducers, order, |_, _, _| {}))
 }
 
 pub(super) fn multi_div_rem<const N: usize, F: FiniteField>(
@@ -275,7 +284,7 @@ mod tests {
         fields::{Gf256, PrimeFieldElement64, Zp18446744069414584321},
         poly::{
             multivariate::sparse_multivariate_polynomial::SparseMultiPoly, DivisionRoute,
-            MonomialOrder,
+            MonomialOrder, PreparedDivisors,
         },
         FiniteField, Monomial, MultivariatePolynomial,
     };
@@ -325,6 +334,17 @@ mod tests {
                         "normal_form under {}",
                         order.name()
                     );
+                    // Divisors prepared once reduce to the same remainder on either route.
+                    let prepared = PreparedDivisors::new(&divisors, order);
+                    for route in [DivisionRoute::Merge, DivisionRoute::Heap] {
+                        prop_assert_eq!(
+                            prepared.normal_form(&dividend, route),
+                            dividend.normal_form(&divisors, order),
+                            "prepared {:?} under {}",
+                            route,
+                            order.name()
+                        );
+                    }
                     if divisors.iter().any(|d| !d.is_zero()) {
                         prop_assert_eq!(
                             dividend.multi_div_rem_with(&divisors, order, DivisionRoute::Heap),

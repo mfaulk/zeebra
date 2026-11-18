@@ -30,6 +30,7 @@ pub use sparse_multivariate_multiply::{
     multivariate_multiply_route_unstable, MultiplyRoute,
 };
 pub use sparse_multivariate_polynomial::SparseMultiPoly as MultivariatePolynomial;
+pub(crate) use sparse_multivariate_polynomial_arithmetic::PreparedDivisors;
 pub use sparse_multivariate_polynomial_arithmetic::{
     CrossCallRepeats, DivisionRoute, NormalFormCounts, NormalFormError,
 };
