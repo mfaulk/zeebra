@@ -257,7 +257,8 @@ route, and its per-degree `tail_reduce` is `RowForm::Reduced` (#477).
 - No earlier study records it in msolve or Groebner.jl.
 
 It changes the rows symbolic preprocessing selects and so the trajectory, and its value is
-instance-dependent. It is filed as #809.
+instance-dependent. It is filed as #809, and was deferred there: see
+[`simplify-reducer-reuse.md`](simplify-reducer-reuse.md).
 
 **OpenF4's GF(2) support: nothing further here.** It stores one `bool` per entry with a per-element
 XOR loop (`include/element-gf2.h:126`; `specialisation-echelonize-gf2.inl:46-53`), weaker than
@@ -311,6 +312,7 @@ The 16-bit delta-coded column index is the only Giac representation idea not alr
 - **#808: tail-only final interreduction against fixed reducers** (Giac, msolve), against the full RREF
   in `interreduce.rs:242`. Expected value is memory on classical families.
 - **#809: Faugère's `Simplify`** (OpenF4). Changes the trajectory; value instance-dependent.
+  Deferred: [`simplify-reducer-reuse.md`](simplify-reducer-reuse.md).
 
 **Inputs to existing work, not new issues:**
 
