@@ -155,6 +155,10 @@ pub struct InternReport {
     pub emit: Duration,
     /// The caller's serial stitching between phases: rows, leads, arena, `term_handles` appends.
     pub stitch: Duration,
+    /// Of the step phases above, the seed step's: interning the seed rows' terms (#888).
+    pub seed_step: Duration,
+    /// Of [`Self::scan`], the steps the caller ran alone, interning as it scanned (#888).
+    pub solo: Duration,
     /// Scratch buffers grown, all on the caller (#871).
     pub growths: usize,
     /// Slice scans repeated after a growth.
@@ -1203,6 +1207,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         let mut prepared = false;
         'steps: loop {
             let level_start = monomials.len();
+            let (step_started, seeding) = (Instant::now(), seed_step);
             let dispatched;
             let solo;
             {
@@ -1293,7 +1298,12 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                 }
                 s.frontier.clear();
                 s.frontier.extend_from_slice(&monomials[level_start..]);
-                report.scan += started.elapsed();
+                let solo_time = started.elapsed();
+                report.scan += solo_time;
+                report.solo += solo_time;
+                if seeding {
+                    report.seed_step += step_started.elapsed();
+                }
                 if rows.len() > max_rows {
                     refused = Some(Refusal::Rows(RowBudgetExceeded { limit: max_rows }));
                     break;
@@ -1488,6 +1498,9 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
             s.frontier.clear();
             s.frontier.extend_from_slice(&monomials[level_start..]);
             report.stitch += stitching.elapsed();
+            if seeding {
+                report.seed_step += step_started.elapsed();
+            }
             if rows.len() > max_rows {
                 refused = Some(Refusal::Rows(RowBudgetExceeded { limit: max_rows }));
                 break;
@@ -1564,6 +1577,8 @@ fn accumulate(total: &mut InternReport, batch: &InternReport) {
     total.merge += batch.merge;
     total.emit += batch.emit;
     total.stitch += batch.stitch;
+    total.seed_step += batch.seed_step;
+    total.solo += batch.solo;
     total.growths += batch.growths;
     total.rescans += batch.rescans;
     total.scratch_bytes = total.scratch_bytes.max(batch.scratch_bytes);

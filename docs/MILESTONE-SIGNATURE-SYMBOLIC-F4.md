@@ -846,7 +846,7 @@ Every attempt below is retained in its evidence directory.
 |---|---|---|
 | #886 | Medium | the library default's `Auto { max_workers: 16 }`, forward and symbolic, does not clamp to `available_parallelism()`; measure what oversubscription costs, then decide |
 | #887 | Medium | Zeebra's own certificate cannot finish Eco-12 in 600 s, and took 606 s on Katsura-11; wide-field verification still rests on grobx certified mode, which needs 32 GiB on Eco-12 |
-| #888 | Medium | symbolic preprocessing after #861: the caller's stitch and the merge walk are the serial remainder; the stage is still 19–21% of MQ10's 16-worker wall, and Cyclic-7 gains nothing |
+| #888 | Medium | symbolic preprocessing after #861: the caller's stitch and the merge walk are the serial remainder; the stage is still 19–21% of MQ10's 16-worker wall, and Cyclic-7 gains nothing. Split by component in [`m30-symbolic-remainder.md`](research/m30-symbolic-remainder.md): stitch and merge walk together are 6.6% of MQ10's F4 call, the seed step and the solo steps are larger, and no target cleared the bar |
 | #889 | Low (`opportunity`) | signature F4 beyond M30: what turning #857's 9.7–22.8× work saving into wall time would take (the cross-target cascade, parallel bookkeeping and interreduction) |
 | #890 | Low | attribute the one-worker drift between `4f5784c5` and `e4826153` (item 15) |
 | #891 | Low | `batch_order_study`, `parallel_forward_study` and `mq10_profile` still inherit the 16-thread symbolic team |
