@@ -5,20 +5,17 @@
 use super::gcd::{partial_bezout_half_with_base_case, HALF_GCD_BASE_CASE};
 use crate::{FiniteField, Polynomial, UnivariatePolynomial};
 
-/// Smallest `n` (half the sequence length) from which [`berlekamp_massey`] takes half-GCD, for a
-/// field element of at most 4 bytes.
-const EUCLID_CROSSOVER_32_BIT: usize = 6144;
-/// As [`EUCLID_CROSSOVER_32_BIT`], for 5 to 8 bytes.
-const EUCLID_CROSSOVER_64_BIT: usize = 3072;
-/// As [`EUCLID_CROSSOVER_32_BIT`], for wider elements.
-const EUCLID_CROSSOVER_WIDE: usize = 1536;
+/// Smallest `n` (half the sequence length) from which [`berlekamp_massey`] takes half-GCD, by
+/// element width: at most 4 bytes, 5 to 8, and wider. The classical recurrence is a dot product
+/// and an axpy per term, so it holds out far longer than classical `partial_bezout` does.
+const EUCLID_CROSSOVER: [usize; 3] = [384, 3072, 1536];
 
 /// The `n` from which [`berlekamp_massey`] takes half-GCD for `F`.
 pub(crate) fn berlekamp_massey_crossover<F: FiniteField>() -> usize {
     match std::mem::size_of::<F>() {
-        0..=4 => EUCLID_CROSSOVER_32_BIT,
-        5..=8 => EUCLID_CROSSOVER_64_BIT,
-        _ => EUCLID_CROSSOVER_WIDE,
+        0..=4 => EUCLID_CROSSOVER[0],
+        5..=8 => EUCLID_CROSSOVER[1],
+        _ => EUCLID_CROSSOVER[2],
     }
 }
 
@@ -26,8 +23,8 @@ pub(crate) fn berlekamp_massey_crossover<F: FiniteField>() -> usize {
 /// nilpotent factors: the `p` of least degree `L` with `sum_i p[i] s[k + i] = 0` for every
 /// `k + L < len`.
 ///
-/// Classical Berlekamp–Massey, or half-GCD once an even-length sequence's half reaches
-/// `berlekamp_massey_crossover`. Both return the same polynomial.
+/// Classical Berlekamp–Massey, or half-GCD once an even-length sequence's half reaches 384, 3072
+/// or 1536 terms for 4-byte, 8-byte or wider elements. Both return the same polynomial.
 pub fn berlekamp_massey<F: FiniteField>(sequence: &[F]) -> Vec<F> {
     if sequence.len().is_multiple_of(2) && sequence.len() / 2 >= berlekamp_massey_crossover::<F>() {
         if let Some(p) = berlekamp_massey_euclid_unstable(sequence) {

@@ -85,14 +85,14 @@ pub fn lcm<F: FiniteField>(
 /// `(x^{2t}, S(x))` with `degree_bound = t`, which yields `Ω` as the remainder and `Λ` as the
 /// cofactor. Rational reconstruction and Padé approximation want the same primitive.
 ///
-/// Classical Euclid, or half-GCD's transition matrix once the sequence spans
-/// `bezout_half_crossover` degrees; both return the same pair.
+/// Classical Euclid, or half-GCD's transition matrix once `min(deg a, deg b) - degree_bound`
+/// reaches 512, 768 or 256 for 4-byte, 8-byte or wider elements; both return the same pair.
 pub fn partial_bezout<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
     degree_bound: u32,
 ) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
-    if bezout_takes_half::<F>(a, b, degree_bound) {
+    if spans(a, b, degree_bound, partial_bezout_half_crossover::<F>()) {
         partial_bezout_half_unstable(a, b, degree_bound)
     } else {
         partial_bezout_classical_unstable(a, b, degree_bound)
@@ -131,33 +131,42 @@ pub(crate) fn partial_bezout_half_with_base_case<F: FiniteField>(
     (cofactor, d)
 }
 
-/// Smallest span, in degrees, from which `partial_bezout` and `xgcd` take half-GCD, for a field
-/// element of at most 4 bytes. Above `gcd`'s, because these routes must build the matrix.
-const BEZOUT_HALF_CROSSOVER_32_BIT: u32 = 6144;
-/// As [`BEZOUT_HALF_CROSSOVER_32_BIT`], for 5 to 8 bytes.
-const BEZOUT_HALF_CROSSOVER_64_BIT: u32 = 3072;
-/// As [`BEZOUT_HALF_CROSSOVER_32_BIT`], for wider elements.
-const BEZOUT_HALF_CROSSOVER_WIDE: u32 = 1536;
+/// The span, in degrees, from which [`partial_bezout`] takes half-GCD, by element width: at
+/// most 4 bytes, 5 to 8, and wider. Far below `gcd`'s, because the classical route this replaces
+/// carries a cofactor row through every step. `docs/research/certified-wiedemann.md`
+/// § Reconstruction has the sweep.
+const PARTIAL_BEZOUT_HALF_CROSSOVER: [u32; 3] = [512, 768, 256];
+/// As [`PARTIAL_BEZOUT_HALF_CROSSOVER`], for [`xgcd`], whose classical route also pays a final
+/// exact division for `u` that the matrix makes unnecessary.
+const XGCD_HALF_CROSSOVER: [u32; 3] = [384, 256, 192];
 
-/// The span from which [`partial_bezout`] and [`xgcd`] take half-GCD for `F`, tiered by element
-/// width as [`half_gcd_crossover`] is.
-pub(crate) fn bezout_half_crossover<F: FiniteField>() -> u32 {
+/// The entry of a width-tiered crossover table for `F`, tiered as [`half_gcd_crossover`] is.
+fn tier<F: FiniteField>(table: [u32; 3]) -> u32 {
     match std::mem::size_of::<F>() {
-        0..=4 => BEZOUT_HALF_CROSSOVER_32_BIT,
-        5..=8 => BEZOUT_HALF_CROSSOVER_64_BIT,
-        _ => BEZOUT_HALF_CROSSOVER_WIDE,
+        0..=4 => table[0],
+        5..=8 => table[1],
+        _ => table[2],
     }
 }
 
-/// Whether the sequence from `(a, b)` down to `degree_bound` spans the crossover: the smaller
+pub(crate) fn partial_bezout_half_crossover<F: FiniteField>() -> u32 {
+    tier::<F>(PARTIAL_BEZOUT_HALF_CROSSOVER)
+}
+
+pub(crate) fn xgcd_half_crossover<F: FiniteField>() -> u32 {
+    tier::<F>(XGCD_HALF_CROSSOVER)
+}
+
+/// Whether the sequence from `(a, b)` down to `degree_bound` spans `crossover`: the smaller
 /// operand's degree above the bound, which is the degree Euclid has to drop.
-fn bezout_takes_half<F: FiniteField>(
+fn spans<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
     degree_bound: u32,
+    crossover: u32,
 ) -> bool {
     let span = signed_degree(a).min(signed_degree(b)) - i64::from(degree_bound);
-    span >= i64::from(bezout_half_crossover::<F>())
+    span >= i64::from(crossover)
 }
 
 /// The monic greatest common divisor of two polynomials together with cofactors witnessing it:
@@ -165,9 +174,10 @@ fn bezout_takes_half<F: FiniteField>(
 ///
 /// Running [`partial_bezout`]'s sequence to completion rather than halting it: the last nonzero
 /// remainder is the gcd, and `degree_bound = 0` is what "run to completion" means, since every
-/// nonzero remainder has degree at least zero. Dispatches as [`partial_bezout`] does.
+/// nonzero remainder has degree at least zero. Half-GCD once the smaller operand reaches degree
+/// 384, 256 or 192 for 4-byte, 8-byte or wider elements, classical Euclid below.
 pub fn xgcd<F: FiniteField>(a: &UnivariatePolynomial<F>, b: &UnivariatePolynomial<F>) -> Xgcd<F> {
-    if bezout_takes_half::<F>(a, b, 0) {
+    if spans(a, b, 0, xgcd_half_crossover::<F>()) {
         xgcd_half_unstable(a, b)
     } else {
         xgcd_classical_unstable(a, b)
@@ -1205,9 +1215,10 @@ mod tests {
         use super::*;
         use crate::fields::{Bn254Fr, KoalaBear, PrimeFieldElement64, Zp18446744069414584321};
         use crate::poly::univariate::gcd::{
-            bezout_half_crossover, partial_bezout_classical_unstable, partial_bezout_half_unstable,
-            partial_bezout_half_with_base_case, signed_degree, xgcd_classical_unstable,
-            xgcd_half_unstable, xgcd_half_with_base_case, HALF_GCD_BASE_CASE,
+            partial_bezout_classical_unstable, partial_bezout_half_crossover,
+            partial_bezout_half_unstable, partial_bezout_half_with_base_case, signed_degree,
+            xgcd_classical_unstable, xgcd_half_crossover, xgcd_half_unstable,
+            xgcd_half_with_base_case, HALF_GCD_BASE_CASE,
         };
         use rand::{prelude::StdRng, SeedableRng};
 
@@ -1365,9 +1376,10 @@ mod tests {
         #[test]
         fn test_bezout_entry_points_agree_across_their_dispatch() {
             type F = Bn254Fr;
-            let crossover = u64::from(bezout_half_crossover::<F>());
-            let mut rng = StdRng::seed_from_u64(0x815_d15);
+            let mut rng = StdRng::seed_from_u64(0x0815_0d15);
+            let crossover = u64::from(xgcd_half_crossover::<F>());
             for degree in [crossover - 1, crossover, crossover + 1] {
+                // `b` sets the smaller degree, which is what the dispatch reads.
                 let a = UnivariatePolynomial::<F>::rand(degree + 3, &mut rng);
                 let b = UnivariatePolynomial::<F>::rand(degree, &mut rng);
                 assert_eq!(
@@ -1375,15 +1387,19 @@ mod tests {
                     xgcd_classical_unstable(&a, &b),
                     "degree {degree}"
                 );
-                let mut power = vec![F::zero(); 2 * degree as usize + 1];
-                power[2 * degree as usize] = F::one();
+            }
+            let crossover = u64::from(partial_bezout_half_crossover::<F>());
+            for span in [crossover - 1, crossover, crossover + 1] {
+                // (x^{2n}, S) halted at n - 1 spans deg S - (n - 1) = n degrees.
+                let mut power = vec![F::zero(); 2 * span as usize + 1];
+                power[2 * span as usize] = F::one();
                 let x_power = UnivariatePolynomial::new(&power);
-                let s = UnivariatePolynomial::<F>::rand(2 * degree - 1, &mut rng);
-                let bound = degree as u32 - 1;
+                let s = UnivariatePolynomial::<F>::rand(2 * span - 1, &mut rng);
+                let bound = span as u32 - 1;
                 assert_eq!(
                     partial_bezout(&x_power, &s, bound),
                     partial_bezout_classical_unstable(&x_power, &s, bound),
-                    "degree {degree}"
+                    "span {span}"
                 );
             }
         }
