@@ -177,6 +177,8 @@ jobs:
           cargo test --features research-multirow --example mq10_profile
           cargo test --features research-sigf4 --lib grobner::sigf4
           cargo test --features research-sigf4 --example sig_f4_study
+          cargo test --features research-sigf4-replay --lib grobner::sigf4::replay
+          cargo test --features research-sigf4-replay --example sig_f4_study
           python3 research/m30-sigf4/test_run.py
           python3 research/m30-sigf4/summarize.py research/m30-sigf4/{gate,controls,gate2,controls2}.jsonl.gz | diff - research/m30-sigf4/tables.md
           python3 research/m30-final/test_campaign.py

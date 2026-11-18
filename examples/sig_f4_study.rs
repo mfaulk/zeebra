@@ -513,6 +513,17 @@ mod tests {
         assert!(args(&["--field", "bn254", "--name", "eco-12", "--engine", "f4"]).is_err());
     }
 
+    // The replay runs both signature designs, so it needs the signature engine and two workers.
+    #[test]
+    fn replay_needs_the_signature_engine_and_two_workers() {
+        let base = [
+            "--field", "wide64", "--name", "eco-12", "--replay", "--engine",
+        ];
+        assert!(args(&[&base[..], &["sigf4", "--workers", "2"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["sigf4"]].concat()).is_err());
+        assert!(args(&[&base[..], &["f4", "--workers", "2"]].concat()).is_err());
+    }
+
     // The shipping F4 arm caps the symbolic team at the worker count, as forward is (#883).
     #[test]
     fn f4_arm_caps_the_symbolic_team() {
