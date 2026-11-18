@@ -787,6 +787,15 @@ fn live<const N: usize, F: FiniteField + Sync>(
         ("scratch_growths", Json::size(report.growths)),
         ("scratch_rescans", Json::size(report.rescans)),
         ("scratch_bytes", Json::size(report.scratch_bytes)),
+        // #888: where the served batches' closure time went, summed over the run.
+        ("spawn_ns", time(report.spawn)),
+        ("seed_ns", time(report.seed)),
+        ("scan_ns", time(report.scan)),
+        ("solo_ns", time(report.solo)),
+        ("merge_ns", time(report.merge)),
+        ("emit_ns", time(report.emit)),
+        ("stitch_ns", time(report.stitch)),
+        ("seed_step_ns", time(report.seed_step)),
     ])
 }
 

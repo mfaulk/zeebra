@@ -5015,6 +5015,54 @@ fn test_parallel_symbolic_without_a_wide_step_starts_no_team_and_holds_no_scratc
     }
 }
 
+/// #888: the report splits out the seed step and the caller-alone steps: all of `scan` is solo when
+/// no step dispatches, none of it when every step does, and the seed step is timed either way.
+#[test]
+fn test_intern_report_times_the_seed_step_and_the_solo_steps() {
+    use crate::grobner::f4::{
+        observer::trace_batches,
+        symbolic_intern::{
+            symbolic_preprocessing_interned_in, InternConfig, InternScratch, Limits, Merge, Retain,
+        },
+        PairMultiples,
+    };
+    use std::time::Duration;
+    type G = Zp2147483647;
+    let options = F4Options::default();
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, _, trace) = trace_batches(&katsura::<6, G>(), order, &options).expect("within limits");
+    for min_frontier in [usize::MAX, 1] {
+        let config = InternConfig {
+            workers: 4,
+            merge: Merge::Serial,
+            min_frontier,
+            slices_per_worker: 4,
+            min_seed_rows: 0,
+            retain: Retain::Batch,
+        };
+        let mut scratch = InternScratch::new();
+        for batch in trace.batches() {
+            let (got, report) = symbolic_preprocessing_interned_in(
+                &batch.basis,
+                &batch.pairs,
+                usize::MAX,
+                options.reducer_selection,
+                PairMultiples::Distinct,
+                &config,
+                &mut scratch,
+                &Limits::none(),
+            );
+            assert!(got.is_ok());
+            assert!(report.seed_step > Duration::ZERO);
+            if min_frontier == usize::MAX {
+                assert_eq!(report.solo, report.scan);
+            } else {
+                assert_eq!(report.solo, Duration::ZERO);
+            }
+        }
+    }
+}
+
 /// #861: `ParallelSymbolic::Serial` and one worker take the serial closure, `Auto` asks for the
 /// serial merge at the shipped threshold, and zero workers means the available parallelism.
 #[test]
