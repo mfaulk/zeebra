@@ -1,0 +1,111 @@
+{
+ "issue": 901,
+ "freeze": {
+  "commit": "acbaf12c840d5ccea52b10388cc850ed6e8a5236",
+  "includes": {
+   "#896": "9f904d08",
+   "#897": "4d8ea30c",
+   "#898": "64363ab0"
+  }
+ },
+ "catalog": "research/wide-corpus/cases.json",
+ "catalog_sha256": "43f42f5eb1b3fc039bdaecd1f1abf67864cacdec4525e7de6e72cddfd0a0f0da",
+ "corpus": [
+  {
+   "field": "wide64",
+   "name": "eco-12",
+   "variables": 12,
+   "sha256": "e9ef0fecf3906d9283e1ce003c4489d6921fb8718f2956c39c4aaa79e52a93cb",
+   "role": "primary (gating)"
+  },
+  {
+   "field": "goldilocks",
+   "name": "katsura-11",
+   "variables": 11,
+   "sha256": "036f0a35884e82d7bc3e3bc930ee9ccbe38fbddfc81e56fa8bf190a05ae1b955",
+   "role": "second family (gating)"
+  },
+  {
+   "field": "wide64",
+   "name": "katsura-11",
+   "variables": 11,
+   "sha256": "c08214c56a6654ab7a376c61df339b2e7cc65a225d027cc3a3fc3bec9876a4a2",
+   "role": "competitive (reported)"
+  },
+  {
+   "field": "goldilocks",
+   "name": "mq-random-11",
+   "variables": 11,
+   "sha256": "ee76de455c5ea571d6e8286152a4b4380b9d1ea323ee63dc8f889ffa11a92af5",
+   "role": "reported"
+  },
+  {
+   "field": "goldilocks",
+   "name": "cyclic-7",
+   "variables": 7,
+   "sha256": "274e9a533b788e6e440803ad61ee44d2e0c691cec045c8c3bd6607ad8c42cb11",
+   "role": "unfavourable control (gating via entry point)"
+  },
+  {
+   "field": "wide64",
+   "name": "cyclic-7",
+   "variables": 7,
+   "sha256": "1da97cb3fe0eff34f224caaa8f029579d5f7252d910b78a3d5021baec41386bc",
+   "role": "unfavourable control (reported)"
+  },
+  {
+   "field": "goldilocks",
+   "name": "katsura-4",
+   "variables": 4,
+   "sha256": "00f08d221047f38741f377f52893d3d561236feecf3bce5f9108d570937f35d3",
+   "role": "small control (gating)"
+  },
+  {
+   "field": "wide64",
+   "name": "katsura-4",
+   "variables": 4,
+   "sha256": "f2670d770ef9a866db0a407dbd1f05827563a9af3bc4485d51a99bb3eef307b6",
+   "role": "small control (gating)"
+  },
+  {
+   "field": "goldilocks",
+   "name": "noon-7",
+   "variables": 7,
+   "sha256": "c146f701505e9d4a0b2ffaec9d0047b85eba1358f885c54196115c14ced7a933",
+   "role": "small control (gating)"
+  }
+ ],
+ "held_out": [
+  {
+   "field": "wide64",
+   "name": "katsura-9",
+   "variables": 9,
+   "sha256": "18eb9c774fc5700cc38e0724dc04af38f34803132a8c20b38f1ad88f5ff749ec",
+   "role": "held out (reported; never used for tuning)"
+  },
+  {
+   "field": "wide64",
+   "name": "noon-8",
+   "variables": 8,
+   "sha256": "403af18521ea58b7846c8cc18d07f9932884a27413953b9c6eac6a23ed090668",
+   "role": "held out (reported; never used for tuning)"
+  },
+  {
+   "field": "wide64",
+   "name": "eco-14",
+   "variables": 14,
+   "sha256": "130bc6948c318399f9be14c4b78b9d8434e446fa5e8c7343b56d67bd10eb68f2",
+   "role": "held out (reported; never used for tuning)"
+  }
+ ],
+ "mq10": [
+  {
+   "target": "mq10-32003",
+   "source": "examples/m29_cost_model.rs (generated in-process, pinned there)"
+  },
+  {
+   "target": "mq10-m31",
+   "source": "examples/m29_cost_model.rs (generated in-process, pinned there)"
+  }
+ ]
+}
