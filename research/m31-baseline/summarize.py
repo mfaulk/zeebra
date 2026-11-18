@@ -131,7 +131,7 @@ def stage_table(c):
     out = ['| row | arm | n | ' + ' | '.join(STAGES) + ' | Σ stages | total − Σ | call − total | '
            'setup (main − call − render) | render | exec + exit (process − main) | process wall | '
            'Σ named ÷ process |',
-           '|---|---|---:|' + '---:|' * (len(STAGES) + 9)]
+           '|---|---|---:|' + '---:|' * (len(STAGES) + 8)]
     for row in c.rows:
         for arm in ('sigf4:1', 'sigf4:16'):
             reps = list(c.reports[(row, arm)].items())
@@ -227,6 +227,28 @@ class Split:
                 f'{med(reports, lambda r: s(r["statistics"]["split"]["drop_ns"])):.3f} |')
         return '\n'.join(out)
 
+    def ceilings(self, row):
+        """Elimination-stage ceilings against design 1 from the measured components: what a schedule
+        that made the cascade free would leave, with setup as measured in either design."""
+        d1, d2 = self.runs.get((row, 'sigf4:1')), self.runs.get((row, 'sigf4:16'))
+        if not (d1 and d2):
+            return f'(need both designs for {row})'
+
+        def part(runs, k):
+            return med(runs, lambda r: s(sum(b[k] for b in r['statistics']['split']['batches'])))
+        e1 = med(d1, lambda r: s(r['statistics']['elimination_ns']))
+        e2 = med(d2, lambda r: s(r['statistics']['elimination_ns']))
+        s1, s2, par = part(d1, 'setup_ns'), part(d2, 'setup_ns'), part(d2, 'parallel_pass_ns')
+        rows = [('design 2 as measured', e2),
+                ('cascade free, design 2 setup', s2 + par),
+                ('cascade free, design 1 setup', s1 + par),
+                ('cascade and setup free (parallel pass only)', par)]
+        out = [f'{row}: design 1 elimination {e1:.3f} s (setup {s1:.3f}); design 2 setup {s2:.3f}, '
+               f'parallel pass {par:.3f}.', '', '| schedule | elimination s | ceiling vs design 1 |',
+               '|---|---:|---:|']
+        out += [f'| {name} | {t:.3f} | {e1 / t:.2f}× |' for name, t in rows]
+        return '\n'.join(out)
+
     def batches(self, row, top=12):
         """Per batch, design 1's serial products split and design 2's measured pass times."""
         d1, d2 = self.runs.get((row, 'sigf4:1')), self.runs.get((row, 'sigf4:16'))
@@ -280,6 +302,7 @@ def main(paths):
         sp = Split(split)
         print('\n## Elimination split (instrument binary)\n\n' + sp.table())
         for row in SPLIT_BATCH_ROWS:
+            print('\n### Elimination ceilings: ' + row + '\n\n' + sp.ceilings(row))
             print('\n### Per batch: ' + row + '\n\n' + sp.batches(row))
 
 
