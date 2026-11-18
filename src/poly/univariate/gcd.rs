@@ -86,7 +86,7 @@ pub fn lcm<F: FiniteField>(
 /// cofactor. Rational reconstruction and Padé approximation want the same primitive.
 ///
 /// Classical Euclid, or half-GCD's transition matrix once the sequence spans
-/// [`bezout_half_crossover`] degrees; both return the same pair.
+/// `bezout_half_crossover` degrees; both return the same pair.
 pub fn partial_bezout<F: FiniteField>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,

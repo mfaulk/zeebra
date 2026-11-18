@@ -27,9 +27,9 @@ pub(crate) fn berlekamp_massey_crossover<F: FiniteField>() -> usize {
 /// `k + L < len`.
 ///
 /// Classical Berlekamp–Massey, or half-GCD once an even-length sequence's half reaches
-/// [`berlekamp_massey_crossover`]. Both return the same polynomial.
+/// `berlekamp_massey_crossover`. Both return the same polynomial.
 pub fn berlekamp_massey<F: FiniteField>(sequence: &[F]) -> Vec<F> {
-    if sequence.len() % 2 == 0 && sequence.len() / 2 >= berlekamp_massey_crossover::<F>() {
+    if sequence.len().is_multiple_of(2) && sequence.len() / 2 >= berlekamp_massey_crossover::<F>() {
         if let Some(p) = berlekamp_massey_euclid_unstable(sequence) {
             return p;
         }
@@ -88,7 +88,7 @@ pub(crate) fn berlekamp_massey_euclid_with_base_case<F: FiniteField>(
     base_case: i64,
 ) -> Option<Vec<F>> {
     assert!(
-        sequence.len() % 2 == 0,
+        sequence.len().is_multiple_of(2),
         "the Euclidean route needs an even-length sequence"
     );
     let length = sequence.len();
@@ -257,7 +257,7 @@ mod tests {
     }
 
     fn check_planted<F: FiniteField>() {
-        let mut rng = StdRng::seed_from_u64(0x815_b3);
+        let mut rng = StdRng::seed_from_u64(0x0008_15b3);
         for (n, order, nilpotent) in [
             (70, 70, 0),
             (150, 149, 0),
