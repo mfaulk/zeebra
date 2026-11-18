@@ -417,6 +417,12 @@ reducer *selection policy* (which would change the algebra and belongs to a diff
 A serial path and an explicit fallback remain. A large stage speedup without the whole-task
 improvement does not ship.
 
+**Outcome (#861):** every line met at `ad61fb15`, so `ParallelSymbolic::Auto { max_workers: 16 }`
+is the default: Eco-12 0.748× [0.746, 0.749] complete F4 at 16 workers (n = 10), held-out
+Katsura-11 0.780×, small tasks and one worker 0.965–1.022×, peak RSS ≤1.069×, bases identical.
+Step 0 found the #871 prototype at up to 1.33× on Katsura-7; the adaptive fallback that fixed it
+is in [`m30-parallel-interning.md`](research/m30-parallel-interning.md) §11.
+
 ## 10. Benchmark, correctness and resource protocol
 
 M30 reuses M29's infrastructure (`research/m29-baseline/` scripts, `examples/m29_cost_model.rs`,

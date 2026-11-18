@@ -1,4 +1,4 @@
-# M30-P2: deterministic parallel monomial interning and dispatch (#860)
+# M30-P2: deterministic parallel monomial interning and dispatch (#860), integrated by #861
 
 **Measured at:** `514cada9` (the `intern` and `live` suites; executable SHA-256 `c6e9b6d3…`), and
 `bcf5af6a` for the retained first `intern` pass (`intern-seed512`). Both heads' production source
@@ -8,7 +8,9 @@ to the same shipping path (`ed6f5fd7`). 2026-11-17, 11:08–12:30 EST, inside th
 load up to 7.2 at child starts, at most three compilers running on other CCDs. The §5 RSS diagnosis is
 a single unlocked run per arm on CPUs 96–111 and reports memory only. §9 (#871) was measured at
 `7d0ac698` (executable SHA-256 `3d509058…`), 2026-11-17 17:15–17:32 EST, under `tools/benchlock.sh`
-on CPUs 8–23, 1-minute load up to 4.7 at child starts.
+on CPUs 8–23, 1-minute load up to 4.7 at child starts. §11 (#861) was measured 2026-11-17/18 under
+`tools/benchlock.sh` on CPUs 8–23 at `55147884` (Step 0, executable SHA-256 `ba35f534…`), `ddac56a9`
+(`f4ade0e2…`), `155216f5` (`4c0b42cf…`) and `ad61fb15`, the shipped head (`f2b2ecba…`).
 **Host:** as [`m30-symbolic-cost-model.md`](m30-symbolic-cost-model.md).
 **Evidence:** [`research/m30-symbolic/`](../../research/m30-symbolic/README.md) (`intern.jsonl.gz`,
 `intern-seed512.jsonl.gz`, `live.jsonl.gz`, [`tables.md`](../../research/m30-symbolic/tables.md)).
@@ -340,3 +342,93 @@ No timing or memory figures; behaviour only.
 | Criterion (plan §9.4) | Status after #872 |
 |---|---|
 | budget and cancellation | row budget, live-entry budget and step-boundary stops tested (`test_parallel_interning_charges_its_scratch_to_the_live_entry_budget`, `test_live_interning_trips_a_live_budget_the_shipping_path_meets`, `test_parallel_interning_stops_at_a_step_boundary`, `test_live_interning_honors_an_observer_stop_at_the_first_step`) |
+
+## 11. Integration and the acceptance gate (#861, 2026-11-18)
+
+**Result: shipped as the default.** `F4Options::parallel_symbolic` is `ParallelSymbolic::Auto
+{ max_workers: 16 }` at `recommended()` (hence `default()`), and `Serial` at `baseline()`. At 16
+workers complete F4 runs at **0.748× the serial closure on Eco-12 [0.746, 0.749]**, 0.80–0.82× on
+MQ11 and MQ10, and 0.780× on the held-out Katsura-11. Small tasks and one worker stay within ±3%,
+peak RSS is at most 1.069×, and every basis is identical. Shipped head: `ad61fb15`.
+
+Method: `gate` suite (`research/m30-symbolic/campaign.py`). `--merge auto` runs the shipped option
+and `--merge off` the serial closure in the same executable. n = 10 per arm, paired by repetition,
+interleaved with rotated arm order, under `tools/benchlock.sh` on CPUs 8–23. Ratio = median ÷
+median, with a 95% bootstrap interval that resamples each arm independently. Full tables:
+[`tables.md`](../../research/m30-symbolic/tables.md).
+
+### Step 0: the prototype fails the small-task line
+
+The #871 prototype (`small` suite, `55147884`, serial merge through `with_live`, n = 15):
+
+| Target | 1 worker | 4 | 8 | 16 |
+|---|---:|---:|---:|---:|
+| Katsura-6 | 1.023 [0.974, 1.059] | 1.047 [0.969, 1.090] | 1.075 [1.017, 1.108] | **1.163** [1.094, 1.200] |
+| Katsura-7 | 1.011 [0.997, 1.034] | **1.065** [1.048, 1.083] | **1.154** [1.124, 1.173] | **1.330** [1.307, 1.364] |
+| cyclic-6 | 1.010 [0.974, 1.041] | 1.000 [0.966, 1.023] | **1.064** [1.049, 1.087] | **1.068** [1.049, 1.100] |
+
+The cost grew with the worker count even where no step dispatched, which places it in per-batch
+setup rather than in the team. Two things caused it:
+
+- Every batch opened 4 × workers slices at their hinted capacities.
+- Narrow steps ran the whole candidate → merge → emit round trip on the caller.
+
+### The adaptive fallback
+
+1. **Caller-alone steps intern directly.** A step below the threshold interns each term straight
+   into the columns' index, in scan order. That order is the serial closure's first-occurrence
+   order. There are no candidates, no merge and no emit, and no scratch is touched
+   (`solo_step`). A batch with no wide step therefore allocates no scratch and starts no thread
+   (`test_parallel_symbolic_without_a_wide_step_starts_no_team_and_holds_no_scratch`).
+2. **Slices are prepared lazily.** They take their hinted capacities at the first dispatched
+   step. A slice that no step prepared keeps its previous hint.
+3. **The threshold scales with the team: `max(512, 48 × workers)`**, which is 768 at 16 workers
+   and 512 at 8 and below (`ParallelSymbolic::min_frontier`). A run's first dispatch pays for a
+   spawn and a cold scratch, and both grow with the team.
+   - At #860's 256 (`ddac56a9`, `gate-256`), one 256-wide Katsura-7 step cost 1.044 / 1.078 /
+     **1.180** at 4 / 8 / 16 workers.
+   - At a flat 512 (`155216f5`, `gate-512`), the small tasks passed. A 512-wide Katsura-8 step
+     still cost a team of 16 **1.064** [1.050, 1.078].
+   - In the unscripted threshold probes (`frontier-probe-*.txt`, F4-call µs, n = 3–5), 768
+     against 512 at 16 workers costs Eco-12 +1.1%, MQ10 +0.9% and Katsura-11 +2.9%.
+4. **Scratch over the allowance falls back.** Under the shipped option, a batch whose step
+   scratch would exceed the live-entry allowance takes the serial closure instead of refusing.
+   Forward elimination's reservation does the same (#752). The default therefore refuses exactly
+   what the serial path refuses, which `test_public_mq_refusal_reports_full_construction_demand`
+   checks. The `with_live` research override still refuses, so §10's charge stays testable.
+
+The step scratch now lives in the run's `ReducerCache`, so it is scoped to one F4 call and no
+thread-local outlives it.
+
+### Acceptance (`gate`, `ad61fb15`, n = 10)
+
+| Target | workers | serial ms | shipped ms | ratio [95% CI] | peak RSS, paired | basis |
+|---|---:|---:|---:|---:|---:|---|
+| Eco-12 | 16 | 3130.2 | 2340.0 | **0.748** [0.746, 0.749] | 1.001 | identical |
+| MQ11 | 16 | 5654.1 | 4550.5 | **0.805** [0.802, 0.807] | 1.000 | identical |
+| MQ10 / 32003 | 16 | 293.3 | 239.4 | 0.816 [0.813, 0.819] | 1.069 | identical |
+| MQ10 / 2³¹−1 | 16 | 278.8 | 223.8 | 0.803 [0.795, 0.806] | 1.063 | identical |
+| Katsura-11 (held out) | 16 | 1455.1 | 1135.6 | **0.780** [0.777, 0.784] | 1.032 | identical |
+| cyclic-7 (held out) | 4 / 8 / 16 | 141.9 / 132.9 / 138.8 | 133.8 / 123.9 / 133.7 | 0.943 / 0.932 / 0.963 | ≤1.010 | identical |
+| Katsura-8 | 4 / 8 / 16 | 19.2 / 18.7 / 19.7 | 18.7 / 18.1 / 19.0 | 0.971 / 0.965 / 0.968 | ≤1.027 | identical |
+| Katsura-6 | 1 / 4 / 8 / 16 | 3.6 | 3.6 | 1.022 / 0.989 / 1.015 / 0.977 | ≤1.026 | identical |
+| Katsura-7 | 1 / 4 / 8 / 16 | 7.1 | 7.1 | 0.996 / 1.001 / 0.990 / 1.007 | ≤1.028 | identical |
+| cyclic-6 | 1 / 4 / 8 / 16 | 6.8 | 6.8 | 1.008 / 0.995 / 0.965 / 1.006 | ≤1.025 | identical |
+| the five substantial targets | 1 | — | — | 0.999–1.002 | 1.000–1.001 | identical |
+
+The worst small-task interval is Katsura-6 at 1 worker, [0.984, 1.042]. Its median is 1.022 on a
+3.6 ms process wall, and one worker runs the serial closure itself, so the difference is noise.
+
+| Criterion (plan §9.4) | Result |
+|---|---|
+| ≥2× symbolic stage at 16 workers | met (§3: 4.9× Eco-12, 5.7× MQ11; the dispatched scan is unchanged) |
+| ≥10% complete F4 process wall, n ≥ 9, 95% interval | **met**: Eco-12 −25.2% [−25.4, −25.1], MQ11 −19.5% |
+| held-out instance or family | **met**: Katsura-11 −22.0%, cyclic-7 −3.7% to −6.8% |
+| ≤5% regression on small tasks and at one worker | **met**: Katsura-6/7 and cyclic-6 0.965–1.022, one worker 0.996–1.022 |
+| peak RSS ≤1.15× | **met**: ≤1.069× (MQ10), ≤1.032× elsewhere |
+| identical, deterministic output | **met**: every run's basis digest equals the serial one; closure equality at 1/4/8/16 workers with every step dispatched, none, or the threshold deciding (`test_parallel_symbolic_closure_matches_the_serial_closure_at_every_worker_count`); F4 across worker counts, twice each (`test_parallel_symbolic_f4_is_identical_to_serial_across_worker_counts`) |
+| budget and cancellation | **met**: #872's tests unchanged and green; the scratch-over-allowance fallback is covered by the public MQ refusal test |
+
+What is left serial is the stitch and the merge walk (§8). A threshold set by step width still
+charges a team start to a problem whose widest step lands just above it. The 16-worker figures
+for Katsura-8 and cyclic-7 are where that would show, and they did not regress.

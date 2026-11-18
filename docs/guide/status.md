@@ -18,6 +18,10 @@ A running record of what Zeebra implements. The short version is in the [README]
 - [x] F4 forward elimination on up to 16 worker threads behind a per-batch gate: 3.8x–4.0x
       complete F4 on MQ10, 1.5x–4.3x on held-out Katsura and Cyclic, small systems unchanged and
       bases identical ([#752](../research/parallel-forward.md))
+- [x] F4 symbolic preprocessing on up to 16 worker threads, deterministic by a serial canonical
+      merge: 0.748x complete F4 on Eco-12 and 0.78–0.82x on MQ11, MQ10 and held-out Katsura-11 at
+      16 workers, small systems within 3%, peak RSS within 1.07x, bases identical (measured at
+      `ad61fb15`; [#861](../research/m30-parallel-interning.md))
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] That oracle over an extension field: a differential case names a field rather than a

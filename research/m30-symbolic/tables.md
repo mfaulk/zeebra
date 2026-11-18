@@ -217,3 +217,125 @@ As the #860 table, plus the RSS ratio paired per repetition (arm ÷ the same rep
 | katsura11-m31 | 16 | serial | 5 | 1114.7 [1111.6, 1150.8] | 0.767 [0.764, 0.792] | 144 | 0.998 [0.993, 1.006] | 39 | 801 | identical |
 | katsura11-m31 | 16 | serialrun | 5 | 1126.4 [1119.5, 1131.4] | 0.775 [0.770, 0.779] | 167 | 1.156 [1.146, 1.164] | 39 | 801 | identical |
 
+## #861 small tasks: shipping (`off`) and the serial merge, same binary
+
+Process wall ms (median [95% CI]); ratio = median(arm) / median(off) with a 95% bootstrap interval, each arm resampled independently; paired = median of per-repetition ratios. The F4 call column is the in-process `f4_call_ns` ratio, which leaves out process start-up.
+
+| Target | workers | n | off ms | serial ms | ratio [95% CI] | paired | F4 call ratio | RSS ratio, paired | dispatched steps | basis |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| katsura6-m31 | 1 | 15 | 3.45 | 3.53 | 1.023 [0.974, 1.059] | 1.006 | 1.002 | 1.004 | 0 | identical |
+| katsura6-m31 | 4 | 15 | 3.34 | 3.50 | 1.047 [0.969, 1.090] | 1.043 | 1.090 | 1.065 | 0 | identical |
+| katsura6-m31 | 8 | 15 | 3.43 | 3.69 | 1.075 [1.017, 1.108] | 1.034 | 1.208 | 1.078 | 0 | identical |
+| katsura6-m31 | 16 | 15 | 3.22 | 3.75 | 1.163 [1.094, 1.200] | 1.161 | 1.408 | 1.122 | 0 | identical |
+| katsura7-m31 | 1 | 15 | 6.92 | 7.00 | 1.011 [0.997, 1.034] | 1.008 | 1.007 | 1.003 | 0 | identical |
+| katsura7-m31 | 4 | 15 | 6.97 | 7.42 | 1.065 [1.048, 1.083] | 1.056 | 1.110 | 1.126 | 1 | identical |
+| katsura7-m31 | 8 | 15 | 6.90 | 7.96 | 1.154 [1.124, 1.173] | 1.154 | 1.202 | 1.149 | 1 | identical |
+| katsura7-m31 | 16 | 15 | 6.90 | 9.18 | 1.330 [1.307, 1.364] | 1.331 | 1.524 | 1.255 | 1 | identical |
+| cyclic6-m31 | 1 | 15 | 6.71 | 6.78 | 1.010 [0.974, 1.041] | 0.997 | 1.001 | 1.008 | 0 | identical |
+| cyclic6-m31 | 4 | 15 | 6.73 | 6.73 | 1.000 [0.966, 1.023] | 1.010 | 1.009 | 1.085 | 0 | identical |
+| cyclic6-m31 | 8 | 15 | 6.65 | 7.08 | 1.064 [1.049, 1.087] | 1.074 | 1.079 | 1.079 | 0 | identical |
+| cyclic6-m31 | 16 | 15 | 6.80 | 7.26 | 1.068 [1.049, 1.100] | 1.072 | 1.160 | 1.146 | 0 | identical |
+
+## #861 `gate-256`: `ParallelSymbolic::Auto` (`auto`) against the serial closure, team threshold 256 (ddac56a9)
+
+Process wall ms (median [95% CI]); ratio = median(arm) / median(off) with a 95% bootstrap interval, each arm resampled independently; paired = median of per-repetition ratios. The F4 call column is the in-process `f4_call_ns` ratio, which leaves out process start-up.
+
+| Target | workers | n | off ms | auto ms | ratio [95% CI] | paired | F4 call ratio | RSS ratio, paired | dispatched steps | basis |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| mq10-32003 | 1 | 10 | 1124.81 | 1124.14 | 0.999 [0.993, 1.003] | 0.999 | 0.999 | 1.001 | 0 | identical |
+| mq10-32003 | 16 | 10 | 292.60 | 238.36 | 0.815 [0.809, 0.818] | 0.814 | 0.789 | 1.092 | 0 | identical |
+| mq10-m31 | 1 | 10 | 969.79 | 969.10 | 0.999 [0.989, 1.003] | 0.998 | 0.999 | 0.998 | 0 | identical |
+| mq10-m31 | 16 | 10 | 278.59 | 222.90 | 0.800 [0.797, 0.803] | 0.801 | 0.772 | 1.089 | 0 | identical |
+| eco12-wide64 | 1 | 10 | 12817.95 | 12794.81 | 0.998 [0.997, 1.000] | 0.998 | 0.998 | 1.000 | 0 | identical |
+| eco12-wide64 | 16 | 10 | 3118.59 | 2298.91 | 0.737 [0.734, 0.739] | 0.736 | 0.720 | 1.000 | 0 | identical |
+| mq11-goldilocks | 1 | 10 | 38580.16 | 38577.49 | 1.000 [0.998, 1.001] | 0.999 | 1.000 | 1.000 | 0 | identical |
+| mq11-goldilocks | 16 | 10 | 5648.14 | 4500.36 | 0.797 [0.796, 0.799] | 0.798 | 0.771 | 1.000 | 0 | identical |
+| katsura11-m31 | 1 | 10 | 7084.43 | 7112.08 | 1.004 [0.997, 1.010] | 1.001 | 1.004 | 1.000 | 0 | identical |
+| katsura11-m31 | 16 | 10 | 1457.67 | 1111.22 | 0.762 [0.760, 0.770] | 0.763 | 0.726 | 0.984 | 0 | identical |
+| katsura6-m31 | 1 | 10 | 3.64 | 3.65 | 1.004 [0.948, 1.037] | 0.978 | 0.996 | 0.998 | 0 | identical |
+| katsura6-m31 | 4 | 10 | 3.52 | 3.65 | 1.037 [0.995, 1.059] | 1.019 | 0.984 | 1.034 | 0 | identical |
+| katsura6-m31 | 8 | 10 | 3.54 | 3.58 | 1.013 [0.986, 1.049] | 1.008 | 0.989 | 1.006 | 0 | identical |
+| katsura6-m31 | 16 | 10 | 3.70 | 3.57 | 0.964 [0.934, 1.000] | 0.970 | 0.995 | 1.011 | 0 | identical |
+| katsura7-m31 | 1 | 10 | 7.05 | 6.96 | 0.987 [0.977, 1.016] | 0.992 | 0.996 | 1.020 | 0 | identical |
+| katsura7-m31 | 4 | 10 | 7.02 | 7.33 | 1.044 [1.019, 1.063] | 1.039 | 1.063 | 1.061 | 0 | identical |
+| katsura7-m31 | 8 | 10 | 7.10 | 7.66 | 1.078 [1.057, 1.105] | 1.089 | 1.122 | 1.075 | 0 | identical |
+| katsura7-m31 | 16 | 10 | 7.11 | 8.39 | 1.180 [1.166, 1.232] | 1.192 | 1.321 | 1.084 | 0 | identical |
+| cyclic6-m31 | 1 | 10 | 6.83 | 6.78 | 0.993 [0.980, 1.020] | 1.003 | 0.995 | 0.993 | 0 | identical |
+| cyclic6-m31 | 4 | 10 | 6.76 | 6.71 | 0.992 [0.967, 1.015] | 0.997 | 0.965 | 1.001 | 0 | identical |
+| cyclic6-m31 | 8 | 10 | 6.81 | 6.76 | 0.992 [0.964, 1.009] | 0.999 | 0.984 | 0.996 | 0 | identical |
+| cyclic6-m31 | 16 | 10 | 6.87 | 6.75 | 0.982 [0.957, 1.021] | 0.991 | 0.988 | 1.003 | 0 | identical |
+
+## #861 `gate-512`: `ParallelSymbolic::Auto` (`auto`) against the serial closure, threshold 512 (155216f5)
+
+Process wall ms (median [95% CI]); ratio = median(arm) / median(off) with a 95% bootstrap interval, each arm resampled independently; paired = median of per-repetition ratios. The F4 call column is the in-process `f4_call_ns` ratio, which leaves out process start-up.
+
+| Target | workers | n | off ms | auto ms | ratio [95% CI] | paired | F4 call ratio | RSS ratio, paired | dispatched steps | basis |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| mq10-32003 | 1 | 10 | 1189.55 | 1189.55 | 1.000 [0.990, 1.006] | 0.999 | 1.000 | 1.000 | 0 | identical |
+| mq10-32003 | 16 | 10 | 293.15 | 237.92 | 0.812 [0.808, 0.816] | 0.815 | 0.789 | 1.073 | 0 | identical |
+| mq10-m31 | 1 | 10 | 977.51 | 972.31 | 0.995 [0.984, 1.003] | 0.998 | 0.995 | 1.000 | 0 | identical |
+| mq10-m31 | 16 | 10 | 276.78 | 223.12 | 0.806 [0.802, 0.808] | 0.806 | 0.778 | 1.074 | 0 | identical |
+| eco12-wide64 | 1 | 10 | 12813.43 | 12812.19 | 1.000 [0.995, 1.003] | 0.999 | 1.000 | 1.000 | 0 | identical |
+| eco12-wide64 | 16 | 10 | 3095.13 | 2280.97 | 0.737 [0.735, 0.741] | 0.737 | 0.718 | 1.001 | 0 | identical |
+| mq11-goldilocks | 1 | 10 | 38654.80 | 38646.91 | 1.000 [0.998, 1.004] | 1.000 | 1.000 | 1.000 | 0 | identical |
+| mq11-goldilocks | 16 | 10 | 5638.06 | 4511.62 | 0.800 [0.798, 0.802] | 0.800 | 0.773 | 1.001 | 0 | identical |
+| katsura11-m31 | 1 | 10 | 7109.78 | 7113.41 | 1.001 [0.997, 1.003] | 1.000 | 1.001 | 1.000 | 0 | identical |
+| katsura11-m31 | 16 | 10 | 1449.64 | 1105.28 | 0.762 [0.761, 0.764] | 0.761 | 0.724 | 0.984 | 0 | identical |
+| katsura6-m31 | 1 | 10 | 3.75 | 3.67 | 0.977 [0.965, 1.021] | 0.995 | 1.005 | 1.005 | 0 | identical |
+| katsura6-m31 | 4 | 10 | 3.61 | 3.64 | 1.008 [0.957, 1.043] | 1.002 | 0.984 | 1.007 | 0 | identical |
+| katsura6-m31 | 8 | 10 | 3.62 | 3.67 | 1.014 [0.979, 1.058] | 1.021 | 0.985 | 0.988 | 0 | identical |
+| katsura6-m31 | 16 | 10 | 3.59 | 3.55 | 0.989 [0.932, 1.061] | 1.004 | 0.989 | 1.013 | 0 | identical |
+| katsura7-m31 | 1 | 10 | 7.07 | 7.14 | 1.009 [0.988, 1.030] | 1.010 | 0.998 | 1.003 | 0 | identical |
+| katsura7-m31 | 4 | 10 | 7.21 | 7.18 | 0.996 [0.989, 1.023] | 0.996 | 0.993 | 1.022 | 0 | identical |
+| katsura7-m31 | 8 | 10 | 7.10 | 7.14 | 1.005 [0.978, 1.017] | 0.993 | 0.991 | 1.025 | 0 | identical |
+| katsura7-m31 | 16 | 10 | 7.04 | 7.10 | 1.009 [0.967, 1.026] | 1.006 | 0.999 | 1.010 | 0 | identical |
+| cyclic6-m31 | 1 | 10 | 6.80 | 6.81 | 1.002 [0.981, 1.022] | 1.000 | 1.005 | 0.999 | 0 | identical |
+| cyclic6-m31 | 4 | 10 | 6.84 | 6.79 | 0.993 [0.978, 1.017] | 0.997 | 0.973 | 1.004 | 0 | identical |
+| cyclic6-m31 | 8 | 10 | 6.85 | 6.77 | 0.988 [0.960, 1.009] | 0.974 | 0.973 | 1.015 | 0 | identical |
+| cyclic6-m31 | 16 | 10 | 6.86 | 6.74 | 0.983 [0.951, 1.004] | 0.986 | 0.979 | 1.017 | 0 | identical |
+| katsura8-m31 | 1 | 10 | 24.91 | 24.86 | 0.998 [0.985, 1.011] | 0.996 | 1.001 | 0.997 | 0 | identical |
+| katsura8-m31 | 4 | 10 | 19.35 | 18.63 | 0.963 [0.949, 0.976] | 0.961 | 0.941 | 1.006 | 0 | identical |
+| katsura8-m31 | 8 | 10 | 18.75 | 18.01 | 0.961 [0.947, 0.974] | 0.962 | 0.952 | 1.011 | 0 | identical |
+| katsura8-m31 | 16 | 10 | 19.59 | 20.84 | 1.064 [1.050, 1.078] | 1.060 | 1.088 | 1.027 | 0 | identical |
+| cyclic7-m31 | 1 | 10 | 226.92 | 227.52 | 1.003 [0.992, 1.020] | 1.001 | 1.003 | 0.998 | 0 | identical |
+| cyclic7-m31 | 4 | 10 | 140.51 | 134.52 | 0.957 [0.928, 0.979] | 0.955 | 0.957 | 1.005 | 0 | identical |
+| cyclic7-m31 | 8 | 10 | 133.37 | 123.53 | 0.926 [0.924, 0.931] | 0.928 | 0.918 | 1.010 | 0 | identical |
+| cyclic7-m31 | 16 | 10 | 139.06 | 133.08 | 0.957 [0.952, 0.966] | 0.959 | 0.953 | 1.015 | 0 | identical |
+
+## #861 `gate`: `ParallelSymbolic::Auto` (`auto`) against the serial closure, as shipped, threshold max(512, 48 workers) (ad61fb15)
+
+Process wall ms (median [95% CI]); ratio = median(arm) / median(off) with a 95% bootstrap interval, each arm resampled independently; paired = median of per-repetition ratios. The F4 call column is the in-process `f4_call_ns` ratio, which leaves out process start-up.
+
+| Target | workers | n | off ms | auto ms | ratio [95% CI] | paired | F4 call ratio | RSS ratio, paired | dispatched steps | basis |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| mq10-32003 | 1 | 10 | 1189.30 | 1187.57 | 0.999 [0.996, 1.002] | 0.999 | 0.998 | 1.000 | 0 | identical |
+| mq10-32003 | 16 | 10 | 293.31 | 239.36 | 0.816 [0.813, 0.819] | 0.817 | 0.792 | 1.069 | 0 | identical |
+| mq10-m31 | 1 | 10 | 973.25 | 974.97 | 1.002 [0.993, 1.005] | 1.001 | 1.001 | 1.000 | 0 | identical |
+| mq10-m31 | 16 | 10 | 278.76 | 223.82 | 0.803 [0.795, 0.806] | 0.803 | 0.776 | 1.063 | 0 | identical |
+| eco12-wide64 | 1 | 10 | 12838.23 | 12829.98 | 0.999 [0.993, 1.002] | 0.999 | 0.999 | 1.001 | 0 | identical |
+| eco12-wide64 | 16 | 10 | 3130.21 | 2339.95 | 0.748 [0.746, 0.749] | 0.748 | 0.730 | 1.001 | 0 | identical |
+| mq11-goldilocks | 1 | 10 | 38808.23 | 38811.16 | 1.000 [0.998, 1.001] | 1.000 | 1.000 | 1.000 | 0 | identical |
+| mq11-goldilocks | 16 | 10 | 5654.07 | 4550.53 | 0.805 [0.802, 0.807] | 0.804 | 0.778 | 1.000 | 0 | identical |
+| katsura11-m31 | 1 | 10 | 7111.07 | 7123.73 | 1.002 [0.999, 1.006] | 1.003 | 1.002 | 1.000 | 0 | identical |
+| katsura11-m31 | 16 | 10 | 1455.10 | 1135.58 | 0.780 [0.777, 0.784] | 0.781 | 0.746 | 1.032 | 0 | identical |
+| katsura6-m31 | 1 | 10 | 3.63 | 3.71 | 1.022 [0.984, 1.042] | 1.012 | 0.990 | 1.002 | 0 | identical |
+| katsura6-m31 | 4 | 10 | 3.62 | 3.58 | 0.989 [0.959, 1.053] | 1.008 | 0.984 | 1.016 | 0 | identical |
+| katsura6-m31 | 8 | 10 | 3.53 | 3.58 | 1.015 [0.949, 1.037] | 1.007 | 0.996 | 1.020 | 0 | identical |
+| katsura6-m31 | 16 | 10 | 3.63 | 3.55 | 0.977 [0.932, 1.006] | 0.966 | 0.996 | 1.026 | 0 | identical |
+| katsura7-m31 | 1 | 10 | 7.12 | 7.10 | 0.996 [0.972, 1.013] | 0.983 | 0.994 | 0.977 | 0 | identical |
+| katsura7-m31 | 4 | 10 | 7.09 | 7.09 | 1.001 [0.986, 1.017] | 1.004 | 0.997 | 1.025 | 0 | identical |
+| katsura7-m31 | 8 | 10 | 7.18 | 7.11 | 0.990 [0.975, 1.013] | 0.990 | 1.005 | 1.028 | 0 | identical |
+| katsura7-m31 | 16 | 10 | 7.07 | 7.12 | 1.007 [0.988, 1.027] | 1.013 | 0.997 | 0.993 | 0 | identical |
+| cyclic6-m31 | 1 | 10 | 6.83 | 6.88 | 1.008 [0.989, 1.021] | 1.010 | 1.000 | 0.996 | 0 | identical |
+| cyclic6-m31 | 4 | 10 | 6.84 | 6.81 | 0.995 [0.971, 1.027] | 0.995 | 0.978 | 1.007 | 0 | identical |
+| cyclic6-m31 | 8 | 10 | 6.92 | 6.68 | 0.965 [0.942, 0.999] | 0.969 | 0.968 | 1.003 | 0 | identical |
+| cyclic6-m31 | 16 | 10 | 6.78 | 6.82 | 1.006 [0.995, 1.050] | 1.008 | 0.983 | 1.025 | 0 | identical |
+| katsura8-m31 | 1 | 10 | 24.97 | 24.89 | 0.997 [0.993, 1.003] | 0.998 | 0.997 | 0.982 | 0 | identical |
+| katsura8-m31 | 4 | 10 | 19.22 | 18.66 | 0.971 [0.962, 0.978] | 0.971 | 0.940 | 1.019 | 0 | identical |
+| katsura8-m31 | 8 | 10 | 18.71 | 18.05 | 0.965 [0.957, 0.980] | 0.969 | 0.955 | 1.002 | 0 | identical |
+| katsura8-m31 | 16 | 10 | 19.67 | 19.04 | 0.968 [0.959, 0.980] | 0.971 | 0.964 | 1.027 | 0 | identical |
+| cyclic7-m31 | 1 | 10 | 226.42 | 225.51 | 0.996 [0.992, 1.002] | 0.998 | 0.996 | 1.003 | 0 | identical |
+| cyclic7-m31 | 4 | 10 | 141.94 | 133.79 | 0.943 [0.928, 0.953] | 0.940 | 0.940 | 1.010 | 0 | identical |
+| cyclic7-m31 | 8 | 10 | 132.94 | 123.85 | 0.932 [0.928, 0.935] | 0.930 | 0.923 | 1.007 | 0 | identical |
+| cyclic7-m31 | 16 | 10 | 138.75 | 133.68 | 0.963 [0.956, 0.975] | 0.966 | 0.960 | 1.010 | 0 | identical |
+

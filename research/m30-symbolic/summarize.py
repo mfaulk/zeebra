@@ -306,7 +306,7 @@ def small(records, out, arm='serial', targets=SMALL_TARGETS,
           title='## #861 small tasks: shipping (`off`) and the serial merge, same binary\n'):
     out.append(title)
     name = arm
-    out.append('Process wall ms (median [95% CI]); ratio = median(serial) / median(off) with a 95% bootstrap '
+    out.append('Process wall ms (median [95% CI]); ratio = median(arm) / median(off) with a 95% bootstrap '
                'interval, each arm resampled independently; paired = median of per-repetition ratios. The F4 '
                'call column is the in-process `f4_call_ns` ratio, which leaves out process start-up.\n')
     out.append(f'| Target | workers | n | off ms | {name} ms | ratio [95% CI] | paired | F4 call ratio | '
@@ -347,10 +347,12 @@ def main():
         records = jsonl(d / f'{name}.jsonl')
         if records:
             section(records, out)
-    records = jsonl(d / 'gate.jsonl')
-    if records:
-        small(records, out, 'auto', TARGETS + SMALL_TARGETS + ('katsura8-m31', 'cyclic7-m31'),
-              '## #861 acceptance: the shipped `ParallelSymbolic::Auto` (`auto`) against the serial closure\n')
+    for name, what in (('gate-256', 'team threshold 256 (ddac56a9)'), ('gate-512', 'threshold 512 (155216f5)'),
+                       ('gate', 'as shipped, threshold max(512, 48 workers) (ad61fb15)')):
+        records = jsonl(d / f'{name}.jsonl')
+        if records:
+            small(records, out, 'auto', TARGETS + SMALL_TARGETS + ('katsura8-m31', 'cyclic7-m31'),
+                  f'## #861 `{name}`: `ParallelSymbolic::Auto` (`auto`) against the serial closure, {what}\n')
     print('\n'.join(out))
 
 
