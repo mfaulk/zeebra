@@ -89,16 +89,10 @@ fn cpu_us() -> u64 {
     ticks * 10_000
 }
 
-fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, started: Instant) {
-    let order = MonomialOrder::GradedReverseLexicographic;
-    let input = corpus::instance(problem, modulus, order).expect("corpus problem");
-    let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
-    let system: Vec<MultivariatePolynomial<N, F>> = input
-        .system
-        .iter()
-        .map(|s| MultivariatePolynomial::parse(s, names).unwrap())
-        .collect();
-    let (forward, backward) = arm.split_once('/').expect("ARM is FORWARD/BACKWARD");
+#[path = "support/symbolic_team.rs"]
+mod symbolic_team;
+
+fn options(forward: &str) -> F4Options {
     let setting = match forward.split_once(':') {
         None if forward == "serial" => ParallelForward::Serial,
         Some(("forced", w)) => ParallelForward::Forced {
@@ -109,10 +103,25 @@ fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, s
         },
         _ => panic!("forward: serial | forced:P | auto:MAX"),
     };
-    let options = F4Options {
+    F4Options {
         parallel_forward: setting,
+        parallel_symbolic: symbolic_team::capped_to(setting),
         ..F4Options::default()
-    };
+    }
+}
+
+fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, started: Instant) {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let input = corpus::instance(problem, modulus, order).expect("corpus problem");
+    let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
+    let system: Vec<MultivariatePolynomial<N, F>> = input
+        .system
+        .iter()
+        .map(|s| MultivariatePolynomial::parse(s, names).unwrap())
+        .collect();
+    let (forward, backward) = arm.split_once('/').expect("ARM is FORWARD/BACKWARD");
+    let options = options(forward);
+    let setting = options.parallel_forward;
     let f4_started = Instant::now();
     let (basis, statistics) = match backward {
         "selected" => f4_reported(&system, order, &options),
@@ -203,5 +212,28 @@ fn main() {
         11 => go!(11),
         14 => go!(14),
         _ => panic!("unsupported size {n}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zeebra::grobner::ParallelSymbolic;
+
+    // A P-worker forward arm caps the symbolic team at P, and a serial arm runs it serially (#891).
+    #[test]
+    fn forward_arm_caps_the_symbolic_team() {
+        assert_eq!(
+            options("serial").parallel_symbolic,
+            ParallelSymbolic::Serial
+        );
+        assert_eq!(
+            options("forced:4").parallel_symbolic,
+            ParallelSymbolic::Auto { max_workers: 4 }
+        );
+        assert_eq!(
+            options("auto:8").parallel_symbolic,
+            ParallelSymbolic::Auto { max_workers: 8 }
+        );
     }
 }
