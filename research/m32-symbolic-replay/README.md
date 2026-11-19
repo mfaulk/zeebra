@@ -7,7 +7,10 @@ Data for [`docs/research/m32-parallel-symbolic.md`](../../docs/research/m32-para
 - `replay.sh` — the session (`replay.sh <binary> <out.jsonl> <n>`), run as
   `tools/bench-reserve.sh run zb-933 8-23 replay.sh …`.
 - `summarize.py` — the §4 and §6 tables.
-- `binaries.sha256`, `benchlock.log` — the binary and the lock record.
+- `conventional.jsonl.gz`, `conventional.sh` — §5's conventional-F4 serial closure at `7b25a1ee`
+  (`m29_cost_model --workers 1 --stages`, MQ10 / 32003 and Eco-12, n = 5, CPU 8), run as
+  `tools/bench-reserve.sh run zb-933 8-23 conventional.sh <m29_cost_model> <out.jsonl> 5`.
+- `binaries.sha256`, `benchlock.log` — the binaries and the lock records.
 
 Build (commit `8694d172`, tagged `measured/933-symbolic-replay`), from a `git archive` of it:
 
