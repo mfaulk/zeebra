@@ -7,9 +7,9 @@
 **High-performance computational algebra for cryptographic security analysis.**
 
 Many cryptographic constructions are secure only if some system of polynomial equations over a
-finite field is infeasible to solve. Once a hash function or signature scheme is written as such a
-system, its security can be computed with: you can measure how the cost of solving grows as rounds
-are added, or recover a solution when one is within reach. Zeebra's long-term goal is to automate
+finite field is infeasible to solve. Writing a hash function or signature scheme as such a system
+makes its security measurable: you can track how the cost of solving grows with the number of
+rounds, or recover a solution when one is within reach. Zeebra's long-term goal is to automate
 this kind of algebraic security analysis. Today it is the engine such analysis needs, not a turnkey
 attack tool.
 
