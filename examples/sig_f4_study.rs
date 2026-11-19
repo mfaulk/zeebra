@@ -3,7 +3,7 @@
 //!
 //! cargo run --release --features research-sigf4 --example sig_f4_study -- \
 //!     --field wide64 --name eco-12 --engine sigf4|f4|entry [--workers 16] [--wall-s 600]
-//!     [--certify] [--claim]
+//!     [--certify] [--claim] [--calls K]
 //!
 //! `--engine entry` runs the supported opt-in entry point, `grobner::f4_signature` with its
 //! pre-solve dispatch (#905), under the same options as the `f4` arm; it reports the route taken.
@@ -11,6 +11,9 @@
 //! `m29_cost_model` does. #939's held-out candidates outside both catalogs (`goldilocks/cyclic-6`,
 //! `m31/eco-11`, `gf32003/mq-random-9`) are generated here and refused unless they reproduce their
 //! pinned digest (`research/m32-baseline/README.md`).
+//!
+//! `--calls K` solves K more times after the timed call, in the same process, and reports each
+//! call's time as `warm_ns`: #934's small-row method (plan §10.3) for rows under 50 ms.
 //!
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
@@ -63,6 +66,7 @@ struct Args {
     claim: bool,
     symbolic: bool,
     min_frontier: usize,
+    calls: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -78,6 +82,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         claim: false,
         symbolic: false,
         min_frontier: 512,
+        calls: 0,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -104,6 +109,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--min-frontier" => {
                 parsed.min_frontier = value()?.parse().map_err(|_| "--min-frontier")?
             }
+            "--calls" => parsed.calls = value()?.parse().map_err(|_| "--calls takes a count")?,
             other => return Err(format!("unexpected argument {other}")),
         }
     }
@@ -123,6 +129,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         return Err(
             "--symbolic-replay replays the signature engine's closure: --engine sigf4".into(),
         );
+    }
+    if parsed.calls > 0 && (parsed.certify || parsed.discovery || parsed.replay || parsed.symbolic)
+    {
+        return Err("--calls times the solve alone".into());
     }
     if parsed.replay && (parsed.engine != "sigf4" || parsed.workers < 2) {
         return Err("--replay runs design 1 and design 2: --engine sigf4 --workers ≥ 2".into());
@@ -752,58 +762,16 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         panic!("--replay requires --features research-sigf4-replay");
     }
     let started = Instant::now();
-    let (result, statistics, work) = if args.engine == "entry" {
-        let (result, report) = f4_signature_reported(&system, ORDER, &f4_options(args));
-        let summary = Json::object([
-            ("route", Json::string(format!("{:?}", report.route))),
-            ("dispatch_ns", Json::nanos(report.dispatch)),
-            ("variables", Json::size(report.features.variables)),
-            (
-                "min_nonlinear_degree",
-                Json::int(report.features.min_nonlinear_degree),
-            ),
-            ("max_degree", Json::int(report.features.max_degree)),
-        ]);
-        (result.map_err(|e| e.to_string()), summary, Json::Null)
-    } else if args.engine == "sigf4" {
-        let options = SigF4Options {
-            max_wall_time: Some(args.wall),
-            workers: args.workers,
-            parallel_cascade: args.claim,
-            ..SigF4Options::default()
-        };
-        let (result, stats) = sig_f4_reported(&system, ORDER, &options);
-        (
-            result.map_err(|e| e.to_string()),
-            sig_statistics(&stats),
-            Json::Null,
-        )
-    } else {
-        let options = f4_options(args);
-        let solve = || f4_reported(&system, ORDER, &options);
-        #[cfg(feature = "research-work")]
-        let ((result, stats), work) = if args.discovery {
-            let (r, w) = zeebra::linalg::work::measure_discovery(solve);
-            (r, discovery(&w))
-        } else {
-            (solve(), Json::Null)
-        };
-        #[cfg(not(feature = "research-work"))]
-        let ((result, stats), work) = {
-            assert!(!args.discovery, "--discovery requires research-work");
-            (solve(), Json::Null)
-        };
-        let summary = Json::object([
-            ("batches", Json::size(stats.batches)),
-            ("pairs_reduced", Json::size(stats.pairs_reduced)),
-            ("zero_rows", Json::size(stats.zero_rows)),
-            ("elements_added", Json::size(stats.elements_added)),
-            ("max_matrix_rows", Json::size(stats.max_matrix_rows)),
-            ("max_matrix_columns", Json::size(stats.max_matrix_columns)),
-        ]);
-        (result.map_err(|e| e.to_string()), summary, work)
-    };
+    let (result, statistics, work) = solve(&system, args);
     let elapsed = started.elapsed();
+    // #934's small-row method (plan §10.3): further calls in the same process, each timed alone.
+    let warm: Vec<Json> = (0..args.calls)
+        .map(|_| {
+            let clock = Instant::now();
+            let _ = solve(&system, args);
+            Json::nanos(clock.elapsed())
+        })
+        .collect();
     let render = Instant::now();
     let (status, basis) = match &result {
         Ok(basis) => {
@@ -838,6 +806,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("workers", Json::size(args.workers)),
         ("status", Json::string(status)),
         ("call_ns", Json::nanos(elapsed)),
+        ("warm_ns", Json::Array(warm)),
         ("render_ns", Json::nanos(render)),
         (
             "peak_rss_bytes",
@@ -857,6 +826,69 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("work", work),
         ("certification", certification),
     ])
+}
+
+/// One solve by `args.engine`: the basis or the stop, the engine's statistics and the census.
+#[allow(clippy::type_complexity)]
+fn solve<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    args: &Args,
+) -> (
+    Result<Vec<MultivariatePolynomial<N, F>>, String>,
+    Json,
+    Json,
+) {
+    if args.engine == "entry" {
+        let (result, report) = f4_signature_reported(system, ORDER, &f4_options(args));
+        let summary = Json::object([
+            ("route", Json::string(format!("{:?}", report.route))),
+            ("dispatch_ns", Json::nanos(report.dispatch)),
+            ("variables", Json::size(report.features.variables)),
+            (
+                "min_nonlinear_degree",
+                Json::int(report.features.min_nonlinear_degree),
+            ),
+            ("max_degree", Json::int(report.features.max_degree)),
+        ]);
+        (result.map_err(|e| e.to_string()), summary, Json::Null)
+    } else if args.engine == "sigf4" {
+        let options = SigF4Options {
+            max_wall_time: Some(args.wall),
+            workers: args.workers,
+            parallel_cascade: args.claim,
+            ..SigF4Options::default()
+        };
+        let (result, stats) = sig_f4_reported(system, ORDER, &options);
+        (
+            result.map_err(|e| e.to_string()),
+            sig_statistics(&stats),
+            Json::Null,
+        )
+    } else {
+        let options = f4_options(args);
+        let solve = || f4_reported(system, ORDER, &options);
+        #[cfg(feature = "research-work")]
+        let ((result, stats), work) = if args.discovery {
+            let (r, w) = zeebra::linalg::work::measure_discovery(solve);
+            (r, discovery(&w))
+        } else {
+            (solve(), Json::Null)
+        };
+        #[cfg(not(feature = "research-work"))]
+        let ((result, stats), work) = {
+            assert!(!args.discovery, "--discovery requires research-work");
+            (solve(), Json::Null)
+        };
+        let summary = Json::object([
+            ("batches", Json::size(stats.batches)),
+            ("pairs_reduced", Json::size(stats.pairs_reduced)),
+            ("zero_rows", Json::size(stats.zero_rows)),
+            ("elements_added", Json::size(stats.elements_added)),
+            ("max_matrix_rows", Json::size(stats.max_matrix_rows)),
+            ("max_matrix_columns", Json::size(stats.max_matrix_columns)),
+        ]);
+        (result.map_err(|e| e.to_string()), summary, work)
+    }
 }
 
 fn main() {
@@ -921,6 +953,28 @@ mod tests {
             "entry"
         ])
         .is_ok());
+    }
+
+    // Warm calls time the solve alone, so they refuse certification, the census and the replay.
+    #[test]
+    fn calls_time_the_solve_alone() {
+        let base = [
+            "--field",
+            "goldilocks",
+            "--name",
+            "katsura-4",
+            "--engine",
+            "entry",
+        ];
+        assert_eq!(
+            args(&[&base[..], &["--calls", "5"]].concat())
+                .unwrap()
+                .calls,
+            5
+        );
+        assert_eq!(args(&base).unwrap().calls, 0);
+        assert!(args(&[&base[..], &["--calls", "5", "--certify"]].concat()).is_err());
+        assert!(args(&[&base[..], &["--calls", "x"]].concat()).is_err());
     }
 
     // The replay runs both signature designs, so it needs the signature engine and two workers.
