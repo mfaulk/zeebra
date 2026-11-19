@@ -344,6 +344,7 @@ fn ratio_cmp<const N: usize, F>(
 /// The least-ratio element whose lead divides `m`, the newest on a tie, resuming a cached
 /// `(best, scanned)`; returns it with the basis length scanned to. A function of `m` and the basis
 /// alone, whatever the cache held (`docs/research/m32-parallel-symbolic.md` §3, Lemma 1).
+#[inline(always)]
 fn least_ratio<const N: usize, F>(
     basis: &[Element<N, F>],
     lead_masks: &[u64],
