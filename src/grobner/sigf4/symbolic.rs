@@ -204,6 +204,76 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         }
     }
 
+    /// Item `item` of a level: its row, the lead handle of a reducer row, and the terms to shift;
+    /// `None` for a column no element reduces. Also the cache entry the lookup computed, when the
+    /// one read was missing or stale.
+    #[allow(clippy::type_complexity)]
+    fn item(
+        &self,
+        seeds: bool,
+        item: usize,
+        work: &[Monomial<N>],
+        cache: &Cache<N>,
+    ) -> (
+        Option<(Row<N>, Option<u32>, &[(Monomial<N>, F)])>,
+        Option<(Monomial<N>, (u32, u32))>,
+    ) {
+        if seeds {
+            let t = &self.targets[item];
+            let row = Row {
+                sig: t.sig,
+                mult: t.mult,
+                source: t.source,
+            };
+            return (Some((row, None, self.terms(t.source))), None);
+        }
+        let m = work[item];
+        let cached = cache.get(&m).copied();
+        let (best, total) = least_ratio(self.basis, self.lead_masks, self.order, &m, cached);
+        let update =
+            (cached.map_or(0, |(_, scanned)| scanned) < total).then_some((m, (best, total)));
+        if best == NONE {
+            return (None, update);
+        }
+        let e = &self.basis[best as usize];
+        let mult = m.checked_div(&e.lead).expect("the lead divides the column");
+        let row = Row {
+            sig: e.sig.times(&mult),
+            mult,
+            source: RowSource::Element(best),
+        };
+        (Some((row, Some(item as u32), &e.terms[1..])), update)
+    }
+
+    /// A narrow level on the caller, straight into the tables: the serial closure's own steps.
+    fn direct(&self, state: &mut State<N>, seeds: bool, items: Range<usize>, out: &mut Out<N>) {
+        let State {
+            seen, work, cache, ..
+        } = state;
+        for item in items {
+            let (found, update) = self.item(seeds, item, work, cache);
+            if let Some((m, entry)) = update {
+                cache.insert(m, entry);
+            }
+            let Some((row, lead, terms)) = found else {
+                continue;
+            };
+            let mut handles = Vec::with_capacity(terms.len() + usize::from(lead.is_some()));
+            handles.extend(lead);
+            for (tm, _) in terms {
+                let s = *tm * row.mult;
+                handles.push(*seen.entry(s).or_insert_with(|| {
+                    work.push(s);
+                    (work.len() - 1) as u32
+                }));
+            }
+            out.refs += handles.len();
+            out.reducers += usize::from(!seeds);
+            out.handles.push(handles);
+            out.rows.push(row);
+        }
+    }
+
     /// One slice of a level, against the frozen state.
     fn scan(&self, state: &State<N>, seeds: bool, items: Range<usize>, out: &mut Slice<N>) {
         out.rows.clear();
@@ -212,33 +282,10 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         out.local.clear();
         out.updates.clear();
         for item in items {
-            let (row, lead, terms) = if seeds {
-                let t = &self.targets[item];
-                let row = Row {
-                    sig: t.sig,
-                    mult: t.mult,
-                    source: t.source,
-                };
-                (row, None, self.terms(t.source))
-            } else {
-                let m = state.work[item];
-                let cached = state.cache.get(&m).copied();
-                let (best, total) =
-                    least_ratio(self.basis, self.lead_masks, self.order, &m, cached);
-                if cached.map_or(0, |(_, scanned)| scanned) < total {
-                    out.updates.push((m, (best, total)));
-                }
-                if best == NONE {
-                    continue;
-                }
-                let e = &self.basis[best as usize];
-                let mult = m.checked_div(&e.lead).expect("the lead divides the column");
-                let row = Row {
-                    sig: e.sig.times(&mult),
-                    mult,
-                    source: RowSource::Element(best),
-                };
-                (row, Some(item as u32), &e.terms[1..])
+            let (found, update) = self.item(seeds, item, &state.work, &state.cache);
+            out.updates.extend(update);
+            let Some((row, lead, terms)) = found else {
+                continue;
             };
             out.refs.extend(lead);
             let (local, new) = (&mut out.local, &mut out.new);
@@ -359,19 +406,15 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         }
     }
 
-    /// Bytes the batch's closure holds: its tables, rows, handles and slice scratch. The cache
-    /// is the engine's, across batches, and is not charged here.
-    fn live_bytes(state: &State<N>, slices: &[Mutex<Slice<N>>], out: &Out<N>) -> usize {
+    /// Bytes the batch's tables, rows and handles hold; the caller adds the slice scratch. The
+    /// cache is the engine's, across batches, and is not charged here.
+    fn live_bytes(state: &State<N>, out: &Out<N>) -> usize {
         let mono = size_of::<Monomial<N>>();
         state.seen.capacity() * (mono + 5)
             + state.work.capacity() * mono
             + out.rows.capacity() * size_of::<Row<N>>()
             + out.handles.capacity() * size_of::<Vec<u32>>()
             + out.refs * 4
-            + slices
-                .iter()
-                .map(|s| s.lock().expect("no scan panics").bytes())
-                .sum::<usize>()
     }
 
     /// The level-synchronous closure on `workers` threads (the caller included). One scoped team
@@ -468,6 +511,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
     ) -> Option<Halt> {
         let workers = self.workers.max(1);
         let (mut seeds, mut lo, mut hi) = (true, 0, self.targets.len());
+        let mut scratch = 0;
         #[cfg(test)]
         let mut level = 0u64;
         while lo < hi {
@@ -492,16 +536,16 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                 *team_levels += 1;
                 count
             } else {
-                let guard = state.read().expect("no step panics");
-                let mut slice = slices[0].lock().expect("no scan panics");
-                self.scan(&guard, seeds, lo..hi, &mut slice);
-                1
+                0
             };
             #[cfg(test)]
             if let Some(adversary) = &self.adversary {
                 pause(adversary, u64::MAX - level, count as u64);
             }
             let mut guard = state.write().expect("no step panics");
+            if count == 0 {
+                self.direct(&mut guard, seeds, lo..hi, out);
+            }
             for slice in &slices[..count] {
                 Self::merge(
                     &mut guard,
@@ -518,7 +562,13 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             if out.rows.len() > self.max_rows {
                 return Some(Halt::Rows);
             }
-            let bytes = Self::live_bytes(&guard, slices, out);
+            if count > 0 {
+                scratch = slices
+                    .iter()
+                    .map(|s| s.lock().expect("no scan panics").bytes())
+                    .sum();
+            }
+            let bytes = Self::live_bytes(&guard, out) + scratch;
             *peak = (*peak).max(bytes);
             if self.live_limit.is_some_and(|limit| bytes > limit) {
                 return Some(Halt::LiveBytes { bytes });

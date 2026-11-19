@@ -33,6 +33,13 @@ const EVERY_LEVEL: Tuning = Tuning {
     fallback: false,
 };
 
+/// Narrow levels straight into the tables on the caller, wide ones on the team, in one closure.
+const MIXED: Tuning = Tuning {
+    min_frontier: 12,
+    min_sort: 64,
+    fallback: false,
+};
+
 type Run<const N: usize, F> = (Vec<MultivariatePolynomial<N, F>>, SigF4Statistics);
 
 /// Design 2 at `workers`, every signature check (and so the per-batch closure oracle) on.
@@ -81,9 +88,9 @@ fn assert_same_batches<const N: usize, F: FiniteField>(
     );
 }
 
-// T1: with the team on every level, each batch's closure equals the serial one (asserted in the
-// engine) at 1–16 workers, both graded orders and two fields; each batch eliminates as the serial
-// engine's, and the basis equals shipping F4's.
+// T1: with the team on every level, or on the wide levels only, each batch's closure equals the
+// serial one (asserted in the engine) at 1–16 workers, both graded orders and two fields; each
+// batch eliminates as the serial engine's, and the basis equals shipping F4's.
 #[test]
 fn test_parallel_closure_equals_serial_on_every_batch() {
     fn check<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>], name: &str) {
@@ -96,8 +103,11 @@ fn test_parallel_closure_equals_serial_on_every_batch() {
             );
             for workers in 1..=16 {
                 let label = format!("{name} {order:?} w={workers}");
+                let mixed = solve(system, order, &checked(workers), MIXED);
+                assert_same_batches(&serial, &mixed, &format!("{label} mixed"));
                 let run = solve(system, order, &checked(workers), EVERY_LEVEL);
                 assert_same_batches(&serial, &run, &label);
+                assert!(mixed.1.symbolic_team_levels <= run.1.symbolic_team_levels);
                 assert_eq!(
                     run.1.symbolic_team_levels > 0,
                     workers > 1,
