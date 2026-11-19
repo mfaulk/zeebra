@@ -18,6 +18,8 @@ build, anything else the baseline build, or the pin build for `admission`):
                rf4:W, ren:W  as f4:W and en:W from the M31 reference
   split      deliverable 4, n = 5: sd1:1 and scl:4/8/16 from the split build (symbolic-stage
              components and the symbolic thread's frequency), never timed against `walls`
+  ab         the split build against the instrument build it was compiled beside (same source, feature
+             off), n = 5: is the split build's faster symbolic stage the instrument's own effect?
   small      #934, n = 31 on katsura-4 at both fields: en and f4 at 1 and 16 workers, each process
              `--repeat 21` (one cold call, twenty warm), from the instrument build (`BINS/m32`)
 
@@ -58,10 +60,12 @@ SPLIT_ROWS = ['wide64/eco-12', 'goldilocks/katsura-11', 'goldilocks/mq-random-11
 SUITES = {'admission': [(r, ['f4:16']) for r in HELD_OUT],
           'walls': [(r, WALL_ARMS) for r in DEV],
           'split': [(r, ['sd1:1', 'scl:4', 'scl:8', 'scl:16']) for r in SPLIT_ROWS],
-          'small': [(r, ['en:1', 'f4:1', 'en:16', 'f4:16']) for r in ('goldilocks/katsura-4', 'wide64/katsura-4')]}
-REPS = {'admission': 3, 'walls': 9, 'split': 5, 'small': 31}
+          'small': [(r, ['en:1', 'f4:1', 'en:16', 'f4:16']) for r in ('goldilocks/katsura-4', 'wide64/katsura-4')],
+          'ab': [(r, ['d1:1', 'sd1:1', 'cl:16', 'scl:16']) for r in ('wide64/eco-12', 'goldilocks/katsura-11',
+                                                                 'gf32003/mq-random-10')]}
+REPS = {'admission': 3, 'walls': 9, 'split': 5, 'small': 31, 'ab': 5}
 # The build an unprefixed arm runs, per suite; the baseline otherwise.
-SIG_BUILD = {'admission': 'pin', 'small': 'm32'}
+SIG_BUILD = {'admission': 'pin', 'small': 'm32', 'ab': 'm32'}
 EXTRA = {'small': ['--repeat', '21']}
 BUILDS = {'r': 'ref', 's': 'split'}
 ENGINE = {'f4': 'f4', 'en': 'entry', 'cl': 'sigf4', 'd1': 'sigf4'}

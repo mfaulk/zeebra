@@ -210,14 +210,14 @@ def ceilings(c, out):
                    f"{'≤ 0' if need <= 0 else f'≤ {need:,.0f}'} | {speed} |")
     out.append('')
     out.append('**Other rows at a 1.5× symbolic cut** (sig path, all else unchanged):\n')
-    out.append('| Row | Sig 16w | Symbolic 16w | Projected | ÷ conventional F4-16 |')
-    out.append('|---|---:|---:|---:|---:|')
+    out.append('| Row | Sig 16w | Symbolic 16w | Projected | ÷ sig now | ÷ conventional F4-16 |')
+    out.append('|---|---:|---:|---:|---:|---:|')
     for row in ('goldilocks/katsura-11', 'wide64/katsura-11', 'goldilocks/mq-random-11'):
         sig_r = med(list(c.wall[(row, 'en:16')].values())) * 1e3
         f4_r = med(list(c.wall[(row, 'f4:16')].values())) * 1e3
         sym = stat(c, row, 'cl:16', 'symbolic_ns') * 1e3
         proj = sig_r - sym / 3
-        out.append(f'| {row} | {sig_r:,.0f} | {sym:,.0f} | {proj:,.0f} | {proj / f4_r:.3f} |')
+        out.append(f'| {row} | {sig_r:,.0f} | {sym:,.0f} | {proj:,.0f} | {proj / sig_r:.3f} | {proj / f4_r:.3f} |')
     out.append('')
     rest = sum(stat(c, eco, 'cl:16', f'{n}_ns') for n in ('bookkeeping', 'interreduction')) * 1e3
     out.append(f'Eco-12\'s serial remainder after S1 (bookkeeping + interreduction at 16 workers): {rest:,.0f} ms.\n')
