@@ -90,6 +90,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     reducers: MonomialMap<N, (u32, u32)>,
     wall: Option<(Instant, Duration)>,
     stats: &'a mut SigF4Statistics,
+    #[cfg(feature = "research-sigf4-usage")]
+    usage: super::usage::UsageLog<N>,
 }
 
 pub(super) fn run<const N: usize, F: FiniteField>(
@@ -127,6 +129,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         wall: options.max_wall_time.map(|budget| (started, budget)),
         inputs,
         stats,
+        #[cfg(feature = "research-sigf4-usage")]
+        usage: Default::default(),
     };
     #[cfg(feature = "research-sigf4-split")]
     {
@@ -171,6 +175,15 @@ pub(super) fn run<const N: usize, F: FiniteField>(
             .map(|e| MultivariatePolynomial::new(&e.terms))
             .collect()
     };
+    #[cfg(feature = "research-sigf4-usage")]
+    {
+        let clock = Instant::now();
+        let minimal = minimal_basis_for_interreduction(basis.clone(), order);
+        let usage = std::mem::take(&mut engine.usage);
+        engine.stats.usage = usage.finish(engine.inputs.len());
+        engine.stats.usage.minimal_selection = clock.elapsed();
+        engine.stats.usage.minimal_elements = minimal.len();
+    }
     engine.stats.signature_basis_elements = engine.basis.len();
     engine.stats.syzygy_signatures = engine.syzygies.len();
     engine.stats.signature_metadata_bytes = engine.basis.len()
@@ -328,13 +341,19 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let m = mask(&t.mono);
         let mut best = NONE;
         for &(sig_mask, id) in &self.by_index[t.index as usize] {
-            if sig_mask & !m != 0 || !divides(&self.basis[id as usize].sig.mono, &t.mono) {
+            let divisible =
+                sig_mask & !m == 0 && divides(&self.basis[id as usize].sig.mono, &t.mono);
+            #[cfg(feature = "research-sigf4-usage")]
+            self.usage.report.rewriter_scan(divisible);
+            if !divisible {
                 continue;
             }
             if best == NONE || self.ratio_cmp(id, best) != Ordering::Less {
                 best = id;
             }
         }
+        #[cfg(feature = "research-sigf4-usage")]
+        self.usage.report.rewriter_returned(best);
         best
     }
 
@@ -356,10 +375,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
             self.reducers.insert(*m, (best, total));
         }
+        #[cfg(feature = "research-sigf4-usage")]
+        self.usage
+            .report
+            .reducer(best, total.saturating_sub(scanned), self.stats.batches - 1);
         best
     }
 
     fn reject_by_syzygy(&mut self, t: &Signature<N>) -> bool {
+        #[cfg(feature = "research-sigf4-usage")]
+        self.usage.ops.push(super::usage::StoreOp::Query(*t));
         match self.syzygies.covering(t) {
             Some(SyzygySource::Koszul) => self.stats.rejected_koszul += 1,
             Some(SyzygySource::ZeroRow) => self.stats.rejected_zero_row += 1,
@@ -372,6 +397,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     /// True if the ideal turned out to be the whole ring.
     fn batch(&mut self, mut entries: Vec<Pending<N>>) -> Result<bool, SigF4Error> {
         let clock = Instant::now();
+        #[cfg(feature = "research-sigf4-usage")]
+        let before = (self.stats.symbolic, self.stats.elimination);
         let order = self.order;
         entries.sort_by(|a, b| a.sig.cmp_in(&b.sig, order));
         let mut targets: Vec<Row<N>> = Vec::new();
@@ -420,6 +447,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                     self.stats.rejected_duplicate += 1;
                 } else {
                     kept = Some(element);
+                    #[cfg(feature = "research-sigf4-usage")]
+                    self.usage.report.partner(other);
                 }
             }
             if let Some(element) = kept {
@@ -435,8 +464,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         self.stats.bookkeeping += clock.elapsed();
+        #[cfg(feature = "research-sigf4-usage")]
+        let select = clock.elapsed();
         if targets.is_empty() {
             return Ok(false);
+        }
+        #[cfg(feature = "research-sigf4-usage")]
+        for t in &targets {
+            if let RowSource::Element(id) = t.source {
+                self.usage.report.target(id, self.stats.batches);
+            }
         }
         self.stats.batches += 1;
         self.stats.targets += targets.len();
@@ -450,14 +487,33 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 self.check_new_element(sig, &terms[0].0);
             }
         }
+        #[cfg(feature = "research-sigf4-usage")]
+        let mut batch_use = super::usage::BatchUse {
+            degree: targets[0].sig.degree(),
+            targets: targets.len(),
+            elements_added: new.len(),
+            select,
+            symbolic: self.stats.symbolic - before.0,
+            elimination: self.stats.elimination - before.1,
+            ..Default::default()
+        };
         for (sig, terms) in new {
             if terms[0].0.is_one() {
                 self.stats.bookkeeping += clock.elapsed();
                 return Ok(true);
             }
+            #[cfg(feature = "research-sigf4-usage")]
+            let (inserted, lead, len) = (Instant::now(), terms[0].0, terms.len());
             self.insert(sig, terms)?;
+            #[cfg(feature = "research-sigf4-usage")]
+            {
+                batch_use.insert += inserted.elapsed();
+                self.usage.born(lead, len, self.stats.batches - 1);
+            }
         }
         self.stats.bookkeeping += clock.elapsed();
+        #[cfg(feature = "research-sigf4-usage")]
+        self.usage.report.batches.push(batch_use);
         Ok(false)
     }
 
@@ -813,6 +869,10 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 self.stats.zero_rows += 1;
                 self.stats.rows_adding_no_rank += 1;
                 self.stats.products_on_zero_rows += products;
+                #[cfg(feature = "research-sigf4-usage")]
+                self.usage
+                    .ops
+                    .push(super::usage::StoreOp::Insert(t, SyzygySource::ZeroRow));
                 self.syzygies.insert(t, SyzygySource::ZeroRow);
             }
             Kind::Singular => {
@@ -859,6 +919,17 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 Ordering::Less => self.syzygies.insert(k_old, SyzygySource::Koszul),
                 Ordering::Equal => false,
             };
+            #[cfg(feature = "research-sigf4-usage")]
+            if k_new != k_old {
+                let k = if k_new.cmp_in(&k_old, order) == Ordering::Greater {
+                    k_new
+                } else {
+                    k_old
+                };
+                self.usage
+                    .ops
+                    .push(super::usage::StoreOp::Insert(k, SyzygySource::Koszul));
+            }
 
             let lcm = Monomial::lcm(&lead, &g_lead);
             let u = lcm.checked_div(&lead).expect("lcm");

@@ -241,6 +241,104 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("claim_cascade_ns", Json::nanos(s.claim_cascade)),
         #[cfg(feature = "research-sigf4-split")]
         ("split", split(&s.split)),
+        #[cfg(feature = "research-sigf4-usage")]
+        ("usage", usage(&s.usage)),
+    ])
+}
+
+/// #936: which signature-basis elements were consulted, and how; the syzygy-store replay.
+#[cfg(feature = "research-sigf4-usage")]
+fn usage(u: &zeebra::grobner::sigf4::usage::UsageReport) -> Json {
+    use zeebra::grobner::sigf4::usage::ElementUse;
+    let count =
+        |f: &dyn Fn(&ElementUse) -> bool| Json::size(u.elements.iter().filter(|e| f(e)).count());
+    let sum = |f: &dyn Fn(&ElementUse) -> u64| Json::int(u.elements.iter().map(f).sum::<u64>());
+    let essential = |e: &ElementUse| e.dominated_from.is_none();
+    let terms_read = |e: &ElementUse| e.reducer_rows + e.target_rows > 0;
+    let consulted =
+        |e: &ElementUse| terms_read(e) || e.partner_roles > 0 || e.rewriter_wins.get() > 0;
+    let r = &u.replay;
+    let batches = u.batches.iter().map(|b| {
+        Json::object([
+            ("degree", Json::int(b.degree)),
+            ("targets", Json::size(b.targets)),
+            ("elements_added", Json::size(b.elements_added)),
+            ("essential_added", Json::size(b.essential_added)),
+            ("select_ns", Json::nanos(b.select)),
+            ("insert_ns", Json::nanos(b.insert)),
+            ("symbolic_ns", Json::nanos(b.symbolic)),
+            ("elimination_ns", Json::nanos(b.elimination)),
+        ])
+    });
+    Json::object([
+        ("elements", Json::size(u.elements.len())),
+        ("essential", count(&essential)),
+        ("dominated", count(&|e| !essential(e))),
+        (
+            "dominated_at_birth",
+            count(&|e| e.dominated_from == Some(e.born)),
+        ),
+        ("never_consulted", count(&|e| !consulted(e))),
+        ("terms_read", count(&terms_read)),
+        (
+            "dominated_terms_read_after",
+            count(&|e| e.rows_after_dominated > 0),
+        ),
+        (
+            "dominated_rewriter_won",
+            count(&|e| !essential(e) && e.rewriter_wins.get() > 0),
+        ),
+        (
+            "dominated_partner",
+            count(&|e| !essential(e) && e.partner_roles > 0),
+        ),
+        ("reducer_rows", sum(&|e| e.reducer_rows)),
+        (
+            "reducer_rows_dominated",
+            sum(&|e| if essential(e) { 0 } else { e.reducer_rows }),
+        ),
+        ("target_rows", sum(&|e| e.target_rows)),
+        (
+            "target_rows_dominated",
+            sum(&|e| if essential(e) { 0 } else { e.target_rows }),
+        ),
+        ("rows_after_dominated", sum(&|e| e.rows_after_dominated)),
+        ("partner_roles", sum(&|e| e.partner_roles)),
+        ("rewriter_wins", sum(&|e| e.rewriter_wins.get())),
+        ("terms", sum(&|e| e.terms as u64)),
+        (
+            "terms_dominated",
+            sum(&|e| if essential(e) { 0 } else { e.terms as u64 }),
+        ),
+        (
+            "terms_dominated_never_read_after",
+            sum(&|e| {
+                if !essential(e) && e.rows_after_dominated == 0 {
+                    e.terms as u64
+                } else {
+                    0
+                }
+            }),
+        ),
+        ("rewriter_calls", Json::int(u.rewriter_calls.get())),
+        ("rewriter_scanned", Json::int(u.rewriter_scanned.get())),
+        ("rewriter_divisible", Json::int(u.rewriter_divisible.get())),
+        ("reducer_lookups", Json::int(u.reducer_lookups)),
+        ("reducer_scanned", Json::int(u.reducer_scanned)),
+        ("minimal_selection_ns", Json::nanos(u.minimal_selection)),
+        ("minimal_elements", Json::size(u.minimal_elements)),
+        ("store_koszul_inserts", Json::size(r.koszul_inserts)),
+        ("store_zero_row_inserts", Json::size(r.zero_row_inserts)),
+        ("store_queries", Json::size(r.queries)),
+        ("store_koszul_hits", Json::size(r.koszul_hits)),
+        ("store_koszul_hits_equal", Json::size(r.koszul_hits_equal)),
+        ("store_koszul_hits_lost", Json::size(r.koszul_hits_lost)),
+        ("store_replay_full_ns", Json::nanos(r.full)),
+        (
+            "store_replay_without_koszul_ns",
+            Json::nanos(r.without_koszul),
+        ),
+        ("batches", Json::Array(batches.collect())),
     ])
 }
 

@@ -93,6 +93,10 @@ research-sigf4-replay = ["research-sigf4"]
 # elimination, and clocks on the engine's unstaged glue. Off in every timed binary.
 research-sigf4-split = ["research-sigf4"]
 
+# #936's instrument: which signature-basis elements the rewrite and syzygy criteria and the batch
+# matrices consult, the syzygy-store call log and its offline replay. Off in every timed binary.
+research-sigf4-usage = ["research-sigf4"]
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
