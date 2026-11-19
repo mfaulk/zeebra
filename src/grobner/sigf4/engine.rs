@@ -33,6 +33,8 @@ use crate::{
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
+#[path = "symbolic.rs"]
+pub(super) mod symbolic;
 #[cfg(feature = "research-sigf4-replay")]
 #[path = "symbolic_replay.rs"]
 pub mod symbolic_replay;
@@ -65,6 +67,7 @@ struct Pending<const N: usize> {
 }
 
 /// One row of a batch matrix: `mult · source` with signature `sig`.
+#[derive(Debug, PartialEq)]
 struct Row<const N: usize> {
     sig: Signature<N>,
     mult: Monomial<N>,
@@ -569,6 +572,117 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         #[cfg(feature = "research-sigf4-replay")]
         let before = symbolic_replay::active().then(|| self.reducers.clone());
         let clock = Instant::now();
+        let built = self.closure(targets);
+        self.stats.symbolic += clock.elapsed();
+        let matrix = built.map_err(|halt| {
+            SigF4Error::Budget(match halt {
+                symbolic::Halt::Rows => F4Error::TooManyRows {
+                    limit: self.options.max_matrix_rows,
+                },
+                symbolic::Halt::Wall => {
+                    // Without a budget only the tests' adversary stops a closure on the wall.
+                    let (start, budget) = self.wall.unwrap_or((clock, Duration::ZERO));
+                    F4Error::TimeBudgetExceeded {
+                        degree: targets[0].sig.degree(),
+                        elapsed_millis: millis(start.elapsed()),
+                        budget_millis: millis(budget),
+                    }
+                }
+                symbolic::Halt::LiveBytes { bytes } => F4Error::TooManyLiveBytes {
+                    bytes,
+                    limit: self.options.max_live_bytes.unwrap_or(usize::MAX),
+                },
+            })
+        })?;
+        let symbolic::Matrix {
+            columns,
+            rows,
+            handles,
+            reducers,
+            team_levels,
+            peak_live_bytes,
+        } = matrix;
+        self.stats.reducer_rows += reducers;
+        self.stats.max_matrix_rows = self.stats.max_matrix_rows.max(rows.len());
+        self.stats.max_matrix_columns = self.stats.max_matrix_columns.max(columns.len());
+        self.stats.symbolic_team_levels += team_levels;
+        self.stats.symbolic_peak_live_bytes =
+            self.stats.symbolic_peak_live_bytes.max(peak_live_bytes);
+        #[cfg(feature = "research-sigf4-replay")]
+        if let Some(before) = before {
+            let view = symbolic_replay::View {
+                order: self.order,
+                basis: &self.basis,
+                lead_masks: &self.lead_masks,
+                inputs: &self.inputs,
+            };
+            let serial = (&columns[..], &rows[..], &handles[..], &self.reducers);
+            symbolic_replay::replay(view, targets, &before, serial, clock.elapsed());
+        }
+        if rows.len() > self.options.max_matrix_rows {
+            return Err(SigF4Error::Budget(F4Error::TooManyRows {
+                limit: self.options.max_matrix_rows,
+            }));
+        }
+        if columns.len() > self.options.max_matrix_columns {
+            return Err(SigF4Error::Budget(F4Error::TooManyColumns {
+                limit: self.options.max_matrix_columns,
+            }));
+        }
+        Ok((columns, rows, handles, reducers))
+    }
+
+    /// The batch's closure: #940's parallel closure with `workers > 1` on a field that crosses
+    /// threads, else the serial one. Under `check_signatures` the serial closure re-runs on the
+    /// cache as the batch found it and must agree exactly, cache included (§3.1 T1).
+    fn closure(&mut self, targets: &[Row<N>]) -> Result<symbolic::Matrix<N>, symbolic::Halt> {
+        let tuning = symbolic::tuning();
+        // The usage instrument counts each lookup in `reducer`, which only the serial closure calls.
+        if self.options.workers > 1 && !cfg!(feature = "research-sigf4-usage") {
+            let oracle = self.options.check_signatures.then(|| self.reducers.clone());
+            let job = symbolic::Closure {
+                order: self.order,
+                basis: &self.basis,
+                lead_masks: &self.lead_masks,
+                inputs: &self.inputs,
+                targets,
+                cache: &mut self.reducers,
+                workers: self.options.workers,
+                max_rows: self.options.max_matrix_rows,
+                deadline: self
+                    .wall
+                    .and_then(|(start, budget)| start.checked_add(budget)),
+                live_limit: self.options.max_live_bytes,
+                tuning,
+                #[cfg(test)]
+                adversary: self.options.adversary,
+            };
+            let ran = if tuning.fallback {
+                Err(job)
+            } else {
+                F::run_concurrent(job)
+            };
+            if let Ok(built) = ran {
+                if let (Some(mut cache), Ok(parallel)) = (oracle, &built) {
+                    std::mem::swap(&mut self.reducers, &mut cache);
+                    let serial = self.serial_closure(targets);
+                    assert!(
+                        serial.same(parallel),
+                        "the parallel closure moved the matrix"
+                    );
+                    assert!(
+                        self.reducers == cache,
+                        "the parallel closure moved the reducer cache"
+                    );
+                }
+                return built;
+            }
+        }
+        Ok(self.serial_closure(targets))
+    }
+
+    /// The serial closure: a FIFO worklist of columns in first-occurrence order.
+    fn serial_closure(&mut self, targets: &[Row<N>]) -> symbolic::Matrix<N> {
         let mut seen: MonomialMap<N, u32> = MonomialMap::default();
         let mut work: Vec<Monomial<N>> = Vec::new();
         let mut rows: Vec<Row<N>> = Vec::with_capacity(targets.len());
@@ -635,32 +749,14 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         let columns: Vec<Monomial<N>> = by_position.iter().map(|&id| work[id as usize]).collect();
-        self.stats.reducer_rows += reducers;
-        self.stats.max_matrix_rows = self.stats.max_matrix_rows.max(rows.len());
-        self.stats.max_matrix_columns = self.stats.max_matrix_columns.max(columns.len());
-        self.stats.symbolic += clock.elapsed();
-        #[cfg(feature = "research-sigf4-replay")]
-        if let Some(before) = before {
-            let view = symbolic_replay::View {
-                order: self.order,
-                basis: &self.basis,
-                lead_masks: &self.lead_masks,
-                inputs: &self.inputs,
-            };
-            let serial = (&columns[..], &rows[..], &handles[..], &self.reducers);
-            symbolic_replay::replay(view, targets, &before, serial, clock.elapsed());
+        symbolic::Matrix {
+            columns,
+            rows,
+            handles,
+            reducers,
+            team_levels: 0,
+            peak_live_bytes: 0,
         }
-        if rows.len() > self.options.max_matrix_rows {
-            return Err(SigF4Error::Budget(F4Error::TooManyRows {
-                limit: self.options.max_matrix_rows,
-            }));
-        }
-        if columns.len() > self.options.max_matrix_columns {
-            return Err(SigF4Error::Budget(F4Error::TooManyColumns {
-                limit: self.options.max_matrix_columns,
-            }));
-        }
-        Ok((columns, rows, handles, reducers))
     }
 
     fn terms_of(&self, source: RowSource) -> &[(Monomial<N>, F)] {

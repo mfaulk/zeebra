@@ -26,6 +26,8 @@ pub mod signature;
 #[cfg(feature = "research-sigf4-replay")]
 pub use engine::symbolic_replay;
 #[cfg(all(test, feature = "research-sigf4"))]
+mod symbolic_tests;
+#[cfg(all(test, feature = "research-sigf4"))]
 mod tests;
 #[cfg(feature = "research-sigf4-usage")]
 pub mod usage;
@@ -188,6 +190,11 @@ pub struct SigF4Statistics {
     /// Parallel cascade only: phase A's wall and the cascade pass's, summed over batches.
     pub claim_phase_a: Duration,
     pub claim_cascade: Duration,
+    /// Symbolic closure levels scanned by the worker team rather than the caller alone (#940).
+    pub symbolic_team_levels: usize,
+    /// The most bytes one batch's parallel symbolic closure held: its column and row tables,
+    /// handles and slice scratch (#940).
+    pub symbolic_peak_live_bytes: usize,
     /// Per completed batch, each target's outcome and exact row in signature order: the oracle
     /// Theorem 1 of #902 makes per-batch.
     #[cfg(test)]
