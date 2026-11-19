@@ -90,6 +90,7 @@ case "$1" in
         python3 research/m31-final/test_campaign.py
         python3 research/m31-final/summarize.py research/m31-final | diff - research/m31-final/tables.md
         python3 research/m32-baseline/test_pins.py
+        python3 research/m32-baseline/summarize.py research/m32-baseline | diff - research/m32-baseline/tables.md
         python3 tools/test/multirow-study-test.py
         python3 tools/test/public-corpus-test.py
         ;;

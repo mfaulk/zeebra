@@ -144,11 +144,12 @@ def attribution(c, split, out):
 
 def symbolic_split(split, c, out):
     out.append('## Symbolic stage by component (split build, medians over repetitions)\n')
-    out.append('The split build clocks every reducer lookup and unfuses multiplication from interning, so its '
-               'symbolic total is above the timed build\'s (last column); shares are of the split build\'s '
-               'own total. "Other" is the remainder: building reducer rows (lead division, signature '
-               'multiply) and the row vectors. Frequency: the symbolic thread\'s CPU, `scaling_cur_freq` '
-               'before and after each batch, time-weighted; the CPU set\'s sampled mean is beside it.\n')
+    out.append('The split build clocks every reducer lookup and unfuses multiplication from interning (products '
+               'into a scratch buffer, then interned). That changes the stage itself: its symbolic total differs '
+               'from the timed build\'s (last column; the A/B below), so shares are of the split build\'s own '
+               'total. "Other" is the remainder: building reducer rows (lead division, signature multiply) and '
+               'the row vectors. Frequency: the symbolic thread\'s CPU, `scaling_cur_freq` before and after each '
+               'batch, time-weighted; the CPU set\'s sampled mean over the whole child is beside it.\n')
     out.append('| row | workers | symbolic ms | reducer search | multiply | interning | column sort | other | '
                'searches | terms | symbolic-thread MHz | CPU-set mean MHz | timed build symbolic ms |')
     out.append('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|')
