@@ -1,0 +1,1834 @@
+== mq10 2026-11-18T20:24:11-05:00 load=1.15
+suite mq10: settled after 0s at load 1.15, compilers 0
+32003 mq-random-10 zeebra 1 0 verified
+32003 mq-random-10 msolve 1 0 verified
+32003 mq-random-10 grobx 1 0 verified
+32003 mq-random-10 groebner-rs 1 0 verified
+32003 mq-random-10 zeebra 4 0 verified
+32003 mq-random-10 msolve 4 0 verified
+32003 mq-random-10 grobx 4 0 unsupported
+32003 mq-random-10 groebner-rs 4 0 verified
+32003 mq-random-10 zeebra 8 0 verified
+32003 mq-random-10 msolve 8 0 verified
+32003 mq-random-10 grobx 8 0 unsupported
+32003 mq-random-10 groebner-rs 8 0 verified
+32003 mq-random-10 zeebra 16 0 verified
+32003 mq-random-10 msolve 16 0 verified
+32003 mq-random-10 grobx 16 0 unsupported
+32003 mq-random-10 groebner-rs 16 0 verified
+2147483647 mq-random-10 zeebra 1 0 verified
+2147483647 mq-random-10 msolve 1 0 verified
+2147483647 mq-random-10 grobx 1 0 verified
+2147483647 mq-random-10 groebner-rs 1 0 verified
+2147483647 mq-random-10 zeebra 4 0 verified
+2147483647 mq-random-10 msolve 4 0 verified
+2147483647 mq-random-10 grobx 4 0 unsupported
+2147483647 mq-random-10 groebner-rs 4 0 verified
+2147483647 mq-random-10 zeebra 8 0 verified
+2147483647 mq-random-10 msolve 8 0 verified
+2147483647 mq-random-10 grobx 8 0 unsupported
+2147483647 mq-random-10 groebner-rs 8 0 verified
+2147483647 mq-random-10 zeebra 16 0 verified
+2147483647 mq-random-10 msolve 16 0 verified
+2147483647 mq-random-10 grobx 16 0 unsupported
+2147483647 mq-random-10 groebner-rs 16 0 verified
+32003 mq-random-10 groebner-rs 16 1 verified
+32003 mq-random-10 grobx 16 1 unsupported
+32003 mq-random-10 msolve 16 1 verified
+32003 mq-random-10 zeebra 16 1 verified
+32003 mq-random-10 groebner-rs 8 1 verified
+32003 mq-random-10 grobx 8 1 unsupported
+32003 mq-random-10 msolve 8 1 verified
+32003 mq-random-10 zeebra 8 1 verified
+32003 mq-random-10 groebner-rs 4 1 verified
+32003 mq-random-10 grobx 4 1 unsupported
+32003 mq-random-10 msolve 4 1 verified
+32003 mq-random-10 zeebra 4 1 verified
+32003 mq-random-10 groebner-rs 1 1 verified
+32003 mq-random-10 grobx 1 1 verified
+32003 mq-random-10 msolve 1 1 verified
+32003 mq-random-10 zeebra 1 1 verified
+2147483647 mq-random-10 groebner-rs 16 1 verified
+2147483647 mq-random-10 grobx 16 1 unsupported
+2147483647 mq-random-10 msolve 16 1 verified
+2147483647 mq-random-10 zeebra 16 1 verified
+2147483647 mq-random-10 groebner-rs 8 1 verified
+2147483647 mq-random-10 grobx 8 1 unsupported
+2147483647 mq-random-10 msolve 8 1 verified
+2147483647 mq-random-10 zeebra 8 1 verified
+2147483647 mq-random-10 groebner-rs 4 1 verified
+2147483647 mq-random-10 grobx 4 1 unsupported
+2147483647 mq-random-10 msolve 4 1 verified
+2147483647 mq-random-10 zeebra 4 1 verified
+2147483647 mq-random-10 groebner-rs 1 1 verified
+2147483647 mq-random-10 grobx 1 1 verified
+2147483647 mq-random-10 msolve 1 1 verified
+2147483647 mq-random-10 zeebra 1 1 verified
+32003 mq-random-10 zeebra 1 2 verified
+32003 mq-random-10 msolve 1 2 verified
+32003 mq-random-10 grobx 1 2 verified
+32003 mq-random-10 groebner-rs 1 2 verified
+32003 mq-random-10 zeebra 4 2 verified
+32003 mq-random-10 msolve 4 2 verified
+32003 mq-random-10 grobx 4 2 unsupported
+32003 mq-random-10 groebner-rs 4 2 verified
+32003 mq-random-10 zeebra 8 2 verified
+32003 mq-random-10 msolve 8 2 verified
+32003 mq-random-10 grobx 8 2 unsupported
+32003 mq-random-10 groebner-rs 8 2 verified
+32003 mq-random-10 zeebra 16 2 verified
+32003 mq-random-10 msolve 16 2 verified
+32003 mq-random-10 grobx 16 2 unsupported
+32003 mq-random-10 groebner-rs 16 2 verified
+2147483647 mq-random-10 zeebra 1 2 verified
+2147483647 mq-random-10 msolve 1 2 verified
+2147483647 mq-random-10 grobx 1 2 verified
+2147483647 mq-random-10 groebner-rs 1 2 verified
+2147483647 mq-random-10 zeebra 4 2 verified
+2147483647 mq-random-10 msolve 4 2 verified
+2147483647 mq-random-10 grobx 4 2 unsupported
+2147483647 mq-random-10 groebner-rs 4 2 verified
+2147483647 mq-random-10 zeebra 8 2 verified
+2147483647 mq-random-10 msolve 8 2 verified
+2147483647 mq-random-10 grobx 8 2 unsupported
+2147483647 mq-random-10 groebner-rs 8 2 verified
+2147483647 mq-random-10 zeebra 16 2 verified
+2147483647 mq-random-10 msolve 16 2 verified
+2147483647 mq-random-10 grobx 16 2 unsupported
+2147483647 mq-random-10 groebner-rs 16 2 verified
+32003 mq-random-10 groebner-rs 16 3 verified
+32003 mq-random-10 grobx 16 3 unsupported
+32003 mq-random-10 msolve 16 3 verified
+32003 mq-random-10 zeebra 16 3 verified
+32003 mq-random-10 groebner-rs 8 3 verified
+32003 mq-random-10 grobx 8 3 unsupported
+32003 mq-random-10 msolve 8 3 verified
+32003 mq-random-10 zeebra 8 3 verified
+32003 mq-random-10 groebner-rs 4 3 verified
+32003 mq-random-10 grobx 4 3 unsupported
+32003 mq-random-10 msolve 4 3 verified
+32003 mq-random-10 zeebra 4 3 verified
+32003 mq-random-10 groebner-rs 1 3 verified
+32003 mq-random-10 grobx 1 3 verified
+32003 mq-random-10 msolve 1 3 verified
+32003 mq-random-10 zeebra 1 3 verified
+2147483647 mq-random-10 groebner-rs 16 3 verified
+2147483647 mq-random-10 grobx 16 3 unsupported
+2147483647 mq-random-10 msolve 16 3 verified
+2147483647 mq-random-10 zeebra 16 3 verified
+2147483647 mq-random-10 groebner-rs 8 3 verified
+2147483647 mq-random-10 grobx 8 3 unsupported
+2147483647 mq-random-10 msolve 8 3 verified
+2147483647 mq-random-10 zeebra 8 3 verified
+2147483647 mq-random-10 groebner-rs 4 3 verified
+2147483647 mq-random-10 grobx 4 3 unsupported
+2147483647 mq-random-10 msolve 4 3 verified
+2147483647 mq-random-10 zeebra 4 3 verified
+2147483647 mq-random-10 groebner-rs 1 3 verified
+2147483647 mq-random-10 grobx 1 3 verified
+2147483647 mq-random-10 msolve 1 3 verified
+2147483647 mq-random-10 zeebra 1 3 verified
+32003 mq-random-10 zeebra 1 4 verified
+32003 mq-random-10 msolve 1 4 verified
+32003 mq-random-10 grobx 1 4 verified
+32003 mq-random-10 groebner-rs 1 4 verified
+32003 mq-random-10 zeebra 4 4 verified
+32003 mq-random-10 msolve 4 4 verified
+32003 mq-random-10 grobx 4 4 unsupported
+32003 mq-random-10 groebner-rs 4 4 verified
+32003 mq-random-10 zeebra 8 4 verified
+32003 mq-random-10 msolve 8 4 verified
+32003 mq-random-10 grobx 8 4 unsupported
+32003 mq-random-10 groebner-rs 8 4 verified
+32003 mq-random-10 zeebra 16 4 verified
+32003 mq-random-10 msolve 16 4 verified
+32003 mq-random-10 grobx 16 4 unsupported
+32003 mq-random-10 groebner-rs 16 4 verified
+2147483647 mq-random-10 zeebra 1 4 verified
+2147483647 mq-random-10 msolve 1 4 verified
+2147483647 mq-random-10 grobx 1 4 verified
+2147483647 mq-random-10 groebner-rs 1 4 verified
+2147483647 mq-random-10 zeebra 4 4 verified
+2147483647 mq-random-10 msolve 4 4 verified
+2147483647 mq-random-10 grobx 4 4 unsupported
+2147483647 mq-random-10 groebner-rs 4 4 verified
+2147483647 mq-random-10 zeebra 8 4 verified
+2147483647 mq-random-10 msolve 8 4 verified
+2147483647 mq-random-10 grobx 8 4 unsupported
+2147483647 mq-random-10 groebner-rs 8 4 verified
+2147483647 mq-random-10 zeebra 16 4 verified
+2147483647 mq-random-10 msolve 16 4 verified
+2147483647 mq-random-10 grobx 16 4 unsupported
+2147483647 mq-random-10 groebner-rs 16 4 verified
+32003 mq-random-10 groebner-rs 16 5 verified
+32003 mq-random-10 grobx 16 5 unsupported
+32003 mq-random-10 msolve 16 5 verified
+32003 mq-random-10 zeebra 16 5 verified
+32003 mq-random-10 groebner-rs 8 5 verified
+32003 mq-random-10 grobx 8 5 unsupported
+32003 mq-random-10 msolve 8 5 verified
+32003 mq-random-10 zeebra 8 5 verified
+32003 mq-random-10 groebner-rs 4 5 verified
+32003 mq-random-10 grobx 4 5 unsupported
+32003 mq-random-10 msolve 4 5 verified
+32003 mq-random-10 zeebra 4 5 verified
+32003 mq-random-10 groebner-rs 1 5 verified
+32003 mq-random-10 grobx 1 5 verified
+32003 mq-random-10 msolve 1 5 verified
+32003 mq-random-10 zeebra 1 5 verified
+2147483647 mq-random-10 groebner-rs 16 5 verified
+2147483647 mq-random-10 grobx 16 5 unsupported
+2147483647 mq-random-10 msolve 16 5 verified
+2147483647 mq-random-10 zeebra 16 5 verified
+2147483647 mq-random-10 groebner-rs 8 5 verified
+2147483647 mq-random-10 grobx 8 5 unsupported
+2147483647 mq-random-10 msolve 8 5 verified
+2147483647 mq-random-10 zeebra 8 5 verified
+2147483647 mq-random-10 groebner-rs 4 5 verified
+2147483647 mq-random-10 grobx 4 5 unsupported
+2147483647 mq-random-10 msolve 4 5 verified
+2147483647 mq-random-10 zeebra 4 5 verified
+2147483647 mq-random-10 groebner-rs 1 5 verified
+2147483647 mq-random-10 grobx 1 5 verified
+2147483647 mq-random-10 msolve 1 5 verified
+2147483647 mq-random-10 zeebra 1 5 verified
+32003 mq-random-10 zeebra 1 6 verified
+32003 mq-random-10 msolve 1 6 verified
+32003 mq-random-10 grobx 1 6 verified
+32003 mq-random-10 groebner-rs 1 6 verified
+32003 mq-random-10 zeebra 4 6 verified
+32003 mq-random-10 msolve 4 6 verified
+32003 mq-random-10 grobx 4 6 unsupported
+32003 mq-random-10 groebner-rs 4 6 verified
+32003 mq-random-10 zeebra 8 6 verified
+32003 mq-random-10 msolve 8 6 verified
+32003 mq-random-10 grobx 8 6 unsupported
+32003 mq-random-10 groebner-rs 8 6 verified
+32003 mq-random-10 zeebra 16 6 verified
+32003 mq-random-10 msolve 16 6 verified
+32003 mq-random-10 grobx 16 6 unsupported
+32003 mq-random-10 groebner-rs 16 6 verified
+2147483647 mq-random-10 zeebra 1 6 verified
+2147483647 mq-random-10 msolve 1 6 verified
+2147483647 mq-random-10 grobx 1 6 verified
+2147483647 mq-random-10 groebner-rs 1 6 verified
+2147483647 mq-random-10 zeebra 4 6 verified
+2147483647 mq-random-10 msolve 4 6 verified
+2147483647 mq-random-10 grobx 4 6 unsupported
+2147483647 mq-random-10 groebner-rs 4 6 verified
+2147483647 mq-random-10 zeebra 8 6 verified
+2147483647 mq-random-10 msolve 8 6 verified
+2147483647 mq-random-10 grobx 8 6 unsupported
+2147483647 mq-random-10 groebner-rs 8 6 verified
+2147483647 mq-random-10 zeebra 16 6 verified
+2147483647 mq-random-10 msolve 16 6 verified
+2147483647 mq-random-10 grobx 16 6 unsupported
+2147483647 mq-random-10 groebner-rs 16 6 verified
+32003 mq-random-10 groebner-rs 16 7 verified
+32003 mq-random-10 grobx 16 7 unsupported
+32003 mq-random-10 msolve 16 7 verified
+32003 mq-random-10 zeebra 16 7 verified
+32003 mq-random-10 groebner-rs 8 7 verified
+32003 mq-random-10 grobx 8 7 unsupported
+32003 mq-random-10 msolve 8 7 verified
+32003 mq-random-10 zeebra 8 7 verified
+32003 mq-random-10 groebner-rs 4 7 verified
+32003 mq-random-10 grobx 4 7 unsupported
+32003 mq-random-10 msolve 4 7 verified
+32003 mq-random-10 zeebra 4 7 verified
+32003 mq-random-10 groebner-rs 1 7 verified
+32003 mq-random-10 grobx 1 7 verified
+32003 mq-random-10 msolve 1 7 verified
+32003 mq-random-10 zeebra 1 7 verified
+2147483647 mq-random-10 groebner-rs 16 7 verified
+2147483647 mq-random-10 grobx 16 7 unsupported
+2147483647 mq-random-10 msolve 16 7 verified
+2147483647 mq-random-10 zeebra 16 7 verified
+2147483647 mq-random-10 groebner-rs 8 7 verified
+2147483647 mq-random-10 grobx 8 7 unsupported
+2147483647 mq-random-10 msolve 8 7 verified
+2147483647 mq-random-10 zeebra 8 7 verified
+2147483647 mq-random-10 groebner-rs 4 7 verified
+2147483647 mq-random-10 grobx 4 7 unsupported
+2147483647 mq-random-10 msolve 4 7 verified
+2147483647 mq-random-10 zeebra 4 7 verified
+2147483647 mq-random-10 groebner-rs 1 7 verified
+2147483647 mq-random-10 grobx 1 7 verified
+2147483647 mq-random-10 msolve 1 7 verified
+2147483647 mq-random-10 zeebra 1 7 verified
+32003 mq-random-10 zeebra 1 8 verified
+32003 mq-random-10 msolve 1 8 verified
+32003 mq-random-10 grobx 1 8 verified
+32003 mq-random-10 groebner-rs 1 8 verified
+32003 mq-random-10 zeebra 4 8 verified
+32003 mq-random-10 msolve 4 8 verified
+32003 mq-random-10 grobx 4 8 unsupported
+32003 mq-random-10 groebner-rs 4 8 verified
+32003 mq-random-10 zeebra 8 8 verified
+32003 mq-random-10 msolve 8 8 verified
+32003 mq-random-10 grobx 8 8 unsupported
+32003 mq-random-10 groebner-rs 8 8 verified
+32003 mq-random-10 zeebra 16 8 verified
+32003 mq-random-10 msolve 16 8 verified
+32003 mq-random-10 grobx 16 8 unsupported
+32003 mq-random-10 groebner-rs 16 8 verified
+2147483647 mq-random-10 zeebra 1 8 verified
+2147483647 mq-random-10 msolve 1 8 verified
+2147483647 mq-random-10 grobx 1 8 verified
+2147483647 mq-random-10 groebner-rs 1 8 verified
+2147483647 mq-random-10 zeebra 4 8 verified
+2147483647 mq-random-10 msolve 4 8 verified
+2147483647 mq-random-10 grobx 4 8 unsupported
+2147483647 mq-random-10 groebner-rs 4 8 verified
+2147483647 mq-random-10 zeebra 8 8 verified
+2147483647 mq-random-10 msolve 8 8 verified
+2147483647 mq-random-10 grobx 8 8 unsupported
+2147483647 mq-random-10 groebner-rs 8 8 verified
+2147483647 mq-random-10 zeebra 16 8 verified
+2147483647 mq-random-10 msolve 16 8 verified
+2147483647 mq-random-10 grobx 16 8 unsupported
+2147483647 mq-random-10 groebner-rs 16 8 verified
+== walls 2026-11-18T20:28:48-05:00 load=2.15
+walls 0 wide64/eco-12 f4:1 13.414s complete load=2.1
+walls 0 wide64/eco-12 f4:4 4.302s complete load=2.0
+walls 0 wide64/eco-12 f4:8 3.008s complete load=1.9
+walls 0 wide64/eco-12 f4:16 2.376s complete load=1.8
+walls 0 wide64/eco-12 en:1 2.605s complete load=1.8
+walls 0 wide64/eco-12 en:16 1.793s complete load=1.7
+walls 0 wide64/eco-12 cl:4 1.967s complete load=1.7
+walls 0 wide64/eco-12 cl:8 1.782s complete load=2.3
+walls 0 wide64/eco-12 cl:16 1.789s complete load=2.2
+walls 0 wide64/eco-12 d1:1 2.630s complete load=2.1
+walls 0 wide64/eco-12 zf4:16 2.374s complete load=2.0
+walls 0 wide64/eco-12 zd1:1 3.742s complete load=1.9
+walls 0 goldilocks/katsura-11 f4:1 10.157s complete load=1.9
+walls 0 goldilocks/katsura-11 f4:4 3.103s complete load=2.2
+walls 0 goldilocks/katsura-11 f4:8 1.898s complete load=2.4
+walls 0 goldilocks/katsura-11 f4:16 1.351s complete load=2.3
+walls 0 goldilocks/katsura-11 en:1 0.941s complete load=2.1
+walls 0 goldilocks/katsura-11 en:16 0.610s complete load=2.1
+walls 0 goldilocks/katsura-11 cl:4 0.643s complete load=2.0
+walls 0 goldilocks/katsura-11 cl:8 0.609s complete load=1.9
+walls 0 goldilocks/katsura-11 cl:16 0.617s complete load=1.9
+walls 0 goldilocks/katsura-11 d1:1 0.930s complete load=1.9
+walls 0 goldilocks/katsura-11 zf4:16 1.359s complete load=1.8
+walls 0 goldilocks/katsura-11 zd1:1 1.069s complete load=1.7
+walls 0 wide64/katsura-11 f4:1 9.148s complete load=1.7
+walls 0 wide64/katsura-11 f4:4 2.804s complete load=1.5
+walls 0 wide64/katsura-11 f4:8 1.838s complete load=1.5
+walls 0 wide64/katsura-11 f4:16 1.333s complete load=1.3
+walls 0 wide64/katsura-11 en:1 0.939s complete load=1.3
+walls 0 wide64/katsura-11 en:16 0.613s complete load=1.3
+walls 0 wide64/katsura-11 cl:4 0.634s complete load=1.3
+walls 0 wide64/katsura-11 cl:8 0.637s complete load=1.3
+walls 0 wide64/katsura-11 cl:16 0.650s complete load=1.3
+walls 0 wide64/katsura-11 d1:1 0.926s complete load=1.7
+walls 0 wide64/katsura-11 zf4:16 1.333s complete load=1.7
+walls 0 wide64/katsura-11 zd1:1 1.107s complete load=1.6
+walls 0 goldilocks/mq-random-11 f4:1 41.615s complete load=1.6
+walls 0 goldilocks/mq-random-11 f4:4 11.629s complete load=1.4
+walls 0 goldilocks/mq-random-11 f4:8 7.179s complete load=2.1
+walls 0 goldilocks/mq-random-11 f4:16 4.673s complete load=2.5
+walls 0 goldilocks/mq-random-11 en:1 5.358s complete load=3.4
+walls 0 goldilocks/mq-random-11 en:16 2.145s complete load=3.3
+walls 0 goldilocks/mq-random-11 cl:4 2.897s complete load=3.2
+walls 0 goldilocks/mq-random-11 cl:8 2.319s complete load=4.4
+walls 0 goldilocks/mq-random-11 cl:16 2.129s complete load=4.6
+walls 0 goldilocks/mq-random-11 d1:1 5.362s complete load=4.5
+walls 0 goldilocks/mq-random-11 zf4:16 4.668s complete load=4.2
+walls 0 goldilocks/mq-random-11 zd1:1 5.655s complete load=5.1
+walls 0 goldilocks/cyclic-7 f4:1 0.298s complete load=4.7
+walls 0 goldilocks/cyclic-7 f4:4 0.161s complete load=4.5
+walls 0 goldilocks/cyclic-7 f4:8 0.135s complete load=4.5
+walls 0 goldilocks/cyclic-7 f4:16 0.144s complete load=4.3
+walls 0 goldilocks/cyclic-7 en:1 0.292s complete load=4.0
+walls 0 goldilocks/cyclic-7 en:16 0.144s complete load=3.9
+walls 0 goldilocks/cyclic-7 cl:4 0.601s complete load=3.9
+walls 0 goldilocks/cyclic-7 cl:8 0.642s complete load=3.7
+walls 0 goldilocks/cyclic-7 cl:16 0.669s complete load=3.6
+walls 0 goldilocks/cyclic-7 d1:1 0.591s complete load=3.6
+walls 0 goldilocks/cyclic-7 zf4:16 0.146s complete load=3.6
+walls 0 goldilocks/cyclic-7 zd1:1 0.885s complete load=3.5
+walls 0 wide64/cyclic-7 f4:1 0.286s complete load=3.5
+walls 0 wide64/cyclic-7 f4:4 0.158s complete load=3.4
+walls 0 wide64/cyclic-7 f4:8 0.135s complete load=3.3
+walls 0 wide64/cyclic-7 f4:16 0.146s complete load=3.3
+walls 0 wide64/cyclic-7 en:1 0.280s complete load=3.3
+walls 0 wide64/cyclic-7 en:16 0.146s complete load=3.2
+walls 0 wide64/cyclic-7 cl:4 0.600s complete load=3.2
+walls 0 wide64/cyclic-7 cl:8 0.643s complete load=3.1
+walls 0 wide64/cyclic-7 cl:16 0.664s complete load=3.1
+walls 0 wide64/cyclic-7 d1:1 0.572s complete load=3.1
+walls 0 wide64/cyclic-7 zf4:16 0.145s complete load=3.0
+walls 0 wide64/cyclic-7 zd1:1 0.889s complete load=2.8
+walls 0 goldilocks/katsura-4 f4:1 0.006s complete load=2.8
+walls 0 goldilocks/katsura-4 f4:4 0.006s complete load=2.8
+walls 0 goldilocks/katsura-4 f4:8 0.006s complete load=2.7
+walls 0 goldilocks/katsura-4 f4:16 0.006s complete load=2.6
+walls 0 goldilocks/katsura-4 en:1 0.006s complete load=2.5
+walls 0 goldilocks/katsura-4 en:16 0.006s complete load=2.3
+walls 0 goldilocks/katsura-4 cl:4 0.007s complete load=2.3
+walls 0 goldilocks/katsura-4 cl:8 0.006s complete load=2.2
+walls 0 goldilocks/katsura-4 cl:16 0.006s complete load=2.1
+walls 0 goldilocks/katsura-4 d1:1 0.006s complete load=2.1
+walls 0 goldilocks/katsura-4 zf4:16 0.006s complete load=2.1
+walls 0 goldilocks/katsura-4 zd1:1 0.006s complete load=2.2
+walls 0 wide64/katsura-4 f4:1 0.007s complete load=2.1
+walls 0 wide64/katsura-4 f4:4 0.006s complete load=2.0
+walls 0 wide64/katsura-4 f4:8 0.006s complete load=1.9
+walls 0 wide64/katsura-4 f4:16 0.006s complete load=1.8
+walls 0 wide64/katsura-4 en:1 0.006s complete load=1.8
+walls 0 wide64/katsura-4 en:16 0.006s complete load=1.9
+walls 0 wide64/katsura-4 cl:4 0.007s complete load=1.9
+walls 0 wide64/katsura-4 cl:8 0.006s complete load=1.9
+walls 0 wide64/katsura-4 cl:16 0.006s complete load=1.9
+walls 0 wide64/katsura-4 d1:1 0.006s complete load=1.8
+walls 0 wide64/katsura-4 zf4:16 0.006s complete load=1.8
+walls 0 wide64/katsura-4 zd1:1 0.006s complete load=1.7
+walls 0 goldilocks/noon-7 f4:1 0.206s complete load=1.6
+walls 0 goldilocks/noon-7 f4:4 0.170s complete load=1.6
+walls 0 goldilocks/noon-7 f4:8 0.163s complete load=1.6
+walls 0 goldilocks/noon-7 f4:16 0.195s complete load=1.6
+walls 0 goldilocks/noon-7 en:1 0.100s complete load=1.6
+walls 0 goldilocks/noon-7 en:16 0.110s complete load=1.6
+walls 0 goldilocks/noon-7 cl:4 0.102s complete load=1.6
+walls 0 goldilocks/noon-7 cl:8 0.102s complete load=1.6
+walls 0 goldilocks/noon-7 cl:16 0.109s complete load=1.7
+walls 0 goldilocks/noon-7 d1:1 0.101s complete load=1.6
+walls 0 goldilocks/noon-7 zf4:16 0.191s complete load=1.6
+walls 0 goldilocks/noon-7 zd1:1 0.114s complete load=1.6
+walls 0 wide64/katsura-9 f4:1 0.168s complete load=1.6
+walls 0 wide64/katsura-9 f4:4 0.084s complete load=1.6
+walls 0 wide64/katsura-9 f4:8 0.070s complete load=1.6
+walls 0 wide64/katsura-9 f4:16 0.073s complete load=1.6
+walls 0 wide64/katsura-9 en:1 0.045s complete load=1.6
+walls 0 wide64/katsura-9 en:16 0.043s complete load=1.6
+walls 0 wide64/katsura-9 cl:4 0.041s complete load=1.7
+walls 0 wide64/katsura-9 cl:8 0.040s complete load=1.8
+walls 0 wide64/katsura-9 cl:16 0.042s complete load=1.9
+walls 0 wide64/katsura-9 d1:1 0.045s complete load=1.9
+walls 0 wide64/katsura-9 zf4:16 0.076s complete load=1.8
+walls 0 wide64/katsura-9 zd1:1 0.053s complete load=1.8
+walls 0 wide64/noon-8 f4:1 1.373s complete load=1.7
+walls 0 wide64/noon-8 f4:4 0.986s complete load=1.8
+walls 0 wide64/noon-8 f4:8 0.946s complete load=1.8
+walls 0 wide64/noon-8 f4:16 0.980s complete load=1.8
+walls 0 wide64/noon-8 en:1 0.580s complete load=1.8
+walls 0 wide64/noon-8 en:16 0.591s complete load=1.9
+walls 0 wide64/noon-8 cl:4 0.574s complete load=1.9
+walls 0 wide64/noon-8 cl:8 0.586s complete load=1.9
+walls 0 wide64/noon-8 cl:16 0.597s complete load=1.9
+walls 0 wide64/noon-8 d1:1 0.579s complete load=1.9
+walls 0 wide64/noon-8 zf4:16 0.975s complete load=1.9
+walls 0 wide64/noon-8 zd1:1 0.683s complete load=2.0
+walls 0 gf32003/mq-random-10 f4:1 1.076s complete load=2.0
+walls 0 gf32003/mq-random-10 f4:4 0.383s complete load=2.0
+walls 0 gf32003/mq-random-10 f4:8 0.273s complete load=1.9
+walls 0 gf32003/mq-random-10 f4:16 0.238s complete load=1.9
+walls 0 gf32003/mq-random-10 en:1 0.466s complete load=1.9
+walls 0 gf32003/mq-random-10 en:16 0.386s complete load=1.9
+walls 0 gf32003/mq-random-10 cl:4 0.364s complete load=1.9
+walls 0 gf32003/mq-random-10 cl:8 0.368s complete load=1.9
+walls 0 gf32003/mq-random-10 cl:16 0.387s complete load=1.8
+walls 0 gf32003/mq-random-10 d1:1 0.468s complete load=1.8
+walls 0 gf32003/mq-random-10 cm:16 0.240s complete load=1.8
+walls 0 gf32003/mq-random-10 zcm:16 0.242s complete load=1.7
+walls 0 m31/mq-random-10 f4:1 0.932s complete load=1.7
+walls 0 m31/mq-random-10 f4:4 0.345s complete load=1.7
+walls 0 m31/mq-random-10 f4:8 0.249s complete load=1.6
+walls 0 m31/mq-random-10 f4:16 0.226s complete load=1.6
+walls 0 m31/mq-random-10 en:1 0.449s complete load=1.6
+walls 0 m31/mq-random-10 en:16 0.391s complete load=1.5
+walls 0 m31/mq-random-10 cl:4 0.368s complete load=1.5
+walls 0 m31/mq-random-10 cl:8 0.361s complete load=1.5
+walls 0 m31/mq-random-10 cl:16 0.392s complete load=1.5
+walls 0 m31/mq-random-10 d1:1 0.451s complete load=1.4
+walls 0 m31/mq-random-10 cm:16 0.225s complete load=1.4
+walls 0 m31/mq-random-10 zcm:16 0.230s complete load=1.5
+walls 1 wide64/eco-12 f4:4 4.296s complete load=1.4
+walls 1 wide64/eco-12 f4:8 3.010s complete load=1.6
+walls 1 wide64/eco-12 f4:16 2.376s complete load=1.6
+walls 1 wide64/eco-12 en:1 2.555s complete load=1.6
+walls 1 wide64/eco-12 en:16 1.739s complete load=1.6
+walls 1 wide64/eco-12 cl:4 1.863s complete load=1.5
+walls 1 wide64/eco-12 cl:8 1.755s complete load=1.7
+walls 1 wide64/eco-12 cl:16 1.754s complete load=1.7
+walls 1 wide64/eco-12 d1:1 2.574s complete load=1.6
+walls 1 wide64/eco-12 zf4:16 2.348s complete load=1.6
+walls 1 wide64/eco-12 zd1:1 3.645s complete load=1.7
+walls 1 wide64/eco-12 f4:1 12.939s complete load=1.6
+walls 1 goldilocks/katsura-11 f4:4 3.002s complete load=1.6
+walls 1 goldilocks/katsura-11 f4:8 1.895s complete load=1.5
+walls 1 goldilocks/katsura-11 f4:16 1.353s complete load=1.5
+walls 1 goldilocks/katsura-11 en:1 0.982s complete load=1.5
+walls 1 goldilocks/katsura-11 en:16 0.613s complete load=1.6
+walls 1 goldilocks/katsura-11 cl:4 0.658s complete load=1.6
+walls 1 goldilocks/katsura-11 cl:8 0.626s complete load=1.6
+walls 1 goldilocks/katsura-11 cl:16 0.620s complete load=1.6
+walls 1 goldilocks/katsura-11 d1:1 0.950s complete load=1.5
+walls 1 goldilocks/katsura-11 zf4:16 1.365s complete load=1.5
+walls 1 goldilocks/katsura-11 zd1:1 1.066s complete load=1.5
+walls 1 goldilocks/katsura-11 f4:1 9.758s complete load=1.5
+walls 1 wide64/katsura-11 f4:4 2.827s complete load=1.5
+walls 1 wide64/katsura-11 f4:8 1.841s complete load=1.6
+walls 1 wide64/katsura-11 f4:16 1.333s complete load=1.6
+walls 1 wide64/katsura-11 en:1 0.905s complete load=1.5
+walls 1 wide64/katsura-11 en:16 0.624s complete load=1.5
+walls 1 wide64/katsura-11 cl:4 0.651s complete load=1.5
+walls 1 wide64/katsura-11 cl:8 0.615s complete load=1.5
+walls 1 wide64/katsura-11 cl:16 0.626s complete load=1.5
+walls 1 wide64/katsura-11 d1:1 0.909s complete load=1.7
+walls 1 wide64/katsura-11 zf4:16 1.340s complete load=1.7
+walls 1 wide64/katsura-11 zd1:1 1.089s complete load=1.6
+walls 1 wide64/katsura-11 f4:1 9.147s complete load=1.6
+walls 1 goldilocks/mq-random-11 f4:4 11.556s complete load=1.5
+walls 1 goldilocks/mq-random-11 f4:8 7.166s complete load=1.9
+walls 1 goldilocks/mq-random-11 f4:16 4.667s complete load=2.9
+walls 1 goldilocks/mq-random-11 en:1 5.376s complete load=3.7
+walls 1 goldilocks/mq-random-11 en:16 2.132s complete load=3.8
+walls 1 goldilocks/mq-random-11 cl:4 2.675s complete load=3.8
+walls 1 goldilocks/mq-random-11 cl:8 2.317s complete load=3.8
+walls 1 goldilocks/mq-random-11 cl:16 2.121s complete load=3.6
+walls 1 goldilocks/mq-random-11 d1:1 5.331s complete load=3.6
+walls 1 goldilocks/mq-random-11 zf4:16 4.654s complete load=3.2
+walls 1 goldilocks/mq-random-11 zd1:1 5.686s complete load=4.2
+walls 1 goldilocks/mq-random-11 f4:1 41.844s complete load=3.8
+walls 1 goldilocks/cyclic-7 f4:4 0.161s complete load=3.1
+walls 1 goldilocks/cyclic-7 f4:8 0.137s complete load=3.0
+walls 1 goldilocks/cyclic-7 f4:16 0.149s complete load=3.0
+walls 1 goldilocks/cyclic-7 en:1 0.292s complete load=3.8
+walls 1 goldilocks/cyclic-7 en:16 0.145s complete load=3.7
+walls 1 goldilocks/cyclic-7 cl:4 0.606s complete load=3.6
+walls 1 goldilocks/cyclic-7 cl:8 0.652s complete load=3.6
+walls 1 goldilocks/cyclic-7 cl:16 0.674s complete load=3.5
+walls 1 goldilocks/cyclic-7 d1:1 0.607s complete load=3.8
+walls 1 goldilocks/cyclic-7 zf4:16 0.145s complete load=3.8
+walls 1 goldilocks/cyclic-7 zd1:1 0.909s complete load=4.0
+walls 1 goldilocks/cyclic-7 f4:1 0.306s complete load=4.0
+walls 1 wide64/cyclic-7 f4:4 0.158s complete load=4.0
+walls 1 wide64/cyclic-7 f4:8 0.137s complete load=4.1
+walls 1 wide64/cyclic-7 f4:16 0.146s complete load=4.0
+walls 1 wide64/cyclic-7 en:1 0.293s complete load=4.5
+walls 1 wide64/cyclic-7 en:16 0.144s complete load=4.5
+walls 1 wide64/cyclic-7 cl:4 0.623s complete load=4.4
+walls 1 wide64/cyclic-7 cl:8 0.641s complete load=4.4
+walls 1 wide64/cyclic-7 cl:16 0.666s complete load=4.4
+walls 1 wide64/cyclic-7 d1:1 0.574s complete load=4.3
+walls 1 wide64/cyclic-7 zf4:16 0.152s complete load=4.0
+walls 1 wide64/cyclic-7 zd1:1 0.889s complete load=4.0
+walls 1 wide64/cyclic-7 f4:1 0.291s complete load=7.1
+walls 1 goldilocks/katsura-4 f4:4 0.006s complete load=6.6
+walls 1 goldilocks/katsura-4 f4:8 0.006s complete load=6.2
+walls 1 goldilocks/katsura-4 f4:16 0.006s complete load=5.9
+walls 1 goldilocks/katsura-4 en:1 0.006s complete load=5.8
+walls 1 goldilocks/katsura-4 en:16 0.006s complete load=5.7
+walls 1 goldilocks/katsura-4 cl:4 0.006s complete load=5.5
+walls 1 goldilocks/katsura-4 cl:8 0.007s complete load=5.3
+walls 1 goldilocks/katsura-4 cl:16 0.006s complete load=4.8
+walls 1 goldilocks/katsura-4 d1:1 0.007s complete load=4.6
+walls 1 goldilocks/katsura-4 zf4:16 0.006s complete load=4.3
+walls 1 goldilocks/katsura-4 zd1:1 0.006s complete load=4.1
+walls 1 goldilocks/katsura-4 f4:1 0.006s complete load=3.9
+walls 1 wide64/katsura-4 f4:4 0.006s complete load=3.8
+walls 1 wide64/katsura-4 f4:8 0.006s complete load=3.5
+walls 1 wide64/katsura-4 f4:16 0.006s complete load=5.8
+walls 1 wide64/katsura-4 en:1 0.006s complete load=5.4
+walls 1 wide64/katsura-4 en:16 0.006s complete load=5.4
+walls 1 wide64/katsura-4 cl:4 0.006s complete load=5.2
+walls 1 wide64/katsura-4 cl:8 0.006s complete load=4.7
+walls 1 wide64/katsura-4 cl:16 0.006s complete load=4.7
+walls 1 wide64/katsura-4 d1:1 0.006s complete load=4.4
+walls 1 wide64/katsura-4 zf4:16 0.006s complete load=4.1
+walls 1 wide64/katsura-4 zd1:1 0.006s complete load=3.8
+walls 1 wide64/katsura-4 f4:1 0.006s complete load=3.9
+walls 1 goldilocks/noon-7 f4:4 0.171s complete load=3.5
+walls 1 goldilocks/noon-7 f4:8 0.163s complete load=3.5
+walls 1 goldilocks/noon-7 f4:16 0.197s complete load=3.3
+walls 1 goldilocks/noon-7 en:1 0.100s complete load=3.6
+walls 1 goldilocks/noon-7 en:16 0.108s complete load=3.4
+walls 1 goldilocks/noon-7 cl:4 0.101s complete load=3.2
+walls 1 goldilocks/noon-7 cl:8 0.103s complete load=3.2
+walls 1 goldilocks/noon-7 cl:16 0.108s complete load=3.2
+walls 1 goldilocks/noon-7 d1:1 0.100s complete load=3.2
+walls 1 goldilocks/noon-7 zf4:16 0.196s complete load=3.1
+walls 1 goldilocks/noon-7 zd1:1 0.114s complete load=3.0
+walls 1 goldilocks/noon-7 f4:1 0.207s complete load=3.0
+walls 1 wide64/katsura-9 f4:4 0.084s complete load=3.2
+walls 1 wide64/katsura-9 f4:8 0.070s complete load=3.0
+walls 1 wide64/katsura-9 f4:16 0.073s complete load=2.9
+walls 1 wide64/katsura-9 en:1 0.045s complete load=2.8
+walls 1 wide64/katsura-9 en:16 0.044s complete load=2.6
+walls 1 wide64/katsura-9 cl:4 0.041s complete load=2.5
+walls 1 wide64/katsura-9 cl:8 0.040s complete load=2.5
+walls 1 wide64/katsura-9 cl:16 0.043s complete load=2.5
+walls 1 wide64/katsura-9 d1:1 0.045s complete load=2.5
+walls 1 wide64/katsura-9 zf4:16 0.075s complete load=2.5
+walls 1 wide64/katsura-9 zd1:1 0.053s complete load=2.3
+walls 1 wide64/katsura-9 f4:1 0.168s complete load=2.2
+walls 1 wide64/noon-8 f4:4 1.060s complete load=2.1
+walls 1 wide64/noon-8 f4:8 0.939s complete load=2.3
+walls 1 wide64/noon-8 f4:16 0.958s complete load=2.3
+walls 1 wide64/noon-8 en:1 0.576s complete load=2.4
+walls 1 wide64/noon-8 en:16 0.595s complete load=2.5
+walls 1 wide64/noon-8 cl:4 0.580s complete load=2.5
+walls 1 wide64/noon-8 cl:8 0.582s complete load=2.5
+walls 1 wide64/noon-8 cl:16 0.603s complete load=2.6
+walls 1 wide64/noon-8 d1:1 0.581s complete load=2.7
+walls 1 wide64/noon-8 zf4:16 0.975s complete load=2.7
+walls 1 wide64/noon-8 zd1:1 0.677s complete load=2.8
+walls 1 wide64/noon-8 f4:1 1.444s complete load=2.9
+walls 1 gf32003/mq-random-10 f4:4 0.391s complete load=2.9
+walls 1 gf32003/mq-random-10 f4:8 0.274s complete load=2.9
+walls 1 gf32003/mq-random-10 f4:16 0.237s complete load=2.9
+walls 1 gf32003/mq-random-10 en:1 0.469s complete load=3.0
+walls 1 gf32003/mq-random-10 en:16 0.378s complete load=2.9
+walls 1 gf32003/mq-random-10 cl:4 0.379s complete load=2.9
+walls 1 gf32003/mq-random-10 cl:8 0.359s complete load=2.9
+walls 1 gf32003/mq-random-10 cl:16 0.384s complete load=2.9
+walls 1 gf32003/mq-random-10 d1:1 0.464s complete load=2.9
+walls 1 gf32003/mq-random-10 cm:16 0.238s complete load=2.9
+walls 1 gf32003/mq-random-10 zcm:16 0.242s complete load=2.9
+walls 1 gf32003/mq-random-10 f4:1 1.083s complete load=2.8
+walls 1 m31/mq-random-10 f4:4 0.351s complete load=2.9
+walls 1 m31/mq-random-10 f4:8 0.249s complete load=2.9
+walls 1 m31/mq-random-10 f4:16 0.227s complete load=2.9
+walls 1 m31/mq-random-10 en:1 0.454s complete load=3.0
+walls 1 m31/mq-random-10 en:16 0.392s complete load=3.0
+walls 1 m31/mq-random-10 cl:4 0.379s complete load=3.0
+walls 1 m31/mq-random-10 cl:8 0.358s complete load=2.9
+walls 1 m31/mq-random-10 cl:16 0.390s complete load=2.9
+walls 1 m31/mq-random-10 d1:1 0.445s complete load=2.9
+walls 1 m31/mq-random-10 cm:16 0.224s complete load=2.9
+walls 1 m31/mq-random-10 zcm:16 0.225s complete load=3.0
+walls 1 m31/mq-random-10 f4:1 0.935s complete load=3.0
+walls 2 wide64/eco-12 f4:8 2.990s complete load=3.0
+walls 2 wide64/eco-12 f4:16 2.361s complete load=3.0
+walls 2 wide64/eco-12 en:1 2.568s complete load=4.2
+walls 2 wide64/eco-12 en:16 1.745s complete load=4.1
+walls 2 wide64/eco-12 cl:4 1.877s complete load=4.0
+walls 2 wide64/eco-12 cl:8 1.741s complete load=3.9
+walls 2 wide64/eco-12 cl:16 1.731s complete load=3.9
+walls 2 wide64/eco-12 d1:1 2.558s complete load=3.8
+walls 2 wide64/eco-12 zf4:16 2.342s complete load=3.7
+walls 2 wide64/eco-12 zd1:1 3.624s complete load=4.9
+walls 2 wide64/eco-12 f4:1 12.970s complete load=4.6
+walls 2 wide64/eco-12 f4:4 4.412s complete load=4.3
+walls 2 goldilocks/katsura-11 f4:8 1.874s complete load=4.4
+walls 2 goldilocks/katsura-11 f4:16 1.353s complete load=4.9
+walls 2 goldilocks/katsura-11 en:1 0.944s complete load=4.7
+walls 2 goldilocks/katsura-11 en:16 0.614s complete load=4.6
+walls 2 goldilocks/katsura-11 cl:4 0.660s complete load=4.6
+walls 2 goldilocks/katsura-11 cl:8 0.615s complete load=4.5
+walls 2 goldilocks/katsura-11 cl:16 0.613s complete load=4.3
+walls 2 goldilocks/katsura-11 d1:1 0.970s complete load=4.3
+walls 2 goldilocks/katsura-11 zf4:16 1.372s complete load=4.3
+walls 2 goldilocks/katsura-11 zd1:1 1.085s complete load=4.2
+walls 2 goldilocks/katsura-11 f4:1 9.816s complete load=4.1
+walls 2 goldilocks/katsura-11 f4:4 2.988s complete load=3.9
+walls 2 wide64/katsura-11 f4:8 1.835s complete load=4.1
+walls 2 wide64/katsura-11 f4:16 1.344s complete load=4.6
+walls 2 wide64/katsura-11 en:1 0.922s complete load=4.5
+walls 2 wide64/katsura-11 en:16 0.617s complete load=4.4
+walls 2 wide64/katsura-11 cl:4 0.664s complete load=4.4
+walls 2 wide64/katsura-11 cl:8 0.608s complete load=4.3
+walls 2 wide64/katsura-11 cl:16 0.618s complete load=4.3
+walls 2 wide64/katsura-11 d1:1 0.940s complete load=4.3
+walls 2 wide64/katsura-11 zf4:16 1.343s complete load=4.2
+walls 2 wide64/katsura-11 zd1:1 1.066s complete load=4.1
+walls 2 wide64/katsura-11 f4:1 9.227s complete load=4.0
+walls 2 wide64/katsura-11 f4:4 2.917s complete load=3.8
+walls 2 goldilocks/mq-random-11 f4:8 7.163s complete load=4.0
+walls 2 goldilocks/mq-random-11 f4:16 4.682s complete load=5.0
+walls 2 goldilocks/mq-random-11 en:1 5.363s complete load=5.7
+walls 2 goldilocks/mq-random-11 en:16 2.125s complete load=5.5
+walls 2 goldilocks/mq-random-11 cl:4 2.715s complete load=5.3
+walls 2 goldilocks/mq-random-11 cl:8 2.315s complete load=5.4
+walls 2 goldilocks/mq-random-11 cl:16 2.134s complete load=5.2
+walls 2 goldilocks/mq-random-11 d1:1 5.385s complete load=4.9
+walls 2 goldilocks/mq-random-11 zf4:16 4.684s complete load=4.6
+walls 2 goldilocks/mq-random-11 zd1:1 5.685s complete load=5.7
+walls 2 goldilocks/mq-random-11 f4:1 41.413s complete load=5.4
+walls 2 goldilocks/mq-random-11 f4:4 11.663s complete load=3.8
+walls 2 goldilocks/cyclic-7 f4:8 0.136s complete load=4.5
+walls 2 goldilocks/cyclic-7 f4:16 0.143s complete load=4.6
+walls 2 goldilocks/cyclic-7 en:1 0.303s complete load=4.6
+walls 2 goldilocks/cyclic-7 en:16 0.145s complete load=4.4
+walls 2 goldilocks/cyclic-7 cl:4 0.600s complete load=4.2
+walls 2 goldilocks/cyclic-7 cl:8 0.643s complete load=4.2
+walls 2 goldilocks/cyclic-7 cl:16 0.667s complete load=4.2
+walls 2 goldilocks/cyclic-7 d1:1 0.591s complete load=4.2
+walls 2 goldilocks/cyclic-7 zf4:16 0.145s complete load=4.2
+walls 2 goldilocks/cyclic-7 zd1:1 0.906s complete load=4.1
+walls 2 goldilocks/cyclic-7 f4:1 0.306s complete load=4.2
+walls 2 goldilocks/cyclic-7 f4:4 0.158s complete load=4.2
+walls 2 wide64/cyclic-7 f4:8 0.137s complete load=4.2
+walls 2 wide64/cyclic-7 f4:16 0.147s complete load=4.3
+walls 2 wide64/cyclic-7 en:1 0.293s complete load=4.3
+walls 2 wide64/cyclic-7 en:16 0.153s complete load=4.3
+walls 2 wide64/cyclic-7 cl:4 0.621s complete load=5.2
+walls 2 wide64/cyclic-7 cl:8 0.641s complete load=5.7
+walls 2 wide64/cyclic-7 cl:16 0.666s complete load=5.7
+walls 2 wide64/cyclic-7 d1:1 0.605s complete load=6.1
+walls 2 wide64/cyclic-7 zf4:16 0.144s complete load=6.3
+walls 2 wide64/cyclic-7 zd1:1 0.913s complete load=6.3
+walls 2 wide64/cyclic-7 f4:1 0.282s complete load=6.1
+walls 2 wide64/cyclic-7 f4:4 0.157s complete load=5.8
+walls 2 goldilocks/katsura-4 f4:8 0.006s complete load=5.8
+walls 2 goldilocks/katsura-4 f4:16 0.006s complete load=5.5
+walls 2 goldilocks/katsura-4 en:1 0.006s complete load=5.2
+walls 2 goldilocks/katsura-4 en:16 0.006s complete load=5.0
+walls 2 goldilocks/katsura-4 cl:4 0.006s complete load=4.8
+walls 2 goldilocks/katsura-4 cl:8 0.006s complete load=4.6
+walls 2 goldilocks/katsura-4 cl:16 0.006s complete load=4.5
+walls 2 goldilocks/katsura-4 d1:1 0.006s complete load=5.4
+walls 2 goldilocks/katsura-4 zf4:16 0.006s complete load=5.8
+walls 2 goldilocks/katsura-4 zd1:1 0.006s complete load=6.1
+walls 2 goldilocks/katsura-4 f4:1 0.006s complete load=6.3
+walls 2 goldilocks/katsura-4 f4:4 0.006s complete load=6.4
+walls 2 wide64/katsura-4 f4:8 0.006s complete load=6.0
+walls 2 wide64/katsura-4 f4:16 0.006s complete load=6.2
+walls 2 wide64/katsura-4 en:1 0.006s complete load=6.5
+walls 2 wide64/katsura-4 en:16 0.006s complete load=7.2
+walls 2 wide64/katsura-4 cl:4 0.006s complete load=7.4
+walls 2 wide64/katsura-4 cl:8 0.006s complete load=7.5
+walls 2 wide64/katsura-4 cl:16 0.006s complete load=7.6
+walls 2 wide64/katsura-4 d1:1 0.007s complete load=7.7
+walls 2 wide64/katsura-4 zf4:16 0.006s complete load=7.8
+walls 2 wide64/katsura-4 zd1:1 0.006s complete load=8.3
+walls 2 wide64/katsura-4 f4:1 0.006s complete load=8.5
+walls 2 wide64/katsura-4 f4:4 0.006s complete load=8.7
+walls 2 goldilocks/noon-7 f4:8 0.167s complete load=8.7
+walls 2 goldilocks/noon-7 f4:16 0.192s complete load=8.8
+walls 2 goldilocks/noon-7 en:1 0.102s complete load=8.8
+walls 2 goldilocks/noon-7 en:16 0.107s complete load=9.1
+walls 2 goldilocks/noon-7 cl:4 0.103s complete load=9.1
+walls 2 goldilocks/noon-7 cl:8 0.104s complete load=9.4
+walls 2 goldilocks/noon-7 cl:16 0.108s complete load=9.3
+walls 2 goldilocks/noon-7 d1:1 0.102s complete load=9.4
+walls 2 goldilocks/noon-7 zf4:16 0.195s complete load=9.5
+walls 2 goldilocks/noon-7 zd1:1 0.116s complete load=9.6
+walls 2 goldilocks/noon-7 f4:1 0.214s complete load=9.6
+walls 2 goldilocks/noon-7 f4:4 0.172s complete load=9.6
+walls 2 wide64/katsura-9 f4:8 0.071s complete load=9.5
+walls 2 wide64/katsura-9 f4:16 0.074s complete load=9.6
+walls 2 wide64/katsura-9 en:1 0.046s complete load=9.7
+walls 2 wide64/katsura-9 en:16 0.043s complete load=9.6
+walls 2 wide64/katsura-9 cl:4 0.041s complete load=9.8
+walls 2 wide64/katsura-9 cl:8 0.041s complete load=9.9
+walls 2 wide64/katsura-9 cl:16 0.043s complete load=10.0
+walls 2 wide64/katsura-9 d1:1 0.045s complete load=10.0
+walls 2 wide64/katsura-9 zf4:16 0.074s complete load=9.8
+walls 2 wide64/katsura-9 zd1:1 0.053s complete load=9.7
+walls 2 wide64/katsura-9 f4:1 0.171s complete load=9.7
+walls 2 wide64/katsura-9 f4:4 0.084s complete load=9.6
+walls 2 wide64/noon-8 f4:8 0.967s complete load=9.6
+walls 2 wide64/noon-8 f4:16 1.016s complete load=9.6
+walls 2 wide64/noon-8 en:1 0.648s complete load=9.6
+walls 2 wide64/noon-8 en:16 0.644s complete load=9.6
+walls 2 wide64/noon-8 cl:4 0.615s complete load=9.7
+walls 2 wide64/noon-8 cl:8 0.624s complete load=9.9
+walls 2 wide64/noon-8 cl:16 0.641s complete load=9.9
+walls 2 wide64/noon-8 d1:1 0.632s complete load=9.9
+walls 2 wide64/noon-8 zf4:16 1.003s complete load=10.0
+walls 2 wide64/noon-8 zd1:1 0.696s complete load=9.7
+walls 2 wide64/noon-8 f4:1 1.496s complete load=9.7
+walls 2 wide64/noon-8 f4:4 1.087s complete load=9.5
+walls 2 gf32003/mq-random-10 f4:8 0.284s complete load=9.1
+walls 2 gf32003/mq-random-10 f4:16 0.244s complete load=10.4
+walls 2 gf32003/mq-random-10 en:1 0.508s complete load=10.4
+walls 2 gf32003/mq-random-10 en:16 0.390s complete load=10.7
+walls 2 gf32003/mq-random-10 cl:4 0.378s complete load=10.0
+walls 2 gf32003/mq-random-10 cl:8 0.358s complete load=10.0
+walls 2 gf32003/mq-random-10 cl:16 0.377s complete load=9.4
+walls 2 gf32003/mq-random-10 d1:1 0.471s complete load=8.8
+walls 2 gf32003/mq-random-10 cm:16 0.239s complete load=8.2
+walls 2 gf32003/mq-random-10 zcm:16 0.245s complete load=8.2
+walls 2 gf32003/mq-random-10 f4:1 1.084s complete load=7.7
+walls 2 gf32003/mq-random-10 f4:4 0.403s complete load=7.7
+walls 2 m31/mq-random-10 f4:8 0.248s complete load=7.7
+walls 2 m31/mq-random-10 f4:16 0.224s complete load=7.3
+walls 2 m31/mq-random-10 en:1 0.452s complete load=6.9
+walls 2 m31/mq-random-10 en:16 0.389s complete load=6.9
+walls 2 m31/mq-random-10 cl:4 0.384s complete load=6.5
+walls 2 m31/mq-random-10 cl:8 0.371s complete load=6.2
+walls 2 m31/mq-random-10 cl:16 0.402s complete load=6.5
+walls 2 m31/mq-random-10 d1:1 0.480s complete load=6.5
+walls 2 m31/mq-random-10 cm:16 0.226s complete load=7.3
+walls 2 m31/mq-random-10 zcm:16 0.226s complete load=7.8
+walls 2 m31/mq-random-10 f4:1 0.935s complete load=7.8
+walls 2 m31/mq-random-10 f4:4 0.334s complete load=7.2
+walls 3 wide64/eco-12 f4:16 2.403s complete load=6.7
+walls 3 wide64/eco-12 en:1 2.825s complete load=6.3
+walls 3 wide64/eco-12 en:16 1.760s complete load=7.4
+walls 3 wide64/eco-12 cl:4 1.911s complete load=7.1
+walls 3 wide64/eco-12 cl:8 1.795s complete load=6.9
+walls 3 wide64/eco-12 cl:16 1.773s complete load=6.5
+walls 3 wide64/eco-12 d1:1 2.737s complete load=6.2
+walls 3 wide64/eco-12 zf4:16 2.359s complete load=5.9
+walls 3 wide64/eco-12 zd1:1 3.591s complete load=5.5
+walls 3 wide64/eco-12 f4:1 12.989s complete load=5.2
+walls 3 wide64/eco-12 f4:4 4.310s complete load=4.4
+walls 3 wide64/eco-12 f4:8 3.002s complete load=4.1
+walls 3 goldilocks/katsura-11 f4:16 1.371s complete load=4.0
+walls 3 goldilocks/katsura-11 en:1 0.937s complete load=3.8
+walls 3 goldilocks/katsura-11 en:16 0.620s complete load=3.6
+walls 3 goldilocks/katsura-11 cl:4 0.645s complete load=3.6
+walls 3 goldilocks/katsura-11 cl:8 0.610s complete load=3.6
+walls 3 goldilocks/katsura-11 cl:16 0.613s complete load=3.5
+walls 3 goldilocks/katsura-11 d1:1 0.946s complete load=3.5
+walls 3 goldilocks/katsura-11 zf4:16 1.359s complete load=3.3
+walls 3 goldilocks/katsura-11 zd1:1 1.071s complete load=3.2
+walls 3 goldilocks/katsura-11 f4:1 9.790s complete load=3.2
+walls 3 goldilocks/katsura-11 f4:4 2.951s complete load=3.0
+walls 3 goldilocks/katsura-11 f4:8 1.890s complete load=2.9
+walls 3 wide64/katsura-11 f4:16 1.348s complete load=3.4
+walls 3 wide64/katsura-11 en:1 0.916s complete load=4.5
+walls 3 wide64/katsura-11 en:16 0.610s complete load=4.3
+walls 3 wide64/katsura-11 cl:4 0.647s complete load=4.3
+walls 3 wide64/katsura-11 cl:8 0.606s complete load=4.1
+walls 3 wide64/katsura-11 cl:16 0.615s complete load=4.0
+walls 3 wide64/katsura-11 d1:1 0.911s complete load=3.8
+walls 3 wide64/katsura-11 zf4:16 1.343s complete load=3.8
+walls 3 wide64/katsura-11 zd1:1 1.074s complete load=3.7
+walls 3 wide64/katsura-11 f4:1 9.105s complete load=3.6
+walls 3 wide64/katsura-11 f4:4 2.861s complete load=3.4
+walls 3 wide64/katsura-11 f4:8 1.841s complete load=3.3
+walls 3 goldilocks/mq-random-11 f4:16 4.653s complete load=3.2
+walls 3 goldilocks/mq-random-11 en:1 5.325s complete load=3.0
+walls 3 goldilocks/mq-random-11 en:16 2.116s complete load=2.9
+walls 3 goldilocks/mq-random-11 cl:4 2.672s complete load=2.9
+walls 3 goldilocks/mq-random-11 cl:8 2.282s complete load=3.1
+walls 3 goldilocks/mq-random-11 cl:16 2.118s complete load=3.0
+walls 3 goldilocks/mq-random-11 d1:1 5.321s complete load=2.9
+walls 3 goldilocks/mq-random-11 zf4:16 4.648s complete load=2.8
+walls 3 goldilocks/mq-random-11 zd1:1 5.625s complete load=3.9
+walls 3 goldilocks/mq-random-11 f4:1 41.200s complete load=3.6
+walls 3 goldilocks/mq-random-11 f4:4 11.557s complete load=2.8
+walls 3 goldilocks/mq-random-11 f4:8 7.186s complete load=3.0
+walls 3 goldilocks/cyclic-7 f4:16 0.144s complete load=3.4
+walls 3 goldilocks/cyclic-7 en:1 0.293s complete load=3.4
+walls 3 goldilocks/cyclic-7 en:16 0.144s complete load=3.3
+walls 3 goldilocks/cyclic-7 cl:4 0.594s complete load=3.2
+walls 3 goldilocks/cyclic-7 cl:8 0.643s complete load=3.2
+walls 3 goldilocks/cyclic-7 cl:16 0.669s complete load=3.1
+walls 3 goldilocks/cyclic-7 d1:1 0.570s complete load=3.1
+walls 3 goldilocks/cyclic-7 zf4:16 0.145s complete load=3.1
+walls 3 goldilocks/cyclic-7 zd1:1 0.872s complete load=3.0
+walls 3 goldilocks/cyclic-7 f4:1 0.291s complete load=2.8
+walls 3 goldilocks/cyclic-7 f4:4 0.159s complete load=2.8
+walls 3 goldilocks/cyclic-7 f4:8 0.136s complete load=2.8
+walls 3 wide64/cyclic-7 f4:16 0.142s complete load=2.7
+walls 3 wide64/cyclic-7 en:1 0.279s complete load=2.7
+walls 3 wide64/cyclic-7 en:16 0.147s complete load=2.7
+walls 3 wide64/cyclic-7 cl:4 0.573s complete load=2.5
+walls 3 wide64/cyclic-7 cl:8 0.639s complete load=2.4
+walls 3 wide64/cyclic-7 cl:16 0.668s complete load=2.4
+walls 3 wide64/cyclic-7 d1:1 0.564s complete load=2.4
+walls 3 wide64/cyclic-7 zf4:16 0.144s complete load=2.3
+walls 3 wide64/cyclic-7 zd1:1 0.880s complete load=2.3
+walls 3 wide64/cyclic-7 f4:1 0.275s complete load=2.2
+walls 3 wide64/cyclic-7 f4:4 0.156s complete load=2.1
+walls 3 wide64/cyclic-7 f4:8 0.136s complete load=2.1
+walls 3 goldilocks/katsura-4 f4:16 0.006s complete load=2.1
+walls 3 goldilocks/katsura-4 en:1 0.006s complete load=2.5
+walls 3 goldilocks/katsura-4 en:16 0.006s complete load=3.5
+walls 3 goldilocks/katsura-4 cl:4 0.006s complete load=3.5
+walls 3 goldilocks/katsura-4 cl:8 0.007s complete load=3.5
+walls 3 goldilocks/katsura-4 cl:16 0.007s complete load=3.3
+walls 3 goldilocks/katsura-4 d1:1 0.007s complete load=3.2
+walls 3 goldilocks/katsura-4 zf4:16 0.006s complete load=3.1
+walls 3 goldilocks/katsura-4 zd1:1 0.006s complete load=2.9
+walls 3 goldilocks/katsura-4 f4:1 0.006s complete load=2.8
+walls 3 goldilocks/katsura-4 f4:4 0.006s complete load=2.8
+walls 3 goldilocks/katsura-4 f4:8 0.006s complete load=2.9
+walls 3 wide64/katsura-4 f4:16 0.006s complete load=4.9
+walls 3 wide64/katsura-4 en:1 0.006s complete load=5.3
+walls 3 wide64/katsura-4 en:16 0.006s complete load=5.0
+walls 3 wide64/katsura-4 cl:4 0.008s complete load=4.9
+walls 3 wide64/katsura-4 cl:8 0.008s complete load=12.4
+walls 3 wide64/katsura-4 cl:16 0.007s complete load=19.2
+walls 3 wide64/katsura-4 d1:1 0.007s complete load=30.4
+walls 3 wide64/katsura-4 zf4:16 0.007s complete load=30.2
+walls 3 wide64/katsura-4 zd1:1 0.006s complete load=33.2
+walls 3 wide64/katsura-4 f4:1 0.006s complete load=34.0
+walls 3 wide64/katsura-4 f4:4 0.006s complete load=33.0
+walls 3 wide64/katsura-4 f4:8 0.006s complete load=31.3
+walls 3 goldilocks/noon-7 f4:16 0.193s complete load=28.9
+walls 3 goldilocks/noon-7 en:1 0.100s complete load=26.7
+walls 3 goldilocks/noon-7 en:16 0.109s complete load=24.6
+walls 3 goldilocks/noon-7 cl:4 0.102s complete load=22.7
+walls 3 goldilocks/noon-7 cl:8 0.103s complete load=20.9
+walls 3 goldilocks/noon-7 cl:16 0.109s complete load=19.3
+walls 3 goldilocks/noon-7 d1:1 0.100s complete load=17.8
+walls 3 goldilocks/noon-7 zf4:16 0.192s complete load=16.5
+walls 3 goldilocks/noon-7 zd1:1 0.116s complete load=16.5
+walls 3 goldilocks/noon-7 f4:1 0.214s complete load=15.3
+walls 3 goldilocks/noon-7 f4:4 0.170s complete load=14.1
+walls 3 goldilocks/noon-7 f4:8 0.165s complete load=14.1
+walls 3 wide64/katsura-9 f4:16 0.073s complete load=13.1
+walls 3 wide64/katsura-9 en:1 0.045s complete load=12.0
+walls 3 wide64/katsura-9 en:16 0.044s complete load=11.2
+walls 3 wide64/katsura-9 cl:4 0.041s complete load=9.7
+walls 3 wide64/katsura-9 cl:8 0.040s complete load=9.1
+walls 3 wide64/katsura-9 cl:16 0.043s complete load=8.5
+walls 3 wide64/katsura-9 d1:1 0.045s complete load=7.9
+walls 3 wide64/katsura-9 zf4:16 0.074s complete load=7.2
+walls 3 wide64/katsura-9 zd1:1 0.053s complete load=6.7
+walls 3 wide64/katsura-9 f4:1 0.170s complete load=6.1
+walls 3 wide64/katsura-9 f4:4 0.084s complete load=5.8
+walls 3 wide64/katsura-9 f4:8 0.070s complete load=5.4
+walls 3 wide64/noon-8 f4:16 0.979s complete load=5.1
+walls 3 wide64/noon-8 en:1 0.573s complete load=4.7
+walls 3 wide64/noon-8 en:16 0.606s complete load=4.4
+walls 3 wide64/noon-8 cl:4 0.583s complete load=4.4
+walls 3 wide64/noon-8 cl:8 0.603s complete load=4.2
+walls 3 wide64/noon-8 cl:16 0.600s complete load=3.9
+walls 3 wide64/noon-8 d1:1 0.578s complete load=3.8
+walls 3 wide64/noon-8 zf4:16 0.969s complete load=3.8
+walls 3 wide64/noon-8 zd1:1 0.660s complete load=3.6
+walls 3 wide64/noon-8 f4:1 1.386s complete load=3.5
+walls 3 wide64/noon-8 f4:4 1.020s complete load=3.4
+walls 3 wide64/noon-8 f4:8 0.934s complete load=3.4
+walls 3 gf32003/mq-random-10 f4:16 0.243s complete load=3.9
+walls 3 gf32003/mq-random-10 en:1 0.475s complete load=3.7
+walls 3 gf32003/mq-random-10 en:16 0.378s complete load=3.7
+walls 3 gf32003/mq-random-10 cl:4 0.374s complete load=3.6
+walls 3 gf32003/mq-random-10 cl:8 0.360s complete load=3.5
+walls 3 gf32003/mq-random-10 cl:16 0.380s complete load=3.5
+walls 3 gf32003/mq-random-10 d1:1 0.467s complete load=3.4
+walls 3 gf32003/mq-random-10 cm:16 0.239s complete load=3.2
+walls 3 gf32003/mq-random-10 zcm:16 0.243s complete load=3.1
+walls 3 gf32003/mq-random-10 f4:1 1.089s complete load=3.1
+walls 3 gf32003/mq-random-10 f4:4 0.387s complete load=3.1
+walls 3 gf32003/mq-random-10 f4:8 0.275s complete load=3.0
+walls 3 m31/mq-random-10 f4:16 0.226s complete load=3.0
+walls 3 m31/mq-random-10 en:1 0.442s complete load=3.0
+walls 3 m31/mq-random-10 en:16 0.388s complete load=3.0
+walls 3 m31/mq-random-10 cl:4 0.383s complete load=3.0
+walls 3 m31/mq-random-10 cl:8 0.370s complete load=2.9
+walls 3 m31/mq-random-10 cl:16 0.393s complete load=2.8
+walls 3 m31/mq-random-10 d1:1 0.455s complete load=2.8
+walls 3 m31/mq-random-10 cm:16 0.227s complete load=2.8
+walls 3 m31/mq-random-10 zcm:16 0.227s complete load=2.6
+walls 3 m31/mq-random-10 f4:1 0.940s complete load=2.6
+walls 3 m31/mq-random-10 f4:4 0.343s complete load=2.6
+walls 3 m31/mq-random-10 f4:8 0.248s complete load=2.5
+walls 4 wide64/eco-12 en:1 2.555s complete load=2.5
+walls 4 wide64/eco-12 en:16 1.746s complete load=2.5
+walls 4 wide64/eco-12 cl:4 1.845s complete load=2.5
+walls 4 wide64/eco-12 cl:8 1.752s complete load=2.5
+walls 4 wide64/eco-12 cl:16 1.738s complete load=2.4
+walls 4 wide64/eco-12 d1:1 2.562s complete load=2.4
+walls 4 wide64/eco-12 zf4:16 2.348s complete load=2.4
+walls 4 wide64/eco-12 zd1:1 3.603s complete load=2.4
+walls 4 wide64/eco-12 f4:1 12.848s complete load=2.3
+walls 4 wide64/eco-12 f4:4 4.305s complete load=2.3
+walls 4 wide64/eco-12 f4:8 3.007s complete load=2.5
+walls 4 wide64/eco-12 f4:16 2.526s complete load=2.6
+walls 4 goldilocks/katsura-11 en:1 0.939s complete load=2.5
+walls 4 goldilocks/katsura-11 en:16 0.617s complete load=2.5
+walls 4 goldilocks/katsura-11 cl:4 0.652s complete load=2.6
+walls 4 goldilocks/katsura-11 cl:8 0.607s complete load=2.5
+walls 4 goldilocks/katsura-11 cl:16 0.612s complete load=2.5
+walls 4 goldilocks/katsura-11 d1:1 0.936s complete load=2.5
+walls 4 goldilocks/katsura-11 zf4:16 1.361s complete load=2.5
+walls 4 goldilocks/katsura-11 zd1:1 1.086s complete load=2.4
+walls 4 goldilocks/katsura-11 f4:1 9.752s complete load=2.4
+walls 4 goldilocks/katsura-11 f4:4 2.937s complete load=2.3
+walls 4 goldilocks/katsura-11 f4:8 1.887s complete load=2.3
+walls 4 goldilocks/katsura-11 f4:16 1.354s complete load=2.4
+walls 4 wide64/katsura-11 en:1 0.928s complete load=2.4
+walls 4 wide64/katsura-11 en:16 0.611s complete load=2.3
+walls 4 wide64/katsura-11 cl:4 0.636s complete load=2.2
+walls 4 wide64/katsura-11 cl:8 0.615s complete load=2.2
+walls 4 wide64/katsura-11 cl:16 0.614s complete load=2.2
+walls 4 wide64/katsura-11 d1:1 0.911s complete load=2.2
+walls 4 wide64/katsura-11 zf4:16 1.345s complete load=2.2
+walls 4 wide64/katsura-11 zd1:1 1.057s complete load=2.2
+walls 4 wide64/katsura-11 f4:1 9.154s complete load=2.2
+walls 4 wide64/katsura-11 f4:4 2.812s complete load=2.1
+walls 4 wide64/katsura-11 f4:8 1.848s complete load=2.0
+walls 4 wide64/katsura-11 f4:16 1.348s complete load=2.0
+walls 4 goldilocks/mq-random-11 en:1 5.402s complete load=2.0
+walls 4 goldilocks/mq-random-11 en:16 2.126s complete load=2.0
+walls 4 goldilocks/mq-random-11 cl:4 2.663s complete load=1.9
+walls 4 goldilocks/mq-random-11 cl:8 2.304s complete load=2.0
+walls 4 goldilocks/mq-random-11 cl:16 2.149s complete load=1.9
+walls 4 goldilocks/mq-random-11 d1:1 5.382s complete load=1.9
+walls 4 goldilocks/mq-random-11 zf4:16 4.668s complete load=1.9
+walls 4 goldilocks/mq-random-11 zd1:1 5.647s complete load=1.9
+walls 4 goldilocks/mq-random-11 f4:1 41.553s complete load=1.9
+walls 4 goldilocks/mq-random-11 f4:4 11.564s complete load=1.9
+walls 4 goldilocks/mq-random-11 f4:8 7.168s complete load=2.5
+walls 4 goldilocks/mq-random-11 f4:16 4.651s complete load=3.0
+walls 4 goldilocks/cyclic-7 en:1 0.283s complete load=2.9
+walls 4 goldilocks/cyclic-7 en:16 0.145s complete load=2.9
+walls 4 goldilocks/cyclic-7 cl:4 0.578s complete load=2.9
+walls 4 goldilocks/cyclic-7 cl:8 0.648s complete load=2.9
+walls 4 goldilocks/cyclic-7 cl:16 0.667s complete load=2.8
+walls 4 goldilocks/cyclic-7 d1:1 0.574s complete load=2.8
+walls 4 goldilocks/cyclic-7 zf4:16 0.147s complete load=2.9
+walls 4 goldilocks/cyclic-7 zd1:1 0.870s complete load=2.8
+walls 4 goldilocks/cyclic-7 f4:1 0.291s complete load=2.8
+walls 4 goldilocks/cyclic-7 f4:4 0.159s complete load=2.7
+walls 4 goldilocks/cyclic-7 f4:8 0.136s complete load=2.7
+walls 4 goldilocks/cyclic-7 f4:16 0.145s complete load=2.7
+walls 4 wide64/cyclic-7 en:1 0.278s complete load=2.7
+walls 4 wide64/cyclic-7 en:16 0.143s complete load=2.8
+walls 4 wide64/cyclic-7 cl:4 0.604s complete load=2.8
+walls 4 wide64/cyclic-7 cl:8 0.640s complete load=2.7
+walls 4 wide64/cyclic-7 cl:16 0.665s complete load=2.7
+walls 4 wide64/cyclic-7 d1:1 0.576s complete load=2.7
+walls 4 wide64/cyclic-7 zf4:16 0.146s complete load=2.6
+walls 4 wide64/cyclic-7 zd1:1 0.878s complete load=2.5
+walls 4 wide64/cyclic-7 f4:1 0.281s complete load=2.5
+walls 4 wide64/cyclic-7 f4:4 0.156s complete load=2.4
+walls 4 wide64/cyclic-7 f4:8 0.135s complete load=2.3
+walls 4 wide64/cyclic-7 f4:16 0.145s complete load=2.3
+walls 4 goldilocks/katsura-4 en:1 0.006s complete load=2.3
+walls 4 goldilocks/katsura-4 en:16 0.006s complete load=2.2
+walls 4 goldilocks/katsura-4 cl:4 0.006s complete load=2.2
+walls 4 goldilocks/katsura-4 cl:8 0.006s complete load=2.2
+walls 4 goldilocks/katsura-4 cl:16 0.006s complete load=2.3
+walls 4 goldilocks/katsura-4 d1:1 0.006s complete load=2.3
+walls 4 goldilocks/katsura-4 zf4:16 0.006s complete load=2.2
+walls 4 goldilocks/katsura-4 zd1:1 0.007s complete load=2.1
+walls 4 goldilocks/katsura-4 f4:1 0.006s complete load=2.0
+walls 4 goldilocks/katsura-4 f4:4 0.007s complete load=1.9
+walls 4 goldilocks/katsura-4 f4:8 0.006s complete load=1.9
+walls 4 goldilocks/katsura-4 f4:16 0.006s complete load=1.8
+walls 4 wide64/katsura-4 en:1 0.006s complete load=1.8
+walls 4 wide64/katsura-4 en:16 0.006s complete load=1.8
+walls 4 wide64/katsura-4 cl:4 0.006s complete load=1.8
+walls 4 wide64/katsura-4 cl:8 0.006s complete load=1.8
+walls 4 wide64/katsura-4 cl:16 0.006s complete load=1.8
+walls 4 wide64/katsura-4 d1:1 0.006s complete load=1.7
+walls 4 wide64/katsura-4 zf4:16 0.006s complete load=1.7
+walls 4 wide64/katsura-4 zd1:1 0.006s complete load=1.6
+walls 4 wide64/katsura-4 f4:1 0.006s complete load=4.0
+walls 4 wide64/katsura-4 f4:4 0.006s complete load=4.4
+walls 4 wide64/katsura-4 f4:8 0.006s complete load=4.1
+walls 4 wide64/katsura-4 f4:16 0.006s complete load=3.8
+walls 4 goldilocks/noon-7 en:1 0.100s complete load=3.4
+walls 4 goldilocks/noon-7 en:16 0.108s complete load=3.2
+walls 4 goldilocks/noon-7 cl:4 0.103s complete load=3.2
+walls 4 goldilocks/noon-7 cl:8 0.104s complete load=3.1
+walls 4 goldilocks/noon-7 cl:16 0.108s complete load=3.1
+walls 4 goldilocks/noon-7 d1:1 0.101s complete load=3.3
+walls 4 goldilocks/noon-7 zf4:16 0.193s complete load=3.1
+walls 4 goldilocks/noon-7 zd1:1 0.116s complete load=2.9
+walls 4 goldilocks/noon-7 f4:1 0.210s complete load=2.9
+walls 4 goldilocks/noon-7 f4:4 0.169s complete load=2.8
+walls 4 goldilocks/noon-7 f4:8 0.164s complete load=2.7
+walls 4 goldilocks/noon-7 f4:16 0.193s complete load=2.7
+walls 4 wide64/katsura-9 en:1 0.046s complete load=2.6
+walls 4 wide64/katsura-9 en:16 0.043s complete load=2.4
+walls 4 wide64/katsura-9 cl:4 0.041s complete load=2.2
+walls 4 wide64/katsura-9 cl:8 0.041s complete load=2.1
+walls 4 wide64/katsura-9 cl:16 0.043s complete load=2.0
+walls 4 wide64/katsura-9 d1:1 0.045s complete load=2.0
+walls 4 wide64/katsura-9 zf4:16 0.075s complete load=1.8
+walls 4 wide64/katsura-9 zd1:1 0.054s complete load=1.7
+walls 4 wide64/katsura-9 f4:1 0.170s complete load=1.6
+walls 4 wide64/katsura-9 f4:4 0.083s complete load=1.6
+walls 4 wide64/katsura-9 f4:8 0.070s complete load=1.4
+walls 4 wide64/katsura-9 f4:16 0.072s complete load=1.3
+walls 4 wide64/noon-8 en:1 0.577s complete load=1.2
+walls 4 wide64/noon-8 en:16 0.602s complete load=1.2
+walls 4 wide64/noon-8 cl:4 0.575s complete load=1.2
+walls 4 wide64/noon-8 cl:8 0.591s complete load=1.2
+walls 4 wide64/noon-8 cl:16 0.605s complete load=1.2
+walls 4 wide64/noon-8 d1:1 0.583s complete load=1.2
+walls 4 wide64/noon-8 zf4:16 0.969s complete load=1.2
+walls 4 wide64/noon-8 zd1:1 0.661s complete load=1.1
+walls 4 wide64/noon-8 f4:1 1.375s complete load=1.1
+walls 4 wide64/noon-8 f4:4 1.037s complete load=1.2
+walls 4 wide64/noon-8 f4:8 1.054s complete load=1.2
+walls 4 wide64/noon-8 f4:16 0.985s complete load=13.3
+walls 4 gf32003/mq-random-10 en:1 0.495s complete load=13.3
+walls 4 gf32003/mq-random-10 en:16 0.387s complete load=12.6
+walls 4 gf32003/mq-random-10 cl:4 0.370s complete load=11.7
+walls 4 gf32003/mq-random-10 cl:8 0.358s complete load=11.1
+walls 4 gf32003/mq-random-10 cl:16 0.380s complete load=11.1
+walls 4 gf32003/mq-random-10 d1:1 0.467s complete load=10.4
+walls 4 gf32003/mq-random-10 cm:16 0.245s complete load=9.7
+walls 4 gf32003/mq-random-10 zcm:16 0.242s complete load=9.7
+walls 4 gf32003/mq-random-10 f4:1 1.407s complete load=9.1
+walls 4 gf32003/mq-random-10 f4:4 0.470s complete load=17.0
+walls 4 gf32003/mq-random-10 f4:8 0.332s complete load=23.4
+walls 4 gf32003/mq-random-10 f4:16 0.242s complete load=22.8
+walls 4 m31/mq-random-10 en:1 0.479s complete load=22.8
+walls 4 m31/mq-random-10 en:16 0.398s complete load=22.7
+walls 4 m31/mq-random-10 cl:4 0.377s complete load=21.2
+walls 4 m31/mq-random-10 cl:8 0.363s complete load=21.2
+walls 4 m31/mq-random-10 cl:16 0.386s complete load=19.7
+walls 4 m31/mq-random-10 d1:1 0.447s complete load=18.2
+walls 4 m31/mq-random-10 cm:16 0.225s complete load=18.2
+walls 4 m31/mq-random-10 zcm:16 0.231s complete load=16.9
+walls 4 m31/mq-random-10 f4:1 0.941s complete load=15.7
+walls 4 m31/mq-random-10 f4:4 0.336s complete load=14.5
+walls 4 m31/mq-random-10 f4:8 0.249s complete load=14.5
+walls 4 m31/mq-random-10 f4:16 0.227s complete load=13.4
+walls 5 wide64/eco-12 en:16 1.741s complete load=12.6
+walls 5 wide64/eco-12 cl:4 1.836s complete load=11.7
+walls 5 wide64/eco-12 cl:8 1.742s complete load=10.9
+walls 5 wide64/eco-12 cl:16 1.799s complete load=10.9
+walls 5 wide64/eco-12 d1:1 2.590s complete load=10.2
+walls 5 wide64/eco-12 zf4:16 2.352s complete load=9.1
+walls 5 wide64/eco-12 zd1:1 3.618s complete load=8.6
+walls 5 wide64/eco-12 f4:1 12.926s complete load=8.0
+walls 5 wide64/eco-12 f4:4 4.273s complete load=6.5
+walls 5 wide64/eco-12 f4:8 3.008s complete load=6.3
+walls 5 wide64/eco-12 f4:16 2.363s complete load=5.6
+walls 5 wide64/eco-12 en:1 2.524s complete load=5.1
+walls 5 goldilocks/katsura-11 en:16 0.614s complete load=4.9
+walls 5 goldilocks/katsura-11 cl:4 0.642s complete load=4.6
+walls 5 goldilocks/katsura-11 cl:8 0.620s complete load=4.6
+walls 5 goldilocks/katsura-11 cl:16 0.630s complete load=4.5
+walls 5 goldilocks/katsura-11 d1:1 0.929s complete load=4.2
+walls 5 goldilocks/katsura-11 zf4:16 1.344s complete load=4.2
+walls 5 goldilocks/katsura-11 zd1:1 1.073s complete load=4.0
+walls 5 goldilocks/katsura-11 f4:1 9.746s complete load=3.8
+walls 5 goldilocks/katsura-11 f4:4 2.886s complete load=3.2
+walls 5 goldilocks/katsura-11 f4:8 1.888s complete load=3.6
+walls 5 goldilocks/katsura-11 f4:16 1.400s complete load=3.4
+walls 5 goldilocks/katsura-11 en:1 0.935s complete load=3.2
+walls 5 wide64/katsura-11 en:16 0.608s complete load=3.2
+walls 5 wide64/katsura-11 cl:4 0.649s complete load=3.0
+walls 5 wide64/katsura-11 cl:8 0.602s complete load=2.9
+walls 5 wide64/katsura-11 cl:16 0.612s complete load=2.9
+walls 5 wide64/katsura-11 d1:1 0.916s complete load=2.8
+walls 5 wide64/katsura-11 zf4:16 1.344s complete load=2.7
+walls 5 wide64/katsura-11 zd1:1 1.060s complete load=2.6
+walls 5 wide64/katsura-11 f4:1 9.130s complete load=2.6
+walls 5 wide64/katsura-11 f4:4 2.805s complete load=2.2
+walls 5 wide64/katsura-11 f4:8 1.841s complete load=2.1
+walls 5 wide64/katsura-11 f4:16 1.324s complete load=2.1
+walls 5 wide64/katsura-11 en:1 0.911s complete load=1.9
+walls 5 goldilocks/mq-random-11 en:16 2.114s complete load=1.9
+walls 5 goldilocks/mq-random-11 cl:4 2.643s complete load=1.8
+walls 5 goldilocks/mq-random-11 cl:8 2.307s complete load=1.8
+walls 5 goldilocks/mq-random-11 cl:16 2.126s complete load=1.8
+walls 5 goldilocks/mq-random-11 d1:1 5.324s complete load=1.9
+walls 5 goldilocks/mq-random-11 zf4:16 4.670s complete load=1.9
+walls 5 goldilocks/mq-random-11 zd1:1 5.662s complete load=2.9
+walls 5 goldilocks/mq-random-11 f4:1 41.328s complete load=2.8
+walls 5 goldilocks/mq-random-11 f4:4 11.675s complete load=1.9
+walls 5 goldilocks/mq-random-11 f4:8 7.163s complete load=3.2
+walls 5 goldilocks/mq-random-11 f4:16 4.668s complete load=3.4
+walls 5 goldilocks/mq-random-11 en:1 5.358s complete load=4.6
+walls 5 goldilocks/cyclic-7 en:16 0.145s complete load=4.0
+walls 5 goldilocks/cyclic-7 cl:4 0.601s complete load=3.8
+walls 5 goldilocks/cyclic-7 cl:8 0.640s complete load=3.8
+walls 5 goldilocks/cyclic-7 cl:16 0.666s complete load=3.7
+walls 5 goldilocks/cyclic-7 d1:1 0.580s complete load=3.5
+walls 5 goldilocks/cyclic-7 zf4:16 0.145s complete load=3.5
+walls 5 goldilocks/cyclic-7 zd1:1 0.871s complete load=3.4
+walls 5 goldilocks/cyclic-7 f4:1 0.291s complete load=3.2
+walls 5 goldilocks/cyclic-7 f4:4 0.158s complete load=3.2
+walls 5 goldilocks/cyclic-7 f4:8 0.137s complete load=3.0
+walls 5 goldilocks/cyclic-7 f4:16 0.141s complete load=2.9
+walls 5 goldilocks/cyclic-7 en:1 0.291s complete load=2.9
+walls 5 wide64/cyclic-7 en:16 0.146s complete load=2.8
+walls 5 wide64/cyclic-7 cl:4 0.588s complete load=2.6
+walls 5 wide64/cyclic-7 cl:8 0.637s complete load=2.6
+walls 5 wide64/cyclic-7 cl:16 0.665s complete load=2.4
+walls 5 wide64/cyclic-7 d1:1 0.569s complete load=2.3
+walls 5 wide64/cyclic-7 zf4:16 0.145s complete load=2.2
+walls 5 wide64/cyclic-7 zd1:1 0.878s complete load=2.2
+walls 5 wide64/cyclic-7 f4:1 0.282s complete load=2.1
+walls 5 wide64/cyclic-7 f4:4 0.160s complete load=2.0
+walls 5 wide64/cyclic-7 f4:8 0.135s complete load=2.0
+walls 5 wide64/cyclic-7 f4:16 0.146s complete load=2.0
+walls 5 wide64/cyclic-7 en:1 0.284s complete load=1.9
+walls 5 goldilocks/katsura-4 en:16 0.006s complete load=1.9
+walls 5 goldilocks/katsura-4 cl:4 0.006s complete load=1.9
+walls 5 goldilocks/katsura-4 cl:8 0.006s complete load=1.7
+walls 5 goldilocks/katsura-4 cl:16 0.006s complete load=1.7
+walls 5 goldilocks/katsura-4 d1:1 0.006s complete load=1.6
+walls 5 goldilocks/katsura-4 zf4:16 0.006s complete load=1.5
+walls 5 goldilocks/katsura-4 zd1:1 0.006s complete load=1.4
+walls 5 goldilocks/katsura-4 f4:1 0.006s complete load=1.3
+walls 5 goldilocks/katsura-4 f4:4 0.006s complete load=1.2
+walls 5 goldilocks/katsura-4 f4:8 0.006s complete load=1.1
+walls 5 goldilocks/katsura-4 f4:16 0.006s complete load=1.1
+walls 5 goldilocks/katsura-4 en:1 0.007s complete load=1.0
+walls 5 wide64/katsura-4 en:16 0.006s complete load=1.0
+walls 5 wide64/katsura-4 cl:4 0.006s complete load=1.0
+walls 5 wide64/katsura-4 cl:8 0.006s complete load=1.0
+walls 5 wide64/katsura-4 cl:16 0.006s complete load=1.0
+walls 5 wide64/katsura-4 d1:1 0.006s complete load=1.1
+walls 5 wide64/katsura-4 zf4:16 0.006s complete load=1.2
+walls 5 wide64/katsura-4 zd1:1 0.006s complete load=1.3
+walls 5 wide64/katsura-4 f4:1 0.006s complete load=1.7
+walls 5 wide64/katsura-4 f4:4 0.006s complete load=1.7
+walls 5 wide64/katsura-4 f4:8 0.006s complete load=1.6
+walls 5 wide64/katsura-4 f4:16 0.006s complete load=1.6
+walls 5 wide64/katsura-4 en:1 0.006s complete load=1.5
+walls 5 goldilocks/noon-7 en:16 0.111s complete load=1.5
+walls 5 goldilocks/noon-7 cl:4 0.103s complete load=1.5
+walls 5 goldilocks/noon-7 cl:8 0.102s complete load=1.5
+walls 5 goldilocks/noon-7 cl:16 0.109s complete load=1.5
+walls 5 goldilocks/noon-7 d1:1 0.101s complete load=1.5
+walls 5 goldilocks/noon-7 zf4:16 0.194s complete load=1.6
+walls 5 goldilocks/noon-7 zd1:1 0.117s complete load=1.6
+walls 5 goldilocks/noon-7 f4:1 0.202s complete load=1.5
+walls 5 goldilocks/noon-7 f4:4 0.171s complete load=1.6
+walls 5 goldilocks/noon-7 f4:8 0.165s complete load=1.6
+walls 5 goldilocks/noon-7 f4:16 0.190s complete load=1.6
+walls 5 goldilocks/noon-7 en:1 0.098s complete load=1.6
+walls 5 wide64/katsura-9 en:16 0.042s complete load=1.6
+walls 5 wide64/katsura-9 cl:4 0.041s complete load=1.5
+walls 5 wide64/katsura-9 cl:8 0.040s complete load=1.5
+walls 5 wide64/katsura-9 cl:16 0.042s complete load=1.5
+walls 5 wide64/katsura-9 d1:1 0.045s complete load=1.4
+walls 5 wide64/katsura-9 zf4:16 0.075s complete load=1.5
+walls 5 wide64/katsura-9 zd1:1 0.053s complete load=1.5
+walls 5 wide64/katsura-9 f4:1 0.169s complete load=1.6
+walls 5 wide64/katsura-9 f4:4 0.084s complete load=1.6
+walls 5 wide64/katsura-9 f4:8 0.070s complete load=1.7
+walls 5 wide64/katsura-9 f4:16 0.074s complete load=1.7
+walls 5 wide64/katsura-9 en:1 0.046s complete load=1.8
+walls 5 wide64/noon-8 en:16 0.592s complete load=1.8
+walls 5 wide64/noon-8 cl:4 0.587s complete load=1.8
+walls 5 wide64/noon-8 cl:8 0.587s complete load=2.3
+walls 5 wide64/noon-8 cl:16 0.599s complete load=2.2
+walls 5 wide64/noon-8 d1:1 0.579s complete load=2.2
+walls 5 wide64/noon-8 zf4:16 0.970s complete load=2.2
+walls 5 wide64/noon-8 zd1:1 0.683s complete load=2.2
+walls 5 wide64/noon-8 f4:1 1.366s complete load=2.1
+walls 5 wide64/noon-8 f4:4 0.998s complete load=2.1
+walls 5 wide64/noon-8 f4:8 0.955s complete load=2.1
+walls 5 wide64/noon-8 f4:16 0.983s complete load=2.0
+walls 5 wide64/noon-8 en:1 0.581s complete load=2.0
+walls 5 gf32003/mq-random-10 en:16 0.376s complete load=2.0
+walls 5 gf32003/mq-random-10 cl:4 0.381s complete load=2.0
+walls 5 gf32003/mq-random-10 cl:8 0.364s complete load=2.0
+walls 5 gf32003/mq-random-10 cl:16 0.377s complete load=2.0
+walls 5 gf32003/mq-random-10 d1:1 0.470s complete load=1.9
+walls 5 gf32003/mq-random-10 cm:16 0.240s complete load=2.0
+walls 5 gf32003/mq-random-10 zcm:16 0.240s complete load=2.0
+walls 5 gf32003/mq-random-10 f4:1 1.085s complete load=2.0
+walls 5 gf32003/mq-random-10 f4:4 0.382s complete load=2.1
+walls 5 gf32003/mq-random-10 f4:8 0.273s complete load=2.1
+walls 5 gf32003/mq-random-10 f4:16 0.241s complete load=2.0
+walls 5 gf32003/mq-random-10 en:1 0.477s complete load=2.0
+walls 5 m31/mq-random-10 en:16 0.392s complete load=2.0
+walls 5 m31/mq-random-10 cl:4 0.367s complete load=2.0
+walls 5 m31/mq-random-10 cl:8 0.367s complete load=2.0
+walls 5 m31/mq-random-10 cl:16 0.397s complete load=2.0
+walls 5 m31/mq-random-10 d1:1 0.444s complete load=2.0
+walls 5 m31/mq-random-10 cm:16 0.226s complete load=2.0
+walls 5 m31/mq-random-10 zcm:16 0.223s complete load=2.0
+walls 5 m31/mq-random-10 f4:1 0.930s complete load=2.0
+walls 5 m31/mq-random-10 f4:4 0.336s complete load=2.0
+walls 5 m31/mq-random-10 f4:8 0.248s complete load=2.0
+walls 5 m31/mq-random-10 f4:16 0.227s complete load=2.0
+walls 5 m31/mq-random-10 en:1 0.453s complete load=1.9
+walls 6 wide64/eco-12 cl:4 1.840s complete load=1.9
+walls 6 wide64/eco-12 cl:8 1.756s complete load=1.9
+walls 6 wide64/eco-12 cl:16 1.752s complete load=1.9
+walls 6 wide64/eco-12 d1:1 2.560s complete load=1.9
+walls 6 wide64/eco-12 zf4:16 2.367s complete load=1.9
+walls 6 wide64/eco-12 zd1:1 3.616s complete load=1.9
+walls 6 wide64/eco-12 f4:1 12.883s complete load=1.9
+walls 6 wide64/eco-12 f4:4 4.321s complete load=2.0
+walls 6 wide64/eco-12 f4:8 3.007s complete load=2.3
+walls 6 wide64/eco-12 f4:16 2.364s complete load=2.9
+walls 6 wide64/eco-12 en:1 2.557s complete load=2.9
+walls 6 wide64/eco-12 en:16 1.744s complete load=2.8
+walls 6 goldilocks/katsura-11 cl:4 0.692s complete load=2.7
+walls 6 goldilocks/katsura-11 cl:8 0.617s complete load=3.0
+walls 6 goldilocks/katsura-11 cl:16 0.622s complete load=2.8
+walls 6 goldilocks/katsura-11 d1:1 0.947s complete load=2.8
+walls 6 goldilocks/katsura-11 zf4:16 1.357s complete load=2.7
+walls 6 goldilocks/katsura-11 zd1:1 1.071s complete load=3.9
+walls 6 goldilocks/katsura-11 f4:1 10.054s complete load=3.7
+walls 6 goldilocks/katsura-11 f4:4 3.021s complete load=3.8
+walls 6 goldilocks/katsura-11 f4:8 1.889s complete load=3.9
+walls 6 goldilocks/katsura-11 f4:16 1.362s complete load=3.7
+walls 6 goldilocks/katsura-11 en:1 0.938s complete load=3.5
+walls 6 goldilocks/katsura-11 en:16 0.624s complete load=3.4
+walls 6 wide64/katsura-11 cl:4 0.657s complete load=3.4
+walls 6 wide64/katsura-11 cl:8 0.610s complete load=3.4
+walls 6 wide64/katsura-11 cl:16 0.611s complete load=3.2
+walls 6 wide64/katsura-11 d1:1 0.915s complete load=3.0
+walls 6 wide64/katsura-11 zf4:16 1.338s complete load=3.0
+walls 6 wide64/katsura-11 zd1:1 1.091s complete load=3.0
+walls 6 wide64/katsura-11 f4:1 9.225s complete load=2.9
+walls 6 wide64/katsura-11 f4:4 2.832s complete load=2.8
+walls 6 wide64/katsura-11 f4:8 1.840s complete load=2.8
+walls 6 wide64/katsura-11 f4:16 1.340s complete load=2.7
+walls 6 wide64/katsura-11 en:1 0.931s complete load=2.7
+walls 6 wide64/katsura-11 en:16 0.617s complete load=2.7
+walls 6 goldilocks/mq-random-11 cl:4 2.677s complete load=2.5
+walls 6 goldilocks/mq-random-11 cl:8 2.310s complete load=2.6
+walls 6 goldilocks/mq-random-11 cl:16 2.138s complete load=2.5
+walls 6 goldilocks/mq-random-11 d1:1 5.340s complete load=2.6
+walls 6 goldilocks/mq-random-11 zf4:16 4.671s complete load=2.5
+walls 6 goldilocks/mq-random-11 zd1:1 5.669s complete load=2.6
+walls 6 goldilocks/mq-random-11 f4:1 41.313s complete load=2.6
+walls 6 goldilocks/mq-random-11 f4:4 11.712s complete load=2.6
+walls 6 goldilocks/mq-random-11 f4:8 7.179s complete load=3.0
+walls 6 goldilocks/mq-random-11 f4:16 4.676s complete load=3.4
+walls 6 goldilocks/mq-random-11 en:1 5.358s complete load=4.5
+walls 6 goldilocks/mq-random-11 en:16 2.126s complete load=4.2
+walls 6 goldilocks/cyclic-7 cl:4 0.597s complete load=4.2
+walls 6 goldilocks/cyclic-7 cl:8 0.641s complete load=4.0
+walls 6 goldilocks/cyclic-7 cl:16 0.666s complete load=3.7
+walls 6 goldilocks/cyclic-7 d1:1 0.585s complete load=3.6
+walls 6 goldilocks/cyclic-7 zf4:16 0.148s complete load=3.6
+walls 6 goldilocks/cyclic-7 zd1:1 0.872s complete load=3.4
+walls 6 goldilocks/cyclic-7 f4:1 0.297s complete load=3.3
+walls 6 goldilocks/cyclic-7 f4:4 0.158s complete load=3.3
+walls 6 goldilocks/cyclic-7 f4:8 0.136s complete load=3.5
+walls 6 goldilocks/cyclic-7 f4:16 0.146s complete load=3.5
+walls 6 goldilocks/cyclic-7 en:1 0.297s complete load=3.5
+walls 6 goldilocks/cyclic-7 en:16 0.145s complete load=3.4
+walls 6 wide64/cyclic-7 cl:4 0.586s complete load=3.4
+walls 6 wide64/cyclic-7 cl:8 0.633s complete load=3.4
+walls 6 wide64/cyclic-7 cl:16 0.661s complete load=3.3
+walls 6 wide64/cyclic-7 d1:1 0.575s complete load=3.1
+walls 6 wide64/cyclic-7 zf4:16 0.142s complete load=3.0
+walls 6 wide64/cyclic-7 zd1:1 0.881s complete load=3.0
+walls 6 wide64/cyclic-7 f4:1 0.277s complete load=3.0
+walls 6 wide64/cyclic-7 f4:4 0.156s complete load=2.9
+walls 6 wide64/cyclic-7 f4:8 0.135s complete load=2.9
+walls 6 wide64/cyclic-7 f4:16 0.146s complete load=2.8
+walls 6 wide64/cyclic-7 en:1 0.285s complete load=2.7
+walls 6 wide64/cyclic-7 en:16 0.144s complete load=2.7
+walls 6 goldilocks/katsura-4 cl:4 0.006s complete load=2.7
+walls 6 goldilocks/katsura-4 cl:8 0.006s complete load=2.6
+walls 6 goldilocks/katsura-4 cl:16 0.007s complete load=2.5
+walls 6 goldilocks/katsura-4 d1:1 0.006s complete load=2.3
+walls 6 goldilocks/katsura-4 zf4:16 0.006s complete load=2.4
+walls 6 goldilocks/katsura-4 zd1:1 0.006s complete load=2.5
+walls 6 goldilocks/katsura-4 f4:1 0.006s complete load=2.5
+walls 6 goldilocks/katsura-4 f4:4 0.006s complete load=2.3
+walls 6 goldilocks/katsura-4 f4:8 0.006s complete load=2.2
+walls 6 goldilocks/katsura-4 f4:16 0.006s complete load=2.3
+walls 6 goldilocks/katsura-4 en:1 0.006s complete load=2.2
+walls 6 goldilocks/katsura-4 en:16 0.006s complete load=2.1
+walls 6 wide64/katsura-4 cl:4 0.006s complete load=1.9
+walls 6 wide64/katsura-4 cl:8 0.006s complete load=1.9
+walls 6 wide64/katsura-4 cl:16 0.006s complete load=1.9
+walls 6 wide64/katsura-4 d1:1 0.006s complete load=2.0
+walls 6 wide64/katsura-4 zf4:16 0.006s complete load=2.0
+walls 6 wide64/katsura-4 zd1:1 0.006s complete load=2.0
+walls 6 wide64/katsura-4 f4:1 0.006s complete load=1.9
+walls 6 wide64/katsura-4 f4:4 0.006s complete load=1.8
+walls 6 wide64/katsura-4 f4:8 0.006s complete load=1.7
+walls 6 wide64/katsura-4 f4:16 0.006s complete load=1.7
+walls 6 wide64/katsura-4 en:1 0.006s complete load=1.6
+walls 6 wide64/katsura-4 en:16 0.006s complete load=1.6
+walls 6 goldilocks/noon-7 cl:4 0.102s complete load=1.6
+walls 6 goldilocks/noon-7 cl:8 0.104s complete load=1.6
+walls 6 goldilocks/noon-7 cl:16 0.108s complete load=1.6
+walls 6 goldilocks/noon-7 d1:1 0.101s complete load=1.8
+walls 6 goldilocks/noon-7 zf4:16 0.191s complete load=1.8
+walls 6 goldilocks/noon-7 zd1:1 0.116s complete load=1.8
+walls 6 goldilocks/noon-7 f4:1 0.210s complete load=1.7
+walls 6 goldilocks/noon-7 f4:4 0.173s complete load=1.7
+walls 6 goldilocks/noon-7 f4:8 0.165s complete load=1.7
+walls 6 goldilocks/noon-7 f4:16 0.196s complete load=1.7
+walls 6 goldilocks/noon-7 en:1 0.100s complete load=1.7
+walls 6 goldilocks/noon-7 en:16 0.107s complete load=1.9
+walls 6 wide64/katsura-9 cl:4 0.041s complete load=1.9
+walls 6 wide64/katsura-9 cl:8 0.040s complete load=1.9
+walls 6 wide64/katsura-9 cl:16 0.043s complete load=1.9
+walls 6 wide64/katsura-9 d1:1 0.045s complete load=2.0
+walls 6 wide64/katsura-9 zf4:16 0.075s complete load=4.4
+walls 6 wide64/katsura-9 zd1:1 0.053s complete load=4.1
+walls 6 wide64/katsura-9 f4:1 0.169s complete load=3.9
+walls 6 wide64/katsura-9 f4:4 0.084s complete load=3.7
+walls 6 wide64/katsura-9 f4:8 0.070s complete load=3.6
+walls 6 wide64/katsura-9 f4:16 0.074s complete load=3.4
+walls 6 wide64/katsura-9 en:1 0.045s complete load=3.3
+walls 6 wide64/katsura-9 en:16 0.043s complete load=3.1
+walls 6 wide64/noon-8 cl:4 0.576s complete load=3.0
+walls 6 wide64/noon-8 cl:8 0.588s complete load=2.9
+walls 6 wide64/noon-8 cl:16 0.597s complete load=2.9
+walls 6 wide64/noon-8 d1:1 0.577s complete load=2.8
+walls 6 wide64/noon-8 zf4:16 0.976s complete load=2.7
+walls 6 wide64/noon-8 zd1:1 0.665s complete load=2.7
+walls 6 wide64/noon-8 f4:1 1.373s complete load=2.7
+walls 6 wide64/noon-8 f4:4 1.009s complete load=2.7
+walls 6 wide64/noon-8 f4:8 0.940s complete load=2.7
+walls 6 wide64/noon-8 f4:16 0.968s complete load=2.7
+walls 6 wide64/noon-8 en:1 0.581s complete load=2.6
+walls 6 wide64/noon-8 en:16 0.598s complete load=2.6
+walls 6 gf32003/mq-random-10 cl:4 0.368s complete load=2.6
+walls 6 gf32003/mq-random-10 cl:8 0.358s complete load=2.6
+walls 6 gf32003/mq-random-10 cl:16 0.376s complete load=2.6
+walls 6 gf32003/mq-random-10 d1:1 0.474s complete load=2.6
+walls 6 gf32003/mq-random-10 cm:16 0.236s complete load=2.7
+walls 6 gf32003/mq-random-10 zcm:16 0.242s complete load=2.6
+walls 6 gf32003/mq-random-10 f4:1 1.085s complete load=2.6
+walls 6 gf32003/mq-random-10 f4:4 0.383s complete load=2.6
+walls 6 gf32003/mq-random-10 f4:8 0.275s complete load=2.4
+walls 6 gf32003/mq-random-10 f4:16 0.241s complete load=2.4
+walls 6 gf32003/mq-random-10 en:1 0.466s complete load=2.5
+walls 6 gf32003/mq-random-10 en:16 0.381s complete load=2.4
+walls 6 m31/mq-random-10 cl:4 0.365s complete load=2.4
+walls 6 m31/mq-random-10 cl:8 0.361s complete load=2.3
+walls 6 m31/mq-random-10 cl:16 0.394s complete load=2.4
+walls 6 m31/mq-random-10 d1:1 0.442s complete load=2.4
+walls 6 m31/mq-random-10 cm:16 0.226s complete load=2.4
+walls 6 m31/mq-random-10 zcm:16 0.224s complete load=2.2
+walls 6 m31/mq-random-10 f4:1 0.931s complete load=2.2
+walls 6 m31/mq-random-10 f4:4 0.341s complete load=2.2
+walls 6 m31/mq-random-10 f4:8 0.249s complete load=2.1
+walls 6 m31/mq-random-10 f4:16 0.226s complete load=2.1
+walls 6 m31/mq-random-10 en:1 0.477s complete load=2.1
+walls 6 m31/mq-random-10 en:16 0.405s complete load=4.5
+walls 7 wide64/eco-12 cl:8 1.808s complete load=4.3
+walls 7 wide64/eco-12 cl:16 1.743s complete load=4.3
+walls 7 wide64/eco-12 d1:1 2.567s complete load=4.1
+walls 7 wide64/eco-12 zf4:16 2.354s complete load=4.0
+walls 7 wide64/eco-12 zd1:1 3.565s complete load=3.6
+walls 7 wide64/eco-12 f4:1 12.857s complete load=3.3
+walls 7 wide64/eco-12 f4:4 4.236s complete load=2.8
+walls 7 wide64/eco-12 f4:8 3.013s complete load=2.9
+walls 7 wide64/eco-12 f4:16 2.372s complete load=3.3
+walls 7 wide64/eco-12 en:1 2.551s complete load=3.3
+walls 7 wide64/eco-12 en:16 1.736s complete load=3.1
+walls 7 wide64/eco-12 cl:4 1.864s complete load=3.1
+walls 7 goldilocks/katsura-11 cl:8 0.607s complete load=3.0
+walls 7 goldilocks/katsura-11 cl:16 0.623s complete load=2.9
+walls 7 goldilocks/katsura-11 d1:1 0.932s complete load=2.9
+walls 7 goldilocks/katsura-11 zf4:16 1.351s complete load=2.9
+walls 7 goldilocks/katsura-11 zd1:1 1.065s complete load=2.9
+walls 7 goldilocks/katsura-11 f4:1 9.716s complete load=2.8
+walls 7 goldilocks/katsura-11 f4:4 2.916s complete load=2.8
+walls 7 goldilocks/katsura-11 f4:8 1.882s complete load=2.9
+walls 7 goldilocks/katsura-11 f4:16 1.364s complete load=2.8
+walls 7 goldilocks/katsura-11 en:1 0.940s complete load=2.7
+walls 7 goldilocks/katsura-11 en:16 0.620s complete load=2.8
+walls 7 goldilocks/katsura-11 cl:4 0.644s complete load=2.8
+walls 7 wide64/katsura-11 cl:8 0.616s complete load=2.8
+walls 7 wide64/katsura-11 cl:16 0.613s complete load=2.7
+walls 7 wide64/katsura-11 d1:1 0.915s complete load=2.7
+walls 7 wide64/katsura-11 zf4:16 1.346s complete load=2.7
+walls 7 wide64/katsura-11 zd1:1 1.055s complete load=4.0
+walls 7 wide64/katsura-11 f4:1 9.241s complete load=3.8
+walls 7 wide64/katsura-11 f4:4 2.858s complete load=3.5
+walls 7 wide64/katsura-11 f4:8 1.838s complete load=3.7
+walls 7 wide64/katsura-11 f4:16 1.347s complete load=3.6
+walls 7 wide64/katsura-11 en:1 0.911s complete load=4.7
+walls 7 wide64/katsura-11 en:16 0.610s complete load=4.4
+walls 7 wide64/katsura-11 cl:4 0.656s complete load=4.4
+walls 7 goldilocks/mq-random-11 cl:8 2.305s complete load=4.2
+walls 7 goldilocks/mq-random-11 cl:16 2.122s complete load=4.6
+walls 7 goldilocks/mq-random-11 d1:1 5.354s complete load=4.4
+walls 7 goldilocks/mq-random-11 zf4:16 4.665s complete load=4.2
+walls 7 goldilocks/mq-random-11 zd1:1 5.621s complete load=4.0
+walls 7 goldilocks/mq-random-11 f4:1 41.309s complete load=3.7
+walls 7 goldilocks/mq-random-11 f4:4 11.624s complete load=3.1
+walls 7 goldilocks/mq-random-11 f4:8 7.175s complete load=3.4
+walls 7 goldilocks/mq-random-11 f4:16 4.674s complete load=4.2
+walls 7 goldilocks/mq-random-11 en:1 5.347s complete load=3.9
+walls 7 goldilocks/mq-random-11 en:16 2.130s complete load=3.7
+walls 7 goldilocks/mq-random-11 cl:4 2.639s complete load=3.6
+walls 7 goldilocks/cyclic-7 cl:8 0.643s complete load=3.7
+walls 7 goldilocks/cyclic-7 cl:16 0.671s complete load=3.6
+walls 7 goldilocks/cyclic-7 d1:1 0.572s complete load=3.5
+walls 7 goldilocks/cyclic-7 zf4:16 0.148s complete load=3.5
+walls 7 goldilocks/cyclic-7 zd1:1 0.873s complete load=3.4
+walls 7 goldilocks/cyclic-7 f4:1 0.289s complete load=3.3
+walls 7 goldilocks/cyclic-7 f4:4 0.158s complete load=3.3
+walls 7 goldilocks/cyclic-7 f4:8 0.138s complete load=3.3
+walls 7 goldilocks/cyclic-7 f4:16 0.145s complete load=3.2
+walls 7 goldilocks/cyclic-7 en:1 0.294s complete load=3.2
+walls 7 goldilocks/cyclic-7 en:16 0.142s complete load=3.1
+walls 7 goldilocks/cyclic-7 cl:4 0.587s complete load=3.0
+walls 7 wide64/cyclic-7 cl:8 0.645s complete load=3.0
+walls 7 wide64/cyclic-7 cl:16 0.664s complete load=2.9
+walls 7 wide64/cyclic-7 d1:1 0.577s complete load=2.8
+walls 7 wide64/cyclic-7 zf4:16 0.146s complete load=2.8
+walls 7 wide64/cyclic-7 zd1:1 0.877s complete load=2.8
+walls 7 wide64/cyclic-7 f4:1 0.278s complete load=2.7
+walls 7 wide64/cyclic-7 f4:4 0.157s complete load=2.7
+walls 7 wide64/cyclic-7 f4:8 0.136s complete load=2.6
+walls 7 wide64/cyclic-7 f4:16 0.143s complete load=2.6
+walls 7 wide64/cyclic-7 en:1 0.279s complete load=2.6
+walls 7 wide64/cyclic-7 en:16 0.147s complete load=2.6
+walls 7 wide64/cyclic-7 cl:4 0.584s complete load=2.6
+walls 7 goldilocks/katsura-4 cl:8 0.006s complete load=2.6
+walls 7 goldilocks/katsura-4 cl:16 0.006s complete load=2.6
+walls 7 goldilocks/katsura-4 d1:1 0.006s complete load=2.5
+walls 7 goldilocks/katsura-4 zf4:16 0.006s complete load=2.4
+walls 7 goldilocks/katsura-4 zd1:1 0.006s complete load=2.4
+walls 7 goldilocks/katsura-4 f4:1 0.006s complete load=2.3
+walls 7 goldilocks/katsura-4 f4:4 0.006s complete load=2.2
+walls 7 goldilocks/katsura-4 f4:8 0.006s complete load=2.1
+walls 7 goldilocks/katsura-4 f4:16 0.006s complete load=2.0
+walls 7 goldilocks/katsura-4 en:1 0.006s complete load=1.9
+walls 7 goldilocks/katsura-4 en:16 0.006s complete load=2.0
+walls 7 goldilocks/katsura-4 cl:4 0.006s complete load=2.1
+walls 7 wide64/katsura-4 cl:8 0.006s complete load=2.1
+walls 7 wide64/katsura-4 cl:16 0.006s complete load=2.0
+walls 7 wide64/katsura-4 d1:1 0.006s complete load=2.1
+walls 7 wide64/katsura-4 zf4:16 0.006s complete load=2.0
+walls 7 wide64/katsura-4 zd1:1 0.006s complete load=1.9
+walls 7 wide64/katsura-4 f4:1 0.006s complete load=1.8
+walls 7 wide64/katsura-4 f4:4 0.006s complete load=1.8
+walls 7 wide64/katsura-4 f4:8 0.006s complete load=1.7
+walls 7 wide64/katsura-4 f4:16 0.006s complete load=1.7
+walls 7 wide64/katsura-4 en:1 0.006s complete load=1.8
+walls 7 wide64/katsura-4 en:16 0.006s complete load=1.8
+walls 7 wide64/katsura-4 cl:4 0.006s complete load=1.7
+walls 7 goldilocks/noon-7 cl:8 0.103s complete load=1.7
+walls 7 goldilocks/noon-7 cl:16 0.107s complete load=1.7
+walls 7 goldilocks/noon-7 d1:1 0.101s complete load=1.7
+walls 7 goldilocks/noon-7 zf4:16 0.192s complete load=1.7
+walls 7 goldilocks/noon-7 zd1:1 0.115s complete load=1.7
+walls 7 goldilocks/noon-7 f4:1 0.209s complete load=1.7
+walls 7 goldilocks/noon-7 f4:4 0.171s complete load=1.7
+walls 7 goldilocks/noon-7 f4:8 0.163s complete load=1.7
+walls 7 goldilocks/noon-7 f4:16 0.192s complete load=1.7
+walls 7 goldilocks/noon-7 en:1 0.100s complete load=1.7
+walls 7 goldilocks/noon-7 en:16 0.110s complete load=1.8
+walls 7 goldilocks/noon-7 cl:4 0.101s complete load=1.8
+walls 7 wide64/katsura-9 cl:8 0.040s complete load=1.9
+walls 7 wide64/katsura-9 cl:16 0.042s complete load=1.9
+walls 7 wide64/katsura-9 d1:1 0.046s complete load=1.8
+walls 7 wide64/katsura-9 zf4:16 0.072s complete load=1.7
+walls 7 wide64/katsura-9 zd1:1 0.053s complete load=1.7
+walls 7 wide64/katsura-9 f4:1 0.168s complete load=1.6
+walls 7 wide64/katsura-9 f4:4 0.083s complete load=1.6
+walls 7 wide64/katsura-9 f4:8 0.070s complete load=1.6
+walls 7 wide64/katsura-9 f4:16 0.073s complete load=1.5
+walls 7 wide64/katsura-9 en:1 0.046s complete load=1.5
+walls 7 wide64/katsura-9 en:16 0.043s complete load=1.5
+walls 7 wide64/katsura-9 cl:4 0.040s complete load=1.6
+walls 7 wide64/noon-8 cl:8 0.587s complete load=1.6
+walls 7 wide64/noon-8 cl:16 0.594s complete load=1.7
+walls 7 wide64/noon-8 d1:1 0.578s complete load=1.7
+walls 7 wide64/noon-8 zf4:16 0.979s complete load=1.7
+walls 7 wide64/noon-8 zd1:1 0.665s complete load=1.7
+walls 7 wide64/noon-8 f4:1 1.369s complete load=1.7
+walls 7 wide64/noon-8 f4:4 0.984s complete load=1.7
+walls 7 wide64/noon-8 f4:8 0.934s complete load=1.7
+walls 7 wide64/noon-8 f4:16 0.974s complete load=1.7
+walls 7 wide64/noon-8 en:1 0.582s complete load=1.6
+walls 7 wide64/noon-8 en:16 0.594s complete load=1.6
+walls 7 wide64/noon-8 cl:4 0.602s complete load=1.8
+walls 7 gf32003/mq-random-10 cl:8 0.369s complete load=1.7
+walls 7 gf32003/mq-random-10 cl:16 0.377s complete load=1.7
+walls 7 gf32003/mq-random-10 d1:1 0.479s complete load=1.7
+walls 7 gf32003/mq-random-10 cm:16 0.239s complete load=1.7
+walls 7 gf32003/mq-random-10 zcm:16 0.241s complete load=1.7
+walls 7 gf32003/mq-random-10 f4:1 1.093s complete load=1.8
+walls 7 gf32003/mq-random-10 f4:4 0.383s complete load=1.8
+walls 7 gf32003/mq-random-10 f4:8 0.274s complete load=1.8
+walls 7 gf32003/mq-random-10 f4:16 0.239s complete load=1.8
+walls 7 gf32003/mq-random-10 en:1 0.472s complete load=1.7
+walls 7 gf32003/mq-random-10 en:16 0.376s complete load=1.7
+walls 7 gf32003/mq-random-10 cl:4 0.385s complete load=1.9
+walls 7 m31/mq-random-10 cl:8 0.376s complete load=2.4
+walls 7 m31/mq-random-10 cl:16 0.404s complete load=2.4
+walls 7 m31/mq-random-10 d1:1 0.478s complete load=2.4
+walls 7 m31/mq-random-10 cm:16 0.225s complete load=2.3
+walls 7 m31/mq-random-10 zcm:16 0.224s complete load=3.5
+walls 7 m31/mq-random-10 f4:1 0.932s complete load=3.5
+walls 7 m31/mq-random-10 f4:4 0.335s complete load=3.4
+walls 7 m31/mq-random-10 f4:8 0.248s complete load=3.3
+walls 7 m31/mq-random-10 f4:16 0.226s complete load=3.3
+walls 7 m31/mq-random-10 en:1 0.448s complete load=5.1
+walls 7 m31/mq-random-10 en:16 0.387s complete load=4.9
+walls 7 m31/mq-random-10 cl:4 0.364s complete load=4.9
+walls 8 wide64/eco-12 cl:16 1.740s complete load=4.5
+walls 8 wide64/eco-12 d1:1 2.555s complete load=4.3
+walls 8 wide64/eco-12 zf4:16 2.347s complete load=4.2
+walls 8 wide64/eco-12 zd1:1 3.617s complete load=4.1
+walls 8 wide64/eco-12 f4:1 12.803s complete load=3.9
+walls 8 wide64/eco-12 f4:4 4.307s complete load=3.4
+walls 8 wide64/eco-12 f4:8 3.002s complete load=3.3
+walls 8 wide64/eco-12 f4:16 2.354s complete load=3.2
+walls 8 wide64/eco-12 en:1 2.573s complete load=3.1
+walls 8 wide64/eco-12 en:16 1.742s complete load=3.1
+walls 8 wide64/eco-12 cl:4 1.863s complete load=3.0
+walls 8 wide64/eco-12 cl:8 1.753s complete load=3.0
+walls 8 goldilocks/katsura-11 cl:16 0.612s complete load=3.0
+walls 8 goldilocks/katsura-11 d1:1 0.948s complete load=3.0
+walls 8 goldilocks/katsura-11 zf4:16 1.355s complete load=3.0
+walls 8 goldilocks/katsura-11 zd1:1 1.074s complete load=4.1
+walls 8 goldilocks/katsura-11 f4:1 9.720s complete load=4.0
+walls 8 goldilocks/katsura-11 f4:4 2.892s complete load=3.7
+walls 8 goldilocks/katsura-11 f4:8 1.884s complete load=3.8
+walls 8 goldilocks/katsura-11 f4:16 1.359s complete load=3.6
+walls 8 goldilocks/katsura-11 en:1 0.941s complete load=4.7
+walls 8 goldilocks/katsura-11 en:16 0.616s complete load=4.5
+walls 8 goldilocks/katsura-11 cl:4 0.658s complete load=4.4
+walls 8 goldilocks/katsura-11 cl:8 0.611s complete load=4.4
+walls 8 wide64/katsura-11 cl:16 0.615s complete load=4.3
+walls 8 wide64/katsura-11 d1:1 0.924s complete load=4.1
+walls 8 wide64/katsura-11 zf4:16 1.338s complete load=4.1
+walls 8 wide64/katsura-11 zd1:1 1.054s complete load=5.2
+walls 8 wide64/katsura-11 f4:1 9.100s complete load=4.9
+walls 8 wide64/katsura-11 f4:4 2.843s complete load=4.5
+walls 8 wide64/katsura-11 f4:8 1.846s complete load=4.5
+walls 8 wide64/katsura-11 f4:16 1.345s complete load=4.3
+walls 8 wide64/katsura-11 en:1 0.906s complete load=5.3
+walls 8 wide64/katsura-11 en:16 0.616s complete load=5.1
+walls 8 wide64/katsura-11 cl:4 0.638s complete load=4.8
+walls 8 wide64/katsura-11 cl:8 0.609s complete load=4.8
+walls 8 goldilocks/mq-random-11 cl:16 2.148s complete load=4.6
+walls 8 goldilocks/mq-random-11 d1:1 5.309s complete load=4.4
+walls 8 goldilocks/mq-random-11 zf4:16 4.667s complete load=4.2
+walls 8 goldilocks/mq-random-11 zd1:1 5.613s complete load=3.8
+walls 8 goldilocks/mq-random-11 f4:1 41.347s complete load=3.5
+walls 8 goldilocks/mq-random-11 f4:4 12.033s complete load=2.9
+walls 8 goldilocks/mq-random-11 f4:8 7.187s complete load=3.3
+walls 8 goldilocks/mq-random-11 f4:16 4.669s complete load=4.3
+walls 8 goldilocks/mq-random-11 en:1 5.454s complete load=5.3
+walls 8 goldilocks/mq-random-11 en:16 2.155s complete load=5.1
+walls 8 goldilocks/mq-random-11 cl:4 2.831s complete load=6.2
+walls 8 goldilocks/mq-random-11 cl:8 2.347s complete load=6.1
+walls 8 goldilocks/cyclic-7 cl:16 0.670s complete load=6.4
+walls 8 goldilocks/cyclic-7 d1:1 0.593s complete load=6.2
+walls 8 goldilocks/cyclic-7 zf4:16 0.143s complete load=5.8
+walls 8 goldilocks/cyclic-7 zd1:1 0.905s complete load=5.8
+walls 8 goldilocks/cyclic-7 f4:1 0.298s complete load=5.6
+walls 8 goldilocks/cyclic-7 f4:4 0.159s complete load=5.5
+walls 8 goldilocks/cyclic-7 f4:8 0.135s complete load=5.5
+walls 8 goldilocks/cyclic-7 f4:16 0.146s complete load=5.2
+walls 8 goldilocks/cyclic-7 en:1 0.293s complete load=4.9
+walls 8 goldilocks/cyclic-7 en:16 0.145s complete load=4.9
+walls 8 goldilocks/cyclic-7 cl:4 0.590s complete load=4.8
+walls 8 goldilocks/cyclic-7 cl:8 0.645s complete load=4.5
+walls 8 wide64/cyclic-7 cl:16 0.671s complete load=4.5
+walls 8 wide64/cyclic-7 d1:1 0.566s complete load=4.3
+walls 8 wide64/cyclic-7 zf4:16 0.146s complete load=4.1
+walls 8 wide64/cyclic-7 zd1:1 0.905s complete load=3.9
+walls 8 wide64/cyclic-7 f4:1 0.279s complete load=3.9
+walls 8 wide64/cyclic-7 f4:4 0.157s complete load=3.7
+walls 8 wide64/cyclic-7 f4:8 0.135s complete load=3.6
+walls 8 wide64/cyclic-7 f4:16 0.144s complete load=3.6
+walls 8 wide64/cyclic-7 en:1 0.283s complete load=3.4
+walls 8 wide64/cyclic-7 en:16 0.146s complete load=3.6
+walls 8 wide64/cyclic-7 cl:4 0.590s complete load=3.6
+walls 8 wide64/cyclic-7 cl:8 0.640s complete load=3.7
+walls 8 goldilocks/katsura-4 cl:16 0.006s complete load=3.5
+walls 8 goldilocks/katsura-4 d1:1 0.006s complete load=3.4
+walls 8 goldilocks/katsura-4 zf4:16 0.006s complete load=3.2
+walls 8 goldilocks/katsura-4 zd1:1 0.006s complete load=3.0
+walls 8 goldilocks/katsura-4 f4:1 0.006s complete load=2.9
+walls 8 goldilocks/katsura-4 f4:4 0.006s complete load=2.7
+walls 8 goldilocks/katsura-4 f4:8 0.006s complete load=2.6
+walls 8 goldilocks/katsura-4 f4:16 0.006s complete load=2.5
+walls 8 goldilocks/katsura-4 en:1 0.006s complete load=2.3
+walls 8 goldilocks/katsura-4 en:16 0.006s complete load=2.4
+walls 8 goldilocks/katsura-4 cl:4 0.006s complete load=2.2
+walls 8 goldilocks/katsura-4 cl:8 0.006s complete load=2.2
+walls 8 wide64/katsura-4 cl:16 0.006s complete load=2.1
+walls 8 wide64/katsura-4 d1:1 0.006s complete load=2.5
+walls 8 wide64/katsura-4 zf4:16 0.006s complete load=2.4
+walls 8 wide64/katsura-4 zd1:1 0.006s complete load=2.4
+walls 8 wide64/katsura-4 f4:1 0.006s complete load=3.0
+walls 8 wide64/katsura-4 f4:4 0.006s complete load=3.4
+walls 8 wide64/katsura-4 f4:8 0.006s complete load=3.3
+walls 8 wide64/katsura-4 f4:16 0.006s complete load=3.1
+walls 8 wide64/katsura-4 en:1 0.006s complete load=2.9
+walls 8 wide64/katsura-4 en:16 0.006s complete load=3.3
+walls 8 wide64/katsura-4 cl:4 0.006s complete load=3.2
+walls 8 wide64/katsura-4 cl:8 0.006s complete load=4.2
+walls 8 goldilocks/noon-7 cl:16 0.110s complete load=5.4
+walls 8 goldilocks/noon-7 d1:1 0.099s complete load=5.4
+walls 8 goldilocks/noon-7 zf4:16 0.195s complete load=5.1
+walls 8 goldilocks/noon-7 zd1:1 0.117s complete load=4.8
+walls 8 goldilocks/noon-7 f4:1 0.208s complete load=4.6
+walls 8 goldilocks/noon-7 f4:4 0.172s complete load=4.6
+walls 8 goldilocks/noon-7 f4:8 0.163s complete load=5.7
+walls 8 goldilocks/noon-7 f4:16 0.194s complete load=5.3
+walls 8 goldilocks/noon-7 en:1 0.097s complete load=5.3
+walls 8 goldilocks/noon-7 en:16 0.108s complete load=4.8
+walls 8 goldilocks/noon-7 cl:4 0.102s complete load=4.8
+walls 8 goldilocks/noon-7 cl:8 0.104s complete load=5.7
+walls 8 wide64/katsura-9 cl:16 0.044s complete load=5.4
+walls 8 wide64/katsura-9 d1:1 0.045s complete load=5.1
+walls 8 wide64/katsura-9 zf4:16 0.075s complete load=5.2
+walls 8 wide64/katsura-9 zd1:1 0.054s complete load=5.4
+walls 8 wide64/katsura-9 f4:1 0.168s complete load=5.1
+walls 8 wide64/katsura-9 f4:4 0.084s complete load=4.8
+walls 8 wide64/katsura-9 f4:8 0.070s complete load=4.6
+walls 8 wide64/katsura-9 f4:16 0.074s complete load=4.4
+walls 8 wide64/katsura-9 en:1 0.045s complete load=4.1
+walls 8 wide64/katsura-9 en:16 0.044s complete load=3.9
+walls 8 wide64/katsura-9 cl:4 0.042s complete load=3.6
+walls 8 wide64/katsura-9 cl:8 0.040s complete load=3.4
+walls 8 wide64/noon-8 cl:16 0.642s complete load=4.1
+walls 8 wide64/noon-8 d1:1 0.628s complete load=4.5
+walls 8 wide64/noon-8 zf4:16 0.976s complete load=4.9
+walls 8 wide64/noon-8 zd1:1 0.661s complete load=4.6
+walls 8 wide64/noon-8 f4:1 1.380s complete load=4.6
+walls 8 wide64/noon-8 f4:4 0.993s complete load=4.5
+walls 8 wide64/noon-8 f4:8 0.930s complete load=4.6
+walls 8 wide64/noon-8 f4:16 0.984s complete load=4.5
+walls 8 wide64/noon-8 en:1 0.586s complete load=4.5
+walls 8 wide64/noon-8 en:16 0.596s complete load=4.3
+walls 8 wide64/noon-8 cl:4 0.582s complete load=4.1
+walls 8 wide64/noon-8 cl:8 0.613s complete load=4.1
+walls 8 gf32003/mq-random-10 cl:16 0.389s complete load=4.0
+walls 8 gf32003/mq-random-10 d1:1 0.508s complete load=4.4
+walls 8 gf32003/mq-random-10 cm:16 0.241s complete load=4.4
+walls 8 gf32003/mq-random-10 zcm:16 0.243s complete load=5.0
+walls 8 gf32003/mq-random-10 f4:1 1.192s complete load=5.3
+walls 8 gf32003/mq-random-10 f4:4 0.377s complete load=5.6
+walls 8 gf32003/mq-random-10 f4:8 0.274s complete load=5.6
+walls 8 gf32003/mq-random-10 f4:16 0.241s complete load=5.8
+walls 8 gf32003/mq-random-10 en:1 0.469s complete load=5.5
+walls 8 gf32003/mq-random-10 en:16 0.378s complete load=5.5
+walls 8 gf32003/mq-random-10 cl:4 0.367s complete load=5.3
+walls 8 gf32003/mq-random-10 cl:8 0.359s complete load=5.1
+walls 8 m31/mq-random-10 cl:16 0.392s complete load=5.1
+walls 8 m31/mq-random-10 d1:1 0.442s complete load=5.0
+walls 8 m31/mq-random-10 cm:16 0.231s complete load=4.7
+walls 8 m31/mq-random-10 zcm:16 0.228s complete load=4.4
+walls 8 m31/mq-random-10 f4:1 1.030s complete load=4.4
+walls 8 m31/mq-random-10 f4:4 0.353s complete load=5.5
+walls 8 m31/mq-random-10 f4:8 0.251s complete load=6.5
+walls 8 m31/mq-random-10 f4:16 0.226s complete load=6.5
+walls 8 m31/mq-random-10 en:1 0.442s complete load=6.2
+walls 8 m31/mq-random-10 en:16 0.391s complete load=5.8
+walls 8 m31/mq-random-10 cl:4 0.374s complete load=5.8
+walls 8 m31/mq-random-10 cl:8 0.365s complete load=5.5
+== census 2026-11-18T22:23:53-05:00 load=5.24
+census 0 wide64/eco-12 wk:1 13.851s complete load=5.2
+census 0 goldilocks/katsura-11 wk:1 10.509s complete load=4.6
+census 0 wide64/katsura-11 wk:1 9.769s complete load=5.3
+census 0 goldilocks/mq-random-11 wk:1 41.601s complete load=4.8
+census 0 goldilocks/cyclic-7 wk:1 0.298s complete load=5.3
+census 0 wide64/cyclic-7 wk:1 0.291s complete load=5.1
+census 0 goldilocks/katsura-4 wk:1 0.006s complete load=5.1
+census 0 wide64/katsura-4 wk:1 0.006s complete load=5.0
+census 0 goldilocks/noon-7 wk:1 0.215s complete load=4.8
+census 0 wide64/katsura-9 wk:1 0.182s complete load=4.6
+census 0 wide64/noon-8 wk:1 1.396s complete load=4.3
+census 0 gf32003/mq-random-10 wk:1 1.245s complete load=4.2
+census 0 m31/mq-random-10 wk:1 1.041s complete load=4.0
+== certify 2026-11-18T22:25:56-05:00 load=4.01
+certify 0 wide64/eco-12 ec:16 64.339s complete load=4.0
+certify 0 goldilocks/katsura-11 ec:16 29.572s complete load=16.8
+certify 0 wide64/katsura-11 ec:16 29.824s complete load=19.8
+certify 0 goldilocks/mq-random-11 ec:16 71.432s complete load=18.7
+certify 0 goldilocks/cyclic-7 ec:16 0.188s complete load=27.0
+certify 0 wide64/cyclic-7 ec:16 0.185s complete load=27.0
+certify 0 goldilocks/katsura-4 ec:16 0.007s complete load=26.4
+certify 0 wide64/katsura-4 ec:16 0.007s complete load=25.6
+certify 0 goldilocks/noon-7 ec:16 0.340s complete load=24.9
+certify 0 wide64/katsura-9 ec:16 0.233s complete load=24.2
+certify 0 wide64/noon-8 ec:16 4.604s complete load=23.6
+certify 0 gf32003/mq-random-10 ec:16 5.596s complete load=24.3
+certify 0 m31/mq-random-10 ec:16 5.584s complete load=25.2
+== wide 2026-11-18T22:30:13-05:00 load=25.31
+suite wide: settled after 360s at load 6.88, compilers 0
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+== certified 2026-11-18T22:52:34-05:00 load=2.54
+certified 0 wide64/eco-12 gc:1 309.342s admitted load=2.5
+certified 0 goldilocks/mq-random-11 gc:1 487.467s admitted load=2.4
+certified 0 wide64/katsura-11 gc:1 81.990s admitted load=2.5
+certified 0 wide64/cyclic-7 gc:1 3.208s admitted load=2.0
+certified 1 wide64/eco-12 gc:1 302.376s admitted load=2.1
+certified 1 goldilocks/mq-random-11 gc:1 488.259s admitted load=5.8
+certified 1 wide64/katsura-11 gc:1 88.283s admitted load=4.2
+certified 1 wide64/cyclic-7 gc:1 3.318s admitted load=4.7
+certified 2 wide64/eco-12 gc:1 308.380s admitted load=4.6
+certified 2 goldilocks/mq-random-11 gc:1 495.945s admitted load=7.6
+certified 2 wide64/katsura-11 gc:1 83.812s admitted load=6.1
+certified 2 wide64/cyclic-7 gc:1 3.276s admitted load=4.2
+certified 3 wide64/eco-12 gc:1 302.751s admitted load=4.1
+certified 3 goldilocks/mq-random-11 gc:1 488.639s admitted load=20.6
+certified 3 wide64/katsura-11 gc:1 87.219s admitted load=5.2
+certified 3 wide64/cyclic-7 gc:1 3.315s admitted load=8.3
+certified 4 wide64/eco-12 gc:1 308.211s admitted load=8.1
+certified 4 goldilocks/mq-random-11 gc:1 497.693s admitted load=6.9
+certified 4 wide64/katsura-11 gc:1 85.827s admitted load=4.2
+certified 4 wide64/cyclic-7 gc:1 3.260s admitted load=4.1
+certified 5 wide64/eco-12 gc:1 311.536s admitted load=4.2
+certified 5 goldilocks/mq-random-11 gc:1 486.451s admitted load=22.7
+certified 5 wide64/katsura-11 gc:1 82.290s admitted load=3.0
+certified 5 wide64/cyclic-7 gc:1 3.435s admitted load=3.2
+certified 6 wide64/eco-12 gc:1 285.357s admitted load=4.2
+certified 6 goldilocks/mq-random-11 gc:1 471.393s admitted load=2.2
+certified 6 wide64/katsura-11 gc:1 84.039s admitted load=3.0
+certified 6 wide64/cyclic-7 gc:1 3.196s admitted load=3.2
+certified 7 wide64/eco-12 gc:1 310.075s admitted load=3.1
+certified 7 goldilocks/mq-random-11 gc:1 504.770s admitted load=11.7
+certified 7 wide64/katsura-11 gc:1 85.838s admitted load=5.4
+certified 7 wide64/cyclic-7 gc:1 3.185s admitted load=11.1
+certified 8 wide64/eco-12 gc:1 295.604s admitted load=9.9
+certified 8 goldilocks/mq-random-11 gc:1 475.379s admitted load=8.3
+certified 8 wide64/katsura-11 gc:1 81.346s admitted load=6.3
+certified 8 wide64/cyclic-7 gc:1 3.164s admitted load=2.9

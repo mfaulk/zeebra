@@ -1,0 +1,2930 @@
+[
+ {
+  "archive": "mq10-try1.json.gz",
+  "sha256": "a54a8e26460a5a952efa231fc7503a6e6c3d7178570c8f738868514b8f129cce",
+  "commit": "35843b3ca4fb279b15fff9aaccaf0082d4de22cf",
+  "binaries": {
+   "msolve": {
+    "path": "/home/mfaulk/.local/opt/zeebra-ext/bin/msolve",
+    "sha256": "557470de2e13aaa214fd6380600b3fedadc05c2ed203f6afa29a8b172abb6c8d",
+    "version": "0.11.0\n"
+   },
+   "grobx": {
+    "path": "/buildcache/cargo-target/zeebra-906/target/bin/grobx-driver",
+    "sha256": "40035ef86d0854f706984fe83baa88905f03e5d9fc8f1c4092f88598786a2d9c",
+    "version": {
+     "allocator": "grobx::Allocator (mimalloc small blocks; system large blocks)",
+     "build": "9267861f330b88263c44c1b25bca45e052a991df9e9868e3321401f785e883f8",
+     "build_metadata": "3ec6584b17107406c8e632563d94ea165ca6c567071b5f9260a3a9638d406d39  Cargo.toml;b182db894314d90260738b41fcbc70ad486c0a5bf1138d8c957a96446f64b09b  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;70de95834101bce5bf22ba2704a67b5d5eb9c9c28f2d5e97141f790457ba0104  src/main.rs;5406d8f48d96208869e4d436cea637a29a4d8dfd3fb4290da8e0aac3c8b8aed6  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;",
+     "contract": 1,
+     "isa": "x86-64-v3",
+     "kernel_peak_rss_bytes": 6811648,
+     "revision": "1854835dbc25f24dc9a9ba017024d5030e99da1c",
+     "version": "0.73.3"
+    }
+   },
+   "groebner-rs": {
+    "path": "/buildcache/cargo-target/zeebra-906/target/bin/groebner-rs-driver",
+    "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0",
+    "version": {
+     "algorithm": "groebner_basis_f4(canonicalize=true); randomized modular row combinations",
+     "allocator": "system",
+     "build": "305eda2ea63b34e0c6e9931728935cc81375d65ef1523f9272f3f83694b3a9ad",
+     "build_metadata": "e30c7934926a354895481326507bb4c5e1cb9ff0333a91c865004c5f0cd011ed  Cargo.toml;ab8c959b4e84111efc810d555d6f3addd427aafbbc53a1e92c290651ff48cc1e  Cargo.lock;ca67e66659a82661386e5a08471c913cb8b3f7c7ce37592207d3f513589a41c2  rust-toolchain.toml;7908449a3bf5dea88e6b2cde22f3489e5bb463befc3b75cc16fbbbd4c2369a43  src/main.rs;261e495702428f4ffbf5dc5fc8a87702d25ede048c0c854887916563087ed98c  build.rs;PROFILE=release;OPT_LEVEL=3;DEBUG=false;TARGET=x86_64-unknown-linux-gnu;CARGO_ENCODED_RUSTFLAGS=-C target-cpu=x86-64-v3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;rustc 1.99.1 (58cf8f9c3 2026-10-13);binary: rustc;commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67;commit-date: 2026-10-13;host: x86_64-unknown-linux-gnu;release: 1.99.1;LLVM version: 23.1.1;",
+     "contract": 2,
+     "features": "parallel; no mimalloc",
+     "isa": "x86-64-v3",
+     "kernel_peak_rss_bytes": 2359296,
+     "revision": "c3e1d630fba9b2155a4c389d9022f13e0ba09218"
+    }
+   },
+   "zeebra": {
+    "path": "/buildcache/cargo-target/zeebra-906/target/bin/zeebra_driver",
+    "sha256": "e824462a5dc408c78e1b7905b35e6ef81dcf2f0bc4288fa8294eaf612b0fdc46",
+    "version": null
+   }
+  },
+  "attempts": [
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 1063957458,
+    "peak_rss_bytes": 38936576
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 221032021,
+    "peak_rss_bytes": 14876672
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 339265131,
+    "peak_rss_bytes": 18079744
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 118830762,
+    "peak_rss_bytes": 23232512
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 366744104,
+    "peak_rss_bytes": 43692032
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 119189852,
+    "peak_rss_bytes": 15204352
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 0,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 86771347,
+    "peak_rss_bytes": 26587136
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 274830202,
+    "peak_rss_bytes": 44679168
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 113957866,
+    "peak_rss_bytes": 15855616
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 0,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 86970894,
+    "peak_rss_bytes": 28958720
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 239498101,
+    "peak_rss_bytes": 48144384
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 124018694,
+    "peak_rss_bytes": 16338944
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 0,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 103572995,
+    "peak_rss_bytes": 35446784
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 927456122,
+    "peak_rss_bytes": 39878656
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 231663237,
+    "peak_rss_bytes": 14970880
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 157306034,
+    "peak_rss_bytes": 18079744
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 151806692,
+    "peak_rss_bytes": 24854528
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 330099519,
+    "peak_rss_bytes": 45199360
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 168540934,
+    "peak_rss_bytes": 15241216
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 0,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 103675480,
+    "peak_rss_bytes": 25481216
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 250084483,
+    "peak_rss_bytes": 46116864
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 468154095,
+    "peak_rss_bytes": 15597568
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 0,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 93769224,
+    "peak_rss_bytes": 25481216
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 223266311,
+    "peak_rss_bytes": 49770496
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 317480207,
+    "peak_rss_bytes": 16588800
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 0,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 0,
+    "status": "verified",
+    "process_wall_ns": 108592378,
+    "peak_rss_bytes": 26918912
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 97769609,
+    "peak_rss_bytes": 31563776
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 1,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 124843114,
+    "peak_rss_bytes": 16289792
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 240892330,
+    "peak_rss_bytes": 48340992
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 87760228,
+    "peak_rss_bytes": 28999680
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 1,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 115443058,
+    "peak_rss_bytes": 15482880
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 278192337,
+    "peak_rss_bytes": 44273664
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 88164784,
+    "peak_rss_bytes": 28078080
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 1,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 126234108,
+    "peak_rss_bytes": 14905344
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 371476554,
+    "peak_rss_bytes": 43831296
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 115454510,
+    "peak_rss_bytes": 25047040
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 333613741,
+    "peak_rss_bytes": 17985536
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 213835997,
+    "peak_rss_bytes": 14491648
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 1060016175,
+    "peak_rss_bytes": 38678528
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 114847871,
+    "peak_rss_bytes": 26947584
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 1,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 215357127,
+    "peak_rss_bytes": 16535552
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 223728034,
+    "peak_rss_bytes": 49651712
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 94934140,
+    "peak_rss_bytes": 29683712
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 1,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 468743180,
+    "peak_rss_bytes": 15667200
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 254475887,
+    "peak_rss_bytes": 47063040
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 98490613,
+    "peak_rss_bytes": 23793664
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 1,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 162188057,
+    "peak_rss_bytes": 15392768
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 329046264,
+    "peak_rss_bytes": 45088768
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 156075414,
+    "peak_rss_bytes": 23199744
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 156303225,
+    "peak_rss_bytes": 18198528
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 237248111,
+    "peak_rss_bytes": 14655488
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 1,
+    "status": "verified",
+    "process_wall_ns": 908316165,
+    "peak_rss_bytes": 39669760
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 1072964450,
+    "peak_rss_bytes": 38514688
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 215479338,
+    "peak_rss_bytes": 14684160
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 339262727,
+    "peak_rss_bytes": 18165760
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 119273370,
+    "peak_rss_bytes": 23535616
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 365840394,
+    "peak_rss_bytes": 44093440
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 125021361,
+    "peak_rss_bytes": 15028224
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 2,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 81696619,
+    "peak_rss_bytes": 26492928
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 278629885,
+    "peak_rss_bytes": 44654592
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 119779548,
+    "peak_rss_bytes": 15519744
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 2,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 87405667,
+    "peak_rss_bytes": 28811264
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 239464687,
+    "peak_rss_bytes": 48140288
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 125290001,
+    "peak_rss_bytes": 16293888
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 2,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 100639331,
+    "peak_rss_bytes": 32870400
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 917471632,
+    "peak_rss_bytes": 39735296
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 232533453,
+    "peak_rss_bytes": 14721024
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 158812505,
+    "peak_rss_bytes": 18247680
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 151526842,
+    "peak_rss_bytes": 25784320
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 317933965,
+    "peak_rss_bytes": 45109248
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 163398257,
+    "peak_rss_bytes": 15044608
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 2,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 98113950,
+    "peak_rss_bytes": 26152960
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 250402062,
+    "peak_rss_bytes": 45932544
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 469671614,
+    "peak_rss_bytes": 15532032
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 2,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 105005978,
+    "peak_rss_bytes": 25296896
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 227013262,
+    "peak_rss_bytes": 49954816
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 203836825,
+    "peak_rss_bytes": 16814080
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 2,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 2,
+    "status": "verified",
+    "process_wall_ns": 106736363,
+    "peak_rss_bytes": 27160576
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 96338438,
+    "peak_rss_bytes": 31813632
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 3,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 198711993,
+    "peak_rss_bytes": 16678912
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 239767880,
+    "peak_rss_bytes": 48680960
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 88102256,
+    "peak_rss_bytes": 30527488
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 3,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 117024752,
+    "peak_rss_bytes": 15339520
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 279904647,
+    "peak_rss_bytes": 44449792
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 82256489,
+    "peak_rss_bytes": 26722304
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 3,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 126308227,
+    "peak_rss_bytes": 15216640
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 394249736,
+    "peak_rss_bytes": 43978752
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 120745356,
+    "peak_rss_bytes": 23994368
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 331659850,
+    "peak_rss_bytes": 18006016
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 218035115,
+    "peak_rss_bytes": 14622720
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 1056161200,
+    "peak_rss_bytes": 38748160
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 107563389,
+    "peak_rss_bytes": 29597696
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 3,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 233426204,
+    "peak_rss_bytes": 16793600
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 229401314,
+    "peak_rss_bytes": 50016256
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 101167401,
+    "peak_rss_bytes": 27668480
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 3,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 467124723,
+    "peak_rss_bytes": 15589376
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 258324561,
+    "peak_rss_bytes": 46379008
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 99749065,
+    "peak_rss_bytes": 26177536
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 3,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 159054303,
+    "peak_rss_bytes": 15114240
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 328868446,
+    "peak_rss_bytes": 45191168
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 159057799,
+    "peak_rss_bytes": 24985600
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 158765346,
+    "peak_rss_bytes": 18001920
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 247323685,
+    "peak_rss_bytes": 15040512
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 3,
+    "status": "verified",
+    "process_wall_ns": 918202847,
+    "peak_rss_bytes": 39534592
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 1086163771,
+    "peak_rss_bytes": 38678528
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 213724935,
+    "peak_rss_bytes": 14876672
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 333210405,
+    "peak_rss_bytes": 18186240
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 121194436,
+    "peak_rss_bytes": 22253568
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 396556031,
+    "peak_rss_bytes": 43634688
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 127496387,
+    "peak_rss_bytes": 14860288
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 4,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 88469601,
+    "peak_rss_bytes": 26828800
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 276502295,
+    "peak_rss_bytes": 44556288
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 118402350,
+    "peak_rss_bytes": 15769600
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 4,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 89243296,
+    "peak_rss_bytes": 28766208
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 242100736,
+    "peak_rss_bytes": 49627136
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 145132977,
+    "peak_rss_bytes": 16449536
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 4,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 96174127,
+    "peak_rss_bytes": 33574912
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 1007262995,
+    "peak_rss_bytes": 39809024
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 243274349,
+    "peak_rss_bytes": 14880768
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 178041870,
+    "peak_rss_bytes": 18219008
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 152715672,
+    "peak_rss_bytes": 24981504
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 327558525,
+    "peak_rss_bytes": 45338624
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 163045308,
+    "peak_rss_bytes": 15495168
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 4,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 106097344,
+    "peak_rss_bytes": 28594176
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 255636964,
+    "peak_rss_bytes": 46252032
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 464784903,
+    "peak_rss_bytes": 15601664
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 4,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 101194813,
+    "peak_rss_bytes": 25022464
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 226355448,
+    "peak_rss_bytes": 50098176
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 203580279,
+    "peak_rss_bytes": 16941056
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 4,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 4,
+    "status": "verified",
+    "process_wall_ns": 109120718,
+    "peak_rss_bytes": 27615232
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 97602902,
+    "peak_rss_bytes": 34451456
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 5,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 125483626,
+    "peak_rss_bytes": 16543744
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 243093065,
+    "peak_rss_bytes": 48263168
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 89982756,
+    "peak_rss_bytes": 30507008
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 5,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 118777691,
+    "peak_rss_bytes": 15519744
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 280727795,
+    "peak_rss_bytes": 44253184
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 91701259,
+    "peak_rss_bytes": 26865664
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 5,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 136936309,
+    "peak_rss_bytes": 14987264
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 389543395,
+    "peak_rss_bytes": 43704320
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 114278963,
+    "peak_rss_bytes": 22867968
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 369885478,
+    "peak_rss_bytes": 18006016
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 239646590,
+    "peak_rss_bytes": 14520320
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 1130770530,
+    "peak_rss_bytes": 38895616
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 109405927,
+    "peak_rss_bytes": 27844608
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 5,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 214607967,
+    "peak_rss_bytes": 16936960
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 222755121,
+    "peak_rss_bytes": 50106368
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 97651314,
+    "peak_rss_bytes": 27734016
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 5,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 468311570,
+    "peak_rss_bytes": 15601664
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 251834344,
+    "peak_rss_bytes": 45936640
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 97728801,
+    "peak_rss_bytes": 27860992
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 5,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 163167049,
+    "peak_rss_bytes": 15044608
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 331273589,
+    "peak_rss_bytes": 45203456
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 155826802,
+    "peak_rss_bytes": 23130112
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 179983185,
+    "peak_rss_bytes": 18161664
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 245544936,
+    "peak_rss_bytes": 14655488
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 5,
+    "status": "verified",
+    "process_wall_ns": 990274633,
+    "peak_rss_bytes": 39780352
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 1107139071,
+    "peak_rss_bytes": 38895616
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 235867786,
+    "peak_rss_bytes": 14385152
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 357383911,
+    "peak_rss_bytes": 17784832
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 117185336,
+    "peak_rss_bytes": 23748608
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 390036018,
+    "peak_rss_bytes": 44089344
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 135319898,
+    "peak_rss_bytes": 15355904
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 6,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 84454250,
+    "peak_rss_bytes": 25243648
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 277663735,
+    "peak_rss_bytes": 44732416
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 116465723,
+    "peak_rss_bytes": 15683584
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 6,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 86539687,
+    "peak_rss_bytes": 28663808
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 236307959,
+    "peak_rss_bytes": 48140288
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 126593998,
+    "peak_rss_bytes": 16580608
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 6,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 97401631,
+    "peak_rss_bytes": 31862784
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 981469002,
+    "peak_rss_bytes": 39780352
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 236487820,
+    "peak_rss_bytes": 15048704
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 161524248,
+    "peak_rss_bytes": 18010112
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 151495913,
+    "peak_rss_bytes": 25571328
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 334127502,
+    "peak_rss_bytes": 45060096
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 167840707,
+    "peak_rss_bytes": 15216640
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 6,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 104519166,
+    "peak_rss_bytes": 27672576
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 248167422,
+    "peak_rss_bytes": 46567424
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 467222007,
+    "peak_rss_bytes": 15630336
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 6,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 98270156,
+    "peak_rss_bytes": 27119616
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 228748678,
+    "peak_rss_bytes": 50262016
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 280839036,
+    "peak_rss_bytes": 16621568
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 6,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 6,
+    "status": "verified",
+    "process_wall_ns": 109324524,
+    "peak_rss_bytes": 27488256
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 108883139,
+    "peak_rss_bytes": 31035392
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 7,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 125468868,
+    "peak_rss_bytes": 16683008
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 242994008,
+    "peak_rss_bytes": 47886336
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 87217881,
+    "peak_rss_bytes": 28524544
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 7,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 116252570,
+    "peak_rss_bytes": 15687680
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 277684204,
+    "peak_rss_bytes": 44961792
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 93493212,
+    "peak_rss_bytes": 25845760
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 7,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 135748900,
+    "peak_rss_bytes": 15056896
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 399481891,
+    "peak_rss_bytes": 43929600
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 121979773,
+    "peak_rss_bytes": 22319104
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 370517516,
+    "peak_rss_bytes": 18026496
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 231652004,
+    "peak_rss_bytes": 14516224
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 1122659704,
+    "peak_rss_bytes": 39149568
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 111454115,
+    "peak_rss_bytes": 30089216
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 7,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 208997635,
+    "peak_rss_bytes": 16515072
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 224518950,
+    "peak_rss_bytes": 50929664
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 99264358,
+    "peak_rss_bytes": 27013120
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 7,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 465741283,
+    "peak_rss_bytes": 15609856
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 250056538,
+    "peak_rss_bytes": 45854720
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 105146884,
+    "peak_rss_bytes": 24289280
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 7,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 169611530,
+    "peak_rss_bytes": 15458304
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 337606969,
+    "peak_rss_bytes": 45449216
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 163575883,
+    "peak_rss_bytes": 25202688
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 157571144,
+    "peak_rss_bytes": 17997824
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 239184496,
+    "peak_rss_bytes": 14639104
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 7,
+    "status": "verified",
+    "process_wall_ns": 936072067,
+    "peak_rss_bytes": 40214528
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 1104315736,
+    "peak_rss_bytes": 38477824
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 228215739,
+    "peak_rss_bytes": 14446592
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 343659688,
+    "peak_rss_bytes": 18153472
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 117084325,
+    "peak_rss_bytes": 24305664
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 390993010,
+    "peak_rss_bytes": 43753472
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 131881468,
+    "peak_rss_bytes": 14888960
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 8,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 88144766,
+    "peak_rss_bytes": 26415104
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 275045567,
+    "peak_rss_bytes": 43982848
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 117550046,
+    "peak_rss_bytes": 15663104
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 8,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 88110662,
+    "peak_rss_bytes": 29065216
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 239747361,
+    "peak_rss_bytes": 47812608
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 124306968,
+    "peak_rss_bytes": 16338944
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 8,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "32003",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 99557784,
+    "peak_rss_bytes": 31956992
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 928312405,
+    "peak_rss_bytes": 39710720
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 240461924,
+    "peak_rss_bytes": 14962688
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 158482079,
+    "peak_rss_bytes": 18255872
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 1,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 158571608,
+    "peak_rss_bytes": 23138304
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 4,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 351313759,
+    "peak_rss_bytes": 45129728
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 4,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 176680362,
+    "peak_rss_bytes": 15568896
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 4,
+    "repeat": 8,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 4,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 106022763,
+    "peak_rss_bytes": 24236032
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 8,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 252721393,
+    "peak_rss_bytes": 46825472
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 8,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 464077955,
+    "peak_rss_bytes": 15474688
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 8,
+    "repeat": 8,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 8,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 95975041,
+    "peak_rss_bytes": 25071616
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "zeebra",
+    "workers": 16,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 228110360,
+    "peak_rss_bytes": 50122752
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "msolve",
+    "workers": 16,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 389031617,
+    "peak_rss_bytes": 16482304
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "grobx",
+    "workers": 16,
+    "repeat": 8,
+    "status": "unsupported",
+    "process_wall_ns": null,
+    "peak_rss_bytes": null
+   },
+   {
+    "field": "2147483647",
+    "name": "mq-random-10",
+    "engine": "groebner-rs",
+    "workers": 16,
+    "repeat": 8,
+    "status": "verified",
+    "process_wall_ns": 106197784,
+    "peak_rss_bytes": 27402240
+   }
+  ]
+ }
+]
