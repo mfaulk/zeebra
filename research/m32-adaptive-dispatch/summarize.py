@@ -17,10 +17,10 @@ from collections import defaultdict
 DRAWS = 20000
 # Plan §8.2 Gate R: (reference arm, threshold on the 95% upper bound).
 BOUNDS = {'mq10': ('f4', 1.05), 'mq10x': ('f4', 1.05), 'fav': ('m31', 1.03), 'rev1fav': ('m31', 1.03),
-          'ctrl': ('f4', 1.05)}
+          'ctrl': ('f4', 1.05), 't9': ('none', 1.0)}
 WARM = {'small', 'rev1small'}
 # The extension block's records pool with the first n = 9 (plan §10.3).
-POOLED = {'mq10x': 'mq10'}
+POOLED = {'mq10x': 'mq10', 'rev1favx': 'rev1fav'}
 SMALL_BOUNDS = {'wide64/katsura-9': ('m31', 1.03)}
 SMALL_DEFAULT = ('f4', 1.05)
 T9_NS = 50_000

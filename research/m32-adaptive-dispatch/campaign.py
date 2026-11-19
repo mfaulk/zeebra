@@ -58,7 +58,8 @@ SUITES['rev1fav'] = [(r, [f'{a}:{w}' for w in (8, 16) for a in ('m31', 'en')])
                      for r in ['goldilocks/noon-7', 'wide64/noon-8']]
 SUITES['t9'] = [(r, [f'en:{w}' for w in W4]) for r in MQ10 + FAVOURABLE + CYCLIC + SMALL_VS_F4
                 + SMALL_VS_M31]
-REPS = {'mq10': 9, 'fav': 9, 'ctrl': 9, 'small': 31, 'mq10x': 12, 'rev1small': 31, 'rev1fav': 9,
+SUITES['rev1favx'] = [(r, ['m31:16', 'en:16']) for r in ['goldilocks/noon-7', 'wide64/noon-8']]
+REPS = {'rev1favx': 12, 'mq10': 9, 'fav': 9, 'ctrl': 9, 'small': 31, 'mq10x': 12, 'rev1small': 31, 'rev1fav': 9,
         't9': 3}
 WARM = {'small', 'rev1small'}
 
