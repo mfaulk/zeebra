@@ -53,6 +53,9 @@ def stat(c, row, arm, key):
 
 
 def walls(c, out):
+    # M31's order leaves arms it does not list tied, and ties fall back to set order, which varies.
+    M1.ARM_ORDER = [f'{p}:{w}' for p in ('f4', 'rf4', 'en', 'ren') for w in (1, 4, 8, 16)] + [
+        'd1:1', 'cl:4', 'cl:8', 'cl:16']
     M1.walls_table(c, out)
 
 

@@ -42,7 +42,10 @@ absolute walls are beside builds. Executable SHA-256s, toolchain and options:
   processes) resolves katsura-4's entry-point ÷ shipping ratio to a half-width of 0.50–0.70% at
   both fields and 1 and 16 workers, against the 2% acceptance. Process wall at the same n gives
   0.83–1.61%. The plan's default method stands (§7).
-- **#935.** See §8.
+- **#935: groebner-rs is fastest at 8 workers on the four wide rows (Katsura-11 ties 8 and 16),
+  and there it matches or beats Zeebra's 16-worker entry point.** Eco-12 908 ms (Zeebra entry at 16 w 1,753, ratio 1.93), Katsura-11 /
+  2⁶⁴−353 597 ms (612), MQ11 2,170 ms (2,144), Cyclic-7 69 ms (146). M31 measured groebner-rs only
+  at one worker on these rows; its best configuration changes #942's competitive reading (§8).
 
 ## 1. Freeze (F0)
 
@@ -228,4 +231,28 @@ margin. The M31 miss (#934's finding) came from n = 9, not from process wall as 
 
 ## 8. groebner-rs at its best worker count (#935)
 
-Pending.
+The wide controller (`tools/external/wide-corpus.py`) now admits a worker count for groebner-rs
+(`--workers W`, sent in the request as the driver's rayon pool size). Before, it refused anything
+but one worker for every comparand. The driver echoes the pool size, the controller checks the
+echo, and with `ZEEBRA_RESEARCH_THREAD_TICKS` set the driver reports per-thread CPU ticks, from
+which the controller records `observed_threads`: the driver threads that ran during the solve.
+grobx's pinned driver is serial and stays at its declared one worker; it is not worked around and
+not run here. The sweep used M30-0's driver `81dc5c4c`, nine passes, one worker count per pass,
+rotated, on CPUs 8..8+W−1 (process wall, ms, median [95%]):
+
+| Row | 1 w | 4 w | 8 w | 16 w | Observed threads at 1/4/8/16 | Best | Zeebra entry 16 w | Zeebra ÷ rs best |
+|---|---:|---:|---:|---:|---|---|---:|---:|
+| Eco-12 / 2⁶⁴−353 | 3,318.8 | 1,166.4 | **907.5** [901.1, 912.4] | 933.8 | 1 / 4 / 8 / 16 | 8 | 1,753 | 1.93 |
+| MQ11 / Goldilocks | 10,064.4 | 3,260.7 | **2,170.2** [2,161.5, 2,188.4] | 2,210.4 | 1 / 4 / 8 / 16 | 8 | 2,144 | 0.99 |
+| Katsura-11 / 2⁶⁴−353 | 2,455.8 | 815.7 | 597.2 | **596.6** [587.8, 607.8] | 1 / 4 / 8 / 16 | 16 (8 is within its interval) | 612 | 1.03 |
+| Cyclic-7 / 2⁶⁴−353 | 197.7 | 85.8 | **69.3** [68.9, 69.9] | 78.6 | 1 / 4 / 8 / 10 | 8 | 146 | 2.11 |
+
+Zeebra's figure is the `en:16` wall from §2 (the sig path on the first three rows; Cyclic-7's entry dispatches to F4). The ratio divides medians and mixes worker counts (16 against 8). It is a
+best-supported-configuration reading, not equal-worker (plan §10.5). Every pass returned one basis
+per row, the same at every worker count. One-worker walls are 2–9% above M31's (Eco-12 3,319
+against 3,198 ms), so absolute figures carry this session's ambient load.
+
+**For #942:** M31's competitive table (`research/m31-final/tables.md`) read groebner-rs at one worker on these rows, putting Zeebra-16 ÷ groebner-rs-1 at
+0.220–0.753. At its best configuration groebner-rs is ahead on Eco-12 and Cyclic-7 and level on MQ11
+and Katsura-11. Read #942's comparand column with groebner-rs at 8 workers (16 on Katsura-11,
+statistically tied with 8). No published M31 figure changes.

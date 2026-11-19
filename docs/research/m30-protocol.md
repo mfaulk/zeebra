@@ -41,7 +41,9 @@ comparand identities are never treated as paired.
 - **grobx.** Raw randomized mode (the adapter default) is the timing comparand. Certified mode,
   research overlays (#716's arms 1–4) and `Params.signatures=false` are separate rows, each labelled,
   never folded into the raw row.
-- **groebner-rs.** One worker (its adapter refuses more).
+- **groebner-rs.** One worker in M30 and M31 (the wide adapter refused more). Since #935 the wide
+  controller admits `--workers W` for groebner-rs and records the driver's observed threads
+  (`docs/research/m32-baseline.md` §8).
 
 ## 3. Repetitions, order and windows
 
