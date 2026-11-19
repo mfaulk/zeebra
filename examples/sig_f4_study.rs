@@ -22,6 +22,12 @@
 //! twice, without and with recording, then design 2 recorded, and prints #902's cascade records
 //! and schedule ceilings instead of a timing row; it refuses if recording moved any algebraic
 //! quantity (`docs/research/m31-parallel-signature-elimination.md`).
+//!
+//! With `--features research-sigf4-replay`, `--symbolic-replay` (sigf4) replays every batch's
+//! symbolic closure as #933's level-synchronous design at 1/4/8/16 workers beside the engine's own
+//! (run at `--workers`, `--claim` as given), asserts each run equal to it, and prints the per-batch
+//! clocks and the ceiling; `--min-frontier` (default 512) is the narrowest level a team scans
+//! (`docs/research/m32-parallel-symbolic.md` §4).
 use std::time::{Duration, Instant};
 use zeebra::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
@@ -52,6 +58,8 @@ struct Args {
     discovery: bool,
     replay: bool,
     claim: bool,
+    symbolic: bool,
+    min_frontier: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -65,6 +73,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         discovery: false,
         replay: false,
         claim: false,
+        symbolic: false,
+        min_frontier: 512,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -87,6 +97,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--discovery" => parsed.discovery = true,
             "--replay" => parsed.replay = true,
             "--claim" => parsed.claim = true,
+            "--symbolic-replay" => parsed.symbolic = true,
+            "--min-frontier" => {
+                parsed.min_frontier = value()?.parse().map_err(|_| "--min-frontier")?
+            }
             other => return Err(format!("unexpected argument {other}")),
         }
     }
@@ -101,6 +115,11 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
         return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
+    }
+    if parsed.symbolic && (parsed.engine != "sigf4" || parsed.replay) {
+        return Err(
+            "--symbolic-replay replays the signature engine's closure: --engine sigf4".into(),
+        );
     }
     if parsed.replay && (parsed.engine != "sigf4" || parsed.workers < 2) {
         return Err("--replay runs design 1 and design 2: --engine sigf4 --workers ≥ 2".into());
@@ -452,6 +471,109 @@ mod cascade {
     }
 }
 
+/// #933: every batch's symbolic closure replayed at 1/4/8/16 workers beside the engine's own.
+#[cfg(feature = "research-sigf4-replay")]
+mod closure {
+    use super::*;
+    use zeebra::grobner::sigf4::symbolic_replay::{record, SymbolicRecord, WORKERS};
+
+    fn batch(r: &SymbolicRecord) -> Json {
+        let runs = r.runs.iter().map(|run| {
+            Json::object([
+                ("workers", Json::size(run.workers)),
+                ("total_ns", Json::int(run.total)),
+                ("scan_ns", Json::int(run.scan)),
+                ("merge_ns", Json::int(run.merge)),
+                ("sort_ns", Json::int(run.sort)),
+            ])
+        });
+        Json::object([
+            ("targets", Json::size(r.targets)),
+            ("rows", Json::size(r.rows)),
+            ("columns", Json::size(r.columns)),
+            ("serial_ns", Json::int(r.serial_ns)),
+            ("lookup_ns", Json::int(r.census.lookup_ns)),
+            (
+                "levels",
+                Json::Array(r.levels.iter().map(|&n| Json::size(n)).collect()),
+            ),
+            ("runs", Json::Array(runs.collect())),
+        ])
+    }
+
+    /// Per worker count: the stage sums and the speedup over the engine's own closure, as run and
+    /// with the sort's share divided by the worker count (the design's parallel sort, §2).
+    fn ceilings(records: &[SymbolicRecord]) -> Json {
+        let serial: u64 = records.iter().map(|r| r.serial_ns).sum();
+        let rows = WORKERS.iter().enumerate().map(|(k, &workers)| {
+            let sum = |f: fn(&zeebra::grobner::sigf4::symbolic_replay::Run) -> u64| {
+                records.iter().map(|r| f(&r.runs[k])).sum::<u64>()
+            };
+            let (total, sort) = (sum(|r| r.total), sum(|r| r.sort));
+            let sorted = total - sort + sort / workers as u64;
+            Json::object([
+                ("workers", Json::size(workers)),
+                ("total_ns", Json::int(total)),
+                ("scan_ns", Json::int(sum(|r| r.scan))),
+                ("merge_ns", Json::int(sum(|r| r.merge))),
+                ("sort_ns", Json::int(sort)),
+                (
+                    "speedup",
+                    Json::string(format!("{:.3}", serial as f64 / total as f64)),
+                ),
+                (
+                    "speedup_parallel_sort",
+                    Json::string(format!("{:.3}", serial as f64 / sorted as f64)),
+                ),
+            ])
+        });
+        Json::Array(rows.collect())
+    }
+
+    pub(super) fn report<const N: usize, F: FiniteField>(
+        system: &[MultivariatePolynomial<N, F>],
+        names: &[&str; N],
+        digest: &str,
+        args: &Args,
+    ) -> Json {
+        let options = SigF4Options {
+            max_wall_time: Some(args.wall),
+            workers: args.workers,
+            parallel_cascade: args.claim,
+            ..SigF4Options::default()
+        };
+        let (plain, plain_stats) = sig_f4_reported(system, ORDER, &options);
+        let ((recorded, stats), records) = record(args.min_frontier, || {
+            sig_f4_reported(system, ORDER, &options)
+        });
+        let digest_of = |b: Result<Vec<MultivariatePolynomial<N, F>>, _>| {
+            basis_sha256(&b.expect("the engine finishes"), names)
+        };
+        let basis = digest_of(plain);
+        assert_eq!(digest_of(recorded), basis, "recording moved the basis");
+        let census = |f: fn(&SymbolicRecord) -> u64| Json::int(records.iter().map(f).sum());
+        Json::object([
+            ("field", Json::string(&args.field)),
+            ("name", Json::string(&args.name)),
+            ("digest", Json::string(digest)),
+            ("engine_workers", Json::size(args.workers)),
+            ("claim", Json::Bool(args.claim)),
+            ("min_frontier", Json::size(args.min_frontier)),
+            ("basis_sha256", Json::string(basis)),
+            ("plain_symbolic_ns", Json::nanos(plain_stats.symbolic)),
+            ("recorded_symbolic_ns", Json::nanos(stats.symbolic)),
+            ("lookup_ns", census(|r| r.census.lookup_ns)),
+            ("cache_current", census(|r| r.census.cache_current)),
+            ("cache_stale", census(|r| r.census.cache_stale)),
+            ("cache_missing", census(|r| r.census.cache_missing)),
+            ("elements_scanned", census(|r| r.census.elements_scanned)),
+            ("term_lookups", census(|r| r.census.term_lookups)),
+            ("ceilings", ceilings(&records)),
+            ("batches", Json::Array(records.iter().map(batch).collect())),
+        ])
+    }
+}
+
 fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
     let system: Vec<MultivariatePolynomial<N, F>> = input
@@ -459,6 +581,12 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         .iter()
         .map(|s| MultivariatePolynomial::parse(s, names).expect("generator parses"))
         .collect();
+    if args.symbolic {
+        #[cfg(feature = "research-sigf4-replay")]
+        return closure::report(&system, &names, &input.digest, args);
+        #[cfg(not(feature = "research-sigf4-replay"))]
+        panic!("--symbolic-replay requires --features research-sigf4-replay");
+    }
     if args.replay {
         #[cfg(feature = "research-sigf4-replay")]
         return cascade::report(&system, &names, &input.digest, args);
@@ -646,6 +774,17 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--workers", "2"]].concat()).is_ok());
         assert!(args(&[&base[..], &["sigf4"]].concat()).is_err());
         assert!(args(&[&base[..], &["f4", "--workers", "2"]].concat()).is_err());
+    }
+
+    // The symbolic replay needs the signature engine and is not the cascade replay.
+    #[test]
+    fn symbolic_replay_needs_the_signature_engine() {
+        let base = ["--field", "wide64", "--name", "eco-12", "--symbolic-replay"];
+        let sig = |extra: &[&str]| args(&[&base[..], &["--engine", "sigf4"], extra].concat());
+        assert_eq!(sig(&["--min-frontier", "64"]).unwrap().min_frontier, 64);
+        assert!(sig(&["--workers", "16", "--claim"]).is_ok());
+        assert!(sig(&["--workers", "2", "--replay"]).is_err());
+        assert!(args(&[&base[..], &["--engine", "f4"]].concat()).is_err());
     }
 
     // The parallel cascade belongs to the signature engine and is not a replay arm.

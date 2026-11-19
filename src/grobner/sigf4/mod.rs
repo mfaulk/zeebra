@@ -23,6 +23,8 @@ mod engine;
 #[cfg(feature = "research-sigf4-replay")]
 pub mod replay;
 pub mod signature;
+#[cfg(feature = "research-sigf4-replay")]
+pub use engine::symbolic_replay;
 #[cfg(all(test, feature = "research-sigf4"))]
 mod tests;
 

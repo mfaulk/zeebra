@@ -33,6 +33,10 @@ use crate::{
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
+#[cfg(feature = "research-sigf4-replay")]
+#[path = "symbolic_replay.rs"]
+pub mod symbolic_replay;
+
 pub(super) const NONE: u32 = u32::MAX;
 
 /// A row after reduction: its remaining entries in column order, and the products spent.
@@ -67,7 +71,7 @@ struct Row<const N: usize> {
     source: RowSource,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RowSource {
     Input(usize),
     Element(u32),
@@ -301,6 +305,46 @@ fn gcd_is_one<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
         .all(|(x, y)| *x == 0 || *y == 0)
 }
 
+/// `ratio(a) < ratio(b)` as module terms `s/lt`, compared by cross-multiplication.
+fn ratio_cmp<const N: usize, F>(
+    basis: &[Element<N, F>],
+    order: MonomialOrder,
+    a: u32,
+    b: u32,
+) -> Ordering {
+    let (a, b) = (&basis[a as usize], &basis[b as usize]);
+    order
+        .cmp(&(a.sig.mono * b.lead), &(b.sig.mono * a.lead))
+        .then(a.sig.index.cmp(&b.sig.index))
+}
+
+/// The least-ratio element whose lead divides `m`, the newest on a tie, resuming a cached
+/// `(best, scanned)`; returns it with the basis length scanned to. A function of `m` and the basis
+/// alone, whatever the cache held (`docs/research/m32-parallel-symbolic.md` §3, Lemma 1).
+fn least_ratio<const N: usize, F>(
+    basis: &[Element<N, F>],
+    lead_masks: &[u64],
+    order: MonomialOrder,
+    m: &Monomial<N>,
+    cached: Option<(u32, u32)>,
+) -> (u32, u32) {
+    let (mut best, scanned) = cached.unwrap_or((NONE, 0));
+    let total = basis.len() as u32;
+    if scanned < total {
+        let mm = mask(m);
+        for (offset, &lead_mask) in lead_masks[scanned as usize..].iter().enumerate() {
+            let id = scanned + offset as u32;
+            if lead_mask & !mm != 0 || !divides(&basis[id as usize].lead, m) {
+                continue;
+            }
+            if best == NONE || ratio_cmp(basis, order, id, best) != Ordering::Greater {
+                best = id;
+            }
+        }
+    }
+    (best, total)
+}
+
 impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     fn push(&mut self, pending: Pending<N>) {
         self.queue
@@ -311,12 +355,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats.peak_pending = self.stats.peak_pending.max(self.pending);
     }
 
-    /// `ratio(a) < ratio(b)` as module terms `s/lt`, compared by cross-multiplication.
     fn ratio_cmp(&self, a: u32, b: u32) -> Ordering {
-        let (a, b) = (&self.basis[a as usize], &self.basis[b as usize]);
-        self.order
-            .cmp(&(a.sig.mono * b.lead), &(b.sig.mono * a.lead))
-            .then(a.sig.index.cmp(&b.sig.index))
+        ratio_cmp(&self.basis, self.order, a, b)
     }
 
     /// The canonical rewriter of `t`: the `⊴_rat`-maximal element whose signature divides `t`
@@ -341,19 +381,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     /// The least-signature reducer multiple for column monomial `m`, i.e. the least-ratio element
     /// whose lead divides `m`. Cached per monomial; only elements added since are rescanned.
     fn reducer(&mut self, m: &Monomial<N>) -> u32 {
-        let (mut best, scanned) = self.reducers.get(m).copied().unwrap_or((NONE, 0));
-        let total = self.basis.len() as u32;
-        if scanned < total {
-            let mm = mask(m);
-            for (offset, &lead_mask) in self.lead_masks[scanned as usize..].iter().enumerate() {
-                let id = scanned + offset as u32;
-                if lead_mask & !mm != 0 || !divides(&self.basis[id as usize].lead, m) {
-                    continue;
-                }
-                if best == NONE || self.ratio_cmp(id, best) != Ordering::Greater {
-                    best = id;
-                }
-            }
+        let cached = self.reducers.get(m).copied();
+        let (best, total) = least_ratio(&self.basis, &self.lead_masks, self.order, m, cached);
+        if cached.map_or(0, |(_, scanned)| scanned) < total {
             self.reducers.insert(*m, (best, total));
         }
         best
@@ -472,6 +502,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         &mut self,
         targets: &[Row<N>],
     ) -> Result<(Vec<Monomial<N>>, Vec<Row<N>>, Vec<Vec<u32>>, usize), SigF4Error> {
+        #[cfg(feature = "research-sigf4-replay")]
+        let before = symbolic_replay::active().then(|| self.reducers.clone());
         let clock = Instant::now();
         let mut seen: MonomialMap<N, u32> = MonomialMap::default();
         let mut work: Vec<Monomial<N>> = Vec::new();
@@ -543,6 +575,17 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats.max_matrix_rows = self.stats.max_matrix_rows.max(rows.len());
         self.stats.max_matrix_columns = self.stats.max_matrix_columns.max(columns.len());
         self.stats.symbolic += clock.elapsed();
+        #[cfg(feature = "research-sigf4-replay")]
+        if let Some(before) = before {
+            let view = symbolic_replay::View {
+                order: self.order,
+                basis: &self.basis,
+                lead_masks: &self.lead_masks,
+                inputs: &self.inputs,
+            };
+            let serial = (&columns[..], &rows[..], &handles[..], &self.reducers);
+            symbolic_replay::replay(view, targets, &before, serial, clock.elapsed());
+        }
         if rows.len() > self.options.max_matrix_rows {
             return Err(SigF4Error::Budget(F4Error::TooManyRows {
                 limit: self.options.max_matrix_rows,
