@@ -102,9 +102,10 @@ CCD-aligned `taskset` from CPU 8, `rss-guard` 8 GiB, 180 s cap
 ([`campaign.py`](../../research/m32-adaptive-dispatch/campaign.py),
 [`summarize.py`](../../research/m32-adaptive-dispatch/summarize.py), records `*.jsonl.gz`). Every
 suite ran under `tools/bench-reserve.sh run` inside the CCD 1–2 reservation another session (#939)
-held all day; this issue never reserved, and its suites queued behind #939's and #940's under
-benchlock. Load outside the reservation 0.8–18. Rows under 50 ms (katsura-4, katsura-9) use §10.3's
-default, since #934 has not landed: the median of 10 warm in-process calls per process, n = 31
+held most of the day; this issue reserved only for its last extension block (§3.2), and its
+suites queued behind #939's and #940's under benchlock. Load outside the reservation 0.7–20.3 (§3.3). Rows under 50 ms (katsura-4, katsura-9) use §10.3's
+default, since #934 had not landed when the gate was read (it merged in #952 afterwards, and its
+`--repeat` replaced this harness's `--calls` on `main`): the median of 10 warm in-process calls per process, n = 31
 processes. 1,144 of 1,144 first-read children completed; every row has one basis digest across all
 arms and repetitions.
 

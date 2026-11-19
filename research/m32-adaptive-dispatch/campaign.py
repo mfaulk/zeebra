@@ -18,6 +18,9 @@ Suites (each read once; §10.3's precision rule decides whether one n = 12 exten
          of the warm calls per process, n = 31 processes; katsura-4 (both fields) en ÷ f4 and
          katsura-9 en ÷ m31, at 1 and 16 workers (katsura-9 also 4 and 8, where the team cap acts).
 
+`--calls` is the measured builds' own warm-call flag (tags `measured/927-base`, `-head`, `-rev1`);
+#934's `--repeat` replaced it on `main` before this merged, so rerun at those tags.
+
     tools/bench-reserve.sh run zb-927 8-23 python3 -u research/m32-adaptive-dispatch/campaign.py \\
         --suite mq10 --bins BINDIR --output OUT.jsonl
 """
