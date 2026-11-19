@@ -25,6 +25,8 @@ pub mod replay;
 pub mod signature;
 #[cfg(all(test, feature = "research-sigf4"))]
 mod tests;
+#[cfg(feature = "research-sigf4-usage")]
+pub mod usage;
 
 use std::time::Duration;
 
@@ -191,6 +193,10 @@ pub struct SigF4Statistics {
     /// #901's elimination split and glue clocks; collected only under `research-sigf4-split`.
     #[cfg(feature = "research-sigf4-split")]
     pub split: SplitLog,
+    /// #936's element-use counts and syzygy-store replay; collected only under
+    /// `research-sigf4-usage`.
+    #[cfg(feature = "research-sigf4-usage")]
+    pub usage: usage::UsageReport,
 }
 
 /// One batch's elimination, split by pivot source. `reducer_*` is work against the batch's reducer
