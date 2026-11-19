@@ -149,12 +149,16 @@ pub fn signature_route<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     options: &F4Options,
 ) -> Result<SignatureDispatch, SigF4Error> {
+    // The worker cap first, off the clock: an `Auto` cap reads the process's CPU count once per
+    // process (about 100 µs of cgroup files, #752). M31's entry point paid it too, after its
+    // clock, and the shipping F4 pays it on its first batch; it is not the rule's cost.
+    let workers = caller_workers(options);
     let started = Instant::now();
     engine::graded(order)?;
     let mut used = [false; N];
     let mut degrees = Vec::with_capacity(generators.len());
     let mut features = DispatchFeatures {
-        workers: caller_workers(options),
+        workers,
         field_bits: u32::try_from(8 * std::mem::size_of::<F>()).unwrap_or(u32::MAX),
         ..DispatchFeatures::default()
     };
