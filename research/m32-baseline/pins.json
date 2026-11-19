@@ -1,0 +1,415 @@
+{
+ "issue": 939,
+ "freeze": {
+  "reference": {
+   "commit": "8715c8edb5ed5ab17e9d71331c48e07cb87b7754",
+   "what": "M31 final main (#926)"
+  },
+  "baseline": {
+   "commit": "7b25a1ee56c348fb68fd5671a94fe19d1e6aafec",
+   "what": "M32 baseline main (#943); timed src/ equals e59a90a1 and differs from the reference only in documentation (identities.json)"
+  }
+ },
+ "catalog": "research/wide-corpus/cases.json",
+ "catalog_sha256": "43f42f5eb1b3fc039bdaecd1f1abf67864cacdec4525e7de6e72cddfd0a0f0da",
+ "development": [
+  {
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "name": "eco-12",
+   "variables": 12,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "e9ef0fecf3906d9283e1ce003c4489d6921fb8718f2956c39c4aaa79e52a93cb",
+   "role": "M31 primary"
+  },
+  {
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "name": "katsura-11",
+   "variables": 11,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "036f0a35884e82d7bc3e3bc930ee9ccbe38fbddfc81e56fa8bf190a05ae1b955",
+   "role": "M31 second family"
+  },
+  {
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "name": "katsura-11",
+   "variables": 11,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "c08214c56a6654ab7a376c61df339b2e7cc65a225d027cc3a3fc3bec9876a4a2",
+   "role": "M31 competitive"
+  },
+  {
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "name": "mq-random-11",
+   "variables": 11,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (dense MQ; StdRng seed 1937768459; all degree <=2 coefficients nonzero; no planting)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "ee76de455c5ea571d6e8286152a4b4380b9d1ea323ee63dc8f889ffa11a92af5",
+   "role": "M31 reported"
+  },
+  {
+   "field": "gf32003",
+   "modulus": "32003",
+   "name": "mq-random-10",
+   "variables": 10,
+   "order": "grevlex",
+   "generator": "grobner::external::corpus::random_mq_instance(10, seed 10) (ladder)",
+   "canonical": "external contract (Instance::canonical)",
+   "sha256": "16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f",
+   "role": "M31 MQ10"
+  },
+  {
+   "field": "m31",
+   "modulus": "2147483647",
+   "name": "mq-random-10",
+   "variables": 10,
+   "order": "grevlex",
+   "generator": "grobner::external::corpus::random_mq_instance(10, seed 10) (ladder)",
+   "canonical": "external contract (Instance::canonical)",
+   "sha256": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+   "role": "M31 MQ10"
+  },
+  {
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "name": "cyclic-7",
+   "variables": 7,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "274e9a533b788e6e440803ad61ee44d2e0c691cec045c8c3bd6607ad8c42cb11",
+   "role": "M31 unfavourable control"
+  },
+  {
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "name": "cyclic-7",
+   "variables": 7,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "1da97cb3fe0eff34f224caaa8f029579d5f7252d910b78a3d5021baec41386bc",
+   "role": "M31 unfavourable control"
+  },
+  {
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "name": "katsura-4",
+   "variables": 4,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "00f08d221047f38741f377f52893d3d561236feecf3bce5f9108d570937f35d3",
+   "role": "M31 small control"
+  },
+  {
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "name": "katsura-4",
+   "variables": 4,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "f2670d770ef9a866db0a407dbd1f05827563a9af3bc4485d51a99bb3eef307b6",
+   "role": "M31 small control"
+  },
+  {
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "name": "noon-7",
+   "variables": 7,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (Noonburg 11/10; equations multiplied by 10)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "c146f701505e9d4a0b2ffaec9d0047b85eba1358f885c54196115c14ced7a933",
+   "role": "M31 small control"
+  },
+  {
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "name": "katsura-9",
+   "variables": 9,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (independent benchmark_systems definition)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "18eb9c774fc5700cc38e0724dc04af38f34803132a8c20b38f1ad88f5ff749ec",
+   "role": "M31 held out, demoted"
+  },
+  {
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "name": "noon-8",
+   "variables": 8,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (Noonburg 11/10; equations multiplied by 10)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "403af18521ea58b7846c8cc18d07f9932884a27413953b9c6eac6a23ed090668",
+   "role": "M31 held out, demoted"
+  }
+ ],
+ "held_out": [
+  {
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "name": "mq-random-10",
+   "variables": 10,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (dense MQ; StdRng seed 1937768458; all degree <=2 coefficients nonzero; no planting)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "f69e955f898956df18bf174d1635f4f2cef7cf3e457e101713e826b3674a7bf3",
+   "why": "MQ10's family and size at another field width",
+   "admission": {
+    "verdict": "kept",
+    "reason": "completes inside 20 ms-60 s; both engines accept the field",
+    "arm": "f4:16",
+    "n": 3,
+    "statuses": [
+     "complete"
+    ],
+    "process_wall_ms": [
+     925.1,
+     930.5,
+     933.5
+    ],
+    "median_process_wall_ms": 930.5,
+    "call_ms": [
+     750.5,
+     753.1,
+     756.3
+    ],
+    "peak_rss_mib": 107,
+    "basis_elements": [
+     426
+    ],
+    "basis_sha256": [
+     "e269548906c86840406da4c40cca4800d4763cbf76d68ae03ce950b94cd1c86d"
+    ],
+    "input_digests": [
+     "f69e955f898956df18bf174d1635f4f2cef7cf3e457e101713e826b3674a7bf3"
+    ],
+    "field_acceptance": "both engines generic over FiniteField; no field refusal (sigf4/dispatch.rs)"
+   }
+  },
+  {
+   "field": "wide64",
+   "modulus": "18446744073709551263",
+   "name": "mq-random-12",
+   "variables": 12,
+   "order": "grevlex",
+   "generator": "research/wide-corpus/cases.json (dense MQ; StdRng seed 1937768460; all degree <=2 coefficients nonzero; no planting)",
+   "canonical": "wide-corpus-v1",
+   "sha256": "549302dc73ca71fcacde392a0e24dc4c26f469159b880d29a6b01c62c0a300a6",
+   "why": "larger dense MQ, the other side of the crossover",
+   "admission": {
+    "verdict": "dropped",
+    "reason": "median process wall 104554.0 ms outside 20 ms-60 s",
+    "arm": "f4:16",
+    "n": 3,
+    "statuses": [
+     "complete"
+    ],
+    "process_wall_ms": [
+     103969.1,
+     104554.0,
+     105039.1
+    ],
+    "median_process_wall_ms": 104554.0,
+    "call_ms": [
+     101342.0,
+     101850.4,
+     102399.0
+    ],
+    "peak_rss_mib": 1438,
+    "basis_elements": [
+     1463
+    ],
+    "basis_sha256": [
+     "32e476446edcad74a9344d2a079b3fabda6ab30e50476b759a17d55a4076e765"
+    ],
+    "input_digests": [
+     "549302dc73ca71fcacde392a0e24dc4c26f469159b880d29a6b01c62c0a300a6"
+    ],
+    "field_acceptance": "both engines generic over FiniteField; no field refusal (sigf4/dispatch.rs)"
+   }
+  },
+  {
+   "field": "gf32003",
+   "modulus": "32003",
+   "name": "mq-random-9",
+   "variables": 9,
+   "order": "grevlex",
+   "generator": "grobner::external::corpus::random_mq_instance(9, seed 9)",
+   "canonical": "external contract (Instance::canonical)",
+   "sha256": "4e4ddcb645c8f6eddb73d21a1532437643f7a2a2a6faf6643886d1c4a5076b21",
+   "why": "smaller dense MQ",
+   "admission": {
+    "verdict": "dropped",
+    "reason": "median process wall 3.1 ms outside 20 ms-60 s",
+    "arm": "f4:16",
+    "n": 3,
+    "statuses": [
+     "complete"
+    ],
+    "process_wall_ms": [
+     3.1,
+     3.1,
+     3.2
+    ],
+    "median_process_wall_ms": 3.1,
+    "call_ms": [
+     0.0,
+     0.0,
+     0.1
+    ],
+    "peak_rss_mib": 5,
+    "basis_elements": [
+     1
+    ],
+    "basis_sha256": [
+     "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    ],
+    "input_digests": [
+     "4e4ddcb645c8f6eddb73d21a1532437643f7a2a2a6faf6643886d1c4a5076b21"
+    ],
+    "field_acceptance": "both engines generic over FiniteField; no field refusal (sigf4/dispatch.rs)"
+   }
+  },
+  {
+   "field": "m31",
+   "modulus": "2147483647",
+   "name": "katsura-10",
+   "variables": 10,
+   "order": "grevlex",
+   "generator": "grobner::benchmark_systems::katsura::<10> (ladder katsura_instance)",
+   "canonical": "external contract (Instance::canonical)",
+   "sha256": "67d6a96fadd21cc7a295c7100c93d84d2d7be37d9b7927377e57f973ebbbc8b0",
+   "why": "favourable family, unseen size and field",
+   "admission": {
+    "verdict": "kept",
+    "reason": "completes inside 20 ms-60 s; both engines accept the field",
+    "arm": "f4:16",
+    "n": 3,
+    "statuses": [
+     "complete"
+    ],
+    "process_wall_ms": [
+     240.5,
+     242.4,
+     250.8
+    ],
+    "median_process_wall_ms": 242.4,
+    "call_ms": [
+     192.3,
+     194.2,
+     202.6
+    ],
+    "peak_rss_mib": 42,
+    "basis_elements": [
+     272
+    ],
+    "basis_sha256": [
+     "cd22a85e5a985da4c404397792962545b9d4ca7e06d13a56f7bd62455961bc6d"
+    ],
+    "input_digests": [
+     "67d6a96fadd21cc7a295c7100c93d84d2d7be37d9b7927377e57f973ebbbc8b0"
+    ],
+    "field_acceptance": "both engines generic over FiniteField; no field refusal (sigf4/dispatch.rs)"
+   }
+  },
+  {
+   "field": "m31",
+   "modulus": "2147483647",
+   "name": "eco-11",
+   "variables": 11,
+   "order": "grevlex",
+   "generator": "grobner::benchmark_systems::eco::<11>",
+   "canonical": "external contract (Instance::canonical)",
+   "sha256": "3bdb17005b060d861412758860684229498a54906f610b9854b6bd09d8d11951",
+   "why": "favourable family, unseen size and field",
+   "admission": {
+    "verdict": "kept",
+    "reason": "completes inside 20 ms-60 s; both engines accept the field",
+    "arm": "f4:16",
+    "n": 3,
+    "statuses": [
+     "complete"
+    ],
+    "process_wall_ms": [
+     426.1,
+     427.4,
+     432.2
+    ],
+    "median_process_wall_ms": 427.4,
+    "call_ms": [
+     367.4,
+     369.1,
+     373.5
+    ],
+    "peak_rss_mib": 60,
+    "basis_elements": [
+     389
+    ],
+    "basis_sha256": [
+     "aab307f91a115fb374b81027c5ab426e17e661464b0e71c675090d6846041526"
+    ],
+    "input_digests": [
+     "3bdb17005b060d861412758860684229498a54906f610b9854b6bd09d8d11951"
+    ],
+    "field_acceptance": "both engines generic over FiniteField; no field refusal (sigf4/dispatch.rs)"
+   }
+  },
+  {
+   "field": "goldilocks",
+   "modulus": "18446744069414584321",
+   "name": "cyclic-6",
+   "variables": 6,
+   "order": "grevlex",
+   "generator": "grobner::benchmark_systems::cyclic::<6>",
+   "canonical": "external contract (Instance::canonical)",
+   "sha256": "2867c8eb39e07bec37ecb907e5b6971146a479594b0a9fc5ba20b64650a0c918",
+   "why": "degree-spread control",
+   "admission": {
+    "verdict": "dropped",
+    "reason": "median process wall 7.6 ms outside 20 ms-60 s",
+    "arm": "f4:16",
+    "n": 3,
+    "statuses": [
+     "complete"
+    ],
+    "process_wall_ms": [
+     7.5,
+     7.6,
+     7.7
+    ],
+    "median_process_wall_ms": 7.6,
+    "call_ms": [
+     4.3,
+     4.3,
+     4.3
+    ],
+    "peak_rss_mib": 8,
+    "basis_elements": [
+     45
+    ],
+    "basis_sha256": [
+     "0e29bd4c43734b884eea12ca8024114ffc00ae6b7d6788c7e599c2adb60facc5"
+    ],
+    "input_digests": [
+     "2867c8eb39e07bec37ecb907e5b6971146a479594b0a9fc5ba20b64650a0c918"
+    ],
+    "field_acceptance": "both engines generic over FiniteField; no field refusal (sigf4/dispatch.rs)"
+   }
+  }
+ ],
+ "admission_rule": "kept iff conventional F4 at 16 workers completes in 20 ms-60 s (median process wall) under 180 s / 8 GiB and both engines accept the field; otherwise dropped with the reason and not replaced"
+}

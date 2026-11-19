@@ -1,0 +1,19 @@
+== admission 2026-11-19T09:15:49-05:00 load=5.75
+admission 0 goldilocks/mq-random-10 f4:16 0.930s complete load=5.8
+admission 0 wide64/mq-random-12 f4:16 105.039s complete load=5.7
+admission 0 gf32003/mq-random-9 f4:16 0.003s complete load=5.5
+admission 0 m31/katsura-10 f4:16 0.242s complete load=5.2
+admission 0 m31/eco-11 f4:16 0.432s complete load=4.9
+admission 0 goldilocks/cyclic-6 f4:16 0.008s complete load=4.8
+admission 1 goldilocks/mq-random-10 f4:16 0.933s complete load=4.5
+admission 1 wide64/mq-random-12 f4:16 103.969s complete load=4.4
+admission 1 gf32003/mq-random-9 f4:16 0.003s complete load=4.6
+admission 1 m31/katsura-10 f4:16 0.251s complete load=4.3
+admission 1 m31/eco-11 f4:16 0.427s complete load=4.0
+admission 1 goldilocks/cyclic-6 f4:16 0.008s complete load=3.9
+admission 2 goldilocks/mq-random-10 f4:16 0.925s complete load=3.6
+admission 2 wide64/mq-random-12 f4:16 104.554s complete load=3.4
+admission 2 gf32003/mq-random-9 f4:16 0.003s complete load=3.4
+admission 2 m31/katsura-10 f4:16 0.240s complete load=3.2
+admission 2 m31/eco-11 f4:16 0.426s complete load=3.1
+admission 2 goldilocks/cyclic-6 f4:16 0.008s complete load=3.1
