@@ -6,8 +6,11 @@
 use std::{sync::mpsc, time::Duration};
 
 use super::{
-    claim::Adversary, engine::symbolic::with_tuning, engine::symbolic::Tuning,
-    engine::symbolic::PANIC_AT, sig_f4_reported, SigF4Error, SigF4Options, SigF4Statistics,
+    claim::Adversary,
+    engine::symbolic::with_tuning,
+    engine::symbolic::Tuning,
+    engine::symbolic::{PANIC_AT, TEAM_STARTS},
+    sig_f4_reported, SigF4Error, SigF4Options, SigF4Statistics,
 };
 use crate::{
     fields::{PrimeFieldElement64, Zp32003},
@@ -30,6 +33,8 @@ const GRADED: [MonomialOrder; 2] = [
 const EVERY_LEVEL: Tuning = Tuning {
     min_frontier: 1,
     min_sort: 1,
+    min_work: 0,
+    min_start: 0,
     max_step: usize::MAX,
     fallback: false,
 };
@@ -39,6 +44,8 @@ const EVERY_LEVEL: Tuning = Tuning {
 const MIXED: Tuning = Tuning {
     min_frontier: 12,
     min_sort: 64,
+    min_work: 0,
+    min_start: 0,
     max_step: 40,
     fallback: false,
 };
@@ -378,4 +385,84 @@ fn test_a_caller_panic_mid_closure_dismisses_the_team() {
         .recv_timeout(Duration::from_secs(60))
         .expect("the solve returns rather than hanging");
     assert!(panicked, "the injected panic propagates");
+}
+
+/// Every level under the work gate.
+const NO_WORK: Tuning = Tuning {
+    min_work: usize::MAX,
+    min_start: usize::MAX,
+    ..EVERY_LEVEL
+};
+
+// A closure whose every level is under the work gate never starts the team, not even to sort its
+// columns, and still builds the serial engine's batches.
+#[test]
+fn test_levels_under_the_work_gate_never_start_the_team() {
+    let system = katsura::<6, Goldilocks>();
+    let serial = solve(&system, GREVLEX, &checked(1), Tuning::default());
+    TEAM_STARTS.set(0);
+    let run = solve(&system, GREVLEX, &checked(8), NO_WORK);
+    assert_eq!(run.1.symbolic_team_levels, 0);
+    assert_eq!(TEAM_STARTS.get(), 0, "the sort stays on the caller too");
+    assert_same_batches(&serial, &run, "gated");
+}
+
+// The work gate (step width times the mean row length) is monotone: raising it never adds a team
+// level, some threshold puts a closure's wide steps on the team and its narrow ones on the caller,
+// and every split builds the serial engine's batches.
+#[test]
+fn test_the_work_gate_splits_a_closure_by_level_size() {
+    let system = katsura::<6, Goldilocks>();
+    let serial = solve(&system, GREVLEX, &checked(1), Tuning::default());
+    let every = solve(&system, GREVLEX, &checked(8), EVERY_LEVEL)
+        .1
+        .symbolic_team_levels;
+    assert!(every > 0);
+    let mut last = every;
+    let mut split = false;
+    for min_work in [10, 100, 1_000, 3_000, 10_000, 30_000, 100_000] {
+        let tuning = Tuning {
+            min_work,
+            min_start: min_work,
+            ..EVERY_LEVEL
+        };
+        let run = solve(&system, GREVLEX, &checked(8), tuning);
+        let levels = run.1.symbolic_team_levels;
+        assert!(levels <= last, "min_work {min_work}: {levels} > {last}");
+        split |= 0 < levels && levels < every;
+        last = levels;
+        assert_same_batches(&serial, &run, &format!("min_work {min_work}"));
+    }
+    assert!(split, "some threshold splits the closure");
+    assert_eq!(
+        last, 0,
+        "the largest threshold keeps every level on the caller"
+    );
+}
+
+// The start gate and the step gate are separate: a team that may start but may not continue runs
+// one step per closure, and one that may continue but may not start never runs.
+#[test]
+fn test_the_start_gate_admits_the_first_step_only() {
+    let system = katsura::<6, Goldilocks>();
+    let serial = solve(&system, GREVLEX, &checked(1), Tuning::default());
+    let first = Tuning {
+        min_work: usize::MAX,
+        ..EVERY_LEVEL
+    };
+    let run = solve(&system, GREVLEX, &checked(8), first);
+    assert_eq!(
+        run.1.symbolic_team_levels, serial.1.batches,
+        "one team step in every closure"
+    );
+    assert_same_batches(&serial, &run, "first step only");
+    let never = Tuning {
+        min_start: usize::MAX,
+        ..EVERY_LEVEL
+    };
+    TEAM_STARTS.set(0);
+    let run = solve(&system, GREVLEX, &checked(8), never);
+    assert_eq!(run.1.symbolic_team_levels, 0);
+    assert_eq!(TEAM_STARTS.get(), 0);
+    assert_same_batches(&serial, &run, "never started");
 }

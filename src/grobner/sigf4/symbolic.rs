@@ -34,17 +34,29 @@ const LOCAL: u32 = 1 << 31;
 /// The capacity a slice's buffers start with; any nonzero value puts them in the caller's malloc
 /// arena (see `Slice::seeded`).
 const SEED: usize = 16;
+/// One emitted term against one basis lead tested, in the closure's work estimate.
+const TERM_UNITS: usize = 8;
 
-/// When the team is woken. A level narrower than `min_frontier` is scanned by the caller alone
-/// (#861's `MIN_FRONTIER`), and fewer than `min_sort` columns are sorted by it alone, so a closure
-/// that never widens never starts a team. A wider level is scanned in consecutive steps of at most
+/// When the team is woken. A step narrower than `min_frontier` items is scanned by the caller
+/// alone (#861's `MIN_FRONTIER`). Work is counted in units, a basis lead tested or a term emitted
+/// at `TERM_UNITS`: exact for the seeds, else the step's width at the closure's mean so far. A team
+/// not yet started is started only when the rest of the level holds `min_start` units, which must
+/// repay starting it; a started team takes a step of at least `min_work` units. The columns are
+/// sorted on the team only if a level started it and there are `min_sort` of them, so a closure
+/// that never pays never starts a team. A wide level is scanned in consecutive steps of at most
 /// `max_step` items, which bounds the slice scratch; any split into consecutive steps merged in
 /// order assigns the serial ids (§3, Lemma 4 applies to each step). `fallback` (tests) takes the
 /// serial path a field that cannot cross threads takes.
+///
+/// The defaults were fitted at 16 workers on development rows only (#940): at a 1 M unit start,
+/// Noon-7 / Goldilocks no longer starts a team on closures it cannot repay, while Eco-12, MQ10,
+/// Katsura-11 and Noon-8 keep their gains.
 #[derive(Clone, Copy, Debug)]
 pub(in crate::grobner::sigf4) struct Tuning {
     pub(in crate::grobner::sigf4) min_frontier: usize,
     pub(in crate::grobner::sigf4) min_sort: usize,
+    pub(in crate::grobner::sigf4) min_work: usize,
+    pub(in crate::grobner::sigf4) min_start: usize,
     pub(in crate::grobner::sigf4) max_step: usize,
     pub(in crate::grobner::sigf4) fallback: bool,
 }
@@ -54,6 +66,8 @@ impl Default for Tuning {
         Self {
             min_frontier: 512,
             min_sort: 4096,
+            min_work: 100_000,
+            min_start: 1_000_000,
             max_step: 2048,
             fallback: false,
         }
@@ -67,6 +81,9 @@ thread_local! {
     /// the team inside that step.
     pub(in crate::grobner::sigf4) static PANIC_AT: std::cell::Cell<Option<u64>> =
         const { std::cell::Cell::new(None) };
+    /// Teams started by closures on this thread.
+    pub(in crate::grobner::sigf4) static TEAM_STARTS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
 }
 
 /// Runs `f` with `tuning` in force on this thread.
@@ -158,6 +175,8 @@ struct Slice<const N: usize> {
     new: Vec<Monomial<N>>,
     local: MonomialMap<N, u32>,
     updates: Vec<(Monomial<N>, (u32, u32))>,
+    /// The scan's work in `TERM_UNITS` terms.
+    units: usize,
 }
 
 impl<const N: usize> Slice<N> {
@@ -172,6 +191,7 @@ impl<const N: usize> Slice<N> {
             new: Vec::with_capacity(SEED),
             local: MonomialMap::default(),
             updates: Vec::with_capacity(SEED),
+            units: 0,
         }
     }
 
@@ -281,6 +301,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
     ) -> (
         Option<(Row<N>, Option<u32>, &[(Monomial<N>, F)])>,
         Option<(Monomial<N>, (u32, u32))>,
+        usize,
     ) {
         if seeds {
             let t = &self.targets[item];
@@ -289,15 +310,16 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                 mult: t.mult,
                 source: t.source,
             };
-            return (Some((row, None, self.terms(t.source))), None);
+            return (Some((row, None, self.terms(t.source))), None, 0);
         }
         let m = work[item];
         let cached = cache.get(&m).copied();
         let (best, total) = least_ratio(self.basis, self.lead_masks, self.order, &m, cached);
-        let update =
-            (cached.map_or(0, |(_, scanned)| scanned) < total).then_some((m, (best, total)));
+        let from = cached.map_or(0, |(_, scanned)| scanned);
+        let update = (from < total).then_some((m, (best, total)));
+        let scanned = (total - from) as usize;
         if best == NONE {
-            return (None, update);
+            return (None, update, scanned);
         }
         let e = &self.basis[best as usize];
         let mult = m.checked_div(&e.lead).expect("the lead divides the column");
@@ -306,22 +328,35 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             mult,
             source: RowSource::Element(best),
         };
-        (Some((row, Some(item as u32), &e.terms[1..])), update)
+        (
+            Some((row, Some(item as u32), &e.terms[1..])),
+            update,
+            scanned,
+        )
     }
 
     /// A narrow level on the caller, straight into the tables: the serial closure's own steps.
-    fn direct(&self, state: &mut State<N>, seeds: bool, items: Range<usize>, out: &mut Out<N>) {
+    fn direct(
+        &self,
+        state: &mut State<N>,
+        seeds: bool,
+        items: Range<usize>,
+        out: &mut Out<N>,
+    ) -> usize {
         let State {
             seen, work, cache, ..
         } = state;
+        let mut units = 0;
         for item in items {
-            let (found, update) = self.item(seeds, item, work, cache);
+            let (found, update, scanned) = self.item(seeds, item, work, cache);
+            units += scanned;
             if let Some((m, entry)) = update {
                 cache.insert(m, entry);
             }
             let Some((row, lead, terms)) = found else {
                 continue;
             };
+            units += TERM_UNITS * terms.len();
             let mut handles = Vec::with_capacity(terms.len() + usize::from(lead.is_some()));
             handles.extend(lead);
             for (tm, _) in terms {
@@ -336,6 +371,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             out.handles.push(handles);
             out.rows.push(row);
         }
+        units
     }
 
     /// One slice of a level, against the frozen state.
@@ -345,12 +381,15 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         out.new.clear();
         out.local.clear();
         out.updates.clear();
+        out.units = 0;
         for item in items {
-            let (found, update) = self.item(seeds, item, &state.work, &state.cache);
+            let (found, update, scanned) = self.item(seeds, item, &state.work, &state.cache);
+            out.units += scanned;
             out.updates.extend(update);
             let Some((row, lead, terms)) = found else {
                 continue;
             };
+            out.units += TERM_UNITS * terms.len();
             out.refs.extend(lead);
             let (local, new) = (&mut out.local, &mut out.new);
             for (tm, _) in terms {
@@ -516,6 +555,8 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         let result = std::thread::scope(|scope| {
             let mut step = |plan: Plan| {
                 if !started.replace(true) {
+                    #[cfg(test)]
+                    TEAM_STARTS.set(TEAM_STARTS.get() + 1);
                     for _ in 1..workers {
                         scope.spawn(move || loop {
                             team.barrier.wait();
@@ -558,7 +599,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             );
             match halted {
                 Some(halt) => Err(halt),
-                None => Ok(this.sort(state_ref, &mut out, &mut step)),
+                None => Ok(this.sort(state_ref, &mut out, &mut step, team_levels > 0)),
             }
         });
         *self.cache = state.into_inner().expect("no step panics").cache;
@@ -588,10 +629,28 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         let mut scratch = 0;
         #[cfg(test)]
         let mut level = 0u64;
+        let (mut done_items, mut done_units) = (0usize, 0usize);
         while lo < top {
             let hi = top.min(lo.saturating_add(self.tuning.max_step.max(1)));
             let n = hi - lo;
-            let count = if workers > 1 && n >= self.tuning.min_frontier {
+            // Work in units: exact for the seeds, else the width at the closure's mean so far. A
+            // team not yet started must be repaid by the rest of the level, a started one by
+            // this step.
+            let work = |to: usize| -> usize {
+                if seeds {
+                    self.targets[lo..to]
+                        .iter()
+                        .map(|t| TERM_UNITS * self.terms(t.source).len())
+                        .sum()
+                } else {
+                    (to - lo).saturating_mul(done_units / done_items.max(1))
+                }
+            };
+            let pays = || match *team_levels {
+                0 => work(top) >= self.tuning.min_start,
+                _ => work(hi) >= self.tuning.min_work,
+            };
+            let count = if workers > 1 && n >= self.tuning.min_frontier && pays() {
                 let chunk = n.div_ceil(slices.len().min(n));
                 let count = n.div_ceil(chunk);
                 #[cfg(test)]
@@ -619,16 +678,14 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             }
             let mut guard = state.write().expect("no step panics");
             if count == 0 {
-                self.direct(&mut guard, seeds, lo..hi, out);
+                done_units += self.direct(&mut guard, seeds, lo..hi, out);
             }
             for slice in &slices[..count] {
-                Self::merge(
-                    &mut guard,
-                    &mut slice.lock().expect("no scan panics"),
-                    out,
-                    seeds,
-                );
+                let mut slice = slice.lock().expect("no scan panics");
+                done_units += slice.units;
+                Self::merge(&mut guard, &mut slice, out, seeds);
             }
+            done_items += n;
             if hi < top {
                 lo = hi;
             } else {
@@ -675,12 +732,13 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         state: &RwLock<State<N>>,
         out: &mut Out<N>,
         step: &mut impl FnMut(Plan),
+        started: bool,
     ) -> Vec<Monomial<N>> {
         let workers = self.workers.max(1);
         let order = self.order;
         let mut guard = state.write().expect("no step panics");
         let n = guard.work.len();
-        let team = workers > 1 && n >= self.tuning.min_sort;
+        let team = started && workers > 1 && n >= self.tuning.min_sort;
         let by_position: Vec<u32> = if team {
             let runs = workers.min(n);
             let chunk = n.div_ceil(runs);
