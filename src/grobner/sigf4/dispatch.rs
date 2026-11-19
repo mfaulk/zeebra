@@ -121,6 +121,13 @@ pub fn signature_route<const N: usize, F: FiniteField>(
 /// `parallel_forward` and `parallel_symbolic`; more than one worker runs its parallel cascade. The
 /// shipping route uses `options` unchanged.
 ///
+/// # Performance caveat
+/// The dispatch thresholds were fitted to M31's corpus. Two held-out rows favoured the signature
+/// route, but other families are not covered. Dense random quadratic systems pass the rule yet ran
+/// 1.6–1.75× *slower* than [`crate::grobner::f4_with_options`] at 16 workers (MQ10, #927),
+/// because the signature engine's symbolic stage is serial. Measure your own systems before
+/// preferring this entry point; [`f4_signature_reported`] reports which route ran.
+///
 /// ```
 /// use zeebra::{
 ///     fields::Zp32003,
