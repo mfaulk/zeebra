@@ -22,6 +22,14 @@ release() { if [ "$owned" = 1 ]; then tools/bench-reserve.sh release || tools/be
 trap release EXIT
 
 mkdir -p "$out"
+# Run every arm from a tmpfs copy. A binary's text counts toward peak RSS, and on XFS how many of
+# its pages a run maps depends on the page-cache folios the file happens to have (a freshly linked
+# binary measured 2 MB above a copy of itself), so arms staged alike are compared alike.
+stage="$(mktemp -d /dev/shm/zb-940-bins.XXXXXX)"
+trap 'release; rm -rf "$stage"' EXIT
+cp -r "$BINS"/. "$stage"/
+(cd "$stage" && sha256sum ./*/sig_f4_study ./*/m29_cost_model) | tee "$out/bins.sha256"
+BINS="$stage"
 status=0
 for suite in "$@"; do
   echo "== $suite $(date -Is) load=$(cut -d' ' -f1 /proc/loadavg)" | tee -a "$out/session.log"
