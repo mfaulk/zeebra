@@ -40,7 +40,8 @@ use crate::{grobner::f4::F4Error, poly::MonomialOrder, FiniteField, Multivariate
 /// so this engine takes its own (RFC §6).
 #[derive(Clone, Debug)]
 pub struct SigF4Options {
-    /// Cooperative wall budget, checked between batches and inside interreduction.
+    /// Cooperative wall budget, checked between batches, inside interreduction, at the parallel
+    /// cascade's safe points and at each level of the parallel symbolic closure.
     pub max_wall_time: Option<Duration>,
     /// Limit on the signature basis, which may outgrow the reduced basis (RS §B.4).
     pub max_basis_elements: Option<usize>,
@@ -58,15 +59,19 @@ pub struct SigF4Options {
     /// signature invariants. Expensive; for tests.
     pub check_signatures: bool,
     /// Threads for design 2's parallel pre-reduction against each batch's reducer block (RFC
-    /// §6.1 item 1). `1` is design 1, fully serial. A field that is not `Send + Sync` runs the
-    /// same pass serially.
+    /// §6.1 item 1) and for each batch's symbolic closure, whose wide levels the team scans
+    /// (#940; the matrix is the serial closure's exactly). `1` is design 1, fully serial. A field
+    /// that is not `Send + Sync` runs both serially.
     pub workers: usize,
     /// Finish each batch's cascade on `workers` threads under #902's "prereduce + claim" schedule
     /// (M31-S2, #904) instead of design 2's serial pass. Every result row equals design 1's.
     pub parallel_cascade: bool,
     /// Bytes one batch of the parallel cascade may hold: its sparse rows, pre-reduced and final
-    /// rows, per-worker workspaces and coordination metadata. Crossing it abandons the batch with
-    /// [`F4Error::TooManyLiveBytes`]. `None` is unbounded; the serial designs do not read it.
+    /// rows, per-worker workspaces and coordination metadata. Separately, bytes one batch's
+    /// parallel symbolic closure may hold: its column table, rows, handles and slice scratch,
+    /// checked at each level. Crossing either abandons the batch with
+    /// [`F4Error::TooManyLiveBytes`]. `None` is unbounded; the serial closure and passes do not
+    /// read it.
     pub max_live_bytes: Option<usize>,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
