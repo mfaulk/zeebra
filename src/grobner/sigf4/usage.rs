@@ -66,6 +66,11 @@ pub struct StoreReplay {
     pub koszul_hits_lost: usize,
     pub full: Duration,
     pub without_koszul: Duration,
+    /// Koszul inserts skipped because the query right after them was covered and divides them:
+    /// the stored signature covering the query covers the Koszul signature too, so the insert was
+    /// a no-op (Roune–Stillman §3.3's first observation). The store's contents are unchanged.
+    pub koszul_skippable: usize,
+    pub skip_covered: Duration,
 }
 
 /// What [`super::SigF4Statistics::usage`] carries out of the engine.
@@ -222,5 +227,61 @@ fn replay<const N: usize>(ops: &[StoreOp<N>], indices: usize) -> StoreReplay {
     };
     out.full = timed(true);
     out.without_koszul = timed(false);
+    (out.skip_covered, out.koszul_skippable) = skip_covered(ops, indices);
     out
+}
+
+/// The query-first schedule: a Koszul insert followed by a query of a signature dividing it runs
+/// the query first and drops the insert if the query is covered. Checks every answer against the
+/// recorded order's.
+fn skip_covered<const N: usize>(ops: &[StoreOp<N>], indices: usize) -> (Duration, usize) {
+    let mut reference = SyzygyStore::new(indices);
+    let expected: Vec<bool> = ops
+        .iter()
+        .filter_map(|op| match *op {
+            StoreOp::Insert(s, source) => {
+                reference.insert(s, source);
+                None
+            }
+            StoreOp::Query(t) => Some(reference.covering(&t).is_some()),
+        })
+        .collect();
+    let mut best = (Duration::MAX, 0);
+    for _ in 0..3 {
+        let clock = Instant::now();
+        let mut store = SyzygyStore::new(indices);
+        let (mut answers, mut skipped, mut k) = (Vec::with_capacity(expected.len()), 0, 0);
+        while k < ops.len() {
+            match (ops[k], ops.get(k + 1)) {
+                (StoreOp::Insert(s, SyzygySource::Koszul), Some(&StoreOp::Query(t)))
+                    if s.divides(&t) || t.divides(&s) =>
+                {
+                    let hit = store.covering(&t).is_some();
+                    if hit && t.divides(&s) {
+                        skipped += 1;
+                    } else {
+                        store.insert(s, SyzygySource::Koszul);
+                    }
+                    answers.push(hit || store.covering(&t).is_some());
+                    k += 2;
+                }
+                (StoreOp::Insert(s, source), _) => {
+                    store.insert(s, source);
+                    k += 1;
+                }
+                (StoreOp::Query(t), _) => {
+                    answers.push(store.covering(&t).is_some());
+                    k += 1;
+                }
+            }
+        }
+        let elapsed = clock.elapsed();
+        assert_eq!(
+            answers, expected,
+            "the query-first schedule changed an answer"
+        );
+        best = best.min((elapsed, skipped));
+        best.1 = skipped;
+    }
+    best
 }

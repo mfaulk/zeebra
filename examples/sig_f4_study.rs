@@ -338,6 +338,8 @@ fn usage(u: &zeebra::grobner::sigf4::usage::UsageReport) -> Json {
             "store_replay_without_koszul_ns",
             Json::nanos(r.without_koszul),
         ),
+        ("store_koszul_skippable", Json::size(r.koszul_skippable)),
+        ("store_replay_skip_covered_ns", Json::nanos(r.skip_covered)),
         ("batches", Json::Array(batches.collect())),
     ])
 }
