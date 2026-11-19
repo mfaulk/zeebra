@@ -490,9 +490,12 @@ fn split(log: &zeebra::grobner::sigf4::SplitLog) -> Json {
         ("column_sort_ns", Json::nanos(sum(|b| b.column_sort))),
         (
             "searches",
-            Json::int(symbolic.iter().map(|b| b.searches).sum()),
+            Json::int(symbolic.iter().map(|b| b.searches).sum::<u64>()),
         ),
-        ("terms", Json::int(symbolic.iter().map(|b| b.terms).sum())),
+        (
+            "terms",
+            Json::int(symbolic.iter().map(|b| b.terms).sum::<u64>()),
+        ),
         (
             "khz_weighted",
             if weight > 0.0 {
