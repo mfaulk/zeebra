@@ -409,7 +409,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     fn reducer(&mut self, m: &Monomial<N>) -> u32 {
         let cached = self.reducers.get(m).copied();
         let (best, total) = least_ratio(&self.basis, &self.lead_masks, self.order, m, cached);
-        if cached.map_or(0, |(_, scanned)| scanned) < total {
+        let scanned = cached.map_or(0, |(_, scanned)| scanned);
+        if scanned < total {
             self.reducers.insert(*m, (best, total));
         }
         #[cfg(feature = "research-sigf4-usage")]
