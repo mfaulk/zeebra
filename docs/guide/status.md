@@ -33,7 +33,11 @@ A running record of what Zeebra implements. The short version is in the [README]
       for small inputs and spread degrees: 0.712x complete wall on Eco-12 and 0.44x on Katsura-11 and
       MQ11 against shipping F4 at 16 workers, controls within 1.05x at 1 and 16 workers, peak RSS
       within 1.02x, bases identical and certified; MQ10 is 1.6–1.75x slower through it (measured at
-      `5bd0db63`; [#905](../research/m31-sigf4-dispatch.md)). Shipping F4 stays the default
+      `5bd0db63`; [#905](../research/m31-sigf4-dispatch.md)). Shipping F4 stays the default. In the
+      M31 final cohort, beside the M31 freeze: 0.737x on Eco-12, 0.45x on Katsura-11 and MQ11,
+      0.68x of grobx's raw randomized one-worker wall on MQ11 and parity with it on Eco-12, identical
+      certified bases (measured at `8715c8ed`; [M31 report](../MILESTONE-COMPETITIVE-SIGNATURE-F4.md)
+      §15)
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] That oracle over an extension field: a differential case names a field rather than a

@@ -1,12 +1,17 @@
 # M31 — Signature-F4 Wall-Time Conversion and Competitive Performance
 
-**Status:** planning, 2026-11-18. No M31 measurement has been taken and no M31 code exists.
+**Status:** complete, 2026-11-18. Minimum met; Target met at Gate C and on six of seven criteria in
+the final cohort (criterion 3 missed on one 6 ms control cell); Stretch met on MQ11; Research
+stretch met. The opt-in `grobner::f4_signature` ships; shipping F4 stays the default. The
+integration report is §15 (#906). §§1–14 are the plan as fixed before measurement, except §7.4's
+note on the authorized fourth change.
 **Predecessor:** M30 — Signature-Based Work Avoidance and Parallel Symbolic F4
 ([`MILESTONE-SIGNATURE-SYMBOLIC-F4.md`](MILESTONE-SIGNATURE-SYMBOLIC-F4.md), §15 integration
 report; tracker #854, closed).
 **Planning base:** `main` at `f0715369` (#895). PRs #896, #897 and #898 were open, green and
 unmerged at planning time (§4).
-**Measured at:** not measured here. Every figure is quoted from the M30 report §15 (final `main`
+**Measured at:** §15 at final `main` `8715c8ed` beside the freeze `acbaf12c` (evidence in
+[`research/m31-final/`](../research/m31-final/README.md)). §§1–14 are not measured here: every figure there is quoted from the M30 report §15 (final `main`
 `e4826153`, instrument `5515c412`, evidence in [`research/m30-final/`](../research/m30-final/README.md)),
 from [#857's prototype report](research/m30-sigf4-prototype.md) (`2d589a80` design 1, `7d85eee5`
 design 2), from [the signature RFC](research/signature-f4-rfc.md) and from the bodies of PRs #896
@@ -678,35 +683,260 @@ critical path or share a PR with M31 work.
 Hierarchy: #901, #889, #899 and #906 are native sub-issues of #900; #902–#905 are sub-issues of
 #889. Dependencies are native "blocked by" relations.
 
-## 15. Planned final scoreboard and report (M31-I fills this section)
+## 15. Integration report (#906)
 
-### 15.1 Verdicts, kept apart
+**Measured at:** final `main` `8715c8ed` (#926; its `src/`, `examples/` and `Cargo.lock` are
+identical to `5bd0db63`, where Gate C was read), interleaved in one campaign with the M31-0 freeze
+`acbaf12c` (built from #901's instrument commit `5919caaa`, whose timed library is the freeze's).
+Every executable was built from a `git archive` of its commit into its own target directory.
+Evidence: [`research/m31-final/`](../research/m31-final/README.md); every table:
+[`tables.md`](../research/m31-final/tables.md). 2026-11-18, 20:24 to 2026-11-19 01:08 EST, one CCD 1–2
+reservation (`tools/bench-reserve.sh`), each suite under its own `bench-reserve run` lock, released
+at the end. n = 9 per cell, fresh processes, arms rotated per repetition, every attempt retained:
+1,404 of 1,404 Zeebra wall children, 13 of 13 certification children and 13 of 13 census children
+complete; wide comparands 72 of 72 complete (grobx raw and groebner-rs, nine passes of four rows), grobx certified 36 of 36 admitted, MQ10 comparand window 234 verified and 54 grobx `unsupported` (it declares one worker only). Zeebra ratios are paired per repetition (median of per-repetition
+ratios, 95% bootstrap); a Zeebra ÷ comparand ratio is median ÷ median with each side resampled
+independently, because the comparands run under their own controllers.
 
-1. **Algorithmic work** (§2.2 quantities: pairs rejected by mechanism, reductions to zero, zero
-   rows, coefficient products, signature-basis size) — final engine vs shipping F4 and design 1.
-2. **Parallel speedup** of the signature engine (1/4/8/16 workers; per stage).
-3. **End-to-end wall** — signature path vs shipping F4 at the same commit (Target).
-4. **Competitive position** — vs the strongest comparand per row (Stretch).
+**What moved since the freeze.** Shipping F4's elimination and symbolic code did not change in
+M31 (only #909's certification budget and #926's entry point touched `src/grobner/f4/` and
+`src/grobner/mod.rs`): final ÷ freeze F4-16 is 0.987–1.016 on every row. The signature engine did change: design 1
+at `8715c8ed` is 0.708× the freeze's on Eco-12 and 0.85–0.95× elsewhere (#903's three changes).
+So the plan §10.2 reading against shipping F4 at the evaluated commit and the reading against the
+freeze agree to within 3% on every row (within 1% on every substantial one).
 
-### 15.2 Primary scoreboard template
+### 15.1 Status
 
-| Task | Shipping F4 16w | Sig path 16w | Sig ÷ F4 [95%] | Sig RSS ÷ F4 | Comparand (mode, workers) | Sig ÷ comparand [95%] | Equal-worker ratio | Verification |
-|---|---:|---:|---:|---:|---|---:|---:|---|
-| Eco-12 / 2⁶⁴−353 | | | | | grobx raw (1w); grobx certified | | | |
-| Katsura-11 / Goldilocks | | | | | — | | | |
-| Katsura-11 / 2⁶⁴−353 | | | | | grobx raw (1w) | | | |
-| MQ11 / Goldilocks | | | | | grobx raw (1w) | | | |
-| MQ10 / 32003, 2³¹−1 | | | | | msolve exact, groebner-rs (best w) | | | |
-| Cyclic-7 | | | | | grobx raw (1w) | | | |
-| controls, held-out rows | | | | | — | | | |
+**Minimum met. Target: six of seven criteria met in this cohort; criterion 3 missed on one cell
+(katsura-4 / Goldilocks at one worker, upper bound 1.086 against 1.05), on a 6 ms process whose two
+arms run the same shipping F4 computation. Gate C, at the same source, had met all seven. Stretch
+met on MQ11 / Goldilocks (0.679 [0.645, 0.720] against grobx raw randomized at one worker, the strongest comparand there), and not on Eco-12 (0.999, upper 1.063) or Katsura-11 / 2⁶⁴−353 (1.056). Research stretch met.**
+
+**Four verdicts, kept apart (§15.1 of the plan).**
+
+1. **Algorithmic work: the saving is intact and unchanged.** Pairs created, rejections by
+   mechanism, reductions to zero, zero rows, signature-basis size and coefficient products are
+   identical between the freeze's design 1 and the final design 1 on every row; #903's changes did
+   not touch the algebra. Against shipping F4 (census, one worker): design 1 does 0.103× the
+   coefficient products on Eco-12 (610.8 M against 5.924 G), 0.044× on Katsura-11, 0.086× on MQ11,
+   0.048–0.068× on the held-out rows and 0.153× on MQ10; reductions to zero fall from 6,326 to
+   1,013 (Eco-12), 3,936 to 145 (Katsura-11) and 6,293 to 540 (MQ11). The parallel cascade adds
+   phase A's redundant products: 1.216× design 1 on Eco-12, 1.0001× on Katsura-11, none on MQ11,
+   1.07× on MQ10. Signature-basis outgrowth is unchanged: 1,885 for 743 on Eco-12, 3,083 for 209 on
+   Cyclic-7, 585 for 247 on MQ10.
+2. **Parallel speedup: real in elimination, small end to end.** At 16 workers the cascade runs
+   Eco-12's elimination stage 3.60× [3.56, 3.64] faster than design 1, Katsura-11's 5.9×, MQ11's
+   11.0×. Complete wall gains only 1.47× (Eco-12), 1.53× (Katsura-11) and 2.51× (MQ11), and
+   8 workers already deliver all of it on Eco-12 and Katsura-11 (1.47× and 1.54× at 8). The other
+   three stages are serial and do not shrink: on Eco-12 at 16 workers symbolic is 552 ms (466 ms at
+   one worker, so it is *slower* beside a 16-thread team), bookkeeping 259 ms and interreduction
+   264 ms, against 370 ms of elimination. On Cyclic-7, noon-7 and noon-8 more workers are slower.
+3. **End-to-end wall: the opt-in path beats shipping F4 where it routes to the signature engine,
+   except MQ10.** `f4_signature` at 16 workers ÷ shipping F4-16: **Eco-12 0.737 [0.732, 0.740]**,
+   **Katsura-11 / Goldilocks 0.453 [0.451, 0.455]**, Katsura-11 / 2⁶⁴−353 0.459, MQ11 0.456,
+   noon-7 0.558, held-out katsura-9 0.585 and noon-8 0.612; the shipping-routed controls are
+   0.996–1.002; **MQ10 is 1.583× and 1.728× slower**. At one worker the path is 0.096–0.48× shipping
+   F4-1 on every routed row, MQ10 included. Peak RSS is 0.67–0.94× shipping on every
+   routed row.
+4. **Competitive position: a lead on MQ11, parity on Eco-12, short on Katsura-11, far
+   behind on MQ10.** At 16 workers the opt-in path is 0.679 [0.645, 0.720] of grobx raw randomized
+   (one worker, its best supported configuration) on MQ11, 0.999 [0.948, 1.063] on Eco-12 and
+   1.056 [0.989, 1.106] on Katsura-11 / 2⁶⁴−353. It is ahead of groebner-rs on every wide row
+   (0.22–0.55× on the signature-routed ones) and of grobx certified mode by two orders of
+   magnitude. At equal workers (one each) it is 1.46× (Eco-12), 1.58× (Katsura-11) and 1.71× (MQ11)
+   behind grobx raw. On MQ10 it is 3.2× / 2.4× behind msolve exact and 4.3× / 4.0× behind
+   groebner-rs at their best worker counts, and behind shipping F4, which is itself 2.06× / 1.39×
+   behind msolve. Cyclic-7 runs shipping F4 and is 1.15× grobx raw.**
+
+### 15.2 Primary scoreboard (process wall, final `main`)
+
+Process wall, ms, medians of n = 9. "Sig path" is `f4_signature` (dispatch included) at 16 workers;
+both Zeebra arms come from one binary at `8715c8ed`. The comparand ratio is the sig path at 16
+workers against the comparand's best supported configuration (**not** an equal-worker comparison
+unless the worker counts match); the equal-worker column is the signature path at the comparand's
+worker count (`en:1` at one worker, the cascade at 4/8/16). grobx raw is randomized and
+uncertified; grobx certified, groebner-rs (answers checked by its controller), msolve exact and
+Zeebra (deterministic, certified by `certify_f4_output`) are separate rows and never merged.
+
+| Task | Shipping F4 16w | Sig path 16w | Sig ÷ F4 [95%] | Sig RSS ÷ F4 | Comparand (mode, workers) | comparand ms | Sig ÷ comparand [95%] | Equal-worker ratio [95%] | Verification |
+|---|---:|---:|---:|---:|---|---:|---:|---:|---|
+| Eco-12 / 2⁶⁴−353 | 2,372 | 1,744 | **0.737** [0.732, 0.740] | 0.853 | grobx raw randomized (1w) | 1,746.5 | **0.999** [0.948, 1.063] | 1.464 [1.391, 1.565] | digest `3bf17412`; certified, 62.6 s |
+| | | | | | groebner-rs (1w) | 3,198.4 | 0.545 [0.526, 0.587] | 0.800 [0.772, 0.861] | |
+| | | | | | grobx certified (1w) | 308,211 | 0.006 [0.006, 0.006] | 0.008 | admitted 9 / 9, digest equal; 10.6 GiB |
+| Katsura-11 / Goldilocks | 1,359 | 616 | **0.453** [0.451, 0.455] | 0.764 | — | | | | `2881e43e`; certified, 28.9 s |
+| Katsura-11 / 2⁶⁴−353 | 1,344 | 613 | 0.459 [0.453, 0.461] | 0.764 | grobx raw randomized (1w) | 580.6 | **1.056** [0.989, 1.106] | 1.578 [1.480, 1.654] | `c6735109`; certified, 29.2 s |
+| | | | | | groebner-rs (1w) | 2,262.2 | 0.271 [0.253, 0.280] | 0.405 [0.378, 0.421] | |
+| | | | | | grobx certified (1w) | 84,039 | 0.007 [0.007, 0.008] | 0.011 | admitted 9 / 9, digest equal |
+| MQ11 / Goldilocks | 4,669 | 2,126 | 0.456 [0.454, 0.459] | 0.939 | grobx raw randomized (1w) | 3,130.9 | **0.679** [0.645, 0.720] | 1.711 [1.624, 1.814] | `ddef89cb`; certified, 69.2 s |
+| | | | | | groebner-rs (1w) | 9,646.1 | 0.220 [0.212, 0.236] | 0.556 [0.533, 0.595] | |
+| | | | | | grobx certified (1w) | 488,259 | 0.004 [0.004, 0.004] | 0.011 | admitted 9 / 9, digest equal |
+| MQ10 / 32003 | 241 | 378 | **1.583** [1.561, 1.602] | 0.674 | msolve exact (8w) | 117.0 | 3.233 [3.189, 3.318] | 3.067 [3.027, 3.132] | `ccee8a56`; certified, 5.2 s; comparands checked against Singular references |
+| | | | | | groebner-rs (8w) | 87.8 | 4.311 [4.270, 4.422] | 4.090 [4.037, 4.179] | |
+| | | | | | grobx raw randomized (1w) | 339.3 | 1.115 [1.043, 1.144] | 1.393 [1.284, 1.441] | |
+| MQ10 / 2³¹−1 | 226 | 391 | **1.728** [1.717, 1.756] | 0.834 | msolve exact (4w) | 163.4 | 2.392 [2.306, 2.415] | 2.291 [2.176, 2.336] | `deb2802f`; certified, 5.2 s |
+| | | | | | groebner-rs (8w) | 98.3 | 3.977 [3.862, 4.116] | 3.718 [3.589, 3.856] | |
+| | | | | | grobx raw randomized (1w) | 158.8 | 2.462 [2.200, 2.504] | 2.849 [2.547, 3.003] | |
+| Cyclic-7 / Goldilocks (routed to shipping) | 145 | 145 | 0.996 [0.978, 1.013] | 1.000 | — | | | | `afd9a87c`; certified |
+| Cyclic-7 / 2⁶⁴−353 (routed to shipping) | 146 | 146 | 1.001 [0.988, 1.036] | 0.998 | grobx raw randomized (1w) | 126.7 | 1.149 [1.087, 1.199] | 2.230 [2.106, 2.336] | `31c838c1`; certified |
+| | | | | | groebner-rs (1w) | 193.4 | 0.753 [0.731, 0.803] | 1.461 [1.416, 1.560] | |
+| | | | | | grobx certified (1w) | 3,260 | 0.045 [0.044, 0.046] | 0.087 | admitted 9 / 9, digest equal |
+| katsura-4 / Goldilocks; / 2⁶⁴−353 (routed to shipping) | 6; 6 | 6; 6 | 0.999; 1.002 | 0.99; 0.99 | — | | | | certified |
+| noon-7 / Goldilocks | 193 | 108 | 0.558 [0.546, 0.571] | 0.870 | — | | | | certified |
+| katsura-9 / 2⁶⁴−353 (held out) | 73 | 43 | 0.585 [0.582, 0.596] | 0.921 | — | | | | certified |
+| noon-8 / 2⁶⁴−353 (held out) | 980 | 596 | 0.612 [0.603, 0.621] | 0.818 | — | | | | certified |
+
+**Comparand conditions.** The comparand suites ran in the same reservation as the Zeebra cohort,
+after it. grobx raw came out 4–9% slower than in M30's final cohort with the same executable
+(Eco-12 1,746.5 against 1,613.7 ms; MQ11 3,130.9 against 2,914.0; Katsura-11 580.6 against 547.0;
+Cyclic-7 126.7 against 116.3). The one-minute machine load at the start of its nine passes was
+2.5–16.8, against a median of 3.0 over the Zeebra wall children. Read against M30's grobx medians
+instead, the 16-worker ratios would be Eco-12 1.08, MQ11 0.73 and Katsura-11 1.12; the stretch
+verdict below holds either way. groebner-rs and grobx run one worker on the wide rows because the
+wide adapters refuse more (#935), and msolve cannot run the 2⁶⁴−353 or Goldilocks rows
+(characteristic must be below 2³¹).
 
 ### 15.3 Per-row detail
 
-Process wall; peak RSS and live-entry budget; workers and actual CPU allocation; 95% intervals;
-pair rejections by category; reductions to zero; coefficient products; signature-basis size;
-symbolic, elimination, bookkeeping and interreduction times; dispatch decision and its cost;
-certification status and time (outside solve wall); every timeout, refusal and stopped experiment.
+Everything §15.3 of the plan lists is in [`tables.md`](../research/m31-final/tables.md): process wall
+and peak RSS for all 12 arms per row; worker curves of both engines; paired ratios; the signature
+engine's four stage clocks at 1/4/8/16 workers; pair rejections by mechanism, reductions to zero,
+zero rows, coefficient products and signature-basis size for the freeze's design 1, the final
+design 1 and the cascade; shipping F4's census; the dispatch decision; digests; certification.
+Points the summary rows do not carry:
 
-### 15.4 Success tiers, criterion by criterion; negative, inconclusive and stopped results; issue dispositions; follow-ups
+- **Dispatch.** The route is the same at 1 and 16 workers on every row: `Signature` on Eco-12,
+  both Katsura-11s, MQ11, MQ10 (both fields), noon-7, katsura-9 and noon-8; `Shipping(DegreeSpread)`
+  on both Cyclic-7s; `Shipping(Small)` on both katsura-4s. Median dispatch cost 0.2–3.3 µs.
+- **Live budget.** No child stopped on a size, time or memory budget; the 8 GiB `rss-guard` never
+  fired. The largest peak RSS is MQ11's shipping F4 at 16 workers (394 MiB); the entry point's is
+  370 MiB.
+- **Certification** (outside solver wall; `certify_f4_output` on the entry point's output at 16
+  workers): `checks_passed` and complete on all 13 rows; Eco-12 62.6 s, MQ11 69.2 s, Katsura-11
+  28.9–29.2 s, MQ10 5.2 s, noon-8 4.0 s, the rest under 0.3 s.
+- **Equality.** One basis digest per row across all 108 children (12 arms × 9 repetitions, both
+  builds, both engines, all worker counts); Eco-12 `3bf17412`, MQ11 `ddef89cb`, Katsura-11 /
+  2⁶⁴−353 `c6735109` and Cyclic-7 / 2⁶⁴−353 `31c838c1` equal M30's digests, which grobx certified
+  mode independently checked there and this cohort checks again: grobx certified mode admitted 9 of 9 on each of the four wide rows, each with the same digest.
+- **Where the routed wall goes** (Eco-12, cascade at 16 workers, medians): symbolic 552 ms,
+  elimination 370, interreduction 264, bookkeeping 259; their sum is 1,445 ms of a 1,752 ms
+  process, the remainder being startup, parsing, minimal-basis selection and output. 74% of the
+  staged time is in the three serial stages. On MQ10 / 32003 symbolic preprocessing alone is
+  216–219 ms of a 378 ms process at 4–16 workers, while shipping F4-16 completes in 241 ms (#927).
 
-As M30 §15.5–§15.8.
+### 15.4 Success tiers, criterion by criterion (§6, as written)
+
+| Tier | Criterion | Status | Evidence |
+|---|---|---|---|
+| Minimum 1 | M31-0 freezes a reproducible baseline and publishes the stage decomposition and the re-derived §6.3 budget | **met** | #901, PR #908; freeze `acbaf12c`, held-out pins `956a5b17`; [`m31-baseline.md`](research/m31-baseline.md); eco-14 dropped under §10.3's rule (shipping F4-16 stops at its 32,000,000 live-nonzero limit) |
+| Minimum 2 | M31-S1 publishes cascade dependency statistics on Eco-12 and Katsura-11, a correctness argument with open obligations, a ceiling and a Gate A read | **met**; Gate A **pass** | #902, PR #910; [`m31-parallel-signature-elimination.md`](research/m31-parallel-signature-elimination.md) (Theorem 1; displacement rejected, obligations O1–O4 open and load-bearing) |
+| Minimum 3 | a bounded S2 experiment, S3 change or justified rejection resolves H1 or H3 | **met**, both | H1 supported (S2 elimination 3.65× at `4b702ea3`, products 1.216×); H3 holds on two of three stages (interreduction 2.79×, bookkeeping 2.03×; symbolic 1.0×) |
+| Minimum 4 | M31-I publishes the report, including every negative and stopped result | **met** | this section, [`research/m31-final/`](../research/m31-final/README.md) |
+| Target 1 | Eco-12 / 2⁶⁴−353, 16 w: median ≤ 0.75 and 95% upper ≤ 0.80 | **met** | 0.737 [0.732, 0.740] (Gate C: 0.712 [0.705, 0.715]) |
+| Target 2 | Katsura-11 / Goldilocks, 16 w: median ≤ 0.90, interval excludes 1.0 | **met** | 0.453 [0.451, 0.455] (Gate C: 0.442) |
+| Target 3 | controls through the entry point, upper ≤ 1.05 at 1 and 16 w | **missed in this cohort, on one of ten cells** | katsura-4 / Goldilocks at 1 w: 1.018 [1.005, **1.086**]. Every other cell passes: katsura-4 / Goldilocks 16 w 0.999 [0.977, 1.006]; katsura-4 / 2⁶⁴−353 1.004 [0.974, 1.025] and 1.002 [0.984, 1.033]; noon-7 0.478 [0.469, 0.485] and 0.558 [0.546, 0.571]; Cyclic-7 / Goldilocks 0.988 [0.974, 1.008] and 0.996 [0.978, 1.013]. The failing cell is a 6 ms process routed `Shipping(Small)`, so both arms run the identical shipping F4 call after a 0.2 µs dispatch; its upper bound comes from one repetition (rep 5: 6.93 ms against 5.98 ms). It is reported as written, and not re-run (§6: no retrospective change, and re-running until a cell passes is resampling). Gate C met it at the same source (0.987 [0.961, 1.031]) |
+| Target 4 | peak RSS ≤ 1.25× shipping F4 on every corpus row | **met** | worst 1.093 [1.085, 1.102] (MQ10 / 2³¹−1, 1 w); routed rows 0.67–0.94 at 16 w |
+| Target 5 | §9 contract; equality with shipping F4; independent certification | **met** | one digest per row over 108 children; `certify_f4_output` complete on all 13 rows; ⟨G⟩ ⊆ input by equality with M30's grobx-certified digests (§9.1 item 3) ; this cohort's grobx-certified runs (36 of 36 admitted) agree with every wide-row digest |
+| Target 6 | typed `Unsupported`, budgets, cancellation, no panic under adversarial scheduling | **met** (not re-tested here) | #905 §3; #904's adverse-schedule suite on `main`; no child in this cohort panicked or stopped |
+| Target 7 | no default change | **met** | `f4`, `f4_with_options` and every solver unchanged |
+| Stretch | on Eco-12, MQ11 or Katsura-11 / 2⁶⁴−353: sig path 16 w ÷ strongest comparand's best supported configuration, median ≤ 1.00 and upper ≤ 1.05, verified | **met** (MQ11) | MQ11 / Goldilocks: Zeebra 16w vs grobx 1w (best supported configuration) **0.679 [0.645, 0.720]**; equal-worker 1.711 [1.624, 1.814]; vs groebner-rs 1w 0.220. Zeebra is deterministic and its output certified (69.2 s, outside the solve); grobx raw is randomized and uncertified; the bases agree (`ddef89cb`, the grobx-certified digest). Not met on Eco-12 (0.999 [0.948, 1.063]: median ≤ 1.00, upper > 1.05) or Katsura-11 / 2⁶⁴−353 (1.056 [0.989, 1.106]). Against M30's grobx medians the MQ11 ratio is 0.73 (§15.2, comparand conditions). MQ10 is reported, not scored: 2.4–4.3× behind msolve and groebner-rs |
+| Research stretch | a parallel signature-elimination algorithm discharging every S1 obligation, with adversarial-schedule tests, cutting Eco-12 elimination ≥ 3× against design 1 at 16 w with products ≤ 1.25× design 1's | **met** | #902 Theorem 1 (no open obligation for the exact schedule; E1–E3 discharged by #904's tests); elimination 3.60× [3.56, 3.64] at `8715c8ed`; products 742,988,440 ÷ 610,820,323 = 1.216 |
+
+**Does the signature path qualify as a supported opt-in?** Gate C (#905) decided that, on all seven
+criteria at `5bd0db63`, and the opt-in shipped. This cohort re-reads the same source with five more
+arms per row in the rotation and reproduces every gating figure within a few percent, except one
+control cell whose computation is identical on both arms. No code change follows from it (plan
+§8.4: no new optimization starts from #906); the follow-ups in §15.8 include re-reading criterion 3
+with a resolution suited to a 6 ms process.
+
+### 15.5 Gate D: the remaining gap per comparand
+
+Gate D asks, if the engine qualifies but misses §6.4, for the exact remaining gap per comparand
+and the stage decomposition that explains it. The engine qualified (Gate C) and §6.4 is met on
+MQ11, so Gate D is satisfied; the gaps that remain on the other rows are recorded here because
+§6.4 is per instance. No optimization starts from this report (§8.4).
+
+| Row | Comparand (best supported configuration) | Gap: sig 16w ÷ comparand | At equal workers | Kind |
+|---|---|---:|---:|---|
+| Eco-12 / 2⁶⁴−353 | grobx raw randomized, 1w | 0.999 [0.948, 1.063] (1.08 against M30's grobx median) | 1.464 | parity at the median; upper bound misses 1.05 |
+| Eco-12 / 2⁶⁴−353 | groebner-rs, 1w | 0.545 | 0.800 | lead |
+| Katsura-11 / 2⁶⁴−353 | grobx raw randomized, 1w | 1.056 [0.989, 1.106] (1.12) | 1.578 | short by ~6% |
+| Katsura-11 / 2⁶⁴−353 | groebner-rs, 1w | 0.271 | 0.405 | lead |
+| MQ11 / Goldilocks | grobx raw randomized, 1w | 0.679 [0.645, 0.720] (0.73) | 1.711 | **lead (stretch met)** |
+| MQ11 / Goldilocks | groebner-rs, 1w | 0.220 | 0.556 | lead |
+| Cyclic-7 / 2⁶⁴−353 (shipping route) | grobx raw randomized, 1w | 1.149 [1.087, 1.199] | 2.230 | short |
+| MQ10 / 32003 | groebner-rs, 8w; msolve exact, 8w | 4.311; 3.233 | 4.090; 3.067 | far behind |
+| MQ10 / 2³¹−1 | groebner-rs, 8w; msolve exact, 4w | 3.977; 2.392 | 3.718; 2.291 | far behind |
+| every wide row | grobx certified, 1w | 0.004–0.045 | | lead |
+
+**Dominant causes, from Zeebra's own stage clocks** (grobx's internals are not instrumented here;
+§11):
+
+1. **Serial stages, not elimination.** On Eco-12 at 16 workers the cascade's elimination is 370 ms,
+   but symbolic preprocessing (552 ms), bookkeeping (259 ms) and interreduction (264 ms) are serial
+   and together 1,075 ms — 62% of grobx raw's entire one-worker solve. Removing the parity gap on
+   Eco-12 (about 0–8%, 0–130 ms) or Katsura-11 (about 6–12%, 30–65 ms; there symbolic is 184 ms
+   and interreduction 115 ms of a 613 ms process) needs these stages to move, not more workers:
+   the wall is flat from 8 to 16 workers (#933).
+2. **Signature-basis outgrowth** feeds two of those stages: 1,885 signature elements for 743 reduced
+   on Eco-12 (#936). On Katsura-11 and MQ11, where outgrowth is small (561 / 537; 767 / 767), the
+   path does best.
+3. **Process overhead** outside the four stages is 300 ms of Eco-12's 1,752 ms (startup, parsing,
+   minimal-basis selection, output), comparable in size to the parity gap.
+4. **The equal-worker gap** (1.46–1.71× behind grobx raw at one worker each) is design 1's serial
+   wall: on Eco-12 one-worker elimination alone is 1,333 ms. grobx raw additionally gives up
+   determinism and certification, which Zeebra keeps.
+5. **MQ10** is a routing and symbolic-stage problem before it is a comparand problem: through the
+   entry point it is 1.58–1.73× slower than Zeebra's own shipping F4 (#927), whose own gap to msolve
+   (2.06× / 1.39×) and groebner-rs (2.74× / 2.30×) is M29/M30's, unchanged here.
+
+### 15.6 Negative, inconclusive and stopped results
+
+1. **Parallel cascade does not carry the end-to-end wall.** S2 met Gate B and elimination scales
+   (3.6× on Eco-12), but the three serial stages left the complete wall at 1.47× design 1, flat from
+   8 to 16 workers.
+2. **H3's symbolic leg was not compressed** (#903 change 3 moved row construction, counted as
+   elimination; symbolic 457 → 454 ms). In this cohort the signature engine's symbolic stage *grows*
+   with the worker count on every substantial row (Eco-12 466 → 552 ms, MQ11 439 → 514 ms), which
+   is consistent with lower single-core boost beside an active team, which has been seen on this
+   host before, but was not attributed here.
+3. **MQ10 is slower through the opt-in entry point** (1.583× and 1.728× at 16 workers): routed to
+   the signature engine by a rule that has no feature separating it from katsura-9 and noon-8.
+   Reported, not scored (§6.2); #927.
+4. **The cascade is a loss on non-regular and small-batch inputs** (Cyclic-7 at 16 workers takes
+   1.14–1.16× design 1's wall; noon-7, noon-8 slower with more workers). The dispatch keeps Cyclic-7 away
+   from it; noon-7 and noon-8 still win against shipping F4.
+5. **Signature-basis outgrowth** was measured only (§4.3 item 5): unchanged.
+6. **#903's fourth (setup) change** was authorized on #900 and recorded as not paying (45 ms of
+   setup left, below the gate's 3%; [`m31-sigf4-serial.md`](research/m31-sigf4-serial.md) §5.2).
+7. **Displacement (RFC §6.1 item 2) was rejected**, not built: two of its four proof obligations
+   are load-bearing and open (#902 §10).
+8. **Target criterion 3** missed in this cohort on one cell (§15.4).
+9. **eco-14** was dropped by M31-0 under §10.3's rule (shipping F4-16 stops at its live-nonzero
+   limit); it was not replaced.
+10. **No stopped runs.** No timeout, refusal, budget stop or memory-guard kill in any Zeebra suite.
+    No comparand child stopped either: grobx raw, groebner-rs and grobx certified completed every attempt, and the only non-verified MQ10 cells are grobx's 54 declared `unsupported` cells above one worker.
+
+### 15.7 Issue dispositions
+
+| Issue | Disposition |
+|---|---|
+| #901, #902, #903, #904, #905, #899, #912 | closed, completed (#903 with three of four changes merged, the fourth recorded as not paying) |
+| #887, #890 | closed, completed (M30 follow-ups resolved during M31) |
+| #889 (S anchor) | its four children are closed; ready to close as completed |
+| #927 | open: MQ10 through the entry point (Gate D, §15.6 item 3) |
+| #877, #888, #894 | open, independent backlog as §13 declared; none was worked in M31 |
+| #906 | closed by this report's PR |
+| #900 | ready to close once that PR merges |
+
+### 15.8 Follow-ups (Project #7, linked to #900)
+
+| Issue | Priority | What |
+|---|---|---|
+| #933 | Medium | the signature engine's serial stages (symbolic first) cap `f4_signature` at 16 workers; attribute the symbolic stage's growth with workers, then parallel signature-aware symbolic preprocessing. The lever for Gate D's Eco-12 and Katsura-11 gaps and for #927 |
+| #927 | (existing) | MQ10 1.58–1.73× slower through the entry point |
+| #937 | Medium | decision: whether `f4_signature`'s dispatch becomes the default for graded orders (after #927) |
+| #934 | Low | a measurement method that can resolve a 5% gate on 6 ms controls (Target criterion 3) |
+| #935 | Low | groebner-rs at its best worker count on the wide rows (the wide adapters run one worker) |
+| #936 | Low | signature-basis outgrowth: which outgrown elements the criteria need |
+
+Each is a sub-issue of #900 on Project #7 with Priority set.

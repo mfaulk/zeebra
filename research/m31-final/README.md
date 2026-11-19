@@ -11,7 +11,14 @@ Executable SHA-256s: [binaries.sha256](binaries.sha256). Comparand executables a
 digest (`research/m30-baseline/identities.json`): grobx driver `40035ef8`, groebner-rs driver
 `81dc5c4c`, msolve `557470de`.
 
-SESSION
+**Session:** 2026-11-18 20:24 – 2026-11-19 01:08 EST, one `tools/bench-reserve.sh` reservation of CCDs
+1–2 (CPUs 8–23 and siblings), each suite under its own `bench-reserve run zb-906 8-23` lock, in the
+order mq10, walls, census, certify, wide, certified ([session.log](session.log)). Children are
+CCD-aligned `taskset` from CPU 8, `rss-guard` at 8 GiB (grobx certified: its own request cap plus
+1 GiB), 180 s solve cap (600 s for grobx certified). The MQ10 window ran to completion with no
+compiler on the machine (`campaign_stop: complete`). Every attempt is retained; none failed, timed
+out or was refused except grobx's 54 `unsupported` cells above one worker on MQ10, which its
+adapter declares. **Host:** Threadripper PRO 5995WX, `ZEEBRA_MACHINE=5995wx`.
 
 ## Files
 
@@ -25,7 +32,7 @@ SESSION
 | `certified.jsonl.gz` | grobx certified mode, one worker, n = 9 on the four wide rows (Eco-12 at the 32 GiB cap #855 declared) |
 | `wide-attempts.json` | `research/m30-final/extract.py` over nine `wide-corpus.py` passes (grobx raw, groebner-rs; one worker) |
 | `mq10-attempts.json` | the same extract over `comparand-scaling.py` (msolve exact, grobx raw, groebner-rs, Zeebra's driver; 1/4/8/16 workers) |
-| `session.log`, `benchlock.log` | the session's console and lock records |
+| `session.log`, `benchlock.log`, `suite-starts.jsonl` | the session console, its six `bench-reserve run` lock records (all `status=0`), and the machine context at the start of the two comparand suites |
 | [summarize.py](summarize.py) → [tables.md](tables.md) | every table |
 
 The controller archives (`wide-*-pass*.json.gz`, `mq10-try*.json.gz`) hold full inputs and bases and
