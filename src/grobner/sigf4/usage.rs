@@ -50,7 +50,7 @@ pub struct BatchUse {
     pub elimination: Duration,
 }
 
-/// Replay of [`UsageLog::ops`] against fresh stores; the timings are best of three.
+/// Replay of the engine's syzygy-store calls against fresh stores; the timings are best of three.
 #[derive(Clone, Debug, Default)]
 pub struct StoreReplay {
     pub koszul_inserts: usize,
