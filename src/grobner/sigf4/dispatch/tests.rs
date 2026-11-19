@@ -412,7 +412,7 @@ fn test_team_never_exceeds_max_workers() {
 fn test_small_signature_inputs_cap_the_team() {
     assert_eq!(
         (SIGNATURE_SMALL_TEAM_VARIABLES, SIGNATURE_SMALL_TEAM),
-        (10, 4)
+        (10, 8)
     );
     for count in [1, 2, 4, 8, 16] {
         let small = count.min(SIGNATURE_SMALL_TEAM);
