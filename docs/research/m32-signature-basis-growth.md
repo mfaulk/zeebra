@@ -2,7 +2,7 @@
 
 **Status:** complete, 2026-11-19. **Gate G fails** (§6): every sound option projects ≤ 3.1% of
 Eco-12's 16-worker wall, and Cyclic-7 cannot reach conventional F4 even with bookkeeping at zero.
-**Measured at:** `3d46b15f` (the `research-sigf4-usage` instrument; binary sha256 prefix
+**Measured at:** `3d46b15f`, tag `measured/936-sig-basis-growth` (the `research-sigf4-usage` instrument; binary sha256 prefix
 `6c8c489798fbb6d6`), one worker pinned to CPU 2, under `tools/benchlock.sh` tag `936-usage`
 (2026-11-19T09:10, load 10.4 from builds elsewhere). Raw output:
 [`research/m32-outgrowth/`](../../research/m32-outgrowth/). **Counts** are algebraic and do not
