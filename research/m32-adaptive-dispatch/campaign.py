@@ -49,7 +49,18 @@ SUITES = {
     'small': [(r, [f'{a}:{w}' for w in (1, 16) for a in ('f4', 'en')]) for r in SMALL_VS_F4]
     + [(r, [f'{a}:{w}' for w in W4 for a in ('m31', 'en')]) for r in SMALL_VS_M31],
 }
-REPS = {'mq10': 9, 'fav': 9, 'ctrl': 9, 'small': 31}
+# Plan §10.3's one extension block (n = 12, pooled), for the cells the first read left imprecise.
+SUITES['mq10x'] = [('m31/mq-random-10', ['f4:4', 'en:4'])]
+# Revision 1 (team cap 8 and the dispatch clock), read once with `--bins` pointing `head` at its
+# build: the cells the revision can move, and the dispatch cost on every dev row.
+SUITES['rev1small'] = [(r, [f'{a}:{w}' for w in W4 for a in ('m31', 'en')]) for r in SMALL_VS_M31]
+SUITES['rev1fav'] = [(r, [f'{a}:{w}' for w in (8, 16) for a in ('m31', 'en')])
+                     for r in ['goldilocks/noon-7', 'wide64/noon-8']]
+SUITES['t9'] = [(r, [f'en:{w}' for w in W4]) for r in MQ10 + FAVOURABLE + CYCLIC + SMALL_VS_F4
+                + SMALL_VS_M31]
+REPS = {'mq10': 9, 'fav': 9, 'ctrl': 9, 'small': 31, 'mq10x': 12, 'rev1small': 31, 'rev1fav': 9,
+        't9': 3}
+WARM = {'small', 'rev1small'}
 
 
 def command(bins, row, arm, calls=0):
@@ -73,7 +84,7 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     args = p.parse_args()
     bins = dict(base=args.bins / 'base/sig_f4_study', head=args.bins / 'head/sig_f4_study')
-    calls = CALLS if args.suite == 'small' else 0
+    calls = CALLS if args.suite in WARM else 0
     BASE.command = lambda b, row, arm: command(b, row, arm, calls)
     with args.output.open('a') as out:
         for rep, row, arm in BASE.plan(SUITES[args.suite], args.reps or REPS[args.suite]):

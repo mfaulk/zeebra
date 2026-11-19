@@ -16,7 +16,11 @@ from collections import defaultdict
 
 DRAWS = 20000
 # Plan §8.2 Gate R: (reference arm, threshold on the 95% upper bound).
-BOUNDS = {'mq10': ('f4', 1.05), 'fav': ('m31', 1.03), 'ctrl': ('f4', 1.05)}
+BOUNDS = {'mq10': ('f4', 1.05), 'mq10x': ('f4', 1.05), 'fav': ('m31', 1.03), 'rev1fav': ('m31', 1.03),
+          'ctrl': ('f4', 1.05)}
+WARM = {'small', 'rev1small'}
+# The extension block's records pool with the first n = 9 (plan §10.3).
+POOLED = {'mq10x': 'mq10'}
 SMALL_BOUNDS = {'wide64/katsura-9': ('m31', 1.03)}
 SMALL_DEFAULT = ('f4', 1.05)
 T9_NS = 50_000
@@ -44,13 +48,13 @@ def complete(r):
 def metric(r):
     """Milliseconds: process wall, or the median warm call for the small suite."""
     warm = r['report'].get('warm_ns') or []
-    if r['suite'] == 'small':
+    if r['suite'] in WARM:
         return statistics.median(warm) / 1e6
     return r['process_wall_ns'] / 1e6
 
 
 def bound(suite, row):
-    if suite == 'small':
+    if suite in WARM:
         return SMALL_BOUNDS.get(row, SMALL_DEFAULT)
     return BOUNDS[suite]
 
@@ -60,17 +64,18 @@ def main(paths):
     cells = defaultdict(lambda: defaultdict(dict))  # (suite, row, workers) -> rep -> label -> record
     digests = defaultdict(set)
     failures = []
-    dispatch = []  # (row, workers, dispatch ns, wall ms)
+    dispatch = defaultdict(list)  # en binary -> (row, workers, dispatch ns, wall ms)
     for r in records:
         if not complete(r):
             failures.append((r['suite'], r['row'], r['arm'], r['rep'], r['returncode']))
             continue
         label, workers = r['arm'].split(':')
-        cells[(r['suite'], r['row'], int(workers))][r['rep']][label] = r
+        suite = POOLED.get(r['suite'], r['suite'])
+        cells[(suite, r['row'], int(workers))][r['rep']][label] = r
         digests[r['row']].add(r['report']['basis_sha256'])
         if label == 'en':
             stats = r['report']['statistics']
-            dispatch.append((r['row'], int(workers), stats['dispatch_ns'], r['process_wall_ns'] / 1e6))
+            dispatch[r['argv'][0]].append((r['row'], int(workers), stats['dispatch_ns'], r['process_wall_ns'] / 1e6))
     print('| suite | row | w | n | reference ms | en ms | en ÷ ref [95%] | half-width | bound | read |'
           ' route | team |')
     print('|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---:|')
@@ -79,6 +84,8 @@ def main(paths):
         ref, threshold = bound(suite, row)
         reps = cells[(suite, row, workers)]
         pairs = [(reps[k]['en'], reps[k][ref]) for k in sorted(reps) if 'en' in reps[k] and ref in reps[k]]
+        if not pairs:
+            continue
         ratios = [metric(e) / metric(b) for e, b in pairs]
         lo, hi = interval(ratios)
         med = statistics.median(ratios)
@@ -94,12 +101,14 @@ def main(paths):
               f"{med:.3f} [{lo:.3f}, {hi:.3f}] | {100 * half:.1f}% | {threshold} | {read} | "
               f"{stats['route']} | {stats.get('team', '—')} |")
     print()
-    worst = max(dispatch, key=lambda d: d[2])
-    worst_share = max((d[2] / 1e6 / d[3] for d in dispatch if d[3] >= 50), default=0.0)
-    t9 = worst[2] <= T9_NS and worst_share <= 0.001
-    print(f"T9 dispatch cost: max {worst[2] / 1e3:.1f} µs ({worst[0]}, {worst[1]} w); "
-          f"median {statistics.median(d[2] for d in dispatch) / 1e3:.1f} µs; "
-          f"worst share of wall on rows ≥ 50 ms {100 * worst_share:.4f}% — {'pass' if t9 else 'FAIL'}")
+    t9 = True
+    for binary, costs in sorted(dispatch.items()):
+        worst = max(costs, key=lambda d: d[2])
+        worst_share = max((d[2] / 1e6 / d[3] for d in costs if d[3] >= 50), default=0.0)
+        t9 = worst[2] <= T9_NS and worst_share <= 0.001
+        print(f"T9 dispatch cost, {binary} (n = {len(costs)}): max {worst[2] / 1e3:.1f} µs "
+              f"({worst[0]}, {worst[1]} w); median {statistics.median(d[2] for d in costs) / 1e3:.1f} µs; "
+              f"worst share of wall on rows ≥ 50 ms {100 * worst_share:.4f}% — {'pass' if t9 else 'FAIL'}")
     print(f"Basis digests: {sum(len(v) == 1 for v in digests.values())} of {len(digests)} rows "
           f"have one digest across every arm and repetition")
     print(f"Incomplete children: {len(failures)} {failures[:5]}")
