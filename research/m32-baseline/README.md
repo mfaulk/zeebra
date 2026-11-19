@@ -1,14 +1,19 @@
-# #939 M32-0: freeze and corpus pin
+# #939 M32-0: freeze, corpus pin, baseline cohort and performance model
 
 Plan: [`docs/MILESTONE-ADAPTIVE-F4.md`](../../docs/MILESTONE-ADAPTIVE-F4.md) §7.1, §8.3 (F0), §10.1.
 Findings: [`docs/research/m32-baseline.md`](../../docs/research/m32-baseline.md).
 
-**Measured at:** the admission read only — pin build `f26b8d80` (tag `measured/939-pin`): the
-baseline `7b25a1ee` plus the held-out inputs in `examples/sig_f4_study.rs`; library identical.
-One `tools/bench-reserve.sh` reservation of CCDs 1–2, `bench-reserve run zb-939 8-23`, 2026-11-19 09:15–09:22 EST ([benchlock.log](benchlock.log), `status=0`); children `taskset` from CPU 8, `rss-guard` 8 GiB, 180 s cap. Load 3–6 on the other CPUs (another session's compilers); an admission bound, not a gate. **Host:** Threadripper PRO 5995WX.
+**Measured at:** the cohort (`walls`) at the baseline `7b25a1ee` and the M31 reference `8715c8ed`;
+the admission read at the pin build `f26b8d80` (tag `measured/939-pin`); the `split`, `small` and
+`ab` suites at the instrument build `45107ec3` (tag `measured/939-instrument`), the baseline's
+library plus `research-sigf4-split`/`-usage`-gated code (`identities.json`). The `rs` sweep ran
+groebner-rs's driver `81dc5c4c` (M30-0's) under the wide controller at this branch. All sessions
+used `tools/bench-reserve.sh` CCDs 1–2 (`bench-reserve run zb-939 8-23`) on 2026-11-19, with
+children `taskset` from CPU 8, `rss-guard` at 8 GiB and a 180 s cap. Other sessions' compilers ran
+on the remaining CPUs throughout (per-child `load_start` 1–18), so absolute walls are taken beside
+builds. Lock records: [benchlock.log](benchlock.log). **Host:** Threadripper PRO 5995WX.
 
-This directory holds #939's first two deliverables. The baseline cohort, the symbolic-stage
-attribution, the cost model, #934 and #935 follow under the same issue and add their own files here.
+Tables: [tables.md](tables.md) (generated). Findings: [`docs/research/m32-baseline.md`](../../docs/research/m32-baseline.md).
 
 ## Files
 
@@ -16,9 +21,16 @@ attribution, the cost model, #934 and #935 follow under the same issue and add t
 |---|---|
 | [pins.py](pins.py) → [pins.json](pins.json) | the freeze commits, every development and held-out row's canonical SHA-256 and generator, and the admission verdicts; reproduced in CI |
 | [identities.py](identities.py) → [identities.json](identities.json) | toolchain, build, options, field representations, timed `src/` diffs, executable SHA-256s of all three builds |
-| [campaign.py](campaign.py), [run.sh](run.sh) | the `admission` suite on M31's child runner (`research/m31-baseline/campaign.py` `run_one`) |
-| [test_pins.py](test_pins.py) | unit tests for the admission rule and the pin reproduction; run in CI |
-| `admission.jsonl.gz`, `session.log`, `benchlock.log` | every admission attempt, the session console and its `bench-reserve run` lock record |
+| [campaign.py](campaign.py), [run.sh](run.sh) | suites `admission`, `walls`, `split`, `ab`, `small` on M31's child runner (`research/m31-baseline/campaign.py` `run_one`), and `rs` (#935) through `tools/external/wide-corpus.py` |
+| [summarize.py](summarize.py) → [tables.md](tables.md) | every table: entry point ÷ F4 at 1/4/8/16 workers, M31 §15.2 check, stage clocks, attribution, symbolic split and frequency, A/B, §6.3 ceilings, #934, #935 |
+| [test_pins.py](test_pins.py) | unit tests for the admission rule, the pin reproduction and the suite plans; run in CI |
+| `admission.jsonl.gz` | the held-out admission read (18 children) |
+| `walls.jsonl.gz` | deliverable 3: 13 development rows × 20 arms × n = 9 (2,340 children) |
+| `split.jsonl.gz` | deliverable 4: the split build (`research-sigf4-split`), 5 rows × `sd1:1`, `scl:4/8/16` × n = 5 |
+| `ab.jsonl.gz` | the split build against the instrument build it was compiled beside, n = 5 |
+| `small.jsonl.gz` | #934: katsura-4 at both fields, en/f4 at 1 and 16 workers, `--repeat 21`, n = 31 |
+| `rs.jsonl.gz` | #935: groebner-rs at 1/4/8/16 workers on the four wide rows, n = 9 (extract of the controller archives, which stay outside the repository; each named by SHA-256) |
+| `session.log`, `benchlock.log` | session consoles and the `bench-reserve run` lock records |
 
 ## 1. Freeze (F0)
 
@@ -49,6 +61,9 @@ added to `sigf4/dispatch.rs`, which shift the source line numbers embedded in it
 | M32 baseline `7b25a1ee` | `wide_corpus` | `75ad7d5d36b4f0ba580e6452637ce9da26253fd3aaa1d3c0348f9117060582a9` |
 | M32 baseline `7b25a1ee` | `zeebra_driver` | `e824462a5dc408c78e1b7905b35e6ef81dcf2f0bc4288fa8294eaf612b0fdc46` |
 | pin build `f26b8d80` | `sig_f4_study` | `26b25335db554ab8b0d720a0e48a178c460306e779411fbb992ad85bffd471a3` |
+| instrument build `45107ec3` (`research-sigf4`) | `sig_f4_study` | `6f0a39e9691d7998d6d3e95b57cd4de0a353a7109844d8ea42521106e2da851f` |
+| split build `45107ec3` (`research-sigf4-split`) | `sig_f4_study` | `cd7cdd1cdf290d3d696db90ad0f6b5fd4a62c75b5597be15f688a4e3b8206f61` |
+| groebner-rs comparand (M30-0) | `groebner-rs-driver` | `81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0` |
 
 ## 2. Corpus pin (plan §10.1)
 
@@ -107,15 +122,23 @@ instantiates both engines for every row. The signature engine was not run on any
 
 ```sh
 B=/buildcache/cargo-target/zeebra-939           # never under $HOME or /tmp
-export RUSTC_WRAPPER="" CARGO_INCREMENTAL=0 TMPDIR=$B/tmp
-for c in pin:f26b8d80 base:7b25a1ee ref:8715c8ed; do
+export RUSTC_WRAPPER="" CARGO_INCREMENTAL=0 TMPDIR=$B/tmp ZEEBRA_MACHINE=5995wx
+for c in pin:f26b8d80 base:7b25a1ee ref:8715c8ed m32:45107ec3; do
   git archive -o $B/${c%%:*}.tar ${c#*:}
 done
 # in each extract: cargo build -j24 --release --locked --features research-sigf4 --example sig_f4_study
-#   (base and ref also: --example m29_cost_model --example zeebra_driver --example wide_corpus)
-# then copy each into $B/bin/{pin,base,ref}/
-setsid -w research/m32-baseline/run.sh OUT admission
-gzip -n -c OUT/admission.jsonl > research/m32-baseline/admission.jsonl.gz
+#   (base and ref also: --example m29_cost_model --example zeebra_driver --example wide_corpus);
+#   the m32 extract once more with --features research-sigf4-split, copied to $B/bin/split/
+# then copy each into $B/bin/{pin,base,ref,m32}/, and groebner-rs-driver (M30-0's, 81dc5c4c) into $B/bin/
+setsid -w research/m32-baseline/run.sh OUT admission       # one session per line; each releases the CCDs
+setsid -w research/m32-baseline/run.sh OUT walls
+setsid -w research/m32-baseline/run.sh OUT split small
+setsid -w research/m32-baseline/run.sh OUT ab
+setsid -w research/m32-baseline/run.sh OUT rs
+for s in admission walls split small ab; do gzip -n -c OUT/$s.jsonl > research/m32-baseline/$s.jsonl.gz; done
+python3 research/m32-baseline/summarize.py --extract-rs OUT research/m32-baseline
 python3 research/m32-baseline/pins.py > research/m32-baseline/pins.json
-python3 research/m32-baseline/identities.py --bins $B/bin --pin f26b8d80 > research/m32-baseline/identities.json
+python3 research/m32-baseline/identities.py --bins $B/bin --pin f26b8d80 --instrument 45107ec3 \
+  > research/m32-baseline/identities.json
+python3 research/m32-baseline/summarize.py research/m32-baseline > research/m32-baseline/tables.md
 ```

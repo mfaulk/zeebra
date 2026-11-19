@@ -35,6 +35,15 @@
     "sha256": "e824462a5dc408c78e1b7905b35e6ef81dcf2f0bc4288fa8294eaf612b0fdc46"
    }
   },
+  "m32": {
+   "sig_f4_study": {
+    "bytes": 10741952,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/m32/sig_f4_study",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/m32/sig_f4_study",
+    "sha256": "6f0a39e9691d7998d6d3e95b57cd4de0a353a7109844d8ea42521106e2da851f"
+   }
+  },
   "pin": {
    "sig_f4_study": {
     "bytes": 10728632,
@@ -73,6 +82,15 @@
     "resolved": "/buildcache/cargo-target/zeebra-939/bin/ref/zeebra_driver",
     "sha256": "e824462a5dc408c78e1b7905b35e6ef81dcf2f0bc4288fa8294eaf612b0fdc46"
    }
+  },
+  "split": {
+   "sig_f4_study": {
+    "bytes": 10851336,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/split/sig_f4_study",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/split/sig_f4_study",
+    "sha256": "cd7cdd1cdf290d3d696db90ad0f6b5fd4a62c75b5597be15f688a4e3b8206f61"
+   }
   }
  },
  "fields": {
@@ -91,12 +109,23 @@
    "what": "M31 final main (#926)"
   }
  },
+ "groebner_rs_driver": {
+  "bytes": 1469776,
+  "path": "/buildcache/cargo-target/zeebra-939/bin/groebner-rs-driver",
+  "present": true,
+  "resolved": "/buildcache/cargo-target/zeebra-939/bin/groebner-rs-driver",
+  "sha256": "81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0"
+ },
  "host": {
   "boost": "1",
   "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores",
   "governor": "performance",
   "kernel": "7.3.3-200.fc44.x86_64",
   "machine": "5995wx"
+ },
+ "instrument_build": {
+  "commit": "45107ec3bd0ee9dea04ff2d6bfc532c5c4974dcf",
+  "what": "m32: research-sigf4 with sig_f4_study --repeat (#934); split: research-sigf4-split (symbolic components); never timed against walls"
  },
  "options": {
   "entry": "grobner::f4_signature under the same options, pre-solve dispatch included",
@@ -112,6 +141,8 @@
  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
  "schema": 1,
  "timed_diffs": {
+  "baseline..instrument (timed tree)": "Cargo.toml                  |   4 +\n src/grobner/sigf4/engine.rs | 135 +++++++++++++++++-\n src/grobner/sigf4/mod.rs    |  64 +++++++++\n src/grobner/sigf4/tests.rs  |  24 ++++\n src/grobner/sigf4/usage.rs  | 323 ++++++++++++++++++++++++++++++++++++++++++++\n 5 files changed, 549 insertions(+), 1 deletion(-)",
+  "baseline..instrument outside research features": "src/grobner/sigf4/engine.rs: #948's `divisible` rewrite of the rewriter check (same predicate); nothing else",
   "baseline..pin": "examples/sig_f4_study.rs | 111 ++++++++++++++++++++++++++++++++++++++++++++---\n 1 file changed, 104 insertions(+), 7 deletions(-)",
   "e59a90a1..baseline": "identical",
   "reference..baseline": "src/grobner/sigf4/dispatch.rs | 7 +++++++\n src/lib.rs                    | 1 +\n 2 files changed, 8 insertions(+)",

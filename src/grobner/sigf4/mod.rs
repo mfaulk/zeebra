@@ -221,10 +221,68 @@ pub struct BatchSplit {
     pub cascading_targets: usize,
 }
 
+/// One batch's symbolic stage by component (#939). The split build unfuses multiplication from
+/// interning (products go to a scratch buffer first) and clocks every reducer lookup, so its
+/// symbolic total runs above the timed build's; `total` here is this build's own. The CPU and its
+/// `scaling_cur_freq` are read outside the clock, before and after.
+#[cfg(feature = "research-sigf4-split")]
+#[derive(Clone, Debug, Default)]
+pub struct SymbolicSplit {
+    pub reducer_search: Duration,
+    pub searches: u64,
+    pub multiply: Duration,
+    pub interning: Duration,
+    pub terms: u64,
+    pub column_sort: Duration,
+    pub total: Duration,
+    pub cpu: Option<usize>,
+    pub khz_before: Option<u64>,
+    pub khz_after: Option<u64>,
+}
+
+#[cfg(feature = "research-sigf4-split")]
+impl SymbolicSplit {
+    /// The CPU this thread runs on and that CPU's current frequency, from procfs and sysfs.
+    pub(crate) fn cpu_khz() -> (Option<usize>, Option<u64>) {
+        let cpu = std::fs::read_to_string("/proc/thread-self/stat")
+            .ok()
+            .and_then(|s| {
+                // Field 39 (processor), counted after the parenthesised command name.
+                let rest = &s[s.rfind(')')? + 2..];
+                rest.split_whitespace().nth(36)?.parse().ok()
+            });
+        let khz = cpu.and_then(|c: usize| {
+            let path = format!("/sys/devices/system/cpu/cpu{c}/cpufreq/scaling_cur_freq");
+            std::fs::read_to_string(path).ok()?.trim().parse().ok()
+        });
+        (cpu, khz)
+    }
+
+    /// Multiplies `terms` by `mult` into `scratch`, then interns each product, clocking each half.
+    pub(crate) fn row<const N: usize>(
+        &mut self,
+        scratch: &mut Vec<crate::Monomial<N>>,
+        terms: impl Iterator<Item = crate::Monomial<N>>,
+        mult: crate::Monomial<N>,
+        mut intern: impl FnMut(crate::Monomial<N>) -> u32,
+        out: &mut Vec<u32>,
+    ) {
+        let clock = std::time::Instant::now();
+        scratch.clear();
+        scratch.extend(terms.map(|m| m * mult));
+        let products = std::time::Instant::now();
+        out.extend(scratch.iter().map(|&m| intern(m)));
+        self.interning += products.elapsed();
+        self.multiply += products - clock;
+        self.terms += scratch.len() as u64;
+    }
+}
+
 #[cfg(feature = "research-sigf4-split")]
 #[derive(Clone, Debug, Default)]
 pub struct SplitLog {
     pub batches: Vec<BatchSplit>,
+    pub symbolic: Vec<SymbolicSplit>,
     /// Input normalization before the first batch.
     pub inputs: Duration,
     /// Converting the signature basis to polynomials, and dropping the engine.

@@ -26,7 +26,7 @@ EXAMPLES = ('sig_f4_study', 'm29_cost_model', 'zeebra_driver', 'wide_corpus')
 
 def code_lines(a, b):
     """Changed lines in the timed tree that are neither comments nor doc attributes."""
-    diff = m29.sh('git', 'diff', '-U0', a, b, '--', *TIMED).splitlines()
+    diff = m29.sh('git', 'diff', '-U0', a, b, '--', 'src').splitlines()
     return [l for l in diff if l[:1] in '+-' and not l.startswith(('+++', '---'))
             and l[1:].strip() and not l[1:].strip().startswith(('//', '#[doc'))]
 
@@ -35,27 +35,37 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--bins', type=Path, required=True, help='BINDIR/{ref,base,pin}/<example>')
     p.add_argument('--pin', required=True, help='the commit the pin build was archived from')
+    p.add_argument('--instrument', required=True, help='the commit the m32 and split builds were archived from')
     a = p.parse_args()
     ref, base = FREEZE['reference']['commit'], FREEZE['baseline']['commit']
     pin = m29.sh('git', 'rev-parse', a.pin)
+    instrument = m29.sh('git', 'rev-parse', a.instrument)
     m30 = ROOT / 'research/m30-baseline/identities.json'
     doc = dict(
         schema=1,
         freeze=FREEZE,
         pin_build=dict(commit=pin, what='baseline + #939 held-out inputs in examples/sig_f4_study.rs; '
                                          'used only for the admission read'),
+        instrument_build=dict(commit=instrument, what='m32: research-sigf4 with sig_f4_study --repeat (#934); '
+                              'split: research-sigf4-split (symbolic components); never timed against walls'),
         timed_diffs={
             'reference..baseline': m29.sh('git', 'diff', '--stat', ref, base, '--', *TIMED),
             'reference..baseline code lines (not // or #[doc])': code_lines(ref, base),
             'e59a90a1..baseline': m29.sh('git', 'diff', '--stat', 'e59a90a1', base, '--', *TIMED) or 'identical',
             'baseline..pin': m29.sh('git', 'diff', '--stat', base, pin, '--', *TIMED, 'examples') or 'identical',
+            'baseline..instrument (timed tree)': m29.sh('git', 'diff', '--stat', base, instrument, '--', *TIMED),
+            # Read by hand: every changed src/ line sits under cfg(feature = research-sigf4-split or
+            # -usage) or in tests, except #948's semantics-preserving rewrite of the rewriter test.
+            'baseline..instrument outside research features': "src/grobner/sigf4/engine.rs: #948's "
+                "`divisible` rewrite of the rewriter check (same predicate); nothing else",
         },
         rustc=m29.sh('rustc', '-vV'),
         build='git archive of each commit; cargo build --release --locked --features research-sigf4; '
               'fat LTO, codegen-units=1 (Cargo.toml), x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER="", '
               'CARGO_INCREMENTAL=0; private CARGO_TARGET_DIR under /buildcache/cargo-target/zeebra-939',
         executables={label: {name: m29.identity(a.bins / label / name) for name in EXAMPLES
-                             if (a.bins / label / name).exists()} for label in ('ref', 'base', 'pin')},
+                             if (a.bins / label / name).exists()} for label in ('ref', 'base', 'pin', 'm32', 'split')},
+        groebner_rs_driver=m29.identity(a.bins / 'groebner-rs-driver'),
         options=dict(
             f4='F4Options::default() with parallel_forward and parallel_symbolic Serial at 1 worker, '
                'Auto { max_workers: w } otherwise (sig_f4_study::f4_options)',
