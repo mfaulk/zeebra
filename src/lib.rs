@@ -83,6 +83,7 @@ pub use rings::Ring;
 /// have examples nothing compiles.
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
+#[doc = include_str!("../docs/guide/README.md")]
 #[doc = include_str!("../docs/guide/benchmarking.md")]
 #[doc = include_str!("../docs/guide/development.md")]
 #[doc = include_str!("../docs/guide/external-engines.md")]
