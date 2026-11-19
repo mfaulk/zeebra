@@ -31,6 +31,9 @@ pub(super) type Cache<const N: usize> = MonomialMap<N, (u32, u32)>;
 const SLICES_PER_WORKER: usize = 4;
 /// Marks a slice-local id in a scanned row; handles stay below it.
 const LOCAL: u32 = 1 << 31;
+/// The capacity a slice's buffers start with; any nonzero value puts them in the caller's malloc
+/// arena (see `Slice::seeded`).
+const SEED: usize = 16;
 
 /// When the team is woken. A level narrower than `min_frontier` is scanned by the caller alone
 /// (#861's `MIN_FRONTIER`), and fewer than `min_sort` columns are sorted by it alone, so a closure
@@ -158,6 +161,20 @@ struct Slice<const N: usize> {
 }
 
 impl<const N: usize> Slice<N> {
+    /// Buffers allocated here, on the caller: a worker's growth of one reallocates within the
+    /// caller's malloc arena, where the batch's later allocations reuse it, rather than in the
+    /// worker's own, where freed scratch stays resident and adds to the process's peak. The local
+    /// map is left empty, since a table resize allocates afresh anyway.
+    fn seeded() -> Self {
+        Slice {
+            rows: Vec::with_capacity(SEED),
+            refs: Vec::with_capacity(SEED),
+            new: Vec::with_capacity(SEED),
+            local: MonomialMap::default(),
+            updates: Vec::with_capacity(SEED),
+        }
+    }
+
     fn bytes(&self) -> usize {
         let mono = size_of::<Monomial<N>>();
         self.rows.capacity() * size_of::<(Row<N>, usize)>()
@@ -476,7 +493,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             ..State::default()
         });
         let slices: Vec<Mutex<Slice<N>>> = (0..workers * SLICES_PER_WORKER)
-            .map(|_| Mutex::default())
+            .map(|_| Mutex::new(Slice::seeded()))
             .collect();
         let team = Team {
             plan: Mutex::new(Plan {
