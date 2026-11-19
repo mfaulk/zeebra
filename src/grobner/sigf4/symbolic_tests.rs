@@ -3,11 +3,11 @@
 //! engine re-runs the serial closure on a clone of the reducer cache and asserts the columns, rows
 //! in order, handles and cache equal, so every checked run below is a per-batch oracle.
 
-use std::time::Duration;
+use std::{sync::mpsc, time::Duration};
 
 use super::{
-    claim::Adversary, engine::symbolic::with_tuning, engine::symbolic::Tuning, sig_f4_reported,
-    SigF4Error, SigF4Options, SigF4Statistics,
+    claim::Adversary, engine::symbolic::with_tuning, engine::symbolic::Tuning,
+    engine::symbolic::PANIC_AT, sig_f4_reported, SigF4Error, SigF4Options, SigF4Statistics,
 };
 use crate::{
     fields::{PrimeFieldElement64, Zp32003},
@@ -30,13 +30,16 @@ const GRADED: [MonomialOrder; 2] = [
 const EVERY_LEVEL: Tuning = Tuning {
     min_frontier: 1,
     min_sort: 1,
+    max_step: usize::MAX,
     fallback: false,
 };
 
-/// Narrow levels straight into the tables on the caller, wide ones on the team, in one closure.
+/// Narrow levels straight into the tables on the caller, wide ones on the team in bounded steps
+/// (whose remainders may be narrow), in one closure.
 const MIXED: Tuning = Tuning {
     min_frontier: 12,
     min_sort: 64,
+    max_step: 40,
     fallback: false,
 };
 
@@ -351,4 +354,28 @@ fn test_narrow_closures_stay_on_the_caller() {
     assert_eq!(run.1.symbolic_team_levels, 0);
     let serial = solve(&system, GREVLEX, &checked(1), Tuning::default());
     assert_same_batches(&serial, &run, "narrow");
+}
+
+// A panic on the caller inside a team step propagates out of the solve instead of leaving the team
+// parked at a barrier and the scope joining it forever.
+#[test]
+fn test_a_caller_panic_mid_closure_dismisses_the_team() {
+    let (done, finished) = mpsc::channel();
+    std::thread::spawn(move || {
+        PANIC_AT.set(Some(3));
+        let options = SigF4Options {
+            check_signatures: false,
+            ..checked(8)
+        };
+        let run = std::panic::catch_unwind(|| {
+            with_tuning(EVERY_LEVEL, || {
+                sig_f4_reported(&katsura::<6, Goldilocks>(), GREVLEX, &options)
+            })
+        });
+        done.send(run.is_err()).expect("the test waits");
+    });
+    let panicked = finished
+        .recv_timeout(Duration::from_secs(60))
+        .expect("the solve returns rather than hanging");
+    assert!(panicked, "the injected panic propagates");
 }

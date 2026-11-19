@@ -347,6 +347,8 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("claim_peak_live_bytes", size(s.claim_peak_live_bytes)),
         ("claim_phase_a_ns", Json::nanos(s.claim_phase_a)),
         ("claim_cascade_ns", Json::nanos(s.claim_cascade)),
+        ("symbolic_team_levels", size(s.symbolic_team_levels)),
+        ("symbolic_peak_live_bytes", size(s.symbolic_peak_live_bytes)),
         #[cfg(feature = "research-sigf4-split")]
         ("split", split(&s.split)),
         #[cfg(feature = "research-sigf4-usage")]

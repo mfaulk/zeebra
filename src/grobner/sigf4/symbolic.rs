@@ -11,7 +11,7 @@ use std::{
     mem::{size_of, take},
     ops::Range,
     sync::{
-        atomic::{AtomicUsize, Ordering::Relaxed},
+        atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed},
         Barrier, Mutex, RwLock,
     },
     time::Instant,
@@ -34,12 +34,15 @@ const LOCAL: u32 = 1 << 31;
 
 /// When the team is woken. A level narrower than `min_frontier` is scanned by the caller alone
 /// (#861's `MIN_FRONTIER`), and fewer than `min_sort` columns are sorted by it alone, so a closure
-/// that never widens never starts a team. `fallback` (tests) takes the serial path a field that
-/// cannot cross threads takes.
+/// that never widens never starts a team. A wider level is scanned in consecutive steps of at most
+/// `max_step` items, which bounds the slice scratch; any split into consecutive steps merged in
+/// order assigns the serial ids (§3, Lemma 4 applies to each step). `fallback` (tests) takes the
+/// serial path a field that cannot cross threads takes.
 #[derive(Clone, Copy, Debug)]
 pub(in crate::grobner::sigf4) struct Tuning {
     pub(in crate::grobner::sigf4) min_frontier: usize,
     pub(in crate::grobner::sigf4) min_sort: usize,
+    pub(in crate::grobner::sigf4) max_step: usize,
     pub(in crate::grobner::sigf4) fallback: bool,
 }
 
@@ -48,6 +51,7 @@ impl Default for Tuning {
         Self {
             min_frontier: 512,
             min_sort: 4096,
+            max_step: 2048,
             fallback: false,
         }
     }
@@ -56,6 +60,10 @@ impl Default for Tuning {
 #[cfg(test)]
 thread_local! {
     static TUNING: std::cell::Cell<Tuning> = std::cell::Cell::new(Tuning::default());
+    /// The number of team steps after which the caller panics in its share of the next, leaving
+    /// the team inside that step.
+    pub(in crate::grobner::sigf4) static PANIC_AT: std::cell::Cell<Option<u64>> =
+        const { std::cell::Cell::new(None) };
 }
 
 /// Runs `f` with `tuning` in force on this thread.
@@ -139,11 +147,11 @@ struct State<const N: usize> {
 /// What one slice of a level produced.
 #[derive(Default)]
 struct Slice<const N: usize> {
-    /// Each row with its handles: one known before the step, or `LOCAL | local id`. The merge
-    /// translates them in place, so a row's handles are allocated once.
-    rows: Vec<(Row<N>, Vec<u32>)>,
-    /// Handles across `rows`.
-    refs: usize,
+    /// Each row with the end of its refs.
+    rows: Vec<(Row<N>, usize)>,
+    /// A handle known before the step, or `LOCAL | local id`. One flat buffer, reused across
+    /// steps: the caller copies each row out, so the batch's handles are allocated on its thread.
+    refs: Vec<u32>,
     new: Vec<Monomial<N>>,
     local: MonomialMap<N, u32>,
     updates: Vec<(Monomial<N>, (u32, u32))>,
@@ -152,8 +160,8 @@ struct Slice<const N: usize> {
 impl<const N: usize> Slice<N> {
     fn bytes(&self) -> usize {
         let mono = size_of::<Monomial<N>>();
-        self.rows.capacity() * size_of::<(Row<N>, Vec<u32>)>()
-            + self.refs * 4
+        self.rows.capacity() * size_of::<(Row<N>, usize)>()
+            + self.refs.capacity() * 4
             + self.new.capacity() * mono
             + self.local.capacity() * (mono + 5)
             + self.updates.capacity() * (mono + 8)
@@ -187,6 +195,44 @@ struct Team {
     plan: Mutex<Plan>,
     next: AtomicUsize,
     barrier: Barrier,
+    /// Set only when the caller unwinds, possibly mid-step.
+    abort: AtomicBool,
+}
+
+impl Team {
+    fn exiting(&self) -> bool {
+        let plan = self
+            .plan
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        matches!(plan.step, Step::Exit)
+    }
+}
+
+/// Sends a started team home: the exit plan, then the barrier the team is parked at. A caller that
+/// unwinds may leave the team at a step's second barrier, so then `abort` is set first, which a
+/// worker reads after that barrier.
+struct Dismiss<'a> {
+    team: &'a Team,
+    started: &'a Cell<bool>,
+}
+
+impl Drop for Dismiss<'_> {
+    fn drop(&mut self) {
+        if self.started.get() {
+            let mut plan = self
+                .team
+                .plan
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            plan.step = Step::Exit;
+            drop(plan);
+            if std::thread::panicking() {
+                self.team.abort.store(true, Relaxed);
+            }
+            self.team.barrier.wait();
+        }
+    }
 }
 
 /// What the caller accumulates; rows and handles in serial order.
@@ -278,7 +324,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
     /// One slice of a level, against the frozen state.
     fn scan(&self, state: &State<N>, seeds: bool, items: Range<usize>, out: &mut Slice<N>) {
         out.rows.clear();
-        out.refs = 0;
+        out.refs.clear();
         out.new.clear();
         out.local.clear();
         out.updates.clear();
@@ -288,12 +334,11 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             let Some((row, lead, terms)) = found else {
                 continue;
             };
-            let mut handles = Vec::with_capacity(terms.len() + usize::from(lead.is_some()));
-            handles.extend(lead);
+            out.refs.extend(lead);
             let (local, new) = (&mut out.local, &mut out.new);
             for (tm, _) in terms {
                 let s = *tm * row.mult;
-                handles.push(match state.seen.get(&s) {
+                out.refs.push(match state.seen.get(&s) {
                     Some(&h) => h,
                     None => {
                         let next = new.len() as u32;
@@ -305,8 +350,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                     }
                 });
             }
-            out.refs += handles.len();
-            out.rows.push((row, handles));
+            out.rows.push((row, out.refs.len()));
         }
     }
 
@@ -333,15 +377,17 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         if !seeds {
             out.reducers += slice.rows.len();
         }
-        out.refs += slice.refs;
-        for (row, mut handles) in slice.rows.drain(..) {
-            for h in &mut handles {
-                if *h & LOCAL != 0 {
-                    *h = translate[(*h & !LOCAL) as usize];
-                }
-            }
-            out.handles.push(handles);
+        out.refs += slice.refs.len();
+        let mut start = 0;
+        for (row, end) in slice.rows.drain(..) {
+            let resolve = |&r: &u32| match r & LOCAL {
+                0 => r,
+                _ => translate[(r & !LOCAL) as usize],
+            };
+            out.handles
+                .push(slice.refs[start..end].iter().map(resolve).collect());
             out.rows.push(row);
+            start = end;
         }
         cache.extend(slice.updates.drain(..));
     }
@@ -439,6 +485,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             }),
             next: AtomicUsize::new(0),
             barrier: Barrier::new(workers),
+            abort: AtomicBool::new(false),
         };
         let mut out = Out {
             rows: Vec::with_capacity(self.targets.len()),
@@ -455,12 +502,15 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                     for _ in 1..workers {
                         scope.spawn(move || loop {
                             team.barrier.wait();
-                            let plan = *team.plan.lock().expect("no plan panics");
-                            if matches!(plan.step, Step::Exit) {
+                            if team.exiting() {
                                 return;
                             }
+                            let plan = *team.plan.lock().expect("no plan panics");
                             this.help(plan, state_ref, slices_ref, &team.next);
                             team.barrier.wait();
+                            if team.abort.load(Relaxed) {
+                                return;
+                            }
                         });
                     }
                 }
@@ -468,7 +518,18 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                 team.next.store(0, Relaxed);
                 team.barrier.wait();
                 this.help(plan, state_ref, slices_ref, &team.next);
+                #[cfg(test)]
+                if let Some(n) = PANIC_AT.get() {
+                    PANIC_AT.set(n.checked_sub(1));
+                    assert!(n > 0, "injected mid-step");
+                }
                 team.barrier.wait();
+            };
+            // Dismisses a started team however the caller leaves the scope, a panic included,
+            // which would otherwise leave the team parked and the scope joining it forever.
+            let _dismiss = Dismiss {
+                team,
+                started: &started,
             };
             let halted = this.levels(
                 state_ref,
@@ -478,15 +539,10 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                 &mut team_levels,
                 &mut peak,
             );
-            let result = match halted {
+            match halted {
                 Some(halt) => Err(halt),
                 None => Ok(this.sort(state_ref, &mut out, &mut step)),
-            };
-            if started.get() {
-                team.plan.lock().expect("no plan panics").step = Step::Exit;
-                team.barrier.wait();
             }
-            result
         });
         *self.cache = state.into_inner().expect("no step panics").cache;
         Ok(Matrix {
@@ -511,11 +567,12 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         peak: &mut usize,
     ) -> Option<Halt> {
         let workers = self.workers.max(1);
-        let (mut seeds, mut lo, mut hi) = (true, 0, self.targets.len());
+        let (mut seeds, mut lo, mut top) = (true, 0, self.targets.len());
         let mut scratch = 0;
         #[cfg(test)]
         let mut level = 0u64;
-        while lo < hi {
+        while lo < top {
+            let hi = top.min(lo.saturating_add(self.tuning.max_step.max(1)));
             let n = hi - lo;
             let count = if workers > 1 && n >= self.tuning.min_frontier {
                 let chunk = n.div_ceil(slices.len().min(n));
@@ -555,7 +612,11 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                     seeds,
                 );
             }
-            (seeds, lo, hi) = (false, if seeds { 0 } else { hi }, guard.work.len());
+            if hi < top {
+                lo = hi;
+            } else {
+                (seeds, lo, top) = (false, if seeds { 0 } else { top }, guard.work.len());
+            }
             #[cfg(test)]
             {
                 level += 1;
