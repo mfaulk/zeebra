@@ -245,13 +245,12 @@ def digest_table(c, certify, certified, passes, out):
         for a in p['attempts']:
             if a['engine'] == 'grobx' and a['status'] == 'complete' and a['basis_text_sha256']:
                 grobx_raw[f"{a['field']}/{a['name']}"].add(a['basis_text_sha256'])
-    out.append('| row | sig_f4_study digests (all arms, both builds) | children | entry `--certify` (16 w) | '
+    out.append('| row | basis digests (all arms, both builds) | children | entry `--certify` (16 w) | '
                'certify s | grobx certified (admitted / n) | grobx certified digest = Zeebra | grobx raw digest = Zeebra |')
     out.append('|---|---|---:|---|---:|---|---|---|')
     for row in c.rows:
-        sig = {r['basis_sha256'] for (rw, arm), reps in c.reports.items() if rw == row
-               and not arm.endswith(('cm:16',)) for r in reps.values()}
-        n = sum(len(reps) for (rw, arm), reps in c.reports.items() if rw == row and not arm.endswith('cm:16'))
+        sig = {r['basis_sha256'] for (rw, arm), reps in c.reports.items() if rw == row for r in reps.values()}
+        n = sum(len(reps) for (rw, arm), reps in c.reports.items() if rw == row)
         e = cert.get(row)
         if e and M0.complete(e) and e['report'].get('certification'):
             k = e['report']['certification']
@@ -267,10 +266,7 @@ def digest_table(c, certify, certified, passes, out):
                    f"{f'{len(adm)} / {len(g)}' if g else '—'} | {('yes' if gd == sig else 'NO') if gd else '—'} | "
                    f"{('yes' if grobx_raw[row] == sig else 'NO') if grobx_raw.get(row) else '—'} |")
     out.append('')
-    mq = [(row, sorted({r['basis_sha256'] for arm in ('cm:16', 'zcm:16') for r in c.reports[(row, arm)].values()}))
-          for row in MQ10]
-    out.append('MQ10 `m29_cost_model` digests (final and freeze, a different digest format from `sig_f4_study`): '
-               + '; '.join(f"{row}: {', '.join(d[:8] for d in ds)}" for row, ds in mq) + '\n')
+    out.append('MQ10\'s `m29_cost_model` arms (final and freeze) print the same digest format and are included.\n')
 
 
 def comparand_table(c, certified, passes, windows, out):
@@ -315,7 +311,9 @@ def comparand_table(c, certified, passes, windows, out):
             line(row, label, 1, v, rs, f'{len(v)} of {len(att)}')
         g = [r for r in certified if r['row'] == row]
         v = [r['process_wall_ns'] / 1e6 for r in g if (r.get('certified') or {}).get('admitted')]
-        line(row, 'grobx (certified)', 1, v, [], f'{len(v)} of {len(g)}')
+        rs = [r['certified']['kernel_peak_rss_bytes'] / 2**20 for r in g
+              if (r.get('certified') or {}).get('kernel_peak_rss_bytes')]
+        line(row, 'grobx (certified)', 1, v, rs, f'{len(v)} of {len(g)}')
     for win in windows:
         groups, rss_groups = {}, {}
         for a in win['attempts']:
