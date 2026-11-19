@@ -118,7 +118,8 @@ def certified_summary(context, row, report):
         return dict(admitted=False, error=str(error))
     return dict(admitted=True, elements=len(basis),
                 basis_text_sha256=hashlib.sha256('\n'.join(sorted(basis)).encode()).hexdigest(),
-                solve_ns=report.get('solve_ns'), rss_cap_gib=CERTIFIED_GIB.get(row, 8))
+                solve_ns=report.get('solve_ns'), kernel_peak_rss_bytes=report.get('kernel_peak_rss_bytes'),
+                rss_cap_gib=CERTIFIED_GIB.get(row, 8))
 
 
 def main():
