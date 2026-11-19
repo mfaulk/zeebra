@@ -250,6 +250,13 @@ salvage usable commits rather than silently dropping them.
 Both `release` forms refuse if another agent holds the claim, because both touch
 state there is only one of.
 
+**Test locally before opening the PR; PR CI is a backstop.** PR CI runs only the
+debug tests, doctests, lint and MSRV. The optimized tests, research-artifact
+sets and benchmark smoke run nightly (#924). Run whichever of those your change
+can break first, as listed in `docs/guide/development.md` under *Before opening a
+PR*, and name what you ran in the PR body. A red nightly opens a `Nightly CI
+failed` issue; whoever picks it up fixes or bisects it.
+
 **A green check is not a green merge.** CI tests your branch merged into `main`
 *as of when the run was queued*, and nothing re-runs when `main` moves — which is
 how #311 and #324 were each green and the merge of both a panic, with no textual
