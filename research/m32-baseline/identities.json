@@ -1,0 +1,120 @@
+{
+ "build": "git archive of each commit; cargo build --release --locked --features research-sigf4; fat LTO, codegen-units=1 (Cargo.toml), x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\", CARGO_INCREMENTAL=0; private CARGO_TARGET_DIR under /buildcache/cargo-target/zeebra-939",
+ "comparands": {
+  "reused_from": "research/m30-baseline/identities.json",
+  "sha256": "4cf654bfc4a184f1fc1bb5dc1ea096f59abb2f56e39fbe359f3a294ac1f0113e"
+ },
+ "executables": {
+  "base": {
+   "m29_cost_model": {
+    "bytes": 5156552,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/base/m29_cost_model",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/base/m29_cost_model",
+    "sha256": "b9c4ae822221501ee62afa948e9b742b98ac1972dff652643b0b82922dffc358"
+   },
+   "sig_f4_study": {
+    "bytes": 8776936,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/base/sig_f4_study",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/base/sig_f4_study",
+    "sha256": "2048b344ccf3463943d0d7369b4a51244d2abbb0388bef2fe55432ef7408968f"
+   },
+   "wide_corpus": {
+    "bytes": 34831368,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/base/wide_corpus",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/base/wide_corpus",
+    "sha256": "75ad7d5d36b4f0ba580e6452637ce9da26253fd3aaa1d3c0348f9117060582a9"
+   },
+   "zeebra_driver": {
+    "bytes": 25897616,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/base/zeebra_driver",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/base/zeebra_driver",
+    "sha256": "e824462a5dc408c78e1b7905b35e6ef81dcf2f0bc4288fa8294eaf612b0fdc46"
+   }
+  },
+  "pin": {
+   "sig_f4_study": {
+    "bytes": 10728632,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/pin/sig_f4_study",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/pin/sig_f4_study",
+    "sha256": "26b25335db554ab8b0d720a0e48a178c460306e779411fbb992ad85bffd471a3"
+   }
+  },
+  "ref": {
+   "m29_cost_model": {
+    "bytes": 5156552,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/ref/m29_cost_model",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/ref/m29_cost_model",
+    "sha256": "04488cbc717b66814ca5e57f952cd77405480c51c812bbd58d91682eab66f5fd"
+   },
+   "sig_f4_study": {
+    "bytes": 8776936,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/ref/sig_f4_study",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/ref/sig_f4_study",
+    "sha256": "90f3577954cd88d8ebf12c1f8f5a31bb0d9233b142821959cbb99c21c308f4ee"
+   },
+   "wide_corpus": {
+    "bytes": 34831368,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/ref/wide_corpus",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/ref/wide_corpus",
+    "sha256": "75ad7d5d36b4f0ba580e6452637ce9da26253fd3aaa1d3c0348f9117060582a9"
+   },
+   "zeebra_driver": {
+    "bytes": 25897616,
+    "path": "/buildcache/cargo-target/zeebra-939/bin/ref/zeebra_driver",
+    "present": true,
+    "resolved": "/buildcache/cargo-target/zeebra-939/bin/ref/zeebra_driver",
+    "sha256": "e824462a5dc408c78e1b7905b35e6ef81dcf2f0bc4288fa8294eaf612b0fdc46"
+   }
+  }
+ },
+ "fields": {
+  "gf32003": "Zp32003",
+  "goldilocks": "PrimeFieldElement64<2^64-2^32+1>",
+  "m31": "Zp2147483647",
+  "wide64": "PrimeFieldElement64<2^64-353>"
+ },
+ "freeze": {
+  "baseline": {
+   "commit": "7b25a1ee56c348fb68fd5671a94fe19d1e6aafec",
+   "what": "M32 baseline main (#943); timed src/ equals e59a90a1 and differs from the reference only in documentation (identities.json)"
+  },
+  "reference": {
+   "commit": "8715c8edb5ed5ab17e9d71331c48e07cb87b7754",
+   "what": "M31 final main (#926)"
+  }
+ },
+ "host": {
+  "boost": "1",
+  "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores",
+  "governor": "performance",
+  "kernel": "7.3.3-200.fc44.x86_64",
+  "machine": "5995wx"
+ },
+ "options": {
+  "entry": "grobner::f4_signature under the same options, pre-solve dispatch included",
+  "f4": "F4Options::default() with parallel_forward and parallel_symbolic Serial at 1 worker, Auto { max_workers: w } otherwise (sig_f4_study::f4_options)",
+  "placement": "taskset CPUs 8..8+w-1 inside bench-reserve CCDs 1-2",
+  "rss_cap_kib": 8388608,
+  "wall_cap_s": 180
+ },
+ "pin_build": {
+  "commit": "f26b8d80097fb269a63e7937638033edd5917b02",
+  "what": "baseline + #939 held-out inputs in examples/sig_f4_study.rs; used only for the admission read"
+ },
+ "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
+ "schema": 1,
+ "timed_diffs": {
+  "baseline..pin": "examples/sig_f4_study.rs | 111 ++++++++++++++++++++++++++++++++++++++++++++---\n 1 file changed, 104 insertions(+), 7 deletions(-)",
+  "e59a90a1..baseline": "identical",
+  "reference..baseline": "src/grobner/sigf4/dispatch.rs | 7 +++++++\n src/lib.rs                    | 1 +\n 2 files changed, 8 insertions(+)",
+  "reference..baseline code lines (not // or #[doc])": []
+ }
+}
