@@ -177,12 +177,19 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     };
     #[cfg(feature = "research-sigf4-usage")]
     {
-        let clock = Instant::now();
-        let minimal = minimal_basis_for_interreduction(basis.clone(), order);
+        // Best of three, the clone outside the clock: the selection alone, as interreduction
+        // runs it on the whole signature basis.
+        let (mut best, mut kept) = (Duration::MAX, 0);
+        for _ in 0..3 {
+            let copy = basis.clone();
+            let clock = Instant::now();
+            kept = minimal_basis_for_interreduction(copy, order).len();
+            best = best.min(clock.elapsed());
+        }
         let usage = std::mem::take(&mut engine.usage);
         engine.stats.usage = usage.finish(engine.inputs.len());
-        engine.stats.usage.minimal_selection = clock.elapsed();
-        engine.stats.usage.minimal_elements = minimal.len();
+        engine.stats.usage.minimal_selection = best;
+        engine.stats.usage.minimal_elements = kept;
     }
     engine.stats.signature_basis_elements = engine.basis.len();
     engine.stats.syzygy_signatures = engine.syzygies.len();
