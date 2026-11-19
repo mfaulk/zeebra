@@ -1,9 +1,14 @@
 # M32-S1a: parallel signature-aware symbolic preprocessing — design, correctness and ceiling (#933)
 
-**Status:** design selected and argued (§2, §3) before any implementation; replay ceiling §4;
-attribution §5. Gate P reading §6.
-**Measured at:** `7b25a1ee` (the M32 F0 baseline) plus the replay instrument on this branch,
-built from `git archive` into private target directories; exploratory n = 5, labelled as such.
+**Status:** design selected and argued (§2, §3) before any implementation, 2026-11-19. Replay
+ceiling (§4): Eco-12 symbolic 2.95× at 16 workers, projected wall 0.79× the M31 reference.
+**Gate P passes** (§6). Attribution split by cause is incomplete (§5): it needs #939's frequency
+record.
+**Measured at:** `8694d172` — the M32 F0 baseline `7b25a1ee` plus this branch's replay instrument
+(no change to the engine's algebra or its serial closure; tagged `measured/933-symbolic-replay`).
+Built from `git archive` into a private target directory, release, fat LTO, `x86-64-v3`; SHA-256 in
+[`research/m32-symbolic-replay/binaries.sha256`](../../research/m32-symbolic-replay/binaries.sha256).
+Exploratory: n = 5 fresh processes per cell, one benchlock session (CPUs 8–23, CCDs 1–2 reserved).
 **Plan:** [`MILESTONE-ADAPTIVE-F4.md`](../MILESTONE-ADAPTIVE-F4.md) §4.1 H1–H3, §7.2, §8.2 Gate
 P, §9.2, §11 (Track A). M31 evidence: [`m31-sigf4-serial.md`](m31-sigf4-serial.md) §3
 (change 3: the symbolic leg stayed 1.0×), [`m31-sigf4-parallel.md`](m31-sigf4-parallel.md),
@@ -155,12 +160,101 @@ Remaining for #940 to **implement and test** (each specified here, none changes 
 
 ## 4. Ceiling from replayed batches (deliverable 5)
 
-PENDING (filled from the replay).
+**Instrument.** `sigf4::symbolic_replay` (feature `research-sigf4-replay`; with its engine hook and `sig_f4_study` flags, 595 net non-test lines, under the 600-line cap) runs
+§2's design on every batch beside the engine's serial closure, on the same targets and basis and a
+clone of the reducer cache as the batch found it, at 1/4/8/16 workers, three runs each (the
+median-time run kept), plus a serial census pass. Every run is **asserted equal** to the serial
+closure — columns, rows in order, handles and the cache afterwards — so the replay is also the
+per-batch oracle of §3.1 T1 on real batches. Its sort is serial (the design's is parallel; the
+"parallel sort" column divides the measured sort by the worker count). Team start-up is on the
+clock; the cache clone is not. A level narrower than 512 items (#861's `MIN_FRONTIER`) is scanned
+by the caller alone.
+
+```sh
+sig_f4_study --field wide64 --name eco-12 --engine sigf4 --workers 16 --claim --symbolic-replay
+research/m32-symbolic-replay/replay.sh <binary> <out.jsonl> 5      # the session below
+python3 research/m32-symbolic-replay/summarize.py research/m32-symbolic-replay/replay.jsonl.gz
+```
+
+The engine ran at 16 workers with the parallel cascade (the M31 reference's configuration) and,
+as a control, at one worker (design 1). `S_w` = the engine's own closure ÷ the prototype at `w`
+workers, per process, summed over batches; median over 5 processes, range in brackets.
+
+| Row | Engine w | Engine closure ms | S1 | S4 | S8 | S16 [range] | S16, parallel sort |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 | 16 | 540.2 | 1.05 | 2.14 | 2.70 | **2.95** [2.91, 3.06] | 3.32 |
+| | 1 | 472.6 | 0.96 | 1.91 | 2.37 | 2.58 [2.55, 2.68] | 2.92 |
+| MQ10 / 32003 | 16 | 236.5 | 1.07 | 1.84 | 2.10 | 1.99 [1.93, 2.00] | 2.32 |
+| | 1 | 222.0 | 1.01 | 1.72 | 1.97 | 1.84 [1.78, 1.90] | 2.15 |
+
+Prototype phases, engine at 16 workers (medians, ms):
+
+| Row | w | Total | Scan | Merge | Sort |
+|---|---:|---:|---:|---:|---:|
+| Eco-12 | 1 | 512.8 | 475.8 | 16.9 | 21.0 |
+| | 16 | 183.1 | 120.9 | 29.5 | 22.2 |
+| MQ10 | 1 | 221.7 | 189.9 | 14.6 | 16.4 |
+| | 16 | 119.5 | 55.9 | 23.7 | 18.3 |
+
+Reading:
+
+- **Eco-12 has the width.** 29 batches, 181 levels, 79,834 rows over 100,702 columns; 63 levels are
+  ≥ 512 items wide and hold 89% of all items. The scan scales 3.9× at 16 workers.
+- **MQ10 does not.** 65 batches, 332 levels; the wide levels hold 74% of items, and from 8 to 16
+  workers the merge's growth outweighs the scan's gain (S8 2.10, S16 1.99).
+- **The serial remainder is the merge and the sort.** The merge grows with the worker count
+  (Eco-12 16.9 → 29.5 ms): more slices means more monomials new to several slices, each re-probed
+  in the merge. The sort is ~21 ms whatever the worker count. Together they are 28% of the 16-worker
+  prototype on Eco-12, which is where #940's remaining headroom is (parallel sort; #861's sharded
+  merge if needed).
+- **Warm-run bias.** The prototype runs straight after the engine's closure on the same batch, so
+  its caches are warmer; S1 = 1.05 in the 16-worker context is that bias (≈ 5%). Divided out
+  (`S16 / S1`), Eco-12 is still 2.81×. These are ceilings, as the plan says: #940 measures the real
+  thing through `f4_signature`.
 
 ## 5. Attribution and per-row cost (deliverables 1–2)
 
-PENDING.
+**The growth with workers is not symbolic work (H2's premise).** The closure is a deterministic
+function of the batch (§3), and every replay process saw the same 29 Eco-12 batches with the same
+100,702 columns and 79,834 rows, and the same basis digest, at 1 and 16 engine workers. Yet the
+engine's own closure took 472.6 ms beside design 1 and 540.2 ms beside the 16-worker cascade
+(+14%; unrecorded runs in the same processes: 446–485 against 539–542 ms), reproducing M31's
+466 → 552 ms. The prototype at one worker, run on the same batches immediately afterwards, grew only
+~4.5% (≈ 492 → 514 ms). What differs is what ran just before the closure: the parallel elimination.
+That is consistent with the post-burst clock (this host holds all-core boost, ~12% below single-core,
+for 200–500 ms after a multicore burst) and with caches evicted by the team; it does not separate the
+two, nor allocator effects.
+
+**Open (needs #939):** the split of the +68 ms between CPU frequency, cache and allocator. That
+requires the frequency record and the component split #939 is producing; this note does not claim
+it. A scheduling-only change (parking or not waking the team) is therefore not proposed here.
+
+**H3 is falsified: reducer search is not the cost.** The census pass times the least-ratio lookup
+(cache read and scan of the elements added since) separately: **2.3–2.6%** of the Eco-12 closure and
+**5.6–6.0%** of MQ10's, far under H3's 30%. The lookups scanned 22.1 M basis elements on Eco-12
+(13,621 cache misses, 65,457 stale entries, 21,624 current), mostly rejected by the 8-byte mask. The
+closure's cost is shifting and interning terms — one hash probe of `seen` per shifted term — which is
+exactly what the design parallelizes. No divisibility index belongs in #940.
+
+**Per-row cost against conventional F4 (deliverable 2): partly open.** The signature closure costs
+6.8 µs per row on Eco-12 and 3.0 µs on MQ10 (engine closure ÷ rows, 16-worker context). The
+comparison with conventional F4's serial closure on the same inputs needs conventional symbolic stage
+clocks at `7b25a1ee`, which #939's baseline cohort records; until then the only figure is M30's
+92.6 ms serial on MQ10 / 32003 against this engine's 198–222 ms, at different commits. Since the
+reducer search is a few percent, whatever gap remains is in interning volume (rows × terms), not in
+the signature-aware choice.
 
 ## 6. Gate P
 
-PENDING.
+| Criterion | Evidence | Result |
+|---|---|---|
+| Correctness argument with no load-bearing open obligation | §3: O1–O7 discharged; T1–T6 are tests and safe points for #940, none changes the argument; the replay asserted equality on every Eco-12 and MQ10 batch at 1/4/8/16 workers (5 processes × 2 contexts × 13 runs) | **met** |
+| Projected Eco-12 symbolic ≥ 2.0× at 16 w, from replayed batches | S16 = 2.95 [2.91, 3.06] in the reference's context; 2.81 with the warm-run bias divided out; 2.58 in design 1's context | **met** |
+| Projected Eco-12 wall ≤ 0.88× M31 reference | 1,752 − 552 + 552 / 2.95 = 1,387 ms → **0.792**; with S16 = 2.58: 1,414 ms → 0.807 | **met** |
+
+Additive Amdahl from the M31 reference's medians, as plan §6.3 does; `8715c8ed..7b25a1ee` changed no
+measured path (`src/grobner/`, `src/poly/`), so the reference and this baseline run the same code.
+MQ10 at 16 workers projects to S16 ≈ 2.0 (symbolic 232 → ~116 ms, wall ~264 ms), short of the 2.2×
+plan §6.3 needs for T3 by S1 alone: **MQ10 still needs routing (#927).**
+
+**Gate P passes; #940 is unblocked.**

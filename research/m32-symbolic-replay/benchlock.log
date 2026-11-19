@@ -1,0 +1,3 @@
+2026-11-19T09:20:23-05:00  QUEUED   zb-933          pid=3136981  systemd-run --user --scope --quiet --collect --slice=zbbench.slice -p AllowedCPUs=8-23 -- tasks
+2026-11-19T09:22:22-05:00  START    zb-933          pid=3136981  waited=119s load=3.04 lock=ccd:1,2 cpus=8-23 systemd-run --user --scope --quiet --collect --sli
+2026-11-19T09:24:17-05:00  END      zb-933          pid=3136981  status=0 end=exited elapsed=115s load=3.74 systemd-run --user --scope --quiet --collect --slice
