@@ -172,6 +172,22 @@ def symbolic_split(split, c, out):
     out.append('')
 
 
+def ab(c, out):
+    out.append('## Split build against the instrument build (same source, feature off; paired, median [95%])\n')
+    out.append('`d1`/`cl` run the instrument build, `sd1`/`scl` the split build, interleaved in one session.\n')
+    out.append('| row | workers | symbolic ms, instrument | symbolic ms, split | split ÷ instrument, symbolic | '
+               'split ÷ instrument, process wall |')
+    out.append('|---|---:|---:|---:|---:|---:|')
+    for row in c.rows:
+        for plain, split in (('d1:1', 'sd1:1'), ('cl:16', 'scl:16')):
+            if reports(c, row, plain) and reports(c, row, split):
+                symbolic = c.ratio(row, split, plain, lambda r: r['statistics']['symbolic_ns'])
+                out.append(f"| {row} | {plain.split(':')[1]} | {stat(c, row, plain, 'symbolic_ns') * 1e3:,.0f} | "
+                           f"{stat(c, row, split, 'symbolic_ns') * 1e3:,.0f} | {fmt(symbolic)} | "
+                           f"{fmt(c.ratio(row, split, plain))} |")
+    out.append('')
+
+
 def split_records(split, row, arm):
     return split.raw.get((row, arm), [])
 
@@ -318,6 +334,9 @@ def main(argv):
         symbolic_split(split, c if c.rows else None, out)
     if c.rows:
         ceilings(c, out)
+    ab_cohort = cohort(directory, 'ab')
+    if ab_cohort.rows:
+        ab(ab_cohort, out)
     small_records = M1.load(directory, 'small')
     if small_records:
         small(small_records, out)
