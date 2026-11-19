@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 SETS=(default delayed-reduction comparand-replay research-work research-multirow research-sigf4
-    research-sigf4-replay research-sigf4-split)
+    research-sigf4-replay research-sigf4-split research-sigf4-usage)
 
 usage() {
     printf 'usage: %s --sets | <set>\nsets: %s\n' "$0" "${SETS[*]}" >&2
@@ -130,6 +130,10 @@ case "$1" in
     research-sigf4-split)
         cargo test --features research-sigf4-split --lib grobner::sigf4
         cargo test --features research-sigf4-split --example sig_f4_study
+        ;;
+    research-sigf4-usage)
+        cargo test --features research-sigf4-usage --lib grobner::sigf4::usage
+        cargo test --features research-sigf4-usage --example sig_f4_study
         ;;
     *)
         set +x
