@@ -139,10 +139,11 @@ struct State<const N: usize> {
 /// What one slice of a level produced.
 #[derive(Default)]
 struct Slice<const N: usize> {
-    /// Each row with the end of its refs.
-    rows: Vec<(Row<N>, usize)>,
-    /// A handle known before the step, or `LOCAL | local id`.
-    refs: Vec<u32>,
+    /// Each row with its handles: one known before the step, or `LOCAL | local id`. The merge
+    /// translates them in place, so a row's handles are allocated once.
+    rows: Vec<(Row<N>, Vec<u32>)>,
+    /// Handles across `rows`.
+    refs: usize,
     new: Vec<Monomial<N>>,
     local: MonomialMap<N, u32>,
     updates: Vec<(Monomial<N>, (u32, u32))>,
@@ -151,8 +152,8 @@ struct Slice<const N: usize> {
 impl<const N: usize> Slice<N> {
     fn bytes(&self) -> usize {
         let mono = size_of::<Monomial<N>>();
-        self.rows.capacity() * size_of::<(Row<N>, usize)>()
-            + self.refs.capacity() * 4
+        self.rows.capacity() * size_of::<(Row<N>, Vec<u32>)>()
+            + self.refs * 4
             + self.new.capacity() * mono
             + self.local.capacity() * (mono + 5)
             + self.updates.capacity() * (mono + 8)
@@ -277,7 +278,7 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
     /// One slice of a level, against the frozen state.
     fn scan(&self, state: &State<N>, seeds: bool, items: Range<usize>, out: &mut Slice<N>) {
         out.rows.clear();
-        out.refs.clear();
+        out.refs = 0;
         out.new.clear();
         out.local.clear();
         out.updates.clear();
@@ -287,11 +288,12 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
             let Some((row, lead, terms)) = found else {
                 continue;
             };
-            out.refs.extend(lead);
+            let mut handles = Vec::with_capacity(terms.len() + usize::from(lead.is_some()));
+            handles.extend(lead);
             let (local, new) = (&mut out.local, &mut out.new);
             for (tm, _) in terms {
                 let s = *tm * row.mult;
-                out.refs.push(match state.seen.get(&s) {
+                handles.push(match state.seen.get(&s) {
                     Some(&h) => h,
                     None => {
                         let next = new.len() as u32;
@@ -303,7 +305,8 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
                     }
                 });
             }
-            out.rows.push((row, out.refs.len()));
+            out.refs += handles.len();
+            out.rows.push((row, handles));
         }
     }
 
@@ -330,17 +333,15 @@ impl<const N: usize, F: FiniteField> Closure<'_, N, F> {
         if !seeds {
             out.reducers += slice.rows.len();
         }
-        out.refs += slice.refs.len();
-        let mut start = 0;
-        for (row, end) in slice.rows.drain(..) {
-            let resolve = |&r: &u32| match r & LOCAL {
-                0 => r,
-                _ => translate[(r & !LOCAL) as usize],
-            };
-            out.handles
-                .push(slice.refs[start..end].iter().map(resolve).collect());
+        out.refs += slice.refs;
+        for (row, mut handles) in slice.rows.drain(..) {
+            for h in &mut handles {
+                if *h & LOCAL != 0 {
+                    *h = translate[(*h & !LOCAL) as usize];
+                }
+            }
+            out.handles.push(handles);
             out.rows.push(row);
-            start = end;
         }
         cache.extend(slice.updates.drain(..));
     }
