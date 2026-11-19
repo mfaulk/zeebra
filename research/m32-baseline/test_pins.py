@@ -63,5 +63,29 @@ class PinTest(unittest.TestCase):
         self.assertTrue(all(a == ['f4:16'] for _, a in campaign.SUITES['admission']))
 
 
+class CampaignTest(unittest.TestCase):
+    BINS = dict(sig=Path('B'), ref=Path('R'), split=Path('S'))
+
+    def test_walls_cover_every_development_row(self):
+        """The walls suite runs every pinned development row, each with all twenty arms."""
+        dev = [f"{r['field']}/{r['name']}" for r in json.loads((HERE / 'pins.json').read_text())['development']]
+        self.assertEqual(sorted(r for r, _ in campaign.SUITES['walls']), sorted(dev))
+        self.assertTrue(all(len(a) == 20 for _, a in campaign.SUITES['walls']))
+
+    def test_prefixes_pick_the_build(self):
+        """`r` arms run the reference build, `s` arms the split build, unprefixed arms the suite's own."""
+        self.assertEqual(campaign.command(self.BINS, 'wide64/eco-12', 'ren:16')[1][:1], ['R'])
+        self.assertEqual(campaign.command(self.BINS, 'wide64/eco-12', 'scl:8')[1][0], 'S')
+        argv = campaign.command(self.BINS, 'wide64/eco-12', 'cl:8')[1]
+        self.assertEqual((argv[0], argv[-1], argv[argv.index('--engine') + 1]), ('B', '--claim', 'sigf4'))
+        self.assertEqual(campaign.command(self.BINS, 'wide64/eco-12', 'en:1')[1][6], 'entry')
+
+    def test_small_controls_repeat_the_call(self):
+        """The #934 suite appends `--repeat` to every child and runs at least 31 processes per cell."""
+        argv = campaign.command(self.BINS, 'wide64/katsura-4', 'en:16', campaign.EXTRA['small'])[1]
+        self.assertEqual(argv[-2:], ['--repeat', '21'])
+        self.assertGreaterEqual(campaign.REPS['small'], 31)
+
+
 if __name__ == '__main__':
     unittest.main()
