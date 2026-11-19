@@ -21,7 +21,7 @@ use crate::{
     grobner::{
         buchberger::{minimal_basis_for_interreduction, reduce_grobner_basis_until},
         f4::{
-            certify_f4_output,
+            certify_f4_output_with_workers, certify_f4_output_within,
             interreduce::{
                 interreduce_by_matrix_with, MatrixInterreductionAborted,
                 MatrixInterreductionMethod, MatrixInterreductionReport,
@@ -101,14 +101,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     let started = Instant::now();
     #[cfg(feature = "research-sigf4-split")]
     let inputs_clock = Instant::now();
-    if !matches!(
-        order,
-        MonomialOrder::GradedReverseLexicographic | MonomialOrder::GradedLexicographic
-    ) {
-        return Err(SigF4Error::Unsupported {
-            reason: "the signature engine supports graded orders only (RFC §7)",
-        });
-    }
+    graded(order)?;
 
     let mut inputs: Vec<Vec<(Monomial<N>, F)>> = Vec::new();
     for p in generators.iter().filter(|p| !p.is_zero()) {
@@ -205,13 +198,32 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     stats.reduced_basis_elements = reduced.len();
 
     if options.certify {
-        let report = certify_f4_output(generators, &reduced, order);
+        // As the shipping F4 certifies (#909, #912): on the engine's workers, under the
+        // certificate's own budget when one is set, and a stop is never a rejection.
+        let workers = options.workers.max(1);
+        let report = match options.max_certify_time {
+            None => certify_f4_output_with_workers(generators, &reduced, order, workers),
+            Some(budget) => certify_f4_output_within(generators, &reduced, order, workers, budget)
+                .map_err(|progress| {
+                    SigF4Error::Budget(F4Error::CertificationTimeBudgetExceeded { progress })
+                })?,
+        };
         if let Some(reason) = report.first_failure() {
             return Err(SigF4Error::Budget(F4Error::CertificationFailed { reason }));
         }
     }
     stats.total = started.elapsed();
     Ok(reduced)
+}
+
+/// Lex, `Weighted` and `Block` are refused (plan §9.3): the engine's batches are degrees.
+pub(super) fn graded(order: MonomialOrder) -> Result<(), SigF4Error> {
+    match order {
+        MonomialOrder::GradedReverseLexicographic | MonomialOrder::GradedLexicographic => Ok(()),
+        _ => Err(SigF4Error::Unsupported {
+            reason: "the signature engine supports graded orders only (RFC §7)",
+        }),
+    }
 }
 
 /// The shipping F4's final stage: minimal basis, then matrix interreduction with the division

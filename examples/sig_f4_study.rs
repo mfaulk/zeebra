@@ -2,8 +2,13 @@
 //! row; process wall belongs to the caller (`research/m30-sigf4/run.py`).
 //!
 //! cargo run --release --features research-sigf4 --example sig_f4_study -- \
-//!     --field wide64 --name eco-12 --engine sigf4|f4 [--workers 16] [--wall-s 600] [--certify]
-//!     [--claim]
+//!     --field wide64 --name eco-12 --engine sigf4|f4|entry [--workers 16] [--wall-s 600]
+//!     [--certify] [--claim]
+//!
+//! `--engine entry` runs the supported opt-in entry point, `grobner::f4_signature` with its
+//! pre-solve dispatch (#905), under the same options as the `f4` arm; it reports the route taken.
+//! `--field gf32003|m31` takes MQ10 (`--name mq-random-10`) from the published ladder, as
+//! `m29_cost_model` does.
 //!
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
@@ -19,11 +24,12 @@
 //! quantity (`docs/research/m31-parallel-signature-elimination.md`).
 use std::time::{Duration, Instant};
 use zeebra::{
-    fields::PrimeFieldElement64,
+    fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
-        certify_f4_output,
+        certify_f4_output_with_workers,
         differential::polynomial_to_string,
-        f4_reported,
+        external::corpus,
+        f4_reported, f4_signature_reported,
         sigf4::{sig_f4_reported, SigF4Options, SigF4Statistics},
         F4Options, ParallelForward, ParallelSymbolic,
     },
@@ -84,11 +90,11 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             other => return Err(format!("unexpected argument {other}")),
         }
     }
-    if !["goldilocks", "wide64"].contains(&parsed.field.as_str()) {
-        return Err("--field must be goldilocks or wide64".into());
+    if !["goldilocks", "wide64", "gf32003", "m31"].contains(&parsed.field.as_str()) {
+        return Err("--field must be goldilocks, wide64, gf32003 or m31".into());
     }
-    if !["sigf4", "f4"].contains(&parsed.engine.as_str()) {
-        return Err("--engine must be sigf4 or f4".into());
+    if !["sigf4", "f4", "entry"].contains(&parsed.engine.as_str()) {
+        return Err("--engine must be sigf4, f4 or entry".into());
     }
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
@@ -128,6 +134,26 @@ struct Input {
     digest: String,
     variables: Vec<String>,
     generators: Vec<String>,
+}
+
+/// MQ10 at the two M29 primes, from the published ladder under its pinned digest.
+fn ladder(field: &str, name: &str) -> Input {
+    let modulus = if field == "gf32003" {
+        32003
+    } else {
+        2147483647
+    };
+    let input = corpus::instance(name, modulus, ORDER).expect("published ladder entry");
+    let entry = corpus::ladder().into_iter().find(|e| e.name == input.name);
+    assert_eq!(
+        entry.and_then(|e| e.digest_at(modulus).map(str::to_string)),
+        Some(input.digest())
+    );
+    Input {
+        digest: input.digest(),
+        variables: input.variables.clone(),
+        generators: input.system.clone(),
+    }
 }
 
 /// A frozen #738 row, refused unless its canonical text still hashes to its digest.
@@ -440,7 +466,20 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         panic!("--replay requires --features research-sigf4-replay");
     }
     let started = Instant::now();
-    let (result, statistics, work) = if args.engine == "sigf4" {
+    let (result, statistics, work) = if args.engine == "entry" {
+        let (result, report) = f4_signature_reported(&system, ORDER, &f4_options(args));
+        let summary = Json::object([
+            ("route", Json::string(format!("{:?}", report.route))),
+            ("dispatch_ns", Json::nanos(report.dispatch)),
+            ("variables", Json::size(report.features.variables)),
+            (
+                "min_nonlinear_degree",
+                Json::int(report.features.min_nonlinear_degree),
+            ),
+            ("max_degree", Json::int(report.features.max_degree)),
+        ]);
+        (result.map_err(|e| e.to_string()), summary, Json::Null)
+    } else if args.engine == "sigf4" {
         let options = SigF4Options {
             max_wall_time: Some(args.wall),
             workers: args.workers,
@@ -495,9 +534,11 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let certification = match (&result, args.certify) {
         (Ok(basis), true) => {
             let clock = Instant::now();
-            let report = certify_f4_output(&system, basis, ORDER);
+            // On the run's workers: serially, Eco-12's certificate outran its 600 s budget (#887).
+            let report = certify_f4_output_with_workers(&system, basis, ORDER, args.workers);
             Json::object([
                 ("checks_passed", Json::Bool(report.checks_passed())),
+                ("complete", Json::Bool(report.is_complete())),
                 ("ns", Json::nanos(clock.elapsed())),
             ])
         }
@@ -536,13 +577,19 @@ fn main() {
     let started = Instant::now();
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let args = parse_args(&raw).unwrap_or_else(|e| panic!("{e}"));
-    let input = wide(&args.field, &args.name);
+    let input = if ["gf32003", "m31"].contains(&args.field.as_str()) {
+        ladder(&args.field, &args.name)
+    } else {
+        wide(&args.field, &args.name)
+    };
     let n = input.variables.len();
     let mut report = match (args.field.as_str(), n) {
         ("goldilocks", 4) => run::<4, Goldilocks>(input, &args),
         ("goldilocks", 7) => run::<7, Goldilocks>(input, &args),
         ("goldilocks", 11) => run::<11, Goldilocks>(input, &args),
         ("goldilocks", 12) => run::<12, Goldilocks>(input, &args),
+        ("gf32003", 10) => run::<10, Zp32003>(input, &args),
+        ("m31", 10) => run::<10, Zp2147483647>(input, &args),
         ("wide64", 8) => run::<8, Wide>(input, &args),
         ("wide64", 9) => run::<9, Wide>(input, &args),
         ("wide64", 14) => run::<14, Wide>(input, &args),
@@ -578,6 +625,16 @@ mod tests {
         assert!(args(&[&base[..], &["f4", "--workers", "16", "--discovery"]].concat()).is_err());
         assert!(args(&[&base[..], &["magma"]].concat()).is_err());
         assert!(args(&["--field", "bn254", "--name", "eco-12", "--engine", "f4"]).is_err());
+        assert!(args(&[&base[..], &["entry", "--workers", "16"]].concat()).is_ok());
+        assert!(args(&[
+            "--field",
+            "m31",
+            "--name",
+            "mq-random-10",
+            "--engine",
+            "entry"
+        ])
+        .is_ok());
     }
 
     // The replay runs both signature designs, so it needs the signature engine and two workers.

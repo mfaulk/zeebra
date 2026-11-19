@@ -90,7 +90,7 @@ Every Rust example in this file and in [`docs/guide/`](docs/guide) is compiled a
 | Linear algebra: dense and sparse matrices, echelon backends, bit-packed GF(2) with Four Russians | [`linear-algebra.md`](docs/guide/linear-algebra.md) |
 | NTT and fast univariate arithmetic, root finding | [`ntt.md`](docs/guide/ntt.md) |
 | Gröbner bases: Buchberger, monomial orders, FGLM conversion | [`grobner-bases.md`](docs/guide/grobner-bases.md) |
-| F4, its resource budgets, and Hilbert functions | [`f4.md`](docs/guide/f4.md) |
+| F4, its resource budgets, the opt-in signature F4 (`f4_signature`), and Hilbert functions | [`f4.md`](docs/guide/f4.md) |
 | Solving zero-dimensional systems, and route selection | [`solving-systems.md`](docs/guide/solving-systems.md) |
 | Integers, perfect powers, Lenstra's elliptic curve method | [`number-theory.md`](docs/guide/number-theory.md) |
 | Reed–Solomon codes over an FFT domain | [`reed-solomon.md`](docs/guide/reed-solomon.md) |
@@ -104,7 +104,7 @@ Every Rust example in this file and in [`docs/guide/`](docs/guide) is compiled a
 | `proptest` | off | `Arbitrary` implementations for the public types, for property-testing downstream code. |
 | `research-work` | off | Research counters and opt-in experiments. Shipping defaults are unaffected. |
 | `research-multirow` | off | Research-only four-row band elimination ([#715](docs/research/multirow-reuse.md)), selected per thread; single-row stays the default even when enabled. |
-| `research-sigf4` | off | Research-only signature-compatible F4 (`grobner::sigf4::sig_f4`, [#857](docs/research/m30-sigf4-prototype.md)), a separate engine for graded orders; the shipping `f4` never calls it. `SigF4Options::parallel_cascade` (`sig_f4_study --claim`) runs #904's parallel cross-target cascade, exact to design 1's rows ([results](docs/research/m31-sigf4-parallel.md)). Implies `external-runners`. |
+| `research-sigf4` | off | The signature engine's research surface (`grobner::sigf4::sig_f4`, `SigF4Options`, statistics; [#857](docs/research/m30-sigf4-prototype.md)). The engine itself compiles in every build for the opt-in `grobner::f4_signature` ([guide](docs/guide/f4.md#opt-in-signature-f4)); the shipping `f4` never calls it. `SigF4Options::parallel_cascade` (`sig_f4_study --claim`) runs #904's parallel cross-target cascade, exact to design 1's rows ([results](docs/research/m31-sigf4-parallel.md)). Implies `external-runners`. |
 | `research-sigf4-replay` | off | #902's replay of the signature engine's cross-target cascade (`grobner::sigf4::replay`, `sig_f4_study --replay`; [findings](docs/research/m31-parallel-signature-elimination.md)). Observes only. Implies `research-sigf4`. |
 | `research-sigf4-split` | off | #901's instrument on the signature engine: per-batch elimination split into reducer-block and cross-target-cascade work, and clocks on the engine's unstaged glue ([m31-baseline](docs/research/m31-baseline.md)). Never in a timed binary. Implies `research-sigf4`. |
 
