@@ -423,6 +423,11 @@ stored compactly, lazily or discarded, with a soundness argument from the publis
 and a cost model. Prototype only through Gate G. S3 never delays S1 or S2, and a justified negative
 result completes it.
 
+**Result (2026-11-19):** Gate G failed. The outgrowth is the unique minimal signature basis, and no
+element can be discarded. The exact bookkeeping options project 3.1% of Eco-12's 16-worker wall,
+and Cyclic-7's floor is 1.92× conventional F4. H5 is falsified. See
+[`m32-signature-basis-growth.md`](research/m32-signature-basis-growth.md).
+
 ### 7.5 M32-Q — production qualification (#941) and the default decision (#937)
 
 #941 qualifies the merged S1 + S2 path at freeze F2 (§8.3): correctness against conventional F4 and

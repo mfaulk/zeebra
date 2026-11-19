@@ -285,3 +285,39 @@ fn skip_covered<const N: usize>(ops: &[StoreOp<N>], indices: usize) -> (Duration
     }
     best
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        fields::Zp32003,
+        grobner::{
+            benchmark_systems::cyclic,
+            sigf4::{sig_f4_reported, SigF4Options},
+        },
+        MonomialOrder,
+    };
+
+    /// The essential elements are exactly the reduced basis, every element is accounted for, and
+    /// the query-first replay (which asserts its own answers) skips some Koszul inserts.
+    #[test]
+    fn test_usage_on_cyclic_5() {
+        let (result, stats) = sig_f4_reported(
+            &cyclic::<5, Zp32003>(),
+            MonomialOrder::GradedReverseLexicographic,
+            &SigF4Options::default(),
+        );
+        let reduced = result.expect("cyclic-5 finishes").len();
+        let u = &stats.usage;
+        assert_eq!(u.elements.len(), stats.signature_basis_elements);
+        let essential = u.elements.iter().filter(|e| e.dominated_from.is_none());
+        assert_eq!(essential.count(), reduced);
+        assert_eq!(u.minimal_elements, reduced);
+        assert_eq!(
+            u.batches.iter().map(|b| b.essential_added).sum::<usize>(),
+            reduced
+        );
+        assert_eq!(u.replay.koszul_inserts, stats.pairs_created);
+        assert!(u.replay.koszul_skippable > 0);
+        assert!(u.replay.koszul_hits_equal + u.replay.koszul_hits_lost <= u.replay.koszul_hits);
+    }
+}
