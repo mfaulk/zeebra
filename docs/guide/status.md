@@ -29,6 +29,11 @@ A running record of what Zeebra implements. The short version is in the [README]
       criteria cut coefficient work 9.7x on Eco-12, 11.7x on MQ11 and 22.8x on Katsura-11 against
       shipping F4, with identical bases. It is not faster in wall time on Eco-12 at 16 workers and
       does not ship ([#857](../research/m30-sigf4-prototype.md); M30 report §15.4)
+- [x] Opt-in signature F4, `grobner::f4_signature`, with a pre-solve dispatch to the shipping F4
+      for small inputs and spread degrees: 0.712x complete wall on Eco-12 and 0.44x on Katsura-11 and
+      MQ11 against shipping F4 at 16 workers, controls within 1.05x at 1 and 16 workers, peak RSS
+      within 1.02x, bases identical and certified; MQ10 is 1.6–1.75x slower through it (measured at
+      `5bd0db63`; [#905](../research/m31-sigf4-dispatch.md)). Shipping F4 stays the default
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] That oracle over an extension field: a differential case names a field rather than a
