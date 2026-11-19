@@ -85,8 +85,8 @@ research-multirow = []
 research-sigf4 = ["external-runners"]
 
 # #902's replay of the cross-target cascade (`sigf4::replay`): engine call sites that record each
-# batch's dependency trace when a recording is active. Separate so the plain research engine
-# compiles none of it.
+# batch's dependency trace when a recording is active; and #933's replay of the symbolic closure
+# (`sigf4::symbolic_replay`). Separate so the plain research engine compiles none of it.
 research-sigf4-replay = ["research-sigf4"]
 
 # #901's instrument: per-batch reducer-block / cross-target-cascade split of the signature engine's
