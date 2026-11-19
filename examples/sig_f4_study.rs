@@ -849,6 +849,12 @@ fn solve<const N: usize, F: FiniteField>(
                 Json::int(report.features.min_nonlinear_degree),
             ),
             ("max_degree", Json::int(report.features.max_degree)),
+            ("terms", Json::size(report.features.terms)),
+            ("monomials", Json::int(report.features.monomials)),
+            ("field_bits", Json::int(report.features.field_bits)),
+            ("max_workers", Json::size(report.features.workers)),
+            ("team", Json::size(report.workers)),
+            ("cascade", Json::string(format!("{:?}", report.cascade))),
         ]);
         (result.map_err(|e| e.to_string()), summary, Json::Null)
     } else if args.engine == "sigf4" {
