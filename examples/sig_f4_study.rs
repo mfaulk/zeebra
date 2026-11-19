@@ -475,7 +475,7 @@ mod cascade {
 #[cfg(feature = "research-sigf4-replay")]
 mod closure {
     use super::*;
-    use zeebra::grobner::sigf4::symbolic_replay::{record, SymbolicRecord, WORKERS};
+    use zeebra::grobner::sigf4::symbolic_replay::{record, SymbolicRecord};
 
     fn batch(r: &SymbolicRecord) -> Json {
         let runs = r.runs.iter().map(|run| {
@@ -501,35 +501,6 @@ mod closure {
         ])
     }
 
-    /// Per worker count: the stage sums and the speedup over the engine's own closure, as run and
-    /// with the sort's share divided by the worker count (the design's parallel sort, §2).
-    fn ceilings(records: &[SymbolicRecord]) -> Json {
-        let serial: u64 = records.iter().map(|r| r.serial_ns).sum();
-        let rows = WORKERS.iter().enumerate().map(|(k, &workers)| {
-            let sum = |f: fn(&zeebra::grobner::sigf4::symbolic_replay::Run) -> u64| {
-                records.iter().map(|r| f(&r.runs[k])).sum::<u64>()
-            };
-            let (total, sort) = (sum(|r| r.total), sum(|r| r.sort));
-            let sorted = total - sort + sort / workers as u64;
-            Json::object([
-                ("workers", Json::size(workers)),
-                ("total_ns", Json::int(total)),
-                ("scan_ns", Json::int(sum(|r| r.scan))),
-                ("merge_ns", Json::int(sum(|r| r.merge))),
-                ("sort_ns", Json::int(sort)),
-                (
-                    "speedup",
-                    Json::string(format!("{:.3}", serial as f64 / total as f64)),
-                ),
-                (
-                    "speedup_parallel_sort",
-                    Json::string(format!("{:.3}", serial as f64 / sorted as f64)),
-                ),
-            ])
-        });
-        Json::Array(rows.collect())
-    }
-
     pub(super) fn report<const N: usize, F: FiniteField>(
         system: &[MultivariatePolynomial<N, F>],
         names: &[&str; N],
@@ -551,7 +522,7 @@ mod closure {
         };
         let basis = digest_of(plain);
         assert_eq!(digest_of(recorded), basis, "recording moved the basis");
-        let census = |f: fn(&SymbolicRecord) -> u64| Json::int(records.iter().map(f).sum());
+        let census = |f: fn(&SymbolicRecord) -> u64| Json::int(records.iter().map(f).sum::<u64>());
         Json::object([
             ("field", Json::string(&args.field)),
             ("name", Json::string(&args.name)),
@@ -560,15 +531,13 @@ mod closure {
             ("claim", Json::Bool(args.claim)),
             ("min_frontier", Json::size(args.min_frontier)),
             ("basis_sha256", Json::string(basis)),
-            ("plain_symbolic_ns", Json::nanos(plain_stats.symbolic)),
+            ("plain_statistics", sig_statistics(&plain_stats)),
             ("recorded_symbolic_ns", Json::nanos(stats.symbolic)),
             ("lookup_ns", census(|r| r.census.lookup_ns)),
             ("cache_current", census(|r| r.census.cache_current)),
             ("cache_stale", census(|r| r.census.cache_stale)),
             ("cache_missing", census(|r| r.census.cache_missing)),
             ("elements_scanned", census(|r| r.census.elements_scanned)),
-            ("term_lookups", census(|r| r.census.term_lookups)),
-            ("ceilings", ceilings(&records)),
             ("batches", Json::Array(records.iter().map(batch).collect())),
         ])
     }

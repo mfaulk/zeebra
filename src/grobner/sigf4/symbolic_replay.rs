@@ -75,8 +75,6 @@ pub struct Census {
     pub cache_missing: u64,
     /// Basis elements the lookups scanned.
     pub elements_scanned: u64,
-    /// Shifted terms looked up for interning.
-    pub term_lookups: u64,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -298,7 +296,6 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
                     }
                 });
             }
-            out.census.term_lookups += terms.len() as u64;
             out.rows.push((row, out.refs.len()));
         }
     }
@@ -388,7 +385,7 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
             handles: Vec::with_capacity(self.targets.len()),
             cache: MonomialMap::default(),
         };
-        let (mut run, mut levels, mut census) = (Run::default(), Vec::new(), Census::default());
+        let (mut run, mut levels) = (Run::default(), Vec::new());
         let started = Instant::now();
         std::thread::scope(|scope| {
             for _ in 1..workers {
@@ -433,10 +430,11 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
                 let clock = Instant::now();
                 let mut shared = shared.write().expect("no merge panics");
                 for slice in &slices[..count] {
-                    let mut slice = slice.lock().expect("no scan panics");
-                    Self::merge(&mut shared, &mut slice, &mut out);
-                    accumulate(&mut census, &slice.census);
-                    slice.census = Census::default();
+                    Self::merge(
+                        &mut shared,
+                        &mut slice.lock().expect("no scan panics"),
+                        &mut out,
+                    );
                 }
                 run.merge += clock.elapsed().as_nanos() as u64;
                 (seeds, lo, hi) = (false, if seeds { 0 } else { hi }, shared.work.len());
@@ -465,17 +463,10 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
         run.sort = clock.elapsed().as_nanos() as u64;
         run.total = started.elapsed().as_nanos() as u64;
         run.workers = workers;
+        // A census pass is serial, so every level's census accumulated in slice 0.
+        let census = slices[0].lock().expect("no scan panics").census.clone();
         (out, run, levels, census)
     }
-}
-
-fn accumulate(total: &mut Census, c: &Census) {
-    total.lookup_ns += c.lookup_ns;
-    total.cache_current += c.cache_current;
-    total.cache_stale += c.cache_stale;
-    total.cache_missing += c.cache_missing;
-    total.elements_scanned += c.elements_scanned;
-    total.term_lookups += c.term_lookups;
 }
 
 impl<const N: usize, F: FiniteField> ConcurrentJob<F> for Job<'_, N, F> {
@@ -533,8 +524,8 @@ mod tests {
             assert_eq!(r.levels[0], r.targets);
             assert!(r.columns > 0 && r.rows >= r.targets);
         }
-        let lookups: u64 = records.iter().map(|r| r.census.term_lookups).sum();
-        assert!(lookups > 0);
+        let looked_up = |r: &SymbolicRecord| r.census.cache_missing + r.census.cache_stale;
+        assert!(records.iter().map(looked_up).sum::<u64>() > 0);
     }
 
     // Nothing is recorded outside `record`.
