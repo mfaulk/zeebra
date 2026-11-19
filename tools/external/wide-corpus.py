@@ -244,15 +244,30 @@ def pack(cohort, path, chunk_size=16*1024**2):
         raise ValueError('packing changed the retained campaign')
 
 
+# Engines that take a worker count (#935). groebner-rs's driver sizes a rayon pool from the request;
+# grobx's pinned driver is serial and Julia's adapter is not asked.
+MULTIWORKER = ('zeebra', 'groebner-rs')
+
+
 def cohort_engines(selected, workers):
-    """The engines a cohort runs. The comparand drivers here are only ever asked for one worker, so a
-    multiworker cohort is Zeebra's alone and is read against a serial cohort's comparand rows."""
+    """The engines a cohort runs. grobx and Julia are only ever asked for one worker, so a
+    multiworker cohort runs Zeebra and groebner-rs alone."""
     engines = ENGINES if selected is None else tuple(selected.split(','))
     if any(e not in ENGINES for e in engines):
         raise ValueError('unknown engine in ' + str(selected))
-    if workers != 1 and engines != ('zeebra',):
-        raise ValueError('only Zeebra runs a multiworker cohort')
+    if workers != 1 and any(e not in MULTIWORKER for e in engines):
+        raise ValueError('only ' + ' and '.join(MULTIWORKER) + ' run a multiworker cohort')
     return engines
+
+
+def request_workers(engine, workers):
+    return workers if engine in MULTIWORKER else 1
+
+
+def observed_threads(hot):
+    """Driver threads whose CPU ticks moved across the solve (`ZEEBRA_RESEARCH_THREAD_TICKS`): a
+    lower bound, since a thread that ran less than a tick is not seen."""
+    return sum(1 for tid, ticks in hot['after'].items() if ticks > hot['before'].get(tid, 0))
 
 
 def runner_command(binary, case, engine, workers):
@@ -387,7 +402,8 @@ def main():
     p.add_argument('--fields', default='wide64,goldilocks,bn254')
     p.add_argument('--rows', help='comma separated; default all frozen rows')
     p.add_argument('--engines', help='comma separated subset of ' + ','.join(ENGINES) + '; default all')
-    p.add_argument('--workers', type=int, default=1, help="Zeebra's F4 forward-worker cap; above 1, Zeebra only")
+    p.add_argument('--workers', type=int, default=1,
+                   help="Zeebra's F4 forward-worker cap and groebner-rs's pool size; above 1, those two only")
     p.add_argument('--continue-controller', action='store_true', help='allow an explicitly audited controller update with an identical native instrument')
     args = p.parse_args()
     if args.pack:
@@ -449,7 +465,7 @@ def main():
             stem = args.scratch / str(len(cohort['attempts']))
             direct = engine in REVISIONS
             request = dict(variables=c['variables'], modulus=int(c['modulus']), order='grevlex',
-                           workers=1, generators=c['generators'])
+                           workers=request_workers(engine, args.workers), generators=c['generators'])
             if direct:
                 if engine == 'grobx':
                     request.update(mode='raw', wall_ns=60_000_000_000, rss_bytes=2*1024**3)
@@ -466,6 +482,8 @@ def main():
                 raw = json.loads(a.pop('stdout'))
                 if direct:
                     a['raw'] = raw
+                    if raw.get('hot_thread_cpu_ticks'):
+                        a['observed_threads'] = observed_threads(raw['hot_thread_cpu_ticks'])
                     basis = validate_native(raw, request, engine)
                     a['report'] = dict(c, engine=engine, status='stopped-by-limit' if basis is None else 'complete',
                                        solver_process_wall_ns=a['process_wall_ns'], engine_wall_ns=raw.get('solve_ns'),

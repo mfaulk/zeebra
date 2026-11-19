@@ -535,6 +535,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         &mut self,
         targets: &[Row<N>],
     ) -> Result<(Vec<Monomial<N>>, Vec<Row<N>>, Vec<Vec<u32>>, usize), SigF4Error> {
+        #[cfg(feature = "research-sigf4-split")]
+        let (mut split, mut scratch) = {
+            let (cpu, khz_before) = super::SymbolicSplit::cpu_khz();
+            let split = super::SymbolicSplit {
+                cpu,
+                khz_before,
+                ..Default::default()
+            };
+            (split, Vec::new())
+        };
         let clock = Instant::now();
         let mut seen: MonomialMap<N, u32> = MonomialMap::default();
         let mut work: Vec<Monomial<N>> = Vec::new();
@@ -556,12 +566,26 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 RowSource::Input(i) => &self.inputs[i],
                 RowSource::Element(id) => &self.basis[id as usize].terms,
             };
+            #[cfg(not(feature = "research-sigf4-split"))]
             handles.push(
                 terms
                     .iter()
                     .map(|(m, _)| intern(*m * t.mult, &mut work))
                     .collect(),
             );
+            #[cfg(feature = "research-sigf4-split")]
+            {
+                let mut row = Vec::with_capacity(terms.len());
+                let products = terms.iter().map(|(m, _)| *m);
+                split.row(
+                    &mut scratch,
+                    products,
+                    t.mult,
+                    |m| intern(m, &mut work),
+                    &mut row,
+                );
+                handles.push(row);
+            }
         }
         let mut reducers = 0;
         let mut next = 0;
@@ -569,7 +593,14 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             let m = work[next];
             let lead = next as u32;
             next += 1;
+            #[cfg(feature = "research-sigf4-split")]
+            let search = Instant::now();
             let id = self.reducer(&m);
+            #[cfg(feature = "research-sigf4-split")]
+            {
+                split.reducer_search += search.elapsed();
+                split.searches += 1;
+            }
             if id == NONE {
                 continue;
             }
@@ -578,8 +609,20 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             let sig = e.sig.times(&mult);
             let mut row = Vec::with_capacity(e.terms.len());
             row.push(lead);
+            #[cfg(not(feature = "research-sigf4-split"))]
             for (tm, _) in &e.terms[1..] {
                 row.push(intern(*tm * mult, &mut work));
+            }
+            #[cfg(feature = "research-sigf4-split")]
+            {
+                let products = e.terms[1..].iter().map(|(m, _)| *m);
+                split.row(
+                    &mut scratch,
+                    products,
+                    mult,
+                    |m| intern(m, &mut work),
+                    &mut row,
+                );
             }
             handles.push(row);
             rows.push(Row {
@@ -589,6 +632,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             });
             reducers += 1;
         }
+        #[cfg(feature = "research-sigf4-split")]
+        let sort = Instant::now();
         let order = self.order;
         let mut by_position: Vec<u32> = (0..work.len() as u32).collect();
         by_position.sort_unstable_by(|&a, &b| order.cmp(&work[b as usize], &work[a as usize]));
@@ -602,10 +647,20 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         let columns: Vec<Monomial<N>> = by_position.iter().map(|&id| work[id as usize]).collect();
+        #[cfg(feature = "research-sigf4-split")]
+        {
+            split.column_sort = sort.elapsed();
+        }
         self.stats.reducer_rows += reducers;
         self.stats.max_matrix_rows = self.stats.max_matrix_rows.max(rows.len());
         self.stats.max_matrix_columns = self.stats.max_matrix_columns.max(columns.len());
         self.stats.symbolic += clock.elapsed();
+        #[cfg(feature = "research-sigf4-split")]
+        {
+            split.total = clock.elapsed();
+            split.khz_after = super::SymbolicSplit::cpu_khz().1;
+            self.stats.split.symbolic.push(split);
+        }
         if rows.len() > self.options.max_matrix_rows {
             return Err(SigF4Error::Budget(F4Error::TooManyRows {
                 limit: self.options.max_matrix_rows,

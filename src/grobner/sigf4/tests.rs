@@ -430,6 +430,30 @@ proptest! {
     }
 }
 
+/// The #939 symbolic split has one record per batch, its components fit inside its total, and it
+/// clocks one reducer lookup per column.
+#[cfg(feature = "research-sigf4-split")]
+#[test]
+fn test_symbolic_split_covers_every_batch() {
+    let system = katsura::<6, Goldilocks>();
+    for workers in [1, 4] {
+        let options = SigF4Options {
+            workers,
+            ..SigF4Options::checked()
+        };
+        let (_, s) = sig_f4_reported(&system, GREVLEX, &options);
+        let log = &s.split.symbolic;
+        assert_eq!(log.len(), s.batches);
+        for b in log {
+            assert!(b.reducer_search + b.multiply + b.interning + b.column_sort <= b.total);
+            assert!(b.terms > 0);
+        }
+        let searches: u64 = log.iter().map(|b| b.searches).sum();
+        let columns: u64 = s.split.batches.iter().map(|b| b.columns as u64).sum();
+        assert_eq!(searches, columns);
+    }
+}
+
 /// The #901 split accounts for every coefficient product, per batch, at one and four workers.
 #[cfg(feature = "research-sigf4-split")]
 #[test]

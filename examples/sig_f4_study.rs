@@ -55,6 +55,7 @@ struct Args {
     discovery: bool,
     replay: bool,
     claim: bool,
+    repeat: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
@@ -68,6 +69,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         discovery: false,
         replay: false,
         claim: false,
+        repeat: 1,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -90,6 +92,13 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--discovery" => parsed.discovery = true,
             "--replay" => parsed.replay = true,
             "--claim" => parsed.claim = true,
+            "--repeat" => {
+                parsed.repeat = value()?
+                    .parse()
+                    .ok()
+                    .filter(|&k| k > 0)
+                    .ok_or("--repeat takes a positive integer")?
+            }
             other => return Err(format!("unexpected argument {other}")),
         }
     }
@@ -104,6 +113,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
         return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
+    }
+    if parsed.repeat > 1 && (parsed.certify || parsed.discovery || parsed.replay) {
+        return Err("--repeat times the solve alone".into());
     }
     if parsed.replay && (parsed.engine != "sigf4" || parsed.workers < 2) {
         return Err("--replay runs design 1 and design 2: --engine sigf4 --workers ≥ 2".into());
@@ -453,7 +465,49 @@ fn split(log: &zeebra::grobner::sigf4::SplitLog) -> Json {
             ("cascading_targets", Json::size(b.cascading_targets)),
         ])
     });
+    let symbolic = &log.symbolic;
+    let sum = |f: fn(&zeebra::grobner::sigf4::SymbolicSplit) -> Duration| -> Duration {
+        symbolic.iter().map(f).sum()
+    };
+    // Time-weighted over batches, each batch at the mean of its before and after readings.
+    let read: Vec<(f64, f64)> = symbolic
+        .iter()
+        .filter_map(|b| {
+            let khz = (b.khz_before? + b.khz_after?) as f64 / 2.0;
+            Some((khz, b.total.as_secs_f64()))
+        })
+        .collect();
+    let weight: f64 = read.iter().map(|r| r.1).sum();
+    let khz = read.iter().map(|r| r.0 * r.1).sum::<f64>() / weight;
+    let mut cpus: Vec<usize> = symbolic.iter().filter_map(|b| b.cpu).collect();
+    cpus.sort_unstable();
+    cpus.dedup();
+    let symbolic = Json::object([
+        ("total_ns", Json::nanos(sum(|b| b.total))),
+        ("reducer_search_ns", Json::nanos(sum(|b| b.reducer_search))),
+        ("multiply_ns", Json::nanos(sum(|b| b.multiply))),
+        ("interning_ns", Json::nanos(sum(|b| b.interning))),
+        ("column_sort_ns", Json::nanos(sum(|b| b.column_sort))),
+        (
+            "searches",
+            Json::int(symbolic.iter().map(|b| b.searches).sum()),
+        ),
+        ("terms", Json::int(symbolic.iter().map(|b| b.terms).sum())),
+        (
+            "khz_weighted",
+            if weight > 0.0 {
+                Json::int(khz as u64)
+            } else {
+                Json::Null
+            },
+        ),
+        (
+            "cpus",
+            Json::Array(cpus.into_iter().map(Json::size).collect()),
+        ),
+    ]);
     Json::object([
+        ("symbolic", symbolic),
         ("inputs_ns", Json::nanos(log.inputs)),
         ("materialize_ns", Json::nanos(log.materialize)),
         ("drop_ns", Json::nanos(log.drop)),
@@ -654,58 +708,69 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         #[cfg(not(feature = "research-sigf4-replay"))]
         panic!("--replay requires --features research-sigf4-replay");
     }
-    let started = Instant::now();
-    let (result, statistics, work) = if args.engine == "entry" {
-        let (result, report) = f4_signature_reported(&system, ORDER, &f4_options(args));
-        let summary = Json::object([
-            ("route", Json::string(format!("{:?}", report.route))),
-            ("dispatch_ns", Json::nanos(report.dispatch)),
-            ("variables", Json::size(report.features.variables)),
+    // `--repeat k` (#934): k solves in one process, the last one reported; `calls_ns` keeps every
+    // call's time, the first of them cold.
+    let mut calls = Vec::with_capacity(args.repeat);
+    let solve = || {
+        if args.engine == "entry" {
+            let (result, report) = f4_signature_reported(&system, ORDER, &f4_options(args));
+            let summary = Json::object([
+                ("route", Json::string(format!("{:?}", report.route))),
+                ("dispatch_ns", Json::nanos(report.dispatch)),
+                ("variables", Json::size(report.features.variables)),
+                (
+                    "min_nonlinear_degree",
+                    Json::int(report.features.min_nonlinear_degree),
+                ),
+                ("max_degree", Json::int(report.features.max_degree)),
+            ]);
+            (result.map_err(|e| e.to_string()), summary, Json::Null)
+        } else if args.engine == "sigf4" {
+            let options = SigF4Options {
+                max_wall_time: Some(args.wall),
+                workers: args.workers,
+                parallel_cascade: args.claim,
+                ..SigF4Options::default()
+            };
+            let (result, stats) = sig_f4_reported(&system, ORDER, &options);
             (
-                "min_nonlinear_degree",
-                Json::int(report.features.min_nonlinear_degree),
-            ),
-            ("max_degree", Json::int(report.features.max_degree)),
-        ]);
-        (result.map_err(|e| e.to_string()), summary, Json::Null)
-    } else if args.engine == "sigf4" {
-        let options = SigF4Options {
-            max_wall_time: Some(args.wall),
-            workers: args.workers,
-            parallel_cascade: args.claim,
-            ..SigF4Options::default()
-        };
-        let (result, stats) = sig_f4_reported(&system, ORDER, &options);
-        (
-            result.map_err(|e| e.to_string()),
-            sig_statistics(&stats),
-            Json::Null,
-        )
-    } else {
-        let options = f4_options(args);
-        let solve = || f4_reported(&system, ORDER, &options);
-        #[cfg(feature = "research-work")]
-        let ((result, stats), work) = if args.discovery {
-            let (r, w) = zeebra::linalg::work::measure_discovery(solve);
-            (r, discovery(&w))
+                result.map_err(|e| e.to_string()),
+                sig_statistics(&stats),
+                Json::Null,
+            )
         } else {
-            (solve(), Json::Null)
-        };
-        #[cfg(not(feature = "research-work"))]
-        let ((result, stats), work) = {
-            assert!(!args.discovery, "--discovery requires research-work");
-            (solve(), Json::Null)
-        };
-        let summary = Json::object([
-            ("batches", Json::size(stats.batches)),
-            ("pairs_reduced", Json::size(stats.pairs_reduced)),
-            ("zero_rows", Json::size(stats.zero_rows)),
-            ("elements_added", Json::size(stats.elements_added)),
-            ("max_matrix_rows", Json::size(stats.max_matrix_rows)),
-            ("max_matrix_columns", Json::size(stats.max_matrix_columns)),
-        ]);
-        (result.map_err(|e| e.to_string()), summary, work)
+            let options = f4_options(args);
+            let solve = || f4_reported(&system, ORDER, &options);
+            #[cfg(feature = "research-work")]
+            let ((result, stats), work) = if args.discovery {
+                let (r, w) = zeebra::linalg::work::measure_discovery(solve);
+                (r, discovery(&w))
+            } else {
+                (solve(), Json::Null)
+            };
+            #[cfg(not(feature = "research-work"))]
+            let ((result, stats), work) = {
+                assert!(!args.discovery, "--discovery requires research-work");
+                (solve(), Json::Null)
+            };
+            let summary = Json::object([
+                ("batches", Json::size(stats.batches)),
+                ("pairs_reduced", Json::size(stats.pairs_reduced)),
+                ("zero_rows", Json::size(stats.zero_rows)),
+                ("elements_added", Json::size(stats.elements_added)),
+                ("max_matrix_rows", Json::size(stats.max_matrix_rows)),
+                ("max_matrix_columns", Json::size(stats.max_matrix_columns)),
+            ]);
+            (result.map_err(|e| e.to_string()), summary, work)
+        }
     };
+    for _ in 1..args.repeat {
+        let warm = Instant::now();
+        drop(solve());
+        calls.push(warm.elapsed());
+    }
+    let started = Instant::now();
+    let (result, statistics, work) = solve();
     let elapsed = started.elapsed();
     let render = Instant::now();
     let (status, basis) = match &result {
@@ -741,6 +806,16 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("workers", Json::size(args.workers)),
         ("status", Json::string(status)),
         ("call_ns", Json::nanos(elapsed)),
+        (
+            "calls_ns",
+            Json::Array(
+                calls
+                    .iter()
+                    .chain([&elapsed])
+                    .map(|&d| Json::nanos(d))
+                    .collect(),
+            ),
+        ),
         ("render_ns", Json::nanos(render)),
         (
             "peak_rss_bytes",
@@ -824,6 +899,27 @@ mod tests {
             "entry"
         ])
         .is_ok());
+    }
+
+    // `--repeat` takes a positive count and times the solve alone, so it refuses the add-ons.
+    #[test]
+    fn repeat_times_the_solve_alone() {
+        let base = [
+            "--field",
+            "wide64",
+            "--name",
+            "katsura-4",
+            "--engine",
+            "entry",
+        ];
+        assert_eq!(
+            args(&[&base[..], &["--repeat", "5"]].concat())
+                .unwrap()
+                .repeat,
+            5
+        );
+        assert!(args(&[&base[..], &["--repeat", "0"]].concat()).is_err());
+        assert!(args(&[&base[..], &["--repeat", "5", "--certify"]].concat()).is_err());
     }
 
     // The replay runs both signature designs, so it needs the signature engine and two workers.

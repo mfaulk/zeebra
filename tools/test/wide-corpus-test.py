@@ -24,6 +24,19 @@ class WideCorpusTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             wide.cohort_engines('magma', 1)
 
+    # groebner-rs is admitted at a worker count (#935) and asked for it; grobx and Julia stay serial.
+    def test_groebner_rs_is_admitted_at_a_worker_count(self):
+        self.assertEqual(wide.cohort_engines('groebner-rs', 8), ('groebner-rs',))
+        self.assertEqual(wide.request_workers('groebner-rs', 8), 8)
+        self.assertEqual(wide.request_workers('grobx', 8), 1)
+        with self.assertRaises(ValueError):
+            wide.cohort_engines('groebner-rs,groebner.jl', 8)
+
+    # The observed thread count is the number of driver threads whose CPU ticks moved in the solve.
+    def test_observed_threads_count_threads_that_ran(self):
+        hot = dict(before={'1': 10, '2': 0, '3': 5}, after={'1': 90, '2': 0, '3': 7, '4': 3})
+        self.assertEqual(wide.observed_threads(hot), 3)
+
     # Full basis equality rejects matching leading monomials with different tail coefficients.
     def test_changed_tail_is_rejected(self):
         with self.assertRaises(ValueError):
