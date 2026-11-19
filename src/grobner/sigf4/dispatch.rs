@@ -47,11 +47,12 @@ pub const SIGNATURE_CROSSOVER_WORKERS: usize = 4;
 pub const SIGNATURE_CROSSOVER_VARIABLES: RangeInclusive<usize> = 10..=10;
 
 /// Signature inputs in fewer variables than this run on at most [`SIGNATURE_SMALL_TEAM`] workers:
-/// noon-7, noon-8 and katsura-9 ran 2–8% slower at 16 workers than at four.
+/// noon-7, noon-8 and katsura-9 ran 2–13% slower at 16 workers than at eight.
 pub const SIGNATURE_SMALL_TEAM_VARIABLES: usize = 10;
 
-/// The team a small signature input runs on.
-pub const SIGNATURE_SMALL_TEAM: usize = 4;
+/// The team a small signature input runs on. Eight, not four: katsura-9's warm calls ran 2.9%
+/// slower on four workers than on eight (#927's first Gate R read).
+pub const SIGNATURE_SMALL_TEAM: usize = 8;
 
 /// Which engine the entry point ran, and why.
 #[derive(Clone, Debug, PartialEq, Eq)]
