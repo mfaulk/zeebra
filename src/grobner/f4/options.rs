@@ -623,8 +623,11 @@ pub enum GradedEngine {
 
     /// [`f4_signature`](crate::grobner::f4_signature)'s pre-solve dispatch: the signature engine
     /// where its thresholds expect it to win, conventional F4 elsewhere and as the fallback from a
-    /// signature-engine size limit. Wall, matrix, basis-size, live-byte and certification budgets
-    /// keep their meaning, and the team never exceeds the caller's worker caps.
+    /// signature-engine size limit. Wall, matrix, basis-size and certification budgets keep their
+    /// meaning, and the team never exceeds the caller's worker caps. The live budget binds on the
+    /// signature engine's parallel cascade only; at one worker it is not charged. A call with
+    /// `max_batches` or `max_pairs_per_batch` set stays on conventional F4, whose batches those
+    /// count.
     /// [`F4Statistics::graded_route`](crate::grobner::F4Statistics::graded_route) records the
     /// decision. On the signature route the statistics carry only batches, matrix extents and
     /// elements added, and the rest stay zero.

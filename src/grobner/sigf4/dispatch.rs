@@ -285,8 +285,8 @@ pub fn f4_signature_reported<const N: usize, F: FiniteField>(
 enum Work {
     /// Neither engine ran: the order was refused.
     Refused,
-    Signature(SigF4Statistics),
-    Shipping(F4Statistics),
+    Signature(Box<SigF4Statistics>),
+    Shipping(Box<F4Statistics>),
 }
 
 fn dispatched<const N: usize, F: FiniteField>(
@@ -336,20 +336,24 @@ fn dispatched<const N: usize, F: FiniteField>(
             let (result, work) = shipping(generators, order, &fallback);
             (result, report, work)
         }
-        result => (result, report, Work::Signature(statistics)),
+        result => (result, report, Work::Signature(Box::new(statistics))),
     }
 }
 
+/// What [`f4_reported`] returns: the basis or the budget crossed, and the work done.
+pub(crate) type Reported<const N: usize, F> = (
+    Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
+    F4Statistics,
+);
+
 /// [`GradedEngine::Adaptive`](crate::grobner::GradedEngine::Adaptive) for the conventional entry
-/// points: `None` for an order the signature engine refuses, which then runs conventional F4.
+/// points: `None` for an order the signature engine refuses, or for a batch budget, which then
+/// run conventional F4.
 pub(crate) fn adaptive_f4<const N: usize, F: FiniteField>(
     generators: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     options: &F4Options,
-) -> Option<(
-    Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
-    F4Statistics,
-)> {
+) -> Option<Reported<N, F>> {
     engine::graded(order).ok()?;
     // Budgets counted in conventional F4's batches have no signature-engine meaning.
     if options.max_batches.is_some() || options.max_pairs_per_batch.is_some() {
@@ -362,7 +366,7 @@ pub(crate) fn adaptive_f4<const N: usize, F: FiniteField>(
         Err(SigF4Error::Unsupported { .. }) => return None,
     };
     let mut statistics = match work {
-        Work::Shipping(statistics) => statistics,
+        Work::Shipping(statistics) => *statistics,
         Work::Signature(work) => F4Statistics {
             batches: work.batches,
             max_matrix_rows: work.max_matrix_rows,
@@ -434,7 +438,7 @@ fn shipping<const N: usize, F: FiniteField>(
     let (result, statistics) = f4_reported(generators, order, &conventional);
     (
         result.map_err(SigF4Error::Budget),
-        Work::Shipping(statistics),
+        Work::Shipping(Box::new(statistics)),
     )
 }
 

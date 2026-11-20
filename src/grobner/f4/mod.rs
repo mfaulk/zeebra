@@ -132,10 +132,7 @@ fn graded_engine<const N: usize, F: FiniteField>(
     generators: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     options: &F4Options,
-) -> Option<(
-    Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
-    F4Statistics,
-)> {
+) -> Option<crate::grobner::sigf4::dispatch::Reported<N, F>> {
     match options.graded_engine {
         GradedEngine::Conventional => None,
         GradedEngine::Adaptive => {
