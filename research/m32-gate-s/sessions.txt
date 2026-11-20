@@ -1,0 +1,10 @@
+== gate 2026-11-19T14:30:06-05:00 load=18.81
+== mq10 2026-11-19T15:45:55-05:00 load=2.25
+bench-reserve: no verified reservation (status rc 1); see `tools/bench-reserve.sh status`
+== small 2026-11-19T15:45:55-05:00 load=2.25
+bench-reserve: no verified reservation (status rc 1); see `tools/bench-reserve.sh status`
+== curve 2026-11-19T15:45:55-05:00 load=2.25
+bench-reserve: no verified reservation (status rc 1); see `tools/bench-reserve.sh status`
+== mq10 2026-11-19T15:46:50-05:00 load=2.00
+== small 2026-11-19T15:59:36-05:00 load=2.06
+== curve 2026-11-19T16:48:40-05:00 load=1.01
