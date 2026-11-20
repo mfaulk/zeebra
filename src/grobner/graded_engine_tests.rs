@@ -316,3 +316,64 @@ fn test_solver_routes_its_graded_basis_through_the_option() {
     );
     assert_eq!(statistics.f4.expect("computed").graded_route, None);
 }
+
+/// A batch budget or batch-size cap is counted in conventional F4's batches, which the signature
+/// engine does not have, so the option leaves those calls on conventional F4.
+#[test]
+fn test_batch_budgets_keep_conventional_f4() {
+    let system = katsura::<7, Zp32003>();
+    for capped in [
+        F4Options {
+            max_batches: Some(2),
+            ..adaptive(1)
+        },
+        F4Options {
+            max_pairs_per_batch: Some(4),
+            ..adaptive(2)
+        },
+    ] {
+        let plain = F4Options {
+            graded_engine: GradedEngine::Conventional,
+            ..capped.clone()
+        };
+        let (result, statistics) = f4_reported(&system, GREVLEX, &capped);
+        assert_eq!(statistics.graded_route, None);
+        assert_eq!(result, f4_reported(&system, GREVLEX, &plain).0);
+    }
+    let error = f4_with_options(
+        &system,
+        GREVLEX,
+        &F4Options {
+            max_batches: Some(1),
+            ..adaptive(1)
+        },
+    )
+    .expect_err("one batch is not enough");
+    assert!(matches!(error, F4Error::TooManyBatches { limit: 1 }));
+}
+
+/// A live-entry budget tightened below the byte budget binds on the signature route's parallel
+/// cascade too: the engine is given the smaller of the two, in bytes, and falls back typed. (The
+/// serial cascade, at one worker, charges no live bytes; #941's report records the gap.)
+#[test]
+fn test_live_entry_budget_binds_on_the_signature_route() {
+    let system = katsura::<7, Goldilocks>();
+    let tight = F4Options {
+        max_live_nonzeros: 8,
+        ..adaptive(4)
+    };
+    let (result, statistics) = f4_reported(&system, GREVLEX, &tight);
+    let route = statistics.graded_route.expect("routed").route;
+    assert!(
+        matches!(
+            route,
+            SignatureRoute::Shipping(ShippingReason::Fallback(F4Error::TooManyLiveBytes { .. }))
+        ),
+        "{route:?}"
+    );
+    let plain = F4Options {
+        graded_engine: GradedEngine::Conventional,
+        ..tight
+    };
+    assert_eq!(result, f4_reported(&system, GREVLEX, &plain).0);
+}

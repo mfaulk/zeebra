@@ -320,7 +320,7 @@ fn dispatched<const N: usize, F: FiniteField>(
     let result = engine::run(
         generators,
         order,
-        &signature_options(options, report.workers),
+        &signature_options::<F>(options, report.workers),
         &mut statistics,
     );
     match result {
@@ -351,6 +351,10 @@ pub(crate) fn adaptive_f4<const N: usize, F: FiniteField>(
     F4Statistics,
 )> {
     engine::graded(order).ok()?;
+    // Budgets counted in conventional F4's batches have no signature-engine meaning.
+    if options.max_batches.is_some() || options.max_pairs_per_batch.is_some() {
+        return None;
+    }
     let (result, report, work) = dispatched(generators, order, options);
     let result = match result {
         Ok(basis) => Ok(basis),
@@ -382,7 +386,14 @@ fn caller_workers(options: &F4Options) -> usize {
 }
 
 /// The signature engine's budgets, read from the shipping F4's options, on `workers` threads.
-fn signature_options(options: &F4Options, workers: usize) -> SigF4Options {
+///
+/// The live budget is the smaller of `max_live_bytes` and the live-entry allowance in bytes, so a
+/// tightened `max_live_nonzeros` binds here too; at the presets the two are equal.
+fn signature_options<F: FiniteField>(options: &F4Options, workers: usize) -> SigF4Options {
+    let live = options
+        .live_entry_allowance::<F>()
+        .saturating_mul(F4Options::bytes_per_entry::<F>())
+        .min(options.max_live_bytes);
     SigF4Options {
         max_wall_time: options.max_wall_time,
         max_basis_elements: options.max_basis_elements,
@@ -392,7 +403,7 @@ fn signature_options(options: &F4Options, workers: usize) -> SigF4Options {
         max_certify_time: options.max_certify_time,
         workers,
         parallel_cascade: workers > 1,
-        max_live_bytes: Some(options.max_live_bytes),
+        max_live_bytes: Some(live),
         ..SigF4Options::default()
     }
 }
