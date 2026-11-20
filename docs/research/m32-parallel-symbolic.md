@@ -5,12 +5,16 @@ ceiling (§4): Eco-12 symbolic 2.95× at 16 workers, projected wall 0.79× the M
 **Gate P passes** (§6). #940 built this design and **Gate S failed** on both its reads: T1 and T2
 passed both times, but the re-read after the owner's fix pass still missed Noon-7 at 16 workers
 ([`research/m32-gate-s`](../../research/m32-gate-s/README.md)); the implementation is not merged.
-Attribution split by cause is incomplete (§5): it needs #939's frequency record.
+Attribution (§5): Eco-12's +90 ms growth with workers is about 50 ms
+CPU clock and about 40 ms cross-CCD cache locality, with no extra work and no team overhead. Per
+term, the signature closure costs what conventional F4's does; MQ10's gap is volume.
 **Measured at:** `8694d172` — the M32 F0 baseline `7b25a1ee` plus this branch's replay instrument
 (no change to the engine's algebra or its serial closure; tagged `measured/933-symbolic-replay`).
 Built from `git archive` into a private target directory, release, fat LTO, `x86-64-v3`; SHA-256 in
 [`research/m32-symbolic-replay/binaries.sha256`](../../research/m32-symbolic-replay/binaries.sha256).
 Exploratory: n = 5 fresh processes per cell, one benchlock session (CPUs 8–23, CCDs 1–2 reserved).
+§5 also reads #939's records at `7b25a1ee` / `45107ec3` ([`m32-baseline.md`](m32-baseline.md)) and
+conventional F4 at `7b25a1ee` (`m29_cost_model`, its own session).
 **Plan:** [`MILESTONE-ADAPTIVE-F4.md`](../MILESTONE-ADAPTIVE-F4.md) §4.1 H1–H3, §7.2, §8.2 Gate
 P, §9.2, §11 (Track A). M31 evidence: [`m31-sigf4-serial.md`](m31-sigf4-serial.md) §3
 (change 3: the symbolic leg stayed 1.0×), [`m31-sigf4-parallel.md`](m31-sigf4-parallel.md),
@@ -227,9 +231,61 @@ That is consistent with the post-burst clock (this host holds all-core boost, ~1
 for 200–500 ms after a multicore burst) and with caches evicted by the team; it does not separate the
 two, nor allocator effects.
 
-**Open (needs #939):** the split of the +68 ms between CPU frequency, cache and allocator. That
-requires the frequency record and the component split #939 is producing; this note does not claim
-it. A scheduling-only change (parking or not waking the team) is therefore not proposed here.
+**Attribution of the growth (deliverable 1).** This uses #939's records
+([`m32-baseline.md`](m32-baseline.md) §3–§4): the timed cohort's stage clocks (n = 9) and the split
+build's per-component clocks with the symbolic thread's frequency (n = 5). The split build ran
+13:07–13:15 local at load 1.2–5.9. Its first repetition of every arm ran at load 1.2–1.4 with no
+compiler running and gives the same clocks as the median (4,503 MHz at one worker, 3,984 at 16), so
+the frequency figures are not a foreign-load artifact. Component growth from one worker, split
+build, Eco-12 / 2⁶⁴−353:
+
+| Workers (CPUs) | Symbolic-thread MHz | Cycle-time ratio | Stage | Multiply | Reducer search | Column sort | Interning | Timed-build stage ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 (8) | 4,465 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 462 |
+| 4 (8–11) | 4,122 | 1.083 | 1.039 | 1.057 | 1.067 | 1.070 | 1.014 | 483 |
+| 8 (8–15) | 3,985 | 1.121 | 1.082 | 1.086 | 1.105 | 1.107 | 1.064 | 514 |
+| 16 (8–23) | 3,986 | 1.120 | **1.274** | 1.090 | 1.133 | 1.156 | **1.348** | 552 |
+
+Of Eco-12's +90 ms (462 → 552):
+
+- **Symbolic work: 0 ms.** The searches (100,702) and terms (14,570,055) are identical at every
+  worker count. So are the replay's columns, rows and basis digest (above).
+- **Team overhead: 0 ms inside the stage.** The cascade's team is scoped to a batch
+  (`std::thread::scope` in `claim.rs`) and is joined before the next batch's symbolic stage starts.
+  No other thread runs during the stage, so there is nothing to park.
+- **CPU frequency: about 50 ms, all of the growth up to 8 workers.** The symbolic thread runs about
+  12% slower in cycle time beside a team. The compute-bound components grow by about that much and no
+  more: multiply ×1.09, sort ×1.16 and search ×1.13 at 16 workers. Up to 8 workers the whole stage
+  grows less than the clock ratio (×1.082 against ×1.121), and the timed build's 462 → 514 ms is
+  clock. The clock bottoms out at about 3,985 MHz from 8 workers.
+- **Cache locality across CCDs: about 40 ms, all of the growth from 8 to 16 workers.** The clock is
+  flat (3,985 → 3,986 MHz), yet the timed stage grows 514 → 552 ms. In the split build, interning
+  alone grows from ×1.064 to ×1.348, which is 49 of that build's 54 ms. Sixteen workers is the only
+  arm whose team spans two CCDs (CPUs 8–23 are CCDs 1 and 2; 8 workers fit in 8–15). It is also the
+  only arm in which the symbolic thread is recorded on the second CCD's CPUs (16, 17, 22, 23).
+  Interning is hash probes into per-batch tables and reads of the basis terms, which is the
+  L3-sensitive part of the stage. Each CCD has its own 32 MB L3. The symbolic thread therefore
+  works against an L3 that does not hold its data, and against data last written by the other CCD's
+  cores. The replay agrees. Beside the 16-worker cascade, the engine's cold closure took 5% longer
+  than an immediate warm rerun of the same batch at the same clock. Beside design 1 it took 4% less.
+  That is a cold-start penalty of about 9% that appears only after the 16-worker elimination.
+- **Allocator: no evidence.** The stage allocates little, on the caller's thread: per-batch tables
+  grown by doubling. An allocator effect would also show at 8 workers, where the stage stays within
+  the clock. It is not excluded, but nothing needs it.
+
+MQ10 / 32003 shows the same pattern. Up to 8 workers the stage tracks the clock (×1.074 and ×1.083
+against ×1.075 and ×1.085). At 16 the stage is ×1.218 against ×1.088, with interning ×1.253. MQ10 /
+2³¹−1 is the exception: its interning grows ×1.21 already at 4 workers, an arm that stays in one CCD.
+That is one row at n = 5 and is left unexplained.
+
+**Consequence for #940.** No scheduling-only change is available: there is no team alive during the
+stage, and the clock cost follows any multicore burst. The parallel closure pays both effects too,
+and the replay ceiling (§4) was measured in that context. The CCD finding bears on #940's serial
+merge, which runs on the caller right after a 16-wide scan spread over two CCDs. That merge (Eco-12
+16.9 → 29.5 ms, §4) should be read at 8 and 16 workers to check whether its growth is the same
+locality effect. #939's unfused-loop lead (§4.1 there: multiply into a buffer, then probe) applies
+directly to the scan. It was measured at load 18.5–19.8, however, and needs a quiet-box re-read
+before #940 builds on it.
 
 **H3 is falsified: reducer search is not the cost.** The census pass times the least-ratio lookup
 (cache read and scan of the elements added since) separately: **2.3–2.6%** of the Eco-12 closure and
@@ -238,13 +294,34 @@ it. A scheduling-only change (parking or not waking the team) is therefore not p
 closure's cost is shifting and interning terms — one hash probe of `seen` per shifted term — which is
 exactly what the design parallelizes. No divisibility index belongs in #940.
 
-**Per-row cost against conventional F4 (deliverable 2): partly open.** The signature closure costs
-6.8 µs per row on Eco-12 and 3.0 µs on MQ10 (engine closure ÷ rows, 16-worker context). The
-comparison with conventional F4's serial closure on the same inputs needs conventional symbolic stage
-clocks at `7b25a1ee`, which #939's baseline cohort records; until then the only figure is M30's
-92.6 ms serial on MQ10 / 32003 against this engine's 198–222 ms, at different commits. Since the
-reducer search is a few percent, whatever gap remains is in interning volume (rows × terms), not in
-the signature-aware choice.
+**Per-row cost against conventional F4's serial closure (deliverable 2).** Conventional F4 at
+`7b25a1ee` (`m29_cost_model --workers 1 --stages`) ran on the same two inputs: n = 5 interleaved
+processes, pinned to CPU 8, one benchlock session (17:17–17:18 local, load 1.1–1.3). Its records are
+[`research/m32-symbolic-replay/conventional.jsonl.gz`](../../research/m32-symbolic-replay/conventional.jsonl.gz).
+The signature column is #939's timed `d1:1` arm (n = 9) with the counts from its split build.
+
+| Row | Closure | Symbolic ms | Rows | Terms interned | µs / row | ns / term | Terms / row |
+|---|---|---:|---:|---:|---:|---:|---:|
+| MQ10 / 32003 | conventional F4 | 76.5 | 52,440 | 2,523,210 | 1.46 | 30.3 | 48 |
+| | signature engine | 205 | 78,958 | 5,955,187 | 2.60 | 34.4 | 75 |
+| Eco-12 / 2⁶⁴−353 | conventional F4 | 917.1 | 162,030 | 26,993,014 | 5.66 | 34.0 | 167 |
+| | signature engine | 462 | 79,834 | 14,570,055 | 5.79 | 31.7 | 183 |
+
+Conventional rows are reducer rows plus pair rows (two per pair, less the removed duplicate
+multiples). Its terms are the matrix's initial nonzeros, which is one interning per term. The stage
+clocks cost conventional F4 a few percent (3.8–11.5% on MQ10, per `m29_cost_model`), which flatters
+neither side.
+
+- **Per term, the two closures cost the same: 30–34 ns.** The signature closure's least-ratio
+  search, which plan §6.3 expected to be different work, does not show up in the unit cost (it is
+  1–13% of the stage, §4 of #939).
+- **The difference is volume.** On MQ10 the signature closure interns 2.36× conventional's terms:
+  1.51× the rows, and longer ones (75 terms against 48). The signature rule fixes each column's
+  reducer as the least-ratio element, while conventional F4 chooses by its own selection policy. The
+  volume accounts for the whole 2.7× (205 against 76.5 ms). On Eco-12 it interns 0.54× the terms, and its stage is 0.50× conventional's.
+- So H3's premise (a costlier per-row search) is false. MQ10's serial gap is set by how many and
+  how long the reducer rows are. Parallel interning (#940) attacks that cost directly. Shortening the
+  rows would mean changing the reducer choice, which §3 and §9.2 hold fixed.
 
 ## 6. Gate P
 
