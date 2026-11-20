@@ -1,14 +1,18 @@
 use std::time::Duration;
 
 use super::{
-    f4_signature, f4_signature_reported, signature_route, ShippingReason, SignatureRoute,
-    SIGNATURE_MIN_VARIABLES,
+    f4_signature, f4_signature_reported, signature_route, Cascade, ShippingReason,
+    SignatureDispatch, SignatureRoute, SIGNATURE_CROSSOVER_VARIABLES, SIGNATURE_CROSSOVER_WORKERS,
+    SIGNATURE_MIN_VARIABLES, SIGNATURE_SMALL_TEAM, SIGNATURE_SMALL_TEAM_VARIABLES,
 };
 use crate::{
-    fields::{PrimeFieldElement64, Zp32003},
+    fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, eco, katsura, noon},
-        f4::{certify_f4_output, f4_with_options, F4Error, F4Options, ParallelForward},
+        f4::{
+            certify_f4_output, f4_with_options, F4Error, F4Options, ParallelForward,
+            ParallelSymbolic,
+        },
         sigf4::SigF4Error,
     },
     poly::{BlockOrder, BlockOrderKind, MonomialOrder, WeightedTieBreak},
@@ -25,12 +29,60 @@ const GRADED: [MonomialOrder; 2] = [
 fn route<const N: usize, F: FiniteField>(
     system: &[MultivariatePolynomial<N, F>],
 ) -> SignatureRoute {
-    signature_route(system, GREVLEX).expect("graded").0
+    signature_route(system, GREVLEX, &workers(1))
+        .expect("graded")
+        .route
 }
 
+/// The dispatch decision at `count` workers.
+fn decide<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    count: usize,
+) -> SignatureDispatch {
+    signature_route(system, GREVLEX, &workers(count)).expect("graded")
+}
+
+/// `N` generators, each with every monomial of degree at most two and a nonzero pseudorandom
+/// coefficient: the dense MQ shape.
+fn dense_quadratic<const N: usize, F: FiniteField>(seed: u64) -> Vec<MultivariatePolynomial<N, F>> {
+    let mut state = seed;
+    let mut monomials = vec![[0u32; N]];
+    for i in 0..N {
+        let mut e = [0; N];
+        e[i] = 1;
+        monomials.push(e);
+        for j in i..N {
+            let mut e = [0; N];
+            e[i] += 1;
+            e[j] += 1;
+            monomials.push(e);
+        }
+    }
+    (0..N)
+        .map(|_| {
+            let terms: Vec<_> = monomials
+                .iter()
+                .map(|e| {
+                    state = state
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    (crate::Monomial::new(e), F::new(1 + (state >> 33) % 30000))
+                })
+                .collect();
+            MultivariatePolynomial::new(&terms)
+        })
+        .collect()
+}
+
+/// Options capping both the forward and the symbolic team at `count`.
 fn workers(count: usize) -> F4Options {
     F4Options {
         parallel_forward: ParallelForward::Forced { workers: count },
+        parallel_symbolic: if count == 1 {
+            ParallelSymbolic::Serial
+        } else {
+            ParallelSymbolic::Auto { max_workers: count }
+        },
         ..F4Options::default()
     }
 }
@@ -89,7 +141,7 @@ fn test_every_non_graded_order_is_unsupported_on_every_route() {
             );
             assert_eq!(report.features.generators, 0, "no feature was read");
             assert!(matches!(
-                signature_route(system, order),
+                signature_route(system, order, &F4Options::default()),
                 Err(SigF4Error::Unsupported { .. })
             ));
         }
@@ -152,7 +204,7 @@ fn test_near_uniform_degrees_route_to_signature() {
     assert_eq!(route(&katsura::<7, Zp32003>()), SignatureRoute::Signature);
     assert_eq!(route(&eco::<7, Goldilocks>()), SignatureRoute::Signature);
     assert_eq!(route(&noon::<6, Zp32003>()), SignatureRoute::Signature);
-    let (_, features) = signature_route(&eco::<7, Goldilocks>(), GREVLEX).unwrap();
+    let features = decide(&eco::<7, Goldilocks>(), 1).features;
     assert_eq!((features.min_nonlinear_degree, features.max_degree), (2, 3));
 }
 
@@ -244,4 +296,156 @@ fn test_dispatch_is_cheap_and_recorded() {
         f4_signature(&katsura::<7, Zp32003>(), GREVLEX, &F4Options::default()),
         result
     );
+}
+
+/// A quadratic input in the crossover band takes the signature engine below
+/// `SIGNATURE_CROSSOVER_WORKERS` workers and the shipping F4 from there up, at three fields;
+/// quadratics just outside the band keep the signature engine at every worker count.
+#[test]
+fn test_quadratic_in_the_band_crosses_to_shipping_at_the_worker_threshold() {
+    fn crosses<const N: usize, F: FiniteField>() {
+        let system = dense_quadratic::<N, F>(N as u64);
+        for count in 1..=16 {
+            let report = decide(&system, count);
+            let expected = if SIGNATURE_CROSSOVER_VARIABLES.contains(&N)
+                && count >= SIGNATURE_CROSSOVER_WORKERS
+            {
+                SignatureRoute::Shipping(ShippingReason::WorkerCrossover)
+            } else {
+                SignatureRoute::Signature
+            };
+            assert_eq!(report.route, expected, "{N} variables, {count} workers");
+            assert_eq!(report.features.workers, count);
+        }
+    }
+    assert_eq!(SIGNATURE_CROSSOVER_WORKERS, 4);
+    assert_eq!(SIGNATURE_CROSSOVER_VARIABLES, 10..=10);
+    crosses::<10, Zp32003>();
+    crosses::<10, Zp2147483647>();
+    crosses::<10, Goldilocks>();
+    crosses::<9, Zp32003>();
+    crosses::<11, Goldilocks>();
+}
+
+/// MQ10 from the published ladder, the development row the crossover exists for, crosses at four
+/// workers at both of its fields and keeps the signature engine below that.
+#[cfg(feature = "external-runners")]
+#[test]
+fn test_mq10_crosses_at_four_workers_at_both_fields() {
+    fn mq10<F: FiniteField>(modulus: u64) {
+        let instance = crate::grobner::external::corpus::instance("mq-random-10", modulus, GREVLEX)
+            .expect("ladder row");
+        let names: [&str; 10] = std::array::from_fn(|i| instance.variables[i].as_str());
+        let system: Vec<MultivariatePolynomial<10, F>> = instance
+            .system
+            .iter()
+            .map(|s| MultivariatePolynomial::parse(s, names).expect("parses"))
+            .collect();
+        for count in [1, 2, 3, 4, 8, 16] {
+            let report = decide(&system, count);
+            let crossed = report.route == SignatureRoute::Shipping(ShippingReason::WorkerCrossover);
+            assert_eq!(
+                crossed,
+                count >= SIGNATURE_CROSSOVER_WORKERS,
+                "{count} workers, {:?}",
+                report.features
+            );
+        }
+    }
+    mq10::<Zp32003>(32003);
+    mq10::<Zp2147483647>(2147483647);
+}
+
+/// The crossover leaves every other signature input where it was at 16 workers: Katsura-9 and -11
+/// on either side of the band, cubics (Noon, Eco), and MQ11's dense shape.
+#[test]
+fn test_crossover_leaves_other_signature_inputs_alone() {
+    let signature = SignatureRoute::Signature;
+    assert_eq!(decide(&katsura::<9, Goldilocks>(), 16).route, signature);
+    assert_eq!(decide(&katsura::<11, Zp32003>(), 16).route, signature);
+    assert_eq!(decide(&noon::<8, Goldilocks>(), 16).route, signature);
+    assert_eq!(decide(&eco::<12, Zp32003>(), 16).route, signature);
+    let mq11 = dense_quadratic::<11, Goldilocks>(11);
+    assert_eq!(decide(&mq11, 16).route, signature);
+}
+
+/// The dispatch reports term count, density, the caller's worker cap and the field's width.
+#[test]
+fn test_dispatch_reports_density_workers_and_field_width() {
+    let dense = decide(&dense_quadratic::<6, Zp32003>(6), 3).features;
+    assert_eq!(dense.terms, 6 * 28);
+    assert_eq!(dense.monomials, 6 * 28);
+    assert_eq!(dense.density(), 1.0);
+    assert_eq!(dense.workers, 3);
+    assert_eq!(dense.field_bits, 32);
+    let sparse = decide(&katsura::<9, Goldilocks>(), 1).features;
+    assert!(sparse.density() < 0.2, "{}", sparse.density());
+    assert_eq!(sparse.field_bits, 64);
+}
+
+/// The team never exceeds the caller's cap; the cascade is parallel exactly when the signature
+/// route has more than one worker, and absent on the shipping route.
+#[test]
+fn test_team_never_exceeds_max_workers() {
+    fn check<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>]) {
+        for count in 1..=16 {
+            let report = decide(system, count);
+            assert!(report.workers >= 1 && report.workers <= count);
+            let cascade = match report.route {
+                SignatureRoute::Signature if report.workers > 1 => Some(Cascade::Parallel),
+                SignatureRoute::Signature => Some(Cascade::Serial),
+                SignatureRoute::Shipping(_) => None,
+            };
+            assert_eq!(report.cascade, cascade, "{count} workers");
+        }
+    }
+    check(&katsura::<4, Zp32003>());
+    check(&katsura::<7, Goldilocks>());
+    check(&katsura::<11, Zp32003>());
+    check(&cyclic::<7, Goldilocks>());
+    check(&dense_quadratic::<10, Zp32003>(10));
+}
+
+/// Signature inputs in fewer than `SIGNATURE_SMALL_TEAM_VARIABLES` variables run on at most
+/// `SIGNATURE_SMALL_TEAM` workers; larger ones and the shipping route keep the caller's cap.
+#[test]
+fn test_small_signature_inputs_cap_the_team() {
+    assert_eq!(
+        (SIGNATURE_SMALL_TEAM_VARIABLES, SIGNATURE_SMALL_TEAM),
+        (10, 8)
+    );
+    for count in [1, 2, 4, 8, 16] {
+        let small = count.min(SIGNATURE_SMALL_TEAM);
+        assert_eq!(decide(&katsura::<9, Goldilocks>(), count).workers, small);
+        assert_eq!(decide(&noon::<7, Zp32003>(), count).workers, small);
+        assert_eq!(decide(&katsura::<11, Zp32003>(), count).workers, count);
+        assert_eq!(decide(&eco::<12, Goldilocks>(), count).workers, count);
+        assert_eq!(decide(&cyclic::<7, Goldilocks>(), count).workers, count);
+    }
+}
+
+/// On the crossover route the entry point returns the shipping F4's basis, which certifies.
+#[test]
+fn test_entry_point_equals_shipping_f4_on_the_crossover_route() {
+    fn squares<F: FiniteField>() -> Vec<MultivariatePolynomial<10, F>> {
+        (0..10)
+            .map(|i| {
+                let mut e = [0; 10];
+                e[i] = 2;
+                let mut f = [0; 10];
+                f[(i + 1) % 10] = 1;
+                MultivariatePolynomial::new(&[
+                    (crate::Monomial::new(&e), F::one()),
+                    (crate::Monomial::new(&f), F::new(i as u64 + 1)),
+                ])
+            })
+            .collect()
+    }
+    let system = squares::<Zp32003>();
+    assert_eq!(
+        decide(&system, 4).route,
+        SignatureRoute::Shipping(ShippingReason::WorkerCrossover)
+    );
+    agrees(&system);
+    agrees(&squares::<Goldilocks>());
 }

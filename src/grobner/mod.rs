@@ -73,8 +73,10 @@ pub use s_polynomial::s_polynomial;
 pub use shape_certificate::{shape_position_hypotheses, HypothesisGap, PurePower, ShapeHypotheses};
 pub use sigf4::{
     dispatch::{
-        f4_signature, f4_signature_reported, signature_route, DispatchFeatures, ShippingReason,
-        SignatureDispatch, SignatureRoute, SIGNATURE_MAX_DEGREE_SPREAD, SIGNATURE_MIN_VARIABLES,
+        f4_signature, f4_signature_reported, signature_route, Cascade, DispatchFeatures,
+        ShippingReason, SignatureDispatch, SignatureRoute, SIGNATURE_CROSSOVER_VARIABLES,
+        SIGNATURE_CROSSOVER_WORKERS, SIGNATURE_MAX_DEGREE_SPREAD, SIGNATURE_MIN_VARIABLES,
+        SIGNATURE_SMALL_TEAM, SIGNATURE_SMALL_TEAM_VARIABLES,
     },
     SigF4Error,
 };

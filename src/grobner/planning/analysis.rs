@@ -106,6 +106,24 @@ impl SystemShape {
         }
     }
 
+    /// Nonzero terms against the monomials each nonzero generator's degree allows in `variables`
+    /// variables, `terms / Σ C(variables + d, d)`. One for a dense system, near zero for a sparse
+    /// one, zero if there are no nonzero generators.
+    pub fn monomial_density(&self) -> f64 {
+        let possible: u64 = self
+            .degree_histogram
+            .iter()
+            .map(|&(degree, count)| {
+                monomials_up_to_degree(self.variables, degree).saturating_mul(count as u64)
+            })
+            .fold(0, u64::saturating_add);
+        if possible == 0 {
+            0.0
+        } else {
+            self.terms as f64 / possible as f64
+        }
+    }
+
     /// Variables ranked by how few generators constrain them, least-constrained first.
     ///
     /// A **ranking, not a recommendation**, and in particular not a count: how many variables to
@@ -119,6 +137,20 @@ impl SystemShape {
         order.sort_by_key(|&i| (self.occurrences[i], i));
         order
     }
+}
+
+/// Monomials of total degree at most `degree` in `variables` variables, `C(variables + degree,
+/// degree)`, saturating at `u64::MAX`.
+pub fn monomials_up_to_degree(variables: usize, degree: u64) -> u64 {
+    let mut count: u128 = 1;
+    for i in 1..=u128::from(degree) {
+        // C(v + i, i) = C(v + i - 1, i - 1) (v + i) / i, exact at every step.
+        count = count.saturating_mul(variables as u128 + i) / i;
+        if count >= u128::from(u64::MAX) {
+            return u64::MAX;
+        }
+    }
+    count as u64
 }
 
 /// Read the shape of `system` off its terms.
@@ -203,7 +235,7 @@ pub fn analyze<const N: usize, F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{analyze, SystemShape};
+    use super::{analyze, monomials_up_to_degree, SystemShape};
     use crate::{
         fields::Zp2147483647,
         grobner::{
@@ -379,5 +411,34 @@ mod tests {
         assert_eq!(shape.quadratic_generators, 3);
         assert_eq!(shape.max_degree, 2);
         assert_eq!(shape.linear_generators, 0);
+    }
+
+    /// Monomials of degree at most d in v variables are C(v + d, d), saturating rather than wrapping.
+    #[test]
+    fn test_monomials_up_to_degree() {
+        assert_eq!(monomials_up_to_degree(2, 2), 6);
+        assert_eq!(monomials_up_to_degree(10, 2), 66);
+        assert_eq!(monomials_up_to_degree(11, 3), 364);
+        assert_eq!(monomials_up_to_degree(0, 5), 1);
+        assert_eq!(monomials_up_to_degree(7, 0), 1);
+        assert_eq!(monomials_up_to_degree(usize::MAX, 40), u64::MAX);
+    }
+
+    /// Density is terms against the monomials each generator's degree allows: one for a dense
+    /// quadratic, small for a sparse one, zero for the empty system.
+    #[test]
+    fn test_monomial_density() {
+        let dense = analyze(&parse(
+            &[
+                "x^2 + x*y + y^2 + x + y + 1",
+                "2*x^2 + 3*x*y + y^2 + x + 5*y + 7",
+            ],
+            ["x", "y"],
+        ));
+        assert_eq!(dense.monomial_density(), 1.0);
+        let sparse = analyze(&parse(&["x^2 - 1", "y + 1"], ["x", "y"]));
+        // 2 of 6 monomials, then 2 of 3.
+        assert_eq!(sparse.monomial_density(), 4.0 / 9.0);
+        assert_eq!(analyze::<3, F>(&[]).monomial_density(), 0.0);
     }
 }
