@@ -352,28 +352,46 @@ fn test_batch_budgets_keep_conventional_f4() {
     assert!(matches!(error, F4Error::TooManyBatches { limit: 1 }));
 }
 
-/// A live-entry budget tightened below the byte budget binds on the signature route's parallel
-/// cascade too: the engine is given the smaller of the two, in bytes, and falls back typed. (The
-/// serial cascade, at one worker, charges no live bytes; #941's report records the gap.)
+/// A tight live-entry or live-byte budget binds on the signature route at one worker (serial
+/// cascade, #962) and at four (parallel cascade), at two fields: the engine is given the smaller of
+/// the two in bytes, falls back typed, and returns what conventional F4 returns under the same
+/// options.
 #[test]
-fn test_live_entry_budget_binds_on_the_signature_route() {
-    let system = katsura::<7, Goldilocks>();
-    let tight = F4Options {
-        max_live_nonzeros: 8,
-        ..adaptive(4)
-    };
-    let (result, statistics) = f4_reported(&system, GREVLEX, &tight);
-    let route = statistics.graded_route.expect("routed").route;
-    assert!(
-        matches!(
-            route,
-            SignatureRoute::Shipping(ShippingReason::Fallback(F4Error::TooManyLiveBytes { .. }))
-        ),
-        "{route:?}"
-    );
-    let plain = F4Options {
-        graded_engine: GradedEngine::Conventional,
-        ..tight
-    };
-    assert_eq!(result, f4_reported(&system, GREVLEX, &plain).0);
+fn test_live_budgets_bind_on_the_signature_route_at_every_team() {
+    fn binds<F: FiniteField>() {
+        let system = katsura::<7, F>();
+        for count in [1, 4] {
+            for tight in [
+                F4Options {
+                    max_live_nonzeros: 8,
+                    ..adaptive(count)
+                },
+                F4Options {
+                    max_live_bytes: 64,
+                    ..adaptive(count)
+                },
+            ] {
+                let decided = signature_route(&system, GREVLEX, &tight).expect("graded");
+                assert_eq!(decided.route, SignatureRoute::Signature, "{count} workers");
+                let (result, statistics) = f4_reported(&system, GREVLEX, &tight);
+                let route = statistics.graded_route.expect("routed").route;
+                assert!(
+                    matches!(
+                        route,
+                        SignatureRoute::Shipping(ShippingReason::Fallback(
+                            F4Error::TooManyLiveBytes { .. }
+                        ))
+                    ),
+                    "{count} workers: {route:?}"
+                );
+                let plain = F4Options {
+                    graded_engine: GradedEngine::Conventional,
+                    ..tight
+                };
+                assert_eq!(result, f4_reported(&system, GREVLEX, &plain).0);
+            }
+        }
+    }
+    binds::<Goldilocks>();
+    binds::<Zp32003>();
 }
