@@ -322,6 +322,49 @@ fn test_wall_budget_returns_a_typed_error() {
     assert_eq!(statistics.batches, 1, "one batch is always reduced");
 }
 
+/// The serial cascades (design 1 at one worker, design 2's pre-reduction at four) charge the live
+/// budget (#962): a small limit is a typed refusal that abandons the batch unsettled, at two
+/// fields, and a finished run reports a peak above it and within the default limit.
+#[test]
+fn test_serial_cascade_charges_the_live_budget() {
+    fn charged<F: FiniteField>() {
+        let system = katsura::<5, F>();
+        for workers in [1, 4] {
+            let serial = SigF4Options {
+                workers,
+                parallel_cascade: false,
+                ..SigF4Options::checked()
+            };
+            let tight = SigF4Options {
+                max_live_bytes: Some(2_000),
+                ..serial.clone()
+            };
+            let (result, s) = sig_f4_reported(&system, GREVLEX, &tight);
+            assert!(
+                matches!(
+                    result,
+                    Err(SigF4Error::Budget(F4Error::TooManyLiveBytes {
+                        limit: 2_000,
+                        ..
+                    }))
+                ),
+                "{workers} workers: {result:?}"
+            );
+            assert_eq!(
+                s.batch_trace.len() + 1,
+                s.batches,
+                "the refused batch is abandoned before any target is settled"
+            );
+            let (result, s) = sig_f4_reported(&system, GREVLEX, &serial);
+            result.expect("the default budget suffices");
+            assert!(s.claim_peak_live_bytes > 2_000, "{workers} workers");
+            assert!(s.claim_peak_live_bytes <= serial.max_live_bytes.expect("default is set"));
+        }
+    }
+    charged::<Zp32003>();
+    charged::<Goldilocks>();
+}
+
 /// The counters partition as RFC §10.1 reports them: zero-row work is part of the total.
 #[test]
 fn test_statistics_are_internally_consistent() {
