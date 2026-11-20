@@ -802,6 +802,21 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             setup: clock.elapsed(),
             ..Default::default()
         };
+        // Charged as the parallel cascade charges (#962): the rows, the pivot maps and every
+        // workspace up front, then each reduced row as it is made. A crossing abandons the batch
+        // before any of it is settled.
+        let mut live = LiveBudget::new(self.options.max_live_bytes);
+        let phase_a_workers = if self.options.workers > 1 {
+            self.options.workers
+        } else {
+            0
+        };
+        let fixed = batch_rows_bytes(&block, &targets)
+            + 2 * ncols * size_of::<u32>()
+            + (1 + phase_a_workers) * Workspace::<F>::bytes(ncols);
+        if let Err(stop) = live.charge(fixed) {
+            return Err(self.abandon(&live, clock, stop));
+        }
         #[cfg(feature = "research-sigf4-split")]
         let pass_clock = Instant::now();
         let prereduced: Vec<Reduced<F>> = if self.options.workers > 1 {
@@ -824,10 +839,18 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         #[cfg(feature = "research-sigf4-split")]
         let pass_clock = Instant::now();
+        let prereduced_bytes = prereduced
+            .iter()
+            .map(|(row, _)| std::mem::size_of_val(row.as_slice()))
+            .sum::<usize>();
+        if let Err(stop) = live.charge(prereduced_bytes) {
+            return Err(self.abandon(&live, clock, stop));
+        }
         let mut prereduced = prereduced.into_iter();
 
         let mut target_at: Vec<u32> = vec![NONE; ncols];
-        let mut results: Vec<(Signature<N>, Vec<(u32, F)>)> = Vec::new();
+        // Every target's outcome in signature order; `target_at` indexes the elements among them.
+        let mut finals: Vec<(Signature<N>, Kind, Vec<(u32, F)>, u64)> = Vec::new();
         let mut workspace = Workspace::new(ncols);
         let check = self.options.check_signatures;
         #[cfg(feature = "research-sigf4-replay")]
@@ -841,7 +864,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 let pivot = if let Some(pivot) = block.admissible(c, &t) {
                     Some(pivot)
                 } else if target_at[c] != NONE {
-                    let (s, entries) = &results[target_at[c] as usize];
+                    let (s, _, entries, _) = &finals[target_at[c] as usize];
                     assert!(
                         !check || s.cmp_in(&t, order) == Ordering::Less,
                         "an earlier target must have a smaller signature"
@@ -877,11 +900,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                     *v *= inverse;
                 }
             }
-            self.settle(t, kind, &out, earlier + later, columns);
-            if kind == Kind::Element {
-                target_at[out[0].0 as usize] = results.len() as u32;
-                results.push((t, out));
+            if let Err(stop) = live.charge(std::mem::size_of_val(out.as_slice())) {
+                return Err(self.abandon(&live, clock, stop));
             }
+            if kind == Kind::Element {
+                target_at[out[0].0 as usize] = finals.len() as u32;
+            }
+            finals.push((t, kind, out, earlier + later));
         }
         #[cfg(feature = "research-sigf4-replay")]
         replay.finish();
@@ -890,8 +915,23 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             split.serial_pass = pass_clock.elapsed();
             self.stats.split.batches.push(split);
         }
+        self.stats.claim_peak_live_bytes = self.stats.claim_peak_live_bytes.max(live.peak);
+        let mut results = Vec::new();
+        for (t, kind, row, products) in finals {
+            self.settle(t, kind, &row, products, columns);
+            if kind == Kind::Element {
+                results.push((t, row));
+            }
+        }
         self.stats.elimination += clock.elapsed();
         Ok(finish_batch(results, columns))
+    }
+
+    /// Records a serial batch abandoned on its live budget, whole and before any settlement.
+    fn abandon(&mut self, live: &LiveBudget, clock: Instant, stop: SigF4Error) -> SigF4Error {
+        self.stats.claim_peak_live_bytes = self.stats.claim_peak_live_bytes.max(live.peak);
+        self.stats.elimination += clock.elapsed();
+        stop
     }
 
     /// The parallel cascade (M31-S2): #902's prereduce + claim schedule, then design 1's
@@ -904,10 +944,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         columns: &[Monomial<N>],
         clock: Instant,
     ) -> Result<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>, SigF4Error> {
-        let entry = size_of::<(u32, F)>();
-        let rows_bytes = (targets.iter().map(|(_, r)| r.len()).sum::<usize>()
-            + block.rows.iter().map(Vec::len).sum::<usize>())
-            * entry;
+        let rows_bytes = batch_rows_bytes(block, targets);
         let job = Claim {
             block,
             targets,
@@ -1100,6 +1137,48 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     }
 }
 
+/// The batch's sparse rows, targets and reducers, already allocated when elimination starts.
+fn batch_rows_bytes<const N: usize, F>(
+    block: &ReducerBlock<'_, N, F>,
+    targets: &[(Signature<N>, Vec<(u32, F)>)],
+) -> usize {
+    (targets.iter().map(|(_, r)| r.len()).sum::<usize>()
+        + block.rows.iter().map(Vec::len).sum::<usize>())
+        * size_of::<(u32, F)>()
+}
+
+/// The serial cascade's live-byte account, in the parallel cascade's units (#962): crossing the
+/// limit is [`F4Error::TooManyLiveBytes`], which the dispatch falls back from.
+struct LiveBudget {
+    live: usize,
+    peak: usize,
+    limit: Option<usize>,
+}
+
+impl LiveBudget {
+    fn new(limit: Option<usize>) -> Self {
+        Self {
+            live: 0,
+            peak: 0,
+            limit,
+        }
+    }
+
+    fn charge(&mut self, bytes: usize) -> Result<(), SigF4Error> {
+        self.live = self.live.saturating_add(bytes);
+        self.peak = self.peak.max(self.live);
+        match self.limit {
+            Some(limit) if self.live > limit => {
+                Err(SigF4Error::Budget(F4Error::TooManyLiveBytes {
+                    bytes: self.live,
+                    limit,
+                }))
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn finish_batch<const N: usize, F: FiniteField>(
     results: Vec<(Signature<N>, Vec<(u32, F)>)>,
@@ -1153,6 +1232,13 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
 pub(super) struct Workspace<F> {
     acc: Vec<F>,
     touched: Vec<u64>,
+}
+
+impl<F> Workspace<F> {
+    /// What one workspace over `ncols` columns holds, as the live budget charges it.
+    pub(super) fn bytes(ncols: usize) -> usize {
+        ncols * size_of::<F>() + ncols.div_ceil(64) * size_of::<u64>()
+    }
 }
 
 impl<F: FiniteField> Workspace<F> {

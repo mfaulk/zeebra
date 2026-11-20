@@ -62,9 +62,9 @@ pub struct SigF4Options {
     /// Finish each batch's cascade on `workers` threads under #902's "prereduce + claim" schedule
     /// (M31-S2, #904) instead of design 2's serial pass. Every result row equals design 1's.
     pub parallel_cascade: bool,
-    /// Bytes one batch of the parallel cascade may hold: its sparse rows, pre-reduced and final
-    /// rows, per-worker workspaces and coordination metadata. Crossing it abandons the batch with
-    /// [`F4Error::TooManyLiveBytes`]. `None` is unbounded; the serial designs do not read it.
+    /// Bytes one batch's elimination may hold, on either cascade: its sparse rows, pre-reduced
+    /// and final rows, workspaces and pivot or coordination metadata. Crossing it abandons the
+    /// batch with [`F4Error::TooManyLiveBytes`]. `None` is unbounded.
     pub max_live_bytes: Option<usize>,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
@@ -181,9 +181,10 @@ pub struct SigF4Statistics {
     pub interreduction: Duration,
     pub total: Duration,
     /// Parallel cascade only: times a target waited for every earlier target's announcement, and
-    /// for an earlier target's final row; and the most live bytes any batch held.
+    /// for an earlier target's final row.
     pub claim_announcement_waits: u64,
     pub claim_final_waits: u64,
+    /// The most live bytes any batch held, on either cascade (the serial one since #962).
     pub claim_peak_live_bytes: usize,
     /// Parallel cascade only: phase A's wall and the cascade pass's, summed over batches.
     pub claim_phase_a: Duration,
