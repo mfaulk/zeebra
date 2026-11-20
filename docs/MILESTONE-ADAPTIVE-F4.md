@@ -836,9 +836,9 @@ past 8 workers: its Eco-12 wall went 1,440 → 1,418 ms from 8 to 16 and its sym
 `592653ee`).
 
 **Why symbolic grows with workers.** Of Eco-12's +90 ms (462 → 552 ms), #953 attributes about
-50 ms to CPU clock and about 40 ms to cross-CCD cache locality, with zero extra symbolic work. That
-text is at `e2a98685:docs/research/m32-parallel-symbolic.md` §5. The next merge (#956) dropped it
-from `main`, and #959 restores it.
+50 ms to CPU clock and about 40 ms to cross-CCD cache locality, with zero extra symbolic work
+([`m32-parallel-symbolic.md`](research/m32-parallel-symbolic.md) §5, restored on `main` by #959 in
+`dfd984c0`).
 
 ### 15.4 Dispatch
 
@@ -882,7 +882,7 @@ On the merged record so far:
 | Criterion | Status | Evidence |
 |---|---|---|
 | Min 1. Baseline | **met** | #939: M31's ratios reproduce within 1.6% (worst MQ10 / 32003, 1.609 against 1.583); component split; §6.3 re-derived; #934 and #935 closed ([`m32-baseline.md`](research/m32-baseline.md)) |
-| Min 2. Parallel symbolic investigated | **met** | #933: one design, correctness argument, replay ceiling S16 = 2.95, Gate P passed. The attribution is #953's (`e2a98685`; see §15.3) |
+| Min 2. Parallel symbolic investigated | **met** | #933: one design, correctness argument, replay ceiling S16 = 2.95, Gate P passed. The attribution is #953's (§15.3) |
 | Min 3. MQ10 | **met** | #927: Gate R passed at revision 1. MQ10 is routed, with the caveats in §15.8.3 |
 | Min 4. Safety of anything adopted | `TODO(F3)` | the one adopted change is the dispatch; Gate Q `check`; the T8 gap in §15.5 |
 | Min 5. Decision | `TODO(F3)` | #937 |
