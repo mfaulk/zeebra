@@ -74,6 +74,10 @@ pub enum ShippingReason {
     Linear,
     /// The nonlinear degrees spread wider than [`SIGNATURE_MAX_DEGREE_SPREAD`].
     DegreeSpread,
+    /// The order is graded-lex. The signature engine is correct there but not usable: on
+    /// katsura-9, katsura-11 and MQ11 it passed 8 GiB where conventional F4 takes seconds, and on
+    /// MQ10 its signature basis reached 34× the grevlex run's (#961). Only grevlex is routed to it.
+    Order,
     /// A quadratic input in [`SIGNATURE_CROSSOVER_VARIABLES`] with at least
     /// [`SIGNATURE_CROSSOVER_WORKERS`] workers, where the shipping F4's parallel elimination
     /// outruns the signature engine's serial symbolic stage.
