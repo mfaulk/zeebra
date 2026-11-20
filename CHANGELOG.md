@@ -14,9 +14,9 @@ change to `y` may break the public API.
   `f4_signature`'s pre-solve dispatch, with the same reduced basis; `F4Statistics::graded_route`
   records the decision. Off by default at every preset, so nothing changes unless a caller opts in;
   Lex, `Weighted` and `Block`, `f4` and the observer entry points keep conventional F4. Breaking:
-  an exhaustive `F4Options` or `F4Statistics` literal needs the new field (#941). Known gaps:
-  under graded-lex the signature route can exhaust memory (#961), and at one worker it charges no
-  live-byte budget (#962). Use the option under grevlex only.
+  an exhaustive `F4Options` or `F4Statistics` literal needs the new field (#941). Graded-lex
+  always runs conventional F4 (`ShippingReason::Order`, #961), and the signature route charges
+  the live-byte budget at every worker count (#962).
 
 - `F4Options::max_certify_time`, a wall budget for the `certify` check separate from
   `max_wall_time`, checked between reductions. Running out is the new
@@ -69,6 +69,14 @@ change to `y` may break the public API.
 - F4's recommended/default live allowance is 32 million entries and 512 MB, sized from measured
   reduced-row peaks (#659, #490). `baseline()` retains 20 million entries and 320 MB; explicit
   caller budgets remain enforced. The allowance bounds matrix payload, not process RSS.
+- `f4_signature` and `GradedEngine::Adaptive` send graded-lex to conventional F4, reported as the
+  new `ShippingReason::Order`: the signature engine passed 8 GiB there on katsura-9, katsura-11
+  and MQ11 (#961). Grevlex routing is unchanged. Breaking only for an exhaustive in-crate match;
+  `ShippingReason` is `#[non_exhaustive]`.
+- The signature engine's serial cascade, which `f4_signature` runs at one worker, now charges
+  `max_live_bytes` (and a tightened `max_live_nonzeros`, through the dispatch) and refuses with
+  `TooManyLiveBytes`, from which the dispatch falls back to conventional F4 (#962).
+  `SigF4Statistics::claim_peak_live_bytes` now reports either cascade's peak.
 
 ## [0.1.0] - 2026-11-10
 
