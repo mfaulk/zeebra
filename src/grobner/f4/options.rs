@@ -632,8 +632,12 @@ pub enum GradedEngine {
     /// decision. On the signature route the statistics carry only batches, matrix extents and
     /// elements added, and the rest stay zero.
     ///
-    /// Qualified by #941 (`docs/research/m32-qualification.md`); whether it becomes the default is
-    /// #937's decision.
+    /// **Do not use it under `GradedLexicographic` (#961).** On non-trivial systems the signature
+    /// route there exhausted memory past every budget but wall time, or ran far slower than
+    /// conventional F4.
+    ///
+    /// Measured by #941 (`docs/research/m32-qualification.md`), which did not pass Gate Q; it stays
+    /// opt-in, and whether it becomes the default is #937's decision.
     Adaptive,
 }
 

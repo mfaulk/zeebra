@@ -14,7 +14,9 @@ change to `y` may break the public API.
   `f4_signature`'s pre-solve dispatch, with the same reduced basis; `F4Statistics::graded_route`
   records the decision. Off by default at every preset, so nothing changes unless a caller opts in;
   Lex, `Weighted` and `Block`, `f4` and the observer entry points keep conventional F4. Breaking:
-  an exhaustive `F4Options` or `F4Statistics` literal needs the new field (#941).
+  an exhaustive `F4Options` or `F4Statistics` literal needs the new field (#941). Known gaps:
+  under graded-lex the signature route can exhaust memory (#961), and at one worker it charges no
+  live-byte budget (#962). Use the option under grevlex only.
 
 - `F4Options::max_certify_time`, a wall budget for the `certify` check separate from
   `max_wall_time`, checked between reductions. Running out is the new
