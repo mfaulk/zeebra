@@ -4,6 +4,7 @@
 # reserved. Inside another session's reservation the suites queue behind its benchlock.
 #
 #   setsid -w research/m32-qualification/run.sh OUTDIR dev small
+#   CAMPAIGN_ARGS="--reps 12 --first-rep 9 --rows R... --arms A..." run.sh OUTDIR dev   # §10.3 extension
 #
 # BINS/{head,m31}/sig_f4_study are built from `git archive`s of the head and reference commits into
 # separate CARGO_TARGET_DIRs (release, fat LTO, one codegen unit, x86-64-v3, --features research-sigf4).
@@ -33,6 +34,6 @@ status=0
 for suite in "$@"; do
   echo "== $suite $(date -Is) load=$(cut -d' ' -f1 /proc/loadavg)" | tee -a "$out/session.log"
   tools/bench-reserve.sh run "$TAG" 8-23 python3 -u research/m32-qualification/campaign.py \
-    --suite "$suite" --bins "$BINS" --output "$out/$suite.jsonl" 2>&1 | tee -a "$out/session.log" || status=$?
+    --suite "$suite" --bins "$BINS" --output "$out/$suite.jsonl" ${CAMPAIGN_ARGS:-} 2>&1 | tee -a "$out/session.log" || status=$?
 done
 exit "$status"

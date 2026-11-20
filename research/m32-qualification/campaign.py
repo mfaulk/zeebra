@@ -7,8 +7,8 @@ per repetition:
   f4:W   conventional F4 from the head build (F2 plus the option), `--engine f4`;
   ad:W   the head build's `F4Options::graded_engine = Adaptive` through `f4_reported`,
          `--engine adaptive`: the path the option qualifies;
-  m31:W  the M31 reference entry point (`measured/927-base`, `c1d93389`, timed `src/` equal to
-         `8715c8ed`), `--engine entry`.
+  m31:W  the M31 reference entry point (`measured/927-base`, `c1d93389`, whose `src/` is
+         `ce67df76`'s, not `8715c8ed`'s), `--engine entry`.
 
 Timed suites (each read once; §10.3's precision rule alone decides an n = 12 extension block):
 

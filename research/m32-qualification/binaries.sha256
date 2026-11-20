@@ -1,0 +1,4 @@
+e4268234f1aa3227479fe09813c83f983b97d602acd4938a895c6652788be8cf  head/sig_f4_study  f8ec0b4c (F2 f427e8d7 + #941 option)
+bfaca0e578817a21e736e96676d5525642c26213920e4f39bec2ae933660d821  m31/sig_f4_study  c1d93389 (measured/927-base; src/ identical to ce67df76)
+81dc5c4ce1fd7223bc60ceb2ac60b2719b0015e7e42587d3b6a869ed1c5e62f0  groebner-rs-driver  M30-0 build (81dc5c4c), copied from /buildcache/cargo-target/zeebra-939/bin
+92d8d7bb7d8f2d8fee6eec8186b925d427ada6555594c35e0ae93f7e3acb3589  f2/sig_f4_study  f427e8d7 (F2; diagnostic only, not a Gate Q arm)
