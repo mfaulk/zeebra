@@ -6,7 +6,7 @@
 the split, small-control and A/B builds (the baseline's library plus `research-*`-gated
 instruments). 2026-11-19, `tools/bench-reserve.sh` sessions on CCDs 1–2 under `benchlock`
 (`zb-939`). Other sessions' compilers ran on the remaining CPUs throughout (load 1–18), so
-absolute walls are beside builds. Executable SHA-256s, toolchain and options:
+absolute walls are beside builds. §4.1's quiet re-read (#964): `45107ec3`, 2026-11-20, load 1.4–3.4. Executable SHA-256s, toolchain and options:
 [`research/m32-baseline/identities.json`](../../research/m32-baseline/identities.json).
 **Plan:** [`MILESTONE-ADAPTIVE-F4.md`](../MILESTONE-ADAPTIVE-F4.md) §6.3, §7.1, §8.3, §10.
 **Records and generated tables:** [`research/m32-baseline/`](../../research/m32-baseline/),
@@ -164,6 +164,12 @@ The unfused split build is faster even though it clocks every reducer lookup. Th
 a design. It is row-dependent: it loses on Katsura-11, and it is unexplained (instruction-level
 parallelism in the hash probes is one candidate). It is handed to #933 with the records. The
 component shares above are the split build's own, so they describe the unfused path.
+
+**Quiet re-read (#964).** The same suite, re-run on 2026-11-20 at load 1.4–3.4 from fresh builds of
+`45107ec3`, reads symbolic 0.612 / 0.675 (Eco-12), 1.143 / 1.154 (Katsura-11) and 0.656 / 0.698
+(MQ10) at 1 / 16 workers: the same directions, within about 0.02 except Katsura-11 at 16 workers.
+The table above is the original read and is unchanged;
+[`research/m32-katsura9-gap/`](../../research/m32-katsura9-gap/README.md) has the re-read.
 
 ## 5. Eco-12's ~300 ms outside the four stages
 
