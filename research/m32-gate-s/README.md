@@ -1,10 +1,11 @@
 # #940 M32-S1b Gate S: campaign and evidence
 
-**Result: Gate S fails.** T1 and T2 pass with wide margins, but three dev-corpus cells exceed
-head ÷ base 95% upper 1.05 (below). Per the plan (`docs/MILESTONE-ADAPTIVE-F4.md` §8.2), #940
-closes with this negative result, and a second design needs an owner decision on #938.
-**Measured at:** `592653ee` (head: the parallel closure, tagged `measured/940-gate-s`) against its
-merge base `ce67df76`. Each `sig_f4_study` was built from a `git archive` of its commit into its own
+**Result: Gate S fails twice.** The first read missed three dev-corpus cells. The owner then allowed
+one bounded fix pass and one more read (#938). The re-read ([below](#re-read-after-the-fix-pass),
+records in [`s2/`](s2/tables.md)) fixed both 1-worker cells but still missed Noon-7 / Goldilocks at
+16 workers. Under plan §8.2, #940 closes with this negative result and no further attempt.
+**Measured at:** `592653ee` (first read, tagged `measured/940-gate-s`) and `62cbe4de` (re-read,
+tagged `measured/940-gate-s2`), each against the merge base `ce67df76`. Each `sig_f4_study` was built from a `git archive` of its commit into its own
 target directory (release, `--features research-sigf4`). SHA-256 in
 [binaries.sha256](binaries.sha256). Later branch commits touch only `research/`.
 Gate S is read once: n = 9 fresh processes per cell (n = 31 for the rows under 50 ms, read on the
@@ -16,13 +17,53 @@ in-process call time), head and base interleaved and rotated in one session per 
 | [campaign.py](campaign.py) | the controller: M31's `run_one` child runner over the head and base arms; suites `gate`, `small`, `mq10`, `curve` |
 | [run.sh](run.sh) | one session: stage both arms' binaries on tmpfs, reserve CCDs 1–2 before each suite unless another session holds them, `bench-reserve run zb-940 8-23`, release on exit |
 | [summarize.py](summarize.py) → [tables.md](tables.md) | paired per-repetition ratios with 95% bootstrap intervals, the §10.3 precision rule, the worker curve and the MQ10 re-read |
-| [test_campaign.py](test_campaign.py) | unit tests for the plan and the summary; run in CI |
+| [test_campaign.py](test_campaign.py) | unit tests for the plan and the summary (`python3 -m unittest discover -s research/m32-gate-s`) |
 | `gate.jsonl.gz` | Eco-12 `cl:16` and `en:1/16`, and the dev rows at or above 50 ms at `en:1/16` |
 | `small.jsonl.gz` | the dev rows under 50 ms at `en:1/16`, n = 31 |
 | `mq10.jsonl.gz` | MQ10 at both fields: `en` at 1/4/8/16 workers on both builds, and the head's shipping F4 |
 | `curve.jsonl.gz` | `cl` at 1/2/4/8/16 workers on Eco-12 and MQ10 / GF(32003), with stage clocks |
 
-## Gate S
+## Re-read after the fix pass
+
+The owner's scope on #938 allowed three things: (a) not starting the team where it cannot pay, (b)
+the 1-worker regression, and (c) timing the serial merge.
+
+- **(a) Start gate.** Work is counted in units: a basis lead tested is 1 unit, an emitted term 8
+  (`a31d31aa..62cbe4de`, +59 net src lines). A team starts only when the rest of a level holds 1 M
+  units. Once started, it continues on steps of 100 k, and it sorts only if a level started it. The
+  thresholds were fitted at 16 workers on dev rows. Across those rows the units track time within
+  1.75–4.7 ns per unit, where items alone vary from 0.5 to 20 µs.
+- **(b) 1-worker regression.** Two causes. First, `least_ratio` lost its inlining once the parallel
+  closure became its second caller; `#[inline(always)]` restores it. Second, the rest of the gap was
+  in elimination, whose code is unchanged. With both builds at 64-byte function alignment
+  (`-C llvm-args=-align-all-functions=6`, a diagnostic build only), head ÷ base at 1 worker was
+  0.997 on Katsura-11 and 0.999 on MQ11 / Goldilocks. So the remainder is code placement.
+- **(c) Serial merge.** On Eco-12 the merge took 20 ms with 8 workers on one CCD, 35 ms with 16
+  workers on two CCDs, and 34 ms with 8 workers split over two CCDs. Crossing CCDs costs the time,
+  not the worker count. The crate has no affinity control, so there was no cheap placement fix in
+  the design. The worker curve already peaks at 8 workers.
+  These were exploratory runs on CPUs 32–47, not gate cells.
+
+The re-read ran under this session's own reservation: fresh processes, n = 9, the same thresholds
+([`s2/tables.md`](s2/tables.md)).
+
+| Criterion | Cell [95%] | Threshold | Result |
+|---|---|---|---|
+| T1 Eco-12 symbolic, base ÷ head, `cl:16` | 2.621 [2.602, 2.652] | ≥ 1.5, lower ≥ 1.4 | met |
+| T2 Eco-12 process wall, head ÷ base, `en:16` | 0.824 [0.812, 0.831] | ≤ 0.90, upper ≤ 0.92 | met |
+| Katsura-11 / Goldilocks, 1 worker | 1.007 [0.996, 1.010] | upper ≤ 1.05 | met (was 1.044) |
+| MQ11 / Goldilocks, 1 worker | 1.000 [0.996, 1.003] | upper ≤ 1.05 | met (was 1.037) |
+| **Noon-7 / Goldilocks, 16 workers** | **1.057 [1.041, 1.082]** | upper ≤ 1.05 | **missed** |
+| Peak RSS | max 1.094 (MQ10 / GF(32003), 16 workers) | ≤ 1.10 | met |
+
+The start gate did not stop Noon-7: the head still runs 14 team levels there (diagnostic run), so
+its symbolic stage is 27.7 against 23.0 ms. The sweep that fitted 1 M units read Noon-7 at
+23.0 ms, but that came from 3 repetitions on a loaded machine and did not hold. The `gate` and `mq10`
+suites ran to completion. The session was then stopped before `small` and `curve`, because the
+missed cell already decides the gate: `small` had recorded nothing, and `curve` would have added
+no further evidence. The MQ10 re-read matches the first read within its intervals.
+
+## Gate S (first read)
 
 | Criterion | Cell [95%] | Threshold | Result |
 |---|---|---|---|

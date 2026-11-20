@@ -2,8 +2,9 @@
 
 **Status:** design selected and argued (§2, §3) before any implementation, 2026-11-19. Replay
 ceiling (§4): Eco-12 symbolic 2.95× at 16 workers, projected wall 0.79× the M31 reference.
-**Gate P passes** (§6). #940 built this design and **Gate S fails** on three dev-corpus cells
-while T1 and T2 pass ([`research/m32-gate-s`](../../research/m32-gate-s/README.md)). Attribution split by cause is incomplete (§5): it needs #939's frequency
+**Gate P passes** (§6). #940 built this design. **Gate S failed** on both its reads; T1 and T2 passed both times. The
+re-read, after the owner's fix pass, still missed Noon-7 at 16 workers
+([`research/m32-gate-s`](../../research/m32-gate-s/README.md)). Attribution split by cause is incomplete (§5): it needs #939's frequency
 record.
 **Measured at:** `8694d172` — the M32 F0 baseline `7b25a1ee` plus this branch's replay instrument
 (no change to the engine's algebra or its serial closure; tagged `measured/933-symbolic-replay`).
