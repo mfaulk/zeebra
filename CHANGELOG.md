@@ -9,6 +9,13 @@ change to `y` may break the public API.
 
 ### Added
 
+- `F4Options::graded_engine` and `GradedEngine`: with `GradedEngine::Adaptive`, `f4_with_options`,
+  `f4_reported` and the solvers built on them run graded orders (grevlex, graded-lex) through
+  `f4_signature`'s pre-solve dispatch, with the same reduced basis; `F4Statistics::graded_route`
+  records the decision. Off by default at every preset, so nothing changes unless a caller opts in;
+  Lex, `Weighted` and `Block`, `f4` and the observer entry points keep conventional F4. Breaking:
+  an exhaustive `F4Options` or `F4Statistics` literal needs the new field (#941).
+
 - `F4Options::max_certify_time`, a wall budget for the `certify` check separate from
   `max_wall_time`, checked between reductions. Running out is the new
   `F4Error::CertificationTimeBudgetExceeded { progress }` (`StopKind::Time`), never

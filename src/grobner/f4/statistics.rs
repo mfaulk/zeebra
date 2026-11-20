@@ -674,6 +674,11 @@ impl BatchStatistics {
 /// What a whole F4 computation cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct F4Statistics {
+    /// The dispatch decision under [`GradedEngine::Adaptive`](super::GradedEngine::Adaptive) on a
+    /// graded order; `None` when the option is off, the order is not graded, or the entry point
+    /// does not route.
+    pub graded_route: Option<crate::grobner::SignatureDispatch>,
+
     /// Aggregate selected-target work and temporary reservations; mathematical peaks stay separate.
     pub candidate_reduction: CandidateReductionStatistics,
 

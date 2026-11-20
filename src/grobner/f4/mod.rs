@@ -54,8 +54,9 @@ pub use membership::{
 };
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
-    BatchOrder, F4Error, F4Options, Gf2Elimination, InterreductionRoute, PairMultiples,
-    ParallelForward, ParallelSymbolic, ReducerSelection, ReductionStrategy, StopKind,
+    BatchOrder, F4Error, F4Options, Gf2Elimination, GradedEngine, InterreductionRoute,
+    PairMultiples, ParallelForward, ParallelSymbolic, ReducerSelection, ReductionStrategy,
+    StopKind,
 };
 pub use reduction::{
     build_batch_matrix, reduce_batch, reduce_batch_in, reduce_batch_observed_in, BatchOutcome,
@@ -109,12 +110,38 @@ pub fn f4<const N: usize, F: FiniteField>(
 }
 
 /// As [`f4`], under the given limits, additionally reporting the work performed.
+///
+/// With [`F4Options::graded_engine`] set to [`GradedEngine::Adaptive`], a graded order goes
+/// through [`f4_signature`](crate::grobner::f4_signature)'s dispatch, which returns the same
+/// basis; every other order, and the default, runs conventional F4. [`f4_reported`] routes the
+/// same way.
 pub fn f4_with_options<const N: usize, F: FiniteField>(
     generators: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     options: &F4Options,
 ) -> Result<(Vec<MultivariatePolynomial<N, F>>, F4Statistics), F4Error> {
+    if let Some((basis, statistics)) = graded_engine(generators, order, options) {
+        return basis.map(|basis| (basis, statistics));
+    }
     f4_observed(generators, order, options, &mut observer::Ignore)
+}
+
+/// [`F4Options::graded_engine`]'s route, when it applies.
+#[inline]
+fn graded_engine<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+) -> Option<(
+    Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
+    F4Statistics,
+)> {
+    match options.graded_engine {
+        GradedEngine::Conventional => None,
+        GradedEngine::Adaptive => {
+            crate::grobner::sigf4::dispatch::adaptive_f4(generators, order, options)
+        }
+    }
 }
 
 /// As [`f4_with_options`], returning the statistics accumulated even when a limit is crossed.
@@ -146,6 +173,9 @@ pub fn f4_reported<const N: usize, F: FiniteField>(
     Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
     F4Statistics,
 ) {
+    if let Some(routed) = graded_engine(generators, order, options) {
+        return routed;
+    }
     let mut statistics = new_statistics::<F>();
     let basis = f4_into(
         generators,
