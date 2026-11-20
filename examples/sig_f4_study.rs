@@ -37,10 +37,11 @@ use zeebra::{
         benchmark_systems::{cyclic, eco},
         certify_f4_output_with_workers,
         differential::polynomial_to_string,
-        external::{corpus, FieldSpec, Instance},
+        external::{corpus, ExternalSolver, FieldSpec, Instance, Limits, SingularSolver, Task},
         f4_reported, f4_signature_reported,
+        reference::buchberger_reference,
         sigf4::{sig_f4_reported, SigF4Options, SigF4Statistics},
-        F4Options, ParallelForward, ParallelSymbolic,
+        F4Options, GradedEngine, ParallelForward, ParallelSymbolic,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -64,7 +65,12 @@ struct Args {
     symbolic: bool,
     min_frontier: usize,
     repeat: usize,
+    order: MonomialOrder,
+    sample_threads: bool,
 }
+
+/// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
+const REFERENCES: [&str; 3] = ["groebner-rs", "singular", "reference"];
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
     let mut parsed = Args {
@@ -80,6 +86,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         symbolic: false,
         min_frontier: 512,
         repeat: 1,
+        order: ORDER,
+        sample_threads: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -99,6 +107,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                 parsed.wall = Duration::from_secs(value()?.parse().map_err(|_| "--wall-s")?)
             }
             "--certify" => parsed.certify = true,
+            "--sample-threads" => parsed.sample_threads = true,
             "--discovery" => parsed.discovery = true,
             "--replay" => parsed.replay = true,
             "--claim" => parsed.claim = true,
@@ -113,14 +122,29 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                     .filter(|&k| k > 0)
                     .ok_or("--repeat takes a positive integer")?
             }
+            "--order" => {
+                parsed.order = match value()?.as_str() {
+                    "grevlex" => MonomialOrder::GradedReverseLexicographic,
+                    "grlex" => MonomialOrder::GradedLexicographic,
+                    _ => return Err("--order must be grevlex or grlex".into()),
+                }
+            }
             other => return Err(format!("unexpected argument {other}")),
         }
     }
     if !["goldilocks", "wide64", "gf32003", "m31"].contains(&parsed.field.as_str()) {
         return Err("--field must be goldilocks, wide64, gf32003 or m31".into());
     }
-    if !["sigf4", "f4", "entry"].contains(&parsed.engine.as_str()) {
-        return Err("--engine must be sigf4, f4 or entry".into());
+    if !["sigf4", "f4", "entry", "adaptive"].contains(&parsed.engine.as_str())
+        && !REFERENCES.contains(&parsed.engine.as_str())
+    {
+        return Err(
+            "--engine must be sigf4, f4, entry, adaptive, groebner-rs, singular or reference"
+                .into(),
+        );
+    }
+    if REFERENCES.contains(&parsed.engine.as_str()) && (parsed.repeat > 1 || parsed.certify) {
+        return Err("a reference engine is neither timed repeatedly nor certified".into());
     }
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
@@ -790,6 +814,144 @@ mod closure {
     }
 }
 
+/// The basis from an engine independent of Zeebra's: Singular through its adapter, the pinned
+/// groebner-rs driver, or the naive Buchberger reference in-process. External answers are parsed back and
+/// made monic, so the digest is computed exactly as for Zeebra's own bases.
+fn reference<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    input: &Input,
+    args: &Args,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, String> {
+    if args.engine == "reference" {
+        return Ok(buchberger_reference(system, args.order));
+    }
+    let modulus: u64 = match args.field.as_str() {
+        "goldilocks" => 18446744069414584321,
+        "wide64" => 18446744073709551263,
+        "gf32003" => 32003,
+        _ => 2147483647,
+    };
+    let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
+    let instance = Instance::new(
+        &args.name,
+        args.name.split('-').next().unwrap_or("row"),
+        FieldSpec::prime(modulus),
+        input.variables.clone(),
+        system
+            .iter()
+            .map(|p| polynomial_to_string(p, &names, args.order))
+            .collect(),
+        args.order,
+    );
+    let scratch = std::path::PathBuf::from(std::env::var("TMPDIR").map_err(|_| "set TMPDIR")?)
+        .join(format!("sig-f4-study-{}", std::process::id()));
+    let texts: Vec<String> = if args.engine == "singular" {
+        let mut solver = SingularSolver::with_binary("Singular", &scratch, args.wall)
+            .map_err(|e| format!("{e:?}"))?;
+        let limits = Limits::wall(args.wall).with_workers(args.workers);
+        let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
+        let answer = report
+            .status
+            .answer()
+            .ok_or_else(|| format!("{:?}", report.status))?;
+        answer.basis.clone().ok_or("no basis in the answer")?
+    } else {
+        groebner_rs(&instance, modulus, args, &scratch)?
+    };
+    let _ = std::fs::remove_dir_all(&scratch);
+    texts
+        .iter()
+        .map(|text| {
+            let p = MultivariatePolynomial::<N, F>::parse(text, names)
+                .map_err(|e| format!("{text}: {e}"))?;
+            Ok(p.scale(&p.leading_coefficient(args.order).inverse()))
+        })
+        .collect()
+}
+
+/// The pinned groebner-rs driver (`$ZEEBRA_GROEBNER_RS_DRIVER`) through its JSON contract 2 directly:
+/// the adapter would also verify against Zeebra, which needs built-in widths these fields lack, and
+/// the comparison here is the digest.
+fn groebner_rs(
+    instance: &Instance,
+    modulus: u64,
+    args: &Args,
+    scratch: &std::path::Path,
+) -> Result<Vec<String>, String> {
+    let quoted = |list: &[String]| {
+        list.iter()
+            .map(|s| format!("\"{s}\""))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let order = if args.order == MonomialOrder::GradedLexicographic {
+        "grlex"
+    } else {
+        "grevlex"
+    };
+    let request = format!(
+        "{{\"variables\":[{}],\"modulus\":{modulus},\"order\":\"{order}\",\"workers\":{},\"generators\":[{}]}}",
+        quoted(&instance.variables),
+        args.workers,
+        quoted(&instance.system)
+    );
+    std::fs::create_dir_all(scratch).map_err(|e| e.to_string())?;
+    let path = scratch.join("groebner-rs.json");
+    std::fs::write(&path, request).map_err(|e| e.to_string())?;
+    let driver =
+        std::env::var("ZEEBRA_GROEBNER_RS_DRIVER").unwrap_or_else(|_| "groebner-rs-driver".into());
+    let output = std::process::Command::new(driver)
+        .arg(&path)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+    let json = Json::parse(&String::from_utf8_lossy(&output.stdout)).map_err(|e| e.to_string())?;
+    json.get("basis")
+        .ok_or("no basis in the driver's output")?
+        .items()
+        .iter()
+        .map(|t| {
+            t.as_str()
+                .map(str::to_string)
+                .ok_or("a basis entry is not text".into())
+        })
+        .collect()
+}
+
+/// The most threads alive in this process at once during the solve, besides the main thread and
+/// the sampler, read from `/proc/self/task` every 50 µs (#941's worker discipline check). A lower
+/// bound: a thread that lives less than one interval can be missed.
+struct ThreadSampler {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    handle: std::thread::JoinHandle<usize>,
+}
+
+impl ThreadSampler {
+    fn start() -> Self {
+        use std::sync::atomic::Ordering;
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = stop.clone();
+        let handle = std::thread::spawn(move || {
+            let mut peak = 0;
+            while !flag.load(Ordering::Relaxed) {
+                if let Ok(tasks) = std::fs::read_dir("/proc/self/task") {
+                    peak = peak.max(tasks.count());
+                }
+                std::thread::sleep(Duration::from_micros(50));
+            }
+            peak.saturating_sub(2)
+        });
+        Self { stop, handle }
+    }
+
+    fn finish(self) -> usize {
+        self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.handle.join().expect("sampler")
+    }
+}
+
 fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
     let system: Vec<MultivariatePolynomial<N, F>> = input
@@ -813,8 +975,37 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     // call's time, the first of them cold.
     let mut calls = Vec::with_capacity(args.repeat);
     let solve = || {
-        if args.engine == "entry" {
-            let (result, report) = f4_signature_reported(&system, ORDER, &f4_options(args));
+        if args.engine == "adaptive" {
+            let options = F4Options {
+                graded_engine: GradedEngine::Adaptive,
+                ..f4_options(args)
+            };
+            let (result, stats) = f4_reported(&system, args.order, &options);
+            let route = stats.graded_route.as_ref();
+            let summary = Json::object([
+                (
+                    "route",
+                    Json::string(format!("{:?}", route.map(|r| &r.route))),
+                ),
+                (
+                    "dispatch_ns",
+                    route.map_or(Json::Null, |r| Json::nanos(r.dispatch)),
+                ),
+                ("team", route.map_or(Json::Null, |r| Json::size(r.workers))),
+                (
+                    "cascade",
+                    Json::string(format!("{:?}", route.and_then(|r| r.cascade))),
+                ),
+                ("batches", Json::size(stats.batches)),
+                ("elements_added", Json::size(stats.elements_added)),
+                ("max_matrix_rows", Json::size(stats.max_matrix_rows)),
+                ("max_matrix_columns", Json::size(stats.max_matrix_columns)),
+            ]);
+            (result.map_err(|e| e.to_string()), summary, Json::Null)
+        } else if REFERENCES.contains(&args.engine.as_str()) {
+            (reference(&system, &input, args), Json::Null, Json::Null)
+        } else if args.engine == "entry" {
+            let (result, report) = f4_signature_reported(&system, args.order, &f4_options(args));
             let summary = Json::object([
                 ("route", Json::string(format!("{:?}", report.route))),
                 ("dispatch_ns", Json::nanos(report.dispatch)),
@@ -839,7 +1030,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 parallel_cascade: args.claim,
                 ..SigF4Options::default()
             };
-            let (result, stats) = sig_f4_reported(&system, ORDER, &options);
+            let (result, stats) = sig_f4_reported(&system, args.order, &options);
             (
                 result.map_err(|e| e.to_string()),
                 sig_statistics(&stats),
@@ -847,7 +1038,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             )
         } else {
             let options = f4_options(args);
-            let solve = || f4_reported(&system, ORDER, &options);
+            let solve = || f4_reported(&system, args.order, &options);
             #[cfg(feature = "research-work")]
             let ((result, stats), work) = if args.discovery {
                 let (r, w) = zeebra::linalg::work::measure_discovery(solve);
@@ -871,6 +1062,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             (result.map_err(|e| e.to_string()), summary, work)
         }
     };
+    let threads = args.sample_threads.then(ThreadSampler::start);
     for _ in 1..args.repeat {
         let warm = Instant::now();
         drop(solve());
@@ -879,12 +1071,13 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let started = Instant::now();
     let (result, statistics, work) = solve();
     let elapsed = started.elapsed();
+    let threads_peak = threads.map(ThreadSampler::finish);
     let render = Instant::now();
     let (status, basis) = match &result {
         Ok(basis) => {
             let mut text: Vec<_> = basis
                 .iter()
-                .map(|p| polynomial_to_string(p, &names, ORDER))
+                .map(|p| polynomial_to_string(p, &names, args.order))
                 .collect();
             text.sort();
             ("complete".to_string(), Some(text))
@@ -896,7 +1089,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         (Ok(basis), true) => {
             let clock = Instant::now();
             // On the run's workers: serially, Eco-12's certificate outran its 600 s budget (#887).
-            let report = certify_f4_output_with_workers(&system, basis, ORDER, args.workers);
+            let report = certify_f4_output_with_workers(&system, basis, args.order, args.workers);
             Json::object([
                 ("checks_passed", Json::Bool(report.checks_passed())),
                 ("complete", Json::Bool(report.is_complete())),
@@ -924,6 +1117,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             ),
         ),
         ("render_ns", Json::nanos(render)),
+        ("threads_peak", threads_peak.map_or(Json::Null, Json::size)),
         (
             "peak_rss_bytes",
             peak_resident_bytes().map(Json::int).unwrap_or(Json::Null),
@@ -1006,6 +1200,21 @@ mod tests {
             "entry"
         ])
         .is_ok());
+    }
+
+    // The option arm and the reference engines parse, under either graded order, and references are never repeated or certified.
+    #[test]
+    fn adaptive_arm_references_and_orders_parse() {
+        let base = ["--field", "m31", "--name", "katsura-10", "--engine"];
+        let parsed = args(&[&base[..], &["adaptive", "--order", "grlex"]].concat()).unwrap();
+        assert_eq!(parsed.order, MonomialOrder::GradedLexicographic);
+        assert_eq!(args(&[&base[..], &["f4"]].concat()).unwrap().order, ORDER);
+        for engine in REFERENCES {
+            assert!(args(&[&base[..], &[engine]].concat()).is_ok());
+            assert!(args(&[&base[..], &[engine, "--repeat", "3"]].concat()).is_err());
+            assert!(args(&[&base[..], &[engine, "--certify"]].concat()).is_err());
+        }
+        assert!(args(&[&base[..], &["f4", "--order", "lex"]].concat()).is_err());
     }
 
     // `--repeat` takes a positive count and times the solve alone, so it refuses the add-ons.
