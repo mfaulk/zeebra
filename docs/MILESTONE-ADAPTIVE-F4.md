@@ -971,25 +971,28 @@ tags `measured/940-gate-s` and `measured/940-gate-s2`.
   is 0.157, against katsura-9's 0.164
   ([`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §2).
 
-#### 15.8.4 katsura-9 at F2 is about 2.5% behind M31 (#958)
+#### 15.8.4 katsura-9: Gate Q's T4 fail is a protocol confound (#958)
 
-#941's diagnostic, outside Gate Q
-([comment](https://github.com/mfaulk/zeebra/issues/941#issuecomment-7044748257), posted, not
-merged), is warm in-process calls on katsura-9 / 2⁶⁴−353. F2 entry ÷ M31 entry reads
-1.029 [1.021, 1.034] at 1 w and 1.024 [1.020, 1.027] at 16 w. #941's own tree adds about 1.5% on
-top.
+Gate Q's T4 cell, katsura-9 / 2⁶⁴−353 at 16 w, read ad ÷ m31 **1.036 [1.034, 1.040]** against
+1.03, and #941's diagnostic read F2 entry ÷ M31 entry at 1.029 [1.021, 1.034] (1 w) and
+1.024 [1.020, 1.027] (16 w) ([`m32-qualification.md`](research/m32-qualification.md) §2). Every
+head-side arm there ran `--repeat 21` and every M31 arm `--calls 20`.
 
-The triage on #958 is read-only, with no timing. It finds no change to the serial route's
-measured code between Gate R revision 1's head `588d2a44`, which passed this row at
-1.006 / 0.989, and F2. The leading suspect is #952's change to the warm-call harness: #941 times
-the head with `--repeat 21` and the reference with `--calls 20`. Code placement under fat LTO is
-second.
+#958 (PR #976, `9c24a24f`; [`research/m32-katsura9-gap/`](../research/m32-katsura9-gap/README.md))
+timed four libraries through one shared harness, n = 21. **Under one protocol (`--calls 20`), F2 ÷
+the true M31 `8715c8ed` is 0.997 [0.984, 1.001] at 1 w and 0.985 [0.983, 0.986] at 16 w.** On the
+same F2 binary, `--repeat 21` ÷ `--calls 20` is 1.054 / 1.058: `--repeat` frees every basis between
+calls, glibc trims the heap top back to the kernel, and the next call faults it in again. With
+trimming disabled the penalty mostly goes away. #947's and #948's refactor costs nothing
+(`ce67df76` ÷ `8715c8ed` 0.998 / 0.996), and harness text placement moves the row 0.997–1.001.
 
-#941's "M31" arm is `c1d93389`, as was Gate R's. Its library is `ce67df76`'s and carries #947's
-and #948's ungated serial-closure refactors. So `8715c8ed` itself has not been timed against F2
-with warm calls. Plan §6 defines the M31 reference as `8715c8ed`, so the F3 cohort has to build
-`8715c8ed` itself, with a warm-call harness backported to `examples/` only. Timed bisect:
-`TODO(F3)`, once the bench lock is free (order on #958).
+**Both reads stand side by side.** Gate Q's recorded verdict is unchanged: T4 failed at Gate Q,
+with this confound named. Read under one protocol, the library is level with M31 on this row. One
+gap is not explained: #958's session read the cross-protocol pairing at 1.050–1.060, against
+#941's 1.024–1.029. Direction and cause agree; the size difference does not.
+
+This is why the F3 cohort (§15.0) builds `8715c8ed` itself and runs every Zeebra arm through one
+harness with one protocol per suite.
 
 #### 15.8.5 Load during the reads
 
@@ -1006,16 +1009,26 @@ with warm calls. Plan §6 defines the M31 reference as `8715c8ed`, so the F3 coh
   ratios are paired and interleaved, but those absolute walls are not quiet-box figures.
   (Recomputed from `walls.jsonl.gz` and `rs.jsonl.gz`.)
 
-#### 15.8.6 The unfused symbolic loop: a lead that needs a quiet re-read (#939)
+#### 15.8.6 The unfused symbolic loop: confirmed on a quiet box (#939, #964)
 
 In #939's split build, multiplying each row into a buffer and then interning it ran faster than the
-shipping fused loop. Symbolic stage, unfused ÷ shipping, at 1 worker: Eco-12 **0.601**
-[0.595, 0.617], MQ10 / 32003 **0.643** [0.638, 0.694], Katsura-11 / Goldilocks **1.156**
-[1.092, 1.159] (`45107ec3`, n = 5;
-[`research/m32-baseline/tables.md`](../research/m32-baseline/tables.md)). It ran at load
-18.5–19.8, inside §15.8.5's window. It is row-dependent, it is unexplained, and it needs a
-quiet-box re-read before anything builds on it (#953, at `e2a98685`). No issue tracks it yet:
-`TODO(F3)` to file, or to fold into #942's follow-ups.
+shipping fused loop on two rows and slower on a third. #964 re-ran the identical suite from fresh
+builds of `45107ec3` at load 1.4–3.4 (PR #976, `9c24a24f`;
+[`research/m32-katsura9-gap/README.md`](../research/m32-katsura9-gap/README.md) §#964). Symbolic
+stage, unfused ÷ shipping, n = 5:
+
+| Row | Workers | #939 (load 18.5–19.8) | #964 (quiet) |
+|---|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 | 1 | 0.601 [0.595, 0.617] | 0.612 [0.606, 0.633] |
+| | 16 | 0.655 [0.647, 0.677] | 0.675 [0.667, 0.680] |
+| Katsura-11 / Goldilocks | 1 | 1.156 [1.092, 1.159] | 1.143 [1.077, 1.172] |
+| | 16 | 1.082 [1.069, 1.161] | 1.154 [1.081, 1.420] |
+| MQ10 / 32003 | 1 | 0.643 [0.638, 0.694] | 0.656 [0.649, 0.729] |
+| | 16 | 0.686 [0.665, 0.742] | 0.698 [0.680, 0.760] |
+
+**The lead survives.** Every cell keeps its direction and stays within about 0.02 of the loaded
+read, except Katsura-11 at 16 w, whose interval is wide in both. It is row-dependent and still
+unexplained. It is M33's to pursue (#970), not M32 work.
 
 #### 15.8.7 Other negative and stopped results
 
