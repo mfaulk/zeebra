@@ -1,14 +1,19 @@
 # M32 — Adaptive F4: Parallel Symbolic Preprocessing and Production Qualification
 
-**Status:** planned, 2026-11-19. No M32 measurement has been taken. §§1–13 are the plan, fixed
-before measurement; §15 will hold the integration report (#942), written from §13's template.
+**Status:** §§1–13 are the plan, fixed 2026-11-19 before any M32 measurement and not edited
+since. §15 is the integration report (#942) in **draft**, 2026-11-20. It is written from the merged
+gate records. The final cohort at F3, Gate Q's outcome, the held-out results and the #937 decision
+are marked `TODO(F3)` and are not yet measured or decided.
 **Predecessor:** M31 — Signature-F4 Wall-Time Conversion and Competitive Performance
 ([`MILESTONE-COMPETITIVE-SIGNATURE-F4.md`](MILESTONE-COMPETITIVE-SIGNATURE-F4.md), §15 integration
 report; tracker #900, closed).
 **Planning base:** `main` at `e59a90a1`. Its timed `src/` differs from M31's final `8715c8ed` only
 in doc comments (`src/grobner/sigf4/dispatch.rs`, `src/lib.rs`).
-**Measured at:** `8715c8ed`, quoted; nothing here is measured by M32. Every figure in §§2–6 is quoted from M31's final
-cohort at that commit (evidence and every table in
+**Measured at:** not measured here. §§2–6 quote `8715c8ed`. §15 quotes M32's gate records, each
+at the commit its record names: `7b25a1ee`, `8715c8ed` and `45107ec3` (#939); `8694d172` (#933);
+`3d46b15f` (#936); `592653ee` and `62cbe4de` against `ce67df76` (#940); `8544cf24` and `588d2a44`
+against `c1d93389` (#927); `f427e8d7` and `f8ec0b4c` (#941, posted on the issue, not yet merged).
+Every figure in §§2–6 is quoted from M31's final cohort at `8715c8ed` (evidence and every table in
 [`research/m31-final/`](../research/m31-final/README.md)), from
 [`m31-sigf4-dispatch.md`](research/m31-sigf4-dispatch.md) (`5bd0db63`), from
 [`m31-sigf4-parallel.md`](research/m31-sigf4-parallel.md) (`4b702ea3`), or from the M30 report
@@ -731,3 +736,319 @@ and timeout.
 
 **15.9 Dispositions and follow-ups.** Every M32 issue's outcome; follow-ups filed on Project #7
 with Priority and linked to #938.
+
+## 15. Integration report (#942) — DRAFT
+
+> **Draft, 2026-11-20.** This is written from the merged gate records only. Nothing in §15 was
+> measured for it. Every `TODO(F3)` marks a figure or verdict that waits for the final cohort at
+> freeze F3, for Gate Q (#941), for the held-out read, or for the owner's decision (#937). None of
+> them is estimated here. Each figure names its source file and the commit it was measured at.
+> Figures posted on an issue but not yet merged say so.
+
+### 15.0 Header
+
+| Item | Value |
+|---|---|
+| Final revision (F3) | `TODO(F3)` |
+| F0 | M31 reference `8715c8ed`; M32 baseline `7b25a1ee`, identical in code ([`m32-baseline.md`](research/m32-baseline.md) §1) |
+| F2 | `f427e8d7` (`main` after #950), declared on #941 ([predeclaration](https://github.com/mfaulk/zeebra/issues/941#issuecomment-7042293851)) |
+| Gate records | #939 [`research/m32-baseline/`](../research/m32-baseline/README.md); #933 [`m32-parallel-symbolic.md`](research/m32-parallel-symbolic.md); #936 [`m32-signature-basis-growth.md`](research/m32-signature-basis-growth.md); #940 [`research/m32-gate-s/`](../research/m32-gate-s/README.md); #927 [`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) |
+| Dates | gates read 2026-11-19 to 2026-11-20; final cohort `TODO(F3)` |
+| Reservation | every M32 campaign so far: CCDs 1–2 (CPUs 8–23) through `tools/bench-reserve.sh`, under `benchlock`. Final cohort `TODO(F3)` |
+| Attempts | Gate P 1 read; Gate G 1; Gate S 2 (the second allowed by the owner on #938); Gate R 2 (first read plus revision 1 of 2); Gate Q `TODO(F3)` |
+| Comparands | groebner-rs driver `81dc5c4c` (M30-0's), [`research/m32-baseline/README.md`](../research/m32-baseline/README.md) §1. grobx and msolve are not yet run in M32: `TODO(F3)` |
+| Evidence path | `research/m32-final/` — `TODO(F3)`, not yet created |
+
+### 15.1 Status
+
+**Minimum.** Items 1–3 are met on the merged record: the baseline (#939), parallel symbolic
+investigated to a Gate P read (#933), and MQ10 handled by routing (#927, Gate R passed at
+revision 1). Items 4–6 are `TODO(F3)`: the safety checks of the adopted dispatch (Gate Q's `check`
+suite), the decision (#937), and this report's final form.
+
+**Target.** The one optimization that cleared its gate is the worker-aware dispatch (#950). The
+parallel symbolic closure (#940) passed T1 and T2 twice on its own head but failed Gate S twice,
+and it is not merged. So T1 and T2 cannot be met at F3 unless something new merges. Every Target
+cell is `TODO(F3)` (§15.6).
+
+**Stretch.** `TODO(F3)`. S-d is not attempted, because Gate G failed.
+
+The four verdicts, kept apart:
+
+1. **Algorithmic work.** No merged M32 change alters the signature engine's algebra. #933's replay
+   and #940's head produce the serial closure's rows exactly
+   ([`m32-parallel-symbolic.md`](research/m32-parallel-symbolic.md) §4, at `8694d172`). The
+   signature basis is the unique minimal one, and none of it can be discarded
+   ([`m32-signature-basis-growth.md`](research/m32-signature-basis-growth.md) §0, at
+   `3d46b15f`). Products and reductions to zero at F3: `TODO(F3)`.
+2. **Stage speedups.** Eco-12's symbolic stage ran 2.630× and 2.621× faster on #940's two heads
+   (base ÷ head, `cl:16`). Neither head is merged. At F3 the symbolic stage is M31's: `TODO(F3)`
+   to confirm.
+3. **Complete process wall.** MQ10 is routed to conventional F4 from 4 workers, at 0.99–1.01×
+   conventional (Gate R). Against the M31 reference, katsura-9 reads 2.4–2.9% slower at F2
+   (§15.8.4). F3 cohort: `TODO(F3)`.
+4. **Competitive position.** groebner-rs at its best worker count (8) is ahead of Zeebra's
+   16-worker entry point on Eco-12 and Cyclic-7, and level on MQ11 and Katsura-11 (§15.7). msolve
+   and grobx at F3: `TODO(F3)`.
+
+### 15.2 Primary scoreboard
+
+`TODO(F3)`: the full scoreboard, per §13, from the final cohort. Until then, the F0 reference
+cohort is the last complete read of every dev row. Its ratios are entry point ÷ conventional F4 at
+16 workers, n = 9, paired medians, at `7b25a1ee` against `8715c8ed`
+([`research/m32-baseline/tables.md`](../research/m32-baseline/tables.md); `en:16` walls recomputed
+from `walls.jsonl.gz`):
+
+| Row | F0 route | Entry 16 w, ms | Entry ÷ F4, 16 w | Baseline ÷ M31 | Adaptive 16 w | Adaptive ÷ conventional | Adaptive ÷ M31 |
+|---|---|---:|---:|---:|---|---|---|
+| Eco-12 / 2⁶⁴−353 | Signature | 1,753 | 0.738 | 1.001 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| Katsura-11 / Goldilocks | Signature | 616 | 0.454 | 1.001 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| Katsura-11 / 2⁶⁴−353 | Signature | 612 | 0.456 | 0.993 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| MQ11 / Goldilocks | Signature | 2,144 | 0.458 | 1.005 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| MQ10 / 32003 | Signature (F0) | 385 | 1.609 | 1.016 | `TODO(F3)` (routed to F4 from 4 w) | `TODO(F3)` | `TODO(F3)` |
+| MQ10 / 2³¹−1 | Signature (F0) | 393 | 1.745 | 1.010 | `TODO(F3)` (routed to F4 from 4 w) | `TODO(F3)` | `TODO(F3)` |
+| Cyclic-7 / Goldilocks | Shipping (degree spread) | 146 | 1.008 | 1.012 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| Cyclic-7 / 2⁶⁴−353 | Shipping (degree spread) | 146 | 1.001 | 1.000 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| noon-7 / Goldilocks | Signature | 109 | 0.560 | 1.005 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| noon-8 / 2⁶⁴−353 | Signature | 602 | 0.611 | 0.999 | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+| Held-out rows (3) | — | — | — | — | `TODO(F3)` | `TODO(F3)` | `TODO(F3)` |
+
+RSS ratios, best comparand per row, equal-worker ratios and verification: `TODO(F3)`.
+
+### 15.3 Worker scaling and stages
+
+`TODO(F3)`: wall and the four stage clocks at 1/4/8/16 workers for both engines and the adaptive
+path, and the 8 → 16 ratio (S-b).
+
+The F0 reference, Eco-12 / 2⁶⁴−353, signature route, medians in ms, at `7b25a1ee`
+([`m32-baseline.md`](research/m32-baseline.md) §3):
+
+| Arm | Wall | Symbolic | Elimination | Bookkeeping | Interreduction |
+|---|---:|---:|---:|---:|---:|
+| `d1:1` | 2,565 | 462 | 1,326 | 230 | 269 |
+| `cl:4` | 1,836 | 483 | 565 | 239 | 261 |
+| `cl:8` | 1,746 | 514 | 429 | 252 | 263 |
+| `cl:16` | 1,745 | 552 | 370 | 260 | 262 |
+
+At F0 the 8 → 16 wall ratio is 1,745 ÷ 1,746, about 1.00. #940's unmerged head did no better
+past 8 workers: its Eco-12 wall went 1,440 → 1,418 ms from 8 to 16 and its symbolic stage
+183 → 201 ms ([`research/m32-gate-s/README.md`](../research/m32-gate-s/README.md), worker curve, at
+`592653ee`).
+
+**Why symbolic grows with workers.** Of Eco-12's +90 ms (462 → 552 ms), #953 attributes about
+50 ms to CPU clock and about 40 ms to cross-CCD cache locality, with zero extra symbolic work. That
+text is at `e2a98685:docs/research/m32-parallel-symbolic.md` §5. The next merge (#956) dropped it
+from `main`, and #959 restores it.
+
+### 15.4 Dispatch
+
+The rule merged in #950 (`f427e8d7`;
+[`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §2):
+
+| Condition, in order | Decision | Dev rows it takes |
+|---|---|---|
+| linear, fewer than 6 variables, or nonlinear degree spread > 1 (M31's rule) | conventional F4 (`Linear`, `Small`, `DegreeSpread`) | katsura-4 (`Small`); Cyclic-7 (`DegreeSpread`) |
+| greatest degree 2, variables in `10..=10`, cap ≥ 4 workers | conventional F4 (`WorkerCrossover`) | MQ10, both fields, at 4, 8 and 16 w |
+| otherwise | signature engine; team min(cap, 8) below 10 variables, else the cap | Eco-12, Katsura-11, MQ11, MQ10 at 1 w; noon-7, noon-8 and katsura-9 capped at 8 |
+
+**Dispatch cost (T9)**, Gate R revision 1 at `588d2a44`: median 1.0 µs, max 5.1 µs (MQ11, 16 w).
+The worst share of wall on rows ≥ 50 ms is 0.0013%.
+
+**Held out.** Two held-out rows sit on the band's edges by shape alone, read from the pin file's
+generator names and not from their terms. katsura-10 / GF(2³¹−1) and mq-random-10 / Goldilocks
+both have 10 variables, so the band routes them to conventional F4 from 4 workers
+([`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §5). Every route at every worker
+count, and the held-out results: `TODO(F3)` (Gate Q's `held` suite, read once).
+
+### 15.5 Correctness and safety
+
+`TODO(F3)`: digests, certification status and time, independent references, budget and
+cancellation checks, and the adverse-schedule suite, from Gate Q's `check` suite and the final
+cohort.
+
+On the merged record so far:
+
+- **#939.** Each of its 2,340 cohort children and every split, A/B and small-control child
+  returned its row's one basis digest. Every held-out admission record matches its pin.
+- **#927.** All 1,144 first-read children and every revision-1 child have one basis digest per
+  row.
+- **Known T8 gap, declared before measurement on #941.** The signature engine charges
+  `max_live_bytes` only in its parallel cascade. At one worker the adaptive route therefore has no
+  live-byte budget
+  ([predeclaration](https://github.com/mfaulk/zeebra/issues/941#issuecomment-7042293851)).
+
+### 15.6 Success criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Min 1. Baseline | **met** | #939: M31's ratios reproduce within 1.6% (worst MQ10 / 32003, 1.609 against 1.583); component split; §6.3 re-derived; #934 and #935 closed ([`m32-baseline.md`](research/m32-baseline.md)) |
+| Min 2. Parallel symbolic investigated | **met** | #933: one design, correctness argument, replay ceiling S16 = 2.95, Gate P passed. The attribution is #953's (`e2a98685`; see §15.3) |
+| Min 3. MQ10 | **met** | #927: Gate R passed at revision 1. MQ10 is routed, with the caveats in §15.8.3 |
+| Min 4. Safety of anything adopted | `TODO(F3)` | the one adopted change is the dispatch; Gate Q `check`; the T8 gap in §15.5 |
+| Min 5. Decision | `TODO(F3)` | #937 |
+| Min 6. Report | `TODO(F3)` | this section, completed at F3 |
+| T1. Eco-12 symbolic ≥ 1.5× | `TODO(F3)`; cannot be met without a merged parallel symbolic stage | #940 read 2.630 and 2.621 on its unmerged heads |
+| T2. Eco-12 wall ≤ 0.90× M31 | `TODO(F3)`; the same | #940 read 0.819 and 0.824 on its unmerged heads |
+| T3. MQ10 ≤ 1.05 at 1/4/8/16 w | `TODO(F3)` | Gate R passed. Gate Q's re-check on dev rows also passes: worst 1.008 [0.990, 1.016], 32003 at 4 w, n = 21 (#941, posted, not merged) |
+| T4. Gains preserved | `TODO(F3)`; at risk | Gate Q's re-check: katsura-9 at 16 w, ad ÷ m31 **1.036 [1.034, 1.040]** against 1.03 (#941, posted, not merged); §15.8.4 and #958 |
+| T5. No regressions (dev and held out) | `TODO(F3)` | held out unread |
+| T6. Memory | `TODO(F3)` | — |
+| T7. Correctness | `TODO(F3)` | — |
+| T8. Resource and behaviour | `TODO(F3)`; known gap | §15.5 |
+| T9. Dispatch cost | met at Gate R revision 1; `TODO(F3)` to re-read | §15.4 |
+| T10. Qualified | `TODO(F3)` | Gate Q, #937 |
+| S-a. Eco-12 vs grobx | `TODO(F3)` | grobx is not run in M32 so far |
+| S-b. 16 w ÷ 8 w ≤ 0.90 | `TODO(F3)`; F0 reads about 1.00 | §15.3 |
+| S-c. Default for graded orders | `TODO(F3)` | #937 |
+| S-d. Reduced outgrowth | **not attempted** | Gate G failed (§15.8.1) |
+
+### 15.7 Competitive gap
+
+**groebner-rs at its best worker count (#935).** Process wall, ms, median of n = 9, at driver
+`81dc5c4c`, against Zeebra's F0 entry point at 16 workers (`7b25a1ee`). Both are from
+[`research/m32-baseline/tables.md`](../research/m32-baseline/tables.md), and the medians were
+recomputed from `rs.jsonl.gz` and `walls.jsonl.gz`:
+
+| Row | groebner-rs 8 w | groebner-rs best | Zeebra entry 16 w | Zeebra ÷ rs best |
+|---|---:|---|---:|---:|
+| Eco-12 / 2⁶⁴−353 | 907.5 | 8 w | 1,753 | 1.93 |
+| Katsura-11 / 2⁶⁴−353 | 597.2 | 16 w, 596.6 (8 w inside its interval) | 612 | 1.03 |
+| MQ11 / Goldilocks | 2,170.2 | 8 w | 2,144 | 0.99 |
+| Cyclic-7 / 2⁶⁴−353 | 69.3 | 8 w | 146 (entry dispatches to F4) | 2.11 |
+
+This is a best-supported-configuration reading, not equal-worker: it divides medians across
+worker counts (16 against 8). M31 read groebner-rs at one worker on these rows, which put
+Zeebra-16 ÷ groebner-rs-1 at 0.220–0.753. At its best configuration groebner-rs is ahead on
+Eco-12 and Cyclic-7 and level on MQ11 and Katsura-11. Two caveats:
+
+- The sweep ran at load 5.0–30.5 (median 18.0, recomputed from `rs.jsonl.gz`; §15.8.5).
+- Zeebra's process wall includes harness cost that a comparand driver which does not render its
+  basis does not pay. On Eco-12 at 16 workers that is 140 ms of render, 41 ms of parsing and
+  report, and 19 ms of exec and exit ([`m32-baseline.md`](research/m32-baseline.md) §5).
+
+grobx raw and certified, msolve exact, equal-worker rows, the guarantee difference and the stage
+decomposition of what remains: `TODO(F3)`.
+
+### 15.8 Negative, inconclusive and stopped results
+
+#### 15.8.1 Gate G fails; H5 falsified (#936, `3d46b15f`)
+
+Every sound option projects at most **3.1%** of Eco-12's 16-worker wall: query-first Koszul
+insertion about 19 ms, plus incremental essential tracking about 35 ms, of 1,744 ms. The bar is
+5%. Roune–Stillman's lazy Koszul queue is bounded at 6.8%, but only if 95,207 lost eliminations
+cost nothing, which is unproven for this engine. Cyclic-7 cannot reach conventional F4 this way.
+With bookkeeping and interreduction both at zero it would still take 0.279 s, **1.92×**
+conventional F4's 0.145 s. #936 closed completed with this result. The MQ10 side finding is #946
+([`m32-signature-basis-growth.md`](research/m32-signature-basis-growth.md) §0, §6).
+
+#### 15.8.2 Gate S fails twice (#940)
+
+| Read | Head | T1 symbolic | T2 wall | Cells missed (upper > 1.05) | Peak RSS max |
+|---|---|---|---|---|---|
+| First | `592653ee` | 2.630 [2.585, 2.649] met | 0.819 [0.813, 0.824] met | Katsura-11 / Goldilocks 1 w 1.044 [1.020, 1.068]; MQ11 / Goldilocks 1 w 1.037 [1.033, 1.054]; noon-7 / Goldilocks 16 w 1.055 [1.040, 1.071] | 1.085 |
+| Re-read after the owner's fix pass | `62cbe4de` | 2.621 [2.602, 2.652] met | 0.824 [0.812, 0.831] met | **noon-7 / Goldilocks 16 w 1.057 [1.041, 1.082]** | 1.094 |
+
+Both reads are against `ce67df76`
+([`research/m32-gate-s/tables.md`](../research/m32-gate-s/tables.md),
+[`s2/tables.md`](../research/m32-gate-s/s2/tables.md)). The re-read session was **stopped**
+before its `small` and `curve` suites, because the missed cell already decided the gate. The
+1-worker gap in the first read was code placement: with 64-byte function alignment on both builds,
+a diagnostic, head ÷ base was 0.997–0.999. #940 is closed with no `src/` merged. Its code is on the
+tags `measured/940-gate-s` and `measured/940-gate-s2`.
+
+#### 15.8.3 Gate R's first read fails; H4 falsified (#927)
+
+- **First read** (`8544cf24` against `c1d93389`). katsura-9 against the M31 entry point at 8 w read
+  **1.029 [1.028, 1.030]**, upper 1.0300 against 1.03. The team cap was 4 against M31's 8.
+  **T9 failed**: dispatch took a median 93 µs and a max 118 µs from 4 workers up, a cgroup CPU
+  count read inside the clock. The katsura-9 medians were recomputed from `small.jsonl.gz` and match.
+- **Revision 1** (`588d2a44`) passed. **Caveat:** it re-read only the cells the revision can move:
+  katsura-9 at 1/4/8/16 w, noon-7 and noon-8 at 8 and 16 w, and T9 dispatch cost on every dev row.
+  Every other Gate R cell is carried over from the first read, at `8544cf24`.
+- **H4 is falsified on its validation clause.** In leave-one-family-out validation, the MQ fold
+  fits no band and misroutes MQ10 at 4, 8 and 16 w by **1.10–1.75×** (M31 figures), over the 5%
+  bound. The `10..=10` band is fitted to MQ10 alone. No cheap feature separates MQ10: its density
+  is 0.157, against katsura-9's 0.164
+  ([`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §2).
+
+#### 15.8.4 katsura-9 at F2 is about 2.5% behind M31 (#958)
+
+#941's diagnostic, outside Gate Q
+([comment](https://github.com/mfaulk/zeebra/issues/941#issuecomment-7044748257), posted, not
+merged), is warm in-process calls on katsura-9 / 2⁶⁴−353. F2 entry ÷ M31 entry reads
+1.029 [1.021, 1.034] at 1 w and 1.024 [1.020, 1.027] at 16 w. #941's own tree adds about 1.5% on
+top.
+
+The triage on #958 is read-only, with no timing. It finds no change to the serial route's
+measured code between Gate R revision 1's head `588d2a44`, which passed this row at
+1.006 / 0.989, and F2. The leading suspect is #952's change to the warm-call harness: #941 times
+the head with `--repeat 21` and the reference with `--calls 20`. Code placement under fat LTO is
+second.
+
+#941's "M31" arm is `c1d93389`, as was Gate R's. Its library is `ce67df76`'s and carries #947's
+and #948's ungated serial-closure refactors. So `8715c8ed` itself has not been timed against F2
+with warm calls. Plan §6 defines the M31 reference as `8715c8ed`, so the F3 cohort has to build
+`8715c8ed` itself, with a warm-call harness backported to `examples/` only. Timed bisect:
+`TODO(F3)`, once the bench lock is free (order on #958).
+
+#### 15.8.5 Load during the reads
+
+- **#927.** Another session ran a 32-thread memory-heavy job on CPUs 24–55 from about 13:40 to
+  14:57 local on 2026-11-19. That is outside the reserved CCDs but shares package clock and DRAM
+  bandwidth. All 432 `fav` children (load 16.9–20.0) and `small` repetitions 27–30 (up to 20.3)
+  ran inside it. #927 records that no verdict depends on those windows
+  ([`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §3.3).
+- **#939.** Its `ab` session (14:20–14:25 local) ran inside the same window at load 18.5–19.8. The
+  `rs` sweep (#935) started at 14:57 at load 17.47 (`benchlock.log`). Its children ran at load
+  5.0–30.5, median 18.0. Whether the same job caused this is not recorded.
+- **#939's header understates the load.** It says per-child `load_start` was 1–18. The records
+  show `walls` at 0.5–41.2, with 15 of 2,340 children above 18, at about 10:36 local. The
+  ratios are paired and interleaved, but those absolute walls are not quiet-box figures.
+  (Recomputed from `walls.jsonl.gz` and `rs.jsonl.gz`.)
+
+#### 15.8.6 The unfused symbolic loop: a lead that needs a quiet re-read (#939)
+
+In #939's split build, multiplying each row into a buffer and then interning it ran faster than the
+shipping fused loop. Symbolic stage, unfused ÷ shipping, at 1 worker: Eco-12 **0.601**
+[0.595, 0.617], MQ10 / 32003 **0.643** [0.638, 0.694], Katsura-11 / Goldilocks **1.156**
+[1.092, 1.159] (`45107ec3`, n = 5;
+[`research/m32-baseline/tables.md`](../research/m32-baseline/tables.md)). It ran at load
+18.5–19.8, inside §15.8.5's window. It is row-dependent, it is unexplained, and it needs a
+quiet-box re-read before anything builds on it (#953, at `e2a98685`). No issue tracks it yet:
+`TODO(F3)` to file, or to fold into #942's follow-ups.
+
+#### 15.8.7 Other negative and stopped results
+
+- **H3 is falsified** (#933, `8694d172`). Reducer search is 2.3–2.6% of the Eco-12 closure and
+  5.6–6.0% of MQ10's, against H3's 30%. #939's split build puts it at 1–13% of the stage.
+  Interning is 52–86%.
+- **Held-out rows dropped by the admission rule and not replaced** (#939): mq-random-12 /
+  2⁶⁴−353 (conventional F4-16 took 104.6 s, over 60 s), mq-random-9 / GF(32003) (3.1 ms; an
+  inconsistent system) and cyclic-6 / Goldilocks (7.6 ms). The held-out set has no dense MQ
+  beyond the crossover.
+- **Gate Q.** The threshold re-check fails T4 on katsura-9 (§15.6). Under #941's rule the re-fit
+  is not used and the thresholds stand. Outcome: `TODO(F3)`.
+- Refusals and timeouts at F3: `TODO(F3)`.
+
+### 15.9 Dispositions and follow-ups
+
+| Issue | Outcome |
+|---|---|
+| #939 M32-0 | closed: baseline, pin and model ([`m32-baseline.md`](research/m32-baseline.md)) |
+| #934 small controls | closed: in-process warm-call method, half-width ≤ 0.70% on katsura-4 |
+| #935 comparand workers | closed: groebner-rs best at 8 workers (§15.7) |
+| #933 S1a | closed: Gate P passed |
+| #940 S1b | closed: Gate S failed twice; nothing merged |
+| #936 S3 | closed: Gate G failed; H5 falsified |
+| #927 S2 | closed: Gate R passed at revision 1, merged as `f427e8d7` (#950); H4 falsified |
+| #941 Q | `TODO(F3)`: open, draft PR #957 |
+| #937 decision | `TODO(F3)`: open |
+| #942 M32-I | this draft; final cohort `TODO(F3)` |
+
+**Follow-ups filed on Project #7, linked to #938:**
+
+- #946: MQ10 tail after the last essential element (`opportunity`)
+- #958: the katsura-9 F2 ÷ M31 regression triage (Medium)
+- #959: restore #953's attribution text (Low)
+
+Follow-ups from Gate Q and the F3 cohort: `TODO(F3)`.
