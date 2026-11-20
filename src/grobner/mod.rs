@@ -25,6 +25,8 @@ pub mod transform;
 // Singular's weighted bases, committed as literals. Test data only: nothing on a shipping path
 // reads it, and `weighted_reference_bases::tests` is the differential check #624 asked for.
 #[cfg(test)]
+mod graded_engine_tests;
+#[cfg(test)]
 mod weighted_reference_bases;
 
 pub use buchberger::{
@@ -40,10 +42,11 @@ pub use f4::{
     Allowance, BatchObserver, BatchOrder, BudgetApproach, BudgetLine, BudgetReport, CacheMode,
     CertificationReport, CertificationStage, CertificationStopped, ConstructionTimings,
     DegreeProfile, DegreeStatistics, DivmaskCalibration, F4Error, F4Options, F4Statistics,
-    Gf2Elimination, HilbertCounts, HilbertSelection, InterreductionRoute, MatrixInterreduction,
-    MatrixRefusal, MembershipLimits, MembershipStatus, PairMultiples, ParallelForward,
-    ParallelSymbolic, Provenance, ReducerSelection, ReductionStrategy, SelectionLimits, StopKind,
-    SymbolicCounts, WitnessCertificationReport, WitnessError, WitnessLimit, DIVMASK_BITS,
+    Gf2Elimination, GradedEngine, HilbertCounts, HilbertSelection, InterreductionRoute,
+    MatrixInterreduction, MatrixRefusal, MembershipLimits, MembershipStatus, PairMultiples,
+    ParallelForward, ParallelSymbolic, Provenance, ReducerSelection, ReductionStrategy,
+    SelectionLimits, StopKind, SymbolicCounts, WitnessCertificationReport, WitnessError,
+    WitnessLimit, DIVMASK_BITS,
 };
 pub use fglm::{
     classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,

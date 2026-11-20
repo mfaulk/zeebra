@@ -17,7 +17,7 @@ use std::{
 use super::{engine, SigF4Error, SigF4Options, SigF4Statistics};
 use crate::{
     grobner::{
-        f4::{f4_reported, F4Error, F4Options},
+        f4::{f4_reported, F4Error, F4Options, F4Statistics, GradedEngine},
         planning::monomials_up_to_degree,
     },
     poly::MonomialOrder,
@@ -277,6 +277,27 @@ pub fn f4_signature_reported<const N: usize, F: FiniteField>(
     Result<Vec<MultivariatePolynomial<N, F>>, SigF4Error>,
     SignatureDispatch,
 ) {
+    let (result, report, _) = dispatched(generators, order, options);
+    (result, report)
+}
+
+/// What the engine that produced the result counted.
+enum Work {
+    /// Neither engine ran: the order was refused.
+    Refused,
+    Signature(Box<SigF4Statistics>),
+    Shipping(Box<F4Statistics>),
+}
+
+fn dispatched<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+) -> (
+    Result<Vec<MultivariatePolynomial<N, F>>, SigF4Error>,
+    SignatureDispatch,
+    Work,
+) {
     let started = Instant::now();
     let mut report = match signature_route(generators, order, options) {
         Ok(report) => report,
@@ -288,17 +309,18 @@ pub fn f4_signature_reported<const N: usize, F: FiniteField>(
                 features: DispatchFeatures::default(),
                 dispatch: started.elapsed(),
             };
-            return (Err(refusal), report);
+            return (Err(refusal), report, Work::Refused);
         }
     };
     if report.route != SignatureRoute::Signature {
-        return (shipping(generators, order, options), report);
+        let (result, work) = shipping(generators, order, options);
+        return (result, report, work);
     }
     let mut statistics = SigF4Statistics::default();
     let result = engine::run(
         generators,
         order,
-        &signature_options(options, report.workers),
+        &signature_options::<F>(options, report.workers),
         &mut statistics,
     );
     match result {
@@ -311,10 +333,52 @@ pub fn f4_signature_reported<const N: usize, F: FiniteField>(
                 ..options.clone()
             };
             report.route = SignatureRoute::Shipping(ShippingReason::Fallback(limit));
-            (shipping(generators, order, &fallback), report)
+            let (result, work) = shipping(generators, order, &fallback);
+            (result, report, work)
         }
-        result => (result, report),
+        result => (result, report, Work::Signature(Box::new(statistics))),
     }
+}
+
+/// What [`f4_reported`] returns: the basis or the budget crossed, and the work done.
+pub(crate) type Reported<const N: usize, F> = (
+    Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
+    F4Statistics,
+);
+
+/// [`GradedEngine::Adaptive`](crate::grobner::GradedEngine::Adaptive) for the conventional entry
+/// points: `None` for an order the signature engine refuses, or for a batch budget, which then
+/// run conventional F4.
+pub(crate) fn adaptive_f4<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+) -> Option<Reported<N, F>> {
+    engine::graded(order).ok()?;
+    // Budgets counted in conventional F4's batches have no signature-engine meaning.
+    if options.max_batches.is_some() || options.max_pairs_per_batch.is_some() {
+        return None;
+    }
+    let (result, report, work) = dispatched(generators, order, options);
+    let result = match result {
+        Ok(basis) => Ok(basis),
+        Err(SigF4Error::Budget(error)) => Err(error),
+        Err(SigF4Error::Unsupported { .. }) => return None,
+    };
+    let mut statistics = match work {
+        Work::Shipping(statistics) => *statistics,
+        Work::Signature(work) => F4Statistics {
+            batches: work.batches,
+            max_matrix_rows: work.max_matrix_rows,
+            max_matrix_columns: work.max_matrix_columns,
+            elements_added: work.elements_added,
+            bytes_per_entry: F4Options::bytes_per_entry::<F>(),
+            ..F4Statistics::default()
+        },
+        Work::Refused => return None,
+    };
+    statistics.graded_route = Some(report);
+    Some((result, statistics))
 }
 
 /// The larger of the forward and symbolic worker caps in `options`.
@@ -326,7 +390,14 @@ fn caller_workers(options: &F4Options) -> usize {
 }
 
 /// The signature engine's budgets, read from the shipping F4's options, on `workers` threads.
-fn signature_options(options: &F4Options, workers: usize) -> SigF4Options {
+///
+/// The live budget is the smaller of `max_live_bytes` and the live-entry allowance in bytes, so a
+/// tightened `max_live_nonzeros` binds here too; at the presets the two are equal.
+fn signature_options<F: FiniteField>(options: &F4Options, workers: usize) -> SigF4Options {
+    let live = options
+        .live_entry_allowance::<F>()
+        .saturating_mul(F4Options::bytes_per_entry::<F>())
+        .min(options.max_live_bytes);
     SigF4Options {
         max_wall_time: options.max_wall_time,
         max_basis_elements: options.max_basis_elements,
@@ -336,7 +407,7 @@ fn signature_options(options: &F4Options, workers: usize) -> SigF4Options {
         max_certify_time: options.max_certify_time,
         workers,
         parallel_cascade: workers > 1,
-        max_live_bytes: Some(options.max_live_bytes),
+        max_live_bytes: Some(live),
         ..SigF4Options::default()
     }
 }
@@ -353,14 +424,22 @@ fn is_signature_size_limit(error: &F4Error) -> bool {
     )
 }
 
+/// Conventional F4 with the graded-engine option cleared, so a shipping route never dispatches
+/// again.
 fn shipping<const N: usize, F: FiniteField>(
     generators: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     options: &F4Options,
-) -> Result<Vec<MultivariatePolynomial<N, F>>, SigF4Error> {
-    f4_reported(generators, order, options)
-        .0
-        .map_err(SigF4Error::Budget)
+) -> (Result<Vec<MultivariatePolynomial<N, F>>, SigF4Error>, Work) {
+    let conventional = F4Options {
+        graded_engine: GradedEngine::Conventional,
+        ..options.clone()
+    };
+    let (result, statistics) = f4_reported(generators, order, &conventional);
+    (
+        result.map_err(SigF4Error::Budget),
+        Work::Shipping(Box::new(statistics)),
+    )
 }
 
 #[cfg(test)]

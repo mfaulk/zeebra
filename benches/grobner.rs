@@ -9,6 +9,9 @@
 //! holds instances Buchberger cannot: they are the point of the milestone, and leaving them out
 //! would understate it while putting Buchberger in them would hang the suite.
 //!
+//! The `adaptive` group compares conventional F4 with the default-off `GradedEngine::Adaptive`
+//! option on the same inputs.
+//!
 //! `N` is a const generic, so each instance size is a separate instantiation.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -17,7 +20,7 @@ use zeebra::{
     fields::Zp2147483647,
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
-        buchberger, f4,
+        buchberger, f4, f4_with_options, F4Options, GradedEngine,
     },
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
@@ -141,5 +144,43 @@ fn f4_only(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(grobner, paired, f4_only);
+/// Conventional F4 against `GradedEngine::Adaptive` (#941) under both graded orders, on a system the
+/// dispatch sends to the signature engine (katsura-7) and one it keeps on conventional F4
+/// (cyclic-6, spread degrees). The nightly smoke run executes each case once.
+fn bench_adaptive<const N: usize>(
+    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    label: &str,
+    system: Vec<MultivariatePolynomial<N, F>>,
+) {
+    for &order in &GRADED {
+        for engine in [GradedEngine::Conventional, GradedEngine::Adaptive] {
+            let options = F4Options {
+                graded_engine: engine,
+                ..F4Options::default()
+            };
+            group.bench_with_input(
+                BenchmarkId::new(format!("{engine:?}/{label}/{}", order.name()), N),
+                &system,
+                |bencher, system| {
+                    bencher.iter(|| {
+                        black_box(
+                            f4_with_options(black_box(system), order, &options)
+                                .expect("within limits"),
+                        )
+                    })
+                },
+            );
+        }
+    }
+}
+
+fn adaptive(c: &mut Criterion) {
+    let mut group = c.benchmark_group("grobner_adaptive");
+    group.sample_size(10);
+    bench_adaptive::<7>(&mut group, "katsura", katsura::<7, F>());
+    bench_adaptive::<6>(&mut group, "cyclic", cyclic::<6, F>());
+    group.finish();
+}
+
+criterion_group!(grobner, paired, f4_only, adaptive);
 criterion_main!(grobner);

@@ -591,6 +591,56 @@ impl ReducerSelection {
     }
 }
 
+/// The algorithm [`f4_with_options`](crate::grobner::f4_with_options) and
+/// [`f4_reported`](crate::grobner::f4_reported), and the solvers built on them, use for a graded
+/// order (`GradedReverseLexicographic`, `GradedLexicographic`).
+///
+/// Lex, `Weighted` and `Block` orders ignore this field and always run conventional F4, as do
+/// [`f4_observed`](crate::grobner::f4_observed) and
+/// [`f4_observed_reported`](crate::grobner::f4_observed_reported), whose observer sees
+/// conventional F4's batches. Every choice returns the same reduced basis.
+///
+/// ```
+/// use zeebra::{
+///     fields::Zp32003,
+///     grobner::{benchmark_systems::katsura, f4_with_options, F4Options, GradedEngine},
+///     MonomialOrder,
+/// };
+///
+/// let system = katsura::<7, Zp32003>();
+/// let order = MonomialOrder::GradedReverseLexicographic;
+/// let adaptive = F4Options { graded_engine: GradedEngine::Adaptive, ..F4Options::default() };
+/// let (basis, statistics) = f4_with_options(&system, order, &adaptive).unwrap();
+/// assert_eq!(basis, f4_with_options(&system, order, &F4Options::default()).unwrap().0);
+/// // The dispatch's decision, its features and its cost.
+/// assert!(statistics.graded_route.is_some());
+/// ```
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GradedEngine {
+    /// Conventional F4. The default.
+    #[default]
+    Conventional,
+
+    /// [`f4_signature`](crate::grobner::f4_signature)'s pre-solve dispatch: the signature engine
+    /// where its thresholds expect it to win, conventional F4 elsewhere and as the fallback from a
+    /// signature-engine size limit. Wall, matrix, basis-size and certification budgets keep their
+    /// meaning, and the team never exceeds the caller's worker caps. The live budget binds on the
+    /// signature engine's parallel cascade only; at one worker it is not charged. A call with
+    /// `max_batches` or `max_pairs_per_batch` set stays on conventional F4, whose batches those
+    /// count.
+    /// [`F4Statistics::graded_route`](crate::grobner::F4Statistics::graded_route) records the
+    /// decision. On the signature route the statistics carry only batches, matrix extents and
+    /// elements added, and the rest stay zero.
+    ///
+    /// **Do not use it under `GradedLexicographic` (#961).** On non-trivial systems the signature
+    /// route there exhausted memory past every budget but wall time, or ran far slower than
+    /// conventional F4.
+    ///
+    /// Measured by #941 (`docs/research/m32-qualification.md`), which did not pass Gate Q; it stays
+    /// opt-in, and whether it becomes the default is #937's decision.
+    Adaptive,
+}
+
 /// Limits on an F4 computation.
 ///
 /// Public fields with a `Default`, so a caller changes what it cares about:
@@ -903,6 +953,11 @@ pub struct F4Options {
     /// `Auto { max_workers: 16 }` at [`recommended`](Self::recommended);
     /// [`ParallelSymbolic::Serial`] at [`baseline`](Self::baseline).
     pub parallel_symbolic: ParallelSymbolic,
+
+    /// Which algorithm computes a basis under a graded order. See [`GradedEngine`].
+    ///
+    /// [`GradedEngine::Conventional`] at every preset; nothing changes unless a caller opts in.
+    pub graded_engine: GradedEngine,
 }
 
 impl F4Options {
@@ -942,6 +997,7 @@ impl F4Options {
             batch_order: BatchOrder::Forward,
             pair_multiples: PairMultiples::Every,
             parallel_symbolic: ParallelSymbolic::Serial,
+            graded_engine: GradedEngine::Conventional,
         }
     }
 
