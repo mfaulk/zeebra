@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "contract": "every cross-library row ever recorded, APPEND-ONLY and in the order recorded, INCLUDING the runs that produced no answer. A row whose outcome is unsupported, stopped-by-limit or failed carries NO publishable time: see docs/research/external-comparison-protocol.md section 3. Ratios are valid only between rows agreeing on problem_digest, task, limits, machine and build, with both outcomes answered and their invariants agreed.",
+  "row_count": 2,
+  "rows": [
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "abababababababababababababababababababababababababababababababab",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(18446744069414584321)",
+        "characteristic": 18446744069414584321,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0",
+      "environment": {
+        "commit": "c0ffeec0",
+        "base_commit": "",
+        "patch_id": "",
+        "machine": "fixture",
+        "cpu": "affinity 0",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "bench-job job: median of 3 clean attempts, 30 s wall, 1 workers"
+      },
+      "limits": {
+        "wall_nanos": 30000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "reproduce": "tools/bench-job report job",
+      "outcome": "complete",
+      "wall_nanos": 1100000000,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 1048576,
+      "peak_rss_basis": "direct-child VmHWM (exact)",
+      "stages": [
+        {
+          "name": "symbolic",
+          "elapsed_nanos": 440000000
+        }
+      ]
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "abababababababababababababababababababababababababababababababab",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(18446744069414584321)",
+        "characteristic": 18446744069414584321,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": null,
+      "environment": {
+        "commit": "c0ffeec0",
+        "base_commit": "",
+        "patch_id": "",
+        "machine": "fixture",
+        "cpu": "affinity 0",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "bench-job job: median of 0 clean attempts, 30 s wall, 1 workers"
+      },
+      "limits": {
+        "wall_nanos": 30000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "reproduce": "tools/bench-job report job",
+      "outcome": "failed",
+      "outcome_detail": "no clean complete attempt"
+    }
+  ]
+}

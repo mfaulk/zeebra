@@ -398,9 +398,41 @@ setsid nohup tools/bench-job run <job-id> > /buildcache/bench-jobs/<job-id>.log 
 tools/bench-job status [<job-id>] [--json]     # queued, running, done, cancelled, failed, interrupted
 tools/bench-job cancel <job-id>               # stops within 10 s (SIGINT to the child)
 tools/bench-job resume <job-id> [--force-uncancel]
-tools/bench-job report <job-id>               # dumps the journal until #969's report lands
+tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05]
+tools/bench-job scoreboard <job-id> [--append research/competitive/results/history.json]
 tools/bench-reserve.sh release
 ```
+
+**Reading a report.** `report` renders Markdown (`--json` gives the same data) from the journal
+alone, through `tools/bench_stats.py` (*Statistics and verdicts* below):
+
+- **Provenance:** job id, mode, manifest and journal SHA-256s, each arm's commit, binary SHA-256 and
+  build, cpus, reservation (CCD-scoped in dev mode, exclusive in publication mode), clock governor
+  and the session's median clock per cell.
+- **Attempts:** counts by status, the contaminated count (#968), session void, and whether the job
+  stopped before completing.
+- **Wall and RSS, Stages, Scaling:** medians per instance, worker count and arm, over clean `ok`
+  attempts only. Stages come from the child's `statistics.*_ns`. Scaling lists each arm's speedup
+  over its fewest workers.
+- **Ratios:** every arm ÷ the baseline arm (default: the first), paired per repetition, with a
+  `regression_verdict` against `--bound`. Fewer than 9 pairs reads `stopped`.
+- **Verification:** one basis digest per instance (`consistent`) or several (`DIVERGENT`), and
+  every attempt that failed or was contaminated.
+
+Contaminated attempts are listed and counted but never timed.
+
+**Scoreboard.** `scoreboard` turns a publication-mode job into `CompetitiveRecord` rows. Each
+instance needs a `competitive` block (`problem`, `problem_digest`, `family`, `task`, `field`,
+`order`, `variable_count`), and each arm may name `library` and `library_version`. You get one row
+per instance, arm and worker count: the median of the clean attempts, or `failed` with no time.
+`--append` adds the rows to `history.json`; then `cargo run --release --example competitive --
+--write` re-renders `COMPETITIVE.md`. Dev-mode jobs are refused. A row with no `invariants` from the
+child renders but is never publishable.
+
+**Nightly smoke.** `tools/bench-job-smoke.sh` runs submit → run → report → verify with 2 attempts
+on katsura-4 in the nightly `Benchmarks run` job. Timing is ignored and no verdict is read.
+GitHub CI has no performance gate. This repository has no self-hosted runner, and timings from
+shared runners mean nothing. Performance campaigns stay local.
 
 `run --next` takes the oldest queued job instead of a named one. Exit status: 0 the plan finished
 (every attempt has an outcome, failures included), 3 refused (binary or input hash mismatch, or the

@@ -161,7 +161,8 @@ the nightly scheduled run (`17 9 * * *`, UTC) and on manual dispatch instead.
 | PR or push to `main`, code change | Debug tests (`--tests`), debug doctests, Clippy, Rustdoc, package, MSRV and shell/provenance checks |
 | PR or push to `main`, only `README.md` or guide Markdown | Debug doctests, guide-inclusion test, formatting, Rustdoc, shell/provenance checks |
 | PR or push to `main`, only other prose (`docs/` outside the guides, `research/` Markdown, `CHANGELOG.md`, `CLAUDE.md`) | Shell/provenance checks and merge-staleness notice |
-| Nightly and manual dispatch | Everything above, plus `cargo build --all-targets`, the optimized tests, the research-artifact checks, the comparand replay and the benchmark smoke run |
+| Nightly and manual dispatch | Everything above, plus `cargo build --all-targets`, the optimized tests, the research-artifact checks, the comparand replay, the benchmark smoke run and the 2-attempt `bench-job` smoke (`tools/bench-job-smoke.sh`, timing ignored) |
+| Manual, local only | Performance campaigns and gates (`tools/bench-job` under a reservation). No GitHub job times anything: there is no self-hosted runner, and shared-runner timing is meaningless |
 
 `Classify changes` reads the full PR diff with NUL-separated paths. `tools/ci-scope.sh` uses a
 conservative allowlist; unknown paths, code, config, scripts and measurement JSON select the code
