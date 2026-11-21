@@ -38,6 +38,13 @@ A running record of what Zeebra implements. The short version is in the [README]
       0.68x of grobx's raw randomized one-worker wall on MQ11 and parity with it on Eco-12, identical
       certified bases (measured at `8715c8ed`; [M31 report](../MILESTONE-COMPETITIVE-SIGNATURE-F4.md)
       §15)
+- [x] A worker-aware dispatch for `f4_signature` (M32): MQ10 goes to the shipping F4 from four
+      workers (0.58–0.63x of M31's path at 16 workers), every signature-routed row stays level with
+      M31, and `F4Options::graded_engine` routes the ordinary interface through it, opt-in. The
+      parallel symbolic stage did not pass its gate, so Eco-12 is unchanged at 0.732x shipping F4.
+      Graded-lex is unqualified (#961), the one-worker live budget is uncharged (#962), and the
+      crossover band misroutes two held-out rows (#978). Shipping F4 stays the default (#937;
+      measured at `9c24a24f`; [M32 report](../MILESTONE-ADAPTIVE-F4.md) §15)
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] That oracle over an extension field: a differential case names a field rather than a
