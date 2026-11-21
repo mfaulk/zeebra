@@ -199,7 +199,7 @@ pub(crate) fn interreduce_by_matrix_with<const N: usize, F: FiniteField>(
     }
 
     stop_if_asked!(minimal.len());
-    let __t0 = std::time::Instant::now();
+
     let basis = MonicBasis::new(&minimal, order);
     let elements = basis.len();
 
@@ -228,7 +228,7 @@ pub(crate) fn interreduce_by_matrix_with<const N: usize, F: FiniteField>(
     })?;
 
     stop_if_asked!(elements);
-    let __t1 = std::time::Instant::now();
+
     let mut matrix =
         MacaulayMatrix::build_within(&basis, &preprocessed, order, max_columns, max_nonzeros)
             .map_err(|exceeded| {
@@ -270,7 +270,6 @@ pub(crate) fn interreduce_by_matrix_with<const N: usize, F: FiniteField>(
     stop_if_asked!(elements);
 
     if method == MatrixInterreductionMethod::TailsOnly {
-        if std::env::var_os("ZB_IR_SPLIT").is_some() { eprintln!("IRSPLIT closure_ms={:.2} build_ms={:.2} rows={} cols={} nnz={} seeds={}", (__t1-__t0).as_secs_f64()*1e3, __t1.elapsed().as_secs_f64()*1e3, report.rows, report.columns, report.nonzeros, elements); }
         return reduce_tails_against_fixed_rows(matrix, minimal, order, max_nonzeros, report);
     }
 
@@ -372,8 +371,6 @@ fn reduce_tails_against_fixed_rows<const N: usize, F: FiniteField>(
         pivots[lead] = index;
     }
 
-    let __t2 = std::time::Instant::now();
-    let mut __conv = std::time::Duration::ZERO;
     let built = report.nonzeros;
     let mut accumulator = DenseAccumulator::new(columns);
     let mut reduced: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(report.elements);
@@ -400,11 +397,8 @@ fn reduce_tails_against_fixed_rows<const N: usize, F: FiniteField>(
             ));
         }
         let tail = accumulator.take();
-        let __c = std::time::Instant::now();
         reduced.push(matrix.sparse_row_polynomial(&tail));
-        __conv += __c.elapsed();
     }
-    let __t3 = std::time::Instant::now();
     // The fixed rows' buffers and the dense working row.
     report.peak_entry_capacity = matrix.matrix().entry_capacity() + columns;
 
@@ -414,7 +408,6 @@ fn reduce_tails_against_fixed_rows<const N: usize, F: FiniteField>(
         "every seed row yields its element"
     );
     reduced.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
-    if std::env::var_os("ZB_IR_SPLIT").is_some() { eprintln!("IRSPLIT sweep_loop_ms={:.2} of_which_conv_ms={:.2} sort_ms={:.2}", (__t3-__t2).as_secs_f64()*1e3, __conv.as_secs_f64()*1e3, __t3.elapsed().as_secs_f64()*1e3); }
     Ok((reduced, report))
 }
 
