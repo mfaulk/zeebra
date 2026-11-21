@@ -1,0 +1,3250 @@
+== dev 2026-11-20T15:51:40-05:00 load=1.67
+dev 0 wide64/eco-12 f4:1 12.917s complete load=1.5
+dev 0 wide64/eco-12 f4:4 4.333s complete load=1.4
+dev 0 wide64/eco-12 f4:8 3.022s complete load=1.6
+dev 0 wide64/eco-12 f4:16 2.375s complete load=1.5
+dev 0 wide64/eco-12 en:1 2.551s complete load=1.6
+dev 0 wide64/eco-12 en:4 1.803s complete load=1.5
+dev 0 wide64/eco-12 en:8 1.731s complete load=1.4
+dev 0 wide64/eco-12 en:16 1.730s complete load=1.3
+dev 0 wide64/eco-12 sg:1 2.568s complete load=1.3
+dev 0 wide64/eco-12 sg:16 1.732s complete load=1.2
+dev 0 wide64/eco-12 mf4:16 2.354s complete load=1.2
+dev 0 wide64/eco-12 men:1 2.542s complete load=1.2
+dev 0 wide64/eco-12 men:16 1.743s complete load=1.2
+dev 0 wide64/eco-12 sg:4 1.816s complete load=1.2
+dev 0 wide64/eco-12 sg:8 1.765s complete load=2.1
+dev 0 wide64/eco-12 msg:16 1.742s complete load=2.1
+dev 0 goldilocks/katsura-11 f4:1 9.787s complete load=2.0
+dev 0 goldilocks/katsura-11 f4:4 2.906s complete load=1.8
+dev 0 goldilocks/katsura-11 f4:8 1.888s complete load=2.0
+dev 0 goldilocks/katsura-11 f4:16 1.371s complete load=2.5
+dev 0 goldilocks/katsura-11 en:1 0.949s complete load=2.5
+dev 0 goldilocks/katsura-11 en:4 0.649s complete load=2.3
+dev 0 goldilocks/katsura-11 en:8 0.612s complete load=2.5
+dev 0 goldilocks/katsura-11 en:16 0.617s complete load=2.3
+dev 0 goldilocks/katsura-11 sg:1 0.915s complete load=2.1
+dev 0 goldilocks/katsura-11 sg:16 0.615s complete load=2.0
+dev 0 goldilocks/katsura-11 mf4:16 1.355s complete load=1.9
+dev 0 goldilocks/katsura-11 men:1 0.915s complete load=1.8
+dev 0 goldilocks/katsura-11 men:16 0.613s complete load=1.8
+dev 0 goldilocks/katsura-11 sg:4 0.653s complete load=1.6
+dev 0 goldilocks/katsura-11 sg:8 0.637s complete load=1.6
+dev 0 goldilocks/katsura-11 msg:16 0.610s complete load=1.6
+dev 0 wide64/katsura-11 f4:1 9.215s complete load=1.5
+dev 0 wide64/katsura-11 f4:4 2.848s complete load=1.4
+dev 0 wide64/katsura-11 f4:8 1.855s complete load=1.7
+dev 0 wide64/katsura-11 f4:16 1.337s complete load=2.2
+dev 0 wide64/katsura-11 en:1 0.910s complete load=2.2
+dev 0 wide64/katsura-11 en:4 0.647s complete load=2.1
+dev 0 wide64/katsura-11 en:8 0.622s complete load=2.1
+dev 0 wide64/katsura-11 en:16 0.611s complete load=2.0
+dev 0 wide64/katsura-11 sg:1 0.918s complete load=1.8
+dev 0 wide64/katsura-11 sg:16 0.613s complete load=1.8
+dev 0 wide64/katsura-11 mf4:16 1.331s complete load=1.7
+dev 0 wide64/katsura-11 men:1 0.916s complete load=1.7
+dev 0 wide64/katsura-11 men:16 0.634s complete load=2.8
+dev 0 wide64/katsura-11 sg:4 0.639s complete load=2.6
+dev 0 wide64/katsura-11 sg:8 0.609s complete load=2.5
+dev 0 wide64/katsura-11 msg:16 0.619s complete load=2.5
+dev 0 goldilocks/mq-random-11 f4:1 41.751s complete load=2.3
+dev 0 goldilocks/mq-random-11 f4:4 11.580s complete load=1.8
+dev 0 goldilocks/mq-random-11 f4:8 7.154s complete load=2.1
+dev 0 goldilocks/mq-random-11 f4:16 4.671s complete load=2.5
+dev 0 goldilocks/mq-random-11 en:1 5.139s complete load=3.3
+dev 0 goldilocks/mq-random-11 en:4 2.682s complete load=3.1
+dev 0 goldilocks/mq-random-11 en:8 2.322s complete load=2.9
+dev 0 goldilocks/mq-random-11 en:16 2.165s complete load=2.7
+dev 0 goldilocks/mq-random-11 sg:1 5.221s complete load=2.8
+dev 0 goldilocks/mq-random-11 sg:16 2.127s complete load=3.6
+dev 0 goldilocks/mq-random-11 mf4:16 4.665s complete load=3.4
+dev 0 goldilocks/mq-random-11 men:1 5.152s complete load=4.4
+dev 0 goldilocks/mq-random-11 men:16 2.142s complete load=4.0
+dev 0 goldilocks/mq-random-11 sg:4 2.709s complete load=4.0
+dev 0 goldilocks/mq-random-11 sg:8 2.339s complete load=3.5
+dev 0 goldilocks/mq-random-11 msg:16 2.123s complete load=3.2
+dev 0 gf32003/mq-random-10 f4:1 1.074s complete load=3.0
+dev 0 gf32003/mq-random-10 f4:4 0.384s complete load=2.9
+dev 0 gf32003/mq-random-10 f4:8 0.275s complete load=2.9
+dev 0 gf32003/mq-random-10 f4:16 0.238s complete load=2.7
+dev 0 gf32003/mq-random-10 en:1 0.467s complete load=2.5
+dev 0 gf32003/mq-random-10 en:4 0.399s complete load=2.3
+dev 0 gf32003/mq-random-10 en:8 0.274s complete load=2.3
+dev 0 gf32003/mq-random-10 en:16 0.241s complete load=2.2
+dev 0 gf32003/mq-random-10 sg:1 0.464s complete load=2.1
+dev 0 gf32003/mq-random-10 sg:16 0.378s complete load=2.0
+dev 0 gf32003/mq-random-10 mf4:16 0.245s complete load=1.9
+dev 0 gf32003/mq-random-10 men:1 0.466s complete load=1.8
+dev 0 gf32003/mq-random-10 men:16 0.382s complete load=1.7
+dev 0 m31/mq-random-10 f4:1 0.964s complete load=1.6
+dev 0 m31/mq-random-10 f4:4 0.338s complete load=1.5
+dev 0 m31/mq-random-10 f4:8 0.250s complete load=1.5
+dev 0 m31/mq-random-10 f4:16 0.228s complete load=1.4
+dev 0 m31/mq-random-10 en:1 0.455s complete load=1.4
+dev 0 m31/mq-random-10 en:4 0.335s complete load=1.4
+dev 0 m31/mq-random-10 en:8 0.249s complete load=1.2
+dev 0 m31/mq-random-10 en:16 0.225s complete load=1.2
+dev 0 m31/mq-random-10 sg:1 0.468s complete load=1.2
+dev 0 m31/mq-random-10 sg:16 0.399s complete load=1.1
+dev 0 m31/mq-random-10 mf4:16 0.224s complete load=1.0
+dev 0 m31/mq-random-10 men:1 0.438s complete load=1.0
+dev 0 m31/mq-random-10 men:16 0.387s complete load=1.0
+dev 0 goldilocks/cyclic-7 f4:1 0.291s complete load=1.0
+dev 0 goldilocks/cyclic-7 f4:4 0.159s complete load=1.0
+dev 0 goldilocks/cyclic-7 f4:8 0.137s complete load=0.9
+dev 0 goldilocks/cyclic-7 f4:16 0.149s complete load=1.0
+dev 0 goldilocks/cyclic-7 en:1 0.293s complete load=1.1
+dev 0 goldilocks/cyclic-7 en:4 0.158s complete load=1.0
+dev 0 goldilocks/cyclic-7 en:8 0.137s complete load=0.9
+dev 0 goldilocks/cyclic-7 en:16 0.145s complete load=0.9
+dev 0 goldilocks/cyclic-7 sg:1 0.575s complete load=0.9
+dev 0 goldilocks/cyclic-7 sg:16 0.673s complete load=0.9
+dev 0 goldilocks/cyclic-7 mf4:16 0.146s complete load=1.1
+dev 0 goldilocks/cyclic-7 men:1 0.292s complete load=1.0
+dev 0 goldilocks/cyclic-7 men:16 0.146s complete load=1.0
+dev 0 wide64/cyclic-7 f4:1 0.278s complete load=1.1
+dev 0 wide64/cyclic-7 f4:4 0.157s complete load=1.2
+dev 0 wide64/cyclic-7 f4:8 0.135s complete load=1.2
+dev 0 wide64/cyclic-7 f4:16 0.147s complete load=1.2
+dev 0 wide64/cyclic-7 en:1 0.274s complete load=1.1
+dev 0 wide64/cyclic-7 en:4 0.157s complete load=1.1
+dev 0 wide64/cyclic-7 en:8 0.135s complete load=1.1
+dev 0 wide64/cyclic-7 en:16 0.146s complete load=1.0
+dev 0 wide64/cyclic-7 sg:1 0.575s complete load=0.9
+dev 0 wide64/cyclic-7 sg:16 0.672s complete load=1.0
+dev 0 wide64/cyclic-7 mf4:16 0.146s complete load=1.0
+dev 0 wide64/cyclic-7 men:1 0.273s complete load=0.9
+dev 0 wide64/cyclic-7 men:16 0.147s complete load=0.9
+dev 0 goldilocks/noon-7 f4:1 0.207s complete load=0.9
+dev 0 goldilocks/noon-7 f4:4 0.171s complete load=0.9
+dev 0 goldilocks/noon-7 f4:8 0.165s complete load=1.9
+dev 0 goldilocks/noon-7 f4:16 0.191s complete load=1.7
+dev 0 goldilocks/noon-7 en:1 0.100s complete load=1.6
+dev 0 goldilocks/noon-7 en:4 0.103s complete load=1.5
+dev 0 goldilocks/noon-7 en:8 0.103s complete load=1.5
+dev 0 goldilocks/noon-7 en:16 0.106s complete load=1.4
+dev 0 goldilocks/noon-7 sg:1 0.095s complete load=1.3
+dev 0 goldilocks/noon-7 sg:16 0.108s complete load=1.2
+dev 0 goldilocks/noon-7 mf4:16 0.192s complete load=1.3
+dev 0 goldilocks/noon-7 men:1 0.098s complete load=1.2
+dev 0 goldilocks/noon-7 men:16 0.106s complete load=1.1
+dev 0 wide64/noon-8 f4:1 1.377s complete load=1.2
+dev 0 wide64/noon-8 f4:4 0.969s complete load=1.2
+dev 0 wide64/noon-8 f4:8 0.936s complete load=1.2
+dev 0 wide64/noon-8 f4:16 0.981s complete load=1.2
+dev 0 wide64/noon-8 en:1 0.584s complete load=1.1
+dev 0 wide64/noon-8 en:4 0.604s complete load=1.1
+dev 0 wide64/noon-8 en:8 0.585s complete load=1.1
+dev 0 wide64/noon-8 en:16 0.592s complete load=1.2
+dev 0 wide64/noon-8 sg:1 0.570s complete load=1.2
+dev 0 wide64/noon-8 sg:16 0.600s complete load=1.2
+dev 0 wide64/noon-8 mf4:16 0.970s complete load=1.1
+dev 0 wide64/noon-8 men:1 0.585s complete load=1.1
+dev 0 wide64/noon-8 men:16 0.597s complete load=1.1
+dev 1 wide64/eco-12 f4:4 4.267s complete load=1.0
+dev 1 wide64/eco-12 f4:8 3.054s complete load=1.2
+dev 1 wide64/eco-12 f4:16 2.369s complete load=1.6
+dev 1 wide64/eco-12 en:1 2.527s complete load=1.6
+dev 1 wide64/eco-12 en:4 1.818s complete load=1.5
+dev 1 wide64/eco-12 en:8 1.734s complete load=1.5
+dev 1 wide64/eco-12 en:16 1.740s complete load=2.1
+dev 1 wide64/eco-12 sg:1 2.583s complete load=1.9
+dev 1 wide64/eco-12 sg:16 1.736s complete load=2.0
+dev 1 wide64/eco-12 mf4:16 2.367s complete load=1.8
+dev 1 wide64/eco-12 men:1 2.544s complete load=3.0
+dev 1 wide64/eco-12 men:16 1.768s complete load=2.7
+dev 1 wide64/eco-12 sg:4 1.812s complete load=2.5
+dev 1 wide64/eco-12 sg:8 1.734s complete load=2.4
+dev 1 wide64/eco-12 msg:16 1.760s complete load=2.2
+dev 1 wide64/eco-12 f4:1 12.901s complete load=2.1
+dev 1 goldilocks/katsura-11 f4:4 2.868s complete load=1.9
+dev 1 goldilocks/katsura-11 f4:8 1.881s complete load=1.7
+dev 1 goldilocks/katsura-11 f4:16 1.354s complete load=1.6
+dev 1 goldilocks/katsura-11 en:1 0.919s complete load=1.6
+dev 1 goldilocks/katsura-11 en:4 0.638s complete load=1.6
+dev 1 goldilocks/katsura-11 en:8 0.617s complete load=1.5
+dev 1 goldilocks/katsura-11 en:16 0.615s complete load=1.3
+dev 1 goldilocks/katsura-11 sg:1 0.912s complete load=1.3
+dev 1 goldilocks/katsura-11 sg:16 0.613s complete load=1.3
+dev 1 goldilocks/katsura-11 mf4:16 1.347s complete load=1.3
+dev 1 goldilocks/katsura-11 men:1 0.930s complete load=2.5
+dev 1 goldilocks/katsura-11 men:16 0.621s complete load=2.3
+dev 1 goldilocks/katsura-11 sg:4 0.661s complete load=2.4
+dev 1 goldilocks/katsura-11 sg:8 0.614s complete load=2.2
+dev 1 goldilocks/katsura-11 msg:16 0.606s complete load=3.1
+dev 1 goldilocks/katsura-11 f4:1 9.862s complete load=2.9
+dev 1 wide64/katsura-11 f4:4 2.811s complete load=2.6
+dev 1 wide64/katsura-11 f4:8 1.849s complete load=2.6
+dev 1 wide64/katsura-11 f4:16 1.339s complete load=2.5
+dev 1 wide64/katsura-11 en:1 0.907s complete load=2.3
+dev 1 wide64/katsura-11 en:4 0.639s complete load=2.3
+dev 1 wide64/katsura-11 en:8 0.607s complete load=2.2
+dev 1 wide64/katsura-11 en:16 0.617s complete load=2.1
+dev 1 wide64/katsura-11 sg:1 0.911s complete load=1.9
+dev 1 wide64/katsura-11 sg:16 0.638s complete load=1.9
+dev 1 wide64/katsura-11 mf4:16 1.344s complete load=1.9
+dev 1 wide64/katsura-11 men:1 0.944s complete load=1.9
+dev 1 wide64/katsura-11 men:16 0.639s complete load=1.9
+dev 1 wide64/katsura-11 sg:4 0.632s complete load=1.9
+dev 1 wide64/katsura-11 sg:8 0.610s complete load=1.8
+dev 1 wide64/katsura-11 msg:16 0.611s complete load=1.7
+dev 1 wide64/katsura-11 f4:1 9.128s complete load=1.6
+dev 1 goldilocks/mq-random-11 f4:4 11.539s complete load=1.5
+dev 1 goldilocks/mq-random-11 f4:8 7.175s complete load=1.8
+dev 1 goldilocks/mq-random-11 f4:16 4.672s complete load=2.3
+dev 1 goldilocks/mq-random-11 en:1 5.156s complete load=3.2
+dev 1 goldilocks/mq-random-11 en:4 2.705s complete load=3.1
+dev 1 goldilocks/mq-random-11 en:8 2.322s complete load=2.7
+dev 1 goldilocks/mq-random-11 en:16 2.134s complete load=2.5
+dev 1 goldilocks/mq-random-11 sg:1 5.180s complete load=2.3
+dev 1 goldilocks/mq-random-11 sg:16 2.139s complete load=2.3
+dev 1 goldilocks/mq-random-11 mf4:16 4.667s complete load=2.2
+dev 1 goldilocks/mq-random-11 men:1 5.185s complete load=3.1
+dev 1 goldilocks/mq-random-11 men:16 2.126s complete load=2.9
+dev 1 goldilocks/mq-random-11 sg:4 2.699s complete load=2.9
+dev 1 goldilocks/mq-random-11 sg:8 2.351s complete load=2.6
+dev 1 goldilocks/mq-random-11 msg:16 2.122s complete load=2.5
+dev 1 goldilocks/mq-random-11 f4:1 41.830s complete load=2.4
+dev 1 gf32003/mq-random-10 f4:4 0.383s complete load=1.8
+dev 1 gf32003/mq-random-10 f4:8 0.273s complete load=1.9
+dev 1 gf32003/mq-random-10 f4:16 0.243s complete load=1.8
+dev 1 gf32003/mq-random-10 en:1 0.462s complete load=1.7
+dev 1 gf32003/mq-random-10 en:4 0.387s complete load=1.8
+dev 1 gf32003/mq-random-10 en:8 0.274s complete load=1.6
+dev 1 gf32003/mq-random-10 en:16 0.242s complete load=2.4
+dev 1 gf32003/mq-random-10 sg:1 0.458s complete load=2.4
+dev 1 gf32003/mq-random-10 sg:16 0.379s complete load=2.3
+dev 1 gf32003/mq-random-10 mf4:16 0.242s complete load=2.2
+dev 1 gf32003/mq-random-10 men:1 0.464s complete load=2.1
+dev 1 gf32003/mq-random-10 men:16 0.378s complete load=2.0
+dev 1 gf32003/mq-random-10 f4:1 1.076s complete load=1.9
+dev 1 m31/mq-random-10 f4:4 0.333s complete load=1.8
+dev 1 m31/mq-random-10 f4:8 0.250s complete load=1.7
+dev 1 m31/mq-random-10 f4:16 0.225s complete load=1.5
+dev 1 m31/mq-random-10 en:1 0.459s complete load=1.5
+dev 1 m31/mq-random-10 en:4 0.338s complete load=1.5
+dev 1 m31/mq-random-10 en:8 0.248s complete load=1.5
+dev 1 m31/mq-random-10 en:16 0.226s complete load=1.4
+dev 1 m31/mq-random-10 sg:1 0.457s complete load=1.3
+dev 1 m31/mq-random-10 sg:16 0.388s complete load=1.3
+dev 1 m31/mq-random-10 mf4:16 0.225s complete load=1.3
+dev 1 m31/mq-random-10 men:1 0.450s complete load=1.2
+dev 1 m31/mq-random-10 men:16 0.393s complete load=1.1
+dev 1 m31/mq-random-10 f4:1 0.964s complete load=1.1
+dev 1 goldilocks/cyclic-7 f4:4 0.160s complete load=1.1
+dev 1 goldilocks/cyclic-7 f4:8 0.137s complete load=1.1
+dev 1 goldilocks/cyclic-7 f4:16 0.147s complete load=1.0
+dev 1 goldilocks/cyclic-7 en:1 0.289s complete load=0.9
+dev 1 goldilocks/cyclic-7 en:4 0.159s complete load=0.9
+dev 1 goldilocks/cyclic-7 en:8 0.135s complete load=0.9
+dev 1 goldilocks/cyclic-7 en:16 0.144s complete load=0.9
+dev 1 goldilocks/cyclic-7 sg:1 0.571s complete load=0.8
+dev 1 goldilocks/cyclic-7 sg:16 0.669s complete load=0.8
+dev 1 goldilocks/cyclic-7 mf4:16 0.144s complete load=0.9
+dev 1 goldilocks/cyclic-7 men:1 0.290s complete load=1.0
+dev 1 goldilocks/cyclic-7 men:16 0.148s complete load=1.0
+dev 1 goldilocks/cyclic-7 f4:1 0.296s complete load=1.0
+dev 1 wide64/cyclic-7 f4:4 0.156s complete load=1.0
+dev 1 wide64/cyclic-7 f4:8 0.135s complete load=1.1
+dev 1 wide64/cyclic-7 f4:16 0.145s complete load=1.0
+dev 1 wide64/cyclic-7 en:1 0.279s complete load=0.9
+dev 1 wide64/cyclic-7 en:4 0.155s complete load=0.9
+dev 1 wide64/cyclic-7 en:8 0.135s complete load=0.9
+dev 1 wide64/cyclic-7 en:16 0.142s complete load=0.9
+dev 1 wide64/cyclic-7 sg:1 0.575s complete load=0.8
+dev 1 wide64/cyclic-7 sg:16 0.711s complete load=0.8
+dev 1 wide64/cyclic-7 mf4:16 0.147s complete load=0.8
+dev 1 wide64/cyclic-7 men:1 0.271s complete load=0.8
+dev 1 wide64/cyclic-7 men:16 0.146s complete load=0.8
+dev 1 wide64/cyclic-7 f4:1 0.278s complete load=0.9
+dev 1 goldilocks/noon-7 f4:4 0.173s complete load=0.9
+dev 1 goldilocks/noon-7 f4:8 0.165s complete load=0.9
+dev 1 goldilocks/noon-7 f4:16 0.193s complete load=0.9
+dev 1 goldilocks/noon-7 en:1 0.099s complete load=2.2
+dev 1 goldilocks/noon-7 en:4 0.097s complete load=2.0
+dev 1 goldilocks/noon-7 en:8 0.103s complete load=1.9
+dev 1 goldilocks/noon-7 en:16 0.108s complete load=1.7
+dev 1 goldilocks/noon-7 sg:1 0.099s complete load=1.7
+dev 1 goldilocks/noon-7 sg:16 0.109s complete load=1.5
+dev 1 goldilocks/noon-7 mf4:16 0.193s complete load=1.4
+dev 1 goldilocks/noon-7 men:1 0.100s complete load=1.4
+dev 1 goldilocks/noon-7 men:16 0.110s complete load=1.3
+dev 1 goldilocks/noon-7 f4:1 0.218s complete load=1.3
+dev 1 wide64/noon-8 f4:4 1.021s complete load=1.2
+dev 1 wide64/noon-8 f4:8 0.952s complete load=1.1
+dev 1 wide64/noon-8 f4:16 0.979s complete load=1.1
+dev 1 wide64/noon-8 en:1 0.569s complete load=1.2
+dev 1 wide64/noon-8 en:4 0.574s complete load=1.1
+dev 1 wide64/noon-8 en:8 0.583s complete load=2.0
+dev 1 wide64/noon-8 en:16 0.593s complete load=2.0
+dev 1 wide64/noon-8 sg:1 0.593s complete load=1.9
+dev 1 wide64/noon-8 sg:16 0.603s complete load=1.8
+dev 1 wide64/noon-8 mf4:16 0.968s complete load=1.8
+dev 1 wide64/noon-8 men:1 0.577s complete load=1.6
+dev 1 wide64/noon-8 men:16 0.605s complete load=1.6
+dev 1 wide64/noon-8 f4:1 1.369s complete load=1.6
+dev 2 wide64/eco-12 f4:8 3.054s complete load=1.5
+dev 2 wide64/eco-12 f4:16 2.367s complete load=1.5
+dev 2 wide64/eco-12 en:1 2.527s complete load=2.4
+dev 2 wide64/eco-12 en:4 1.798s complete load=2.3
+dev 2 wide64/eco-12 en:8 1.731s complete load=2.2
+dev 2 wide64/eco-12 en:16 1.733s complete load=2.1
+dev 2 wide64/eco-12 sg:1 2.562s complete load=2.2
+dev 2 wide64/eco-12 sg:16 1.732s complete load=2.1
+dev 2 wide64/eco-12 mf4:16 2.360s complete load=1.9
+dev 2 wide64/eco-12 men:1 2.542s complete load=1.8
+dev 2 wide64/eco-12 men:16 1.765s complete load=1.7
+dev 2 wide64/eco-12 sg:4 1.818s complete load=1.7
+dev 2 wide64/eco-12 sg:8 1.732s complete load=1.6
+dev 2 wide64/eco-12 msg:16 1.749s complete load=1.5
+dev 2 wide64/eco-12 f4:1 12.868s complete load=1.7
+dev 2 wide64/eco-12 f4:4 4.385s complete load=1.6
+dev 2 goldilocks/katsura-11 f4:8 1.880s complete load=1.7
+dev 2 goldilocks/katsura-11 f4:16 1.355s complete load=1.6
+dev 2 goldilocks/katsura-11 en:1 0.941s complete load=1.6
+dev 2 goldilocks/katsura-11 en:4 0.647s complete load=1.4
+dev 2 goldilocks/katsura-11 en:8 0.612s complete load=1.3
+dev 2 goldilocks/katsura-11 en:16 0.613s complete load=1.3
+dev 2 goldilocks/katsura-11 sg:1 0.918s complete load=1.3
+dev 2 goldilocks/katsura-11 sg:16 0.620s complete load=1.3
+dev 2 goldilocks/katsura-11 mf4:16 1.351s complete load=1.2
+dev 2 goldilocks/katsura-11 men:1 0.918s complete load=2.0
+dev 2 goldilocks/katsura-11 men:16 0.608s complete load=2.0
+dev 2 goldilocks/katsura-11 sg:4 0.642s complete load=1.9
+dev 2 goldilocks/katsura-11 sg:8 0.610s complete load=2.0
+dev 2 goldilocks/katsura-11 msg:16 0.612s complete load=1.9
+dev 2 goldilocks/katsura-11 f4:1 9.790s complete load=1.8
+dev 2 goldilocks/katsura-11 f4:4 2.848s complete load=1.8
+dev 2 wide64/katsura-11 f4:8 1.852s complete load=1.7
+dev 2 wide64/katsura-11 f4:16 1.341s complete load=1.7
+dev 2 wide64/katsura-11 en:1 0.905s complete load=1.8
+dev 2 wide64/katsura-11 en:4 0.630s complete load=1.8
+dev 2 wide64/katsura-11 en:8 0.611s complete load=1.7
+dev 2 wide64/katsura-11 en:16 0.605s complete load=1.7
+dev 2 wide64/katsura-11 sg:1 0.911s complete load=1.7
+dev 2 wide64/katsura-11 sg:16 0.613s complete load=1.8
+dev 2 wide64/katsura-11 mf4:16 1.331s complete load=1.9
+dev 2 wide64/katsura-11 men:1 0.909s complete load=3.3
+dev 2 wide64/katsura-11 men:16 0.616s complete load=3.2
+dev 2 wide64/katsura-11 sg:4 0.676s complete load=4.5
+dev 2 wide64/katsura-11 sg:8 0.608s complete load=4.4
+dev 2 wide64/katsura-11 msg:16 0.614s complete load=4.2
+dev 2 wide64/katsura-11 f4:1 9.140s complete load=5.0
+dev 2 wide64/katsura-11 f4:4 2.810s complete load=4.5
+dev 2 goldilocks/mq-random-11 f4:8 7.168s complete load=4.1
+dev 2 goldilocks/mq-random-11 f4:16 4.680s complete load=3.8
+dev 2 goldilocks/mq-random-11 en:1 5.150s complete load=4.7
+dev 2 goldilocks/mq-random-11 en:4 2.670s complete load=4.2
+dev 2 goldilocks/mq-random-11 en:8 2.328s complete load=4.0
+dev 2 goldilocks/mq-random-11 en:16 2.157s complete load=3.8
+dev 2 goldilocks/mq-random-11 sg:1 5.149s complete load=3.6
+dev 2 goldilocks/mq-random-11 sg:16 2.131s complete load=3.2
+dev 2 goldilocks/mq-random-11 mf4:16 4.636s complete load=3.1
+dev 2 goldilocks/mq-random-11 men:1 5.187s complete load=3.9
+dev 2 goldilocks/mq-random-11 men:16 2.110s complete load=3.3
+dev 2 goldilocks/mq-random-11 sg:4 2.683s complete load=3.1
+dev 2 goldilocks/mq-random-11 sg:8 2.334s complete load=2.8
+dev 2 goldilocks/mq-random-11 msg:16 2.143s complete load=2.7
+dev 2 goldilocks/mq-random-11 f4:1 41.764s complete load=2.5
+dev 2 goldilocks/mq-random-11 f4:4 11.522s complete load=1.7
+dev 2 gf32003/mq-random-10 f4:8 0.275s complete load=2.0
+dev 2 gf32003/mq-random-10 f4:16 0.241s complete load=1.8
+dev 2 gf32003/mq-random-10 en:1 0.463s complete load=1.8
+dev 2 gf32003/mq-random-10 en:4 0.386s complete load=1.8
+dev 2 gf32003/mq-random-10 en:8 0.273s complete load=1.8
+dev 2 gf32003/mq-random-10 en:16 0.238s complete load=1.6
+dev 2 gf32003/mq-random-10 sg:1 0.495s complete load=1.6
+dev 2 gf32003/mq-random-10 sg:16 0.375s complete load=1.5
+dev 2 gf32003/mq-random-10 mf4:16 0.240s complete load=1.5
+dev 2 gf32003/mq-random-10 men:1 0.468s complete load=1.4
+dev 2 gf32003/mq-random-10 men:16 0.377s complete load=1.3
+dev 2 gf32003/mq-random-10 f4:1 1.079s complete load=1.3
+dev 2 gf32003/mq-random-10 f4:4 0.398s complete load=1.2
+dev 2 m31/mq-random-10 f4:8 0.249s complete load=1.2
+dev 2 m31/mq-random-10 f4:16 0.228s complete load=1.2
+dev 2 m31/mq-random-10 en:1 0.454s complete load=1.1
+dev 2 m31/mq-random-10 en:4 0.344s complete load=1.1
+dev 2 m31/mq-random-10 en:8 0.249s complete load=1.2
+dev 2 m31/mq-random-10 en:16 0.225s complete load=1.1
+dev 2 m31/mq-random-10 sg:1 0.462s complete load=1.1
+dev 2 m31/mq-random-10 sg:16 0.389s complete load=1.1
+dev 2 m31/mq-random-10 mf4:16 0.224s complete load=1.1
+dev 2 m31/mq-random-10 men:1 0.473s complete load=1.4
+dev 2 m31/mq-random-10 men:16 0.386s complete load=1.5
+dev 2 m31/mq-random-10 f4:1 0.936s complete load=1.5
+dev 2 m31/mq-random-10 f4:4 0.335s complete load=2.5
+dev 2 goldilocks/cyclic-7 f4:8 0.136s complete load=2.3
+dev 2 goldilocks/cyclic-7 f4:16 0.145s complete load=2.2
+dev 2 goldilocks/cyclic-7 en:1 0.292s complete load=2.1
+dev 2 goldilocks/cyclic-7 en:4 0.159s complete load=2.1
+dev 2 goldilocks/cyclic-7 en:8 0.136s complete load=2.0
+dev 2 goldilocks/cyclic-7 en:16 0.146s complete load=2.0
+dev 2 goldilocks/cyclic-7 sg:1 0.576s complete load=1.8
+dev 2 goldilocks/cyclic-7 sg:16 0.675s complete load=1.7
+dev 2 goldilocks/cyclic-7 mf4:16 0.147s complete load=1.7
+dev 2 goldilocks/cyclic-7 men:1 0.286s complete load=1.6
+dev 2 goldilocks/cyclic-7 men:16 0.147s complete load=1.6
+dev 2 goldilocks/cyclic-7 f4:1 0.290s complete load=1.5
+dev 2 goldilocks/cyclic-7 f4:4 0.158s complete load=1.4
+dev 2 wide64/cyclic-7 f4:8 0.136s complete load=1.4
+dev 2 wide64/cyclic-7 f4:16 0.145s complete load=1.4
+dev 2 wide64/cyclic-7 en:1 0.281s complete load=1.3
+dev 2 wide64/cyclic-7 en:4 0.158s complete load=1.2
+dev 2 wide64/cyclic-7 en:8 0.135s complete load=1.1
+dev 2 wide64/cyclic-7 en:16 0.145s complete load=1.2
+dev 2 wide64/cyclic-7 sg:1 0.574s complete load=1.2
+dev 2 wide64/cyclic-7 sg:16 0.673s complete load=1.3
+dev 2 wide64/cyclic-7 mf4:16 0.148s complete load=1.2
+dev 2 wide64/cyclic-7 men:1 0.277s complete load=1.2
+dev 2 wide64/cyclic-7 men:16 0.145s complete load=1.2
+dev 2 wide64/cyclic-7 f4:1 0.280s complete load=1.2
+dev 2 wide64/cyclic-7 f4:4 0.157s complete load=1.2
+dev 2 goldilocks/noon-7 f4:8 0.164s complete load=1.1
+dev 2 goldilocks/noon-7 f4:16 0.195s complete load=1.1
+dev 2 goldilocks/noon-7 en:1 0.101s complete load=1.2
+dev 2 goldilocks/noon-7 en:4 0.104s complete load=1.1
+dev 2 goldilocks/noon-7 en:8 0.103s complete load=1.1
+dev 2 goldilocks/noon-7 en:16 0.105s complete load=1.1
+dev 2 goldilocks/noon-7 sg:1 0.102s complete load=1.1
+dev 2 goldilocks/noon-7 sg:16 0.109s complete load=1.0
+dev 2 goldilocks/noon-7 mf4:16 0.190s complete load=1.0
+dev 2 goldilocks/noon-7 men:1 0.101s complete load=0.9
+dev 2 goldilocks/noon-7 men:16 0.109s complete load=0.8
+dev 2 goldilocks/noon-7 f4:1 0.208s complete load=0.8
+dev 2 goldilocks/noon-7 f4:4 0.172s complete load=0.8
+dev 2 wide64/noon-8 f4:8 0.945s complete load=0.9
+dev 2 wide64/noon-8 f4:16 0.972s complete load=0.9
+dev 2 wide64/noon-8 en:1 0.572s complete load=0.9
+dev 2 wide64/noon-8 en:4 0.582s complete load=0.9
+dev 2 wide64/noon-8 en:8 0.586s complete load=0.9
+dev 2 wide64/noon-8 en:16 0.593s complete load=0.9
+dev 2 wide64/noon-8 sg:1 0.586s complete load=0.9
+dev 2 wide64/noon-8 sg:16 0.601s complete load=1.1
+dev 2 wide64/noon-8 mf4:16 0.984s complete load=1.0
+dev 2 wide64/noon-8 men:1 0.569s complete load=1.0
+dev 2 wide64/noon-8 men:16 0.602s complete load=1.0
+dev 2 wide64/noon-8 f4:1 1.361s complete load=1.0
+dev 2 wide64/noon-8 f4:4 0.991s complete load=1.0
+dev 3 wide64/eco-12 f4:16 2.397s complete load=0.9
+dev 3 wide64/eco-12 en:1 2.562s complete load=0.8
+dev 3 wide64/eco-12 en:4 1.795s complete load=0.8
+dev 3 wide64/eco-12 en:8 1.740s complete load=0.9
+dev 3 wide64/eco-12 en:16 1.731s complete load=0.8
+dev 3 wide64/eco-12 sg:1 2.542s complete load=1.1
+dev 3 wide64/eco-12 sg:16 1.748s complete load=1.0
+dev 3 wide64/eco-12 mf4:16 2.362s complete load=1.1
+dev 3 wide64/eco-12 men:1 2.555s complete load=1.8
+dev 3 wide64/eco-12 men:16 1.740s complete load=1.8
+dev 3 wide64/eco-12 sg:4 1.803s complete load=1.6
+dev 3 wide64/eco-12 sg:8 1.768s complete load=1.6
+dev 3 wide64/eco-12 msg:16 1.738s complete load=1.5
+dev 3 wide64/eco-12 f4:1 12.980s complete load=2.7
+dev 3 wide64/eco-12 f4:4 4.271s complete load=2.3
+dev 3 wide64/eco-12 f4:8 3.015s complete load=2.6
+dev 3 goldilocks/katsura-11 f4:16 1.362s complete load=3.0
+dev 3 goldilocks/katsura-11 en:1 0.922s complete load=2.6
+dev 3 goldilocks/katsura-11 en:4 0.676s complete load=2.6
+dev 3 goldilocks/katsura-11 en:8 0.609s complete load=2.5
+dev 3 goldilocks/katsura-11 en:16 0.611s complete load=2.4
+dev 3 goldilocks/katsura-11 sg:1 0.912s complete load=2.9
+dev 3 goldilocks/katsura-11 sg:16 0.612s complete load=2.8
+dev 3 goldilocks/katsura-11 mf4:16 1.353s complete load=2.5
+dev 3 goldilocks/katsura-11 men:1 0.923s complete load=2.3
+dev 3 goldilocks/katsura-11 men:16 0.612s complete load=2.3
+dev 3 goldilocks/katsura-11 sg:4 0.641s complete load=2.3
+dev 3 goldilocks/katsura-11 sg:8 0.610s complete load=2.2
+dev 3 goldilocks/katsura-11 msg:16 0.618s complete load=2.1
+dev 3 goldilocks/katsura-11 f4:1 9.788s complete load=1.9
+dev 3 goldilocks/katsura-11 f4:4 2.899s complete load=1.8
+dev 3 goldilocks/katsura-11 f4:8 1.884s complete load=1.9
+dev 3 wide64/katsura-11 f4:16 1.342s complete load=1.7
+dev 3 wide64/katsura-11 en:1 0.921s complete load=1.7
+dev 3 wide64/katsura-11 en:4 0.638s complete load=1.6
+dev 3 wide64/katsura-11 en:8 0.616s complete load=1.5
+dev 3 wide64/katsura-11 en:16 0.611s complete load=1.5
+dev 3 wide64/katsura-11 sg:1 0.912s complete load=1.5
+dev 3 wide64/katsura-11 sg:16 0.609s complete load=1.5
+dev 3 wide64/katsura-11 mf4:16 1.329s complete load=1.4
+dev 3 wide64/katsura-11 men:1 0.918s complete load=1.4
+dev 3 wide64/katsura-11 men:16 0.619s complete load=1.4
+dev 3 wide64/katsura-11 sg:4 0.639s complete load=1.3
+dev 3 wide64/katsura-11 sg:8 0.607s complete load=1.2
+dev 3 wide64/katsura-11 msg:16 0.645s complete load=1.2
+dev 3 wide64/katsura-11 f4:1 9.155s complete load=1.3
+dev 3 wide64/katsura-11 f4:4 2.787s complete load=1.4
+dev 3 wide64/katsura-11 f4:8 1.854s complete load=1.5
+dev 3 goldilocks/mq-random-11 f4:16 4.677s complete load=1.4
+dev 3 goldilocks/mq-random-11 en:1 5.169s complete load=2.6
+dev 3 goldilocks/mq-random-11 en:4 2.770s complete load=2.3
+dev 3 goldilocks/mq-random-11 en:8 2.327s complete load=2.3
+dev 3 goldilocks/mq-random-11 en:16 2.198s complete load=2.3
+dev 3 goldilocks/mq-random-11 sg:1 5.394s complete load=2.2
+dev 3 goldilocks/mq-random-11 sg:16 2.254s complete load=2.3
+dev 3 goldilocks/mq-random-11 mf4:16 4.725s complete load=2.3
+dev 3 goldilocks/mq-random-11 men:1 5.681s complete load=4.7
+dev 3 goldilocks/mq-random-11 men:16 2.185s complete load=4.2
+dev 3 goldilocks/mq-random-11 sg:4 2.916s complete load=4.0
+dev 3 goldilocks/mq-random-11 sg:8 2.388s complete load=3.8
+dev 3 goldilocks/mq-random-11 msg:16 2.126s complete load=3.8
+dev 3 goldilocks/mq-random-11 f4:1 43.461s complete load=3.5
+dev 3 goldilocks/mq-random-11 f4:4 12.150s complete load=3.0
+dev 3 goldilocks/mq-random-11 f4:8 7.256s complete load=3.4
+dev 3 gf32003/mq-random-10 f4:16 0.241s complete load=4.4
+dev 3 gf32003/mq-random-10 en:1 0.505s complete load=4.3
+dev 3 gf32003/mq-random-10 en:4 0.401s complete load=4.1
+dev 3 gf32003/mq-random-10 en:8 0.274s complete load=4.4
+dev 3 gf32003/mq-random-10 en:16 0.240s complete load=4.1
+dev 3 gf32003/mq-random-10 sg:1 0.491s complete load=3.9
+dev 3 gf32003/mq-random-10 sg:16 0.375s complete load=3.7
+dev 3 gf32003/mq-random-10 mf4:16 0.243s complete load=3.4
+dev 3 gf32003/mq-random-10 men:1 0.469s complete load=3.2
+dev 3 gf32003/mq-random-10 men:16 0.379s complete load=3.0
+dev 3 gf32003/mq-random-10 f4:1 1.085s complete load=2.7
+dev 3 gf32003/mq-random-10 f4:4 0.395s complete load=2.7
+dev 3 gf32003/mq-random-10 f4:8 0.276s complete load=2.7
+dev 3 m31/mq-random-10 f4:16 0.228s complete load=2.6
+dev 3 m31/mq-random-10 en:1 0.487s complete load=2.8
+dev 3 m31/mq-random-10 en:4 0.336s complete load=2.7
+dev 3 m31/mq-random-10 en:8 0.250s complete load=2.5
+dev 3 m31/mq-random-10 en:16 0.228s complete load=2.4
+dev 3 m31/mq-random-10 sg:1 0.468s complete load=2.2
+dev 3 m31/mq-random-10 sg:16 0.393s complete load=2.1
+dev 3 m31/mq-random-10 mf4:16 0.226s complete load=2.1
+dev 3 m31/mq-random-10 men:1 0.447s complete load=1.9
+dev 3 m31/mq-random-10 men:16 0.388s complete load=1.7
+dev 3 m31/mq-random-10 f4:1 0.939s complete load=1.7
+dev 3 m31/mq-random-10 f4:4 0.340s complete load=1.7
+dev 3 m31/mq-random-10 f4:8 0.250s complete load=1.6
+dev 3 goldilocks/cyclic-7 f4:16 0.147s complete load=1.6
+dev 3 goldilocks/cyclic-7 en:1 0.304s complete load=1.6
+dev 3 goldilocks/cyclic-7 en:4 0.158s complete load=1.5
+dev 3 goldilocks/cyclic-7 en:8 0.137s complete load=1.4
+dev 3 goldilocks/cyclic-7 en:16 0.145s complete load=1.4
+dev 3 goldilocks/cyclic-7 sg:1 0.578s complete load=1.5
+dev 3 goldilocks/cyclic-7 sg:16 0.669s complete load=1.4
+dev 3 goldilocks/cyclic-7 mf4:16 0.148s complete load=1.4
+dev 3 goldilocks/cyclic-7 men:1 0.287s complete load=1.4
+dev 3 goldilocks/cyclic-7 men:16 0.146s complete load=1.4
+dev 3 goldilocks/cyclic-7 f4:1 0.308s complete load=2.4
+dev 3 goldilocks/cyclic-7 f4:4 0.158s complete load=2.3
+dev 3 goldilocks/cyclic-7 f4:8 0.136s complete load=2.1
+dev 3 wide64/cyclic-7 f4:16 0.145s complete load=2.0
+dev 3 wide64/cyclic-7 en:1 0.291s complete load=2.0
+dev 3 wide64/cyclic-7 en:4 0.157s complete load=1.9
+dev 3 wide64/cyclic-7 en:8 0.135s complete load=1.8
+dev 3 wide64/cyclic-7 en:16 0.142s complete load=1.7
+dev 3 wide64/cyclic-7 sg:1 0.587s complete load=1.5
+dev 3 wide64/cyclic-7 sg:16 0.677s complete load=1.5
+dev 3 wide64/cyclic-7 mf4:16 0.144s complete load=1.6
+dev 3 wide64/cyclic-7 men:1 0.285s complete load=1.7
+dev 3 wide64/cyclic-7 men:16 0.144s complete load=1.7
+dev 3 wide64/cyclic-7 f4:1 0.280s complete load=1.6
+dev 3 wide64/cyclic-7 f4:4 0.157s complete load=1.5
+dev 3 wide64/cyclic-7 f4:8 0.135s complete load=1.4
+dev 3 goldilocks/noon-7 f4:16 0.191s complete load=1.4
+dev 3 goldilocks/noon-7 en:1 0.101s complete load=1.4
+dev 3 goldilocks/noon-7 en:4 0.102s complete load=1.3
+dev 3 goldilocks/noon-7 en:8 0.103s complete load=1.2
+dev 3 goldilocks/noon-7 en:16 0.104s complete load=1.2
+dev 3 goldilocks/noon-7 sg:1 0.100s complete load=1.1
+dev 3 goldilocks/noon-7 sg:16 0.110s complete load=1.0
+dev 3 goldilocks/noon-7 mf4:16 0.192s complete load=1.0
+dev 3 goldilocks/noon-7 men:1 0.103s complete load=0.9
+dev 3 goldilocks/noon-7 men:16 0.110s complete load=0.9
+dev 3 goldilocks/noon-7 f4:1 0.212s complete load=0.9
+dev 3 goldilocks/noon-7 f4:4 0.174s complete load=0.9
+dev 3 goldilocks/noon-7 f4:8 0.165s complete load=1.0
+dev 3 wide64/noon-8 f4:16 0.983s complete load=1.0
+dev 3 wide64/noon-8 en:1 0.579s complete load=0.9
+dev 3 wide64/noon-8 en:4 0.595s complete load=0.9
+dev 3 wide64/noon-8 en:8 0.585s complete load=0.9
+dev 3 wide64/noon-8 en:16 0.596s complete load=1.0
+dev 3 wide64/noon-8 sg:1 0.592s complete load=1.0
+dev 3 wide64/noon-8 sg:16 0.594s complete load=1.0
+dev 3 wide64/noon-8 mf4:16 0.985s complete load=1.0
+dev 3 wide64/noon-8 men:1 0.585s complete load=1.2
+dev 3 wide64/noon-8 men:16 0.622s complete load=1.2
+dev 3 wide64/noon-8 f4:1 1.412s complete load=1.2
+dev 3 wide64/noon-8 f4:4 1.031s complete load=1.3
+dev 3 wide64/noon-8 f4:8 0.978s complete load=1.4
+dev 4 wide64/eco-12 en:1 2.580s complete load=1.5
+dev 4 wide64/eco-12 en:4 1.845s complete load=1.5
+dev 4 wide64/eco-12 en:8 1.739s complete load=1.5
+dev 4 wide64/eco-12 en:16 1.738s complete load=1.4
+dev 4 wide64/eco-12 sg:1 2.563s complete load=1.4
+dev 4 wide64/eco-12 sg:16 1.752s complete load=1.6
+dev 4 wide64/eco-12 mf4:16 2.385s complete load=1.5
+dev 4 wide64/eco-12 men:1 2.566s complete load=2.7
+dev 4 wide64/eco-12 men:16 1.767s complete load=2.4
+dev 4 wide64/eco-12 sg:4 1.853s complete load=2.4
+dev 4 wide64/eco-12 sg:8 1.739s complete load=2.4
+dev 4 wide64/eco-12 msg:16 1.767s complete load=2.2
+dev 4 wide64/eco-12 f4:1 13.062s complete load=2.2
+dev 4 wide64/eco-12 f4:4 4.416s complete load=2.9
+dev 4 wide64/eco-12 f4:8 3.020s complete load=2.6
+dev 4 wide64/eco-12 f4:16 2.376s complete load=3.0
+dev 4 goldilocks/katsura-11 en:1 0.925s complete load=2.8
+dev 4 goldilocks/katsura-11 en:4 0.664s complete load=2.8
+dev 4 goldilocks/katsura-11 en:8 0.617s complete load=2.6
+dev 4 goldilocks/katsura-11 en:16 0.633s complete load=2.6
+dev 4 goldilocks/katsura-11 sg:1 0.950s complete load=2.5
+dev 4 goldilocks/katsura-11 sg:16 0.620s complete load=2.3
+dev 4 goldilocks/katsura-11 mf4:16 1.367s complete load=3.6
+dev 4 goldilocks/katsura-11 men:1 0.942s complete load=3.4
+dev 4 goldilocks/katsura-11 men:16 0.621s complete load=3.2
+dev 4 goldilocks/katsura-11 sg:4 0.651s complete load=3.1
+dev 4 goldilocks/katsura-11 sg:8 0.618s complete load=2.8
+dev 4 goldilocks/katsura-11 msg:16 0.613s complete load=2.8
+dev 4 goldilocks/katsura-11 f4:1 9.968s complete load=2.7
+dev 4 goldilocks/katsura-11 f4:4 2.943s complete load=2.3
+dev 4 goldilocks/katsura-11 f4:8 1.889s complete load=2.2
+dev 4 goldilocks/katsura-11 f4:16 1.372s complete load=2.4
+dev 4 wide64/katsura-11 en:1 0.915s complete load=2.3
+dev 4 wide64/katsura-11 en:4 0.659s complete load=2.3
+dev 4 wide64/katsura-11 en:8 0.607s complete load=2.2
+dev 4 wide64/katsura-11 en:16 0.613s complete load=2.0
+dev 4 wide64/katsura-11 sg:1 0.919s complete load=2.2
+dev 4 wide64/katsura-11 sg:16 0.625s complete load=2.2
+dev 4 wide64/katsura-11 mf4:16 1.342s complete load=2.1
+dev 4 wide64/katsura-11 men:1 0.930s complete load=2.0
+dev 4 wide64/katsura-11 men:16 0.640s complete load=2.0
+dev 4 wide64/katsura-11 sg:4 0.648s complete load=2.1
+dev 4 wide64/katsura-11 sg:8 0.612s complete load=1.9
+dev 4 wide64/katsura-11 msg:16 0.610s complete load=1.9
+dev 4 wide64/katsura-11 f4:1 9.265s complete load=1.8
+dev 4 wide64/katsura-11 f4:4 2.859s complete load=1.6
+dev 4 wide64/katsura-11 f4:8 1.854s complete load=1.8
+dev 4 wide64/katsura-11 f4:16 1.346s complete load=1.8
+dev 4 goldilocks/mq-random-11 en:1 5.206s complete load=1.8
+dev 4 goldilocks/mq-random-11 en:4 2.746s complete load=1.7
+dev 4 goldilocks/mq-random-11 en:8 2.365s complete load=1.9
+dev 4 goldilocks/mq-random-11 en:16 2.165s complete load=1.9
+dev 4 goldilocks/mq-random-11 sg:1 5.208s complete load=1.9
+dev 4 goldilocks/mq-random-11 sg:16 2.163s complete load=1.9
+dev 4 goldilocks/mq-random-11 mf4:16 4.656s complete load=1.8
+dev 4 goldilocks/mq-random-11 men:1 5.207s complete load=2.7
+dev 4 goldilocks/mq-random-11 men:16 2.144s complete load=2.7
+dev 4 goldilocks/mq-random-11 sg:4 2.744s complete load=2.3
+dev 4 goldilocks/mq-random-11 sg:8 2.346s complete load=3.3
+dev 4 goldilocks/mq-random-11 msg:16 2.140s complete load=3.1
+dev 4 goldilocks/mq-random-11 f4:1 42.128s complete load=2.9
+dev 4 goldilocks/mq-random-11 f4:4 11.814s complete load=2.2
+dev 4 goldilocks/mq-random-11 f4:8 7.159s complete load=2.4
+dev 4 goldilocks/mq-random-11 f4:16 4.710s complete load=2.7
+dev 4 gf32003/mq-random-10 en:1 0.470s complete load=3.5
+dev 4 gf32003/mq-random-10 en:4 0.385s complete load=3.4
+dev 4 gf32003/mq-random-10 en:8 0.275s complete load=3.4
+dev 4 gf32003/mq-random-10 en:16 0.242s complete load=3.2
+dev 4 gf32003/mq-random-10 sg:1 0.475s complete load=3.2
+dev 4 gf32003/mq-random-10 sg:16 0.384s complete load=3.1
+dev 4 gf32003/mq-random-10 mf4:16 0.243s complete load=3.0
+dev 4 gf32003/mq-random-10 men:1 0.472s complete load=3.1
+dev 4 gf32003/mq-random-10 men:16 0.382s complete load=2.9
+dev 4 gf32003/mq-random-10 f4:1 1.096s complete load=2.7
+dev 4 gf32003/mq-random-10 f4:4 0.394s complete load=2.6
+dev 4 gf32003/mq-random-10 f4:8 0.275s complete load=2.4
+dev 4 gf32003/mq-random-10 f4:16 0.242s complete load=2.4
+dev 4 m31/mq-random-10 en:1 0.461s complete load=2.4
+dev 4 m31/mq-random-10 en:4 0.352s complete load=2.3
+dev 4 m31/mq-random-10 en:8 0.250s complete load=2.5
+dev 4 m31/mq-random-10 en:16 0.228s complete load=2.3
+dev 4 m31/mq-random-10 sg:1 0.453s complete load=2.2
+dev 4 m31/mq-random-10 sg:16 0.400s complete load=2.1
+dev 4 m31/mq-random-10 mf4:16 0.227s complete load=2.4
+dev 4 m31/mq-random-10 men:1 0.462s complete load=2.2
+dev 4 m31/mq-random-10 men:16 0.395s complete load=2.0
+dev 4 m31/mq-random-10 f4:1 0.944s complete load=2.0
+dev 4 m31/mq-random-10 f4:4 0.348s complete load=1.9
+dev 4 m31/mq-random-10 f4:8 0.250s complete load=1.9
+dev 4 m31/mq-random-10 f4:16 0.230s complete load=2.5
+dev 4 goldilocks/cyclic-7 en:1 0.304s complete load=2.3
+dev 4 goldilocks/cyclic-7 en:4 0.157s complete load=2.1
+dev 4 goldilocks/cyclic-7 en:8 0.136s complete load=2.1
+dev 4 goldilocks/cyclic-7 en:16 0.146s complete load=2.0
+dev 4 goldilocks/cyclic-7 sg:1 0.580s complete load=1.9
+dev 4 goldilocks/cyclic-7 sg:16 0.670s complete load=2.0
+dev 4 goldilocks/cyclic-7 mf4:16 0.145s complete load=2.0
+dev 4 goldilocks/cyclic-7 men:1 0.288s complete load=2.4
+dev 4 goldilocks/cyclic-7 men:16 0.146s complete load=2.3
+dev 4 goldilocks/cyclic-7 f4:1 0.307s complete load=2.3
+dev 4 goldilocks/cyclic-7 f4:4 0.160s complete load=2.1
+dev 4 goldilocks/cyclic-7 f4:8 0.136s complete load=1.9
+dev 4 goldilocks/cyclic-7 f4:16 0.143s complete load=1.9
+dev 4 wide64/cyclic-7 en:1 0.282s complete load=1.9
+dev 4 wide64/cyclic-7 en:4 0.158s complete load=1.7
+dev 4 wide64/cyclic-7 en:8 0.135s complete load=1.6
+dev 4 wide64/cyclic-7 en:16 0.145s complete load=1.6
+dev 4 wide64/cyclic-7 sg:1 0.597s complete load=2.5
+dev 4 wide64/cyclic-7 sg:16 0.671s complete load=2.4
+dev 4 wide64/cyclic-7 mf4:16 0.144s complete load=2.3
+dev 4 wide64/cyclic-7 men:1 0.278s complete load=2.5
+dev 4 wide64/cyclic-7 men:16 0.143s complete load=2.4
+dev 4 wide64/cyclic-7 f4:1 0.276s complete load=2.3
+dev 4 wide64/cyclic-7 f4:4 0.157s complete load=2.1
+dev 4 wide64/cyclic-7 f4:8 0.135s complete load=2.1
+dev 4 wide64/cyclic-7 f4:16 0.145s complete load=2.0
+dev 4 goldilocks/noon-7 en:1 0.101s complete load=1.9
+dev 4 goldilocks/noon-7 en:4 0.101s complete load=1.8
+dev 4 goldilocks/noon-7 en:8 0.102s complete load=1.7
+dev 4 goldilocks/noon-7 en:16 0.106s complete load=1.5
+dev 4 goldilocks/noon-7 sg:1 0.103s complete load=1.4
+dev 4 goldilocks/noon-7 sg:16 0.111s complete load=2.0
+dev 4 goldilocks/noon-7 mf4:16 0.194s complete load=2.1
+dev 4 goldilocks/noon-7 men:1 0.099s complete load=2.0
+dev 4 goldilocks/noon-7 men:16 0.110s complete load=1.8
+dev 4 goldilocks/noon-7 f4:1 0.210s complete load=1.7
+dev 4 goldilocks/noon-7 f4:4 0.171s complete load=1.7
+dev 4 goldilocks/noon-7 f4:8 0.167s complete load=1.5
+dev 4 goldilocks/noon-7 f4:16 0.193s complete load=1.4
+dev 4 wide64/noon-8 en:1 0.579s complete load=1.3
+dev 4 wide64/noon-8 en:4 0.586s complete load=1.3
+dev 4 wide64/noon-8 en:8 0.585s complete load=1.3
+dev 4 wide64/noon-8 en:16 0.592s complete load=1.3
+dev 4 wide64/noon-8 sg:1 0.592s complete load=1.2
+dev 4 wide64/noon-8 sg:16 0.600s complete load=1.4
+dev 4 wide64/noon-8 mf4:16 0.975s complete load=1.4
+dev 4 wide64/noon-8 men:1 0.589s complete load=1.3
+dev 4 wide64/noon-8 men:16 0.623s complete load=1.4
+dev 4 wide64/noon-8 f4:1 1.409s complete load=1.3
+dev 4 wide64/noon-8 f4:4 1.026s complete load=1.5
+dev 4 wide64/noon-8 f4:8 0.950s complete load=1.4
+dev 4 wide64/noon-8 f4:16 0.989s complete load=1.3
+dev 5 wide64/eco-12 en:4 1.844s complete load=1.2
+dev 5 wide64/eco-12 en:8 1.766s complete load=1.1
+dev 5 wide64/eco-12 en:16 1.749s complete load=1.1
+dev 5 wide64/eco-12 sg:1 2.628s complete load=1.2
+dev 5 wide64/eco-12 sg:16 1.736s complete load=1.3
+dev 5 wide64/eco-12 mf4:16 2.362s complete load=1.3
+dev 5 wide64/eco-12 men:1 2.577s complete load=1.3
+dev 5 wide64/eco-12 men:16 1.745s complete load=1.2
+dev 5 wide64/eco-12 sg:4 1.838s complete load=1.2
+dev 5 wide64/eco-12 sg:8 1.737s complete load=1.4
+dev 5 wide64/eco-12 msg:16 1.746s complete load=1.3
+dev 5 wide64/eco-12 f4:1 13.006s complete load=1.2
+dev 5 wide64/eco-12 f4:4 4.371s complete load=1.6
+dev 5 wide64/eco-12 f4:8 3.023s complete load=1.7
+dev 5 wide64/eco-12 f4:16 2.377s complete load=1.9
+dev 5 wide64/eco-12 en:1 2.582s complete load=2.7
+dev 5 goldilocks/katsura-11 en:4 0.650s complete load=2.5
+dev 5 goldilocks/katsura-11 en:8 0.613s complete load=2.4
+dev 5 goldilocks/katsura-11 en:16 0.659s complete load=2.4
+dev 5 goldilocks/katsura-11 sg:1 0.925s complete load=3.6
+dev 5 goldilocks/katsura-11 sg:16 0.617s complete load=3.4
+dev 5 goldilocks/katsura-11 mf4:16 1.363s complete load=3.2
+dev 5 goldilocks/katsura-11 men:1 0.965s complete load=2.9
+dev 5 goldilocks/katsura-11 men:16 0.613s complete load=2.8
+dev 5 goldilocks/katsura-11 sg:4 0.656s complete load=2.6
+dev 5 goldilocks/katsura-11 sg:8 0.612s complete load=2.6
+dev 5 goldilocks/katsura-11 msg:16 0.640s complete load=2.4
+dev 5 goldilocks/katsura-11 f4:1 9.908s complete load=2.2
+dev 5 goldilocks/katsura-11 f4:4 3.017s complete load=2.0
+dev 5 goldilocks/katsura-11 f4:8 1.891s complete load=1.9
+dev 5 goldilocks/katsura-11 f4:16 1.362s complete load=1.9
+dev 5 goldilocks/katsura-11 en:1 0.924s complete load=2.0
+dev 5 wide64/katsura-11 en:4 0.656s complete load=1.9
+dev 5 wide64/katsura-11 en:8 0.617s complete load=1.8
+dev 5 wide64/katsura-11 en:16 0.654s complete load=1.7
+dev 5 wide64/katsura-11 sg:1 0.933s complete load=1.5
+dev 5 wide64/katsura-11 sg:16 0.612s complete load=1.5
+dev 5 wide64/katsura-11 mf4:16 1.332s complete load=1.6
+dev 5 wide64/katsura-11 men:1 0.922s complete load=1.5
+dev 5 wide64/katsura-11 men:16 0.627s complete load=1.5
+dev 5 wide64/katsura-11 sg:4 0.638s complete load=1.5
+dev 5 wide64/katsura-11 sg:8 0.621s complete load=1.5
+dev 5 wide64/katsura-11 msg:16 0.613s complete load=1.5
+dev 5 wide64/katsura-11 f4:1 9.210s complete load=1.4
+dev 5 wide64/katsura-11 f4:4 2.880s complete load=1.6
+dev 5 wide64/katsura-11 f4:8 1.857s complete load=1.4
+dev 5 wide64/katsura-11 f4:16 1.339s complete load=1.4
+dev 5 wide64/katsura-11 en:1 0.918s complete load=2.6
+dev 5 goldilocks/mq-random-11 en:4 2.733s complete load=2.4
+dev 5 goldilocks/mq-random-11 en:8 2.321s complete load=2.3
+dev 5 goldilocks/mq-random-11 en:16 2.151s complete load=2.1
+dev 5 goldilocks/mq-random-11 sg:1 5.184s complete load=2.0
+dev 5 goldilocks/mq-random-11 sg:16 2.158s complete load=1.8
+dev 5 goldilocks/mq-random-11 mf4:16 4.642s complete load=1.7
+dev 5 goldilocks/mq-random-11 men:1 5.180s complete load=3.0
+dev 5 goldilocks/mq-random-11 men:16 2.126s complete load=2.6
+dev 5 goldilocks/mq-random-11 sg:4 2.723s complete load=2.5
+dev 5 goldilocks/mq-random-11 sg:8 2.321s complete load=2.2
+dev 5 goldilocks/mq-random-11 msg:16 2.121s complete load=2.0
+dev 5 goldilocks/mq-random-11 f4:1 42.060s complete load=1.9
+dev 5 goldilocks/mq-random-11 f4:4 11.724s complete load=2.4
+dev 5 goldilocks/mq-random-11 f4:8 7.167s complete load=2.3
+dev 5 goldilocks/mq-random-11 f4:16 4.708s complete load=2.2
+dev 5 goldilocks/mq-random-11 en:1 5.189s complete load=3.3
+dev 5 gf32003/mq-random-10 en:4 0.386s complete load=3.3
+dev 5 gf32003/mq-random-10 en:8 0.275s complete load=3.3
+dev 5 gf32003/mq-random-10 en:16 0.238s complete load=3.1
+dev 5 gf32003/mq-random-10 sg:1 0.465s complete load=2.9
+dev 5 gf32003/mq-random-10 sg:16 0.378s complete load=2.9
+dev 5 gf32003/mq-random-10 mf4:16 0.242s complete load=2.9
+dev 5 gf32003/mq-random-10 men:1 0.472s complete load=2.8
+dev 5 gf32003/mq-random-10 men:16 0.387s complete load=2.6
+dev 5 gf32003/mq-random-10 f4:1 1.110s complete load=2.6
+dev 5 gf32003/mq-random-10 f4:4 0.393s complete load=2.5
+dev 5 gf32003/mq-random-10 f4:8 0.274s complete load=2.4
+dev 5 gf32003/mq-random-10 f4:16 0.240s complete load=2.3
+dev 5 gf32003/mq-random-10 en:1 0.463s complete load=2.2
+dev 5 m31/mq-random-10 en:4 0.353s complete load=2.1
+dev 5 m31/mq-random-10 en:8 0.250s complete load=2.0
+dev 5 m31/mq-random-10 en:16 0.224s complete load=1.9
+dev 5 m31/mq-random-10 sg:1 0.460s complete load=2.0
+dev 5 m31/mq-random-10 sg:16 0.394s complete load=1.8
+dev 5 m31/mq-random-10 mf4:16 0.225s complete load=1.6
+dev 5 m31/mq-random-10 men:1 0.451s complete load=1.6
+dev 5 m31/mq-random-10 men:16 0.391s complete load=1.8
+dev 5 m31/mq-random-10 f4:1 0.944s complete load=1.8
+dev 5 m31/mq-random-10 f4:4 0.341s complete load=1.8
+dev 5 m31/mq-random-10 f4:8 0.250s complete load=1.7
+dev 5 m31/mq-random-10 f4:16 0.226s complete load=1.6
+dev 5 m31/mq-random-10 en:1 0.459s complete load=1.7
+dev 5 goldilocks/cyclic-7 en:4 0.158s complete load=1.7
+dev 5 goldilocks/cyclic-7 en:8 0.137s complete load=1.5
+dev 5 goldilocks/cyclic-7 en:16 0.148s complete load=1.4
+dev 5 goldilocks/cyclic-7 sg:1 0.578s complete load=1.4
+dev 5 goldilocks/cyclic-7 sg:16 0.669s complete load=1.4
+dev 5 goldilocks/cyclic-7 mf4:16 0.144s complete load=1.3
+dev 5 goldilocks/cyclic-7 men:1 0.289s complete load=1.4
+dev 5 goldilocks/cyclic-7 men:16 0.145s complete load=1.3
+dev 5 goldilocks/cyclic-7 f4:1 0.297s complete load=1.3
+dev 5 goldilocks/cyclic-7 f4:4 0.160s complete load=1.2
+dev 5 goldilocks/cyclic-7 f4:8 0.136s complete load=1.4
+dev 5 goldilocks/cyclic-7 f4:16 0.143s complete load=1.3
+dev 5 goldilocks/cyclic-7 en:1 0.294s complete load=1.4
+dev 5 wide64/cyclic-7 en:4 0.157s complete load=1.4
+dev 5 wide64/cyclic-7 en:8 0.135s complete load=1.4
+dev 5 wide64/cyclic-7 en:16 0.145s complete load=1.3
+dev 5 wide64/cyclic-7 sg:1 0.615s complete load=1.4
+dev 5 wide64/cyclic-7 sg:16 0.673s complete load=1.4
+dev 5 wide64/cyclic-7 mf4:16 0.143s complete load=1.3
+dev 5 wide64/cyclic-7 men:1 0.278s complete load=1.3
+dev 5 wide64/cyclic-7 men:16 0.148s complete load=1.3
+dev 5 wide64/cyclic-7 f4:1 0.286s complete load=2.1
+dev 5 wide64/cyclic-7 f4:4 0.158s complete load=2.2
+dev 5 wide64/cyclic-7 f4:8 0.135s complete load=2.2
+dev 5 wide64/cyclic-7 f4:16 0.145s complete load=2.4
+dev 5 wide64/cyclic-7 en:1 0.285s complete load=2.3
+dev 5 goldilocks/noon-7 en:4 0.102s complete load=2.7
+dev 5 goldilocks/noon-7 en:8 0.101s complete load=2.6
+dev 5 goldilocks/noon-7 en:16 0.106s complete load=2.4
+dev 5 goldilocks/noon-7 sg:1 0.102s complete load=2.3
+dev 5 goldilocks/noon-7 sg:16 0.109s complete load=2.1
+dev 5 goldilocks/noon-7 mf4:16 0.194s complete load=2.0
+dev 5 goldilocks/noon-7 men:1 0.101s complete load=1.9
+dev 5 goldilocks/noon-7 men:16 0.108s complete load=1.8
+dev 5 goldilocks/noon-7 f4:1 0.213s complete load=1.7
+dev 5 goldilocks/noon-7 f4:4 0.172s complete load=1.6
+dev 5 goldilocks/noon-7 f4:8 0.165s complete load=1.5
+dev 5 goldilocks/noon-7 f4:16 0.194s complete load=1.7
+dev 5 goldilocks/noon-7 en:1 0.099s complete load=2.0
+dev 5 wide64/noon-8 en:4 0.594s complete load=1.9
+dev 5 wide64/noon-8 en:8 0.582s complete load=1.8
+dev 5 wide64/noon-8 en:16 0.596s complete load=1.8
+dev 5 wide64/noon-8 sg:1 0.582s complete load=1.7
+dev 5 wide64/noon-8 sg:16 0.611s complete load=1.6
+dev 5 wide64/noon-8 mf4:16 1.008s complete load=1.4
+dev 5 wide64/noon-8 men:1 0.580s complete load=1.4
+dev 5 wide64/noon-8 men:16 0.609s complete load=1.4
+dev 5 wide64/noon-8 f4:1 1.380s complete load=1.4
+dev 5 wide64/noon-8 f4:4 1.003s complete load=1.4
+dev 5 wide64/noon-8 f4:8 0.937s complete load=1.5
+dev 5 wide64/noon-8 f4:16 0.976s complete load=1.6
+dev 5 wide64/noon-8 en:1 0.584s complete load=1.6
+dev 6 wide64/eco-12 en:8 1.738s complete load=1.6
+dev 6 wide64/eco-12 en:16 1.760s complete load=1.5
+dev 6 wide64/eco-12 sg:1 2.557s complete load=2.7
+dev 6 wide64/eco-12 sg:16 1.755s complete load=2.4
+dev 6 wide64/eco-12 mf4:16 2.371s complete load=2.2
+dev 6 wide64/eco-12 men:1 2.546s complete load=2.0
+dev 6 wide64/eco-12 men:16 1.739s complete load=1.9
+dev 6 wide64/eco-12 sg:4 1.848s complete load=1.7
+dev 6 wide64/eco-12 sg:8 1.732s complete load=1.6
+dev 6 wide64/eco-12 msg:16 1.772s complete load=1.7
+dev 6 wide64/eco-12 f4:1 12.972s complete load=1.6
+dev 6 wide64/eco-12 f4:4 4.332s complete load=1.5
+dev 6 wide64/eco-12 f4:8 3.019s complete load=1.4
+dev 6 wide64/eco-12 f4:16 2.369s complete load=1.4
+dev 6 wide64/eco-12 en:1 2.539s complete load=2.5
+dev 6 wide64/eco-12 en:4 1.838s complete load=2.3
+dev 6 goldilocks/katsura-11 en:8 0.615s complete load=2.2
+dev 6 goldilocks/katsura-11 en:16 0.611s complete load=2.1
+dev 6 goldilocks/katsura-11 sg:1 0.923s complete load=2.1
+dev 6 goldilocks/katsura-11 sg:16 0.610s complete load=1.9
+dev 6 goldilocks/katsura-11 mf4:16 1.367s complete load=1.9
+dev 6 goldilocks/katsura-11 men:1 0.919s complete load=2.7
+dev 6 goldilocks/katsura-11 men:16 0.615s complete load=2.5
+dev 6 goldilocks/katsura-11 sg:4 0.651s complete load=2.5
+dev 6 goldilocks/katsura-11 sg:8 0.614s complete load=2.4
+dev 6 goldilocks/katsura-11 msg:16 0.632s complete load=2.3
+dev 6 goldilocks/katsura-11 f4:1 9.869s complete load=2.2
+dev 6 goldilocks/katsura-11 f4:4 2.962s complete load=2.0
+dev 6 goldilocks/katsura-11 f4:8 1.892s complete load=2.2
+dev 6 goldilocks/katsura-11 f4:16 1.366s complete load=2.6
+dev 6 goldilocks/katsura-11 en:1 0.951s complete load=2.5
+dev 6 goldilocks/katsura-11 en:4 0.665s complete load=2.4
+dev 6 wide64/katsura-11 en:8 0.615s complete load=2.3
+dev 6 wide64/katsura-11 en:16 0.612s complete load=2.3
+dev 6 wide64/katsura-11 sg:1 0.940s complete load=2.2
+dev 6 wide64/katsura-11 sg:16 0.631s complete load=2.0
+dev 6 wide64/katsura-11 mf4:16 1.348s complete load=1.9
+dev 6 wide64/katsura-11 men:1 0.917s complete load=1.7
+dev 6 wide64/katsura-11 men:16 0.623s complete load=1.7
+dev 6 wide64/katsura-11 sg:4 0.648s complete load=1.6
+dev 6 wide64/katsura-11 sg:8 0.608s complete load=1.7
+dev 6 wide64/katsura-11 msg:16 0.614s complete load=1.5
+dev 6 wide64/katsura-11 f4:1 9.231s complete load=1.4
+dev 6 wide64/katsura-11 f4:4 2.889s complete load=1.6
+dev 6 wide64/katsura-11 f4:8 1.853s complete load=1.6
+dev 6 wide64/katsura-11 f4:16 1.345s complete load=1.5
+dev 6 wide64/katsura-11 en:1 0.913s complete load=1.6
+dev 6 wide64/katsura-11 en:4 0.682s complete load=1.6
+dev 6 goldilocks/mq-random-11 en:8 2.345s complete load=1.4
+dev 6 goldilocks/mq-random-11 en:16 2.121s complete load=1.4
+dev 6 goldilocks/mq-random-11 sg:1 5.249s complete load=1.4
+dev 6 goldilocks/mq-random-11 sg:16 2.126s complete load=1.3
+dev 6 goldilocks/mq-random-11 mf4:16 4.639s complete load=1.3
+dev 6 goldilocks/mq-random-11 men:1 5.216s complete load=2.3
+dev 6 goldilocks/mq-random-11 men:16 2.135s complete load=2.2
+dev 6 goldilocks/mq-random-11 sg:4 2.702s complete load=2.1
+dev 6 goldilocks/mq-random-11 sg:8 2.325s complete load=1.9
+dev 6 goldilocks/mq-random-11 msg:16 2.118s complete load=2.0
+dev 6 goldilocks/mq-random-11 f4:1 42.004s complete load=1.9
+dev 6 goldilocks/mq-random-11 f4:4 11.714s complete load=1.5
+dev 6 goldilocks/mq-random-11 f4:8 7.184s complete load=2.8
+dev 6 goldilocks/mq-random-11 f4:16 4.646s complete load=3.0
+dev 6 goldilocks/mq-random-11 en:1 5.206s complete load=3.9
+dev 6 goldilocks/mq-random-11 en:4 2.745s complete load=3.5
+dev 6 gf32003/mq-random-10 en:8 0.275s complete load=3.6
+dev 6 gf32003/mq-random-10 en:16 0.239s complete load=3.8
+dev 6 gf32003/mq-random-10 sg:1 0.469s complete load=3.7
+dev 6 gf32003/mq-random-10 sg:16 0.380s complete load=3.5
+dev 6 gf32003/mq-random-10 mf4:16 0.242s complete load=3.3
+dev 6 gf32003/mq-random-10 men:1 0.478s complete load=3.0
+dev 6 gf32003/mq-random-10 men:16 0.377s complete load=2.8
+dev 6 gf32003/mq-random-10 f4:1 1.085s complete load=2.7
+dev 6 gf32003/mq-random-10 f4:4 0.389s complete load=2.6
+dev 6 gf32003/mq-random-10 f4:8 0.275s complete load=2.4
+dev 6 gf32003/mq-random-10 f4:16 0.242s complete load=2.4
+dev 6 gf32003/mq-random-10 en:1 0.469s complete load=2.2
+dev 6 gf32003/mq-random-10 en:4 0.379s complete load=2.2
+dev 6 m31/mq-random-10 en:8 0.248s complete load=2.2
+dev 6 m31/mq-random-10 en:16 0.224s complete load=2.0
+dev 6 m31/mq-random-10 sg:1 0.457s complete load=1.9
+dev 6 m31/mq-random-10 sg:16 0.396s complete load=1.8
+dev 6 m31/mq-random-10 mf4:16 0.230s complete load=1.8
+dev 6 m31/mq-random-10 men:1 0.475s complete load=1.7
+dev 6 m31/mq-random-10 men:16 0.389s complete load=1.5
+dev 6 m31/mq-random-10 f4:1 0.931s complete load=1.5
+dev 6 m31/mq-random-10 f4:4 0.352s complete load=1.6
+dev 6 m31/mq-random-10 f4:8 0.250s complete load=1.5
+dev 6 m31/mq-random-10 f4:16 0.225s complete load=2.1
+dev 6 m31/mq-random-10 en:1 0.461s complete load=2.0
+dev 6 m31/mq-random-10 en:4 0.345s complete load=1.8
+dev 6 goldilocks/cyclic-7 en:8 0.136s complete load=1.7
+dev 6 goldilocks/cyclic-7 en:16 0.143s complete load=1.7
+dev 6 goldilocks/cyclic-7 sg:1 0.578s complete load=1.5
+dev 6 goldilocks/cyclic-7 sg:16 0.665s complete load=1.4
+dev 6 goldilocks/cyclic-7 mf4:16 0.142s complete load=1.4
+dev 6 goldilocks/cyclic-7 men:1 0.290s complete load=1.4
+dev 6 goldilocks/cyclic-7 men:16 0.146s complete load=1.4
+dev 6 goldilocks/cyclic-7 f4:1 0.300s complete load=1.5
+dev 6 goldilocks/cyclic-7 f4:4 0.159s complete load=1.4
+dev 6 goldilocks/cyclic-7 f4:8 0.136s complete load=1.3
+dev 6 goldilocks/cyclic-7 f4:16 0.144s complete load=1.3
+dev 6 goldilocks/cyclic-7 en:1 0.296s complete load=1.3
+dev 6 goldilocks/cyclic-7 en:4 0.159s complete load=1.2
+dev 6 wide64/cyclic-7 en:8 0.135s complete load=1.2
+dev 6 wide64/cyclic-7 en:16 0.147s complete load=1.2
+dev 6 wide64/cyclic-7 sg:1 0.578s complete load=1.2
+dev 6 wide64/cyclic-7 sg:16 0.676s complete load=1.2
+dev 6 wide64/cyclic-7 mf4:16 0.147s complete load=1.3
+dev 6 wide64/cyclic-7 men:1 0.274s complete load=1.2
+dev 6 wide64/cyclic-7 men:16 0.146s complete load=1.1
+dev 6 wide64/cyclic-7 f4:1 0.279s complete load=1.2
+dev 6 wide64/cyclic-7 f4:4 0.157s complete load=1.1
+dev 6 wide64/cyclic-7 f4:8 0.135s complete load=1.1
+dev 6 wide64/cyclic-7 f4:16 0.147s complete load=1.0
+dev 6 wide64/cyclic-7 en:1 0.281s complete load=1.0
+dev 6 wide64/cyclic-7 en:4 0.157s complete load=1.0
+dev 6 goldilocks/noon-7 en:8 0.106s complete load=1.2
+dev 6 goldilocks/noon-7 en:16 0.106s complete load=2.0
+dev 6 goldilocks/noon-7 sg:1 0.101s complete load=1.9
+dev 6 goldilocks/noon-7 sg:16 0.109s complete load=1.7
+dev 6 goldilocks/noon-7 mf4:16 0.192s complete load=1.7
+dev 6 goldilocks/noon-7 men:1 0.099s complete load=1.7
+dev 6 goldilocks/noon-7 men:16 0.109s complete load=1.6
+dev 6 goldilocks/noon-7 f4:1 0.210s complete load=1.5
+dev 6 goldilocks/noon-7 f4:4 0.171s complete load=1.5
+dev 6 goldilocks/noon-7 f4:8 0.164s complete load=1.4
+dev 6 goldilocks/noon-7 f4:16 0.193s complete load=1.3
+dev 6 goldilocks/noon-7 en:1 0.103s complete load=1.3
+dev 6 goldilocks/noon-7 en:4 0.102s complete load=1.3
+dev 6 wide64/noon-8 en:8 0.590s complete load=1.2
+dev 6 wide64/noon-8 en:16 0.592s complete load=1.1
+dev 6 wide64/noon-8 sg:1 0.585s complete load=1.1
+dev 6 wide64/noon-8 sg:16 0.600s complete load=1.1
+dev 6 wide64/noon-8 mf4:16 0.973s complete load=1.1
+dev 6 wide64/noon-8 men:1 0.583s complete load=1.1
+dev 6 wide64/noon-8 men:16 0.629s complete load=1.0
+dev 6 wide64/noon-8 f4:1 1.401s complete load=1.0
+dev 6 wide64/noon-8 f4:4 1.024s complete load=0.9
+dev 6 wide64/noon-8 f4:8 0.956s complete load=0.9
+dev 6 wide64/noon-8 f4:16 0.975s complete load=0.9
+dev 6 wide64/noon-8 en:1 0.580s complete load=0.9
+dev 6 wide64/noon-8 en:4 0.588s complete load=1.0
+dev 7 wide64/eco-12 en:16 1.749s complete load=0.9
+dev 7 wide64/eco-12 sg:1 2.598s complete load=0.9
+dev 7 wide64/eco-12 sg:16 1.759s complete load=0.9
+dev 7 wide64/eco-12 mf4:16 2.376s complete load=0.8
+dev 7 wide64/eco-12 men:1 2.570s complete load=0.7
+dev 7 wide64/eco-12 men:16 1.756s complete load=0.8
+dev 7 wide64/eco-12 sg:4 1.847s complete load=0.8
+dev 7 wide64/eco-12 sg:8 1.766s complete load=0.8
+dev 7 wide64/eco-12 msg:16 1.763s complete load=0.7
+dev 7 wide64/eco-12 f4:1 13.105s complete load=0.8
+dev 7 wide64/eco-12 f4:4 4.380s complete load=0.9
+dev 7 wide64/eco-12 f4:8 3.026s complete load=1.0
+dev 7 wide64/eco-12 f4:16 2.400s complete load=0.9
+dev 7 wide64/eco-12 en:1 2.564s complete load=0.9
+dev 7 wide64/eco-12 en:4 1.836s complete load=1.0
+dev 7 wide64/eco-12 en:8 1.758s complete load=1.0
+dev 7 goldilocks/katsura-11 en:16 0.618s complete load=1.1
+dev 7 goldilocks/katsura-11 sg:1 0.923s complete load=1.1
+dev 7 goldilocks/katsura-11 sg:16 0.622s complete load=1.0
+dev 7 goldilocks/katsura-11 mf4:16 1.357s complete load=1.0
+dev 7 goldilocks/katsura-11 men:1 0.937s complete load=1.1
+dev 7 goldilocks/katsura-11 men:16 0.618s complete load=1.0
+dev 7 goldilocks/katsura-11 sg:4 0.663s complete load=1.3
+dev 7 goldilocks/katsura-11 sg:8 0.612s complete load=1.3
+dev 7 goldilocks/katsura-11 msg:16 0.615s complete load=1.3
+dev 7 goldilocks/katsura-11 f4:1 9.901s complete load=1.4
+dev 7 goldilocks/katsura-11 f4:4 2.989s complete load=2.5
+dev 7 goldilocks/katsura-11 f4:8 1.893s complete load=2.6
+dev 7 goldilocks/katsura-11 f4:16 1.373s complete load=3.1
+dev 7 goldilocks/katsura-11 en:1 0.935s complete load=3.0
+dev 7 goldilocks/katsura-11 en:4 0.660s complete load=2.8
+dev 7 goldilocks/katsura-11 en:8 0.627s complete load=2.7
+dev 7 wide64/katsura-11 en:16 0.623s complete load=2.5
+dev 7 wide64/katsura-11 sg:1 0.918s complete load=2.4
+dev 7 wide64/katsura-11 sg:16 0.611s complete load=2.2
+dev 7 wide64/katsura-11 mf4:16 1.460s complete load=2.1
+dev 7 wide64/katsura-11 men:1 0.910s complete load=2.0
+dev 7 wide64/katsura-11 men:16 0.628s complete load=2.0
+dev 7 wide64/katsura-11 sg:4 0.639s complete load=2.0
+dev 7 wide64/katsura-11 sg:8 0.618s complete load=2.0
+dev 7 wide64/katsura-11 msg:16 0.614s complete load=1.8
+dev 7 wide64/katsura-11 f4:1 9.239s complete load=1.7
+dev 7 wide64/katsura-11 f4:4 2.869s complete load=1.6
+dev 7 wide64/katsura-11 f4:8 1.851s complete load=1.6
+dev 7 wide64/katsura-11 f4:16 1.348s complete load=1.5
+dev 7 wide64/katsura-11 en:1 0.919s complete load=1.4
+dev 7 wide64/katsura-11 en:4 0.664s complete load=1.3
+dev 7 wide64/katsura-11 en:8 0.620s complete load=1.2
+dev 7 goldilocks/mq-random-11 en:16 2.202s complete load=1.2
+dev 7 goldilocks/mq-random-11 sg:1 5.197s complete load=1.2
+dev 7 goldilocks/mq-random-11 sg:16 2.144s complete load=1.2
+dev 7 goldilocks/mq-random-11 mf4:16 4.641s complete load=1.2
+dev 7 goldilocks/mq-random-11 men:1 5.200s complete load=1.3
+dev 7 goldilocks/mq-random-11 men:16 2.133s complete load=1.3
+dev 7 goldilocks/mq-random-11 sg:4 2.743s complete load=1.3
+dev 7 goldilocks/mq-random-11 sg:8 2.328s complete load=1.5
+dev 7 goldilocks/mq-random-11 msg:16 2.165s complete load=1.3
+dev 7 goldilocks/mq-random-11 f4:1 42.156s complete load=1.3
+dev 7 goldilocks/mq-random-11 f4:4 11.905s complete load=1.4
+dev 7 goldilocks/mq-random-11 f4:8 7.203s complete load=1.8
+dev 7 goldilocks/mq-random-11 f4:16 4.704s complete load=2.2
+dev 7 goldilocks/mq-random-11 en:1 5.232s complete load=2.0
+dev 7 goldilocks/mq-random-11 en:4 2.805s complete load=1.9
+dev 7 goldilocks/mq-random-11 en:8 2.357s complete load=1.7
+dev 7 gf32003/mq-random-10 en:16 0.239s complete load=2.6
+dev 7 gf32003/mq-random-10 sg:1 0.489s complete load=2.5
+dev 7 gf32003/mq-random-10 sg:16 0.384s complete load=2.4
+dev 7 gf32003/mq-random-10 mf4:16 0.241s complete load=2.2
+dev 7 gf32003/mq-random-10 men:1 0.466s complete load=2.0
+dev 7 gf32003/mq-random-10 men:16 0.378s complete load=2.1
+dev 7 gf32003/mq-random-10 f4:1 1.080s complete load=2.2
+dev 7 gf32003/mq-random-10 f4:4 0.397s complete load=2.1
+dev 7 gf32003/mq-random-10 f4:8 0.273s complete load=1.9
+dev 7 gf32003/mq-random-10 f4:16 0.238s complete load=1.9
+dev 7 gf32003/mq-random-10 en:1 0.479s complete load=1.8
+dev 7 gf32003/mq-random-10 en:4 0.391s complete load=1.8
+dev 7 gf32003/mq-random-10 en:8 0.274s complete load=1.8
+dev 7 m31/mq-random-10 en:16 0.228s complete load=1.7
+dev 7 m31/mq-random-10 sg:1 0.456s complete load=1.6
+dev 7 m31/mq-random-10 sg:16 0.397s complete load=1.5
+dev 7 m31/mq-random-10 mf4:16 0.224s complete load=1.6
+dev 7 m31/mq-random-10 men:1 0.449s complete load=1.4
+dev 7 m31/mq-random-10 men:16 0.393s complete load=1.3
+dev 7 m31/mq-random-10 f4:1 0.970s complete load=1.2
+dev 7 m31/mq-random-10 f4:4 0.348s complete load=1.2
+dev 7 m31/mq-random-10 f4:8 0.248s complete load=1.3
+dev 7 m31/mq-random-10 f4:16 0.225s complete load=1.3
+dev 7 m31/mq-random-10 en:1 0.469s complete load=1.2
+dev 7 m31/mq-random-10 en:4 0.336s complete load=1.1
+dev 7 m31/mq-random-10 en:8 0.249s complete load=1.1
+dev 7 goldilocks/cyclic-7 en:16 0.149s complete load=1.2
+dev 7 goldilocks/cyclic-7 sg:1 0.608s complete load=1.2
+dev 7 goldilocks/cyclic-7 sg:16 0.670s complete load=1.1
+dev 7 goldilocks/cyclic-7 mf4:16 0.146s complete load=1.0
+dev 7 goldilocks/cyclic-7 men:1 0.289s complete load=1.0
+dev 7 goldilocks/cyclic-7 men:16 0.147s complete load=1.0
+dev 7 goldilocks/cyclic-7 f4:1 0.293s complete load=1.2
+dev 7 goldilocks/cyclic-7 f4:4 0.159s complete load=1.2
+dev 7 goldilocks/cyclic-7 f4:8 0.137s complete load=1.1
+dev 7 goldilocks/cyclic-7 f4:16 0.147s complete load=1.1
+dev 7 goldilocks/cyclic-7 en:1 0.307s complete load=1.3
+dev 7 goldilocks/cyclic-7 en:4 0.160s complete load=1.3
+dev 7 goldilocks/cyclic-7 en:8 0.137s complete load=1.2
+dev 7 wide64/cyclic-7 en:16 0.146s complete load=1.1
+dev 7 wide64/cyclic-7 sg:1 0.601s complete load=1.1
+dev 7 wide64/cyclic-7 sg:16 0.671s complete load=1.1
+dev 7 wide64/cyclic-7 mf4:16 0.145s complete load=1.1
+dev 7 wide64/cyclic-7 men:1 0.276s complete load=1.0
+dev 7 wide64/cyclic-7 men:16 0.147s complete load=1.0
+dev 7 wide64/cyclic-7 f4:1 0.293s complete load=1.0
+dev 7 wide64/cyclic-7 f4:4 0.158s complete load=1.0
+dev 7 wide64/cyclic-7 f4:8 0.135s complete load=1.0
+dev 7 wide64/cyclic-7 f4:16 0.143s complete load=0.9
+dev 7 wide64/cyclic-7 en:1 0.282s complete load=0.8
+dev 7 wide64/cyclic-7 en:4 0.156s complete load=0.8
+dev 7 wide64/cyclic-7 en:8 0.135s complete load=0.9
+dev 7 goldilocks/noon-7 en:16 0.106s complete load=0.9
+dev 7 goldilocks/noon-7 sg:1 0.101s complete load=0.9
+dev 7 goldilocks/noon-7 sg:16 0.108s complete load=1.0
+dev 7 goldilocks/noon-7 mf4:16 0.191s complete load=0.9
+dev 7 goldilocks/noon-7 men:1 0.102s complete load=0.9
+dev 7 goldilocks/noon-7 men:16 0.109s complete load=1.1
+dev 7 goldilocks/noon-7 f4:1 0.215s complete load=1.1
+dev 7 goldilocks/noon-7 f4:4 0.172s complete load=1.1
+dev 7 goldilocks/noon-7 f4:8 0.165s complete load=1.0
+dev 7 goldilocks/noon-7 f4:16 0.190s complete load=2.1
+dev 7 goldilocks/noon-7 en:1 0.101s complete load=2.0
+dev 7 goldilocks/noon-7 en:4 0.104s complete load=1.7
+dev 7 goldilocks/noon-7 en:8 0.103s complete load=1.6
+dev 7 wide64/noon-8 en:16 0.604s complete load=1.5
+dev 7 wide64/noon-8 sg:1 0.579s complete load=1.5
+dev 7 wide64/noon-8 sg:16 0.602s complete load=1.4
+dev 7 wide64/noon-8 mf4:16 0.996s complete load=1.4
+dev 7 wide64/noon-8 men:1 0.589s complete load=1.4
+dev 7 wide64/noon-8 men:16 0.592s complete load=1.4
+dev 7 wide64/noon-8 f4:1 1.371s complete load=1.4
+dev 7 wide64/noon-8 f4:4 1.001s complete load=1.5
+dev 7 wide64/noon-8 f4:8 0.940s complete load=1.4
+dev 7 wide64/noon-8 f4:16 0.981s complete load=1.3
+dev 7 wide64/noon-8 en:1 0.604s complete load=1.2
+dev 7 wide64/noon-8 en:4 0.578s complete load=1.2
+dev 7 wide64/noon-8 en:8 0.591s complete load=1.3
+dev 8 wide64/eco-12 sg:1 2.618s complete load=1.3
+dev 8 wide64/eco-12 sg:16 1.723s complete load=1.2
+dev 8 wide64/eco-12 mf4:16 2.372s complete load=1.2
+dev 8 wide64/eco-12 men:1 2.589s complete load=1.1
+dev 8 wide64/eco-12 men:16 1.814s complete load=1.3
+dev 8 wide64/eco-12 sg:4 1.848s complete load=1.2
+dev 8 wide64/eco-12 sg:8 1.793s complete load=1.1
+dev 8 wide64/eco-12 msg:16 1.753s complete load=1.1
+dev 8 wide64/eco-12 f4:1 12.990s complete load=1.2
+dev 8 wide64/eco-12 f4:4 4.594s complete load=1.2
+dev 8 wide64/eco-12 f4:8 3.068s complete load=1.5
+dev 8 wide64/eco-12 f4:16 2.373s complete load=2.1
+dev 8 wide64/eco-12 en:1 2.619s complete load=2.0
+dev 8 wide64/eco-12 en:4 1.825s complete load=1.8
+dev 8 wide64/eco-12 en:8 1.771s complete load=1.7
+dev 8 wide64/eco-12 en:16 1.787s complete load=2.2
+dev 8 goldilocks/katsura-11 sg:1 1.005s complete load=2.2
+dev 8 goldilocks/katsura-11 sg:16 0.647s complete load=2.2
+dev 8 goldilocks/katsura-11 mf4:16 1.368s complete load=2.2
+dev 8 goldilocks/katsura-11 men:1 1.008s complete load=2.6
+dev 8 goldilocks/katsura-11 men:16 0.642s complete load=2.4
+dev 8 goldilocks/katsura-11 sg:4 0.690s complete load=2.4
+dev 8 goldilocks/katsura-11 sg:8 0.644s complete load=2.6
+dev 8 goldilocks/katsura-11 msg:16 0.646s complete load=2.6
+dev 8 goldilocks/katsura-11 f4:1 10.758s complete load=3.3
+dev 8 goldilocks/katsura-11 f4:4 3.126s complete load=3.6
+dev 8 goldilocks/katsura-11 f4:8 1.901s complete load=3.6
+dev 8 goldilocks/katsura-11 f4:16 1.376s complete load=4.1
+dev 8 goldilocks/katsura-11 en:1 1.014s complete load=4.6
+dev 8 goldilocks/katsura-11 en:4 0.693s complete load=4.3
+dev 8 goldilocks/katsura-11 en:8 0.639s complete load=5.0
+dev 8 goldilocks/katsura-11 en:16 0.646s complete load=5.3
+dev 8 wide64/katsura-11 sg:1 0.974s complete load=5.1
+dev 8 wide64/katsura-11 sg:16 0.620s complete load=4.7
+dev 8 wide64/katsura-11 mf4:16 1.340s complete load=4.4
+dev 8 wide64/katsura-11 men:1 0.971s complete load=4.1
+dev 8 wide64/katsura-11 men:16 0.615s complete load=4.0
+dev 8 wide64/katsura-11 sg:4 0.639s complete load=3.8
+dev 8 wide64/katsura-11 sg:8 0.628s complete load=3.5
+dev 8 wide64/katsura-11 msg:16 0.650s complete load=3.4
+dev 8 wide64/katsura-11 f4:1 9.376s complete load=3.4
+dev 8 wide64/katsura-11 f4:4 2.947s complete load=3.0
+dev 8 wide64/katsura-11 f4:8 1.859s complete load=2.9
+dev 8 wide64/katsura-11 f4:16 1.346s complete load=2.8
+dev 8 wide64/katsura-11 en:1 0.917s complete load=2.7
+dev 8 wide64/katsura-11 en:4 0.658s complete load=2.6
+dev 8 wide64/katsura-11 en:8 0.608s complete load=2.4
+dev 8 wide64/katsura-11 en:16 0.628s complete load=2.2
+dev 8 goldilocks/mq-random-11 sg:1 5.189s complete load=2.2
+dev 8 goldilocks/mq-random-11 sg:16 2.163s complete load=2.1
+dev 8 goldilocks/mq-random-11 mf4:16 4.667s complete load=2.0
+dev 8 goldilocks/mq-random-11 men:1 5.177s complete load=1.8
+dev 8 goldilocks/mq-random-11 men:16 2.125s complete load=1.8
+dev 8 goldilocks/mq-random-11 sg:4 2.698s complete load=1.8
+dev 8 goldilocks/mq-random-11 sg:8 2.368s complete load=1.8
+dev 8 goldilocks/mq-random-11 msg:16 2.115s complete load=1.7
+dev 8 goldilocks/mq-random-11 f4:1 41.984s complete load=1.7
+dev 8 goldilocks/mq-random-11 f4:4 11.589s complete load=1.5
+dev 8 goldilocks/mq-random-11 f4:8 7.167s complete load=2.1
+dev 8 goldilocks/mq-random-11 f4:16 4.666s complete load=2.4
+dev 8 goldilocks/mq-random-11 en:1 5.176s complete load=2.3
+dev 8 goldilocks/mq-random-11 en:4 2.756s complete load=2.4
+dev 8 goldilocks/mq-random-11 en:8 2.330s complete load=2.4
+dev 8 goldilocks/mq-random-11 en:16 2.141s complete load=2.6
+dev 8 gf32003/mq-random-10 sg:1 0.461s complete load=2.5
+dev 8 gf32003/mq-random-10 sg:16 0.379s complete load=2.3
+dev 8 gf32003/mq-random-10 mf4:16 0.242s complete load=3.1
+dev 8 gf32003/mq-random-10 men:1 0.490s complete load=3.1
+dev 8 gf32003/mq-random-10 men:16 0.374s complete load=3.0
+dev 8 gf32003/mq-random-10 f4:1 1.118s complete load=2.9
+dev 8 gf32003/mq-random-10 f4:4 0.379s complete load=2.9
+dev 8 gf32003/mq-random-10 f4:8 0.275s complete load=2.7
+dev 8 gf32003/mq-random-10 f4:16 0.240s complete load=2.6
+dev 8 gf32003/mq-random-10 en:1 0.467s complete load=2.4
+dev 8 gf32003/mq-random-10 en:4 0.379s complete load=2.3
+dev 8 gf32003/mq-random-10 en:8 0.275s complete load=2.1
+dev 8 gf32003/mq-random-10 en:16 0.239s complete load=2.0
+dev 8 m31/mq-random-10 sg:1 0.456s complete load=1.8
+dev 8 m31/mq-random-10 sg:16 0.402s complete load=1.8
+dev 8 m31/mq-random-10 mf4:16 0.226s complete load=1.7
+dev 8 m31/mq-random-10 men:1 0.450s complete load=1.7
+dev 8 m31/mq-random-10 men:16 0.390s complete load=1.6
+dev 8 m31/mq-random-10 f4:1 0.931s complete load=1.5
+dev 8 m31/mq-random-10 f4:4 0.342s complete load=1.9
+dev 8 m31/mq-random-10 f4:8 0.249s complete load=1.9
+dev 8 m31/mq-random-10 f4:16 0.226s complete load=1.8
+dev 8 m31/mq-random-10 en:1 0.461s complete load=1.7
+dev 8 m31/mq-random-10 en:4 0.349s complete load=1.5
+dev 8 m31/mq-random-10 en:8 0.250s complete load=1.5
+dev 8 m31/mq-random-10 en:16 0.227s complete load=1.6
+dev 8 goldilocks/cyclic-7 sg:1 0.573s complete load=1.5
+dev 8 goldilocks/cyclic-7 sg:16 0.668s complete load=1.6
+dev 8 goldilocks/cyclic-7 mf4:16 0.145s complete load=1.6
+dev 8 goldilocks/cyclic-7 men:1 0.284s complete load=1.5
+dev 8 goldilocks/cyclic-7 men:16 0.146s complete load=1.5
+dev 8 goldilocks/cyclic-7 f4:1 0.290s complete load=1.5
+dev 8 goldilocks/cyclic-7 f4:4 0.159s complete load=1.5
+dev 8 goldilocks/cyclic-7 f4:8 0.137s complete load=1.4
+dev 8 goldilocks/cyclic-7 f4:16 0.146s complete load=1.3
+dev 8 goldilocks/cyclic-7 en:1 0.290s complete load=1.3
+dev 8 goldilocks/cyclic-7 en:4 0.160s complete load=1.3
+dev 8 goldilocks/cyclic-7 en:8 0.137s complete load=1.4
+dev 8 goldilocks/cyclic-7 en:16 0.146s complete load=1.3
+dev 8 wide64/cyclic-7 sg:1 0.581s complete load=1.2
+dev 8 wide64/cyclic-7 sg:16 0.671s complete load=1.2
+dev 8 wide64/cyclic-7 mf4:16 0.144s complete load=1.2
+dev 8 wide64/cyclic-7 men:1 0.274s complete load=1.2
+dev 8 wide64/cyclic-7 men:16 0.149s complete load=1.2
+dev 8 wide64/cyclic-7 f4:1 0.276s complete load=1.1
+dev 8 wide64/cyclic-7 f4:4 0.157s complete load=1.1
+dev 8 wide64/cyclic-7 f4:8 0.135s complete load=1.1
+dev 8 wide64/cyclic-7 f4:16 0.143s complete load=1.1
+dev 8 wide64/cyclic-7 en:1 0.276s complete load=1.2
+dev 8 wide64/cyclic-7 en:4 0.157s complete load=1.2
+dev 8 wide64/cyclic-7 en:8 0.135s complete load=1.1
+dev 8 wide64/cyclic-7 en:16 0.144s complete load=1.1
+dev 8 goldilocks/noon-7 sg:1 0.099s complete load=1.1
+dev 8 goldilocks/noon-7 sg:16 0.109s complete load=1.0
+dev 8 goldilocks/noon-7 mf4:16 0.196s complete load=1.0
+dev 8 goldilocks/noon-7 men:1 0.101s complete load=1.0
+dev 8 goldilocks/noon-7 men:16 0.109s complete load=0.9
+dev 8 goldilocks/noon-7 f4:1 0.208s complete load=0.9
+dev 8 goldilocks/noon-7 f4:4 0.170s complete load=1.0
+dev 8 goldilocks/noon-7 f4:8 0.164s complete load=1.0
+dev 8 goldilocks/noon-7 f4:16 0.193s complete load=0.9
+dev 8 goldilocks/noon-7 en:1 0.102s complete load=0.9
+dev 8 goldilocks/noon-7 en:4 0.102s complete load=0.9
+dev 8 goldilocks/noon-7 en:8 0.104s complete load=1.9
+dev 8 goldilocks/noon-7 en:16 0.105s complete load=1.7
+dev 8 wide64/noon-8 sg:1 0.586s complete load=1.6
+dev 8 wide64/noon-8 sg:16 0.602s complete load=1.4
+dev 8 wide64/noon-8 mf4:16 0.977s complete load=1.4
+dev 8 wide64/noon-8 men:1 0.577s complete load=1.4
+dev 8 wide64/noon-8 men:16 0.619s complete load=1.5
+dev 8 wide64/noon-8 f4:1 1.401s complete load=1.4
+dev 8 wide64/noon-8 f4:4 1.001s complete load=1.4
+dev 8 wide64/noon-8 f4:8 0.934s complete load=1.4
+dev 8 wide64/noon-8 f4:16 0.998s complete load=1.3
+dev 8 wide64/noon-8 en:1 0.582s complete load=1.3
+dev 8 wide64/noon-8 en:4 0.575s complete load=1.2
+dev 8 wide64/noon-8 en:8 0.587s complete load=1.2
+dev 8 wide64/noon-8 en:16 0.593s complete load=1.2
+== small 2026-11-20T17:53:03-05:00 load=1.24
+small 0 goldilocks/katsura-4 f4:1 0.006s complete load=1.2
+small 0 goldilocks/katsura-4 f4:16 0.007s complete load=1.1
+small 0 goldilocks/katsura-4 en:1 0.007s complete load=1.2
+small 0 goldilocks/katsura-4 en:16 0.007s complete load=1.2
+small 0 goldilocks/katsura-4 mf4:16 0.007s complete load=1.2
+small 0 goldilocks/katsura-4 men:16 0.007s complete load=1.2
+small 0 wide64/katsura-4 f4:1 0.007s complete load=1.1
+small 0 wide64/katsura-4 f4:16 0.007s complete load=1.1
+small 0 wide64/katsura-4 en:1 0.007s complete load=1.1
+small 0 wide64/katsura-4 en:16 0.007s complete load=1.0
+small 0 wide64/katsura-4 mf4:16 0.007s complete load=1.0
+small 0 wide64/katsura-4 men:16 0.007s complete load=1.0
+small 0 wide64/katsura-9 en:1 0.519s complete load=0.9
+small 0 wide64/katsura-9 en:4 0.439s complete load=0.8
+small 0 wide64/katsura-9 en:8 0.455s complete load=0.9
+small 0 wide64/katsura-9 en:16 0.503s complete load=0.9
+small 0 wide64/katsura-9 men:1 0.523s complete load=0.9
+small 0 wide64/katsura-9 men:4 0.438s complete load=0.8
+small 0 wide64/katsura-9 men:8 0.458s complete load=0.7
+small 0 wide64/katsura-9 men:16 0.515s complete load=0.7
+small 0 wide64/katsura-9 f4:1 2.885s complete load=0.8
+small 0 wide64/katsura-9 f4:16 1.087s complete load=0.9
+small 0 wide64/katsura-9 sg:1 0.522s complete load=0.9
+small 0 wide64/katsura-9 sg:16 0.519s complete load=0.9
+small 0 wide64/katsura-9 mf4:16 1.081s complete load=0.9
+small 1 goldilocks/katsura-4 f4:16 0.007s complete load=1.0
+small 1 goldilocks/katsura-4 en:1 0.007s complete load=1.0
+small 1 goldilocks/katsura-4 en:16 0.007s complete load=0.9
+small 1 goldilocks/katsura-4 mf4:16 0.007s complete load=0.8
+small 1 goldilocks/katsura-4 men:16 0.007s complete load=0.9
+small 1 goldilocks/katsura-4 f4:1 0.007s complete load=0.8
+small 1 wide64/katsura-4 f4:16 0.007s complete load=0.7
+small 1 wide64/katsura-4 en:1 0.007s complete load=0.9
+small 1 wide64/katsura-4 en:16 0.007s complete load=0.8
+small 1 wide64/katsura-4 mf4:16 0.007s complete load=0.8
+small 1 wide64/katsura-4 men:16 0.007s complete load=1.7
+small 1 wide64/katsura-4 f4:1 0.006s complete load=1.6
+small 1 wide64/katsura-9 en:4 0.436s complete load=1.5
+small 1 wide64/katsura-9 en:8 0.454s complete load=1.5
+small 1 wide64/katsura-9 en:16 0.510s complete load=1.4
+small 1 wide64/katsura-9 men:1 0.532s complete load=1.4
+small 1 wide64/katsura-9 men:4 0.442s complete load=1.4
+small 1 wide64/katsura-9 men:8 0.458s complete load=1.3
+small 1 wide64/katsura-9 men:16 0.515s complete load=1.2
+small 1 wide64/katsura-9 f4:1 2.886s complete load=1.2
+small 1 wide64/katsura-9 f4:16 1.086s complete load=1.2
+small 1 wide64/katsura-9 sg:1 0.530s complete load=1.2
+small 1 wide64/katsura-9 sg:16 0.511s complete load=1.1
+small 1 wide64/katsura-9 mf4:16 1.080s complete load=1.1
+small 1 wide64/katsura-9 en:1 0.517s complete load=1.1
+small 2 goldilocks/katsura-4 en:1 0.007s complete load=1.1
+small 2 goldilocks/katsura-4 en:16 0.007s complete load=1.1
+small 2 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 2 goldilocks/katsura-4 men:16 0.007s complete load=1.1
+small 2 goldilocks/katsura-4 f4:1 0.006s complete load=1.0
+small 2 goldilocks/katsura-4 f4:16 0.007s complete load=1.0
+small 2 wide64/katsura-4 en:1 0.007s complete load=1.0
+small 2 wide64/katsura-4 en:16 0.007s complete load=0.9
+small 2 wide64/katsura-4 mf4:16 0.007s complete load=0.8
+small 2 wide64/katsura-4 men:16 0.007s complete load=0.9
+small 2 wide64/katsura-4 f4:1 0.006s complete load=0.8
+small 2 wide64/katsura-4 f4:16 0.007s complete load=0.9
+small 2 wide64/katsura-9 en:8 0.454s complete load=1.0
+small 2 wide64/katsura-9 en:16 0.504s complete load=1.0
+small 2 wide64/katsura-9 men:1 0.528s complete load=1.0
+small 2 wide64/katsura-9 men:4 0.448s complete load=0.9
+small 2 wide64/katsura-9 men:8 0.458s complete load=0.9
+small 2 wide64/katsura-9 men:16 0.515s complete load=0.9
+small 2 wide64/katsura-9 f4:1 2.889s complete load=0.9
+small 2 wide64/katsura-9 f4:16 1.089s complete load=0.8
+small 2 wide64/katsura-9 sg:1 0.529s complete load=0.8
+small 2 wide64/katsura-9 sg:16 0.514s complete load=0.9
+small 2 wide64/katsura-9 mf4:16 1.081s complete load=0.9
+small 2 wide64/katsura-9 en:1 0.531s complete load=0.9
+small 2 wide64/katsura-9 en:4 0.446s complete load=0.9
+small 3 goldilocks/katsura-4 en:16 0.007s complete load=0.8
+small 3 goldilocks/katsura-4 mf4:16 0.007s complete load=0.7
+small 3 goldilocks/katsura-4 men:16 0.007s complete load=0.7
+small 3 goldilocks/katsura-4 f4:1 0.006s complete load=0.6
+small 3 goldilocks/katsura-4 f4:16 0.007s complete load=0.6
+small 3 goldilocks/katsura-4 en:1 0.007s complete load=0.7
+small 3 wide64/katsura-4 en:16 0.007s complete load=0.6
+small 3 wide64/katsura-4 mf4:16 0.007s complete load=0.6
+small 3 wide64/katsura-4 men:16 0.007s complete load=0.6
+small 3 wide64/katsura-4 f4:1 0.007s complete load=1.5
+small 3 wide64/katsura-4 f4:16 0.007s complete load=1.5
+small 3 wide64/katsura-4 en:1 0.007s complete load=1.5
+small 3 wide64/katsura-9 en:16 0.504s complete load=1.4
+small 3 wide64/katsura-9 men:1 0.518s complete load=1.3
+small 3 wide64/katsura-9 men:4 0.452s complete load=1.4
+small 3 wide64/katsura-9 men:8 0.457s complete load=1.4
+small 3 wide64/katsura-9 men:16 0.523s complete load=1.3
+small 3 wide64/katsura-9 f4:1 2.883s complete load=1.2
+small 3 wide64/katsura-9 f4:16 1.083s complete load=1.1
+small 3 wide64/katsura-9 sg:1 0.523s complete load=1.2
+small 3 wide64/katsura-9 sg:16 0.517s complete load=1.2
+small 3 wide64/katsura-9 mf4:16 1.083s complete load=1.1
+small 3 wide64/katsura-9 en:1 0.527s complete load=1.0
+small 3 wide64/katsura-9 en:4 0.445s complete load=1.0
+small 3 wide64/katsura-9 en:8 0.454s complete load=1.0
+small 4 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 4 goldilocks/katsura-4 men:16 0.007s complete load=0.9
+small 4 goldilocks/katsura-4 f4:1 0.007s complete load=0.9
+small 4 goldilocks/katsura-4 f4:16 0.007s complete load=0.9
+small 4 goldilocks/katsura-4 en:1 0.007s complete load=0.9
+small 4 goldilocks/katsura-4 en:16 0.007s complete load=1.0
+small 4 wide64/katsura-4 mf4:16 0.007s complete load=0.9
+small 4 wide64/katsura-4 men:16 0.007s complete load=0.9
+small 4 wide64/katsura-4 f4:1 0.006s complete load=0.9
+small 4 wide64/katsura-4 f4:16 0.007s complete load=0.9
+small 4 wide64/katsura-4 en:1 0.006s complete load=1.1
+small 4 wide64/katsura-4 en:16 0.007s complete load=1.1
+small 4 wide64/katsura-9 men:1 0.522s complete load=1.1
+small 4 wide64/katsura-9 men:4 0.440s complete load=1.1
+small 4 wide64/katsura-9 men:8 0.457s complete load=1.1
+small 4 wide64/katsura-9 men:16 0.522s complete load=1.0
+small 4 wide64/katsura-9 f4:1 2.939s complete load=1.0
+small 4 wide64/katsura-9 f4:16 1.086s complete load=1.0
+small 4 wide64/katsura-9 sg:1 0.526s complete load=1.1
+small 4 wide64/katsura-9 sg:16 0.518s complete load=1.1
+small 4 wide64/katsura-9 mf4:16 1.083s complete load=1.0
+small 4 wide64/katsura-9 en:1 0.535s complete load=1.0
+small 4 wide64/katsura-9 en:4 0.443s complete load=1.0
+small 4 wide64/katsura-9 en:8 0.454s complete load=1.1
+small 4 wide64/katsura-9 en:16 0.506s complete load=1.0
+small 5 goldilocks/katsura-4 men:16 0.007s complete load=0.9
+small 5 goldilocks/katsura-4 f4:1 0.007s complete load=0.9
+small 5 goldilocks/katsura-4 f4:16 0.007s complete load=0.9
+small 5 goldilocks/katsura-4 en:1 0.007s complete load=0.8
+small 5 goldilocks/katsura-4 en:16 0.007s complete load=0.8
+small 5 goldilocks/katsura-4 mf4:16 0.007s complete load=0.8
+small 5 wide64/katsura-4 men:16 0.007s complete load=0.8
+small 5 wide64/katsura-4 f4:1 0.007s complete load=0.9
+small 5 wide64/katsura-4 f4:16 0.007s complete load=0.8
+small 5 wide64/katsura-4 en:1 0.007s complete load=1.6
+small 5 wide64/katsura-4 en:16 0.007s complete load=1.6
+small 5 wide64/katsura-4 mf4:16 0.007s complete load=1.5
+small 5 wide64/katsura-9 men:4 0.451s complete load=1.4
+small 5 wide64/katsura-9 men:8 0.459s complete load=1.3
+small 5 wide64/katsura-9 men:16 0.515s complete load=1.3
+small 5 wide64/katsura-9 f4:1 2.907s complete load=1.3
+small 5 wide64/katsura-9 f4:16 1.081s complete load=1.1
+small 5 wide64/katsura-9 sg:1 0.516s complete load=1.0
+small 5 wide64/katsura-9 sg:16 0.515s complete load=1.0
+small 5 wide64/katsura-9 mf4:16 1.086s complete load=1.0
+small 5 wide64/katsura-9 en:1 0.524s complete load=1.0
+small 5 wide64/katsura-9 en:4 0.450s complete load=1.0
+small 5 wide64/katsura-9 en:8 0.453s complete load=1.3
+small 5 wide64/katsura-9 en:16 0.503s complete load=1.2
+small 5 wide64/katsura-9 men:1 0.532s complete load=1.3
+small 6 goldilocks/katsura-4 f4:1 0.006s complete load=1.4
+small 6 goldilocks/katsura-4 f4:16 0.007s complete load=1.4
+small 6 goldilocks/katsura-4 en:1 0.007s complete load=1.4
+small 6 goldilocks/katsura-4 en:16 0.007s complete load=1.5
+small 6 goldilocks/katsura-4 mf4:16 0.007s complete load=1.6
+small 6 goldilocks/katsura-4 men:16 0.007s complete load=1.5
+small 6 wide64/katsura-4 f4:1 0.007s complete load=1.5
+small 6 wide64/katsura-4 f4:16 0.007s complete load=1.3
+small 6 wide64/katsura-4 en:1 0.007s complete load=1.1
+small 6 wide64/katsura-4 en:16 0.007s complete load=1.1
+small 6 wide64/katsura-4 mf4:16 0.007s complete load=1.0
+small 6 wide64/katsura-4 men:16 0.007s complete load=0.9
+small 6 wide64/katsura-9 men:8 0.458s complete load=1.0
+small 6 wide64/katsura-9 men:16 0.515s complete load=1.1
+small 6 wide64/katsura-9 f4:1 2.901s complete load=1.3
+small 6 wide64/katsura-9 f4:16 1.096s complete load=1.3
+small 6 wide64/katsura-9 sg:1 0.535s complete load=1.2
+small 6 wide64/katsura-9 sg:16 0.514s complete load=1.3
+small 6 wide64/katsura-9 mf4:16 1.092s complete load=1.4
+small 6 wide64/katsura-9 en:1 0.519s complete load=1.3
+small 6 wide64/katsura-9 en:4 0.449s complete load=1.3
+small 6 wide64/katsura-9 en:8 0.454s complete load=1.3
+small 6 wide64/katsura-9 en:16 0.504s complete load=1.3
+small 6 wide64/katsura-9 men:1 0.526s complete load=1.3
+small 6 wide64/katsura-9 men:4 0.444s complete load=1.3
+small 7 goldilocks/katsura-4 f4:16 0.007s complete load=1.2
+small 7 goldilocks/katsura-4 en:1 0.007s complete load=1.3
+small 7 goldilocks/katsura-4 en:16 0.007s complete load=1.2
+small 7 goldilocks/katsura-4 mf4:16 0.007s complete load=1.1
+small 7 goldilocks/katsura-4 men:16 0.007s complete load=1.1
+small 7 goldilocks/katsura-4 f4:1 0.007s complete load=1.1
+small 7 wide64/katsura-4 f4:16 0.007s complete load=1.0
+small 7 wide64/katsura-4 en:1 0.007s complete load=1.0
+small 7 wide64/katsura-4 en:16 0.007s complete load=2.0
+small 7 wide64/katsura-4 mf4:16 0.007s complete load=1.9
+small 7 wide64/katsura-4 men:16 0.007s complete load=1.7
+small 7 wide64/katsura-4 f4:1 0.006s complete load=1.7
+small 7 wide64/katsura-9 men:16 0.517s complete load=1.6
+small 7 wide64/katsura-9 f4:1 2.948s complete load=1.4
+small 7 wide64/katsura-9 f4:16 1.080s complete load=1.4
+small 7 wide64/katsura-9 sg:1 0.523s complete load=1.4
+small 7 wide64/katsura-9 sg:16 0.511s complete load=1.3
+small 7 wide64/katsura-9 mf4:16 1.083s complete load=1.2
+small 7 wide64/katsura-9 en:1 0.520s complete load=1.3
+small 7 wide64/katsura-9 en:4 0.435s complete load=1.4
+small 7 wide64/katsura-9 en:8 0.454s complete load=1.5
+small 7 wide64/katsura-9 en:16 0.506s complete load=1.4
+small 7 wide64/katsura-9 men:1 0.534s complete load=1.3
+small 7 wide64/katsura-9 men:4 0.448s complete load=1.3
+small 7 wide64/katsura-9 men:8 0.459s complete load=1.2
+small 8 goldilocks/katsura-4 en:1 0.007s complete load=1.2
+small 8 goldilocks/katsura-4 en:16 0.007s complete load=1.0
+small 8 goldilocks/katsura-4 mf4:16 0.007s complete load=1.1
+small 8 goldilocks/katsura-4 men:16 0.007s complete load=1.0
+small 8 goldilocks/katsura-4 f4:1 0.007s complete load=0.9
+small 8 goldilocks/katsura-4 f4:16 0.007s complete load=0.9
+small 8 wide64/katsura-4 en:1 0.007s complete load=1.0
+small 8 wide64/katsura-4 en:16 0.007s complete load=1.1
+small 8 wide64/katsura-4 mf4:16 0.007s complete load=1.2
+small 8 wide64/katsura-4 men:16 0.007s complete load=1.4
+small 8 wide64/katsura-4 f4:1 0.007s complete load=1.4
+small 8 wide64/katsura-4 f4:16 0.007s complete load=1.4
+small 8 wide64/katsura-9 f4:1 2.873s complete load=1.4
+small 8 wide64/katsura-9 f4:16 1.091s complete load=1.4
+small 8 wide64/katsura-9 sg:1 0.517s complete load=1.3
+small 8 wide64/katsura-9 sg:16 0.516s complete load=1.3
+small 8 wide64/katsura-9 mf4:16 1.078s complete load=1.3
+small 8 wide64/katsura-9 en:1 0.525s complete load=1.3
+small 8 wide64/katsura-9 en:4 0.443s complete load=1.3
+small 8 wide64/katsura-9 en:8 0.454s complete load=1.2
+small 8 wide64/katsura-9 en:16 0.508s complete load=1.1
+small 8 wide64/katsura-9 men:1 0.530s complete load=1.1
+small 8 wide64/katsura-9 men:4 0.452s complete load=1.1
+small 8 wide64/katsura-9 men:8 0.457s complete load=1.0
+small 8 wide64/katsura-9 men:16 0.514s complete load=1.0
+small 9 goldilocks/katsura-4 en:16 0.007s complete load=1.0
+small 9 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 9 goldilocks/katsura-4 men:16 0.007s complete load=1.0
+small 9 goldilocks/katsura-4 f4:1 0.007s complete load=0.9
+small 9 goldilocks/katsura-4 f4:16 0.007s complete load=1.0
+small 9 goldilocks/katsura-4 en:1 0.007s complete load=0.9
+small 9 wide64/katsura-4 en:16 0.007s complete load=0.8
+small 9 wide64/katsura-4 mf4:16 0.007s complete load=0.9
+small 9 wide64/katsura-4 men:16 0.007s complete load=0.9
+small 9 wide64/katsura-4 f4:1 0.007s complete load=1.8
+small 9 wide64/katsura-4 f4:16 0.007s complete load=1.6
+small 9 wide64/katsura-4 en:1 0.007s complete load=1.7
+small 9 wide64/katsura-9 f4:16 1.090s complete load=1.6
+small 9 wide64/katsura-9 sg:1 0.528s complete load=1.6
+small 9 wide64/katsura-9 sg:16 0.514s complete load=1.6
+small 9 wide64/katsura-9 mf4:16 1.084s complete load=1.5
+small 9 wide64/katsura-9 en:1 0.518s complete load=1.7
+small 9 wide64/katsura-9 en:4 0.433s complete load=1.5
+small 9 wide64/katsura-9 en:8 0.455s complete load=1.5
+small 9 wide64/katsura-9 en:16 0.504s complete load=1.4
+small 9 wide64/katsura-9 men:1 0.523s complete load=1.5
+small 9 wide64/katsura-9 men:4 0.439s complete load=1.4
+small 9 wide64/katsura-9 men:8 0.458s complete load=1.3
+small 9 wide64/katsura-9 men:16 0.515s complete load=1.3
+small 9 wide64/katsura-9 f4:1 2.906s complete load=1.2
+small 10 goldilocks/katsura-4 mf4:16 0.007s complete load=1.1
+small 10 goldilocks/katsura-4 men:16 0.007s complete load=1.2
+small 10 goldilocks/katsura-4 f4:1 0.007s complete load=1.2
+small 10 goldilocks/katsura-4 f4:16 0.007s complete load=1.1
+small 10 goldilocks/katsura-4 en:1 0.007s complete load=1.1
+small 10 goldilocks/katsura-4 en:16 0.007s complete load=1.0
+small 10 wide64/katsura-4 mf4:16 0.007s complete load=1.2
+small 10 wide64/katsura-4 men:16 0.007s complete load=1.1
+small 10 wide64/katsura-4 f4:1 0.007s complete load=1.0
+small 10 wide64/katsura-4 f4:16 0.007s complete load=1.0
+small 10 wide64/katsura-4 en:1 0.008s complete load=0.9
+small 10 wide64/katsura-4 en:16 0.007s complete load=0.9
+small 10 wide64/katsura-9 sg:1 0.521s complete load=1.0
+small 10 wide64/katsura-9 sg:16 0.513s complete load=0.9
+small 10 wide64/katsura-9 mf4:16 1.099s complete load=0.8
+small 10 wide64/katsura-9 en:1 0.525s complete load=0.8
+small 10 wide64/katsura-9 en:4 0.439s complete load=0.7
+small 10 wide64/katsura-9 en:8 0.453s complete load=0.8
+small 10 wide64/katsura-9 en:16 0.504s complete load=0.8
+small 10 wide64/katsura-9 men:1 0.527s complete load=0.8
+small 10 wide64/katsura-9 men:4 0.462s complete load=0.7
+small 10 wide64/katsura-9 men:8 0.457s complete load=0.8
+small 10 wide64/katsura-9 men:16 0.522s complete load=0.8
+small 10 wide64/katsura-9 f4:1 2.910s complete load=0.8
+small 10 wide64/katsura-9 f4:16 1.092s complete load=0.8
+small 11 goldilocks/katsura-4 men:16 0.007s complete load=1.0
+small 11 goldilocks/katsura-4 f4:1 0.006s complete load=0.9
+small 11 goldilocks/katsura-4 f4:16 0.007s complete load=0.8
+small 11 goldilocks/katsura-4 en:1 0.007s complete load=0.8
+small 11 goldilocks/katsura-4 en:16 0.007s complete load=0.8
+small 11 goldilocks/katsura-4 mf4:16 0.007s complete load=0.9
+small 11 wide64/katsura-4 men:16 0.007s complete load=0.8
+small 11 wide64/katsura-4 f4:1 0.007s complete load=0.8
+small 11 wide64/katsura-4 f4:16 0.007s complete load=1.8
+small 11 wide64/katsura-4 en:1 0.006s complete load=1.7
+small 11 wide64/katsura-4 en:16 0.007s complete load=1.5
+small 11 wide64/katsura-4 mf4:16 0.007s complete load=1.6
+small 11 wide64/katsura-9 sg:16 0.518s complete load=1.5
+small 11 wide64/katsura-9 mf4:16 1.085s complete load=1.5
+small 11 wide64/katsura-9 en:1 0.518s complete load=1.5
+small 11 wide64/katsura-9 en:4 0.447s complete load=1.5
+small 11 wide64/katsura-9 en:8 0.454s complete load=1.4
+small 11 wide64/katsura-9 en:16 0.504s complete load=1.4
+small 11 wide64/katsura-9 men:1 0.560s complete load=1.4
+small 11 wide64/katsura-9 men:4 0.442s complete load=1.4
+small 11 wide64/katsura-9 men:8 0.457s complete load=1.4
+small 11 wide64/katsura-9 men:16 0.516s complete load=1.4
+small 11 wide64/katsura-9 f4:1 2.913s complete load=1.2
+small 11 wide64/katsura-9 f4:16 1.086s complete load=1.2
+small 11 wide64/katsura-9 sg:1 0.517s complete load=1.2
+small 12 goldilocks/katsura-4 f4:1 0.007s complete load=1.3
+small 12 goldilocks/katsura-4 f4:16 0.007s complete load=1.2
+small 12 goldilocks/katsura-4 en:1 0.007s complete load=1.2
+small 12 goldilocks/katsura-4 en:16 0.007s complete load=1.1
+small 12 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 12 goldilocks/katsura-4 men:16 0.007s complete load=1.0
+small 12 wide64/katsura-4 f4:1 0.007s complete load=1.0
+small 12 wide64/katsura-4 f4:16 0.007s complete load=0.9
+small 12 wide64/katsura-4 en:1 0.007s complete load=0.9
+small 12 wide64/katsura-4 en:16 0.007s complete load=0.9
+small 12 wide64/katsura-4 mf4:16 0.007s complete load=0.9
+small 12 wide64/katsura-4 men:16 0.007s complete load=0.8
+small 12 wide64/katsura-9 mf4:16 1.087s complete load=0.8
+small 12 wide64/katsura-9 en:1 0.522s complete load=2.1
+small 12 wide64/katsura-9 en:4 0.451s complete load=1.9
+small 12 wide64/katsura-9 en:8 0.454s complete load=1.8
+small 12 wide64/katsura-9 en:16 0.504s complete load=1.9
+small 12 wide64/katsura-9 men:1 0.520s complete load=1.8
+small 12 wide64/katsura-9 men:4 0.445s complete load=1.7
+small 12 wide64/katsura-9 men:8 0.459s complete load=1.7
+small 12 wide64/katsura-9 men:16 0.520s complete load=1.6
+small 12 wide64/katsura-9 f4:1 2.878s complete load=1.6
+small 12 wide64/katsura-9 f4:16 1.078s complete load=1.4
+small 12 wide64/katsura-9 sg:1 0.519s complete load=1.3
+small 12 wide64/katsura-9 sg:16 0.516s complete load=1.3
+small 13 goldilocks/katsura-4 f4:16 0.007s complete load=1.4
+small 13 goldilocks/katsura-4 en:1 0.007s complete load=1.2
+small 13 goldilocks/katsura-4 en:16 0.007s complete load=1.1
+small 13 goldilocks/katsura-4 mf4:16 0.007s complete load=1.1
+small 13 goldilocks/katsura-4 men:16 0.007s complete load=1.1
+small 13 goldilocks/katsura-4 f4:1 0.007s complete load=1.0
+small 13 wide64/katsura-4 f4:16 0.007s complete load=0.9
+small 13 wide64/katsura-4 en:1 0.007s complete load=1.1
+small 13 wide64/katsura-4 en:16 0.007s complete load=2.0
+small 13 wide64/katsura-4 mf4:16 0.007s complete load=1.9
+small 13 wide64/katsura-4 men:16 0.007s complete load=1.7
+small 13 wide64/katsura-4 f4:1 0.007s complete load=1.7
+small 13 wide64/katsura-9 en:1 0.528s complete load=1.5
+small 13 wide64/katsura-9 en:4 0.441s complete load=1.6
+small 13 wide64/katsura-9 en:8 0.454s complete load=1.5
+small 13 wide64/katsura-9 en:16 0.507s complete load=1.5
+small 13 wide64/katsura-9 men:1 0.533s complete load=1.5
+small 13 wide64/katsura-9 men:4 0.439s complete load=1.4
+small 13 wide64/katsura-9 men:8 0.464s complete load=1.4
+small 13 wide64/katsura-9 men:16 0.520s complete load=1.4
+small 13 wide64/katsura-9 f4:1 2.879s complete load=1.2
+small 13 wide64/katsura-9 f4:16 1.085s complete load=1.1
+small 13 wide64/katsura-9 sg:1 0.522s complete load=1.1
+small 13 wide64/katsura-9 sg:16 0.515s complete load=1.2
+small 13 wide64/katsura-9 mf4:16 1.085s complete load=1.2
+small 14 goldilocks/katsura-4 en:1 0.006s complete load=1.2
+small 14 goldilocks/katsura-4 en:16 0.007s complete load=1.2
+small 14 goldilocks/katsura-4 mf4:16 0.007s complete load=1.1
+small 14 goldilocks/katsura-4 men:16 0.007s complete load=1.0
+small 14 goldilocks/katsura-4 f4:1 0.006s complete load=1.1
+small 14 goldilocks/katsura-4 f4:16 0.007s complete load=1.0
+small 14 wide64/katsura-4 en:1 0.008s complete load=0.9
+small 14 wide64/katsura-4 en:16 0.007s complete load=1.0
+small 14 wide64/katsura-4 mf4:16 0.007s complete load=0.9
+small 14 wide64/katsura-4 men:16 0.007s complete load=0.8
+small 14 wide64/katsura-4 f4:1 0.007s complete load=0.7
+small 14 wide64/katsura-4 f4:16 0.007s complete load=0.8
+small 14 wide64/katsura-9 en:4 0.442s complete load=0.7
+small 14 wide64/katsura-9 en:8 0.454s complete load=0.7
+small 14 wide64/katsura-9 en:16 0.507s complete load=0.7
+small 14 wide64/katsura-9 men:1 0.522s complete load=0.7
+small 14 wide64/katsura-9 men:4 0.447s complete load=0.7
+small 14 wide64/katsura-9 men:8 0.458s complete load=1.0
+small 14 wide64/katsura-9 men:16 0.517s complete load=0.9
+small 14 wide64/katsura-9 f4:1 2.897s complete load=0.8
+small 14 wide64/katsura-9 f4:16 1.102s complete load=0.8
+small 14 wide64/katsura-9 sg:1 0.519s complete load=0.9
+small 14 wide64/katsura-9 sg:16 0.513s complete load=1.0
+small 14 wide64/katsura-9 mf4:16 1.076s complete load=0.9
+small 14 wide64/katsura-9 en:1 0.519s complete load=1.0
+small 15 goldilocks/katsura-4 en:16 0.007s complete load=1.0
+small 15 goldilocks/katsura-4 mf4:16 0.007s complete load=0.9
+small 15 goldilocks/katsura-4 men:16 0.007s complete load=0.8
+small 15 goldilocks/katsura-4 f4:1 0.008s complete load=0.8
+small 15 goldilocks/katsura-4 f4:16 0.007s complete load=0.7
+small 15 goldilocks/katsura-4 en:1 0.007s complete load=0.7
+small 15 wide64/katsura-4 en:16 0.007s complete load=0.9
+small 15 wide64/katsura-4 mf4:16 0.007s complete load=0.8
+small 15 wide64/katsura-4 men:16 0.007s complete load=1.6
+small 15 wide64/katsura-4 f4:1 0.007s complete load=1.6
+small 15 wide64/katsura-4 f4:16 0.007s complete load=1.5
+small 15 wide64/katsura-4 en:1 0.007s complete load=1.3
+small 15 wide64/katsura-9 en:8 0.456s complete load=1.3
+small 15 wide64/katsura-9 en:16 0.505s complete load=1.3
+small 15 wide64/katsura-9 men:1 0.530s complete load=1.2
+small 15 wide64/katsura-9 men:4 0.446s complete load=1.1
+small 15 wide64/katsura-9 men:8 0.456s complete load=1.1
+small 15 wide64/katsura-9 men:16 0.516s complete load=1.1
+small 15 wide64/katsura-9 f4:1 2.971s complete load=1.1
+small 15 wide64/katsura-9 f4:16 1.089s complete load=1.1
+small 15 wide64/katsura-9 sg:1 0.552s complete load=1.0
+small 15 wide64/katsura-9 sg:16 0.516s complete load=1.0
+small 15 wide64/katsura-9 mf4:16 1.079s complete load=1.0
+small 15 wide64/katsura-9 en:1 0.524s complete load=1.0
+small 15 wide64/katsura-9 en:4 0.446s complete load=1.0
+small 16 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 16 goldilocks/katsura-4 men:16 0.007s complete load=0.9
+small 16 goldilocks/katsura-4 f4:1 0.007s complete load=0.9
+small 16 goldilocks/katsura-4 f4:16 0.007s complete load=0.8
+small 16 goldilocks/katsura-4 en:1 0.007s complete load=0.8
+small 16 goldilocks/katsura-4 en:16 0.007s complete load=0.9
+small 16 wide64/katsura-4 mf4:16 0.007s complete load=0.8
+small 16 wide64/katsura-4 men:16 0.007s complete load=0.7
+small 16 wide64/katsura-4 f4:1 0.007s complete load=0.9
+small 16 wide64/katsura-4 f4:16 0.007s complete load=0.8
+small 16 wide64/katsura-4 en:1 0.008s complete load=0.7
+small 16 wide64/katsura-4 en:16 0.007s complete load=0.7
+small 16 wide64/katsura-9 en:16 0.505s complete load=0.6
+small 16 wide64/katsura-9 men:1 0.539s complete load=0.7
+small 16 wide64/katsura-9 men:4 0.454s complete load=0.7
+small 16 wide64/katsura-9 men:8 0.459s complete load=0.7
+small 16 wide64/katsura-9 men:16 0.511s complete load=0.7
+small 16 wide64/katsura-9 f4:1 2.908s complete load=0.7
+small 16 wide64/katsura-9 f4:16 1.078s complete load=0.7
+small 16 wide64/katsura-9 sg:1 0.525s complete load=0.7
+small 16 wide64/katsura-9 sg:16 0.519s complete load=0.7
+small 16 wide64/katsura-9 mf4:16 1.091s complete load=0.6
+small 16 wide64/katsura-9 en:1 0.520s complete load=0.6
+small 16 wide64/katsura-9 en:4 0.445s complete load=0.7
+small 16 wide64/katsura-9 en:8 0.454s complete load=0.8
+small 17 goldilocks/katsura-4 men:16 0.007s complete load=0.8
+small 17 goldilocks/katsura-4 f4:1 0.007s complete load=0.7
+small 17 goldilocks/katsura-4 f4:16 0.007s complete load=0.8
+small 17 goldilocks/katsura-4 en:1 0.007s complete load=0.7
+small 17 goldilocks/katsura-4 en:16 0.007s complete load=0.6
+small 17 goldilocks/katsura-4 mf4:16 0.007s complete load=0.8
+small 17 wide64/katsura-4 men:16 0.007s complete load=0.8
+small 17 wide64/katsura-4 f4:1 0.007s complete load=0.9
+small 17 wide64/katsura-4 f4:16 0.007s complete load=1.8
+small 17 wide64/katsura-4 en:1 0.007s complete load=1.8
+small 17 wide64/katsura-4 en:16 0.007s complete load=1.7
+small 17 wide64/katsura-4 mf4:16 0.007s complete load=1.6
+small 17 wide64/katsura-9 men:1 0.527s complete load=1.4
+small 17 wide64/katsura-9 men:4 0.434s complete load=1.5
+small 17 wide64/katsura-9 men:8 0.459s complete load=1.4
+small 17 wide64/katsura-9 men:16 0.517s complete load=1.4
+small 17 wide64/katsura-9 f4:1 2.881s complete load=1.4
+small 17 wide64/katsura-9 f4:16 1.081s complete load=1.3
+small 17 wide64/katsura-9 sg:1 0.520s complete load=1.3
+small 17 wide64/katsura-9 sg:16 0.516s complete load=1.3
+small 17 wide64/katsura-9 mf4:16 1.090s complete load=1.3
+small 17 wide64/katsura-9 en:1 0.520s complete load=1.2
+small 17 wide64/katsura-9 en:4 0.442s complete load=1.1
+small 17 wide64/katsura-9 en:8 0.454s complete load=1.2
+small 17 wide64/katsura-9 en:16 0.506s complete load=1.2
+small 18 goldilocks/katsura-4 f4:1 0.006s complete load=1.3
+small 18 goldilocks/katsura-4 f4:16 0.007s complete load=1.2
+small 18 goldilocks/katsura-4 en:1 0.007s complete load=1.1
+small 18 goldilocks/katsura-4 en:16 0.007s complete load=1.0
+small 18 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 18 goldilocks/katsura-4 men:16 0.007s complete load=0.9
+small 18 wide64/katsura-4 f4:1 0.007s complete load=1.0
+small 18 wide64/katsura-4 f4:16 0.007s complete load=1.5
+small 18 wide64/katsura-4 en:1 0.007s complete load=1.4
+small 18 wide64/katsura-4 en:16 0.007s complete load=1.4
+small 18 wide64/katsura-4 mf4:16 0.007s complete load=1.3
+small 18 wide64/katsura-4 men:16 0.007s complete load=1.2
+small 18 wide64/katsura-9 men:4 0.438s complete load=1.1
+small 18 wide64/katsura-9 men:8 0.458s complete load=1.1
+small 18 wide64/katsura-9 men:16 0.519s complete load=1.1
+small 18 wide64/katsura-9 f4:1 2.883s complete load=1.1
+small 18 wide64/katsura-9 f4:16 1.084s complete load=1.1
+small 18 wide64/katsura-9 sg:1 0.520s complete load=1.1
+small 18 wide64/katsura-9 sg:16 0.512s complete load=1.1
+small 18 wide64/katsura-9 mf4:16 1.082s complete load=1.1
+small 18 wide64/katsura-9 en:1 0.524s complete load=1.2
+small 18 wide64/katsura-9 en:4 0.463s complete load=1.1
+small 18 wide64/katsura-9 en:8 0.454s complete load=1.1
+small 18 wide64/katsura-9 en:16 0.507s complete load=1.1
+small 18 wide64/katsura-9 men:1 0.523s complete load=1.2
+small 19 goldilocks/katsura-4 f4:16 0.007s complete load=1.1
+small 19 goldilocks/katsura-4 en:1 0.007s complete load=1.0
+small 19 goldilocks/katsura-4 en:16 0.007s complete load=1.0
+small 19 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 19 goldilocks/katsura-4 men:16 0.007s complete load=0.9
+small 19 goldilocks/katsura-4 f4:1 0.007s complete load=0.8
+small 19 wide64/katsura-4 f4:16 0.007s complete load=0.8
+small 19 wide64/katsura-4 en:1 0.007s complete load=0.8
+small 19 wide64/katsura-4 en:16 0.007s complete load=1.7
+small 19 wide64/katsura-4 mf4:16 0.007s complete load=1.5
+small 19 wide64/katsura-4 men:16 0.007s complete load=1.4
+small 19 wide64/katsura-4 f4:1 0.006s complete load=1.3
+small 19 wide64/katsura-9 men:8 0.458s complete load=1.3
+small 19 wide64/katsura-9 men:16 0.518s complete load=1.2
+small 19 wide64/katsura-9 f4:1 2.893s complete load=1.1
+small 19 wide64/katsura-9 f4:16 1.083s complete load=1.2
+small 19 wide64/katsura-9 sg:1 0.518s complete load=1.2
+small 19 wide64/katsura-9 sg:16 0.514s complete load=1.1
+small 19 wide64/katsura-9 mf4:16 1.086s complete load=1.0
+small 19 wide64/katsura-9 en:1 0.535s complete load=1.0
+small 19 wide64/katsura-9 en:4 0.450s complete load=1.0
+small 19 wide64/katsura-9 en:8 0.454s complete load=1.0
+small 19 wide64/katsura-9 en:16 0.503s complete load=1.1
+small 19 wide64/katsura-9 men:1 0.528s complete load=1.7
+small 19 wide64/katsura-9 men:4 0.441s complete load=1.6
+small 20 goldilocks/katsura-4 en:1 0.008s complete load=1.6
+small 20 goldilocks/katsura-4 en:16 0.007s complete load=1.4
+small 20 goldilocks/katsura-4 mf4:16 0.007s complete load=1.3
+small 20 goldilocks/katsura-4 men:16 0.007s complete load=1.3
+small 20 goldilocks/katsura-4 f4:1 0.007s complete load=1.2
+small 20 goldilocks/katsura-4 f4:16 0.007s complete load=1.1
+small 20 wide64/katsura-4 en:1 0.007s complete load=1.0
+small 20 wide64/katsura-4 en:16 0.007s complete load=1.0
+small 20 wide64/katsura-4 mf4:16 0.007s complete load=0.9
+small 20 wide64/katsura-4 men:16 0.007s complete load=0.9
+small 20 wide64/katsura-4 f4:1 0.006s complete load=0.8
+small 20 wide64/katsura-4 f4:16 0.007s complete load=0.8
+small 20 wide64/katsura-9 men:16 0.518s complete load=0.7
+small 20 wide64/katsura-9 f4:1 2.914s complete load=0.7
+small 20 wide64/katsura-9 f4:16 1.102s complete load=0.8
+small 20 wide64/katsura-9 sg:1 0.526s complete load=2.1
+small 20 wide64/katsura-9 sg:16 0.518s complete load=1.9
+small 20 wide64/katsura-9 mf4:16 1.082s complete load=2.0
+small 20 wide64/katsura-9 en:1 0.519s complete load=1.9
+small 20 wide64/katsura-9 en:4 0.445s complete load=1.8
+small 20 wide64/katsura-9 en:8 0.455s complete load=1.7
+small 20 wide64/katsura-9 en:16 0.505s complete load=1.5
+small 20 wide64/katsura-9 men:1 0.525s complete load=1.5
+small 20 wide64/katsura-9 men:4 0.452s complete load=1.6
+small 20 wide64/katsura-9 men:8 0.459s complete load=1.5
+small 21 goldilocks/katsura-4 en:16 0.007s complete load=1.5
+small 21 goldilocks/katsura-4 mf4:16 0.007s complete load=1.4
+small 21 goldilocks/katsura-4 men:16 0.007s complete load=1.3
+small 21 goldilocks/katsura-4 f4:1 0.006s complete load=1.2
+small 21 goldilocks/katsura-4 f4:16 0.007s complete load=1.1
+small 21 goldilocks/katsura-4 en:1 0.007s complete load=1.1
+small 21 wide64/katsura-4 en:16 0.007s complete load=1.2
+small 21 wide64/katsura-4 mf4:16 0.007s complete load=1.2
+small 21 wide64/katsura-4 men:16 0.007s complete load=2.1
+small 21 wide64/katsura-4 f4:1 0.007s complete load=2.0
+small 21 wide64/katsura-4 f4:16 0.007s complete load=1.7
+small 21 wide64/katsura-4 en:1 0.007s complete load=1.6
+small 21 wide64/katsura-9 f4:1 2.907s complete load=1.5
+small 21 wide64/katsura-9 f4:16 1.090s complete load=1.3
+small 21 wide64/katsura-9 sg:1 0.526s complete load=1.3
+small 21 wide64/katsura-9 sg:16 0.521s complete load=1.3
+small 21 wide64/katsura-9 mf4:16 1.090s complete load=1.3
+small 21 wide64/katsura-9 en:1 0.529s complete load=2.6
+small 21 wide64/katsura-9 en:4 0.434s complete load=2.4
+small 21 wide64/katsura-9 en:8 0.454s complete load=2.2
+small 21 wide64/katsura-9 en:16 0.504s complete load=2.4
+small 21 wide64/katsura-9 men:1 0.541s complete load=2.3
+small 21 wide64/katsura-9 men:4 0.441s complete load=2.2
+small 21 wide64/katsura-9 men:8 0.458s complete load=2.0
+small 21 wide64/katsura-9 men:16 0.517s complete load=2.0
+small 22 goldilocks/katsura-4 mf4:16 0.007s complete load=1.9
+small 22 goldilocks/katsura-4 men:16 0.007s complete load=1.8
+small 22 goldilocks/katsura-4 f4:1 0.007s complete load=1.7
+small 22 goldilocks/katsura-4 f4:16 0.007s complete load=1.6
+small 22 goldilocks/katsura-4 en:1 0.006s complete load=1.5
+small 22 goldilocks/katsura-4 en:16 0.007s complete load=1.4
+small 22 wide64/katsura-4 mf4:16 0.007s complete load=1.3
+small 22 wide64/katsura-4 men:16 0.007s complete load=1.3
+small 22 wide64/katsura-4 f4:1 0.007s complete load=1.2
+small 22 wide64/katsura-4 f4:16 0.007s complete load=1.1
+small 22 wide64/katsura-4 en:1 0.007s complete load=1.2
+small 22 wide64/katsura-4 en:16 0.007s complete load=1.1
+small 22 wide64/katsura-9 f4:16 1.082s complete load=1.0
+small 22 wide64/katsura-9 sg:1 0.525s complete load=1.0
+small 22 wide64/katsura-9 sg:16 0.515s complete load=1.0
+small 22 wide64/katsura-9 mf4:16 1.088s complete load=1.0
+small 22 wide64/katsura-9 en:1 0.527s complete load=1.0
+small 22 wide64/katsura-9 en:4 0.451s complete load=0.9
+small 22 wide64/katsura-9 en:8 0.453s complete load=0.9
+small 22 wide64/katsura-9 en:16 0.504s complete load=0.9
+small 22 wide64/katsura-9 men:1 0.523s complete load=0.9
+small 22 wide64/katsura-9 men:4 0.451s complete load=0.9
+small 22 wide64/katsura-9 men:8 0.457s complete load=0.9
+small 22 wide64/katsura-9 men:16 0.514s complete load=0.9
+small 22 wide64/katsura-9 f4:1 2.885s complete load=0.9
+small 23 goldilocks/katsura-4 men:16 0.007s complete load=0.9
+small 23 goldilocks/katsura-4 f4:1 0.007s complete load=0.8
+small 23 goldilocks/katsura-4 f4:16 0.007s complete load=0.8
+small 23 goldilocks/katsura-4 en:1 0.007s complete load=0.8
+small 23 goldilocks/katsura-4 en:16 0.007s complete load=0.7
+small 23 goldilocks/katsura-4 mf4:16 0.007s complete load=0.7
+small 23 wide64/katsura-4 men:16 0.007s complete load=0.8
+small 23 wide64/katsura-4 f4:1 0.007s complete load=0.7
+small 23 wide64/katsura-4 f4:16 0.007s complete load=1.6
+small 23 wide64/katsura-4 en:1 0.006s complete load=1.4
+small 23 wide64/katsura-4 en:16 0.007s complete load=1.4
+small 23 wide64/katsura-4 mf4:16 0.007s complete load=1.4
+small 23 wide64/katsura-9 sg:1 0.521s complete load=1.3
+small 23 wide64/katsura-9 sg:16 0.515s complete load=1.2
+small 23 wide64/katsura-9 mf4:16 1.083s complete load=1.2
+small 23 wide64/katsura-9 en:1 0.547s complete load=1.1
+small 23 wide64/katsura-9 en:4 0.440s complete load=1.1
+small 23 wide64/katsura-9 en:8 0.454s complete load=1.1
+small 23 wide64/katsura-9 en:16 0.504s complete load=1.1
+small 23 wide64/katsura-9 men:1 0.523s complete load=1.0
+small 23 wide64/katsura-9 men:4 0.458s complete load=1.0
+small 23 wide64/katsura-9 men:8 0.458s complete load=1.0
+small 23 wide64/katsura-9 men:16 0.518s complete load=1.0
+small 23 wide64/katsura-9 f4:1 2.896s complete load=0.9
+small 23 wide64/katsura-9 f4:16 1.077s complete load=0.8
+small 24 goldilocks/katsura-4 f4:1 0.007s complete load=0.9
+small 24 goldilocks/katsura-4 f4:16 0.007s complete load=0.8
+small 24 goldilocks/katsura-4 en:1 0.006s complete load=0.7
+small 24 goldilocks/katsura-4 en:16 0.007s complete load=0.7
+small 24 goldilocks/katsura-4 mf4:16 0.007s complete load=0.7
+small 24 goldilocks/katsura-4 men:16 0.007s complete load=0.7
+small 24 wide64/katsura-4 f4:1 0.007s complete load=0.8
+small 24 wide64/katsura-4 f4:16 0.007s complete load=0.8
+small 24 wide64/katsura-4 en:1 0.006s complete load=0.6
+small 24 wide64/katsura-4 en:16 0.007s complete load=0.7
+small 24 wide64/katsura-4 mf4:16 0.007s complete load=0.6
+small 24 wide64/katsura-4 men:16 0.007s complete load=0.6
+small 24 wide64/katsura-9 sg:16 0.512s complete load=0.6
+small 24 wide64/katsura-9 mf4:16 1.084s complete load=0.7
+small 24 wide64/katsura-9 en:1 0.524s complete load=0.7
+small 24 wide64/katsura-9 en:4 0.444s complete load=0.6
+small 24 wide64/katsura-9 en:8 0.454s complete load=0.6
+small 24 wide64/katsura-9 en:16 0.506s complete load=0.7
+small 24 wide64/katsura-9 men:1 0.538s complete load=0.7
+small 24 wide64/katsura-9 men:4 0.440s complete load=0.7
+small 24 wide64/katsura-9 men:8 0.458s complete load=0.7
+small 24 wide64/katsura-9 men:16 0.518s complete load=0.8
+small 24 wide64/katsura-9 f4:1 2.929s complete load=0.8
+small 24 wide64/katsura-9 f4:16 1.081s complete load=0.8
+small 24 wide64/katsura-9 sg:1 0.534s complete load=0.8
+small 25 goldilocks/katsura-4 f4:16 0.007s complete load=0.7
+small 25 goldilocks/katsura-4 en:1 0.007s complete load=0.7
+small 25 goldilocks/katsura-4 en:16 0.007s complete load=0.7
+small 25 goldilocks/katsura-4 mf4:16 0.007s complete load=0.6
+small 25 goldilocks/katsura-4 men:16 0.007s complete load=0.6
+small 25 goldilocks/katsura-4 f4:1 0.007s complete load=0.5
+small 25 wide64/katsura-4 f4:16 0.007s complete load=0.6
+small 25 wide64/katsura-4 en:1 0.007s complete load=0.5
+small 25 wide64/katsura-4 en:16 0.007s complete load=1.3
+small 25 wide64/katsura-4 mf4:16 0.007s complete load=1.3
+small 25 wide64/katsura-4 men:16 0.007s complete load=1.2
+small 25 wide64/katsura-4 f4:1 0.007s complete load=1.2
+small 25 wide64/katsura-9 mf4:16 1.087s complete load=1.1
+small 25 wide64/katsura-9 en:1 0.527s complete load=1.1
+small 25 wide64/katsura-9 en:4 0.439s complete load=1.1
+small 25 wide64/katsura-9 en:8 0.456s complete load=1.1
+small 25 wide64/katsura-9 en:16 0.505s complete load=1.0
+small 25 wide64/katsura-9 men:1 0.531s complete load=1.0
+small 25 wide64/katsura-9 men:4 0.449s complete load=1.0
+small 25 wide64/katsura-9 men:8 0.457s complete load=1.0
+small 25 wide64/katsura-9 men:16 0.513s complete load=1.2
+small 25 wide64/katsura-9 f4:1 2.907s complete load=1.2
+small 25 wide64/katsura-9 f4:16 1.084s complete load=1.2
+small 25 wide64/katsura-9 sg:1 0.523s complete load=1.2
+small 25 wide64/katsura-9 sg:16 0.515s complete load=1.2
+small 26 goldilocks/katsura-4 en:1 0.008s complete load=1.1
+small 26 goldilocks/katsura-4 en:16 0.007s complete load=1.1
+small 26 goldilocks/katsura-4 mf4:16 0.007s complete load=1.0
+small 26 goldilocks/katsura-4 men:16 0.007s complete load=1.0
+small 26 goldilocks/katsura-4 f4:1 0.007s complete load=1.0
+small 26 goldilocks/katsura-4 f4:16 0.007s complete load=1.0
+small 26 wide64/katsura-4 en:1 0.007s complete load=1.0
+small 26 wide64/katsura-4 en:16 0.007s complete load=1.0
+small 26 wide64/katsura-4 mf4:16 0.007s complete load=1.1
+small 26 wide64/katsura-4 men:16 0.007s complete load=1.1
+small 26 wide64/katsura-4 f4:1 0.007s complete load=1.0
+small 26 wide64/katsura-4 f4:16 0.007s complete load=1.1
+small 26 wide64/katsura-9 en:1 0.526s complete load=1.0
+small 26 wide64/katsura-9 en:4 0.455s complete load=0.9
+small 26 wide64/katsura-9 en:8 0.454s complete load=0.9
+small 26 wide64/katsura-9 en:16 0.504s complete load=0.9
+small 26 wide64/katsura-9 men:1 0.525s complete load=0.9
+small 26 wide64/katsura-9 men:4 0.438s complete load=0.8
+small 26 wide64/katsura-9 men:8 0.459s complete load=0.8
+small 26 wide64/katsura-9 men:16 0.513s complete load=0.8
+small 26 wide64/katsura-9 f4:1 2.882s complete load=0.8
+small 26 wide64/katsura-9 f4:16 1.085s complete load=0.9
+small 26 wide64/katsura-9 sg:1 0.527s complete load=0.8
+small 26 wide64/katsura-9 sg:16 0.523s complete load=0.8
+small 26 wide64/katsura-9 mf4:16 1.078s complete load=0.8
+small 27 goldilocks/katsura-4 en:16 0.007s complete load=0.8
+small 27 goldilocks/katsura-4 mf4:16 0.007s complete load=0.8
+small 27 goldilocks/katsura-4 men:16 0.007s complete load=0.7
+small 27 goldilocks/katsura-4 f4:1 0.007s complete load=0.7
+small 27 goldilocks/katsura-4 f4:16 0.007s complete load=0.6
+small 27 goldilocks/katsura-4 en:1 0.007s complete load=0.6
+small 27 wide64/katsura-4 en:16 0.007s complete load=0.7
+small 27 wide64/katsura-4 mf4:16 0.007s complete load=1.8
+small 27 wide64/katsura-4 men:16 0.007s complete load=1.6
+small 27 wide64/katsura-4 f4:1 0.007s complete load=1.6
+small 27 wide64/katsura-4 f4:16 0.007s complete load=1.4
+small 27 wide64/katsura-4 en:1 0.007s complete load=1.3
+small 27 wide64/katsura-9 en:4 0.461s complete load=1.2
+small 27 wide64/katsura-9 en:8 0.454s complete load=1.3
+small 27 wide64/katsura-9 en:16 0.504s complete load=1.2
+small 27 wide64/katsura-9 men:1 0.527s complete load=1.1
+small 27 wide64/katsura-9 men:4 0.458s complete load=1.1
+small 27 wide64/katsura-9 men:8 0.457s complete load=1.2
+small 27 wide64/katsura-9 men:16 0.515s complete load=1.3
+small 27 wide64/katsura-9 f4:1 2.888s complete load=1.2
+small 27 wide64/katsura-9 f4:16 1.085s complete load=1.1
+small 27 wide64/katsura-9 sg:1 0.525s complete load=1.2
+small 27 wide64/katsura-9 sg:16 0.512s complete load=1.2
+small 27 wide64/katsura-9 mf4:16 1.087s complete load=1.2
+small 27 wide64/katsura-9 en:1 0.521s complete load=1.2
+small 28 goldilocks/katsura-4 mf4:16 0.007s complete load=1.1
+small 28 goldilocks/katsura-4 men:16 0.007s complete load=1.1
+small 28 goldilocks/katsura-4 f4:1 0.007s complete load=1.1
+small 28 goldilocks/katsura-4 f4:16 0.007s complete load=1.0
+small 28 goldilocks/katsura-4 en:1 0.006s complete load=1.0
+small 28 goldilocks/katsura-4 en:16 0.007s complete load=0.9
+small 28 wide64/katsura-4 mf4:16 0.007s complete load=1.0
+small 28 wide64/katsura-4 men:16 0.007s complete load=1.0
+small 28 wide64/katsura-4 f4:1 0.007s complete load=0.9
+small 28 wide64/katsura-4 f4:16 0.007s complete load=0.8
+small 28 wide64/katsura-4 en:1 0.007s complete load=0.8
+small 28 wide64/katsura-4 en:16 0.007s complete load=0.9
+small 28 wide64/katsura-9 en:8 0.455s complete load=1.0
+small 28 wide64/katsura-9 en:16 0.503s complete load=0.9
+small 28 wide64/katsura-9 men:1 0.531s complete load=0.9
+small 28 wide64/katsura-9 men:4 0.438s complete load=1.1
+small 28 wide64/katsura-9 men:8 0.459s complete load=1.1
+small 28 wide64/katsura-9 men:16 0.515s complete load=1.1
+small 28 wide64/katsura-9 f4:1 2.877s complete load=1.1
+small 28 wide64/katsura-9 f4:16 1.091s complete load=1.1
+small 28 wide64/katsura-9 sg:1 0.523s complete load=1.1
+small 28 wide64/katsura-9 sg:16 0.517s complete load=1.1
+small 28 wide64/katsura-9 mf4:16 1.087s complete load=1.1
+small 28 wide64/katsura-9 en:1 0.538s complete load=1.1
+small 28 wide64/katsura-9 en:4 0.449s complete load=1.0
+small 29 goldilocks/katsura-4 men:16 0.007s complete load=1.0
+small 29 goldilocks/katsura-4 f4:1 0.008s complete load=1.0
+small 29 goldilocks/katsura-4 f4:16 0.007s complete load=0.9
+small 29 goldilocks/katsura-4 en:1 0.007s complete load=1.0
+small 29 goldilocks/katsura-4 en:16 0.007s complete load=0.9
+small 29 goldilocks/katsura-4 mf4:16 0.007s complete load=0.8
+small 29 wide64/katsura-4 men:16 0.007s complete load=0.9
+small 29 wide64/katsura-4 f4:1 0.008s complete load=0.9
+small 29 wide64/katsura-4 f4:16 0.007s complete load=1.6
+small 29 wide64/katsura-4 en:1 0.007s complete load=1.5
+small 29 wide64/katsura-4 en:16 0.007s complete load=1.4
+small 29 wide64/katsura-4 mf4:16 0.007s complete load=1.3
+small 29 wide64/katsura-9 en:16 0.503s complete load=1.4
+small 29 wide64/katsura-9 men:1 0.530s complete load=1.4
+small 29 wide64/katsura-9 men:4 0.450s complete load=1.3
+small 29 wide64/katsura-9 men:8 0.458s complete load=1.3
+small 29 wide64/katsura-9 men:16 0.518s complete load=1.3
+small 29 wide64/katsura-9 f4:1 2.929s complete load=1.3
+small 29 wide64/katsura-9 f4:16 1.083s complete load=1.1
+small 29 wide64/katsura-9 sg:1 0.524s complete load=1.0
+small 29 wide64/katsura-9 sg:16 0.514s complete load=1.0
+small 29 wide64/katsura-9 mf4:16 1.086s complete load=1.0
+small 29 wide64/katsura-9 en:1 0.524s complete load=1.0
+small 29 wide64/katsura-9 en:4 0.433s complete load=1.2
+small 29 wide64/katsura-9 en:8 0.454s complete load=1.1
+small 30 goldilocks/katsura-4 f4:1 0.007s complete load=1.1
+small 30 goldilocks/katsura-4 f4:16 0.007s complete load=1.0
+small 30 goldilocks/katsura-4 en:1 0.007s complete load=0.9
+small 30 goldilocks/katsura-4 en:16 0.007s complete load=0.8
+small 30 goldilocks/katsura-4 mf4:16 0.007s complete load=0.9
+small 30 goldilocks/katsura-4 men:16 0.007s complete load=0.8
+small 30 wide64/katsura-4 f4:1 0.007s complete load=0.7
+small 30 wide64/katsura-4 f4:16 0.007s complete load=0.7
+small 30 wide64/katsura-4 en:1 0.007s complete load=0.7
+small 30 wide64/katsura-4 en:16 0.007s complete load=0.9
+small 30 wide64/katsura-4 mf4:16 0.007s complete load=0.8
+small 30 wide64/katsura-4 men:16 0.007s complete load=0.8
+small 30 wide64/katsura-9 men:1 0.532s complete load=0.7
+small 30 wide64/katsura-9 men:4 0.461s complete load=0.7
+small 30 wide64/katsura-9 men:8 0.457s complete load=0.8
+small 30 wide64/katsura-9 men:16 0.518s complete load=0.7
+small 30 wide64/katsura-9 f4:1 2.908s complete load=0.6
+small 30 wide64/katsura-9 f4:16 1.085s complete load=0.7
+small 30 wide64/katsura-9 sg:1 0.515s complete load=0.8
+small 30 wide64/katsura-9 sg:16 0.510s complete load=0.8
+small 30 wide64/katsura-9 mf4:16 1.086s complete load=0.8
+small 30 wide64/katsura-9 en:1 0.524s complete load=0.7
+small 30 wide64/katsura-9 en:4 0.443s complete load=0.7
+small 30 wide64/katsura-9 en:8 0.455s complete load=0.8
+small 30 wide64/katsura-9 en:16 0.503s complete load=0.9
+== held 2026-11-20T19:06:01-05:00 load=0.96
+held 0 goldilocks/mq-random-10 f4:1 5.773s complete load=1.0
+held 0 goldilocks/mq-random-10 f4:4 1.827s complete load=1.0
+held 0 goldilocks/mq-random-10 f4:8 1.192s complete load=0.9
+held 0 goldilocks/mq-random-10 f4:16 0.920s complete load=0.8
+held 0 goldilocks/mq-random-10 en:1 0.951s complete load=0.8
+held 0 goldilocks/mq-random-10 en:4 1.796s complete load=0.8
+held 0 goldilocks/mq-random-10 en:8 1.185s complete load=0.9
+held 0 goldilocks/mq-random-10 en:16 0.913s complete load=0.9
+held 0 goldilocks/mq-random-10 sg:1 0.970s complete load=0.9
+held 0 goldilocks/mq-random-10 sg:16 0.508s complete load=1.9
+held 0 goldilocks/mq-random-10 mf4:16 0.915s complete load=1.8
+held 0 goldilocks/mq-random-10 men:1 0.957s complete load=1.7
+held 0 goldilocks/mq-random-10 men:16 0.505s complete load=1.6
+held 0 m31/katsura-10 f4:1 0.847s complete load=1.7
+held 0 m31/katsura-10 f4:4 0.323s complete load=1.5
+held 0 m31/katsura-10 f4:8 0.248s complete load=1.4
+held 0 m31/katsura-10 f4:16 0.239s complete load=1.4
+held 0 m31/katsura-10 en:1 0.178s complete load=1.4
+held 0 m31/katsura-10 en:4 0.324s complete load=1.3
+held 0 m31/katsura-10 en:8 0.250s complete load=1.3
+held 0 m31/katsura-10 en:16 0.240s complete load=1.2
+held 0 m31/katsura-10 sg:1 0.178s complete load=1.1
+held 0 m31/katsura-10 sg:16 0.145s complete load=1.2
+held 0 m31/katsura-10 mf4:16 0.240s complete load=1.3
+held 0 m31/katsura-10 men:1 0.171s complete load=1.2
+held 0 m31/katsura-10 men:16 0.146s complete load=1.1
+held 0 m31/eco-11 f4:1 1.330s complete load=1.0
+held 0 m31/eco-11 f4:4 0.535s complete load=1.0
+held 0 m31/eco-11 f4:8 0.437s complete load=1.0
+held 0 m31/eco-11 f4:16 0.431s complete load=1.0
+held 0 m31/eco-11 en:1 0.411s complete load=1.0
+held 0 m31/eco-11 en:4 0.332s complete load=1.0
+held 0 m31/eco-11 en:8 0.318s complete load=1.1
+held 0 m31/eco-11 en:16 0.340s complete load=1.0
+held 0 m31/eco-11 sg:1 0.412s complete load=1.0
+held 0 m31/eco-11 sg:16 0.335s complete load=1.0
+held 0 m31/eco-11 mf4:16 0.428s complete load=1.1
+held 0 m31/eco-11 men:1 0.410s complete load=1.0
+held 0 m31/eco-11 men:16 0.335s complete load=0.9
+held 1 goldilocks/mq-random-10 f4:4 1.793s complete load=0.9
+held 1 goldilocks/mq-random-10 f4:8 1.193s complete load=1.0
+held 1 goldilocks/mq-random-10 f4:16 0.918s complete load=1.0
+held 1 goldilocks/mq-random-10 en:1 0.953s complete load=1.0
+held 1 goldilocks/mq-random-10 en:4 1.768s complete load=1.0
+held 1 goldilocks/mq-random-10 en:8 1.188s complete load=1.1
+held 1 goldilocks/mq-random-10 en:16 0.919s complete load=1.1
+held 1 goldilocks/mq-random-10 sg:1 0.953s complete load=1.2
+held 1 goldilocks/mq-random-10 sg:16 0.508s complete load=1.3
+held 1 goldilocks/mq-random-10 mf4:16 0.924s complete load=1.2
+held 1 goldilocks/mq-random-10 men:1 0.956s complete load=1.2
+held 1 goldilocks/mq-random-10 men:16 0.513s complete load=1.1
+held 1 goldilocks/mq-random-10 f4:1 5.769s complete load=1.1
+held 1 m31/katsura-10 f4:4 0.335s complete load=1.1
+held 1 m31/katsura-10 f4:8 0.248s complete load=1.2
+held 1 m31/katsura-10 f4:16 0.242s complete load=1.1
+held 1 m31/katsura-10 en:1 0.177s complete load=1.1
+held 1 m31/katsura-10 en:4 0.323s complete load=1.2
+held 1 m31/katsura-10 en:8 0.248s complete load=1.2
+held 1 m31/katsura-10 en:16 0.240s complete load=1.1
+held 1 m31/katsura-10 sg:1 0.179s complete load=1.1
+held 1 m31/katsura-10 sg:16 0.144s complete load=1.0
+held 1 m31/katsura-10 mf4:16 0.242s complete load=1.2
+held 1 m31/katsura-10 men:1 0.171s complete load=1.2
+held 1 m31/katsura-10 men:16 0.145s complete load=1.1
+held 1 m31/katsura-10 f4:1 0.837s complete load=1.1
+held 1 m31/eco-11 f4:4 0.534s complete load=1.1
+held 1 m31/eco-11 f4:8 0.437s complete load=1.1
+held 1 m31/eco-11 f4:16 0.430s complete load=1.1
+held 1 m31/eco-11 en:1 0.413s complete load=1.2
+held 1 m31/eco-11 en:4 0.332s complete load=2.0
+held 1 m31/eco-11 en:8 0.317s complete load=1.9
+held 1 m31/eco-11 en:16 0.337s complete load=1.8
+held 1 m31/eco-11 sg:1 0.412s complete load=1.8
+held 1 m31/eco-11 sg:16 0.336s complete load=2.1
+held 1 m31/eco-11 mf4:16 0.427s complete load=1.9
+held 1 m31/eco-11 men:1 0.410s complete load=1.9
+held 1 m31/eco-11 men:16 0.343s complete load=1.9
+held 1 m31/eco-11 f4:1 1.322s complete load=1.8
+held 2 goldilocks/mq-random-10 f4:8 1.190s complete load=1.7
+held 2 goldilocks/mq-random-10 f4:16 0.921s complete load=1.8
+held 2 goldilocks/mq-random-10 en:1 0.949s complete load=1.8
+held 2 goldilocks/mq-random-10 en:4 1.762s complete load=1.7
+held 2 goldilocks/mq-random-10 en:8 1.189s complete load=1.7
+held 2 goldilocks/mq-random-10 en:16 0.914s complete load=1.6
+held 2 goldilocks/mq-random-10 sg:1 0.956s complete load=1.6
+held 2 goldilocks/mq-random-10 sg:16 0.507s complete load=1.6
+held 2 goldilocks/mq-random-10 mf4:16 0.906s complete load=1.5
+held 2 goldilocks/mq-random-10 men:1 0.957s complete load=1.5
+held 2 goldilocks/mq-random-10 men:16 0.509s complete load=1.4
+held 2 goldilocks/mq-random-10 f4:1 5.825s complete load=1.3
+held 2 goldilocks/mq-random-10 f4:4 1.809s complete load=1.3
+held 2 m31/katsura-10 f4:8 0.247s complete load=1.2
+held 2 m31/katsura-10 f4:16 0.242s complete load=1.1
+held 2 m31/katsura-10 en:1 0.175s complete load=1.1
+held 2 m31/katsura-10 en:4 0.326s complete load=1.1
+held 2 m31/katsura-10 en:8 0.247s complete load=1.1
+held 2 m31/katsura-10 en:16 0.243s complete load=1.7
+held 2 m31/katsura-10 sg:1 0.193s complete load=1.6
+held 2 m31/katsura-10 sg:16 0.146s complete load=1.5
+held 2 m31/katsura-10 mf4:16 0.238s complete load=1.4
+held 2 m31/katsura-10 men:1 0.174s complete load=1.4
+held 2 m31/katsura-10 men:16 0.148s complete load=1.3
+held 2 m31/katsura-10 f4:1 0.842s complete load=1.2
+held 2 m31/katsura-10 f4:4 0.326s complete load=1.2
+held 2 m31/eco-11 f4:8 0.434s complete load=1.3
+held 2 m31/eco-11 f4:16 0.425s complete load=1.3
+held 2 m31/eco-11 en:1 0.417s complete load=1.3
+held 2 m31/eco-11 en:4 0.335s complete load=1.2
+held 2 m31/eco-11 en:8 0.320s complete load=1.1
+held 2 m31/eco-11 en:16 0.346s complete load=1.2
+held 2 m31/eco-11 sg:1 0.416s complete load=1.3
+held 2 m31/eco-11 sg:16 0.339s complete load=1.3
+held 2 m31/eco-11 mf4:16 0.428s complete load=1.2
+held 2 m31/eco-11 men:1 0.411s complete load=1.1
+held 2 m31/eco-11 men:16 0.334s complete load=1.1
+held 2 m31/eco-11 f4:1 1.289s complete load=1.1
+held 2 m31/eco-11 f4:4 0.531s complete load=1.0
+held 3 goldilocks/mq-random-10 f4:16 0.918s complete load=1.1
+held 3 goldilocks/mq-random-10 en:1 0.949s complete load=1.2
+held 3 goldilocks/mq-random-10 en:4 1.772s complete load=1.2
+held 3 goldilocks/mq-random-10 en:8 1.194s complete load=1.4
+held 3 goldilocks/mq-random-10 en:16 0.912s complete load=2.0
+held 3 goldilocks/mq-random-10 sg:1 0.984s complete load=2.0
+held 3 goldilocks/mq-random-10 sg:16 0.503s complete load=1.9
+held 3 goldilocks/mq-random-10 mf4:16 0.919s complete load=1.9
+held 3 goldilocks/mq-random-10 men:1 0.946s complete load=1.9
+held 3 goldilocks/mq-random-10 men:16 0.507s complete load=1.8
+held 3 goldilocks/mq-random-10 f4:1 5.784s complete load=1.6
+held 3 goldilocks/mq-random-10 f4:4 1.778s complete load=2.4
+held 3 goldilocks/mq-random-10 f4:8 1.195s complete load=2.2
+held 3 m31/katsura-10 f4:16 0.242s complete load=2.1
+held 3 m31/katsura-10 en:1 0.175s complete load=2.1
+held 3 m31/katsura-10 en:4 0.332s complete load=2.0
+held 3 m31/katsura-10 en:8 0.249s complete load=2.0
+held 3 m31/katsura-10 en:16 0.242s complete load=2.0
+held 3 m31/katsura-10 sg:1 0.173s complete load=1.8
+held 3 m31/katsura-10 sg:16 0.147s complete load=1.8
+held 3 m31/katsura-10 mf4:16 0.240s complete load=1.7
+held 3 m31/katsura-10 men:1 0.171s complete load=1.6
+held 3 m31/katsura-10 men:16 0.145s complete load=1.5
+held 3 m31/katsura-10 f4:1 0.831s complete load=1.4
+held 3 m31/katsura-10 f4:4 0.336s complete load=1.4
+held 3 m31/katsura-10 f4:8 0.250s complete load=1.4
+held 3 m31/eco-11 f4:16 0.424s complete load=1.5
+held 3 m31/eco-11 en:1 0.415s complete load=1.4
+held 3 m31/eco-11 en:4 0.325s complete load=1.3
+held 3 m31/eco-11 en:8 0.323s complete load=1.3
+held 3 m31/eco-11 en:16 0.339s complete load=1.3
+held 3 m31/eco-11 sg:1 0.413s complete load=1.3
+held 3 m31/eco-11 sg:16 0.336s complete load=1.3
+held 3 m31/eco-11 mf4:16 0.424s complete load=1.3
+held 3 m31/eco-11 men:1 0.411s complete load=1.3
+held 3 m31/eco-11 men:16 0.338s complete load=1.3
+held 3 m31/eco-11 f4:1 1.289s complete load=1.2
+held 3 m31/eco-11 f4:4 0.530s complete load=1.2
+held 3 m31/eco-11 f4:8 0.438s complete load=1.2
+held 4 goldilocks/mq-random-10 en:1 0.966s complete load=1.7
+held 4 goldilocks/mq-random-10 en:4 1.772s complete load=1.8
+held 4 goldilocks/mq-random-10 en:8 1.193s complete load=2.0
+held 4 goldilocks/mq-random-10 en:16 0.915s complete load=2.5
+held 4 goldilocks/mq-random-10 sg:1 0.954s complete load=2.3
+held 4 goldilocks/mq-random-10 sg:16 0.506s complete load=2.2
+held 4 goldilocks/mq-random-10 mf4:16 0.909s complete load=2.1
+held 4 goldilocks/mq-random-10 men:1 0.963s complete load=2.0
+held 4 goldilocks/mq-random-10 men:16 0.508s complete load=1.9
+held 4 goldilocks/mq-random-10 f4:1 5.787s complete load=1.9
+held 4 goldilocks/mq-random-10 f4:4 1.782s complete load=1.7
+held 4 goldilocks/mq-random-10 f4:8 1.192s complete load=1.7
+held 4 goldilocks/mq-random-10 f4:16 0.919s complete load=1.7
+held 4 m31/katsura-10 en:1 0.175s complete load=1.6
+held 4 m31/katsura-10 en:4 0.325s complete load=1.6
+held 4 m31/katsura-10 en:8 0.248s complete load=1.7
+held 4 m31/katsura-10 en:16 0.240s complete load=1.6
+held 4 m31/katsura-10 sg:1 0.177s complete load=1.5
+held 4 m31/katsura-10 sg:16 0.144s complete load=1.5
+held 4 m31/katsura-10 mf4:16 0.240s complete load=1.5
+held 4 m31/katsura-10 men:1 0.168s complete load=1.5
+held 4 m31/katsura-10 men:16 0.144s complete load=1.4
+held 4 m31/katsura-10 f4:1 0.834s complete load=1.4
+held 4 m31/katsura-10 f4:4 0.329s complete load=1.4
+held 4 m31/katsura-10 f4:8 0.249s complete load=1.4
+held 4 m31/katsura-10 f4:16 0.240s complete load=1.3
+held 4 m31/eco-11 en:1 0.415s complete load=1.3
+held 4 m31/eco-11 en:4 0.331s complete load=1.2
+held 4 m31/eco-11 en:8 0.319s complete load=1.2
+held 4 m31/eco-11 en:16 0.340s complete load=1.3
+held 4 m31/eco-11 sg:1 0.413s complete load=1.3
+held 4 m31/eco-11 sg:16 0.334s complete load=1.2
+held 4 m31/eco-11 mf4:16 0.426s complete load=2.0
+held 4 m31/eco-11 men:1 0.416s complete load=2.0
+held 4 m31/eco-11 men:16 0.336s complete load=1.9
+held 4 m31/eco-11 f4:1 1.326s complete load=1.8
+held 4 m31/eco-11 f4:4 0.555s complete load=1.8
+held 4 m31/eco-11 f4:8 0.437s complete load=1.8
+held 4 m31/eco-11 f4:16 0.429s complete load=2.3
+held 5 goldilocks/mq-random-10 en:4 1.764s complete load=2.1
+held 5 goldilocks/mq-random-10 en:8 1.186s complete load=2.3
+held 5 goldilocks/mq-random-10 en:16 0.921s complete load=2.7
+held 5 goldilocks/mq-random-10 sg:1 0.966s complete load=2.6
+held 5 goldilocks/mq-random-10 sg:16 0.508s complete load=2.5
+held 5 goldilocks/mq-random-10 mf4:16 0.906s complete load=2.3
+held 5 goldilocks/mq-random-10 men:1 0.941s complete load=2.1
+held 5 goldilocks/mq-random-10 men:16 0.509s complete load=2.0
+held 5 goldilocks/mq-random-10 f4:1 5.809s complete load=2.0
+held 5 goldilocks/mq-random-10 f4:4 1.825s complete load=1.8
+held 5 goldilocks/mq-random-10 f4:8 1.191s complete load=1.8
+held 5 goldilocks/mq-random-10 f4:16 0.914s complete load=1.8
+held 5 goldilocks/mq-random-10 en:1 0.944s complete load=1.7
+held 5 m31/katsura-10 en:4 0.323s complete load=1.7
+held 5 m31/katsura-10 en:8 0.249s complete load=2.0
+held 5 m31/katsura-10 en:16 0.241s complete load=1.9
+held 5 m31/katsura-10 sg:1 0.175s complete load=1.8
+held 5 m31/katsura-10 sg:16 0.148s complete load=1.8
+held 5 m31/katsura-10 mf4:16 0.241s complete load=1.7
+held 5 m31/katsura-10 men:1 0.174s complete load=1.6
+held 5 m31/katsura-10 men:16 0.144s complete load=1.4
+held 5 m31/katsura-10 f4:1 0.831s complete load=1.4
+held 5 m31/katsura-10 f4:4 0.326s complete load=1.4
+held 5 m31/katsura-10 f4:8 0.246s complete load=1.4
+held 5 m31/katsura-10 f4:16 0.242s complete load=1.3
+held 5 m31/katsura-10 en:1 0.176s complete load=1.2
+held 5 m31/eco-11 en:4 0.340s complete load=1.2
+held 5 m31/eco-11 en:8 0.324s complete load=1.2
+held 5 m31/eco-11 en:16 0.336s complete load=1.1
+held 5 m31/eco-11 sg:1 0.413s complete load=1.0
+held 5 m31/eco-11 sg:16 0.338s complete load=1.0
+held 5 m31/eco-11 mf4:16 0.428s complete load=1.0
+held 5 m31/eco-11 men:1 0.407s complete load=1.0
+held 5 m31/eco-11 men:16 0.342s complete load=1.0
+held 5 m31/eco-11 f4:1 1.306s complete load=1.0
+held 5 m31/eco-11 f4:4 0.534s complete load=1.0
+held 5 m31/eco-11 f4:8 0.436s complete load=1.1
+held 5 m31/eco-11 f4:16 0.426s complete load=1.0
+held 5 m31/eco-11 en:1 0.411s complete load=1.0
+held 6 goldilocks/mq-random-10 en:8 1.189s complete load=1.1
+held 6 goldilocks/mq-random-10 en:16 0.918s complete load=1.2
+held 6 goldilocks/mq-random-10 sg:1 0.951s complete load=1.1
+held 6 goldilocks/mq-random-10 sg:16 0.505s complete load=1.4
+held 6 goldilocks/mq-random-10 mf4:16 0.911s complete load=1.4
+held 6 goldilocks/mq-random-10 men:1 0.944s complete load=1.3
+held 6 goldilocks/mq-random-10 men:16 0.511s complete load=1.4
+held 6 goldilocks/mq-random-10 f4:1 5.813s complete load=1.4
+held 6 goldilocks/mq-random-10 f4:4 1.839s complete load=1.4
+held 6 goldilocks/mq-random-10 f4:8 1.186s complete load=1.6
+held 6 goldilocks/mq-random-10 f4:16 0.916s complete load=2.1
+held 6 goldilocks/mq-random-10 en:1 0.954s complete load=3.2
+held 6 goldilocks/mq-random-10 en:4 1.805s complete load=3.0
+held 6 m31/katsura-10 en:8 0.248s complete load=2.9
+held 6 m31/katsura-10 en:16 0.242s complete load=3.5
+held 6 m31/katsura-10 sg:1 0.176s complete load=3.3
+held 6 m31/katsura-10 sg:16 0.144s complete load=3.1
+held 6 m31/katsura-10 mf4:16 0.239s complete load=2.9
+held 6 m31/katsura-10 men:1 0.172s complete load=2.7
+held 6 m31/katsura-10 men:16 0.148s complete load=2.7
+held 6 m31/katsura-10 f4:1 0.847s complete load=2.6
+held 6 m31/katsura-10 f4:4 0.322s complete load=2.5
+held 6 m31/katsura-10 f4:8 0.247s complete load=2.3
+held 6 m31/katsura-10 f4:16 0.243s complete load=2.2
+held 6 m31/katsura-10 en:1 0.180s complete load=2.1
+held 6 m31/katsura-10 en:4 0.333s complete load=2.1
+held 6 m31/eco-11 en:8 0.320s complete load=2.0
+held 6 m31/eco-11 en:16 0.334s complete load=1.8
+held 6 m31/eco-11 sg:1 0.414s complete load=1.7
+held 6 m31/eco-11 sg:16 0.344s complete load=1.7
+held 6 m31/eco-11 mf4:16 0.429s complete load=1.6
+held 6 m31/eco-11 men:1 0.414s complete load=1.6
+held 6 m31/eco-11 men:16 0.336s complete load=1.6
+held 6 m31/eco-11 f4:1 1.297s complete load=1.5
+held 6 m31/eco-11 f4:4 0.551s complete load=1.4
+held 6 m31/eco-11 f4:8 0.436s complete load=1.7
+held 6 m31/eco-11 f4:16 0.426s complete load=1.6
+held 6 m31/eco-11 en:1 0.413s complete load=1.5
+held 6 m31/eco-11 en:4 0.332s complete load=1.5
+held 7 goldilocks/mq-random-10 en:16 0.929s complete load=1.4
+held 7 goldilocks/mq-random-10 sg:1 0.980s complete load=1.3
+held 7 goldilocks/mq-random-10 sg:16 0.507s complete load=1.3
+held 7 goldilocks/mq-random-10 mf4:16 0.917s complete load=1.4
+held 7 goldilocks/mq-random-10 men:1 0.941s complete load=1.4
+held 7 goldilocks/mq-random-10 men:16 0.507s complete load=1.4
+held 7 goldilocks/mq-random-10 f4:1 5.780s complete load=1.5
+held 7 goldilocks/mq-random-10 f4:4 1.790s complete load=1.3
+held 7 goldilocks/mq-random-10 f4:8 1.190s complete load=1.5
+held 7 goldilocks/mq-random-10 f4:16 0.919s complete load=2.0
+held 7 goldilocks/mq-random-10 en:1 0.955s complete load=2.0
+held 7 goldilocks/mq-random-10 en:4 1.785s complete load=1.9
+held 7 goldilocks/mq-random-10 en:8 1.184s complete load=1.8
+held 7 m31/katsura-10 en:16 0.241s complete load=1.7
+held 7 m31/katsura-10 sg:1 0.181s complete load=1.7
+held 7 m31/katsura-10 sg:16 0.145s complete load=1.6
+held 7 m31/katsura-10 mf4:16 0.239s complete load=1.4
+held 7 m31/katsura-10 men:1 0.173s complete load=1.3
+held 7 m31/katsura-10 men:16 0.145s complete load=1.3
+held 7 m31/katsura-10 f4:1 0.827s complete load=1.3
+held 7 m31/katsura-10 f4:4 0.337s complete load=1.3
+held 7 m31/katsura-10 f4:8 0.248s complete load=1.2
+held 7 m31/katsura-10 f4:16 0.244s complete load=1.1
+held 7 m31/katsura-10 en:1 0.174s complete load=1.3
+held 7 m31/katsura-10 en:4 0.322s complete load=1.3
+held 7 m31/katsura-10 en:8 0.248s complete load=1.2
+held 7 m31/eco-11 en:16 0.334s complete load=1.1
+held 7 m31/eco-11 sg:1 0.417s complete load=1.1
+held 7 m31/eco-11 sg:16 0.336s complete load=1.1
+held 7 m31/eco-11 mf4:16 0.427s complete load=1.1
+held 7 m31/eco-11 men:1 0.415s complete load=1.1
+held 7 m31/eco-11 men:16 0.337s complete load=1.1
+held 7 m31/eco-11 f4:1 1.330s complete load=1.0
+held 7 m31/eco-11 f4:4 0.546s complete load=1.2
+held 7 m31/eco-11 f4:8 0.436s complete load=1.1
+held 7 m31/eco-11 f4:16 0.428s complete load=2.0
+held 7 m31/eco-11 en:1 0.416s complete load=2.0
+held 7 m31/eco-11 en:4 0.325s complete load=1.9
+held 7 m31/eco-11 en:8 0.318s complete load=1.7
+held 8 goldilocks/mq-random-10 sg:1 0.946s complete load=1.7
+held 8 goldilocks/mq-random-10 sg:16 0.506s complete load=1.7
+held 8 goldilocks/mq-random-10 mf4:16 0.903s complete load=1.8
+held 8 goldilocks/mq-random-10 men:1 0.981s complete load=1.7
+held 8 goldilocks/mq-random-10 men:16 0.505s complete load=1.7
+held 8 goldilocks/mq-random-10 f4:1 5.787s complete load=1.6
+held 8 goldilocks/mq-random-10 f4:4 1.791s complete load=1.5
+held 8 goldilocks/mq-random-10 f4:8 1.191s complete load=1.8
+held 8 goldilocks/mq-random-10 f4:16 0.911s complete load=2.3
+held 8 goldilocks/mq-random-10 en:1 0.942s complete load=2.1
+held 8 goldilocks/mq-random-10 en:4 1.799s complete load=2.0
+held 8 goldilocks/mq-random-10 en:8 1.185s complete load=1.8
+held 8 goldilocks/mq-random-10 en:16 0.919s complete load=1.8
+held 8 m31/katsura-10 sg:1 0.175s complete load=1.7
+held 8 m31/katsura-10 sg:16 0.146s complete load=1.8
+held 8 m31/katsura-10 mf4:16 0.239s complete load=1.7
+held 8 m31/katsura-10 men:1 0.171s complete load=1.5
+held 8 m31/katsura-10 men:16 0.144s complete load=1.5
+held 8 m31/katsura-10 f4:1 0.829s complete load=1.5
+held 8 m31/katsura-10 f4:4 0.322s complete load=1.5
+held 8 m31/katsura-10 f4:8 0.247s complete load=1.8
+held 8 m31/katsura-10 f4:16 0.242s complete load=1.7
+held 8 m31/katsura-10 en:1 0.177s complete load=1.5
+held 8 m31/katsura-10 en:4 0.332s complete load=1.5
+held 8 m31/katsura-10 en:8 0.249s complete load=1.5
+held 8 m31/katsura-10 en:16 0.242s complete load=1.3
+held 8 m31/eco-11 sg:1 0.415s complete load=1.2
+held 8 m31/eco-11 sg:16 0.335s complete load=1.2
+held 8 m31/eco-11 mf4:16 0.427s complete load=1.2
+held 8 m31/eco-11 men:1 0.412s complete load=1.2
+held 8 m31/eco-11 men:16 0.335s complete load=1.2
+held 8 m31/eco-11 f4:1 1.299s complete load=1.1
+held 8 m31/eco-11 f4:4 0.535s complete load=1.1
+held 8 m31/eco-11 f4:8 0.437s complete load=1.4
+held 8 m31/eco-11 f4:16 0.429s complete load=1.3
+held 8 m31/eco-11 en:1 0.438s complete load=1.2
+held 8 m31/eco-11 en:4 0.330s complete load=1.2
+held 8 m31/eco-11 en:8 0.319s complete load=1.2
+held 8 m31/eco-11 en:16 0.341s complete load=1.1
+== certify 2026-11-20T19:33:44-05:00 load=1.13
+certify 0 wide64/eco-12 ec:16 63.144s complete load=1.1
+certify 0 goldilocks/katsura-11 ec:16 28.924s complete load=10.5
+certify 0 wide64/katsura-11 ec:16 29.563s complete load=11.8
+certify 0 goldilocks/mq-random-11 ec:16 69.618s complete load=12.5
+certify 0 gf32003/mq-random-10 ec:16 5.223s complete load=14.0
+certify 0 m31/mq-random-10 ec:16 5.230s complete load=12.3
+certify 0 goldilocks/cyclic-7 ec:16 0.184s complete load=11.6
+certify 0 wide64/cyclic-7 ec:16 0.184s complete load=10.8
+certify 0 goldilocks/noon-7 ec:16 0.329s complete load=10.1
+certify 0 wide64/noon-8 ec:16 4.230s complete load=9.6
+certify 0 goldilocks/katsura-4 ec:16 0.007s complete load=10.3
+certify 0 wide64/katsura-4 ec:16 0.007s complete load=9.0
+certify 0 wide64/katsura-9 ec:16 0.227s complete load=8.3
+certify 0 goldilocks/mq-random-10 ec:16 7.428s complete load=7.6
+certify 0 m31/katsura-10 ec:16 2.096s complete load=8.9
+certify 0 m31/eco-11 ec:16 7.728s complete load=8.3
+== dev 2026-11-20T19:39:16-05:00 load=4.54
+dev 9 wide64/katsura-11 en:16 0.622s complete load=4.5
+dev 9 wide64/katsura-11 men:16 0.623s complete load=4.3
+dev 9 wide64/noon-8 en:16 0.625s complete load=4.1
+dev 9 wide64/noon-8 men:16 0.614s complete load=3.9
+dev 10 wide64/katsura-11 men:16 0.616s complete load=3.8
+dev 10 wide64/katsura-11 en:16 0.634s complete load=4.7
+dev 10 wide64/noon-8 men:16 0.596s complete load=4.5
+dev 10 wide64/noon-8 en:16 0.603s complete load=4.2
+dev 11 wide64/katsura-11 en:16 0.613s complete load=3.9
+dev 11 wide64/katsura-11 men:16 0.615s complete load=3.6
+dev 11 wide64/noon-8 en:16 0.594s complete load=3.6
+dev 11 wide64/noon-8 men:16 0.600s complete load=3.4
+dev 12 wide64/katsura-11 men:16 0.647s complete load=3.2
+dev 12 wide64/katsura-11 en:16 0.614s complete load=3.1
+dev 12 wide64/noon-8 men:16 0.602s complete load=2.9
+dev 12 wide64/noon-8 en:16 0.598s complete load=2.8
+dev 13 wide64/katsura-11 en:16 0.616s complete load=2.6
+dev 13 wide64/katsura-11 men:16 0.617s complete load=2.5
+dev 13 wide64/noon-8 en:16 0.606s complete load=2.5
+dev 13 wide64/noon-8 men:16 0.598s complete load=2.5
+dev 14 wide64/katsura-11 men:16 0.616s complete load=2.3
+dev 14 wide64/katsura-11 en:16 0.612s complete load=2.1
+dev 14 wide64/noon-8 men:16 0.635s complete load=2.1
+dev 14 wide64/noon-8 en:16 0.593s complete load=2.1
+dev 15 wide64/katsura-11 en:16 0.619s complete load=2.0
+dev 15 wide64/katsura-11 men:16 0.620s complete load=1.9
+dev 15 wide64/noon-8 en:16 0.597s complete load=1.9
+dev 15 wide64/noon-8 men:16 0.597s complete load=1.8
+dev 16 wide64/katsura-11 men:16 0.610s complete load=1.8
+dev 16 wide64/katsura-11 en:16 0.613s complete load=1.8
+dev 16 wide64/noon-8 men:16 0.607s complete load=1.8
+dev 16 wide64/noon-8 en:16 0.609s complete load=2.0
+dev 17 wide64/katsura-11 en:16 0.639s complete load=1.9
+dev 17 wide64/katsura-11 men:16 0.613s complete load=1.8
+dev 17 wide64/noon-8 en:16 0.593s complete load=1.8
+dev 17 wide64/noon-8 men:16 0.594s complete load=1.6
+dev 18 wide64/katsura-11 men:16 0.625s complete load=1.7
+dev 18 wide64/katsura-11 en:16 0.615s complete load=1.6
+dev 18 wide64/noon-8 men:16 0.602s complete load=2.8
+dev 18 wide64/noon-8 en:16 0.600s complete load=2.7
+dev 19 wide64/katsura-11 en:16 0.619s complete load=2.5
+dev 19 wide64/katsura-11 men:16 0.611s complete load=2.4
+dev 19 wide64/noon-8 en:16 0.615s complete load=2.3
+dev 19 wide64/noon-8 men:16 0.603s complete load=2.2
+dev 20 wide64/katsura-11 men:16 0.619s complete load=2.1
+dev 20 wide64/katsura-11 en:16 0.615s complete load=2.0
+dev 20 wide64/noon-8 men:16 0.593s complete load=1.8
+dev 20 wide64/noon-8 en:16 0.602s complete load=1.8
+== rs 2026-11-20T19:42:58-05:00 load=1.74
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: set ZEEBRA_MACHINE and ZEEBRA_AFFINITY to actual CPU affinity
+== wide 2026-11-20T19:43:04-05:00 load=1.76
+suite wide: settled after 0s at load 1.78, compilers 0
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+usage: wide-corpus.py [-h] [--binary BINARY] [--freeze]
+                      [--summarize SUMMARIZE] [--pack PACK] [--output OUTPUT]
+                      [--scratch SCRATCH] [--fields FIELDS] [--rows ROWS]
+                      [--engines ENGINES] [--workers WORKERS]
+                      [--continue-controller]
+wide-corpus.py: error: commit tracked changes before measuring
+== mq10 2026-11-20T19:49:53-05:00 load=1.78
+suite mq10: settled after 0s at load 1.78, compilers 0
+32003 mq-random-10 zeebra 1 0 verified
+32003 mq-random-10 msolve 1 0 verified
+32003 mq-random-10 grobx 1 0 verified
+32003 mq-random-10 groebner-rs 1 0 verified
+32003 mq-random-10 zeebra 4 0 verified
+32003 mq-random-10 msolve 4 0 verified
+32003 mq-random-10 grobx 4 0 unsupported
+32003 mq-random-10 groebner-rs 4 0 verified
+32003 mq-random-10 zeebra 8 0 verified
+32003 mq-random-10 msolve 8 0 verified
+32003 mq-random-10 grobx 8 0 unsupported
+32003 mq-random-10 groebner-rs 8 0 verified
+32003 mq-random-10 zeebra 16 0 verified
+32003 mq-random-10 msolve 16 0 verified
+32003 mq-random-10 grobx 16 0 unsupported
+32003 mq-random-10 groebner-rs 16 0 verified
+2147483647 mq-random-10 zeebra 1 0 verified
+2147483647 mq-random-10 msolve 1 0 verified
+2147483647 mq-random-10 grobx 1 0 verified
+2147483647 mq-random-10 groebner-rs 1 0 verified
+2147483647 mq-random-10 zeebra 4 0 verified
+2147483647 mq-random-10 msolve 4 0 verified
+2147483647 mq-random-10 grobx 4 0 unsupported
+2147483647 mq-random-10 groebner-rs 4 0 verified
+2147483647 mq-random-10 zeebra 8 0 verified
+2147483647 mq-random-10 msolve 8 0 verified
+2147483647 mq-random-10 grobx 8 0 unsupported
+2147483647 mq-random-10 groebner-rs 8 0 verified
+2147483647 mq-random-10 zeebra 16 0 verified
+2147483647 mq-random-10 msolve 16 0 verified
+2147483647 mq-random-10 grobx 16 0 unsupported
+2147483647 mq-random-10 groebner-rs 16 0 verified
+32003 mq-random-10 groebner-rs 16 1 verified
+32003 mq-random-10 grobx 16 1 unsupported
+32003 mq-random-10 msolve 16 1 verified
+32003 mq-random-10 zeebra 16 1 verified
+32003 mq-random-10 groebner-rs 8 1 verified
+32003 mq-random-10 grobx 8 1 unsupported
+32003 mq-random-10 msolve 8 1 verified
+32003 mq-random-10 zeebra 8 1 verified
+32003 mq-random-10 groebner-rs 4 1 verified
+32003 mq-random-10 grobx 4 1 unsupported
+32003 mq-random-10 msolve 4 1 verified
+32003 mq-random-10 zeebra 4 1 verified
+32003 mq-random-10 groebner-rs 1 1 verified
+32003 mq-random-10 grobx 1 1 verified
+32003 mq-random-10 msolve 1 1 verified
+32003 mq-random-10 zeebra 1 1 verified
+2147483647 mq-random-10 groebner-rs 16 1 verified
+2147483647 mq-random-10 grobx 16 1 unsupported
+2147483647 mq-random-10 msolve 16 1 verified
+2147483647 mq-random-10 zeebra 16 1 verified
+2147483647 mq-random-10 groebner-rs 8 1 verified
+2147483647 mq-random-10 grobx 8 1 unsupported
+2147483647 mq-random-10 msolve 8 1 verified
+2147483647 mq-random-10 zeebra 8 1 verified
+2147483647 mq-random-10 groebner-rs 4 1 verified
+2147483647 mq-random-10 grobx 4 1 unsupported
+2147483647 mq-random-10 msolve 4 1 verified
+2147483647 mq-random-10 zeebra 4 1 verified
+2147483647 mq-random-10 groebner-rs 1 1 verified
+2147483647 mq-random-10 grobx 1 1 verified
+2147483647 mq-random-10 msolve 1 1 verified
+2147483647 mq-random-10 zeebra 1 1 verified
+32003 mq-random-10 zeebra 1 2 verified
+32003 mq-random-10 msolve 1 2 verified
+32003 mq-random-10 grobx 1 2 verified
+32003 mq-random-10 groebner-rs 1 2 verified
+32003 mq-random-10 zeebra 4 2 verified
+32003 mq-random-10 msolve 4 2 verified
+32003 mq-random-10 grobx 4 2 unsupported
+32003 mq-random-10 groebner-rs 4 2 verified
+32003 mq-random-10 zeebra 8 2 verified
+32003 mq-random-10 msolve 8 2 verified
+32003 mq-random-10 grobx 8 2 unsupported
+32003 mq-random-10 groebner-rs 8 2 verified
+32003 mq-random-10 zeebra 16 2 verified
+32003 mq-random-10 msolve 16 2 verified
+32003 mq-random-10 grobx 16 2 unsupported
+32003 mq-random-10 groebner-rs 16 2 verified
+2147483647 mq-random-10 zeebra 1 2 verified
+2147483647 mq-random-10 msolve 1 2 verified
+2147483647 mq-random-10 grobx 1 2 verified
+2147483647 mq-random-10 groebner-rs 1 2 verified
+2147483647 mq-random-10 zeebra 4 2 verified
+2147483647 mq-random-10 msolve 4 2 verified
+2147483647 mq-random-10 grobx 4 2 unsupported
+2147483647 mq-random-10 groebner-rs 4 2 verified
+2147483647 mq-random-10 zeebra 8 2 verified
+2147483647 mq-random-10 msolve 8 2 verified
+2147483647 mq-random-10 grobx 8 2 unsupported
+2147483647 mq-random-10 groebner-rs 8 2 verified
+2147483647 mq-random-10 zeebra 16 2 verified
+2147483647 mq-random-10 msolve 16 2 verified
+2147483647 mq-random-10 grobx 16 2 unsupported
+2147483647 mq-random-10 groebner-rs 16 2 verified
+32003 mq-random-10 groebner-rs 16 3 verified
+32003 mq-random-10 grobx 16 3 unsupported
+32003 mq-random-10 msolve 16 3 verified
+32003 mq-random-10 zeebra 16 3 verified
+32003 mq-random-10 groebner-rs 8 3 verified
+32003 mq-random-10 grobx 8 3 unsupported
+32003 mq-random-10 msolve 8 3 verified
+32003 mq-random-10 zeebra 8 3 verified
+32003 mq-random-10 groebner-rs 4 3 verified
+32003 mq-random-10 grobx 4 3 unsupported
+32003 mq-random-10 msolve 4 3 verified
+32003 mq-random-10 zeebra 4 3 verified
+32003 mq-random-10 groebner-rs 1 3 verified
+32003 mq-random-10 grobx 1 3 verified
+32003 mq-random-10 msolve 1 3 verified
+32003 mq-random-10 zeebra 1 3 verified
+2147483647 mq-random-10 groebner-rs 16 3 verified
+2147483647 mq-random-10 grobx 16 3 unsupported
+2147483647 mq-random-10 msolve 16 3 verified
+2147483647 mq-random-10 zeebra 16 3 verified
+2147483647 mq-random-10 groebner-rs 8 3 verified
+2147483647 mq-random-10 grobx 8 3 unsupported
+2147483647 mq-random-10 msolve 8 3 verified
+2147483647 mq-random-10 zeebra 8 3 verified
+2147483647 mq-random-10 groebner-rs 4 3 verified
+2147483647 mq-random-10 grobx 4 3 unsupported
+2147483647 mq-random-10 msolve 4 3 verified
+2147483647 mq-random-10 zeebra 4 3 verified
+2147483647 mq-random-10 groebner-rs 1 3 verified
+2147483647 mq-random-10 grobx 1 3 verified
+2147483647 mq-random-10 msolve 1 3 verified
+2147483647 mq-random-10 zeebra 1 3 verified
+32003 mq-random-10 zeebra 1 4 verified
+32003 mq-random-10 msolve 1 4 verified
+32003 mq-random-10 grobx 1 4 verified
+32003 mq-random-10 groebner-rs 1 4 verified
+32003 mq-random-10 zeebra 4 4 verified
+32003 mq-random-10 msolve 4 4 verified
+32003 mq-random-10 grobx 4 4 unsupported
+32003 mq-random-10 groebner-rs 4 4 verified
+32003 mq-random-10 zeebra 8 4 verified
+32003 mq-random-10 msolve 8 4 verified
+32003 mq-random-10 grobx 8 4 unsupported
+32003 mq-random-10 groebner-rs 8 4 verified
+32003 mq-random-10 zeebra 16 4 verified
+32003 mq-random-10 msolve 16 4 verified
+32003 mq-random-10 grobx 16 4 unsupported
+32003 mq-random-10 groebner-rs 16 4 verified
+2147483647 mq-random-10 zeebra 1 4 verified
+2147483647 mq-random-10 msolve 1 4 verified
+2147483647 mq-random-10 grobx 1 4 verified
+2147483647 mq-random-10 groebner-rs 1 4 verified
+2147483647 mq-random-10 zeebra 4 4 verified
+2147483647 mq-random-10 msolve 4 4 verified
+2147483647 mq-random-10 grobx 4 4 unsupported
+2147483647 mq-random-10 groebner-rs 4 4 verified
+2147483647 mq-random-10 zeebra 8 4 verified
+2147483647 mq-random-10 msolve 8 4 verified
+2147483647 mq-random-10 grobx 8 4 unsupported
+2147483647 mq-random-10 groebner-rs 8 4 verified
+2147483647 mq-random-10 zeebra 16 4 verified
+2147483647 mq-random-10 msolve 16 4 verified
+2147483647 mq-random-10 grobx 16 4 unsupported
+2147483647 mq-random-10 groebner-rs 16 4 verified
+32003 mq-random-10 groebner-rs 16 5 verified
+32003 mq-random-10 grobx 16 5 unsupported
+32003 mq-random-10 msolve 16 5 verified
+32003 mq-random-10 zeebra 16 5 verified
+32003 mq-random-10 groebner-rs 8 5 verified
+32003 mq-random-10 grobx 8 5 unsupported
+32003 mq-random-10 msolve 8 5 verified
+32003 mq-random-10 zeebra 8 5 verified
+32003 mq-random-10 groebner-rs 4 5 verified
+32003 mq-random-10 grobx 4 5 unsupported
+32003 mq-random-10 msolve 4 5 verified
+32003 mq-random-10 zeebra 4 5 verified
+32003 mq-random-10 groebner-rs 1 5 verified
+32003 mq-random-10 grobx 1 5 verified
+32003 mq-random-10 msolve 1 5 verified
+32003 mq-random-10 zeebra 1 5 verified
+2147483647 mq-random-10 groebner-rs 16 5 verified
+2147483647 mq-random-10 grobx 16 5 unsupported
+2147483647 mq-random-10 msolve 16 5 verified
+2147483647 mq-random-10 zeebra 16 5 verified
+2147483647 mq-random-10 groebner-rs 8 5 verified
+2147483647 mq-random-10 grobx 8 5 unsupported
+2147483647 mq-random-10 msolve 8 5 verified
+2147483647 mq-random-10 zeebra 8 5 verified
+2147483647 mq-random-10 groebner-rs 4 5 verified
+2147483647 mq-random-10 grobx 4 5 unsupported
+2147483647 mq-random-10 msolve 4 5 verified
+2147483647 mq-random-10 zeebra 4 5 verified
+2147483647 mq-random-10 groebner-rs 1 5 verified
+2147483647 mq-random-10 grobx 1 5 verified
+2147483647 mq-random-10 msolve 1 5 verified
+2147483647 mq-random-10 zeebra 1 5 verified
+32003 mq-random-10 zeebra 1 6 verified
+32003 mq-random-10 msolve 1 6 verified
+32003 mq-random-10 grobx 1 6 verified
+32003 mq-random-10 groebner-rs 1 6 verified
+32003 mq-random-10 zeebra 4 6 verified
+32003 mq-random-10 msolve 4 6 verified
+32003 mq-random-10 grobx 4 6 unsupported
+32003 mq-random-10 groebner-rs 4 6 verified
+32003 mq-random-10 zeebra 8 6 verified
+32003 mq-random-10 msolve 8 6 verified
+32003 mq-random-10 grobx 8 6 unsupported
+32003 mq-random-10 groebner-rs 8 6 verified
+32003 mq-random-10 zeebra 16 6 verified
+32003 mq-random-10 msolve 16 6 verified
+32003 mq-random-10 grobx 16 6 unsupported
+32003 mq-random-10 groebner-rs 16 6 verified
+2147483647 mq-random-10 zeebra 1 6 verified
+2147483647 mq-random-10 msolve 1 6 verified
+2147483647 mq-random-10 grobx 1 6 verified
+2147483647 mq-random-10 groebner-rs 1 6 verified
+2147483647 mq-random-10 zeebra 4 6 verified
+2147483647 mq-random-10 msolve 4 6 verified
+2147483647 mq-random-10 grobx 4 6 unsupported
+2147483647 mq-random-10 groebner-rs 4 6 verified
+2147483647 mq-random-10 zeebra 8 6 verified
+2147483647 mq-random-10 msolve 8 6 verified
+2147483647 mq-random-10 grobx 8 6 unsupported
+2147483647 mq-random-10 groebner-rs 8 6 verified
+2147483647 mq-random-10 zeebra 16 6 verified
+2147483647 mq-random-10 msolve 16 6 verified
+2147483647 mq-random-10 grobx 16 6 unsupported
+2147483647 mq-random-10 groebner-rs 16 6 verified
+32003 mq-random-10 groebner-rs 16 7 verified
+32003 mq-random-10 grobx 16 7 unsupported
+32003 mq-random-10 msolve 16 7 verified
+32003 mq-random-10 zeebra 16 7 verified
+32003 mq-random-10 groebner-rs 8 7 verified
+32003 mq-random-10 grobx 8 7 unsupported
+32003 mq-random-10 msolve 8 7 verified
+32003 mq-random-10 zeebra 8 7 verified
+32003 mq-random-10 groebner-rs 4 7 verified
+32003 mq-random-10 grobx 4 7 unsupported
+32003 mq-random-10 msolve 4 7 verified
+32003 mq-random-10 zeebra 4 7 verified
+32003 mq-random-10 groebner-rs 1 7 verified
+32003 mq-random-10 grobx 1 7 verified
+32003 mq-random-10 msolve 1 7 verified
+32003 mq-random-10 zeebra 1 7 verified
+2147483647 mq-random-10 groebner-rs 16 7 verified
+2147483647 mq-random-10 grobx 16 7 unsupported
+2147483647 mq-random-10 msolve 16 7 verified
+2147483647 mq-random-10 zeebra 16 7 verified
+2147483647 mq-random-10 groebner-rs 8 7 verified
+2147483647 mq-random-10 grobx 8 7 unsupported
+2147483647 mq-random-10 msolve 8 7 verified
+2147483647 mq-random-10 zeebra 8 7 verified
+2147483647 mq-random-10 groebner-rs 4 7 verified
+2147483647 mq-random-10 grobx 4 7 unsupported
+2147483647 mq-random-10 msolve 4 7 verified
+2147483647 mq-random-10 zeebra 4 7 verified
+2147483647 mq-random-10 groebner-rs 1 7 verified
+2147483647 mq-random-10 grobx 1 7 verified
+2147483647 mq-random-10 msolve 1 7 verified
+2147483647 mq-random-10 zeebra 1 7 verified
+32003 mq-random-10 zeebra 1 8 verified
+32003 mq-random-10 msolve 1 8 verified
+32003 mq-random-10 grobx 1 8 verified
+32003 mq-random-10 groebner-rs 1 8 verified
+32003 mq-random-10 zeebra 4 8 verified
+32003 mq-random-10 msolve 4 8 verified
+32003 mq-random-10 grobx 4 8 unsupported
+32003 mq-random-10 groebner-rs 4 8 verified
+32003 mq-random-10 zeebra 8 8 verified
+32003 mq-random-10 msolve 8 8 verified
+32003 mq-random-10 grobx 8 8 unsupported
+32003 mq-random-10 groebner-rs 8 8 verified
+32003 mq-random-10 zeebra 16 8 verified
+32003 mq-random-10 msolve 16 8 verified
+32003 mq-random-10 grobx 16 8 unsupported
+32003 mq-random-10 groebner-rs 16 8 verified
+2147483647 mq-random-10 zeebra 1 8 verified
+2147483647 mq-random-10 msolve 1 8 verified
+2147483647 mq-random-10 grobx 1 8 verified
+2147483647 mq-random-10 groebner-rs 1 8 verified
+2147483647 mq-random-10 zeebra 4 8 verified
+2147483647 mq-random-10 msolve 4 8 verified
+2147483647 mq-random-10 grobx 4 8 unsupported
+2147483647 mq-random-10 groebner-rs 4 8 verified
+2147483647 mq-random-10 zeebra 8 8 verified
+2147483647 mq-random-10 msolve 8 8 verified
+2147483647 mq-random-10 grobx 8 8 unsupported
+2147483647 mq-random-10 groebner-rs 8 8 verified
+2147483647 mq-random-10 zeebra 16 8 verified
+2147483647 mq-random-10 msolve 16 8 verified
+2147483647 mq-random-10 grobx 16 8 unsupported
+2147483647 mq-random-10 groebner-rs 16 8 verified
+== certified 2026-11-20T19:54:29-05:00 load=2.66
+certified 0 wide64/eco-12 gc:1 286.790s admitted load=2.5
+certified 0 goldilocks/mq-random-11 gc:1 463.244s admitted load=1.7
+certified 0 wide64/katsura-11 gc:1 81.042s admitted load=1.3
+certified 0 wide64/cyclic-7 gc:1 3.129s admitted load=1.7
+certified 1 wide64/eco-12 gc:1 285.397s admitted load=1.7
+certified 1 goldilocks/mq-random-11 gc:1 462.185s admitted load=1.5
+certified 1 wide64/katsura-11 gc:1 80.561s admitted load=1.2
+certified 1 wide64/cyclic-7 gc:1 3.134s admitted load=1.6
+certified 2 wide64/eco-12 gc:1 284.769s admitted load=1.6
+certified 2 goldilocks/mq-random-11 gc:1 464.007s admitted load=1.6
+certified 2 wide64/katsura-11 gc:1 81.179s admitted load=1.2
+certified 2 wide64/cyclic-7 gc:1 3.104s admitted load=1.7
+certified 3 wide64/eco-12 gc:1 284.756s admitted load=1.6
+certified 3 goldilocks/mq-random-11 gc:1 461.100s admitted load=1.6
+certified 3 wide64/katsura-11 gc:1 80.897s admitted load=1.2
+certified 3 wide64/cyclic-7 gc:1 3.101s admitted load=1.4
+certified 4 wide64/eco-12 gc:1 284.777s admitted load=1.4
+certified 4 goldilocks/mq-random-11 gc:1 463.228s admitted load=1.7
+certified 4 wide64/katsura-11 gc:1 81.104s admitted load=1.3
+certified 4 wide64/cyclic-7 gc:1 3.082s admitted load=1.5
+certified 5 wide64/eco-12 gc:1 285.737s admitted load=1.4
+certified 5 goldilocks/mq-random-11 gc:1 462.803s admitted load=1.4
+certified 5 wide64/katsura-11 gc:1 80.762s admitted load=1.2
+certified 5 wide64/cyclic-7 gc:1 3.113s admitted load=1.3
+certified 6 wide64/eco-12 gc:1 285.314s admitted load=1.3
+certified 6 goldilocks/mq-random-11 gc:1 461.587s admitted load=1.3
+certified 6 wide64/katsura-11 gc:1 81.053s admitted load=2.2
+certified 6 wide64/cyclic-7 gc:1 3.105s admitted load=1.5
+certified 7 wide64/eco-12 gc:1 285.650s admitted load=1.4
+certified 7 goldilocks/mq-random-11 gc:1 464.318s admitted load=1.5
+certified 7 wide64/katsura-11 gc:1 80.917s admitted load=2.1
+certified 7 wide64/cyclic-7 gc:1 3.078s admitted load=1.3
+certified 8 wide64/eco-12 gc:1 284.849s admitted load=1.4
+certified 8 goldilocks/mq-random-11 gc:1 462.824s admitted load=1.5
+certified 8 wide64/katsura-11 gc:1 80.915s admitted load=2.2
+certified 8 wide64/cyclic-7 gc:1 3.123s admitted load=1.5
+== rs 2026-11-20T22:03:20-05:00 load=1.06
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+wide64 eco-12 groebner-rs complete
+goldilocks mq-random-11 groebner-rs complete
+wide64 katsura-11 groebner-rs complete
+wide64 cyclic-7 groebner-rs complete
+== wide-rerun 2026-11-20T22:09:03-05:00 load=1.25
+suite wide: settled after 0s at load 1.25, compilers 0
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete
+wide64 eco-12 groebner-rs complete
+wide64 eco-12 grobx complete
+goldilocks mq-random-11 groebner-rs complete
+goldilocks mq-random-11 grobx complete
+wide64 katsura-11 groebner-rs complete
+wide64 katsura-11 grobx complete
+wide64 cyclic-7 groebner-rs complete
+wide64 cyclic-7 grobx complete

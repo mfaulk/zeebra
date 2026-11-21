@@ -1,14 +1,21 @@
 # M32 — Adaptive F4: Parallel Symbolic Preprocessing and Production Qualification
 
-**Status:** planned, 2026-11-19. No M32 measurement has been taken. §§1–13 are the plan, fixed
-before measurement; §15 will hold the integration report (#942), written from §13's template.
+**Status:** §§1–13 are the plan, fixed 2026-11-19 before any M32 measurement and not edited
+since. §15 is the integration report (#942), complete 2026-11-20: the gate records and the
+final cohort at freeze F3 (`9c24a24f`).
 **Predecessor:** M31 — Signature-F4 Wall-Time Conversion and Competitive Performance
 ([`MILESTONE-COMPETITIVE-SIGNATURE-F4.md`](MILESTONE-COMPETITIVE-SIGNATURE-F4.md), §15 integration
 report; tracker #900, closed).
 **Planning base:** `main` at `e59a90a1`. Its timed `src/` differs from M31's final `8715c8ed` only
 in doc comments (`src/grobner/sigf4/dispatch.rs`, `src/lib.rs`).
-**Measured at:** `8715c8ed`, quoted; nothing here is measured by M32. Every figure in §§2–6 is quoted from M31's final
-cohort at that commit (evidence and every table in
+**Measured at:** §§2–6 quote `8715c8ed`. §15 quotes M32's gate records, each at the commit its
+record names: `7b25a1ee`, `8715c8ed` and `45107ec3` (#939); `8694d172` (#933); `3d46b15f`
+(#936); `592653ee` and `62cbe4de` against `ce67df76` (#940); `8544cf24` and `588d2a44` against
+`c1d93389` (#927); `f427e8d7` and `f8ec0b4c` (#941, merged as `041a21ef`); `9c24a24f` (#958,
+#964). The final cohort is freeze F3 `9c24a24f` against M31 `8715c8ed` rebuilt beside it, with
+one harness on every arm ([`research/m32-final/`](../research/m32-final/README.md), tag
+`measured/942-final`).
+Every figure in §§2–6 is quoted from M31's final cohort at `8715c8ed` (evidence and every table in
 [`research/m31-final/`](../research/m31-final/README.md)), from
 [`m31-sigf4-dispatch.md`](research/m31-sigf4-dispatch.md) (`5bd0db63`), from
 [`m31-sigf4-parallel.md`](research/m31-sigf4-parallel.md) (`4b702ea3`), or from the M30 report
@@ -731,3 +738,443 @@ and timeout.
 
 **15.9 Dispositions and follow-ups.** Every M32 issue's outcome; follow-ups filed on Project #7
 with Priority and linked to #938.
+
+## 15. Integration report (#942)
+
+> **2026-11-20, at freeze F3 `9c24a24f`.** Figures marked "F3 cohort" come from
+> [`research/m32-final/`](../research/m32-final/README.md) (tables in
+> [`tables.md`](../research/m32-final/tables.md)). Every other figure names its record and the
+> commit it was measured at. Ratios are paired medians [95% bootstrap of the median, 20,000 draws].
+
+### 15.0 Header
+
+| Item | Value |
+|---|---|
+| Final revision (F3) | `9c24a24f` (`main` after #976; tag `measured/942-final`). Its `src/` is code-identical to Gate Q's head `f8ec0b4c`: the one difference is a doc comment in `src/grobner/f4/options.rs` |
+| F2 → F3 on measured paths | `git log f427e8d7..9c24a24f --numstat -- src/grobner src/linalg src/fields src/poly`: one commit, #957 (`041a21ef`): `f4/mod.rs` +29/−2, `f4/options.rs` +56/−0, `f4/statistics.rs` +5/−0, `graded_engine_tests.rs` +379/−0, `grobner/mod.rs` +7/−4, `sigf4/dispatch.rs` +91/−12. Gate Q measured that code, so it is not re-read (§8.3) |
+| F0 | M31 reference `8715c8ed`, **rebuilt in the F3 cohort**; M32 baseline `7b25a1ee`, identical in code ([`m32-baseline.md`](research/m32-baseline.md) §1) |
+| F2 | `f427e8d7` (`main` after #950), declared on #941 ([predeclaration](https://github.com/mfaulk/zeebra/issues/941#issuecomment-7042293851)) |
+| Gate records | #939 [`research/m32-baseline/`](../research/m32-baseline/README.md); #933 [`m32-parallel-symbolic.md`](research/m32-parallel-symbolic.md); #936 [`m32-signature-basis-growth.md`](research/m32-signature-basis-growth.md); #940 [`research/m32-gate-s/`](../research/m32-gate-s/README.md); #927 [`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md); #941 [`m32-qualification.md`](research/m32-qualification.md) (`041a21ef`); #958 and #964 [`research/m32-katsura9-gap/`](../research/m32-katsura9-gap/README.md) (`9c24a24f`) |
+| Harness and protocol | **One harness for every Zeebra arm**: #958's `harness.rs` (SHA-256 `9d2b2776…`) copied over `examples/sig_f4_study.rs` in both the F3 and the `8715c8ed` trees, so the library is the only difference. Rows of ≥ 50 ms: one solve per fresh process, process wall, on every arm. katsura-4 and katsura-9: `--calls 20` on every arm (median warm call per process, #934). `--repeat` is not used. This is #958's lesson (§15.8.4) |
+| Dates | gates read 2026-11-19 to 2026-11-20; F3 cohort 2026-11-20 15:51 to 22:17 local |
+| Reservation | every M32 campaign: CCDs 1–2 (CPUs 8–23) through `tools/bench-reserve.sh`, under `benchlock`. F3 cohort: tag `zb-942`, no other `benchlock` holder during it ([`benchlock.log`](../research/m32-final/benchlock.log)) |
+| Attempts | Gate P 1 read; Gate G 1; Gate S 2 (the second allowed by the owner on #938); Gate R 2 (first read plus revision 1 of 2); Gate Q 1 (three cells extended to n = 21); F3 cohort 1, with one predeclared n = 12 extension block on two cells (§15.6) |
+| Comparands | groebner-rs driver `81dc5c4c` and grobx driver `40035ef8` (M30-0's builds, by SHA-256); msolve 0.11.0 (`tools/external/env.sh`). Run in the F3 cohort's second and third sessions (§15.8.7) |
+| Evidence path | [`research/m32-final/`](../research/m32-final/README.md): every child retained, `cpu-context` before and after each, executable SHA-256s in `binaries.sha256` |
+
+### 15.1 Status
+
+**Minimum: met.** Items 1–3 were met at their gates: the baseline (#939), parallel symbolic
+investigated to a Gate P read (#933), and MQ10 handled by routing (#927, Gate R at revision 1).
+Item 4: the one adopted change is #950's worker-aware dispatch, and #957's opt-in option over it.
+Both passed §9's correctness contract under grevlex (Gate Q `check`; §15.5). Gate Q found two
+safety gaps in the option, graded-lex memory (#961) and the uncharged one-worker live budget
+(#962). Neither is a default, both are documented, and both are filed. Item 5: #937 decided to
+keep the option opt-in, with no default flip. Item 6: this section.
+
+**Target: not met.** Of T1–T10, T3, T5, T7 (grevlex), T9 and the M31-relative half of T4 are met
+in the F3 cohort. T1 and T2 are missed because nothing from S1 merged. T4's absolute Eco-12 bound
+is missed for the same reason. T6 is met on its stated rows. T8 and T10 are missed, as Gate Q
+recorded (§15.6).
+
+**Stretch: not met.** S-a is missed: Eco-12, adaptive 16 w ÷ grobx raw randomized 1 w in the same session, reads 1.060 [1.051, 1.073] against ≤ 0.90. S-b is missed (Eco-12 16 w ÷ 8 w 0.999, Katsura-11 1.004). S-c is
+not met: #937 keeps the option opt-in. S-d is not attempted, because Gate G failed.
+
+The four verdicts, kept apart:
+
+1. **Algorithmic work: unchanged.** At F3 the signature engine does M31's work exactly. Forced at
+   16 workers, F3 ÷ M31 coefficient products are 1.000 on Eco-12, both Katsura-11 rows and MQ11,
+   with the same signature-basis sizes (1,885, 561, 561 and 767). Every child of a row, over both
+   builds, every arm and every worker count, returned one basis digest (F3 cohort).
+2. **Stage speedups: none.** Eco-12's symbolic stage, M31 ÷ F3 at 16 w, is 1.025 [1.024, 1.030],
+   against T1's 1.5. #940's 2.63× was on unmerged heads (§15.8.2).
+3. **Complete process wall.** On signature-routed rows the adaptive path equals M31: Eco-12
+   0.992 [0.984, 1.002], MQ11 1.010 [1.004, 1.022] at 16 w. The gain is MQ10 at 4–16 workers,
+   where the dispatch now runs conventional F4: 0.634 and 0.581 of M31's entry point at 16 w, and
+   0.995–1.011 of conventional F4 at every count. **The same band costs the two 10-variable
+   held-out rows it catches**: mq-random-10 / Goldilocks at **1.801** [1.795, 1.820] and
+   katsura-10 / GF(2³¹−1) at **1.661** [1.641, 1.675] of M31's entry point at 16 w, where the
+   signature engine forced reads 0.552 and 0.601 of conventional F4 (§15.4, #978).
+4. **Competitive position.** At 16 workers Zeebra is behind on most rows. groebner-rs at 8 w is 1.95× ahead on Eco-12 and 2.10× on Cyclic-7, and within 4% on Katsura-11 and MQ11. grobx raw (randomized, uncertified, one worker) is 6–19% ahead on Eco-12, Katsura-11 and Cyclic-7; on MQ11 Zeebra reads 0.733 of it. On MQ10, msolve and groebner-rs at their best worker counts are 1.4–2.8× ahead. On equal guarantees, Zeebra plus certification is about 4.5× faster than grobx certified on Eco-12 (§15.7).
+
+### 15.2 Primary scoreboard
+
+F3 cohort, 16 workers, process wall ms, n = 9 (katsura-4 and katsura-9: warm-call ms, n = 31).
+`ad` is the adaptive path (`f4_signature` at F3), `f4` conventional F4 at F3, `M31` the
+reference `8715c8ed`'s `f4_signature`. RSS is peak VmHWM. The comparand columns are §15.7's.
+
+| Row | Route (16 w) | F4 | M31 | ad | ad ÷ F4 | ad ÷ M31 | RSS ad ÷ F4 | RSS ad ÷ M31 | F3 F4 ÷ M31 F4 |
+|---|---|---:|---:|---:|---|---|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 | Signature | 2,375.5 | 1,756.0 | 1,739.5 | 0.732 [0.728, 0.743] | 0.992 [0.984, 1.002] | 0.849 | 1.008 | 1.003 |
+| Katsura-11 / Goldilocks | Signature | 1,365.6 | 615.3 | 617.0 | 0.452 [0.448, 0.470] | 1.007 [0.992, 1.020] | 0.767 | 1.012 | 1.006 |
+| Katsura-11 / 2⁶⁴−353 | Signature | 1,341.7 | 619.3 | 614.6 | 0.457 [0.455, 0.467] | 0.993 [0.983, 1.000] (n = 21) | 0.766 | 1.012 | 1.004 |
+| MQ11 / Goldilocks | Signature | 4,676.6 | 2,133.2 | 2,157.4 | 0.460 [0.457, 0.468] | 1.010 [1.004, 1.022] | 0.939 | 1.004 | 1.002 |
+| MQ10 / 32003 | F4 (`WorkerCrossover`) | 240.6 | 378.3 | 239.3 | 0.996 [0.988, 1.003] | **0.634** [0.630, 0.638] | 1.007 | 1.568 | 0.994 |
+| MQ10 / 2³¹−1 | F4 (`WorkerCrossover`) | 226.0 | 390.2 | 226.3 | 0.995 [0.991, 1.005] | **0.581** [0.575, 0.584] | 0.998 | 1.263 | 1.006 |
+| Cyclic-7 / Goldilocks | F4 (`DegreeSpread`) | 146.0 | 146.1 | 145.5 | 1.001 [0.984, 1.019] | 0.993 [0.983, 1.014] | 0.994 | 1.066 | 1.002 |
+| Cyclic-7 / 2⁶⁴−353 | F4 (`DegreeSpread`) | 145.1 | 146.2 | 145.2 | 0.999 [0.982, 1.009] | 0.991 [0.973, 1.002] | 1.009 | 1.077 | 1.000 |
+| noon-7 / Goldilocks | Signature (team 8) | 192.8 | 108.9 | 105.9 | 0.547 [0.545, 0.558] | 0.971 [0.964, 0.979] | 0.860 | 1.034 | 0.996 |
+| noon-8 / 2⁶⁴−353 | Signature (team 8) | 981.0 | 602.3 | 596.2 | 0.606 [0.599, 0.611] | 0.993 [0.980, 1.003] (n = 21) | 0.807 | 0.997 | 1.002 |
+| katsura-9 / 2⁶⁴−353 (warm) | Signature (team 8) | 50.3 | 23.6 | 23.1 | 0.458 [0.457, 0.459] | 0.979 [0.978, 0.980] | 0.796 | 0.914 | 1.003 |
+| katsura-4 / Goldilocks (warm) | F4 (`Small`) | 0.046 | 0.047 | 0.047 | 1.010 [1.006, 1.014] | 0.997 [0.992, 1.001] | 0.995 | 1.312 | 0.989 |
+| katsura-4 / 2⁶⁴−353 (warm) | F4 (`Small`) | 0.046 | 0.046 | 0.046 | 1.011 [1.007, 1.015] | 1.002 [0.996, 1.007] | 1.042 | 1.320 | 0.993 |
+| **Held out:** mq-random-10 / Goldilocks | F4 (`WorkerCrossover`) | 918.1 | 507.8 | 917.9 | 1.001 [0.993, 1.009] | **1.801** [1.795, 1.820] | 0.999 | 1.153 | 1.005 |
+| **Held out:** katsura-10 / GF(2³¹−1) | F4 (`WorkerCrossover`) | 242.2 | 145.2 | 241.0 | 0.999 [0.991, 1.003] | **1.661** [1.641, 1.675] | 1.021 | 1.317 | 1.009 |
+| **Held out:** eco-11 / GF(2³¹−1) | Signature | 428.2 | 336.4 | 338.7 | 0.790 [0.783, 0.798] | 1.001 [0.983, 1.017] | 0.853 | 1.014 | 1.003 |
+
+The katsura-4 RSS ratios against M31 (1.31–1.32) are a fixed 1.9 MiB of process overhead on a
+6 MiB process (7.8 against 5.9 MiB, every arm of the F3 build alike), not solver memory. The last
+column shows conventional F4 did not move between M31 and F3 (0.989–1.009). Verification:
+certification passed on every row (§15.5).
+
+### 15.3 Worker scaling and stages
+
+F3 cohort, adaptive ÷ conventional F4 at each worker count (n = 9; katsura-9 n = 31):
+
+| Row | 1 w | 4 w | 8 w | 16 w | ad 16 w ÷ 8 w (S-b) |
+|---|---:|---:|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 | 0.197 | 0.419 | 0.576 | 0.732 | **0.999** [0.994, 1.009] |
+| Katsura-11 / Goldilocks | 0.094 | 0.223 | 0.326 | 0.452 | **1.004** [0.993, 1.026] |
+| Katsura-11 / 2⁶⁴−353 | 0.099 | 0.228 | 0.332 | 0.457 | 1.004 [0.992, 1.033] |
+| MQ11 / Goldilocks | 0.123 | 0.233 | 0.325 | 0.460 | 0.927 [0.916, 0.934] (not counted) |
+| MQ10 / 32003 | 0.429 | 0.984 | 0.999 | 0.996 | 0.874 |
+| MQ10 / 2³¹−1 | 0.486 | 1.011 | 1.000 | 0.995 | 0.909 |
+| Cyclic-7 / Goldilocks | 0.989 | 1.000 | 0.998 | 1.001 | 1.070 |
+| Cyclic-7 / 2⁶⁴−353 | 1.003 | 1.002 | 1.000 | 0.999 | 1.073 |
+| noon-7 / Goldilocks | 0.482 | 0.598 | 0.624 | 0.547 | 1.031 |
+| noon-8 / 2⁶⁴−353 | 0.416 | 0.577 | 0.619 | 0.606 | 1.013 |
+| katsura-9 / 2⁶⁴−353 (warm) | 0.173 | — | — | 0.458 | 1.117 |
+| mq-random-10 / Goldilocks (held out) | 0.164 | 0.986 | 0.996 | 1.001 | 0.772 |
+| katsura-10 / GF(2³¹−1) (held out) | 0.211 | 0.990 | 1.001 | 0.999 | 0.970 |
+| eco-11 / GF(2³¹−1) (held out) | 0.314 | 0.617 | 0.730 | 0.790 | 1.065 |
+
+The signature engine forced (`sg`, `--claim` above one worker), F3 cohort, medians in ms. The
+entry arms and conventional F4 report no stage clocks in this harness:
+
+| Row | Arm | Wall | Symbolic | Elimination | Bookkeeping | Interreduction |
+|---|---|---:|---:|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 | F3 1 w | 2,568.0 | 457.8 | 1,329.8 | 233.2 | 278.6 |
+| | F3 4 w | 1,838.1 | 473.0 | 567.2 | 237.0 | 260.1 |
+| | F3 8 w | 1,739.3 | 499.2 | 427.8 | 253.3 | 268.5 |
+| | F3 16 w | 1,735.6 | 537.4 | 367.2 | 260.6 | 265.9 |
+| | M31 16 w | 1,753.3 | 551.1 | 369.2 | 260.3 | 263.7 |
+| Katsura-11 / Goldilocks | F3 1 w | 923.2 | 154.5 | 430.9 | 15.4 | 111.3 |
+| | F3 16 w | 617.3 | 183.4 | 76.5 | 17.7 | 113.3 |
+| MQ11 / Goldilocks | F3 1 w | 5,197.1 | 436.6 | 3,505.0 | 26.2 | 509.9 |
+| | F3 16 w | 2,144.3 | 510.9 | 342.0 | 29.8 | 506.1 |
+
+Past 8 workers nothing improves on Eco-12 or Katsura-11: elimination still falls (428 → 367 ms on
+Eco-12) but symbolic grows by about as much (499 → 537 ms), as at F0 (#953's attribution: about
+50 ms of CPU clock and 40 ms of cross-CCD cache locality, with zero extra symbolic work;
+[`m32-parallel-symbolic.md`](research/m32-parallel-symbolic.md) §5, restored on `main` by #959 in
+`dfd984c0`). #940's unmerged head did no better past 8 workers: Eco-12 1,440 → 1,418 ms
+([`research/m32-gate-s/README.md`](../research/m32-gate-s/README.md), at `592653ee`).
+
+### 15.4 Dispatch
+
+The rule merged in #950 (`f427e8d7`;
+[`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §2), unchanged at F3:
+
+| Condition, in order | Decision | Rows it takes |
+|---|---|---|
+| linear, fewer than 6 variables, or nonlinear degree spread > 1 (M31's rule) | conventional F4 (`Linear`, `Small`, `DegreeSpread`) | katsura-4 (`Small`); Cyclic-7 (`DegreeSpread`), at every count |
+| greatest degree 2, variables in `10..=10`, cap ≥ 4 workers | conventional F4 (`WorkerCrossover`) | MQ10 (both fields), **mq-random-10 / Goldilocks and katsura-10 / GF(2³¹−1)**, at 4, 8 and 16 w |
+| otherwise | signature engine; team min(cap, 8) below 10 variables, else the cap | Eco-12, Katsura-11, MQ11, eco-11 at every count; MQ10, mq-random-10 and katsura-10 at 1 w; noon-7, noon-8 and katsura-9 capped at 8 |
+
+Every route above is the one the F3 cohort recorded at 1/4/8/16 workers.
+
+**Every case that chose conventional F4, with its reason:**
+
+- **`Small`**: katsura-4, both fields, at every count. Adaptive ÷ conventional 1.010–1.013 under
+  warm calls: the feature pass on a 0.05 ms row (T5 passes).
+- **`DegreeSpread`**: Cyclic-7, both fields, at every count; 0.989–1.003. Forced, the signature
+  engine takes 670 ms at 16 w against conventional F4's 146 ms (4.6×), so this route is right.
+- **`WorkerCrossover`** at 4, 8 and 16 w:
+  - MQ10, both fields: 0.984–1.011 of conventional F4, 0.58–0.63 of M31 at 16 w. Right: forced,
+    the signature engine is 1.57× (32003) and 1.75× (2³¹−1) conventional F4 at 16 w.
+  - **mq-random-10 / Goldilocks (held out): wrong.** Forced, the signature engine is
+    **0.552** [0.551, 0.556] of conventional F4 at 16 w (507 against 918 ms). M31, which had no
+    band, sent it there; F3's adaptive path is 1.801× M31.
+  - **katsura-10 / GF(2³¹−1) (held out): wrong.** Forced, the signature engine is
+    **0.601** [0.595, 0.608] of conventional F4 at 16 w (146 against 242 ms); F3 is 1.661× M31.
+
+The `10..=10` band keys on degree 2 and ten variables, and both held-out rows match that shape.
+#927's leave-one-family-out clause had already found the band fitted to MQ10 alone (H4 falsified,
+§15.8.3). Gate Q read the held-out rows against conventional F4 only, where they pass T5 at
+1.001 and 0.999. Read against M31 and the forced engine, they are a 1.7–1.8× regression on the
+opt-in path. Filed as #978.
+
+**Dispatch cost (T9)**, F3 cohort, every adaptive child: max 5.0 µs; worst share of wall on rows
+≥ 50 ms 0.0011%.
+
+**Held out.** Read once by Gate Q and again here, as §10.1 allows. Adaptive ÷ conventional at
+1 / 16 w: mq-random-10 / Goldilocks 0.164 / 1.001 (Gate Q 0.171 / 1.002); katsura-10 / GF(2³¹−1)
+0.211 / 0.999 (Gate Q 0.207 / 1.001); eco-11 / GF(2³¹−1) 0.314 / 0.790 (Gate Q 0.313 / 0.794).
+
+### 15.5 Correctness and safety
+
+- **Digests (F3 cohort).** All 2,452 timed children (2,404 plus the 48 of the extension block) and the 16 certification children completed.
+  Each row has one basis digest across both builds, every arm (conventional, adaptive, signature
+  engine forced) and every worker count.
+- **Certification (F3 cohort).** `certify_f4_output_with_workers` at 16 w on the adaptive path's
+  output passed and completed on all 16 rows. Certification time, outside the solve: Eco-12
+  61.4 s, MQ11 67.5 s, Katsura-11 28.3 / 28.9 s, eco-11 7.4 s, mq-random-10 / Goldilocks 6.5 s,
+  MQ10 5.0 s, every other row ≤ 3.6 s.
+- **Independent references (Gate Q `check`, at `f8ec0b4c`, the same code as F3).** Under grevlex
+  every row's digest equals conventional F4's and groebner-rs's; Singular agrees on all five
+  narrow-field rows; the four M31 grobx-certified digests match. The `grobner::external` coverage
+  assertion ran with `ZEEBRA_REQUIRE_MSOLVE=1`: 343/343
+  ([`m32-qualification.md`](research/m32-qualification.md) §5). **F3 cohort comparands:** every grobx raw and grobx certified basis on the wide rows equals Zeebra's digest, and so does every groebner-rs basis once its term spacing is normalized (`tables.md` compares the raw text, so it shows "text differs"; the normalized check is in the evidence README). MQ10's msolve, groebner-rs, grobx and Zeebra-driver answers were verified by comparand-scaling against #739's references.
+- **Graded-lex (Gate Q).** The signature route exceeds 8 GiB or stalls on katsura-9, Katsura-11,
+  MQ11, mq-random-10, katsura-10 and Eco-12, all of which conventional F4 solves (#961, High).
+  Every graded-lex child that completed agreed with the references.
+- **Budgets and behaviour (Gate Q).** Wall, certification, matrix, basis-size and the size-limit
+  fallback stop typed. **The live-byte budget is not charged at one worker (#962).** Thread
+  high-water never exceeded the cap on the signature route; on conventional-F4 routes 16 children
+  read one over (`m32-qualification.md` §5). Determinism across 1/2/4/8/16 workers and typed
+  cancellation are covered by `graded_engine_tests`. No adverse-schedule failure was observed.
+
+### 15.6 Success criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Min 1. Baseline | **met** | #939: M31's ratios reproduce within 1.6% (worst MQ10 / 32003, 1.609 against 1.583); component split; §6.3 re-derived; #934 and #935 closed ([`m32-baseline.md`](research/m32-baseline.md)) |
+| Min 2. Parallel symbolic investigated | **met** | #933: one design, correctness argument, replay ceiling S16 = 2.95, Gate P passed. The attribution is #953's (§15.3) |
+| Min 3. MQ10 | **met** | #927: Gate R passed at revision 1. MQ10 is routed, with the caveats in §15.8.3 |
+| Min 4. Safety of anything adopted | **met**, with two documented gaps in the opt-in option | §15.5: grevlex correct and certified everywhere; #961 and #962 filed |
+| Min 5. Decision | **met** | #937 (closed): keep the option opt-in, no default flip in M32; a grevlex-only default may be proposed later, after #961, #962 and #958 |
+| Min 6. Report | **met** | this section |
+| T1. Eco-12 symbolic, M31 ÷ final ≥ 1.5× | **missed** | 1.025 [1.024, 1.030] (F3 cohort). #940 read 2.630 and 2.621 on its unmerged heads |
+| T2. Eco-12 wall ≤ 0.90× M31 | **missed** | 0.992 [0.984, 1.002] (F3 cohort). #940 read 0.819 and 0.824 unmerged |
+| T3. MQ10 ≤ 1.05 at 1/4/8/16 w | **met** | worst upper 1.026 (2³¹−1, 4 w); all eight cells 0.429–1.011 (F3 cohort). Gate R and Gate Q agree |
+| T4. Gains preserved | **missed** (absolute Eco-12 bound) | ad ÷ F4 at 16 w: Katsura-11 0.452 / 0.457, MQ11 0.460 (≤ 0.50, met); **Eco-12 0.732** against 0.70 (missed: S1 did not land; Gate Q read 0.733). ad ÷ M31 on every signature-routed dev row, upper ≤ 1.03: met, worst upper 1.022 (MQ11, 1.010 [1.004, 1.022]). katsura-9: **0.979** [0.978, 0.980] under one protocol (Gate Q read 1.036 across protocols; §15.8.4) |
+| T5. No regressions vs conventional (dev controls and held out, 1 and 16 w) | **met** | worst upper 1.025 (Cyclic-7 / 2⁶⁴−353, 1 w); katsura-4 1.010–1.013; held out ≤ 1.009 (F3 cohort). Against M31 the held-out band rows regress 1.66–1.80× (§15.4), which T5 does not test |
+| T6. Memory | **met** | peak RSS ad ÷ F4 worst 1.107 (MQ10 / 2³¹−1, 1 w), ≤ 1.25 everywhere; ad ÷ M31 on signature-routed rows worst 1.034 (noon-7), ≤ 1.10 (F3 cohort) |
+| T7. Correctness | **missed** under graded-lex; met under grevlex | §15.5; #961 |
+| T8. Resource and behaviour | **missed** | one-worker live budget (#962); graded-lex memory (#961) |
+| T9. Dispatch cost | **met** | max 5.0 µs, worst share 0.0011% (F3 cohort); Gate Q 6.9 µs |
+| T10. Qualified | **missed** | Gate Q failed T4, T7 and T8 (#941, `041a21ef`); #937 recorded the policy |
+| S-a. Eco-12 vs grobx raw | **missed** | Zeebra 16 w vs grobx 1 w (best supported configuration), same session: **1.060** [1.051, 1.073] against median ≤ 0.90, upper ≤ 0.95. Equal workers 1.562. grobx raw is randomized and uncertified (§15.7) | |
+| S-b. 16 w ÷ 8 w ≤ 0.90 | **missed** | Eco-12 0.999 [0.994, 1.009], Katsura-11 1.004 [0.993, 1.026] (F3 cohort) |
+| S-c. Default for graded orders | **missed** | #937: kept opt-in |
+| S-d. Reduced outgrowth | **not attempted** | Gate G failed (§15.8.1) |
+
+**Precision.** Two T4 cells missed §10.3's half-width rule (≤ 1.5% for a 1.03 bound) at n = 9:
+Katsura-11 / 2⁶⁴−353 and noon-8. They took the one predeclared n = 12 extension block (`en:16`
+and `men:16` only) and are read once at n = 21: Katsura-11 / 2⁶⁴−353 0.993 [0.983, 1.000] and noon-8 0.993 [0.980, 1.003], both inside the rule and both met. The n = 9 reads were 0.983 [0.964, 1.021] and 0.979 [0.951, 0.992].
+
+### 15.7 Competitive gap
+
+F3 cohort, process wall, ms, median [95%] of n = 9. Zeebra ÷ comparand is median ÷ median with
+each side resampled independently. "Best configuration" divides Zeebra's adaptive path at 16 w by
+the comparand at its best supported or best measured worker count; "equal workers" divides the
+adaptive path at the comparand's own count. Every comparand answer agrees with Zeebra's (§15.5).
+
+**Wide rows** (grobx's and the wide controller's groebner-rs adapters run one worker; #935's
+groebner-rs driver at 8 w):
+
+| Row | Comparand (mode, workers) | Comparand | Zeebra 16 w ÷ it (best config) | Zeebra equal-worker ÷ it |
+|---|---|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 | grobx raw randomized, 1 w | 1,640.3 | 1.060 [1.051, 1.073] | 1.562 [1.539, 1.575] |
+| | groebner-rs, 8 w | 891.9 | 1.950 [1.936, 1.970] | 1.950 [1.937, 1.976] |
+| | groebner-rs, 1 w | 2,972.0 | 0.585 | 0.862 [0.853, 0.875] |
+| | grobx certified, 1 w | 285,314.5 | 0.006 | 0.009 |
+| Katsura-11 / 2⁶⁴−353 | grobx raw randomized, 1 w | 557.6 | 1.102 [1.086, 1.119] | 1.642 [1.610, 1.661] |
+| | groebner-rs, 8 w | 592.3 | 1.038 [1.025, 1.051] | 1.039 [1.018, 1.050] |
+| | groebner-rs, 1 w | 2,201.6 | 0.279 | 0.416 [0.413, 0.423] |
+| | grobx certified, 1 w | 80,917.4 | 0.008 | 0.011 |
+| MQ11 / Goldilocks | grobx raw randomized, 1 w | 2,943.6 | **0.733** [0.718, 0.741] | 1.758 [1.721, 1.775] |
+| | groebner-rs, 8 w | 2,111.6 | 1.022 [1.011, 1.038] | 1.103 [1.096, 1.116] |
+| | groebner-rs, 1 w | 9,022.6 | 0.239 | 0.574 [0.570, 0.578] |
+| | grobx certified, 1 w | 462,824.2 | 0.005 | 0.011 |
+| Cyclic-7 / 2⁶⁴−353 | grobx raw randomized, 1 w | 121.8 | 1.192 [1.137, 1.254] | 2.311 [2.209, 2.432] |
+| | groebner-rs, 8 w | 69.1 | 2.103 [2.073, 2.123] | 1.958 [1.951, 1.971] |
+| | groebner-rs, 1 w | 176.8 | 0.821 | 1.592 [1.550, 1.624] |
+| | grobx certified, 1 w | 3,105.0 | 0.047 | 0.091 |
+
+**MQ10** (comparand-scaling at 1/4/8/16 w; best configuration per comparand):
+
+| Row | Comparand (mode, best workers) | Comparand | Zeebra 16 w ÷ it | Zeebra equal-worker ÷ it |
+|---|---|---:|---:|---:|
+| MQ10 / 32003 | msolve exact, 8 w | 116.4 | 2.056 [2.030, 2.095] | 2.356 [2.321, 2.402] |
+| | groebner-rs, 4 w | 86.5 | 2.766 [2.718, 2.843] | 4.464 [4.380, 4.606] |
+| | grobx raw randomized, 1 w (refuses more) | 339.7 | 0.705 [0.690, 0.722] | 1.375 [1.347, 1.413] |
+| MQ10 / 2³¹−1 | msolve exact, 4 w | 160.9 | 1.407 [1.321, 1.426] | 2.139 [1.995, 2.189] |
+| | groebner-rs, 8 w | 97.3 | 2.326 [2.285, 2.380] | 2.564 [2.521, 2.631] |
+| | grobx raw randomized, 1 w (refuses more) | 158.4 | 1.428 [1.404, 1.447] | 2.907 [2.857, 2.936] |
+
+msolve's own worker curve is irregular in this window (MQ10 / 2³¹−1 at 8 w read 465.6 ms, against
+160.9 at 4 w and 211.8 at 16 w); every cell is in
+[`tables.md`](../research/m32-final/tables.md). The controller's Zeebra driver, conventional F4,
+read 238.4 and 224.9 ms at 16 w, within 1% of this cohort's harness (240.6 and 226.0).
+
+**The guarantee difference.** grobx raw is randomized and uncertified; its row is a speed
+reference, not an equal-guarantee one. Zeebra is deterministic, and certifying its output costs
+61.4 s on Eco-12, 28.9 s on Katsura-11 and 67.5 s on MQ11 at 16 w, outside the solve (§15.5). On
+equal guarantees, Zeebra's solve plus certification (63.1 s on Eco-12) is about 4.5× faster than
+grobx certified (285.3 s). groebner-rs and msolve are deterministic and are checked against their
+own reduced bases by their controllers.
+
+**What remains, by stage.** On Eco-12 at 16 w the signature engine spends 537 ms in symbolic
+preprocessing, 367 ms in elimination, 261 ms in bookkeeping and 266 ms in interreduction, 1,431 ms
+of a 1,740 ms process wall. The other 309 ms are outside these four clocks: input, setup, and the harness's render and exit (§15.2's process wall
+includes it). groebner-rs at 8 w finishes the whole process
+in 892 ms. Even with symbolic preprocessing free, Eco-12 would sit near 1,200 ms, so closing the
+gap needs work outside M32's scope. That work is M33's (#965, #970).
+
+### 15.8 Negative, inconclusive and stopped results
+
+#### 15.8.1 Gate G fails; H5 falsified (#936, `3d46b15f`)
+
+Every sound option projects at most **3.1%** of Eco-12's 16-worker wall: query-first Koszul
+insertion about 19 ms, plus incremental essential tracking about 35 ms, of 1,744 ms. The bar is
+5%. Roune–Stillman's lazy Koszul queue is bounded at 6.8%, but only if 95,207 lost eliminations
+cost nothing, which is unproven for this engine. Cyclic-7 cannot reach conventional F4 this way.
+With bookkeeping and interreduction both at zero it would still take 0.279 s, **1.92×**
+conventional F4's 0.145 s. #936 closed completed with this result. The MQ10 side finding is #946
+([`m32-signature-basis-growth.md`](research/m32-signature-basis-growth.md) §0, §6).
+
+#### 15.8.2 Gate S fails twice (#940)
+
+| Read | Head | T1 symbolic | T2 wall | Cells missed (upper > 1.05) | Peak RSS max |
+|---|---|---|---|---|---|
+| First | `592653ee` | 2.630 [2.585, 2.649] met | 0.819 [0.813, 0.824] met | Katsura-11 / Goldilocks 1 w 1.044 [1.020, 1.068]; MQ11 / Goldilocks 1 w 1.037 [1.033, 1.054]; noon-7 / Goldilocks 16 w 1.055 [1.040, 1.071] | 1.085 |
+| Re-read after the owner's fix pass | `62cbe4de` | 2.621 [2.602, 2.652] met | 0.824 [0.812, 0.831] met | **noon-7 / Goldilocks 16 w 1.057 [1.041, 1.082]** | 1.094 |
+
+Both reads are against `ce67df76`
+([`research/m32-gate-s/tables.md`](../research/m32-gate-s/tables.md),
+[`s2/tables.md`](../research/m32-gate-s/s2/tables.md)). The re-read session was **stopped**
+before its `small` and `curve` suites, because the missed cell already decided the gate. The
+1-worker gap in the first read was code placement: with 64-byte function alignment on both builds,
+a diagnostic, head ÷ base was 0.997–0.999. #940 is closed with no `src/` merged. Its code is on the
+tags `measured/940-gate-s` and `measured/940-gate-s2`.
+
+#### 15.8.3 Gate R's first read fails; H4 falsified (#927)
+
+- **First read** (`8544cf24` against `c1d93389`). katsura-9 against the M31 entry point at 8 w read
+  **1.029 [1.028, 1.030]**, upper 1.0300 against 1.03. The team cap was 4 against M31's 8.
+  **T9 failed**: dispatch took a median 93 µs and a max 118 µs from 4 workers up, a cgroup CPU
+  count read inside the clock. The katsura-9 medians were recomputed from `small.jsonl.gz` and match.
+- **Revision 1** (`588d2a44`) passed. **Caveat:** it re-read only the cells the revision can move:
+  katsura-9 at 1/4/8/16 w, noon-7 and noon-8 at 8 and 16 w, and T9 dispatch cost on every dev row.
+  Every other Gate R cell is carried over from the first read, at `8544cf24`.
+- **H4 is falsified on its validation clause.** In leave-one-family-out validation, the MQ fold
+  fits no band and misroutes MQ10 at 4, 8 and 16 w by **1.10–1.75×** (M31 figures), over the 5%
+  bound. The `10..=10` band is fitted to MQ10 alone. No cheap feature separates MQ10: its density
+  is 0.157, against katsura-9's 0.164
+  ([`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §2).
+
+#### 15.8.4 katsura-9: Gate Q's T4 fail is a protocol confound (#958)
+
+Gate Q's T4 cell, katsura-9 / 2⁶⁴−353 at 16 w, read ad ÷ m31 **1.036 [1.034, 1.040]** against
+1.03, and #941's diagnostic read F2 entry ÷ M31 entry at 1.029 [1.021, 1.034] (1 w) and
+1.024 [1.020, 1.027] (16 w) ([`m32-qualification.md`](research/m32-qualification.md) §2). Every
+head-side arm there ran `--repeat 21` and every M31 arm `--calls 20`.
+
+#958 (PR #976, `9c24a24f`; [`research/m32-katsura9-gap/`](../research/m32-katsura9-gap/README.md))
+timed four libraries through one shared harness, n = 21. **Under one protocol (`--calls 20`), F2 ÷
+the true M31 `8715c8ed` is 0.997 [0.984, 1.001] at 1 w and 0.985 [0.983, 0.986] at 16 w.** On the
+same F2 binary, `--repeat 21` ÷ `--calls 20` is 1.054 / 1.058: `--repeat` frees every basis between
+calls, glibc trims the heap top back to the kernel, and the next call faults it in again. With
+trimming disabled the penalty mostly goes away. #947's and #948's refactor costs nothing
+(`ce67df76` ÷ `8715c8ed` 0.998 / 0.996), and harness text placement moves the row 0.997–1.001.
+
+**Both reads stand side by side.** Gate Q's recorded verdict is unchanged: T4 failed at Gate Q,
+with this confound named. Read under one protocol, the library is level with M31 on this row. One
+gap is not explained: #958's session read the cross-protocol pairing at 1.050–1.060, against
+#941's 1.024–1.029. Direction and cause agree; the size difference does not.
+
+This is why the F3 cohort (§15.0) builds `8715c8ed` itself and runs every Zeebra arm through one
+harness with one protocol per suite.
+
+#### 15.8.5 Load during the reads
+
+- **#927.** Another session ran a 32-thread memory-heavy job on CPUs 24–55 from about 13:40 to
+  14:57 local on 2026-11-19. That is outside the reserved CCDs but shares package clock and DRAM
+  bandwidth. All 432 `fav` children (load 16.9–20.0) and `small` repetitions 27–30 (up to 20.3)
+  ran inside it. #927 records that no verdict depends on those windows
+  ([`m32-adaptive-dispatch.md`](research/m32-adaptive-dispatch.md) §3.3).
+- **#939.** Its `ab` session (14:20–14:25 local) ran inside the same window at load 18.5–19.8. The
+  `rs` sweep (#935) started at 14:57 at load 17.47 (`benchlock.log`). Its children ran at load
+  5.0–30.5, median 18.0. Whether the same job caused this is not recorded.
+- **#939's header understates the load.** It says per-child `load_start` was 1–18. The records
+  show `walls` at 0.5–41.2, with 15 of 2,340 children above 18, at about 10:36 local. The
+  ratios are paired and interleaved, but those absolute walls are not quiet-box figures.
+  (Recomputed from `walls.jsonl.gz` and `rs.jsonl.gz`.)
+
+- **F3 cohort (#942).** Three sessions on 2026-11-20, 15:51–22:17 local, inside the CCD 1–2
+  reservation; no compiler ran in any cpu-context snapshot. Load at child start: `dev` 0.7–5.3,
+  median 1.7 (34 of 1,326 children above 4, at most 5.3, spread across repetitions 0–10; the
+  one-minute average still counts the cohort's own previous 16-worker child); `small`
+  0.5–2.6; `held` 0.8–3.5. `certify` read 1.1–14.0, median 10.2: those children follow 16-worker
+  certifications, and its one figure per row is not a timing verdict. Comparand suites started
+  at load 1.1–2.7 (`session.log`). Per-suite tables are `tables.md` §7.
+
+#### 15.8.6 The unfused symbolic loop: confirmed on a quiet box (#939, #964)
+
+In #939's split build, multiplying each row into a buffer and then interning it ran faster than the
+shipping fused loop on two rows and slower on a third. #964 re-ran the identical suite from fresh
+builds of `45107ec3` at load 1.4–3.4 (PR #976, `9c24a24f`;
+[`research/m32-katsura9-gap/README.md`](../research/m32-katsura9-gap/README.md) §#964). Symbolic
+stage, unfused ÷ shipping, n = 5:
+
+| Row | Workers | #939 (load 18.5–19.8) | #964 (quiet) |
+|---|---:|---:|---:|
+| Eco-12 / 2⁶⁴−353 | 1 | 0.601 [0.595, 0.617] | 0.612 [0.606, 0.633] |
+| | 16 | 0.655 [0.647, 0.677] | 0.675 [0.667, 0.680] |
+| Katsura-11 / Goldilocks | 1 | 1.156 [1.092, 1.159] | 1.143 [1.077, 1.172] |
+| | 16 | 1.082 [1.069, 1.161] | 1.154 [1.081, 1.420] |
+| MQ10 / 32003 | 1 | 0.643 [0.638, 0.694] | 0.656 [0.649, 0.729] |
+| | 16 | 0.686 [0.665, 0.742] | 0.698 [0.680, 0.760] |
+
+**The lead survives.** Every cell keeps its direction and stays within about 0.02 of the loaded
+read, except Katsura-11 at 16 w, whose interval is wide in both. It is row-dependent and still
+unexplained. It is M33's to pursue (#970), not M32 work.
+
+#### 15.8.7 Other negative and stopped results
+
+- **The `WorkerCrossover` band misroutes two held-out rows (#978, High).** mq-random-10 /
+  Goldilocks and katsura-10 / GF(2³¹−1) go to conventional F4 at 4–16 workers, where the signature
+  engine is 0.55–0.60× faster; the adaptive path reads 1.80× and 1.66× M31 at 16 w (§15.4).
+- **H3 is falsified** (#933, `8694d172`). Reducer search is 2.3–2.6% of the Eco-12 closure and
+  5.6–6.0% of MQ10's, against H3's 30%. #939's split build puts it at 1–13% of the stage.
+  Interning is 52–86%.
+- **Held-out rows dropped by the admission rule and not replaced** (#939): mq-random-12 /
+  2⁶⁴−353 (conventional F4-16 took 104.6 s, over 60 s), mq-random-9 / GF(32003) (3.1 ms; an
+  inconsistent system) and cyclic-6 / Goldilocks (7.6 ms). The held-out set has no dense MQ
+  beyond the crossover.
+- **Gate Q fails T4, T7 and T8** (#941, `041a21ef`). The threshold re-check failed T4 on
+  katsura-9; under #941's rule the re-fit was not used and the thresholds stand. The held-out set
+  passed. #937 keeps the option opt-in.
+- **Refusals and timeouts at F3.** None in the Zeebra suites: every one of the 2,468 children
+  completed inside its 180 s and 8 GiB budgets. Comparands: grobx refused all 54 MQ10 cells above one worker (`unsupported`, as in M31); every other comparand cell completed or verified (msolve, groebner-rs and the Zeebra driver 72 of 72 each, grobx 18 of 18 at one worker, grobx certified 36 of 36). Two attempts were refused before timing and re-run in session 3: the first `rs` sweep (the wide controller needs `ZEEBRA_MACHINE`, which `run.sh` did not then set) and passes 5–9 of the first `wide` suite (the controller refuses a dirty tree, and a tracked edit landed mid-suite). Both refusals are in `session.log`; `benchlock.log` records the second as `status=2`.
+
+### 15.9 Dispositions and follow-ups
+
+| Issue | Outcome |
+|---|---|
+| #939 M32-0 | closed: baseline, pin and model ([`m32-baseline.md`](research/m32-baseline.md)) |
+| #934 small controls | closed: in-process warm-call method, half-width ≤ 0.70% on katsura-4 |
+| #935 comparand workers | closed: groebner-rs best at 8 workers (§15.7) |
+| #933 S1a | closed: Gate P passed |
+| #940 S1b | closed: Gate S failed twice; nothing merged |
+| #936 S3 | closed: Gate G failed; H5 falsified |
+| #927 S2 | closed: Gate R passed at revision 1, merged as `f427e8d7` (#950); H4 falsified |
+| #941 Q | closed: Gate Q failed T4, T7 and T8; the opt-in option merged as `041a21ef` (#957) |
+| #937 decision | closed: keep the option opt-in; no default flip in M32 |
+| #958 katsura-9 gap | closed: a protocol confound, not the library (PR #976, `9c24a24f`) |
+| #959 attribution text | closed: restored on `main` (`dfd984c0`) |
+| #964 unfused A/B re-read | closed: the lead survives a quiet box (PR #976) |
+| #942 M32-I | this report |
+
+**Open follow-ups on Project #7, linked to #938:**
+
+- #961: graded-lex signature route exhausts memory (filed High by #941; the board reads Medium at
+  this writing; also labelled M33)
+- #962: the serial cascade does not charge `max_live_bytes` (filed Medium by #941; the board reads
+  High at this writing; also labelled M33)
+- #978: the `WorkerCrossover` band misroutes 10-variable held-out rows (High; filed by this report)
+- #946: MQ10 tail after the last essential element (`opportunity`, Low)
+
+The unfused multiply/intern lead (§15.8.6) and the one-worker gap to grobx are M33's (#970).
+#938 stays open while #961, #962 and #978 are open.
