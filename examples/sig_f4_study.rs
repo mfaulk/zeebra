@@ -654,6 +654,7 @@ fn split(log: &zeebra::grobner::sigf4::SplitLog) -> Json {
         ("inputs_ns", Json::nanos(log.inputs)),
         ("materialize_ns", Json::nanos(log.materialize)),
         ("drop_ns", Json::nanos(log.drop)),
+        ("minimal_selection_ns", Json::nanos(log.minimal_selection)),
         ("redundant_elements", Json::size(log.redundant_elements)),
         (
             "products_on_redundant_elements",

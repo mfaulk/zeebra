@@ -455,7 +455,8 @@ fn test_symbolic_split_covers_every_batch() {
 }
 
 /// #970's ledger: every element-adding row's products land on a kept or a redundant element,
-/// redundant elements are those the reduced basis drops, and each batch counts its entries.
+/// redundant elements are those the reduced basis drops, each batch counts its entries, and the
+/// minimal selection before interreduction is clocked.
 #[cfg(feature = "research-sigf4-split")]
 #[test]
 fn test_element_ledger_splits_products_into_kept_and_redundant() {
@@ -479,6 +480,7 @@ fn test_element_ledger_splits_products_into_kept_and_redundant() {
         for b in &log.batches {
             assert!(b.entries >= (b.targets + b.reducers) as u64);
         }
+        assert!(log.minimal_selection > std::time::Duration::ZERO);
     }
 }
 

@@ -294,6 +294,8 @@ pub struct SplitLog {
     /// reduced basis drops (a lead another element also has, or one a smaller lead divides) and
     /// the products their rows cost, beside those of the elements it keeps.
     pub element_products: Vec<u64>,
+    /// Interreduction's minimal-basis selection alone, timed on a copy outside its stage clock.
+    pub minimal_selection: Duration,
     pub redundant_elements: usize,
     pub products_on_redundant_elements: u64,
     pub products_on_kept_elements: u64,

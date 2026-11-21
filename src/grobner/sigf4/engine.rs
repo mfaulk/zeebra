@@ -203,16 +203,19 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         + engine.stats.peak_pending * size_of::<Pending<N>>()
         + engine.reducers.len() * (size_of::<Monomial<N>>() + 8);
     #[cfg(feature = "research-sigf4-split")]
-    let leads: Vec<Monomial<N>> = engine.basis.iter().map(|e| e.lead).collect();
-    #[cfg(feature = "research-sigf4-split")]
-    let drop_clock = {
+    let (leads, drop_clock) = {
         engine.stats.split.materialize = materialize_clock.elapsed();
-        Instant::now()
+        let leads: Vec<Monomial<N>> = engine.basis.iter().map(|e| e.lead).collect();
+        (leads, Instant::now())
     };
     drop(engine);
     #[cfg(feature = "research-sigf4-split")]
     {
         stats.split.drop = drop_clock.elapsed();
+        let copy = basis.clone();
+        let clock = Instant::now();
+        let _ = minimal_basis_for_interreduction(copy, order);
+        stats.split.minimal_selection = clock.elapsed();
     }
 
     let interreduction = Instant::now();
