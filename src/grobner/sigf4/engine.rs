@@ -14,6 +14,7 @@ use std::{
 use super::{
     claim::{Claim, Kind, Stop},
     signature::{divides, mask, Signature, SyzygySource, SyzygyStore},
+    table::{hash, MonomialTable},
     SigF4Error, SigF4Options, SigF4Statistics,
 };
 use crate::{
@@ -29,7 +30,7 @@ use crate::{
             F4Error, F4Options,
         },
     },
-    poly::{MonomialMap, MonomialOrder},
+    poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
@@ -42,11 +43,13 @@ pub(super) const NONE: u32 = u32::MAX;
 /// A row after reduction: its remaining entries in column order, and the products spent.
 pub(super) type Reduced<F> = (Vec<(u32, F)>, u64);
 
-/// A signed basis element: `(s(α), ᾱ)` with `ᾱ` monic, terms in descending order.
+/// A signed basis element: `(s(α), ᾱ)` with `ᾱ` monic, terms in descending order, and each
+/// term's additive hash.
 struct Element<const N: usize, F> {
     sig: Signature<N>,
     lead: Monomial<N>,
     terms: Vec<(Monomial<N>, F)>,
+    hashes: Vec<u64>,
 }
 
 /// What a pending signature reduces: an input, or `mult·element` (the pair's larger half), where
@@ -81,6 +84,7 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     order: MonomialOrder,
     options: &'a SigF4Options,
     inputs: Vec<Vec<(Monomial<N>, F)>>,
+    input_hashes: Vec<Vec<u64>>,
     basis: Vec<Element<N, F>>,
     /// `mask(lead)` per basis element, apart from the elements so the reducer scan reads eight
     /// bytes per element.
@@ -90,8 +94,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     syzygies: SyzygyStore<N>,
     queue: BTreeMap<u64, Vec<Pending<N>>>,
     pending: usize,
-    /// Least-ratio basis element whose lead divides the key, and how much of the basis was scanned.
-    reducers: MonomialMap<N, (u32, u32)>,
+    /// Every column monomial of the run, with its least-ratio reducer search cached.
+    table: MonomialTable<N>,
     wall: Option<(Instant, Duration)>,
     stats: &'a mut SigF4Statistics,
     #[cfg(feature = "research-sigf4-usage")]
@@ -129,8 +133,12 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         lead_masks: Vec::new(),
         queue: BTreeMap::new(),
         pending: 0,
-        reducers: MonomialMap::default(),
+        table: MonomialTable::default(),
         wall: options.max_wall_time.map(|budget| (started, budget)),
+        input_hashes: inputs
+            .iter()
+            .map(|terms| terms.iter().map(|(m, _)| hash(m)).collect())
+            .collect(),
         inputs,
         stats,
         #[cfg(feature = "research-sigf4-usage")]
@@ -201,7 +209,12 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         * (size_of::<Signature<N>>() + 2 * size_of::<u64>())
         + engine.syzygies.len() * (size_of::<Monomial<N>>() + size_of::<u64>() + 1)
         + engine.stats.peak_pending * size_of::<Pending<N>>()
-        + engine.reducers.len() * (size_of::<Monomial<N>>() + 8);
+        + engine.table.bytes()
+        + engine
+            .basis
+            .iter()
+            .map(|e| e.hashes.len() * size_of::<u64>())
+            .sum::<usize>();
     #[cfg(feature = "research-sigf4-split")]
     let (leads, drop_clock) = {
         engine.stats.split.materialize = materialize_clock.elapsed();
@@ -424,14 +437,15 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         best
     }
 
-    /// The least-signature reducer multiple for column monomial `m`, i.e. the least-ratio element
-    /// whose lead divides `m`. Cached per monomial; only elements added since are rescanned.
-    fn reducer(&mut self, m: &Monomial<N>) -> u32 {
-        let cached = self.reducers.get(m).copied();
-        let (best, total) = least_ratio(&self.basis, &self.lead_masks, self.order, m, cached);
-        let scanned = cached.map_or(0, |(_, scanned)| scanned);
+    /// The least-signature reducer multiple for column `id`, i.e. the least-ratio element whose
+    /// lead divides its monomial. Cached per monomial; only elements added since are rescanned.
+    fn reducer(&mut self, id: u32) -> u32 {
+        let cached = self.table.reducer(id);
+        let m = self.table.mono(id);
+        let (best, total) = least_ratio(&self.basis, &self.lead_masks, self.order, m, Some(cached));
+        let scanned = cached.1;
         if scanned < total {
-            self.reducers.insert(*m, (best, total));
+            self.table.set_reducer(id, (best, total));
         }
         #[cfg(feature = "research-sigf4-usage")]
         self.usage
@@ -587,7 +601,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         targets: &[Row<N>],
     ) -> Result<(Vec<Monomial<N>>, Vec<Row<N>>, Vec<Vec<u32>>, usize), SigF4Error> {
         #[cfg(feature = "research-sigf4-replay")]
-        let before = symbolic_replay::active().then(|| self.reducers.clone());
+        let before = symbolic_replay::active().then(|| self.table.reducer_map());
         #[cfg(feature = "research-sigf4-split")]
         let (mut split, mut scratch) = {
             let (cpu, khz_before) = super::SymbolicSplit::cpu_khz();
@@ -599,42 +613,46 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             (split, Vec::new())
         };
         let clock = Instant::now();
-        let mut seen: MonomialMap<N, u32> = MonomialMap::default();
-        let mut work: Vec<Monomial<N>> = Vec::new();
+        self.table.begin_batch();
+        // Table ids in first-occurrence order: a term's handle indexes this until the sort.
+        let mut work: Vec<u32> = Vec::new();
         let mut rows: Vec<Row<N>> = Vec::with_capacity(targets.len());
         let mut handles: Vec<Vec<u32>> = Vec::with_capacity(targets.len());
-        let mut intern = |m: Monomial<N>, work: &mut Vec<Monomial<N>>| -> u32 {
-            *seen.entry(m).or_insert_with(|| {
-                work.push(m);
-                (work.len() - 1) as u32
-            })
-        };
         for t in targets {
             rows.push(Row {
                 sig: t.sig,
                 mult: t.mult,
                 source: t.source,
             });
-            let terms = match t.source {
-                RowSource::Input(i) => &self.inputs[i],
-                RowSource::Element(id) => &self.basis[id as usize].terms,
+            let (terms, hashes) = match t.source {
+                RowSource::Input(i) => (&self.inputs[i], &self.input_hashes[i]),
+                RowSource::Element(id) => {
+                    let e = &self.basis[id as usize];
+                    (&e.terms, &e.hashes)
+                }
             };
+            let hm = hash(&t.mult);
             #[cfg(not(feature = "research-sigf4-split"))]
             handles.push(
                 terms
                     .iter()
-                    .map(|(m, _)| intern(*m * t.mult, &mut work))
+                    .zip(hashes)
+                    .map(|((m, _), &h)| {
+                        self.table
+                            .intern(*m * t.mult, h.wrapping_add(hm), &mut work)
+                    })
                     .collect(),
             );
             #[cfg(feature = "research-sigf4-split")]
             {
                 let mut row = Vec::with_capacity(terms.len());
-                let products = terms.iter().map(|(m, _)| *m);
+                let products = terms.iter().map(|(m, _)| *m).zip(hashes.iter().copied());
+                let table = &mut self.table;
                 split.row(
                     &mut scratch,
                     products,
-                    t.mult,
-                    |m| intern(m, &mut work),
+                    (t.mult, hm),
+                    |m, h| table.intern(m, h, &mut work),
                     &mut row,
                 );
                 handles.push(row);
@@ -643,12 +661,12 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let mut reducers = 0;
         let mut next = 0;
         while next < work.len() {
-            let m = work[next];
+            let column = work[next];
             let lead = next as u32;
             next += 1;
             #[cfg(feature = "research-sigf4-split")]
             let search = Instant::now();
-            let id = self.reducer(&m);
+            let id = self.reducer(column);
             #[cfg(feature = "research-sigf4-split")]
             {
                 split.reducer_search += search.elapsed();
@@ -658,22 +676,35 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 continue;
             }
             let e = &self.basis[id as usize];
-            let mult = m.checked_div(&e.lead).expect("the lead divides the column");
+            let mult = self
+                .table
+                .mono(column)
+                .checked_div(&e.lead)
+                .expect("the lead divides the column");
+            // Additive: h(mult) = h(column) - h(lead).
+            let hm = self.table.hash_of(column).wrapping_sub(e.hashes[0]);
             let sig = e.sig.times(&mult);
             let mut row = Vec::with_capacity(e.terms.len());
             row.push(lead);
             #[cfg(not(feature = "research-sigf4-split"))]
-            for (tm, _) in &e.terms[1..] {
-                row.push(intern(*tm * mult, &mut work));
+            for ((tm, _), &th) in e.terms[1..].iter().zip(&e.hashes[1..]) {
+                row.push(
+                    self.table
+                        .intern(*tm * mult, th.wrapping_add(hm), &mut work),
+                );
             }
             #[cfg(feature = "research-sigf4-split")]
             {
-                let products = e.terms[1..].iter().map(|(m, _)| *m);
+                let products = e.terms[1..]
+                    .iter()
+                    .map(|(m, _)| *m)
+                    .zip(e.hashes[1..].iter().copied());
+                let table = &mut self.table;
                 split.row(
                     &mut scratch,
                     products,
-                    mult,
-                    |m| intern(m, &mut work),
+                    (mult, hm),
+                    |m, h| table.intern(m, h, &mut work),
                     &mut row,
                 );
             }
@@ -688,6 +719,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         #[cfg(feature = "research-sigf4-split")]
         let sort = Instant::now();
         let order = self.order;
+        let work: Vec<Monomial<N>> = work.iter().map(|&id| *self.table.mono(id)).collect();
         let mut by_position: Vec<u32> = (0..work.len() as u32).collect();
         by_position.sort_unstable_by(|&a, &b| order.cmp(&work[b as usize], &work[a as usize]));
         let mut position = vec![0u32; work.len()];
@@ -722,7 +754,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 lead_masks: &self.lead_masks,
                 inputs: &self.inputs,
             };
-            let serial = (&columns[..], &rows[..], &handles[..], &self.reducers);
+            let cache = self.table.reducer_map();
+            let serial = (&columns[..], &rows[..], &handles[..], &cache);
             symbolic_replay::replay(view, targets, &before, serial, clock.elapsed());
         }
         if rows.len() > self.options.max_matrix_rows {
@@ -1130,7 +1163,15 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         self.by_index[sig.index as usize].push((mask(&sig.mono), id));
         self.lead_masks.push(mask(&lead));
-        self.basis.push(Element { sig, lead, terms });
+        let hashing = Instant::now();
+        let hashes = terms.iter().map(|(m, _)| hash(m)).collect();
+        self.stats.element_hashing += hashing.elapsed();
+        self.basis.push(Element {
+            sig,
+            lead,
+            terms,
+            hashes,
+        });
         self.stats.elements_added += 1;
         if let Some(limit) = self.options.max_basis_elements {
             if self.basis.len() > limit {

@@ -12,7 +12,7 @@ use super::{
 use crate::{
     fields::{PrimeFieldElement64, Zp13, Zp32003},
     grobner::{
-        benchmark_systems::{cyclic, eco, katsura},
+        benchmark_systems::{cyclic, eco, katsura, noon, reimer},
         f4::{certify_f4_output, f4, F4Error},
         reference::buchberger_reference,
     },
@@ -384,6 +384,15 @@ fn test_statistics_are_internally_consistent() {
     assert!(s.signature_metadata_bytes > 0);
 }
 
+/// Hashing new elements' terms is clocked on its own, inside bookkeeping (#971 Gate C).
+#[test]
+fn test_element_hashing_is_clocked_inside_bookkeeping() {
+    let (result, s) = sig_f4_reported(&katsura::<6, Zp32003>(), GREVLEX, &SigF4Options::default());
+    result.unwrap();
+    assert!(s.element_hashing > std::time::Duration::ZERO);
+    assert!(s.element_hashing <= s.bookkeeping);
+}
+
 /// Every criterion fires on Katsura-6, so the equality tests are not passing on a criterion-free
 /// engine, and fewer targets reduce to zero than pairs are rejected.
 #[test]
@@ -558,3 +567,81 @@ fn test_elimination_split_accounts_for_every_product() {
         }
     }
 }
+
+/// FNV-1a over a trace's text: stable across toolchains, unlike `DefaultHasher`.
+fn fnv1a(text: &str) -> u64 {
+    text.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
+/// Every batch's rows and outcomes, the reduced basis and the matrix shape, digested.
+fn trace_digest<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &SigF4Options,
+) -> u64 {
+    let (result, s) = sig_f4_reported(system, order, options);
+    let basis = result.expect("signature engine finishes");
+    let text = format!(
+        "{:?}|{:?}|{:?}",
+        s.batch_trace,
+        basis,
+        (
+            s.targets,
+            s.reducer_rows,
+            s.coefficient_products,
+            s.max_matrix_rows,
+            s.max_matrix_columns
+        )
+    );
+    fnv1a(&text)
+}
+
+type Wide = PrimeFieldElement64<18446744073709551263>;
+
+/// Batch traces and reduced bases on every family here, and the wide prime, stay bit-identical to
+/// the engine before #971's run-wide monomial table.
+#[test]
+fn test_batch_traces_are_pinned_across_families() {
+    let checked = SigF4Options {
+        check_signatures: true,
+        ..SigF4Options::default()
+    };
+    let cascade = SigF4Options {
+        workers: 3,
+        parallel_cascade: true,
+        ..checked.clone()
+    };
+    let lex = MonomialOrder::GradedLexicographic;
+    let digests = [
+        trace_digest(&eco::<7, Goldilocks>(), GREVLEX, &checked),
+        trace_digest(&eco::<8, Wide>(), GREVLEX, &checked),
+        trace_digest(&katsura::<6, Wide>(), GREVLEX, &checked),
+        trace_digest(&katsura::<7, Goldilocks>(), GREVLEX, &checked),
+        trace_digest(&katsura::<5, Zp32003>(), lex, &checked),
+        trace_digest(&cyclic::<5, Zp32003>(), GREVLEX, &checked),
+        trace_digest(&cyclic::<5, Wide>(), lex, &checked),
+        trace_digest(&noon::<5, Wide>(), GREVLEX, &checked),
+        trace_digest(&reimer::<4, Zp32003>(), GREVLEX, &checked),
+        trace_digest(&katsura::<6, Goldilocks>(), GREVLEX, &cascade),
+        trace_digest(&eco::<9, Wide>(), GREVLEX, &checked),
+        trace_digest(&katsura::<8, Wide>(), GREVLEX, &checked),
+    ];
+    assert_eq!(digests, PINNED_TRACES, "{digests:#x?}");
+}
+
+const PINNED_TRACES: [u64; 12] = [
+    0x419a83a7341bc1c0,
+    0x67e781c2a3620195,
+    0xa934167c5405dd3f,
+    0x6a2025e6a457f26f,
+    0x46418666e7ab7acc,
+    0xaeedf86901a4c6ee,
+    0xe76033afc800b57c,
+    0xc42c80a749da37db,
+    0x82dd1b18aeb5ba79,
+    0x971e6f966f04a247,
+    0x16cc832403076243,
+    0x944b14cd411bfb50,
+];

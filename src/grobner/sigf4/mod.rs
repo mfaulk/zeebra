@@ -23,6 +23,7 @@ mod engine;
 #[cfg(feature = "research-sigf4-replay")]
 pub mod replay;
 pub mod signature;
+mod table;
 #[cfg(feature = "research-sigf4-replay")]
 pub use engine::symbolic_replay;
 #[cfg(all(test, feature = "research-sigf4"))]
@@ -176,6 +177,8 @@ pub struct SigF4Statistics {
     pub signature_metadata_bytes: usize,
     /// Pair generation, the queue and every criterion: the bookkeeping RFC §5 leaves unpriced.
     pub bookkeeping: Duration,
+    /// The part of `bookkeeping` spent hashing new elements' terms for the monomial table.
+    pub element_hashing: Duration,
     pub symbolic: Duration,
     pub elimination: Duration,
     pub interreduction: Duration,
@@ -261,20 +264,22 @@ impl SymbolicSplit {
         (cpu, khz)
     }
 
-    /// Multiplies `terms` by `mult` into `scratch`, then interns each product, clocking each half.
+    /// Multiplies `terms` and their additive hashes by `mult` into `scratch`, then interns each
+    /// product, clocking each half.
+    #[allow(clippy::type_complexity)]
     pub(crate) fn row<const N: usize>(
         &mut self,
-        scratch: &mut Vec<crate::Monomial<N>>,
-        terms: impl Iterator<Item = crate::Monomial<N>>,
-        mult: crate::Monomial<N>,
-        mut intern: impl FnMut(crate::Monomial<N>) -> u32,
+        scratch: &mut Vec<(crate::Monomial<N>, u64)>,
+        terms: impl Iterator<Item = (crate::Monomial<N>, u64)>,
+        (mult, mult_hash): (crate::Monomial<N>, u64),
+        mut intern: impl FnMut(crate::Monomial<N>, u64) -> u32,
         out: &mut Vec<u32>,
     ) {
         let clock = std::time::Instant::now();
         scratch.clear();
-        scratch.extend(terms.map(|m| m * mult));
+        scratch.extend(terms.map(|(m, h)| (m * mult, h.wrapping_add(mult_hash))));
         let products = std::time::Instant::now();
-        out.extend(scratch.iter().map(|&m| intern(m)));
+        out.extend(scratch.iter().map(|&(m, h)| intern(m, h)));
         self.interning += products.elapsed();
         self.multiply += products - clock;
         self.terms += scratch.len() as u64;
