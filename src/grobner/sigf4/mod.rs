@@ -210,6 +210,8 @@ pub struct BatchSplit {
     pub targets: usize,
     pub reducers: usize,
     pub columns: usize,
+    /// Nonzero entries of the batch matrix as built, targets and reducers.
+    pub entries: u64,
     /// Column index and sparse-row construction before either pass.
     pub setup: Duration,
     pub parallel_pass: Duration,
@@ -288,6 +290,15 @@ pub struct SplitLog {
     /// Converting the signature basis to polynomials, and dropping the engine.
     pub materialize: Duration,
     pub drop: Duration,
+    /// #970: products of each element-adding row, in insertion order; then the elements the
+    /// reduced basis drops (a lead another element also has, or one a smaller lead divides) and
+    /// the products their rows cost, beside those of the elements it keeps.
+    pub element_products: Vec<u64>,
+    /// Interreduction's minimal-basis selection alone, timed on a copy outside its stage clock.
+    pub minimal_selection: Duration,
+    pub redundant_elements: usize,
+    pub products_on_redundant_elements: u64,
+    pub products_on_kept_elements: u64,
 }
 
 /// The reduced Gröbner basis under a graded `order`, by the signature engine. Same contract as

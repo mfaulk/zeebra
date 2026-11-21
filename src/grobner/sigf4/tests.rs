@@ -454,6 +454,36 @@ fn test_symbolic_split_covers_every_batch() {
     }
 }
 
+/// #970's ledger: every element-adding row's products land on a kept or a redundant element,
+/// redundant elements are those the reduced basis drops, each batch counts its entries, and the
+/// minimal selection before interreduction is clocked.
+#[cfg(feature = "research-sigf4-split")]
+#[test]
+fn test_element_ledger_splits_products_into_kept_and_redundant() {
+    let system = katsura::<6, Goldilocks>();
+    for workers in [1, 4] {
+        let options = SigF4Options {
+            workers,
+            ..SigF4Options::checked()
+        };
+        let (_, s) = sig_f4_reported(&system, GREVLEX, &options);
+        let log = &s.split;
+        assert_eq!(
+            log.redundant_elements,
+            s.signature_basis_elements - s.reduced_basis_elements
+        );
+        assert!(log.redundant_elements > 0);
+        assert_eq!(
+            log.products_on_kept_elements + log.products_on_redundant_elements,
+            s.coefficient_products - s.products_on_zero_rows - s.products_on_singular_rows
+        );
+        for b in &log.batches {
+            assert!(b.entries >= (b.targets + b.reducers) as u64);
+        }
+        assert!(log.minimal_selection > std::time::Duration::ZERO);
+    }
+}
+
 /// The #901 split accounts for every coefficient product, per batch, at one and four workers.
 #[cfg(feature = "research-sigf4-split")]
 #[test]
