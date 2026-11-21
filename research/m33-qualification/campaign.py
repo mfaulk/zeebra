@@ -15,6 +15,7 @@ suite refuses a held-out row, by name and by input digest; a Gate D suite refuse
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -25,9 +26,21 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-sys.path.insert(0, str(ROOT / 'research/m33-baseline'))
-import admission  # noqa: E402
-import campaign as baseline  # noqa: E402
+
+
+def _baseline(name):
+    """An M33-0 module by path: its directory is not put on sys.path, where its `campaign.py` and
+    `summarize.py` would shadow these."""
+    spec = importlib.util.spec_from_file_location(f'm33_baseline_{name}', ROOT / f'research/m33-baseline/{name}.py')
+    module = importlib.util.module_from_spec(spec)
+    path = list(sys.path)
+    spec.loader.exec_module(module)
+    sys.path[:] = path  # the cohort's modules put their own directory first
+    return module
+
+
+admission = _baseline('admission')
+baseline = _baseline('campaign')
 
 F0 = baseline.F0
 HARNESS = 'examples/m33_qualify.rs'
