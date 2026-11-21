@@ -186,9 +186,12 @@ missing.
 | `arms[].commit` | 7–40 hex; the source the binary was built from |
 | `arms[].binary`, `arms[].sha256` | absolute path at submit time and its SHA-256, which must match; the job copies it |
 | `arms[].build.{profile,flags,recipe}` | strings; `recipe` must contain `git archive <commit>` |
-| `arms[].argv` | template; `{field}` placeholders take `instance.params` and `instance`, `input`, `workers`, `seed`, `rep`, `cpus`, `wall_seconds`, `live_bytes` |
+| `arms[].build.comparand` | optional; an externally provisioned comparand's provenance (provision script, upstream pin). It stands in for the `git archive` recipe, which a Zeebra arm still needs (#966) |
+| `arms[].workers` | optional subset of `run.workers`; the arm runs only at those counts (Track G's 16-worker best-supported arm beside 1-worker arms, #966) |
+| `arms[].argv` | template; `{field}` placeholders take `instance.params` and `instance`, `input`, `inputs[<key>]`, `workers`, `seed`, `rep`, `cpus`, `wall_seconds`, `live_bytes` |
 | `instances[].name`, `.params` | unique name; template values |
 | `instances[].path`, `.sha256` | optional input file and its digest; copied and re-hashed like a binary |
+| `instances[].inputs` | optional `{key: {path, sha256}}`, one file per solver format, each copied and re-hashed like `path`; argv names one as `{inputs[key]}` (#966) |
 | `run.workers` | list of worker counts; an attempt pins to the first *w* CPUs of `run.cpus` |
 | `run.cpus` | cpulist handed to `bench-reserve run`; must lie inside the reservation |
 | `run.repetitions`, `run.interleave`, `run.seeds` | *n* ≥ 1; `"rotate"` (the only rule); integer seeds, default `[0]` |

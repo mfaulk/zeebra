@@ -159,8 +159,11 @@ def validate(m):
         _require(HEX.match(commit) and 7 <= len(commit) <= 40, f'arm {name}: commit must be a hex sha')
         _require(all(isinstance(build.get(k), str) for k in ('profile', 'flags', 'recipe')),
                  f'arm {name}: build needs profile, flags and recipe')
-        _require(f'git archive {commit}' in build['recipe'],
-                 f'arm {name}: the build recipe must record `git archive {commit}`; a job never builds')
+        # An externally provisioned comparand (msolve's tarball, a pinned grobx) names its provenance
+        # instead; a Zeebra arm must still record the archive it was built from.
+        _require(f'git archive {commit}' in build['recipe'] or isinstance(build.get('comparand'), str),
+                 f'arm {name}: the build recipe must record `git archive {commit}` (or build.comparand its '
+                 f'provenance); a job never builds')
         _require(isinstance(arm.get('argv'), list) and all(isinstance(a, str) for a in arm['argv']),
                  f'arm {name}: argv must be a list of strings')
         binary = Path(arm.get('binary', ''))
@@ -170,16 +173,20 @@ def validate(m):
         problem = _source_problem(binary, commit)
         _require(problem is None, f'arm {name}: {problem}')
     for inst in instances:
-        if inst.get('path') is not None:
-            path = Path(inst['path'])
-            _require(path.is_absolute() and path.is_file(), f'instance {inst["name"]}: path must be an absolute file')
-            _require(sha256_file(path) == inst.get('sha256'), f'instance {inst["name"]}: input does not match its sha256')
+        for key, spec in _inputs(inst):
+            path = Path(spec['path'])
+            _require(path.is_absolute() and path.is_file(), f'instance {inst["name"]}: input {key} must be an absolute file')
+            _require(sha256_file(path) == spec.get('sha256'), f'instance {inst["name"]}: input {key} does not match its sha256')
         _require(isinstance(inst.get('params', {}), dict), f'instance {inst["name"]}: params must be an object')
     limits = run.get('limits') or {}
     cpus = expand_cpus(run.get('cpus', ''))
     workers = run.get('workers')
     _require(isinstance(workers, list) and workers and all(isinstance(w, int) and 0 < w <= len(cpus) for w in workers),
              'run.workers must be positive and fit in run.cpus')
+    for arm in arms:
+        _require(arm.get('workers') is None or (isinstance(arm['workers'], list) and arm['workers']
+                                                and set(arm['workers']) <= set(workers)),
+                 f'arm {arm["name"]}: workers must be a non-empty subset of run.workers')
     _require(isinstance(run.get('repetitions'), int) and run['repetitions'] > 0, 'run.repetitions must be >= 1')
     _require(run.get('interleave', 'rotate') == 'rotate', 'run.interleave supports only "rotate"')
     _require(all(isinstance(s, int) for s in run.get('seeds', [0])), 'run.seeds must be integers')
@@ -197,8 +204,9 @@ def validate(m):
 def expand(m):
     """The plan: instances x workers x seeds in turn, arms rotated one place per repetition."""
     run = m['run']
-    rows = [(dict(instance=i['name'], workers=w, seed=s), [a['name'] for a in m['arms']])
-            for i in m['instances'] for w in run['workers'] for s in run.get('seeds', [0])]
+    rows = [(dict(instance=i['name'], workers=w, seed=s), arms)
+            for i in m['instances'] for w in run['workers'] for s in run.get('seeds', [0])
+            if (arms := [a['name'] for a in m['arms'] if w in a.get('workers', run['workers'])])]
     return [dict(row, rep=rep, arm=arm) for rep, row, arm in campaign.plan(rows, run['repetitions'])]
 
 
@@ -214,8 +222,20 @@ def binary_path(directory, arm):
     return directory / 'bin' / _key(arm['name']) / Path(arm['binary']).name
 
 
-def input_path(directory, inst):
+def input_path(directory, inst, key=None):
+    if key is not None:
+        return directory / 'inputs' / _key(inst['name']) / key / Path(inst['inputs'][key]['path']).name
     return directory / 'inputs' / _key(inst['name']) / Path(inst['path']).name if inst.get('path') else None
+
+
+def _inputs(inst):
+    """(key, {path, sha256}) for the instance's files: `path` as key None, then each of `inputs`, which
+    lets one instance carry a file per solver format (`{inputs[key]}` in argv)."""
+    out = [(None, dict(path=inst['path'], sha256=inst.get('sha256')))] if inst.get('path') is not None else []
+    inputs = inst.get('inputs') or {}
+    _require(isinstance(inputs, dict) and all(NAME.match(k) and '/' not in k for k in inputs),
+             f'instance {inst["name"]}: inputs must map plain keys to files')
+    return out + sorted(inputs.items())
 
 
 def attempt_cpus(m, workers):
@@ -226,6 +246,7 @@ def argv(m, cell, directory):
     arm = next(a for a in m['arms'] if a['name'] == cell['arm'])
     inst = next(i for i in m['instances'] if i['name'] == cell['instance'])
     values = dict(inst.get('params', {}), instance=inst['name'], input=str(input_path(directory, inst) or ''),
+                  inputs={k: str(input_path(directory, inst, k)) for k in inst.get('inputs') or {}},
                   workers=cell['workers'], seed=cell['seed'], rep=cell['rep'], cpus=attempt_cpus(m, cell['workers']),
                   wall_seconds=m['run']['limits']['wall_seconds'], live_bytes=m['run']['limits'].get('live_bytes'))
     try:
@@ -274,8 +295,8 @@ def submit(path):
     for arm in m['arms']:
         _install(Path(arm['binary']), binary_path(stage, arm), arm['sha256'])
     for inst in m['instances']:
-        if inst.get('path'):
-            _install(Path(inst['path']), input_path(stage, inst), inst['sha256'])
+        for key, spec in _inputs(inst):
+            _install(Path(spec['path']), input_path(stage, inst, key), spec['sha256'])
     (stage / 'manifest.json').write_bytes(canonical(m) + b'\n')
     aj.StudyJournal.create(stage / 'journal', journal_header(job_id, m), expand(m), journal_limits(m))
     stage.rename(final)
@@ -712,8 +733,10 @@ def run_job(directory, force_uncancel=False):
             refusal = dict(reason='binary-mismatch', arm=arm['name'], path=str(binary_path(directory, arm)),
                            expected=arm['sha256'], actual=actual)
         inst = next(i for i in m['instances'] if i['name'] == cell['instance'])
-        if refusal is None and inst.get('path') and sha256_file(input_path(directory, inst)) != inst['sha256']:
-            refusal = dict(reason='input-mismatch', instance=inst['name'], expected=inst['sha256'])
+        changed = [(k, s) for k, s in _inputs(inst) if sha256_file(input_path(directory, inst, k)) != s['sha256']]
+        if refusal is None and changed:
+            refusal = dict(reason='input-mismatch', instance=inst['name'], input=changed[0][0],
+                           expected=changed[0][1]['sha256'])
         if refusal is not None:
             with Deferred():
                 journal.record_stop(refusal.pop('reason'), attempt=aid, at=now(), **refusal)

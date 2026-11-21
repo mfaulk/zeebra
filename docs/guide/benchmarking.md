@@ -444,6 +444,12 @@ checkout with uncommitted changes, or one at another commit; a build recipe that
 and re-hashes the copy before **every** attempt, and an attempt whose binary changed is refused with
 a `binary-mismatch` stop record rather than run. A job never compiles.
 
+**Comparands and per-solver inputs (#966).** An externally provisioned comparand (msolve's
+tarball, a pinned grobx driver) records `build.comparand`, its provenance, in place of the
+`git archive` recipe. An instance can carry one file per solver format in `inputs`, named in argv as
+`{inputs[ms]}`, and an arm with its own `workers` list runs only at those counts.
+`research/m33-baseline/campaign.py manifest` writes both M33-0 baseline jobs this way.
+
 **Where jobs live.** `$ZEEBRA_BENCH_JOBS`, default `/buildcache/bench-jobs`. A root under `$HOME`
 or this repository is refused (CLAUDE.md §1). `/buildcache` is root-owned, so the default needs a
 one-time `sudo install -d -o "$USER" /buildcache/bench-jobs`.
@@ -454,7 +460,7 @@ one-time `sudo install -d -o "$USER" /buildcache/bench-jobs`.
   <job-id>/                 job id = first 12 hex of the canonical manifest's SHA-256
     manifest.json           canonical and immutable
     bin/<arm>/<binary>      the copies that run, mode 0555
-    inputs/<instance>/...   copied instance files, when the manifest names a path
+    inputs/<instance>/...   copied instance files (`path`, and `inputs/<instance>/<key>/` per named input)
     journal/                StudyJournal: header.json (plan, limits), journal.jsonl, blobs/
     started                 pid and time of the first run; its absence means queued
     run.lock                flock held by the live runner
