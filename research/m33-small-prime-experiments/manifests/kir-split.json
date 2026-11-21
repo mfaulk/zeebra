@@ -1,0 +1,78 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 973,
+  "agent": "agent-a164e1fd56e441681@feat/973-k-ir-parallel-interreduce",
+  "track": "M",
+  "session": "kir-split"
+ },
+ "arms": [
+  {
+   "name": "irsplit",
+   "commit": "159f19587abb32f30a78307c90805a601b287015",
+   "binary": "/buildcache/cargo-target/zeebra-973/sig_f4_study-159f1958",
+   "sha256": "341d650c9849f5dc0cffb1a47599ddbe3a6d7cbdf455cce66e5c3859b88203de",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "checkout whose tracked files equal git archive 159f19587abb32f30a78307c90805a601b287015; cargo build --release --features research-sigf4 --example sig_f4_study (merge base plus the ZB_IR_SPLIT sub-stage clocks)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "m31/katsura-11",
+   "params": {
+    "field": "m31",
+    "name": "katsura-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {}
+  },
+  {
+   "name": "gf32003/katsura-11",
+   "params": {
+    "field": "gf32003",
+    "name": "katsura-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {}
+  }
+ ],
+ "run": {
+  "workers": [
+   1,
+   4,
+   8,
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 180,
+   "kill_after_seconds": 30,
+   "rss_bytes": 8589934592,
+   "live_bytes": null
+  }
+ }
+}

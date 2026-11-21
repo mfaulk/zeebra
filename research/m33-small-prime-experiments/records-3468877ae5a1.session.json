@@ -1,0 +1,67 @@
+{
+ "attempts": 72,
+ "job": {
+  "context": {
+   "agent": "agent-a164e1fd56e441681@feat/973-k-ir-parallel-interreduce",
+   "issue": 973,
+   "session": "kir-split",
+   "track": "M"
+  },
+  "job_id": "3468877ae5a1",
+  "manifest_sha256": "3468877ae5a1a2062a3c44b94669e5d236578f56f14939b72e32648f4eaa6a77",
+  "mode": "dev"
+ },
+ "journal_sha256": "f7d2a9719f5f9e07c7adb15159e7e3c2fc3ef832931daa0e906b2f38b75f2998",
+ "stop": {
+  "at": "2026-11-21T11:57:25+00:00",
+  "attempts": 72,
+  "contamination": {
+   "contaminated": 10,
+   "flagged": {
+    "3468877ae5a1:17:0": [
+     "bench clock 1742152 kHz is 21.6% off the session median"
+    ],
+    "3468877ae5a1:18:0": [
+     "bench clock 1587658 kHz is 10.8% off the session median"
+    ],
+    "3468877ae5a1:22:0": [
+     "bench clock 1587535 kHz is 10.8% off the session median"
+    ],
+    "3468877ae5a1:25:0": [
+     "bench clock 1741785 kHz is 21.5% off the session median"
+    ],
+    "3468877ae5a1:49:0": [
+     "bench clock 1742038 kHz is 21.6% off the session median"
+    ],
+    "3468877ae5a1:52:0": [
+     "bench clock 4537596 kHz is 13.7% off the session median"
+    ],
+    "3468877ae5a1:60:0": [
+     "bench clock 4537569 kHz is 13.7% off the session median"
+    ],
+    "3468877ae5a1:64:0": [
+     "bench clock 4121558 kHz is 3.2% off the session median"
+    ],
+    "3468877ae5a1:70:0": [
+     "bench clock 1587264 kHz is 10.8% off the session median"
+    ],
+    "3468877ae5a1:9:0": [
+     "bench clock 1741017 kHz is 21.5% off the session median"
+    ]
+   },
+   "median_khz": {
+    "gf32003/katsura-11@16w": 1627212,
+    "gf32003/katsura-11@1w": 3992286,
+    "gf32003/katsura-11@4w": 1433184,
+    "gf32003/katsura-11@8w": 1433184,
+    "m31/katsura-11@16w": 1627212,
+    "m31/katsura-11@1w": 3992262,
+    "m31/katsura-11@4w": 1433184,
+    "m31/katsura-11@8w": 1433184
+   },
+   "total": 72,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}
