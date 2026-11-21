@@ -329,6 +329,8 @@ def render():
     if any(s.startswith('g2-1-c') for s in SESSION_OF.values()):
         lines += gate_c(recs, 'g2-1-c', '5. Gate C verdicts (thresholds posted on #971 before measuring)')
     lines += gate_b2(recs)
+    if any(s.startswith('g2-2-c') for s in SESSION_OF.values()):
+        lines += gate_c(recs, 'g2-2-c', '7. G2-2 Gate C verdicts (head = G2-2, base = main with #994; thresholds as for G2-1)')
     return '\n'.join(lines).rstrip() + '\n'
 
 
