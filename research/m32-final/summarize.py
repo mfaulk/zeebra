@@ -103,7 +103,9 @@ def fr(c, digits=3):
 
 
 def fms(v):
-    return '—' if v is None else f'{v:,.1f}'
+    if v is None:
+        return '—'
+    return f'{v:,.1f}' if v >= 10 else f'{v:.3f}'
 
 
 def rss(r):
