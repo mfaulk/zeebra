@@ -12,6 +12,17 @@
 //! `m31/eco-11`, `gf32003/mq-random-9`) are generated here and refused unless they reproduce their
 //! pinned digest (`research/m32-baseline/README.md`).
 //!
+//! `--generate` builds the row from its generator at any of the four fields instead of a catalog:
+//! `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, or `mq-random-N-sS` (the ladder's MQ generator at
+//! seed S), each in the external contract's canonical form, as M33's candidate pool is digested
+//! (`research/m33-baseline/admission.py`); `--input-only` prints the row's digest, variables and
+//! generators and solves nothing.
+//!
+//! Every complete run reports `basis_m33`, the `m33-basis-v1` digest
+//! (`tools/external/basis_digest.py`) every M33 solver is compared by. `--digest-only` skips the
+//! text render, so the process renders nothing (plan §11.3); `--write-basis PATH` writes the rendered
+//! basis, one element per line, for a verification run.
+//!
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
 //!
@@ -30,11 +41,14 @@
 //! (run at `--workers`, `--claim` as given), asserts each run equal to it, and prints the per-batch
 //! clocks and the ceiling; `--min-frontier` (default 512) is the narrowest level a team scans
 //! (`docs/research/m32-parallel-symbolic.md` §4).
+#[path = "support/basis_digest.rs"]
+mod basis_digest;
+
 use std::time::{Duration, Instant};
 use zeebra::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
     grobner::{
-        benchmark_systems::{cyclic, eco},
+        benchmark_systems::{cyclic, eco, katsura, noon},
         certify_f4_output_with_workers,
         differential::polynomial_to_string,
         external::{corpus, ExternalSolver, FieldSpec, Instance, Limits, SingularSolver, Task},
@@ -67,6 +81,10 @@ struct Args {
     repeat: usize,
     order: MonomialOrder,
     sample_threads: bool,
+    generate: bool,
+    input_only: bool,
+    digest_only: bool,
+    write_basis: Option<String>,
 }
 
 /// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
@@ -88,6 +106,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         repeat: 1,
         order: ORDER,
         sample_threads: false,
+        generate: false,
+        input_only: false,
+        digest_only: false,
+        write_basis: None,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -109,6 +131,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--certify" => parsed.certify = true,
             "--sample-threads" => parsed.sample_threads = true,
             "--discovery" => parsed.discovery = true,
+            "--generate" => parsed.generate = true,
+            "--input-only" => parsed.input_only = true,
+            "--digest-only" => parsed.digest_only = true,
+            "--write-basis" => parsed.write_basis = Some(value()?),
             "--replay" => parsed.replay = true,
             "--claim" => parsed.claim = true,
             "--symbolic-replay" => parsed.symbolic = true,
@@ -285,6 +311,75 @@ fn held_out(field: &str, name: &str) -> Option<Input> {
         .map(|row| row.2);
     assert_eq!(Some(instance.digest().as_str()), pinned, "{field}/{name}");
     Some(Input {
+        digest: instance.digest(),
+        variables: instance.variables.clone(),
+        generators: instance.system.clone(),
+    })
+}
+
+/// The modulus of each `--field`.
+fn modulus(field: &str) -> u64 {
+    match field {
+        "goldilocks" => 18446744069414584321,
+        "wide64" => 18446744073709551263,
+        "gf32003" => 32003,
+        "m31" => 2147483647,
+        _ => panic!("unknown field {field}"),
+    }
+}
+
+/// `--generate`: the row built from its generator at `field`, in the external contract's form.
+fn generated(field: &str, name: &str) -> Result<Input, String> {
+    fn render<const N: usize, F: FiniteField>(
+        name: &str,
+        family: &str,
+        system: &[MultivariatePolynomial<N, F>],
+        modulus: u64,
+    ) -> Instance {
+        let names: Vec<String> = (1..=N).map(|i| format!("x{i}")).collect();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let text = system
+            .iter()
+            .map(|p| polynomial_to_string(p, &refs, ORDER))
+            .collect();
+        Instance::new(name, family, FieldSpec::prime(modulus), names, text, ORDER)
+    }
+    fn family<F: FiniteField>(name: &str, family: &str, n: usize, p: u64) -> Option<Instance> {
+        macro_rules! sized {
+            ($($k:literal)*) => {
+                match (family, n) {
+                    $(("katsura", $k) => Some(render(name, family, &katsura::<$k, F>(), p)),
+                      ("eco", $k) => Some(render(name, family, &eco::<$k, F>(), p)),
+                      ("cyclic", $k) => Some(render(name, family, &cyclic::<$k, F>(), p)),
+                      ("noon", $k) => Some(render(name, family, &noon::<$k, F>(), p)),)*
+                    _ => None,
+                }
+            };
+        }
+        sized!(4 5 6 7 8 9 10 11 12 13 14)
+    }
+    let p = modulus(field);
+    let refused = || format!("--generate has no generator for {name}");
+    let (stem, seed) = match name.rsplit_once("-s") {
+        Some((stem, seed)) if stem.starts_with("mq-random-") => {
+            (stem, Some(seed.parse::<u64>().map_err(|_| refused())?))
+        }
+        _ => (name, None),
+    };
+    let (fam, n) = stem.rsplit_once('-').ok_or_else(refused)?;
+    let n: usize = n.parse().map_err(|_| refused())?;
+    let instance = match (fam, seed) {
+        ("mq-random", Some(seed)) => corpus::random_mq_instance(n, seed, p, ORDER),
+        (_, None) => match field {
+            "goldilocks" => family::<Goldilocks>(name, fam, n, p),
+            "wide64" => family::<Wide>(name, fam, n, p),
+            "gf32003" => family::<Zp32003>(name, fam, n, p),
+            _ => family::<Zp2147483647>(name, fam, n, p),
+        }
+        .ok_or_else(refused)?,
+        _ => return Err(refused()),
+    };
+    Ok(Input {
         digest: instance.digest(),
         variables: instance.variables.clone(),
         generators: instance.system.clone(),
@@ -1072,8 +1167,15 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let (result, statistics, work) = solve();
     let elapsed = started.elapsed();
     let threads_peak = threads.map(ThreadSampler::finish);
+    let m33 = Instant::now();
+    let basis_m33 = result
+        .as_ref()
+        .ok()
+        .map(|b| basis_digest::basis_digest(b, modulus(&args.field).into()));
+    let m33 = m33.elapsed();
     let render = Instant::now();
     let (status, basis) = match &result {
+        Ok(_) if args.digest_only => ("complete".to_string(), None),
         Ok(basis) => {
             let mut text: Vec<_> = basis
                 .iter()
@@ -1085,6 +1187,9 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         Err(error) => (format!("stopped: {error}"), None),
     };
     let render = render.elapsed();
+    if let (Some(path), Some(text)) = (&args.write_basis, &basis) {
+        std::fs::write(path, text.join("\n") + "\n").expect("--write-basis");
+    }
     let certification = match (&result, args.certify) {
         (Ok(basis), true) => {
             let clock = Instant::now();
@@ -1117,6 +1222,8 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             ),
         ),
         ("render_ns", Json::nanos(render)),
+        ("basis_m33", basis_m33.map_or(Json::Null, Json::string)),
+        ("basis_m33_ns", Json::nanos(m33)),
         ("threads_peak", threads_peak.map_or(Json::Null, Json::size)),
         (
             "peak_rss_bytes",
@@ -1124,7 +1231,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ),
         (
             "basis_elements",
-            basis.as_ref().map_or(Json::Null, |b| Json::size(b.len())),
+            result.as_ref().map_or(Json::Null, |b| Json::size(b.len())),
         ),
         (
             "basis_sha256",
@@ -1142,28 +1249,48 @@ fn main() {
     let started = Instant::now();
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let args = parse_args(&raw).unwrap_or_else(|e| panic!("{e}"));
-    let input = input(&args.field, &args.name);
-    let n = input.variables.len();
-    let mut report = match (args.field.as_str(), n) {
-        ("goldilocks", 4) => run::<4, Goldilocks>(input, &args),
-        ("goldilocks", 6) => run::<6, Goldilocks>(input, &args),
-        ("goldilocks", 10) => run::<10, Goldilocks>(input, &args),
-        ("goldilocks", 7) => run::<7, Goldilocks>(input, &args),
-        ("goldilocks", 11) => run::<11, Goldilocks>(input, &args),
-        ("goldilocks", 12) => run::<12, Goldilocks>(input, &args),
-        ("gf32003", 9) => run::<9, Zp32003>(input, &args),
-        ("gf32003", 10) => run::<10, Zp32003>(input, &args),
-        ("m31", 10) => run::<10, Zp2147483647>(input, &args),
-        ("m31", 11) => run::<11, Zp2147483647>(input, &args),
-        ("wide64", 8) => run::<8, Wide>(input, &args),
-        ("wide64", 9) => run::<9, Wide>(input, &args),
-        ("wide64", 14) => run::<14, Wide>(input, &args),
-        ("wide64", 4) => run::<4, Wide>(input, &args),
-        ("wide64", 7) => run::<7, Wide>(input, &args),
-        ("wide64", 11) => run::<11, Wide>(input, &args),
-        ("wide64", 12) => run::<12, Wide>(input, &args),
-        (field, n) => panic!("no instantiation for {field} with {n} variables"),
+    let input = if args.generate {
+        generated(&args.field, &args.name).unwrap_or_else(|e| panic!("{e}"))
+    } else {
+        input(&args.field, &args.name)
     };
+    let n = input.variables.len();
+    if args.input_only {
+        let strings = |v: &[String]| Json::Array(v.iter().map(Json::string).collect());
+        let row = Json::object([
+            ("field", Json::string(&args.field)),
+            ("name", Json::string(&args.name)),
+            ("modulus", Json::string(modulus(&args.field).to_string())),
+            ("digest", Json::string(&input.digest)),
+            ("variables", strings(&input.variables)),
+            ("generators", strings(&input.generators)),
+        ]);
+        println!("{}", row.to_json().replace('\n', ""));
+        return;
+    }
+    // Every field at every size a catalog, the ladder or `--generate` can produce.
+    macro_rules! dispatch {
+        ($($field:literal => $f:ty),*) => {
+            match (args.field.as_str(), n) {
+                $(
+                    ($field, 4) => run::<4, $f>(input, &args),
+                    ($field, 6) => run::<6, $f>(input, &args),
+                    ($field, 7) => run::<7, $f>(input, &args),
+                    ($field, 8) => run::<8, $f>(input, &args),
+                    ($field, 9) => run::<9, $f>(input, &args),
+                    ($field, 10) => run::<10, $f>(input, &args),
+                    ($field, 11) => run::<11, $f>(input, &args),
+                    ($field, 12) => run::<12, $f>(input, &args),
+                    ($field, 13) => run::<13, $f>(input, &args),
+                    ($field, 14) => run::<14, $f>(input, &args),
+                )*
+                (field, n) => panic!("no instantiation for {field} with {n} variables"),
+            }
+        };
+    }
+    let mut report = dispatch!(
+        "goldilocks" => Goldilocks, "wide64" => Wide, "gf32003" => Zp32003, "m31" => Zp2147483647
+    );
     // In-process time before and after the solve: with `call_ns` and `render_ns` this leaves only
     // exec and exit to the caller's process wall.
     if let Json::Object(fields) = &mut report {
@@ -1291,6 +1418,37 @@ mod tests {
         for (field, name, pinned) in HELD_OUT {
             assert_eq!(input(field, name).digest, pinned, "{field}/{name}");
         }
+    }
+
+    /// `--generate` reproduces every row M32 pinned in the external contract's form, MQ at seed n.
+    #[test]
+    fn generated_rows_reproduce_the_code_pins() {
+        let pins = [
+            ("m31", "katsura-10", HELD_OUT[3].2),
+            ("m31", "eco-11", HELD_OUT[4].2),
+            ("goldilocks", "cyclic-6", HELD_OUT[5].2),
+            ("gf32003", "mq-random-9-s9", HELD_OUT[2].2),
+            (
+                "gf32003",
+                "mq-random-10-s10",
+                "16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f",
+            ),
+        ];
+        for (field, name, pinned) in pins {
+            assert_eq!(
+                generated(field, name).unwrap().digest,
+                pinned,
+                "{field}/{name}"
+            );
+        }
+    }
+
+    /// `--generate` refuses a family it has no generator for and an unseeded MQ row.
+    #[test]
+    fn generate_refuses_unknown_rows() {
+        assert!(generated("m31", "bivium-3").is_err());
+        assert!(generated("m31", "mq-random-10").is_err());
+        assert!(generated("m31", "katsura-40").is_err());
     }
 
     // The two engines agree on a small frozen row, which is what the basis digest relies on.

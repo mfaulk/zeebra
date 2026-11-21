@@ -1,0 +1,30 @@
+{
+ "G": [
+  {
+   "field": "wide64",
+   "name": "mq-random-10-s1",
+   "digest": "163887f5b7124c5a8d17496418e0a4eefde69fdce9d8caebf193980c9c8f41e3",
+   "basis_m33": "545c5286164f842cc30f4ecfc42b8330586eaf4c4fa234410c8182193ea96a0c"
+  },
+  {
+   "field": "wide64",
+   "name": "katsura-12",
+   "digest": "62cf88203aa37730e6cf1bc0b08f5b37c4391b390ac35fa22b7226b9ae320edd",
+   "basis_m33": "a3331f03acc9dc93446ac9970ab10b81ab1f4f6a466f7fc04460c72b000ab0d3"
+  }
+ ],
+ "M": [
+  {
+   "field": "m31",
+   "name": "mq-random-10-s1",
+   "digest": "bd4820193849c505dcb9fe707ed8d770a47b0e5fa5146e4f00b235344ed62479",
+   "basis_m33": "5ef0bd92c10d3ec5b4445fc97ab13b82717a746a702e5225c382fb44d8eb986c"
+  },
+  {
+   "field": "gf32003",
+   "name": "katsura-12",
+   "digest": "915a3a283588d6806648c354252f080dd8a533ad9db60ff2cc7befd7c88b31bd",
+   "basis_m33": "a6c62dbc5d42c03f3180e86084d26af87cdcff8808be6c3365ba7394bf48cef6"
+  }
+ ]
+}

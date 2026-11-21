@@ -66,7 +66,11 @@ fn solve(input: &Value) -> Result<Value, String> {
         Some("lex") => grobx::MonomialOrder::Lex,
         _ => return Err("unsupported order".into()),
     };
-    if input["workers"].as_u64() != Some(1) {
+    // A multi-worker request is refused unless it is #966's thread probe, which asks the library
+    // for `workers` threads to observe how many it computes on; no timing row uses it.
+    let workers = input["workers"].as_u64().unwrap_or(0) as usize;
+    let probe = input["threads_probe"].as_bool() == Some(true);
+    if workers != 1 && !(probe && workers > 1) {
         return Err("this revision computes on one thread".into());
     }
     let mode = input["mode"].as_str().ok_or("missing mode")?;
@@ -94,7 +98,7 @@ fn solve(input: &Value) -> Result<Value, String> {
     );
     let mut params = grobx::Params::new(
         order,
-        grobx::Threads::Count(NonZeroUsize::new(1).unwrap()),
+        grobx::Threads::Count(NonZeroUsize::new(workers).unwrap()),
         0,
     );
     params.report = true;
@@ -198,6 +202,10 @@ mod tests {
             input[key] = value;
             assert!(solve(&input).is_err(), "{key}");
         }
+        let mut probe = base.clone();
+        probe["workers"] = json!(16);
+        probe["threads_probe"] = json!(true);
+        assert!(solve(&probe).is_ok(), "the thread probe is accepted");
     }
     // An exhausted internal budget returns a stop with no usable answer or certification.
     #[test]
