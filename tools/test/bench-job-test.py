@@ -25,8 +25,8 @@ CHILD = '''#!/bin/sh
 case "$1" in
   ok) echo '{"status":"ok"}' ;;
   fail) echo boom >&2; exit 1 ;;
-  sleep) sleep "$2" ;;
-  once) [ -e "$2" ] && exit 0; : > "$2"; [ "$3" = fail ] && exit 1; sleep 30 ;;
+  sleep) exec sleep "$2" ;;
+  once) [ -e "$2" ] && exit 0; : > "$2"; [ "$3" = fail ] && exit 1; exec sleep 30 ;;
 esac
 '''
 FAKE_RESERVE = '#!/bin/sh\n[ "$1" = run ] || exit 64\nshift 3\nexec "$@"\n'
