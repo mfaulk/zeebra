@@ -194,49 +194,54 @@ GATE_B2 = dict(katsura_wall_hi=0.95, katsura_half_width=0.025, katsura_interredu
 
 
 def gate_b2(recs):
-    """G2-2's Gate B (Gate A record on #971): head is G2-2, base is #994's head; per-arm clean attempts."""
+    """G2-2's Gate B (Gate A record on #971): head is G2-2, base is #994's head. Each criterion is read on
+    the attempts the per-arm clock rule leaves clean and on every ok attempt."""
     keep = clean_attempts(recs)
-    pooled = {}
-    for (job, row, w), arms in cells(recs, keep).items():
-        if w == 1 and SESSION_OF.get(job, '').startswith('g2-2-b') and 'head' in arms and 'base' in arms:
-            pooled[row] = arms
-    if not pooled:
+
+    def pooled(keep_set):
+        return {row: arms for (job, row, w), arms in cells(recs, keep_set).items()
+                if w == 1 and SESSION_OF.get(job, '').startswith('g2-2-b') and 'head' in arms and 'base' in arms}
+
+    sets = (pooled(keep), pooled(None))
+    if not sets[1]:
         return []
-    out = ['## 6. G2-2 Gate B verdicts (head = G2-2, base = #994; clean attempts under the per-arm rule)', '',
-           '| Criterion | Threshold | Measured | Verdict |', '|---|---|---|---|']
+    out = ['## 6. G2-2 Gate B verdicts (head = G2-2, base = #994 head)', '',
+           '| Criterion | Threshold | clean: measured | n | verdict | all ok: measured | n | verdict |',
+           '|---|---|---:|---:|---|---:|---:|---|']
 
-    def line(name, threshold, c, ok):
-        out.append(f"| {name} | {threshold} | {g1.fci(c) if hasattr(c, 'median') else c} | {'pass' if ok else '**FAIL**'} |")
+    def line(name, threshold, row, q, test, show=None):
+        cols = []
+        for i, arms in enumerate(sets):
+            a = arms.get(row)
+            if not a:
+                cols += ['—', '0', 'short']
+                continue
+            c = paired(a, q, f'g22-{row}-{q}-{i}')
+            cols += [show(c) if show else g1.fci(c), str(c.n), 'pass' if test(c) else '**FAIL**']
+        out.append(f"| {name} | {threshold} | {' | '.join(cols)} |")
 
-    kat, eco = pooled.get('wide64/katsura-11'), pooled.get('wide64/eco-12')
-    if kat:
-        w = paired(kat, 'wall', 'g22-kat-wall')
-        line('Katsura-11 paired wall, upper bound', f"≤ {GATE_B2['katsura_wall_hi']}", w, w.hi <= GATE_B2['katsura_wall_hi'])
-        hw = (w.hi - w.lo) / 2
-        line('Katsura-11 wall half-width (precision rule)', f"≤ {GATE_B2['katsura_half_width']}", f'{hw:.4f}',
-             hw <= GATE_B2['katsura_half_width'])
-        c = paired(kat, 'interreduction', 'g22-kat-inter')
-        line('Katsura-11 interreduction ratio (Gate A falsifier)', f"≤ {GATE_B2['katsura_interreduction']}", c,
-             c.median <= GATE_B2['katsura_interreduction'])
-    if eco:
-        w = paired(eco, 'wall', 'g22-eco-wall')
-        line('Eco-12 paired wall, upper bound (Gate A falsifier)', f"≤ {GATE_B2['eco_wall_hi']}", w,
-             w.hi <= GATE_B2['eco_wall_hi'])
-    for label, arms in (('Katsura-11', kat), ('Eco-12', eco)):
+    k, e = 'wide64/katsura-11', 'wide64/eco-12'
+    g = GATE_B2
+    line('Katsura-11 paired wall, upper bound', f"≤ {g['katsura_wall_hi']}", k, 'wall', lambda c: c.hi <= g['katsura_wall_hi'])
+    line('Katsura-11 wall half-width (precision rule)', f"≤ {g['katsura_half_width']}", k, 'wall',
+         lambda c: (c.hi - c.lo) / 2 <= g['katsura_half_width'], show=lambda c: f'{(c.hi - c.lo) / 2:.4f}')
+    line('Katsura-11 interreduction ratio (Gate A falsifier)', f"≤ {g['katsura_interreduction']}", k, 'interreduction',
+         lambda c: c.median <= g['katsura_interreduction'])
+    line('Eco-12 paired wall, upper bound (Gate A falsifier)', f"≤ {g['eco_wall_hi']}", e, 'wall',
+         lambda c: c.hi <= g['eco_wall_hi'])
+    for label, row in (('Katsura-11', k), ('Eco-12', e)):
         for q in ('symbolic', 'elimination'):
-            if arms:
-                c = paired(arms, q, f'g22-{label}-{q}')
-                line(f'{label} {q} moves ≤ 3% (Gate A falsifier)', f"|median − 1| ≤ {GATE_B2['stage_drift']}", c,
-                     abs(c.median - 1) <= GATE_B2['stage_drift'])
+            line(f'{label} {q} moves ≤ 3% (Gate A falsifier)', f"|median − 1| ≤ {g['stage_drift']}", row, q,
+                 lambda c: abs(c.median - 1) <= g['stage_drift'])
     for row in ORDER:
-        if row in pooled:
-            c = paired(pooled[row], 'rss', f'g22-{row}-rss')
-            line(f'{LABEL[row]} peak RSS', f"≤ {GATE_B2['rss']}×", c, c.median <= GATE_B2['rss'])
+        if row in sets[1]:
+            line(f'{LABEL[row]} paired wall', 'reported', row, 'wall', lambda c: True)
+            line(f'{LABEL[row]} peak RSS', f"≤ {g['rss']}×", row, 'rss', lambda c: c.median <= g['rss'])
     d = g1.digests(recs)
     same = all(len(v) == 1 for v in d.values())
-    out.append(f"| `m33-basis-v1` digests, every ok attempt, arm and job | one per row | "
-               f"{', '.join(str(len(v)) for v in d.values())} distinct | {'pass' if same else '**FAIL**'} |")
-    return out + ['']
+    out += ['', f"Digests: {'one' if same else 'MORE THAN ONE'} `m33-basis-v1` digest per row over every ok attempt, "
+            f"arm and job ({len(d)} rows).", '']
+    return out
 
 
 def arm_rule_table(recs, sessions):
@@ -323,6 +328,7 @@ def render():
     lines += ab_table(recs) + gate_b(recs) + grobx_table(recs)
     if any(s.startswith('g2-1-c') for s in SESSION_OF.values()):
         lines += gate_c(recs, 'g2-1-c', '5. Gate C verdicts (thresholds posted on #971 before measuring)')
+    lines += gate_b2(recs)
     return '\n'.join(lines).rstrip() + '\n'
 
 

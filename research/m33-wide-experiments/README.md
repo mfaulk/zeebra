@@ -3,7 +3,8 @@
 Write-up: [`docs/research/m33-wide-experiments.md`](../../docs/research/m33-wide-experiments.md).
 
 **Measured at:** Gate B, merge base `261b17f1` and candidate G2-1 `fa868367` (tag `measured/971-g2-1-table`);
-Gate C, merge base `93f2853a` and candidate `32864419` (tag `measured/971-g2-1-gatec`);
+Gate C, merge base `93f2853a` and candidate `32864419` (tag `measured/971-g2-1-gatec`); G2-2 Gate B, #994 head
+`32864419` and candidate `cba1ee89` (tag `measured/971-g2-2-columns`);
 grobx 0.155.1 `8005a2a1` as pinned in [`../m33-baseline/pins.json`](../m33-baseline/pins.json). One
 `tools/bench-job` dev-mode session per job listed in [tables.md](tables.md), CPUs 8–23 of reserved CCDs 1–2.
 
@@ -14,7 +15,7 @@ grobx 0.155.1 `8005a2a1` as pinned in [`../m33-baseline/pins.json`](../m33-basel
 | [build.sh](build.sh) | the timed `research-sigf4` study at each named commit, from `git archive`, in parallel; `ZB_ALIGN_LOOPS=64` builds the loop-aligned placement control |
 | [campaign.py](campaign.py) | `manifest` (arms `base`, `head`, `grobx155`; `--gate b`, `c`, `c-warm` (cells under 300 ms, 21 calls per process) or `c-dev` (development rows at 1 w); `--align-loops 64` for the control builds), `extract` (#970's extractor plus the worker count and per-call times), `retain` |
 | [noon8-probe.sh](noon8-probe.sh) → [noon8-probe.txt](noon8-probe.txt) | untimed Noon-8 stage clocks under both allocators, and page faults by function (`perf`) |
-| [summarize.py](summarize.py) → [tables.md](tables.md) | every table and the Gate B and Gate C verdicts, regenerated from the files here alone; `--check` exits 1 when stale |
+| [summarize.py](summarize.py) → [tables.md](tables.md) | every table and the Gate B and Gate C verdicts (G2-2 Gate B in §6), regenerated from the files here alone; `--check` exits 1 when stale |
 | `manifests/*.json` | the submitted manifests |
 | `records-<job>.jsonl.gz`, `.session.json` | one record per attempt: wall, peak RSS, contamination metrics, Zeebra's statistics, grobx's report summary, the basis digest |
 | `journals/<job>/` | the hash-chained journal, payloads under 64 KiB |
