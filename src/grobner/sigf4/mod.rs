@@ -69,6 +69,9 @@ pub struct SigF4Options {
     pub max_live_bytes: Option<usize>,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
+    /// Tests only: the column-space interreduction's live-entry budget, to force its fallback.
+    #[cfg(test)]
+    pub(crate) interreduction_live_entries: Option<usize>,
 }
 
 impl Default for SigF4Options {
@@ -86,6 +89,8 @@ impl Default for SigF4Options {
             max_live_bytes: Some(crate::grobner::F4Options::default().max_live_bytes),
             #[cfg(test)]
             adversary: None,
+            #[cfg(test)]
+            interreduction_live_entries: None,
         }
     }
 }
@@ -182,6 +187,9 @@ pub struct SigF4Statistics {
     pub symbolic: Duration,
     pub elimination: Duration,
     pub interreduction: Duration,
+    /// Whether final interreduction ran in the engine's column space (G2-2) rather than falling
+    /// back to the polynomial route on a budget refusal.
+    pub interreduction_in_columns: bool,
     pub total: Duration,
     /// Parallel cascade only: times a target waited for every earlier target's announcement, and
     /// for an earlier target's final row.

@@ -1,0 +1,157 @@
+{
+ "attempts": 372,
+ "job": {
+  "context": {
+   "agent": "agent-a284aca23113f0932@perf/971-sigf4-column-interreduction",
+   "issue": 971,
+   "session": "g2-2-c2-warm",
+   "track": "G"
+  },
+  "job_id": "e95341beca7f",
+  "manifest_sha256": "e95341beca7ff76d7db182741e01e9cde7d4410ab624fad1a10bbfebfc46a2e7",
+  "mode": "dev"
+ },
+ "journal_sha256": "08718229abf6fc9246a4571ee2b3a0a379bfd17cb6448c6652b5e2cc4a0a0f9e",
+ "stop": {
+  "at": "2026-11-21T17:24:02+00:00",
+  "attempts": 372,
+  "contamination": {
+   "contaminated": 38,
+   "flagged": {
+    "e95341beca7f:102:0": [
+     "bench clock 1711646 kHz is 3.3% off the session median"
+    ],
+    "e95341beca7f:103:0": [
+     "bench clock 1510367 kHz is 4.9% off the session median"
+    ],
+    "e95341beca7f:115:0": [
+     "bench clock 1587913 kHz is 4.1% off the session median"
+    ],
+    "e95341beca7f:119:0": [
+     "bench clock 2997346 kHz is 3.4% off the session median"
+    ],
+    "e95341beca7f:122:0": [
+     "bench clock 1587470 kHz is 5.1% off the session median"
+    ],
+    "e95341beca7f:126:0": [
+     "bench clock 1733872 kHz is 4.7% off the session median"
+    ],
+    "e95341beca7f:141:0": [
+     "bench clock 3992290 kHz is 12.0% off the session median"
+    ],
+    "e95341beca7f:143:0": [
+     "bench clock 2990921 kHz is 3.1% off the session median"
+    ],
+    "e95341beca7f:152:0": [
+     "bench clock 4101750 kHz is 9.6% off the session median"
+    ],
+    "e95341beca7f:163:0": [
+     "bench clock 1742003 kHz is 5.2% off the session median"
+    ],
+    "e95341beca7f:187:0": [
+     "bench clock 1592934 kHz is 3.8% off the session median"
+    ],
+    "e95341beca7f:196:0": [
+     "bench clock 2664880 kHz is 85.9% off the session median"
+    ],
+    "e95341beca7f:210:0": [
+     "bench clock 1510561 kHz is 4.9% off the session median"
+    ],
+    "e95341beca7f:215:0": [
+     "bench clock 3081738 kHz is 6.3% off the session median"
+    ],
+    "e95341beca7f:21:0": [
+     "bench clock 4071892 kHz is 10.3% off the session median"
+    ],
+    "e95341beca7f:223:0": [
+     "bench clock 1510503 kHz is 4.9% off the session median"
+    ],
+    "e95341beca7f:234:0": [
+     "bench clock 1510480 kHz is 4.9% off the session median"
+    ],
+    "e95341beca7f:235:0": [
+     "bench clock 1737364 kHz is 4.9% off the session median"
+    ],
+    "e95341beca7f:242:0": [
+     "bench clock 1587383 kHz is 5.1% off the session median"
+    ],
+    "e95341beca7f:243:0": [
+     "bench clock 1587692 kHz is 5.1% off the session median"
+    ],
+    "e95341beca7f:246:0": [
+     "bench clock 1741892 kHz is 5.2% off the session median"
+    ],
+    "e95341beca7f:250:0": [
+     "bench clock 2991849 kHz is 3.2% off the session median"
+    ],
+    "e95341beca7f:259:0": [
+     "bench clock 1595868 kHz is 3.7% off the session median"
+    ],
+    "e95341beca7f:270:0": [
+     "bench clock 1587688 kHz is 4.1% off the session median"
+    ],
+    "e95341beca7f:271:0": [
+     "bench clock 1510471 kHz is 4.9% off the session median"
+    ],
+    "e95341beca7f:283:0": [
+     "bench clock 1587671 kHz is 4.1% off the session median"
+    ],
+    "e95341beca7f:287:0": [
+     "bench clock 3060333 kHz is 5.5% off the session median"
+    ],
+    "e95341beca7f:294:0": [
+     "bench clock 1587722 kHz is 4.1% off the session median"
+    ],
+    "e95341beca7f:316:0": [
+     "bench clock 2668295 kHz is 86.2% off the session median"
+    ],
+    "e95341beca7f:32:0": [
+     "bench clock 4305521 kHz is 5.1% off the session median"
+    ],
+    "e95341beca7f:343:0": [
+     "bench clock 1742277 kHz is 9.7% off the session median"
+    ],
+    "e95341beca7f:42:0": [
+     "bench clock 1704397 kHz is 7.4% off the session median"
+    ],
+    "e95341beca7f:69:0": [
+     "bench clock 3992323 kHz is 12.0% off the session median"
+    ],
+    "e95341beca7f:6:0": [
+     "bench clock 1593632 kHz is 3.8% off the session median"
+    ],
+    "e95341beca7f:78:0": [
+     "bench clock 1587758 kHz is 4.1% off the session median"
+    ],
+    "e95341beca7f:7:0": [
+     "bench clock 1510618 kHz is 4.9% off the session median"
+    ],
+    "e95341beca7f:8:0": [
+     "bench clock 3992270 kHz is 12.0% off the session median"
+    ],
+    "e95341beca7f:95:0": [
+     "bench clock 2997619 kHz is 3.4% off the session median"
+    ]
+   },
+   "grouping": "arm",
+   "median_khz": {
+    "wide64/katsura-4@16w/base": 1510468,
+    "wide64/katsura-4@16w/head": 1510471,
+    "wide64/katsura-4@1w/base": 1433184,
+    "wide64/katsura-4@1w/head": 1433184,
+    "wide64/katsura-9@16w/base": 1656409,
+    "wide64/katsura-9@16w/head": 1587694,
+    "wide64/katsura-9@1w/base": 1433184,
+    "wide64/katsura-9@1w/head": 1433184,
+    "wide64/noon-7@16w/base": 2899804,
+    "wide64/noon-7@16w/head": 2979174,
+    "wide64/noon-7@1w/base": 4537614,
+    "wide64/noon-7@1w/head": 3992202
+   },
+   "total": 372,
+   "version": 2,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}

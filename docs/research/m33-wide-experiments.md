@@ -1,6 +1,9 @@
 # M33-G2: bounded wide-field one-worker experiments (#971)
 
-**Status:** candidate 1 measured at Gate B and Gate C, 2026-11-21. Gate C fails on one cell (§6).
+**Status:** candidate 1 measured at Gate B and Gate C, 2026-11-21; Gate C fails on one cell (§6).
+Candidate 1 merged as `2f8253f3` (owner, #965), with MQ11 at 1 w reported as no improvement. Candidate 2
+measured at Gate B (Gate A stage criterion missed; the owner ruled the Gate B pass governs) and at Gate C,
+where every cell passes (§7.1).
 **Plan:** [`MILESTONE-COMPETITIVE-BENCHMARKING.md`](../MILESTONE-COMPETITIVE-BENCHMARKING.md) §§9.6, 11, 12, 13.
 **Attribution:** [`m33-grobx-attribution.md`](m33-grobx-attribution.md) §§5, 9–10 (Gate A record).
 **Measured at:** merge base `261b17f1` against candidate `fa868367` (tag `measured/971-g2-1-table`),
@@ -10,7 +13,11 @@ both the `research-sigf4` `sig_f4_study` from `git archive`; grobx 0.155.1 `8005
 attempt, CPU 8 of reserved CCDs 1–2, load 0.8–2.1. **Gate C** (§6): merge base `93f2853a` against
 candidate `32864419` (tag `measured/971-g2-1-gatec`), the same build recipe, jobs `e75ea88fcbc2` (main),
 `1f41a1d157a3` (warm-call) and `478f0042939d` (loop-aligned placement control), 2026-11-21.
-**Host:** Threadripper PRO 5995WX.
+**G2-2 Gate B** (§7): #994's head
+`32864419` against candidate `cba1ee89` (tag `measured/971-g2-2-columns`), job `b74ceab30185`.
+**G2-2 Gate C** (§7.1): main `2f8253f3` against
+candidate `6f5466b0` (tag `measured/971-g2-2-gatec`), jobs `d92fee9ebd98` (main) and `e95341beca7f`
+(warm-call). **Host:** Threadripper PRO 5995WX.
 **Records:** [`research/m33-wide-experiments/`](../../research/m33-wide-experiments/README.md); every
 figure below is in its generated [`tables.md`](../../research/m33-wide-experiments/tables.md).
 
@@ -19,7 +26,7 @@ figure below is in its generated [`tables.md`](../../research/m33-wide-experimen
 | Candidate | Predicted (Gate A) | Measured, paired head ÷ base | Verdict |
 |---|---|---|---|
 | **G2-1** run-wide monomial table | Eco-12 wall −10.1%, symbolic ≤ 0.45; Katsura-11 −10.4%; MQ11 −4.6% | Eco-12 wall **0.906 [0.898, 0.915]** (−9.4%), symbolic **0.466 [0.454, 0.475]**; Katsura-11 0.904 [0.882, 0.911]; MQ11 0.945 [0.943, 0.949] | Gate B pass criteria met; Gate A stage criterion missed (0.466 > 0.45). The owner ruled on #965 that the Gate B pass governs. **Gate C: 17 of 18 cells pass; MQ11 / Goldilocks at 1 w fails** (0.993 [0.977, 1.007] against ≤ 0.97). See §6 |
-| G2-2 interreduction in column space | Katsura-11 −14.7% against #994 | see its own PR (stacked on #994) | measured separately |
+| G2-2 interreduction in column space | Katsura-11 −14.7% (−110 ms) against #994; interreduction ratio ≤ 0.30 | Katsura-11 wall **0.890 [0.873, 0.911]** (−82 ms); interreduction **0.368 [0.360, 0.407]**; Eco-12 0.888 [0.856, 0.905] | Gate B pass criteria met; Gate A stage criterion missed (0.368 > 0.30); the owner ruled the Gate B pass governs. **Gate C: 18 of 18 cells pass**; Katsura-11 0.880 [0.874, 0.891] at 1 w. See §7.1 |
 
 Exploratory, dev mode, same session: Eco-12 / 2⁶⁴−353 at 1 w goes from 1.550 [1.514, 1.571] × grobx
 (base) to **1.410 [1.367, 1.427]** × grobx (candidate). This is not a competitive result (plan §11.2).
@@ -147,6 +154,9 @@ explanation). Digests: one `m33-basis-v1` digest per row across every arm, worke
 measured 0.945 [0.943, 0.949] on the pre-rebase pair. The verdict on the shipped binary stands as a fail.
 No corrective iteration on the code was run; §6.3 is a diagnostic control and was not adopted.
 
+**Owner decision (#965, comment 7065780153):** #994 is adopted and merged as `2f8253f3`. MQ11 / Goldilocks at
+1 w is reported as no improvement, not as a gain.
+
 ### 6.2 Noon-8's elimination growth (the owner's condition)
 
 It reproduces: at 1 w, elimination is 24.0 → 29.0 ms (1.196 [1.186, 1.216]) while the wall still gains 4%.
@@ -195,3 +205,78 @@ inside bookkeeping). It accounts for most of the growth where the growth is real
 | Eco-12 / 2⁶⁴−353 | 235.5 | 243.3 | 1.007 [0.970, 1.053] | 2.8 |
 
 Noon-8's remaining 1.9 ms is not isolated.
+
+## 7. G2-2: interreduction in the engine's column space (Gate B)
+
+**The change.** The final interreduction no longer converts the signature basis to `MultivariatePolynomial`s
+before reducing (`src/grobner/sigf4/interreduce.rs`):
+
+- the minimal selection runs on the engine's own leads;
+- the closure interns through the run-wide monomial table and reuses its reducer cache;
+- a tails-only sweep runs in the engine's `Workspace`;
+- only the reduced basis is materialized.
+
+The F4 interreduction limits still apply. A refusal falls back to the old materialize-and-divide route, and a
+test forces it. The reduced Gröbner basis is unique, so the result is bit-identical. The pinned batch traces
+and `agrees_with_f4` checks over four families show it.
+
+**Gate B, job `b74ceab30185`,** paired G2-2 ÷ #994's head, dev mode, n = 9, 1 w. The per-arm clock rule left
+13/135 attempts contaminated, so the session is not void.
+
+| Row | Wall | Interreduction stage (ms, base → head) | Peak RSS |
+|---|---:|---:|---:|
+| Katsura-11 / 2⁶⁴−353 (target) | **0.890 [0.873, 0.911]** | 116.7 → 43.8, **0.368 [0.360, 0.407]** | 0.835 |
+| Eco-12 / 2⁶⁴−353 (control) | 0.888 [0.856, 0.905] | 275.2 → 95.6, 0.353 | 0.798 |
+| MQ11 / Goldilocks | 0.893 [0.883, 0.904] | 536.1 → 290.4, 0.545 | 0.809 |
+| Noon-8 / 2⁶⁴−353 | 0.765 [0.747, 0.779] | 128.3 → 47.1, 0.366 | 0.817 |
+| Cyclic-7 / 2⁶⁴−353 | 0.891 [0.852, 0.903] | — | 0.575 |
+
+The pass criteria hold:
+
+- Katsura-11's wall upper bound is 0.911 (≤ 0.95);
+- its half-width is 0.019 (≤ 0.025);
+- there is one digest per row;
+- RSS falls on every row.
+
+The Eco-12 control is 0.888 (falsifier at > 1.00). Symbolic and elimination move ≤ 2.5% on both rows.
+
+**Verdict: falsified.** The Gate A record names this falsifier: Katsura-11's interreduction-stage ratio
+must be ≤ 0.30, and it is 0.368 with an interval above 0.30.
+
+The wall gain is −82 ms against the predicted −110 ms. An untimed flat profile (CPU 41) puts most of the
+remaining ~44 ms in materializing the reduced basis. `MultivariatePolynomial::new` re-sorts the terms
+(the quicksort and merge over `(&Monomial, &coefficient)` pairs, plus `memcmp`), about 25 ms. The sweep
+itself is a small part.
+
+Per the stop rule, no corrective iteration was run. Materializing in the order the engine already holds
+would be one, and it would aim at the stage threshold. The owner ruled on #965 (comment 7065780153) that
+the Gate B pass governs, as for G2-1.
+
+### 7.1 Gate C
+
+Gate C ran against main `2f8253f3`, which contains #994. It used G2-1's rows, worker counts and thresholds,
+and bench-job's per-arm clock rule (46/360 and 38/372 attempts contaminated; no session is void). The
+figures below are paired head ÷ base on every ok attempt; the clean-only reading is in `tables.md` §7 and
+agrees on every verdict it has the pairs for.
+
+| Row | 1 w | 16 w |
+|---|---:|---:|
+| Eco-12 / 2⁶⁴−353 (dev, ≤ 0.97 at 1 w) | 0.894 [0.878, 0.907] | 0.864 [0.841, 0.866] |
+| Katsura-11 / 2⁶⁴−353 (dev, target) | **0.880 [0.874, 0.891]** | 0.828 [0.817, 0.830] |
+| MQ11 / Goldilocks (dev) | 0.943 [0.937, 0.960] | 0.855 [0.843, 0.864] |
+| Noon-8 / 2⁶⁴−353 | 0.768 [0.750, 0.785] | 0.783 [0.772, 0.799] |
+| Cyclic-7 / 2⁶⁴−353 | 0.911 [0.854, 0.938] | 0.897 [0.892, 0.904] |
+| Katsura-11 / Goldilocks | 0.891 [0.853, 0.902] | 0.828 [0.821, 0.842] |
+| Noon-7 / 2⁶⁴−353 (warm) | 0.666 [0.664, 0.671] | 0.715 [0.711, 0.721] |
+| Katsura-9 / 2⁶⁴−353 (warm) | 0.781 [0.775, 0.785] | 0.717 [0.713, 0.723] |
+| Katsura-4 / 2⁶⁴−353 (warm) | 0.826 [0.820, 0.831] | 0.980 [0.952, 1.018] |
+
+**Verdict: 18 of 18 cells pass.** Peak RSS is ≤ 1.00× everywhere (0.53–0.91× where it changes), and there
+is one `m33-basis-v1` digest per row. Two cells miss the precision rule but still pass: Cyclic-7 at 1 w and
+Katsura-4 at 16 w.
+
+**Exploratory, dev mode, same session (plan §11.2, not a competitive result):** Eco-12 / 2⁶⁴−353 at 1 w is
+1.414 [1.358, 1.452] × grobx 0.155.1 on main and **1.264 [1.218, 1.292]** × with G2-2. Katsura-11 is 1.349
+on main and 1.177 with G2-2. Confirmation is #975's.
+
+**Sessions:** G2-2 used 3 of its 8 (Gate B, Gate C main, warm-call).
