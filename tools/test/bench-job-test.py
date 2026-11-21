@@ -216,7 +216,8 @@ class BenchJobTest(unittest.TestCase):
         self.cli('run', job, check=0)
         attempts = self.state(job)['attempts']
         self.assertEqual([a['status'] for a in attempts], ['timeout', 'timeout'])
-        self.assertEqual(attempts[0]['metadata']['exit'], 124)
+        # 124 when the child honours timeout's SIGINT; ubuntu-latest's timeout/sleep reach --kill-after (137).
+        self.assertIn(attempts[0]['metadata']['exit'], (124, 137))
 
     # Failed tries are retried up to the manifest's budget and every try is kept with its output.
     def test_failures_are_preserved_and_retried(self):
