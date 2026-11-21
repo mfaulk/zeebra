@@ -1,0 +1,624 @@
+#!/usr/bin/env python3
+"""Durable benchmark jobs: submit a manifest, run it later, read a complete result (#967).
+
+    tools/bench-job submit <manifest.json>        validate, copy binaries, queue; prints the job id
+    tools/bench-job status [job-id] [--json]
+    tools/bench-job run (<job-id> | --next)       foreground; background it yourself
+    tools/bench-job resume <job-id> [--force-uncancel]
+    tools/bench-job cancel <job-id>
+    tools/bench-job report <job-id>
+
+A job is a directory under $ZEEBRA_BENCH_JOBS (default /buildcache/bench-jobs), never $HOME or a
+worktree. The manifest is frozen at submit and names the job (first 12 hex of its SHA-256); every
+attempt is an exit record in a `StudyJournal` (tools/external/attempt_journal.py), so the journal,
+not this script, is the result. There is no daemon: `run` is an ordinary process under
+`bench-reserve run`, which takes the CCD-scoped benchlock for the whole job, and a SIGKILLed runner
+loses at most the attempt in flight, which `resume` re-runs because its exit never became durable.
+"""
+import argparse
+import datetime
+import fcntl
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+TOOLS = Path(__file__).resolve().parent
+ROOT = TOOLS.parent
+SCHEMA = 'bench-job-manifest-v1'
+MODES = ('dev', 'publication')
+DEFAULT_ROOT = '/buildcache/bench-jobs'
+NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/-]*$')
+HEX = re.compile(r'^[0-9a-f]+$')
+RETRYABLE = ('failed', 'timeout', 'rss-limit')
+EXIT_REFUSED, EXIT_CANCELLED, EXIT_BUSY, EXIT_USAGE = 3, 4, 75, 64
+
+
+def _module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+aj = _module('attempt_journal', TOOLS / 'external' / 'attempt_journal.py')
+campaign = _module('bench_campaign', TOOLS / 'bench_campaign.py')
+
+
+class JobError(Exception):
+    def __init__(self, message, code=EXIT_USAGE):
+        super().__init__(message)
+        self.code = code
+
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for block in iter(lambda: f.read(1 << 20), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+def now():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+
+
+def jobs_root():
+    root = Path(os.environ.get('ZEEBRA_BENCH_JOBS', DEFAULT_ROOT)).resolve()
+    for name, base in (('$HOME', Path.home().resolve()), ('the repository', ROOT)):
+        if root == base or base in root.parents:
+            raise JobError(f'job root {root} is under {name.lstrip("$")}: '
+                           f'runtime state belongs on /buildcache (CLAUDE.md §1); set ZEEBRA_BENCH_JOBS')
+    return root
+
+
+def job_dir(job_id):
+    if not re.fullmatch(r'[0-9a-f]{12}', job_id or ''):
+        raise JobError(f'{job_id!r} is not a job id (12 hex digits)')
+    d = jobs_root() / job_id
+    if not (d / 'manifest.json').is_file():
+        raise JobError(f'no job {job_id} under {jobs_root()}')
+    return d
+
+
+def expand_cpus(cpus):
+    out = []
+    for part in str(cpus).split(','):
+        m = re.fullmatch(r'(\d+)(?:-(\d+))?', part)
+        if not m or (m[2] and int(m[2]) < int(m[1])):
+            raise JobError(f'malformed cpu list {cpus!r}')
+        out += range(int(m[1]), int(m[2] or m[1]) + 1)
+    return out
+
+
+def compress_cpus(ids):
+    runs = []
+    for c in ids:
+        if runs and c == runs[-1][1] + 1:
+            runs[-1][1] = c
+        else:
+            runs.append([c, c])
+    return ','.join(str(a) if a == b else f'{a}-{b}' for a, b in runs)
+
+
+# ------------------------------------------------------------------------------------------------
+# Manifest: validation and the deterministic plan.
+# ------------------------------------------------------------------------------------------------
+
+def _require(cond, message):
+    if not cond:
+        raise JobError(f'manifest: {message}')
+
+
+def _source_problem(binary, commit):
+    """Why a binary cannot be trusted to be `commit`, or None. A binary outside any git checkout is
+    judged by its recipe alone; one inside a checkout must sit in a clean tree at that commit."""
+    git = lambda *a: subprocess.run(['git', '-C', str(binary.parent), *a], capture_output=True, text=True)
+    if git('rev-parse', '--show-toplevel').returncode != 0:
+        return None
+    if git('status', '--porcelain', '--untracked-files=no').stdout.strip():
+        return f'{binary} was built in a dirty tree'
+    head = git('rev-parse', 'HEAD').stdout.strip()
+    if not head.startswith(commit):
+        return f'{binary} sits in a checkout at {head[:12]}, not {commit[:12]}'
+    return None
+
+
+def validate(m):
+    _require(isinstance(m, dict) and m.get('schema') == SCHEMA, f'schema must be {SCHEMA!r}')
+    _require(m.get('mode') in MODES, f'mode must be one of {MODES}, not {m.get("mode")!r}')
+    ctx = m.get('context') or {}
+    _require(isinstance(ctx.get('issue'), int) and isinstance(ctx.get('agent'), str),
+             'context needs an integer issue and the agent id (scripts/agent/zb-claim.sh id)')
+    arms, instances, run = m.get('arms') or [], m.get('instances') or [], m.get('run') or {}
+    _require(arms and instances, 'arms and instances must both be non-empty')
+    for kind, items in (('arm', arms), ('instance', instances)):
+        names = [i.get('name') for i in items]
+        _require(all(isinstance(n, str) and NAME.match(n) and '..' not in n for n in names),
+                 f'every {kind} needs a plain name')
+        _require(len(set(names)) == len(names), f'{kind} names must be unique')
+    for arm in arms:
+        name, commit, build = arm['name'], str(arm.get('commit', '')), arm.get('build') or {}
+        _require(HEX.match(commit) and 7 <= len(commit) <= 40, f'arm {name}: commit must be a hex sha')
+        _require(all(isinstance(build.get(k), str) for k in ('profile', 'flags', 'recipe')),
+                 f'arm {name}: build needs profile, flags and recipe')
+        _require(f'git archive {commit}' in build['recipe'],
+                 f'arm {name}: the build recipe must record `git archive {commit}`; a job never builds')
+        _require(isinstance(arm.get('argv'), list) and all(isinstance(a, str) for a in arm['argv']),
+                 f'arm {name}: argv must be a list of strings')
+        binary = Path(arm.get('binary', ''))
+        _require(binary.is_absolute() and binary.is_file() and os.access(binary, os.X_OK),
+                 f'arm {name}: binary must be an absolute path to an executable')
+        _require(sha256_file(binary) == arm.get('sha256'), f'arm {name}: {binary} does not match its sha256')
+        problem = _source_problem(binary, commit)
+        _require(problem is None, f'arm {name}: {problem}')
+    for inst in instances:
+        if inst.get('path') is not None:
+            path = Path(inst['path'])
+            _require(path.is_absolute() and path.is_file(), f'instance {inst["name"]}: path must be an absolute file')
+            _require(sha256_file(path) == inst.get('sha256'), f'instance {inst["name"]}: input does not match its sha256')
+        _require(isinstance(inst.get('params', {}), dict), f'instance {inst["name"]}: params must be an object')
+    limits = run.get('limits') or {}
+    cpus = expand_cpus(run.get('cpus', ''))
+    workers = run.get('workers')
+    _require(isinstance(workers, list) and workers and all(isinstance(w, int) and 0 < w <= len(cpus) for w in workers),
+             'run.workers must be positive and fit in run.cpus')
+    _require(isinstance(run.get('repetitions'), int) and run['repetitions'] > 0, 'run.repetitions must be >= 1')
+    _require(run.get('interleave', 'rotate') == 'rotate', 'run.interleave supports only "rotate"')
+    _require(all(isinstance(s, int) for s in run.get('seeds', [0])), 'run.seeds must be integers')
+    _require(isinstance(run.get('retries', 0), int) and run.get('retries', 0) >= 0, 'run.retries must be >= 0')
+    _require(isinstance(limits.get('wall_seconds'), (int, float)) and limits['wall_seconds'] > 0,
+             'run.limits.wall_seconds must be positive')
+    for key in ('rss_bytes', 'live_bytes'):
+        _require(limits.get(key) is None or isinstance(limits[key], int), f'run.limits.{key} must be an integer or null')
+    for cell in expand(m):
+        argv(m, cell, Path('/job'))
+
+
+def expand(m):
+    """The plan: instances x workers x seeds in turn, arms rotated one place per repetition."""
+    run = m['run']
+    rows = [(dict(instance=i['name'], workers=w, seed=s), [a['name'] for a in m['arms']])
+            for i in m['instances'] for w in run['workers'] for s in run.get('seeds', [0])]
+    return [dict(row, rep=rep, arm=arm) for rep, row, arm in campaign.plan(rows, run['repetitions'])]
+
+
+def attempt_id(job_id, index, try_):
+    return f'{job_id}:{index}:{try_}'
+
+
+def _key(name):
+    return name.replace('/', '__')
+
+
+def binary_path(directory, arm):
+    return directory / 'bin' / _key(arm['name']) / Path(arm['binary']).name
+
+
+def input_path(directory, inst):
+    return directory / 'inputs' / _key(inst['name']) / Path(inst['path']).name if inst.get('path') else None
+
+
+def attempt_cpus(m, workers):
+    return compress_cpus(expand_cpus(m['run']['cpus'])[:workers])
+
+
+def argv(m, cell, directory):
+    arm = next(a for a in m['arms'] if a['name'] == cell['arm'])
+    inst = next(i for i in m['instances'] if i['name'] == cell['instance'])
+    values = dict(inst.get('params', {}), instance=inst['name'], input=str(input_path(directory, inst) or ''),
+                  workers=cell['workers'], seed=cell['seed'], rep=cell['rep'], cpus=attempt_cpus(m, cell['workers']),
+                  wall_seconds=m['run']['limits']['wall_seconds'], live_bytes=m['run']['limits'].get('live_bytes'))
+    try:
+        return [str(binary_path(directory, arm)), *(a.format_map(values) for a in arm['argv'])]
+    except (KeyError, IndexError, ValueError) as e:
+        raise JobError(f'manifest: arm {arm["name"]} argv template names an unknown field {e}') from None
+
+
+def journal_limits(m):
+    run, limits = m['run'], m['run']['limits']
+    per_try = limits['wall_seconds'] + limits.get('kill_after_seconds', 60)
+    attempts = len(expand(m)) * (1 + run.get('retries', 0))
+    return dict(aggregate_wall_seconds=limits.get('aggregate_wall_seconds', attempts * per_try),
+                output_bytes=limits.get('output_bytes', 1 << 30))
+
+
+def journal_header(job_id, m):
+    return dict(bench_job=dict(job_id=job_id, manifest_sha256=hashlib.sha256(canonical(m)).hexdigest(),
+                               mode=m['mode'], context=m['context']))
+
+
+def open_journal(directory, m):
+    return aj.StudyJournal.open(directory / 'journal', journal_header(directory.name, m), expand(m),
+                                journal_limits(m), quarantine_torn=True)
+
+
+# ------------------------------------------------------------------------------------------------
+# submit / status / cancel / report.
+# ------------------------------------------------------------------------------------------------
+
+def submit(path):
+    m = json.loads(Path(path).read_text())
+    validate(m)
+    root = jobs_root()
+    job_id = hashlib.sha256(canonical(m)).hexdigest()[:12]
+    final, stage = root / job_id, root / f'.{job_id}.partial'
+    if final.exists():
+        raise JobError(f'job {job_id} was already submitted; a manifest names exactly one job')
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        raise JobError(f'cannot create {root}; /buildcache is root-owned, so create it once with '
+                       f'`sudo install -d -o "$USER" {root}` or set ZEEBRA_BENCH_JOBS') from None
+    shutil.rmtree(stage, ignore_errors=True)
+    stage.mkdir()
+    for arm in m['arms']:
+        _install(Path(arm['binary']), binary_path(stage, arm), arm['sha256'])
+    for inst in m['instances']:
+        if inst.get('path'):
+            _install(Path(inst['path']), input_path(stage, inst), inst['sha256'])
+    (stage / 'manifest.json').write_bytes(canonical(m) + b'\n')
+    aj.StudyJournal.create(stage / 'journal', journal_header(job_id, m), expand(m), journal_limits(m))
+    stage.rename(final)
+    with open(root / 'queue', 'a') as q:
+        fcntl.flock(q, fcntl.LOCK_EX)
+        q.write(f'{now()} {job_id}\n')
+    return job_id
+
+
+def _install(source, target, digest):
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+    target.chmod(0o555 if os.access(source, os.X_OK) else 0o444)
+    if sha256_file(target) != digest:
+        raise JobError(f'{source} changed while it was being copied')
+
+
+def load_manifest(directory):
+    return json.loads((directory / 'manifest.json').read_bytes())
+
+
+def _lock_free(directory):
+    with open(directory / 'run.lock', 'a') as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        return True
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    return True
+
+
+def job_status(directory):
+    """State, outcome counts and the attempt in flight, from the chain-checked journal."""
+    m = load_manifest(directory)
+    out = dict(job=directory.name, mode=m['mode'], issue=m['context']['issue'], plan=len(expand(m)))
+    try:
+        header, header_sha = aj._read_header(directory / 'journal')
+        entries, _ = aj._entries(directory / 'journal', header_sha)
+        attempts, _, stop, _ = aj._replay(directory / 'journal', header, entries)
+    except ValueError as e:
+        attempts, stop, out['journal_error'] = [], None, str(e)
+    outcomes = {}
+    for a in attempts:
+        outcomes[a['status']] = outcomes.get(a['status'], 0) + 1
+    out.update(outcomes=outcomes, stop=stop)
+    started = directory / 'started'
+    if stop is not None:
+        out['state'] = {'complete': 'done', 'cancelled': 'cancelled'}.get(stop['reason'], 'failed')
+    elif not _lock_free(directory):
+        out['state'] = 'running'
+        try:
+            current = json.loads((directory / 'current.json').read_text())
+            out['current'] = dict(current, elapsed_seconds=round(time.time() - current['started_unix'], 1))
+        except (OSError, ValueError):
+            pass
+    elif not started.exists():
+        out['state'] = 'queued'
+    else:
+        pid = int(started.read_text().split()[0] or 0)
+        out['state'] = 'waiting-for-lock' if _alive(pid) else 'interrupted'
+    if (directory / 'cancel').exists() and out['state'] != 'cancelled':
+        out['cancel_requested'] = True
+    return out
+
+
+def _status_line(s):
+    counts = ' '.join(f'{k}={v}' for k, v in sorted(s['outcomes'].items())) or 'none'
+    line = f"{s['job']}  {s['state']:<16} #{s['issue']} {s['mode']:<11} attempts {counts} of {s['plan']} cells"
+    if 'current' in s:
+        line += f"  current {s['current']['attempt']} {s['current']['elapsed_seconds']}s"
+    if s.get('stop') and s['state'] == 'failed':
+        line += f"  stop={s['stop']['reason']}"
+    return line
+
+
+def cancel(directory):
+    """A live runner sees the request and stops; with none, the stop is journaled here and now."""
+    with open(directory / 'run.lock', 'a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            pass
+        else:
+            journal = open_journal(directory, load_manifest(directory))
+            if journal.stopped:
+                return 'already stopped'
+            journal.record_stop('cancelled', at=now(), boundary='not-running')
+            return 'cancelled'
+    aj._atomic_write(directory / 'cancel', f'{now()} {os.getpid()}\n'.encode())
+    return 'cancel requested; the runner stops within 10 s'
+
+
+def report(directory):
+    # Placeholder until #969's `bench_stats` renders tables from the journal.
+    state = aj.load(directory / 'journal')
+    rows = [dict(attempt=a['metadata'].get('attempt_id'), index=a['index'], cell=a['cell'], status=a['status'],
+                 exit=a['metadata']['exit'], wall_seconds=a['metadata']['wall_seconds'],
+                 peak_rss_bytes=a['metadata']['observed_peak_rss_bytes']) for a in state['attempts']]
+    return dict(header=state['header'], stop=state['stop'], stops=state['stops'], attempts=rows,
+                journal_sha256=state['journal_sha256'])
+
+
+# ------------------------------------------------------------------------------------------------
+# The runner.
+# ------------------------------------------------------------------------------------------------
+
+def enforce_mode(m):
+    """B2's hook (#968): refuse a `publication` job the machine cannot support. Recorded only, for now."""
+    return None
+
+
+def contamination(result, m):
+    """B2's hook (#968): the §11.2 per-attempt contamination record, stored in the exit metadata."""
+    return None
+
+
+def classify(metadata):
+    if metadata['exit'] == 0:
+        return 'ok'
+    if metadata['stop'] == 'cancelled':
+        return 'cancelled'
+    if metadata['guard'].get('rss_guard_rc') == 3:
+        return 'rss-limit'
+    if metadata['exit'] in (124, 137) and metadata['wall_seconds'] >= metadata['guard']['wall_seconds']:
+        return 'timeout'
+    return 'failed'
+
+
+class Deferred:
+    """Hold SIGINT/SIGTERM while a record is being written, so an operator's signal cannot tear one."""
+
+    def __enter__(self):
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM})
+
+    def __exit__(self, *_):
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT, signal.SIGTERM})
+
+
+def _next_work(journal, retries):
+    """(index, try) to run next, or None. A cancelled try is always re-run; a failed one while the
+    manifest's retry budget lasts; anything else moves on to the first index without an exit."""
+    if journal.attempts:
+        last = journal.attempts[-1]
+        status = last['status']
+        if status == 'cancelled' or (status in RETRYABLE and last['try'] < retries):
+            return last['index'], last['try'] + 1
+    if journal.next_index < len(journal.header['plan']):
+        return journal.next_index, 0
+    return None
+
+
+def run_job(directory, force_uncancel=False):
+    m = load_manifest(directory)
+    lock = open(directory / 'run.lock', 'a')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise JobError(f'job {directory.name} is already running', EXIT_BUSY) from None
+    journal = open_journal(directory, m)
+    cancel_file = directory / 'cancel'
+    if force_uncancel:
+        cancel_file.unlink(missing_ok=True)
+    if journal.stopped:
+        reason = aj.load(directory / 'journal')['stop']['reason']
+        if reason == 'complete':
+            return 0
+        if reason != 'cancelled' or not force_uncancel:
+            hint = ' (resume --force-uncancel to continue)' if reason == 'cancelled' else ''
+            raise JobError(f'job {directory.name} is stopped: {reason}{hint}',
+                           EXIT_CANCELLED if reason == 'cancelled' else EXIT_REFUSED)
+        with Deferred():
+            journal.record_resume('force-uncancel', at=now())
+    if journal.attempts and journal.attempts[-1]['status'] == 'unverified':
+        # The runner died between the exit and its verdict; the exit metadata decides it.
+        last = aj.load(directory / 'journal')['attempts'][-1]
+        with Deferred():
+            journal.record_verdict(last['index'], classify(last['metadata']),
+                                   dict(attempt_id=last['metadata']['attempt_id'], recovered=True))
+    enforce_mode(m)
+    limits, retries = m['run']['limits'], m['run'].get('retries', 0)
+    plan = journal.header['plan']
+    (directory / 'scratch').mkdir(exist_ok=True)
+    while (work := _next_work(journal, retries)) is not None:
+        index, try_ = work
+        cell, aid = plan[index], attempt_id(directory.name, index, try_)
+        if cancel_file.exists():
+            with Deferred():
+                journal.record_stop('cancelled', at=now(), boundary='between-attempts', next_attempt=aid)
+            return EXIT_CANCELLED
+        refusal = journal.refusal(limits['wall_seconds'] + limits.get('kill_after_seconds', 60))
+        arm = next(a for a in m['arms'] if a['name'] == cell['arm'])
+        actual = sha256_file(binary_path(directory, arm))
+        if refusal is None and actual != arm['sha256']:
+            refusal = dict(reason='binary-mismatch', arm=arm['name'], path=str(binary_path(directory, arm)),
+                           expected=arm['sha256'], actual=actual)
+        inst = next(i for i in m['instances'] if i['name'] == cell['instance'])
+        if refusal is None and inst.get('path') and sha256_file(input_path(directory, inst)) != inst['sha256']:
+            refusal = dict(reason='input-mismatch', instance=inst['name'], expected=inst['sha256'])
+        if refusal is not None:
+            with Deferred():
+                journal.record_stop(refusal.pop('reason'), attempt=aid, at=now(), **refusal)
+            raise JobError(f'{aid}: refused, {journal_stop(directory)}', EXIT_REFUSED)
+        cpus = attempt_cpus(m, cell['workers'])
+        aj._atomic_write(directory / 'current.json', canonical(dict(
+            attempt=aid, index=index, cell=cell, runner_pid=os.getpid(), started=now(),
+            started_unix=time.time())))
+        command = argv(m, cell, directory)
+        guard = None
+        if limits.get('rss_bytes'):
+            guard = (Path(command[0]).name[:15], command[0], limits['rss_bytes'] // 1024)
+        load = os.getloadavg()[0]
+        r = campaign.run_child(command, cpus, limits['wall_seconds'], limits.get('kill_after_seconds', 60), guard,
+                               should_stop=cancel_file.exists, scratch_dir=directory / 'scratch')
+        metadata = dict(attempt_id=aid, attempt_try=try_, cpus=cpus, argv=command, binary_sha256=actual, load_start=load,
+                        process_wall_ns=r['process_wall_ns'], wall_seconds=r['process_wall_ns'] / 1e9,
+                        cpu_seconds=r['cpu_seconds'], observed_peak_rss_bytes=r['peak_rss_bytes'],
+                        exit=r['returncode'], stop='cancelled' if r['stopped'] else None,
+                        guard=dict(wall_seconds=limits['wall_seconds'], rss_bytes=limits.get('rss_bytes'),
+                                   rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr']),
+                        before=r['before'], after=r['after'], freq=r['freq'], contamination=contamination(r, m))
+        status = classify(metadata)
+        with Deferred():
+            journal.record_exit(index, cell, r['stdout'], r['stderr'], metadata, try_=try_)
+            journal.record_verdict(index, status, dict(attempt_id=aid))
+        (directory / 'current.json').unlink(missing_ok=True)
+        print(aid, cell['arm'], cell['instance'], f"w={cell['workers']}", status,
+              f"{metadata['wall_seconds']:.3f}s", flush=True)
+        if status == 'cancelled':
+            with Deferred():
+                journal.record_stop('cancelled', at=now(), boundary='in-attempt', attempt=aid)
+            return EXIT_CANCELLED
+    with Deferred():
+        journal.record_stop('complete', at=now(), attempts=len(journal.attempts))
+    return 0
+
+
+def journal_stop(directory):
+    stop = aj.load(directory / 'journal')['stop']
+    return ' '.join([stop['reason'], *(f'{k}={v}' for k, v in sorted(stop.items()) if k not in ('reason', 'at'))])
+
+
+def launch(directory, force_uncancel):
+    """Exec the runner under `bench-reserve run`: the reservation check, the zbbench.slice scope and
+    the CCD-scoped benchlock for the whole job. B2 (#968) extends this for `publication` mode, which
+    must hold an exclusive lock rather than a CCD-scoped one."""
+    m = load_manifest(directory)
+    reserve = os.environ.get('ZEEBRA_BENCH_JOB_RESERVE', str(TOOLS / 'bench-reserve.sh'))
+    inner = [sys.executable, str(Path(__file__).resolve()), '_run', directory.name]
+    if force_uncancel:
+        inner.append('--force-uncancel')
+    sys.stdout.flush()
+    os.execvp(reserve, [reserve, 'run', f'bench-job-{directory.name}', m['run']['cpus'], *inner])
+
+
+def start(directory, resume, force_uncancel):
+    started = directory / 'started'
+    if resume:
+        if not started.exists():
+            raise JobError(f'job {directory.name} never started; use run')
+        s = job_status(directory)
+        if s['state'] in ('running', 'waiting-for-lock'):
+            raise JobError(f'job {directory.name} is {s["state"]}', EXIT_BUSY)
+        if s['state'] == 'cancelled' and not force_uncancel:
+            raise JobError(f'job {directory.name} was cancelled; resume --force-uncancel to continue', EXIT_CANCELLED)
+        started.write_text(f'{os.getpid()} {now()}\n')
+    else:
+        try:
+            fd = os.open(started, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+        except FileExistsError:
+            raise JobError(f'job {directory.name} has already started; use resume') from None
+        os.write(fd, f'{os.getpid()} {now()}\n'.encode())
+        os.close(fd)
+    launch(directory, force_uncancel)
+
+
+def next_queued():
+    queue = jobs_root() / 'queue'
+    seen = []
+    for line in queue.read_text().splitlines() if queue.exists() else []:
+        job_id = line.split()[-1]
+        if job_id not in seen and (jobs_root() / job_id / 'manifest.json').exists() \
+                and not (jobs_root() / job_id / 'started').exists():
+            seen.append(job_id)
+    for job_id in seen:
+        try:
+            fd = os.open(jobs_root() / job_id / 'started', os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+        except FileExistsError:
+            continue  # another `run --next` took it first
+        os.write(fd, f'{os.getpid()} {now()}\n'.encode())
+        os.close(fd)
+        return jobs_root() / job_id
+    return None
+
+
+def main(args=None):
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = p.add_subparsers(dest='command', required=True)
+    sub.add_parser('submit').add_argument('manifest', type=Path)
+    s = sub.add_parser('status')
+    s.add_argument('job', nargs='?')
+    s.add_argument('--json', action='store_true')
+    r = sub.add_parser('run')
+    g = r.add_mutually_exclusive_group(required=True)
+    g.add_argument('job', nargs='?')
+    g.add_argument('--next', action='store_true', help='take the oldest queued job')
+    for name in ('resume', '_run'):
+        x = sub.add_parser(name)
+        x.add_argument('job')
+        x.add_argument('--force-uncancel', action='store_true')
+    sub.add_parser('cancel').add_argument('job')
+    sub.add_parser('report').add_argument('job')
+    a = p.parse_args(args)
+    try:
+        if a.command == 'submit':
+            print(submit(a.manifest))
+        elif a.command == 'status':
+            root = jobs_root()
+            dirs = [job_dir(a.job)] if a.job else sorted(d for d in root.glob('*') if (d / 'manifest.json').is_file()) \
+                if root.exists() else []
+            for s in map(job_status, dirs):
+                print(json.dumps(s, sort_keys=True) if a.json else _status_line(s))
+        elif a.command == 'run':
+            directory = next_queued() if a.next else job_dir(a.job)
+            if directory is None:
+                print('bench-job: no queued job', file=sys.stderr)
+                return 1
+            if a.next:
+                launch(directory, False)
+            start(directory, False, False)
+        elif a.command == 'resume':
+            start(job_dir(a.job), True, a.force_uncancel)
+        elif a.command == '_run':
+            return run_job(job_dir(a.job), a.force_uncancel)
+        elif a.command == 'cancel':
+            print(cancel(job_dir(a.job)))
+        elif a.command == 'report':
+            print(json.dumps(report(job_dir(a.job)), indent=1, sort_keys=True, default=str))
+    except JobError as e:
+        print(f'bench-job: {e}', file=sys.stderr)
+        return e.code
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

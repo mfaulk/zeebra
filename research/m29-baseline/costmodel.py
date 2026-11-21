@@ -11,17 +11,17 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import threading
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools'))
+# Moved to the shared runner (#967); re-exported so the M29-M32 campaigns that import them replay.
+from bench_campaign import Sampler, cpulist, snapshot, summarize_freq  # noqa: E402,F401
+
 TARGETS = ('mq10-32003', 'mq10-m31', 'eco12-wide64', 'mq11-goldilocks')
 WORKERS = (1, 4, 8, 16)
 FIRST_CPU = 8
-
-
-def cpulist(workers, first=FIRST_CPU):
-    return f'{first}' if workers == 1 else f'{first}-{first + workers - 1}'
 
 
 def plan(suite, reps):
@@ -50,35 +50,6 @@ def plan(suite, reps):
         shift = (rep * 5) % len(arms)
         out += [(rep, *a) for a in arms[shift:] + arms[:shift]]
     return out
-
-
-def snapshot(cpus):
-    r = subprocess.run(['bash', str(ROOT / 'tools/cpu-context.sh'), cpus], capture_output=True, text=True)
-    return json.loads(r.stdout) if r.returncode == 0 else dict(error=r.returncode, stderr=r.stderr)
-
-
-class Sampler(threading.Thread):
-    def __init__(self, cpus):
-        super().__init__(daemon=True)
-        first, _, last = cpus.partition('-')
-        ids = range(int(first), int(last or first) + 1)
-        self.paths = [Path(f'/sys/devices/system/cpu/cpu{c}/cpufreq/scaling_cur_freq') for c in ids]
-        self.samples, self.stop = [], threading.Event()
-
-    def run(self):
-        while not self.stop.wait(0.025):
-            try:
-                self.samples.append(sum(int(p.read_text()) for p in self.paths) / len(self.paths))
-            except OSError:
-                return
-
-
-def summarize_freq(samples):
-    if not samples:
-        return None
-    s = sorted(samples)
-    return dict(n=len(s), mean_khz=round(sum(s) / len(s)), min_khz=round(s[0]),
-                median_khz=round(s[len(s) // 2]), max_khz=round(s[-1]))
 
 
 def settle(limit_load, max_wait):

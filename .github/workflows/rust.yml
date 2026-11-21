@@ -288,6 +288,7 @@ jobs:
           bash tools/test/bench-reserve-test.sh
           bash tools/test/bench-clock-test.sh
           python3 tools/test/bench-contamination-test.py
+          bash tools/test/bench-job-test.sh
 
       - name: M29 baseline campaign helpers
         if: ${{ !cancelled() }}

@@ -186,5 +186,39 @@ class AttemptJournalTest(unittest.TestCase):
         self.assertTrue(all(a['stdout'] == STDOUT for a in aj.load(self.dir)['attempts']))
 
 
+    # A retry is a further try of the index just recorded, kept beside the try it follows.
+    def test_retry_keeps_every_try_in_order(self):
+        j = self.create()
+        j.record_exit(0, PLAN[0], b'', b'boom', dict(metadata(), exit=1))
+        j.record_verdict(0, 'failed', {})
+        j.record_exit(0, PLAN[0], STDOUT, b'', metadata(), try_=1)
+        j.record_verdict(0, 'ok', {})
+        with self.assertRaisesRegex(ValueError, 'try'):
+            j.record_exit(0, PLAN[0], STDOUT, b'', metadata(), try_=3)
+        j.record_exit(1, PLAN[1], STDOUT, b'', metadata())
+        with self.assertRaisesRegex(ValueError, 'try'):
+            j.record_exit(0, PLAN[0], STDOUT, b'', metadata(), try_=2)
+        attempts = aj.load(self.dir)['attempts']
+        self.assertEqual([(a['index'], a['try'], a['status']) for a in attempts],
+                         [(0, 0, 'failed'), (0, 1, 'ok'), (1, 0, 'unverified')])
+        self.assertEqual(aj.StudyJournal.open(self.dir, HEADER, PLAN, LIMITS).next_index, 2)
+
+    # A resume record lifts a stop so the journal continues, and the stop stays in its history.
+    def test_resume_after_stop_continues_the_chain(self):
+        j = self.create()
+        j.record_exit(0, PLAN[0], STDOUT, b'', metadata())
+        with self.assertRaisesRegex(ValueError, 'not stopped'):
+            j.record_resume('operator')
+        j.record_stop('cancelled', by='test')
+        reopened = aj.StudyJournal.open(self.dir, HEADER, PLAN, LIMITS)
+        self.assertTrue(reopened.stopped)
+        reopened.record_resume('force-uncancel')
+        reopened.record_exit(1, PLAN[1], STDOUT, b'', metadata())
+        state = aj.load(self.dir)
+        self.assertIsNone(state['stop'])
+        self.assertEqual([s['reason'] for s in state['stops']], ['cancelled'])
+        self.assertEqual(len(state['attempts']), 2)
+
+
 if __name__ == '__main__':
     unittest.main()
