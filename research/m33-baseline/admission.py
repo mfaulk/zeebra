@@ -126,24 +126,37 @@ def grobx(binary, case, mode, wall_s):
                        generators=case['generators'], mode=mode, wall_ns=wall_s * 10**9, rss_bytes=CAP_BYTES), f)
     r = guarded([binary, f.name], wall_s + 5)
     os.unlink(f.name)
-    raw = json.loads(r['stdout']) if r['rc'] == 0 and r['stdout'].strip() else {}
-    ok = bool(raw.get('basis')) and not raw.get('stopped') and (mode == 'raw' or raw.get('certified'))
-    digest = None
-    if ok:
-        texts = [t for t in re.split(r'[,\n\[\]:]', raw['basis']) if t.strip()]
-        digest = basis_digest.basis_digest(texts, int(case['modulus']), case['variables'])
-    return r, ok, digest
+    digest = grobx_digest(r['stdout'] if r['rc'] == 0 else '', case, mode)
+    return r, digest is not None, digest
+
+
+def grobx_digest(stdout, case, mode='raw'):
+    """The `m33-basis-v1` digest of a grobx-driver reply, or None if it holds no complete basis."""
+    raw = json.loads(stdout) if stdout.strip() else {}
+    if not (raw.get('basis') and not raw.get('stopped') and (mode == 'raw' or raw.get('certified'))):
+        return None
+    texts = [t for t in re.split(r'[,\n\[\]:]', raw['basis']) if t.strip()]
+    return basis_digest.basis_digest(texts, int(case['modulus']), case['variables'])
+
+
+def msolve_input(case):
+    return ','.join(case['variables']) + '\n' + case['modulus'] + '\n' + ',\n'.join(case['generators']) + '\n'
+
+
+def msolve_digest(text, case):
+    """The `m33-basis-v1` digest of msolve's `-g 2` output, or None if it holds no basis."""
+    body = text[text.find('[') + 1:text.rfind(']')] if '[' in text else ''
+    texts = [t for t in body.replace('\n', '').split(',') if t.strip()]
+    return basis_digest.basis_digest(texts, int(case['modulus']), case['variables']) if texts else None
 
 
 def msolve(binary, case, workers):
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as d:
         src, out = Path(d, 'in.ms'), Path(d, 'out.ms')
-        src.write_text(','.join(case['variables']) + '\n' + case['modulus'] + '\n' + ',\n'.join(case['generators']) + '\n')
+        src.write_text(msolve_input(case))
         r = guarded([binary, '-f', str(src), '-o', str(out), '-t', str(workers), '-g', '2'], CAP_S + 5)
         text = out.read_text() if r['rc'] == 0 and out.exists() else ''
-    body = text[text.find('[') + 1:text.rfind(']')] if '[' in text else ''
-    texts = [t for t in body.replace('\n', '').split(',') if t.strip()]
-    digest = basis_digest.basis_digest(texts, int(case['modulus']), case['variables']) if texts else None
+    digest = msolve_digest(text, case)
     return r, digest is not None, digest
 
 
@@ -242,10 +255,14 @@ def groebner_rs(binary, case):
                        generators=case['generators']), f)
     r = guarded([binary, f.name], CERTIFIED_CAP_S)
     os.unlink(f.name)
-    raw = json.loads(r['stdout']) if r['rc'] == 0 and r['stdout'].strip() else {}
-    texts = raw.get('basis') or []
-    ok = r['stop'] is None and bool(texts)
-    return r, ok, basis_digest.basis_digest(texts, int(case['modulus']), case['variables']) if ok else None
+    digest = groebner_rs_digest(r['stdout'] if r['rc'] == 0 and r['stop'] is None else '', case)
+    return r, digest is not None, digest
+
+
+def groebner_rs_digest(stdout, case):
+    """The `m33-basis-v1` digest of a groebner-rs-driver reply, or None if it holds no basis."""
+    texts = (json.loads(stdout) if stdout.strip() else {}).get('basis') or []
+    return basis_digest.basis_digest(texts, int(case['modulus']), case['variables']) if texts else None
 
 
 REFERENCE_ONLY = {'reference_completes', 'digests_agree'}

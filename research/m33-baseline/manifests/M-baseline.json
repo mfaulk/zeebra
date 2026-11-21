@@ -1,0 +1,222 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 966,
+  "agent": "agent-add69e75fa5f8a6ac@feat/966-baseline-cohort",
+  "track": "M",
+  "session": "baseline"
+ },
+ "arms": [
+  {
+   "name": "entry",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study",
+   "sha256": "d00a6bafd4a1c21ea52f0da0e11384b80f0c6d0d87e6ce0a1e1c3ffb71126b33",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ]
+  },
+  {
+   "name": "sigf4",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study",
+   "sha256": "d00a6bafd4a1c21ea52f0da0e11384b80f0c6d0d87e6ce0a1e1c3ffb71126b33",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "sigf4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    1
+   ]
+  },
+  {
+   "name": "msolve",
+   "commit": "b364edcb",
+   "binary": "/home/mfaulk/.local/opt/zeebra-ext/bin/msolve",
+   "sha256": "557470de2e13aaa214fd6380600b3fedadc05c2ed203f6afa29a8b172abb6c8d",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json",
+    "comparand": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json"
+   },
+   "argv": [
+    "-f",
+    "{inputs[ms]}",
+    "-o",
+    "/dev/stdout",
+    "-t",
+    "{workers}",
+    "-g",
+    "2"
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "gf32003/mq-random-10",
+   "params": {
+    "field": "gf32003",
+    "name": "mq-random-10",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/gf32003__mq-random-10/in.ms",
+     "sha256": "1315f4daa00ec30823dcda19f95e71c622f1e581fbc3f15cd1dfbd1cef34e0bd"
+    }
+   }
+  },
+  {
+   "name": "m31/mq-random-10",
+   "params": {
+    "field": "m31",
+    "name": "mq-random-10",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/m31__mq-random-10/in.ms",
+     "sha256": "ff1c11aeb2ac9dac450a8c47d5e9c45544e4f6e21af4b6e30fa76ba7f2846f76"
+    }
+   }
+  },
+  {
+   "name": "gf32003/katsura-11",
+   "params": {
+    "field": "gf32003",
+    "name": "katsura-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/gf32003__katsura-11/in.ms",
+     "sha256": "ae6935232a62ea041ba72b7c05a8db41719a7b45693200c22402da202551ecdd"
+    }
+   }
+  },
+  {
+   "name": "m31/katsura-11",
+   "params": {
+    "field": "m31",
+    "name": "katsura-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/m31__katsura-11/in.ms",
+     "sha256": "12fc7e94678a602c8070e30d7b625bb72feb3e9b151eea9b2284d58760fde07e"
+    }
+   }
+  },
+  {
+   "name": "gf32003/cyclic-7",
+   "params": {
+    "field": "gf32003",
+    "name": "cyclic-7",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/gf32003__cyclic-7/in.ms",
+     "sha256": "2994ec3acae5d17f9f30cfdbb45a4a83406d5342636e89a9013caaafc9f26390"
+    }
+   }
+  },
+  {
+   "name": "gf32003/noon-7",
+   "params": {
+    "field": "gf32003",
+    "name": "noon-7",
+    "generate": "--generate"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/gf32003__noon-7/in.ms",
+     "sha256": "ba93fb51d629d643f573cfc392ce7a9e7fcf2cb1e635ff380efa53082697f25a"
+    }
+   }
+  },
+  {
+   "name": "m31/eco-11",
+   "params": {
+    "field": "m31",
+    "name": "eco-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/m31__eco-11/in.ms",
+     "sha256": "1b64aecc6522cb2a5d2c3e1233accfeaca98c6ccf56cef099e18f81b8931be6d"
+    }
+   }
+  },
+  {
+   "name": "gf32003/katsura-4",
+   "params": {
+    "field": "gf32003",
+    "name": "katsura-4",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/gf32003__katsura-4/in.ms",
+     "sha256": "66731ca5f9ad9b215fa15272516a9f6fc2fc107b596bf611f9d9f4df90c97470"
+    }
+   }
+  }
+ ],
+ "run": {
+  "workers": [
+   1,
+   4,
+   8,
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 180,
+   "kill_after_seconds": 30,
+   "rss_bytes": 8589934592,
+   "live_bytes": null
+  }
+ }
+}

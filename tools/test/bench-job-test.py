@@ -338,6 +338,42 @@ class BenchJobTest(unittest.TestCase):
         self.cli('run', dev, check=0)
         self.assertEqual(log.read_text().strip(), 'exclusive=')
 
+    # An arm with its own `workers` runs only at those counts; a count outside run.workers is refused.
+    def test_arm_workers_restrict_the_plan(self):
+        m = self.manifest(reps=1)
+        m['run'].update(workers=[1, 2], cpus='0-1')
+        m['arms'][1]['workers'] = [2]
+        cells = [(c['instance'], c['workers'], c['arm']) for c in bj.expand(m)]
+        self.assertEqual([c for c in cells if c[0] == 'i1'], [('i1', 1, 'a'), ('i1', 2, 'a'), ('i1', 2, 'b')])
+        m['arms'][1]['workers'] = [4]
+        with self.assertRaisesRegex(bj.JobError, 'workers'):
+            bj.validate(m)
+
+    # Named per-instance inputs are copied and re-hashed, reach argv as {inputs[key]}, and a changed one is refused.
+    def test_named_inputs_are_copied_and_templated(self):
+        src = self.tmp / 'in.ms'
+        src.write_text('x,y\n7\nx+y\n')
+        m = self.manifest(reps=1, instances=(('i1', ['ok']),))
+        m['instances'][0]['inputs'] = dict(ms=dict(path=str(src), sha256=sha(src)))
+        m['arms'][0]['argv'] = ['ok', '{inputs[ms]}']
+        job = self.job(m)
+        copied = self.jobs / job / 'inputs' / 'i1' / 'ms' / 'in.ms'
+        self.assertEqual(sha(copied), sha(src))
+        cell = next(c for c in bj.expand(m) if c['arm'] == 'a')
+        self.assertEqual(bj.argv(m, cell, self.jobs / job)[-1], str(copied))
+        m['instances'][0]['inputs']['ms']['sha256'] = '0' * 64
+        with self.assertRaisesRegex(bj.JobError, 'input'):
+            bj.validate(m)
+
+    # An externally provisioned comparand may replace the git-archive recipe with a named provenance, never omit both.
+    def test_comparand_build_replaces_git_archive(self):
+        m = self.manifest(reps=1)
+        m['arms'][1]['build'].update(recipe='tools/external/provision.sh', comparand='msolve 0.11.0 tarball')
+        bj.validate(m)
+        del m['arms'][1]['build']['comparand']
+        with self.assertRaisesRegex(bj.JobError, 'git archive'):
+            bj.validate(m)
+
     # The job root may not live under $HOME, where heavy writes reach the system drive.
     def test_jobs_root_under_home_is_refused(self):
         self.env['ZEEBRA_BENCH_JOBS'] = str(Path.home() / 'bench-jobs-should-not-exist')
