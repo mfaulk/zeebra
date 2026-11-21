@@ -126,6 +126,12 @@ class Regression(unittest.TestCase):
         self.assertEqual((rss, excluded), (1.0, 0))
         self.assertEqual(summarize.paired(f0 + f2, small=False)[0], [1.0, 1.0, 1.0])
 
+    def test_repetitions_from_two_jobs_pool(self):
+        """A top-up job's rep 0 adds a pair beside the first job's rep 0 instead of replacing it."""
+        recs = [dict(record(arm, rep=0), job=job, wall_ns=wall)
+                for job, f0, f2 in (('a', 10, 11), ('b', 10, 12)) for arm, wall in (('f0-f4', f0), ('f2-f4', f2))]
+        self.assertEqual(sorted(summarize.paired(recs, small=False)[0]), [1.1, 1.2])
+
 
 if __name__ == '__main__':
     unittest.main()

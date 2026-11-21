@@ -50,7 +50,7 @@ def attempts(job):
         except ValueError:
             report = {}
         version, _, engine = a['cell']['arm'].partition('-')
-        out.append(dict(a['cell'], version=version, engine=engine, status=a['status'], report=report,
+        out.append(dict(a['cell'], job=job.name, version=version, engine=engine, status=a['status'], report=report,
                         wall_ns=a['metadata']['process_wall_ns'],
                         rss=a['metadata'].get('observed_peak_rss_bytes'),
                         contaminated=a['metadata']['attempt_id'] in flagged, context=manifest['context']))
@@ -124,7 +124,8 @@ def paired(records, small):
         return bs.warm_median(r['report']['calls_ns']) if small else r['wall_ns']
     clean = [r for r in records if r['status'] == 'ok' and not r['contaminated']
              and r['report'].get('status') == 'complete']
-    by = {v: {r['rep']: r for r in clean if r['version'] == v} for v in ('f0', 'f2')}
+    # Keyed by job too, so an extension job's repetitions pool with the first job's instead of replacing them.
+    by = {v: {(r.get('job'), r['rep']): r for r in clean if r['version'] == v} for v in ('f0', 'f2')}
     walls = bs.paired_ratios({k: sample(r) for k, r in by['f2'].items()}, {k: sample(r) for k, r in by['f0'].items()})
     rss = [r['rss'] for r in by['f2'].values() if r['rss']], [r['rss'] for r in by['f0'].values() if r['rss']]
     ratio = statistics.median(rss[0]) / statistics.median(rss[1]) if all(rss) else None
