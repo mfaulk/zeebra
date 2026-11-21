@@ -1126,7 +1126,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         self.by_index[sig.index as usize].push((mask(&sig.mono), id));
         self.lead_masks.push(mask(&lead));
+        let hashing = Instant::now();
         let hashes = terms.iter().map(|(m, _)| hash(m)).collect();
+        self.stats.element_hashing += hashing.elapsed();
         self.basis.push(Element {
             sig,
             lead,

@@ -341,6 +341,15 @@ fn test_statistics_are_internally_consistent() {
     assert!(s.signature_metadata_bytes > 0);
 }
 
+/// Hashing new elements' terms is clocked on its own, inside bookkeeping (#971 Gate C).
+#[test]
+fn test_element_hashing_is_clocked_inside_bookkeeping() {
+    let (result, s) = sig_f4_reported(&katsura::<6, Zp32003>(), GREVLEX, &SigF4Options::default());
+    result.unwrap();
+    assert!(s.element_hashing > std::time::Duration::ZERO);
+    assert!(s.element_hashing <= s.bookkeeping);
+}
+
 /// Every criterion fires on Katsura-6, so the equality tests are not passing on a criterion-free
 /// engine, and fewer targets reduce to zero than pairs are rejected.
 #[test]

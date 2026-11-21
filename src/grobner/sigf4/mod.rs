@@ -177,6 +177,8 @@ pub struct SigF4Statistics {
     pub signature_metadata_bytes: usize,
     /// Pair generation, the queue and every criterion: the bookkeeping RFC §5 leaves unpriced.
     pub bookkeeping: Duration,
+    /// The part of `bookkeeping` spent hashing new elements' terms for the monomial table.
+    pub element_hashing: Duration,
     pub symbolic: Duration,
     pub elimination: Duration,
     pub interreduction: Duration,
