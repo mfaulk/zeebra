@@ -1256,7 +1256,7 @@ fn main() {
     };
     let n = input.variables.len();
     if args.input_only {
-        let strings = |v: &[String]| Json::Array(v.iter().map(|s| Json::string(s)).collect());
+        let strings = |v: &[String]| Json::Array(v.iter().map(Json::string).collect());
         let row = Json::object([
             ("field", Json::string(&args.field)),
             ("name", Json::string(&args.name)),

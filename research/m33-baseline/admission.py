@@ -78,9 +78,12 @@ def pool(study):
 
 def guarded(argv, wall_s):
     """Exit status, process wall and the child's peak RSS; the child is killed past either cap."""
+    # Files, not pipes: a polled child whose output outgrows a pipe buffer blocks on the write.
+    out_f = tempfile.TemporaryFile('w+', dir=os.environ.get('TMPDIR'))
+    err_f = tempfile.TemporaryFile('w+', dir=os.environ.get('TMPDIR'))
     started = time.monotonic_ns()
-    child = subprocess.Popen(['taskset', '-c', CPUS, *argv], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             text=True, start_new_session=True)
+    child = subprocess.Popen(['taskset', '-c', CPUS, *argv], stdout=out_f, stderr=err_f, text=True,
+                             start_new_session=True)
     peak, stop = 0, None
     while child.poll() is None:
         try:
@@ -94,9 +97,14 @@ def guarded(argv, wall_s):
             os.killpg(child.pid, signal.SIGKILL)
             break
         time.sleep(0.01)
-    out, err = child.communicate()
-    return dict(rc=child.returncode, wall_ns=time.monotonic_ns() - started, peak=peak, stop=stop, stdout=out,
-                stderr=err[-2000:])
+    child.wait()
+    wall = time.monotonic_ns() - started
+    out_f.seek(0)
+    err_f.seek(0)
+    out, err = out_f.read(), err_f.read()
+    out_f.close()
+    err_f.close()
+    return dict(rc=child.returncode, wall_ns=wall, peak=peak, stop=stop, stdout=out, stderr=err[-2000:])
 
 
 def zeebra(study, row, workers):

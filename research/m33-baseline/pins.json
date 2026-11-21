@@ -1,0 +1,53 @@
+{
+ "issue": 966,
+ "checked": "2026-11-21",
+ "comparands": [
+  {
+   "solver": "grobx",
+   "role": "M33 current pin (Track G)",
+   "upstream": "https://github.com/code1-de/grobx",
+   "commit": "8005a2a1670a7264617a6f49eeb2618d7fa21701",
+   "version": "0.155.1",
+   "released": "2026-11-20T19:05:22Z",
+   "latest_upstream": "8005a2a1 (HEAD of the default branch; the repository publishes no release tags)",
+   "build": "research/m33-baseline/grobx-pin.sh: tools/external/grobx-driver with the rev replaced, lock grobx-0.155.1.Cargo.lock, release, fat LTO, codegen-units 1, -C target-cpu=x86-64-v3, rustc 1.99.1",
+   "executable": "grobx-driver",
+   "sha256": "fdd6aeecac466d3702f1e459f1e1456b72f5444d3563f193b5693df44ce183bc",
+   "threads": "one computing thread under a 16-worker request (census.jsonl); src/call.rs:172 ignores Params::threads"
+  },
+  {
+   "solver": "grobx",
+   "role": "M31 continuity pin (the repository's own, unchanged)",
+   "upstream": "https://github.com/code1-de/grobx",
+   "commit": "1854835dbc25f24dc9a9ba017024d5030e99da1c",
+   "version": "0.73.3",
+   "build": "tools/external/grobx-driver at this branch (the #966 thread probe added), --locked, same flags",
+   "executable": "grobx-driver",
+   "sha256": "cd62eccccf35a2a0b7b79e4c2c9364ce15cab4e6845cad42d33d364c520713f8",
+   "threads": "one computing thread under a 16-worker request (census.jsonl)"
+  },
+  {
+   "solver": "msolve",
+   "role": "Track M pin (unchanged: still the latest release)",
+   "upstream": "https://github.com/algebraic-solving/msolve",
+   "version": "0.11.0",
+   "released": "2026-10-09T08:37:58Z",
+   "latest_upstream": "v0.11.0 is the latest release; master (aba4fe34, 2026-11-20) is 176 commits ahead of the provisioned b364edcb and unreleased",
+   "build": "tools/external/provision.sh (msolve.lip6.fr preconfigured 0.11.0 tarball)",
+   "executable": "msolve",
+   "sha256": "557470de2e13aaa214fd6380600b3fedadc05c2ed203f6afa29a8b172abb6c8d",
+   "threads": "exactly the requested -t at 1/4/8/16 on all four census rows (census.jsonl)"
+  },
+  {
+   "solver": "Singular",
+   "role": "independent reference below 2^31 (admission only)",
+   "executable": "/usr/bin/Singular (system package)"
+  }
+ ],
+ "zeebra": {
+  "f0": "31e334bd (M32 final main, #960); src/ at this branch is identical",
+  "harness": "examples/sig_f4_study.rs at this branch, built from git archive, --features research-sigf4, release, fat LTO, codegen-units 1, x86-64-v3, RUSTC_WRAPPER=''",
+  "admission_build": "b3c15ff3",
+  "sha256": "f4724546c5535b308f00bd4102b09a5592f57805696f0e81b10f9a0f3b42c7eb"
+ }
+}
