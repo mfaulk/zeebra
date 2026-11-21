@@ -5,12 +5,13 @@
 #   tools/bench-clock.sh status [CPULIST]          rc 0 fixed, 1 not fixed, 2 inconsistent/failed
 #   sudo tools/bench-clock.sh fix <MHz> [CPULIST]  default CPULIST 8-23,72-87 (CCDs 1-2 + siblings)
 #   sudo tools/bench-clock.sh restore
-#   tools/bench-clock.sh setup                     print the optional sudoers step; runs nothing
 #
 # A serial process boosts to ~4.5 GHz while a 16-worker run sits at the all-core clock (#827), so a
 # Zeebra-16 / comparand-1 ratio carries a ~1.14x frequency term that is not algorithmic. `fix`
 # disables boost and pins scaling_min_freq = scaling_max_freq = <MHz> on the listed CPUs; pick a
 # figure at or below the 16-worker all-core clock so serial and parallel arms run at one speed.
+#
+# The optional sudoers step is in docs/guide/benchmarking.md, *Fixed clock*.
 #
 # Nothing here runs unless a subcommand is named, and `fix`/`restore` refuse without root (rc 77):
 # no privileged change is made silently. A fixed clock is shared machine state, like a CCD
@@ -133,32 +134,14 @@ bc_fix() { # <MHz> [cpulist]
   return 2
 }
 
-bc_setup_text() {
-  cat <<'SETUP'
-Optional root step, so a session can fix and restore the clock without an interactive sudo.
-Install a root-owned copy: a sudoers entry on the repository's own file would let anyone who can
-edit the checkout run arbitrary code as root.
-
-  sudo install -o root -g root -m 0755 tools/cpu-context.sh tools/bench-clock.sh /usr/local/libexec/zeebra/
-  echo "$USER ALL=(root) NOPASSWD: /usr/local/libexec/zeebra/bench-clock.sh fix *, /usr/local/libexec/zeebra/bench-clock.sh restore" \
-    | sudo tee /etc/sudoers.d/zeebra-bench-clock
-  sudo chmod 0440 /etc/sudoers.d/zeebra-bench-clock && sudo visudo -c
-
-Undo: sudo /usr/local/libexec/zeebra/bench-clock.sh restore (if fixed), then
-  sudo rm -r /etc/sudoers.d/zeebra-bench-clock /usr/local/libexec/zeebra
-A fix does not survive a reboot; nothing here installs a boot-time unit.
-SETUP
-}
-
 bc_main() {
   local cmd="${1:-}"
   [ "$#" -gt 0 ] && shift
   case "$cmd" in
     status) bc_status "$@" ;;
-    fix) [ "$#" -ge 1 ] || { sed -n '5,9p' "${BASH_SOURCE[0]}" >&2; return 64; }; bc_fix "$@" ;;
+    fix) [ "$#" -ge 1 ] || { bc_main; return 64; }; bc_fix "$@" ;;
     restore) bc_restore ;;
-    setup) bc_setup_text ;;
-    *) sed -n '5,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; return 64 ;;
+    *) sed -n '5,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; return 64 ;;
   esac
 }
 

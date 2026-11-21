@@ -165,6 +165,7 @@ current column at this standard, which is why re-taking them is its own serializ
 | Affinity | The CPU set the run was pinned to. **Pinning is applied to the harness process**, not to each child: affinity is inherited across `fork` and preserved across `exec`, and wrapping each child in `taskset` is the first step toward the wrapper hazard in §4. `ZEEBRA_AFFINITY` records it. |
 | Worker count | `Limits::workers`, and the flag that told the tool to use it. Part of the comparison key: a single-threaded tool has not lost to a tool given 64 cores. The cryptanalysis scoreboard already refuses cross-concurrency comparison (`ScoreboardError::DifferentConcurrency`) and this board inherits the rule. |
 | Machine tag | `ZEEBRA_MACHINE`. Two figures from different machines are not a ratio. |
+| Clock mode | `tools/cpu-context.sh`'s `clock` field: `fixed@<MHz>` (set by `tools/bench-clock.sh`, #954) or `boost`. A serial comparand boosts higher than a 16-worker run, so a cross-engine ratio states its clock mode, the same for every arm. |
 | Serialization | Every timed run holds the benchmark lock (`tools/benchlock.sh`), whose `QUEUED`/`START`/`END` log makes **overlapping windows a machine-checkable proof that two figures were not taken under the protocol**. A figure taken without the lock is not publishable. |
 
 ### What it cost
