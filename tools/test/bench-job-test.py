@@ -298,6 +298,11 @@ class BenchJobTest(unittest.TestCase):
         r.update(cpu_seconds=9.0, own_cpu_s=10.0)
         self.assertFalse(bj.contamination(r, self.manifest(), 'job')['verdict']['contaminated'])
 
+    # The clock rule's groups are cells: two instances at one worker count are different groups.
+    def test_cell_group(self):
+        self.assertNotEqual(bj.cell_group(dict(instance='x', workers=1)), bj.cell_group(dict(instance='y', workers=1)))
+        self.assertNotEqual(bj.cell_group(dict(instance='x', workers=1)), bj.cell_group(dict(instance='x', workers=16)))
+
     # The harness runs on run.cpus outside the attempt when there are any; otherwise none are spare.
     def test_harness_cpus(self):
         m = self.manifest()

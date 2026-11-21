@@ -455,7 +455,7 @@ The metrics come from the before/after `cpu-context` snapshots, with the child's
 as `own_cpu_s` and the sampled median clock. Snapshots that cannot be read give `verdict: null`
 plus an `error`, never a clean verdict. The `complete` stop carries the session verdict:
 `{contaminated, total, void, median_khz, flagged}`. That is where the clock rule is applied,
-against each worker count's median.
+against each cell's (instance and worker count's) median.
 
 A `cpu-context` snapshot costs about 0.5 CPU-s, and part of that cost falls inside the window its
 `/proc/stat` reads bound. So the runner moves its harness (snapshots and frequency sampler) onto

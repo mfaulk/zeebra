@@ -453,9 +453,14 @@ def run_attempt(m, command, cpus, guard, cancel_file, directory):
     return r
 
 
+def cell_group(cell):
+    return f"{cell['instance']}@{cell['workers']}w"
+
+
 def session_contamination(journal, m, job_id):
-    """Every judged attempt against its worker count's median clock, and whether the session is void."""
-    rows = [(a['metadata']['attempt_id'], a['cell']['workers'], a['metadata'].get('contamination') or {})
+    """Every judged attempt against its cell's median clock (instance and workers: 1 and 16 workers
+    run at different clocks by design, #827, and so do two instances), and whether the session is void."""
+    rows = [(a['metadata']['attempt_id'], cell_group(a['cell']), a['metadata'].get('contamination') or {})
             for a in aj.load(journal.directory)['attempts']]
     rows = [r for r in rows if r[2].get('metrics')]
     s = bc.session_verdict([r[2]['metrics'] for r in rows], m['mode'], [r[1] for r in rows], lock_owner(job_id))
