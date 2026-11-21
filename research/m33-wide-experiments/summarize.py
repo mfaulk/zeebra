@@ -221,7 +221,7 @@ def gate_c(recs, prefix, title):
             session = SESSION_OF.get(job, '')
             if not session.startswith(prefix):
                 continue
-            build = 'align64' if 'align' in session else 'shipped'
+            build = 'align64' if 'align' in session else 'shipped, warm-call' if session.endswith('warm') else 'shipped'
             for arm, reps in arms.items():
                 for k, r in reps.items():
                     out[build, row, w][arm][(job, k)] = r

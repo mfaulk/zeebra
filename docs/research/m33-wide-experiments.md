@@ -1,13 +1,16 @@
 # M33-G2: bounded wide-field one-worker experiments (#971)
 
-**Status:** candidate 1 measured at Gate B, 2026-11-21. Candidate 2 not started (owner decision on #965).
+**Status:** candidate 1 measured at Gate B and Gate C, 2026-11-21. Gate C fails on one cell (§6).
 **Plan:** [`MILESTONE-COMPETITIVE-BENCHMARKING.md`](../MILESTONE-COMPETITIVE-BENCHMARKING.md) §§9.6, 11, 12, 13.
 **Attribution:** [`m33-grobx-attribution.md`](m33-grobx-attribution.md) §§5, 9–10 (Gate A record).
 **Measured at:** merge base `261b17f1` against candidate `fa868367` (tag `measured/971-g2-1-table`),
 both the `research-sigf4` `sig_f4_study` from `git archive`; grobx 0.155.1 `8005a2a1`
 ([`pins.json`](../../research/m33-baseline/pins.json)). One `tools/bench-job` dev-mode session, job
 `2c4085807850`, 2026-11-21: n = 9 per arm and row, arms interleaved and rotated, fresh process per
-attempt, CPU 8 of reserved CCDs 1–2, load 0.8–2.1. **Host:** Threadripper PRO 5995WX.
+attempt, CPU 8 of reserved CCDs 1–2, load 0.8–2.1. **Gate C** (§6): merge base `93f2853a` against
+candidate `32864419` (tag `measured/971-g2-1-gatec`), the same build recipe, jobs `e75ea88fcbc2` (main),
+`1f41a1d157a3` (warm-call) and `478f0042939d` (loop-aligned placement control), 2026-11-21.
+**Host:** Threadripper PRO 5995WX.
 **Records:** [`research/m33-wide-experiments/`](../../research/m33-wide-experiments/README.md); every
 figure below is in its generated [`tables.md`](../../research/m33-wide-experiments/tables.md).
 
@@ -15,8 +18,8 @@ figure below is in its generated [`tables.md`](../../research/m33-wide-experimen
 
 | Candidate | Predicted (Gate A) | Measured, paired head ÷ base | Verdict |
 |---|---|---|---|
-| **G2-1** run-wide monomial table | Eco-12 wall −10.1%, symbolic ≤ 0.45; Katsura-11 −10.4%; MQ11 −4.6% | Eco-12 wall **0.906 [0.898, 0.915]** (−9.4%), symbolic **0.466 [0.454, 0.475]**; Katsura-11 0.904 [0.882, 0.911]; MQ11 0.945 [0.943, 0.949] | **Gate B pass criteria met; Gate A hypothesis falsified on its stage criterion** (0.466 > 0.45). Not advanced to Gate C; see §4 |
-| G2-2 interreduction in column space | Eco-12 −5.2% (under 8%) | — | not started: no Gate A record; owner decision on #965 |
+| **G2-1** run-wide monomial table | Eco-12 wall −10.1%, symbolic ≤ 0.45; Katsura-11 −10.4%; MQ11 −4.6% | Eco-12 wall **0.906 [0.898, 0.915]** (−9.4%), symbolic **0.466 [0.454, 0.475]**; Katsura-11 0.904 [0.882, 0.911]; MQ11 0.945 [0.943, 0.949] | Gate B pass criteria met; Gate A stage criterion missed (0.466 > 0.45). The owner ruled on #965 that the Gate B pass governs. **Gate C: 17 of 18 cells pass; MQ11 / Goldilocks at 1 w fails** (0.993 [0.977, 1.007] against ≤ 0.97). See §6 |
+| G2-2 interreduction in column space | Katsura-11 −14.7% against #994 | see its own PR (stacked on #994) | measured separately |
 
 Exploratory, dev mode, same session: Eco-12 / 2⁶⁴−353 at 1 w goes from 1.550 [1.514, 1.571] × grobx
 (base) to **1.410 [1.367, 1.427]** × grobx (candidate). This is not a competitive result (plan §11.2).
@@ -86,7 +89,7 @@ assumed. It falls to 3.4× on Katsura-11 and 4.1× on MQ11.
 **Side effects.** Bookkeeping grows 3–14%, 3.4 ms on MQ11. Inserting an element now hashes its terms,
 which is charged to bookkeeping rather than symbolic. That is the likely cause, but it is not separately
 clocked. Noon-8's elimination grows 20%, from 23.6 to
-28.4 ms. That row's wall still gains 5.5%, and the cause was not isolated. Eco-12's RSS grows 5.2% and
+28.4 ms. That row's wall still gains 5.5%; §6.2 attributes the growth. Eco-12's RSS grows 5.2% and
 Cyclic-7's 6.3%, both under the 1.10× that would need an explanation.
 
 ## 4. Verdict
@@ -96,19 +99,99 @@ comment on #971 restated them: "falsified if any of these holds at Gate B". One 
 stage reached 0.466, and the hypothesis needed ≤ 0.45. On that wording the hypothesis is falsified, by 0.016
 with an interval that excludes 0.45. That is despite a wall gain within 0.7 points of the prediction.
 
-**This candidate was stopped here** rather than taken to Gate C. A corrective iteration would have had no
-target except moving the stage the remaining 3.5% toward the threshold, and that is tuning toward a
-threshold. It was not run.
+No corrective iteration was run at Gate B: it would have had no target except moving the stage the
+remaining 3.5% toward the threshold, and that is tuning toward a threshold.
 
-Whether the gate's pass criteria or the hypothesis's stage falsifier governs the candidate is left to the
-owner on #965. The code is the PR's head as measured. If it is allowed to proceed, the next step is
-Gate C as posted: development and control rows at 1 w and 16 w, against the merge base, in one job.
+The owner ruled on #965 (comment 7063833537) that the Gate B pass governs, so the candidate went on to
+Gate C (§6), with two added conditions: explain Noon-8's elimination growth and clock the bookkeeping
+growth.
 
 ## 5. What this does not show
 
-- **No Gate C.** There are no 16 w figures, and no figures for Noon-7, Katsura-9 / 2⁶⁴−353,
-  Katsura-11 / Goldilocks or Katsura-4.
 - **The remaining symbolic time was not split by component** (no `research-sigf4-split` arm this session).
   The probe cost, the multiplications, the reducer search and the column sort are unattributed between them.
-- **Noon-8's elimination growth is unexplained.** The matrices are identical by construction (§1).
-- **Sessions:** 1 of the 8-session cap.
+- **Noon-8's elimination growth is attributed but not removed** (§6.2): the table is not freed per
+  batch, and the fix (or not) is a separate change.
+- **The MQ11 shortfall is attributed but not fixed** (§6.3): the shipped binary fails, and the
+  loop-aligned control is a diagnostic build, not a candidate.
+- **Sessions:** 4 of the 8-session cap (Gate B, Gate C main, warm-call, placement control).
+
+## 6. Gate C (thresholds posted on #971 before measuring)
+
+The owner ruled on #965 that the Gate B pass governs, so Gate C ran as posted: development and control rows
+at 1 w and 16 w, against the merge base, after rebasing onto `origin/main` (`93f2853a`). The per-arm clock
+rule (#965) groups by row, worker count and arm; no session is void (52/360, 52/372 and 6/81 attempts
+contaminated). The figures below use every ok attempt (n = 9, or n = 31 for warm-call cells). The
+clean-only reading is in `tables.md` §5 beside them: it agrees on every verdict it has the pairs for,
+and many cells have fewer than 9 clean pairs. The four cells under 300 ms process wall (Noon-7 and
+Katsura-9 / 2⁶⁴−353, at both worker counts) and Katsura-4 are read by the warm-call median (plan §11.6).
+
+| Row | 1 w | 16 w |
+|---|---:|---:|
+| Eco-12 / 2⁶⁴−353 (dev, ≤ 0.97 at 1 w) | 0.896 [0.868, 0.923] | 0.893 [0.875, 0.904] |
+| Katsura-11 / 2⁶⁴−353 (dev) | 0.906 [0.881, 0.932] | 0.849 [0.845, 0.859] |
+| MQ11 / Goldilocks (dev) | **0.993 [0.977, 1.007] FAIL** | 0.899 [0.895, 0.916] |
+| Noon-8 / 2⁶⁴−353 | 0.959 [0.916, 0.976] | 0.926 [0.899, 0.935] |
+| Cyclic-7 / 2⁶⁴−353 | 0.904 [0.887, 0.919] | 0.899 [0.892, 0.902] |
+| Katsura-11 / Goldilocks | 0.933 [0.914, 0.940] | 0.847 [0.831, 0.865] |
+| Noon-7 / 2⁶⁴−353 (warm) | 0.897 [0.889, 0.917] | 0.908 [0.900, 0.915] |
+| Katsura-9 / 2⁶⁴−353 (warm) | 0.839 [0.834, 0.849] | 0.821 [0.814, 0.825] |
+| Katsura-4 / 2⁶⁴−353 (warm) | 0.904 [0.898, 0.904] | 0.983 [0.974, 1.008] |
+
+Peak RSS is ≤ 1.07× everywhere (Cyclic-7 at 16 w is the largest; under the 1.10× that needs an
+explanation). Digests: one `m33-basis-v1` digest per row across every arm, worker count and job.
+
+### 6.1 Verdict
+
+17 of 18 cells pass. **MQ11 / Goldilocks at 1 w fails**: its upper bound 1.007 is above 0.97, where Gate B
+measured 0.945 [0.943, 0.949] on the pre-rebase pair. The verdict on the shipped binary stands as a fail.
+No corrective iteration on the code was run; §6.3 is a diagnostic control and was not adopted.
+
+### 6.2 Noon-8's elimination growth (the owner's condition)
+
+It reproduces: at 1 w, elimination is 24.0 → 29.0 ms (1.196 [1.186, 1.216]) while the wall still gains 4%.
+The matrices are identical by construction, so the extra time is not arithmetic. `noon8-probe.sh` (output in
+`noon8-probe.txt`, CPU 41, untimed) attributes it to **page faults moving into elimination**:
+
+- The base frees each batch's `MonomialMap` when symbolic preprocessing ends, and elimination's
+  allocations reuse those already-faulted pages. The candidate's table persists across batches, so
+  elimination's allocations fault fresh pages. Faults in `_int_malloc` go from 3,207 to 4,459, while the
+  process total is flat (26,389 → 25,636).
+- With `GLIBC_TUNABLES=glibc.malloc.hugetlb=1`, which removes most first-touch faults, the gap closes:
+  elimination medians are 18.8 ms (base) and 19.7 ms (candidate), against 24.7 and 28.0 ms under the
+  default allocator in the same probe.
+
+So the growth is allocator layout, not a change to elimination. The row's wall gains despite it.
+
+### 6.3 The MQ11 shortfall
+
+On MQ11 at 1 w the candidate's elimination grew 5.9% (3,549 → 3,735 ms) with the same matrices.
+`perf stat` on the Gate B head `fa868367` and the Gate C head `32864419` shows identical user-space
+instruction counts (7.383 × 10¹⁰), the same branch and L1 misses, and about 5% more cycles in the Gate C
+build. The hot loop is `Engine::eliminate`, which neither commit changed. That points to code placement:
+the rebase and the element-hashing clock moved the loop.
+
+Placement control (job `478f0042939d`): both arms rebuilt with `-C llvm-args=-align-loops=64`, so every
+loop is aligned the same way, development rows at 1 w, n = 9. MQ11's elimination ratio becomes
+1.000 [0.995, 1.054] and its wall 0.948 [0.942, 0.998], the Gate B median again. The interval is too wide
+to clear 0.97, so even that build fails the precision rule. Eco-12 is 0.910 and Katsura-11 0.894 under
+the control.
+
+The shortfall therefore is placement in a loop outside the change, and the aligned build recovers the
+median but not a passing interval. Adopting a loop-alignment flag to clear one threshold would be tuning
+toward it, and it was not adopted.
+
+### 6.4 Bookkeeping
+
+Bookkeeping grows by 0–13%. Hashing new elements' terms is now clocked separately (`element_hashing`,
+inside bookkeeping). It accounts for most of the growth where the growth is real:
+
+| Row, 1 w | Base | Candidate | Ratio | `element_hashing` |
+|---|---:|---:|---:|---:|
+| MQ11 / Goldilocks | 26.5 ms | 30.0 ms | 1.132 [1.089, 1.159] | 3.1 ms |
+| Katsura-11 / Goldilocks | 16.1 | 17.1 | 1.085 [1.046, 1.099] | 0.8 |
+| Katsura-11 / 2⁶⁴−353 | 15.7 | 16.7 | 1.053 [1.025, 1.102] | 0.7 |
+| Noon-8 / 2⁶⁴−353 | 84.5 | 87.1 | 1.028 [1.014, 1.034] | 0.7 |
+| Eco-12 / 2⁶⁴−353 | 235.5 | 243.3 | 1.007 [0.970, 1.053] | 2.8 |
+
+Noon-8's remaining 1.9 ms is not isolated.
