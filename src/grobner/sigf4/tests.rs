@@ -341,6 +341,32 @@ fn test_statistics_are_internally_consistent() {
     assert!(s.signature_metadata_bytes > 0);
 }
 
+/// Final interreduction runs in the engine's column space, not through polynomials, and its
+/// reduced basis is the shipping F4's on every family and field here (#971 G2-2).
+#[test]
+fn test_interreduction_runs_in_the_engines_columns() {
+    let (_, s) = sig_f4_reported(&katsura::<6, Zp32003>(), GREVLEX, &SigF4Options::default());
+    assert!(s.interreduction_in_columns);
+    assert!(s.interreduction_columns > 0);
+    agrees_with_f4(&katsura::<6, Goldilocks>(), GREVLEX);
+    agrees_with_f4(&eco::<7, Wide>(), GREVLEX);
+    agrees_with_f4(&cyclic::<5, Wide>(), MonomialOrder::GradedLexicographic);
+    agrees_with_f4(&noon::<5, Zp32003>(), GREVLEX);
+}
+
+/// A refused column-space interreduction falls back to the polynomial route with the same basis.
+#[test]
+fn test_refused_column_interreduction_falls_back_to_polynomials() {
+    let system = katsura::<6, Goldilocks>();
+    let options = SigF4Options {
+        interreduction_live_entries: Some(10),
+        ..SigF4Options::default()
+    };
+    let (fallback, s) = sig_f4_reported(&system, GREVLEX, &options);
+    assert!(!s.interreduction_in_columns);
+    assert_eq!(fallback.unwrap(), f4(&system, GREVLEX).unwrap());
+}
+
 /// Hashing new elements' terms is clocked on its own, inside bookkeeping (#971 Gate C).
 #[test]
 fn test_element_hashing_is_clocked_inside_bookkeeping() {

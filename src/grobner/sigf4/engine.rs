@@ -38,6 +38,9 @@ use crate::{
 #[path = "symbolic_replay.rs"]
 pub mod symbolic_replay;
 
+#[path = "interreduce.rs"]
+mod columns;
+
 pub(super) const NONE: u32 = u32::MAX;
 
 /// A row after reduction: its remaining entries in column order, and the products spent.
@@ -176,10 +179,52 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         }
     }
 
+    // Interreduce from the engine's rows (G2-2); a budget refusal falls back to the polynomial
+    // route below, which materializes the whole signature basis first.
+    let interreduction = Instant::now();
+    let direct = if inconsistent {
+        None
+    } else {
+        let defaults = F4Options::default();
+        #[allow(unused_mut)]
+        let mut limits = columns::Limits {
+            rows: defaults.max_matrix_rows,
+            columns: defaults.max_matrix_columns,
+            live_entries: defaults.live_entry_allowance::<F>(),
+        };
+        #[cfg(test)]
+        if let Some(live) = options.interreduction_live_entries {
+            limits.live_entries = live;
+        }
+        let should_stop = || wall.is_some_and(|(clock, budget)| clock.elapsed() >= budget);
+        match engine.interreduce_in_columns(limits, should_stop) {
+            Ok(done) => Some(done),
+            Err(columns::Declined::Refused) => None,
+            Err(columns::Declined::Stopped { elements }) => {
+                let (clock, budget) = wall.unwrap_or((Instant::now(), Duration::ZERO));
+                return Err(SigF4Error::Budget(
+                    F4Error::InterreductionTimeBudgetExceeded {
+                        elements_reduced: 0,
+                        elements,
+                        elapsed_millis: millis(clock.elapsed()),
+                        budget_millis: millis(budget),
+                    },
+                ));
+            }
+        }
+    };
+    let mut interreduction_time = interreduction.elapsed();
+    let materialized = direct.is_none()
+        || cfg!(any(
+            feature = "research-sigf4-split",
+            feature = "research-sigf4-usage"
+        ));
     #[cfg(feature = "research-sigf4-split")]
     let materialize_clock = Instant::now();
     let basis: Vec<MultivariatePolynomial<N, F>> = if inconsistent {
         vec![MultivariatePolynomial::one()]
+    } else if !materialized {
+        Vec::new()
     } else {
         engine
             .basis
@@ -231,9 +276,17 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         stats.split.minimal_selection = clock.elapsed();
     }
 
-    let interreduction = Instant::now();
-    let (reduced, matrix) = interreduce(basis, order, wall)?;
-    stats.interreduction = interreduction.elapsed();
+    stats.interreduction_in_columns = direct.is_some();
+    let (reduced, matrix) = match direct {
+        Some(done) => done,
+        None => {
+            let clock = Instant::now();
+            let done = interreduce(basis, order, wall)?;
+            interreduction_time += clock.elapsed();
+            done
+        }
+    };
+    stats.interreduction = interreduction_time;
     stats.interreduction_columns = matrix.columns;
     stats.interreduction_nonzeros = matrix.nonzeros;
     stats.interreduction_peak_nonzeros = matrix.peak_nonzeros;
