@@ -323,6 +323,12 @@ jobs:
           python3 -m unittest discover -s research/m33-small-prime-experiments -p 'test_*.py'
           python3 research/m33-small-prime-experiments/summarize.py --check
 
+      - name: M33 G2 experiment helpers and tables
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/m33-wide-experiments -p 'test_*.py'
+          python3 research/m33-wide-experiments/summarize.py --check
+
       - name: M30 symbolic cost-model campaign helpers
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m30-symbolic -p 'test_*.py'
