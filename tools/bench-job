@@ -50,6 +50,7 @@ def _module(name, path):
 
 aj = _module('attempt_journal', TOOLS / 'external' / 'attempt_journal.py')
 campaign = _module('bench_campaign', TOOLS / 'bench_campaign.py')
+bc = _module('bench_contamination', TOOLS / 'bench_contamination.py')
 
 
 class JobError(Exception):
@@ -178,6 +179,8 @@ def validate(m):
     _require(run.get('interleave', 'rotate') == 'rotate', 'run.interleave supports only "rotate"')
     _require(all(isinstance(s, int) for s in run.get('seeds', [0])), 'run.seeds must be integers')
     _require(isinstance(run.get('retries', 0), int) and run.get('retries', 0) >= 0, 'run.retries must be >= 0')
+    _require(isinstance(run.get('mode_wait_seconds', 0), (int, float)) and run.get('mode_wait_seconds', 0) >= 0,
+             'run.mode_wait_seconds must be >= 0')
     _require(isinstance(limits.get('wall_seconds'), (int, float)) and limits['wall_seconds'] > 0,
              'run.limits.wall_seconds must be positive')
     for key in ('rss_bytes', 'live_bytes'):
@@ -383,14 +386,51 @@ def report(directory):
 # The runner.
 # ------------------------------------------------------------------------------------------------
 
-def enforce_mode(m):
-    """B2's hook (#968): refuse a `publication` job the machine cannot support. Recorded only, for now."""
-    return None
+def lock_owner(job_id):
+    return f'bench-job-{job_id}'
 
 
-def contamination(result, m):
-    """B2's hook (#968): the §11.2 per-attempt contamination record, stored in the exit metadata."""
-    return None
+def enforce_mode(m, journal, job_id):
+    """Publication mode starts only once the §11.2 start conditions hold (tools/bench_contamination.py),
+    re-checking every 60 s for up to `run.mode_wait_seconds`; otherwise the refusal is journaled. Dev
+    mode refuses nothing: its context is recorded per attempt."""
+    if m['mode'] != 'publication':
+        return
+    deadline = time.monotonic() + m['run'].get('mode_wait_seconds', 0)
+    while True:
+        snap = campaign.snapshot(m['run']['cpus'])
+        refusals = bc.publication_refusals(snap, lock_owner(job_id)) if 'stat' in snap \
+            else [f'cpu-context failed: {snap}']
+        if not refusals:
+            return
+        if time.monotonic() + 60 > deadline:
+            with Deferred():
+                journal.record_stop('mode-refused', at=now(), refusals=refusals)
+            raise JobError(f'publication mode refused: {"; ".join(refusals)}', EXIT_REFUSED)
+        time.sleep(60)
+
+
+def contamination(result, m, job_id):
+    """The §11.2 per-attempt record stored in the exit metadata. The clock rule needs the session
+    median, so it is applied at the end by `session_contamination`."""
+    before, after = result['before'], result['after']
+    if not all('stat' in s for s in (before, after)):
+        return dict(mode=m['mode'], verdict=None, error='cpu-context snapshots unusable')
+    freq = result.get('freq')
+    metrics = bc.attempt_metrics(before, after, own_cpu_s=result['cpu_seconds'],
+                                 khz_samples=[freq['median_khz']] if freq else None)
+    return dict(mode=m['mode'], metrics=metrics, verdict=bc.attempt_verdict(metrics, m['mode'], owner=lock_owner(job_id)))
+
+
+def session_contamination(journal, m, job_id):
+    """Every judged attempt against its worker count's median clock, and whether the session is void."""
+    rows = [(a['metadata']['attempt_id'], a['cell']['workers'], a['metadata'].get('contamination') or {})
+            for a in aj.load(journal.directory)['attempts']]
+    rows = [r for r in rows if r[2].get('metrics')]
+    s = bc.session_verdict([r[2]['metrics'] for r in rows], m['mode'], [r[1] for r in rows], lock_owner(job_id))
+    flagged = {aid: v['reasons'] for (aid, _, _), v in zip(rows, s['attempts']) if v['contaminated']}
+    return dict(contaminated=s['contaminated'], total=s['total'], void=s['void'], median_khz=s['median_khz'],
+                flagged=flagged)
 
 
 def classify(metadata):
@@ -455,7 +495,7 @@ def run_job(directory, force_uncancel=False):
         with Deferred():
             journal.record_verdict(last['index'], classify(last['metadata']),
                                    dict(attempt_id=last['metadata']['attempt_id'], recovered=True))
-    enforce_mode(m)
+    enforce_mode(m, journal, directory.name)
     limits, retries = m['run']['limits'], m['run'].get('retries', 0)
     plan = journal.header['plan']
     (directory / 'scratch').mkdir(exist_ok=True)
@@ -496,7 +536,8 @@ def run_job(directory, force_uncancel=False):
                         exit=r['returncode'], stop='cancelled' if r['stopped'] else None,
                         guard=dict(wall_seconds=limits['wall_seconds'], rss_bytes=limits.get('rss_bytes'),
                                    rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr']),
-                        before=r['before'], after=r['after'], freq=r['freq'], contamination=contamination(r, m))
+                        before=r['before'], after=r['after'], freq=r['freq'],
+                        contamination=contamination(r, m, directory.name))
         status = classify(metadata)
         with Deferred():
             journal.record_exit(index, cell, r['stdout'], r['stderr'], metadata, try_=try_)
@@ -509,7 +550,8 @@ def run_job(directory, force_uncancel=False):
                 journal.record_stop('cancelled', at=now(), boundary='in-attempt', attempt=aid)
             return EXIT_CANCELLED
     with Deferred():
-        journal.record_stop('complete', at=now(), attempts=len(journal.attempts))
+        journal.record_stop('complete', at=now(), attempts=len(journal.attempts),
+                            contamination=session_contamination(journal, m, directory.name))
     return 0
 
 
@@ -520,15 +562,19 @@ def journal_stop(directory):
 
 def launch(directory, force_uncancel):
     """Exec the runner under `bench-reserve run`: the reservation check, the zbbench.slice scope and
-    the CCD-scoped benchlock for the whole job. B2 (#968) extends this for `publication` mode, which
-    must hold an exclusive lock rather than a CCD-scoped one."""
+    the benchlock for the whole job: CCD-scoped in dev mode, exclusive in publication mode (§11.2),
+    so no other campaign runs anywhere on the machine beside a publication figure."""
     m = load_manifest(directory)
     reserve = os.environ.get('ZEEBRA_BENCH_JOB_RESERVE', str(TOOLS / 'bench-reserve.sh'))
     inner = [sys.executable, str(Path(__file__).resolve()), '_run', directory.name]
     if force_uncancel:
         inner.append('--force-uncancel')
+    env = dict(os.environ)
+    env.pop('ZEEBRA_BENCH_RESERVE_EXCLUSIVE', None)
+    if m['mode'] == 'publication':
+        env['ZEEBRA_BENCH_RESERVE_EXCLUSIVE'] = '1'
     sys.stdout.flush()
-    os.execvp(reserve, [reserve, 'run', f'bench-job-{directory.name}', m['run']['cpus'], *inner])
+    os.execvpe(reserve, [reserve, 'run', lock_owner(directory.name), m['run']['cpus'], *inner], env)
 
 
 def start(directory, resume, force_uncancel):

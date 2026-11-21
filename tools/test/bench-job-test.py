@@ -29,7 +29,9 @@ case "$1" in
   once) [ -e "$2" ] && exit 0; : > "$2"; [ "$3" = fail ] && exit 1; exec sleep 30 ;;
 esac
 '''
-FAKE_RESERVE = '#!/bin/sh\n[ "$1" = run ] || exit 64\nshift 3\nexec "$@"\n'
+FAKE_RESERVE = ('#!/bin/sh\n[ "$1" = run ] || exit 64\nshift 3\n'
+                '[ -z "${RESERVE_LOG:-}" ] || echo "exclusive=${ZEEBRA_BENCH_RESERVE_EXCLUSIVE:-}" >"$RESERVE_LOG"\n'
+                'exec "$@"\n')
 COMMIT = 'c0ffee' * 6 + 'c0ff'
 
 
@@ -254,6 +256,67 @@ class BenchJobTest(unittest.TestCase):
         self.assertEqual(bj.job_status(self.jobs / first)['state'], 'done')
         self.assertEqual(bj.job_status(self.jobs / second)['state'], 'queued')
         self.assertIn(second, self.cli('status', check=0).stdout)
+
+    def fake_context(self, **over):
+        snap = dict(at='2026-11-21T00:00:00.000Z', load1=0.5, compilers=0, runner_workers=0, benchlock_open=[],
+                    clock='boost', rapl_uj=None, cpus=[dict(cpu=0, khz=4000000)],
+                    stat=[dict(cpu=0, role='bench', busy=10, total=100), dict(cpu=64, role='sibling', busy=0, total=100)],
+                    rest_stat=dict(busy=0, total=100, cpus=1))
+        snap.update(over)
+        (self.tmp / 'fake-context.sh').write_text(f"echo '{json.dumps(snap)}'\n")
+
+    # Each attempt's exit metadata carries the §11.2 verdict, and the complete stop the session's.
+    def test_contamination_is_journaled_per_attempt_and_session(self):
+        self.fake_context()
+        job = self.job(self.manifest(reps=1))
+        self.cli('run', job, check=0)
+        state = self.state(job)
+        c = state['attempts'][0]['metadata']['contamination']
+        self.assertEqual(c['verdict']['contaminated'], False)
+        self.assertEqual(c['mode'], 'dev')
+        self.assertIn('bench_foreign', c['metrics'])
+        session = state['stop']['contamination']
+        self.assertEqual((session['contaminated'], session['total'], session['void']), (0, 4, False))
+
+    # Without usable snapshots the verdict is an explicit error, never a silent clean bill.
+    def test_contamination_without_snapshots_is_an_error(self):
+        c = bj.contamination(dict(before=dict(fake=True), after=dict(fake=True), cpu_seconds=1.0, freq=None),
+                             self.manifest(), 'job')
+        self.assertEqual(c['verdict'], None)
+        self.assertIn('error', c)
+
+    # The child's CPU time is what separates its own bench busy time from foreign time.
+    def test_contamination_uses_own_cpu_time(self):
+        before = dict(at='2026-11-21T00:00:00Z', load1=0, compilers=0, cpus=[dict(cpu=0, khz=1)],
+                      stat=[dict(cpu=0, role='bench', busy=0, total=0)], rest_stat=None)
+        after = dict(before, at='2026-11-21T00:00:10Z', stat=[dict(cpu=0, role='bench', busy=1000, total=1000)])
+        r = dict(before=before, after=after, cpu_seconds=9.0, freq=None)
+        self.assertTrue(bj.contamination(r, self.manifest(), 'job')['verdict']['contaminated'])
+        r['cpu_seconds'] = 10.0
+        self.assertFalse(bj.contamination(r, self.manifest(), 'job')['verdict']['contaminated'])
+
+    # Publication mode refuses to start while a compiler runs, and journals the refusal.
+    def test_publication_refuses_with_a_compiler(self):
+        self.fake_context(compilers=1)
+        job = self.job(self.manifest(mode='publication'))
+        r = self.cli('run', job)
+        self.assertEqual(r.returncode, bj.EXIT_REFUSED, r.stderr)
+        stop = self.state(job)['stop']
+        self.assertEqual(stop['reason'], 'mode-refused')
+        self.assertIn('1 compiler process(es)', stop['refusals'])
+        self.assertEqual(self.state(job)['attempts'], [])
+
+    # Publication mode starts when the machine is quiet, under an exclusive rather than CCD lock.
+    def test_publication_runs_exclusive_when_quiet(self):
+        self.fake_context()
+        log = self.tmp / 'reserve.log'
+        self.env['RESERVE_LOG'] = str(log)
+        job = self.job(self.manifest(mode='publication', reps=1))
+        self.cli('run', job, check=0)
+        self.assertEqual(log.read_text().strip(), 'exclusive=1')
+        dev = self.job(self.manifest(reps=1, instances=(('i3', ['ok']),)))
+        self.cli('run', dev, check=0)
+        self.assertEqual(log.read_text().strip(), 'exclusive=')
 
     # The job root may not live under $HOME, where heavy writes reach the system drive.
     def test_jobs_root_under_home_is_refused(self):

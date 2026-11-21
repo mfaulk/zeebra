@@ -212,7 +212,10 @@ br_run() { # <owner> <cpulist> <command> [args...]
     printf 'bench-reserve: %s is not inside the reservation %s\n' "$cpus" "$bench" >&2
     return 64
   fi
-  ZEEBRA_BENCHLOCK_CPUS="$cpus" exec bash "$(dirname "${BASH_SOURCE[0]}")/benchlock.sh" "$owner" \
+  # ZEEBRA_BENCH_RESERVE_EXCLUSIVE=1 (bench-job publication mode) takes the machine-wide lock instead.
+  local scope="$cpus"
+  [ "${ZEEBRA_BENCH_RESERVE_EXCLUSIVE:-}" = 1 ] && scope=""
+  ZEEBRA_BENCHLOCK_CPUS="$scope" exec bash "$(dirname "${BASH_SOURCE[0]}")/benchlock.sh" "$owner" \
     systemd-run --user --scope --quiet --collect --slice="$BR_BENCH_SLICE" -p AllowedCPUs="$cpus" -- \
     taskset --cpu-list "$cpus" "$@"
 }

@@ -344,7 +344,7 @@ first attempt nothing of ours is running, so `check` uses machine-wide `load1`, 
 stricter reading.
 
 Calibration is pending: an A/A and a 5% A/B on Eco-12 1 w and MQ10 16 w under idle, build,
-memory-bandwidth and fixed-clock conditions. It runs as `bench-job` jobs once #967 merges. Until it
+memory-bandwidth and fixed-clock conditions, run as `bench-job` jobs (`research/m33-calibration/`). Until it
 does, nobody has measured which conditions dev mode tolerates.
 
 ### Fixed clock (#954)
@@ -444,10 +444,18 @@ is re-run on `resume --force-uncancel`, which journals a `resume` record after t
 than rewriting it.
 
 **Modes.** `mode` is `dev` or `publication` and is recorded in the manifest and journal header.
-Enforcement — exclusivity and the §11.2 contamination record — is #968's: `enforce_mode` and
-`contamination` in `tools/bench-job` are where `bench_contamination.publication_refusals` and
-`attempt_metrics`/`attempt_verdict` plug in. Until they do, both modes run under the same
-CCD-scoped lock and `contamination` is journaled as `null`.
+A dev job runs under the CCD-scoped lock. A publication job takes the exclusive, machine-wide
+lock (`bench-reserve run` with `ZEEBRA_BENCH_RESERVE_EXCLUSIVE=1`). Before its first attempt it
+checks `bench_contamination.publication_refusals`, re-checking every 60 s for up to
+`run.mode_wait_seconds` (default 0). If the conditions never hold, it journals a `mode-refused`
+stop listing the refusals and exits 3.
+
+Every attempt's exit metadata carries `contamination`, which holds `{mode, metrics, verdict}`.
+The metrics come from the before/after `cpu-context` snapshots, with the child's `wait4` CPU time
+as `own_cpu_s` and the sampled median clock. Snapshots that cannot be read give `verdict: null`
+plus an `error`, never a clean verdict. The `complete` stop carries the session verdict:
+`{contaminated, total, void, median_khz, flagged}`. That is where the clock rule is applied,
+against each worker count's median.
 
 Worked example: the M32 `walls` cell `wide64/katsura-9` on the dispatch entry point at one worker
 (`research/m32-baseline/campaign.py`, arm `en:1`), from a `git archive` build:
