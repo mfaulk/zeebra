@@ -50,8 +50,8 @@ def zeebra_arm(name, binary, build, commit, workers='{workers}', wrapped=None):
     if wrapped:  # hwcount.py is the arm's binary; the study it runs is named and hashed in the recipe
         tool = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=HERE, text=True).strip()
         arm.update(binary=str(wrapped), sha256=base.sha(wrapped), commit=tool, argv=['--', str(binary), *argv])
-        arm['build']['recipe'] += (f'; run under research/m33-grobx-attribution/hwcount.py at {tool[:8]}, '
-                                   f'study {commit} SHA-256 {base.sha(binary)}')
+        arm['build']['recipe'] = (f'git archive {tool}: research/m33-grobx-attribution/hwcount.py (a script) runs '
+                                  f'the study built by `{recipe}`, SHA-256 {base.sha(binary)}')
     return arm
 
 
