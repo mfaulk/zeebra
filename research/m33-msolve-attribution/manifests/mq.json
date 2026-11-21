@@ -1,0 +1,225 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 972,
+  "agent": "agent-a3baf9a1bff013f77@research/972-msolve-attribution",
+  "track": "M",
+  "session": "mq"
+ },
+ "arms": [
+  {
+   "name": "entry",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study",
+   "sha256": "d00a6bafd4a1c21ea52f0da0e11384b80f0c6d0d87e6ce0a1e1c3ffb71126b33",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ]
+  },
+  {
+   "name": "msolve",
+   "commit": "b364edcb",
+   "binary": "/home/mfaulk/.local/opt/zeebra-ext/bin/msolve",
+   "sha256": "557470de2e13aaa214fd6380600b3fedadc05c2ed203f6afa29a8b172abb6c8d",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json",
+    "comparand": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json"
+   },
+   "argv": [
+    "-f",
+    "{inputs[ms]}",
+    "-o",
+    "/dev/stdout",
+    "-t",
+    "{workers}",
+    "-g",
+    "2"
+   ]
+  },
+  {
+   "name": "msolve-v2",
+   "commit": "b364edcb",
+   "binary": "/home/mfaulk/.local/opt/zeebra-ext/bin/msolve",
+   "sha256": "557470de2e13aaa214fd6380600b3fedadc05c2ed203f6afa29a8b172abb6c8d",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json",
+    "comparand": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json"
+   },
+   "argv": [
+    "-f",
+    "{inputs[ms]}",
+    "-o",
+    "/dev/null",
+    "-t",
+    "{workers}",
+    "-g",
+    "2",
+    "-v",
+    "2"
+   ]
+  },
+  {
+   "name": "sigf4",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study",
+   "sha256": "d00a6bafd4a1c21ea52f0da0e11384b80f0c6d0d87e6ce0a1e1c3ffb71126b33",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "sigf4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    1
+   ]
+  },
+  {
+   "name": "f4stages",
+   "commit": "a81627e61b2fa5416d3ea3ce447b96235d7a387f",
+   "binary": "/buildcache/cargo-target/zeebra-972/sig_f4_study-a81627e6",
+   "sha256": "7782fce5774155b20b823286a8b6e944437edfef1bfb2c425a534c0ab8756d17",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "checkout whose tracked files equal git archive a81627e61b2fa5416d3ea3ce447b96235d7a387f; cargo build --release --features research-sigf4 --example sig_f4_study at a81627e6 (F0 plus #918/#972 instrumentation)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "f4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180",
+    "--stages"
+   ],
+   "workers": [
+    4,
+    8,
+    16
+   ]
+  },
+  {
+   "name": "f4fl",
+   "commit": "a81627e61b2fa5416d3ea3ce447b96235d7a387f",
+   "binary": "/buildcache/cargo-target/zeebra-972/sig_f4_study-a81627e6",
+   "sha256": "7782fce5774155b20b823286a8b6e944437edfef1bfb2c425a534c0ab8756d17",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "checkout whose tracked files equal git archive a81627e61b2fa5416d3ea3ce447b96235d7a387f; cargo build --release --features research-sigf4 --example sig_f4_study at a81627e6 (F0 plus #918/#972 instrumentation)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "f4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180",
+    "--stages",
+    "--fl"
+   ],
+   "workers": [
+    4,
+    8,
+    16
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "m31/mq-random-10",
+   "params": {
+    "field": "m31",
+    "name": "mq-random-10",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/m31__mq-random-10/in.ms",
+     "sha256": "ff1c11aeb2ac9dac450a8c47d5e9c45544e4f6e21af4b6e30fa76ba7f2846f76"
+    }
+   }
+  },
+  {
+   "name": "gf32003/mq-random-10",
+   "params": {
+    "field": "gf32003",
+    "name": "mq-random-10",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/gf32003__mq-random-10/in.ms",
+     "sha256": "1315f4daa00ec30823dcda19f95e71c622f1e581fbc3f15cd1dfbd1cef34e0bd"
+    }
+   }
+  }
+ ],
+ "run": {
+  "workers": [
+   1,
+   4,
+   8,
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 180,
+   "kill_after_seconds": 30,
+   "rss_bytes": 8589934592,
+   "live_bytes": null
+  }
+ }
+}

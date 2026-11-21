@@ -1,0 +1,179 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 972,
+  "agent": "agent-a3baf9a1bff013f77@research/972-msolve-attribution",
+  "track": "M",
+  "session": "k"
+ },
+ "arms": [
+  {
+   "name": "entry",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study",
+   "sha256": "d00a6bafd4a1c21ea52f0da0e11384b80f0c6d0d87e6ce0a1e1c3ffb71126b33",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ]
+  },
+  {
+   "name": "msolve",
+   "commit": "b364edcb",
+   "binary": "/home/mfaulk/.local/opt/zeebra-ext/bin/msolve",
+   "sha256": "557470de2e13aaa214fd6380600b3fedadc05c2ed203f6afa29a8b172abb6c8d",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json",
+    "comparand": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json"
+   },
+   "argv": [
+    "-f",
+    "{inputs[ms]}",
+    "-o",
+    "/dev/stdout",
+    "-t",
+    "{workers}",
+    "-g",
+    "2"
+   ]
+  },
+  {
+   "name": "msolve-v2",
+   "commit": "b364edcb",
+   "binary": "/home/mfaulk/.local/opt/zeebra-ext/bin/msolve",
+   "sha256": "557470de2e13aaa214fd6380600b3fedadc05c2ed203f6afa29a8b172abb6c8d",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json",
+    "comparand": "msolve 0.11.0 release tarball: tools/external/provision.sh, pins.json"
+   },
+   "argv": [
+    "-f",
+    "{inputs[ms]}",
+    "-o",
+    "/dev/null",
+    "-t",
+    "{workers}",
+    "-g",
+    "2",
+    "-v",
+    "2"
+   ]
+  },
+  {
+   "name": "sigf4",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study",
+   "sha256": "d00a6bafd4a1c21ea52f0da0e11384b80f0c6d0d87e6ce0a1e1c3ffb71126b33",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "sigf4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    1
+   ]
+  },
+  {
+   "name": "sigf4claim",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study",
+   "sha256": "d00a6bafd4a1c21ea52f0da0e11384b80f0c6d0d87e6ce0a1e1c3ffb71126b33",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "sigf4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180",
+    "--claim"
+   ],
+   "workers": [
+    4,
+    8,
+    16
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "m31/katsura-11",
+   "params": {
+    "field": "m31",
+    "name": "katsura-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "ms": {
+     "path": "/buildcache/cargo-target/zeebra-966-p2/inputs/m31__katsura-11/in.ms",
+     "sha256": "12fc7e94678a602c8070e30d7b625bb72feb3e9b151eea9b2284d58760fde07e"
+    }
+   }
+  }
+ ],
+ "run": {
+  "workers": [
+   1,
+   4,
+   8,
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 180,
+   "kill_after_seconds": 30,
+   "rss_bytes": 8589934592,
+   "live_bytes": null
+  }
+ }
+}

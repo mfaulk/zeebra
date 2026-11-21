@@ -1,0 +1,89 @@
+{
+ "attempts": 54,
+ "job": {
+  "context": {
+   "agent": "agent-a3baf9a1bff013f77@research/972-msolve-attribution",
+   "issue": 972,
+   "session": "fl",
+   "track": "M"
+  },
+  "job_id": "9de09467ead1",
+  "manifest_sha256": "9de09467ead1b4ec63f932c4907bdd6e8a31ad4037f054e74272b2eafea25a5d",
+  "mode": "dev"
+ },
+ "journal_sha256": "b56a7d526c0e75d3d79a1dbe7b7142884d32ed72c97d5625028ae3aaa554a82b",
+ "stop": {
+  "at": "2026-11-21T10:12:21+00:00",
+  "attempts": 54,
+  "contamination": {
+   "contaminated": 19,
+   "flagged": {
+    "9de09467ead1:11:0": [
+     "bench clock 3287125 kHz is 10.4% off the session median"
+    ],
+    "9de09467ead1:12:0": [
+     "bench clock 3533167 kHz is 7.3% off the session median"
+    ],
+    "9de09467ead1:14:0": [
+     "bench clock 1587434 kHz is 5.1% off the session median"
+    ],
+    "9de09467ead1:15:0": [
+     "bench clock 1587619 kHz is 5.1% off the session median"
+    ],
+    "9de09467ead1:19:0": [
+     "bench clock 3747704 kHz is 13.8% off the session median"
+    ],
+    "9de09467ead1:1:0": [
+     "bench clock 3012246 kHz is 8.5% off the session median"
+    ],
+    "9de09467ead1:24:0": [
+     "bench clock 3508535 kHz is 6.5% off the session median"
+    ],
+    "9de09467ead1:2:0": [
+     "bench clock 1586896 kHz is 5.1% off the session median"
+    ],
+    "9de09467ead1:35:0": [
+     "bench clock 3279802 kHz is 10.2% off the session median"
+    ],
+    "9de09467ead1:37:0": [
+     "bench clock 3029208 kHz is 8.0% off the session median"
+    ],
+    "9de09467ead1:40:0": [
+     "bench clock 3288190 kHz is 10.5% off the session median"
+    ],
+    "9de09467ead1:42:0": [
+     "bench clock 3046337 kHz is 7.5% off the session median"
+    ],
+    "9de09467ead1:43:0": [
+     "bench clock 3602161 kHz is 9.4% off the session median"
+    ],
+    "9de09467ead1:47:0": [
+     "bench clock 3181381 kHz is 6.9% off the session median"
+    ],
+    "9de09467ead1:49:0": [
+     "bench clock 3003816 kHz is 8.8% off the session median"
+    ],
+    "9de09467ead1:4:0": [
+     "bench clock 3172555 kHz is 6.6% off the session median"
+    ],
+    "9de09467ead1:6:0": [
+     "bench clock 3012274 kHz is 8.5% off the session median"
+    ],
+    "9de09467ead1:7:0": [
+     "bench clock 3497932 kHz is 6.2% off the session median"
+    ],
+    "9de09467ead1:8:0": [
+     "bench clock 1587052 kHz is 5.1% off the session median"
+    ]
+   },
+   "median_khz": {
+    "gf32003/cyclic-8@16w": 2976580.5,
+    "gf32003/katsura-11@16w": 3293210.0,
+    "gf32003/mq-random-10@16w": 1510467.0
+   },
+   "total": 54,
+   "void": true
+  },
+  "reason": "complete"
+ }
+}

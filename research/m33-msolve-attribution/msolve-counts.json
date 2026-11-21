@@ -1,0 +1,98 @@
+{
+ "gf32003/mq-random-10@1": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5344937,
+  "forward_products": 280568561,
+  "newpiv_apps": 2089,
+  "newpiv_products": 644764
+ },
+ "gf32003/mq-random-10@16": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5344993,
+  "forward_products": 280628470,
+  "newpiv_apps": 2183,
+  "newpiv_products": 671939
+ },
+ "gf32003/mq-random-10@4": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5345220,
+  "forward_products": 280657405,
+  "newpiv_apps": 2117,
+  "newpiv_products": 650985
+ },
+ "gf32003/mq-random-10@8": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5344961,
+  "forward_products": 280583262,
+  "newpiv_apps": 2124,
+  "newpiv_products": 649756
+ },
+ "m31/katsura-11@1": {
+  "final_apps": 21,
+  "final_products": 546,
+  "forward_apps": 16762948,
+  "forward_products": 2743918492,
+  "newpiv_apps": 120,
+  "newpiv_products": 30994
+ },
+ "m31/katsura-11@16": {
+  "final_apps": 21,
+  "final_products": 546,
+  "forward_apps": 16762458,
+  "forward_products": 2743939202,
+  "newpiv_apps": 401,
+  "newpiv_products": 181377
+ },
+ "m31/katsura-11@4": {
+  "final_apps": 21,
+  "final_products": 546,
+  "forward_apps": 16762859,
+  "forward_products": 2743973432,
+  "newpiv_apps": 200,
+  "newpiv_products": 67683
+ },
+ "m31/katsura-11@8": {
+  "final_apps": 21,
+  "final_products": 546,
+  "forward_apps": 16762802,
+  "forward_products": 2743928955,
+  "newpiv_apps": 204,
+  "newpiv_products": 80606
+ },
+ "m31/mq-random-10@1": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5345076,
+  "forward_products": 280577385,
+  "newpiv_apps": 2089,
+  "newpiv_products": 644800
+ },
+ "m31/mq-random-10@16": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5345025,
+  "forward_products": 280572951,
+  "newpiv_apps": 2147,
+  "newpiv_products": 655858
+ },
+ "m31/mq-random-10@4": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5345066,
+  "forward_products": 280557918,
+  "newpiv_apps": 2101,
+  "newpiv_products": 646373
+ },
+ "m31/mq-random-10@8": {
+  "final_apps": 281,
+  "final_products": 93441,
+  "forward_apps": 5344993,
+  "forward_products": 280529641,
+  "newpiv_apps": 2121,
+  "newpiv_products": 649177
+ }
+}
