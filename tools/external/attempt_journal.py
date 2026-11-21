@@ -6,6 +6,11 @@ checks anything, then appends the verdict as a separate record. Nothing is rewri
 controller's budget is running; `render` repacks the cohort offline. Entries are self-digested and
 hash-chained, payloads are content-addressed, and a torn tail is quarantined only on request.
 Lost metadata is never reconstructed: an exit that did not become durable is not an attempt.
+
+Two record shapes were added for `tools/bench-job` (#967), both absent from older journals, which
+therefore replay unchanged: an exit may carry `try` > 0, a retry of the index recorded just before
+it; and a `resume` record may follow a `stop`, lifting it, so a cancelled job can be continued
+without rewriting or forking the chain.
 """
 import argparse
 import base64
@@ -86,26 +91,36 @@ def _entries(directory, header_sha):
     return entries, prev
 
 
+def _check_order(attempts, distinct, index, try_):
+    """A first try takes the next plan index; a retry repeats the index recorded just before it."""
+    if try_ == 0:
+        return index == distinct
+    return bool(attempts) and attempts[-1]['index'] == index and attempts[-1]['try'] == try_ - 1
+
+
 def _replay(directory, header, entries):
     plan = header['plan']
-    attempts, quarantined, stop = [], [], None
+    attempts, quarantined, stops, stop, distinct = [], [], [], None, 0
     for entry in entries:
         kind = entry['kind']
-        if stop is not None:
+        if stop is not None and kind != 'resume':
             raise ValueError('journal continues after its stop record')
         if kind == 'exit':
-            index = entry['index']
-            if index != len(attempts) or index >= len(plan) or entry['cell'] != plan[index]:
-                raise ValueError(f'exit record {index} out of plan order')
+            index, try_ = entry['index'], entry.get('try', 0)
+            if not _check_order(attempts, distinct, index, try_) or index >= len(plan) \
+                    or entry['cell'] != plan[index]:
+                raise ValueError(f'exit record {index} try {try_} out of plan order')
+            distinct += try_ == 0
             attempts.append(dict(index=index, cell=entry['cell'], metadata=entry['metadata'],
                                  stdout_sha256=entry['stdout'], stderr_sha256=entry['stderr'],
-                                 status='unverified', verdict=None, exit_digest=entry['digest']))
+                                 status='unverified', verdict=None, exit_digest=entry['digest'],
+                                 **{'try': try_}))
         elif kind == 'verdict':
             index = entry['index']
-            if index >= len(attempts) or attempts[index]['verdict'] is not None \
-                    or attempts[index]['exit_digest'] != entry['exit_digest']:
+            match = [a for a in attempts if a['exit_digest'] == entry['exit_digest']]
+            if len(match) != 1 or match[0]['index'] != index or match[0]['verdict'] is not None:
                 raise ValueError(f'verdict record for {index} has no unique exit record')
-            attempts[index].update(status=entry['status'], verdict=entry['details'])
+            match[0].update(status=entry['status'], verdict=entry['details'])
         elif kind == 'quarantine':
             path = directory / entry['file']
             if not path.exists() or _sha(path.read_bytes()) != entry['sha256']:
@@ -113,9 +128,14 @@ def _replay(directory, header, entries):
             quarantined.append(entry['file'])
         elif kind == 'stop':
             stop = entry['values']
+            stops.append(stop)
+        elif kind == 'resume':
+            if stop is None:
+                raise ValueError('resume record without a stop to lift')
+            stop = None
         else:
             raise ValueError(f'unknown journal record kind {kind!r}')
-    return attempts, quarantined, stop
+    return attempts, quarantined, stop, stops
 
 
 class StudyJournal:
@@ -127,9 +147,9 @@ class StudyJournal:
         self.limits = limits
         self._tail = tail
         self.bytes_written = 0
-        self.attempts, _, stop = _replay(directory, header, entries)
+        self.attempts, _, stop, _ = _replay(directory, header, entries)
         self.stopped = stop is not None
-        self.next_index = len(self.attempts)
+        self.next_index = len({a['index'] for a in self.attempts})
         self.child_wall_seconds = sum(a['metadata']['wall_seconds'] for a in self.attempts)
         referenced = {d for a in self.attempts for d in (a['stdout_sha256'], a['stderr_sha256'])}
         self._blobs = set(referenced)
@@ -203,33 +223,39 @@ class StudyJournal:
         self._blobs.add(digest)
         return digest
 
-    def record_exit(self, index, cell, stdout, stderr, metadata):
+    def record_exit(self, index, cell, stdout, stderr, metadata, try_=0):
         """Persist one finished child before any parsing; returns the exit record's digest."""
         if self.stopped:
             raise ValueError('journal is stopped; start a new campaign to measure more')
-        if index != self.next_index:
+        if try_ == 0 and index != self.next_index:
             raise ValueError(f'exit index {index} is not the next plan index {self.next_index}')
+        if not _check_order(self.attempts, self.next_index, index, try_):
+            raise ValueError(f'try {try_} of index {index} does not follow the previous try')
         plan = self.header['plan']
         if index >= len(plan) or _plain(cell) != plan[index]:
             raise ValueError(f'cell {cell!r} is not plan entry {index}')
         missing = [k for k in REQUIRED_METADATA if k not in metadata]
         if missing:
             raise ValueError(f'exit metadata lacks {", ".join(missing)}; lost metadata is never inferred')
-        entry = self._append(dict(kind='exit', index=index, cell=_plain(cell), metadata=_plain(metadata),
-                                  stdout=self._store(bytes(stdout)), stderr=self._store(bytes(stderr))))
-        self.attempts.append(dict(index=index, exit_digest=entry['digest'], verdict=None))
-        self.next_index += 1
+        record = dict(kind='exit', index=index, cell=_plain(cell), metadata=_plain(metadata),
+                      stdout=self._store(bytes(stdout)), stderr=self._store(bytes(stderr)))
+        if try_:
+            record['try'] = try_
+        entry = self._append(record)
+        self.attempts.append(dict(index=index, exit_digest=entry['digest'], verdict=None, **{'try': try_}))
+        self.next_index += try_ == 0
         self.child_wall_seconds += metadata['wall_seconds']
         return entry['digest']
 
     def record_verdict(self, index, status, details):
         if status == 'unverified':
             raise ValueError('unverified is the absence of a verdict, not a verdict')
-        if index >= len(self.attempts) or self.attempts[index]['verdict'] is not None:
+        latest = [a for a in self.attempts if a['index'] == index][-1:]
+        if not latest or latest[0]['verdict'] is not None:
             raise ValueError(f'attempt {index} has no exit record or already has a verdict')
-        self._append(dict(kind='verdict', index=index, exit_digest=self.attempts[index]['exit_digest'],
+        self._append(dict(kind='verdict', index=index, exit_digest=latest[0]['exit_digest'],
                           status=status, details=_plain(details)))
-        self.attempts[index]['verdict'] = status
+        latest[0]['verdict'] = status
 
     def refusal(self, next_child_wall_seconds):
         """The budget refusal the controller must record instead of launching, or None."""
@@ -248,19 +274,26 @@ class StudyJournal:
         self._append(dict(kind='stop', values=_plain(dict(values, reason=reason))))
         self.stopped = True
 
+    def record_resume(self, reason, **values):
+        """Lift the current stop; the stop record itself stays in the chain."""
+        if not self.stopped:
+            raise ValueError('journal is not stopped; there is nothing to resume')
+        self._append(dict(kind='resume', values=_plain(dict(values, reason=reason))))
+        self.stopped = False
+
 
 def load(directory):
     """Verify every record and payload; return the cohort with raw bytes restored."""
     directory = Path(directory)
     document, header_sha = _read_header(directory)
     entries, _ = _entries(directory, header_sha)
-    attempts, quarantined, stop = _replay(directory, document, entries)
+    attempts, quarantined, stop, stops = _replay(directory, document, entries)
     for attempt in attempts:
         attempt['stdout'] = _blob(directory, attempt.pop('stdout_sha256'))
         attempt['stderr'] = _blob(directory, attempt.pop('stderr_sha256'))
         attempt.pop('exit_digest')
     return dict(header=document['header'], plan=document['plan'], limits=document['limits'],
-                attempts=attempts, quarantined=quarantined, stop=stop,
+                attempts=attempts, quarantined=quarantined, stop=stop, stops=stops,
                 journal_sha256=_sha((directory / JOURNAL).read_bytes()))
 
 
@@ -278,6 +311,8 @@ def render(directory, output):
     for a in state['attempts']:
         row = dict(index=a['index'], cell=a['cell'], metadata=a['metadata'], status=a['status'],
                    verdict=a['verdict'])
+        if a['try']:
+            row['try'] = a['try']
         row.update(_text(a['stdout'], 'stdout'))
         row.update(_text(a['stderr'], 'stderr'))
         attempts.append(row)

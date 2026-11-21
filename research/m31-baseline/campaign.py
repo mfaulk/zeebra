@@ -14,8 +14,6 @@ import argparse
 import importlib.util
 import json
 import os
-import subprocess
-import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -30,6 +28,9 @@ def _module(name, path):
 
 
 costmodel = _module('costmodel', HERE.parent / 'm29-baseline' / 'costmodel.py')
+# `plan` moved to the shared runner (#967) and is re-exported for the controllers that import it.
+bench_campaign = _module('bench_campaign', ROOT / 'tools' / 'bench_campaign.py')
+plan = bench_campaign.plan
 
 FIRST_CPU = 8
 CAP_S = 180
@@ -59,17 +60,6 @@ def suite_rows(suite):
     raise ValueError(suite)
 
 
-def plan(rows, reps):
-    """(rep, row, arm) in run order: rows in turn, arms rotated one place per repetition, so each
-    arm's repetition r sits beside every other arm's repetition r (the pairing the ratios use)."""
-    order = []
-    for rep in range(reps):
-        for row, arms in rows:
-            shift = rep % len(arms)
-            order += [(rep, row, arm) for arm in arms[shift:] + arms[:shift]]
-    return order
-
-
 def command(bins, row, arm):
     engine, workers = arm.split(':')
     if '/' not in row:
@@ -80,40 +70,20 @@ def command(bins, row, arm):
 
 
 def run_one(bins, row, arm):
+    """One child via the shared runner. `command`, `CAP_S` and `RSS_KB` are read from this module at
+    call time, because the M31-M32 controllers that load it override them before calling this."""
     workers = int(arm.split(':')[1])
     cpus = costmodel.cpulist(workers, FIRST_CPU)
     comm, argv = command(bins, row, arm)
-    before = costmodel.snapshot(cpus)
-    sampler = costmodel.Sampler(cpus)
-    sampler.start()
-    started = time.perf_counter_ns()
-    child = subprocess.Popen(['taskset', '-c', cpus, 'timeout', '--signal=INT', '--kill-after=60s',
-                              str(CAP_S + 30), *argv],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    guard = subprocess.Popen(['bash', str(ROOT / 'tools/rss-guard.sh'), comm, row.split('/')[-1],
-                              # Integer seconds only: a fractional poll is an arithmetic error in
-                              # the guard, which then exits 1 having guarded nothing (the walls
-                              # session's records show it).
-                              str(RSS_KB), '--poll', '1', '--wait', '3', '--signal', 'INT'],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-    stdout, stderr = child.communicate()
-    wall = time.perf_counter_ns() - started
-    try:
-        guard_rc = guard.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        guard.kill()
-        guard_rc = 'hung'
-    guard_err = guard.stderr.read()[-500:]
-    sampler.stop.set()
-    sampler.join()
-    after = costmodel.snapshot(cpus)
+    r = bench_campaign.run_child(argv, cpus, CAP_S + 30, guard=(comm, row.split('/')[-1], RSS_KB))
+    stdout, stderr = (r[k].decode(errors='replace') for k in ('stdout', 'stderr'))
     try:
         report = json.loads(stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):
         report = None
-    return dict(cpus=cpus, process_wall_ns=wall, returncode=child.returncode, rss_guard_rc=guard_rc, rss_guard_stderr=guard_err,
-                before=before, after=after, freq=costmodel.summarize_freq(sampler.samples),
-                report=report, stderr=stderr[-2000:])
+    return dict(cpus=cpus, process_wall_ns=r['process_wall_ns'], returncode=r['returncode'],
+                rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr'], before=r['before'],
+                after=r['after'], freq=r['freq'], report=report, stderr=stderr[-2000:])
 
 
 def main():
