@@ -69,6 +69,9 @@ def plan(rows, reps):
 
 
 def _die_with_parent():
+    # A controller started in the background inherits SIGINT ignored, and so would the binary; then
+    # neither `timeout --signal=INT` nor a cancel could stop it short of `--kill-after`.
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_PDEATHSIG, signal.SIGTERM)
 
 
