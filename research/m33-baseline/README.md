@@ -1,7 +1,8 @@
 # #966 M33-0: aligned timed region, admission draw, comparand pins and thread census
 
 Plan: [`docs/MILESTONE-COMPETITIVE-BENCHMARKING.md`](../../docs/MILESTONE-COMPETITIVE-BENCHMARKING.md)
-§5, §9.1, §11. This directory holds Part 1. The baseline cohort (Part 2) is added by a later PR.
+§5, §9.1, §11. Part 1 is §§1–4 below; Part 2, the F0 baseline cohort, is §5 and its write-up is
+[`docs/research/m33-baseline.md`](../../docs/research/m33-baseline.md).
 
 **Measured at:** the harness builds `3cd261a7` (census inputs only) and `b3c15ff3` (timed-region
 check, admission), both `git archive` builds whose `src/` equals F0 `31e334bd` (M32 final main,
@@ -20,6 +21,14 @@ reservation; their walls are not timing results. **Host:** Threadripper PRO 5995
 | [pins.json](pins.json) | comparand commits, versions, build flags and executable SHA-256s |
 | [timed-region.json](timed-region.json) | the one-row check of the aligned timed region (Eco-12) |
 | [test_admission.py](test_admission.py) | unit tests for the draw rule and the digest encoding; run in CI |
+| [campaign.py](campaign.py) | Part 2: per-solver request files, the two bench-job manifests, the untimed references, `extract` and `retain` of each journal, and the thread census pass |
+| [manifests/](manifests/) | the submitted bench-job manifests, one per track and session |
+| `records-<track>-<job>.jsonl.gz`, `.session.json` | one compact record per timed attempt and the job's stop record; what `summarize.py` reads |
+| [journals/](journals/) | each job's hash-chained journal, with payloads under 64 KiB; `omitted.json` lists the competitors' basis texts left out by digest |
+| [references.json](references.json) | one independent `m33-basis-v1` per row: Singular below 2³¹, groebner-rs at one worker on wide fields |
+| `threads-<track>.jsonl` | observed threads per arm and cell, one census-sampled attempt each |
+| [summarize.py](summarize.py) → [tables.md](tables.md) | every table, regenerated from the files above alone (`--check` verifies) |
+| [test_campaign.py](test_campaign.py) | unit tests for digest parsing across solvers and the cost model's cut |
 
 ## 1. Aligned timed region (plan §11.3)
 
@@ -136,3 +145,29 @@ under the caps, so m31 / eco-13, which is earlier in Track M's draw order, was n
 completed draw did not move. Each re-read record keeps both readings
 (`recheck: {reference, completes, agrees}`). The pre-amendment file is not committed; this paragraph
 and the per-record field are its trace.
+
+## 5. Part 2: the F0 baseline cohort
+
+F0 is `31e334bd` (tag `measured/966-f0`). Zeebra is built from `git archive 9d6f16e4` (tag
+`measured/966-baseline-harness`), whose `src/`, `Cargo.toml` and `Cargo.lock` equal F0's
+(`git diff --stat 31e334bd 9d6f16e4 -- src Cargo.toml Cargo.lock` is empty), with
+`--features research-sigf4`, release, fat LTO, one codegen unit, x86-64-v3, `RUSTC_WRAPPER=""`,
+`CARGO_INCREMENTAL=0`. Executable SHA-256 `d00a6baf…` (in every manifest).
+
+```sh
+S=/buildcache/cargo-target/zeebra-966-p2/target/release/examples/sig_f4_study
+export ZEEBRA_BENCH_JOBS=/buildcache/cargo-target/zeebra-966-p2/jobs
+research/m33-baseline/campaign.py inputs --study "$S"
+research/m33-baseline/campaign.py references          # untimed, CPUs 24-39
+research/m33-baseline/campaign.py manifest --track G --study "$S" --agent "$(scripts/agent/zb-claim.sh id)" > manifests/G-baseline.json
+tools/bench-job submit manifests/G-baseline.json      # likewise Track M; then tools/bench-job run <id>
+research/m33-baseline/campaign.py extract --job "$ZEEBRA_BENCH_JOBS/<id>" --track G
+research/m33-baseline/campaign.py retain --job "$ZEEBRA_BENCH_JOBS/<id>"
+tools/bench-reserve.sh run zb-966-threads 8-23 research/m33-baseline/campaign.py threads --manifest manifests/G-rerun.json --output threads-G.jsonl
+research/m33-baseline/summarize.py                    # tables.md
+```
+
+The jobs use three small `tools/bench-job` extensions made for this cohort: per-instance named
+inputs (one request file per solver format), per-arm worker lists (Track G's 16-worker
+best-supported arm beside 1-worker arms) and `build.comparand` for externally provisioned
+comparands (`docs/research/benchmark-schema.md` §7).
