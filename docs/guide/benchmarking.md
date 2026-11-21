@@ -457,6 +457,12 @@ plus an `error`, never a clean verdict. The `complete` stop carries the session 
 `{contaminated, total, void, median_khz, flagged}`. That is where the clock rule is applied,
 against each worker count's median.
 
+A `cpu-context` snapshot costs about 0.5 CPU-s, and part of that cost falls inside the window its
+`/proc/stat` reads bound. So the runner moves its harness (snapshots and frequency sampler) onto
+the CPUs of `run.cpus` that the attempt does not use. When none are free, as at 16 workers on
+8-23, it counts the harness's CPU time as the child's own (`harness_cpu_seconds` in the
+metadata). That can hide at most that much foreign time.
+
 Worked example: the M32 `walls` cell `wide64/katsura-9` on the dispatch entry point at one worker
 (`research/m32-baseline/campaign.py`, arm `en:1`), from a `git archive` build:
 

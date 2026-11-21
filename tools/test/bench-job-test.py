@@ -294,6 +294,16 @@ class BenchJobTest(unittest.TestCase):
         self.assertTrue(bj.contamination(r, self.manifest(), 'job')['verdict']['contaminated'])
         r['cpu_seconds'] = 10.0
         self.assertFalse(bj.contamination(r, self.manifest(), 'job')['verdict']['contaminated'])
+        # Harness time on the attempt's CPUs (own_cpu_s, when no spare CPU could take it) is own time too.
+        r.update(cpu_seconds=9.0, own_cpu_s=10.0)
+        self.assertFalse(bj.contamination(r, self.manifest(), 'job')['verdict']['contaminated'])
+
+    # The harness runs on run.cpus outside the attempt when there are any; otherwise none are spare.
+    def test_harness_cpus(self):
+        m = self.manifest()
+        m['run']['cpus'] = '8-11'
+        self.assertEqual(bj.harness_cpus(m, '8'), {9, 10, 11})
+        self.assertEqual(bj.harness_cpus(m, '8-11'), set())
 
     # Publication mode refuses to start while a compiler runs, and journals the refusal.
     def test_publication_refuses_with_a_compiler(self):

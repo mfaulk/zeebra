@@ -23,6 +23,7 @@ import importlib.util
 import json
 import os
 import re
+import resource
 import shutil
 import signal
 import subprocess
@@ -417,9 +418,39 @@ def contamination(result, m, job_id):
     if not all('stat' in s for s in (before, after)):
         return dict(mode=m['mode'], verdict=None, error='cpu-context snapshots unusable')
     freq = result.get('freq')
-    metrics = bc.attempt_metrics(before, after, own_cpu_s=result['cpu_seconds'],
+    metrics = bc.attempt_metrics(before, after, own_cpu_s=result.get('own_cpu_s', result['cpu_seconds']),
                                  khz_samples=[freq['median_khz']] if freq else None)
     return dict(mode=m['mode'], metrics=metrics, verdict=bc.attempt_verdict(metrics, m['mode'], owner=lock_owner(job_id)))
+
+
+def harness_cpus(m, cpus):
+    """CPUs of run.cpus the attempt does not use, where the runner's own snapshots and sampler go."""
+    return set(expand_cpus(m['run']['cpus'])) - set(expand_cpus(cpus))
+
+
+def _cpu_used():
+    return sum(u.ru_utime + u.ru_stime for u in map(resource.getrusage, (resource.RUSAGE_SELF,
+                                                                         resource.RUSAGE_CHILDREN)))
+
+
+def run_attempt(m, command, cpus, guard, cancel_file, directory):
+    """`run_child`, with the harness kept off the attempt's CPUs where it can be. A cpu-context
+    snapshot costs ~0.5 CPU-s, inside the window its /proc/stat reads bound: on a 0.3 s 16-worker
+    attempt that alone exceeds the 5% rule. Where no CPU is spare, the harness's CPU time is
+    counted as own time (`own_cpu_s`), which can hide at most that much foreign time."""
+    spare, saved = harness_cpus(m, cpus), os.sched_getaffinity(0)
+    if spare:
+        os.sched_setaffinity(0, spare)  # this thread only; the snapshot children and sampler inherit it
+    used = _cpu_used()
+    try:
+        r = campaign.run_child(command, cpus, m['run']['limits']['wall_seconds'],
+                               m['run']['limits'].get('kill_after_seconds', 60), guard,
+                               should_stop=cancel_file.exists, scratch_dir=directory / 'scratch')
+    finally:
+        os.sched_setaffinity(0, saved)
+    harness = max(0.0, _cpu_used() - used - r['cpu_seconds'])
+    r.update(harness_cpu_seconds=harness, own_cpu_s=r['cpu_seconds'] + (0.0 if spare else harness))
+    return r
 
 
 def session_contamination(journal, m, job_id):
@@ -528,11 +559,11 @@ def run_job(directory, force_uncancel=False):
         if limits.get('rss_bytes'):
             guard = (Path(command[0]).name[:15], command[0], limits['rss_bytes'] // 1024)
         load = os.getloadavg()[0]
-        r = campaign.run_child(command, cpus, limits['wall_seconds'], limits.get('kill_after_seconds', 60), guard,
-                               should_stop=cancel_file.exists, scratch_dir=directory / 'scratch')
+        r = run_attempt(m, command, cpus, guard, cancel_file, directory)
         metadata = dict(attempt_id=aid, attempt_try=try_, cpus=cpus, argv=command, binary_sha256=actual, load_start=load,
                         process_wall_ns=r['process_wall_ns'], wall_seconds=r['process_wall_ns'] / 1e9,
-                        cpu_seconds=r['cpu_seconds'], observed_peak_rss_bytes=r['peak_rss_bytes'],
+                        cpu_seconds=r['cpu_seconds'], harness_cpu_seconds=r['harness_cpu_seconds'],
+                        observed_peak_rss_bytes=r['peak_rss_bytes'],
                         exit=r['returncode'], stop='cancelled' if r['stopped'] else None,
                         guard=dict(wall_seconds=limits['wall_seconds'], rss_bytes=limits.get('rss_bytes'),
                                    rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr']),
