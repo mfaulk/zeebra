@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """`m33-basis-v1`, the one basis digest every M33 solver is compared by (plan §11.3).
 
-Each element is made monic and becomes its terms sorted by exponent tuple; the elements are sorted
-as those tuples, then hashed as text. `examples/support/basis_digest.rs` computes the same digest
-inside Zeebra without rendering the basis, so a solver's timed region carries only the hash.
+Each element is made monic and written as its terms in ascending exponent-tuple order, `e1,…,en:c`
+joined by spaces; the lines are sorted as strings and hashed under a `m33-basis-v1 p n` header.
+`examples/support/basis_digest.rs` computes the same digest inside Zeebra without rendering the
+basis, so a solver's timed region carries only the hash.
 
     basis_digest.py --modulus P --variables x1,x2 BASIS.txt   # one polynomial per line
 """
@@ -46,7 +47,7 @@ def canonical_polynomial(text, modulus, variables):
 
 def digest_canonical(polynomials, modulus, nvars):
     """The digest of already-canonical elements; zero elements are dropped."""
-    lines = [' '.join(f"{','.join(map(str, m))}:{c}" for m, c in p) for p in sorted(p for p in polynomials if p)]
+    lines = sorted(' '.join(f"{','.join(map(str, m))}:{c}" for m, c in p) for p in polynomials if p)
     return hashlib.sha256('\n'.join([f'{FORMAT} {modulus} {nvars}', *lines]).encode()).hexdigest()
 
 

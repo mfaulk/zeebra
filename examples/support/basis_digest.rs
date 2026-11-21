@@ -2,49 +2,37 @@
 // text, taken here from the basis itself so the timed region renders nothing. Elements must be monic,
 // as a reduced basis is; the Python side normalizes and would expose one that is not.
 
+use std::fmt::Write;
 use zeebra::{util::sha256_hex, FiniteField, MultivariatePolynomial};
 
 pub fn basis_digest<const N: usize, F: FiniteField>(
     basis: &[MultivariatePolynomial<N, F>],
     modulus: u128,
 ) -> String {
-    let mut elements: Vec<Vec<(&[u32], u128)>> = basis
+    let mut lines: Vec<String> = basis
         .iter()
         .filter(|p| !p.is_zero())
         .map(|p| {
-            let mut terms: Vec<_> = p
-                .terms()
-                .iter()
-                .map(|(m, c)| {
-                    (
-                        m.exponents(),
-                        c.to_string().parse().expect("canonical residue"),
-                    )
-                })
-                .collect();
-            terms.sort_unstable();
-            terms
+            let mut terms: Vec<_> = p.terms().iter().collect();
+            terms.sort_unstable_by(|a, b| a.0.exponents().cmp(b.0.exponents()));
+            let mut line = String::new();
+            for (i, (monomial, coefficient)) in terms.iter().enumerate() {
+                if i > 0 {
+                    line.push(' ');
+                }
+                for (j, e) in monomial.exponents().iter().enumerate() {
+                    if j > 0 {
+                        line.push(',');
+                    }
+                    write!(line, "{e}").unwrap();
+                }
+                write!(line, ":{coefficient}").unwrap();
+            }
+            line
         })
         .collect();
-    elements.sort_unstable();
-    let mut text = format!("m33-basis-v1 {modulus} {N}");
-    for element in &elements {
-        text.push('\n');
-        for (i, (exponents, coefficient)) in element.iter().enumerate() {
-            if i > 0 {
-                text.push(' ');
-            }
-            for (j, e) in exponents.iter().enumerate() {
-                if j > 0 {
-                    text.push(',');
-                }
-                text.push_str(&e.to_string());
-            }
-            text.push(':');
-            text.push_str(&coefficient.to_string());
-        }
-    }
-    sha256_hex(text.as_bytes())
+    lines.sort_unstable();
+    sha256_hex(format!("m33-basis-v1 {modulus} {N}\n{}", lines.join("\n")).as_bytes())
 }
 
 #[cfg(test)]
