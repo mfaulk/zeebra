@@ -592,6 +592,7 @@ fn split(log: &zeebra::grobner::sigf4::SplitLog) -> Json {
             ("targets", Json::size(b.targets)),
             ("reducers", Json::size(b.reducers)),
             ("columns", Json::size(b.columns)),
+            ("entries", Json::int(b.entries)),
             ("setup_ns", Json::nanos(b.setup)),
             ("parallel_pass_ns", Json::nanos(b.parallel_pass)),
             ("serial_pass_ns", Json::nanos(b.serial_pass)),
@@ -653,6 +654,15 @@ fn split(log: &zeebra::grobner::sigf4::SplitLog) -> Json {
         ("inputs_ns", Json::nanos(log.inputs)),
         ("materialize_ns", Json::nanos(log.materialize)),
         ("drop_ns", Json::nanos(log.drop)),
+        ("redundant_elements", Json::size(log.redundant_elements)),
+        (
+            "products_on_redundant_elements",
+            Json::int(log.products_on_redundant_elements),
+        ),
+        (
+            "products_on_kept_elements",
+            Json::int(log.products_on_kept_elements),
+        ),
         ("batches", Json::Array(batches.collect())),
     ])
 }

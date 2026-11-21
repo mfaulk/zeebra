@@ -203,6 +203,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         + engine.stats.peak_pending * size_of::<Pending<N>>()
         + engine.reducers.len() * (size_of::<Monomial<N>>() + 8);
     #[cfg(feature = "research-sigf4-split")]
+    let leads: Vec<Monomial<N>> = engine.basis.iter().map(|e| e.lead).collect();
+    #[cfg(feature = "research-sigf4-split")]
     let drop_clock = {
         engine.stats.split.materialize = materialize_clock.elapsed();
         Instant::now()
@@ -220,6 +222,21 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     stats.interreduction_nonzeros = matrix.nonzeros;
     stats.interreduction_peak_nonzeros = matrix.peak_nonzeros;
     stats.reduced_basis_elements = reduced.len();
+    #[cfg(feature = "research-sigf4-split")]
+    {
+        // The first element at each surviving lead is the one interreduction kept.
+        let mut kept: std::collections::HashSet<Monomial<N>> =
+            reduced.iter().map(|p| p.leading_monomial(order)).collect();
+        let split = &mut stats.split;
+        for (lead, &products) in leads.iter().zip(&split.element_products) {
+            if kept.remove(lead) {
+                split.products_on_kept_elements += products;
+            } else {
+                split.redundant_elements += 1;
+                split.products_on_redundant_elements += products;
+            }
+        }
+    }
 
     if options.certify {
         // As the shipping F4 certifies (#909, #912): on the engine's workers, under the
@@ -799,6 +816,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             targets: target_count,
             reducers: reducer_count,
             columns: ncols,
+            entries: targets
+                .iter()
+                .map(|t| t.1.len() as u64)
+                .chain(reducer_rows.iter().map(|r| r.len() as u64))
+                .sum(),
             setup: clock.elapsed(),
             ..Default::default()
         };
@@ -986,7 +1008,10 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 self.stats.rows_adding_no_rank += 1;
                 self.stats.products_on_singular_rows += products;
             }
-            Kind::Element => {}
+            Kind::Element => {
+                #[cfg(feature = "research-sigf4-split")]
+                self.stats.split.element_products.push(products);
+            }
         }
         #[cfg(test)]
         {
