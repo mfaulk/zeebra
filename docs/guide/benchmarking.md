@@ -416,7 +416,7 @@ a `binary-mismatch` stop record rather than run. A job never compiles.
 or this repository is refused (CLAUDE.md §1). `/buildcache` is root-owned, so the default needs a
 one-time `sudo install -d -o "$USER" /buildcache/bench-jobs`.
 
-```
+```text
 /buildcache/bench-jobs/
   queue                     "<iso-time> <job-id>" per submit, oldest first
   <job-id>/                 job id = first 12 hex of the canonical manifest's SHA-256
