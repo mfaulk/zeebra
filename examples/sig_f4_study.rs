@@ -25,7 +25,8 @@
 //!
 //! `--stages` (f4) turns on stage measurement and reports the stage clocks, the concurrent passes'
 //! worker time and products, and the work counters (#972); `--fl` (f4) runs the Faugère–Lachartre
-//! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918).
+//! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918); `--reducer
+//! NAME` (f4) sets the symbolic reducer selection by its `ReducerSelection` variant name.
 //!
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
@@ -60,6 +61,7 @@ use zeebra::{
         reference::buchberger_reference,
         sigf4::{sig_f4_reported, SigF4Options, SigF4Statistics},
         BatchOrder, F4Options, F4Statistics, GradedEngine, ParallelForward, ParallelSymbolic,
+        ReducerSelection,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -91,6 +93,7 @@ struct Args {
     write_basis: Option<String>,
     stages: bool,
     fl: bool,
+    reducer: ReducerSelection,
 }
 
 /// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
@@ -118,6 +121,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         write_basis: None,
         stages: false,
         fl: false,
+        reducer: ReducerSelection::default(),
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -147,6 +151,13 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--claim" => parsed.claim = true,
             "--stages" => parsed.stages = true,
             "--fl" => parsed.fl = true,
+            "--reducer" => {
+                let name = value()?;
+                parsed.reducer = ReducerSelection::ALL
+                    .into_iter()
+                    .find(|s| format!("{s:?}") == name)
+                    .ok_or(format!("--reducer: no ReducerSelection::{name}"))?
+            }
             "--symbolic-replay" => parsed.symbolic = true,
             "--min-frontier" => {
                 parsed.min_frontier = value()?.parse().map_err(|_| "--min-frontier")?
@@ -185,7 +196,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
     }
-    if (parsed.stages || parsed.fl) && parsed.engine != "f4" {
+    if (parsed.stages || parsed.fl || parsed.reducer != ReducerSelection::default())
+        && parsed.engine != "f4"
+    {
         return Err("--stages and --fl configure the shipping F4: --engine f4".into());
     }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
@@ -225,6 +238,7 @@ fn f4_options(args: &Args) -> F4Options {
             }
         },
         measure_stages: args.stages,
+        reducer_selection: args.reducer,
         batch_order: if args.fl {
             BatchOrder::FaugereLachartre
         } else {
@@ -1385,6 +1399,9 @@ mod tests {
         assert!(args(&[&base[..], &["f4", "--workers", "4", "--stages", "--fl"]].concat()).is_ok());
         assert!(args(&[&base[..], &["sigf4", "--stages"]].concat()).is_err());
         assert!(args(&[&base[..], &["entry", "--fl"]].concat()).is_err());
+        let fewest = args(&[&base[..], &["f4", "--reducer", "FewestTerms"]].concat()).unwrap();
+        assert_eq!(fewest.reducer, ReducerSelection::FewestTerms);
+        assert!(args(&[&base[..], &["f4", "--reducer", "Sparsest"]].concat()).is_err());
         assert!(args(&[&base[..], &["magma"]].concat()).is_err());
         assert!(args(&["--field", "bn254", "--name", "eco-12", "--engine", "f4"]).is_err());
         assert!(args(&[&base[..], &["entry", "--workers", "16"]].concat()).is_ok());
