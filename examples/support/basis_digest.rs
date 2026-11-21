@@ -15,10 +15,15 @@ pub fn basis_digest<const N: usize, F: FiniteField>(
         .map(|p| {
             let mut terms: Vec<_> = p.terms().iter().collect();
             terms.sort_unstable_by(|a, b| a.0.exponents().cmp(b.0.exponents()));
-            let mut bytes = Vec::with_capacity(terms.len() * (4 * N + 12));
+            let mut bytes = Vec::with_capacity(terms.len() * (N + 21));
             for (monomial, coefficient) in terms {
-                for e in monomial.exponents() {
-                    bytes.extend_from_slice(&e.to_le_bytes());
+                for &e in monomial.exponents() {
+                    let mut e = e;
+                    while e >= 0x80 {
+                        bytes.push((e as u8 & 0x7f) | 0x80);
+                        e >>= 7;
+                    }
+                    bytes.push(e as u8);
                 }
                 write!(bytes, "{coefficient};").unwrap();
             }
@@ -48,7 +53,7 @@ mod basis_digest_tests {
             .collect();
         assert_eq!(
             basis_digest(&basis, 32003),
-            "732b64fcd26daed997c49a9b032cd303f0c8d3e76264275156efa161c9028e7c"
+            "8fb196a0f7de4f7d36d2d8c6b34fb80eebd5f04658fcc799e1f2583781e5fefc"
         );
     }
 }

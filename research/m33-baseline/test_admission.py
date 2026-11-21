@@ -49,15 +49,16 @@ class Digest(unittest.TestCase):
     def test_vector_shared_with_rust(self):
         """The vector `examples/support/basis_digest.rs` asserts; element order and scaling do not matter."""
         texts = ['2*x1*x2+4', 'x2^2+32002', 'x1^2+3*x2']
-        want = '732b64fcd26daed997c49a9b032cd303f0c8d3e76264275156efa161c9028e7c'
+        want = '8fb196a0f7de4f7d36d2d8c6b34fb80eebd5f04658fcc799e1f2583781e5fefc'
         self.assertEqual(basis_digest.basis_digest(texts, 32003, ['x1', 'x2']), want)
         self.assertEqual(basis_digest.basis_digest(texts[::-1], 32003, ['x1', 'x2']), want)
 
     def test_encoding(self):
-        """Exponents are little-endian u32, the coefficient decimal and `;`, elements length-prefixed."""
+        """Exponents are LEB128, the coefficient decimal and `;`, elements u32-length-prefixed."""
         import struct
+        self.assertEqual(basis_digest.leb128(300), bytes([0xac, 0x02]))
         got = basis_digest.digest_canonical([(((2, 0), 1),), (((1, 0), 3), ((1, 1), 1))], 7, 2)
-        a, b = struct.pack('<2I', 2, 0) + b'1;', struct.pack('<2I', 1, 0) + b'3;' + struct.pack('<2I', 1, 1) + b'1;'
+        a, b = bytes([2, 0]) + b'1;', bytes([1, 0]) + b'3;' + bytes([1, 1]) + b'1;'
         body = b''.join(struct.pack('<I', len(e)) + e for e in sorted([a, b]))
         self.assertEqual(got, hashlib.sha256(b'm33-basis-v1 7 2\n' + body).hexdigest())
 
