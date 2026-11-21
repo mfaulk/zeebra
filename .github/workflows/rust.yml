@@ -192,7 +192,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           cargo build --profile ci-release --features research-sigf4 --example sig_f4_study
-          tools/bench-job-smoke.sh target/ci-release/examples/sig_f4_study "$GITHUB_SHA" "$RUNNER_TEMP/bench-job-smoke"
+          tools/bench-job-smoke.sh target/ci-release/examples/sig_f4_study "$GITHUB_SHA" /tmp/bench-job-smoke  # $RUNNER_TEMP is under $HOME, which bench-job refuses
 
   lint:
     name: Format and lint
