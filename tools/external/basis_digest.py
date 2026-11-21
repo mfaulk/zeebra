@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """`m33-basis-v1`, the one basis digest every M33 solver is compared by (plan §11.3).
 
-Each element is made monic and written as its terms in ascending exponent-tuple order, `e1,…,en:c`
-joined by spaces; the lines are sorted as strings and hashed under a `m33-basis-v1 p n` header.
+Each element is made monic and encoded as its terms in ascending exponent-tuple order, each term
+its exponents as little-endian u32 then its coefficient in decimal and `;`. The encoded elements are
+sorted as bytes, each prefixed by its u32 length, and hashed after a `m33-basis-v1 p n` header line.
+Binary exponents keep the encoding cheap: Eco-12's basis has 400,000 terms.
 `examples/support/basis_digest.rs` computes the same digest inside Zeebra without rendering the
 basis, so a solver's timed region carries only the hash.
 
@@ -11,6 +13,7 @@ basis, so a solver's timed region carries only the hash.
 import argparse
 import hashlib
 import re
+import struct
 import sys
 
 FORMAT = 'm33-basis-v1'
@@ -47,8 +50,10 @@ def canonical_polynomial(text, modulus, variables):
 
 def digest_canonical(polynomials, modulus, nvars):
     """The digest of already-canonical elements; zero elements are dropped."""
-    lines = sorted(' '.join(f"{','.join(map(str, m))}:{c}" for m, c in p) for p in polynomials if p)
-    return hashlib.sha256('\n'.join([f'{FORMAT} {modulus} {nvars}', *lines]).encode()).hexdigest()
+    elements = sorted(b''.join(struct.pack(f'<{nvars}I', *m) + f'{c};'.encode() for m, c in p)
+                      for p in polynomials if p)
+    data = f'{FORMAT} {modulus} {nvars}\n'.encode() + b''.join(struct.pack('<I', len(e)) + e for e in elements)
+    return hashlib.sha256(data).hexdigest()
 
 
 def basis_digest(texts, modulus, variables):
