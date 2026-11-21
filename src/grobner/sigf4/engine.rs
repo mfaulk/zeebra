@@ -299,7 +299,9 @@ fn interreduce<const N: usize, F: FiniteField>(
             budget_millis: millis(budget),
         })
     };
+    let __m = Instant::now();
     let minimal = minimal_basis_for_interreduction(basis, order);
+    if std::env::var_os("ZB_IR_SPLIT").is_some() { eprintln!("IRSPLIT minimal_ms={:.2}", __m.elapsed().as_secs_f64()*1e3); }
     match interreduce_by_matrix_with(
         minimal,
         order,
