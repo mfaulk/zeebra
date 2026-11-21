@@ -133,9 +133,13 @@ def paired(records, small):
 
 
 def ratio_table(jobs, small_jobs, title):
-    cells = defaultdict(list)
+    cells, void = defaultdict(list), []
     for job, small in [(j, False) for j in jobs] + [(j, True) for j in small_jobs]:
-        for r in attempts(job):
+        records = attempts(job)
+        dirty = sum(r['contaminated'] for r in records)
+        if bs.session_void(len(records) - dirty, dirty):  # §11.2: > 20% contaminated, re-run whole
+            void.append(f'**Session void:** {Path(job).name}, {dirty} of {len(records)} attempts contaminated.')
+        for r in records:
             cells[r['instance'], r['engine'], r['workers'], small].append(r)
     raw, verdicts, failed = [f'### {title}', '', '| Row | Engine | Workers | Method | F0 median | n | '
                                                  'F2 ÷ F0 wall [95%] | Peak RSS ratio | Excluded |',
@@ -165,7 +169,7 @@ def ratio_table(jobs, small_jobs, title):
         failed += bool(hard)
         verdicts.append(f'| {instance} | {engine} | {workers} | {method} | {"; ".join(why) or "pass"} |')
     out = raw + ['', '| Row | Engine | Workers | Method | Verdict |', '|---|---|---:|---|---|'] + verdicts
-    return '\n'.join(out), failed
+    return '\n'.join(out + [''] + void if void else out), failed + len(void)
 
 
 def regression(args):

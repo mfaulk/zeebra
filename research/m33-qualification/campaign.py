@@ -75,11 +75,13 @@ def held_out(r):
 def suite_rows(suite):
     if suite == 'grevlex':
         rows = [row('grevlex', f, n) for t in baseline.ROWS for f, n in baseline.rows(t)]
-        rows += [row('grevlex', f, n) for f in FIELDS for n in CROSS]
+        # Noon's coefficient 10 vanishes in characteristic 2, so GF(2) has no Noon row.
+        rows += [row('grevlex', f, n) for f in FIELDS for n in CROSS if not (f == 'gf2' and n.startswith('noon'))]
     elif suite == 'grlex':
         rows = [row('grlex', f, n) for f, n in ROWS_961]
     elif suite == 'lex':
-        rows = [row('lex', f, n) for f in FIELDS for n in LEX]
+        # groebner-rs, the wide-field reference, does not finish lex Cyclic-5 (or Katsura-5) in 600 s.
+        rows = [row('lex', f, n) for f in FIELDS for n in LEX if n in LEX[:2] or f in ('gf2', 'gf32003', 'm31')]
     elif suite.startswith(('regression-', 'small-')):
         track = suite[-1]
         controls = baseline.ROWS[track]['control']
