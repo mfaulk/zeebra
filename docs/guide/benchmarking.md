@@ -307,7 +307,7 @@ Every M33 figure is taken in one of two modes (plan §11.2,
 |---|---|---|
 | any SMT sibling of a bench CPU > 5% busy over the attempt (all of it is foreign) | contaminated | contaminated |
 | bench CPUs in aggregate > 5% foreign: (busy − child's own CPU time) / total | contaminated | contaminated |
-| bench median clock > 3% off the session median, per group (worker count) | contaminated | contaminated |
+| bench median clock > 3% off the median of its group (in `bench-job`, one arm of one cell: instance, worker count, arm) | contaminated | contaminated |
 | busy-CPU equivalents on the non-bench CPUs ≥ 4 | — | contaminated |
 | a compiler/linker, a `Runner.Worker`, or another `benchlock` owner in either snapshot | — | contaminated |
 | more than 20% of a session's attempts contaminated | session void, rerun whole | same |
@@ -408,7 +408,8 @@ alone, through `tools/bench_stats.py` (*Statistics and verdicts* below):
 
 - **Provenance:** job id, mode, manifest and journal SHA-256s, each arm's commit, binary SHA-256 and
   build, cpus, reservation (CCD-scoped in dev mode, exclusive in publication mode), clock governor
-  and the session's median clock per cell.
+  the clock rule's grouping (`arm`, or `cell` for a verdict written before #996) and the session's
+  median clock per group.
 - **Attempts:** counts by status, the contaminated count (#968), session void, and whether the job
   stopped before completing.
 - **Wall and RSS, Stages, Scaling:** medians per instance, worker count and arm, over clean `ok`
@@ -492,8 +493,15 @@ Every attempt's exit metadata carries `contamination`, which holds `{mode, metri
 The metrics come from the before/after `cpu-context` snapshots, with the child's `wait4` CPU time
 as `own_cpu_s` and the sampled median clock. Snapshots that cannot be read give `verdict: null`
 plus an `error`, never a clean verdict. The `complete` stop carries the session verdict:
-`{contaminated, total, void, median_khz, flagged}`. That is where the clock rule is applied,
-against each cell's (instance and worker count's) median.
+`{version, grouping, contaminated, total, void, median_khz, flagged}`. That is where the clock
+rule is applied, against the median of each arm within a cell (instance, worker count and arm;
+`median_khz` is keyed `<instance>@<w>w/<arm>`). Solvers sample different clocks inside one cell:
+grobx reads about 2.67 GHz beside Zeebra's 3.99 and groebner-rs's 4.54, while hardware cycle counts
+put grobx at 4.09–4.16 GHz (#992). A cell-wide median therefore voided every mixed-solver M33
+session on clock alone, with foreign load at 1.7% or less (#996). Version 2 groups per arm; a
+verdict without `version` is version 1, grouped per cell (instance and worker count), and `report`
+still reads it. The foreign and sibling rules are unchanged. The M33 sessions re-judged under
+version 2 are in [`research/m33-clock-rule/`](../../research/m33-clock-rule/README.md).
 
 A `cpu-context` snapshot costs about 0.5 CPU-s, and part of that cost falls inside the window its
 `/proc/stat` reads bound. So the runner moves its harness (snapshots and frequency sampler) onto
