@@ -305,6 +305,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m33-baseline -p 'test_*.py'
 
+      - name: M33 Q qualification manifests and verdicts
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s research/m33-qualification -p 'test_*.py'
+
       - name: M33 G1 attribution helpers and tables
         if: ${{ !cancelled() }}
         run: |
