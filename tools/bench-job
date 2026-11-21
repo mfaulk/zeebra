@@ -6,7 +6,8 @@
     tools/bench-job run (<job-id> | --next)       foreground; background it yourself
     tools/bench-job resume <job-id> [--force-uncancel]
     tools/bench-job cancel <job-id>
-    tools/bench-job report <job-id>
+    tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05]
+    tools/bench-job scoreboard <job-id> [--machine NAME] [--append history.json]
 
 A job is a directory under $ZEEBRA_BENCH_JOBS (default /buildcache/bench-jobs), never $HOME or a
 worktree. The manifest is frozen at submit and names the job (first 12 hex of its SHA-256); every
@@ -28,7 +29,9 @@ import shutil
 import signal
 import subprocess
 import sys
+import statistics as stats
 import time
+from collections import defaultdict
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
@@ -52,6 +55,7 @@ def _module(name, path):
 aj = _module('attempt_journal', TOOLS / 'external' / 'attempt_journal.py')
 campaign = _module('bench_campaign', TOOLS / 'bench_campaign.py')
 bc = _module('bench_contamination', TOOLS / 'bench_contamination.py')
+bs = _module('bench_stats', TOOLS / 'bench_stats.py')
 
 
 class JobError(Exception):
@@ -373,14 +377,173 @@ def cancel(directory):
     return 'cancel requested; the runner stops within 10 s'
 
 
-def report(directory):
-    # Placeholder until #969's `bench_stats` renders tables from the journal.
-    state = aj.load(directory / 'journal')
-    rows = [dict(attempt=a['metadata'].get('attempt_id'), index=a['index'], cell=a['cell'], status=a['status'],
-                 exit=a['metadata']['exit'], wall_seconds=a['metadata']['wall_seconds'],
-                 peak_rss_bytes=a['metadata']['observed_peak_rss_bytes']) for a in state['attempts']]
-    return dict(header=state['header'], stop=state['stop'], stops=state['stops'], attempts=rows,
-                journal_sha256=state['journal_sha256'])
+def _child_report(attempt):
+    """The child's JSON report (its last stdout line), or {} when it printed none."""
+    try:
+        value = json.loads(attempt['stdout'].decode().strip().splitlines()[-1])
+    except (ValueError, IndexError, UnicodeDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _flagged(state):
+    """Contaminated attempt ids: the session verdict once complete, else each attempt's own."""
+    session = (state['stop'] or {}).get('contamination')
+    if session:
+        return set(session.get('flagged') or {})
+    return {a['metadata']['attempt_id'] for a in state['attempts']
+            if (((a['metadata'].get('contamination') or {}).get('verdict')) or {}).get('contaminated')}
+
+
+def _median(values):
+    return stats.median(values) if values else None
+
+
+def summarize(state, m, *, baseline=None, bound=1.05):
+    """The report as data. Contaminated attempts are counted and listed but never timed (#968)."""
+    flagged, job = _flagged(state), state['header']['bench_job']
+    base = baseline or m['arms'][0]['name']
+    timed = defaultdict(lambda: defaultdict(dict))  # (instance, workers) -> arm -> (seed, rep) -> sample
+    digests, verification, statuses = defaultdict(set), [], defaultdict(int)
+    for a in state['attempts']:
+        md, cell, child = a['metadata'], a['cell'], _child_report(a)
+        statuses[a['status']] += 1
+        verification.append(dict(attempt=md['attempt_id'], arm=cell['arm'], instance=cell['instance'],
+                                 workers=cell['workers'], rep=cell['rep'], status=a['status'],
+                                 contaminated=md['attempt_id'] in flagged, basis_sha256=child.get('basis_sha256')))
+        if a['status'] == 'ok' and child.get('basis_sha256'):
+            digests[cell['instance']].add(child['basis_sha256'])  # contamination spoils a time, not an answer
+        if a['status'] != 'ok' or md['attempt_id'] in flagged:
+            continue
+        stages = {k[:-3]: v / 1e6 for k, v in (child.get('statistics') or {}).items()
+                  if k.endswith('_ns') and isinstance(v, (int, float))}
+        timed[(cell['instance'], cell['workers'])][cell['arm']][(cell['seed'], cell['rep'])] = dict(
+            wall_ms=md['process_wall_ns'] / 1e6, rss=md.get('observed_peak_rss_bytes'), stages=stages, child=child)
+    cells, ratios = [], []
+    for (inst, w), arms in sorted(timed.items()):
+        for arm, samples in arms.items():
+            s = list(samples.values())
+            names = sorted({k for x in s for k in x['stages']})
+            cells.append(dict(instance=inst, workers=w, arm=arm, n=len(s),
+                              wall_ms=_median([x['wall_ms'] for x in s]),
+                              rss_mib=_median([x['rss'] / 2**20 for x in s if x['rss']]),
+                              stages_ms={k: _median([x['stages'][k] for x in s if k in x['stages']]) for k in names}))
+        for arm in (a for a in arms if a != base and base in arms):
+            pairs = bs.paired_ratios({k: v['wall_ms'] for k, v in arms[arm].items()},
+                                     {k: v['wall_ms'] for k, v in arms[base].items()})
+            if not pairs:
+                continue
+            ci = bs.paired_ratio(pairs, seed=f'{inst} {w} {arm} {base}')
+            ratios.append(dict(instance=inst, workers=w, arm=arm, baseline=base, bound=bound, **ci._asdict(),
+                               verdict=bs.regression_verdict(ci, bound)._asdict()))
+    stop = state['stop'] or {}
+    session = stop.get('contamination') or {}
+    clocks = sorted({str((a['metadata'].get('before') or {}).get('clock')) for a in state['attempts']})
+    return dict(
+        provenance=dict(job_id=job['job_id'], mode=job['mode'], context=job['context'],
+                        manifest_sha256=job['manifest_sha256'], journal_sha256=state['journal_sha256'],
+                        stop=stop.get('reason'), cpus=m['run']['cpus'], clock=clocks,
+                        median_khz=session.get('median_khz'),
+                        reservation='exclusive' if job['mode'] == 'publication' else 'ccd-scoped',
+                        arms=[dict(name=a['name'], commit=a['commit'], sha256=a['sha256'], **a['build'])
+                              for a in m['arms']]),
+        counts=dict(attempts=len(state['attempts']), statuses=dict(statuses), contaminated=len(flagged),
+                    void=bool(session.get('void')), stopped=stop.get('reason') != 'complete',
+                    inconclusive=sum(r['verdict']['outcome'] == 'inconclusive' for r in ratios)),
+        cells=cells, ratios=ratios, digests={k: sorted(v) for k, v in sorted(digests.items())},
+        verification=verification, timed=timed)
+
+
+def _fmt(value, spec='.1f'):
+    return '—' if value is None else format(value, spec)
+
+
+def render(doc):
+    p, c = doc['provenance'], doc['counts']
+    out = [f"# bench-job {p['job_id']} ({p['mode']})\n", '## Provenance\n',
+           f"- issue #{p['context']['issue']}, agent `{p['context']['agent']}`; stop: {p['stop']}",
+           f"- manifest `{p['manifest_sha256']}`, journal `{p['journal_sha256']}`",
+           f"- cpus {p['cpus']}, reservation {p['reservation']}, clock {', '.join(p['clock'])}, "
+           'median clock (kHz) ' + (', '.join(f'{k} {_fmt(v, ".0f")}' for k, v in (p['median_khz'] or {}).items()) or '—'), '', '| arm | commit | sha256 | profile | flags |',
+           '|---|---|---|---|---|']
+    out += [f"| {a['name']} | `{a['commit'][:12]}` | `{a['sha256'][:16]}` | {a['profile']} | {a['flags']} |"
+            for a in p['arms']]
+    out += ['\n## Attempts\n',
+            f"{c['attempts']} attempts: " + ', '.join(f'{k} {v}' for k, v in sorted(c['statuses'].items()))
+            + f"; contaminated {c['contaminated']} (excluded from timing){', session VOID' if c['void'] else ''}; "
+            f"{'stopped before complete' if c['stopped'] else 'complete'}; inconclusive ratios {c['inconclusive']}.",
+            '\n## Wall and RSS (medians of clean ok attempts)\n', '| instance | w | arm | n | wall ms | RSS MiB |',
+            '|---|---:|---|---:|---:|---:|']
+    out += [f"| {r['instance']} | {r['workers']} | {r['arm']} | {r['n']} | {_fmt(r['wall_ms'], ',.2f')} | "
+            f"{_fmt(r['rss_mib'])} |" for r in doc['cells']]
+    out += ['\n## Stages (median ms, where the child reports them)\n']
+    out += [f"- {r['instance']} @{r['workers']} {r['arm']}: "
+            + ', '.join(f'{k} {v:,.2f}' for k, v in r['stages_ms'].items())
+            for r in doc['cells'] if r['stages_ms']] or ['None reported.']
+    out += ['\n## Scaling (median wall ms by workers; speedup over the fewest)\n']
+    curves = defaultdict(dict)
+    for r in doc['cells']:
+        curves[(r['instance'], r['arm'])][r['workers']] = r['wall_ms']
+    for (inst, arm), curve in sorted(curves.items()):
+        first = curve[min(curve)]
+        out.append(f'- {inst} {arm}: ' + ', '.join(f'{w}w {v:,.2f} ({first / v:.2f}x)' for w, v in sorted(curve.items())))
+    out += ['\n## Ratios (paired per repetition, 95% bootstrap; tools/bench_stats.py)\n',
+            '| instance | w | arm ÷ baseline | n | ratio [95%] | bound | verdict |', '|---|---:|---|---:|---:|---:|---|']
+    out += [f"| {r['instance']} | {r['workers']} | {r['arm']} ÷ {r['baseline']} | {r['n']} | {r['median']:.3f} "
+            f"[{r['lo']:.3f}, {r['hi']:.3f}] | {r['bound']} | {r['verdict']['outcome']} ({r['verdict']['reason']}"
+            f"{'; extend once' if r['verdict']['extend'] else ''}) |" for r in doc['ratios']] or ['No paired arms.']
+    out += ['\n## Verification\n']
+    out += [f"- {inst}: {'consistent' if len(d) == 1 else 'DIVERGENT'} ({', '.join(x[:16] for x in d)})"
+            for inst, d in doc['digests'].items()] or ['No child reported a basis digest.']
+    out += [f"- `{v['attempt']}` {v['arm']} {v['instance']} @{v['workers']} rep {v['rep']}: {v['status']}"
+            f"{', contaminated' if v['contaminated'] else ''}"
+            for v in doc['verification'] if v['status'] != 'ok' or v['contaminated']]
+    return '\n'.join(out) + '\n'
+
+
+def competitive_rows(state, m, *, machine):
+    """`CompetitiveRecord` rows (src/grobner/external/board.rs) for a publication job: one per
+    instance carrying a `competitive` identity block, arm and worker count."""
+    if m['mode'] != 'publication':
+        raise JobError('only a publication-mode job feeds the scoreboard (plan §11.2)', EXIT_REFUSED)
+    doc, rows, limits = summarize(state, m), [], m['run']['limits']
+    job_id = doc['provenance']['job_id']
+    for inst in (i for i in m['instances'] if i.get('competitive')):
+        for arm in m['arms']:
+            for w in m['run']['workers']:
+                samples = list(doc['timed'].get((inst['name'], w), {}).get(arm['name'], {}).values())
+                row = dict(schema=1, **inst['competitive'], library=arm.get('library', 'zeebra'),
+                           library_version=arm.get('library_version'),
+                           environment=dict(commit=arm['commit'][:8], base_commit='', patch_id='', machine=machine,
+                                            cpu=f'affinity {attempt_cpus(m, w)}', concurrency=w,
+                                            build=f"{arm['build']['profile']}, {arm['build']['flags']}",
+                                            policy=f'bench-job {job_id}: median of {len(samples)} clean attempts, '
+                                                   f"{limits['wall_seconds']} s wall, {w} workers"),
+                           limits=dict(wall_nanos=int(limits['wall_seconds'] * 1e9), workers=w,
+                                       max_rss_bytes=limits.get('rss_bytes'), tool_caps=[]),
+                           reproduce=f'tools/bench-job report {job_id}')
+                if not samples:
+                    row.update(outcome='failed', outcome_detail='no clean complete attempt')
+                else:
+                    names = sorted({k for s in samples for k in s['stages']})
+                    row.update(outcome='complete', wall_nanos=round(_median([s['wall_ms'] for s in samples]) * 1e6),
+                               cpu_basis='unavailable', peak_rss_bytes=round(_median([s['rss'] for s in samples])),
+                               peak_rss_basis='direct-child VmHWM (exact)',
+                               stages=[dict(name=k, elapsed_nanos=round(_median(
+                                   [s['stages'][k] for s in samples if k in s['stages']]) * 1e6)) for k in names])
+                    if samples[0]['child'].get('invariants'):
+                        row['invariants'] = samples[0]['child']['invariants']
+                rows.append(row)
+    return rows
+
+
+def append_history(path, rows):
+    """Append to a `history.json` (APPEND-ONLY under COMPETITIVE_HISTORY_CONTRACT); re-render it
+    afterwards with `cargo run --release --example competitive -- --write`."""
+    history = json.loads(Path(path).read_text())
+    history['rows'] += rows
+    history['row_count'] = len(history['rows'])
+    aj._atomic_write(Path(path), (json.dumps(history, indent=2, ensure_ascii=False) + '\n').encode())
 
 
 # ------------------------------------------------------------------------------------------------
@@ -669,7 +832,15 @@ def main(args=None):
         x.add_argument('job')
         x.add_argument('--force-uncancel', action='store_true')
     sub.add_parser('cancel').add_argument('job')
-    sub.add_parser('report').add_argument('job')
+    rp = sub.add_parser('report')
+    rp.add_argument('job')
+    rp.add_argument('--json', action='store_true')
+    rp.add_argument('--baseline', help='the arm every other arm is divided by (default: the first)')
+    rp.add_argument('--bound', type=float, default=1.05, help='regression bound on the upper limit (plan §12.2)')
+    sc = sub.add_parser('scoreboard')
+    sc.add_argument('job')
+    sc.add_argument('--machine', default=os.uname().nodename)
+    sc.add_argument('--append', type=Path, help='research/competitive/results/history.json')
     a = p.parse_args(args)
     try:
         if a.command == 'submit':
@@ -695,7 +866,16 @@ def main(args=None):
         elif a.command == 'cancel':
             print(cancel(job_dir(a.job)))
         elif a.command == 'report':
-            print(json.dumps(report(job_dir(a.job)), indent=1, sort_keys=True, default=str))
+            d = job_dir(a.job)
+            doc = summarize(aj.load(d / 'journal'), load_manifest(d), baseline=a.baseline, bound=a.bound)
+            doc.pop('timed')
+            print(json.dumps(doc, indent=1, sort_keys=True) if a.json else render(doc).rstrip('\n'))
+        elif a.command == 'scoreboard':
+            d = job_dir(a.job)
+            rows = competitive_rows(aj.load(d / 'journal'), load_manifest(d), machine=a.machine)
+            if a.append:
+                append_history(a.append, rows)
+            print(json.dumps(rows, indent=1))
     except JobError as e:
         print(f'bench-job: {e}', file=sys.stderr)
         return e.code

@@ -187,6 +187,12 @@ jobs:
       # This smoke test samples nothing and publishes no performance figures.
       - name: Benchmarks execute without panicking
         run: cargo bench --profile ci-release -- --test
+      # submit -> run -> report -> verify on a real child (#969); timing is ignored.
+      - name: bench-job smoke
+        if: ${{ !cancelled() }}
+        run: |
+          cargo build --profile ci-release --features research-sigf4 --example sig_f4_study
+          tools/bench-job-smoke.sh target/ci-release/examples/sig_f4_study "$GITHUB_SHA" /tmp/bench-job-smoke  # $RUNNER_TEMP is under $HOME, which bench-job refuses
 
   lint:
     name: Format and lint

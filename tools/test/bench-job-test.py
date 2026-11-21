@@ -24,6 +24,7 @@ aj = bj.aj
 CHILD = '''#!/bin/sh
 case "$1" in
   ok) echo '{"status":"ok"}' ;;
+  report) echo '{"status":"complete","basis_sha256":"'"$2"'","statistics":{"symbolic_ns":2000000,"elimination_ns":3000000}}' ;;
   fail) echo boom >&2; exit 1 ;;
   sleep) exec sleep "$2" ;;
   once) [ -e "$2" ] && exit 0; : > "$2"; [ "$3" = fail ] && exit 1; exec sleep 30 ;;
@@ -33,6 +34,10 @@ FAKE_RESERVE = ('#!/bin/sh\n[ "$1" = run ] || exit 64\nshift 3\n'
                 '[ -z "${RESERVE_LOG:-}" ] || echo "exclusive=${ZEEBRA_BENCH_RESERVE_EXCLUSIVE:-}" >"$RESERVE_LOG"\n'
                 'exec "$@"\n')
 COMMIT = 'c0ffee' * 6 + 'c0ff'
+FIXTURE = TOOLS / 'test' / 'fixtures' / 'bench-job-competitive.json'
+K4 = dict(problem='katsura-4', problem_digest='ab' * 32, family='katsura', task='reduced-grobner-basis',
+          field=dict(name='GF(18446744069414584321)', characteristic=18446744069414584321, extension_degree=1,
+                     defining_polynomial=None), order='grevlex', variable_count=5)
 
 
 def sha(path):
@@ -340,6 +345,71 @@ class BenchJobTest(unittest.TestCase):
         self.assertEqual(r.returncode, 64)
         self.assertIn('HOME', r.stderr)
         self.assertFalse((Path.home() / 'bench-jobs-should-not-exist').exists())
+
+
+    def synthetic(self, walls, mode='dev', flagged=()):
+        """A loaded-journal shape: `walls` maps arm -> per-repetition seconds, one instance at 1 worker."""
+        m = self.manifest(mode=mode)
+        m['instances'] = [dict(name='goldilocks/katsura-4', params={}, competitive=K4)]
+        m['arms'][0].update(library='zeebra', library_version='zeebra 0.1.0')
+        attempts = []
+        for rep in range(max(map(len, walls.values()))):
+            for arm, values in walls.items():
+                if rep < len(values):
+                    aid = f'job:{len(attempts)}:0'
+                    report = dict(status='complete', basis_sha256='d1', statistics=dict(symbolic_ns=int(values[rep] * 4e8)))
+                    attempts.append(dict(index=len(attempts), try_=0, status='ok', stdout=json.dumps(report).encode(),
+                                         cell=dict(instance='goldilocks/katsura-4', workers=1, seed=0, rep=rep, arm=arm),
+                                         metadata=dict(attempt_id=aid, process_wall_ns=int(values[rep] * 1e9),
+                                                       observed_peak_rss_bytes=1 << 20, before=dict(clock='boost'))))
+        stop = dict(reason='complete', contamination=dict(contaminated=len(flagged), total=len(attempts), void=False,
+                                                          median_khz=4000000, flagged={f: ['x'] for f in flagged}))
+        header = dict(bench_job=dict(job_id='job', manifest_sha256='m' * 64, mode=mode, context=m['context']))
+        return dict(header=header, stop=stop, stops=[stop], attempts=attempts, journal_sha256='j' * 64), m
+
+    # The report renders every section from a real job, with stages and digests parsed from the child.
+    def test_report_renders_every_section(self):
+        job = self.job(self.manifest(instances=(('i1', ['report', 'd1']),), reps=2))
+        self.cli('run', job, check=0)
+        doc = json.loads(self.cli('report', job, '--json', check=0).stdout)
+        self.assertEqual(doc['counts'], dict(attempts=4, statuses=dict(ok=4), contaminated=0, void=False,
+                                             stopped=False, inconclusive=0))
+        a = next(r for r in doc['cells'] if r['arm'] == 'a')
+        self.assertEqual((a['n'], a['stages_ms']), (2, dict(symbolic=2.0, elimination=3.0)))
+        self.assertEqual(doc['digests'], {'i1': ['d1']})
+        self.assertEqual(doc['ratios'][0]['verdict']['outcome'], 'stopped')
+        self.assertEqual(doc['provenance']['arms'][0]['commit'], COMMIT)
+        md = self.cli('report', job, check=0).stdout
+        for heading in ('## Provenance', '## Attempts', '## Wall and RSS', '## Stages', '## Scaling',
+                        '## Ratios', '## Verification'):
+            self.assertIn(heading, md)
+
+    # Ratios are paired per repetition through bench_stats; contaminated attempts are excluded and counted.
+    def test_report_ratio_and_contamination(self):
+        a = [1.00, 1.01, 0.99, 1.00, 1.02, 0.98, 1.00, 1.01, 0.99, 5.0]
+        state, m = self.synthetic(dict(a=a, b=[x * 2 for x in a[:9]] + [2.0]), flagged=('job:18:0', 'job:19:0'))
+        doc = bj.summarize(state, m)
+        r = doc['ratios'][0]
+        self.assertEqual((r['arm'], r['baseline'], r['n']), ('b', 'a', 9))
+        self.assertAlmostEqual(r['median'], 2.0)
+        self.assertEqual(r['verdict']['outcome'], 'regression')
+        self.assertEqual(doc['counts']['contaminated'], 2)
+        self.assertEqual(len(doc['verification']), 20)
+        # Contamination spoils a time, not an answer: a flagged attempt's digest is still checked.
+        state, m = self.synthetic(dict(a=[1.0]), flagged=('job:0:0',))
+        self.assertEqual(bj.summarize(state, m)['digests'], {'goldilocks/katsura-4': ['d1']})
+        # A machine without cpufreq (GitHub runners) has no median clock; the report still renders.
+        state['stop']['contamination']['median_khz'] = {'goldilocks/katsura-4@1w': None}
+        self.assertIn('median clock (kHz) goldilocks/katsura-4@1w —', bj.render(bj.summarize(state, m)))
+
+    # The scoreboard bridge emits the committed CompetitiveRecord fixture that board.rs's test loads.
+    def test_competitive_rows_match_the_fixture(self):
+        state, m = self.synthetic(dict(a=[1.0, 1.2, 1.1], b=[]), mode='publication')
+        rows = bj.competitive_rows(state, m, machine='fixture')
+        self.assertEqual(rows, json.loads(FIXTURE.read_text())['rows'])
+        dev_state, dev = self.synthetic(dict(a=[1.0]))
+        with self.assertRaises(bj.JobError):
+            bj.competitive_rows(dev_state, dev, machine='fixture')
 
 
 if __name__ == '__main__':

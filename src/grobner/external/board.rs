@@ -3000,6 +3000,21 @@ mod tests {
         assert_eq!(super::provenance_cell(&unpublishable), "no-comparand");
     }
 
+    /// Rows from `tools/bench-job scoreboard` (#969) load and render; the Python test pins the same fixture.
+    #[test]
+    fn test_bench_job_scoreboard_rows_load_and_render() {
+        let text = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tools/test/fixtures/bench-job-competitive.json"
+        ));
+        let board = CompetitiveBoard::load(&Json::parse(text).expect("valid")).expect("loads");
+        assert_eq!(board.rows().len(), 2);
+        assert_eq!(board.rows()[0].outcome, Outcome::Complete);
+        assert_eq!(board.rows()[0].wall, Some(Duration::from_millis(1_100)));
+        assert!(matches!(board.rows()[1].outcome, Outcome::Failed(_)));
+        assert!(board.to_markdown().contains("katsura-4"));
+    }
+
     /// The board round-trips through its history form, contract and count included.
     #[test]
     fn test_the_board_round_trips_through_its_history_form() {
