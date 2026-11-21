@@ -1,0 +1,162 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 972,
+  "agent": "agent-a3baf9a1bff013f77@research/972-msolve-attribution",
+  "track": "M",
+  "session": "rd"
+ },
+ "arms": [
+  {
+   "name": "f4stages",
+   "commit": "358fec73fa2044677ba0ecaa72958616b9087ce5",
+   "binary": "/buildcache/cargo-target/zeebra-972/sig_f4_study-358fec73",
+   "sha256": "63b3ce2734139cda2716126418fec9bfa7d178a2ee9f276dee29a3e9e22f756a",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "checkout whose tracked files equal git archive 358fec73fa2044677ba0ecaa72958616b9087ce5; cargo build --release --features research-sigf4 --example sig_f4_study (F0 plus #918/#972 instrumentation)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "f4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180",
+    "--stages"
+   ]
+  },
+  {
+   "name": "f4fl",
+   "commit": "358fec73fa2044677ba0ecaa72958616b9087ce5",
+   "binary": "/buildcache/cargo-target/zeebra-972/sig_f4_study-358fec73",
+   "sha256": "63b3ce2734139cda2716126418fec9bfa7d178a2ee9f276dee29a3e9e22f756a",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "checkout whose tracked files equal git archive 358fec73fa2044677ba0ecaa72958616b9087ce5; cargo build --release --features research-sigf4 --example sig_f4_study (F0 plus #918/#972 instrumentation)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "f4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180",
+    "--stages",
+    "--fl"
+   ]
+  },
+  {
+   "name": "f4few",
+   "commit": "358fec73fa2044677ba0ecaa72958616b9087ce5",
+   "binary": "/buildcache/cargo-target/zeebra-972/sig_f4_study-358fec73",
+   "sha256": "63b3ce2734139cda2716126418fec9bfa7d178a2ee9f276dee29a3e9e22f756a",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "checkout whose tracked files equal git archive 358fec73fa2044677ba0ecaa72958616b9087ce5; cargo build --release --features research-sigf4 --example sig_f4_study (F0 plus #918/#972 instrumentation)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "f4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180",
+    "--stages",
+    "--reducer",
+    "FewestTerms"
+   ]
+  },
+  {
+   "name": "f4fewfl",
+   "commit": "358fec73fa2044677ba0ecaa72958616b9087ce5",
+   "binary": "/buildcache/cargo-target/zeebra-972/sig_f4_study-358fec73",
+   "sha256": "63b3ce2734139cda2716126418fec9bfa7d178a2ee9f276dee29a3e9e22f756a",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "checkout whose tracked files equal git archive 358fec73fa2044677ba0ecaa72958616b9087ce5; cargo build --release --features research-sigf4 --example sig_f4_study (F0 plus #918/#972 instrumentation)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "f4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180",
+    "--stages",
+    "--reducer",
+    "FewestTerms",
+    "--fl"
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "m31/mq-random-10",
+   "params": {
+    "field": "m31",
+    "name": "mq-random-10",
+    "generate": "--digest-only"
+   },
+   "inputs": {}
+  },
+  {
+   "name": "gf32003/mq-random-10",
+   "params": {
+    "field": "gf32003",
+    "name": "mq-random-10",
+    "generate": "--digest-only"
+   },
+   "inputs": {}
+  }
+ ],
+ "run": {
+  "workers": [
+   4,
+   8,
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 180,
+   "kill_after_seconds": 30,
+   "rss_bytes": 8589934592,
+   "live_bytes": null
+  }
+ }
+}

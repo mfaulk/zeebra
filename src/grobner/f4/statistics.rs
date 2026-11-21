@@ -92,6 +92,13 @@ pub struct StageTimings {
     /// Production candidate selection/finishing, refining `elimination`; includes full fallback.
     pub backward: Duration,
 
+    /// Under [`BatchOrder::FaugereLachartre`](super::BatchOrder::FaugereLachartre), the sweep of
+    /// the pair rows against the reducer block: `fl_sweep + fl_echelon == forward` (#918).
+    pub fl_sweep: Duration,
+
+    /// The FL route's renumbering and echelon of `D'`, the rest of its `forward`.
+    pub fl_echelon: Duration,
+
     /// Candidate extraction, including converting the surviving rows back to polynomials.
     pub extraction: Duration,
 
@@ -256,6 +263,8 @@ impl StageTimings {
         self.elimination += other.elimination;
         self.forward += other.forward;
         self.backward += other.backward;
+        self.fl_sweep += other.fl_sweep;
+        self.fl_echelon += other.fl_echelon;
         self.extraction += other.extraction;
         self.interreduction += other.interreduction;
         self.interreduction_minimize += other.interreduction_minimize;
@@ -305,6 +314,11 @@ impl StageClock {
             }
             None => Duration::ZERO,
         }
+    }
+
+    /// Whether this clock reads time at all.
+    pub fn measuring(&self) -> bool {
+        self.start.is_some()
     }
 
     /// The time since construction. Laps do not reset it.
@@ -430,6 +444,25 @@ pub struct ParallelForwardStatistics {
     pub reserved_entries: usize,
     /// Maximum dense-row and publication-slot workspace bytes across workers.
     pub workspace_bytes: usize,
+    /// Concurrent passes timed: one per forward-order batch, up to two per FL batch. This and
+    /// every field below are zero unless
+    /// [`F4Options::measure_stages`](super::F4Options::measure_stages) is set, which also turns on
+    /// the workers' per-row scheduling and publication clocks.
+    pub passes: usize,
+    /// Workers summed over those passes; `busy_ns / worker_slots` is the mean worker's time.
+    pub worker_slots: usize,
+    /// Worker time from start to exit, summed over workers and passes.
+    pub busy_ns: u64,
+    /// The slowest worker's time, summed over passes: the passes' critical path.
+    pub critical_ns: u64,
+    /// Worker time spent taking a row under the ledger lock.
+    pub scheduling_ns: u64,
+    /// Worker time spent publishing a pivot.
+    pub publication_ns: u64,
+    /// Coefficient products, one per pivot entry applied.
+    pub products: usize,
+    /// Of those, products applied after a lost publication.
+    pub retry_products: usize,
 }
 
 impl ParallelForwardStatistics {
@@ -440,6 +473,30 @@ impl ParallelForwardStatistics {
         self.lost_publications += other.lost_publications;
         self.reserved_entries = self.reserved_entries.max(other.reserved_entries);
         self.workspace_bytes = self.workspace_bytes.max(other.workspace_bytes);
+        self.passes += other.passes;
+        self.worker_slots += other.worker_slots;
+        self.busy_ns += other.busy_ns;
+        self.critical_ns += other.critical_ns;
+        self.scheduling_ns += other.scheduling_ns;
+        self.publication_ns += other.publication_ns;
+        self.products = self.products.saturating_add(other.products);
+        self.retry_products = self.retry_products.saturating_add(other.retry_products);
+    }
+
+    /// Fold one measured concurrent pass of `workers` threads in.
+    pub(crate) fn record_pass(
+        &mut self,
+        report: &crate::linalg::concurrent::Report,
+        workers: usize,
+    ) {
+        self.passes += 1;
+        self.worker_slots += workers;
+        self.busy_ns += report.worker_ns.iter().sum::<u64>();
+        self.critical_ns += report.worker_ns.iter().copied().max().unwrap_or(0);
+        self.scheduling_ns += report.scheduling_ns;
+        self.publication_ns += report.publication_ns;
+        self.products = self.products.saturating_add(report.products);
+        self.retry_products = self.retry_products.saturating_add(report.retry_products);
     }
 }
 
@@ -1480,6 +1537,8 @@ mod tests {
         let one = StageTimings {
             forward: Duration::ZERO,
             backward: Duration::ZERO,
+            fl_sweep: Duration::ZERO,
+            fl_echelon: Duration::ZERO,
             symbolic: Duration::from_micros(10),
             construction: Duration::from_micros(20),
             elimination: Duration::from_micros(30),

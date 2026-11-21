@@ -384,6 +384,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
             options.elimination,
             matrix,
             allowance,
+            options.measure_stages,
             &mut parallel_forward,
         );
         let mut block = match parallel {

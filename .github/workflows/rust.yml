@@ -311,6 +311,12 @@ jobs:
           python3 -m unittest discover -s research/m33-grobx-attribution -p 'test_*.py'
           python3 research/m33-grobx-attribution/summarize.py --check
 
+      - name: M33 M1 attribution helpers and tables
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/m33-msolve-attribution -p 'test_*.py'
+          python3 research/m33-msolve-attribution/summarize.py --check
+
       - name: M30 symbolic cost-model campaign helpers
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m30-symbolic -p 'test_*.py'
