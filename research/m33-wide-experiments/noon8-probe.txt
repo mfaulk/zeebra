@@ -1,0 +1,37 @@
+# noon8-probe.sh 93f2853a 32864419 cpu=40 2026-11-21T14:30:47Z
+malloc commit rep elimination_ms symbolic_ms bookkeeping_ms element_hashing_ms
+default 93f2853a 1 24.85 126.55 86.08 0.00
+default 32864419 1 28.02 83.68 84.57 0.73
+default 93f2853a 2 23.53 120.16 79.94 0.00
+default 32864419 2 27.90 84.07 82.04 0.71
+default 93f2853a 3 23.82 120.72 80.61 0.00
+default 32864419 3 28.37 85.66 86.24 0.76
+default 93f2853a 4 24.72 126.69 85.77 0.00
+default 32864419 4 29.32 87.30 87.20 0.76
+default 93f2853a 5 25.75 129.53 85.61 0.00
+default 32864419 5 27.94 81.58 84.54 0.75
+glibc.malloc.hugetlb=1 93f2853a 1 19.60 114.27 84.84 0.00
+glibc.malloc.hugetlb=1 32864419 1 19.65 80.58 86.53 0.73
+glibc.malloc.hugetlb=1 93f2853a 2 18.56 115.03 83.91 0.00
+glibc.malloc.hugetlb=1 32864419 2 20.59 84.30 86.29 0.78
+glibc.malloc.hugetlb=1 93f2853a 3 18.62 116.89 85.55 0.00
+glibc.malloc.hugetlb=1 32864419 3 18.46 79.12 78.61 0.62
+glibc.malloc.hugetlb=1 93f2853a 4 19.15 121.26 85.61 0.00
+glibc.malloc.hugetlb=1 32864419 4 19.82 83.97 87.36 0.75
+glibc.malloc.hugetlb=1 93f2853a 5 18.76 116.03 85.37 0.00
+glibc.malloc.hugetlb=1 32864419 5 18.90 83.20 85.88 0.68
+# user-space page faults by faulting function, default malloc (top 6)
+## 93f2853a total 26389
+35.74% 9432    <hashbrown::raw::RawTable<(zeebra::poly::multivariate::monomial::Monomial<8>, zeebra::f
+19.31% 5096    __memmove_avx_unaligned_erms - -
+12.15% 3207    _int_malloc - -
+6.39% 1687    zeebra::grobner::sigf4::engine::finish_batch::<8, zeebra::fields::prime_field_64::Prime
+4.56% 1203    <hashbrown::raw::RawTable<(zeebra::poly::multivariate::monomial::Monomial<8>, zeebra::f
+3.98% 1051    zeebra::grobner::sigf4::engine::run::<8, zeebra::fields::prime_field_64::PrimeFieldElem
+## 32864419 total 25636
+36.58% 9377    <hashbrown::raw::RawTable<(zeebra::poly::multivariate::monomial::Monomial<8>, zeebra::f
+19.47% 4991    __memmove_avx_unaligned_erms - -
+17.39% 4459    _int_malloc - -
+6.56% 1683    zeebra::grobner::sigf4::engine::finish_batch::<8, zeebra::fields::prime_field_64::Prime
+5.01% 1285    <zeebra::grobner::sigf4::engine::Engine<8, zeebra::fields::prime_field_64::PrimeFieldEl
+3.24% 830    zeebra::grobner::sigf4::engine::run::<8, zeebra::fields::prime_field_64::PrimeFieldElem

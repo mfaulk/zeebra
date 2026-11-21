@@ -20,9 +20,10 @@ class GateRows(unittest.TestCase):
             self.assertEqual(rows[:3], campaign.DEVELOPMENT)
             self.assertEqual(rows[0], ('wide64', 'eco-12'))
 
-    def test_warm_call_gate_is_only_the_small_control(self):
-        """The warm-call session holds Katsura-4 alone, the one Track G row under 300 ms."""
-        self.assertEqual(campaign.GATE_ROWS['c-warm'], [('wide64', 'katsura-4')])
+    def test_warm_call_gate_holds_the_sub_300_ms_controls(self):
+        """The warm-call session holds exactly the Track G controls whose process wall is under 300 ms."""
+        self.assertEqual(set(campaign.GATE_ROWS['c-warm']),
+                         {('wide64', 'katsura-4'), ('wide64', 'katsura-9'), ('wide64', 'noon-7')})
 
 
 if __name__ == '__main__':

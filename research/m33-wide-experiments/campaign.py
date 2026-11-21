@@ -36,8 +36,11 @@ GATE_ROWS = {
     'b': DEVELOPMENT + [('wide64', 'noon-8'), ('wide64', 'cyclic-7')],
     'c': DEVELOPMENT + [('wide64', 'cyclic-7'), ('wide64', 'noon-7'), ('wide64', 'noon-8'),
                         ('wide64', 'katsura-9'), ('goldilocks', 'katsura-11')],
-    # Under 300 ms: the warm-call method (plan §11.6), k = 21 calls per process.
-    'c-warm': [('wide64', 'katsura-4')],
+    # Cells under 300 ms process wall in the main session use the warm-call method (plan §11.6),
+    # k = 21 calls per process: Katsura-4, and Katsura-9 and Noon-7 at both worker counts.
+    # The corrective session's rows: the development rows, where Gate C's one failure was.
+    'c-dev': DEVELOPMENT,
+    'c-warm': [('wide64', 'katsura-4'), ('wide64', 'katsura-9'), ('wide64', 'noon-7')],
 }
 WARM_CALLS = 21
 HELD_OUT = {(r['field'], r['name']) for t in json.loads((ROOT / 'research/m33-baseline/held-out.json').read_text()).values()
@@ -47,10 +50,21 @@ HELD_OUT = {(r['field'], r['name']) for t in json.loads((ROOT / 'research/m33-ba
 def manifest(args):
     rows = GATE_ROWS[args.gate]
     assert not HELD_OUT & set(rows), 'a held-out row is never timed for Zeebra'
-    workers = [1] if args.gate == 'b' else [1, 16]
+    workers = [1] if args.gate in ('b', 'c-dev') else [1, 16]
     study = lambda c: g1.study(args.bin, 'sig', c)  # noqa: E731
     arms = [g1.zeebra_arm('base', study(args.base), 'sig', args.base),
             g1.zeebra_arm('head', study(args.head), 'sig', args.head)]
+    if args.align_loops:
+        # Gate C's placement control: both arms built with every loop 64-byte aligned (`build.sh`).
+        for arm, commit in zip(arms, (args.base, args.head)):
+            binary = g1.study(args.bin, f'sig-align{args.align_loops}', commit)
+            flag = f'-C llvm-args=-align-loops={args.align_loops}'
+            arm.update(binary=str(binary), sha256=base.sha(binary))
+            arm['build']['flags'] = arm['build']['flags'].replace(
+                '-C target-cpu=x86-64-v3 (.cargo/config.toml)',
+                f'RUSTFLAGS="-C target-cpu=x86-64-v3 {flag}"')
+            arm['build']['recipe'] = f'ZB_ALIGN_LOOPS={args.align_loops} research/m33-wide-experiments/build.sh {commit}: ' \
+                + arm['build']['recipe']
     for arm in arms:
         arm['workers'] = workers
         if args.gate == 'c-warm':
@@ -95,6 +109,7 @@ def main():
     p.add_argument('--base')
     p.add_argument('--head')
     p.add_argument('--gate', choices=sorted(GATE_ROWS), default='b')
+    p.add_argument('--align-loops', type=int, default=0, help='use the loop-aligned builds (placement control)')
     p.add_argument('--inputs', default=g1.INPUTS)
     p.add_argument('--grobx155', default='/buildcache/cargo-target/zeebra-grobx-8005a2a1/release/grobx-driver')
     p.add_argument('--no-grobx', dest='grobx', action='store_false')

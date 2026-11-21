@@ -38,6 +38,7 @@ GATE_B = dict(eco_wall_hi=0.95, eco_symbolic=0.45, katsura_wall_hi=1.00, stage_d
               eco_half_width=0.025)
 # Plan §§12.2, 13, as posted on #971: the development gain holds at 1 w; nothing regresses past 1.05.
 GATE_C = dict(development_hi=0.97, control_hi=1.05, rss=1.25)
+SMALL_MS = 300
 SESSION_OF = {}
 
 
@@ -201,35 +202,67 @@ def arm_rule_table(recs, sessions):
                   'use every ok attempt.', '']
 
 
-def gate_c(recs):
-    """Gate C's criteria per row and worker count, clean attempts under the per-arm rule."""
+def gate_c(recs, prefix, title):
+    """Gate C's criteria per job, row and worker count: on the attempts the per-arm clock rule leaves
+    clean (plan §11.2), which reads `short` below n = 9 pairs, and on every ok attempt beside it."""
     keep = clean_attempts(recs)
-    out = ['## 5. Gate C verdicts (thresholds posted on #971 before measuring)', '',
+    out = [f'## {title}', '',
            'Development rows at 1 w must keep the gain (upper ≤ 0.97); every other cell, the development rows at 16 w '
-           'included, must not regress (upper ≤ 1.05). Katsura-4 is read by the warm-call median. The precision rule '
-           'asks a half-width ≤ half the distance from the threshold to 1.0.', '',
-           '| Row | w | Quantity | head ÷ base [95%] | n | Threshold | Precise | RSS | Verdict |',
-           '|---|---:|---|---:|---:|---|---|---:|---|']
-    rows = sorted(((row, w, arms) for (job, row, w), arms in cells(recs, keep).items()
-                   if SESSION_OF.get(job, '').startswith('g2-1-c') and 'head' in arms and 'base' in arms),
-                  key=lambda t: (ORDER.index(t[0]), t[1]))
-    failed = 0
-    for row, w, arms in rows:
+           'included, must not regress (upper ≤ 1.05). Cells under 300 ms process wall are read by the warm-call '
+           'median. "Precise" is the precision rule: a half-width ≤ half the distance from the threshold to 1.0.', '',
+           '| Build | Row | w | Quantity | Threshold | clean: head ÷ base [95%] | n | verdict | all ok: head ÷ base [95%] | '
+           'n | verdict | precise (all ok) | RSS |',
+           '|---|---|---:|---|---|---:|---:|---|---:|---:|---|---|---:|']
+    def pool(keep_set):
+        """(build, row, workers) -> arm -> (job, rep) -> record: the predeclared extension is pooled
+        with its session, and the loop-aligned placement control stays a build of its own."""
+        out = defaultdict(lambda: defaultdict(dict))
+        for (job, row, w), arms in cells(recs, keep_set).items():
+            session = SESSION_OF.get(job, '')
+            if not session.startswith(prefix):
+                continue
+            build = 'align64' if 'align' in session else 'shipped'
+            for arm, reps in arms.items():
+                for k, r in reps.items():
+                    out[build, row, w][arm][(job, k)] = r
+        return out
+
+    every, clean = pool(None), pool(keep)
+    small, failed = [], []
+    for (job, row, w), arms in sorted(every.items(), key=lambda kv: (kv[0][0], ORDER.index(kv[0][1]), kv[0][2])):
+        if 'head' not in arms or 'base' not in arms:
+            continue
         warm = len(next(iter(arms['head'].values()))['zeebra'].get('calls_ns') or []) > 1
+        if not warm and g1.med([value(r, 'wall') for r in arms['base'].values()]) < SMALL_MS:
+            small.append(f'{LABEL[row]} @{w}')
+            continue
+        if job == 'align64' and not w == 1:
+            continue
         q = 'warm' if warm else 'wall'
-        c = paired(arms, q, f'gateC-{row}-{w}-{q}')
-        rss = paired(arms, 'rss', f'gateC-{row}-{w}-rss')
-        development = (row in ('wide64/eco-12', 'wide64/katsura-11', 'goldilocks/mq-random-11')) and w == 1
+        development = row in ('wide64/eco-12', 'wide64/katsura-11', 'goldilocks/mq-random-11') and w == 1
         bound = GATE_C['development_hi'] if development else GATE_C['control_hi']
-        precise = (c.hi - c.lo) / 2 <= abs(1 - bound) / 2
-        ok = c.hi <= bound and rss.median <= GATE_C['rss']
-        failed += not ok
-        out.append(f"| {LABEL[row]} | {w} | {q} | {g1.fci(c)} | {c.n} | ≤ {bound} | {'yes' if precise else 'no'} | "
-                   f"{rss.median:.3f} | {'pass' if ok else '**FAIL**'} |")
+        c_all = paired(arms, q, f'{job}-{row}-{w}-{q}')
+        ca = clean.get((job, row, w), {})
+        c_clean = paired(ca, q, f'{job}-{row}-{w}-{q}-clean') if 'head' in ca and 'base' in ca else None
+        rss = paired(arms, 'rss', f'{job}-{row}-{w}-rss')
+
+        def verdict(c):
+            if c is None or c.n < 9:
+                return 'short'
+            return 'pass' if c.hi <= bound and rss.median <= GATE_C['rss'] else '**FAIL**'
+
+        precise = (c_all.hi - c_all.lo) / 2 <= abs(1 - bound) / 2
+        if verdict(c_all) == '**FAIL**' or verdict(c_clean) == '**FAIL**':
+            failed.append(f'{LABEL[row]} @{w}')
+        out.append(f"| {job} | {LABEL[row]} | {w} | {q} | ≤ {bound} | {g1.fci(c_clean)} | {c_clean.n if c_clean else 0} | "
+                   f"{verdict(c_clean)} | {g1.fci(c_all)} | {c_all.n} | {verdict(c_all)} | {'yes' if precise else 'no'} | "
+                   f"{rss.median:.3f} |")
     d = g1.digests(recs)
     same = all(len(v) == 1 for v in d.values())
+    if small:
+        out += ['', f"Under {SMALL_MS} ms process wall, so read by the warm-call session instead: {', '.join(small)}."]
     out += ['', f"Digests: {'one' if same else 'MORE THAN ONE'} `m33-basis-v1` digest per row over every ok attempt, "
-            f"arm and worker count ({len(d)} rows). Cells failing: {failed}.", '']
+            f"arm, worker count and job ({len(d)} rows). Cells failing: {', '.join(failed) or 'none'}.", '']
     return out
 
 
@@ -239,7 +272,7 @@ def render():
     lines += g1.session_table(recs, sessions) + arm_rule_table(recs, sessions)
     lines += ab_table(recs) + gate_b(recs) + grobx_table(recs)
     if any(s.startswith('g2-1-c') for s in SESSION_OF.values()):
-        lines += gate_c(recs)
+        lines += gate_c(recs, 'g2-1-c', '5. Gate C verdicts (thresholds posted on #971 before measuring)')
     return '\n'.join(lines).rstrip() + '\n'
 
 
