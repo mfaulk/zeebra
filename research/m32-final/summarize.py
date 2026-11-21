@@ -297,13 +297,25 @@ def comparands(directory, c, out):
         return f'{statistics.median(values):,.1f} [{lo:,.1f}, {hi:,.1f}]'
 
     def zr(row, arm, values):
-        z = c.median(row, arm)
-        return '—' if z is None or not values else f'{z / statistics.median(values):.3f}'
+        """median ÷ median with each side resampled independently (plan §10.2)."""
+        z = c.values(row, arm)
+        if not z or not values:
+            return '—'
+        rng = random.Random(f'{row} {arm}')
+        draws = sorted(statistics.median(rng.choices(z, k=len(z)))
+                       / statistics.median(rng.choices(values, k=len(values))) for _ in range(DRAWS))
+        med = statistics.median(z) / statistics.median(values)
+        return f'{med:.3f} [{draws[int(0.025 * DRAWS)]:.3f}, {draws[int(0.975 * DRAWS) - 1]:.3f}]'
 
     zdig = {}
     for (row, _), reps in c.cells.items():
         for r in reps.values():
             zdig.setdefault(row, set()).add(r['report']['basis_sha256'])
+    def same(row, digests):
+        if not digests:
+            return '—'
+        return 'yes' if digests <= zdig.get(row, set()) else f'no ({len(digests)} distinct)'
+
     rs_path = d / 'rs.jsonl.gz'
     if rs_path.exists():
         rows = [json.loads(x) for x in gzip.open(rs_path, 'rt') if x.strip()]
@@ -329,7 +341,7 @@ def comparands(directory, c, out):
             if vals:
                 out.append(f"| {row} | {engine} ({mode}) | 1 | {len(done)} of {len(attempts)} | {iv(vals)} | "
                            f"{zr(row, 'en:16', vals)} | {zr(row, 'en:1', vals)} | "
-                           f"{len({a['basis_text_sha256'] for a in done})} basis |")
+                           f"{same(row, {a['basis_text_sha256'] for a in done})} |")
     mq_path = d / 'mq10-attempts.json'
     if mq_path.exists():
         acc = defaultdict(list)

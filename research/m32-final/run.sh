@@ -23,7 +23,7 @@ cd "$(dirname "$0")/../.."
 B="${B:-/buildcache/cargo-target/zeebra-942}"
 BINS="${BINS:-$B/bin}"
 T="${T:-$B/target-f3}"
-export TMPDIR="${TMPDIR:-$B/tmp}"
+export TMPDIR="${TMPDIR:-$B/tmp}" ZEEBRA_MACHINE="${ZEEBRA_MACHINE:-5995wx}"
 TAG=zb-942
 
 rc=0
