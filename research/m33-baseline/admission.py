@@ -3,6 +3,7 @@
 
     admission.py pool --study BIN > candidates.json      # digests, exclusions, draw order
     admission.py run --study BIN --grobx BIN --msolve BIN --output admission.jsonl
+    admission.py recheck --study BIN --groebner-rs BIN    # Track G reference amendment, below
     admission.py draw > held-out.json                    # from the two files above
 
 `run` walks each track's candidates in draw order and stops a track once two pass (at most one
@@ -146,11 +147,11 @@ def msolve(binary, case, workers):
     return r, digest is not None, digest
 
 
-def singular(case):
+def singular(case, cap_s=CERTIFIED_CAP_S):
     names = ','.join(case['variables'])
     script = (f"short=0;\nring r={case['modulus']},({names}),dp;\nideal i={','.join(case['generators'])};\n"
               "option(redSB);\nideal g=std(i);\nint k;\nfor(k=1;k<=size(g);k++){print(g[k]);}\nquit;\n")
-    r = guarded(['Singular', '-q', '--no-rc', '-c', script], CERTIFIED_CAP_S)
+    r = guarded(['Singular', '-q', '--no-rc', '-c', script], cap_s)
     texts = [t for t in r['stdout'].splitlines() if t.strip()]
     ok = r['rc'] == 0 and bool(texts)
     return r, ok, basis_digest.basis_digest(texts, int(case['modulus']), case['variables']) if ok else None
@@ -234,6 +235,50 @@ def drawn(records, track):
     return out
 
 
+def groebner_rs(binary, case):
+    """groebner-rs at one worker: the plan's other independent reference on wide fields (§5.2.5)."""
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, dir=os.environ.get('TMPDIR')) as f:
+        json.dump(dict(variables=case['variables'], modulus=int(case['modulus']), order='grevlex', workers=1,
+                       generators=case['generators']), f)
+    r = guarded([binary, f.name], CERTIFIED_CAP_S)
+    os.unlink(f.name)
+    raw = json.loads(r['stdout']) if r['rc'] == 0 and r['stdout'].strip() else {}
+    texts = raw.get('basis') or []
+    ok = r['stop'] is None and bool(texts)
+    return r, ok, basis_digest.basis_digest(texts, int(case['modulus']), case['variables']) if ok else None
+
+
+REFERENCE_ONLY = {'reference_completes', 'digests_agree'}
+RECHECK_CAP_S = 1800
+
+
+def recheck(args):
+    """Amendment (#966): on a track the fixed caps left short of two held-out rows, a candidate refused
+    only because its reference did not finish in 600 s / 8 GiB is re-read once, in draw order: Track G against groebner-rs, the plan's other wide-field reference; Track M
+    against Singular again at a 1,800 s cap. No timing is re-run; the record keeps both readings."""
+    records = [json.loads(line) for line in args.output.read_text().splitlines()]
+    for r in records:
+        failed = {k for k, v in r['checks'].items() if not v}
+        # Only a track the fixed caps left short of two is re-read, so a completed draw never moves.
+        short = len(drawn(records, r['track'])) < 2
+        if not short or failed != REFERENCE_ONLY or len(r['basis_m33']) != 1 or 'recheck' in r:
+            continue
+        case = request(args.study, r)
+        if r['track'] == 'G':
+            _, ok, digest = groebner_rs(args.groebner_rs, case)
+            reference = 'groebner-rs, 1 worker'
+        else:
+            _, ok, digest = singular(case, RECHECK_CAP_S)
+            reference = f'Singular, {RECHECK_CAP_S} s'
+        agree = ok and digest == r['basis_m33'][0]
+        r['recheck'] = dict(reference=reference, completes=ok, agrees=agree)
+        if agree:
+            r['checks'].update(reference_completes=True, digests_agree=True)
+            r['admitted'] = all(r['checks'].values())
+        print(r['field'], r['name'], 'admitted' if r['admitted'] else f'still refused (completes={ok})', flush=True)
+    args.output.write_text(''.join(json.dumps(r) + '\n' for r in records))
+
+
 def draw():
     records = [json.loads(line) for line in (HERE / 'admission.jsonl').read_text().splitlines()]
     return {track: [dict(field=r['field'], name=r['name'], digest=r['digest'], basis_m33=r['basis_m33'][0])
@@ -242,10 +287,11 @@ def draw():
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('command', choices=('pool', 'run', 'draw'))
+    p.add_argument('command', choices=('pool', 'run', 'recheck', 'draw'))
     p.add_argument('--study', help='sig_f4_study built with --features research-sigf4')
     p.add_argument('--grobx', help='grobx-driver at the M33 pin')
     p.add_argument('--msolve')
+    p.add_argument('--groebner-rs', help='groebner-rs-driver (recheck)')
     p.add_argument('--track', choices=sorted(TRACKS))
     p.add_argument('--output', type=Path, default=HERE / 'admission.jsonl')
     args = p.parse_args()
@@ -254,6 +300,8 @@ def main():
     elif args.command == 'run':
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         run(args)
+    elif args.command == 'recheck':
+        recheck(args)
     else:
         print(json.dumps(draw(), indent=1))
 

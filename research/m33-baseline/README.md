@@ -104,4 +104,35 @@ The criteria:
 - **Reference digest:** grobx certified (wide fields) or Singular (below 2³¹), agreeing with both
   sides.
 
-The drawn rows and their outcome are in `held-out.json` and posted on #965.
+### Result
+
+[admission.jsonl](admission.jsonl) holds 16 candidate reads, each a set of per-criterion booleans
+and basis digests. [held-out.json](held-out.json) holds the draw, which is posted on #965 before any
+Zeebra timing on these rows:
+
+| Track | Held-out row | Input SHA-256 | `m33-basis-v1` |
+|---|---|---|---|
+| G | wide64 / mq-random-10-s1 | `163887f5…` | `545c5286…` |
+| G | wide64 / katsura-12 | `62cf8820…` | `a3331f03…` |
+| M | m31 / mq-random-10-s1 | `bd482019…` | `5ef0bd92…` |
+| M | gf32003 / katsura-12 | `915a3a28…` | `a6c62dbc…` |
+
+The refusals fell into two groups:
+
+- **Below the floor.** Eco-10 and Katsura-8 at every field, and gf32003 / mq-random-9-s8: the
+  competitor finishes under 300 ms.
+- **No reference digest.** wide64 Katsura-12, wide64 Eco-13, goldilocks Eco-13, goldilocks Katsura-12
+  and m31 / eco-13: the reference did not finish in 600 s / 8 GiB. On those rows Zeebra and the
+  competitor completed and agreed.
+
+**Amendment (recorded on #965).** Under the fixed caps, Track G drew only one row, because every
+non-MQ Track G candidate above the floor failed its reference: grobx certified needs more than
+600 s / 8 GiB on rows this size, as Eco-12 did in M31. `admission.py recheck` therefore re-read
+those candidates in draw order against groebner-rs at one worker. That is the plan's other
+wide-field reference (§5.2.5). It stopped at the first agreement, wide64 / katsura-12.
+
+The recheck applies only to a track the caps left short of two. Track M had already drawn two
+under the caps, so m31 / eco-13, which is earlier in Track M's draw order, was not re-read and the
+completed draw did not move. Each re-read record keeps both readings
+(`recheck: {reference, completes, agrees}`). The pre-amendment file is not committed; this paragraph
+and the per-record field are its trace.
