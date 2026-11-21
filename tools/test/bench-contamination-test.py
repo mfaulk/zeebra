@@ -118,6 +118,16 @@ class SessionTest(unittest.TestCase):
         s = bc.session_verdict([serial, wide, serial, wide, wide])
         self.assertGreater(s["contaminated"], 0)
 
+    def test_per_arm_groups_leave_foreign_and_sibling_rules_unchanged(self):
+        """Grouping per arm moves only the clock median: a busy sibling still contaminates its attempt."""
+        steady = [bc.attempt_metrics(*pair(khz=k), own_cpu_s=10.0) for k in (2670000, 4540000) * 3]
+        groups = ["a", "b"] * 3
+        self.assertEqual(bc.session_verdict(steady, groups=groups)["contaminated"], 0)
+        busy = bc.attempt_metrics(*pair(khz=2670000, sib_busy=500), own_cpu_s=10.0)
+        s = bc.session_verdict(steady + [busy], groups=groups + ["a"])
+        self.assertEqual(s["contaminated"], 1)
+        self.assertIn("sibling cpu 72 busy 50.0%", s["attempts"][-1]["reasons"])
+
 
 class PublicationCheckTest(unittest.TestCase):
     def test_refusals_from_a_snapshot(self):

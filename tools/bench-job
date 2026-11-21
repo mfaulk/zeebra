@@ -465,6 +465,7 @@ def summarize(state, m, *, baseline=None, bound=1.05):
                         manifest_sha256=job['manifest_sha256'], journal_sha256=state['journal_sha256'],
                         stop=stop.get('reason'), cpus=m['run']['cpus'], clock=clocks,
                         median_khz=session.get('median_khz'),
+                        clock_grouping=session.get('grouping', 'cell') if session else None,
                         reservation='exclusive' if job['mode'] == 'publication' else 'ccd-scoped',
                         arms=[dict(name=a['name'], commit=a['commit'], sha256=a['sha256'], **a['build'])
                               for a in m['arms']]),
@@ -485,6 +486,7 @@ def render(doc):
            f"- issue #{p['context']['issue']}, agent `{p['context']['agent']}`; stop: {p['stop']}",
            f"- manifest `{p['manifest_sha256']}`, journal `{p['journal_sha256']}`",
            f"- cpus {p['cpus']}, reservation {p['reservation']}, clock {', '.join(p['clock'])}, "
+           f"clock rule grouped per {p['clock_grouping'] or '—'}, "
            'median clock (kHz) ' + (', '.join(f'{k} {_fmt(v, ".0f")}' for k, v in (p['median_khz'] or {}).items()) or '—'), '', '| arm | commit | sha256 | profile | flags |',
            '|---|---|---|---|---|']
     out += [f"| {a['name']} | `{a['commit'][:12]}` | `{a['sha256'][:16]}` | {a['profile']} | {a['flags']} |"
@@ -637,20 +639,40 @@ def run_attempt(m, command, cpus, guard, cancel_file, directory):
     return r
 
 
+VERDICT_VERSION = 2  # 1 (no `version` key): the clock rule grouped per cell; 2: per arm (#996)
+
+
 def cell_group(cell):
     return f"{cell['instance']}@{cell['workers']}w"
 
 
-def session_contamination(journal, m, job_id):
-    """Every judged attempt against its cell's median clock (instance and workers: 1 and 16 workers
-    run at different clocks by design, #827, and so do two instances), and whether the session is void."""
-    rows = [(a['metadata']['attempt_id'], cell_group(a['cell']), a['metadata'].get('contamination') or {})
-            for a in aj.load(journal.directory)['attempts']]
+def clock_group(cell):
+    """The clock rule's group: one arm within a cell. Solvers sample different clocks inside one cell
+    (grobx about 2.67 GHz beside Zeebra's 3.99 and groebner-rs's 4.54, #996), so a cell-wide median
+    flags all but the middle arm; 1 and 16 workers differ by design too (#827)."""
+    return f"{cell_group(cell)}/{cell['arm']}"
+
+
+GROUPINGS = dict(cell=cell_group, arm=clock_group)
+
+
+def session_verdict_of(rows, mode, owner, grouping='arm'):
+    """The session verdict over `(attempt_id, cell, contamination)` rows: every judged attempt
+    against its group's median clock, and whether the session is void. `grouping='cell'` replays
+    verdict v1, for re-judging an older journal."""
     rows = [r for r in rows if r[2].get('metrics')]
-    s = bc.session_verdict([r[2]['metrics'] for r in rows], m['mode'], [r[1] for r in rows], lock_owner(job_id))
+    key = GROUPINGS[grouping]
+    s = bc.session_verdict([r[2]['metrics'] for r in rows], mode, [key(r[1]) for r in rows], owner)
     flagged = {aid: v['reasons'] for (aid, _, _), v in zip(rows, s['attempts']) if v['contaminated']}
-    return dict(contaminated=s['contaminated'], total=s['total'], void=s['void'], median_khz=s['median_khz'],
+    return dict(version=VERDICT_VERSION if grouping == 'arm' else 1, grouping=grouping,
+                contaminated=s['contaminated'], total=s['total'], void=s['void'], median_khz=s['median_khz'],
                 flagged=flagged)
+
+
+def session_contamination(journal, m, job_id):
+    rows = [(a['metadata']['attempt_id'], a['cell'], a['metadata'].get('contamination') or {})
+            for a in aj.load(journal.directory)['attempts']]
+    return session_verdict_of(rows, m['mode'], lock_owner(job_id))
 
 
 def classify(metadata):

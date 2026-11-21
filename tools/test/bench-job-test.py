@@ -303,10 +303,42 @@ class BenchJobTest(unittest.TestCase):
         r.update(cpu_seconds=9.0, own_cpu_s=10.0)
         self.assertFalse(bj.contamination(r, self.manifest(), 'job')['verdict']['contaminated'])
 
-    # The clock rule's groups are cells: two instances at one worker count are different groups.
-    def test_cell_group(self):
-        self.assertNotEqual(bj.cell_group(dict(instance='x', workers=1)), bj.cell_group(dict(instance='y', workers=1)))
-        self.assertNotEqual(bj.cell_group(dict(instance='x', workers=1)), bj.cell_group(dict(instance='x', workers=16)))
+    # The clock rule's groups are arms within a cell: instance, worker count and arm each split a group.
+    def test_clock_group(self):
+        c = dict(instance='x', workers=1, arm='a')
+        for other in (dict(c, instance='y'), dict(c, workers=16), dict(c, arm='b')):
+            self.assertNotEqual(bj.clock_group(c), bj.clock_group(other))
+        self.assertEqual(bj.clock_group(c), bj.clock_group(dict(c, rep=3, seed=1)))
+
+    @staticmethod
+    def clock_rows(khz_by_arm):
+        """(attempt_id, cell, contamination) rows in one cell, clean but for the clock: arm -> per-rep kHz."""
+        rows = []
+        for arm, khz in khz_by_arm.items():
+            for rep, k in enumerate(khz):
+                metrics = dict(sibling_busy={}, bench_foreign=0.0, median_khz=k, rest_load=0.0, load1=0.0,
+                               compilers=0, runner_workers=0, benchlock_owners=[])
+                rows.append((f'job:{len(rows)}:0', dict(instance='wide64/eco-12', workers=1, rep=rep, arm=arm),
+                             dict(metrics=metrics)))
+        return rows
+
+    # A mixed-solver cell whose arms each hold a steady clock is clean, though the arms' clocks differ.
+    def test_mixed_solver_cell_with_steady_arms_is_not_void(self):
+        rows = self.clock_rows(dict(grobx=[2670000] * 5, sig=[3990000] * 5, grs=[4540000] * 5))
+        s = bj.session_verdict_of(rows, 'dev', 'bench-job-job')
+        self.assertEqual((s['contaminated'], s['total'], s['void']), (0, 15, False))
+        self.assertEqual((s['version'], s['grouping']), (bj.VERDICT_VERSION, 'arm'))
+        self.assertEqual(s['median_khz']['wide64/eco-12@1w/grobx'], 2670000)
+        # The same attempts judged per cell, as verdict v1 did, void the session on clock alone.
+        self.assertTrue(bj.session_verdict_of(rows, 'dev', 'bench-job-job', grouping='cell')['void'])
+
+    # One arm whose clock drifts across its repetitions is contaminated, and here voids the session.
+    def test_mixed_solver_cell_with_a_drifting_arm_is_void(self):
+        rows = self.clock_rows(dict(grobx=[2000000, 2400000, 2670000, 3000000, 3400000],
+                                    sig=[3990000] * 5, grs=[4540000] * 5))
+        s = bj.session_verdict_of(rows, 'dev', 'bench-job-job')
+        self.assertEqual((s['contaminated'], s['void']), (4, True))
+        self.assertEqual(set(s['flagged']), {'job:0:0', 'job:1:0', 'job:3:0', 'job:4:0'})
 
     # The harness runs on run.cpus outside the attempt when there are any; otherwise none are spare.
     def test_harness_cpus(self):
@@ -399,7 +431,7 @@ class BenchJobTest(unittest.TestCase):
                                          metadata=dict(attempt_id=aid, process_wall_ns=int(values[rep] * 1e9),
                                                        observed_peak_rss_bytes=1 << 20, before=dict(clock='boost'))))
         stop = dict(reason='complete', contamination=dict(contaminated=len(flagged), total=len(attempts), void=False,
-                                                          median_khz=4000000, flagged={f: ['x'] for f in flagged}))
+                                                          median_khz={'goldilocks/katsura-4@1w': 4000000}, flagged={f: ['x'] for f in flagged}))
         header = dict(bench_job=dict(job_id='job', manifest_sha256='m' * 64, mode=mode, context=m['context']))
         return dict(header=header, stop=stop, stops=[stop], attempts=attempts, journal_sha256='j' * 64), m
 
@@ -437,6 +469,17 @@ class BenchJobTest(unittest.TestCase):
         # A machine without cpufreq (GitHub runners) has no median clock; the report still renders.
         state['stop']['contamination']['median_khz'] = {'goldilocks/katsura-4@1w': None}
         self.assertIn('median clock (kHz) goldilocks/katsura-4@1w —', bj.render(bj.summarize(state, m)))
+
+    # The report names the clock rule's grouping: a v2 verdict's own, and per cell for a verdict without one.
+    def test_report_names_the_clock_grouping(self):
+        state, m = self.synthetic(dict(a=[1.0]))
+        self.assertEqual(bj.summarize(state, m)['provenance']['clock_grouping'], 'cell')
+        self.assertIn('clock rule grouped per cell', bj.render(bj.summarize(state, m)))
+        state['stop']['contamination'].update(version=bj.VERDICT_VERSION, grouping='arm')
+        self.assertEqual(bj.summarize(state, m)['provenance']['clock_grouping'], 'arm')
+        self.assertIn('clock rule grouped per arm', bj.render(bj.summarize(state, m)))
+        state['stop'] = dict(reason='cancelled')
+        self.assertIsNone(bj.summarize(state, m)['provenance']['clock_grouping'])
 
     # The scoreboard bridge emits the committed CompetitiveRecord fixture that board.rs's test loads.
     def test_competitive_rows_match_the_fixture(self):

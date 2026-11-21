@@ -205,3 +205,10 @@ The journal it writes extends `StudyJournal` without forking it. An `exit` recor
 `stop`, lifting it. Journals written before #967 contain neither and replay unchanged. Every exit's
 metadata carries `attempt_id` (`<job-id>:<index>:<try>`), `binary_sha256`, `cpus`, `argv`, the
 `cpu-context` snapshots and `contamination` (null until #968 fills it).
+
+The `complete` stop carries the session verdict, `{version, grouping, contaminated, total, void,
+median_khz, flagged}`. **Version 2** (#996) groups the clock rule per arm within a cell
+(`grouping: "arm"`, `median_khz` keyed `<instance>@<w>w/<arm>`). A verdict with no `version` key
+is **version 1**, grouped per cell (`<instance>@<w>w`), and is read as such: `report` names the
+grouping either way, and a journal is never rewritten. The re-judged M33 sessions are in
+[`research/m33-clock-rule/`](../../research/m33-clock-rule/README.md).
