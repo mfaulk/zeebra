@@ -54,5 +54,12 @@ engine code:
   residual there is not #962's charging.
 - The harness pair reads 0.994 in one session and 1.018 in the next.
 
-Even so, the in-tree pair reads 1.031 and 1.034 on gf32003/MQ10 in two sessions. That is above
-the 1.03 bar.
+**Verdict: gf32003/mq-random-10 missed the 1.03 bar at 1.031 [1.018, 1.040]** (dev, in-tree
+builds, n = 30; a second session read 1.034). Two controls bear on it:
+
+- **Isolating control.** On m31/MQ10, routing-only v3 reads 1.016 [1.011, 1.025] and head reads
+  1.017 [1.010, 1.029], so the serial-cascade charging adds nothing measurable there.
+- **Same-library spread.** Two builds of main's library are 0.974 [0.961, 0.982] apart on
+  gf32003/MQ10.
+
+The owner accepted the merge on that evidence, and the miss stays on record here.
