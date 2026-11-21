@@ -492,6 +492,39 @@ tools/bench-job submit /buildcache/cargo-target/zeebra-967/katsura-9.json
 `tools/test/bench-job-test.sh` covers submit refusals, plan determinism, SIGKILL and resume,
 cancel, timeouts, retries and binary tampering with synthetic children and a fake reservation.
 
+## Statistics and verdicts
+
+New M33 campaigns read their ratios and verdicts through [`tools/bench_stats.py`](../../tools/bench_stats.py)
+(standard library only) instead of copying an `interval()` into their `summarize.py`. Older
+`summarize.py` files stay as published: they are evidence.
+
+```python
+import bench_stats as bs                       # sys.path.insert(0, 'tools') first
+ci = bs.paired_ratio(bs.paired_ratios(cand_by_rep, base_by_rep), seed=f'{row} cand base')
+bs.regression_verdict(ci, 1.05)                # Verdict(outcome, extend, reason)
+ci = bs.independent_ratio(zeebra_ms, msolve_ms, seed=f'{row} msolve {w}')
+bs.win_verdict(ci, anomaly=bs.msolve_anomaly(msolve_by_workers, w))
+```
+
+- **Paired** (Zeebra ÷ Zeebra): median of per-repetition ratios. **Independent** (Zeebra ÷
+  competitor): median ÷ median, each side resampled on its own. Both are 95% percentile bootstraps,
+  20,000 draws. An `int` seed is used as given and a `str` seed is its CRC-32. The same seed always
+  gives the same interval.
+- **Precision rule** (`precise`): the half-width, relative to the median, is at most half the
+  distance from the threshold to 1.0. `relative=False` is the ratio-unit variant used by
+  `research/m32-gate-s`.
+- **Verdicts.** `win`: median < 1 and upper < 1. `loss`: lower > 1. `regression` /
+  `no-regression`: upper vs the bound. `inconclusive`: the interval spans 1 or is imprecise.
+  `stopped`: n < 9. `anomaly`: a win at a worker count where msolve's median exceeds 1.10× its own
+  best. `extend=True` asks for the single predeclared extension (n = 9 → 12 more, pooled to 21). Pass
+  `extended=True` on the pooled read so the verdict is final. A row under 300 ms (`small=True`)
+  never wins.
+- **Contamination.** `partition_contaminated` splits attempts on their `contaminated` flag. Report
+  both counts. `session_void` applies the more-than-20% rule.
+
+`tools/test/bench-stats-test.py` reprints published cells from `research/m32-qualification/` and
+`research/m31-final/` through the module. Its replays must match to the printed digit.
+
 ## Which commit a figure came from
 
 A measurement published under `docs/` states the commit it was taken at. The field has always
