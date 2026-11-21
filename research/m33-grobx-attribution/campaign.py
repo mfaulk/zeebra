@@ -109,7 +109,7 @@ def grobx_summary(text):
     runs, inter, end, text_ns = [], None, None, 0
     for _, kind, f in report_lines(text):
         if kind == 'run':
-            runs.append(dict(engine=f.get('engine'), reduce=f.get('reduce'), rounds=0, reductions=0, zero=0,
+            runs.append(dict(engine=f.get('engine'), reduce=f.get('reduce'), rounds=0, reductions=0, zero=0, zero_rows=0,
                              pivots=0, subtracted=0, entries=0, max_rows=0, max_columns=0,
                              **{f'{c}_ns': 0 for c in ROUND_CLOCKS}))
         elif kind == 'echelon' and runs:
@@ -119,6 +119,7 @@ def grobx_summary(text):
             r['rounds'] += 1
             for k in ('reductions', 'zero', 'pivots', 'subtracted', 'entries'):
                 r[k] += f.get(k, 0)
+            r['zero_rows'] += f.get('zero-rows', 0)
             r['max_rows'] = max(r['max_rows'], f.get('rows', 0))
             r['max_columns'] = max(r['max_columns'], f.get('columns', 0))
             for c in ROUND_CLOCKS:

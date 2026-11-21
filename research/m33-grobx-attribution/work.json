@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "binary": "sig_f4_study-work-a13983d6",
+  "commit": "a13983d6",
+  "cpus": "40",
+  "note": "untimed: off the bench CPUs beside builds; only the counters are read",
+  "sha256": "5f49e1bce3f80f25247309335d9c1dd8b9cfd33738a953e4e4e3fd6ddc885fb0"
+ },
+ "rows": {
+  "goldilocks/mq-random-11": {
+   "basis_m33": "78e96ce288aef60807dfae21a5bfb1256e41942a60bb85b32a686b7ba6e49b07",
+   "call_ns": 39908975360,
+   "work": {
+    "backward_products": 1044026031,
+    "forward_products": 19332957813,
+    "products_on_zero_rows": 18921722777,
+    "zero_rows": 6293
+   }
+  },
+  "wide64/eco-12": {
+   "basis_m33": "d4afa8a5a6f7f4cad7ad81a2c19f30851d9ca0592e1245ce669b6c91f276cae5",
+   "call_ns": 13535080444,
+   "work": {
+    "backward_products": 342715893,
+    "forward_products": 5580969032,
+    "products_on_zero_rows": 5511703161,
+    "zero_rows": 6331
+   }
+  },
+  "wide64/katsura-11": {
+   "basis_m33": "ae1041e0996364ef4766614bb3882a6f39d2f799a929edc705e0d2a2fe38daa0",
+   "call_ns": 9531891140,
+   "work": {
+    "backward_products": 180095343,
+    "forward_products": 4376252738,
+    "products_on_zero_rows": 4240743978,
+    "zero_rows": 3936
+   }
+  }
+ }
+}

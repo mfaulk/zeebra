@@ -34,6 +34,7 @@ class CampaignTest(unittest.TestCase):
         self.assertEqual((plain['rounds'], plain['reductions'], plain['zero'], plain['subtracted']), (2, 56, 3, 567500))
         self.assertEqual((plain['reduce_ns'], plain['backsub_ns'], plain['max_columns']), (1663000, 369000, 533))
         self.assertEqual(plain['run_ns'], 1528967000)
+        self.assertEqual(sig['zero_rows'], 0)
 
     def test_grobx_summary_reads_interreduction_text_and_end(self):
         """The final interreduction, the basis-text build and the call's end are kept apart from rounds."""

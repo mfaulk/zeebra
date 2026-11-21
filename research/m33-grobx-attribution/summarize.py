@@ -173,9 +173,11 @@ def work_table(recs, work):
             ('Rows reduced (targets / reductions)', s['targets'], rounds('reductions')),
             ('Reducer rows', s['reducer_rows'], '—'),
             ('Reductions to zero', s['reductions_to_zero'], rounds('zero')),
+            ('Rows ruled zero by randomized tests', '—', rounds('zero_rows')),
             ('Elements added (pivots)', s['elements_added'], rounds('pivots')),
             ('Reduced basis', s['reduced_basis_elements'], g['inter']['elements']),
-            ('Redundant elements', sp['redundant_elements'], rounds('pivots') - g['inter']['elements']),
+            ('Redundant elements (pivots − reduced basis)', sp['redundant_elements'],
+             max(rounds('pivots') - g['inter']['elements'], 0)),
             ('Max matrix rows × columns', f"{s['max_matrix_rows']:,} × {s['max_matrix_columns']:,}",
              f"{max(run['max_rows'] for run in g['runs']):,} × {max(run['max_columns'] for run in g['runs']):,}"),
             ('Matrix entries, total (M)', fmt(entries / 1e6), fmt(rounds('entries') / 1e6)),
@@ -269,17 +271,19 @@ def hg2_table(recs):
     out += ['', 'Hardware counters, user mode, whole process (`hwcount.py`; medians over attempts). The two builds '
             'differ only in the symbolic stage\'s loop and the split build\'s clocks, so the difference is that '
             'stage\'s.', '',
-            '| Row | arm | instructions (G) | cycles (G) | IPC | L1d reads (G) | L1d miss rate | DRAM fills (M) |',
-            '|---|---|---:|---:|---:|---:|---:|---:|']
+            '| Row | arm | instructions (G) | cycles (G) | IPC | L1d reads (G) | L1d miss rate | DRAM fills (M) | '
+            'cycles ÷ main (GHz) |',
+            '|---|---|---:|---:|---:|---:|---:|---:|---:|']
     for row in ROWS:
         for arm in ('sig-hw', 'split-hw'):
             hw = [r['hwcount'] for r in ok(recs, row, arm) if r.get('hwcount')]
             if not hw:
                 continue
             c = {k: med([h['counts'][k] for h in hw]) for k in hw[0]['counts']}
+            ghz = med([r['hwcount']['counts']['cycles'] / r['zeebra']['main_ns'] for r in ok(recs, row, arm)])
             out.append(f"| {LABEL['/'.join(row)] if arm == 'sig-hw' else ''} | {arm} | {c['instructions'] / 1e9:.2f} | "
                        f"{c['cycles'] / 1e9:.2f} | {c['instructions'] / c['cycles']:.2f} | {c['l1d_reads'] / 1e9:.2f} | "
-                       f"{c['l1d_read_misses'] / c['l1d_reads']:.2%} | {c['fills_dram'] / 1e6:.1f} |")
+                       f"{c['l1d_read_misses'] / c['l1d_reads']:.2%} | {c['fills_dram'] / 1e6:.1f} | {ghz:.2f} |")
         sig = {r['rep']: r['hwcount']['counts'] for r in ok(recs, row, 'sig-hw') if r.get('hwcount')}
         spl = {r['rep']: r['hwcount']['counts'] for r in ok(recs, row, 'split-hw') if r.get('hwcount')}
         reps = sorted(set(sig) & set(spl))
@@ -287,7 +291,7 @@ def hg2_table(recs):
             d = {k: med([spl[i][k] - sig[i][k] for i in reps]) for k in sig[reps[0]]}
             out.append(f"| | split − sig, paired | {d['instructions'] / 1e9:+.2f} | {d['cycles'] / 1e9:+.2f} | — | "
                        f"{d['l1d_reads'] / 1e9:+.2f} | {d['l1d_read_misses'] / 1e6:+.1f} M misses | "
-                       f"{d['fills_dram'] / 1e6:+.1f} |")
+                       f"{d['fills_dram'] / 1e6:+.1f} | — |")
     return out + ['']
 
 
