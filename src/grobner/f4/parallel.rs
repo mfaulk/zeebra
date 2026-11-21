@@ -31,6 +31,7 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
     backend: Backend,
     matrix: &mut MacaulayMatrix<N, F>,
     allowance: usize,
+    measure: bool,
     statistics: &mut ParallelForwardStatistics,
 ) -> Option<BlockOutcome> {
     if setting == ParallelForward::Serial
@@ -49,7 +50,9 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
         .fold((0, 0), |(rows, nonzeros), (_, row)| {
             (rows + 1, nonzeros + row.nonzeros())
         });
-    let (dispatch, config) = gate::<F>(setting, backend, lower_rows, lower_nonzeros, allowance)?;
+    let (dispatch, mut config) =
+        gate::<F>(setting, backend, lower_rows, lower_nonzeros, allowance)?;
+    config.measure_work = measure;
     let workers = config.workers;
     let split = matrix.partition_reducers_first();
     debug_assert_eq!(
@@ -65,7 +68,11 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
                 lost_publications: report.failed_publications,
                 reserved_entries: report.peak_reserved_entries,
                 workspace_bytes: report.workspace_bytes,
+                ..Default::default()
             };
+            if measure {
+                statistics.record_pass(&report, workers);
+            }
             Some(BlockOutcome {
                 statistics: report.statistics,
                 free_pivots: split,
@@ -257,6 +264,26 @@ mod tests {
         assert!(statistics.reserved_entries > 0 && statistics.workspace_bytes > 0);
     }
 
+    // Measured stages make each concurrent pass report its workers' busy time, its slowest
+    // worker and its coefficient products (#972); unmeasured, those counters stay zero.
+    #[test]
+    fn measured_passes_report_worker_time_and_products() {
+        let system = katsura::<6, Zp32003>();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let off = agree(&system, order, &forced(4));
+        assert!(off.batches > 0);
+        assert_eq!((off.passes, off.products, off.busy_ns), (0, 0, 0));
+        let measured = F4Options {
+            measure_stages: true,
+            ..forced(4)
+        };
+        let on = agree(&system, order, &measured);
+        assert_eq!(on.passes, on.batches);
+        assert!(on.worker_slots >= on.passes && on.worker_slots <= 4 * on.passes);
+        assert!(on.products > 0 && on.retry_products <= on.products);
+        assert!(on.critical_ns > 0 && on.critical_ns <= on.busy_ns);
+    }
+
     // A field that provides no concurrent handle is computed serially under any setting.
     #[test]
     fn a_field_without_a_handle_stays_serial() {
@@ -366,6 +393,7 @@ mod tests {
                 Backend::Adaptive,
                 &mut matrix,
                 usize::MAX,
+                false,
                 &mut statistics,
             );
             assert!(outcome.is_none());
