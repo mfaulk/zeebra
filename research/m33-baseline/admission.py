@@ -121,7 +121,7 @@ def grobx(binary, case, mode, wall_s):
     ok = bool(raw.get('basis')) and not raw.get('stopped') and (mode == 'raw' or raw.get('certified'))
     digest = None
     if ok:
-        texts = [t for t in re.split(r'[,\n\[\]]', raw['basis']) if t.strip()]
+        texts = [t for t in re.split(r'[,\n\[\]:]', raw['basis']) if t.strip()]
         digest = basis_digest.basis_digest(texts, int(case['modulus']), case['variables'])
     return r, ok, digest
 
