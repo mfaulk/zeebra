@@ -132,8 +132,9 @@ What that sets:
   share whatever the box was doing. That is the use reservation is for:
   deciding whether a change is faster while the rest of the machine keeps building. Quote the
   ratio, and label any absolute wall as taken beside builds.
-- A frequency cap was not added. It would need root on every boot, and the ratio result does not
-  call for it.
+- The ratio result does not call for a frequency cap. Cross-engine tables with serial comparands
+  do, and *Fixed clock* below adds an opt-in one (#954). It is not yet qualified: its A/A
+  validation is part of #968's calibration.
 
 ### Why a run ended
 
@@ -265,6 +266,123 @@ Compare a serial stage only between arms run in the same parallel context. The
 M29 campaign ([`research/m29-baseline/costmodel.py`](../../research/m29-baseline/costmodel.py)) also
 samples `scaling_cur_freq` every 25 ms during each child. `tools/test/cpu-context-test.sh` covers
 the script against a synthetic `/sys` and `/proc`.
+
+Fields added for M33 (#968). Fields are only added, never renamed or removed:
+
+| field | meaning |
+|---|---|
+| `cpus[].min_khz`, `cpus[].max_khz` | `scaling_min_freq` / `scaling_max_freq` per listed CPU |
+| `kernel` | `uname -r` (`/proc/sys/kernel/osrelease`) |
+| `clock` | `boost`, `fixed@<MHz>` (boost off and one `scaling_max_freq` across the list), or `unknown` |
+| `siblings` | SMT siblings of the listed CPUs that are not themselves listed |
+| `stat[]` | raw `/proc/stat` jiffies `{cpu, role: bench\|sibling, busy, total}` for the list and its siblings |
+| `rest_stat` | `{busy, total, cpus}` summed over every other online CPU |
+| `rapl_uj`, `rapl_max_uj` | RAPL package energy and its wrap range; `null` when unreadable (energy is root-only by default) |
+| `temp_mc` | `k10temp` Tctl, millidegrees C, or `null` |
+| `runner_listeners`, `runner_workers` | counts of `Runner.Listener` / `Runner.Worker` (other repositories' self-hosted CI) |
+| `benchlock_open[]` | `{owner, pid}` per `benchlock.log` START with no END whose process is still alive |
+| `interval_busy_pct[]` | only with `--interval SECONDS`: busy % per listed CPU and sibling over the window |
+
+`busy` is user + nice + system + irq + softirq + steal, and `total` adds idle and iowait. A busy
+fraction is the difference between two snapshots, which is what `tools/bench_contamination.py`
+computes.
+
+### Measurement modes and contamination (#968)
+
+Every M33 figure is taken in one of two modes (plan §11.2,
+[`docs/MILESTONE-COMPETITIVE-BENCHMARKING.md`](../MILESTONE-COMPETITIVE-BENCHMARKING.md)):
+
+- **dev**: decide whether a change is faster. CCDs 1-2 reserved, children pinned to physical CPUs
+  8-23 with their siblings idle. Builds, tests and agents may run on the other CCDs. Quote paired
+  Zeebra ÷ Zeebra ratios with an A/A control. A dev-mode absolute wall is never published as a
+  competitive result.
+- **publication**: Gate D and the competitive scoreboard. Same placement plus an exclusive
+  `benchlock`, no compiler or linker process, no active `Runner.Worker`, and load under 4 on the
+  non-bench CPUs. The clock is fixed if #954 qualifies, otherwise boost, recorded, and the same for
+  every arm.
+
+`tools/bench_contamination.py` holds the rules, so every runner journals the same verdict:
+
+| rule | dev | publication |
+|---|---|---|
+| any SMT sibling of a bench CPU > 5% busy over the attempt (all of it is foreign) | contaminated | contaminated |
+| bench CPUs in aggregate > 5% foreign: (busy − child's own CPU time) / total | contaminated | contaminated |
+| bench median clock > 3% off the session median, per group (worker count) | contaminated | contaminated |
+| busy-CPU equivalents on the non-bench CPUs ≥ 4 | — | contaminated |
+| a compiler/linker, a `Runner.Worker`, or another `benchlock` owner in either snapshot | — | contaminated |
+| more than 20% of a session's attempts contaminated | session void, rerun whole | same |
+
+Contaminated attempts are kept, flagged and excluded from verdicts. The thresholds are the plan's
+starting values. Calibration may tighten them, and loosening one takes an owner decision on #965.
+Bench CPUs are judged in aggregate because `/proc/stat` cannot attribute a CPU's busy time to a
+process. Without the child's CPU time, the bench rule is skipped and the verdict notes it.
+
+The runner's interface, per attempt and per session:
+
+```python
+import bench_contamination as bc            # tools/ on sys.path
+m = bc.attempt_metrics(before, after, own_cpu_s=ru.ru_utime + ru.ru_stime)  # snapshots as dicts; ru from os.wait4
+v = bc.attempt_verdict(m, mode="dev", session_median_khz=None, owner="zb-968")
+#   -> {"contaminated": bool, "reasons": [str], "notes": [str]}
+s = bc.session_verdict([m, ...], mode="dev", groups=[workers, ...], owner="zb-968")
+#   -> {"attempts": [verdict...], "contaminated": n, "total": n, "void": bool, "median_khz": {...}}
+bc.publication_refusals(snapshot, owner="zb-968")   # [] when publication mode may start
+```
+
+The same functions are available from the command line:
+
+```sh
+tools/bench_contamination.py attempt before.json after.json --own-cpu-s 9.8 --mode publication
+tools/bench_contamination.py session metrics.jsonl --mode dev   # lines {"metrics": ..., "group": 16}; rc 1 void
+tools/bench_contamination.py check --mode publication --cpus 8-23 --owner zb-968 --wait 3600 --poll 60
+```
+
+`check` exits 0 when the mode may start, 1 when it is refused (the JSON names each reason), and 2
+when the snapshot failed. Dev mode always passes `check`: it records the context and refuses
+nothing. Publication mode re-polls every `--poll` seconds until `--wait` runs out. Before the
+first attempt nothing of ours is running, so `check` uses machine-wide `load1`, which is the
+stricter reading.
+
+Calibration is pending: an A/A and a 5% A/B on Eco-12 1 w and MQ10 16 w under idle, build,
+memory-bandwidth and fixed-clock conditions. It runs as `bench-job` jobs once #967 merges. Until it
+does, nobody has measured which conditions dev mode tolerates.
+
+### Fixed clock (#954)
+
+A serial process boosts to about 4.5 GHz, while a 16-worker run sits at the all-core clock. So a
+Zeebra-16 ÷ comparand-1 ratio carries a frequency term of about 1.14x that has nothing to do with
+the algorithm. `tools/bench-clock.sh` is opt-in and root-gated:
+
+```sh
+tools/bench-clock.sh status              # rc 0 fixed, 1 not fixed, 2 inconsistent
+sudo tools/bench-clock.sh fix 3900       # boost off, min = max = 3900 MHz on CPUs 8-23,72-87
+sudo tools/bench-clock.sh restore        # boost and every CPU's own min/max back
+```
+
+It runs only when you name a subcommand. `fix` and `restore` refuse without root (rc 77). `fix`
+records the prior state in `/run/zeebra-bench-clock` before it writes anything. It rolls back a
+write that fails or that the kernel clamps, and it refuses a second `fix` until `restore`. A fixed
+clock is shared machine state, like a CCD reservation, so restore it when the session ends. A
+reboot also clears it. `cpu-context` records the result as `"clock":"fixed@3900"`. Pick a figure at
+or below the 16-worker all-core clock (about 3.99 GHz, #827).
+
+Optional root step, so that a session does not need an interactive `sudo`. It is separate from
+the script and fully reversible:
+
+```sh
+sudo install -D -o root -g root -m 0755 -t /usr/local/libexec/zeebra tools/cpu-context.sh tools/bench-clock.sh
+echo "$USER ALL=(root) NOPASSWD: /usr/local/libexec/zeebra/bench-clock.sh fix *, /usr/local/libexec/zeebra/bench-clock.sh restore" \
+  | sudo tee /etc/sudoers.d/zeebra-bench-clock
+sudo chmod 0440 /etc/sudoers.d/zeebra-bench-clock && sudo visudo -c
+# undo: restore if fixed, then
+sudo rm -r /etc/sudoers.d/zeebra-bench-clock /usr/local/libexec/zeebra
+```
+
+Install a root-owned copy. A sudoers entry that names the checkout's own file would let anyone who
+can edit the checkout run code as root. No boot-time unit is installed: the fix is per session, by
+design. Reading RAPL energy as a user needs a similar step (`chmod 0444` on
+`/sys/class/powercap/intel-rapl:0/energy_uj`, undone by a reboot). Until someone takes it,
+`rapl_uj` stays `null`.
 
 ## Which commit a figure came from
 

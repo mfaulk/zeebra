@@ -49,19 +49,7 @@ br_state() { printf '%s' "${ZEEBRA_BENCH_RESERVE_STATE:-${XDG_RUNTIME_DIR:-/run/
 # The pure half.
 # ---------------------------------------------------------------------------------------------
 
-br_compress() { # <id>...  ->  canonical cpulist
-  local out="" lo="" prev="" c
-  for c in $(printf '%s\n' "$@" | sort -nu); do
-    if [ -n "$prev" ] && [ "$c" -eq $((prev + 1)) ]; then
-      prev="$c"
-      continue
-    fi
-    [ -z "$lo" ] || out+="${out:+,}$([ "$lo" = "$prev" ] && echo "$lo" || echo "$lo-$prev")"
-    lo="$c" prev="$c"
-  done
-  [ -z "$lo" ] || out+="${out:+,}$([ "$lo" = "$prev" ] && echo "$lo" || echo "$lo-$prev")"
-  printf '%s' "$out"
-}
+br_compress() { ctx_compress_ids "$@"; } # <id>...  ->  canonical cpulist
 
 br_same_set() { # <cpulist> <cpulist>  ->  rc 0 when equal as sets
   local a b
