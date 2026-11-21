@@ -539,6 +539,7 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("peak_pending", size(s.peak_pending)),
         ("signature_metadata_bytes", size(s.signature_metadata_bytes)),
         ("bookkeeping_ns", Json::nanos(s.bookkeeping)),
+        ("element_hashing_ns", Json::nanos(s.element_hashing)),
         ("symbolic_ns", Json::nanos(s.symbolic)),
         ("elimination_ns", Json::nanos(s.elimination)),
         ("interreduction_ns", Json::nanos(s.interreduction)),
