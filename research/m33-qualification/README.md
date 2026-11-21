@@ -93,7 +93,7 @@ F2=<pinned commit>; git tag measured/974-f2 $F2
 Q=research/m33-qualification
 python3 $Q/campaign.py build --commit 31e334bd --harness 895879c8   # F0 binary
 python3 $Q/campaign.py build --commit $F2 --harness 895879c8        # F2 binary
-cargo test --test m33_safety --test m33_thread_cap && cargo test --lib sigf4::cascade_tests  # at F2
+cargo test --test m33_safety --test m33_thread_cap && cargo test --features research-sigf4 --lib cascade_tests  # at F2
 python3 $Q/campaign.py references --study $F2BIN          # fills any row references.json lacks
 A="--f0-study $F0BIN --f2-study $F2BIN --f2 $F2 --agent $(scripts/agent/zb-claim.sh id)"
 for s in grevlex grlex lex regression-G regression-M small-G small-M; do
@@ -106,6 +106,13 @@ python3 $Q/summarize.py regression <regression-G job> <regression-M job> --small
 python3 $Q/campaign.py manifest --suite gate-d-G --gate-d $A > $M33Q_BUILD/gate-d-G.json   # likewise -M
 python3 $Q/summarize.py gate-d --gate-d --f2 $F2 <gate-d-G job> <gate-d-M job>   # post the raw table on #965 first
 ```
+
+## Run at F2 `db181c51`
+
+`results/` holds the summarizer output of the 2026-11-21 session (`correctness.md`, `regression.md`,
+`jobs.txt`). The write-up is [`docs/research/m33-qualification.md`](../../docs/research/m33-qualification.md):
+Q did not pass and Gate D was not run. Repetitions pool across jobs, so a top-up job for cells
+short of n is passed beside the first job.
 
 ## Dry run (pipeline proof, not a measurement)
 
