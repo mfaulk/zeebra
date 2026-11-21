@@ -40,6 +40,7 @@ enum Pass {
 ///
 /// `None` after a refusal is recorded as a fallback; a worker panic propagates, as for the
 /// forward order.
+#[allow(clippy::too_many_arguments)]
 fn on_workers<F: FiniteField>(
     pass: Pass,
     setting: ParallelForward,
@@ -47,12 +48,14 @@ fn on_workers<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     split: usize,
     allowance: usize,
+    measure: bool,
     record: &mut ParallelForwardStatistics,
 ) -> Option<concurrent::Report> {
     let lower = &matrix.rows()[split..];
     let lower_nonzeros = lower.iter().map(SparseRow::nonzeros).sum();
-    let (dispatch, config) =
+    let (dispatch, mut config) =
         parallel::gate::<F>(setting, backend, lower.len(), lower_nonzeros, allowance)?;
+    config.measure_work = measure;
     let cancel = AtomicBool::new(false);
     let result = match pass {
         Pass::Sweep => dispatch.sweep(matrix, split, &config, &cancel),
@@ -64,6 +67,9 @@ fn on_workers<F: FiniteField>(
             record.max_workers = record.max_workers.max(config.workers);
             record.lost_publications += report.failed_publications;
             record.workspace_bytes = record.workspace_bytes.max(report.workspace_bytes);
+            if measure {
+                record.record_pass(&report, config.workers);
+            }
             Some(report)
         }
         Err(concurrent::Error::Entries { .. } | concurrent::Error::Workspace { .. }) => {
@@ -82,7 +88,8 @@ fn on_workers<F: FiniteField>(
 /// `candidate_columns[c]` says whether a pivot in original column `c` is a candidate; under
 /// `reduce`, exactly the candidate rows are then cleared of every other pivot column, the contract
 /// [`candidate::finish`] keeps for the forward order. The sweep and the echelon of `D'` are charged
-/// to `stages.forward`, the candidate pass to `stages.backward`. `setting` may put either pass
+/// to `stages.forward`, split as `stages.fl_sweep` and `stages.fl_echelon`, the candidate pass to
+/// `stages.backward`. `setting` may put either pass
 /// on workers, recorded in `record`.
 ///
 /// # Errors
@@ -104,6 +111,7 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
         super::structured::check_reducer_block(matrix.matrix(), split),
         Ok(())
     );
+    let measure = clock.measuring();
     let mut statistics = match on_workers(
         Pass::Sweep,
         setting,
@@ -111,6 +119,7 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
         matrix.matrix_mut(),
         split,
         allowance,
+        measure,
         record,
     ) {
         Some(report) => {
@@ -119,6 +128,7 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
         }
         None => sweep_rows_against_pivots(matrix.matrix_mut(), split, allowance)?,
     };
+    stages.fl_sweep = clock.lap();
 
     let columns = matrix.num_columns();
     let mut reducer_led = vec![false; columns];
@@ -165,6 +175,7 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
         &mut residual,
         0,
         within,
+        measure,
         record,
     ) {
         Some(report) => {
@@ -175,7 +186,8 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
         }
         None => row_echelon_with(backend, &mut residual, within).map_err(lift)?,
     };
-    stages.forward = clock.lap();
+    stages.fl_echelon = clock.lap();
+    stages.forward = stages.fl_sweep + stages.fl_echelon;
 
     let mut report = candidate::Report::default();
     let mut back_substituted_rows = None;
@@ -372,6 +384,36 @@ mod tests {
                 assert!(statistics.parallel_forward.batches > 0);
                 assert!(statistics.parallel_forward.reserved_entries > 0);
             }
+        }
+    }
+
+    // Measured FL batches split `forward` exactly into the reducer sweep and the `D'` echelon
+    // (#918), serially and on workers; the forward order leaves both refinements zero.
+    #[test]
+    fn the_fl_forward_clock_splits_into_sweep_and_echelon() {
+        use std::time::Duration;
+        let system = katsura::<6, Zp32003>();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        for parallel_forward in [
+            ParallelForward::Serial,
+            ParallelForward::Forced { workers: 4 },
+        ] {
+            let at = |batch_order| F4Options {
+                batch_order,
+                parallel_forward,
+                measure_stages: true,
+                ..F4Options::default()
+            };
+            let (_, fl) = f4_reported(&system, order, &at(BatchOrder::FaugereLachartre));
+            let stages = fl.stages;
+            assert!(stages.fl_sweep > Duration::ZERO && stages.fl_echelon > Duration::ZERO);
+            assert_eq!(stages.fl_sweep + stages.fl_echelon, stages.forward);
+            let (_, forward) = f4_reported(&system, order, &at(BatchOrder::Forward));
+            assert!(forward.stages.forward > Duration::ZERO);
+            assert_eq!(
+                forward.stages.fl_sweep + forward.stages.fl_echelon,
+                Duration::ZERO
+            );
         }
     }
 

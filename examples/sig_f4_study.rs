@@ -23,6 +23,10 @@
 //! text render, so the process renders nothing (plan §11.3); `--write-basis PATH` writes the rendered
 //! basis, one element per line, for a verification run.
 //!
+//! `--stages` (f4) turns on stage measurement and reports the stage clocks, the concurrent passes'
+//! worker time and products, and the work counters (#972); `--fl` (f4) runs the Faugère–Lachartre
+//! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918).
+//!
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
 //!
@@ -55,7 +59,7 @@ use zeebra::{
         f4_reported, f4_signature_reported,
         reference::buchberger_reference,
         sigf4::{sig_f4_reported, SigF4Options, SigF4Statistics},
-        F4Options, GradedEngine, ParallelForward, ParallelSymbolic,
+        BatchOrder, F4Options, F4Statistics, GradedEngine, ParallelForward, ParallelSymbolic,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -85,6 +89,8 @@ struct Args {
     input_only: bool,
     digest_only: bool,
     write_basis: Option<String>,
+    stages: bool,
+    fl: bool,
 }
 
 /// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
@@ -110,6 +116,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         input_only: false,
         digest_only: false,
         write_basis: None,
+        stages: false,
+        fl: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -137,6 +145,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--write-basis" => parsed.write_basis = Some(value()?),
             "--replay" => parsed.replay = true,
             "--claim" => parsed.claim = true,
+            "--stages" => parsed.stages = true,
+            "--fl" => parsed.fl = true,
             "--symbolic-replay" => parsed.symbolic = true,
             "--min-frontier" => {
                 parsed.min_frontier = value()?.parse().map_err(|_| "--min-frontier")?
@@ -175,6 +185,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
     }
+    if (parsed.stages || parsed.fl) && parsed.engine != "f4" {
+        return Err("--stages and --fl configure the shipping F4: --engine f4".into());
+    }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
         return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
     }
@@ -211,8 +224,53 @@ fn f4_options(args: &Args) -> F4Options {
                 max_workers: args.workers,
             }
         },
+        measure_stages: args.stages,
+        batch_order: if args.fl {
+            BatchOrder::FaugereLachartre
+        } else {
+            BatchOrder::Forward
+        },
         ..F4Options::default()
     }
+}
+
+/// #972: the shipping F4's stage clocks, concurrent-pass timings and work counters.
+fn f4_stage_statistics(s: &F4Statistics) -> Json {
+    let st = &s.stages;
+    let p = &s.parallel_forward;
+    let c = &s.candidate_reduction;
+    Json::object([
+        ("symbolic_ns", Json::nanos(st.symbolic)),
+        ("construction_ns", Json::nanos(st.construction)),
+        ("elimination_ns", Json::nanos(st.elimination)),
+        ("forward_ns", Json::nanos(st.forward)),
+        ("fl_sweep_ns", Json::nanos(st.fl_sweep)),
+        ("fl_echelon_ns", Json::nanos(st.fl_echelon)),
+        ("backward_ns", Json::nanos(st.backward)),
+        ("extraction_ns", Json::nanos(st.extraction)),
+        ("interreduction_ns", Json::nanos(st.interreduction)),
+        ("total_ns", Json::nanos(s.total)),
+        ("parallel_batches", Json::size(p.batches)),
+        ("parallel_fallback_batches", Json::size(p.fallback_batches)),
+        ("passes", Json::size(p.passes)),
+        ("worker_slots", Json::size(p.worker_slots)),
+        ("busy_ns", Json::int(p.busy_ns)),
+        ("critical_ns", Json::int(p.critical_ns)),
+        ("scheduling_ns", Json::int(p.scheduling_ns)),
+        ("publication_ns", Json::int(p.publication_ns)),
+        ("parallel_products", Json::size(p.products)),
+        ("retry_products", Json::size(p.retry_products)),
+        ("lost_publications", Json::size(p.lost_publications)),
+        ("backward_products", Json::size(c.coefficient_products)),
+        ("backward_targets", Json::size(c.targets)),
+        ("backward_parallel_batches", Json::size(c.parallel_batches)),
+        ("row_operations", Json::size(s.row_operations)),
+        ("pivot_inversions", Json::size(s.pivot_inversions)),
+        ("reducer_rows", Json::size(s.reducer_rows)),
+        ("initial_nonzeros", Json::size(s.total_initial_nonzeros)),
+        ("final_nonzeros", Json::size(s.total_final_nonzeros)),
+        ("max_live_nonzeros", Json::size(s.max_live_nonzeros)),
+    ])
 }
 
 struct Input {
@@ -1164,6 +1222,14 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 ("elements_added", Json::size(stats.elements_added)),
                 ("max_matrix_rows", Json::size(stats.max_matrix_rows)),
                 ("max_matrix_columns", Json::size(stats.max_matrix_columns)),
+                (
+                    "stages",
+                    if args.stages {
+                        f4_stage_statistics(&stats)
+                    } else {
+                        Json::Null
+                    },
+                ),
             ]);
             (result.map_err(|e| e.to_string()), summary, work)
         }
@@ -1326,6 +1392,10 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16", "--discovery"]].concat()).is_err());
+        // #972/#918: stage measurement and the FL order configure the shipping F4 only.
+        assert!(args(&[&base[..], &["f4", "--workers", "4", "--stages", "--fl"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["sigf4", "--stages"]].concat()).is_err());
+        assert!(args(&[&base[..], &["entry", "--fl"]].concat()).is_err());
         assert!(args(&[&base[..], &["magma"]].concat()).is_err());
         assert!(args(&["--field", "bn254", "--name", "eco-12", "--engine", "f4"]).is_err());
         assert!(args(&[&base[..], &["entry", "--workers", "16"]].concat()).is_ok());
