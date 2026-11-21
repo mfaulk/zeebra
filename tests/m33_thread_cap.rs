@@ -66,7 +66,20 @@ fn high_water(cap: usize, body: impl FnOnce()) -> (usize, usize, usize) {
     body();
     stop.store(true, Relaxed);
     let (parallel, over) = sampler.join().expect("sampler");
-    (parallel, over, tasks().saturating_sub(before))
+    (parallel, over, settled_excess(before))
+}
+
+/// Threads alive beyond `before`, once they have had up to a second to leave `/proc`: a joined
+/// thread's task entry outlives the join by a moment, and a loaded runner stretches that moment.
+fn settled_excess(before: usize) -> usize {
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    loop {
+        let excess = tasks().saturating_sub(before);
+        if excess == 0 || std::time::Instant::now() >= deadline {
+            return excess;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
 }
 
 fn capped(workers: usize) -> F4Options {
