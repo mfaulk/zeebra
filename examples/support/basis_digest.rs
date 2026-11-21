@@ -2,37 +2,36 @@
 // text, taken here from the basis itself so the timed region renders nothing. Elements must be monic,
 // as a reduced basis is; the Python side normalizes and would expose one that is not.
 
-use std::fmt::Write;
+use std::io::Write;
 use zeebra::{util::sha256_hex, FiniteField, MultivariatePolynomial};
 
 pub fn basis_digest<const N: usize, F: FiniteField>(
     basis: &[MultivariatePolynomial<N, F>],
     modulus: u128,
 ) -> String {
-    let mut lines: Vec<String> = basis
+    let mut elements: Vec<Vec<u8>> = basis
         .iter()
         .filter(|p| !p.is_zero())
         .map(|p| {
             let mut terms: Vec<_> = p.terms().iter().collect();
             terms.sort_unstable_by(|a, b| a.0.exponents().cmp(b.0.exponents()));
-            let mut line = String::new();
-            for (i, (monomial, coefficient)) in terms.iter().enumerate() {
-                if i > 0 {
-                    line.push(' ');
+            let mut bytes = Vec::with_capacity(terms.len() * (4 * N + 12));
+            for (monomial, coefficient) in terms {
+                for e in monomial.exponents() {
+                    bytes.extend_from_slice(&e.to_le_bytes());
                 }
-                for (j, e) in monomial.exponents().iter().enumerate() {
-                    if j > 0 {
-                        line.push(',');
-                    }
-                    write!(line, "{e}").unwrap();
-                }
-                write!(line, ":{coefficient}").unwrap();
+                write!(bytes, "{coefficient};").unwrap();
             }
-            line
+            bytes
         })
         .collect();
-    lines.sort_unstable();
-    sha256_hex(format!("m33-basis-v1 {modulus} {N}\n{}", lines.join("\n")).as_bytes())
+    elements.sort_unstable();
+    let mut data = format!("m33-basis-v1 {modulus} {N}\n").into_bytes();
+    for element in &elements {
+        data.extend_from_slice(&(element.len() as u32).to_le_bytes());
+        data.extend_from_slice(element);
+    }
+    sha256_hex(&data)
 }
 
 #[cfg(test)]
@@ -49,7 +48,7 @@ mod basis_digest_tests {
             .collect();
         assert_eq!(
             basis_digest(&basis, 32003),
-            "58f41dc0cc2e9a8f7be29d3926990116044001f97e05066d0ed0065842eaf754"
+            "732b64fcd26daed997c49a9b032cd303f0c8d3e76264275156efa161c9028e7c"
         );
     }
 }

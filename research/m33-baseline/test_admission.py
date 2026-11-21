@@ -49,15 +49,17 @@ class Digest(unittest.TestCase):
     def test_vector_shared_with_rust(self):
         """The vector `examples/support/basis_digest.rs` asserts; element order and scaling do not matter."""
         texts = ['2*x1*x2+4', 'x2^2+32002', 'x1^2+3*x2']
-        want = '58f41dc0cc2e9a8f7be29d3926990116044001f97e05066d0ed0065842eaf754'
+        want = '732b64fcd26daed997c49a9b032cd303f0c8d3e76264275156efa161c9028e7c'
         self.assertEqual(basis_digest.basis_digest(texts, 32003, ['x1', 'x2']), want)
         self.assertEqual(basis_digest.basis_digest(texts[::-1], 32003, ['x1', 'x2']), want)
 
-    def test_lines_sort_as_strings(self):
-        """Elements are ordered by their serialized line as a string ("10,0:1" before "2,0:1")."""
-        got = basis_digest.digest_canonical([(((2, 0), 1),), (((10, 0), 1),)], 7, 2)
-        want = hashlib.sha256(b'm33-basis-v1 7 2\n10,0:1\n2,0:1').hexdigest()
-        self.assertEqual(got, want)
+    def test_encoding(self):
+        """Exponents are little-endian u32, the coefficient decimal and `;`, elements length-prefixed."""
+        import struct
+        got = basis_digest.digest_canonical([(((2, 0), 1),), (((1, 0), 3), ((1, 1), 1))], 7, 2)
+        a, b = struct.pack('<2I', 2, 0) + b'1;', struct.pack('<2I', 1, 0) + b'3;' + struct.pack('<2I', 1, 1) + b'1;'
+        body = b''.join(struct.pack('<I', len(e)) + e for e in sorted([a, b]))
+        self.assertEqual(got, hashlib.sha256(b'm33-basis-v1 7 2\n' + body).hexdigest())
 
     def test_solver_spellings_agree(self):
         """msolve's explicit `1*x^1` spelling and a negative coefficient digest as the plain text does."""
