@@ -243,7 +243,7 @@ The full table is in `tables.md`. Highlights:
   `tools/test/bench-job-test.py`: per-instance named inputs, per-arm worker lists, and
   `build.comparand`. The schema is in [`benchmark-schema.md`](benchmark-schema.md) §7. Large
   basis-text payloads are not committed; `journals/<job>/omitted.json` lists them by digest.
-- **Statistics.** `tools/bench_stats.py`, imported verbatim from #979's branch (still open at
-  writing), so no third bootstrap copy exists.
+- **Statistics.** `tools/bench_stats.py` (#979): the shared independent bootstrap, the win rule and
+  the msolve anomaly check. No third bootstrap copy exists.
 - **Sessions used:** 4 of #966's 5, plus an untimed thread-census pass and untimed references off
   the bench CPUs.
