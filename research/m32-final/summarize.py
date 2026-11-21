@@ -314,7 +314,7 @@ def comparands(directory, c, out):
     def same(row, digests):
         if not digests:
             return '—'
-        return 'yes' if digests <= zdig.get(row, set()) else f'no ({len(digests)} distinct)'
+        return 'yes' if digests <= zdig.get(row, set()) else f'text differs ({len(digests)} distinct; README)'
 
     rs_path = d / 'rs.jsonl.gz'
     if rs_path.exists():
@@ -325,7 +325,7 @@ def comparands(directory, c, out):
             vals = [r['process_wall_ns'] / 1e6 for r in done]
             if vals:
                 out.append(f"| {row} | groebner-rs (verified) | 8 | {len(done)} | {iv(vals)} | {zr(row, 'en:16', vals)} | "
-                           f"{zr(row, 'en:8', vals)} | {len({r['basis_sha256'] for r in done})} basis |")
+                           f"{zr(row, 'en:8', vals)} | {same(row, {r['basis_sha256'] for r in done})} |")
     wide_path = d / 'wide-attempts.json'
     if wide_path.exists():
         cohorts = json.loads(wide_path.read_text())
@@ -363,7 +363,7 @@ def comparands(directory, c, out):
             done = [r for r in recs if r['row'] == row and (r.get('certified') or {}).get('admitted')]
             vals = [r['process_wall_ns'] / 1e6 for r in done]
             out.append(f"| {row} | grobx (certified) | 1 | {len(done)} of {sum(1 for r in recs if r['row'] == row)} | "
-                       f"{iv(vals) if vals else '—'} | {zr(row, 'en:16', vals)} | {zr(row, 'en:1', vals)} | admitted |")
+                       f"{iv(vals) if vals else '—'} | {zr(row, 'en:16', vals)} | {zr(row, 'en:1', vals)} | {same(row, {r['certified']['basis_text_sha256'] for r in done})} |")
     out.append('')
 
 

@@ -40,6 +40,25 @@ differs between the `f3` and `m31` binaries. Within a suite every arm uses the s
 | `certified.jsonl.gz` | grobx certified mode, one worker |
 | [session.log](session.log), [benchlock.log](benchlock.log), `suite-starts.jsonl` | consoles, lock records, machine context at each suite start |
 
+## Sessions and retained attempts
+
+| Session (2026-11-20, local) | Suites |
+|---|---|
+| 1, 15:51–19:39 | `dev`, `small`, `held`, `certify`, then the §10.3 extension block (`dev`, n = 12 on two cells) |
+| 2, 19:42–22:03 | `rs` (refused before timing: the wide controller requires `ZEEBRA_MACHINE`, which `run.sh` did not then set), `wide` (passes 1–4; passes 5–9 refused because a tracked file was edited mid-suite and the controller refuses a dirty tree), `mq10`, `certified` |
+| 3, 22:03–22:17 | `rs` re-run (n = 9), `wide` passes 5–9 re-run into `OUT/wide-rerun` (`REPS=5`; its archives appear in `wide-attempts.json` under `wide-rerun/`) |
+
+Both refusals are kept in `session.log`; `benchlock.log` records the `wide` one as `status=2`. No
+child was discarded.
+
+## Comparand bases
+
+`tables.md` §8 compares each comparand's basis *text* with Zeebra's digest. grobx's text matches
+exactly. groebner-rs writes terms with spaces (`x1 + x2`), so its raw text never matches and the
+column reads "text differs"; with spaces removed and the polynomials sorted, every groebner-rs
+basis in the `wide` and `rs` archives equals Zeebra's digest on all four rows. MQ10 answers are
+verified by the comparand-scaling controller against #739's references.
+
 The controllers' own archives (`wide-*-pass*.json.gz`, `rs-*-pass*.json.gz`, `mq10-try*.json.gz`)
 hold full inputs and bases and stay outside the repository; the extracts name each by SHA-256.
 
@@ -69,7 +88,7 @@ done
 mkdir -p $B/target-f3/bin && cp $B/target-f3/release/examples/{zeebra_driver,wide_corpus} $B/target-f3/bin/
 cp /path/to/{grobx-driver,groebner-rs-driver} $B/target-f3/bin/   # M30-0's builds; SHA-256 in binaries.sha256
 setsid -w research/m32-final/run.sh OUT dev small held certify
-setsid -w research/m32-final/run.sh OUT rs wide mq10 certified
+setsid -w research/m32-final/run.sh OUT rs wide mq10 certified   # run.sh defaults ZEEBRA_MACHINE=5995wx
 for s in dev small held certify certified; do gzip -n -c OUT/$s.jsonl > research/m32-final/$s.jsonl.gz; done
 python3 research/m30-final/extract.py OUT research/m32-final
 python3 research/m32-final/summarize.py --extract-rs OUT research/m32-final
