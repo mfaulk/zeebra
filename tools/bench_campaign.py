@@ -25,7 +25,9 @@ def cpulist(workers, first=FIRST_CPU):
 
 
 def snapshot(cpus):
-    r = subprocess.run(['bash', str(ROOT / 'tools/cpu-context.sh'), cpus], capture_output=True, text=True)
+    # ZEEBRA_CPU_CONTEXT is a test seam: tools/test/bench-job-test.py stubs the 1-2 s context read.
+    script = os.environ.get('ZEEBRA_CPU_CONTEXT', str(ROOT / 'tools/cpu-context.sh'))
+    r = subprocess.run(['bash', script, cpus], capture_output=True, text=True)
     return json.loads(r.stdout) if r.returncode == 0 else dict(error=r.returncode, stderr=r.stderr)
 
 

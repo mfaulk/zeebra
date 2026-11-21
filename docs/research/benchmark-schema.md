@@ -167,3 +167,38 @@ cargo test --lib -- grobner::record     # Claim, Provenance, InstanceManifest, a
 both keys are present, that neither is `null`, and that no ambiguous `peak_bytes` key exists. The two
 quantities differ by 4.1x on katsura-7, which is why the distinction is structural rather than
 advisory.
+
+## 7. The benchmark-job manifest (`bench-job-manifest-v1`, #967)
+
+A third schema, for *runs* rather than problems or results: the input to `tools/bench-job submit`
+(usage in [`docs/guide/benchmarking.md`](../guide/benchmarking.md), "Submitting a benchmark job").
+The canonical JSON (sorted keys, no whitespace) is the job's identity: the job id is the first 12
+hex of its SHA-256, so a changed byte is a different job and a resubmitted manifest is refused.
+Validation is `validate()` in `tools/bench-job`; anything below marked *required* is refused when
+missing.
+
+| Key | Meaning |
+|---|---|
+| `schema` | `"bench-job-manifest-v1"`, required |
+| `mode` | `"dev"` or `"publication"` (plan §11.2), required; recorded now, enforced by #968 |
+| `context.issue`, `context.agent` | the owning issue and `scripts/agent/zb-claim.sh id`, required |
+| `arms[].name` | unique; `[A-Za-z0-9._/-]`, the rotation unit |
+| `arms[].commit` | 7–40 hex; the source the binary was built from |
+| `arms[].binary`, `arms[].sha256` | absolute path at submit time and its SHA-256, which must match; the job copies it |
+| `arms[].build.{profile,flags,recipe}` | strings; `recipe` must contain `git archive <commit>` |
+| `arms[].argv` | template; `{field}` placeholders take `instance.params` and `instance`, `input`, `workers`, `seed`, `rep`, `cpus`, `wall_seconds`, `live_bytes` |
+| `instances[].name`, `.params` | unique name; template values |
+| `instances[].path`, `.sha256` | optional input file and its digest; copied and re-hashed like a binary |
+| `run.workers` | list of worker counts; an attempt pins to the first *w* CPUs of `run.cpus` |
+| `run.cpus` | cpulist handed to `bench-reserve run`; must lie inside the reservation |
+| `run.repetitions`, `run.interleave`, `run.seeds` | *n* ≥ 1; `"rotate"` (the only rule); integer seeds, default `[0]` |
+| `run.retries` | extra tries for a `failed`, `timeout` or `rss-limit` attempt, default 0 |
+| `run.limits.wall_seconds`, `.kill_after_seconds` | the `timeout --signal=INT` cap and its `--kill-after` (default 60) |
+| `run.limits.rss_bytes`, `.live_bytes` | `rss-guard` ceiling (null: unguarded); the live-bytes limit for argv templates |
+| `run.limits.aggregate_wall_seconds`, `.output_bytes` | the journal's budget; defaults: every try at its cap, 1 GiB |
+
+The journal it writes extends `StudyJournal` without forking it. An `exit` record may carry
+`try` > 0, a retry of the index recorded immediately before it; and a `resume` record may follow a
+`stop`, lifting it. Journals written before #967 contain neither and replay unchanged. Every exit's
+metadata carries `attempt_id` (`<job-id>:<index>:<try>`), `binary_sha256`, `cpus`, `argv`, the
+`cpu-context` snapshots and `contamination` (null until #968 fills it).

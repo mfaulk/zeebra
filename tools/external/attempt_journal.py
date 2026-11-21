@@ -242,7 +242,8 @@ class StudyJournal:
         if try_:
             record['try'] = try_
         entry = self._append(record)
-        self.attempts.append(dict(index=index, exit_digest=entry['digest'], verdict=None, **{'try': try_}))
+        self.attempts.append(dict(index=index, exit_digest=entry['digest'], status='unverified', verdict=None,
+                                  **{'try': try_}))
         self.next_index += try_ == 0
         self.child_wall_seconds += metadata['wall_seconds']
         return entry['digest']
@@ -255,7 +256,7 @@ class StudyJournal:
             raise ValueError(f'attempt {index} has no exit record or already has a verdict')
         self._append(dict(kind='verdict', index=index, exit_digest=latest[0]['exit_digest'],
                           status=status, details=_plain(details)))
-        latest[0]['verdict'] = status
+        latest[0].update(status=status, verdict=_plain(details))
 
     def refusal(self, next_child_wall_seconds):
         """The budget refusal the controller must record instead of launching, or None."""

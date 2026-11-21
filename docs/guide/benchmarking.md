@@ -383,6 +383,100 @@ can edit the checkout run code as root. No boot-time unit is installed: the fix 
 design. Reading RAPL energy as a user needs a similar step (`chmod 0444` on
 `/sys/class/powercap/intel-rapl:0/energy_uj`, undone by a reboot). Until someone takes it,
 `rapl_uj` stays `null`.
+## Submitting a benchmark job
+
+`tools/bench-job` (#967) turns a campaign into a job an agent can submit, leave and read back
+later. It is not a service: the job is a directory, the result is its
+[`StudyJournal`](../../tools/external/attempt_journal.py), and the runner is an ordinary process
+under `bench-reserve run`. The manifest schema is in
+[`docs/research/benchmark-schema.md`](../research/benchmark-schema.md) §7.
+
+```sh
+tools/bench-job submit manifest.json          # validates, copies binaries, queues; prints the job id
+tools/bench-reserve.sh reserve                # the job runs inside a reservation
+setsid nohup tools/bench-job run <job-id> > /buildcache/bench-jobs/<job-id>.log 2>&1 < /dev/null &
+tools/bench-job status [<job-id>] [--json]     # queued, running, done, cancelled, failed, interrupted
+tools/bench-job cancel <job-id>               # stops within 10 s (SIGINT to the child)
+tools/bench-job resume <job-id> [--force-uncancel]
+tools/bench-job report <job-id>               # dumps the journal until #969's report lands
+tools/bench-reserve.sh release
+```
+
+`run --next` takes the oldest queued job instead of a named one. Exit status: 0 the plan finished
+(every attempt has an outcome, failures included), 3 refused (binary or input hash mismatch, or the
+journal's aggregate budget), 4 cancelled, 75 already running, 64 a usage or manifest error.
+
+**What submit refuses.** A binary whose SHA-256 differs from the manifest; a binary inside a git
+checkout with uncommitted changes, or one at another commit; a build recipe that does not record
+`git archive <commit>`; an argv template naming an unknown field. It copies each binary into the job
+and re-hashes the copy before **every** attempt, and an attempt whose binary changed is refused with
+a `binary-mismatch` stop record rather than run. A job never compiles.
+
+**Where jobs live.** `$ZEEBRA_BENCH_JOBS`, default `/buildcache/bench-jobs`. A root under `$HOME`
+or this repository is refused (CLAUDE.md §1). `/buildcache` is root-owned, so the default needs a
+one-time `sudo install -d -o "$USER" /buildcache/bench-jobs`.
+
+```
+/buildcache/bench-jobs/
+  queue                     "<iso-time> <job-id>" per submit, oldest first
+  <job-id>/                 job id = first 12 hex of the canonical manifest's SHA-256
+    manifest.json           canonical and immutable
+    bin/<arm>/<binary>      the copies that run, mode 0555
+    inputs/<instance>/...   copied instance files, when the manifest names a path
+    journal/                StudyJournal: header.json (plan, limits), journal.jsonl, blobs/
+    started                 pid and time of the first run; its absence means queued
+    run.lock                flock held by the live runner
+    current.json            the attempt in flight, with its start time
+    cancel                  a cancel request for the live runner
+```
+
+**Attempts.** The plan is instances × workers × seeds in turn with the arms rotated one place per
+repetition (`tools/bench_campaign.py` `plan`, the rotation M31-M32 used). Attempt *k* of plan index
+*i* is `<job-id>:<i>:<k>`. Each runs as `taskset -c <first w CPUs of run.cpus> timeout --signal=INT`
+under `rss-guard.sh` when `rss_bytes` is set, with a `cpu-context.sh` snapshot before and after.
+The exit, raw stdout and stderr are journaled before the verdict (`ok`, `failed`, `timeout`,
+`rss-limit` or `cancelled`), so nothing is parsed before it is durable.
+
+**Resume.** An index with a recorded exit is never re-run: a SIGKILLed runner loses only the attempt
+in flight, whose exit never became durable, and its child dies with it (`PR_SET_PDEATHSIG`). A
+failed try is retried immediately while `run.retries` lasts, and every try is kept. A cancelled try
+is re-run on `resume --force-uncancel`, which journals a `resume` record after the `stop` rather
+than rewriting it.
+
+**Modes.** `mode` is `dev` or `publication` and is recorded in the manifest and journal header.
+Enforcement — exclusivity and the §11.2 contamination record — is #968's: `enforce_mode` and
+`contamination` in `tools/bench-job` are where `bench_contamination.publication_refusals` and
+`attempt_metrics`/`attempt_verdict` plug in. Until they do, both modes run under the same
+CCD-scoped lock and `contamination` is journaled as `null`.
+
+Worked example: the M32 `walls` cell `wide64/katsura-9` on the dispatch entry point at one worker
+(`research/m32-baseline/campaign.py`, arm `en:1`), from a `git archive` build:
+
+```sh
+C=31e334bda226d896686c64495867729119e52b0f
+S=/buildcache/cargo-target/zeebra-967/src-${C:0:8}; mkdir -p "$S"
+git archive -o "$S.tar" "$C"; tar -xf "$S.tar" -C "$S"
+(cd "$S" && CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-967/target RUSTC_WRAPPER="" \
+  cargo build --release --features research-sigf4 --example sig_f4_study -j24)
+B=/buildcache/cargo-target/zeebra-967/target/release/examples/sig_f4_study
+cat > /buildcache/cargo-target/zeebra-967/katsura-9.json <<JSON
+{"schema": "bench-job-manifest-v1", "mode": "dev",
+ "context": {"issue": 967, "agent": "$(scripts/agent/zb-claim.sh id)"},
+ "arms": [{"name": "en", "commit": "$C", "binary": "$B", "sha256": "$(sha256sum "$B" | cut -c1-64)",
+           "build": {"profile": "release", "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+                     "recipe": "git archive $C | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study"},
+           "argv": ["--field", "{field}", "--name", "{name}", "--engine", "entry",
+                    "--workers", "{workers}", "--wall-s", "180"]}],
+ "instances": [{"name": "wide64/katsura-9", "params": {"field": "wide64", "name": "katsura-9"}}],
+ "run": {"workers": [1], "cpus": "8-23", "repetitions": 9, "interleave": "rotate", "seeds": [0],
+         "retries": 0, "limits": {"wall_seconds": 210, "kill_after_seconds": 60,
+                                  "rss_bytes": 8589934592, "live_bytes": null}}}
+JSON
+tools/bench-job submit /buildcache/cargo-target/zeebra-967/katsura-9.json
+```
+
+`tools/test/bench-job-test.sh` covers submit refusals, plan determinism, SIGKILL and resume,
+cancel, timeouts, retries and binary tampering with synthetic children and a fake reservation.
 
 ## Which commit a figure came from
 
