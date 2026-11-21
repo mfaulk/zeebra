@@ -24,7 +24,7 @@ built, run or inspected.
 
 | Decision | Field | Values |
 |---|---|---|
-| engine | `route` | `Signature`, or `Shipping(Small \| Linear \| DegreeSpread \| WorkerCrossover \| Fallback)` |
+| engine | `route` | `Signature`, or `Shipping(Small \| Linear \| DegreeSpread \| Order \| WorkerCrossover \| Fallback)` |
 | team | `workers` | signature route: at most the caller's cap, never above it; shipping route: the caller's options unchanged |
 | cascade | `cascade` | `Some(Parallel)` when the signature team has more than one worker, `Some(Serial)` otherwise, `None` on the shipping route |
 
@@ -40,6 +40,7 @@ allocates per monomial and the rule reads none of its other fields.
 | Condition, in order | Decision |
 |---|---|
 | M31's rule: linear, < 6 variables, nonlinear degree spread > 1 | shipping |
+| graded-lex (added after Gate Q, #961) | shipping (`Order`) |
 | greatest degree 2, variables in `10..=10`, caller's cap ≥ 4 workers | shipping (`WorkerCrossover`) |
 | otherwise | signature engine; team = min(cap, 8) below 10 variables (4 in the first read), else the cap; parallel cascade iff team > 1 |
 

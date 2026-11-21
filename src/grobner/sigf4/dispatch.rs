@@ -1,7 +1,7 @@
 //! The opt-in entry point (#905): a pre-solve dispatch between the shipping F4 and the signature
-//! engine. The rule reads only the input's size, degrees and density, the caller's worker cap and
-//! the field's width, never an instance name or digest, so it costs one pass over the generators'
-//! terms; it never hands a solve over midway (plan §4.2).
+//! engine. The rule reads only the order, the input's size, degrees and density, the caller's
+//! worker cap and the field's width, never an instance name or digest, so it costs one pass over
+//! the generators' terms; it never hands a solve over midway (plan §4.2).
 //!
 //! The rule is asymmetric on purpose. Sending an input to the shipping F4 that the signature
 //! engine would have won costs only the saving; sending Cyclic-7 the other way cost 4.6× (#904).
@@ -74,6 +74,10 @@ pub enum ShippingReason {
     Linear,
     /// The nonlinear degrees spread wider than [`SIGNATURE_MAX_DEGREE_SPREAD`].
     DegreeSpread,
+    /// The order is graded-lex. The signature engine is correct there but not usable: on
+    /// katsura-9, katsura-11 and MQ11 it passed 8 GiB where conventional F4 takes seconds, and on
+    /// MQ10 its signature basis reached 34× the grevlex run's (#961). Only grevlex is routed to it.
+    Order,
     /// A quadratic input in [`SIGNATURE_CROSSOVER_VARIABLES`] with at least
     /// [`SIGNATURE_CROSSOVER_WORKERS`] workers, where the shipping F4's parallel elimination
     /// outruns the signature engine's serial symbolic stage.
@@ -191,6 +195,8 @@ pub fn signature_route<const N: usize, F: FiniteField>(
         SignatureRoute::Shipping(ShippingReason::Small)
     } else if features.max_degree - features.min_nonlinear_degree > SIGNATURE_MAX_DEGREE_SPREAD {
         SignatureRoute::Shipping(ShippingReason::DegreeSpread)
+    } else if order != MonomialOrder::GradedReverseLexicographic {
+        SignatureRoute::Shipping(ShippingReason::Order)
     } else if features.workers >= SIGNATURE_CROSSOVER_WORKERS
         && features.max_degree == 2
         && SIGNATURE_CROSSOVER_VARIABLES.contains(&features.variables)
@@ -237,7 +243,8 @@ pub fn signature_route<const N: usize, F: FiniteField>(
 /// families. Dense quadratic inputs go to the shipping F4 from four workers up only to at most ten
 /// variables, a bound fitted to MQ10 against MQ11 alone (#927); other families are not covered.
 /// Measure your own systems before preferring this entry point; [`f4_signature_reported`] reports
-/// which route ran, on how many workers.
+/// which route ran, on how many workers. Graded-lex always runs the shipping F4
+/// ([`ShippingReason::Order`], #961).
 ///
 /// ```
 /// use zeebra::{

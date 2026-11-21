@@ -356,6 +356,63 @@ fn test_mq10_crosses_at_four_workers_at_both_fields() {
     mq10::<Zp2147483647>(2147483647);
 }
 
+/// Every #961 row shape goes to the shipping F4 under graded-lex at every worker count and two
+/// fields, with no cascade; grevlex never reports the `Order` reason.
+#[test]
+fn test_graded_lex_routes_to_shipping_on_every_961_row() {
+    fn rule<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>]) {
+        for count in [1, 4, 8, 16] {
+            let options = workers(count);
+            let grlex = signature_route(system, MonomialOrder::GradedLexicographic, &options)
+                .expect("graded");
+            assert_eq!(
+                grlex.route,
+                SignatureRoute::Shipping(ShippingReason::Order),
+                "{N} variables, {count} workers"
+            );
+            assert_eq!(grlex.cascade, None);
+            assert_eq!(grlex.workers, count);
+            let grevlex = signature_route(system, GREVLEX, &options).expect("graded");
+            assert_ne!(
+                grevlex.route,
+                SignatureRoute::Shipping(ShippingReason::Order)
+            );
+        }
+    }
+    fn rows<F: FiniteField>() {
+        rule(&katsura::<9, F>());
+        rule(&katsura::<10, F>());
+        rule(&katsura::<11, F>());
+        rule(&eco::<11, F>());
+        rule(&eco::<12, F>());
+        rule(&dense_quadratic::<10, F>(10));
+        rule(&dense_quadratic::<11, F>(11));
+    }
+    rows::<Zp32003>();
+    rows::<Goldilocks>();
+}
+
+/// Under graded-lex the entry point reports the `Order` route and returns the shipping F4's basis,
+/// at one and four workers.
+#[test]
+fn test_graded_lex_entry_point_runs_the_shipping_f4() {
+    let system = katsura::<7, Goldilocks>();
+    let order = MonomialOrder::GradedLexicographic;
+    for count in [1, 4] {
+        let (result, report) = f4_signature_reported(&system, order, &workers(count));
+        assert_eq!(
+            report.route,
+            SignatureRoute::Shipping(ShippingReason::Order)
+        );
+        assert_eq!(
+            result.expect("finishes"),
+            f4_with_options(&system, order, &workers(count))
+                .expect("shipping F4 finishes")
+                .0
+        );
+    }
+}
+
 /// The crossover leaves every other signature input where it was at 16 workers: Katsura-9 and -11
 /// on either side of the band, cubics (Noon, Eco), and MQ11's dense shape.
 #[test]
