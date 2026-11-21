@@ -464,7 +464,7 @@ def render(doc):
            f"- issue #{p['context']['issue']}, agent `{p['context']['agent']}`; stop: {p['stop']}",
            f"- manifest `{p['manifest_sha256']}`, journal `{p['journal_sha256']}`",
            f"- cpus {p['cpus']}, reservation {p['reservation']}, clock {', '.join(p['clock'])}, "
-           'median clock (kHz) ' + (', '.join(f'{k} {v:.0f}' for k, v in (p['median_khz'] or {}).items()) or '—'), '', '| arm | commit | sha256 | profile | flags |',
+           'median clock (kHz) ' + (', '.join(f'{k} {_fmt(v, ".0f")}' for k, v in (p['median_khz'] or {}).items()) or '—'), '', '| arm | commit | sha256 | profile | flags |',
            '|---|---|---|---|---|']
     out += [f"| {a['name']} | `{a['commit'][:12]}` | `{a['sha256'][:16]}` | {a['profile']} | {a['flags']} |"
             for a in p['arms']]

@@ -398,6 +398,9 @@ class BenchJobTest(unittest.TestCase):
         # Contamination spoils a time, not an answer: a flagged attempt's digest is still checked.
         state, m = self.synthetic(dict(a=[1.0]), flagged=('job:0:0',))
         self.assertEqual(bj.summarize(state, m)['digests'], {'goldilocks/katsura-4': ['d1']})
+        # A machine without cpufreq (GitHub runners) has no median clock; the report still renders.
+        state['stop']['contamination']['median_khz'] = {'goldilocks/katsura-4@1w': None}
+        self.assertIn('median clock (kHz) goldilocks/katsura-4@1w —', bj.render(bj.summarize(state, m)))
 
     # The scoreboard bridge emits the committed CompetitiveRecord fixture that board.rs's test loads.
     def test_competitive_rows_match_the_fixture(self):
