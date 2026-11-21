@@ -69,9 +69,11 @@ def plan(rows, reps):
 
 
 def _die_with_parent():
-    # A controller started in the background inherits SIGINT ignored, and so would the binary; then
-    # neither `timeout --signal=INT` nor a cancel could stop it short of `--kill-after`.
+    # A controller can inherit SIGINT ignored (a background job) or blocked (GitHub's runner), and so
+    # would the binary; then neither `timeout --signal=INT` nor a cancel could stop it short of
+    # `--kill-after`.
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT, signal.SIGTERM})
     ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_PDEATHSIG, signal.SIGTERM)
 
 
