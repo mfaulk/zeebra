@@ -103,6 +103,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     stats: &'a mut SigF4Statistics,
     #[cfg(feature = "research-sigf4-usage")]
     usage: super::usage::UsageLog<N>,
+    #[cfg(feature = "research-reuse")]
+    reuse: Option<crate::grobner::reuse_census::ReuseCensus<N, Signature<N>>>,
 }
 
 pub(super) fn run<const N: usize, F: FiniteField>(
@@ -146,6 +148,10 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         stats,
         #[cfg(feature = "research-sigf4-usage")]
         usage: Default::default(),
+        // Design 1 only: design 2's parallel pass and the claim cascade count products otherwise.
+        #[cfg(feature = "research-reuse")]
+        reuse: (options.reuse_census && options.workers <= 1 && !options.parallel_cascade)
+            .then(Default::default),
     };
     #[cfg(feature = "research-sigf4-split")]
     {
@@ -260,6 +266,14 @@ pub(super) fn run<const N: usize, F: FiniteField>(
             .iter()
             .map(|e| e.hashes.len() * size_of::<u64>())
             .sum::<usize>();
+    #[cfg(feature = "research-reuse")]
+    {
+        let bytes_per_term = size_of::<Monomial<N>>() + size_of::<F>();
+        engine.stats.reuse = engine
+            .reuse
+            .take()
+            .map(|census| (census.summary_json(bytes_per_term), census.batches_json()));
+    }
     #[cfg(feature = "research-sigf4-split")]
     let (leads, drop_clock) = {
         engine.stats.split.materialize = materialize_clock.elapsed();
@@ -1021,6 +1035,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         #[cfg(feature = "research-sigf4-replay")]
         replay.finish();
+        #[cfg(feature = "research-reuse")]
+        self.census_reuse(&block, rows, &targets, &finals);
         #[cfg(feature = "research-sigf4-split")]
         {
             split.serial_pass = pass_clock.elapsed();
@@ -1036,6 +1052,49 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         self.stats.elimination += clock.elapsed();
         Ok(finish_batch(results, columns))
+    }
+
+    /// #1031: census this batch's reducer reuse, with the engine's own product count beside it.
+    #[cfg(feature = "research-reuse")]
+    #[allow(clippy::type_complexity)]
+    fn census_reuse(
+        &mut self,
+        block: &ReducerBlock<'_, N, F>,
+        rows: &[Row<N>],
+        targets: &[(Signature<N>, Vec<(u32, F)>)],
+        finals: &[(Signature<N>, Kind, Vec<(u32, F)>, u64)],
+    ) {
+        use crate::grobner::reuse_census::{Reducer, Target};
+        let Some(census) = self.reuse.as_mut() else {
+            return;
+        };
+        let reducers: Vec<Reducer<'_, N, Signature<N>, F>> = rows[targets.len()..]
+            .iter()
+            .zip(block.rows)
+            .map(|(row, entries)| {
+                let RowSource::Element(element) = row.source else {
+                    unreachable!("a reducer is a basis-element multiple")
+                };
+                Reducer {
+                    element,
+                    multiplier: row.mult,
+                    lead: row.mult * self.basis[element as usize].lead,
+                    signature: row.sig,
+                    row: entries,
+                }
+            })
+            .collect();
+        let targets: Vec<Target<'_, Signature<N>, F>> = targets
+            .iter()
+            .map(|(signature, row)| Target {
+                signature: *signature,
+                row,
+            })
+            .collect();
+        let order = self.order;
+        let cmp = move |a: &Signature<N>, b: &Signature<N>| a.cmp_in(b, order);
+        let live = finals.iter().map(|f| f.3).sum();
+        census.observe(block.ncols, &reducers, &targets, Some(&cmp), Some(live));
     }
 
     /// Records a serial batch abandoned on its live budget, whole and before any settlement.

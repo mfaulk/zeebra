@@ -13,6 +13,8 @@ pub mod planning;
 pub mod record;
 pub mod reference;
 pub mod resultant;
+#[cfg(feature = "research-reuse")]
+pub mod reuse_census;
 mod s_polynomial;
 pub mod shape_certificate;
 #[cfg(feature = "research-sigf4")]
