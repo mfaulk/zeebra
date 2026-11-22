@@ -42,11 +42,12 @@
 //!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
-//! `--features research-work`, `--density` (f4, one worker) adds #1033's density-during-reduction
-//! trace from the dense working row: forward products by the target's density before each
-//! application, with per-checkpoint row histograms, for the whole run and its three largest
-//! batches; `traced_products` below `forward_products` means part of the forward pass ran on a
-//! path the trace does not observe. `--discovery` adds the shipping F4's serial census: forward and
+//! `--features research-work`, `--density` (f4 or sigf4, one worker) adds #1033's
+//! density-during-reduction trace from the dense working row: products by the target's density
+//! before each application, with per-checkpoint row histograms, for the whole run and (f4) its
+//! three largest batches. Under f4, `traced_products` below `forward_products` means part of the
+//! forward pass ran on a path the trace does not observe; sigf4 reports no `forward_products`, so
+//! compare `traced_products` with its `coefficient_products`. `--discovery` adds the shipping F4's serial census: forward and
 //! backward coefficient products and those on rows that end zero (#835's instrument).
 //!
 //! With `--features research-sigf4-replay`, `--replay` (sigf4, `--workers ≥ 2`) runs design 1
@@ -233,8 +234,13 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     {
         return Err("--capture DIR and --batches i,j go together, with --engine f4".into());
     }
-    if parsed.density && (parsed.engine != "f4" || parsed.workers != 1 || parsed.discovery) {
-        return Err("--density observes the serial shipping F4 only, without --discovery".into());
+    if parsed.density
+        && (!["f4", "sigf4"].contains(&parsed.engine.as_str())
+            || parsed.workers != 1
+            || parsed.discovery
+            || parsed.claim)
+    {
+        return Err("--density observes serial f4 or sigf4 only, without --discovery".into());
     }
     if (parsed.stages
         || parsed.fl
@@ -901,7 +907,8 @@ fn density(report: &zeebra::linalg::work::WorkReport) -> Json {
             ("width_share_at_least", at_least(&t.products_by_width)),
         ])
     };
-    let mut total = DensityTrace::default();
+    // The signature engine opens no F4 batch scope, so its products land outside any batch.
+    let mut total = report.outside_batch.forward_density.clone();
     for b in &report.batches {
         total.accumulate(&b.forward_density);
     }
@@ -932,7 +939,8 @@ fn density(report: &zeebra::linalg::work::WorkReport) -> Json {
                     .batches
                     .iter()
                     .map(|b| b.forward.coefficient_products)
-                    .sum(),
+                    .sum::<usize>()
+                    + report.outside_batch.forward.coefficient_products,
             ),
         ),
         (
@@ -1395,11 +1403,23 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 parallel_cascade: args.claim,
                 ..SigF4Options::default()
             };
-            let (result, stats) = sig_f4_reported(&system, args.order, &options);
+            let solve = || sig_f4_reported(&system, args.order, &options);
+            #[cfg(feature = "research-work")]
+            let ((result, stats), work) = if args.density {
+                let (r, w) = zeebra::linalg::work::measure(solve);
+                (r, density(&w))
+            } else {
+                (solve(), Json::Null)
+            };
+            #[cfg(not(feature = "research-work"))]
+            let ((result, stats), work) = {
+                assert!(!args.density, "--density requires research-work");
+                (solve(), Json::Null)
+            };
             (
                 result.map_err(|e| e.to_string()),
                 sig_statistics(&stats),
-                Json::Null,
+                work,
             )
         } else {
             let options = f4_options(args);
@@ -1613,7 +1633,9 @@ mod tests {
         // #1033: the density trace observes the serial shipping F4 only.
         assert!(args(&[&base[..], &["f4", "--density"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16", "--density"]].concat()).is_err());
-        assert!(args(&[&base[..], &["sigf4", "--density"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--density"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["sigf4", "--claim", "--density"]].concat()).is_err());
+        assert!(args(&[&base[..], &["entry", "--density"]].concat()).is_err());
         let capture = ["--capture", "/x", "--batches", "7,8"];
         assert_eq!(
             args(&[&base[..], &["f4"], &capture[..]].concat())
