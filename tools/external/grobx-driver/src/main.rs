@@ -348,7 +348,10 @@ mod tests {
         );
         let x12 = ["x1".to_string(), "x2".to_string()];
         let shared = "8fb196a0f7de4f7d36d2d8c6b34fb80eebd5f04658fcc799e1f2583781e5fefc";
-        for text in ["[2*x1*x2+4,\nx2^2+32002,\nx1^2+3*x2]:\n", "[1*x1^2+3*x2^1,x2^2-1,x1*x2+2]"] {
+        for text in [
+            "[2*x1*x2+4,\nx2^2+32002,\nx1^2+3*x2]:\n",
+            "[1*x1^2+3*x2^1,x2^2-1,x1*x2+2]",
+        ] {
             assert_eq!(basis_m33(text, 32003, &x12).unwrap(), shared);
         }
         let x = ["x".to_string()];
