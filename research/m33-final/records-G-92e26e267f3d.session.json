@@ -1,0 +1,314 @@
+{
+ "attempts": 792,
+ "job": {
+  "context": {
+   "agent": "agent-a68d63781e3d797f1@research/975-m33-final",
+   "issue": 975,
+   "session": "final",
+   "track": "G"
+  },
+  "job_id": "92e26e267f3d",
+  "manifest_sha256": "92e26e267f3df1e71f7af7b32c21cd75069cbc015e3db258155830973e9ce26c",
+  "mode": "publication"
+ },
+ "journal_sha256": "81823a2062ec0dd14a557bc42915bc4197471a0753faf971342fdd305870e235",
+ "stop": {
+  "at": "2026-11-22T16:36:39+00:00",
+  "attempts": 792,
+  "contamination": {
+   "contaminated": 65,
+   "flagged": {
+    "92e26e267f3d:119:0": [
+     "bench clock 1587703 kHz is 4.7% off the session median"
+    ],
+    "92e26e267f3d:12:0": [
+     "bench clock 1433184 kHz is 46.3% off the session median"
+    ],
+    "92e26e267f3d:145:0": [
+     "bench clock 3992227 kHz is 12.0% off the session median"
+    ],
+    "92e26e267f3d:146:0": [
+     "bench clock 4160777 kHz is 8.3% off the session median"
+    ],
+    "92e26e267f3d:164:0": [
+     "bench clock 4537599 kHz is 13.7% off the session median"
+    ],
+    "92e26e267f3d:183:0": [
+     "bench clock 1764136 kHz is 4.2% off the session median"
+    ],
+    "92e26e267f3d:184:0": [
+     "bench clock 4537584 kHz is 13.7% off the session median"
+    ],
+    "92e26e267f3d:190:0": [
+     "bench clock 1510367 kHz is 4.9% off the session median"
+    ],
+    "92e26e267f3d:194:0": [
+     "bench clock 3992298 kHz is 12.0% off the session median"
+    ],
+    "92e26e267f3d:199:0": [
+     "bench clock 1704080 kHz is 3.4% off the session median"
+    ],
+    "92e26e267f3d:1:0": [
+     "bench clock 3992294 kHz is 12.0% off the session median"
+    ],
+    "92e26e267f3d:206:0": [
+     "bench clock 1587712 kHz is 4.7% off the session median"
+    ],
+    "92e26e267f3d:207:0": [
+     "bench clock 1587485 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:238:0": [
+     "bench clock 1512735 kHz is 4.7% off the session median"
+    ],
+    "92e26e267f3d:250:0": [
+     "bench clock 4371588 kHz is 3.7% off the session median"
+    ],
+    "92e26e267f3d:262:0": [
+     "bench clock 1764913 kHz is 3.6% off the session median"
+    ],
+    "92e26e267f3d:270:0": [
+     "bench clock 1901709 kHz is 3.3% off the session median"
+    ],
+    "92e26e267f3d:277:0": [
+     "bench clock 4416625 kHz is 10.6% off the session median"
+    ],
+    "92e26e267f3d:286:0": [
+     "bench clock 1704182 kHz is 3.4% off the session median"
+    ],
+    "92e26e267f3d:294:0": [
+     "bench clock 1587335 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:295:0": [
+     "bench clock 1587128 kHz is 4.7% off the session median"
+    ],
+    "92e26e267f3d:320:0": [
+     "bench clock 4096975 kHz is 9.7% off the session median"
+    ],
+    "92e26e267f3d:352:0": [
+     "bench clock 4537582 kHz is 13.7% off the session median"
+    ],
+    "92e26e267f3d:356:0": [
+     "bench clock 4378965 kHz is 3.5% off the session median"
+    ],
+    "92e26e267f3d:365:0": [
+     "bench clock 4537633 kHz is 12.9% off the session median"
+    ],
+    "92e26e267f3d:378:0": [
+     "bench clock 2657060 kHz is 85.4% off the session median"
+    ],
+    "92e26e267f3d:38:0": [
+     "bench clock 1587589 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:396:0": [
+     "bench clock 2666967 kHz is 86.1% off the session median"
+    ],
+    "92e26e267f3d:39:0": [
+     "bench clock 1587733 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:424:0": [
+     "bench clock 3992297 kHz is 12.0% off the session median"
+    ],
+    "92e26e267f3d:445:0": [
+     "bench clock 4537588 kHz is 13.7% off the session median"
+    ],
+    "92e26e267f3d:446:0": [
+     "bench clock 1765046 kHz is 4.2% off the session median"
+    ],
+    "92e26e267f3d:451:0": [
+     "bench clock 4421323 kHz is 10.7% off the session median"
+    ],
+    "92e26e267f3d:452:0": [
+     "bench clock 4537591 kHz is 12.9% off the session median"
+    ],
+    "92e26e267f3d:45:0": [
+     "bench clock 4335341 kHz is 7.2% off the session median"
+    ],
+    "92e26e267f3d:462:0": [
+     "bench clock 1704374 kHz is 3.4% off the session median"
+    ],
+    "92e26e267f3d:467:0": [
+     "bench clock 1433184 kHz is 46.3% off the session median"
+    ],
+    "92e26e267f3d:480:0": [
+     "bench clock 4323512 kHz is 6.9% off the session median"
+    ],
+    "92e26e267f3d:500:0": [
+     "bench clock 4232800 kHz is 6.7% off the session median"
+    ],
+    "92e26e267f3d:512:0": [
+     "bench clock 4537570 kHz is 13.7% off the session median"
+    ],
+    "92e26e267f3d:535:0": [
+     "bench clock 1934043 kHz is 5.0% off the session median"
+    ],
+    "92e26e267f3d:54:0": [
+     "bench clock 1587695 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:55:0": [
+     "bench clock 1587623 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:59:0": [
+     "bench clock 3992288 kHz is 12.0% off the session median"
+    ],
+    "92e26e267f3d:604:0": [
+     "bench clock 4200841 kHz is 7.4% off the session median"
+    ],
+    "92e26e267f3d:605:0": [
+     "bench clock 4537593 kHz is 13.7% off the session median"
+    ],
+    "92e26e267f3d:614:0": [
+     "bench clock 1764444 kHz is 3.5% off the session median"
+    ],
+    "92e26e267f3d:619:0": [
+     "bench clock 4261270 kHz is 6.7% off the session median"
+    ],
+    "92e26e267f3d:626:0": [
+     "bench clock 4537577 kHz is 12.9% off the session median"
+    ],
+    "92e26e267f3d:631:0": [
+     "bench clock 1664840 kHz is 4.9% off the session median"
+    ],
+    "92e26e267f3d:638:0": [
+     "bench clock 1704704 kHz is 3.4% off the session median"
+    ],
+    "92e26e267f3d:641:0": [
+     "bench clock 1433184 kHz is 46.3% off the session median"
+    ],
+    "92e26e267f3d:660:0": [
+     "bench clock 4313901 kHz is 6.6% off the session median"
+    ],
+    "92e26e267f3d:673:0": [
+     "bench clock 3992810 kHz is 12.0% off the session median"
+    ],
+    "92e26e267f3d:695:0": [
+     "bench clock 3122485 kHz is 4.5% off the session median"
+    ],
+    "92e26e267f3d:70:0": [
+     "bench clock 1587671 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:711:0": [
+     "bench clock 1976877 kHz is 7.3% off the session median"
+    ],
+    "92e26e267f3d:712:0": [
+     "bench clock 4537604 kHz is 13.7% off the session median"
+    ],
+    "92e26e267f3d:713:0": [
+     "bench clock 4277379 kHz is 6.4% off the session median"
+    ],
+    "92e26e267f3d:719:0": [
+     "bench clock 1738218 kHz is 6.8% off the session median"
+    ],
+    "92e26e267f3d:71:0": [
+     "bench clock 1587695 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:747:0": [
+     "bench clock 4336549 kHz is 7.2% off the session median"
+    ],
+    "92e26e267f3d:758:0": [
+     "bench clock 1587708 kHz is 5.1% off the session median"
+    ],
+    "92e26e267f3d:77:0": [
+     "bench clock 4116211 kHz is 3.1% off the session median"
+    ],
+    "92e26e267f3d:99:0": [
+     "bench clock 1433184 kHz is 46.3% off the session median"
+    ]
+   },
+   "grouping": "arm",
+   "median_khz": {
+    "goldilocks/katsura-11@16w/entry16": 1587630,
+    "goldilocks/katsura-11@16w/entry16-f0": 1627437,
+    "goldilocks/katsura-11@1w/entry": 3989149,
+    "goldilocks/katsura-11@1w/entry-f0": 4537582,
+    "goldilocks/katsura-11@1w/grobx155": 2667909,
+    "goldilocks/katsura-11@1w/groebner-rs": 4537642,
+    "goldilocks/katsura-11@1w/sigf4": 3989170,
+    "goldilocks/katsura-11@1w/sigf4-f0": 4537593,
+    "goldilocks/mq-random-11@16w/entry16": 1670141,
+    "goldilocks/mq-random-11@16w/entry16-f0": 1764267,
+    "goldilocks/mq-random-11@1w/entry": 4537637,
+    "goldilocks/mq-random-11@1w/entry-f0": 4537632,
+    "goldilocks/mq-random-11@1w/grobx155": 4537624,
+    "goldilocks/mq-random-11@1w/groebner-rs": 4537629,
+    "goldilocks/mq-random-11@1w/sigf4": 4537631,
+    "goldilocks/mq-random-11@1w/sigf4-f0": 4537635,
+    "wide64/cyclic-7@16w/entry16": 1516328,
+    "wide64/cyclic-7@16w/entry16-f0": 1510478,
+    "wide64/cyclic-7@1w/entry": 1433184,
+    "wide64/cyclic-7@1w/entry-f0": 1433184,
+    "wide64/cyclic-7@1w/grobx155": 1433184,
+    "wide64/cyclic-7@1w/groebner-rs": 1433184,
+    "wide64/cyclic-7@1w/sigf4": 1433184,
+    "wide64/cyclic-7@1w/sigf4-f0": 2667300,
+    "wide64/eco-12@16w/entry16": 2978125,
+    "wide64/eco-12@16w/entry16-f0": 1841604,
+    "wide64/eco-12@1w/entry": 4537602,
+    "wide64/eco-12@1w/entry-f0": 4537596,
+    "wide64/eco-12@1w/grobx155": 3992277,
+    "wide64/eco-12@1w/groebner-rs": 4537633,
+    "wide64/eco-12@1w/sigf4": 4537623,
+    "wide64/eco-12@1w/sigf4-f0": 4537604,
+    "wide64/katsura-11@16w/entry16": 1587695,
+    "wide64/katsura-11@16w/entry16-f0": 1627437,
+    "wide64/katsura-11@1w/entry": 3992239,
+    "wide64/katsura-11@1w/entry-f0": 4020613,
+    "wide64/katsura-11@1w/grobx155": 2666725,
+    "wide64/katsura-11@1w/groebner-rs": 4537629,
+    "wide64/katsura-11@1w/sigf4": 3989176,
+    "wide64/katsura-11@1w/sigf4-f0": 3992298,
+    "wide64/katsura-12@16w/entry16": 1704374,
+    "wide64/katsura-12@16w/entry16-f0": 1704499,
+    "wide64/katsura-12@1w/entry": 4537630,
+    "wide64/katsura-12@1w/entry-f0": 4537627,
+    "wide64/katsura-12@1w/grobx155": 4537633,
+    "wide64/katsura-12@1w/groebner-rs": 4537643,
+    "wide64/katsura-12@1w/sigf4": 4537629,
+    "wide64/katsura-12@1w/sigf4-f0": 4537625,
+    "wide64/katsura-4@16w/entry16": 1510475,
+    "wide64/katsura-4@16w/entry16-f0": 1510469,
+    "wide64/katsura-4@1w/entry": 1433184,
+    "wide64/katsura-4@1w/entry-f0": 1433184,
+    "wide64/katsura-4@1w/grobx155": 1433184,
+    "wide64/katsura-4@1w/groebner-rs": 1433184,
+    "wide64/katsura-4@1w/sigf4": 1433184,
+    "wide64/katsura-4@1w/sigf4-f0": 1433184,
+    "wide64/katsura-9@16w/entry16": 1510470,
+    "wide64/katsura-9@16w/entry16-f0": 1510470,
+    "wide64/katsura-9@1w/entry": 1433184,
+    "wide64/katsura-9@1w/entry-f0": 1433184,
+    "wide64/katsura-9@1w/grobx155": 1433184,
+    "wide64/katsura-9@1w/groebner-rs": 1433184,
+    "wide64/katsura-9@1w/sigf4": 1433184,
+    "wide64/katsura-9@1w/sigf4-f0": 1433184,
+    "wide64/mq-random-10-s1@16w/entry16": 2986927,
+    "wide64/mq-random-10-s1@16w/entry16-f0": 3026374,
+    "wide64/mq-random-10-s1@1w/entry": 4537619,
+    "wide64/mq-random-10-s1@1w/entry-f0": 4537621,
+    "wide64/mq-random-10-s1@1w/grobx155": 4537577,
+    "wide64/mq-random-10-s1@1w/groebner-rs": 3992301,
+    "wide64/mq-random-10-s1@1w/sigf4": 4537609,
+    "wide64/mq-random-10-s1@1w/sigf4-f0": 4537637,
+    "wide64/noon-7@16w/entry16": 1510472,
+    "wide64/noon-7@16w/entry16-f0": 1510471,
+    "wide64/noon-7@1w/entry": 1433184,
+    "wide64/noon-7@1w/entry-f0": 1433184,
+    "wide64/noon-7@1w/grobx155": 1433184,
+    "wide64/noon-7@1w/groebner-rs": 1433184,
+    "wide64/noon-7@1w/sigf4": 1433184,
+    "wide64/noon-7@1w/sigf4-f0": 1433184,
+    "wide64/noon-8@16w/entry16": 1587633,
+    "wide64/noon-8@16w/entry16-f0": 1627427,
+    "wide64/noon-8@1w/entry": 1433184,
+    "wide64/noon-8@1w/entry-f0": 1433184,
+    "wide64/noon-8@1w/grobx155": 1433184,
+    "wide64/noon-8@1w/groebner-rs": 4045530,
+    "wide64/noon-8@1w/sigf4": 1433184,
+    "wide64/noon-8@1w/sigf4-f0": 1433184
+   },
+   "total": 792,
+   "version": 2,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}

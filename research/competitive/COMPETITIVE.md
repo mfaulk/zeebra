@@ -9,16 +9,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | library | rows | answered |
 |---|---:|---:|
 | giac | 62 | 40 |
-| grobx | 46 | 33 |
-| grobx-certified | 39 | 31 |
-| groebner-rs | 103 | 99 |
+| grobx | 57 | 44 |
+| grobx-certified | 40 | 32 |
+| groebner-rs | 114 | 110 |
 | groebner.jl | 113 | 58 |
-| msolve | 113 | 62 |
+| msolve | 153 | 102 |
 | sagebrush | 165 | 130 |
 | singular | 143 | 120 |
 | sylvester | 30 | 27 |
 | sylvester-certified | 26 | 18 |
-| zeebra | 524 | 415 |
+| zeebra | 670 | 561 |
 
 ## cyclic
 
@@ -306,6 +306,26 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `cyclic-7` `18746449c457` | lex-basis-by-conversion | GF(32003) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 332.2 ms | — | 27.5 MB | basis 137.9 ms; conversion 194.3 ms; conversion: route=Classical, projections=3, fallback=Some(NonCyclicProjection) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
 | `cyclic-7` `30ce3b4f54c7` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 130.6 ms | — | 23.7 MB | basis 130.6 ms; quotient-dimension (for the invariant) 1.3 ms | — | unchecked |
 | `cyclic-7` `30ce3b4f54c7` | lex-basis-by-conversion | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 307.4 ms | — | 35.3 MB | basis 130.7 ms; conversion 176.7 ms; conversion: route=Classical, projections=3, fallback=Some(NonCyclicProjection) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 275.5 ms | — | 24.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 277.7 ms | — | 24.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 140.5 ms | — | 25.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 141.2 ms | — | 24.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 103.3 ms | — | 24.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 191.7 ms | — | 24.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 466.9 ms | — | 41.6 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `1da97cb3fe0e` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 572.9 ms | — | 73.7 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 251.5 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 141.2 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 123.2 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 134.2 ms | — | 35.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 253.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 141.4 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 123.1 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 134.5 ms | — | 45.9 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 90.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 74.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 71.6 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `cyclic-7` `18746449c457` | reduced-grobner-basis | GF(32003) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 188.4 ms | — | 35.3 MB | — | — | Singular std, redSB (2 invariants) |
 | `cyclic-8` `a5eda0f9e264` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced)) | `19ff732c` | complete | 27.66 s | — | 205.1 MB | basis 27.66 s | — | unchecked |
 | `cyclic-8` `a5eda0f9e264` | reduced-grobner-basis | GF(2147483647) | 1 | singular (singular build 44105 (44105)) | `19ff732c` | complete | 30.85 s | 30.62 s | 62.0 MB | solve 30.53 s | — | unchecked |
 | `cyclic-8` `a5eda0f9e264` | reduced-grobner-basis | GF(2147483647) | 1 | msolve (msolve 0.11.0) | `19ff732c` | complete | 1.29 s | 1.26 s | 32.4 MB | f4/overall(elapsed) 1.25 s; f4/overall(cpu) 1.24 s; f4/select 110.0 ms; f4/symbolic prep. 140.0 ms; f4/update 190.0 ms; f4/convert 10.0 ms; f4/linear algebra 790.0 ms; f4/reduce gb 0.0 ms | — | unchecked |
@@ -347,6 +367,32 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `cyclic-9` `ccffb9b3e5ca` | lex-basis-by-conversion | GF(32003) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | stopped at the tool's own cap: 50333823 live nonzero entries were needed, over the limit of 32000000 (max_live_nonzeros) | — | — | 1.14 GB | basis 50.46 s | — | unchecked |
 | `cyclic-9` `ff4c2030a8f7` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | stopped at the tool's own cap: 50335041 live nonzero entries were needed, over the limit of 32000000 (max_live_nonzeros) | — | — | 1.23 GB | basis 42.69 s | — | unchecked |
 | `cyclic-9` `ff4c2030a8f7` | lex-basis-by-conversion | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | stopped at the tool's own cap: 50335041 live nonzero entries were needed, over the limit of 32000000 (max_live_nonzeros) | — | — | 1.23 GB | basis 42.60 s | — | unchecked |
+
+## eco
+
+| problem | task | field | workers | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |
+|---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---|
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 314.9 ms | — | 43.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 226.5 ms | — | 43.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 211.5 ms | — | 43.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 228.9 ms | — | 42.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 384.0 ms | — | 49.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 311.2 ms | — | 50.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 300.3 ms | — | 49.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 315.4 ms | — | 49.1 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 455.4 ms | — | 45.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 313.5 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 314.6 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-11` `3bdb17005b06` | reduced-grobner-basis | GF(2147483647) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 475.3 ms | — | 35.2 MB | — | — | Singular std, redSB (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 2.01 s | — | 141.4 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 2.46 s | — | 169.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 1.17 s | — | 143.4 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 1.65 s | — | 168.6 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 1.62 s | — | 36.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 2.94 s | — | 107.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 1.99 s | — | 141.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 2.45 s | — | 168.4 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `eco-12` `e9ef0fecf390` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx-certified (grobx 0.155.1 (certified)) | `db181c51` | complete | 281.36 s | — | 10.57 GB | — | — | groebner-rs, 1 worker (2 invariants) |
 
 ## katsura
 
@@ -441,6 +487,66 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `katsura-11` `c6802b0391f8` | lex-basis-by-conversion | GF(32003) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 4.41 s | — | 215.1 MB | basis 1.85 s; conversion 2.56 s; conversion: route=Classical, projections=0, fallback=Some(DenseOperator) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
 | `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 1.61 s | — | 150.2 MB | basis 1.61 s; quotient-dimension (for the invariant) 11.9 ms | — | unchecked |
 | `katsura-11` `03bf44d5d614` | lex-basis-by-conversion | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 4.04 s | — | 241.7 MB | basis 1.61 s; conversion 2.43 s; conversion: route=Classical, projections=0, fallback=Some(DenseOperator) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 673.9 ms | — | 96.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 851.5 ms | — | 115.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 366.6 ms | — | 96.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 531.3 ms | — | 113.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 551.9 ms | — | 49.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 2.17 s | — | 100.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 671.2 ms | — | 95.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `036f0a35884e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 850.2 ms | — | 114.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 660.4 ms | — | 95.4 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 830.7 ms | — | 114.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 364.9 ms | — | 96.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 530.0 ms | — | 113.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 553.9 ms | — | 55.3 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 2.19 s | — | 97.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 662.0 ms | — | 95.3 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c08214c56a66` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 850.5 ms | — | 114.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 616.6 ms | — | 73.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 352.9 ms | — | 74.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 312.5 ms | — | 75.2 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 325.2 ms | — | 73.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 800.1 ms | — | 100.2 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 527.0 ms | — | 99.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 485.6 ms | — | 99.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 487.0 ms | — | 98.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 1.46 s | — | 38.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 686.9 ms | — | 45.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 582.4 ms | — | 31.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `c6802b0391f8` | reduced-grobner-basis | GF(32003) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 677.1 ms | — | 31.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 585.5 ms | — | 92.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 356.1 ms | — | 91.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 321.3 ms | — | 89.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 340.0 ms | — | 91.1 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 731.0 ms | — | 113.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 525.5 ms | — | 113.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 493.3 ms | — | 110.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 503.5 ms | — | 113.1 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 1.56 s | — | 38.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 749.8 ms | — | 38.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 711.0 ms | — | 45.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 2.62 s | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 4.05 s | — | 341.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 4.82 s | — | 409.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 1.53 s | — | 346.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 2.28 s | — | 410.6 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 3.76 s | — | 114.3 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 13.93 s | — | 374.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 4.05 s | — | 341.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `62cf88203aa3` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 4.83 s | — | 409.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 3.84 s | — | 283.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 1.73 s | — | 283.2 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 1.46 s | — | 283.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 1.40 s | — | 283.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 4.54 s | — | 382.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 2.55 s | — | 382.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 2.29 s | — | 383.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 2.17 s | — | 382.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 10.48 s | — | 69.1 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 4.14 s | — | 69.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 3.23 s | — | 71.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-12` `915a3a283588` | reduced-grobner-basis | GF(32003) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 2.93 s | — | 61.9 MB | — | — | Singular std, redSB (2 invariants) |
 | `katsura-4` `825a3aa54e15` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 0.2 ms | — | — | basis 0.2 ms; quotient-dimension (for the invariant) 0.0 ms | — | unchecked |
 | `katsura-4` `825a3aa54e15` | reduced-grobner-basis | GF(2147483647) | 1 | singular (singular build 44105 (44105)) | `663097a` | complete | 36.1 ms | 10.0 ms | 19.5 MB | solve 0.0 ms | — | unchecked |
 | `katsura-4` `825a3aa54e15` | lex-basis-by-conversion | GF(2147483647) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 0.3 ms | — | — | basis 0.2 ms; conversion 0.1 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
@@ -586,6 +692,26 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `katsura-4` `c5fb073f5c9a` | lex-basis-by-conversion | GF(32003) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 0.2 ms | — | 6.3 MB | basis 0.2 ms; conversion 0.1 ms; conversion: route=Classical, projections=0, fallback=Some(SmallQuotient) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
 | `katsura-4` `825a3aa54e15` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 0.2 ms | — | 6.0 MB | basis 0.2 ms; quotient-dimension (for the invariant) 0.0 ms | — | unchecked |
 | `katsura-4` `825a3aa54e15` | lex-basis-by-conversion | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 0.2 ms | — | 6.5 MB | basis 0.1 ms; conversion 0.1 ms; conversion: route=Classical, projections=0, fallback=Some(SmallQuotient) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 10.5 ms | — | 56.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 10.4 ms | — | 56.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 11.9 ms | — | 56.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 12.0 ms | — | 56.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 9.3 ms | — | 56.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 9.3 ms | — | 56.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 10.4 ms | — | 56.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `f2670d770ef9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 10.6 ms | — | 56.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 8.1 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 8.2 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 8.4 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 10.6 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 8.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 8.4 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 8.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 11.5 ms | — | 45.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 8.1 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 9.3 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 9.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 115.9 ms | — | 39.3 MB | — | — | Singular std, redSB (2 invariants) |
 | `katsura-5` `6f305e37b2cc` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 1.0 ms | — | — | basis 1.0 ms; quotient-dimension (for the invariant) 0.0 ms | — | unchecked |
 | `katsura-5` `6f305e37b2cc` | reduced-grobner-basis | GF(2147483647) | 1 | singular (singular build 44105 (44105)) | `663097a` | complete | 36.0 ms | 10.0 ms | 19.5 MB | solve 0.0 ms | — | unchecked |
 | `katsura-5` `6f305e37b2cc` | lex-basis-by-conversion | GF(2147483647) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 1.1 ms | — | — | basis 1.0 ms; conversion 0.2 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
@@ -777,6 +903,14 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `katsura-9` `4010a392ecf9` | lex-basis-by-conversion | GF(32003) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 109.7 ms | — | 19.4 MB | basis 63.1 ms; conversion 46.6 ms; conversion: route=Classical, projections=0, fallback=Some(DenseOperator) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
 | `katsura-9` `9373c952e86d` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 59.4 ms | — | 16.5 MB | basis 59.4 ms; quotient-dimension (for the invariant) 1.0 ms | — | unchecked |
 | `katsura-9` `9373c952e86d` | lex-basis-by-conversion | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 106.3 ms | — | 21.3 MB | basis 59.5 ms; conversion 46.7 ms; conversion: route=Classical, projections=0, fallback=Some(DenseOperator) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 34.7 ms | — | 49.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 43.3 ms | — | 49.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 32.2 ms | — | 49.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 41.2 ms | — | 49.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 24.6 ms | — | 49.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 81.4 ms | — | 49.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 34.6 ms | — | 49.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `katsura-9` `18eb9c774fc5` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 43.3 ms | — | 49.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
 
 ## mq-planted
 
@@ -1158,6 +1292,58 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 582.1 ms | — | 62.4 MB | basis 303.4 ms; conversion 278.7 ms; conversion: route=Classical, projections=0, fallback=Some(DenseOperator) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
 | `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 279.3 ms | — | 45.2 MB | basis 279.3 ms; quotient-dimension (for the invariant) 1.8 ms | — | unchecked |
 | `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 540.5 ms | — | 58.3 MB | basis 278.8 ms; conversion 261.7 ms; conversion: route=Classical, projections=0, fallback=Some(DenseOperator) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 342.9 ms | — | 39.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 377.7 ms | — | 43.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 262.3 ms | — | 43.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 228.4 ms | — | 40.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 456.0 ms | — | 46.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 373.3 ms | — | 43.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 262.0 ms | — | 42.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 227.2 ms | — | 45.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 235.6 ms | — | 38.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 134.6 ms | — | 38.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 117.3 ms | — | 38.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 228.1 ms | — | 31.1 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 337.0 ms | — | 44.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 335.5 ms | — | 43.9 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 235.8 ms | — | 43.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 212.6 ms | — | 41.3 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 438.7 ms | — | 43.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 336.0 ms | — | 43.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 236.5 ms | — | 43.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 214.0 ms | — | 40.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 252.7 ms | — | 38.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 175.0 ms | — | 38.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 467.6 ms | — | 45.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 309.2 ms | — | 45.9 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 4.00 s | — | 245.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 5.56 s | — | 236.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 885.8 ms | — | 103.4 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 885.1 ms | — | 104.7 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 1.71 s | — | 56.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 1.49 s | — | 60.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 4.02 s | — | 244.7 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `163887f5b712` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 5.57 s | — | 235.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 3.84 s | — | 243.9 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 1.37 s | — | 102.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 931.6 ms | — | 102.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 745.1 ms | — | 104.7 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 5.32 s | — | 235.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 1.38 s | — | 103.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 941.6 ms | — | 104.4 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 748.7 ms | — | 105.5 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 966.4 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 971.8 ms | — | 39.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 551.4 ms | — | 45.9 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-10-s1` `bd4820193849` | reduced-grobner-basis | GF(2147483647) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 2.30 s | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 4.31 s | — | 257.3 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 5.04 s | — | 364.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 1.29 s | — | 295.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 1.82 s | — | 366.5 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 2.91 s | — | 90.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 8.93 s | — | 294.7 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 4.31 s | — | 257.3 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `mq-random-11` `ee76de455c5e` | reduced-grobner-basis | GF(18446744069414584321) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 5.04 s | — | 364.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
 | `mq-random-14` `029def705543` | reduced-grobner-basis | GF(2147483647) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | — | basis 34.44 s | — | unchecked |
 | `mq-random-14` `029def705543` | reduced-grobner-basis | GF(2147483647) | 1 | singular (singular build 44105 (44105)) | `663097a` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | — | — | — | — | unchecked |
 | `mq-random-14` `029def705543` | lex-basis-by-conversion | GF(2147483647) | 1 | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | — | basis 34.42 s | — | unchecked |
@@ -1323,6 +1509,39 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-random-6` `d98e5e5bf82b` | reduced-grobner-basis | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 5.2 ms | — | 7.7 MB | basis 5.2 ms; quotient-dimension (for the invariant) 0.1 ms | — | unchecked |
 | `mq-random-6` `d98e5e5bf82b` | lex-basis-by-conversion | GF(2147483647) | 16 | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=by-order, batch-rows=reduced, fglm=adaptive)) | `0e060666` | complete | 6.6 ms | — | 8.2 MB | basis 5.2 ms; conversion 1.4 ms; conversion: route=Classical, projections=0, fallback=Some(SmallQuotient) 0.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | — | unchecked |
 
+## noon
+
+| problem | task | field | workers | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |
+|---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---|
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 62.3 ms | — | 26.7 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 84.6 ms | — | 25.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 66.0 ms | — | 27.3 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 89.4 ms | — | 27.3 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 29.6 ms | — | 25.0 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 197.0 ms | — | 25.5 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 62.7 ms | — | 27.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `f8137577a0c9` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 84.5 ms | — | 25.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 55.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 56.5 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 57.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 59.3 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 78.4 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 4 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 80.0 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 8 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 80.9 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 83.5 ms | — | 45.8 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 1 | msolve (msolve 0.11.0) | `db181c51` | complete | 125.9 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 4 | msolve (msolve 0.11.0) | `db181c51` | complete | 115.8 ms | — | 42.6 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 8 | msolve (msolve 0.11.0) | `db181c51` | complete | 114.1 ms | — | 46.0 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-7` `4ebfb3532c16` | reduced-grobner-basis | GF(32003) | 16 | msolve (msolve 0.11.0) | `db181c51` | complete | 234.0 ms | — | 45.9 MB | — | — | Singular std, redSB (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 342.6 ms | — | 85.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 478.4 ms | — | 104.4 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F3 db181c51 sig_f4_study --engine entry) | `db181c51` | complete | 365.1 ms | — | 85.7 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 16 | zeebra (zeebra F0 31e334bd sig_f4_study --engine entry) | `31e334bd` | complete | 502.5 ms | — | 103.9 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 1 | grobx (grobx 0.155.1 (raw, randomized, uncertified)) | `db181c51` | complete | 140.3 ms | — | 39.8 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 1 | groebner-rs (groebner-rs driver c3e1d630 (verified)) | `db181c51` | complete | 1.46 s | — | 98.5 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F3 db181c51 sig_f4_study --engine sigf4) | `db181c51` | complete | 341.2 ms | — | 85.2 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+| `noon-8` `403af18521ea` | reduced-grobner-basis | GF(18446744073709551263) | 1 | zeebra (zeebra F0 31e334bd sig_f4_study --engine sigf4) | `31e334bd` | complete | 482.7 ms | — | 104.1 MB | — | — | groebner-rs, 1 worker (2 invariants) |
+
 ## wide-prime-control
 
 | problem | task | field | workers | library | commit | outcome | wall | cpu | peak RSS | stages | eliminant degree | verification |
@@ -1420,7 +1639,7 @@ Computed only for rows agreeing on problem digest, task, limits, machine and bui
 
 The **provenance** column is the corpus's own record of how the problem's ideal equivalence was established, which is the gate on quoting a figure for it at all. A problem with no recorded equivalence, or one no external engine can represent, is **refused here rather than omitted**; a ratio resting on a single external engine is published with that fact stated, because nothing can triangulate it.
 
-**1393 pairs**: 0 refused for want of a recorded ideal equivalence, 458 disqualified by the startup floor, 0 with no checked invariant, 935 publishable — of which 0 resting on a sole comparand and therefore uncorroborated, 82 inside the 20% noise band, 231 against a comparand that is not authoritative, and 623 that a conclusion may rest on.
+**1393 pairs**: 0 refused for want of a recorded ideal equivalence, 457 disqualified by the startup floor, 0 with no checked invariant, 936 publishable — of which 0 resting on a sole comparand and therefore uncorroborated, 82 inside the 20% noise band, 231 against a comparand that is not authoritative, and 624 that a conclusion may rest on.
 
 | problem | task | library | ratio | provenance | checked |
 |---|---|---|---:|---|---|
@@ -1447,47 +1666,47 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-planted-10` | lex-basis-by-conversion | singular | 0.12x | known-solution | 3 invariants agreed |
 | `mq-planted-14` | reduced-grobner-basis | singular | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | groebner.jl | 0.23x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | sagebrush | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-4` | lex-basis-by-conversion | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-4` | lex-basis-by-conversion | sagebrush | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-5` | reduced-grobner-basis | singular | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-5` | reduced-grobner-basis | groebner.jl | 0.96x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-5` | reduced-grobner-basis | sagebrush | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-5` | lex-basis-by-conversion | singular | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-5` | lex-basis-by-conversion | sagebrush | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-6` | reduced-grobner-basis | singular | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | msolve | 0.37x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | msolve | 0.37x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-6` | reduced-grobner-basis | groebner.jl | 3.64x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `katsura-6` | reduced-grobner-basis | sagebrush | 0.37x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-6` | lex-basis-by-conversion | singular | 0.11x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-6` | lex-basis-by-conversion | sagebrush | 0.38x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-7` | reduced-grobner-basis | singular | 0.53x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | msolve | 2.63x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | msolve | 2.63x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-7` | reduced-grobner-basis | groebner.jl | 15.89x | comparand-file | 3 invariants agreed |
 | `katsura-7` | reduced-grobner-basis | sagebrush | 2.61x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-7` | lex-basis-by-conversion | singular | 0.58x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
 | `katsura-7` | lex-basis-by-conversion | sagebrush | 2.85x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-4` | reduced-grobner-basis | singular | 0.00x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.20x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-4` | reduced-grobner-basis | sagebrush | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-5` | reduced-grobner-basis | singular | 0.05x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | msolve | 0.17x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | msolve | 0.17x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.77x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `cyclic-5` | reduced-grobner-basis | sagebrush | 0.17x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-5` | lex-basis-by-conversion | singular | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `cyclic-5` | lex-basis-by-conversion | sagebrush | 0.23x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-6` | reduced-grobner-basis | singular | 0.26x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | msolve | 1.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | msolve | 1.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `cyclic-6` | reduced-grobner-basis | groebner.jl | 6.20x | comparand-file | 3 invariants agreed |
 | `cyclic-6` | reduced-grobner-basis | sagebrush | 1.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-6` | lex-basis-by-conversion | singular | 0.31x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
 | `cyclic-6` | lex-basis-by-conversion | sagebrush | 1.52x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-random-6` | reduced-grobner-basis | singular | 0.50x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | msolve | 2.50x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | msolve | 2.50x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-random-6` | reduced-grobner-basis | groebner.jl | 10.97x | live-oracle | 3 invariants agreed |
 | `mq-random-6` | reduced-grobner-basis | sagebrush | 2.47x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-random-6` | lex-basis-by-conversion | singular | 0.49x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.8x its startup floor** |
@@ -1499,63 +1718,63 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-random-10` | lex-basis-by-conversion | singular | 3.54x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | lex-basis-by-conversion | sagebrush | 74.48x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.06x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.16x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-10` | lex-basis-by-conversion | singular | 0.19x | known-solution | 3 invariants agreed |
 | `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.93x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-planted-14` | reduced-grobner-basis | singular | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.27x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `katsura-4` | reduced-grobner-basis | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | groebner.jl | 0.23x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | sagebrush | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-4` | lex-basis-by-conversion | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-4` | lex-basis-by-conversion | sagebrush | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-5` | reduced-grobner-basis | singular | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-5` | reduced-grobner-basis | groebner.jl | 0.83x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-5` | reduced-grobner-basis | sagebrush | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-5` | lex-basis-by-conversion | singular | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-5` | lex-basis-by-conversion | sagebrush | 0.10x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-6` | reduced-grobner-basis | singular | 0.10x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | msolve | 0.35x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | msolve | 0.35x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-6` | reduced-grobner-basis | groebner.jl | 3.21x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.5x its startup floor** |
 | `katsura-6` | reduced-grobner-basis | sagebrush | 0.34x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-6` | lex-basis-by-conversion | singular | 0.11x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-6` | lex-basis-by-conversion | sagebrush | 0.38x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-7` | reduced-grobner-basis | singular | 0.51x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | msolve | 2.54x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | msolve | 2.54x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `katsura-7` | reduced-grobner-basis | groebner.jl | 14.89x | comparand-file | 3 invariants agreed |
 | `katsura-7` | reduced-grobner-basis | sagebrush | 2.52x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-7` | lex-basis-by-conversion | singular | 0.55x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
 | `katsura-7` | lex-basis-by-conversion | sagebrush | 2.70x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-4` | reduced-grobner-basis | singular | 0.00x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.18x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `cyclic-4` | reduced-grobner-basis | sagebrush | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-5` | reduced-grobner-basis | singular | 0.04x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | msolve | 0.16x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | msolve | 0.16x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.59x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `cyclic-5` | reduced-grobner-basis | sagebrush | 0.16x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-5` | lex-basis-by-conversion | singular | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `cyclic-5` | lex-basis-by-conversion | sagebrush | 0.20x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-6` | reduced-grobner-basis | singular | 0.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.5x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | msolve | 1.26x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | msolve | 1.26x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `cyclic-6` | reduced-grobner-basis | groebner.jl | 6.13x | comparand-file | 3 invariants agreed |
 | `cyclic-6` | reduced-grobner-basis | sagebrush | 1.25x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `cyclic-6` | lex-basis-by-conversion | singular | 0.29x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
 | `cyclic-6` | lex-basis-by-conversion | sagebrush | 1.45x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-random-6` | reduced-grobner-basis | singular | 0.52x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.8x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | msolve | 2.84x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | msolve | 2.84x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-random-6` | reduced-grobner-basis | groebner.jl | 11.42x | live-oracle | 3 invariants agreed |
 | `mq-random-6` | reduced-grobner-basis | sagebrush | 2.84x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-random-6` | lex-basis-by-conversion | singular | 0.52x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.8x its startup floor** |
@@ -1567,19 +1786,19 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-random-10` | lex-basis-by-conversion | singular | 3.86x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | lex-basis-by-conversion | sagebrush | 78.35x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.05x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.16x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-10` | lex-basis-by-conversion | singular | 0.11x | known-solution | 3 invariants agreed |
 | `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.43x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-planted-14` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.22x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-random-10` | reduced-grobner-basis | singular | 1.71x | live-oracle | 3 invariants agreed |
@@ -2403,7 +2622,7 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `katsura-11` | reduced-grobner-basis | singular | 0.61x | comparand-file | 3 invariants agreed |
 | `katsura-11` | reduced-grobner-basis | singular | 0.46x | comparand-file | 3 invariants agreed |
 | `katsura-8` | reduced-grobner-basis | singular | 0.39x | comparand-file | 3 invariants agreed |
-| `katsura-8` | reduced-grobner-basis | msolve | 2.63x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
+| `katsura-8` | reduced-grobner-basis | msolve | 2.63x | comparand-file | 2 invariants agreed |
 | `katsura-8` | reduced-grobner-basis | groebner.jl | 11.26x | comparand-file | 3 invariants agreed |
 | `katsura-8` | reduced-grobner-basis | sagebrush | 2.63x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
 | `katsura-8` | lex-basis-by-conversion | singular | 0.34x | comparand-file | 3 invariants agreed |
@@ -2442,19 +2661,19 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `katsura-11` | reduced-grobner-basis | groebner.jl | 68.20x | comparand-file | 3 invariants agreed |
 | `katsura-11` | reduced-grobner-basis | sagebrush | 12.73x | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `katsura-4` | univariate-eliminant | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
-| `katsura-4` | univariate-eliminant | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | univariate-eliminant | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `katsura-5` | univariate-eliminant | singular | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
-| `katsura-5` | univariate-eliminant | msolve | 0.05x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-5` | univariate-eliminant | msolve | 0.05x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `katsura-6` | univariate-eliminant | singular | 0.04x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.5x its startup floor** |
-| `katsura-6` | univariate-eliminant | msolve | 0.16x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-6` | univariate-eliminant | msolve | 0.16x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `katsura-7` | univariate-eliminant | singular | 0.04x | comparand-file | 4 invariants agreed |
-| `katsura-7` | univariate-eliminant | msolve | 0.76x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-7` | univariate-eliminant | msolve | 0.76x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `cyclic-5` | univariate-eliminant | singular | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `cyclic-6` | univariate-eliminant | singular | 0.07x | comparand-file | 4 invariants agreed |
 | `cyclic-7` | univariate-eliminant | singular | 0.03x | comparand-file | 4 invariants agreed |
 | `katsura-4` | univariate-eliminant | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-8` | univariate-eliminant | singular | 0.01x | comparand-file | 4 invariants agreed |
-| `katsura-8` | univariate-eliminant | msolve | 4.31x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-8` | univariate-eliminant | msolve | 4.31x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
 | `katsura-9` | univariate-eliminant | singular | 0.00x | comparand-file | 4 invariants agreed |
 | `katsura-9` | univariate-eliminant | msolve | 9.06x | comparand-file | 2 invariants agreed |
 | `katsura-10` | univariate-eliminant | msolve | 14.11x | comparand-file | 2 invariants agreed |
@@ -2502,240 +2721,240 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.79x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.21x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.21x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.23x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.23x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.21x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.21x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.20x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.29x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.29x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.29x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.27x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.27x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.27x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.23x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.23x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.25x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.21x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.21x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.20x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.29x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.29x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.29x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.27x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.27x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.27x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.26x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.39x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.38x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.39x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.32x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.31x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.31x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.08x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.39x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.38x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.39x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.22x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner-rs | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner-rs | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.32x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.31x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner-rs | 1.31x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | groebner-rs | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.08x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.10x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.10x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.14x | live-oracle | 3 invariants agreed |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.11x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.19x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.11x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.11x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.19x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.11x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.35x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.56x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.56x | live-oracle | 3 invariants agreed |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.08x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.08x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.05x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.13x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.13x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.16x | live-oracle | 3 invariants agreed |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.30x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.39x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.30x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.30x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.39x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.30x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.42x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.63x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.63x | live-oracle | 3 invariants agreed |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.09x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.06x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.06x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.09x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.06x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.06x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.20x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.19x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 12.23x | live-oracle | 3 invariants agreed |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | grobx | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.12x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.20x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | grobx | 1.12x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | grobx | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.12x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.20x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | grobx | 1.12x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.57x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.78x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | grobx | 27.78x | live-oracle | 3 invariants agreed |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | grobx | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `groebner-rs-wide-control` | reduced-grobner-basis | grobx | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | sylvester | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | sylvester | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `katsura-4` | reduced-grobner-basis | sylvester | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
@@ -2809,14 +3028,14 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-random-10` | reduced-grobner-basis | sylvester | 11.09x | live-oracle | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | sylvester | 11.09x | live-oracle | 3 invariants agreed |
 | `mq-planted-wide-6` | reduced-grobner-basis | groebner.jl | 0.12x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-wide-6` | reduced-grobner-basis | groebner-rs | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-wide-6` | reduced-grobner-basis | grobx | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-6` | reduced-grobner-basis | groebner-rs | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-planted-wide-6` | reduced-grobner-basis | grobx | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-planted-wide-10` | reduced-grobner-basis | groebner.jl | 0.13x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `mq-planted-wide-10` | reduced-grobner-basis | groebner-rs | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-wide-10` | reduced-grobner-basis | grobx | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-10` | reduced-grobner-basis | groebner-rs | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-planted-wide-10` | reduced-grobner-basis | grobx | 0.01x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 | `mq-planted-wide-14` | reduced-grobner-basis | groebner.jl | 0.19x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `mq-planted-wide-14` | reduced-grobner-basis | groebner-rs | 0.02x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-wide-14` | reduced-grobner-basis | grobx | 0.02x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-wide-14` | reduced-grobner-basis | groebner-rs | 0.02x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-planted-wide-14` | reduced-grobner-basis | grobx | 0.02x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 
 ## Engine-internal speedups over Zeebra
 

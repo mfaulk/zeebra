@@ -1,0 +1,67 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "publication",
+ "context": {
+  "issue": 975,
+  "agent": "agent-a68d63781e3d797f1@research/975-m33-final",
+  "track": "Gc",
+  "session": "final"
+ },
+ "arms": [
+  {
+   "name": "grobx155-certified",
+   "commit": "8005a2a1670a7264617a6f49eeb2618d7fa21701",
+   "binary": "/buildcache/cargo-target/zeebra-grobx-8005a2a1/release/grobx-driver",
+   "sha256": "fdd6aeecac466d3702f1e459f1e1456b72f5444d3563f193b5693df44ce183bc",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "grobx 0.155.1 (M33 pin): research/m33-baseline/grobx-pin.sh, pins.json",
+    "comparand": "grobx 0.155.1 (M33 pin): research/m33-baseline/grobx-pin.sh, pins.json"
+   },
+   "argv": [
+    "{inputs[grobx_certified]}"
+   ],
+   "workers": [
+    1
+   ],
+   "library": "grobx-certified",
+   "library_version": "grobx 0.155.1 (certified)"
+  }
+ ],
+ "instances": [
+  {
+   "name": "wide64/eco-12",
+   "params": {
+    "field": "wide64",
+    "name": "eco-12",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx_certified": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__eco-12/grobx-certified.json",
+     "sha256": "d859f21f1e23d083ad5490148cca411f76c0a5c3456a727ade2209f72e5d724d"
+    }
+   }
+  }
+ ],
+ "run": {
+  "workers": [
+   1
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "mode_wait_seconds": 1800,
+  "limits": {
+   "wall_seconds": 600,
+   "kill_after_seconds": 30,
+   "rss_bytes": 34359738368,
+   "live_bytes": null
+  }
+ }
+}

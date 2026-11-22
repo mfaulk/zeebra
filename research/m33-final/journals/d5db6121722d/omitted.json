@@ -1,0 +1,7 @@
+{
+ "payloads": {
+  "7bd0225ed6688f4e777a080a53c464dada4f00d231c79d09dda3dcabfa70925e": 1696869153
+ },
+ "rule": "payloads of 65536 gzipped bytes or more are not committed",
+ "source": "/buildcache/cargo-target/zeebra-975/jobs/d5db6121722d/journal"
+}

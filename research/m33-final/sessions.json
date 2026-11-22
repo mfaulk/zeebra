@@ -1,0 +1,4 @@
+{
+ "rule": "the first non-void session per track is of record, with its top-up job; a void session is dropped whole and re-run whole (README, predeclaration and amendment)",
+ "of_record": ["92e26e267f3d", "7fa0250e1309", "d5db6121722d", "ea52bc970e59", "b5a15591d188"]
+}

@@ -1,0 +1,452 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "publication",
+ "context": {
+  "issue": 975,
+  "agent": "agent-a68d63781e3d797f1@research/975-m33-final",
+  "track": "G",
+  "session": "final"
+ },
+ "arms": [
+  {
+   "name": "sigf4",
+   "commit": "db181c51",
+   "binary": "/buildcache/cargo-target/zeebra-975/target-f3/release/examples/sig_f4_study",
+   "sha256": "beecc346e62578d375f8c4854bf4f706c0626552ad5d845dd55a49475262cc8e",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive db181c51 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "sigf4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    1
+   ],
+   "library": "zeebra",
+   "library_version": "zeebra F3 db181c51 sig_f4_study --engine sigf4"
+  },
+  {
+   "name": "entry",
+   "commit": "db181c51",
+   "binary": "/buildcache/cargo-target/zeebra-975/target-f3/release/examples/sig_f4_study",
+   "sha256": "beecc346e62578d375f8c4854bf4f706c0626552ad5d845dd55a49475262cc8e",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive db181c51 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    1
+   ],
+   "library": "zeebra",
+   "library_version": "zeebra F3 db181c51 sig_f4_study --engine entry"
+  },
+  {
+   "name": "entry16",
+   "commit": "db181c51",
+   "binary": "/buildcache/cargo-target/zeebra-975/target-f3/release/examples/sig_f4_study",
+   "sha256": "beecc346e62578d375f8c4854bf4f706c0626552ad5d845dd55a49475262cc8e",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive db181c51 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    16
+   ],
+   "library": "zeebra",
+   "library_version": "zeebra F3 db181c51 sig_f4_study --engine entry"
+  },
+  {
+   "name": "sigf4-f0",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-975/target-f0/release/examples/sig_f4_study",
+   "sha256": "f8c844ee952dae0a509b8193b13acf0c7efcb273a66ef59389dda66ed3aa8cc4",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "sigf4",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    1
+   ],
+   "library": "zeebra",
+   "library_version": "zeebra F0 31e334bd sig_f4_study --engine sigf4"
+  },
+  {
+   "name": "entry-f0",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-975/target-f0/release/examples/sig_f4_study",
+   "sha256": "f8c844ee952dae0a509b8193b13acf0c7efcb273a66ef59389dda66ed3aa8cc4",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    1
+   ],
+   "library": "zeebra",
+   "library_version": "zeebra F0 31e334bd sig_f4_study --engine entry"
+  },
+  {
+   "name": "entry16-f0",
+   "commit": "9d6f16e4",
+   "binary": "/buildcache/cargo-target/zeebra-975/target-f0/release/examples/sig_f4_study",
+   "sha256": "f8c844ee952dae0a509b8193b13acf0c7efcb273a66ef59389dda66ed3aa8cc4",
+   "build": {
+    "profile": "release",
+    "flags": "--features research-sigf4; fat LTO, codegen-units 1 (Cargo.toml); -C target-cpu=x86-64-v3 (.cargo/config.toml); RUSTC_WRAPPER=\"\" CARGO_INCREMENTAL=0",
+    "recipe": "git archive 9d6f16e4 | tar -x; cargo build --release --features research-sigf4 --example sig_f4_study (src/, Cargo.toml, Cargo.lock identical to F0 31e334bd)"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{generate}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "180"
+   ],
+   "workers": [
+    16
+   ],
+   "library": "zeebra",
+   "library_version": "zeebra F0 31e334bd sig_f4_study --engine entry"
+  },
+  {
+   "name": "grobx155",
+   "commit": "8005a2a1670a7264617a6f49eeb2618d7fa21701",
+   "binary": "/buildcache/cargo-target/zeebra-grobx-8005a2a1/release/grobx-driver",
+   "sha256": "fdd6aeecac466d3702f1e459f1e1456b72f5444d3563f193b5693df44ce183bc",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "grobx 0.155.1 (M33 pin): research/m33-baseline/grobx-pin.sh, pins.json",
+    "comparand": "grobx 0.155.1 (M33 pin): research/m33-baseline/grobx-pin.sh, pins.json"
+   },
+   "argv": [
+    "{inputs[grobx]}"
+   ],
+   "workers": [
+    1
+   ],
+   "library": "grobx",
+   "library_version": "grobx 0.155.1 (raw, randomized, uncertified)"
+  },
+  {
+   "name": "groebner-rs",
+   "commit": "c3e1d630fba9b2155a4c389d9022f13e0ba09218",
+   "binary": "/buildcache/cargo-target/zeebra-groebner-rs/release/groebner-rs-driver",
+   "sha256": "c1eb0b0450eb0500b4f77f32f09f0205f3707ca952b45b5cda8b9a3c50d52f13",
+   "build": {
+    "profile": "release",
+    "flags": "as provisioned (pins.json)",
+    "recipe": "groebner-rs driver: tools/external/provision-groebner-rs.sh",
+    "comparand": "groebner-rs driver: tools/external/provision-groebner-rs.sh"
+   },
+   "argv": [
+    "{inputs[groebner_rs]}"
+   ],
+   "workers": [
+    1
+   ],
+   "library": "groebner-rs",
+   "library_version": "groebner-rs driver c3e1d630 (verified)"
+  }
+ ],
+ "instances": [
+  {
+   "name": "wide64/eco-12",
+   "params": {
+    "field": "wide64",
+    "name": "eco-12",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__eco-12/grobx.json",
+     "sha256": "841120f1ffd9e2b5a73e8c4cbaf764e70dae9af152c6e5f14078eb0b0a9b960f"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__eco-12/groebner-rs.json",
+     "sha256": "323f83f77826f49c3ee99336c01d2914135206cdc44c9b3d2e0de26ef3e59580"
+    }
+   }
+  },
+  {
+   "name": "wide64/katsura-11",
+   "params": {
+    "field": "wide64",
+    "name": "katsura-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-11/grobx.json",
+     "sha256": "d01f836fa2dc6355904c37353799b4d658e01f7bcba174d4c0f2fa42ee202520"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-11/groebner-rs.json",
+     "sha256": "ef99bfb44c12402fb87dbd26788be4c00f68677fe0a87f0bdc89d36803478969"
+    }
+   }
+  },
+  {
+   "name": "goldilocks/mq-random-11",
+   "params": {
+    "field": "goldilocks",
+    "name": "mq-random-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/goldilocks__mq-random-11/grobx.json",
+     "sha256": "f272c41cc707668f3f8772a995f0738febc7a5b786b407c936d17e3aa50cd044"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/goldilocks__mq-random-11/groebner-rs.json",
+     "sha256": "a1cf86a1c14c8fd8c6ae7e2a0e9f47ec961457042ecbf0db45348a7be015521b"
+    }
+   }
+  },
+  {
+   "name": "wide64/cyclic-7",
+   "params": {
+    "field": "wide64",
+    "name": "cyclic-7",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__cyclic-7/grobx.json",
+     "sha256": "4b3eef20822b96f082a611d8727f8ef2b5c43f44cdfe0e479a5d7bf06496c15b"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__cyclic-7/groebner-rs.json",
+     "sha256": "f9410334520ca3815ff3043414e9cb415088c2d93f50f8a68a43e4cb1e0155d2"
+    }
+   }
+  },
+  {
+   "name": "wide64/noon-7",
+   "params": {
+    "field": "wide64",
+    "name": "noon-7",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__noon-7/grobx.json",
+     "sha256": "d6ad28777ff45bff7bfa9b8ac5569767fd3b155e6322bc8ca198cbfb33c3b2d8"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__noon-7/groebner-rs.json",
+     "sha256": "162620a3e02786aa619f37c732c87f8d41f4862ce677222a6bebe6f1f80a87b7"
+    }
+   }
+  },
+  {
+   "name": "wide64/noon-8",
+   "params": {
+    "field": "wide64",
+    "name": "noon-8",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__noon-8/grobx.json",
+     "sha256": "97d1c6cce031d34582b14bad27cf24d78dc10a4f234fc0e57fe7a7f06a473d27"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__noon-8/groebner-rs.json",
+     "sha256": "e124d5af486df4edb93bada6218a0c7e9a565590c09172b48589b1a71b58366d"
+    }
+   }
+  },
+  {
+   "name": "wide64/katsura-9",
+   "params": {
+    "field": "wide64",
+    "name": "katsura-9",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-9/grobx.json",
+     "sha256": "fea2850ebf388a77002ef170f4cc4c2026c40d937aba4c4f70e564d7c446e44d"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-9/groebner-rs.json",
+     "sha256": "5bf95381ee42bd8683aaae64762b574cea3fd651a32252d28606fe3e8cd36b2c"
+    }
+   }
+  },
+  {
+   "name": "goldilocks/katsura-11",
+   "params": {
+    "field": "goldilocks",
+    "name": "katsura-11",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/goldilocks__katsura-11/grobx.json",
+     "sha256": "93deeda898191fd6743ebe5130484eacd37379cabb794ae6b8c458eeb76e08e1"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/goldilocks__katsura-11/groebner-rs.json",
+     "sha256": "315fe363df6992aaa3c4023351a853475889a029b6598f9c37f3bf679b1da1a9"
+    }
+   }
+  },
+  {
+   "name": "wide64/katsura-4",
+   "params": {
+    "field": "wide64",
+    "name": "katsura-4",
+    "generate": "--digest-only"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-4/grobx.json",
+     "sha256": "474c2ebe2696629528c4a6c595985981ee4bc6f65326fb13678e0404a01d7182"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-4/groebner-rs.json",
+     "sha256": "314fd23d5d8a0523a224a3fb1a0e22997551347733c3a426e8a4e60f164643ff"
+    }
+   }
+  },
+  {
+   "name": "wide64/mq-random-10-s1",
+   "params": {
+    "field": "wide64",
+    "name": "mq-random-10-s1",
+    "generate": "--generate"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__mq-random-10-s1/grobx.json",
+     "sha256": "e2d7a38edf91f98c931893538c4875cf864f419274d6affd6d9cab94e8b3555a"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__mq-random-10-s1/groebner-rs.json",
+     "sha256": "e40f8200bbd8becc9741406b882a6d149175c5720b3b8884864e69a4ba8c22c2"
+    }
+   }
+  },
+  {
+   "name": "wide64/katsura-12",
+   "params": {
+    "field": "wide64",
+    "name": "katsura-12",
+    "generate": "--generate"
+   },
+   "inputs": {
+    "grobx": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-12/grobx.json",
+     "sha256": "08fb4b6632ec179e34ce9aea406a3ab5c5afd7f3c511e9c915a18c28ed886b94"
+    },
+    "groebner_rs": {
+     "path": "/buildcache/cargo-target/zeebra-975/inputs/wide64__katsura-12/groebner-rs.json",
+     "sha256": "fece89127af790fc709dcb0203bcb2c130e82c23879ddb8711b2032c36d92773"
+    }
+   }
+  }
+ ],
+ "run": {
+  "workers": [
+   1,
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "mode_wait_seconds": 1800,
+  "limits": {
+   "wall_seconds": 180,
+   "kill_after_seconds": 30,
+   "rss_bytes": 8589934592,
+   "live_bytes": null
+  }
+ }
+}
