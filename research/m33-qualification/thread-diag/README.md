@@ -59,3 +59,21 @@ Maximum worker threads in state R at once, over all arms and 20 runs, with a cap
   of a 15-thread team kept running beside the next full 16-thread team for 3 ms and 9 ms (one
   thread lived from 26.6 ms to 46.5 ms; R in 134 of its samples, S in 26). At those moments 17
   workers were computing.
+
+## Stage measurement on the shipping F4 (`measure_arms.py`, `measure-result.md`)
+
+The question was whether #993's `config.measure_work = measure` explains F2's +1 running thread on
+the shipping F4. The qualification harness never sets `measure_stages`. `F4Options::default()`
+leaves it `false`, and the shipping F4 passes `options.measure_stages` to `parallel::forward`, so
+worker measurement was off in every M33-Q attempt.
+
+The two session-2 failing rows ran at 16 workers, 20 interleaved runs per arm, CPUs 24–39, with no
+reservation. The arms:
+
+- F0: the `accae594` harness binary.
+- F2 with `--measure-stages`, and F2 without it: one binary, harness `2b27161d`, sha256
+  `f1cc4c6abf91771c`, which adds only that switch.
+
+No team ever had more than 16 workers running. An excess of 1 appeared in 1 of 20 runs for each of
+F0 on noon-7 and F2 with measurement on noon-7, and in no run otherwise. The raw traces are in
+`/buildcache/cargo-target/zeebra-974/diag/measure/`.
