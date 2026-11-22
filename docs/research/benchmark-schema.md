@@ -189,7 +189,10 @@ missing.
 | `arms[].build.comparand` | optional; an externally provisioned comparand's provenance (provision script, upstream pin). It stands in for the `git archive` recipe, which a Zeebra arm still needs (#966) |
 | `arms[].workers` | optional subset of `run.workers`; the arm runs only at those counts (Track G's 16-worker best-supported arm beside 1-worker arms, #966) |
 | `arms[].argv` | template; `{field}` placeholders take `instance.params` and `instance`, `input`, `inputs[<key>]`, `workers`, `seed`, `rep`, `cpus`, `wall_seconds`, `live_bytes` |
+| `arms[].contract` | optional task contract: `T-GB`, `T-GB-conv`, `T-RAD`, `T-PT1`, `T-PTALL` or `T-ALG` (`adaptive-selection-contracts.md` §2, #1004) |
+| `arms[].configuration` | optional portfolio configuration id, a plain name (default: the arm's name) |
 | `instances[].name`, `.params` | unique name; template values |
+| `instances[].lineage` | optional `{key: string}` lineage keys, copied to every selection record; #1005 fixes the key set |
 | `instances[].path`, `.sha256` | optional input file and its digest; copied and re-hashed like a binary |
 | `instances[].inputs` | optional `{key: {path, sha256}}`, one file per solver format, each copied and re-hashed like `path`; argv names one as `{inputs[key]}` (#966) |
 | `run.workers` | list of worker counts; an attempt pins to the first *w* CPUs of `run.cpus` |
@@ -300,7 +303,7 @@ Two caveats:
   - runtime verification that the arm's guarantee requires.
 - **The independent-reference audit** (digest comparison, normally offline) is common to every arm.
   It is recorded under `audit` and never charged.
-- **Not yet recorded per attempt:** lineage keys (#1005), task contract and configuration id
-  (#1004), and arithmetic backend and placement beyond what the manifest and `cpu-context` already
-  hold. They belong in the manifest's arm and instance entries, and land with #1005's lineage
-  fields, so they are not duplicated here.
+- **Identity on every record.** The arm's `contract` and `configuration`, and the instance's
+  `lineage`, come from the manifest (§7). The binary hash, commit, build, cpus and `cpu-context`
+  are already on the attempt's metadata. Which lineage keys are required is #1005's decision; this
+  schema carries whatever the manifest states.

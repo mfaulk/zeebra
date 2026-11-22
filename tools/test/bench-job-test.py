@@ -754,6 +754,27 @@ class BenchJobTest(unittest.TestCase):
         slow = next(s for s in doc['selection'] if s['instance'] == 'slow')
         self.assertEqual((slow['completion_ms'], slow['censored_at_ms']), (None, 1000.0))
 
+    # An arm's task contract and configuration id, and an instance's lineage keys, reach every record.
+    def test_selection_records_carry_contract_configuration_and_lineage(self):
+        m = self.manifest(instances=(('i1', ['ok']),), reps=1)
+        m['arms'][0].update(contract='T-GB', configuration='conv-w1')
+        m['instances'][0]['lineage'] = dict(family_id='katsura', formulation_id='katsura-4')
+        job = self.job(m)
+        self.cli('run', job, check=0)
+        doc = json.loads(self.cli('report', job, '--json', check=0).stdout)
+        a = next(s for s in doc['selection'] if s['arm'] == 'a')
+        self.assertEqual((a['contract'], a['configuration'], a['lineage']),
+                         ('T-GB', 'conv-w1', dict(family_id='katsura', formulation_id='katsura-4')))
+        b = next(s for s in doc['selection'] if s['arm'] == 'b')
+        self.assertEqual((b['contract'], b['configuration']), (None, 'b'))
+        for key, value in (('contract', 'T-FAST'), ('configuration', 'has space')):
+            bad = self.manifest(instances=(('i1', ['ok']),), reps=1)
+            bad['arms'][0][key] = value
+            self.assertNotEqual(self.submit(bad).returncode, 0, key)
+        bad = self.manifest(instances=(('i1', ['ok']),), reps=1)
+        bad['instances'][0]['lineage'] = dict(family_id=3)
+        self.assertNotEqual(self.submit(bad).returncode, 0)
+
     # With references, a matching digest is verified and a wrong one is incorrect-output and untimed.
     def test_references_verify_attempts(self):
         state, m = self.synthetic(dict(a=[1.0, 1.0]))

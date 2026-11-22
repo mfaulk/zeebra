@@ -43,6 +43,8 @@ DEFAULT_ROOT = '/buildcache/bench-jobs'
 NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/-]*$')
 HEX = re.compile(r'^[0-9a-f]+$')
 RETRYABLE = ('failed', 'timeout', 'rss-limit')
+# docs/research/adaptive-selection-contracts.md §2 (#1004).
+TASK_CONTRACTS = ('T-GB', 'T-GB-conv', 'T-RAD', 'T-PT1', 'T-PTALL', 'T-ALG')
 EXIT_REFUSED, EXIT_CANCELLED, EXIT_BUSY, EXIT_USAGE = 3, 4, 75, 64
 
 
@@ -167,6 +169,11 @@ def validate(m):
                  f'provenance); a job never builds')
         _require(isinstance(arm.get('argv'), list) and all(isinstance(a, str) for a in arm['argv']),
                  f'arm {name}: argv must be a list of strings')
+        _require(arm.get('contract') is None or arm['contract'] in TASK_CONTRACTS,
+                 f'arm {name}: contract must be one of {", ".join(TASK_CONTRACTS)}')
+        _require(arm.get('configuration') is None or (isinstance(arm['configuration'], str)
+                                                      and NAME.match(arm['configuration'])),
+                 f'arm {name}: configuration must be a plain name')
         binary = Path(arm.get('binary', ''))
         _require(binary.is_absolute() and binary.is_file() and os.access(binary, os.X_OK),
                  f'arm {name}: binary must be an absolute path to an executable')
@@ -179,6 +186,9 @@ def validate(m):
             _require(path.is_absolute() and path.is_file(), f'instance {inst["name"]}: input {key} must be an absolute file')
             _require(sha256_file(path) == spec.get('sha256'), f'instance {inst["name"]}: input {key} does not match its sha256')
         _require(isinstance(inst.get('params', {}), dict), f'instance {inst["name"]}: params must be an object')
+        lineage = inst.get('lineage', {})
+        _require(isinstance(lineage, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in lineage.items()),
+                 f'instance {inst["name"]}: lineage must map names to strings')
     limits = run.get('limits') or {}
     cpus = expand_cpus(run.get('cpus', ''))
     workers = run.get('workers')
@@ -437,13 +447,17 @@ def summarize(state, m, *, baseline=None, bound=1.05, references=None):
     digests, verification, statuses = defaultdict(set), [], defaultdict(int)
     selection, selected = [], defaultdict(int)
     cap = m['run']['limits']['wall_seconds']
+    arms, instances = {a['name']: a for a in m['arms']}, {i['name']: i for i in m['instances']}
     for a in state['attempts']:
         md, cell, child = a['metadata'], a['cell'], _child_report(a)
         statuses[a['status']] += 1
         outcome = selection_outcome(a['status'], md, child, cap, _reference_digest(references, cell['instance']))
         selected[outcome['status']] += 1
+        arm = arms.get(cell['arm'], {})
         selection.append(dict(attempt=md['attempt_id'], arm=cell['arm'], instance=cell['instance'],
-                              workers=cell['workers'], rep=cell['rep'], **outcome))
+                              workers=cell['workers'], rep=cell['rep'], contract=arm.get('contract'),
+                              configuration=arm.get('configuration', cell['arm']),
+                              lineage=instances.get(cell['instance'], {}).get('lineage', {}), **outcome))
         verification.append(dict(attempt=md['attempt_id'], arm=cell['arm'], instance=cell['instance'],
                                  workers=cell['workers'], rep=cell['rep'], status=a['status'],
                                  contaminated=md['attempt_id'] in flagged, basis_sha256=child.get('basis_sha256')))
