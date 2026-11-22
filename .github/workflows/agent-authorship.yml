@@ -1,0 +1,50 @@
+name: Agent authorship
+
+# Commits are attributed to people, never to a coding agent (#1058). A separate workflow from CI so
+# that editing a pull request's body re-runs this check without re-running the test suite: a squash
+# merge can carry a Co-authored-by line from the body into the commit on main.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  authorship:
+    name: No coding-agent authors or co-authors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the pull request's commits and body
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$PR_BODY" >"$RUNNER_TEMP/pr-body.md"
+          bash tools/check-agent-authorship.sh "$BASE_SHA" "$HEAD_SHA" "$RUNNER_TEMP/pr-body.md"
+
+      # `before` is all zeros for a new branch and unreachable after a force-push; either way the
+      # pushed tip is what landed, so fall back to checking that commit alone.
+      - name: Check the pushed commits
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          base="$BEFORE"
+          if ! git cat-file -e "$base^{commit}" 2>/dev/null || ! git merge-base --is-ancestor "$base" "$AFTER"; then
+            base="$(git rev-parse "$AFTER^")"
+          fi
+          bash tools/check-agent-authorship.sh "$base" "$AFTER"
