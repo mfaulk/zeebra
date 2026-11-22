@@ -255,22 +255,93 @@ fn basis_m33<const N: usize, F: FiniteField>(
 
 /// The most threads alive at once besides the main thread and the sampler (`/proc/self/task`
 /// every 50 µs, as `sig_f4_study --sample-threads`); a lower bound.
-fn sampled<T>(on: bool, body: impl FnOnce() -> T) -> (T, Option<usize>) {
+/// Worker threads grouped into teams, the way `research/m33-qualification/thread-diag` groups them:
+/// a team is the threads born before any of them is gone, so a birth after a member's disappearance
+/// starts the next team. A team's exiting threads can briefly outlive its join (#1002); counting per
+/// team keeps them out of the next team's figure.
+#[derive(Default)]
+struct Teams {
+    team_of: std::collections::HashMap<u32, usize>,
+    current: Vec<u32>,
+    shrunk: bool,
+    count: usize,
+}
+
+impl Teams {
+    /// One sweep of `(tid, state)` for every worker thread: (running in total, running in the
+    /// busiest team).
+    fn observe(&mut self, sweep: &[(u32, char)]) -> (usize, usize) {
+        let seen: std::collections::HashSet<u32> = sweep.iter().map(|&(t, _)| t).collect();
+        self.shrunk |= self.current.iter().any(|t| !seen.contains(t));
+        for &(tid, _) in sweep {
+            if !self.team_of.contains_key(&tid) {
+                if self.count == 0 || self.shrunk {
+                    self.count += 1;
+                    self.current.clear();
+                    self.shrunk = false;
+                }
+                self.team_of.insert(tid, self.count);
+                self.current.push(tid);
+            }
+        }
+        let mut per_team = std::collections::HashMap::new();
+        let mut total = 0;
+        for &(tid, _) in sweep.iter().filter(|&&(_, s)| s == 'R') {
+            total += 1;
+            *per_team.entry(self.team_of[&tid]).or_insert(0usize) += 1;
+        }
+        (total, per_team.values().copied().max().unwrap_or(0))
+    }
+}
+
+/// Thread peaks over a call: listed worker threads (`/proc/self/task` entries less the caller and
+/// the sampler), worker threads in state R, and the most in state R within one team.
+#[derive(Clone, Copy, Default)]
+struct ThreadPeaks {
+    listed: usize,
+    running: usize,
+    team_running: usize,
+}
+
+fn worker_states(main: u32, own: u32) -> Vec<(u32, char)> {
+    let Ok(dir) = std::fs::read_dir("/proc/self/task") else {
+        return Vec::new();
+    };
+    dir.flatten()
+        .filter_map(|e| {
+            let tid = e.file_name().to_str()?.parse::<u32>().ok()?;
+            if tid == main || tid == own {
+                return None;
+            }
+            let stat = std::fs::read_to_string(e.path().join("stat")).ok()?;
+            Some((tid, stat.rsplit_once(") ")?.1.chars().next()?))
+        })
+        .collect()
+}
+
+fn sampled<T>(on: bool, body: impl FnOnce() -> T) -> (T, Option<ThreadPeaks>) {
     use std::sync::{atomic::AtomicBool, atomic::Ordering::Relaxed, Arc};
     if !on {
         return (body(), None);
     }
     let stop = Arc::new(AtomicBool::new(false));
     let flag = stop.clone();
+    let main = std::process::id();
     let sampler = std::thread::spawn(move || {
-        let mut peak = 0;
+        let own = std::fs::read_link("/proc/thread-self")
+            .ok()
+            .and_then(|p| p.file_name()?.to_str()?.parse::<u32>().ok())
+            .unwrap_or(0);
+        let (mut peaks, mut teams) = (ThreadPeaks::default(), Teams::default());
         while !flag.load(Relaxed) {
-            if let Ok(tasks) = std::fs::read_dir("/proc/self/task") {
-                peak = peak.max(tasks.count());
-            }
+            let sweep = worker_states(main, own);
+            let (running, team_running) = teams.observe(&sweep);
+            peaks.listed = peaks.listed.max(sweep.len());
+            peaks.running = peaks.running.max(running);
+            peaks.team_running = peaks.team_running.max(team_running);
             std::thread::sleep(Duration::from_micros(50));
         }
-        peak.saturating_sub(2)
+        peaks
     });
     let out = body();
     stop.store(true, Relaxed);
@@ -357,7 +428,18 @@ fn run<const N: usize, F: FiniteField>(input: &Input, args: &Args) -> Vec<(&'sta
             "calls_ns",
             Json::Array(calls.iter().map(|&d| Json::nanos(d)).collect()),
         ),
-        ("threads_peak", threads.map_or(Json::Null, Json::size)),
+        (
+            "threads_peak",
+            threads.map_or(Json::Null, |t| Json::size(t.listed)),
+        ),
+        (
+            "running_peak",
+            threads.map_or(Json::Null, |t| Json::size(t.running)),
+        ),
+        (
+            "team_running_peak",
+            threads.map_or(Json::Null, |t| Json::size(t.team_running)),
+        ),
     ]
 }
 
@@ -450,5 +532,24 @@ mod tests {
         ])
         .is_err());
         assert!(args(&["--field", "gf2", "--name", "katsura-4", "--engine", "sigf4"]).is_err());
+    }
+
+    /// A thread of a team that has begun to exit, running beside a full new team, counts toward the
+    /// process total but not toward any one team's peak; a team running past the cap counts in both.
+    #[test]
+    fn running_threads_are_counted_per_team() {
+        let mut teams = Teams::default();
+        let first: Vec<(u32, char)> = (1..=4).map(|t| (t, 'R')).collect();
+        assert_eq!(teams.observe(&first), (4, 4));
+        // Thread 4 is gone, so the next births form a second team; thread 3 still runs.
+        let mut overlap = vec![(3, 'R')];
+        overlap.extend((10..14).map(|t| (t, 'R')));
+        assert_eq!(teams.observe(&overlap[..1]), (1, 1));
+        assert_eq!(teams.observe(&overlap), (5, 4));
+        // A sleeping thread is not running.
+        assert_eq!(teams.observe(&[(10, 'S'), (11, 'R')]), (1, 1));
+        let mut wide = Teams::default();
+        let five: Vec<(u32, char)> = (1..=5).map(|t| (t, 'R')).collect();
+        assert_eq!(wide.observe(&five), (5, 5));
     }
 }
