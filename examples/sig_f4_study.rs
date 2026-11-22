@@ -13,8 +13,9 @@
 //! pinned digest (`research/m32-baseline/README.md`).
 //!
 //! `--generate` builds the row from its generator at any of the four fields instead of a catalog:
-//! `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, or `mq-random-N-sS` (the ladder's MQ generator at
-//! seed S), each in the external contract's canonical form, as M33's candidate pool is digested
+//! `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, `mq-random-N-sS` (the ladder's MQ generator at
+//! seed S), or `mq-dense-N-sS` / `mq-dense-unplanted-N-sS` (#945's `m = 2n` dense family, #1033;
+//! also `--field gf31`, and n = 15, 18, 20 at gf31 and gf32003), each in the external contract's canonical form, as M33's candidate pool is digested
 //! (`research/m33-baseline/admission.py`); `--input-only` prints the row's digest, variables and
 //! generators and solves nothing.
 //!
@@ -51,7 +52,7 @@ mod basis_digest;
 
 use std::time::{Duration, Instant};
 use zeebra::{
-    fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
+    fields::{PrimeFieldElement64, Zp2147483647, Zp31, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, eco, katsura, noon},
         certify_f4_output_with_workers,
@@ -179,8 +180,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             other => return Err(format!("unexpected argument {other}")),
         }
     }
-    if !["goldilocks", "wide64", "gf32003", "m31"].contains(&parsed.field.as_str()) {
-        return Err("--field must be goldilocks, wide64, gf32003 or m31".into());
+    if !["goldilocks", "wide64", "gf32003", "m31", "gf31"].contains(&parsed.field.as_str()) {
+        return Err("--field must be goldilocks, wide64, gf32003, m31 or gf31".into());
     }
     if !["sigf4", "f4", "entry", "adaptive"].contains(&parsed.engine.as_str())
         && !REFERENCES.contains(&parsed.engine.as_str())
@@ -398,6 +399,7 @@ fn modulus(field: &str) -> u64 {
         "wide64" => 18446744073709551263,
         "gf32003" => 32003,
         "m31" => 2147483647,
+        "gf31" => 31,
         _ => panic!("unknown field {field}"),
     }
 }
@@ -435,7 +437,7 @@ fn generated(field: &str, name: &str) -> Result<Input, String> {
     let p = modulus(field);
     let refused = || format!("--generate has no generator for {name}");
     let (stem, seed) = match name.rsplit_once("-s") {
-        Some((stem, seed)) if stem.starts_with("mq-random-") => {
+        Some((stem, seed)) if stem.starts_with("mq-random-") || stem.starts_with("mq-dense-") => {
             (stem, Some(seed.parse::<u64>().map_err(|_| refused())?))
         }
         _ => (name, None),
@@ -444,10 +446,13 @@ fn generated(field: &str, name: &str) -> Result<Input, String> {
     let n: usize = n.parse().map_err(|_| refused())?;
     let instance = match (fam, seed) {
         ("mq-random", Some(seed)) => corpus::random_mq_instance(n, seed, p, ORDER),
+        ("mq-dense", Some(seed)) => corpus::dense_mq_instance(n, seed, p, ORDER, true),
+        ("mq-dense-unplanted", Some(seed)) => corpus::dense_mq_instance(n, seed, p, ORDER, false),
         (_, None) => match field {
             "goldilocks" => family::<Goldilocks>(name, fam, n, p),
             "wide64" => family::<Wide>(name, fam, n, p),
             "gf32003" => family::<Zp32003>(name, fam, n, p),
+            "gf31" => family::<Zp31>(name, fam, n, p),
             _ => family::<Zp2147483647>(name, fam, n, p),
         }
         .ok_or_else(refused)?,
@@ -1378,12 +1383,25 @@ fn main() {
                     ($field, 13) => run::<13, $f>(input, &args),
                     ($field, 14) => run::<14, $f>(input, &args),
                 )*
+                // #1033's dense MQ rows, at the two small primes only.
+                ("gf31" | "gf32003", 15 | 18 | 20) => large(input, &args),
                 (field, n) => panic!("no instantiation for {field} with {n} variables"),
             }
         };
     }
+    fn large(input: Input, args: &Args) -> Json {
+        match (args.field.as_str(), input.variables.len()) {
+            ("gf31", 15) => run::<15, Zp31>(input, args),
+            ("gf31", 18) => run::<18, Zp31>(input, args),
+            ("gf31", 20) => run::<20, Zp31>(input, args),
+            ("gf32003", 15) => run::<15, Zp32003>(input, args),
+            ("gf32003", 18) => run::<18, Zp32003>(input, args),
+            _ => run::<20, Zp32003>(input, args),
+        }
+    }
     let mut report = dispatch!(
-        "goldilocks" => Goldilocks, "wide64" => Wide, "gf32003" => Zp32003, "m31" => Zp2147483647
+        "goldilocks" => Goldilocks, "wide64" => Wide, "gf32003" => Zp32003, "m31" => Zp2147483647,
+        "gf31" => Zp31
     );
     // In-process time before and after the solve: with `call_ns` and `render_ns` this leaves only
     // exec and exit to the caller's process wall.
@@ -1550,6 +1568,18 @@ mod tests {
         assert!(generated("m31", "bivium-3").is_err());
         assert!(generated("m31", "mq-random-10").is_err());
         assert!(generated("m31", "katsura-40").is_err());
+        assert!(generated("gf31", "mq-dense-12").is_err());
+    }
+
+    /// `--generate` builds #1033's dense rows, planted and unplanted, as 2n generators over gf31.
+    #[test]
+    fn generate_builds_dense_mq_rows() {
+        let planted = generated("gf31", "mq-dense-6-s6").unwrap();
+        let unplanted = generated("gf31", "mq-dense-unplanted-6-s6").unwrap();
+        assert_eq!(planted.variables.len(), 6);
+        assert_eq!(planted.generators.len(), 12);
+        assert_eq!(unplanted.generators.len(), 12);
+        assert_ne!(planted.digest, unplanted.digest);
     }
 
     // The two engines agree on a small frozen row, which is what the basis digest relies on.

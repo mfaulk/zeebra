@@ -5,12 +5,13 @@ use crate::{
     fields::{PrimeFieldElement64, Zp2, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
-        differential::{polynomial_to_string, GeneratedSystem, SystemShape},
+        differential::{polynomial_to_string, GeneratedSystem, GeneratedTerm, SystemShape},
     },
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
 use super::{FieldSpec, Instance};
+use rand::{prelude::StdRng, Rng, SeedableRng};
 
 /// The corpus's reference characteristic.
 ///
@@ -835,6 +836,113 @@ pub fn random_mq_instance(
     ))
 }
 
+/// The point [`dense_mq_instance`] plants for `seed`: `n` residues drawn uniformly from `[0, p)`.
+pub fn dense_mq_point(n: usize, seed: u64, characteristic: u64) -> Vec<u64> {
+    let mut rng = StdRng::seed_from_u64(seed);
+    (0..n).map(|_| rng.gen_range(0..characteristic)).collect()
+}
+
+/// #945's dense MQ family: `2n` quadratics in `n` variables over GF(`characteristic`), each with a
+/// uniform nonzero coefficient on every `x_i` and `x_i x_j` (`i <= j`).
+///
+/// Planted, the constant makes each generator vanish at [`dense_mq_point`]; unplanted, the
+/// constant is drawn like any other coefficient, so the system is almost surely inconsistent. The
+/// draws follow the point's, in a fixed order that does not depend on the variant, so the two
+/// variants of a seed differ only in their constants. This is denser than [`random_mq_instance`],
+/// which draws at most `4n` terms per generator.
+///
+/// # Panics
+/// If `characteristic` is below 3 or does not fit the coefficient arithmetic (`< 2^63`).
+pub fn dense_mq_instance(
+    n: usize,
+    seed: u64,
+    characteristic: u64,
+    order: MonomialOrder,
+    planted: bool,
+) -> Instance {
+    assert!((3..1 << 63).contains(&characteristic));
+    let p = characteristic as u128;
+    let mut rng = StdRng::seed_from_u64(seed);
+    let point: Vec<u128> = (0..n)
+        .map(|_| rng.gen_range(0..characteristic) as u128)
+        .collect();
+    let mut monomials: Vec<Vec<u32>> = Vec::new();
+    for i in 0..n {
+        for j in i..n {
+            let mut exponents = vec![0; n];
+            exponents[i] += 1;
+            exponents[j] += 1;
+            monomials.push(exponents);
+        }
+    }
+    for i in 0..n {
+        let mut exponents = vec![0; n];
+        exponents[i] = 1;
+        monomials.push(exponents);
+    }
+    let value = |exponents: &[u32]| {
+        exponents
+            .iter()
+            .zip(&point)
+            .fold(1u128, |acc, (&e, &x)| (0..e).fold(acc, |a, _| a * x % p))
+    };
+    let polynomials = (0..2 * n)
+        .map(|_| {
+            let mut sum = 0u128;
+            let mut terms: Vec<GeneratedTerm> = monomials
+                .iter()
+                .map(|exponents| {
+                    let coefficient = rng.gen_range(1..characteristic);
+                    sum = (sum + coefficient as u128 * value(exponents)) % p;
+                    GeneratedTerm {
+                        exponents: exponents.clone(),
+                        coefficient,
+                    }
+                })
+                .collect();
+            let constant = if planted {
+                ((p - sum) % p) as u64
+            } else {
+                rng.gen_range(1..characteristic)
+            };
+            if constant != 0 {
+                terms.push(GeneratedTerm {
+                    exponents: vec![0; n],
+                    coefficient: constant,
+                });
+            }
+            terms
+        })
+        .collect();
+    let system = GeneratedSystem {
+        seed,
+        field: crate::grobner::differential::CaseField::prime(characteristic),
+        variables: (1..=n).map(|i| format!("x{i}")).collect(),
+        polynomials,
+    };
+    let family = if planted {
+        "mq-dense"
+    } else {
+        "mq-dense-unplanted"
+    };
+    Instance::new(
+        format!("{family}-{n}"),
+        family,
+        FieldSpec::prime(characteristic),
+        system.variables.clone(),
+        system.render(),
+        order,
+    )
+    .transformed(format!(
+        "seeded dense generation (#945): seed {seed}, m = 2n, every monomial of degree <= 2, {}",
+        if planted {
+            "constant planted at dense_mq_point"
+        } else {
+            "unplanted"
+        }
+    ))
+}
+
 /// A planted multivariate-quadratic instance in `N` variables, with a known solution.
 ///
 /// Zero-dimensional by construction and the planted point is among the solutions, so **every
@@ -1460,7 +1568,8 @@ pub fn manifest() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ceilings, corroboration, corroboration_for, instance, ladder, manifest, CorpusEntry,
+        ceilings, corroboration, corroboration_for, dense_mq_instance, dense_mq_point, instance,
+        ladder, manifest, CorpusEntry,
         Corroboration, Rung, ALTERNATE_CHARACTERISTIC, KOALABEAR_CHARACTERISTIC,
         REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC, WIDE_64_CHARACTERISTIC,
     };
@@ -2750,6 +2859,64 @@ mod tests {
             !kinds.contains("no-comparand"),
             "a ladder rung claims no comparand; check it is not really a sole-comparand row"
         );
+    }
+
+    /// A dense planted MQ row has 2n generators, each carrying every nonconstant monomial of degree
+    /// at most two with a nonzero coefficient, and every generator vanishes at the seed's point.
+    #[test]
+    fn test_a_dense_planted_mq_row_is_full_and_vanishes_at_its_point() {
+        use crate::{fields::Zp31, FiniteField};
+        let row = dense_mq_instance(5, 7, 31, GREVLEX, true);
+        assert_eq!(row.variable_count(), 5);
+        assert_eq!(row.system.len(), 10, "m = 2n");
+        let point: [Zp31; 5] = {
+            let drawn = dense_mq_point(5, 7, 31);
+            std::array::from_fn(|i| Zp31::new(drawn[i]))
+        };
+        let parsed: Vec<MultivariatePolynomial<5, Zp31>> = row
+            .system
+            .iter()
+            .map(|text| MultivariatePolynomial::parse(text, names::<5>()).expect("parses"))
+            .collect();
+        for p in &parsed {
+            let nonconstant = p
+                .terms()
+                .keys()
+                .filter(|m| m.exponents().iter().sum::<u32>() > 0)
+                .count();
+            assert_eq!(nonconstant, 20, "every x_i and x_i x_j (i <= j): 5 + 15");
+        }
+        assert!(satisfies(&parsed, &point), "the planted point is a zero");
+        assert!(row
+            .transformation
+            .as_deref()
+            .unwrap_or_default()
+            .contains("seed 7"));
+    }
+
+    /// A dense MQ row is a function of its seed: the same seed reproduces its digest, a different
+    /// seed or the unplanted variant does not, and the unplanted variant misses the planted point.
+    #[test]
+    fn test_a_dense_mq_row_is_determined_by_its_seed_and_variant() {
+        use crate::{fields::Zp31, FiniteField};
+        let once = dense_mq_instance(4, 3, 31, GREVLEX, true);
+        let twice = dense_mq_instance(4, 3, 31, GREVLEX, true);
+        let other = dense_mq_instance(4, 4, 31, GREVLEX, true);
+        let unplanted = dense_mq_instance(4, 3, 31, GREVLEX, false);
+        assert_eq!(once.digest(), twice.digest());
+        assert_ne!(once.digest(), other.digest());
+        assert_ne!(once.digest(), unplanted.digest());
+        assert_eq!(unplanted.family, "mq-dense-unplanted");
+        let point: [Zp31; 4] = {
+            let drawn = dense_mq_point(4, 3, 31);
+            std::array::from_fn(|i| Zp31::new(drawn[i]))
+        };
+        let parsed: Vec<MultivariatePolynomial<4, Zp31>> = unplanted
+            .system
+            .iter()
+            .map(|text| MultivariatePolynomial::parse(text, names::<4>()).expect("parses"))
+            .collect();
+        assert!(!satisfies(&parsed, &point));
     }
 
     /// A random MQ rung is reproducible from its name alone, and is genuinely quadratic.
