@@ -29,7 +29,7 @@
 //! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918); `--reducer
 //! NAME` (f4) sets the symbolic reducer selection by its `ReducerSelection` variant name.
 //!
-//! `--live-gib G` (f4, entry) raises the live-entry budget to G GiB, for #1033's information-only arm:
+//! `--live-gib G` (f4, entry, sigf4) raises the live-entry budget to G GiB, for #1033's information-only arm:
 //! at the shipping 512 MB the parallel forward pass falls back to serial on the largest dense
 //! batches.
 //!
@@ -247,8 +247,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     {
         return Err("--stages and --fl configure the shipping F4: --engine f4".into());
     }
-    if parsed.live_gib.is_some() && !["f4", "entry"].contains(&parsed.engine.as_str()) {
-        return Err("--live-gib sets F4Options: --engine f4 or entry".into());
+    if parsed.live_gib.is_some() && !["f4", "entry", "sigf4"].contains(&parsed.engine.as_str()) {
+        return Err("--live-gib sets the live budget: --engine f4, entry or sigf4".into());
     }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
         return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
@@ -1401,6 +1401,10 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 max_wall_time: Some(args.wall),
                 workers: args.workers,
                 parallel_cascade: args.claim,
+                max_live_bytes: args
+                    .live_gib
+                    .map(|gib| gib << 30)
+                    .or(SigF4Options::default().max_live_bytes),
                 ..SigF4Options::default()
             };
             let solve = || sig_f4_reported(&system, args.order, &options);
@@ -1637,7 +1641,8 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--claim", "--density"]].concat()).is_err());
         assert!(args(&[&base[..], &["entry", "--density"]].concat()).is_err());
         assert!(args(&[&base[..], &["entry", "--live-gib", "8"]].concat()).is_ok());
-        assert!(args(&[&base[..], &["sigf4", "--live-gib", "8"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--live-gib", "8"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["groebner-rs", "--live-gib", "8"]].concat()).is_err());
         let capture = ["--capture", "/x", "--batches", "7,8"];
         assert_eq!(
             args(&[&base[..], &["f4"], &capture[..]].concat())
