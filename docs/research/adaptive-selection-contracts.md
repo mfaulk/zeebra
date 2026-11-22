@@ -246,7 +246,7 @@ the point by substitution, not by equality.
 | A conversion out of budget is refused, not attempted | `ConversionInfeasible` (planner) and the span checks from D (FGLM) | — |
 | Point answers are verified | `SolveOutcome::Point` only after substitution | — |
 | A budget stop is never "no solution" | Types: `SolveError` vs. `SolveOutcome` | — |
-| Plan wall budget | `PlanBudget.max_elapsed` gates *between* attempts | The `PlanBudget` rustdoc says this is because "F4 has no cooperative time check". `F4Options::max_wall_time` now is one, and the planner does not pass the remaining `max_elapsed` into it. See §6 |
+| Plan wall budget | `PlanBudget.max_elapsed` gates retries and fallbacks *between* attempts; the first always starts | The planner does not pass the remaining allowance into `F4Options::max_wall_time`; that independent cooperative limit keeps the caller's value per basis computation. A complete-solve wall bound needs an external supervisor (§2). See §6 and #1050 |
 | FGLM stage wall budget | none | Needs an external supervisor (§2, T-GB-conv) |
 | Worker labels on fields without a handle | none: silently serial | §3.3 |
 
@@ -316,10 +316,12 @@ No risk-sensitive objective is adopted here. If one is wanted, it is the penaliz
 
 - `GradedEngine::Adaptive`'s rustdoc still says not to use it under grlex. Since #986 the
   dispatcher routes grlex to conventional F4, so the warning now applies only to the forced engine.
-- The `PlanBudget` rustdoc's reason for `max_elapsed` not interrupting an attempt ("F4 has no
-  cooperative time check") is stale since `F4Options::max_wall_time` landed.
+- #1050 corrects the stale `PlanBudget` rationale and preserves its existing behavior:
+  `max_elapsed` gates retries and fallbacks, while `F4Options::max_wall_time` remains independent.
+  FGLM still has no wall budget; a complete-solve wall bound requires an external supervisor.
 
-Both are filed, as #1049 and #1050, rather than changed here, to keep this a documentation change.
+The forced-signature follow-up is filed as #1049. The budget clarification in #1050 changes
+documentation only.
 
 ## 7. Answers to the issue's research questions
 
