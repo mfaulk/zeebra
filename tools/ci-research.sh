@@ -140,6 +140,7 @@ case "$1" in
     research-reuse)
         cargo test --features research-reuse --lib grobner::reuse_census
         cargo test --features research-reuse --example reuse_census
+        python3 research/1031-reuse-census/summarize.py research/1031-reuse-census/runs.jsonl.gz | diff - research/1031-reuse-census/tables.md
         ;;
     *)
         set +x

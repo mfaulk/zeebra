@@ -378,3 +378,21 @@ Any one of these:
    - Peak RSS ≤ 1.25× shipping.
    - Bases identical everywhere.
    - Otherwise reject, and record the counters that explain why.
+
+## 7. Addendum (#1031): the census on current routes — defer retained
+
+[`reduced-multiple-reuse-census.md`](reduced-multiple-reuse-census.md) ran §6.2 step 1's free gates and
+added the counterfactual they lack. Every batch was replayed with its reducer multiples as built,
+all tail-reduced, and only the earlier-built ones tail-reduced. This ran on the conventional F4
+defaults and the signature engine, over the M29 pinned rows and #1030's dense quadratic cohort.
+
+- **Conditions.** (a) is met nowhere. (b) and (c) are met only on the signature engine for MQ10, and
+  (b) also for Katsura-11. (d) is met on 86 of 114 (row, engine) pairs, as M16's recurrence predicted.
+- **But a store of tail-reduced multiples is a loss.** It removes the fill-in chains, but its rows
+  are longer, and the longer rows win. On every pinned row but one the hit-reduced arm costs 3–132%
+  *more* elimination products before upkeep. The exception is Eco-12 on the signature engine: 5.2%
+  saved gross, but −56% once upkeep is charged. On the dense cohort it saves at most 2.4%, and 1.4% net.
+- **So §6.1's conditions are not predictive.** (d) passes where the counterfactual is negative.
+  Before any §6.2 step 2 arm, the gate should be the counterfactual product census
+  (`--features research-reuse`, `examples/reuse_census.rs`), not recurrence. #1069 tracks revising
+  §6.1 to say so.
