@@ -238,7 +238,7 @@ the point by substitution, not by equality.
 | Property | Enforced by | Only documented |
 |---|---|---|
 | Signature engine refuses non-graded orders | `engine::graded` → `SigF4Error::Unsupported`, reached from both `sig_f4_reported` and the dispatcher | — |
-| Signature engine is not used under grlex (#961) | `signature_route` → `ShippingReason::Order` (dispatch only) | **Forced `sig_f4_reported` accepts grlex.** `GradedEngine::Adaptive`'s rustdoc still warns "Do not use it under `GradedLexicographic`", which describes the pre-#986 state |
+| Signature engine is not used under grlex (#961) | `signature_route` → `ShippingReason::Order` (dispatch); since #1049, `engine::run` → `SigF4Error::Unsupported` unless `SigF4Options::allow_graded_lex` | At `45e9b625`, forced `sig_f4_reported` accepted grlex and `GradedEngine::Adaptive`'s rustdoc described the pre-#986 state. #1049 closed both |
 | Batch-counted budgets keep conventional F4 | `adaptive_f4` returns `None` when `max_batches` or `max_pairs_per_batch` is set | — |
 | Pair criteria are sound | Theorems plus the differential corpus against `PairCriteria::NONE` | — |
 | FGLM needs a zero-dimensional source | `classify_ideal` → `PositiveDimensional` | — |
@@ -279,8 +279,9 @@ The point-solving arms are kept apart and scored only against each other (plan �
 ### 5.1 Arms deliberately left out
 
 - **Signature arms under grlex.** Ineligible while #961 is open (plan §4.3). P4–P6 are grevlex-only
-  arms. A harness that runs them through `sig_f4_reported` on a grlex input must refuse the input
-  itself, recording `unsupported`, because the engine will not.
+  arms. Since #1049, `sig_f4_reported` refuses a grlex input with `SigF4Error::Unsupported` unless
+  `SigF4Options::allow_graded_lex` is set, so a harness records that refusal as `unsupported`. It
+  must not set the opt-in.
 - **`adaptive` + cap.** This collapses onto P7 (§3.1), so it is not a distinct arm.
 - **`ConversionStrategy::Classical` and `Wiedemann` as separate S-arms.** They are ablations of S2's
   conversion stage, not distinct T-GB-conv answers. #1039 measures them.
@@ -309,7 +310,7 @@ No risk-sensitive objective is adopted here. If one is wanted, it is the penaliz
 | `ReducerSelection::FewestTerms` + FL order (#997) | On `main` as an option; T-GB eligibility unknown on M34 inputs |
 | P7 `conv-cap16` | yes-with-check: needs a digest check at a cap of 16 |
 | Every parallel arm (P2, P3, P5, P6, P8) | Built after #1002's fix (`03e1ab2f`). #1011 re-runs `m33_thread_cap` and the #1042 team test on the freeze revision (plan §4.3) |
-| Forced-signature harness guard | P4–P6 need the grlex refusal from §5.1 in the harness, or the guard moved into `sig_f4_reported` (#1049) |
+| Forced-signature harness guard | Resolved by #1049: the guard is in `sig_f4_reported` (§5.1) |
 
 ### Follow-ups found while inspecting
 
