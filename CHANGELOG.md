@@ -61,6 +61,12 @@ change to `y` may break the public API.
 
 ### Changed
 
+- The signature engine (`research-sigf4`) refuses `GradedLexicographic` with
+  `SigF4Error::Unsupported` unless the new `SigF4Options::allow_graded_lex` is set, so forcing it
+  through `sig_f4`/`sig_f4_reported` no longer reaches #961's memory exhaustion. The dispatcher
+  already sent graded-lex to conventional F4 and is unchanged. Breaking for `research-sigf4`: an
+  exhaustive `SigF4Options` literal needs the new field (#1049).
+
 - `MonomialOrder` adds a `Block` variant; exhaustive downstream matches need a corresponding arm.
   F4 rejects fixed-arity order/ring mismatches with `F4Error::InvalidOptions` before comparison.
 

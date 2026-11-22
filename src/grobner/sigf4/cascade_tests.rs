@@ -42,7 +42,12 @@ fn solve<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     options: &SigF4Options,
 ) -> Run<N, F> {
-    let (result, statistics) = sig_f4_reported(system, order, options);
+    // Every system here is small, so graded-lex runs despite #961 (#1049).
+    let options = SigF4Options {
+        allow_graded_lex: true,
+        ..options.clone()
+    };
+    let (result, statistics) = sig_f4_reported(system, order, &options);
     (result.expect("the engine finishes"), statistics)
 }
 

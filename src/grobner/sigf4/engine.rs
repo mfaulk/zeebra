@@ -115,6 +115,11 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     #[cfg(feature = "research-sigf4-split")]
     let inputs_clock = Instant::now();
     graded(order)?;
+    if order == MonomialOrder::GradedLexicographic && !options.allow_graded_lex {
+        return Err(SigF4Error::Unsupported {
+            reason: "graded-lex needs SigF4Options::allow_graded_lex (#961)",
+        });
+    }
 
     let mut inputs: Vec<Vec<(Monomial<N>, F)>> = Vec::new();
     for p in generators.iter().filter(|p| !p.is_zero()) {

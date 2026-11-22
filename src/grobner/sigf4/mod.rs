@@ -67,6 +67,11 @@ pub struct SigF4Options {
     /// and final rows, workspaces and pivot or coordination metadata. Crossing it abandons the
     /// batch with [`F4Error::TooManyLiveBytes`]. `None` is unbounded.
     pub max_live_bytes: Option<usize>,
+    /// Accept `GradedLexicographic`. Off by default: on non-trivial systems the engine there
+    /// exhausts memory past every budget but wall time, or runs far slower than conventional F4
+    /// (#961), and the dispatcher never routes it there. A refusal is
+    /// [`SigF4Error::Unsupported`]. Set it only to study #961 or on systems known to be small.
+    pub allow_graded_lex: bool,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
     /// Tests only: the column-space interreduction's live-entry budget, to force its fallback.
@@ -87,6 +92,7 @@ impl Default for SigF4Options {
             workers: 1,
             parallel_cascade: false,
             max_live_bytes: Some(crate::grobner::F4Options::default().max_live_bytes),
+            allow_graded_lex: false,
             #[cfg(test)]
             adversary: None,
             #[cfg(test)]
@@ -111,7 +117,8 @@ impl SigF4Options {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SigF4Error {
-    /// The order is not graded, or does not match the ring's arity.
+    /// The order is not graded, is graded-lex without the opt-in (#961), or does not match the
+    /// ring's arity.
     Unsupported { reason: &'static str },
     /// A budget, a cancellation or certification, in the shipping F4's terms.
     Budget(F4Error),
@@ -319,7 +326,8 @@ pub struct SplitLog {
 /// [`crate::grobner::f4()`].
 ///
 /// # Errors
-/// [`SigF4Error::Unsupported`] for a non-graded order; [`SigF4Error::Budget`] for a crossed budget.
+/// [`SigF4Error::Unsupported`] for a non-graded order, or for `GradedLexicographic` without
+/// [`SigF4Options::allow_graded_lex`] (#961); [`SigF4Error::Budget`] for a crossed budget.
 pub fn sig_f4<const N: usize, F: FiniteField>(
     generators: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,

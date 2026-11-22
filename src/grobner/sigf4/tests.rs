@@ -27,12 +27,21 @@ const GRADED: [MonomialOrder; 2] = [
     MonomialOrder::GradedLexicographic,
 ];
 
+/// [`SigF4Options::checked`] accepting graded-lex (#1049): every system here is small, so #961
+/// does not apply.
+fn checked_any_graded() -> SigF4Options {
+    SigF4Options {
+        allow_graded_lex: true,
+        ..SigF4Options::checked()
+    }
+}
+
 fn agrees_with_f4<const N: usize, F: FiniteField>(
     system: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) {
     let expected = f4(system, order).expect("shipping F4 finishes");
-    let (result, statistics) = sig_f4_reported(system, order, &SigF4Options::checked());
+    let (result, statistics) = sig_f4_reported(system, order, &checked_any_graded());
     let actual = result.expect("signature engine finishes");
     assert_eq!(actual, expected, "reduced bases differ under {order:?}");
     let report = certify_f4_output(system, &actual, order);
@@ -205,12 +214,16 @@ fn test_small_systems_match_the_buchberger_reference() {
     for order in GRADED {
         let system = katsura::<3, Zp13>();
         assert_eq!(
-            sig_f4(&system, order).unwrap(),
+            sig_f4_reported(&system, order, &checked_any_graded())
+                .0
+                .unwrap(),
             buchberger_reference(&system, order)
         );
         let system = cyclic::<3, Zp32003>();
         assert_eq!(
-            sig_f4(&system, order).unwrap(),
+            sig_f4_reported(&system, order, &checked_any_graded())
+                .0
+                .unwrap(),
             buchberger_reference(&system, order)
         );
     }
@@ -268,6 +281,26 @@ fn test_non_graded_orders_are_unsupported() {
         sig_f4(&system, MonomialOrder::Lexicographic),
         Err(SigF4Error::Unsupported { .. })
     ));
+}
+
+/// Graded-lex is refused unless the caller opts in (#1049): #961's memory and stall behaviour is
+/// otherwise reachable by forcing the engine past the dispatcher.
+#[test]
+fn test_graded_lex_requires_opt_in() {
+    let system = katsura::<3, Zp13>();
+    let grlex = MonomialOrder::GradedLexicographic;
+    assert!(matches!(
+        sig_f4(&system, grlex),
+        Err(SigF4Error::Unsupported { .. })
+    ));
+    let (result, _) = sig_f4_reported(&system, grlex, &SigF4Options::default());
+    assert!(matches!(result, Err(SigF4Error::Unsupported { .. })));
+    let opted_in = SigF4Options {
+        allow_graded_lex: true,
+        ..SigF4Options::checked()
+    };
+    let (result, _) = sig_f4_reported(&system, grlex, &opted_in);
+    assert_eq!(result.unwrap(), f4(&system, grlex).unwrap());
 }
 
 /// Degenerate inputs follow F4's contract: zero ideal empty, inconsistent system `{1}`.
@@ -493,7 +526,7 @@ proptest! {
     ) {
         let order = GRADED[usize::from(grlex)];
         let expected = f4(&system, order).unwrap();
-        let actual = sig_f4_reported(&system, order, &SigF4Options::checked()).0.unwrap();
+        let actual = sig_f4_reported(&system, order, &checked_any_graded()).0.unwrap();
         prop_assert_eq!(actual, expected);
     }
 
@@ -632,6 +665,7 @@ type Wide = PrimeFieldElement64<18446744073709551263>;
 fn test_batch_traces_are_pinned_across_families() {
     let checked = SigF4Options {
         check_signatures: true,
+        allow_graded_lex: true,
         ..SigF4Options::default()
     };
     let cascade = SigF4Options {
