@@ -24,6 +24,7 @@ aj = bj.aj
 CHILD = '''#!/bin/sh
 case "$1" in
   ok) echo '{"status":"ok"}' ;;
+  emit) echo '{"selection_outcome":"'"$2"'","verified":'"$3"'}' ;;
   report) echo '{"status":"complete","basis_sha256":"'"$2"'","statistics":{"symbolic_ns":2000000,"elimination_ns":3000000}}' ;;
   fail) echo boom >&2; exit 1 ;;
   selfkill) kill -TERM $$ ;;
@@ -447,7 +448,8 @@ class BenchJobTest(unittest.TestCase):
         self.cli('run', job, check=0)
         doc = json.loads(self.cli('report', job, '--json', check=0).stdout)
         self.assertEqual(doc['counts'], dict(attempts=4, statuses=dict(ok=4), contaminated=0, void=False,
-                                             stopped=False, inconclusive=0))
+                                             stopped=False, inconclusive=0,
+                                             selection={'completed-unverified': 4}))
         a = next(r for r in doc['cells'] if r['arm'] == 'a')
         self.assertEqual((a['n'], a['stages_ms']), (2, dict(symbolic=2.0, elimination=3.0)))
         self.assertEqual(doc['digests'], {'i1': ['d1']})
@@ -722,6 +724,167 @@ class BenchJobTest(unittest.TestCase):
         # Without a reference nothing is claimed checked.
         bare = bj.competitive_rows(state, m, machine='x')
         self.assertTrue(all('invariants' not in r and 'verification' not in r for r in bare))
+
+    # A child that exits 0 but reports a refusal is counted by its selection status and never timed.
+    def test_refusal_reported_with_exit_zero_is_not_timed(self):
+        state, m = self.synthetic(dict(a=[1.0, 1.0], b=[2.0, 2.0]))
+        state['attempts'][1]['stdout'] = json.dumps(dict(status='refused', error='Unsupported { reason: "x" }')).encode()
+        doc = bj.summarize(state, m)
+        self.assertEqual(doc['counts']['selection'], {'completed-unverified': 3, 'unsupported': 1})
+        b = next(c for c in doc['cells'] if c['arm'] == 'b')
+        self.assertEqual(b['n'], 1)
+        self.assertEqual(doc['selection'][1]['status'], 'unsupported')
+        self.assertIn('## Selection outcomes', bj.render(doc))
+
+    # A real job reaches each child-reported status plus the harness's timeout and process failure.
+    def test_a_job_reports_every_selection_status_it_can_reach(self):
+        cases = (('verified', ['emit', 'complete', 'true']), ('unverified', ['emit', 'complete', 'false']),
+                 ('unsupported', ['emit', 'unsupported', 'false']), ('memory', ['emit', 'memory-refusal', 'false']),
+                 ('time-stop', ['emit', 'time-stop', 'false']), ('wrong', ['emit', 'incorrect-output', 'false']),
+                 ('crash', ['fail']), ('slow', ['sleep', '20']))
+        job = self.job(self.manifest(instances=cases, reps=1, wall=1))
+        self.cli('run', job, check=0)
+        doc = json.loads(self.cli('report', job, '--json', check=0).stdout)
+        by_instance = {s['instance']: s['status'] for s in doc['selection'] if s['arm'] == 'a'}
+        self.assertEqual(by_instance, {'verified': 'completed-verified', 'unverified': 'completed-unverified',
+                                       'unsupported': 'unsupported', 'memory': 'memory-refusal',
+                                       'time-stop': 'timeout', 'wrong': 'incorrect-output',
+                                       'crash': 'process-failure', 'slow': 'timeout'})
+        self.assertEqual({c['instance'] for c in doc['cells']}, {'verified', 'unverified'})
+        slow = next(s for s in doc['selection'] if s['instance'] == 'slow')
+        self.assertEqual((slow['completion_ms'], slow['censored_at_ms']), (None, 1000.0))
+
+    # An arm's task contract and configuration id, and an instance's lineage keys, reach every record.
+    def test_selection_records_carry_contract_configuration_and_lineage(self):
+        m = self.manifest(instances=(('i1', ['ok']),), reps=1)
+        m['arms'][0].update(contract='T-GB', configuration='conv-w1')
+        m['instances'][0]['lineage'] = dict(family_id='katsura', formulation_id='katsura-4')
+        job = self.job(m)
+        self.cli('run', job, check=0)
+        doc = json.loads(self.cli('report', job, '--json', check=0).stdout)
+        a = next(s for s in doc['selection'] if s['arm'] == 'a')
+        self.assertEqual((a['contract'], a['configuration'], a['lineage']),
+                         ('T-GB', 'conv-w1', dict(family_id='katsura', formulation_id='katsura-4')))
+        b = next(s for s in doc['selection'] if s['arm'] == 'b')
+        self.assertEqual((b['contract'], b['configuration']), (None, 'b'))
+        for key, value in (('contract', 'T-FAST'), ('configuration', 'has space')):
+            bad = self.manifest(instances=(('i1', ['ok']),), reps=1)
+            bad['arms'][0][key] = value
+            self.assertNotEqual(self.submit(bad).returncode, 0, key)
+        bad = self.manifest(instances=(('i1', ['ok']),), reps=1)
+        bad['instances'][0]['lineage'] = dict(family_id=3)
+        self.assertNotEqual(self.submit(bad).returncode, 0)
+
+    # With references, a matching digest is verified and a wrong one is incorrect-output and untimed.
+    def test_references_verify_attempts(self):
+        state, m = self.synthetic(dict(a=[1.0, 1.0]))
+        state['attempts'][1]['stdout'] = json.dumps(dict(status='complete', basis_sha256='bad')).encode()
+        doc = bj.summarize(state, m, references={'goldilocks/katsura-4': 'd1'})
+        self.assertEqual(doc['counts']['selection'], {'completed-verified': 1, 'incorrect-output': 1})
+        self.assertEqual(doc['cells'][0]['n'], 1)
+
+
+class SelectionOutcomeTest(unittest.TestCase):
+    """The selection-grade status of one attempt (#1008; plan §8.4)."""
+
+    MD = dict(process_wall_ns=2_000_000_000, wall_seconds=2.0)
+
+    def outcome(self, run_status='ok', child=None, cap=30, reference=None, md=None):
+        return bj.selection_outcome(run_status, md or self.MD, child or {}, cap, reference)
+
+    # Every harness status and every child report shape maps to exactly one of the nine statuses.
+    def test_every_status_is_reachable(self):
+        cases = [
+            (('ok', dict(selection_outcome='complete', verified=True)), 'completed-verified'),
+            (('ok', dict(selection_outcome='complete')), 'completed-unverified'),
+            (('ok', {}), 'completed-unverified'),
+            (('timeout', {}), 'timeout'),
+            (('ok', dict(selection_outcome='time-stop')), 'timeout'),
+            (('ok', dict(selection_outcome='memory-refusal')), 'memory-refusal'),
+            (('rss-limit', {}), 'rss-limit'),
+            (('ok', dict(selection_outcome='unsupported')), 'unsupported'),
+            (('failed', {}), 'process-failure'),
+            (('ok', dict(selection_outcome='incorrect-output')), 'incorrect-output'),
+            (('cancelled', {}), 'not-run'),
+        ]
+        for (run_status, child), status in cases:
+            self.assertEqual(self.outcome(run_status, child)['status'], status, (run_status, child))
+        self.assertEqual({s for _, s in cases}, set(bj.SELECTION_STATUSES))
+
+    # A censored attempt carries its cap and never a finite completion time, in-solver stops included.
+    def test_a_timeout_has_no_completion_time(self):
+        for run_status, child in (('timeout', {}), ('ok', dict(selection_outcome='time-stop'))):
+            o = self.outcome(run_status, child, cap=30)
+            self.assertIsNone(o['completion_ms'])
+            self.assertEqual(o['censored_at_ms'], 30_000.0)
+        self.assertEqual(self.outcome()['completion_ms'], 2000.0)
+        for status in ('memory-refusal', 'unsupported', 'incorrect-output'):
+            self.assertIsNone(self.outcome('ok', dict(selection_outcome=status))['completion_ms'], status)
+
+    # m33_qualify's `status`/`error`, RunStatus tags and the grobx driver's `stopped`/`certified` classify unaided.
+    def test_legacy_child_reports_classify(self):
+        legacy = [
+            (dict(status='complete'), 'completed-unverified'),
+            (dict(status='refused', error='Unsupported { reason: "graded orders only" }'), 'unsupported'),
+            (dict(status='stopped', error='Budget(TooManyRows { limit: 10 })'), 'memory-refusal'),
+            (dict(status='stopped', error='TooManyBasisElements { elements: 9, limit: 8 }'), 'memory-refusal'),
+            (dict(status='stopped', error='TimeBudgetExceeded { progress: .. }'), 'timeout'),
+            (dict(status='stopped', error='CertificationFailed { reason: "x" }'), 'incorrect-output'),
+            (dict(status='stopped', error='InvalidOptions { reason: "x" }'), 'process-failure'),
+            (dict(status='stopped', error='something new'), 'process-failure'),
+            (dict(status='verified'), 'completed-verified'),
+            (dict(status='unsupported'), 'unsupported'),
+            (dict(status='failed', error='x'), 'process-failure'),
+            (dict(status='stopped-by-limit', error='the computation did not finish within 30000 ms, and had '
+                  'reached degree 4 after 30001 ms'), 'timeout'),
+            (dict(status='stopped-by-limit', detail='the computation did not finish within 8 batches'),
+             'memory-refusal'),
+            (dict(status='ok'), 'completed-unverified'),
+            # r1cs_import's and whole_route's own `outcome` key is theirs, not this schema's.
+            (dict(outcome='refused'), 'completed-unverified'),
+            (dict(stopped='deadline'), 'timeout'),
+            (dict(stopped='memory'), 'memory-refusal'),
+            (dict(stopped='cancel'), 'not-run'),
+            (dict(certified=True, basis='[x]:\n'), 'completed-verified'),
+            (dict(certified=False, flaw='not reduced'), 'incorrect-output'),
+            (dict(certified=None, basis='[x]:\n'), 'completed-unverified'),
+        ]
+        for child, status in legacy:
+            self.assertEqual(self.outcome('ok', child)['status'], status, child)
+
+    # An independent reference upgrades a completion to verified on a match and makes a mismatch incorrect.
+    def test_reference_digest_verifies_or_convicts(self):
+        match = self.outcome('ok', dict(basis_sha256='d1'), reference='d1')
+        self.assertEqual((match['status'], match['verified_by']), ('completed-verified', 'reference'))
+        both = self.outcome('ok', dict(basis_sha256='d1', verified=True), reference='d1')
+        self.assertEqual(both['verified_by'], 'runtime+reference')
+        wrong = self.outcome('ok', dict(basis_sha256='d2', verified=True), reference='d1')
+        self.assertEqual((wrong['status'], wrong['completion_ms']), ('incorrect-output', None))
+        # No digest to compare is not a conviction: the completion stays unverified by reference.
+        self.assertEqual(self.outcome('ok', {}, reference='d1')['status'], 'completed-unverified')
+
+    # Charged costs come from the child; the independent audit is recorded apart and never charged.
+    def test_costs_are_split_into_charged_and_audit(self):
+        child = dict(selection_outcome='complete', costs_ns=dict(feature=1_000_000, verification=3_000_000, audit=5_000_000))
+        o = self.outcome('ok', child)
+        self.assertEqual(o['charged_ms'], dict(feature=1.0, verification=3.0))
+        self.assertEqual(o['audit_ms'], dict(audit=5.0))
+        with self.assertRaises(bj.JobError):
+            self.outcome('ok', dict(selection_outcome='complete', costs_ns=dict(made_up=1)))
+
+    # The record is plain JSON, versioned, and survives a round trip unchanged.
+    def test_record_round_trips(self):
+        o = self.outcome('ok', dict(selection_outcome='complete', acceptance='probabilistic', costs_ns=dict(probe=7)))
+        self.assertEqual(o['schema'], bj.SELECTION_SCHEMA)
+        self.assertEqual(json.loads(json.dumps(o)), o)
+        self.assertEqual(o['acceptance'], 'probabilistic')
+        with self.assertRaises(bj.JobError):
+            self.outcome('ok', dict(selection_outcome='complete', acceptance='usually'))
+
+    # An unknown `selection_outcome` is a harness bug, refused rather than folded into a status.
+    def test_unknown_outcome_is_refused(self):
+        with self.assertRaises(bj.JobError):
+            self.outcome('ok', dict(selection_outcome='mostly-done'))
 
 
 if __name__ == '__main__':

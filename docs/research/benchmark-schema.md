@@ -189,7 +189,10 @@ missing.
 | `arms[].build.comparand` | optional; an externally provisioned comparand's provenance (provision script, upstream pin). It stands in for the `git archive` recipe, which a Zeebra arm still needs (#966) |
 | `arms[].workers` | optional subset of `run.workers`; the arm runs only at those counts (Track G's 16-worker best-supported arm beside 1-worker arms, #966) |
 | `arms[].argv` | template; `{field}` placeholders take `instance.params` and `instance`, `input`, `inputs[<key>]`, `workers`, `seed`, `rep`, `cpus`, `wall_seconds`, `live_bytes` |
+| `arms[].contract` | optional task contract: `T-GB`, `T-GB-conv`, `T-RAD`, `T-PT1`, `T-PTALL` or `T-ALG` (`adaptive-selection-contracts.md` §2, #1004) |
+| `arms[].configuration` | optional portfolio configuration id, a plain name (default: the arm's name) |
 | `instances[].name`, `.params` | unique name; template values |
+| `instances[].lineage` | optional `{key: string}` lineage keys, copied to every selection record; #1005 fixes the key set |
 | `instances[].path`, `.sha256` | optional input file and its digest; copied and re-hashed like a binary |
 | `instances[].inputs` | optional `{key: {path, sha256}}`, one file per solver format, each copied and re-hashed like `path`; argv names one as `{inputs[key]}` (#966) |
 | `run.workers` | list of worker counts; an attempt pins to the first *w* CPUs of `run.cpus` |
@@ -216,3 +219,91 @@ journal without `clock_source` judges exactly as version 2. **Version 2** (#996)
 is **version 1**, grouped per cell (`<instance>@<w>w`), and is read as such: `report` names the
 grouping either way, and a journal is never rewritten. The re-judged M33 sessions are in
 [`research/m33-clock-rule/`](../../research/m33-clock-rule/README.md).
+
+## 8. Selection outcomes (`selection-outcome-v1`, #1008)
+
+A selector is fitted on a performance matrix, and the matrix compares only if every cell is
+accounted for the same way (M34 plan §8.4). `bench-job`'s journaled status (`ok`, `failed`,
+`timeout`, `rss-limit`, `cancelled`) is the harness's view, and it drives retries. It cannot tell a
+typed refusal from a completion, because a child that refuses still exits 0. Before this schema, such
+an attempt was timed as if it had finished.
+
+`selection_outcome()` in `tools/bench-job` derives one more status per attempt, at report time,
+from:
+
+- the journaled status;
+- the child's JSON report (its last stdout line);
+- optionally, an independent reference digest.
+
+Nothing new is journaled, so every journal written before this schema replays unchanged.
+`report --json` carries one `selection` record per attempt and `counts.selection`.
+
+### 8.1 Statuses
+
+| Status | Comes from | Completion time | Timed |
+|---|---|---|---|
+| `completed-verified` | a completion that passed the arm's runtime check (`verified: true`, grobx `certified: true`, RunStatus `verified`) or matched the reference digest | process wall | yes |
+| `completed-unverified` | a completion with neither | process wall | yes |
+| `timeout` | the harness's wall cap, or an in-solver time stop | none; `censored_at_ms` = the cap | no |
+| `memory-refusal` | a typed in-solver resource refusal (`StopKind::Resource`: matrix, live-entry, live-byte, batch or basis-size limits) | none | no |
+| `rss-limit` | the external `rss-guard` kill | none | no |
+| `unsupported` | a typed refusal before work (`Unsupported`, `refused`) | none | no |
+| `process-failure` | a nonzero exit that is not a cap or guard, a child-reported failure, or a stop the classifier cannot name | none | no |
+| `incorrect-output` | a rejected certificate, or a basis digest different from the reference | none | no |
+| `not-run` | a cancelled attempt | none | no |
+
+- **Censoring.** A censored attempt (`timeout`) records the cap C, never its wall. An in-solver time
+  stop is censored at the job's cap too, because the comparison is at C.
+- **Mismatches.** A digest mismatch overrides any runtime verdict. A missing digest convicts
+  nothing: the attempt stays at the status it already had, which is `completed-unverified` unless
+  its own check passed.
+
+### 8.2 What a child reports
+
+Every key below is optional. A child reporting none of them reads as a completion when it exits 0,
+which is what every attempt was before this schema.
+
+| Key | Values |
+|---|---|
+| `selection_outcome` | `complete`, `unsupported`, `memory-refusal`, `time-stop`, `incorrect-output`. Any other value is refused |
+| `reason` | free text, kept on the record |
+| `verified` | `true` when the arm's own runtime check passed |
+| `acceptance` | `deterministic`, `certified-randomized`, `probabilistic` (the #1029 acceptance modes, `adaptive-selection-contracts.md` §8.4) |
+| `costs_ns` | `{feature, inference, probe, discarded, conversion, verification, fallback}` charged to the arm, plus `audit`, which is recorded and never charged |
+| `basis_sha256` | compared with `--references` |
+
+Without `selection_outcome`, existing shapes are read as follows:
+
+- **m33_qualify's `status` and `error`.**
+  - `refused` → `unsupported`.
+  - `stopped` → named from the `F4Error` or `SigF4Error` Debug variant: a resource limit, a time
+    limit, `CertificationFailed` (→ `incorrect-output`) or `Unsupported`.
+- **The external contract's RunStatus tags.**
+  - `verified` → `completed-verified`.
+  - `unsupported` → `unsupported`.
+  - `failed` → `process-failure`.
+  - `stopped-by-limit` → split on the Display text. A wall budget names milliseconds; any other
+    limit is a resource refusal.
+- **The grobx driver's `stopped`** (`deadline`, `memory` or `cancel`) and `certified` fields.
+
+Two caveats:
+
+- `outcome` is **not** read. `r1cs_import` and `whole_route` already use that key with their own
+  vocabularies.
+- The grobx driver refuses an unsupported cell with a nonzero exit, so through `bench-job` that is
+  `process-failure`. Reporting it as `unsupported` needs the driver to exit 0 with
+  `selection_outcome`, which is driver work (#987's scope).
+
+### 8.3 Cost accounting
+
+- **A policy's cost** is the process wall of every attempt it made, including discarded and
+  fallback attempts. The in-process components in `costs_ns` are attribution *within* that wall,
+  not additions to it:
+  - feature extraction, inference, probes, discarded work, conversion and fallback;
+  - runtime verification that the arm's guarantee requires.
+- **The independent-reference audit** (digest comparison, normally offline) is common to every arm.
+  It is recorded under `audit` and never charged.
+- **Identity on every record.** The arm's `contract` and `configuration`, and the instance's
+  `lineage`, come from the manifest (§7). The binary hash, commit, build, cpus and `cpu-context`
+  are already on the attempt's metadata. Which lineage keys are required is #1005's decision; this
+  schema carries whatever the manifest states.

@@ -6,7 +6,7 @@
     tools/bench-job run (<job-id> | --next)       foreground; background it yourself
     tools/bench-job resume <job-id> [--force-uncancel]
     tools/bench-job cancel <job-id>
-    tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05]
+    tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05] [--references refs.json]
     tools/bench-job scoreboard <job-id> [--machine NAME] [--scored ARM] [--references refs.json]
                                [--attempt-digests digests.json] [--append history.json]
 
@@ -43,6 +43,8 @@ DEFAULT_ROOT = '/buildcache/bench-jobs'
 NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/-]*$')
 HEX = re.compile(r'^[0-9a-f]+$')
 RETRYABLE = ('failed', 'timeout', 'rss-limit')
+# docs/research/adaptive-selection-contracts.md §2 (#1004).
+TASK_CONTRACTS = ('T-GB', 'T-GB-conv', 'T-RAD', 'T-PT1', 'T-PTALL', 'T-ALG')
 EXIT_REFUSED, EXIT_CANCELLED, EXIT_BUSY, EXIT_USAGE = 3, 4, 75, 64
 
 
@@ -167,6 +169,11 @@ def validate(m):
                  f'provenance); a job never builds')
         _require(isinstance(arm.get('argv'), list) and all(isinstance(a, str) for a in arm['argv']),
                  f'arm {name}: argv must be a list of strings')
+        _require(arm.get('contract') is None or arm['contract'] in TASK_CONTRACTS,
+                 f'arm {name}: contract must be one of {", ".join(TASK_CONTRACTS)}')
+        _require(arm.get('configuration') is None or (isinstance(arm['configuration'], str)
+                                                      and NAME.match(arm['configuration'])),
+                 f'arm {name}: configuration must be a plain name')
         binary = Path(arm.get('binary', ''))
         _require(binary.is_absolute() and binary.is_file() and os.access(binary, os.X_OK),
                  f'arm {name}: binary must be an absolute path to an executable')
@@ -179,6 +186,9 @@ def validate(m):
             _require(path.is_absolute() and path.is_file(), f'instance {inst["name"]}: input {key} must be an absolute file')
             _require(sha256_file(path) == spec.get('sha256'), f'instance {inst["name"]}: input {key} does not match its sha256')
         _require(isinstance(inst.get('params', {}), dict), f'instance {inst["name"]}: params must be an object')
+        lineage = inst.get('lineage', {})
+        _require(isinstance(lineage, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in lineage.items()),
+                 f'instance {inst["name"]}: lineage must map names to strings')
     limits = run.get('limits') or {}
     cpus = expand_cpus(run.get('cpus', ''))
     workers = run.get('workers')
@@ -421,21 +431,39 @@ def _median(values):
     return stats.median(values) if values else None
 
 
-def summarize(state, m, *, baseline=None, bound=1.05):
-    """The report as data. Contaminated attempts are counted and listed but never timed (#968)."""
+def _reference_digest(references, instance):
+    """An instance's reference digest from `references`: a digest string, or a scoreboard entry."""
+    ref = (references or {}).get(instance)
+    return ref.get('basis_digest') if isinstance(ref, dict) else ref
+
+
+def summarize(state, m, *, baseline=None, bound=1.05, references=None):
+    """The report as data. Contaminated attempts are counted and listed but never timed (#968), and
+    only a completed attempt's wall is a completion time (#1008): every other selection status is
+    counted, and a timeout is censored at the cap."""
     flagged, job = _flagged(state), state['header']['bench_job']
     base = baseline or m['arms'][0]['name']
     timed = defaultdict(lambda: defaultdict(dict))  # (instance, workers) -> arm -> (seed, rep) -> sample
     digests, verification, statuses = defaultdict(set), [], defaultdict(int)
+    selection, selected = [], defaultdict(int)
+    cap = m['run']['limits']['wall_seconds']
+    arms, instances = {a['name']: a for a in m['arms']}, {i['name']: i for i in m['instances']}
     for a in state['attempts']:
         md, cell, child = a['metadata'], a['cell'], _child_report(a)
         statuses[a['status']] += 1
+        outcome = selection_outcome(a['status'], md, child, cap, _reference_digest(references, cell['instance']))
+        selected[outcome['status']] += 1
+        arm = arms.get(cell['arm'], {})
+        selection.append(dict(attempt=md['attempt_id'], arm=cell['arm'], instance=cell['instance'],
+                              workers=cell['workers'], rep=cell['rep'], contract=arm.get('contract'),
+                              configuration=arm.get('configuration', cell['arm']),
+                              lineage=instances.get(cell['instance'], {}).get('lineage', {}), **outcome))
         verification.append(dict(attempt=md['attempt_id'], arm=cell['arm'], instance=cell['instance'],
                                  workers=cell['workers'], rep=cell['rep'], status=a['status'],
                                  contaminated=md['attempt_id'] in flagged, basis_sha256=child.get('basis_sha256')))
         if a['status'] == 'ok' and child.get('basis_sha256'):
             digests[cell['instance']].add(child['basis_sha256'])  # contamination spoils a time, not an answer
-        if a['status'] != 'ok' or md['attempt_id'] in flagged:
+        if outcome['completion_ms'] is None or md['attempt_id'] in flagged:
             continue
         stages = {k[:-3]: v / 1e6 for k, v in (child.get('statistics') or {}).items()
                   if k.endswith('_ns') and isinstance(v, (int, float))}
@@ -475,9 +503,10 @@ def summarize(state, m, *, baseline=None, bound=1.05):
                               for a in m['arms']]),
         counts=dict(attempts=len(state['attempts']), statuses=dict(statuses), contaminated=len(flagged),
                     void=bool(session.get('void')), stopped=stop.get('reason') != 'complete',
-                    inconclusive=sum(r['verdict']['outcome'] == 'inconclusive' for r in ratios)),
+                    inconclusive=sum(r['verdict']['outcome'] == 'inconclusive' for r in ratios),
+                    selection=dict(selected)),
         cells=cells, ratios=ratios, digests={k: sorted(v) for k, v in sorted(digests.items())},
-        verification=verification, timed=timed)
+        verification=verification, selection=selection, timed=timed)
 
 
 def _fmt(value, spec='.1f'):
@@ -501,7 +530,10 @@ def render(doc):
             f"{c['attempts']} attempts: " + ', '.join(f'{k} {v}' for k, v in sorted(c['statuses'].items()))
             + f"; contaminated {c['contaminated']} (excluded from timing){', session VOID' if c['void'] else ''}; "
             f"{'stopped before complete' if c['stopped'] else 'complete'}; inconclusive ratios {c['inconclusive']}.",
-            '\n## Wall and RSS (medians of clean ok attempts)\n', '| instance | w | arm | n | wall ms | RSS MiB |',
+            f'\n## Selection outcomes ({SELECTION_SCHEMA})\n',
+            ', '.join(f'{k} {c["selection"][k]}' for k in SELECTION_STATUSES if k in c['selection'])
+            + '. Only completed attempts are timed; a timeout is censored at the cap.',
+            '\n## Wall and RSS (medians of clean completed attempts)\n', '| instance | w | arm | n | wall ms | RSS MiB |',
             '|---|---:|---|---:|---:|---:|']
     out += [f"| {r['instance']} | {r['workers']} | {r['arm']} | {r['n']} | {_fmt(r['wall_ms'], ',.2f')} | "
             f"{'' if r.get('rss_exact', True) else '≤ '}{_fmt(r['rss_mib'])} |" for r in doc['cells']]
@@ -763,6 +795,118 @@ def classify(metadata):
     return 'failed'
 
 
+# Selection-grade outcomes (#1008; plan §8.4). `classify` above is the harness's view, which drives
+# retries and is journaled; this is derived from it and the child's report at report time, so every
+# journal written before it replays unchanged. docs/research/benchmark-schema.md §8 is the contract.
+SELECTION_SCHEMA = 'selection-outcome-v1'
+SELECTION_STATUSES = ('completed-verified', 'completed-unverified', 'timeout', 'memory-refusal', 'rss-limit',
+                      'unsupported', 'process-failure', 'incorrect-output', 'not-run')
+CHILD_OUTCOMES = ('complete', 'unsupported', 'memory-refusal', 'time-stop', 'incorrect-output')
+ACCEPTANCE_MODES = ('deterministic', 'certified-randomized', 'probabilistic')
+CHARGED_COSTS = ('feature', 'inference', 'probe', 'discarded', 'conversion', 'verification', 'fallback')
+AUDIT_COSTS = ('audit',)
+# `F4Error` variants by `StopKind` (src/grobner/f4/options.rs), for children that report a Debug string.
+_RESOURCE_STOPS = ('TooManyRows', 'TooManyColumns', 'TooManyNonzeros', 'TooManyLiveBytes', 'TooManyBatches',
+                   'TooManyBasisElements')
+_TIME_STOPS = ('TimeBudgetExceeded', 'InterreductionTimeBudgetExceeded', 'CertificationTimeBudgetExceeded')
+_GROBX_STOPS = dict(deadline='time-stop', memory='memory-refusal', cancel='cancelled')
+
+
+def _stop_from_debug(error):
+    """An `F4Error` or `SigF4Error` Debug string (m33_qualify's `error`) as (outcome, reason)."""
+    found = re.match(r'(?:Budget\()?([A-Za-z]+)', error or '')
+    name = found.group(1) if found else ''
+    if name in _RESOURCE_STOPS:
+        return 'memory-refusal', name
+    if name in _TIME_STOPS:
+        return 'time-stop', name
+    if name == 'CertificationFailed':
+        return 'incorrect-output', name
+    if name == 'Unsupported':
+        return 'unsupported', name
+    return None, f"unclassified stop: {name or 'no error text'}"
+
+
+def _stop_from_display(error):
+    """A limit's Display text (`stopped-by-limit` children): only a wall budget names milliseconds."""
+    if re.search(r'within [0-9]+ ms|ms budget', error or ''):
+        return 'time-stop', error
+    return 'memory-refusal', error
+
+
+def _legacy_outcome(child):
+    """(outcome, reason) for a child without `selection_outcome`: m33_qualify's `status`/`error`,
+    the external contract's RunStatus tags, the grobx driver's `stopped`/`certified`, or a plain
+    completion. Any other `status`, or none, reads as a completion, as every exit-0 attempt did
+    before this schema. `None` is unclassifiable."""
+    status, error = child.get('status'), child.get('error') or child.get('detail')
+    if status in ('refused', 'unsupported'):
+        return 'unsupported', error
+    if status == 'stopped':
+        return _stop_from_debug(error)
+    if status == 'stopped-by-limit':
+        return _stop_from_display(error)
+    if status == 'failed':
+        return None, error or 'the child reported a failure'
+    if child.get('stopped'):
+        return _GROBX_STOPS.get(child['stopped']), f"grobx stopped: {child['stopped']}"
+    if child.get('certified') is False:
+        return 'incorrect-output', child.get('flaw') or 'the checker rejected the result'
+    return 'complete', None
+
+
+def _costs(child, allowed):
+    costs = child.get('costs_ns') or {}
+    unknown = sorted(set(costs) - set(CHARGED_COSTS) - set(AUDIT_COSTS))
+    if unknown:
+        raise JobError(f"child report: unknown cost {', '.join(unknown)} (known: "
+                       f"{', '.join(CHARGED_COSTS + AUDIT_COSTS)})", EXIT_REFUSED)
+    return {k: v / 1e6 for k, v in costs.items() if k in allowed}
+
+
+def selection_outcome(run_status, metadata, child, cap_seconds, reference=None):
+    """One attempt's selection-grade record: exactly one of `SELECTION_STATUSES`, a completion time
+    only when it completed, the cap a timeout is censored at, and its costs split into those charged
+    to the arm and the independent audit, which is recorded and never charged."""
+    reason, verified_by = None, None
+    if run_status == 'cancelled':
+        status, reason = 'not-run', 'cancelled'
+    elif run_status in ('rss-limit', 'timeout'):
+        status = run_status
+    elif run_status != 'ok':
+        status, reason = 'process-failure', f"exit {metadata.get('exit')}"
+    else:
+        if 'selection_outcome' in child:
+            outcome, reason = child['selection_outcome'], child.get('reason')
+            if outcome not in CHILD_OUTCOMES:
+                raise JobError(f"child report: unknown selection_outcome {outcome!r} (known: {', '.join(CHILD_OUTCOMES)})",
+                               EXIT_REFUSED)
+        else:
+            outcome, reason = _legacy_outcome(child)
+        status = {'complete': 'completed', 'time-stop': 'timeout', 'cancelled': 'not-run',
+                  None: 'process-failure'}.get(outcome, outcome)
+    if status == 'completed':
+        runtime = (child.get('verified') is True or child.get('certified') is True
+                   or child.get('status') == 'verified')
+        digest = child.get('basis_sha256')
+        checked = reference is not None and digest is not None
+        if checked and digest != reference:
+            status, reason = 'incorrect-output', 'basis digest differs from the independent reference'
+        else:
+            verified_by = '+'.join(n for n, ok in (('runtime', runtime), ('reference', checked)) if ok) or None
+            status = 'completed-verified' if verified_by else 'completed-unverified'
+    acceptance = child.get('acceptance')
+    if acceptance is not None and acceptance not in ACCEPTANCE_MODES:
+        raise JobError(f"child report: unknown acceptance {acceptance!r} (known: {', '.join(ACCEPTANCE_MODES)})",
+                       EXIT_REFUSED)
+    wall_ms = metadata['process_wall_ns'] / 1e6
+    return dict(schema=SELECTION_SCHEMA, status=status, reason=reason, verified_by=verified_by,
+                acceptance=acceptance, wall_ms=wall_ms,
+                completion_ms=wall_ms if status.startswith('completed-') else None,
+                censored_at_ms=cap_seconds * 1e3 if status == 'timeout' else None,
+                charged_ms=_costs(child, CHARGED_COSTS), audit_ms=_costs(child, AUDIT_COSTS))
+
+
 class Deferred:
     """Hold SIGINT/SIGTERM while a record is being written, so an operator's signal cannot tear one."""
 
@@ -967,6 +1111,8 @@ def main(args=None):
     rp.add_argument('--json', action='store_true')
     rp.add_argument('--baseline', help='the arm every other arm is divided by (default: the first)')
     rp.add_argument('--bound', type=float, default=1.05, help='regression bound on the upper limit (plan §12.2)')
+    rp.add_argument('--references', type=Path,
+                    help='JSON mapping instance -> reference basis digest (or a scoreboard entry with basis_digest)')
     sc = sub.add_parser('scoreboard')
     sc.add_argument('job')
     sc.add_argument('--machine', default=os.uname().nodename)
@@ -1002,7 +1148,8 @@ def main(args=None):
             print(cancel(job_dir(a.job)))
         elif a.command == 'report':
             d = job_dir(a.job)
-            doc = summarize(aj.load(d / 'journal'), load_manifest(d), baseline=a.baseline, bound=a.bound)
+            doc = summarize(aj.load(d / 'journal'), load_manifest(d), baseline=a.baseline, bound=a.bound,
+                            references=json.loads(a.references.read_text()) if a.references else None)
             doc.pop('timed')
             print(json.dumps(doc, indent=1, sort_keys=True) if a.json else render(doc).rstrip('\n'))
         elif a.command == 'scoreboard':

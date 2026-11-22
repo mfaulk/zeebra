@@ -398,7 +398,7 @@ setsid nohup tools/bench-job run <job-id> > /buildcache/bench-jobs/<job-id>.log 
 tools/bench-job status [<job-id>] [--json]     # queued, running, done, cancelled, failed, interrupted
 tools/bench-job cancel <job-id>               # stops within 10 s (SIGINT to the child)
 tools/bench-job resume <job-id> [--force-uncancel]
-tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05]
+tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05] [--references refs.json]
 tools/bench-job scoreboard <job-id> [--scored ARM] [--references refs.json] [--attempt-digests d.json] \
     [--append research/competitive/results/history.json]
 tools/bench-reserve.sh release
@@ -414,8 +414,15 @@ alone, through `tools/bench_stats.py` (*Statistics and verdicts* below):
   clock per group.
 - **Attempts:** counts by status, the contaminated count (#968), session void, and whether the job
   stopped before completing.
-- **Wall and RSS, Stages, Scaling:** medians per instance, worker count and arm, over clean `ok`
-  attempts only. Stages come from the child's `statistics.*_ns`. Scaling lists each arm's speedup
+- **Selection outcomes** (`selection-outcome-v1`, #1008): every attempt's selection-grade status,
+  one of nine. It is derived from the harness status and the child's report:
+  `docs/research/benchmark-schema.md` §8 gives the statuses, the child keys and the cost rules.
+  - A child that exits 0 but reports a refusal or a stop is counted under that status, not timed.
+  - A timeout is censored at the cap and has no completion time.
+  - With `--references` (instance → digest, or the scoreboard's reference file), a matching digest
+    marks an attempt verified and a different one marks it `incorrect-output`.
+- **Wall and RSS, Stages, Scaling:** medians per instance, worker count and arm, over clean
+  *completed* attempts only. Stages come from the child's `statistics.*_ns`. Scaling lists each arm's speedup
   over its fewest workers.
 - **Ratios:** every arm ÷ the baseline arm (default: the first), paired per repetition, with a
   `regression_verdict` against `--bound`. Fewer than 9 pairs reads `stopped`.
