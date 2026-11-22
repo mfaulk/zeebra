@@ -5,6 +5,8 @@ missed (T-M not confirmed at Gate D, owner decision 16). §§1–15 are the plan
 measurement; §17 is the report, written from §16's template.
 **Predecessor:** M32 — Adaptive F4 ([`MILESTONE-ADAPTIVE-F4.md`](MILESTONE-ADAPTIVE-F4.md);
 tracker #938, **open**; final report #942, **open**, draft PR #960).
+**Successor:** M34 — Generalizable Algorithm Selection and One New Competitive Regime
+([`MILESTONE-GENERALIZABLE-SELECTION.md`](MILESTONE-GENERALIZABLE-SELECTION.md); tracker #1043).
 **Planning base:** `main` at `dfd984c0`.
 **Measured at:** §17: F3 = F2 = `db181c51` and F0 `31e334bd` (built from `9d6f16e4`), sessions of
 2026-11-22 (`research/m33-final/`). §§3–4: `8715c8ed`, `7b25a1ee`, `f8ec0b4c`, `2f661626` (quoted; nothing new). Every figure in §§3–4 is quoted from M31's final cohort at

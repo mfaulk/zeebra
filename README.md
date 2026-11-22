@@ -82,10 +82,13 @@ from them in four ways:
   problems are checked for ideal equivalence across engines before they are timed.
 
 Zeebra is competitive but does not lead. It has outperformed Singular on benchmarks such as
-Katsura-11 and random MQ systems. However, msolve and the fastest specialized F4 engines remain
-1.2–2.9× ahead on the large instances in the
-[latest integration report](docs/MILESTONE-SIGNATURE-SYMBOLIC-F4.md#152-primary-scoreboard-process-wall-final-main),
-often while using fewer cores. The [competitive board](research/competitive/COMPETITIVE.md)
-records every attempt, including those that failed or hit a limit.
+Katsura-11 and random MQ systems. In the
+[latest integration report](docs/MILESTONE-COMPETITIVE-BENCHMARKING.md#172-competitive-scoreboard)
+(M33), grobx stays 1.08–1.48× ahead at one worker on wide primes (2.35× on a held-out random MQ
+row), and msolve 1.9–2.8× ahead on MQ10 at 4–8 workers. Zeebra beat msolve on Katsura-11 at 8 workers, but that win did not
+hold on the held-out rows. The [competitive board](research/competitive/COMPETITIVE.md) records
+every attempt, including those that failed or hit a limit. The current milestone,
+[M34](docs/MILESTONE-GENERALIZABLE-SELECTION.md), measures whether choosing among Zeebra's
+algorithms per input pays, and looks for one class of systems where Zeebra leads.
 
 Licensed under the [MIT licence](LICENSE-MIT).
