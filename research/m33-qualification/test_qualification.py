@@ -104,7 +104,7 @@ class Correctness(unittest.TestCase):
         lex = [record('f2-entry', status='refused', basis_m33=None), record('f2-entry', rep=1)]
         self.assertTrue(any('typed refusal' in w for w in summarize.correctness_failures('lex/gf2/katsura-4', lex, REF)))
         grlex = [record('f2-entry', route='Signature')]
-        self.assertTrue(any('Order' in w for w in summarize.correctness_failures('grlex/m31/eco-11', grlex, REF)))
+        self.assertTrue(any('Shipping' in w for w in summarize.correctness_failures('grlex/m31/eco-11', grlex, REF)))
         routed = [record('f2-entry', route='Shipping(Order)')]
         self.assertEqual(summarize.correctness_failures('grlex/m31/eco-11', routed, REF), [])
 
@@ -114,6 +114,34 @@ class Correctness(unittest.TestCase):
         stops = [record('f0-f4', status='stopped', basis_m33=None, error='TooManyLiveNonzeros { .. }'),
                  record('f2-f4', status='stopped', basis_m33=None, error='TimeBudgetExceeded { .. }')]
         self.assertTrue(any('outcomes' in w for w in summarize.correctness_failures('grlex/goldilocks/mq', stops, REF)))
+
+    def test_any_shipping_reason_passes_under_graded_lex(self):
+        """Owner decision 12: graded-lex entry may ship for any reason, but must not take the signature route."""
+        spread = [record('f2-entry', route='Shipping(DegreeSpread)')]
+        self.assertEqual(summarize.correctness_failures('grlex/gf2/cyclic-6', spread, REF), [])
+        self.assertTrue(summarize.correctness_failures('grlex/gf2/cyclic-6', [record('f2-entry', route='Signature')], REF))
+
+    def test_thread_cap_is_judged_per_team_when_states_are_sampled(self):
+        """Owner decision 11: a team's running workers stay within the cap; listed threads of an exiting team do not count."""
+        exiting = [record('f2-entry', 16, threads_peak=21, running_peak=16, team_running_peak=16, route='Signature')]
+        self.assertEqual(summarize.correctness_failures('grevlex/wide64/cyclic-7', exiting, REF), [])
+        wide = [record('f2-entry', 16, threads_peak=17, running_peak=17, team_running_peak=17, route='Signature')]
+        self.assertTrue(any('one team' in w for w in summarize.correctness_failures('grevlex/wide64/cyclic-7', wide, REF)))
+
+    def test_running_excess_at_f2_may_not_exceed_f0_on_an_unchanged_path(self):
+        """Owner decision 11 (#1002): on the shipping F4, F2's running threads over the cap are bounded by F0's."""
+        def arm(v, running):
+            return record(f'{v}-f4', 16, threads_peak=running, running_peak=running, team_running_peak=16)
+        self.assertEqual(summarize.correctness_failures('grevlex/wide64/noon-8', [arm('f0', 17), arm('f2', 17)], REF), [])
+        worse = summarize.correctness_failures('grevlex/wide64/noon-8', [arm('f0', 16), arm('f2', 18)], REF)
+        self.assertTrue(any('F0' in w for w in worse))
+
+    def test_listed_threads_fall_back_to_f0_parity(self):
+        """Without per-thread states, listed threads over the cap pass only when F0 lists as many."""
+        both = [record('f0-f4', 16, threads_peak=21), record('f2-f4', 16, threads_peak=21)]
+        self.assertEqual(summarize.correctness_failures('grevlex/gf32003/noon-7', both, REF), [])
+        f2_only = [record('f0-f4', 16, threads_peak=16), record('f2-f4', 16, threads_peak=18)]
+        self.assertTrue(any('listed' in w for w in summarize.correctness_failures('grevlex/gf32003/noon-7', f2_only, REF)))
 
 
 class Regression(unittest.TestCase):

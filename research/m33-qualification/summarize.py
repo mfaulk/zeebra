@@ -83,18 +83,46 @@ def correctness_failures(instance, records, reference):
         status, engine = r['report'].get('status'), r['engine']
         if order == 'lex' and engine == 'entry' and status != 'refused':
             why.append(f'{r["version"]} entry under lex: {status}, not a typed refusal')
-        if order == 'grlex' and engine == 'entry' and r['version'] == 'f2' and 'Order' not in (r['report'].get('route') or ''):
-            why.append(f'f2 entry under graded-lex took {r["report"].get("route")}, not ShippingReason::Order')
-        threads = r['report'].get('threads_peak')
-        if threads is not None and threads > r['workers']:
-            why.append(f'{r["arm"]} at {r["workers"]} w: {threads} threads')
+        # Owner decision 12 (#965): graded-lex entry may ship to F4 for any reason.
+        if order == 'grlex' and engine == 'entry' and r['version'] == 'f2' \
+                and not (r['report'].get('route') or '').startswith('Shipping('):
+            why.append(f'f2 entry under graded-lex took {r["report"].get("route")}, not a Shipping route')
+        team = r['report'].get('team_running_peak')
+        if team is not None and team > r['workers']:
+            why.append(f'{r["arm"]} at {r["workers"]} w: {team} threads running in one team')
         kind = status if status != 'stopped' else 'stopped ' + (r['report'].get('error') or '').split(' ')[0]
         outcome[r['engine'], r['workers']].add((r['version'], kind))
+    why += thread_parity_failures(reports)
     for (engine, workers), seen in sorted(outcome.items()):
         kinds = {k for _, k in seen}
         if len(kinds) > 1:
             why.append(f'{engine} at {workers} w: outcomes {sorted(seen)}')
     return sorted(set(why))
+
+
+def thread_parity_failures(reports):
+    """Owner decision 11 (#965): threads over the cap at F2 may not exceed F0's on a path whose thread
+    lifecycle is unchanged. The F4 teardown race (#1002) lets a finished team's threads outlive their
+    join on both versions, so F0 sets the allowance. With per-thread states sampled (`running_peak`)
+    the excess is running threads, judged on the shipping F4 and on entry calls that ship at both
+    versions by the same route; without them it is listed threads, on every path."""
+    why, groups = [], defaultdict(lambda: defaultdict(list))
+    for r in reports:
+        groups[r['engine'], r['workers']][r['version']].append(r)
+    for (engine, workers), by in sorted(groups.items()):
+        states = all(r['report'].get('running_peak') is not None for v in by.values() for r in v)
+        if states and engine == 'entry':
+            routes = {v: {r['report'].get('route') for r in rs} for v, rs in by.items()}
+            same = routes.get('f0') == routes.get('f2') and all((x or '').startswith('Shipping(') for x in routes.get('f2', ()))
+            if not same:
+                continue
+        field, what = ('running_peak', 'running') if states else ('threads_peak', 'listed')
+
+        def excess(version):
+            return max((max(0, (r['report'].get(field) or 0) - workers) for r in by.get(version, ())), default=0)
+        if excess('f2') > excess('f0'):
+            why.append(f'{engine} at {workers} w: {what} threads over the cap, F2 {excess("f2")} > F0 {excess("f0")}')
+    return why
 
 
 def correctness(args):
