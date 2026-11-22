@@ -24,7 +24,8 @@ compiler and effective settings; `--version` emits it, while `--startup` measure
 
 Contract 1 accepts one JSON file: `variables` (ordered names), `modulus` (u64 prime), `order`
 (`grevlex` or `lex`), `generators` (expanded polynomial strings), `workers` (exactly 1), `mode`
-(`raw` or `certified`), `wall_ns` (internal deadline) and optional `rss_bytes`. The pinned revision
+(`raw` or `certified`), `wall_ns` (internal deadline), optional `rss_bytes` and optional
+`digest_only` (boolean, default false). The pinned revision
 computes serially even when given a larger thread allowance; the adapter refuses multiworker
 cohorts. Seed is fixed at zero and the complete engine report retains signatures, handovers,
 field kernel, orders and phases. No cheap/probabilistic certification objective is exposed.
@@ -45,6 +46,17 @@ A certified result requires `certified=true`, no stop, a complete basis and comp
 so the board cannot silently compare certified cost with raw computation. Certificate/report text
 is retained in the per-attempt artifact. The Linux child self high-water snapshot complements
 supervisor RSS sampling; the internal memory/deadline checks do not replace the external watchdog.
+
+**Digest-only replies (#1020).** With `digest_only: true` the reply's `basis` and `cofactors` are
+`null`; it carries `basis_m33`, the `m33-basis-v1` digest of the basis text (the one
+`tools/external/basis_digest.py` computes, and `research/m33-baseline/admission.py::grobx_digest`
+reads in place of the text), its cost `basis_m33_ns`, and the texts' lengths `basis_bytes` and
+`cofactors_bytes`. Certification is unchanged: the checker still rules inside `solve_ns`, and
+`certified`, `flaw`, `stopped` and `report` are reported as before. The digest is computed after
+`solve_ns` stops, so it is in process wall but not in-process solve time. grobx's API returns the
+basis only as text, so its own render stays inside `solve_ns`; what leaves process wall is the JSON
+encoding and printing of the texts — Eco-12's certified pair gzips to 1.70 GB, past `tools/bench-job`'s
+1 GiB default output budget. A full reply is unchanged and carries no `basis_m33`.
 
 ```sh
 CARGO_TARGET_DIR=/buildcache/cargo-target/grobx-driver-tests \

@@ -131,9 +131,14 @@ def grobx(binary, case, mode, wall_s):
 
 
 def grobx_digest(stdout, case, mode='raw'):
-    """The `m33-basis-v1` digest of a grobx-driver reply, or None if it holds no complete basis."""
+    """The `m33-basis-v1` digest of a grobx-driver reply, or None if it holds no complete basis.
+    A `digest_only` reply (#1020) carries the driver's own `basis_m33` in place of the basis text."""
     raw = json.loads(stdout) if stdout.strip() else {}
-    if not (raw.get('basis') and not raw.get('stopped') and (mode == 'raw' or raw.get('certified'))):
+    if raw.get('stopped') or not (mode == 'raw' or raw.get('certified')):
+        return None
+    if 'basis_m33' in raw:
+        return raw['basis_m33']
+    if not raw.get('basis'):
         return None
     texts = [t for t in re.split(r'[,\n\[\]:]', raw['basis']) if t.strip()]
     return basis_digest.basis_digest(texts, int(case['modulus']), case['variables'])

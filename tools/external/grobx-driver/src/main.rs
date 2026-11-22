@@ -1,4 +1,5 @@
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::{
     num::NonZeroUsize,
     time::{Duration, Instant},
@@ -37,6 +38,117 @@ fn strings(input: &Value, key: &str) -> Result<Vec<String>, String> {
         })
         .collect()
 }
+// `m33-basis-v1`, ported from `tools/external/basis_digest.py` (its `canonical_polynomial` and
+// `digest_canonical`, over the elements `research/m33-baseline/admission.py::grobx_digest` splits
+// out of a reply), so a digest-only reply is compared with the reference as a full one is.
+fn basis_m33(text: &str, modulus: u64, variables: &[String]) -> Result<String, String> {
+    let p = u128::from(modulus);
+    let mul = |a: u128, b: u128| a * b % p;
+    let pow = |mut b: u128, mut e: u64| {
+        let mut r = 1 % p;
+        while e > 0 {
+            if e & 1 == 1 {
+                r = mul(r, b);
+            }
+            b = mul(b, b);
+            e >>= 1;
+        }
+        r
+    };
+    let index: std::collections::HashMap<&str, usize> = variables
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (v.as_str(), i))
+        .collect();
+    let mut elements = Vec::new();
+    for element in text.split([',', '\n', '[', ']', ':']) {
+        if element.trim().is_empty() {
+            continue;
+        }
+        let compact: String = element.split_whitespace().collect();
+        let mut terms = std::collections::BTreeMap::<Vec<u64>, u128>::new();
+        for term in compact.replace('-', "+-").split('+') {
+            if term.is_empty() {
+                continue;
+            }
+            let mut coefficient = if term.starts_with('-') { p - 1 } else { 1 };
+            let mut exponents = vec![0u64; variables.len()];
+            for factor in term.trim_start_matches('-').split('*') {
+                let invalid = || format!("invalid polynomial factor: {factor}");
+                let (base, power) = match factor.split_once('^') {
+                    Some((b, e)) if !e.is_empty() && e.bytes().all(|c| c.is_ascii_digit()) => {
+                        (b, e.parse::<u64>().map_err(|_| invalid())?)
+                    }
+                    Some(_) => return Err(invalid()),
+                    None => (factor, 1),
+                };
+                if !base.is_empty() && base.bytes().all(|c| c.is_ascii_digit()) {
+                    let value = base
+                        .bytes()
+                        .fold(0, |v, d| (v * 10 + u128::from(d - b'0')) % p);
+                    coefficient = mul(coefficient, pow(value, power));
+                } else if base.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+                    && base.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
+                {
+                    let i = *index
+                        .get(base)
+                        .ok_or_else(|| format!("unknown polynomial variable: {base}"))?;
+                    exponents[i] = exponents[i].checked_add(power).ok_or_else(invalid)?;
+                } else {
+                    return Err(invalid());
+                }
+            }
+            let sum = terms.entry(exponents).or_insert(0);
+            *sum = (*sum + coefficient) % p;
+        }
+        terms.retain(|_, c| *c != 0);
+        let Some(leading) = terms.iter().max_by(|a, b| {
+            let degree = |m: &[u64]| m.iter().map(|&e| u128::from(e)).sum::<u128>();
+            degree(a.0)
+                .cmp(&degree(b.0))
+                .then_with(|| b.0.iter().rev().cmp(a.0.iter().rev()))
+        }) else {
+            continue;
+        };
+        // The leading coefficient's inverse by the extended Euclidean algorithm, as Python's
+        // `pow(c, -1, p)`; a reduced basis over a prime field always has one.
+        let (mut r0, mut r1, mut t0, mut t1) = (p as i128, *leading.1 as i128, 0i128, 1i128);
+        while r1 != 0 {
+            let q = r0 / r1;
+            (r0, r1) = (r1, r0 - q * r1);
+            (t0, t1) = (t1, t0 - q * t1);
+        }
+        if r0 != 1 {
+            return Err("leading coefficient has no inverse".into());
+        }
+        let scale = t0.rem_euclid(p as i128) as u128;
+        let mut bytes = Vec::new();
+        for (monomial, c) in &terms {
+            for &e in monomial {
+                let mut e = e;
+                while e >= 0x80 {
+                    bytes.push((e as u8 & 0x7f) | 0x80);
+                    e >>= 7;
+                }
+                bytes.push(e as u8);
+            }
+            bytes.extend_from_slice(format!("{};", mul(*c, scale)).as_bytes());
+        }
+        elements.push(bytes);
+    }
+    elements.sort_unstable();
+    let mut hasher = Sha256::new();
+    hasher.update(format!("m33-basis-v1 {modulus} {}\n", variables.len()).as_bytes());
+    for element in &elements {
+        hasher.update((element.len() as u32).to_le_bytes());
+        hasher.update(element);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect())
+}
 fn solve(input: &Value) -> Result<Value, String> {
     let start = Instant::now();
     let variables = strings(input, "variables")?;
@@ -74,6 +186,10 @@ fn solve(input: &Value) -> Result<Value, String> {
         return Err("this revision computes on one thread".into());
     }
     let mode = input["mode"].as_str().ok_or("missing mode")?;
+    let digest_only = match input.get("digest_only") {
+        None => false,
+        Some(v) => v.as_bool().ok_or("invalid digest_only")?,
+    };
     if !matches!(mode, "raw" | "certified") {
         return Err("unsupported objective".into());
     }
@@ -120,8 +236,23 @@ fn solve(input: &Value) -> Result<Value, String> {
     output["input_sha256"] = json!(grobx::digest(&text));
     output["generator_echoes"] = json!(engine_echo);
     output["checker_echoes"] = json!(checker_echo);
-    output["basis"] = json!(outcome.basis);
-    output["cofactors"] = json!(outcome.cofactors);
+    if digest_only {
+        // #1020: Eco-12's certified texts gzip to 1.7 GB, past the journal's output budget.
+        let start = Instant::now();
+        let digest = match &outcome.basis {
+            Some(basis) => Some(basis_m33(basis, modulus, &variables)?),
+            None => None,
+        };
+        output["basis_m33"] = json!(digest);
+        output["basis_m33_ns"] = json!(start.elapsed().as_nanos() as u64);
+        output["basis_bytes"] = json!(outcome.basis.as_ref().map(String::len));
+        output["cofactors_bytes"] = json!(outcome.cofactors.as_ref().map(String::len));
+        output["basis"] = Value::Null;
+        output["cofactors"] = Value::Null;
+    } else {
+        output["basis"] = json!(outcome.basis);
+        output["cofactors"] = json!(outcome.cofactors);
+    }
     output["certified"] = json!(outcome.certified);
     output["flaw"] = json!(outcome.flaw);
     output["stopped"] = json!(outcome.stopped.map(|s| s.name()));
@@ -206,6 +337,49 @@ mod tests {
         probe["workers"] = json!(16);
         probe["threads_probe"] = json!(true);
         assert!(solve(&probe).is_ok(), "the thread probe is accepted");
+    }
+    // The digest equals `basis_digest.py`'s on grobx's manual example, the unit and the zero ideal.
+    #[test]
+    fn basis_digest_matches_the_python_digest() {
+        let xy = ["x".to_string(), "y".to_string()];
+        assert_eq!(
+            basis_m33("[y^2+x,\nx*y+6,\nx^2+y]:\n", 7, &xy).unwrap(),
+            "d9920af7738a99cecec9464694df0e803b22f1abbee0358091a635d263ade3cf"
+        );
+        let x12 = ["x1".to_string(), "x2".to_string()];
+        let shared = "8fb196a0f7de4f7d36d2d8c6b34fb80eebd5f04658fcc799e1f2583781e5fefc";
+        for text in ["[2*x1*x2+4,\nx2^2+32002,\nx1^2+3*x2]:\n", "[1*x1^2+3*x2^1,x2^2-1,x1*x2+2]"] {
+            assert_eq!(basis_m33(text, 32003, &x12).unwrap(), shared);
+        }
+        let x = ["x".to_string()];
+        assert_eq!(
+            basis_m33("[1]:\n", 32003, &x).unwrap(),
+            "353bd285ccd03dbd555af7ac297f05056ad28d6b1f297679e8118bcaf7044eb6"
+        );
+        assert_eq!(
+            basis_m33("[]:\n", 32003, &x).unwrap(),
+            "862b98973014a66352e21298112d0faa088fc9470804751af9f004147fee8410"
+        );
+        assert!(basis_m33("[z]:\n", 32003, &x).is_err());
+    }
+    // A digest-only certified reply drops the basis and cofactor texts and carries the full reply's digest.
+    #[test]
+    fn digest_only_reply_carries_the_full_replys_digest() {
+        let mut input = json!({"variables":["x","y","z"],"modulus":32003,"order":"grevlex","workers":1,
+            "mode":"certified","wall_ns":10000000000u64,"rss_bytes":1073741824u64,
+            "generators":["x+y+z","x*y+y*z+z*x","x*y*z-1"]});
+        let full = solve(&input).unwrap();
+        let variables = strings(&input, "variables").unwrap();
+        let expected = basis_m33(full["basis"].as_str().unwrap(), 32003, &variables).unwrap();
+        assert!(full.get("basis_m33").is_none(), "a full reply is unchanged");
+        input["digest_only"] = json!(true);
+        let digest = solve(&input).unwrap();
+        assert_eq!(digest["basis_m33"], expected);
+        assert_eq!(digest["certified"], true);
+        assert!(digest["basis"].is_null() && digest["cofactors"].is_null());
+        assert_eq!(digest["basis_bytes"], full["basis"].as_str().unwrap().len());
+        input["digest_only"] = json!("yes");
+        assert!(solve(&input).is_err());
     }
     // An exhausted internal budget returns a stop with no usable answer or certification.
     #[test]

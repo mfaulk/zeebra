@@ -69,8 +69,13 @@ def write_inputs(study, out):
                 raise SystemExit(f"{h['field']}/{h['name']} does not reproduce its held-out input digest")
     d = Path(out, key('wide64', 'eco-12'))
     req = json.loads((d / 'grobx.json').read_text())
-    (d / 'grobx-certified.json').write_text(json.dumps(dict(req, mode='certified', wall_ns=CERTIFIED_CAP_S * 10**9,
-                                                            rss_bytes=CERTIFIED_CAP_BYTES)))
+    (d / 'grobx-certified.json').write_text(json.dumps(certified_request(req)))
+
+
+def certified_request(req):
+    """Track Gc's request: certified, digest-only, since Eco-12's certified texts gzip to 1.7 GB (#1020)."""
+    return dict(req, mode='certified', wall_ns=CERTIFIED_CAP_S * 10**9, rss_bytes=CERTIFIED_CAP_BYTES,
+                digest_only=True)
 
 
 def leading(poly, variables):

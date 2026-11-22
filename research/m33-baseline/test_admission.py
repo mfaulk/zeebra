@@ -67,6 +67,18 @@ class Digest(unittest.TestCase):
         plain = basis_digest.basis_digest(['x1^2+3*x2', 'x2^2+32002'], 32003, ['x1', 'x2'])
         self.assertEqual(basis_digest.basis_digest(['1*x1^2+3*x2^1', 'x2^2-1'], 32003, ['x1', 'x2']), plain)
 
+    def test_grobx_digest_only_reply(self):
+        """A digest-only grobx reply (#1020) yields its `basis_m33`, under the full reply's conditions."""
+        import json
+        case = dict(modulus='7', variables=['x', 'y'])
+        basis = '[y^2+x,\nx*y+6,\nx^2+y]:\n'
+        want = admission.grobx_digest(json.dumps(dict(basis=basis, stopped=None, certified=True)), case, 'certified')
+        reply = dict(basis=None, basis_m33=want, stopped=None, certified=True)
+        self.assertEqual(admission.grobx_digest(json.dumps(reply), case, 'certified'), want)
+        for spoiled in (dict(certified=None), dict(stopped='deadline'), dict(basis_m33=None)):
+            self.assertIsNone(admission.grobx_digest(json.dumps(dict(reply, **spoiled)), case, 'certified'))
+        self.assertEqual(admission.grobx_digest(json.dumps(dict(reply, certified=None)), case), want)
+
 
 if __name__ == '__main__':
     unittest.main()
