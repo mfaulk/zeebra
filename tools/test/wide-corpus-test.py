@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 from pathlib import Path
 import unittest
@@ -73,6 +74,22 @@ class WideCorpusTests(unittest.TestCase):
             wide.validate_native(dict(raw, modulus=17), request, 'groebner-rs')
         with self.assertRaises(ValueError):
             wide.validate_native(dict(raw, generators=['x1+2']), request, 'groebner-rs')
+
+    # A retained record at a superseded grobx pin replays, but a live run and an unknown pin are refused.
+    def test_superseded_grobx_pin_is_accepted_only_on_replay(self):
+        request = {'variables': ['x1'], 'modulus': 13, 'order': 'grevlex', 'workers': 1,
+                   'generators': ['x1+1'], 'mode': 'raw', 'wall_ns': 1, 'rss_bytes': 1}
+        old = wide.PUBLISHED_REVISIONS['grobx'][1]
+        self.assertNotEqual(old, wide.REVISIONS['grobx'])
+        raw = dict(contract=1, revision=old, isa='x86-64-v3', build='abc',
+                   build_metadata='PROFILE=release;OPT_LEVEL=3;CARGO_PROFILE_RELEASE_LTO=fat;CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1;',
+                   input=request, generator_echoes=[], checker_echoes=[], input_text='',
+                   input_sha256=hashlib.sha256(b'').hexdigest(), stopped='wall')
+        self.assertIsNone(wide.validate_native(raw, request, 'grobx', replay=True))
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            wide.validate_native(raw, request, 'grobx')
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            wide.validate_native(dict(raw, revision='0' * 40), request, 'grobx', replay=True)
 
     # A kernel peak above the ceiling remains a memory stop even if the polling loop missed it.
     def test_kernel_peak_cannot_escape_memory_limit(self):

@@ -363,10 +363,10 @@ def ticks_marker(output, name):
     return {tid:int(ticks) for tid,ticks in (part.split(':') for part in match[1].split(',') if part)}
 
 
-def certified_basis(raw,case,request):
+def certified_basis(raw,case,request,replay=False):
     if (raw.get('input')!=request or raw.get('certified') is not True
             or raw.get('flaw') is not None or raw.get('stopped') is not None or not raw.get('cofactors')
-            or raw.get('revision')!=wide.REVISIONS['grobx'] or raw.get('isa')!='x86-64-v3'
+            or raw.get('revision') not in (wide.PUBLISHED_REVISIONS['grobx'] if replay else (wide.REVISIONS['grobx'],)) or raw.get('isa')!='x86-64-v3'
             or raw.get('generator_echoes')!=raw.get('checker_echoes')
             or hashlib.sha256(raw.get('input_text','').encode()).hexdigest()!=raw.get('input_sha256')):
         raise ValueError('grobx exact certificate absent or rejected')
@@ -378,14 +378,14 @@ def certified_basis(raw,case,request):
     return wide.grobx_work.basis_list(raw['basis'])
 
 
-def certificate_reference(attempt,case,wall):
+def certificate_reference(attempt,case,wall,replay=False):
     if (attempt['status'] not in ('verified','excluded-environment-overlap')
             or attempt.get('exit')!=0 or attempt.get('stop')):
         raise ValueError('an incomplete or resource-stopped attempt is not a reference')
     raw=attempt.get('raw') or json.loads(attempt['stdout'])
     request=dict(variables=case['variables'],modulus=int(case['modulus']),order='grevlex',workers=1,
                  generators=case['generators'],mode='certified',wall_ns=wall*10**9,rss_bytes=2*1024**3)
-    basis=certified_basis(raw,case,request)
+    basis=certified_basis(raw,case,request,replay)
     return dict(basis=basis,timing_eligible=False,source_status=attempt['status'],
                 verification='independent exact grobx-checker/cofactors; reference construction timing excluded')
 
@@ -559,7 +559,7 @@ def validate_cohort(cohort):
             request=dict(variables=case['variables'],modulus=int(case['modulus']),order='grevlex',
                          workers=1,generators=case['generators'],mode='certified',
                          wall_ns=cohort['policy']['wall']*10**9,rss_bytes=2*1024**3)
-            actual=certified_basis(raw,case,request)
+            actual=certified_basis(raw,case,request,replay=True)
         elif a['engine']=='msolve':
             actual=msolve_basis(a['basis_output'],case)
         elif a['engine']=='singular':
@@ -571,7 +571,7 @@ def validate_cohort(cohort):
                          workers=a['workers'],generators=case['generators'])
             if a['engine']=='grobx':
                 request.update(mode='raw',wall_ns=cohort['policy']['wall']*10**9,rss_bytes=2*1024**3)
-            actual=wide.validate_native(a['raw'],request,a['engine'])
+            actual=wide.validate_native(a['raw'],request,a['engine'],replay=True)
             version=cohort['binaries'][a['engine']]['version']
             if any(a['raw'].get(k)!=version.get(k) for k in ('revision','build','build_metadata','isa')):
                 raise ValueError('native build identity changed inside cohort')
@@ -683,7 +683,7 @@ def attestation_table(directory):
     for suffix,text in orphan['files'].items():
         if hashlib.sha256(text.encode()).hexdigest()!=orphan['file_sha256'][suffix]:raise ValueError('partial diagnostic bytes changed')
     raw=json.loads(orphan['files']['.stdout']);request=json.loads(orphan['files']['.request'])
-    actual=wide.validate_native(raw,request,'groebner-rs');source=cohort('native-resume-v1.json.gz')
+    actual=wide.validate_native(raw,request,'groebner-rs',replay=True);source=cohort('native-resume-v1.json.gz')
     case=next(c for c in source['cases'] if c['digest']==orphan['digest'])
     verify_basis(actual,source['references'][case['digest']]['basis'],case)
     lines+=['','Rust p=8 partial diagnostic retains eight CPU-active hot-call participants after exact known-basis checking. Its parent coefficient check was interrupted: process wall/exit metadata are unavailable, so no full-process observation or ratio is fabricated. Rust p=16 hot diagnostics were not attempted.','']
@@ -886,7 +886,7 @@ def main():
         archive_hash=hashlib.sha256(archive.read_bytes()).hexdigest()
         for a in previous['attempts']:
             if a['engine']=='grobx-certified' and a['status'] in ('verified','excluded-environment-overlap'):
-                ref=certificate_reference(a,previous_cases[a['digest']],previous['policy']['wall'])
+                ref=certificate_reference(a,previous_cases[a['digest']],previous['policy']['wall'],replay=True)
             elif a['engine']=='singular' and a['status']=='verified' and not a.get('stop') and not a.get('exit'):
                 outputs=[t for t in a['adapter_artifacts'].values() if re.search(r'^@gbsize ',t,re.M)]
                 if len(outputs)!=1:raise ValueError('Singular reference output absent')

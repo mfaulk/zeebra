@@ -3,7 +3,7 @@ use std::{
     num::NonZeroUsize,
     time::{Duration, Instant},
 };
-const REVISION: &str = "1854835dbc25f24dc9a9ba017024d5030e99da1c";
+const REVISION: &str = "8005a2a1670a7264617a6f49eeb2618d7fa21701";
 #[global_allocator]
 static GLOBAL: grobx::Allocator = grobx::Allocator;
 fn identity() -> Value {

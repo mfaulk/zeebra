@@ -1,10 +1,14 @@
 # Pinned grobx subprocess driver
 
 This isolated **GPL-3.0-only** workspace links grobx and its independent checker at
-`1854835dbc25f24dc9a9ba017024d5030e99da1c`. It contains original integration code and
+`8005a2a1670a7264617a6f49eeb2618d7fa21701` (grobx 0.155.1). It contains original integration code and
 copies no engine/checker implementation into Zeebra's MIT library. The root crate has no new
 runtime dependency. The upstream license is available in the pinned Git checkout; distributing
 the executable requires satisfying its GPL terms and those of its dependencies.
+
+The pin moved from 0.73.3 (`1854835d`) to 0.155.1 in #987. Committed cohorts measured at 0.73.3
+still replay: `wide-corpus.py` keeps both in `PUBLISHED_REVISIONS`, which replays accept, while a
+live run accepts only the current `REVISIONS` entry.
 
 ```sh
 tools/external/provision-grobx.sh

@@ -27,7 +27,11 @@ COMPLETE = ('complete', 'verified')
 ENGINES = ('zeebra', 'groebner.jl', 'groebner-rs', 'grobx')
 
 REVISIONS = {'groebner-rs': 'c3e1d630fba9b2155a4c389d9022f13e0ba09218',
-             'grobx': '1854835dbc25f24dc9a9ba017024d5030e99da1c'}
+             'grobx': '8005a2a1670a7264617a6f49eeb2618d7fa21701'}
+# Every pin a retained cohort was measured at. Live runs accept only REVISIONS; replays of
+# committed records must keep verifying after the pin moves (#987).
+PUBLISHED_REVISIONS = {'groebner-rs': (REVISIONS['groebner-rs'],),
+                       'grobx': (REVISIONS['grobx'], '1854835dbc25f24dc9a9ba017024d5030e99da1c')}
 spec = importlib.util.spec_from_file_location('grobx_work', Path(__file__).with_name('grobx-work-study.py'))
 grobx_work = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(grobx_work)
@@ -61,9 +65,10 @@ def canonical_polynomial(text, modulus, variables):
     return tuple(sorted((m, c * scale % modulus) for m, c in terms.items()))
 
 
-def validate_native(raw, request, engine):
+def validate_native(raw, request, engine, replay=False):
     contract = 2 if engine == 'groebner-rs' else 1
-    if (raw.get('contract') != contract or raw.get('revision') != REVISIONS[engine]
+    accepted = PUBLISHED_REVISIONS[engine] if replay else (REVISIONS[engine],)
+    if (raw.get('contract') != contract or raw.get('revision') not in accepted
             or raw.get('isa') != 'x86-64-v3' or not raw.get('build')):
         raise ValueError('unrecognized native driver identity')
     for setting in ('PROFILE=release;', 'OPT_LEVEL=3;', 'CARGO_PROFILE_RELEASE_LTO=fat;',

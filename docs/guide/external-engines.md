@@ -701,7 +701,7 @@ resource usage. The generated board marks old polled observations and child snap
 ## grobx
 
 The optional `GrobxSolver` adapter drives a separately built GPL-3.0-only executable at
-`1854835dbc25f24dc9a9ba017024d5030e99da1c`. It supports prime fields below 2^64, grevlex/lex
+`8005a2a1670a7264617a6f49eeb2618d7fa21701` (grobx 0.155.1). It supports prime fields below 2^64, grevlex/lex
 reduced bases and lex-basis tasks. It refuses graded lex, weighted/block orders, extension fields,
 conversion/eliminant/solution tasks and multiworker requests. The pinned engine computes serially
 despite its thread allowance parameter. No GPL engine code enters the root dependency graph.

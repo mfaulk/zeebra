@@ -12,7 +12,7 @@ use std::{
 };
 
 /// Source revision of the separately built GPL executable; no upstream source is linked here.
-pub const PINNED_REVISION: &str = "1854835dbc25f24dc9a9ba017024d5030e99da1c";
+pub const PINNED_REVISION: &str = "8005a2a1670a7264617a6f49eeb2618d7fa21701";
 /// Raw reduced-basis computation and computation with exact cofactor certification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -482,7 +482,7 @@ impl ExternalSolver for GrobxSolver {
         }
         let raw = std::fs::read_to_string(output)?;
         let json = Json::parse(&raw).map_err(|e| failure(e.to_string()))?;
-        let version = ToolVersion::new(self.id(), "0.73.3")
+        let version = ToolVersion::new(self.id(), "0.155.1")
             .with_build(identity(&json)?)
             .with_raw(raw);
         self.version = Some(version.clone());

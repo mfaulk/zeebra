@@ -9,10 +9,29 @@ import shutil
 import subprocess
 import tarfile
 import io
+import re
 import importlib.util
 from instrument import instrument, PIN
 
 HERE = Path(__file__).resolve().parent
+
+
+def retarget(driver):
+    """Point a copy of the normal driver, at whatever pin it has, at the instrumented PIN source."""
+    main = driver / 'src/main.rs'
+    found = re.findall(r'^const REVISION: &str = "([0-9a-f]{40})";$', main.read_text(), re.M)
+    if len(found) != 1:
+        raise ValueError('driver REVISION constant not found')
+    dependency = '{ git = "https://github.com/code1-de/grobx", rev = "' + found[0] + '" }'
+    cargo = driver / 'Cargo.toml'
+    text = cargo.read_text()
+    if text.count(dependency) != 2:
+        raise ValueError('driver grobx dependencies are not both at its REVISION')
+    cargo.write_text(text.replace(dependency, '{ path = "../source" }', 1)
+                     .replace(dependency, '{ path = "../source/checker" }', 1))
+    main.write_text(main.read_text().replace(found[0], PIN))
+    # The normal driver may follow a newer pin; resolve against PIN's own lock (#987).
+    shutil.copyfile(HERE / f'grobx-{PIN[:8]}.Cargo.lock', driver / 'Cargo.lock')
 
 
 def main():
@@ -39,12 +58,7 @@ def main():
     original = {str(path.relative_to(source)): path.read_bytes() for path in source.rglob('*') if path.is_file()}
     instrument(source)
     shutil.copytree(HERE.parent, driver, ignore=shutil.ignore_patterns('research', 'target'))
-    cargo = driver / 'Cargo.toml'
-    cargo.write_text(cargo.read_text().replace(
-        '{ git = "https://github.com/code1-de/grobx", rev = "' + PIN + '" }',
-        '{ path = "../source" }', 1).replace(
-        '{ git = "https://github.com/code1-de/grobx", rev = "' + PIN + '" }',
-        '{ path = "../source/checker" }', 1))
+    retarget(driver)
     main = driver / 'src/main.rs'
     s = main.read_text()
     old = '    let outcome = grobx::groebner(&text, &params).map_err(|e| e.to_string())?;'

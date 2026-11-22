@@ -6,6 +6,11 @@ original passive instrumentation to a private copy of upstream commit
 replacement into the external-engine prefix. No upstream solver implementation is copied into
 the MIT crate.
 
+That commit (grobx 0.73.3) is the recipe's own pin. It is not the normal driver's: #987 moved the
+driver to 0.155.1, and `instrument.py` hash-checks the 0.73.3 sources it patches. `provision.py`
+therefore retargets its copy of the driver from whatever pin the driver has to this one, sets
+`REVISION` to match and resolves with `grobx-1854835d.Cargo.lock`, the driver's lock at 0.73.3.
+
 Build before acquiring the benchmark lock, using a new private target:
 
 ```sh
