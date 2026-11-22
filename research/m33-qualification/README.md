@@ -1,8 +1,8 @@
 # #974 M33-Q: correctness, resource safety and held-out qualification
 
 Plan: [`docs/MILESTONE-COMPETITIVE-BENCHMARKING.md`](../../docs/MILESTONE-COMPETITIVE-BENCHMARKING.md)
-§§8.4, 11.4, 12, 13. **Status: prepared, not run.** F2 is not pinned yet, because #971 (G2) is still
-in Gate C. Nothing here has timed Zeebra, and nothing has read a held-out row.
+§§8.4, 11.4, 12, 13. **Status: run at F2 `db181c51`.** Q passes under owner decisions 11–14
+(#965), and Gate D has been read once (`gate-d.md`).
 
 F0 is `31e334bd` (tag `measured/966-f0`). Both arms are built from `git archive` of their commit
 with this directory's harness laid over it, [`examples/m33_qualify.rs`](../../examples/m33_qualify.rs).
@@ -117,7 +117,8 @@ python3 $Q/summarize.py gate-d --gate-d --f2 $F2 <gate-d-G job> <gate-d-M job>  
 `results/` holds the summarizer output of session 1 (`correctness.md`, `regression.md`, `jobs.txt`)
 and session 2 (`session2-*`; the regression top-up driver is `session2-topup.py`). Session 2 rebuilt
 both binaries with harness `accae594` (per-team thread states) for correctness. The write-up is [`docs/research/m33-qualification.md`](../../docs/research/m33-qualification.md):
-Q did not pass and Gate D was not run. Repetitions pool across jobs, so a top-up job for cells
+Q passes under owner decisions 11–14 (`DECISION_13` and `DECISION_14` in `summarize.py` name the
+overridden rows), and the Gate D read is `gate-d.md`. Repetitions pool across jobs, so a top-up job for cells
 short of n is passed beside the first job.
 
 ## Dry run (pipeline proof, not a measurement)

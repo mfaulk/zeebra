@@ -9,17 +9,18 @@ build`.
 |---|---|---|---|---|---|
 | 1 | 2026-11-21 17:58–23:01 | `dd57bc4e` | `fe8fe83cb14a861b` | `b14b4680e3221daa` | correctness (superseded) and regression |
 | 2 | 2026-11-22 00:24–04:03 | `accae594` (correctness), `dd57bc4e` (regression top-up) | `e562ea30cd462eee` / `fe8fe83cb14a861b` | `6902bdc942139bf7` / `b14b4680e3221daa` | correctness and regression top-up |
+| Gate D | 2026-11-22 14:21–14:34, publication mode | `dd57bc4e` | `fe8fe83cb14a861b` | `b14b4680e3221daa` | the held-out read, once |
 
 The regression top-up reused session 1's binaries, so its repetitions pool with session 1's. The
 correctness re-run needed harness `accae594`, which samples thread states per team. That harness
 differs from `dd57bc4e` only in its thread sampler.
 
-Result: **Q did not pass.**
+Result: **Q passes** under owner decisions 11–14 (#965).
 - Safety passes.
-- Correctness fails on 2 of 71 rows under owner decisions 11 and 12 (#965).
-- Regression has no failing cell, but 3 cells cannot reach n.
+- Correctness: 71 of 71 rows pass. Two of them pass by decision 13.
+- Regression: 56 of 56 cells pass. Three of them pass by decision 14, with their partial n shown.
 
-Gate D was therefore **not run**, and the held-out rows were never timed. Nothing was reverted.
+Gate D was then read once (below). Nothing was reverted.
 
 ## Safety (at F2)
 
@@ -52,7 +53,10 @@ The two checks that session 1 failed were amended under owner decisions 11 and 1
   Attempts without thread states fall back to listed threads with F0 parity. Every session-2
   attempt carried thread states, so the fallback was not used.
 
-The two failing rows both fail check 2, on the shipping F4 at 16 workers:
+Two rows fail check 2 on the shipping F4 at 16 workers. **Owner decision 13** (#965) passes them
+at exactly these figures and records them against #1002. `DECISION_13` in `summarize.py` names both
+rows and the exact verdict it waives; any other failure on them, or the same failure on another row,
+still fails:
 
 | Row | Verdict |
 |---|---|
@@ -78,7 +82,9 @@ unreserved CPUs; their re-runs were valid.
 The grevlex/wide64/katsura-9 warm-call job was void on all three runs, at system load about 2. Its
 contamination concentrates in the same arms every time: the shipping F4 at 16 w (about 70% flagged,
 F0 and F2 alike) and F0 entry at 1 w (about 45%). Every flag comes from the clock-deviation rule.
-Its three cells therefore stay below n:
+Its three cells therefore stay below n. **Owner decision 14** (#965) passes them with their partial
+n disclosed. `DECISION_14` waives only the short n, and only while the partial interval's upper
+bound is ≤ 1.05:
 
 | Cell | n |
 |---|---|
@@ -93,7 +99,45 @@ graded-lex route. Its tables are kept in `results/correctness.md` and `results/r
 
 ## Gate D
 
-Not run. The plan reads it only after safety, correctness and regression all pass.
+Read once at F2 `db181c51`, with CCDs 1–2 reserved and released afterwards. Jobs `ae1f4abb17c1`
+(gate-d-G) and `fe70789bb592` (gate-d-M) ran the entry point on the held-out rows of
+`research/m33-baseline/held-out.json`, with n = 9 per cell. The command was
+`summarize.py gate-d --gate-d --f2 db181c51 <jobs>`, which exited 1, and its output, verbatim, is
+`research/m33-qualification/gate-d.md`:
+
+### Gate D held-out read, F2 db181c51 ÷ F0
+
+| Row | Engine | Workers | Method | F0 median | n | F2 ÷ F0 wall [95%] | Peak RSS ratio | Excluded |
+|---|---|---:|---|---:|---:|---|---:|---:|
+| grevlex/gf32003/katsura-12 | entry | 1 | process wall | 4399.1 ms | 8 | 0.855 [0.852, 0.863] | 0.740 | 1 |
+| grevlex/gf32003/katsura-12 | entry | 4 | process wall | 2540.2 ms | 5 | 0.692 [0.673, 0.709] | 0.739 | 4 |
+| grevlex/gf32003/katsura-12 | entry | 8 | process wall | 2285.8 ms | 4 | 0.649 [0.644, 0.654] | 0.744 | 6 |
+| grevlex/gf32003/katsura-12 | entry | 16 | process wall | 2179.8 ms | 8 | 0.655 [0.645, 0.658] | 0.737 | 1 |
+| grevlex/m31/mq-random-10-s1 | entry | 1 | process wall | 5313.3 ms | 8 | 0.717 [0.713, 0.719] | 1.036 | 1 |
+| grevlex/m31/mq-random-10-s1 | entry | 4 | process wall | 1375.8 ms | 8 | 0.995 [0.982, 1.017] | 1.007 | 1 |
+| grevlex/m31/mq-random-10-s1 | entry | 8 | process wall | 937.4 ms | 5 | 1.006 [1.002, 1.008] | 1.003 | 4 |
+| grevlex/m31/mq-random-10-s1 | entry | 16 | process wall | 751.7 ms | 9 | 1.004 [0.996, 1.010] | 1.018 | 0 |
+| grevlex/wide64/katsura-12 | entry | 1 | process wall | 4909.2 ms | 9 | 0.840 [0.836, 0.846] | 0.840 | 0 |
+| grevlex/wide64/katsura-12 | entry | 16 | process wall | 2380.9 ms | 6 | 0.679 [0.674, 0.682] | 0.842 | 3 |
+| grevlex/wide64/mq-random-10-s1 | entry | 1 | process wall | 5567.9 ms | 8 | 0.721 [0.719, 0.728] | 1.037 | 2 |
+| grevlex/wide64/mq-random-10-s1 | entry | 16 | process wall | 888.0 ms | 1 | 1.009 [1.009, 1.009] | 0.960 | 11 |
+
+| Row | Engine | Workers | Method | Verdict |
+|---|---|---:|---|---|
+| grevlex/gf32003/katsura-12 | entry | 1 | process wall | wall stopped: n = 8 < 9 |
+| grevlex/gf32003/katsura-12 | entry | 4 | process wall | wall stopped: n = 5 < 9 |
+| grevlex/gf32003/katsura-12 | entry | 8 | process wall | wall stopped: n = 4 < 9 |
+| grevlex/gf32003/katsura-12 | entry | 16 | process wall | wall stopped: n = 8 < 9 |
+| grevlex/m31/mq-random-10-s1 | entry | 1 | process wall | wall stopped: n = 8 < 9 |
+| grevlex/m31/mq-random-10-s1 | entry | 4 | process wall | wall stopped: n = 8 < 9 |
+| grevlex/m31/mq-random-10-s1 | entry | 8 | process wall | wall stopped: n = 5 < 9 |
+| grevlex/m31/mq-random-10-s1 | entry | 16 | process wall | pass |
+| grevlex/wide64/katsura-12 | entry | 1 | process wall | pass |
+| grevlex/wide64/katsura-12 | entry | 16 | process wall | wall stopped: n = 6 < 9 |
+| grevlex/wide64/mq-random-10-s1 | entry | 1 | process wall | wall stopped: n = 8 < 9 |
+| grevlex/wide64/mq-random-10-s1 | entry | 16 | process wall | wall stopped: n = 1 < 9 |
+
+**Session void:** ae1f4abb17c1, 16 of 72 attempts contaminated.
 
 ## Raw data
 
