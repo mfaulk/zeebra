@@ -178,8 +178,13 @@ open one, so the failure reaches `orient` rather than only the owner's email. Cl
 green again.
 
 `CI complete` always runs and fails if any dependency failed or was cancelled. Intentionally
-skipped jobs are accepted. It is suitable as a required branch-protection check; changing repository
-branch-protection settings is a separate action.
+skipped jobs are accepted.
+
+`main` is protected: every change lands through a pull request, and `CI complete` and
+`No coding-agent authors or co-authors` must pass first. The rules bind admins too, which matters
+because every agent works under the owner's admin token. Force-pushes and deleting `main` are
+blocked. Branches need not be up to date with `main` before merging; see *Testing the merged
+result* for why.
 
 `Agent authorship` (`.github/workflows/agent-authorship.yml`) fails a pull request or a push to
 `main` when a commit names a coding agent — Claude, Codex, Gemini, DeepSeek, Copilot and the like —
