@@ -691,17 +691,22 @@ fn test_batch_traces_are_pinned_across_families() {
     assert_eq!(digests, PINNED_TRACES, "{digests:#x?}");
 }
 
+/// Re-pinned for #1056. The digest includes the reduced basis's `Debug` text. Before #1022 that
+/// text listed terms in `HashMap` iteration order, which follows hashbrown's SIMD group width, so
+/// these pins held on x86_64 only. #1022 made `Debug` canonical, which moved every digest and made
+/// them the same on aarch64 and x86_64. The batch traces print no polynomial, so only the basis
+/// part moved.
 const PINNED_TRACES: [u64; 12] = [
-    0x419a83a7341bc1c0,
-    0x67e781c2a3620195,
-    0xa934167c5405dd3f,
-    0x6a2025e6a457f26f,
-    0x46418666e7ab7acc,
-    0xaeedf86901a4c6ee,
-    0xe76033afc800b57c,
-    0xc42c80a749da37db,
-    0x82dd1b18aeb5ba79,
-    0x971e6f966f04a247,
-    0x16cc832403076243,
-    0x944b14cd411bfb50,
+    0xcdddc794bae7419a,
+    0xbc23765fa7032021,
+    0x3cb9624e7e7ab233,
+    0x2462e69dcf1d2247,
+    0xe19b0598b781cf64,
+    0x25440d4ddeabbd7c,
+    0x84d0192b8b3c568c,
+    0x7dd02d541fdbedf3,
+    0xa461cdf1d86f0ce7,
+    0x6b9ba6b2f40e7cb5,
+    0x9b98bdce6371dd1d,
+    0x43a9cc6aca3d08de,
 ];
