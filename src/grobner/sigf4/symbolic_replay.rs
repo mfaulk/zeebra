@@ -388,8 +388,9 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
         let (mut run, mut levels) = (Run::default(), Vec::new());
         let started = Instant::now();
         std::thread::scope(|scope| {
+            let mut members = Vec::new();
             for _ in 1..workers {
-                scope.spawn(|| loop {
+                members.push(crate::util::team::spawn(scope, || loop {
                     barrier.wait();
                     let p = *plan.lock().expect("no plan panics");
                     if p.exit {
@@ -397,7 +398,7 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
                     }
                     self.work(p, &shared, &slices, &next);
                     barrier.wait();
-                });
+                }));
             }
             let (mut seeds, mut lo, mut hi) = (true, 0, self.targets.len());
             while lo < hi {
@@ -443,6 +444,7 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
             if workers > 1 {
                 barrier.wait();
             }
+            crate::util::team::join_all(members);
         });
         let clock = Instant::now();
         let Shared { work, cache, .. } = shared.into_inner().expect("no merge panics");

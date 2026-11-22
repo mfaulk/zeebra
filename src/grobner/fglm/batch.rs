@@ -538,15 +538,17 @@ fn reduce_targets_on_workers<const N: usize, F: FiniteField + Send + Sync>(
     // the interleaving.
     let mut cells: Vec<usize> = vec![0; results.chunks(block).len()];
     std::thread::scope(|scope| {
-        for ((slots, group), count) in results
+        let members: Vec<_> = results
             .chunks_mut(block)
             .zip(targets.chunks(block))
             .zip(cells.iter_mut())
-        {
-            scope.spawn(move || {
-                *count = reduce_group(group, closure, slots);
-            });
-        }
+            .map(|((slots, group), count)| {
+                crate::util::team::spawn(scope, move || {
+                    *count = reduce_group(group, closure, slots);
+                })
+            })
+            .collect();
+        crate::util::team::join_all(members);
     });
     (results, cells.iter().sum())
 }

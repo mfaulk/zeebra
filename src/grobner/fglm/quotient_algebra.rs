@@ -513,7 +513,7 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for BorderJob<'_, N, F> {
                 .map(|_| {
                     let next = &next;
                     let job = &self;
-                    scope.spawn(move || {
+                    crate::util::team::spawn(scope, move || {
                         let mut done = Vec::new();
                         loop {
                             let index = next.fetch_add(1, Ordering::Relaxed);

@@ -1457,8 +1457,9 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for PhaseA<'_, N, F> {
         let next = AtomicUsize::new(0);
         let slots: Vec<Mutex<Option<Reduced<F>>>> = (0..n).map(|_| Mutex::new(None)).collect();
         std::thread::scope(|scope| {
+            let mut members = Vec::new();
             for _ in 0..workers {
-                scope.spawn(|| {
+                members.push(crate::util::team::spawn(scope, || {
                     let mut workspace = Workspace::new(self.block.ncols);
                     loop {
                         let k = next.fetch_add(1, AtomicOrdering::Relaxed);
@@ -1468,8 +1469,9 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for PhaseA<'_, N, F> {
                         let done = self.reduce_one(&mut workspace, k);
                         *slots[k].lock().expect("a slot is never poisoned") = Some(done);
                     }
-                });
+                }));
             }
+            crate::util::team::join_all(members);
         });
         slots
             .into_iter()

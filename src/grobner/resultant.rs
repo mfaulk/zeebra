@@ -311,9 +311,16 @@ fn sample_determinants<F: FiniteField + Send + Sync>(
     // requested, never more, and never a sample left unevaluated.
     let block = at.len().div_ceil(concurrency).max(1);
     std::thread::scope(|scope| {
-        for (chunk, abscissae) in values.chunks_mut(block).zip(at.chunks(block)) {
-            scope.spawn(move || specialize_block(fc, gc, abscissae, kernel, chunk));
-        }
+        let members: Vec<_> = values
+            .chunks_mut(block)
+            .zip(at.chunks(block))
+            .map(|(chunk, abscissae)| {
+                crate::util::team::spawn(scope, move || {
+                    specialize_block(fc, gc, abscissae, kernel, chunk)
+                })
+            })
+            .collect();
+        crate::util::team::join_all(members);
     });
     values
 }

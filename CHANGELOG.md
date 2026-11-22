@@ -78,6 +78,14 @@ change to `y` may break the public API.
   `TooManyLiveBytes`, from which the dispatch falls back to conventional F4 (#962).
   `SigF4Statistics::claim_peak_live_bytes` now reports either cascade's peak.
 
+### Fixed
+
+- Every worker team (F4's parallel symbolic preprocessing, forward elimination, candidate finishing
+  and certification; the signature engine; FGLM batches; resultant sampling) now joins each worker
+  thread before its call returns. Before, a team joined only implicitly by `std::thread::scope` let
+  its threads finish exiting beside the next team, so more than `workers` threads could run at once
+  (#1002).
+
 ## [0.1.0] - 2026-11-10
 
 The first release on crates.io. Before it, the crate was used only as a git dependency, and the

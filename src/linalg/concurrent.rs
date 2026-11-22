@@ -269,7 +269,7 @@ pub fn sweep<F: FiniteField + Send + Sync>(
         let handles: Vec<_> = (0..workers)
             .map(|_| {
                 let (queue, ledger, failed, known) = (&queue, &ledger, &failed, &known);
-                scope.spawn(move || {
+                crate::util::team::spawn(scope, move || {
                     let result = catch_unwind(AssertUnwindSafe(|| {
                         sweep_worker(upper, known, queue, ledger, failed, cancel, config)
                     }))
@@ -456,7 +456,7 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
             let known = &known;
             let ledger = &ledger;
             let failed = &failed;
-            handles.push(scope.spawn(move || {
+            handles.push(crate::util::team::spawn(scope, move || {
                 let result = catch_unwind(AssertUnwindSafe(|| {
                     let run = || {
                         let started = Instant::now();

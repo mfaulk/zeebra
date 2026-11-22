@@ -1401,7 +1401,9 @@ pub fn symbolic_preprocessing_level_parallel_measured<const N: usize, F: FiniteF
                 let handles: Vec<_> = frontier
                     .chunks(chunk)
                     .map(|slice| {
-                        scope.spawn(move || scan(basis, selection, covered, examined, slice))
+                        crate::util::team::spawn(scope, move || {
+                            scan(basis, selection, covered, examined, slice)
+                        })
                     })
                     .collect();
                 handles

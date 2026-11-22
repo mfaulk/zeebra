@@ -420,10 +420,11 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for Claim<'_, N, F> {
         let workers = self.workers.min(self.targets.len()).max(1);
         self.run_with(workers, |shared, barrier| {
             std::thread::scope(|scope| {
-                for _ in 1..workers {
-                    scope.spawn(|| self.worker(shared, barrier));
-                }
+                let members: Vec<_> = (1..workers)
+                    .map(|_| crate::util::team::spawn(scope, || self.worker(shared, barrier)))
+                    .collect();
                 self.worker(shared, barrier);
+                crate::util::team::join_all(members);
             });
         })
     }

@@ -10,6 +10,7 @@ mod json;
 mod peak_memory;
 mod sha256;
 mod shake128;
+pub(crate) mod team;
 
 pub use duplicates::contains_duplicates;
 pub use isa_floor::{has_isa_floor, isa_floor};

@@ -351,7 +351,7 @@ impl<F: FiniteField> ConcurrentJob<F> for Wave<'_, F> {
             let handles: Vec<_> = (0..workers)
                 .map(|_| {
                     let (wave, next) = (&self, &next);
-                    scope.spawn(move || {
+                    crate::util::team::spawn(scope, move || {
                         let mut accumulator = DenseAccumulator::new(columns);
                         let mut done = Vec::new();
                         loop {

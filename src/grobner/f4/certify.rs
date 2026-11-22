@@ -649,8 +649,9 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for Search<'_, N, F> {
             Vec::new()
         };
         std::thread::scope(|scope| {
+            let mut members = Vec::new();
             for _ in 0..self.workers {
-                scope.spawn(|| loop {
+                members.push(crate::util::team::spawn(scope, || loop {
                     if stopped.load(Ordering::Relaxed) {
                         break;
                     }
@@ -668,8 +669,9 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for Search<'_, N, F> {
                     if let Some(mark) = finished.get(at) {
                         mark.store(true, Ordering::Relaxed);
                     }
-                });
+                }));
             }
+            crate::util::team::join_all(members);
         });
         let earliest = earliest.into_inner();
         if stopped.into_inner() {

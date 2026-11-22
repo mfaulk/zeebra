@@ -1159,7 +1159,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
     std::thread::scope(|scope| {
         // The team starts at the first step wide enough to dispatch, so a closure whose levels all
         // stay under `min_frontier` never pays for threads it would not use.
-        let mut spawned = false;
+        let (mut spawned, mut members) = (false, Vec::new());
         let mut spawn = |report: &mut InternReport| {
             if spawned {
                 return;
@@ -1168,7 +1168,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
             let spawning = Instant::now();
             for _ in 1..workers {
                 let (team, step) = (&team, &step);
-                scope.spawn(move || {
+                members.push(crate::util::team::spawn(scope, move || {
                     let barrier = team.barrier.as_ref().unwrap();
                     loop {
                         barrier.wait();
@@ -1179,7 +1179,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
                         work(team, step, job);
                         barrier.wait();
                     }
-                });
+                }));
             }
             report.spawn = spawning.elapsed();
         };
@@ -1511,6 +1511,7 @@ pub fn symbolic_preprocessing_interned_in<const N: usize, F: FiniteField + Sync>
         if report.dispatched_steps > 0 {
             team.barrier.as_ref().unwrap().wait();
         }
+        crate::util::team::join_all(members);
     });
     drop(step);
     report.growths = *growths - growths_before;

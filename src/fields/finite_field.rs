@@ -747,10 +747,9 @@ mod tests {
             F: Send + Sync,
         {
             std::thread::scope(|scope| {
-                scope
-                    .spawn(|| self.0.iter().fold(F::zero(), |a, b| a + *b))
-                    .join()
-                    .unwrap()
+                crate::util::team::join(crate::util::team::spawn(scope, || {
+                    self.0.iter().fold(F::zero(), |a, b| a + *b)
+                }))
             })
         }
     }

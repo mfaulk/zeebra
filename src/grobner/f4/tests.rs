@@ -5153,6 +5153,37 @@ fn test_parallel_symbolic_f4_is_identical_to_serial_across_worker_counts() {
     }
 }
 
+/// #1002: each batch's symbolic team and forward-elimination team are joined before the next one
+/// starts, so complete F4 never has more than `workers` worker threads alive, even while a
+/// finished team's threads are exiting.
+#[test]
+fn test_parallel_f4_teams_never_exceed_the_worker_cap() {
+    use crate::{
+        grobner::f4::{ParallelForward, ParallelSymbolic},
+        util::team::census::Census,
+    };
+    let order = MonomialOrder::GradedReverseLexicographic;
+    // Katsura-8 has 512-wide steps, so a symbolic team of 4 runs beside the forced forward team.
+    let system = katsura::<8, Zp2147483647>();
+    let workers = 4;
+    let options = F4Options {
+        parallel_symbolic: ParallelSymbolic::Auto {
+            max_workers: workers,
+        },
+        parallel_forward: ParallelForward::Forced { workers },
+        ..F4Options::default()
+    };
+    let census = Census::arm(std::time::Duration::from_millis(20));
+    f4_with_options(&system, order, &options).expect("katsura-8 completes");
+    assert!(
+        census.spawned() > 2 * workers,
+        "{} spawned",
+        census.spawned()
+    );
+    assert_eq!(census.live(), 0);
+    assert!(census.peak() <= workers, "peak {}", census.peak());
+}
+
 /// `tail_only_interreduction` returns the same reduced basis as the full echelon matrix route and
 /// as division, under both batch-row configurations, and records its pass.
 #[test]

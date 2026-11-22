@@ -240,10 +240,11 @@ fn run_concurrently<O: Oracle + Send>(
     let mut report = SweepReport::default();
 
     std::thread::scope(|scope| {
+        let mut members = Vec::new();
         for oracle in oracles.iter_mut() {
             let sender = sender.clone();
             let next = &next;
-            scope.spawn(move || loop {
+            members.push(crate::util::team::spawn(scope, move || loop {
                 let index = next.fetch_add(1, Ordering::Relaxed);
                 if index >= options.systems {
                     return;
@@ -260,7 +261,7 @@ fn run_concurrently<O: Oracle + Send>(
                 {
                     return;
                 }
-            });
+            }));
         }
         // The calling thread's own clone, dropped so the receive loop ends when the workers do.
         drop(sender);
@@ -277,6 +278,7 @@ fn run_concurrently<O: Oracle + Send>(
                 emitted += 1;
             }
         }
+        crate::util::team::join_all(members);
     });
 
     report
