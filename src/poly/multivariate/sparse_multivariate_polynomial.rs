@@ -19,14 +19,17 @@ use proptest::{
     collection::vec,
     prelude::{Arbitrary, BoxedStrategy, Strategy},
 };
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::{
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
     hash::{Hash, Hasher},
 };
 
 /// Multivariate polynomial over N variables.
-#[derive(Clone, Eq, PartialEq, Debug, Default, Deserialize, Serialize)]
+///
+/// `Serialize`, `Debug` and `Hash` write the terms in descending lexicographic order, so equal
+/// polynomials produce equal output however their terms were inserted.
+#[derive(Clone, Eq, PartialEq, Default, Deserialize)]
 pub struct SparseMultiPoly<const N: usize, F: FiniteField> {
     /// Terms stored as the mapping monomial --> coefficient
     /// The zero polynomial may be represented as an empty set of terms, or by the single
@@ -265,14 +268,54 @@ impl<const N: usize, F: FiniteField> Display for SparseMultiPoly<N, F> {
     }
 }
 
+impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
+    /// The terms in descending lexicographic order: the canonical order for anything that writes
+    /// them out, since the map's own iteration order depends on its capacity and insertion history.
+    fn canonical_terms(&self) -> Vec<(&Monomial<N>, &F)> {
+        let order = MonomialOrder::Lexicographic;
+        let mut terms: Vec<_> = self.terms.iter().collect();
+        terms.sort_unstable_by(|(a, _), (b, _)| order.cmp(a, b).reverse());
+        terms
+    }
+}
+
 /// Hash
 impl<const N: usize, F: FiniteField> Hash for SparseMultiPoly<N, F> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // Terms must be hashed in a canonical order.
-        let order = MonomialOrder::Lexicographic;
-        let mut terms: Vec<_> = self.terms.iter().collect();
-        terms.sort_by(|(a, _), (b, _)| order.cmp(a, b).reverse());
-        terms.hash(state);
+        self.canonical_terms().hash(state);
+    }
+}
+
+/// The terms as a map in canonical order. This is the wire shape the derived impl wrote, so data
+/// serialized before #920 still deserializes and `Deserialize` stays derived.
+struct CanonicalTerms<'a, const N: usize, F: FiniteField>(&'a SparseMultiPoly<N, F>);
+
+impl<const N: usize, F: FiniteField> Serialize for CanonicalTerms<'_, N, F> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_map(self.0.canonical_terms())
+    }
+}
+
+impl<const N: usize, F: FiniteField> Serialize for SparseMultiPoly<N, F> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("SparseMultiPoly", 1)?;
+        state.serialize_field("terms", &CanonicalTerms(self))?;
+        state.end()
+    }
+}
+
+/// The derived shape, `SparseMultiPoly { terms: {..} }`, with the terms in canonical order.
+impl<const N: usize, F: FiniteField> Debug for SparseMultiPoly<N, F> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        struct Terms<'a, const N: usize, F: FiniteField>(&'a SparseMultiPoly<N, F>);
+        impl<const N: usize, F: FiniteField> Debug for Terms<'_, N, F> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                f.debug_map().entries(self.0.canonical_terms()).finish()
+            }
+        }
+        f.debug_struct("SparseMultiPoly")
+            .field("terms", &Terms(self))
+            .finish()
     }
 }
 
@@ -610,5 +653,148 @@ mod tests {
         let at_one = p.substitute(0, F::new(1));
         assert!(at_one.is_zero(), "expected zero, got {}", at_one);
         assert!(at_one.terms().is_empty());
+    }
+
+    /// The terms of `p`, all present, in an insertion history chosen to iterate differently.
+    ///
+    /// The same entries go into a map of far larger capacity, in the reverse of `p`'s iteration
+    /// order. The two polynomials are equal; only the hash map's layout differs.
+    fn rebuilt_in_another_layout<const N: usize, F: FiniteField>(
+        p: &SparseMultiPoly<N, F>,
+    ) -> SparseMultiPoly<N, F> {
+        use crate::poly::multivariate::monomial_hash::MonomialMap;
+        let mut terms: MonomialMap<N, F> =
+            MonomialMap::with_capacity_and_hasher(4096, Default::default());
+        let mut entries: Vec<_> = p.terms.iter().map(|(m, c)| (*m, *c)).collect();
+        entries.reverse();
+        terms.extend(entries);
+        SparseMultiPoly { terms }
+    }
+
+    /// A polynomial whose two layouts in [`rebuilt_in_another_layout`] iterate differently.
+    fn polynomial_with_two_layouts() -> (
+        SparseMultiPoly<3, PrimeFieldElement64<541>>,
+        SparseMultiPoly<3, PrimeFieldElement64<541>>,
+    ) {
+        type F = PrimeFieldElement64<541>;
+        let terms: Vec<_> = (0..40u32)
+            .map(|i| {
+                (
+                    Monomial::<3>::new(&[i % 5, i / 5, i % 3]),
+                    F::new(u64::from(i) + 1),
+                )
+            })
+            .collect();
+        let a = SparseMultiPoly::new(&terms);
+        let b = rebuilt_in_another_layout(&a);
+        assert_eq!(a, b);
+        // Without this the tests below could pass because the layouts happened to agree.
+        let order = |p: &SparseMultiPoly<3, F>| p.terms.keys().copied().collect::<Vec<_>>();
+        assert_ne!(
+            order(&a),
+            order(&b),
+            "the two layouts must iterate differently"
+        );
+        (a, b)
+    }
+
+    /// Equal polynomials serialize to the same bytes, however their terms were inserted (#920).
+    #[test]
+    fn test_serialize_is_independent_of_insertion_history() {
+        let (a, b) = polynomial_with_two_layouts();
+        assert_eq!(
+            bincode::serialize(&a).unwrap(),
+            bincode::serialize(&b).unwrap()
+        );
+    }
+
+    /// Equal polynomials print the same `Debug`, so test-failure output is stable too.
+    #[test]
+    fn test_debug_is_independent_of_insertion_history() {
+        let (a, b) = polynomial_with_two_layouts();
+        assert_eq!(format!("{:?}", a), format!("{:?}", b));
+    }
+
+    /// Terms are written in descending lexicographic order, the order `Hash` uses.
+    #[test]
+    fn test_serialize_and_debug_order_terms_lexicographically() {
+        type F = PrimeFieldElement64<337>;
+        let (x2, xy, y, one) = (
+            Monomial::<2>::new(&[2, 0]),
+            Monomial::<2>::new(&[1, 1]),
+            Monomial::<2>::new(&[0, 1]),
+            Monomial::<2>::one(),
+        );
+        let p: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[
+            (y, F::new(3)),
+            (one, F::new(4)),
+            (x2, F::new(1)),
+            (xy, F::new(2)),
+        ]);
+        let sorted = [
+            (x2, F::new(1)),
+            (xy, F::new(2)),
+            (y, F::new(3)),
+            (one, F::new(4)),
+        ];
+
+        // bincode writes a map as its length followed by each key and value, exactly as it
+        // writes a sequence of pairs, so the sorted pairs spell out the expected bytes.
+        assert_eq!(
+            bincode::serialize(&p).unwrap(),
+            bincode::serialize(&sorted.to_vec()).unwrap()
+        );
+
+        let entries: Vec<String> = sorted
+            .iter()
+            .map(|(m, c)| format!("{:?}: {:?}", m, c))
+            .collect();
+        assert_eq!(
+            format!("{:?}", p),
+            format!("SparseMultiPoly {{ terms: {{{}}} }}", entries.join(", "))
+        );
+    }
+
+    /// The shape the derived `Serialize` wrote before #920, kept to test compatibility against.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[serde(rename = "SparseMultiPoly")]
+    struct DerivedSparseMultiPoly<const N: usize, F: FiniteField> {
+        #[serde(bound = "F: FiniteField")]
+        terms: crate::poly::multivariate::monomial_hash::MonomialMap<N, F>,
+    }
+
+    /// Serialization round-trips, and its wire shape is the one the derived impl wrote: old data
+    /// still deserializes, and new data still reads as the old shape.
+    #[test]
+    fn test_serde_round_trip_and_wire_compatibility() {
+        use crate::test_support::draw;
+        use proptest::arbitrary::Arbitrary;
+        type Poly = SparseMultiPoly<3, PrimeFieldElement64<541>>;
+
+        let mut values = draw(
+            &Poly::arbitrary_with(super::ArbParams { num_terms: 12 }),
+            64,
+        );
+        values.push(Poly::zero());
+        values.push(polynomial_with_two_layouts().0);
+
+        for p in &values {
+            let bytes = bincode::serialize(p).unwrap();
+            let recovered: Poly = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(&recovered, p);
+
+            let legacy = DerivedSparseMultiPoly {
+                terms: p.terms.clone(),
+            };
+            let legacy_bytes = bincode::serialize(&legacy).unwrap();
+            let from_legacy: Poly = bincode::deserialize(&legacy_bytes).unwrap();
+            assert_eq!(&from_legacy, p);
+
+            let as_legacy: DerivedSparseMultiPoly<3, PrimeFieldElement64<541>> =
+                bincode::deserialize(&bytes).unwrap();
+            assert_eq!(as_legacy.terms, p.terms);
+            // The same entries, so the same length: only their order may differ.
+            assert_eq!(bytes.len(), legacy_bytes.len());
+        }
     }
 }
