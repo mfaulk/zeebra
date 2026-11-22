@@ -105,10 +105,10 @@
 | grevlex/wide64/katsura-4 | entry | 16 | warm calls | pass |
 | grevlex/wide64/katsura-4 | f4 | 1 | warm calls | pass |
 | grevlex/wide64/katsura-4 | f4 | 16 | warm calls | pass |
-| grevlex/wide64/katsura-9 | entry | 1 | warm calls | wall stopped: n = 20 < 31 |
-| grevlex/wide64/katsura-9 | entry | 16 | warm calls | wall stopped: n = 7 < 31 |
+| grevlex/wide64/katsura-9 | entry | 1 | warm calls | pass by owner decision 14 (#965), n disclosed: wall stopped: n = 20 < 31 |
+| grevlex/wide64/katsura-9 | entry | 16 | warm calls | pass by owner decision 14 (#965), n disclosed: wall stopped: n = 7 < 31 |
 | grevlex/wide64/katsura-9 | f4 | 1 | warm calls | pass |
-| grevlex/wide64/katsura-9 | f4 | 16 | warm calls | wall stopped: n = 5 < 31 |
+| grevlex/wide64/katsura-9 | f4 | 16 | warm calls | pass by owner decision 14 (#965), n disclosed: wall stopped: n = 5 < 31 |
 | grevlex/wide64/noon-7 | entry | 1 | warm calls | pass |
 | grevlex/wide64/noon-7 | entry | 16 | warm calls | pass |
 | grevlex/wide64/noon-7 | f4 | 1 | warm calls | pass |

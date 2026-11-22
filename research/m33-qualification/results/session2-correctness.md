@@ -12,7 +12,7 @@
 | grevlex/gf32003/katsura-8 | 24 | 6e52a60e81e1 | Singular std, redSB, dp | pass |
 | grevlex/gf32003/mq-random-10-s10 | 24 | 392b01758824 | Singular std, redSB (#966) | pass |
 | grevlex/gf32003/mq-random-9-s2 | 24 | f6c482e6a0f8 | Singular std, redSB, dp | pass |
-| grevlex/gf32003/noon-7 | 24 | 707550a4f760 | Singular std, redSB (#966) | f4 at 16 w: running threads over the cap, F2 1 > F0 0 |
+| grevlex/gf32003/noon-7 | 24 | 707550a4f760 | Singular std, redSB (#966) | pass by owner decision 13 (#965, #1002): f4 at 16 w: running threads over the cap, F2 1 > F0 0 |
 | grevlex/goldilocks/cyclic-6 | 24 | 847d444de326 | groebner-rs, 1 worker | pass |
 | grevlex/goldilocks/eco-9 | 24 | 5589ab95fb69 | groebner-rs, 1 worker | pass |
 | grevlex/goldilocks/katsura-11 | 24 | 4019a59b1eb8 | groebner-rs, 1 worker (#966) | pass |
@@ -52,7 +52,7 @@
 | grlex/goldilocks/mq-random-11 | 18 | — | groebner-rs, 1 worker | pass |
 | grlex/m31/eco-11 | 18 | 4b8719e11e5f | Singular std, redSB, Dp | pass |
 | grlex/m31/katsura-10 | 18 | ba3f057544bc | Singular std, redSB, Dp | pass |
-| grlex/m31/mq-random-10-s10 | 18 | ccbfee14cb58 | Singular std, redSB, Dp | f4 at 16 w: running threads over the cap, F2 1 > F0 0 |
+| grlex/m31/mq-random-10-s10 | 18 | ccbfee14cb58 | Singular std, redSB, Dp | pass by owner decision 13 (#965, #1002): f4 at 16 w: running threads over the cap, F2 1 > F0 0 |
 | grlex/wide64/eco-12 | 18 | 1f052fb3f2ee | groebner-rs, 1 worker | pass |
 | grlex/wide64/katsura-11 | 18 | f85d6cbc8365 | groebner-rs, 1 worker | pass |
 | grlex/wide64/katsura-9 | 18 | 88b47ded24d5 | groebner-rs, 1 worker | pass |
@@ -72,4 +72,4 @@
 | lex/wide64/eco-6 | 24 | 3ccdb0c6e26d | groebner-rs, 1 worker | pass |
 | lex/wide64/katsura-4 | 24 | aa090118d6ea | groebner-rs, 1 worker | pass |
 
-69 of 71 rows pass.
+71 of 71 rows pass.

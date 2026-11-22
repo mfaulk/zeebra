@@ -144,6 +144,30 @@ class Correctness(unittest.TestCase):
         self.assertTrue(any('listed' in w for w in summarize.correctness_failures('grevlex/gf32003/noon-7', f2_only, REF)))
 
 
+
+class OwnerOverrides(unittest.TestCase):
+    def test_decision_13_passes_only_the_named_rows_at_the_recorded_figures(self):
+        """Owner decision 13 (#965) waives F2 1 > F0 0 on the shipping F4 at 16 w for its two named rows only."""
+        why = ['f4 at 16 w: running threads over the cap, F2 1 > F0 0']
+        kept, waived = summarize.correctness_overrides('grevlex/gf32003/noon-7', why)
+        self.assertEqual((kept, len(waived)), ([], 1))
+        self.assertIn('decision 13', waived[0])
+        self.assertEqual(summarize.correctness_overrides('grevlex/wide64/noon-8', why)[0], why)
+        worse = ['f4 at 16 w: running threads over the cap, F2 2 > F0 0']
+        self.assertEqual(summarize.correctness_overrides('grevlex/gf32003/noon-7', worse)[0], worse)
+
+    def test_decision_14_waives_only_n_on_the_named_cells(self):
+        """Owner decision 14 (#965) passes the three wide64 katsura-9 warm-call cells short of n, never a wide interval."""
+        ci = summarize.bs.paired_ratio([1.0, 1.01, 0.99, 1.0, 1.02], seed='t')
+        cell = ('grevlex/wide64/katsura-9', 'f4', 16, True)
+        why = [f'wall stopped: n = {ci.n} < 31']
+        kept, waived = summarize.regression_overrides(cell, why, ci)
+        self.assertEqual((kept, len(waived)), ([], 1))
+        self.assertIn('decision 14', waived[0])
+        self.assertEqual(summarize.regression_overrides(('grevlex/wide64/noon-7', 'f4', 16, True), why, ci)[0], why)
+        slow = summarize.bs.paired_ratio([1.2, 1.21, 1.19, 1.2, 1.22], seed='t')
+        self.assertEqual(summarize.regression_overrides(cell, why, slow)[0], why)
+
 class Regression(unittest.TestCase):
     def test_small_rows_pair_warm_calls(self):
         """Under the warm-call method each process contributes its median warm call, not its wall."""

@@ -14,6 +14,7 @@ import argparse
 import importlib.machinery
 import importlib.util
 import json
+import re
 import statistics
 import sys
 from collections import defaultdict
@@ -28,6 +29,19 @@ import bench_stats as bs  # noqa: E402
 
 WALL_BOUND, RSS_BOUND, RSS_EXPLAIN, FLOOR_NS = 1.05, 1.25, 1.10, 300 * 10**6
 GATE_D = HERE / 'gate-d.md'
+
+# Owner overrides recorded on #965. Each names its rows and the exact failure it accepts; any other
+# failure on those rows, or the same failure on another row, still fails. The waived verdict stays
+# in the table beside the decision.
+DECISION_13 = {  # F2's shipping F4 one running thread over F0 at 16 w; recorded against #1002
+    'grevlex/gf32003/noon-7': 'f4 at 16 w: running threads over the cap, F2 1 > F0 0',
+    'grlex/m31/mq-random-10-s10': 'f4 at 16 w: running threads over the cap, F2 1 > F0 0',
+}
+DECISION_14 = {  # every job holding these warm-call cells was void under the clock rule
+    ('grevlex/wide64/katsura-9', 'entry', 1, True),
+    ('grevlex/wide64/katsura-9', 'entry', 16, True),
+    ('grevlex/wide64/katsura-9', 'f4', 16, True),
+}
 
 
 def _bench_job():
@@ -125,6 +139,22 @@ def thread_parity_failures(reports):
     return why
 
 
+def correctness_overrides(instance, why):
+    """(failures kept, failures waived by owner decision 13)."""
+    accepted = DECISION_13.get(instance)
+    waived = [f'pass by owner decision 13 (#965, #1002): {w}' for w in why if w == accepted]
+    return [w for w in why if w != accepted], waived
+
+
+def regression_overrides(cell, why, ci):
+    """(failures kept, failures waived by owner decision 14): only a short n, and only while the
+    partial interval's upper bound is still within the wall bound."""
+    if cell not in DECISION_14 or ci is None or ci.hi > WALL_BOUND:
+        return why, []
+    short = [w for w in why if re.fullmatch(r'wall stopped: n = \d+ < \d+', w)]
+    return [w for w in why if w not in short], [f'pass by owner decision 14 (#965), n disclosed: {w}' for w in short]
+
+
 def correctness(args):
     refs = json.loads(Path(args.references).read_text()) if Path(args.references).exists() else {}
     rows = defaultdict(list)
@@ -135,11 +165,11 @@ def correctness(args):
     failed = 0
     for instance, records in sorted(rows.items()):
         ref = refs.get(instance)
-        why = correctness_failures(instance, records, ref)
+        why, waived = correctness_overrides(instance, correctness_failures(instance, records, ref))
         failed += bool(why)
         digests = sorted({r['report']['basis_m33'][:12] for r in records if r['report'].get('basis_m33')})
         lines.append(f'| {instance} | {len(records)} | {", ".join(digests) or "—"} | '
-                     f'{(ref or {}).get("reference", "—")} | {"; ".join(why) or "pass"} |')
+                     f'{(ref or {}).get("reference", "—")} | {"; ".join(why + waived) or "pass"} |')
     print('\n'.join(lines))
     print(f'\n{len(rows) - failed} of {len(rows)} rows pass.')
     return 1 if failed else 0
@@ -194,9 +224,10 @@ def ratio_table(jobs, small_jobs, title):
             why.append(f'peak RSS {rss:.3f} > {RSS_BOUND}')
         elif rss is not None and rss > RSS_EXPLAIN:
             why.append(f'peak RSS {rss:.3f} > {RSS_EXPLAIN}: explain in the PR')
+        why, waived = regression_overrides((instance, engine, workers, small), why, ci)
         hard = [w for w in why if 'explain' not in w and 'under 300' not in w]
         failed += bool(hard)
-        verdicts.append(f'| {instance} | {engine} | {workers} | {method} | {"; ".join(why) or "pass"} |')
+        verdicts.append(f'| {instance} | {engine} | {workers} | {method} | {"; ".join(why + waived) or "pass"} |')
     out = raw + ['', '| Row | Engine | Workers | Method | Verdict |', '|---|---|---:|---|---|'] + verdicts
     return '\n'.join(out + [''] + void if void else out), failed + len(void)
 
