@@ -1,6 +1,6 @@
 # Adaptive selection: task contracts, eligibility and the initial portfolio
 
-**Issue:** #1004 (M34 WP A, gate G0). **Inspected at:** `main` `2cbd2928`. **Plan:**
+**Issue:** #1004 (M34 WP A, gate G0). **Inspected at:** `main` `45e9b625`. **Plan:**
 [`docs/MILESTONE-GENERALIZABLE-SELECTION.md`](../MILESTONE-GENERALIZABLE-SELECTION.md) §7.1 and §8.1.
 
 This document contains no measurements. Every entry below is a statement about what a configuration
@@ -252,7 +252,7 @@ the point by substitution, not by equality.
 
 ## 5. Initial portfolio
 
-There are eight arms, built from merged code at `2cbd2928`. Each arm names its contract and the
+There are eight arms, built from merged code at `45e9b625`. Each arm names its contract and the
 regime it is expected to cover. The regime is a hypothesis for #1012 to test, not a performance
 claim. Worker counts follow plan §7.2 rather than a Cartesian product.
 
