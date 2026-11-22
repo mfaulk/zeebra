@@ -5,7 +5,8 @@
 //! behaviour because this module exists.
 //!
 //! The split follows the knowledge boundary rather than the call graph. [`analysis`] is what can be
-//! known before a Gröbner basis — counts and structure, no dimension claims. Quotient dimension,
+//! known before a Gröbner basis — counts and structure, with [`structure`] adding the
+//! equation–variable incidence and the linear part, no dimension claims. Quotient dimension,
 //! staircase shape, and therefore every real feasibility question are only answerable *after* a
 //! basis exists, and a planner that forgets which side of that line it is on will infer dimension
 //! from equation counts. §3.1 of `docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md` is the argument.
@@ -13,7 +14,12 @@
 pub mod analysis;
 pub mod policy;
 pub mod report;
+pub mod structure;
 
 pub use analysis::{analyze, monomials_up_to_degree, SystemShape};
 pub use policy::{solve_one_planned, PlanBudget, PlanObjective, PlannedSolveOptions, SolvePolicy};
 pub use report::{Attempt, Choice, OutcomeClass, SolvePlan};
+pub use structure::{
+    incidence, linear_subsystem, scalar_substitutions, IncidenceComponent, IncidenceStructure,
+    LinearSubsystem, ScalarSubstitution, DEFAULT_WIDTH_WORK,
+};
