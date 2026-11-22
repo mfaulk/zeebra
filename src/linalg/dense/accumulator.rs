@@ -15,6 +15,9 @@ pub struct DenseAccumulator<F: FiniteField> {
     pub(super) lead: usize,
     pub(super) tail: usize,
     pub(super) nonzeros: usize,
+    /// Applications to the row now held, for #1033's density checkpoints.
+    #[cfg(feature = "research-work")]
+    applied: usize,
 }
 
 impl<F: FiniteField> DenseAccumulator<F> {
@@ -25,6 +28,8 @@ impl<F: FiniteField> DenseAccumulator<F> {
             lead: num_columns,
             tail: 0,
             nonzeros: 0,
+            #[cfg(feature = "research-work")]
+            applied: 0,
         }
     }
 
@@ -55,6 +60,11 @@ impl<F: FiniteField> DenseAccumulator<F> {
         self.lead = row.leading_column().unwrap_or(self.cells.len());
         self.tail = row.trailing_column().map_or(0, |column| column + 1);
         self.nonzeros = row.nonzeros();
+        #[cfg(feature = "research-work")]
+        {
+            self.applied = 0;
+            crate::linalg::work::density_intake(self.nonzeros, self.lead, self.cells.len());
+        }
     }
 
     /// Gather the row back out, leaving the accumulator zero.
@@ -73,6 +83,12 @@ impl<F: FiniteField> DenseAccumulator<F> {
             }
         }
         debug_assert_eq!(entries.len(), self.nonzeros);
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::density_end(
+            self.nonzeros,
+            entries.first().map_or(0, |e| e.0),
+            self.cells.len(),
+        );
         self.lead = self.cells.len();
         self.tail = 0;
         self.nonzeros = 0;
@@ -115,7 +131,17 @@ impl<F: FiniteField> DenseAccumulator<F> {
             return;
         }
         #[cfg(feature = "research-work")]
-        crate::linalg::work::pivot(row.nonzeros());
+        {
+            crate::linalg::work::pivot(row.nonzeros());
+            crate::linalg::work::density_application(
+                self.nonzeros,
+                self.lead,
+                self.cells.len(),
+                self.applied,
+                row.nonzeros(),
+            );
+            self.applied += 1;
+        }
         // Paid once per row operation; Shoup's quotient for a 64-bit modulus below 2^63 (#779).
         let factor = factor.prepare_factor();
         for (column, coefficient) in row.entries() {
@@ -447,6 +473,41 @@ mod tests {
                 .map(|(column, value)| (*column, F::new(*value)))
                 .collect::<Vec<_>>(),
         )
+    }
+
+    /// #1033: the forward density trace files each application's products under the target's
+    /// density before it, and records the row at intake, at each checkpoint and at the end.
+    #[cfg(feature = "research-work")]
+    #[test]
+    fn test_density_trace_buckets_products_by_target_density() {
+        use crate::linalg::work::{measure, DENSITY_BUCKETS};
+        let ((), report) = measure(|| {
+            let mut accumulator = DenseAccumulator::<F>::new(10);
+            // Two nonzeros from lead 0 over ten columns: 20%, bucket 4 of 20.
+            accumulator.load(&row(&[(0, 1), (1, 1)]));
+            let full = row(&(0..10).map(|c| (c, 1)).collect::<Vec<_>>());
+            accumulator.leading_column();
+            accumulator.subtract_scaled(&full, F::one());
+            // Eight nonzeros remain, from lead 2: 8 of 8 columns, the top bucket.
+            assert_eq!(accumulator.leading_column(), Some(2));
+            let tail = row(&[(2, 1), (3, 1)]);
+            accumulator.subtract_scaled(&tail, -F::one());
+            accumulator.take();
+        });
+        let trace = &report.outside_batch.forward_density;
+        let mut expected = [0; DENSITY_BUCKETS];
+        expected[4] = 10;
+        expected[DENSITY_BUCKETS - 1] = 2;
+        assert_eq!(trace.products_by_span, expected);
+        assert_eq!(
+            trace.products_by_span.iter().sum::<usize>(),
+            report.outside_batch.forward.coefficient_products
+        );
+        // Width density before the second application is 8 of 10: bucket 16.
+        assert_eq!(trace.products_by_width[16], 2);
+        assert_eq!(trace.rows_at_checkpoint[0][4], 1, "intake at 20%");
+        assert_eq!(trace.rows_at_checkpoint[1][DENSITY_BUCKETS - 1], 1);
+        assert_eq!(trace.rows_at_end.iter().sum::<usize>(), 1);
     }
 
     /// Loading and taking a row round-trips and leaves the accumulator zero again.

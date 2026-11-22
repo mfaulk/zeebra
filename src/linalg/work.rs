@@ -126,6 +126,77 @@ impl PhaseWork {
     }
 }
 
+/// Density buckets of 5%: bucket `b` holds densities in `[b/20, (b+1)/20)`, and a full row is in
+/// the last.
+pub const DENSITY_BUCKETS: usize = 20;
+
+/// Applications already made when [`DensityTrace::rows_at_checkpoint`] samples a row; 0 is intake.
+pub const DENSITY_CHECKPOINTS: [usize; 5] = [0, 1, 4, 16, 64];
+
+/// #1033's forward density-during-reduction trace, observed on the dense working row only.
+///
+/// *Span* density is nonzeros over the columns from the row's stored lead to the last column:
+/// what a dense row packed from its lead would hold. *Width* density is over every column.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DensityTrace {
+    /// Coefficient products by the target's span density before the application.
+    pub products_by_span: [usize; DENSITY_BUCKETS],
+    /// The same products by width density.
+    pub products_by_width: [usize; DENSITY_BUCKETS],
+    /// Rows by span density once they have had `DENSITY_CHECKPOINTS[i]` applications, sampled
+    /// before the next one; a row that finishes first is not sampled there.
+    pub rows_at_checkpoint: [[usize; DENSITY_BUCKETS]; DENSITY_CHECKPOINTS.len()],
+    /// Nonzero rows by span density when taken out.
+    pub rows_at_end: [usize; DENSITY_BUCKETS],
+}
+
+fn density_bucket(nonzeros: usize, columns: usize) -> usize {
+    (nonzeros * DENSITY_BUCKETS)
+        .checked_div(columns)
+        .unwrap_or(0)
+        .min(DENSITY_BUCKETS - 1)
+}
+
+impl DensityTrace {
+    pub fn json(&self) -> Json {
+        let buckets = |b: &[usize]| Json::Array(b.iter().copied().map(Json::size).collect());
+        Json::object([
+            ("bucket_width", Json::string("0.05")),
+            ("products_by_span", buckets(&self.products_by_span)),
+            ("products_by_width", buckets(&self.products_by_width)),
+            (
+                "checkpoints",
+                Json::Array(
+                    DENSITY_CHECKPOINTS
+                        .iter()
+                        .copied()
+                        .map(Json::size)
+                        .collect(),
+                ),
+            ),
+            (
+                "rows_at_checkpoint",
+                Json::Array(self.rows_at_checkpoint.iter().map(|b| buckets(b)).collect()),
+            ),
+            ("rows_at_end", buckets(&self.rows_at_end)),
+        ])
+    }
+
+    pub fn accumulate(&mut self, other: &Self) {
+        let add = |a: &mut [usize], b: &[usize]| a.iter_mut().zip(b).for_each(|(x, y)| *x += y);
+        add(&mut self.products_by_span, &other.products_by_span);
+        add(&mut self.products_by_width, &other.products_by_width);
+        for (a, b) in self
+            .rows_at_checkpoint
+            .iter_mut()
+            .zip(&other.rows_at_checkpoint)
+        {
+            add(a, b);
+        }
+        add(&mut self.rows_at_end, &other.rows_at_end);
+    }
+}
+
 /// One matrix's live payload/capacity peaks exclude basis, monomial tables and allocator overhead.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MatrixWork {
@@ -149,6 +220,7 @@ pub struct MatrixWork {
     pub auxiliary_capacity_bytes: usize,
     pub forward: PhaseWork,
     pub backward: PhaseWork,
+    pub forward_density: DensityTrace,
 }
 
 impl MatrixWork {
@@ -191,6 +263,7 @@ impl MatrixWork {
             ),
             ("forward", self.forward.json()),
             ("backward", self.backward.json()),
+            ("forward_density", self.forward_density.json()),
         ])
     }
 }
@@ -462,6 +535,44 @@ pub(crate) fn pivot(products: usize) {
             work.pair_target_operations += usize::from(!reducer);
         }
     });
+}
+
+fn forward_density(f: impl FnOnce(&mut DensityTrace)) {
+    update(|matrix, backward, _| {
+        if !backward {
+            f(&mut matrix.forward_density);
+        }
+    });
+}
+
+/// A row entering the dense working row: its intake checkpoint.
+pub(crate) fn density_intake(nonzeros: usize, lead: usize, width: usize) {
+    forward_density(|t| t.rows_at_checkpoint[0][density_bucket(nonzeros, width - lead)] += 1);
+}
+
+/// One application of `products` products to a target that has had `applied` already.
+pub(crate) fn density_application(
+    nonzeros: usize,
+    lead: usize,
+    width: usize,
+    applied: usize,
+    products: usize,
+) {
+    forward_density(|t| {
+        let span = density_bucket(nonzeros, width - lead);
+        t.products_by_span[span] += products;
+        t.products_by_width[density_bucket(nonzeros, width)] += products;
+        if let Some(i) = DENSITY_CHECKPOINTS[1..].iter().position(|&k| k == applied) {
+            t.rows_at_checkpoint[i + 1][span] += 1;
+        }
+    });
+}
+
+/// A nonzero row leaving the dense working row, from its true lead.
+pub(crate) fn density_end(nonzeros: usize, lead: usize, width: usize) {
+    if nonzeros > 0 {
+        forward_density(|t| t.rows_at_end[density_bucket(nonzeros, width - lead)] += 1);
+    }
 }
 
 pub(crate) fn memory(
