@@ -181,6 +181,14 @@ green again.
 skipped jobs are accepted. It is suitable as a required branch-protection check; changing repository
 branch-protection settings is a separate action.
 
+`Agent authorship` (`.github/workflows/agent-authorship.yml`) fails a pull request or a push to
+`main` when a commit names a coding agent — Claude, Codex, Gemini, DeepSeek, Copilot and the like —
+as author, committer or `Co-authored-by:`, or when the pull request body carries such a line, which
+a squash merge would copy onto `main` (#1058). It is its own workflow so that editing the body
+re-runs it without the test suite. `tools/check-agent-authorship.sh <base> <head>` runs the same
+check locally; names a person can also have, such as Claude or Devin, count only when nothing but
+product words or version numbers accompany them.
+
 `Research artifacts` runs the research-instrument tests, artifact summaries and the delayed-reduction
 pilot. It is a matrix with one runner per set in `tools/ci-research.sh` — `default`,
 `delayed-reduction`, `comparand-replay` and one per `research-*` feature — because every feature set

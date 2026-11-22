@@ -250,6 +250,10 @@ salvage usable commits rather than silently dropping them.
 Both `release` forms refuse if another agent holds the claim, because both touch
 state there is only one of.
 
+**Commits are the owner's, not an agent's.** Never add a coding agent as author, committer or
+`Co-authored-by:` trailer, in a commit or a PR body. The `Agent authorship` workflow rejects it
+(#1058); check a branch with `tools/check-agent-authorship.sh origin/main HEAD`.
+
 **Test locally before opening the PR; PR CI is a backstop.** PR CI runs only the
 debug tests, doctests, lint and MSRV. The optimized tests, research-artifact
 sets and benchmark smoke run nightly (#924). Run whichever of those your change
@@ -326,6 +330,7 @@ bash tools/test/bench-job-test.sh
 bash tools/test/check-archive-reproducible-test.sh
 bash tools/test/check-measurement-provenance-test.sh
 bash tools/check-measurement-provenance.sh
+bash tools/test/check-agent-authorship-test.sh
 shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
   scripts/fetch-eprint scripts/test/*.sh scripts/ci-lint.sh .githooks/pre-push \
   tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
