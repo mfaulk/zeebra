@@ -19,6 +19,15 @@ def ci(m, lo, hi):
     return bs.Interval(m, lo, hi, 9, 9)
 
 
+class CertifiedRequest(unittest.TestCase):
+    def test_certified_request_is_digest_only(self):
+        """Track Gc asks grobx for a certified, digest-only reply under the certified caps (#1020)."""
+        req = campaign.certified_request(dict(variables=['x'], mode='raw', wall_ns=1))
+        self.assertEqual((req['mode'], req['digest_only']), ('certified', True))
+        self.assertEqual((req['wall_ns'], req['rss_bytes']),
+                         (campaign.CERTIFIED_CAP_S * 10**9, campaign.CERTIFIED_CAP_BYTES))
+
+
 class Invariants(unittest.TestCase):
     def test_leading_monomials_are_grevlex_sorted_and_counted(self):
         """The reference basis gives its cardinality and its sorted grevlex leading monomials."""

@@ -62,7 +62,10 @@ this amendment; no development row's interval reaches 1 there.
 
 Two of the three allowed sessions ran, both valid: 2,913 attempts, 279 contaminated (all by the
 per-arm clock rule), and every digest equal to its reference. One grobx certified attempt was
-completed and the job was then refused on output size (#1020). No row qualified for the n = 12
+completed and the job was then refused on output size (#1020). `campaign.py inputs` now writes Track
+Gc's request with `digest_only: true`, so its reply carries the basis digest and not the 1.70 GB of
+certified text; a re-run is therefore a new input and a new job id, and job `d5db6121722d`'s record
+is the full-reply run. No row qualified for the n = 12
 extension: every inconclusive row is small or short of n, not spanning. No third session was run.
 
 Verdicts (plan §17.8): Minimum met. **T-G missed**: no development row wins against grobx raw.

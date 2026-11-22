@@ -201,7 +201,7 @@ missing.
 | `run.retries` | extra tries for a `failed`, `timeout` or `rss-limit` attempt, default 0 |
 | `run.limits.wall_seconds`, `.kill_after_seconds` | the `timeout --signal=INT` cap and its `--kill-after` (default 60) |
 | `run.limits.rss_bytes`, `.live_bytes` | `rss-guard` ceiling (null: unguarded); the live-bytes limit for argv templates |
-| `run.limits.aggregate_wall_seconds`, `.output_bytes` | the journal's budget; defaults: every try at its cap, 1 GiB |
+| `run.limits.aggregate_wall_seconds`, `.output_bytes` | the journal's budget; defaults: every try at its cap, 1 GiB. `output_bytes` must be a positive integer: the job stops with `output-bytes` once the retained (gzipped) child output reaches it. Prefer a digest-only reply to raising it (#1020) |
 
 The journal it writes extends `StudyJournal` without forking it. An `exit` record may carry
 `try` > 0, a retry of the index recorded immediately before it; and a `resume` record may follow a

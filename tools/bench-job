@@ -208,6 +208,10 @@ def validate(m):
              'run.limits.wall_seconds must be positive')
     for key in ('rss_bytes', 'live_bytes'):
         _require(limits.get(key) is None or isinstance(limits[key], int), f'run.limits.{key} must be an integer or null')
+    if 'output_bytes' in limits:  # the journal's retained-output budget (#1020)
+        ob = limits['output_bytes']
+        _require(isinstance(ob, int) and not isinstance(ob, bool) and ob > 0,
+                 'run.limits.output_bytes must be a positive integer')
     for cell in expand(m):
         argv(m, cell, Path('/job'))
 

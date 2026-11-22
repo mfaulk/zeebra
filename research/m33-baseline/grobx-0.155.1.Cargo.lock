@@ -93,6 +93,7 @@ dependencies = [
  "grobx",
  "grobx-checker",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

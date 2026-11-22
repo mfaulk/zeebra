@@ -387,6 +387,18 @@ class BenchJobTest(unittest.TestCase):
         with self.assertRaisesRegex(bj.JobError, 'workers'):
             bj.validate(m)
 
+    # The manifest's output budget reaches the journal's limits; a non-positive or non-integer one is refused (#1020).
+    def test_output_budget_is_read_and_validated(self):
+        m = self.manifest(reps=1)
+        self.assertEqual(bj.journal_limits(m)['output_bytes'], 1 << 30)
+        m['run']['limits']['output_bytes'] = 4 << 30
+        bj.validate(m)
+        self.assertEqual(bj.journal_limits(m)['output_bytes'], 4 << 30)
+        for bad in (0, 1.5, '4G', None):
+            m['run']['limits']['output_bytes'] = bad
+            with self.assertRaisesRegex(bj.JobError, 'output_bytes'):
+                bj.validate(m)
+
     # Named per-instance inputs are copied and re-hashed, reach argv as {inputs[key]}, and a changed one is refused.
     def test_named_inputs_are_copied_and_templated(self):
         src = self.tmp / 'in.ms'
