@@ -1,4 +1,4 @@
-# Structural input features: incidence and the linear part (#1009)
+# Structural input features: incidence, the linear part, supports and leading monomials (#1009)
 
 **Status:** definitions and implementation only. No timing or memory figure appears here. The
 measured cost table and the coverage summary #1009 asks for need the pilot panel from #1006/#1007,
@@ -6,7 +6,9 @@ and both are still open.
 
 `src/grobner/planning/structure.rs` adds features that `SystemShape` (`planning/analysis.rs`) and
 `DispatchFeatures` (`sigf4/dispatch.rs`) lack: equation–variable incidence and the affine-linear
-subsystem. Nothing calls them yet, and the dispatcher is unchanged.
+subsystem. `src/grobner/planning/support.rs` adds the monomial supports (§5) and the initial
+leading monomials under a requested order (§6). Nothing calls either module yet, and the dispatcher
+is unchanged.
 
 ## 1. Two kinds of statement
 
@@ -91,8 +93,86 @@ apart.
 
 - Measured extraction cost, absolute and as a fraction of the cheapest arm's solve time, on the
   #1006/#1007 pilot panel. This needs that panel and a measurement host.
-- Scope items 2, 5 and 6: support overlap, per-variable exponent profiles, leading-monomial
-  divisibility, sampled pair statistics, and the binomial and duplicate-generator fractions.
-- A feature-space coverage summary of the pilot panel.
+- A feature-space coverage summary of the pilot panel, and the stop-condition check against the
+  measured costs.
 - Whether the dispatcher reads any of this through an allocation-free fast path. That is #1013's
   decision, made after the costs are measured.
+
+Scope items 2, 5 and 6, listed here as open before, are §5 and §6.
+
+## 5. Supports: `support_profile`
+
+| feature | definition | cost bound |
+|---|---|---|
+| `terms_histogram` | `(terms, generators)` over nonzero generators | one pass over the terms |
+| `degree_spread_histogram` | `(max − min term degree, generators)`; spread 0 is a homogeneous generator | included above |
+| `homogeneous_generators` | generators with spread 0; all of them is `hilbert::is_homogeneous` | included above |
+| `top_degree_terms`, `homogeneous_capacity` | terms of each generator's top degree, and `Σ C(N + d − 1, d)` over generator degrees `d` | included above |
+| `top_degree_density()` | `top_degree_terms / homogeneous_capacity` | — |
+| `affine_density()` | `terms / Σ C(N + d, d)`, equal to `SystemShape::monomial_density` | — |
+| `distinct_monomials`, `shared_monomials`, `max_monomial_multiplicity` | monomials across the system; those in two or more generators; the most generators any one is in | one hash per term |
+| `overlapping_pairs` | unordered generator pairs sharing a **nonconstant** monomial | at most `overlap_work` pair insertions (default `2^20`); `None` if the cap is reached |
+| `max_exponent`, `exponent_mass` | per variable, the largest exponent in any term and the sum over all terms | included in the first pass |
+| `monomial_generators`, `binomial_generators` | nonconstant one-term generators; two-term generators | included in the first pass |
+| `duplicate_generators` | nonzero generators that are a nonzero scalar multiple of an earlier one | expected `O(T)`: bucket by term count and lex-leading monomial, compare monic forms within a bucket |
+
+Notes:
+
+- **Two densities, because the capacity differs.** A homogeneous degree-`d` generator can only use
+  the `C(N + d − 1, d)` monomials of degree exactly `d`. Measuring it against the `C(N + d, d)` of
+  degree at most `d` understates it. `affine_density` is kept because it is the existing
+  `SystemShape` figure, and the test checks that the two agree.
+- **The constant is left out of overlap.** Nearly every affine generator has a constant term, and
+  sharing it multiplies nothing. `shared_monomials` and `max_monomial_multiplicity` do count it.
+- **Duplicates are exact about the presentation.** Dropping a scalar multiple of another generator
+  leaves the ideal unchanged. The comparison is over the coefficient field: `x + y` and `x − y`
+  are duplicates in characteristic two and not otherwise
+  (`test_duplicates_are_normalized_and_field_exact`).
+
+## 6. Initial leading monomials: `leading_profile`
+
+Every figure here depends on the requested monomial order, which the profile records.
+
+| feature | definition | cost bound |
+|---|---|---|
+| `leading_degree_histogram` | `(deg LM, generators)` | `O(T)` order comparisons |
+| `divisible_leading` | generators whose LM is divisible by another's; of equal LMs, all but the first | `O(m² N)` exponent reads for `m` nonzero generators |
+| `total_pairs`, `sampled_pairs` | `m (m − 1) / 2`, and the pairs examined | — |
+| `coprime_pairs` | sampled pairs with coprime LMs | `O(m + pair_sample · N)` (default sample `2^14`) |
+| `lcm_degree_histogram`, `gcd_degree_histogram` | `deg lcm` and `deg gcd` of the sampled pairs' LMs | included above |
+
+Notes:
+
+- **The sample is deterministic and spread out.** Up to the cap every pair is examined. Past it,
+  the pair at linear index `⌊s · total / cap⌋` is taken for `s = 0 … cap − 1`, exactly `cap` pairs,
+  so the late rows are reached rather than only the first generator's pairs
+  (`test_pair_sampling_is_capped_and_spread`).
+- **A coprime pair is exact for that pair.** Buchberger's product criterion reduces its
+  S-polynomial to zero. The fraction is still only a predictor: it says nothing about the pairs that
+  later generators form.
+- **`divisible_leading > 0` means the input is not interreduced.** A generator whose leading
+  monomial another divides is top-reducible before any pair is formed. A nonzero constant has
+  leading monomial 1 and makes every other generator count.
+- The divisibility count is quadratic in `m` and has no cap. If the pilot panel shows it is too
+  expensive on wide inputs, it gets a work cap like `overlapping_pairs`.
+
+## 7. Invariance of §5 and §6
+
+| feature | variable permutation | generator reorder | generator scaling | invertible generator mixing | ideal invariant? |
+|---|---|---|---|---|---|
+| term, spread and homogeneity counts | invariant | invariant | invariant | not invariant | no² |
+| densities | invariant | invariant | invariant | not invariant | no |
+| distinct and shared monomials, overlap | invariant | invariant | invariant | not invariant | no |
+| `max_exponent`, `exponent_mass` | permuted with the variables | invariant | invariant | not invariant | no |
+| monomial, binomial, duplicate counts | invariant | invariant | invariant | not invariant | no |
+| leading-monomial figures | **not invariant**: the order ranks variables by index | invariant³ | invariant | not invariant | no |
+
+² Homogeneity of every generator is a property of the presentation. An ideal is homogeneous if *some*
+generating set is, and mixing homogeneous generators of different degrees gives a non-homogeneous
+generating set of the same homogeneous ideal.
+
+³ Reordering changes which of two equal leading monomials counts as "first", but not how many count.
+The pair sample is taken over pair positions, so past the cap a reorder can change which pairs are
+sampled, but not `total_pairs` or `sampled_pairs`.
+
+`test_support_profile_invariance_under_reorder_and_scaling` checks reordering and scaling together.
