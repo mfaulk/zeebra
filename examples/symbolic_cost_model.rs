@@ -218,13 +218,12 @@ fn ladder(problem: &str, modulus: u64) -> Input {
     }
 }
 
+/// The frozen #738 catalog, compiled in so the binary does not embed its build directory (#1021).
+const WIDE_CATALOG: &str = include_str!("../research/wide-corpus/cases.json");
+
 /// A frozen #738 row, refused unless its canonical text still hashes to its digest.
 fn wide(field: &str, name: &str) -> Input {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/research/wide-corpus/cases.json"
-    );
-    let cases = Json::parse(&std::fs::read_to_string(path).expect("frozen wide catalog")).unwrap();
+    let cases = Json::parse(WIDE_CATALOG).unwrap();
     let case = cases
         .items()
         .iter()

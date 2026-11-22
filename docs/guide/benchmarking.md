@@ -558,6 +558,36 @@ tools/bench-job submit /buildcache/cargo-target/zeebra-967/katsura-9.json
 `tools/test/bench-job-test.sh` covers submit refusals, plan determinism, SIGKILL and resume,
 cancel, timeouts, retries and binary tampering with synthetic children and a fake reservation.
 
+### Matching a rebuild to a measured binary by hash (#1021)
+
+A rebuild of a measured arm can be identified by its SHA-256 only if two `git archive` builds of
+one commit are byte-identical when built in different directories. Before #1021 they were not:
+`sig_f4_study`, `m33_qualify` and the two cost-model examples read the frozen wide catalog from
+`concat!(env!("CARGO_MANIFEST_DIR"), …)` at run time, so each binary held its own source
+directory. `--remap-path-prefix` does not rewrite that string, because it is a value, not a source
+location. The examples now compile the catalog in with `include_str!`, which also puts the
+catalog the binary reads under the binary's hash.
+
+To check a commit and artifact before relying on a hash match:
+
+```sh
+tools/check-archive-reproducible.sh --workdir /buildcache/cargo-target/zeebra-<issue>/repro \
+  <commit> release/examples/sig_f4_study \
+  -- --release --locked --features research-sigf4 --example sig_f4_study
+```
+
+It extracts the commit into two source and target directories of different names and depths,
+builds both at once, and compares the artifacts. rc 0 means the hashes are equal. rc 1 means they
+differ, and it lists every string in either binary that names its build directory. rc 2 means a
+build failed. Panic locations of this crate are already relative (`src/…`), dependencies' locations
+name `$CARGO_HOME`, which is the same for both builds, and the release profile has no debug
+info, so a listed string is almost always a runtime path like the catalog's.
+
+On macOS the check still reports rc 1 with no strings listed. Apple's linker writes a per-build
+`LC_UUID`, and the ad-hoc code signature hashes the page that contains it. Those 48 bytes are the
+only difference in `sig_f4_study` once the catalog is compiled in. Use the check's verdict on the measurement host
+itself.
+
 ## Statistics and verdicts
 
 New M33 campaigns read their ratios and verdicts through [`tools/bench_stats.py`](../../tools/bench_stats.py)

@@ -118,15 +118,13 @@ struct Input {
     generators: Vec<String>,
 }
 
+/// The frozen #738 catalog, compiled in so the binary does not embed its build directory (#1021).
+const WIDE_CATALOG: &str = include_str!("../research/wide-corpus/cases.json");
+
 /// A frozen #738 row (`research/wide-corpus/cases.json`), the form the F0 baseline timed the
 /// wide-field rows in; refused unless its canonical text still hashes to its digest.
 fn catalog(field: &str, name: &str) -> Result<Input, String> {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/research/wide-corpus/cases.json"
-    );
-    let cases = Json::parse(&std::fs::read_to_string(path).map_err(|e| e.to_string())?)
-        .map_err(|e| format!("{e:?}"))?;
+    let cases = Json::parse(WIDE_CATALOG).map_err(|e| format!("{e:?}"))?;
     let case = cases
         .items()
         .iter()
