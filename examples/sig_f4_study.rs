@@ -29,12 +29,24 @@
 //! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918); `--reducer
 //! NAME` (f4) sets the symbolic reducer selection by its `ReducerSelection` variant name.
 //!
+//! `--live-gib G` (f4) raises the live-entry budget to G GiB, for #1033's information-only arm:
+//! at the shipping 512 MB the parallel forward pass falls back to serial on the largest dense
+//! batches.
+//!
+//! `--capture DIR --batches i,j` (f4) writes those batches' matrices, as built and before
+//! elimination, in the `macaulay::io` archive format with their fingerprints, and solves nothing
+//! further (#1033's captures for #945's matrix-level gate).
+//!
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
 //!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
-//! `--features research-work`, `--discovery` adds the shipping F4's serial census: forward and
+//! `--features research-work`, `--density` (f4, one worker) adds #1033's density-during-reduction
+//! trace from the dense working row: forward products by the target's density before each
+//! application, with per-checkpoint row histograms, for the whole run and its three largest
+//! batches; `traced_products` below `forward_products` means part of the forward pass ran on a
+//! path the trace does not observe. `--discovery` adds the shipping F4's serial census: forward and
 //! backward coefficient products and those on rows that end zero (#835's instrument).
 //!
 //! With `--features research-sigf4-replay`, `--replay` (sigf4, `--workers ≥ 2`) runs design 1
@@ -81,6 +93,7 @@ struct Args {
     wall: Duration,
     certify: bool,
     discovery: bool,
+    density: bool,
     replay: bool,
     claim: bool,
     symbolic: bool,
@@ -95,6 +108,9 @@ struct Args {
     stages: bool,
     fl: bool,
     reducer: ReducerSelection,
+    capture: Option<String>,
+    batches: Vec<usize>,
+    live_gib: Option<usize>,
 }
 
 /// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
@@ -109,6 +125,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         wall: Duration::from_secs(600),
         certify: false,
         discovery: false,
+        density: false,
         replay: false,
         claim: false,
         symbolic: false,
@@ -123,6 +140,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         stages: false,
         fl: false,
         reducer: ReducerSelection::default(),
+        capture: None,
+        batches: Vec::new(),
+        live_gib: None,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -144,6 +164,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--certify" => parsed.certify = true,
             "--sample-threads" => parsed.sample_threads = true,
             "--discovery" => parsed.discovery = true,
+            "--density" => parsed.density = true,
             "--generate" => parsed.generate = true,
             "--input-only" => parsed.input_only = true,
             "--digest-only" => parsed.digest_only = true,
@@ -152,6 +173,16 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--claim" => parsed.claim = true,
             "--stages" => parsed.stages = true,
             "--fl" => parsed.fl = true,
+            "--capture" => parsed.capture = Some(value()?),
+            "--live-gib" => {
+                parsed.live_gib = Some(value()?.parse().map_err(|_| "--live-gib takes GiB")?)
+            }
+            "--batches" => {
+                parsed.batches = value()?
+                    .split(',')
+                    .map(|b| b.parse().map_err(|_| "--batches takes indices like 7,8"))
+                    .collect::<Result<_, _>>()?
+            }
             "--reducer" => {
                 let name = value()?;
                 parsed.reducer = ReducerSelection::ALL
@@ -197,7 +228,18 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
     }
-    if (parsed.stages || parsed.fl || parsed.reducer != ReducerSelection::default())
+    if parsed.capture.is_some() != !parsed.batches.is_empty()
+        || (parsed.capture.is_some() && parsed.engine != "f4")
+    {
+        return Err("--capture DIR and --batches i,j go together, with --engine f4".into());
+    }
+    if parsed.density && (parsed.engine != "f4" || parsed.workers != 1 || parsed.discovery) {
+        return Err("--density observes the serial shipping F4 only, without --discovery".into());
+    }
+    if (parsed.stages
+        || parsed.fl
+        || parsed.live_gib.is_some()
+        || parsed.reducer != ReducerSelection::default())
         && parsed.engine != "f4"
     {
         return Err("--stages and --fl configure the shipping F4: --engine f4".into());
@@ -210,7 +252,12 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--symbolic-replay replays the signature engine's closure: --engine sigf4".into(),
         );
     }
-    if parsed.repeat > 1 && (parsed.certify || parsed.discovery || parsed.replay || parsed.symbolic)
+    if parsed.repeat > 1
+        && (parsed.certify
+            || parsed.discovery
+            || parsed.density
+            || parsed.replay
+            || parsed.symbolic)
     {
         return Err("--repeat times the solve alone".into());
     }
@@ -222,7 +269,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
 
 /// Shipping defaults; only the forward and symbolic worker caps vary, as in `m29_cost_model`.
 fn f4_options(args: &Args) -> F4Options {
-    F4Options {
+    let options = F4Options {
         max_wall_time: Some(args.wall),
         parallel_forward: if args.workers == 1 {
             ParallelForward::Serial
@@ -246,6 +293,15 @@ fn f4_options(args: &Args) -> F4Options {
             BatchOrder::Forward
         },
         ..F4Options::default()
+    };
+    // #1033: a raised live budget, stated in bytes so both limits move (#322); not a shipping arm.
+    match args.live_gib {
+        Some(gib) => F4Options {
+            max_live_bytes: gib << 30,
+            max_live_nonzeros: usize::MAX,
+            ..options
+        },
+        None => options,
     }
 }
 
@@ -767,6 +823,128 @@ fn discovery(report: &zeebra::linalg::work::WorkReport) -> Json {
     ])
 }
 
+/// #1033's matrix capture: each `--batches` index as the shipping F4 built it, before elimination,
+/// written in the `macaulay::io` archive format to `DIR/<field>__<name>__b<index>.zmat`. Each
+/// capture stops the run after constructing its matrix.
+fn capture<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    digest: &str,
+    dir: &str,
+    args: &Args,
+) -> Json {
+    use zeebra::grobner::f4::{
+        macaulay::io::write_matrix,
+        matrix_corpus::{capture_matrix, BatchSelector},
+    };
+    std::fs::create_dir_all(dir).expect("capture directory");
+    let options = f4_options(args);
+    let captured = args.batches.iter().map(|&index| {
+        let c = capture_matrix(
+            "dense",
+            system,
+            args.order,
+            &options,
+            BatchSelector::Prefix(index),
+        )
+        .unwrap_or_else(|e| panic!("batch {index}: {e:?}"));
+        let path = format!("{dir}/{}__{}__b{index}.zmat", args.field, args.name);
+        let mut bytes = Vec::new();
+        write_matrix(&mut bytes, &c.matrix).expect("in-memory write");
+        std::fs::write(&path, &bytes).expect("matrix file");
+        let f = &c.fingerprint;
+        Json::object([
+            ("batch", Json::size(f.batch_index)),
+            ("rows", Json::size(f.rows)),
+            ("columns", Json::size(f.columns)),
+            ("reducer_rows", Json::size(f.reducer_rows)),
+            ("nonzeros", Json::size(f.nonzeros)),
+            ("fingerprint", Json::string(&f.digest)),
+            ("path", Json::string(&path)),
+            ("file_sha256", Json::string(sha256_hex(&bytes))),
+            ("file_bytes", Json::size(bytes.len())),
+        ])
+    });
+    Json::object([
+        ("field", Json::string(&args.field)),
+        ("name", Json::string(&args.name)),
+        ("input_digest", Json::string(digest)),
+        ("captures", Json::Array(captured.collect())),
+    ])
+}
+
+/// #1033's density trace: forward products on rows at least 25/50/75% dense, over all batches and
+/// for the batches carrying the most forward products, with the summed trace.
+#[cfg(feature = "research-work")]
+fn density(report: &zeebra::linalg::work::WorkReport) -> Json {
+    use zeebra::linalg::work::{DensityTrace, DENSITY_BUCKETS};
+    let at_least = |b: &[usize]| {
+        let total: usize = b.iter().sum();
+        Json::Array(
+            [5, 10, 15]
+                .iter()
+                .map(|&from| {
+                    let above: usize = b[from..].iter().sum();
+                    let share = if total == 0 {
+                        0.0
+                    } else {
+                        above as f64 / total as f64
+                    };
+                    Json::string(format!("{share:.4}"))
+                })
+                .collect(),
+        )
+    };
+    let summary = |t: &DensityTrace| {
+        Json::object([
+            ("thresholds", Json::string("0.25,0.50,0.75")),
+            ("span_share_at_least", at_least(&t.products_by_span)),
+            ("width_share_at_least", at_least(&t.products_by_width)),
+        ])
+    };
+    let mut total = DensityTrace::default();
+    for b in &report.batches {
+        total.accumulate(&b.forward_density);
+    }
+    let mut largest: Vec<_> = report.batches.iter().enumerate().collect();
+    largest.sort_by_key(|(_, b)| std::cmp::Reverse(b.forward.coefficient_products));
+    let batches = largest.iter().take(3).map(|(i, b)| {
+        Json::object([
+            ("batch", Json::size(*i)),
+            ("degree", Json::int(b.degree)),
+            ("rows", Json::size(b.rows)),
+            ("columns", Json::size(b.columns)),
+            ("reducer_rows", Json::size(b.reducer_rows)),
+            ("initial_entries", Json::size(b.initial_entries)),
+            (
+                "forward_products",
+                Json::size(b.forward.coefficient_products),
+            ),
+            ("summary", summary(&b.forward_density)),
+            ("trace", b.forward_density.json()),
+        ])
+    });
+    debug_assert_eq!(total.products_by_span.len(), DENSITY_BUCKETS);
+    Json::object([
+        (
+            "forward_products",
+            Json::size(
+                report
+                    .batches
+                    .iter()
+                    .map(|b| b.forward.coefficient_products)
+                    .sum(),
+            ),
+        ),
+        (
+            "traced_products",
+            Json::size(total.products_by_span.iter().sum()),
+        ),
+        ("summary", summary(&total)),
+        ("trace", total.json()),
+        ("largest_batches", Json::Array(batches.collect())),
+    ])
+}
+
 #[cfg(feature = "research-sigf4-replay")]
 fn basis_sha256<const N: usize, F: FiniteField>(
     basis: &[MultivariatePolynomial<N, F>],
@@ -1149,6 +1327,9 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         #[cfg(not(feature = "research-sigf4-replay"))]
         panic!("--symbolic-replay requires --features research-sigf4-replay");
     }
+    if let Some(dir) = &args.capture {
+        return capture(&system, &input.digest, dir, args);
+    }
     if args.replay {
         #[cfg(feature = "research-sigf4-replay")]
         return cascade::report(&system, &names, &input.digest, args);
@@ -1227,12 +1408,16 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             let ((result, stats), work) = if args.discovery {
                 let (r, w) = zeebra::linalg::work::measure_discovery(solve);
                 (r, discovery(&w))
+            } else if args.density {
+                let (r, w) = zeebra::linalg::work::measure(solve);
+                (r, density(&w))
             } else {
                 (solve(), Json::Null)
             };
             #[cfg(not(feature = "research-work"))]
             let ((result, stats), work) = {
                 assert!(!args.discovery, "--discovery requires research-work");
+                assert!(!args.density, "--density requires research-work");
                 (solve(), Json::Null)
             };
             let summary = Json::object([
@@ -1425,6 +1610,19 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16", "--discovery"]].concat()).is_err());
+        // #1033: the density trace observes the serial shipping F4 only.
+        assert!(args(&[&base[..], &["f4", "--density"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["f4", "--workers", "16", "--density"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--density"]].concat()).is_err());
+        let capture = ["--capture", "/x", "--batches", "7,8"];
+        assert_eq!(
+            args(&[&base[..], &["f4"], &capture[..]].concat())
+                .unwrap()
+                .batches,
+            vec![7, 8]
+        );
+        assert!(args(&[&base[..], &["f4", "--capture", "/x"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4"], &capture[..]].concat()).is_err());
         // #972/#918: stage measurement and the FL order configure the shipping F4 only.
         assert!(args(&[&base[..], &["f4", "--workers", "4", "--stages", "--fl"]].concat()).is_ok());
         assert!(args(&[&base[..], &["sigf4", "--stages"]].concat()).is_err());
