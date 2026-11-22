@@ -29,6 +29,7 @@ case "$1" in
   selfkill) kill -TERM $$ ;;
   sleep) exec sleep "$2" ;;
   once) [ -e "$2" ] && exit 0; : > "$2"; [ "$3" = fail ] && exit 1; exec sleep 30 ;;
+  spin) i=0; while [ "$i" -lt "$2" ]; do i=$((i + 1)); done; echo '{"status":"ok"}' ;;
 esac
 '''
 FAKE_RESERVE = ('#!/bin/sh\n[ "$1" = run ] || exit 64\nshift 3\n'
@@ -60,8 +61,9 @@ class BenchJobTest(unittest.TestCase):
         reserve.chmod(0o755)
         context = self.tmp / 'fake-context.sh'
         context.write_text('echo \'{"fake":true}\'\n')
+        # Cycle counting is off unless a test turns it on: it attaches a perf process to every attempt.
         self.env = dict(os.environ, ZEEBRA_BENCH_JOBS=str(self.jobs), ZEEBRA_BENCH_JOB_RESERVE=str(reserve),
-                        ZEEBRA_CPU_CONTEXT=str(context))
+                        ZEEBRA_CPU_CONTEXT=str(context), ZEEBRA_BENCH_PERF='')
         self.saved = dict(os.environ)
         os.environ.update(self.env)
 
@@ -524,6 +526,119 @@ class BenchJobTest(unittest.TestCase):
         self.assertLess(ok['solver_peak_rss_bytes'], ok['observed_peak_rss_bytes'])
         # GNU time's 128+N for a signalled binary reads back as -N, as it does without the reporter.
         self.assertEqual(by_instance['i2']['exit'], -signal.SIGTERM)
+
+    # perf's `-x,` report: the user-only events this box's paranoid level gives, hybrid PMUs summed, gaps None.
+    def test_parse_perf_stat(self):
+        p = bj.campaign.parse_perf_stat
+        here = ('# started on Sun Nov 22 15:12:20 2026\n\n'
+                '1431043761,,cycles:u,335480602,100.00,,\n335.48,msec,task-clock:u,335480602,100.00,,\n')
+        self.assertEqual(p(here), dict(cycles=1431043761, task_clock_ms=335.48, cycles_event='cycles:u'))
+        hybrid = ('100,,cpu_core/cycles/u,1,100.00,,\n50,,cpu_atom/cycles/u,1,100.00,,\n'
+                  '0.10,msec,task-clock,1,100.00,,\n')
+        self.assertEqual(p(hybrid)['cycles'], 150)
+        self.assertEqual(p('<not counted>,,cycles:u,0,0.00,,\n1.0,msec,task-clock:u,1,100.00,,\n'),
+                         dict(cycles=None, task_clock_ms=1.0, cycles_event='cycles:u'))
+        self.assertEqual(p('# started on Sun Nov 22 15:14:17 2026\n\n'),
+                         dict(cycles=None, task_clock_ms=None, cycles_event=None))
+
+    # Cycles per task-clock millisecond is kHz; either count missing, or no CPU time, gives no clock.
+    def test_effective_khz(self):
+        e = bj.campaign.effective_khz
+        self.assertEqual(e(1431043761, 335.48), 4265660)
+        for cycles, ms in ((None, 1.0), (1000, None), (1000, 0.0)):
+            self.assertIsNone(e(cycles, ms))
+
+    # perf is used only where perf_event_paranoid lets this user count its own processes (2 or lower).
+    def test_perf_gating(self):
+        allowed = bj.campaign.perf_permitted
+        self.assertEqual([allowed(t) for t in ('-1\n', '0', '1', '2\n', '3', '4', '', 'x')],
+                         [True, True, True, True, False, False, False, False])
+        paranoid = self.tmp / 'paranoid'
+        paranoid.write_text('3\n')
+        self.assertIsNone(bj.campaign.perf_stat(shutil.which('perf') or '/usr/bin/perf', paranoid))
+        self.assertIsNone(bj.campaign.perf_stat(str(self.tmp / 'no-such-perf')))
+        self.assertIsNone(bj.campaign.perf_stat())  # ZEEBRA_BENCH_PERF='' turns it off
+
+    # The attempt's clock is the cycle count's where perf produced one, else the sampled median, else the snapshots'.
+    def test_attempt_clock_fallback(self):
+        clock = bj.campaign.attempt_clock
+        freq = dict(median_khz=1430000)
+        self.assertEqual(clock(dict(perf=dict(effective_khz=4100000), freq=freq)), (4100000, 'perf-cycles'))
+        self.assertEqual(clock(dict(perf=dict(effective_khz=None), freq=freq)), (1430000, 'sampled'))
+        self.assertEqual(clock(dict(perf=None, freq=freq)), (1430000, 'sampled'))
+        self.assertEqual(clock(dict(freq=freq)), (1430000, 'sampled'))
+        self.assertEqual(clock(dict(perf=None, freq=None)), (None, 'snapshot'))
+
+    # The solver pid is the first descendant of the runner's child that is no longer a wrapper (#328 class).
+    def test_solver_pid(self):
+        pid = bj.campaign.solver_pid
+        wrappers = {'taskset', 'timeout', 'time'}
+        tree = {101: (100, 'time'), 102: (101, 'child'), 103: (1, 'child'), 104: (102, 'worker')}
+        self.assertEqual(pid(tree, 100, wrappers), 102)
+        self.assertEqual(pid({101: (100, 'child'), 103: (1, 'child')}, 100, wrappers), 101)  # no GNU time
+        # Forked but not yet exec'd: the child still carries its parent's wrapper name.
+        self.assertIsNone(pid({101: (100, 'time'), 102: (101, 'time')}, 100, wrappers))
+        self.assertIsNone(pid({103: (1, 'child')}, 100, wrappers))
+
+    # Attempts are judged against attempts clocked the same way: a sampled straggler is not compared with cycle counts.
+    def test_clock_sources_are_grouped_apart(self):
+        rows = self.clock_rows(dict(grobx=[4100000] * 4 + [1430000]))
+        for i, (_, _, c) in enumerate(rows):
+            c['clock_source'] = 'perf-cycles' if i < 4 else 'sampled'
+        s = bj.session_verdict_of(rows, 'dev', 'bench-job-job')
+        self.assertEqual((s['contaminated'], s['void'], s['version']), (0, False, 3))
+        self.assertEqual(s['median_khz'], {'wide64/eco-12@1w/grobx/perf-cycles': 4100000,
+                                           'wide64/eco-12@1w/grobx': 1430000})
+        self.assertEqual(s['clock_sources'], {'perf-cycles': 4, 'sampled': 1})
+        # A journal from before cycle counting has no source and keeps version 2's keys.
+        legacy = bj.session_verdict_of(self.clock_rows(dict(grobx=[4100000] * 3)), 'dev', 'bench-job-job')
+        self.assertEqual(list(legacy['median_khz']), ['wide64/eco-12@1w/grobx'])
+
+    # contamination() feeds the cycle-count clock to the clock rule and names its source.
+    def test_contamination_records_the_clock_source(self):
+        before = dict(at='2026-11-21T00:00:00Z', load1=0, compilers=0, cpus=[dict(cpu=0, khz=1)],
+                      stat=[dict(cpu=0, role='bench', busy=0, total=0)], rest_stat=None)
+        after = dict(before, at='2026-11-21T00:00:10Z', stat=[dict(cpu=0, role='bench', busy=1000, total=1000)])
+        r = dict(before=before, after=after, cpu_seconds=10.0, freq=dict(median_khz=1430000),
+                 perf=dict(effective_khz=4100000))
+        c = bj.contamination(r, self.manifest(), 'job')
+        self.assertEqual((c['clock_source'], c['metrics']['median_khz']), ('perf-cycles', 4100000))
+        r['perf'] = None
+        c = bj.contamination(r, self.manifest(), 'job')
+        self.assertEqual((c['clock_source'], c['metrics']['median_khz']), ('sampled', 1430000))
+
+    def perf_or_skip(self):
+        os.environ['ZEEBRA_BENCH_PERF'] = shutil.which('perf') or '/usr/bin/perf'
+        perf = bj.campaign.perf_stat()
+        if perf is None:
+            self.skipTest('perf cannot count this user\'s processes here')
+        return perf
+
+    # Counting attaches to the solver itself: the guard still watches it, and the timeout's INT still stops it.
+    def test_run_child_counts_cycles_without_moving_the_guard_or_the_signal(self):
+        perf = self.perf_or_skip()
+        r = bj.campaign.run_child([str(self.child), 'spin', '100000000'], '0', 1, kill_after_s=5,
+                                  guard=('child', str(self.child), 1 << 30), rss_reporter=bj.campaign.gnu_time(),
+                                  perf=perf)
+        self.assertEqual(r['returncode'], 124)  # the timeout reached the solver under counting
+        self.assertLess(r['process_wall_ns'], 4e9)
+        self.assertEqual(r['rss_guard_rc'], 0, r['rss_guard_stderr'])  # 1 would be "guarded nothing"
+        self.assertIsNotNone(r['perf']['pid'])
+        self.assertGreater(r['perf']['task_clock_ms'], 100)
+        self.assertGreater(r['perf']['effective_khz'], 100000)
+        self.assertEqual(bj.campaign.attempt_clock(r)[1], 'perf-cycles')
+
+    # A job run with perf available records the counts and judges the clock from them.
+    def test_run_records_cycle_counts(self):
+        self.perf_or_skip()
+        self.env['ZEEBRA_BENCH_PERF'] = os.environ['ZEEBRA_BENCH_PERF']
+        self.fake_context()
+        job = self.job(self.manifest(instances=(('i1', ['spin', '300000']),), reps=1))
+        self.cli('run', job, check=0)
+        md = self.state(job)['attempts'][0]['metadata']
+        self.assertGreater(md['perf']['effective_khz'], 100000)
+        self.assertEqual(md['contamination']['clock_source'], 'perf-cycles')
+        self.assertEqual(md['contamination']['metrics']['median_khz'], md['perf']['effective_khz'])
 
     def publication(self, cells, workers=(1,), arms=None):
         """A publication job's loaded journal from `cells`: (arm, workers, wall seconds, digest) per

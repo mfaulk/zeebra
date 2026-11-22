@@ -469,6 +469,7 @@ def summarize(state, m, *, baseline=None, bound=1.05):
                         stop=stop.get('reason'), cpus=m['run']['cpus'], clock=clocks,
                         median_khz=session.get('median_khz'),
                         clock_grouping=session.get('grouping', 'cell') if session else None,
+                        clock_sources=session.get('clock_sources'),
                         reservation='exclusive' if job['mode'] == 'publication' else 'ccd-scoped',
                         arms=[dict(name=a['name'], commit=a['commit'], sha256=a['sha256'], **a['build'])
                               for a in m['arms']]),
@@ -489,7 +490,9 @@ def render(doc):
            f"- issue #{p['context']['issue']}, agent `{p['context']['agent']}`; stop: {p['stop']}",
            f"- manifest `{p['manifest_sha256']}`, journal `{p['journal_sha256']}`",
            f"- cpus {p['cpus']}, reservation {p['reservation']}, clock {', '.join(p['clock'])}, "
-           f"clock rule grouped per {p['clock_grouping'] or '—'}, "
+           f"clock rule grouped per {p['clock_grouping'] or '—'}"
+           + (f" (clock from {', '.join(f'{k} {v}' for k, v in p['clock_sources'].items())})"
+              if p.get('clock_sources') else '') + ', '
            'median clock (kHz) ' + (', '.join(f'{k} {_fmt(v, ".0f")}' for k, v in (p['median_khz'] or {}).items()) or '—'), '', '| arm | commit | sha256 | profile | flags |',
            '|---|---|---|---|---|']
     out += [f"| {a['name']} | `{a['commit'][:12]}` | `{a['sha256'][:16]}` | {a['profile']} | {a['flags']} |"
@@ -663,10 +666,11 @@ def contamination(result, m, job_id):
     before, after = result['before'], result['after']
     if not all('stat' in s for s in (before, after)):
         return dict(mode=m['mode'], verdict=None, error='cpu-context snapshots unusable')
-    freq = result.get('freq')
+    khz, source = campaign.attempt_clock(result)
     metrics = bc.attempt_metrics(before, after, own_cpu_s=result.get('own_cpu_s', result['cpu_seconds']),
-                                 khz_samples=[freq['median_khz']] if freq else None)
-    return dict(mode=m['mode'], metrics=metrics, verdict=bc.attempt_verdict(metrics, m['mode'], owner=lock_owner(job_id)))
+                                 khz_samples=[khz] if khz else None)
+    return dict(mode=m['mode'], metrics=metrics, clock_source=source,
+                verdict=bc.attempt_verdict(metrics, m['mode'], owner=lock_owner(job_id)))
 
 
 def harness_cpus(m, cpus):
@@ -679,7 +683,7 @@ def _cpu_used():
                                                                          resource.RUSAGE_CHILDREN)))
 
 
-def run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter=None):
+def run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter=None, perf=None):
     """`run_child`, with the harness kept off the attempt's CPUs where it can be. A cpu-context
     snapshot costs ~0.5 CPU-s, inside the window its /proc/stat reads bound: on a 0.3 s 16-worker
     attempt that alone exceeds the 5% rule. Where no CPU is spare, the harness's CPU time is
@@ -692,7 +696,7 @@ def run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter=No
         r = campaign.run_child(command, cpus, m['run']['limits']['wall_seconds'],
                                m['run']['limits'].get('kill_after_seconds', 60), guard,
                                should_stop=cancel_file.exists, scratch_dir=directory / 'scratch',
-                               rss_reporter=rss_reporter)
+                               rss_reporter=rss_reporter, perf=perf)
     finally:
         os.sched_setaffinity(0, saved)
     harness = max(0.0, _cpu_used() - used - r['cpu_seconds'])
@@ -700,7 +704,9 @@ def run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter=No
     return r
 
 
-VERDICT_VERSION = 2  # 1 (no `version` key): the clock rule grouped per cell; 2: per arm (#996)
+# 1 (no `version` key): the clock rule grouped per cell; 2: per arm (#996); 3: per arm and clock source,
+# so a cycle-count clock is never judged against a sampled one (#999). Rows without a source read as 2.
+VERDICT_VERSION = 3
 
 
 def cell_group(cell):
@@ -717,17 +723,26 @@ def clock_group(cell):
 GROUPINGS = dict(cell=cell_group, arm=clock_group)
 
 
+def clock_key(group, contamination):
+    """An attempt's clock-rule group, split by how its clock was read: a cycle count and the sampled
+    `scaling_cur_freq` differ by up to 2.9x on one attempt (#992), so mixing them would flag both."""
+    return f'{group}/{campaign.CLOCK_PERF}' if contamination.get('clock_source') == campaign.CLOCK_PERF else group
+
+
 def session_verdict_of(rows, mode, owner, grouping='arm'):
     """The session verdict over `(attempt_id, cell, contamination)` rows: every judged attempt
     against its group's median clock, and whether the session is void. `grouping='cell'` replays
     verdict v1, for re-judging an older journal."""
     rows = [r for r in rows if r[2].get('metrics')]
     key = GROUPINGS[grouping]
-    s = bc.session_verdict([r[2]['metrics'] for r in rows], mode, [key(r[1]) for r in rows], owner)
+    s = bc.session_verdict([r[2]['metrics'] for r in rows], mode, [clock_key(key(r[1]), r[2]) for r in rows], owner)
     flagged = {aid: v['reasons'] for (aid, _, _), v in zip(rows, s['attempts']) if v['contaminated']}
+    sources = defaultdict(int)
+    for r in rows:
+        sources[r[2].get('clock_source') or campaign.CLOCK_SAMPLED] += 1
     return dict(version=VERDICT_VERSION if grouping == 'arm' else 1, grouping=grouping,
                 contaminated=s['contaminated'], total=s['total'], void=s['void'], median_khz=s['median_khz'],
-                flagged=flagged)
+                clock_sources=dict(sorted(sources.items())), flagged=flagged)
 
 
 def session_contamination(journal, m, job_id):
@@ -806,6 +821,10 @@ def run_job(directory, force_uncancel=False):
     if rss_reporter is None:
         print('bench-job: GNU time not found; peak RSS is the wrapper tree\'s, an upper bound (#990)',
               file=sys.stderr, flush=True)
+    perf = campaign.perf_stat()
+    if perf is None:
+        print('bench-job: perf cannot count cycles here; the clock rule uses sampled scaling_cur_freq (#999)',
+              file=sys.stderr, flush=True)
     while (work := _next_work(journal, retries)) is not None:
         index, try_ = work
         cell, aid = plan[index], attempt_id(directory.name, index, try_)
@@ -837,7 +856,7 @@ def run_job(directory, force_uncancel=False):
         if limits.get('rss_bytes'):
             guard = (Path(command[0]).name[:15], command[0], limits['rss_bytes'] // 1024)
         load = os.getloadavg()[0]
-        r = run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter)
+        r = run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter, perf)
         metadata = dict(attempt_id=aid, attempt_try=try_, cpus=cpus, argv=command, binary_sha256=actual, load_start=load,
                         process_wall_ns=r['process_wall_ns'], wall_seconds=r['process_wall_ns'] / 1e9,
                         cpu_seconds=r['cpu_seconds'], harness_cpu_seconds=r['harness_cpu_seconds'],
@@ -846,7 +865,7 @@ def run_job(directory, force_uncancel=False):
                         exit=r['returncode'], stop='cancelled' if r['stopped'] else None,
                         guard=dict(wall_seconds=limits['wall_seconds'], rss_bytes=limits.get('rss_bytes'),
                                    rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr']),
-                        before=r['before'], after=r['after'], freq=r['freq'],
+                        before=r['before'], after=r['after'], freq=r['freq'], perf=r['perf'],
                         contamination=contamination(r, m, directory.name))
         status = classify(metadata)
         with Deferred():

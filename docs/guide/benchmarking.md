@@ -307,7 +307,7 @@ Every M33 figure is taken in one of two modes (plan §11.2,
 |---|---|---|
 | any SMT sibling of a bench CPU > 5% busy over the attempt (all of it is foreign) | contaminated | contaminated |
 | bench CPUs in aggregate > 5% foreign: (busy − child's own CPU time) / total | contaminated | contaminated |
-| bench median clock > 3% off the median of its group (in `bench-job`, one arm of one cell: instance, worker count, arm) | contaminated | contaminated |
+| bench median clock > 3% off the median of its group (in `bench-job`, one arm of one cell: instance, worker count, arm; and, from #999, clock source) | contaminated | contaminated |
 | busy-CPU equivalents on the non-bench CPUs ≥ 4 | — | contaminated |
 | a compiler/linker, a `Runner.Worker`, or another `benchlock` owner in either snapshot | — | contaminated |
 | more than 20% of a session's attempts contaminated | session void, rerun whole | same |
@@ -409,8 +409,9 @@ alone, through `tools/bench_stats.py` (*Statistics and verdicts* below):
 
 - **Provenance:** job id, mode, manifest and journal SHA-256s, each arm's commit, binary SHA-256 and
   build, cpus, reservation (CCD-scoped in dev mode, exclusive in publication mode), clock governor
-  the clock rule's grouping (`arm`, or `cell` for a verdict written before #996) and the session's
-  median clock per group.
+  the clock rule's grouping (`arm`, or `cell` for a verdict written before #996), how many attempts
+  were clocked from each source (`perf-cycles`, `sampled`; from #999), and the session's median
+  clock per group.
 - **Attempts:** counts by status, the contaminated count (#968), session void, and whether the job
   stopped before completing.
 - **Wall and RSS, Stages, Scaling:** medians per instance, worker count and arm, over clean `ok`
@@ -493,7 +494,30 @@ runner's own `wait4` figure stays in `observed_peak_rss_bytes`. It is only a bou
 is forked from the Python runner, and exec carries the forked image's high-water mark, so it never
 reads below the runner's own RSS (about 31 MiB, #990). A journal without the solver figure, or a host
 without GNU time, falls back to the tree's: the report marks it `≤` and the scoreboard labels its
-basis an upper bound. The exit, raw stdout and stderr are journaled before the verdict (`ok`, `failed`, `timeout`,
+basis an upper bound.
+
+**Cycle counts (#999).** Where `perf` can count this user's processes (`perf_event_paranoid` 2 or
+lower, and `perf stat -e cycles,task-clock -- true` gives a count), each attempt's exit metadata
+carries `perf: {pid, rc, events, cycles, task_clock_ms, cycles_event, effective_khz}`, where
+`effective_khz = cycles / task-clock ms`. perf is **not** wrapped around the child. Its startup,
+about 21 ms here, would fall inside `process_wall_ns`, and it would stand between `timeout` and the
+solver. Instead it runs as `perf stat -p <solver pid>`, a sibling of the measured tree on the
+harness CPUs, and is stopped with SIGINT once the child is reaped. The solver pid is the first
+descendant of the runner's child whose comm is not a wrapper's (`taskset`, `timeout`, GNU time).
+The measured tree, the pid `rss-guard.sh` watches and what `timeout --signal=INT` reaches are the
+same with counting as without it. Three costs follow:
+
+- The solver's first ~25 ms are not counted. An attempt shorter than that gets `perf.pid: null`,
+  and its clock falls back to the sampled median.
+- At paranoid 2 the events are user-only (`cycles:u`), while task-clock also counts kernel time.
+  A solver with a large system-time share therefore reads low, by the same amount on every
+  repetition.
+- perf's CPU time is harness time, counted as the child's own when no CPU is spare.
+
+`$ZEEBRA_BENCH_PERF` names another perf, and set empty it turns counting off. On a host where perf
+cannot count, `run` says so once on stderr and every clock is sampled.
+
+The exit, raw stdout and stderr are journaled before the verdict (`ok`, `failed`, `timeout`,
 `rss-limit` or `cancelled`), so nothing is parsed before it is durable.
 
 **Resume.** An index with a recorded exit is never re-run: a SIGKILLed runner loses only the attempt
@@ -509,11 +533,14 @@ checks `bench_contamination.publication_refusals`, re-checking every 60 s for up
 `run.mode_wait_seconds` (default 0). If the conditions never hold, it journals a `mode-refused`
 stop listing the refusals and exits 3.
 
-Every attempt's exit metadata carries `contamination`, which holds `{mode, metrics, verdict}`.
-The metrics come from the before/after `cpu-context` snapshots, with the child's `wait4` CPU time
-as `own_cpu_s` and the sampled median clock. Snapshots that cannot be read give `verdict: null`
-plus an `error`, never a clean verdict. The `complete` stop carries the session verdict:
-`{version, grouping, contaminated, total, void, median_khz, flagged}`. That is where the clock
+Every attempt's exit metadata carries `contamination`, which holds `{mode, metrics, clock_source,
+verdict}`. The metrics come from the before/after `cpu-context` snapshots, with the child's `wait4`
+CPU time as `own_cpu_s`. The attempt's clock is `perf.effective_khz` where cycles were counted
+(`clock_source: "perf-cycles"`), and otherwise the median of the 25 ms `scaling_cur_freq` samples
+(`"sampled"`). With neither, it is the snapshots' clocks (`"snapshot"`). Snapshots that cannot be
+read give `verdict: null` plus an `error`, never a clean verdict. The `complete` stop carries the
+session verdict: `{version, grouping, contaminated, total, void, median_khz, clock_sources, flagged}`.
+That is where the clock
 rule is applied, against the median of each arm within a cell (instance, worker count and arm;
 `median_khz` is keyed `<instance>@<w>w/<arm>`). Solvers sample different clocks inside one cell:
 grobx reads about 2.67 GHz beside Zeebra's 3.99 and groebner-rs's 4.54, while hardware cycle counts
@@ -522,6 +549,13 @@ session on clock alone, with foreign load at 1.7% or less (#996). Version 2 grou
 verdict without `version` is version 1, grouped per cell (instance and worker count), and `report`
 still reads it. The foreign and sibling rules are unchanged. The M33 sessions re-judged under
 version 2 are in [`research/m33-clock-rule/`](../../research/m33-clock-rule/README.md).
+
+Version 3 (#999) also splits each arm's group by clock source. A cycle-count attempt is judged
+against the arm's other cycle-count attempts, keyed `<instance>@<w>w/<arm>/perf-cycles`. A sampled
+straggler, too short for perf to attach, is judged against the arm's sampled attempts under the
+version 2 key. The two readings differ by up to 2.9x on the same attempt (#992), so one median
+across both would flag them all. `clock_sources` counts the attempts of each source. A journal
+written before #999 has no source, so version 3 judges it exactly as version 2 does.
 
 A `cpu-context` snapshot costs about 0.5 CPU-s, and part of that cost falls inside the window its
 `/proc/stat` reads bound. So the runner moves its harness (snapshots and frequency sampler) onto

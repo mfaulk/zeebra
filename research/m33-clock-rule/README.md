@@ -49,6 +49,9 @@ stay void, and on the clock rule alone:
 - **M1 `fl`** (16-worker arms only): `forward` carries 14 of the 20 flags.
 
 Both are the case #996's optional item 2 addresses: judging the clock from per-process cycle counts
-rather than sampled frequency. A session void under both rules is still void. Nothing here edits a
+rather than sampled frequency. #999 implemented that as verdict version 3 (`docs/guide/benchmarking.md`,
+*Cycle counts*). The retained journals carry no cycle counts, so version 3 judges them exactly as
+version 2 does, and the table above stands. G1 and M1 `fl` can only change by being re-run. A
+session void under both rules is still void. Nothing here edits a
 published M33 table. Those tables and their write-ups stand as written, under the verdict that was
 on record when they were written.

@@ -207,7 +207,11 @@ metadata carries `attempt_id` (`<job-id>:<index>:<try>`), `binary_sha256`, `cpus
 `cpu-context` snapshots and `contamination` (null until #968 fills it).
 
 The `complete` stop carries the session verdict, `{version, grouping, contaminated, total, void,
-median_khz, flagged}`. **Version 2** (#996) groups the clock rule per arm within a cell
+median_khz, clock_sources, flagged}`. **Version 3** (#999) reads an attempt's clock from
+per-process cycle counts where `perf` could attach (`contamination.clock_source: "perf-cycles"`,
+the counts in the exit's `perf`). It judges those attempts only against the arm's other cycle-count
+attempts, keyed `<instance>@<w>w/<arm>/perf-cycles`. Sampled attempts keep the version 2 key, and a
+journal without `clock_source` judges exactly as version 2. **Version 2** (#996) groups the clock rule per arm within a cell
 (`grouping: "arm"`, `median_khz` keyed `<instance>@<w>w/<arm>`). A verdict with no `version` key
 is **version 1**, grouped per cell (`<instance>@<w>w`), and is read as such: `report` names the
 grouping either way, and a journal is never rewritten. The re-judged M33 sessions are in
