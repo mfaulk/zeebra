@@ -439,7 +439,7 @@ def summarize(state, m, *, baseline=None, bound=1.05):
         stages = {k[:-3]: v / 1e6 for k, v in (child.get('statistics') or {}).items()
                   if k.endswith('_ns') and isinstance(v, (int, float))}
         timed[(cell['instance'], cell['workers'])][cell['arm']][(cell['seed'], cell['rep'])] = dict(
-            wall_ms=md['process_wall_ns'] / 1e6, rss=md.get('observed_peak_rss_bytes'), stages=stages, child=child)
+            wall_ms=md['process_wall_ns'] / 1e6, **peak_rss(md), stages=stages, child=child)
     cells, ratios = [], []
     for (inst, w), arms in sorted(timed.items()):
         for arm, samples in arms.items():
@@ -448,6 +448,7 @@ def summarize(state, m, *, baseline=None, bound=1.05):
             cells.append(dict(instance=inst, workers=w, arm=arm, n=len(s),
                               wall_ms=_median([x['wall_ms'] for x in s]),
                               rss_mib=_median([x['rss'] / 2**20 for x in s if x['rss']]),
+                              rss_exact=all(x['rss_basis'] == RSS_SOLVER for x in s),
                               stages_ms={k: _median([x['stages'][k] for x in s if k in x['stages']]) for k in names}))
         for arm in (a for a in arms if a != base and base in arms):
             pairs = bs.paired_ratios({k: v['wall_ms'] for k, v in arms[arm].items()},
@@ -498,7 +499,10 @@ def render(doc):
             '\n## Wall and RSS (medians of clean ok attempts)\n', '| instance | w | arm | n | wall ms | RSS MiB |',
             '|---|---:|---|---:|---:|---:|']
     out += [f"| {r['instance']} | {r['workers']} | {r['arm']} | {r['n']} | {_fmt(r['wall_ms'], ',.2f')} | "
-            f"{_fmt(r['rss_mib'])} |" for r in doc['cells']]
+            f"{'' if r.get('rss_exact', True) else '≤ '}{_fmt(r['rss_mib'])} |" for r in doc['cells']]
+    if not all(r.get('rss_exact', True) for r in doc['cells']):
+        out += ['\n`≤` marks a peak from the wrapper tree, which includes the runner\'s own forked image: '
+                'an upper bound, not the solver\'s figure (#990).']
     out += ['\n## Stages (median ms, where the child reports them)\n']
     out += [f"- {r['instance']} @{r['workers']} {r['arm']}: "
             + ', '.join(f'{k} {v:,.2f}' for k, v in r['stages_ms'].items())
@@ -522,6 +526,20 @@ def render(doc):
             f"{', contaminated' if v['contaminated'] else ''}"
             for v in doc['verification'] if v['status'] != 'ok' or v['contaminated']]
     return '\n'.join(out) + '\n'
+
+
+# The two peak-RSS figures an attempt can carry (#990). The solver's is GNU time's `wait4` of the
+# binary alone, which is `RssBasis::DirectChildHighWater` in src/grobner/external/process.rs. The
+# tree's includes the runner's own image, inherited through fork + exec, so it is only a bound.
+RSS_SOLVER = 'direct-child VmHWM (exact)'
+RSS_TREE = 'wrapper-tree ru_maxrss, includes the forking runner (upper bound)'
+
+
+def peak_rss(md):
+    """{rss, rss_basis} for one attempt: the solver's own peak when it was recorded, else the tree's."""
+    if md.get('solver_peak_rss_bytes'):
+        return dict(rss=md['solver_peak_rss_bytes'], rss_basis=RSS_SOLVER)
+    return dict(rss=md.get('observed_peak_rss_bytes'), rss_basis=RSS_TREE)
 
 
 def competitive_rows(state, m, *, machine):
@@ -551,7 +569,8 @@ def competitive_rows(state, m, *, machine):
                     names = sorted({k for s in samples for k in s['stages']})
                     row.update(outcome='complete', wall_nanos=round(_median([s['wall_ms'] for s in samples]) * 1e6),
                                cpu_basis='unavailable', peak_rss_bytes=round(_median([s['rss'] for s in samples])),
-                               peak_rss_basis='direct-child VmHWM (exact)',
+                               peak_rss_basis=(RSS_SOLVER if all(s['rss_basis'] == RSS_SOLVER for s in samples)
+                                               else RSS_TREE),
                                stages=[dict(name=k, elapsed_nanos=round(_median(
                                    [s['stages'][k] for s in samples if k in s['stages']]) * 1e6)) for k in names])
                     if samples[0]['child'].get('invariants'):
@@ -619,7 +638,7 @@ def _cpu_used():
                                                                          resource.RUSAGE_CHILDREN)))
 
 
-def run_attempt(m, command, cpus, guard, cancel_file, directory):
+def run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter=None):
     """`run_child`, with the harness kept off the attempt's CPUs where it can be. A cpu-context
     snapshot costs ~0.5 CPU-s, inside the window its /proc/stat reads bound: on a 0.3 s 16-worker
     attempt that alone exceeds the 5% rule. Where no CPU is spare, the harness's CPU time is
@@ -631,7 +650,8 @@ def run_attempt(m, command, cpus, guard, cancel_file, directory):
     try:
         r = campaign.run_child(command, cpus, m['run']['limits']['wall_seconds'],
                                m['run']['limits'].get('kill_after_seconds', 60), guard,
-                               should_stop=cancel_file.exists, scratch_dir=directory / 'scratch')
+                               should_stop=cancel_file.exists, scratch_dir=directory / 'scratch',
+                               rss_reporter=rss_reporter)
     finally:
         os.sched_setaffinity(0, saved)
     harness = max(0.0, _cpu_used() - used - r['cpu_seconds'])
@@ -741,6 +761,10 @@ def run_job(directory, force_uncancel=False):
     limits, retries = m['run']['limits'], m['run'].get('retries', 0)
     plan = journal.header['plan']
     (directory / 'scratch').mkdir(exist_ok=True)
+    rss_reporter = campaign.gnu_time()
+    if rss_reporter is None:
+        print('bench-job: GNU time not found; peak RSS is the wrapper tree\'s, an upper bound (#990)',
+              file=sys.stderr, flush=True)
     while (work := _next_work(journal, retries)) is not None:
         index, try_ = work
         cell, aid = plan[index], attempt_id(directory.name, index, try_)
@@ -772,11 +796,12 @@ def run_job(directory, force_uncancel=False):
         if limits.get('rss_bytes'):
             guard = (Path(command[0]).name[:15], command[0], limits['rss_bytes'] // 1024)
         load = os.getloadavg()[0]
-        r = run_attempt(m, command, cpus, guard, cancel_file, directory)
+        r = run_attempt(m, command, cpus, guard, cancel_file, directory, rss_reporter)
         metadata = dict(attempt_id=aid, attempt_try=try_, cpus=cpus, argv=command, binary_sha256=actual, load_start=load,
                         process_wall_ns=r['process_wall_ns'], wall_seconds=r['process_wall_ns'] / 1e9,
                         cpu_seconds=r['cpu_seconds'], harness_cpu_seconds=r['harness_cpu_seconds'],
                         observed_peak_rss_bytes=r['peak_rss_bytes'],
+                        solver_peak_rss_bytes=r['solver_peak_rss_bytes'],
                         exit=r['returncode'], stop='cancelled' if r['stopped'] else None,
                         guard=dict(wall_seconds=limits['wall_seconds'], rss_bytes=limits.get('rss_bytes'),
                                    rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr']),

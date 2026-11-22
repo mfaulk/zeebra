@@ -26,6 +26,7 @@ case "$1" in
   ok) echo '{"status":"ok"}' ;;
   report) echo '{"status":"complete","basis_sha256":"'"$2"'","statistics":{"symbolic_ns":2000000,"elimination_ns":3000000}}' ;;
   fail) echo boom >&2; exit 1 ;;
+  selfkill) kill -TERM $$ ;;
   sleep) exec sleep "$2" ;;
   once) [ -e "$2" ] && exit 0; : > "$2"; [ "$3" = fail ] && exit 1; exec sleep 30 ;;
 esac
@@ -429,7 +430,8 @@ class BenchJobTest(unittest.TestCase):
                     attempts.append(dict(index=len(attempts), try_=0, status='ok', stdout=json.dumps(report).encode(),
                                          cell=dict(instance='goldilocks/katsura-4', workers=1, seed=0, rep=rep, arm=arm),
                                          metadata=dict(attempt_id=aid, process_wall_ns=int(values[rep] * 1e9),
-                                                       observed_peak_rss_bytes=1 << 20, before=dict(clock='boost'))))
+                                                       observed_peak_rss_bytes=40 << 20, solver_peak_rss_bytes=1 << 20,
+                                                       before=dict(clock='boost'))))
         stop = dict(reason='complete', contamination=dict(contaminated=len(flagged), total=len(attempts), void=False,
                                                           median_khz={'goldilocks/katsura-4@1w': 4000000}, flagged={f: ['x'] for f in flagged}))
         header = dict(bench_job=dict(job_id='job', manifest_sha256='m' * 64, mode=mode, context=m['context']))
@@ -480,6 +482,46 @@ class BenchJobTest(unittest.TestCase):
         self.assertIn('clock rule grouped per arm', bj.render(bj.summarize(state, m)))
         state['stop'] = dict(reason='cancelled')
         self.assertIsNone(bj.summarize(state, m)['provenance']['clock_grouping'])
+
+    # GNU time's `-f %M` report: the figure is the last line, a signal death is named before it.
+    def test_parse_time_report(self):
+        p = bj.campaign.parse_time_report
+        self.assertEqual(p('12345\n'), (12345, None))
+        self.assertEqual(p('Command terminated by signal 2\n4567\n'), (4567, 2))
+        self.assertEqual(p('Command exited with non-zero status 1\n890\n'), (890, None))
+        self.assertEqual(p(''), (None, None))
+        self.assertEqual(p('garbage'), (None, None))
+        self.assertIsNone(bj.campaign.gnu_time(str(self.tmp / 'no-such-time')))
+
+    # An attempt's peak is the solver's own when GNU time recorded it, the wrapper tree's bound otherwise.
+    def test_peak_rss_prefers_the_solver(self):
+        self.assertEqual(bj.peak_rss(dict(observed_peak_rss_bytes=40, solver_peak_rss_bytes=5)),
+                         dict(rss=5, rss_basis=bj.RSS_SOLVER))
+        self.assertEqual(bj.peak_rss(dict(observed_peak_rss_bytes=40, solver_peak_rss_bytes=None)),
+                         dict(rss=40, rss_basis=bj.RSS_TREE))
+        self.assertEqual(bj.peak_rss(dict(observed_peak_rss_bytes=40)), dict(rss=40, rss_basis=bj.RSS_TREE))
+
+    # A journal from before #990 has only the tree figure: the scoreboard labels it a bound, the report marks it.
+    def test_tree_only_peaks_are_labelled_upper_bounds(self):
+        state, m = self.synthetic(dict(a=[1.0, 1.2, 1.1]), mode='publication')
+        for a in state['attempts']:
+            del a['metadata']['solver_peak_rss_bytes']
+        row = bj.competitive_rows(state, m, machine='fixture')[0]
+        self.assertEqual((row['peak_rss_bytes'], row['peak_rss_basis']), (40 << 20, bj.RSS_TREE))
+        self.assertIn('| ≤ 40', bj.render(bj.summarize(state, m)))
+
+    # A real run records the binary's own peak beside the tree's, and the tree's carries the runner (#990).
+    def test_run_records_the_solver_peak(self):
+        if bj.campaign.gnu_time() is None:
+            self.skipTest('GNU time is not installed')
+        job = self.job(self.manifest(instances=(('i1', ['ok']), ('i2', ['selfkill'])), reps=1))
+        self.cli('run', job)
+        by_instance = {a['cell']['instance']: a['metadata'] for a in self.state(job)['attempts']}
+        ok = by_instance['i1']
+        self.assertGreater(ok['solver_peak_rss_bytes'], 0)
+        self.assertLess(ok['solver_peak_rss_bytes'], ok['observed_peak_rss_bytes'])
+        # GNU time's 128+N for a signalled binary reads back as -N, as it does without the reporter.
+        self.assertEqual(by_instance['i2']['exit'], -signal.SIGTERM)
 
     # The scoreboard bridge emits the committed CompetitiveRecord fixture that board.rs's test loads.
     def test_competitive_rows_match_the_fixture(self):

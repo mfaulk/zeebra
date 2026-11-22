@@ -77,9 +77,44 @@ def _die_with_parent():
     ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_PDEATHSIG, signal.SIGTERM)
 
 
+# The peak RSS `wait4` reports for the child is the whole tree's maximum, and on Linux that tree
+# starts as a fork of this Python process: exec records the forked image's high-water mark
+# (`setmax_mm_hiwater_rss`), so every figure is at least the controller's own RSS (about 31 MiB
+# under bench-job, #990). The measured binary is therefore launched under GNU time, a small C
+# process whose `wait4` of the binary alone is exact; `rss_reporter` names it.
+GNU_TIME = '/usr/bin/time'
+
+
+def gnu_time(path=None):
+    """`path` (default `$ZEEBRA_BENCH_TIME`, else /usr/bin/time) if it is GNU time, else None."""
+    path = path or os.environ.get('ZEEBRA_BENCH_TIME', GNU_TIME)
+    try:
+        with tempfile.NamedTemporaryFile('r') as f:
+            ok = subprocess.run([path, '-f', '%M', '-o', f.name, 'true'], stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, timeout=10).returncode == 0
+            return path if ok and parse_time_report(f.read())[0] is not None else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def parse_time_report(text):
+    """(peak_rss_kb | None, signal | None) from a `-f %M` report. GNU time writes `Command terminated
+    by signal N` (or `exited with non-zero status`) on its own line before the figure."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    kb = int(lines[-1]) if lines and lines[-1].isdigit() else None
+    sig = next((int(line.rsplit(' ', 1)[1]) for line in lines
+                if line.startswith('Command terminated by signal ') and line.rsplit(' ', 1)[1].isdigit()), None)
+    return kb, sig
+
+
 def run_child(argv, cpus, timeout_s, kill_after_s=60, guard=None, should_stop=None, stop_grace_s=10,
-              scratch_dir=None):
+              scratch_dir=None, rss_reporter=None):
     """One child under `taskset -c cpus timeout --signal=INT`, with `cpu-context` before and after.
+
+    With `rss_reporter` (a GNU time path, see `gnu_time`) the binary runs under it, and
+    `solver_peak_rss_bytes` is the binary's own peak; otherwise it is None and only the tree-wide
+    `peak_rss_bytes` exists. GNU time turns a signalled binary into exit 128+N; that is mapped back
+    to -N, so `returncode` reads as it does without the reporter.
 
     `guard` is `(comm, cmdline-substring, ceiling_kb)` for `tools/rss-guard.sh`. `should_stop` is
     polled every 0.2 s; once it returns true the child gets SIGINT, then SIGKILL after
@@ -87,10 +122,14 @@ def run_child(argv, cpus, timeout_s, kill_after_s=60, guard=None, should_stop=No
     child runs and the controller can block in `wait4`.
     """
     before = snapshot(cpus)
-    with tempfile.TemporaryFile(dir=scratch_dir) as out, tempfile.TemporaryFile(dir=scratch_dir) as err:
+    with tempfile.TemporaryFile(dir=scratch_dir) as out, tempfile.TemporaryFile(dir=scratch_dir) as err, \
+            tempfile.NamedTemporaryFile('r', dir=scratch_dir) as report:
+        # GNU time ignores SIGINT while it waits; `timeout` signals its whole process group, so the
+        # binary still receives the INT, and time reports once it exits.
+        reporter = [rss_reporter, '-f', '%M', '-o', report.name] if rss_reporter else []
         started = time.perf_counter_ns()
         child = subprocess.Popen(['taskset', '-c', cpus, 'timeout', '--signal=INT', f'--kill-after={kill_after_s}s',
-                                  str(timeout_s), *map(str, argv)], stdout=out, stderr=err,
+                                  str(timeout_s), *reporter, *map(str, argv)], stdout=out, stderr=err,
                                  preexec_fn=_die_with_parent)
         sampler = Sampler(cpus)
         sampler.start()
@@ -131,6 +170,9 @@ def run_child(argv, cpus, timeout_s, kill_after_s=60, guard=None, should_stop=No
                 watch.kill()
                 guard_rc = 'hung'
             guard_err = watch.stderr.read()[-500:]
+        solver_kb, solver_sig = parse_time_report(report.read()) if rss_reporter else (None, None)
+        if solver_sig is not None and child.returncode == 128 + solver_sig:
+            child.returncode = -solver_sig
         sampler.stop.set()
         sampler.join()
         after = snapshot(cpus)
@@ -138,6 +180,7 @@ def run_child(argv, cpus, timeout_s, kill_after_s=60, guard=None, should_stop=No
         err.seek(0)
         return dict(cpus=cpus, process_wall_ns=wall, returncode=child.returncode,
                     cpu_seconds=usage.ru_utime + usage.ru_stime, peak_rss_bytes=usage.ru_maxrss * 1024,
+                    solver_peak_rss_bytes=None if solver_kb is None else solver_kb * 1024,
                     rss_guard_rc=guard_rc, rss_guard_stderr=guard_err, before=before, after=after,
                     freq=summarize_freq(sampler.samples), stopped=stopped.is_set(),
                     stdout=out.read(), stderr=err.read())

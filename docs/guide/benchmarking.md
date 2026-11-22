@@ -473,7 +473,13 @@ one-time `sudo install -d -o "$USER" /buildcache/bench-jobs`.
 repetition (`tools/bench_campaign.py` `plan`, the rotation M31-M32 used). Attempt *k* of plan index
 *i* is `<job-id>:<i>:<k>`. Each runs as `taskset -c <first w CPUs of run.cpus> timeout --signal=INT`
 under `rss-guard.sh` when `rss_bytes` is set, with a `cpu-context.sh` snapshot before and after.
-The exit, raw stdout and stderr are journaled before the verdict (`ok`, `failed`, `timeout`,
+The binary itself runs under GNU time (`/usr/bin/time -f %M`, or `$ZEEBRA_BENCH_TIME`), whose
+`wait4` of the binary alone is `solver_peak_rss_bytes`, the peak the report and scoreboard use. The
+runner's own `wait4` figure stays in `observed_peak_rss_bytes`. It is only a bound: the wrapper tree
+is forked from the Python runner, and exec carries the forked image's high-water mark, so it never
+reads below the runner's own RSS (about 31 MiB, #990). A journal without the solver figure, or a host
+without GNU time, falls back to the tree's: the report marks it `≤` and the scoreboard labels its
+basis an upper bound. The exit, raw stdout and stderr are journaled before the verdict (`ok`, `failed`, `timeout`,
 `rss-limit` or `cancelled`), so nothing is parsed before it is durable.
 
 **Resume.** An index with a recorded exit is never re-run: a SIGKILLed runner loses only the attempt
