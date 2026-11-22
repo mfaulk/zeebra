@@ -238,7 +238,7 @@ the point by substitution, not by equality.
 | Property | Enforced by | Only documented |
 |---|---|---|
 | Signature engine refuses non-graded orders | `engine::graded` → `SigF4Error::Unsupported`, reached from both `sig_f4_reported` and the dispatcher | — |
-| Signature engine is not used under grlex (#961) | `signature_route` → `ShippingReason::Order` (dispatch); since #1049, `engine::run` → `SigF4Error::Unsupported` unless `SigF4Options::allow_graded_lex` | At `2cbd2928`, forced `sig_f4_reported` accepted grlex and `GradedEngine::Adaptive`'s rustdoc described the pre-#986 state. #1049 closed both |
+| Signature engine is not used under grlex (#961) | `signature_route` → `ShippingReason::Order` (dispatch); since #1049, `engine::run` → `SigF4Error::Unsupported` unless `SigF4Options::allow_graded_lex` | At `45e9b625`, forced `sig_f4_reported` accepted grlex and `GradedEngine::Adaptive`'s rustdoc described the pre-#986 state. #1049 closed both |
 | Batch-counted budgets keep conventional F4 | `adaptive_f4` returns `None` when `max_batches` or `max_pairs_per_batch` is set | — |
 | Pair criteria are sound | Theorems plus the differential corpus against `PairCriteria::NONE` | — |
 | FGLM needs a zero-dimensional source | `classify_ideal` → `PositiveDimensional` | — |
