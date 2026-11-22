@@ -1458,6 +1458,11 @@ impl<F: FiniteField> Workspace<F> {
         let mut products = 0u64;
         let mut out = Vec::new();
         let mut w = first as usize >> 6;
+        // #1033's density trace: exact nonzeros at or right of the current column.
+        #[cfg(feature = "research-work")]
+        let (ncols, mut nonzeros, mut applied) = (self.acc.len(), entries.len(), 0usize);
+        #[cfg(feature = "research-work")]
+        crate::linalg::work::density_intake(nonzeros, first as usize, ncols);
         while w < words {
             let bits = self.touched[w];
             if bits == 0 {
@@ -1472,16 +1477,50 @@ impl<F: FiniteField> Workspace<F> {
             }
             match pivot(c) {
                 Some(row) => {
+                    #[cfg(feature = "research-work")]
+                    {
+                        crate::linalg::work::density_application(
+                            nonzeros,
+                            c,
+                            ncols,
+                            applied,
+                            row.len() - 1,
+                        );
+                        applied += 1;
+                        nonzeros -= 1;
+                    }
                     let factor = coefficient.prepare_factor();
                     for (cc, v) in &row[1..] {
                         let cc = *cc as usize;
+                        #[cfg(feature = "research-work")]
+                        let before = self.acc[cc].is_zero();
                         self.acc[cc] -= v.mul_prepared(&factor);
+                        #[cfg(feature = "research-work")]
+                        {
+                            nonzeros += usize::from(before);
+                            nonzeros -= usize::from(self.acc[cc].is_zero());
+                        }
                         self.touched[cc >> 6] |= 1 << (cc & 63);
                     }
                     products += (row.len() - 1) as u64;
                 }
-                None => out.push((c as u32, coefficient)),
+                None => {
+                    #[cfg(feature = "research-work")]
+                    {
+                        nonzeros -= 1;
+                    }
+                    out.push((c as u32, coefficient))
+                }
             }
+        }
+        #[cfg(feature = "research-work")]
+        {
+            debug_assert_eq!(nonzeros, 0);
+            crate::linalg::work::density_end(
+                out.len(),
+                out.first().map_or(0, |e| e.0 as usize),
+                ncols,
+            );
         }
         (out, products)
     }
@@ -1545,5 +1584,36 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for PhaseA<'_, N, F> {
                     .expect("every target was reduced")
             })
             .collect()
+    }
+}
+
+#[cfg(all(test, feature = "research-work"))]
+mod density_tests {
+    use super::Workspace;
+    use crate::{fields::Zp13, linalg::work::measure, FiniteField};
+
+    type F = Zp13;
+
+    /// #1033: the signature workspace files each application's products under the remaining
+    /// span's density before it, counting the products it reports, and records intake and end.
+    #[test]
+    fn test_density_trace_buckets_signature_reduction_products() {
+        let pivot: Vec<(u32, F)> = (0..10).map(|c| (c, F::new(1))).collect();
+        let ((out, products), report) = measure(|| {
+            let mut workspace = Workspace::<F>::new(10);
+            // Two nonzeros over ten columns from column 0: 20%, bucket 4 of 20.
+            workspace.reduce(&[(0, F::new(1)), (1, F::new(1))], |c| {
+                (c == 0).then_some(pivot.as_slice())
+            })
+        });
+        assert_eq!(products, 9, "the pivot's tail");
+        // Column 1 cancels; columns 2..9 hold -1 and are unpivoted.
+        assert_eq!(out.len(), 8);
+        let trace = &report.outside_batch.forward_density;
+        assert_eq!(trace.products_by_span[4], 9);
+        assert_eq!(trace.products_by_span.iter().sum::<usize>(), 9);
+        assert_eq!(trace.rows_at_checkpoint[0][4], 1, "intake at 20%");
+        // The row leaves with 8 nonzeros from column 2: 8 of 8, the top bucket.
+        assert_eq!(trace.rows_at_end[19], 1);
     }
 }
