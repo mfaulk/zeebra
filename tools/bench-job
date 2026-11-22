@@ -7,7 +7,8 @@
     tools/bench-job resume <job-id> [--force-uncancel]
     tools/bench-job cancel <job-id>
     tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05]
-    tools/bench-job scoreboard <job-id> [--machine NAME] [--append history.json]
+    tools/bench-job scoreboard <job-id> [--machine NAME] [--scored ARM] [--references refs.json]
+                               [--attempt-digests digests.json] [--append history.json]
 
 A job is a directory under $ZEEBRA_BENCH_JOBS (default /buildcache/bench-jobs), never $HOME or a
 worktree. The manifest is frozen at submit and names the job (first 12 hex of its SHA-256); every
@@ -439,7 +440,8 @@ def summarize(state, m, *, baseline=None, bound=1.05):
         stages = {k[:-3]: v / 1e6 for k, v in (child.get('statistics') or {}).items()
                   if k.endswith('_ns') and isinstance(v, (int, float))}
         timed[(cell['instance'], cell['workers'])][cell['arm']][(cell['seed'], cell['rep'])] = dict(
-            wall_ms=md['process_wall_ns'] / 1e6, **peak_rss(md), stages=stages, child=child)
+            wall_ms=md['process_wall_ns'] / 1e6, **peak_rss(md), stages=stages, child=child,
+            attempt=md['attempt_id'])
     cells, ratios = [], []
     for (inst, w), arms in sorted(timed.items()):
         for arm, samples in arms.items():
@@ -542,29 +544,65 @@ def peak_rss(md):
     return dict(rss=md.get('observed_peak_rss_bytes'), rss_basis=RSS_TREE)
 
 
-def competitive_rows(state, m, *, machine):
+def _scored_arm(m, scored):
+    """The Zeebra arm every competitor row pairs with: `scored`, or the job's only Zeebra arm."""
+    zeebra = [a['name'] for a in m['arms'] if a.get('library', 'zeebra') == 'zeebra']
+    if scored is not None:
+        if scored not in zeebra:
+            raise JobError(f'scoreboard: {scored!r} is not a Zeebra arm of this job ({", ".join(zeebra)})', EXIT_USAGE)
+        return scored
+    if len(zeebra) != 1:
+        raise JobError(f'scoreboard: several Zeebra arms ({", ".join(zeebra)}); name the one competitors pair '
+                       'with (--scored)' if zeebra else 'scoreboard: no Zeebra arm to pair competitors with',
+                       EXIT_USAGE)
+    return zeebra[0]
+
+
+def competitive_rows(state, m, *, machine, scored=None, references=None, attempt_digests=None):
     """`CompetitiveRecord` rows (src/grobner/external/board.rs) for a publication job: one per
-    instance carrying a `competitive` identity block, arm and worker count."""
+    instance carrying a `competitive` identity block, arm, and worker count that arm ran.
+
+    The board pairs two rows only on equal `environment.commit` and `policy`, so every competitor row
+    and the `scored` Zeebra arm's row carry that arm's commit and one policy; any other Zeebra arm's
+    policy names it, so it never pairs by accident. A comparand's own version belongs in
+    `library_version`.
+
+    `references` maps an instance to an independent reference basis (`basis_digest`, `invariants`,
+    `checked_against`). Where one is given, a row is timed only over clean attempts whose basis digest
+    equals it, and carries its invariants. An attempt's digest is `attempt_digests[attempt_id]` when the
+    caller extracted it from output the child does not summarize, else the child's `basis_sha256`.
+    """
     if m['mode'] != 'publication':
         raise JobError('only a publication-mode job feeds the scoreboard (plan §11.2)', EXIT_REFUSED)
+    references, attempt_digests = references or {}, attempt_digests or {}
     doc, rows, limits = summarize(state, m), [], m['run']['limits']
-    job_id = doc['provenance']['job_id']
+    job_id, pair = doc['provenance']['job_id'], _scored_arm(m, scored)
+    stamp = next(a for a in m['arms'] if a['name'] == pair)['commit'][:8]
     for inst in (i for i in m['instances'] if i.get('competitive')):
+        ref = references.get(inst['name'])
         for arm in m['arms']:
-            for w in m['run']['workers']:
-                samples = list(doc['timed'].get((inst['name'], w), {}).get(arm['name'], {}).values())
+            zeebra = arm.get('library', 'zeebra') == 'zeebra'
+            policy = (f"bench-job {job_id}: median process wall of the clean"
+                      f"{', reference-verified' if ref else ''} attempts, arms interleaved, "
+                      f"{limits['wall_seconds']} s wall") + ('' if arm['name'] == pair or not zeebra
+                                                            else f" ({arm['name']} arm)")
+            for w in arm.get('workers', m['run']['workers']):
+                clean = list(doc['timed'].get((inst['name'], w), {}).get(arm['name'], {}).values())
+                samples = clean if ref is None else [
+                    s for s in clean
+                    if attempt_digests.get(s['attempt'], s['child'].get('basis_sha256')) == ref['basis_digest']]
                 row = dict(schema=1, **inst['competitive'], library=arm.get('library', 'zeebra'),
                            library_version=arm.get('library_version'),
-                           environment=dict(commit=arm['commit'][:8], base_commit='', patch_id='', machine=machine,
-                                            cpu=f'affinity {attempt_cpus(m, w)}', concurrency=w,
-                                            build=f"{arm['build']['profile']}, {arm['build']['flags']}",
-                                            policy=f'bench-job {job_id}: median of {len(samples)} clean attempts, '
-                                                   f"{limits['wall_seconds']} s wall, {w} workers"),
+                           environment=dict(commit=arm['commit'][:8] if zeebra else stamp, base_commit='',
+                                            patch_id='', machine=machine, cpu=f'affinity {attempt_cpus(m, w)}',
+                                            concurrency=w, build=f"{arm['build']['profile']}, {arm['build']['flags']}",
+                                            policy=policy),
                            limits=dict(wall_nanos=int(limits['wall_seconds'] * 1e9), workers=w,
                                        max_rss_bytes=limits.get('rss_bytes'), tool_caps=[]),
                            reproduce=f'tools/bench-job report {job_id}')
                 if not samples:
-                    row.update(outcome='failed', outcome_detail='no clean complete attempt')
+                    row.update(outcome='failed', outcome_detail='no clean complete attempt' if not clean
+                               else 'no attempt matched the independent reference')
                 else:
                     names = sorted({k for s in samples for k in s['stages']})
                     row.update(outcome='complete', wall_nanos=round(_median([s['wall_ms'] for s in samples]) * 1e6),
@@ -573,8 +611,11 @@ def competitive_rows(state, m, *, machine):
                                                else RSS_TREE),
                                stages=[dict(name=k, elapsed_nanos=round(_median(
                                    [s['stages'][k] for s in samples if k in s['stages']]) * 1e6)) for k in names])
-                    if samples[0]['child'].get('invariants'):
-                        row['invariants'] = samples[0]['child']['invariants']
+                    if ref is not None:
+                        row.update(invariants=ref['invariants'], verification=dict(
+                            checked_against=ref['checked_against'],
+                            shared_invariants=sum(v is not None for v in ref['invariants'].values()),
+                            note=f'basis digest equal to the reference on {len(samples)}/{len(clean)} clean attempts'))
                 rows.append(row)
     return rows
 
@@ -911,6 +952,11 @@ def main(args=None):
     sc.add_argument('job')
     sc.add_argument('--machine', default=os.uname().nodename)
     sc.add_argument('--append', type=Path, help='research/competitive/results/history.json')
+    sc.add_argument('--scored', help='the Zeebra arm competitor rows pair with (default: the only Zeebra arm)')
+    sc.add_argument('--references', type=Path,
+                    help='JSON: instance -> {basis_digest, invariants, checked_against}, an independent reference')
+    sc.add_argument('--attempt-digests', type=Path,
+                    help="JSON: attempt id -> basis digest, for children whose report carries no basis_sha256")
     a = p.parse_args(args)
     try:
         if a.command == 'submit':
@@ -942,7 +988,10 @@ def main(args=None):
             print(json.dumps(doc, indent=1, sort_keys=True) if a.json else render(doc).rstrip('\n'))
         elif a.command == 'scoreboard':
             d = job_dir(a.job)
-            rows = competitive_rows(aj.load(d / 'journal'), load_manifest(d), machine=a.machine)
+            rows = competitive_rows(aj.load(d / 'journal'), load_manifest(d), machine=a.machine, scored=a.scored,
+                                    references=json.loads(a.references.read_text()) if a.references else None,
+                                    attempt_digests=json.loads(a.attempt_digests.read_text())
+                                    if a.attempt_digests else None)
             if a.append:
                 append_history(a.append, rows)
             print(json.dumps(rows, indent=1))

@@ -3009,9 +3009,22 @@ mod tests {
         ));
         let board = CompetitiveBoard::load(&Json::parse(text).expect("valid")).expect("loads");
         assert_eq!(board.rows().len(), 2);
-        assert_eq!(board.rows()[0].outcome, Outcome::Complete);
-        assert_eq!(board.rows()[0].wall, Some(Duration::from_millis(1_100)));
-        assert!(matches!(board.rows()[1].outcome, Outcome::Failed(_)));
+        let (zeebra, msolve) = (&board.rows()[0], &board.rows()[1]);
+        assert_eq!(zeebra.outcome, Outcome::Complete);
+        assert_eq!(zeebra.wall, Some(Duration::from_millis(1_100)));
+        assert_eq!(msolve.library, "msolve");
+        assert_eq!(msolve.wall, Some(Duration::from_millis(2_050)));
+        // #1019: the competitor row pairs with the scored Zeebra row and both carry the
+        // reference's invariants, so the pair has invariants to agree on.
+        assert!(
+            zeebra.comparable_with(msolve),
+            "rows of one job pair on the board"
+        );
+        assert_eq!(zeebra.agreed_timing_invariants(msolve), 2);
+        assert_eq!(
+            zeebra.verification.as_ref().map(|v| v.shared_invariants),
+            Some(2)
+        );
         assert!(board.to_markdown().contains("katsura-4"));
     }
 

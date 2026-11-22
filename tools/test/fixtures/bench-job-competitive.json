@@ -27,7 +27,7 @@
         "cpu": "affinity 0",
         "concurrency": 1,
         "build": "release, -C target-cpu=x86-64-v3",
-        "policy": "bench-job job: median of 3 clean attempts, 30 s wall, 1 workers"
+        "policy": "bench-job job: median process wall of the clean, reference-verified attempts, arms interleaved, 30 s wall"
       },
       "limits": {
         "wall_nanos": 30000000000,
@@ -41,12 +41,19 @@
       "cpu_basis": "unavailable",
       "peak_rss_bytes": 1048576,
       "peak_rss_basis": "direct-child VmHWM (exact)",
-      "stages": [
-        {
-          "name": "symbolic",
-          "elapsed_nanos": 440000000
-        }
-      ]
+      "stages": [],
+      "invariants": {
+        "basis_cardinality": 2,
+        "leading_monomials": [
+          "x0^2",
+          "x1"
+        ]
+      },
+      "verification": {
+        "checked_against": "Singular std, redSB",
+        "shared_invariants": 2,
+        "note": "basis digest equal to the reference on 3/3 clean attempts"
+      }
     },
     {
       "schema": 1,
@@ -62,8 +69,8 @@
       },
       "order": "grevlex",
       "variable_count": 5,
-      "library": "zeebra",
-      "library_version": null,
+      "library": "msolve",
+      "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "c0ffeec0",
         "base_commit": "",
@@ -72,7 +79,7 @@
         "cpu": "affinity 0",
         "concurrency": 1,
         "build": "release, -C target-cpu=x86-64-v3",
-        "policy": "bench-job job: median of 0 clean attempts, 30 s wall, 1 workers"
+        "policy": "bench-job job: median process wall of the clean, reference-verified attempts, arms interleaved, 30 s wall"
       },
       "limits": {
         "wall_nanos": 30000000000,
@@ -81,8 +88,24 @@
         "tool_caps": []
       },
       "reproduce": "tools/bench-job report job",
-      "outcome": "failed",
-      "outcome_detail": "no clean complete attempt"
+      "outcome": "complete",
+      "wall_nanos": 2050000000,
+      "cpu_basis": "unavailable",
+      "peak_rss_bytes": 1048576,
+      "peak_rss_basis": "direct-child VmHWM (exact)",
+      "stages": [],
+      "invariants": {
+        "basis_cardinality": 2,
+        "leading_monomials": [
+          "x0^2",
+          "x1"
+        ]
+      },
+      "verification": {
+        "checked_against": "Singular std, redSB",
+        "shared_invariants": 2,
+        "note": "basis digest equal to the reference on 2/2 clean attempts"
+      }
     }
   ]
 }

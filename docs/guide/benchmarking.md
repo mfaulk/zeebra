@@ -399,7 +399,8 @@ tools/bench-job status [<job-id>] [--json]     # queued, running, done, cancelle
 tools/bench-job cancel <job-id>               # stops within 10 s (SIGINT to the child)
 tools/bench-job resume <job-id> [--force-uncancel]
 tools/bench-job report <job-id> [--json] [--baseline ARM] [--bound 1.05]
-tools/bench-job scoreboard <job-id> [--append research/competitive/results/history.json]
+tools/bench-job scoreboard <job-id> [--scored ARM] [--references refs.json] [--attempt-digests d.json] \
+    [--append research/competitive/results/history.json]
 tools/bench-reserve.sh release
 ```
 
@@ -424,11 +425,24 @@ Contaminated attempts are listed and counted but never timed.
 
 **Scoreboard.** `scoreboard` turns a publication-mode job into `CompetitiveRecord` rows. Each
 instance needs a `competitive` block (`problem`, `problem_digest`, `family`, `task`, `field`,
-`order`, `variable_count`), and each arm may name `library` and `library_version`. You get one row
-per instance, arm and worker count: the median of the clean attempts, or `failed` with no time.
-`--append` adds the rows to `history.json`; then `cargo run --release --example competitive --
---write` re-renders `COMPETITIVE.md`. Dev-mode jobs are refused. A row with no `invariants` from the
-child renders but is never publishable.
+`order`, `variable_count`), and each arm may name `library` and `library_version` (an arm without
+`library` is a Zeebra arm). You get one row per instance, arm and worker count **that arm ran**: the
+median of the clean attempts, or `failed` with no time. `--append` adds the rows to
+`history.json`; then `cargo run --release --example competitive -- --write` re-renders
+`COMPETITIVE.md`. Dev-mode jobs are refused.
+
+- **Pairing.** The board pairs two rows only when `environment.commit` and `policy` are equal. Each
+  competitor row therefore carries the commit of the **scored** Zeebra arm, and so does that arm's own
+  row, and they share one policy. The scored arm is the job's only Zeebra arm, or the one named with
+  `--scored`. Any other Zeebra arm's policy names the arm, so it never pairs by accident. A
+  comparand's own version goes in `library_version`.
+- **Invariants.** `--references refs.json` maps an instance to an independent reference:
+  `{"basis_digest", "invariants", "checked_against"}`. A row is then timed only over the clean
+  attempts whose basis digest equals the reference. It carries the reference's invariants and a
+  `verification` block. If no attempt matches, the row is `failed`. An attempt's digest is the
+  child's `basis_sha256`, or the entry for its id in `--attempt-digests digests.json` when the
+  caller extracted the digest from output the child does not summarize (msolve, grobx). Without a
+  reference, a row has no invariants: it renders but is never publishable.
 
 **Nightly smoke.** `tools/bench-job-smoke.sh` runs submit → run → report → verify with 2 attempts
 on katsura-4 in the nightly `Benchmarks run` job. Timing is ignored and no verdict is read.

@@ -39,6 +39,8 @@ FIXTURE = TOOLS / 'test' / 'fixtures' / 'bench-job-competitive.json'
 K4 = dict(problem='katsura-4', problem_digest='ab' * 32, family='katsura', task='reduced-grobner-basis',
           field=dict(name='GF(18446744069414584321)', characteristic=18446744069414584321, extension_degree=1,
                      defining_polynomial=None), order='grevlex', variable_count=5)
+REFS = {'goldilocks/katsura-4': dict(basis_digest='d1', checked_against='Singular std, redSB',
+                                     invariants=dict(basis_cardinality=2, leading_monomials=['x0^2', 'x1']))}
 
 
 def sha(path):
@@ -506,7 +508,7 @@ class BenchJobTest(unittest.TestCase):
         state, m = self.synthetic(dict(a=[1.0, 1.2, 1.1]), mode='publication')
         for a in state['attempts']:
             del a['metadata']['solver_peak_rss_bytes']
-        row = bj.competitive_rows(state, m, machine='fixture')[0]
+        row = bj.competitive_rows(state, m, machine='fixture', scored='a')[0]
         self.assertEqual((row['peak_rss_bytes'], row['peak_rss_basis']), (40 << 20, bj.RSS_TREE))
         self.assertIn('| ≤ 40', bj.render(bj.summarize(state, m)))
 
@@ -523,14 +525,88 @@ class BenchJobTest(unittest.TestCase):
         # GNU time's 128+N for a signalled binary reads back as -N, as it does without the reporter.
         self.assertEqual(by_instance['i2']['exit'], -signal.SIGTERM)
 
-    # The scoreboard bridge emits the committed CompetitiveRecord fixture that board.rs's test loads.
+    def publication(self, cells, workers=(1,), arms=None):
+        """A publication job's loaded journal from `cells`: (arm, workers, wall seconds, digest) per
+        clean attempt. `arms` maps arm name -> manifest overrides (library, workers, commit)."""
+        state, m = self.synthetic(dict(a=[]), mode='publication')
+        m['run']['workers'] = list(workers)
+        base = {k: v for k, v in m['arms'][1].items() if k not in ('library', 'library_version')}
+        m['arms'] = [dict(base, name=name, **over) for name, over in arms.items()]
+        state['attempts'] = [
+            dict(index=i, try_=0, status='ok',
+                 stdout=json.dumps(dict(status='complete', basis_sha256=digest)).encode(),
+                 cell=dict(instance='goldilocks/katsura-4', workers=w, seed=0, rep=i, arm=arm),
+                 metadata=dict(attempt_id=f'job:{i}:0', process_wall_ns=int(wall * 1e9),
+                               observed_peak_rss_bytes=40 << 20, solver_peak_rss_bytes=1 << 20,
+                               before=dict(clock='boost')))
+            for i, (arm, w, wall, digest) in enumerate(cells)]
+        return state, m
+
+    # The scoreboard bridge emits the committed CompetitiveRecord fixture that board.rs's test loads:
+    # a Zeebra row and a competitor row that pair, both carrying the reference's invariants.
     def test_competitive_rows_match_the_fixture(self):
-        state, m = self.synthetic(dict(a=[1.0, 1.2, 1.1], b=[]), mode='publication')
-        rows = bj.competitive_rows(state, m, machine='fixture')
+        state, m = self.publication(
+            [('zeebra', 1, 1.0, 'd1'), ('msolve', 1, 2.1, 'd1'), ('zeebra', 1, 1.2, 'd1'),
+             ('msolve', 1, 2.0, 'd1'), ('zeebra', 1, 1.1, 'd1')],
+            arms=dict(zeebra=dict(library='zeebra', library_version='zeebra 0.1.0'),
+                      msolve=dict(library='msolve', library_version='msolve 0.11.0', commit='a1b2c3d4e5')))
+        rows = bj.competitive_rows(state, m, machine='fixture', references=REFS)
         self.assertEqual(rows, json.loads(FIXTURE.read_text())['rows'])
         dev_state, dev = self.synthetic(dict(a=[1.0]))
         with self.assertRaises(bj.JobError):
             bj.competitive_rows(dev_state, dev, machine='fixture')
+
+    # Rows cover only the worker counts each arm ran: an arm with its own `workers` list gets no row,
+    # and so no false "failed", at a count it never ran.
+    def test_competitive_rows_cover_only_the_workers_each_arm_ran(self):
+        state, m = self.publication([('z', 1, 1.0, 'd1'), ('m', 1, 2.0, 'd1'), ('m', 4, 0.9, 'd1')],
+                                    workers=(1, 4), arms=dict(z=dict(workers=[1]), m=dict(library='msolve')))
+        rows = bj.competitive_rows(state, m, machine='x')
+        self.assertEqual(sorted((r['library'], r['limits']['workers']) for r in rows),
+                         [('msolve', 1), ('msolve', 4), ('zeebra', 1)])
+        self.assertTrue(all(r['outcome'] == 'complete' for r in rows))
+
+    # A competitor row pairs with the scored Zeebra arm: the same environment.commit and policy
+    # (board.rs `comparable_with`), whatever its own upstream commit and however many attempts each
+    # arm kept. Any other Zeebra arm is labelled apart, so it never pairs by accident.
+    def test_competitive_rows_pair_with_the_scored_arm(self):
+        cells = [('z', 1, 1.0, 'd1'), ('z', 1, 1.1, 'd1'), ('z', 1, 1.2, 'd1'), ('m', 1, 2.0, 'd1'),
+                 ('m', 1, 2.2, 'd1'), ('z2', 1, 0.9, 'd1')]
+        arms = dict(z=dict(), m=dict(library='msolve', commit='a1b2c3d4e5'), z2=dict(commit='beef' * 10))
+        state, m = self.publication(cells, arms=arms)
+        with self.assertRaisesRegex(bj.JobError, 'several Zeebra arms'):
+            bj.competitive_rows(state, m, machine='x')
+        with self.assertRaisesRegex(bj.JobError, 'not a Zeebra arm'):
+            bj.competitive_rows(state, m, machine='x', scored='m')
+        rows = {r['library'] + r['environment']['commit']: r for r in
+                bj.competitive_rows(state, m, machine='x', scored='z')}
+        z, comp, z2 = rows['zeebra' + COMMIT[:8]], rows['msolve' + COMMIT[:8]], rows['zeebrabeefbeef']
+        for k in ('commit', 'policy', 'machine', 'cpu', 'build'):
+            self.assertEqual(z['environment'][k], comp['environment'][k], k)
+        self.assertNotEqual(z['environment']['policy'], z2['environment']['policy'])
+        self.assertIn('(z2 arm)', z2['environment']['policy'])
+
+    # With a reference, a row is timed only over attempts whose basis digest equals it and carries the
+    # reference's invariants; an arm none of whose attempts match is failed, never timed.
+    def test_competitive_rows_carry_reference_checked_invariants(self):
+        cells = [('z', 1, 1.0, 'd1'), ('z', 1, 9.0, 'WRONG'), ('z', 1, 1.2, 'd1'), ('m', 1, 2.0, 'WRONG'),
+                 ('g', 1, 3.0, None)]
+        state, m = self.publication(cells, arms=dict(z=dict(), m=dict(library='msolve'), g=dict(library='grobx')))
+        rows = {r['library']: r for r in bj.competitive_rows(state, m, machine='x', references=REFS,
+                                                              attempt_digests={'job:4:0': 'd1'})}
+        z = rows['zeebra']
+        self.assertEqual((z['outcome'], z['wall_nanos']), ('complete', 1_100_000_000))
+        self.assertEqual(z['invariants'], REFS['goldilocks/katsura-4']['invariants'])
+        self.assertEqual(z['verification'], dict(checked_against='Singular std, redSB', shared_invariants=2,
+                                                 note='basis digest equal to the reference on 2/3 clean attempts'))
+        self.assertEqual((rows['msolve']['outcome'], rows['msolve']['outcome_detail']),
+                         ('failed', 'no attempt matched the independent reference'))
+        self.assertNotIn('invariants', rows['msolve'])
+        # A digest supplied by the caller stands in for a child that prints none.
+        self.assertEqual((rows['grobx']['outcome'], rows['grobx']['wall_nanos']), ('complete', 3_000_000_000))
+        # Without a reference nothing is claimed checked.
+        bare = bj.competitive_rows(state, m, machine='x')
+        self.assertTrue(all('invariants' not in r and 'verification' not in r for r in bare))
 
 
 if __name__ == '__main__':
