@@ -4,6 +4,7 @@
 //!
 //! cargo run --release --example m33_qualify -- --field FIELD --name ROW [--order grevlex|grlex|lex]
 //!     [--engine entry|f4] [--workers N] [--wall-s S] [--repeat K] [--sample-threads] [--input-only]
+//!     [--measure-stages]
 //!
 //! `entry` is `f4_signature_reported` (the dispatch), `f4` the shipping default. A typed refusal or
 //! budget stop is a normal exit with `status` "refused" or "stopped" and the error's `Debug` text.
@@ -47,6 +48,8 @@ struct Args {
     wall: Duration,
     repeat: usize,
     sample_threads: bool,
+    /// Sets `F4Options::measure_stages`; only the #974 thread diagnosis uses it.
+    measure_stages: bool,
     input_only: bool,
     catalog: bool,
 }
@@ -62,6 +65,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         wall: Duration::from_secs(180),
         repeat: 1,
         sample_threads: false,
+        measure_stages: false,
         input_only: false,
         catalog: false,
     };
@@ -89,6 +93,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
                 }
             }
             "--sample-threads" => a.sample_threads = true,
+            "--measure-stages" => a.measure_stages = true,
             "--input-only" => a.input_only = true,
             "--catalog" => a.catalog = true,
             // An empty argv slot is a manifest parameter left unset (`{catalog}`).
@@ -362,6 +367,7 @@ fn options(args: &Args) -> F4Options {
         } else {
             ParallelSymbolic::Auto { max_workers: w }
         },
+        measure_stages: args.measure_stages,
         ..F4Options::default()
     }
 }
@@ -532,6 +538,12 @@ mod tests {
         ])
         .is_err());
         assert!(args(&["--field", "gf2", "--name", "katsura-4", "--engine", "sigf4"]).is_err());
+        let measured =
+            args(&["--field", "gf2", "--name", "katsura-4", "--measure-stages"]).unwrap();
+        assert!(measured.measure_stages && options(&measured).measure_stages);
+        assert!(
+            !options(&args(&["--field", "gf2", "--name", "katsura-4"]).unwrap()).measure_stages
+        );
     }
 
     /// A thread of a team that has begun to exit, running beside a full new team, counts toward the
