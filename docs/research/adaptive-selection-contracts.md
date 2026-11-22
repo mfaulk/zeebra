@@ -339,7 +339,7 @@ Both are filed, as #1049 and #1050, rather than changed here, to keep this a doc
 
 ## 8. Comparison contract against grobx (#1029)
 
-**Issue:** #1029 (tracker #1028; M34 M-1). **Inspected at:** `main` `630a33a4`, with grobx upstream
+**Issue:** #1029 (tracker #1028; M34 M-1). **Inspected at:** `main` `3fc16682`, with grobx upstream
 read at `8005a2a1` (`MANUAL.md`, fetched as a tarball and not vendored). **Smoke runs:**
 `research/m34-grobx-capability/smoke.jsonl`, produced by `smoke.py` in the same directory. They are
 capability runs on tiny instances and publish no timing or memory figure.
@@ -356,10 +356,11 @@ This is the M33 comparand pin (`research/m33-baseline/pins.json`, #966).
   against `research/m33-baseline/grobx-0.155.1.Cargo.lock` with `--locked`, Rust 1.99.1, release,
   fat LTO, one codegen unit and `-C target-cpu=x86-64-v3`, and the repository's driver source needs
   no change. A private rebuild from `main` gives the same binary bit for bit as M33's (§8.2).
-- **No driver change here.** Moving the repository's four pin sites is #987, which another agent
-  holds. This issue does not duplicate it. Until #987 merges, a deciding run builds its driver with
-  `grobx-pin.sh` and records the driver's `--version` identity on the run (#1008). After #987
-  merges, the provisioned driver is this pin and the identity check is the same.
+- **The repository driver is this pin.** #987 moved the repository's four pin sites to `8005a2a1`
+  (#1053), and this issue made no driver change of its own. `tools/external/provision-grobx.sh`
+  now builds this pin. Its manifest, lock, toolchain file, `src/main.rs` and `build.rs` are byte
+  for byte the sources of the private rebuild in §8.2. Every deciding run records the driver's
+  `--version` identity (#1008).
 - **Threads.** 0.155.1 computes on one thread: `Params::threads` is accepted and ignored (upstream
   `MANUAL.md`, *Rust*; the `pins.json` census). The driver refuses `workers ≠ 1` (§8.3). The only
   equal-worker head-to-head with grobx is therefore at one worker, against Zeebra's P1 and P4 arms
@@ -370,7 +371,7 @@ This is the M33 comparand pin (`research/m33-baseline/pins.json`, #966).
 | Build | Driver source | grobx | Driver SHA-256 | `build` id |
 |---|---|---|---|---|
 | M33 (#966), 2026-11-20 | #966's branch | 0.155.1 `8005a2a1` | `fdd6aeecac466d3702f1e459f1e1456b72f5444d3563f193b5693df44ce183bc` | `7028b2213283e107…` |
-| This issue, private rebuild, 2026-11-22 | `main` `630a33a4` | 0.155.1 `8005a2a1` | `fdd6aeecac466d3702f1e459f1e1456b72f5444d3563f193b5693df44ce183bc` | `7028b2213283e10744394725e5e6142c07cd192e09d55f1689e863c1b3b21f8f` |
+| This issue, private rebuild, 2026-11-22 | `main` `3fc16682` | 0.155.1 `8005a2a1` | `fdd6aeecac466d3702f1e459f1e1456b72f5444d3563f193b5693df44ce183bc` | `7028b2213283e10744394725e5e6142c07cd192e09d55f1689e863c1b3b21f8f` |
 
 The `build` id hashes the driver's manifest, lock, toolchain file, `src/main.rs`, `build.rs` and the
 effective compiler settings (`tools/external/grobx-driver/README.md`). The two builds agree on all

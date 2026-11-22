@@ -6,12 +6,12 @@ These runs back the capability matrix in
 `tools/external/grobx-driver`, at the M34 pin grobx 0.155.1 `8005a2a1`. The record is about
 capability only: it contains no timing or memory figure.
 
-Build the driver to the pin and run the set:
+Build the driver and run the set. Since #1053 the repository provisioner builds this pin:
 
 ```sh
-research/m33-baseline/grobx-pin.sh      # prints the driver's SHA-256; expect fdd6aeec…
+tools/external/provision-grobx.sh       # or research/m33-baseline/grobx-pin.sh, whose build gave fdd6aeec…
 python3 research/m34-grobx-capability/smoke.py \
-  /buildcache/cargo-target/zeebra-grobx-8005a2a1/release/grobx-driver \
+  /buildcache/cargo-target/zeebra-grobx/release/grobx-driver \
   > research/m34-grobx-capability/smoke.jsonl
 ```
 
@@ -27,6 +27,6 @@ following line is one attempt, with these fields:
 The reduction mode (`rows`, `tests`, `sketches` or `combinations`) determines the acceptance mode
 of a raw attempt (§8.4).
 
-**Committed record.** `smoke.jsonl` came from a private rebuild at `main` `630a33a4`, whose
+**Committed record.** `smoke.jsonl` came from a private rebuild at `main` `3fc16682`, whose
 binary is identical to M33's (§8.2). The result was 22 completed attempts and 11 typed refusals.
 All 11 certified attempts returned `certified = true`.
