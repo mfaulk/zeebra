@@ -216,3 +216,91 @@ journal without `clock_source` judges exactly as version 2. **Version 2** (#996)
 is **version 1**, grouped per cell (`<instance>@<w>w`), and is read as such: `report` names the
 grouping either way, and a journal is never rewritten. The re-judged M33 sessions are in
 [`research/m33-clock-rule/`](../../research/m33-clock-rule/README.md).
+
+## 8. Selection outcomes (`selection-outcome-v1`, #1008)
+
+A selector is fitted on a performance matrix, and the matrix compares only if every cell is
+accounted for the same way (M34 plan §8.4). `bench-job`'s journaled status (`ok`, `failed`,
+`timeout`, `rss-limit`, `cancelled`) is the harness's view, and it drives retries. It cannot tell a
+typed refusal from a completion, because a child that refuses still exits 0. Before this schema, such
+an attempt was timed as if it had finished.
+
+`selection_outcome()` in `tools/bench-job` derives one more status per attempt, at report time,
+from:
+
+- the journaled status;
+- the child's JSON report (its last stdout line);
+- optionally, an independent reference digest.
+
+Nothing new is journaled, so every journal written before this schema replays unchanged.
+`report --json` carries one `selection` record per attempt and `counts.selection`.
+
+### 8.1 Statuses
+
+| Status | Comes from | Completion time | Timed |
+|---|---|---|---|
+| `completed-verified` | a completion that passed the arm's runtime check (`verified: true`, grobx `certified: true`, RunStatus `verified`) or matched the reference digest | process wall | yes |
+| `completed-unverified` | a completion with neither | process wall | yes |
+| `timeout` | the harness's wall cap, or an in-solver time stop | none; `censored_at_ms` = the cap | no |
+| `memory-refusal` | a typed in-solver resource refusal (`StopKind::Resource`: matrix, live-entry, live-byte, batch or basis-size limits) | none | no |
+| `rss-limit` | the external `rss-guard` kill | none | no |
+| `unsupported` | a typed refusal before work (`Unsupported`, `refused`) | none | no |
+| `process-failure` | a nonzero exit that is not a cap or guard, a child-reported failure, or a stop the classifier cannot name | none | no |
+| `incorrect-output` | a rejected certificate, or a basis digest different from the reference | none | no |
+| `not-run` | a cancelled attempt | none | no |
+
+- **Censoring.** A censored attempt (`timeout`) records the cap C, never its wall. An in-solver time
+  stop is censored at the job's cap too, because the comparison is at C.
+- **Mismatches.** A digest mismatch overrides any runtime verdict. A missing digest convicts
+  nothing: the attempt stays at the status it already had, which is `completed-unverified` unless
+  its own check passed.
+
+### 8.2 What a child reports
+
+Every key below is optional. A child reporting none of them reads as a completion when it exits 0,
+which is what every attempt was before this schema.
+
+| Key | Values |
+|---|---|
+| `selection_outcome` | `complete`, `unsupported`, `memory-refusal`, `time-stop`, `incorrect-output`. Any other value is refused |
+| `reason` | free text, kept on the record |
+| `verified` | `true` when the arm's own runtime check passed |
+| `acceptance` | `deterministic`, `certified-randomized`, `probabilistic` (the #1029 acceptance modes, `adaptive-selection-contracts.md` §8.4) |
+| `costs_ns` | `{feature, inference, probe, discarded, conversion, verification, fallback}` charged to the arm, plus `audit`, which is recorded and never charged |
+| `basis_sha256` | compared with `--references` |
+
+Without `selection_outcome`, existing shapes are read as follows:
+
+- **m33_qualify's `status` and `error`.**
+  - `refused` → `unsupported`.
+  - `stopped` → named from the `F4Error` or `SigF4Error` Debug variant: a resource limit, a time
+    limit, `CertificationFailed` (→ `incorrect-output`) or `Unsupported`.
+- **The external contract's RunStatus tags.**
+  - `verified` → `completed-verified`.
+  - `unsupported` → `unsupported`.
+  - `failed` → `process-failure`.
+  - `stopped-by-limit` → split on the Display text. A wall budget names milliseconds; any other
+    limit is a resource refusal.
+- **The grobx driver's `stopped`** (`deadline`, `memory` or `cancel`) and `certified` fields.
+
+Two caveats:
+
+- `outcome` is **not** read. `r1cs_import` and `whole_route` already use that key with their own
+  vocabularies.
+- The grobx driver refuses an unsupported cell with a nonzero exit, so through `bench-job` that is
+  `process-failure`. Reporting it as `unsupported` needs the driver to exit 0 with
+  `selection_outcome`, which is driver work (#987's scope).
+
+### 8.3 Cost accounting
+
+- **A policy's cost** is the process wall of every attempt it made, including discarded and
+  fallback attempts. The in-process components in `costs_ns` are attribution *within* that wall,
+  not additions to it:
+  - feature extraction, inference, probes, discarded work, conversion and fallback;
+  - runtime verification that the arm's guarantee requires.
+- **The independent-reference audit** (digest comparison, normally offline) is common to every arm.
+  It is recorded under `audit` and never charged.
+- **Not yet recorded per attempt:** lineage keys (#1005), task contract and configuration id
+  (#1004), and arithmetic backend and placement beyond what the manifest and `cpu-context` already
+  hold. They belong in the manifest's arm and instance entries, and land with #1005's lineage
+  fields, so they are not duplicated here.
