@@ -1569,9 +1569,9 @@ pub fn manifest() -> String {
 mod tests {
     use super::{
         ceilings, corroboration, corroboration_for, dense_mq_instance, dense_mq_point, instance,
-        ladder, manifest, CorpusEntry,
-        Corroboration, Rung, ALTERNATE_CHARACTERISTIC, KOALABEAR_CHARACTERISTIC,
-        REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC, WIDE_64_CHARACTERISTIC,
+        ladder, manifest, CorpusEntry, Corroboration, Rung, ALTERNATE_CHARACTERISTIC,
+        KOALABEAR_CHARACTERISTIC, REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC,
+        WIDE_64_CHARACTERISTIC,
     };
     use crate::{
         fields::Zp2147483647,
