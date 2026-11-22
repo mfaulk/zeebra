@@ -29,7 +29,7 @@
 //! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918); `--reducer
 //! NAME` (f4) sets the symbolic reducer selection by its `ReducerSelection` variant name.
 //!
-//! `--live-gib G` (f4) raises the live-entry budget to G GiB, for #1033's information-only arm:
+//! `--live-gib G` (f4, entry) raises the live-entry budget to G GiB, for #1033's information-only arm:
 //! at the shipping 512 MB the parallel forward pass falls back to serial on the largest dense
 //! batches.
 //!
@@ -242,13 +242,13 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     {
         return Err("--density observes serial f4 or sigf4 only, without --discovery".into());
     }
-    if (parsed.stages
-        || parsed.fl
-        || parsed.live_gib.is_some()
-        || parsed.reducer != ReducerSelection::default())
+    if (parsed.stages || parsed.fl || parsed.reducer != ReducerSelection::default())
         && parsed.engine != "f4"
     {
         return Err("--stages and --fl configure the shipping F4: --engine f4".into());
+    }
+    if parsed.live_gib.is_some() && !["f4", "entry"].contains(&parsed.engine.as_str()) {
+        return Err("--live-gib sets F4Options: --engine f4 or entry".into());
     }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
         return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
@@ -1636,6 +1636,8 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--density"]].concat()).is_ok());
         assert!(args(&[&base[..], &["sigf4", "--claim", "--density"]].concat()).is_err());
         assert!(args(&[&base[..], &["entry", "--density"]].concat()).is_err());
+        assert!(args(&[&base[..], &["entry", "--live-gib", "8"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["sigf4", "--live-gib", "8"]].concat()).is_err());
         let capture = ["--capture", "/x", "--batches", "7,8"];
         assert_eq!(
             args(&[&base[..], &["f4"], &capture[..]].concat())
