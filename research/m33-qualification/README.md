@@ -37,7 +37,8 @@ default budget (#961's table). There the check is that F0 and F2 stop the same w
 is recorded but nothing is compared to it.
 
 The `grlex` suite has no F0 entry arm. On F0, graded-lex takes the signature route, which is #961
-itself (> 8 GiB). Under F2 the entry point must report `Shipping(Order)` and return F0 f4's digest.
+itself (> 8 GiB). Under F2 the entry point must report a `Shipping(_)` route (owner decision 12, #965) and return F0
+f4's digest.
 
 ### What each verdict checks
 
@@ -48,7 +49,11 @@ itself (> 8 GiB). Under F2 the entry point must report `Shipping(Order)` and ret
 - Under graded-lex, F2's entry point routes to F4 by rule.
 - F2 keeps every typed outcome F0 had per engine and worker count (for example, a
   `TooManyLiveNonzeros` stop stays a `TooManyLiveNonzeros` stop).
-- No attempt reports more threads than requested.
+- Thread cap (owner decision 11, #965). Within each team, running workers (state `R`) stay ≤ the
+  worker count (`team_running_peak`). F2's running workers over the cap (`running_peak`) are no
+  more than F0's on the shipping F4, and on entry calls that ship by the same route at both
+  versions. The allowance covers the teardown race of #1002. Reports without thread states fall
+  back to listed threads (`threads_peak`) under the same F0 parity.
 
 **Regression** (§12.2). Each cell is paired F2 ÷ F0 per repetition, using `bench_stats.paired_ratio`
 and `regression_verdict`. The rules:
@@ -109,8 +114,9 @@ python3 $Q/summarize.py gate-d --gate-d --f2 $F2 <gate-d-G job> <gate-d-M job>  
 
 ## Run at F2 `db181c51`
 
-`results/` holds the summarizer output of the 2026-11-21 session (`correctness.md`, `regression.md`,
-`jobs.txt`). The write-up is [`docs/research/m33-qualification.md`](../../docs/research/m33-qualification.md):
+`results/` holds the summarizer output of session 1 (`correctness.md`, `regression.md`, `jobs.txt`)
+and session 2 (`session2-*`; the regression top-up driver is `session2-topup.py`). Session 2 rebuilt
+both binaries with harness `accae594` (per-team thread states) for correctness. The write-up is [`docs/research/m33-qualification.md`](../../docs/research/m33-qualification.md):
 Q did not pass and Gate D was not run. Repetitions pool across jobs, so a top-up job for cells
 short of n is passed beside the first job.
 
