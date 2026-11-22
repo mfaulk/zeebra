@@ -1,0 +1,925 @@
+[
+  {
+    "field": {
+      "characteristic": "18446744073709551263",
+      "extension_degree": 1,
+      "defining_polynomial": []
+    },
+    "variables": [
+      "x1",
+      "x2",
+      "x3",
+      "x4"
+    ],
+    "order": "grevlex",
+    "equations": [
+      [
+        {
+          "exponents": [
+            2,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            2,
+            0,
+            0
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            2,
+            0
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            2
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "18446744073709551262"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "18446744073709551262"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            0,
+            2,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            0,
+            1,
+            0
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "coefficient": [
+            "18446744073709551262"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "coefficient": [
+            "2"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "18446744073709551262"
+          ]
+        }
+      ]
+    ],
+    "schema": "corpus-instance-v1",
+    "id": "katsura-4",
+    "task": "T-GB",
+    "generator": null,
+    "source": {
+      "url": "https://github.com/mfaulk/zeebra/blob/main/research/wide-corpus/cases.json",
+      "revision": "SHA256:43f42f5eb1b3fc039bdaecd1f1abf67864cacdec4525e7de6e72cddfd0a0f0da",
+      "license": "MIT; independently implemented mathematical family"
+    },
+    "transformations": [
+      {
+        "kind": "definition",
+        "description": "independent benchmark_systems definition"
+      }
+    ],
+    "lineage": {
+      "support_id": "7a74a6536eb249b8c31c23e4996b69abdea7bdd656873a70878db491b624e0a1",
+      "formulation_id": "katsura/4",
+      "family_id": "katsura",
+      "source_id": "zeebra/katsura",
+      "presentation_parent": null,
+      "family_parameters": {
+        "n": 4
+      }
+    },
+    "normalized_input_digest": "24021ff73ce58712527c8b5e821e5753797d83beda67bfe3d52790f208b05fa3"
+  },
+  {
+    "field": {
+      "characteristic": "18446744073709551263",
+      "extension_degree": 1,
+      "defining_polynomial": []
+    },
+    "variables": [
+      "x1",
+      "x2",
+      "x3",
+      "x4",
+      "x5",
+      "x6",
+      "x7"
+    ],
+    "order": "grevlex",
+    "equations": [
+      [
+        {
+          "exponents": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        }
+      ],
+      [
+        {
+          "exponents": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "coefficient": [
+            "1"
+          ]
+        },
+        {
+          "exponents": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "coefficient": [
+            "18446744073709551262"
+          ]
+        }
+      ]
+    ],
+    "schema": "corpus-instance-v1",
+    "id": "cyclic-7",
+    "task": "T-GB",
+    "generator": null,
+    "source": {
+      "url": "https://github.com/mfaulk/zeebra/blob/main/research/wide-corpus/cases.json",
+      "revision": "SHA256:43f42f5eb1b3fc039bdaecd1f1abf67864cacdec4525e7de6e72cddfd0a0f0da",
+      "license": "MIT; independently implemented mathematical family"
+    },
+    "transformations": [
+      {
+        "kind": "definition",
+        "description": "independent benchmark_systems definition"
+      }
+    ],
+    "lineage": {
+      "support_id": "25bfe459765ac9fc26d7d5a9041969e9b9d63c0959a7b374607576bd14998616",
+      "formulation_id": "cyclic/7",
+      "family_id": "cyclic",
+      "source_id": "zeebra/cyclic",
+      "presentation_parent": null,
+      "family_parameters": {
+        "n": 7
+      }
+    },
+    "normalized_input_digest": "92f2fa6f6c5faa48ab60f0512bc9968d23f08bfcfc66b2b0f5a8e656d40cc35c"
+  }
+]

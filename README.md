@@ -81,6 +81,12 @@ from them in four ways:
 - **Evidence.** Published measurements name their commit and can be reproduced. Shared benchmark
   problems are checked for ideal equivalence across engines before they are timed.
 
+The [corpus lineage contract](docs/research/corpus-lineage.md) defines instance provenance and
+evaluation splits. Validate a catalog with `python3 tools/corpus_lineage.py validate CATALOG.json`,
+or check for leakage with `python3 tools/corpus_lineage.py check CATALOG.json SPLIT.json`.
+The [retained-corpus audit](research/corpus-lineage/README.md) records known relationships and
+unresolved metadata without running solvers.
+
 Zeebra is competitive but does not lead. It has outperformed Singular on benchmarks such as
 Katsura-11 and random MQ systems. In the
 [latest integration report](docs/MILESTONE-COMPETITIVE-BENCHMARKING.md#172-competitive-scoreboard)

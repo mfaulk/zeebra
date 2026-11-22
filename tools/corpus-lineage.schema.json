@@ -1,0 +1,375 @@
+{
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "corpus-instance-v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "field": {
+      "$ref": "#/$defs/field"
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "order": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task": {
+      "enum": [
+        "T-GB",
+        "T-GB-conv",
+        "T-PT1",
+        "T-PTALL"
+      ]
+    },
+    "equations": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/term"
+        }
+      }
+    },
+    "generator": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/recipe"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "transformations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transformation"
+      }
+    },
+    "lineage": {
+      "$ref": "#/$defs/lineage"
+    },
+    "normalized_input_digest": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "field",
+    "variables",
+    "order",
+    "task",
+    "equations",
+    "generator",
+    "source",
+    "transformations",
+    "lineage",
+    "normalized_input_digest"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zeebra:corpus-instance-v1",
+  "$defs": {
+    "field": {
+      "type": "object",
+      "properties": {
+        "characteristic": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "extension_degree": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "defining_polynomial": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(0|[1-9][0-9]*)$"
+          }
+        }
+      },
+      "required": [
+        "characteristic",
+        "extension_degree",
+        "defining_polynomial"
+      ],
+      "additionalProperties": false
+    },
+    "term": {
+      "type": "object",
+      "properties": {
+        "exponents": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "coefficient": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "exponents",
+        "coefficient"
+      ],
+      "additionalProperties": false
+    },
+    "recipe": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "call": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parameters": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "path",
+        "call",
+        "seed",
+        "parameters"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "url",
+        "revision",
+        "license"
+      ],
+      "additionalProperties": false
+    },
+    "lineage": {
+      "type": "object",
+      "properties": {
+        "support_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formulation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presentation_parent": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "family_parameters": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "support_id",
+        "formulation_id",
+        "family_id",
+        "source_id",
+        "presentation_parent",
+        "family_parameters"
+      ],
+      "additionalProperties": false
+    },
+    "transformation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "assignment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "partition": {
+          "enum": [
+            "development",
+            "evaluation"
+          ]
+        },
+        "hardware": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "partition"
+      ],
+      "additionalProperties": false
+    },
+    "split": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "corpus-split-v1"
+        },
+        "protocol": {
+          "enum": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5-field",
+            "S5-hardware"
+          ]
+        },
+        "assignments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/assignment"
+          },
+          "minItems": 1
+        },
+        "scale_parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "draw": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm",
+            "salt",
+            "catalog_sha256",
+            "evaluation_groups",
+            "exposed_ids"
+          ],
+          "properties": {
+            "algorithm": {
+              "const": "hash-groups-v1"
+            },
+            "salt": {
+              "type": "string",
+              "minLength": 1
+            },
+            "catalog_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "evaluation_groups": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "exposed_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "protocol",
+        "assignments"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
