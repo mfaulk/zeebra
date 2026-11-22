@@ -80,6 +80,39 @@ cargo run --release --example multivariate_mul -- max_degree=90  # stop short of
 cargo run --release --example multivariate_mul -- heap           # heap vs accumulate, with the sort
 ```
 
+### Dense bivariate products by Kronecker substitution
+
+The dense routes above still form every term-product, so a product of two dense bivariate
+polynomials of total degree `d` costs `Θ(d⁴)`. `multiply_bivariate` substitutes `y → x^K`, with `K`
+one more than the product's degree in `x`, multiplies the two univariate images through the NTT, and
+unpacks. That is `O(D² log D)` for a product of total degree `D`. It needs a power-of-two domain,
+and so `KnownOrder` and a random source, which `Mul` cannot carry, so `a * b` does not reach it:
+
+```rust
+use rand::{rngs::StdRng, SeedableRng};
+use zeebra::{fields::KoalaBear, multiply_bivariate, MultivariatePolynomial};
+
+let p = MultivariatePolynomial::<2, KoalaBear>::parse("x^2 + 3*x*y + y^2 + 1", ["x", "y"]).unwrap();
+let mut rng = StdRng::seed_from_u64(1);
+assert_eq!(multiply_bivariate(&p, &p, &mut rng), &p * &p);
+```
+
+It takes the transform when the product's total degree is at least `KRONECKER_CROSSOVER` (54), the
+packing is within 4x of the term-product count (so the pair is dense), and the field's two-adicity
+hosts the domain. Otherwise, as on Mersenne-31, it multiplies as `a * b` does. Measured over
+KoalaBear on an Apple M4 Pro, one thread, at `0cabbad2` plus the change that added the route
+(#944):
+
+| `d` | step | dense triangle | Kronecker | ratio |
+|---:|---|---:|---:|---:|
+| 15 | `p²·p` | 0.119 ms | 0.141 ms | 0.85x |
+| 27 | `p²` | 0.288 ms | 0.142 ms | 2.03x |
+| 81 | `p²·p` | 79.7 ms | 3.0 ms | 26.3x |
+| 243 | `p²·p` | 6 483.9 ms | 65.5 ms | 98.9x |
+| 729 | `p²·p` | not run (forecast ~1 900 s) | 648 ms | — |
+
+Re-measure with `cargo run --release --example bivariate_kronecker`.
+
 ## Add, Sub and scale collect into an operand's own map
 
 `Add`, `Sub`, `Neg` and `scale` **collect into one of their operands' maps** rather than building a

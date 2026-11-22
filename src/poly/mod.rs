@@ -6,16 +6,17 @@ mod univariate;
 pub use multivariate::gcd_profile;
 
 pub(crate) use multivariate::PreparedDivisors;
+pub use multivariate::{
+    kronecker_selected, multiply_bivariate, try_multiply_kronecker, BlockOrder, BlockOrderError,
+    BlockOrderKind, BuildMonomialHasher, CrossCallRepeats, DivisionRoute, GcdError, GcdRoute,
+    Monomial, MonomialHasher, MonomialMap, MonomialOrder, MonomialSet, MultivariatePolynomial,
+    NormalFormCounts, NormalFormError, SquarefreeError, WeightedOrder, WeightedOrderError,
+    WeightedTieBreak, KRONECKER_CROSSOVER,
+};
 #[doc(hidden)]
 pub use multivariate::{
     multiply_multivariate_sorted_unstable, multiply_multivariate_unstable,
     multivariate_multiply_route_unstable, MultiplyRoute,
-};
-pub use multivariate::{
-    BlockOrder, BlockOrderError, BlockOrderKind, BuildMonomialHasher, CrossCallRepeats,
-    DivisionRoute, GcdError, GcdRoute, Monomial, MonomialHasher, MonomialMap, MonomialOrder,
-    MonomialSet, MultivariatePolynomial, NormalFormCounts, NormalFormError, SquarefreeError,
-    WeightedOrder, WeightedOrderError, WeightedTieBreak,
 };
 pub(crate) use univariate::multiply_dense;
 pub(crate) use univariate::PreparedDivisor;

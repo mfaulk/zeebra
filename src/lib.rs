@@ -48,13 +48,14 @@ pub use poly::{
     berlekamp_massey, compose_mod, compose_mod_horner, factorize, gcd, graeffe_2,
     graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root, graeffe_root_with_stats,
     inverse_exponent, is_irreducible, is_permutation_exponent, is_permutation_polynomial,
-    lagrange_interpolate, lcm, multipoint_evaluate, partial_bezout, permutation_exponents, pow_mod,
-    resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd, BlockOrder,
-    BlockOrderError, BlockOrderKind, BuildMonomialHasher, DivisionRoute, GcdError, GcdRoute,
-    GraeffeError, GraeffeStats, ModularComposer, Monomial, MonomialHasher, MonomialMap,
-    MonomialOrder, MonomialSet, MultivariatePolynomial, NormalFormError, Polynomial,
-    PolynomialParams, PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
-    WeightedOrder, WeightedOrderError, WeightedTieBreak, Xgcd,
+    kronecker_selected, lagrange_interpolate, lcm, multiply_bivariate, multipoint_evaluate,
+    partial_bezout, permutation_exponents, pow_mod, resultant, resultant_at_formal_degrees,
+    resultant_from_coefficients, roots, try_multiply_kronecker, xgcd, BlockOrder, BlockOrderError,
+    BlockOrderKind, BuildMonomialHasher, DivisionRoute, GcdError, GcdRoute, GraeffeError,
+    GraeffeStats, ModularComposer, Monomial, MonomialHasher, MonomialMap, MonomialOrder,
+    MonomialSet, MultivariatePolynomial, NormalFormError, Polynomial, PolynomialParams,
+    PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial, WeightedOrder,
+    WeightedOrderError, WeightedTieBreak, Xgcd, KRONECKER_CROSSOVER,
 };
 #[doc(hidden)]
 pub use poly::{

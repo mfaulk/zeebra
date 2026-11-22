@@ -71,6 +71,8 @@ A running record of what Zeebra implements. The short version is in the [README]
 - [x] Multivariate multiplication that collects as it multiplies, so the live set is bounded by the
       product's size and not by the term-product count: the six-round symbolic build from 57.0 GB
       peak resident to 0.32 GB, 179x, for byte-identical output
+- [x] Dense bivariate products by Kronecker substitution through the NTT, `multiply_bivariate`:
+      99x the dense triangle on a degree-243 cube, and a degree-729 cube in 0.65 s
 - [x] That dense accumulator generalized past two variables, which turned out to pay: 1.3x–5.4x
       over the hashing route at three, four and five variables and 8.4x on a trivariate pair dense
       in two variables and linear in the third, with the box-versus-simplex crossover measured

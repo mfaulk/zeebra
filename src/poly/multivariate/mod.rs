@@ -4,6 +4,7 @@ mod dense_index;
 #[cfg(feature = "research-work")]
 pub mod gcd_profile;
 mod heap_division;
+mod kronecker;
 mod monomial;
 mod monomial_arithmetic;
 mod monomial_hash;
@@ -18,6 +19,9 @@ mod sparse_multivariate_polynomial_conversions;
 mod term;
 mod term_arithmetic;
 
+pub use kronecker::{
+    kronecker_selected, multiply_bivariate, try_multiply_kronecker, KRONECKER_CROSSOVER,
+};
 pub use monomial::Monomial;
 pub use monomial_hash::{BuildMonomialHasher, MonomialHasher, MonomialMap, MonomialSet};
 pub use monomial_order::{

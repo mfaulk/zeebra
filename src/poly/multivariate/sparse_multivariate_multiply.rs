@@ -459,7 +459,9 @@ fn dense_box_profitable<const N: usize, F: FiniteField>(
 
 /// The largest exponent of each variable over all terms. Linear in the operand, so negligible
 /// beside the product it sizes.
-fn variable_degrees<const N: usize, F: FiniteField>(p: &SparseMultiPoly<N, F>) -> [u32; N] {
+pub(crate) fn variable_degrees<const N: usize, F: FiniteField>(
+    p: &SparseMultiPoly<N, F>,
+) -> [u32; N] {
     let mut degrees = [0u32; N];
     for monomial in p.terms.keys() {
         for i in 0..N {
