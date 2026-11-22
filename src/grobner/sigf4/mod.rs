@@ -72,6 +72,10 @@ pub struct SigF4Options {
     /// (#961), and the dispatcher never routes it there. A refusal is
     /// [`SigF4Error::Unsupported`]. Set it only to study #961 or on systems known to be small.
     pub allow_graded_lex: bool,
+    /// #1031: census every serial batch's reducer reuse into [`SigF4Statistics::reuse`]. Replays
+    /// each elimination three times, so never on in a timed run.
+    #[cfg(feature = "research-reuse")]
+    pub reuse_census: bool,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
     /// Tests only: the column-space interreduction's live-entry budget, to force its fallback.
@@ -93,6 +97,8 @@ impl Default for SigF4Options {
             parallel_cascade: false,
             max_live_bytes: Some(crate::grobner::F4Options::default().max_live_bytes),
             allow_graded_lex: false,
+            #[cfg(feature = "research-reuse")]
+            reuse_census: false,
             #[cfg(test)]
             adversary: None,
             #[cfg(test)]
@@ -218,6 +224,9 @@ pub struct SigF4Statistics {
     /// `research-sigf4-usage`.
     #[cfg(feature = "research-sigf4-usage")]
     pub usage: usage::UsageReport,
+    /// #1031's census as `(summary, batches)`, when [`SigF4Options::reuse_census`] asked for it.
+    #[cfg(feature = "research-reuse")]
+    pub reuse: Option<(crate::util::Json, crate::util::Json)>,
 }
 
 /// One batch's elimination, split by pivot source. `reducer_*` is work against the batch's reducer

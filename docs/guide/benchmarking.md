@@ -1448,6 +1448,25 @@ python3 tools/test/multirow-study-test.py
 python3 research/multirow-reuse/summarize.py
 ```
 
+### Reduced-multiple reuse census (#1031)
+
+`reuse_census --row <row> --engine f4|sigf4 [--census]`, built with `--features research-reuse`,
+runs the conventional F4 defaults or the signature engine at one worker on a pinned M29 row or a
+generated dense quadratic row (`dmq-n<N>-m<M>-<field>-s<S>[-u]`). With `--census` every batch is
+replayed by `grobner::reuse_census` as built, fully tail-reduced and hit-only tail-reduced, beside
+the cross-batch key ledger. That run is untimed. Without `--census` it is the timed arm; build it
+with `--features research-sigf4` for a binary with no census code at all.
+`research/1031-reuse-census/run.sh` runs both modes over `rows.txt`. The
+[report](../research/reduced-multiple-reuse-census.md) marks #809's reopen conditions and retains
+the defer. Checks:
+
+```sh
+cargo test --features research-reuse --lib grobner::reuse_census
+cargo test --features research-reuse --example reuse_census
+python3 research/1031-reuse-census/summarize.py research/1031-reuse-census/runs.jsonl.gz \
+  | diff - research/1031-reuse-census/tables.md
+```
+
 ### Persistent worker dispatch and border reduction
 
 The [worker-pool study](../../research/worker-pool/README.md) compares scoped threads, a bounded

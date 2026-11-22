@@ -97,6 +97,11 @@ research-sigf4-split = ["research-sigf4"]
 # matrices consult, the syzygy-store call log and its offline replay. Off in every timed binary.
 research-sigf4-usage = ["research-sigf4"]
 
+# #1031's reduced-multiple reuse census (`grobner::reuse_census`): replays every batch with its
+# reducer block as built and tail-reduced, on the signature engine (opt-in per run) and, through
+# a batch observer, the conventional one. Off in every timed binary.
+research-reuse = ["research-sigf4", "research-work"]
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
@@ -139,6 +144,10 @@ required-features = ["external-runners"]
 
 [[example]]
 name = "sig_f4_study"
+required-features = ["research-sigf4"]
+
+[[example]]
+name = "reuse_census"
 required-features = ["research-sigf4"]
 
 [[example]]
