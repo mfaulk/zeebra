@@ -98,6 +98,56 @@ check_rc "newest: empty input returns 1" 1 $?
 
 # --- zb_lease_state --------------------------------------------------------
 
+# --- portable date arithmetic (#1023) --------------------------------------
+# BSD date on macOS has no `-d`; every conversion goes through these helpers,
+# so the same assertions hold on GNU and BSD hosts.
+
+check "date: ISO to epoch" 1767225600 "$(zb_iso_to_epoch 2026-01-01T00:00:00Z)"
+check "date: ISO to epoch is UTC in summer too" 1782907200 \
+  "$(zb_iso_to_epoch 2026-07-01T12:00:00Z)"
+check "date: epoch to ISO" 2026-01-01T06:00:00Z "$(zb_epoch_to_iso 1767247200)"
+check "date: shift forward" 2026-01-01T10:00:00Z "$(zb_iso_shift 2026-01-01T06:00:00Z 14400)"
+check "date: shift backward across midnight" 2025-12-31T22:00:00Z \
+  "$(zb_iso_shift 2026-01-01T02:00:00Z -14400)"
+
+for bad in "" not-a-date 2026-01-01T00:00:00 2026-13-45T00:00:00Z "2026-01-01 00:00:00Z"; do
+  rc=0; out="$(zb_iso_to_epoch "$bad" 2>/dev/null)" || rc=$?
+  check_rc "date: '$bad' is rejected" 1 "$rc"
+  check "date: '$bad' prints nothing" "" "$out"
+done
+rc=0; zb_iso_shift not-a-date 60 >/dev/null 2>&1 || rc=$?
+check_rc "date: shifting an unparseable time fails" 1 "$rc"
+rc=0; zb_epoch_to_iso abc >/dev/null 2>&1 || rc=$?
+check_rc "date: a non-numeric epoch is rejected" 1 "$rc"
+
+# zb_until is what a claim writes as until=; an empty value made fresh claims
+# read as stale on macOS. It must parse, and lie one lease after zb_now.
+u="$(zb_until)"; n="$(zb_now)"
+rc=0; ue="$(zb_iso_to_epoch "$u")" || rc=$?
+check_rc "date: zb_until produces a parseable time" 0 "$rc"
+ne="$(zb_iso_to_epoch "$n")"
+d=$(( ${ue:-0} - ${ne:-0} ))
+if [ "$d" -ge $((ZB_LEASE_SECONDS - 2)) ] && [ "$d" -le "$ZB_LEASE_SECONDS" ]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1)); printf 'FAIL  date: zb_until is one lease after zb_now (got %ss)\n' "$d" >&2
+fi
+
+# A marker whose times do not parse is refused before anything is posted.
+check_rc "marker times: valid pair accepted" 0 \
+  "$(zb_marker_times_ok 2026-01-01T00:00:00Z 2026-01-01T04:00:00Z; echo $?)"
+check_rc "marker times: empty until= refused" 1 \
+  "$(zb_marker_times_ok 2026-01-01T00:00:00Z "" 2>/dev/null; echo $?)"
+check_rc "marker times: until= not after at= refused" 1 \
+  "$(zb_marker_times_ok 2026-01-01T04:00:00Z 2026-01-01T04:00:00Z 2>/dev/null; echo $?)"
+
+# --- gh error hints ---------------------------------------------------------
+
+check "hint: a missing project scope names the fix" \
+  "zb-claim: the gh token lacks the project scope; run: gh auth refresh -s project" \
+  "$(zb_gh_error_hint "GraphQL: Your token has not been granted the required scopes to execute this query. The 'projectV2' field requires one of the following scopes: ['read:project']")"
+check "hint: other errors get no hint" "" "$(zb_gh_error_hint "HTTP 502: Bad Gateway")"
+
 NOW=2026-01-01T06:00:00Z
 
 # A lease whose until= is still in the future is live.
@@ -113,12 +163,12 @@ check "lease: open linked PR overrides expiry" live \
   "$(zb_lease_state 2026-01-01T04:00:00Z "$NOW" 1 -)"
 
 # A commit pushed inside the lease window keeps an expired claim live.
-recent=$(date -u -d '2026-01-01T05:00:00Z' +%s)
+recent=$(zb_iso_to_epoch 2026-01-01T05:00:00Z)
 check "lease: recent branch commit overrides expiry" live \
   "$(zb_lease_state 2026-01-01T04:00:00Z "$NOW" 0 "$recent")"
 
 # A commit older than the lease window does not rescue an expired claim.
-old=$(date -u -d '2026-01-01T00:30:00Z' +%s)
+old=$(zb_iso_to_epoch 2026-01-01T00:30:00Z)
 check "lease: commit older than the window leaves it stale" stale \
   "$(zb_lease_state 2026-01-01T04:00:00Z "$NOW" 0 "$old")"
 

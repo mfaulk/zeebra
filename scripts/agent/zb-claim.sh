@@ -58,8 +58,46 @@ zb_agent_id() {
   printf '%s@%s\n' "$root" "$branch"
 }
 
+# Date arithmetic goes through jq, never `date -d`: BSD date on macOS has no
+# `-d`, and a claim made there wrote `until=""`, which §4 reads as stale (#1023).
+# jq's strptime is strict, so only the marker format `YYYY-MM-DDTHH:MM:SSZ` parses.
+#   zb_iso_to_epoch / zb_epoch_to_iso / zb_iso_shift: 0 — printed   1 — unparseable
+zb_iso_to_epoch() { # <iso8601-utc>
+  local e
+  e="$(jq -nr --arg s "$1" '$s | fromdateiso8601' 2>/dev/null)" || return 1
+  [[ "$e" =~ ^-?[0-9]+$ ]] || return 1
+  printf '%s\n' "$e"
+}
+zb_epoch_to_iso() { # <epoch-seconds>
+  [[ "$1" =~ ^-?[0-9]+$ ]] || return 1
+  jq -nr --argjson e "$1" '$e | todate' 2>/dev/null
+}
+zb_iso_shift() { # <iso8601-utc> <signed-seconds>
+  local e
+  e="$(zb_iso_to_epoch "$1")" || return 1
+  zb_epoch_to_iso $((e + $2))
+}
+
 zb_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
-zb_until() { date -u -d "+${ZB_LEASE_SECONDS} seconds" +%Y-%m-%dT%H:%M:%SZ; }
+zb_until() { zb_iso_shift "$(zb_now)" "$ZB_LEASE_SECONDS"; }
+
+# 0 if a marker's at= and until= both parse and until= is later; else 1. Checked
+# before a claim or heartbeat posts anything, so no marker is born stale.
+zb_marker_times_ok() { # <at-iso> <until-iso>
+  local a u
+  a="$(zb_iso_to_epoch "$1")" && u="$(zb_iso_to_epoch "$2")" && [ "$u" -gt "$a" ] && return 0
+  echo "zb-claim: refusing to write a marker with at=\"$1\" until=\"$2\"" >&2
+  return 1
+}
+
+# A one-line remedy for a gh error message, or nothing. A token without the
+# `project` scope fails every board read with an error that does not say how to fix it.
+zb_gh_error_hint() { # <gh-stderr>
+  case "$1" in
+    *scope*project* | *project*scope*)
+      echo "zb-claim: the gh token lacks the project scope; run: gh auth refresh -s project" ;;
+  esac
+}
 
 # Where this checkout's claim token lives: the worktree's own git directory, so
 # it is per-checkout, never committed, and unaffected by renaming the branch.
@@ -256,8 +294,8 @@ zb_lease_state() { # <until_iso> <now_iso> <has_open_pr 0|1> <last_commit_epoch|
   local until_iso="$1" now_iso="$2" has_pr="$3" last_commit="$4" lease="${5:-$ZB_LEASE_SECONDS}"
   local now_e until_e
   if [ "$has_pr" = 1 ]; then echo live; return 0; fi
-  now_e="$(date -u -d "$now_iso" +%s 2>/dev/null)" || { echo stale; return 0; }
-  if until_e="$(date -u -d "$until_iso" +%s 2>/dev/null)"; then
+  now_e="$(zb_iso_to_epoch "$now_iso")" || { echo stale; return 0; }
+  if until_e="$(zb_iso_to_epoch "$until_iso")"; then
     if [ "$until_e" -gt "$now_e" ]; then echo live; return 0; fi
   fi
   if [ "$last_commit" != "-" ] && [ -n "$last_commit" ]; then
@@ -324,14 +362,19 @@ zb_merge_issue_pages() {
 
 # Run a GraphQL query, failing loudly rather than returning an empty string.
 _zb_gql() { # <query> [jq-filter]
-  local raw
-  raw="$(gh api graphql -f query="$1" 2>/dev/null)" || {
-    echo "zb-claim: GraphQL read failed" >&2
+  local raw err
+  err="$(mktemp)" || return 2
+  raw="$(gh api graphql -f query="$1" 2>"$err")" || {
+    echo "zb-claim: GraphQL read failed: $(head -n 1 "$err")" >&2
+    zb_gh_error_hint "$(cat "$err")" >&2
+    rm -f "$err"
     return 2
   }
+  rm -f "$err"
   [ -n "$raw" ] || { echo "zb-claim: GraphQL returned NO output at exit 0 — treating as failure" >&2; return 2; }
   if printf '%s' "$raw" | jq -e 'has("errors")' >/dev/null 2>&1; then
     echo "zb-claim: GraphQL returned errors: $(printf '%s' "$raw" | jq -c '.errors')" >&2
+    zb_gh_error_hint "$raw" >&2
     return 2
   fi
   if [ $# -ge 2 ]; then printf '%s' "$raw" | jq -r "$2" 2>/dev/null || return 2
@@ -413,7 +456,10 @@ zb_issue_resolution() { # <issue-number>
     [ "$rc" -eq 2 ] && return 2
     withdrawals=""
   }
-  cutoff="$(date -u -d "-${ZB_LEASE_SECONDS} seconds" +%Y-%m-%dT%H:%M:%SZ)"
+  cutoff="$(zb_iso_shift "$(zb_now)" "-$ZB_LEASE_SECONDS")" || {
+    echo "zb-claim: could not compute the lease cutoff" >&2
+    return 2
+  }
   printf '%s\n' "$claims" | zb_resolve_claim "$id" "$token" "$cutoff" "$withdrawals"
 }
 
@@ -462,7 +508,13 @@ zb_set_status() { # <issue-number> <option-id>
 zb_claim() { # <issue-number> <intent>
   local n="$1" intent="${2:-unspecified}" id token now until
   id="$(zb_agent_id)"; now="$(zb_now)"; until="$(zb_until)"
+  zb_marker_times_ok "$now" "$until" || return 2
   token="$(zb_agent_token)" || { echo "zb-claim: could not mint a claim token" >&2; return 2; }
+  # Read the board row before writing anything: a token without the project
+  # scope fails here, not after the comment and label have landed (#1023).
+  local item
+  item="$(_zb_item_id "$n")" || return 2
+  [ -n "$item" ] || { echo "zb-claim: issue #$n is not on the board" >&2; return 2; }
   gh issue comment "$n" --repo "$ZB_REPO" --body \
 "🔒 Claimed by agent \`$id\`. Lease until $until (UTC). Intent: $intent.
 <!-- zb-claim agent=\"$id\" token=\"$token\" at=\"$now\" until=\"$until\" -->" >/dev/null || return 2
@@ -506,6 +558,7 @@ zb_verify() { # <issue-number>
 zb_heartbeat() { # <issue-number>
   local id token now until
   id="$(zb_agent_id)"; now="$(zb_now)"; until="$(zb_until)"
+  zb_marker_times_ok "$now" "$until" || return 2
   token="$(zb_agent_token)" || { echo "zb-claim: could not read this checkout's claim token" >&2; return 2; }
   gh issue comment "$1" --repo "$ZB_REPO" --body \
 "⏱️ Lease refreshed by \`$id\` until $until (UTC).
