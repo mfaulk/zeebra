@@ -63,18 +63,82 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
 | P6 `sig-w16` (grevlex) | none | pending | as P2 | pending | pending |
 | P7 `conv-cap16` | none | pending (#1004: needs a digest check at a cap of 16) | pending | pending | pending |
 | P8 `adaptive` | none | pending | as P2; #961 routing pass | pending | pending |
-| #940 parallel symbolic (`measured/940-gate-s2`) | pending (time-box: 2 sessions, then "deferred: port cost") | — | — | #1040's recommendation | pending |
-| #997 fewest-terms + FL order | pending | — | — | — | pending |
+| #940 parallel symbolic (`measured/940-gate-s2`) | beyond the 2-session time-box (§6) | — | — | #1040's recommendation not posted | **deferred: port cost** |
+| #997 fewest-terms + FL order | none (options on Z0, §5) | pending (yes-with-check) | pending | timed, quiet window | pending |
 | #955 randomized zero-skipping | — | — | — | — | excluded: no exact acceptance rule (#1004) |
 
-## 4. Remaining work
+## 4. Correctness harness
 
-- **Untimed, can run on a busy machine.**
-  - A harness that runs P1–P8 on the qualification set, comparing each digest with an independent
-    reference at one worker and at the maximum. The fields are GF(32003), GF(2³¹−1), 2⁶⁴−59 and
-    2⁶⁴−353, and Goldilocks.
-  - The P7 cap-16 digest check.
-  - The #940 port-cost estimate against current `src/grobner/sigf4/` and `src/grobner/f4/`.
-  - The #997 eligibility check.
-- **Timed, needs a quiet machine.** Any bounded regime read that the M32 records do not already
-  answer. Before each run, load and other sessions' compilers are re-checked inside the bench lock.
+- **Harness.** `examples/m33_qualify.rs` gains the #1011 engines, each `f4` with one option changed
+  over the shared wall and worker settings:
+  - `cap16`: `max_pairs_per_batch = Some(16)`, for P7;
+  - `adaptive`: `GradedEngine::Adaptive`, for P8, with `graded_route` recorded;
+  - `fewest-fl`: `ReducerSelection::FewestTerms` with `BatchOrder::FaugereLachartre`, for #997;
+  - `sig`: the forced signature engine, `sig_f4_reported` with the dispatch's team options, for P4–P6
+    (`research-sigf4` builds only).
+- **Campaign.** `research/m34-qualification/campaign.py` runs each arm on M33-Q's 62 correctness rows
+  on the five fields: 40 grevlex, 10 grlex, 12 lex, 744 cells in all. Every cell is one fresh process.
+  - **Workers.** Conventional arms run at 1, 4 and 16, signature arms at 1, 8 and 16, and P7, P8 and
+    #997 at 1 and 16.
+  - **References.** Each digest is compared with M33-Q's independent reference
+    (`research/m33-qualification/references.json`): Singular below 2³¹, groebner-rs on the wide
+    fields. The input digest must match the reference's input.
+  - **Off grevlex.** Here the signature arms are checked for their typed `Unsupported` refusal, not
+    run for a basis.
+  - **Stops.** A typed budget stop is reported as `stopped`, never as a pass.
+
+## 5. #997 (fewest-terms reducer rule with the FL batch order)
+
+- **Port cost:** none. Both options are on Z0 (`ReducerSelection::FewestTerms`,
+  `BatchOrder::FaugereLachartre`).
+- **Eligibility.** The reducer rule changes which reducer row covers a column, not the pair set. The
+  FL order changes how a batch is eliminated, not its row space (`BatchOrder` docs: both orders give
+  the same candidate rows). The reduced basis is unique, so the arm is T-GB-eligible under every
+  order in principle. It is "yes-with-check" until the harness confirms it by digest on the
+  qualification set.
+- **Already in tree.** `FewestTerms` alone is already in the differential sweep (`differential/mod.rs`).
+  The combination is not.
+- **Regime.** #997's own gate (gated by monomial order, no Cyclic-8 regression) is a timed read, so
+  it waits for a quiet window.
+
+## 6. #940 port-cost estimate (time-box: 2 sessions, plan §12)
+
+- **Ref.** `measured/940-gate-s2` = `62cbe4de`, on base `ce67df76` (2026-11-19).
+- **Its change:** +1,489 / −30 in `src/grobner/sigf4/`. That is a new `symbolic.rs` (882 lines), its
+  tests (468), `engine.rs` +147 and `mod.rs` +22.
+- **Drift since that base.** Z0 has changed the same module by +1,829 / −123 across 10 files:
+  - #994's run-wide monomial table (`table.rs`, and `engine.rs` +501);
+  - #1001's interreduction in engine column space (`interreduce.rs`);
+  - the dispatch rework (`dispatch.rs` +290).
+- **Textual merge** (`git merge-tree 28df047f 62cbe4de`): three conflicted hunks in `src/`, two in
+  `engine.rs` and one in `mod.rs`, plus two documents.
+- **Semantic conflict.** This is the real cost. #940's closure keys columns by `Monomial<N>` with
+  per-batch maps, and takes the reducer cache as a separate `&mut MonomialMap`. Z0's batch closure
+  interns into the run-wide `MonomialTable`, which is single-writer (`intern(&mut self)`,
+  `set_reducer(&mut self)`) and holds that reducer cache itself. A port therefore has to
+  redesign the parallel closure around concurrent (or per-level merged) interning into the
+  run-wide table. That is a new design. It also has to re-establish:
+  - #940's matrix and cache identity oracle (`check_signatures`);
+  - its wall and live-byte budgets;
+  - Gate P's digest equality.
+- **Estimate.** Larger than the original #940 implementation (11 commits), so beyond the 2-session
+  time-box.
+- **Decision under the plan's stop condition:** **deferred: port cost.** The M32 rejection as a
+  default stands (`research/m32-gate-s/README.md`).
+- **If #1040 posts a feature-predicted regime here,** that changes the case for a port, not this
+  estimate.
+
+## 7. Remaining work
+
+- **Build and run the harness.**
+  - The harness change is written but not yet compiled or committed: `cargo test --example
+    m33_qualify`, with and without `research-sigf4`.
+  - Then build at Z0 plus this harness and run `campaign.py run`, all 744 cells. This covers the P7
+    cap-16 check and #997's digest check.
+  - **Why it waits.** Compiling or running it adds compiler processes and load that #1039's
+    publication job (`05a26851f550`, 486 attempts) flags as contamination on its attempts. So the
+    build waits until that job and #945's queued run finish. Nothing here is timed, so the result
+    does not depend on a quiet machine. Only the other sessions' measurements do.
+- **Timed, needs a quiet machine.** Bounded regime reads for P1–P8 and #997 that the M32 records do
+  not already answer, plus #997's own gate (Cyclic-8 no-regression). Before each run, load and other
+  sessions' compilers are re-checked inside the bench lock.
