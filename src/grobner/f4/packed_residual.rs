@@ -6,7 +6,7 @@
 //! row of `A⁻¹B`, is the residual part of its row plus the tails of the reducers it names, so the
 //! tails are built back to front; a pair row is then its own `D` bits plus the tails its `C` entries
 //! name. Nothing is packed at the full width. The matrix that results is the one
-//! [`super::packed::eliminate`] reduces, so the echelon, selective back substitution and write-back
+//! `packed::eliminate` reduces, so the echelon, selective back substitution and write-back
 //! that follow are its.
 
 use std::{
