@@ -246,7 +246,7 @@ fn planted_quadratics<const N: usize, F: FiniteField>(
                     let mut v = *c;
                     for (i, &e) in m.exponents().iter().enumerate() {
                         for _ in 0..e {
-                            v = v * point[i];
+                            v *= point[i];
                         }
                     }
                     v
