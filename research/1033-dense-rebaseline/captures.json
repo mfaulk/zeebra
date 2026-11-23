@@ -1,0 +1,62 @@
+{
+ "binary": "sig_f4_study at measured/1033-dense-rebaseline (00c9f29f), --features research-sigf4",
+ "command": "sig_f4_study --field gf31 --name NAME --generate --engine f4 --workers 1 [--live-gib 8 at n = 20] --capture DIR --batches 3,2",
+ "captures": [
+  {
+   "field": "gf31",
+   "name": "mq-dense-18-s18",
+   "input_digest": "f924482ff9820f1155a119edd5948daa573aebce357f9a6f1194ffd5f3108981",
+   "file": "gf31__mq-dense-18-s18__b3.zmat",
+   "batch": 3,
+   "rows": 24863,
+   "columns": 13866,
+   "reducer_rows": 6457,
+   "nonzeros": 19893538,
+   "fingerprint": "535dcc366e87f4ff",
+   "file_sha256": "c07a614681ef318ce23cc9417b7542d94faeba7d80629cc198743cf5aabd89fb",
+   "file_bytes": 355502738
+  },
+  {
+   "field": "gf31",
+   "name": "mq-dense-18-s18",
+   "input_digest": "f924482ff9820f1155a119edd5948daa573aebce357f9a6f1194ffd5f3108981",
+   "file": "gf31__mq-dense-18-s18__b2.zmat",
+   "batch": 2,
+   "rows": 5568,
+   "columns": 5665,
+   "reducer_rows": 2726,
+   "nonzeros": 2356936,
+   "fingerprint": "57e0e2cf1d420ca0",
+   "file_sha256": "4badb4f91c6e773cd74ffff89fd2924d5204b324f1a6c1b38f343a6d91bc729e",
+   "file_bytes": 42661553
+  },
+  {
+   "field": "gf31",
+   "name": "mq-dense-20-s20",
+   "input_digest": "17a6de22ef1f234e53ef51410a775631e6d0c41ffbd73691dbcf76166136bf7a",
+   "file": "gf31__mq-dense-20-s20__b3.zmat",
+   "batch": 3,
+   "rows": 37240,
+   "columns": 24262,
+   "reducer_rows": 12654,
+   "nonzeros": 52686695,
+   "fingerprint": "833004c2bb7b5d97",
+   "file_sha256": "4b0105ef5472a4caf4fc9971556eedac9299d77690b30b229587d8c12f1d3947",
+   "file_bytes": 938372832
+  },
+  {
+   "field": "gf31",
+   "name": "mq-dense-20-s20",
+   "input_digest": "17a6de22ef1f234e53ef51410a775631e6d0c41ffbd73691dbcf76166136bf7a",
+   "file": "gf31__mq-dense-20-s20__b2.zmat",
+   "batch": 2,
+   "rows": 7710,
+   "columns": 8606,
+   "reducer_rows": 4136,
+   "nonzeros": 4443654,
+   "fingerprint": "5165845c3ee9a8bf",
+   "file_sha256": "7fc00f1e686c9464c00ffc4144ac8047c7fdc97fb20c43df6eb4031030ae589b",
+   "file_bytes": 80137262
+  }
+ ]
+}

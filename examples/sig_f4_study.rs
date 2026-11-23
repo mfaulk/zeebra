@@ -13,8 +13,9 @@
 //! pinned digest (`research/m32-baseline/README.md`).
 //!
 //! `--generate` builds the row from its generator at any of the four fields instead of a catalog:
-//! `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, or `mq-random-N-sS` (the ladder's MQ generator at
-//! seed S), each in the external contract's canonical form, as M33's candidate pool is digested
+//! `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, `mq-random-N-sS` (the ladder's MQ generator at
+//! seed S), or `mq-dense-N-sS` / `mq-dense-unplanted-N-sS` (#945's `m = 2n` dense family, #1033;
+//! also `--field gf31`, and n = 15, 18, 20 at gf31 and gf32003), each in the external contract's canonical form, as M33's candidate pool is digested
 //! (`research/m33-baseline/admission.py`); `--input-only` prints the row's digest, variables and
 //! generators and solves nothing.
 //!
@@ -28,12 +29,25 @@
 //! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918); `--reducer
 //! NAME` (f4) sets the symbolic reducer selection by its `ReducerSelection` variant name.
 //!
+//! `--live-gib G` (f4, entry, sigf4) raises the live-entry budget to G GiB, for #1033's information-only arm:
+//! at the shipping 512 MB the parallel forward pass falls back to serial on the largest dense
+//! batches.
+//!
+//! `--capture DIR --batches i,j` (f4) writes those batches' matrices, as built and before
+//! elimination, in the `macaulay::io` archive format with their fingerprints, and solves nothing
+//! further (#1033's captures for #945's matrix-level gate).
+//!
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
 //!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
-//! `--features research-work`, `--discovery` adds the shipping F4's serial census: forward and
+//! `--features research-work`, `--density` (f4 or sigf4, one worker) adds #1033's
+//! density-during-reduction trace from the dense working row: products by the target's density
+//! before each application, with per-checkpoint row histograms, for the whole run and (f4) its
+//! three largest batches. Under f4, `traced_products` below `forward_products` means part of the
+//! forward pass ran on a path the trace does not observe; sigf4 reports no `forward_products`, so
+//! compare `traced_products` with its `coefficient_products`. `--discovery` adds the shipping F4's serial census: forward and
 //! backward coefficient products and those on rows that end zero (#835's instrument).
 //!
 //! With `--features research-sigf4-replay`, `--replay` (sigf4, `--workers ≥ 2`) runs design 1
@@ -51,7 +65,7 @@ mod basis_digest;
 
 use std::time::{Duration, Instant};
 use zeebra::{
-    fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
+    fields::{PrimeFieldElement64, Zp2147483647, Zp31, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, eco, katsura, noon},
         certify_f4_output_with_workers,
@@ -80,6 +94,7 @@ struct Args {
     wall: Duration,
     certify: bool,
     discovery: bool,
+    density: bool,
     replay: bool,
     claim: bool,
     symbolic: bool,
@@ -94,6 +109,9 @@ struct Args {
     stages: bool,
     fl: bool,
     reducer: ReducerSelection,
+    capture: Option<String>,
+    batches: Vec<usize>,
+    live_gib: Option<usize>,
 }
 
 /// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
@@ -108,6 +126,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         wall: Duration::from_secs(600),
         certify: false,
         discovery: false,
+        density: false,
         replay: false,
         claim: false,
         symbolic: false,
@@ -122,6 +141,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         stages: false,
         fl: false,
         reducer: ReducerSelection::default(),
+        capture: None,
+        batches: Vec::new(),
+        live_gib: None,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -143,6 +165,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--certify" => parsed.certify = true,
             "--sample-threads" => parsed.sample_threads = true,
             "--discovery" => parsed.discovery = true,
+            "--density" => parsed.density = true,
             "--generate" => parsed.generate = true,
             "--input-only" => parsed.input_only = true,
             "--digest-only" => parsed.digest_only = true,
@@ -151,6 +174,16 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--claim" => parsed.claim = true,
             "--stages" => parsed.stages = true,
             "--fl" => parsed.fl = true,
+            "--capture" => parsed.capture = Some(value()?),
+            "--live-gib" => {
+                parsed.live_gib = Some(value()?.parse().map_err(|_| "--live-gib takes GiB")?)
+            }
+            "--batches" => {
+                parsed.batches = value()?
+                    .split(',')
+                    .map(|b| b.parse().map_err(|_| "--batches takes indices like 7,8"))
+                    .collect::<Result<_, _>>()?
+            }
             "--reducer" => {
                 let name = value()?;
                 parsed.reducer = ReducerSelection::ALL
@@ -179,8 +212,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             other => return Err(format!("unexpected argument {other}")),
         }
     }
-    if !["goldilocks", "wide64", "gf32003", "m31"].contains(&parsed.field.as_str()) {
-        return Err("--field must be goldilocks, wide64, gf32003 or m31".into());
+    if !["goldilocks", "wide64", "gf32003", "m31", "gf31"].contains(&parsed.field.as_str()) {
+        return Err("--field must be goldilocks, wide64, gf32003, m31 or gf31".into());
     }
     if !["sigf4", "f4", "entry", "adaptive"].contains(&parsed.engine.as_str())
         && !REFERENCES.contains(&parsed.engine.as_str())
@@ -196,10 +229,26 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     if parsed.discovery && (parsed.engine != "f4" || parsed.workers != 1) {
         return Err("--discovery observes the serial shipping F4 only".into());
     }
+    if parsed.capture.is_some() != !parsed.batches.is_empty()
+        || (parsed.capture.is_some() && parsed.engine != "f4")
+    {
+        return Err("--capture DIR and --batches i,j go together, with --engine f4".into());
+    }
+    if parsed.density
+        && (!["f4", "sigf4"].contains(&parsed.engine.as_str())
+            || parsed.workers != 1
+            || parsed.discovery
+            || parsed.claim)
+    {
+        return Err("--density observes serial f4 or sigf4 only, without --discovery".into());
+    }
     if (parsed.stages || parsed.fl || parsed.reducer != ReducerSelection::default())
         && parsed.engine != "f4"
     {
         return Err("--stages and --fl configure the shipping F4: --engine f4".into());
+    }
+    if parsed.live_gib.is_some() && !["f4", "entry", "sigf4"].contains(&parsed.engine.as_str()) {
+        return Err("--live-gib sets the live budget: --engine f4, entry or sigf4".into());
     }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
         return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
@@ -209,7 +258,12 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--symbolic-replay replays the signature engine's closure: --engine sigf4".into(),
         );
     }
-    if parsed.repeat > 1 && (parsed.certify || parsed.discovery || parsed.replay || parsed.symbolic)
+    if parsed.repeat > 1
+        && (parsed.certify
+            || parsed.discovery
+            || parsed.density
+            || parsed.replay
+            || parsed.symbolic)
     {
         return Err("--repeat times the solve alone".into());
     }
@@ -221,7 +275,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
 
 /// Shipping defaults; only the forward and symbolic worker caps vary, as in `m29_cost_model`.
 fn f4_options(args: &Args) -> F4Options {
-    F4Options {
+    let options = F4Options {
         max_wall_time: Some(args.wall),
         parallel_forward: if args.workers == 1 {
             ParallelForward::Serial
@@ -245,6 +299,15 @@ fn f4_options(args: &Args) -> F4Options {
             BatchOrder::Forward
         },
         ..F4Options::default()
+    };
+    // #1033: a raised live budget, stated in bytes so both limits move (#322); not a shipping arm.
+    match args.live_gib {
+        Some(gib) => F4Options {
+            max_live_bytes: gib << 30,
+            max_live_nonzeros: usize::MAX,
+            ..options
+        },
+        None => options,
     }
 }
 
@@ -398,6 +461,7 @@ fn modulus(field: &str) -> u64 {
         "wide64" => 18446744073709551263,
         "gf32003" => 32003,
         "m31" => 2147483647,
+        "gf31" => 31,
         _ => panic!("unknown field {field}"),
     }
 }
@@ -435,7 +499,7 @@ fn generated(field: &str, name: &str) -> Result<Input, String> {
     let p = modulus(field);
     let refused = || format!("--generate has no generator for {name}");
     let (stem, seed) = match name.rsplit_once("-s") {
-        Some((stem, seed)) if stem.starts_with("mq-random-") => {
+        Some((stem, seed)) if stem.starts_with("mq-random-") || stem.starts_with("mq-dense-") => {
             (stem, Some(seed.parse::<u64>().map_err(|_| refused())?))
         }
         _ => (name, None),
@@ -444,10 +508,13 @@ fn generated(field: &str, name: &str) -> Result<Input, String> {
     let n: usize = n.parse().map_err(|_| refused())?;
     let instance = match (fam, seed) {
         ("mq-random", Some(seed)) => corpus::random_mq_instance(n, seed, p, ORDER),
+        ("mq-dense", Some(seed)) => corpus::dense_mq_instance(n, seed, p, ORDER, true),
+        ("mq-dense-unplanted", Some(seed)) => corpus::dense_mq_instance(n, seed, p, ORDER, false),
         (_, None) => match field {
             "goldilocks" => family::<Goldilocks>(name, fam, n, p),
             "wide64" => family::<Wide>(name, fam, n, p),
             "gf32003" => family::<Zp32003>(name, fam, n, p),
+            "gf31" => family::<Zp31>(name, fam, n, p),
             _ => family::<Zp2147483647>(name, fam, n, p),
         }
         .ok_or_else(refused)?,
@@ -761,6 +828,130 @@ fn discovery(report: &zeebra::linalg::work::WorkReport) -> Json {
         ("backward_products", Json::int(backward)),
         ("zero_rows", Json::int(zero_rows)),
         ("products_on_zero_rows", Json::int(zero_products)),
+    ])
+}
+
+/// #1033's matrix capture: each `--batches` index as the shipping F4 built it, before elimination,
+/// written in the `macaulay::io` archive format to `DIR/<field>__<name>__b<index>.zmat`. Each
+/// capture stops the run after constructing its matrix.
+fn capture<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    digest: &str,
+    dir: &str,
+    args: &Args,
+) -> Json {
+    use zeebra::grobner::f4::{
+        macaulay::io::write_matrix,
+        matrix_corpus::{capture_matrix, BatchSelector},
+    };
+    std::fs::create_dir_all(dir).expect("capture directory");
+    let options = f4_options(args);
+    let captured = args.batches.iter().map(|&index| {
+        let c = capture_matrix(
+            "dense",
+            system,
+            args.order,
+            &options,
+            BatchSelector::Prefix(index),
+        )
+        .unwrap_or_else(|e| panic!("batch {index}: {e:?}"));
+        let path = format!("{dir}/{}__{}__b{index}.zmat", args.field, args.name);
+        let mut bytes = Vec::new();
+        write_matrix(&mut bytes, &c.matrix).expect("in-memory write");
+        std::fs::write(&path, &bytes).expect("matrix file");
+        let f = &c.fingerprint;
+        Json::object([
+            ("batch", Json::size(f.batch_index)),
+            ("rows", Json::size(f.rows)),
+            ("columns", Json::size(f.columns)),
+            ("reducer_rows", Json::size(f.reducer_rows)),
+            ("nonzeros", Json::size(f.nonzeros)),
+            ("fingerprint", Json::string(&f.digest)),
+            ("path", Json::string(&path)),
+            ("file_sha256", Json::string(sha256_hex(&bytes))),
+            ("file_bytes", Json::size(bytes.len())),
+        ])
+    });
+    Json::object([
+        ("field", Json::string(&args.field)),
+        ("name", Json::string(&args.name)),
+        ("input_digest", Json::string(digest)),
+        ("captures", Json::Array(captured.collect())),
+    ])
+}
+
+/// #1033's density trace: forward products on rows at least 25/50/75% dense, over all batches and
+/// for the batches carrying the most forward products, with the summed trace.
+#[cfg(feature = "research-work")]
+fn density(report: &zeebra::linalg::work::WorkReport) -> Json {
+    use zeebra::linalg::work::{DensityTrace, DENSITY_BUCKETS};
+    let at_least = |b: &[usize]| {
+        let total: usize = b.iter().sum();
+        Json::Array(
+            [5, 10, 15]
+                .iter()
+                .map(|&from| {
+                    let above: usize = b[from..].iter().sum();
+                    let share = if total == 0 {
+                        0.0
+                    } else {
+                        above as f64 / total as f64
+                    };
+                    Json::string(format!("{share:.4}"))
+                })
+                .collect(),
+        )
+    };
+    let summary = |t: &DensityTrace| {
+        Json::object([
+            ("thresholds", Json::string("0.25,0.50,0.75")),
+            ("span_share_at_least", at_least(&t.products_by_span)),
+            ("width_share_at_least", at_least(&t.products_by_width)),
+        ])
+    };
+    // The signature engine opens no F4 batch scope, so its products land outside any batch.
+    let mut total = report.outside_batch.forward_density.clone();
+    for b in &report.batches {
+        total.accumulate(&b.forward_density);
+    }
+    let mut largest: Vec<_> = report.batches.iter().enumerate().collect();
+    largest.sort_by_key(|(_, b)| std::cmp::Reverse(b.forward.coefficient_products));
+    let batches = largest.iter().take(3).map(|(i, b)| {
+        Json::object([
+            ("batch", Json::size(*i)),
+            ("degree", Json::int(b.degree)),
+            ("rows", Json::size(b.rows)),
+            ("columns", Json::size(b.columns)),
+            ("reducer_rows", Json::size(b.reducer_rows)),
+            ("initial_entries", Json::size(b.initial_entries)),
+            (
+                "forward_products",
+                Json::size(b.forward.coefficient_products),
+            ),
+            ("summary", summary(&b.forward_density)),
+            ("trace", b.forward_density.json()),
+        ])
+    });
+    debug_assert_eq!(total.products_by_span.len(), DENSITY_BUCKETS);
+    Json::object([
+        (
+            "forward_products",
+            Json::size(
+                report
+                    .batches
+                    .iter()
+                    .map(|b| b.forward.coefficient_products)
+                    .sum::<usize>()
+                    + report.outside_batch.forward.coefficient_products,
+            ),
+        ),
+        (
+            "traced_products",
+            Json::size(total.products_by_span.iter().sum()),
+        ),
+        ("summary", summary(&total)),
+        ("trace", total.json()),
+        ("largest_batches", Json::Array(batches.collect())),
     ])
 }
 
@@ -1146,6 +1337,9 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         #[cfg(not(feature = "research-sigf4-replay"))]
         panic!("--symbolic-replay requires --features research-sigf4-replay");
     }
+    if let Some(dir) = &args.capture {
+        return capture(&system, &input.digest, dir, args);
+    }
     if args.replay {
         #[cfg(feature = "research-sigf4-replay")]
         return cascade::report(&system, &names, &input.digest, args);
@@ -1209,13 +1403,29 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 max_wall_time: Some(args.wall),
                 workers: args.workers,
                 parallel_cascade: args.claim,
+                max_live_bytes: args
+                    .live_gib
+                    .map(|gib| gib << 30)
+                    .or(SigF4Options::default().max_live_bytes),
                 ..SigF4Options::default()
             };
-            let (result, stats) = sig_f4_reported(&system, args.order, &options);
+            let solve = || sig_f4_reported(&system, args.order, &options);
+            #[cfg(feature = "research-work")]
+            let ((result, stats), work) = if args.density {
+                let (r, w) = zeebra::linalg::work::measure(solve);
+                (r, density(&w))
+            } else {
+                (solve(), Json::Null)
+            };
+            #[cfg(not(feature = "research-work"))]
+            let ((result, stats), work) = {
+                assert!(!args.density, "--density requires research-work");
+                (solve(), Json::Null)
+            };
             (
                 result.map_err(|e| e.to_string()),
                 sig_statistics(&stats),
-                Json::Null,
+                work,
             )
         } else {
             let options = f4_options(args);
@@ -1224,12 +1434,16 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             let ((result, stats), work) = if args.discovery {
                 let (r, w) = zeebra::linalg::work::measure_discovery(solve);
                 (r, discovery(&w))
+            } else if args.density {
+                let (r, w) = zeebra::linalg::work::measure(solve);
+                (r, density(&w))
             } else {
                 (solve(), Json::Null)
             };
             #[cfg(not(feature = "research-work"))]
             let ((result, stats), work) = {
                 assert!(!args.discovery, "--discovery requires research-work");
+                assert!(!args.density, "--density requires research-work");
                 (solve(), Json::Null)
             };
             let summary = Json::object([
@@ -1378,12 +1592,25 @@ fn main() {
                     ($field, 13) => run::<13, $f>(input, &args),
                     ($field, 14) => run::<14, $f>(input, &args),
                 )*
+                // #1033's dense MQ rows, at the two small primes only.
+                ("gf31" | "gf32003", 15 | 18 | 20) => large(input, &args),
                 (field, n) => panic!("no instantiation for {field} with {n} variables"),
             }
         };
     }
+    fn large(input: Input, args: &Args) -> Json {
+        match (args.field.as_str(), input.variables.len()) {
+            ("gf31", 15) => run::<15, Zp31>(input, args),
+            ("gf31", 18) => run::<18, Zp31>(input, args),
+            ("gf31", 20) => run::<20, Zp31>(input, args),
+            ("gf32003", 15) => run::<15, Zp32003>(input, args),
+            ("gf32003", 18) => run::<18, Zp32003>(input, args),
+            _ => run::<20, Zp32003>(input, args),
+        }
+    }
     let mut report = dispatch!(
-        "goldilocks" => Goldilocks, "wide64" => Wide, "gf32003" => Zp32003, "m31" => Zp2147483647
+        "goldilocks" => Goldilocks, "wide64" => Wide, "gf32003" => Zp32003, "m31" => Zp2147483647,
+        "gf31" => Zp31
     );
     // In-process time before and after the solve: with `call_ns` and `render_ns` this leaves only
     // exec and exit to the caller's process wall.
@@ -1409,6 +1636,24 @@ mod tests {
         assert!(args(&[&base[..], &["sigf4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16"]].concat()).is_ok());
         assert!(args(&[&base[..], &["f4", "--workers", "16", "--discovery"]].concat()).is_err());
+        // #1033: the density trace observes the serial shipping F4 only.
+        assert!(args(&[&base[..], &["f4", "--density"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["f4", "--workers", "16", "--density"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--density"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["sigf4", "--claim", "--density"]].concat()).is_err());
+        assert!(args(&[&base[..], &["entry", "--density"]].concat()).is_err());
+        assert!(args(&[&base[..], &["entry", "--live-gib", "8"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["sigf4", "--live-gib", "8"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["groebner-rs", "--live-gib", "8"]].concat()).is_err());
+        let capture = ["--capture", "/x", "--batches", "7,8"];
+        assert_eq!(
+            args(&[&base[..], &["f4"], &capture[..]].concat())
+                .unwrap()
+                .batches,
+            vec![7, 8]
+        );
+        assert!(args(&[&base[..], &["f4", "--capture", "/x"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4"], &capture[..]].concat()).is_err());
         // #972/#918: stage measurement and the FL order configure the shipping F4 only.
         assert!(args(&[&base[..], &["f4", "--workers", "4", "--stages", "--fl"]].concat()).is_ok());
         assert!(args(&[&base[..], &["sigf4", "--stages"]].concat()).is_err());
@@ -1550,6 +1795,18 @@ mod tests {
         assert!(generated("m31", "bivium-3").is_err());
         assert!(generated("m31", "mq-random-10").is_err());
         assert!(generated("m31", "katsura-40").is_err());
+        assert!(generated("gf31", "mq-dense-12").is_err());
+    }
+
+    /// `--generate` builds #1033's dense rows, planted and unplanted, as 2n generators over gf31.
+    #[test]
+    fn generate_builds_dense_mq_rows() {
+        let planted = generated("gf31", "mq-dense-6-s6").unwrap();
+        let unplanted = generated("gf31", "mq-dense-unplanted-6-s6").unwrap();
+        assert_eq!(planted.variables.len(), 6);
+        assert_eq!(planted.generators.len(), 12);
+        assert_eq!(unplanted.generators.len(), 12);
+        assert_ne!(planted.digest, unplanted.digest);
     }
 
     // The two engines agree on a small frozen row, which is what the basis digest relies on.
