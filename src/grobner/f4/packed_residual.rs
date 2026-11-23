@@ -1182,6 +1182,38 @@ mod tests {
         assert_eq!(generic.stop_kind(), ours.stop_kind());
     }
 
+    /// `AutoResidual` packs exactly the batches `Auto` packs, all of them on the residual route,
+    /// and returns `Auto`'s basis.
+    #[test]
+    fn test_auto_residual_packs_auto_batches_on_the_residual_route() {
+        for (n_system, system) in [
+            (0, random_mq::<10>(3, 10, 0.3)),
+            (1, random_mq::<10>(4, 20, 0.3)),
+        ] {
+            let (auto_basis, auto) =
+                f4_with_options(&system, ORDER, &options(Gf2Elimination::Auto)).unwrap();
+            assert!(
+                auto.packed_gf2.batches > 0,
+                "system {n_system} packs under Auto"
+            );
+            assert!(
+                auto.packed_gf2.batches < auto.batches,
+                "system {n_system} leaves some batches generic under Auto"
+            );
+            for tails in [ResidualTails::Lazy, ResidualTails::Eager] {
+                let (basis, ours) = f4_with_options(
+                    &system,
+                    ORDER,
+                    &options(Gf2Elimination::AutoResidual(tails)),
+                )
+                .unwrap();
+                assert_eq!(basis, auto_basis, "system {n_system} {tails:?}");
+                assert_eq!(ours.packed_gf2.batches, auto.packed_gf2.batches);
+                assert_eq!(ours.packed_gf2.residual.batches, auto.packed_gf2.batches);
+            }
+        }
+    }
+
     /// The default never selects the residual route.
     #[test]
     fn test_no_default_selects_the_residual_route() {

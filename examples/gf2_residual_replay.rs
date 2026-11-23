@@ -10,6 +10,14 @@
 //! `solve <set> [reps]` times whole solves under `packed`, `lazy` and `eager`, bases asserted
 //! equal to `packed`'s.
 //!
+//! `one <set> <instance> <arm> [workers]` is one solve in a fresh process, for the bench host's
+//! interleaved whole-solve runs. Besides the forced arms it takes `auto` (the default dispatch) and
+//! `auto-eager` (the default's choice of batches, each packed one on the residual route). It prints
+//! wall and elimination time and the process's peak RSS (`VmHWM`), then re-solves under `packed`
+//! and asserts the basis equal. `workers` above one enables `ParallelForward::Auto`. `list <set>`
+//! prints the set's instance names. `big` (n = 16 square and n = 17 square MQ, seed 1077) is a
+//! second held-out set, named before it was measured, for whole solves only.
+//!
 //! Arms are interleaved with a rotating order. Run pinned and under `tools/benchlock.sh` on the
 //! bench host:
 //!
@@ -27,7 +35,7 @@ use zeebra::{
         benchmark_systems::cyclic,
         f4::{
             f4_with_options, packed_residual::ResidualTails, reduce_batch, trace_batches,
-            BatchOrder, F4Options, Gf2Elimination,
+            BatchOrder, F4Options, Gf2Elimination, ParallelForward,
         },
         field_equations::with_field_equations,
     },
@@ -96,7 +104,15 @@ fn arm(name: &str) -> F4Options {
             gf2_elimination: Gf2Elimination::Residual(ResidualTails::Eager),
             ..base
         },
-        _ => unreachable!(),
+        "auto" => F4Options {
+            gf2_elimination: Gf2Elimination::Auto,
+            ..base
+        },
+        "auto-eager" => F4Options {
+            gf2_elimination: Gf2Elimination::AutoResidual(ResidualTails::Eager),
+            ..base
+        },
+        other => panic!("unknown arm {other}"),
     }
 }
 
@@ -225,6 +241,65 @@ fn solve<const N: usize>(label: &str, system: &[MultivariatePolynomial<N, Zp2>],
     println!("{}", fields.join("\t"));
 }
 
+/// The process's peak resident set, in KiB.
+fn peak_rss_kib() -> u64 {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|status| {
+            status
+                .lines()
+                .find_map(|line| line.strip_prefix("VmHWM:"))
+                .and_then(|value| value.trim().trim_end_matches("kB").trim().parse().ok())
+        })
+        .unwrap_or(0)
+}
+
+/// Which instance, arm and worker count `one` runs.
+struct OneSolve {
+    instance: String,
+    arm: String,
+    workers: usize,
+}
+
+fn one<const N: usize>(label: &str, system: &[MultivariatePolynomial<N, Zp2>], target: &OneSolve) {
+    if label != target.instance {
+        return;
+    }
+    let parallel_forward = if target.workers > 1 {
+        ParallelForward::Auto {
+            max_workers: target.workers,
+        }
+    } else {
+        ParallelForward::Serial
+    };
+    let options = F4Options {
+        parallel_forward,
+        ..arm(&target.arm)
+    };
+    let start = Instant::now();
+    let (basis, statistics) = f4_with_options(system, ORDER, &options).expect("instance solves");
+    let elapsed = start.elapsed();
+    let rss = peak_rss_kib();
+    let (expected, _) = f4_with_options(system, ORDER, &arm("packed")).expect("instance solves");
+    assert_eq!(basis, expected, "{label} {}", target.arm);
+    let ms = |d: Duration| format!("{:.2}", d.as_secs_f64() * 1e3);
+    println!(
+        "{label}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{rss}",
+        target.arm,
+        target.workers,
+        basis.len(),
+        ms(elapsed),
+        ms(statistics.stages.elimination),
+        statistics.batches,
+        statistics.packed_gf2.batches,
+        statistics.packed_gf2.residual.batches,
+    );
+}
+
+fn list<const N: usize>(label: &str, _: &[MultivariatePolynomial<N, Zp2>], _: &()) {
+    println!("{label}");
+}
+
 /// Development: #777's instances (seed 272) and #794's grid at n = 12..14 (seed 794).
 macro_rules! dev {
     ($run:ident, $reps:expr) => {{
@@ -263,6 +338,21 @@ macro_rules! heldout {
     }};
 }
 
+/// Held out for the bench host, named before any measurement: square MQ at n = 16 over #794's
+/// densities and at n = 17 at two of them, seed 1077.
+macro_rules! big {
+    ($run:ident, $reps:expr) => {{
+        for density in [0.05, 0.1, 0.15, 0.2, 0.3] {
+            let label = format!("mq-16-d{density:.2}-s1077");
+            $run::<16>(&label, &random_mq::<16>(1077, 16, density), $reps);
+        }
+        for density in [0.1, 0.3] {
+            let label = format!("mq-17-d{density:.2}-s1077");
+            $run::<17>(&label, &random_mq::<17>(1077, 17, density), $reps);
+        }
+    }};
+}
+
 macro_rules! grid {
     ($run:ident, $reps:expr, $seed:expr, $($n:literal),+) => {{
         $(
@@ -283,9 +373,12 @@ const SOLVE_HEADER: &str =
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let reps = args
-        .get(2)
-        .map_or(5, |r| r.parse().expect("a repetition count"));
+    let reps = match args.first().map(String::as_str) {
+        Some("batches" | "solve") => args
+            .get(2)
+            .map_or(5, |r| r.parse().expect("a repetition count")),
+        _ => 0,
+    };
     let set = args.get(1).map(String::as_str);
     match (args.first().map(String::as_str), set) {
         (Some("batches"), Some("dev")) => {
@@ -304,8 +397,33 @@ fn main() {
             println!("{SOLVE_HEADER}");
             heldout!(solve, reps);
         }
+        (Some(mode @ ("one" | "list")), Some(set)) => {
+            let target = OneSolve {
+                instance: args.get(2).cloned().unwrap_or_default(),
+                arm: args.get(3).cloned().unwrap_or_else(|| "auto".into()),
+                workers: args
+                    .get(4)
+                    .map_or(1, |w| w.parse().expect("a worker count")),
+            };
+            match (mode, set) {
+                ("list", "dev") => dev!(list, &()),
+                ("list", "heldout") => heldout!(list, &()),
+                ("list", "big") => big!(list, &()),
+                ("one", "dev") => dev!(one, &target),
+                ("one", "heldout") => heldout!(one, &target),
+                ("one", "big") => big!(one, &target),
+                _ => {
+                    eprintln!("unknown set {set}");
+                    std::process::exit(64);
+                }
+            }
+        }
         _ => {
-            eprintln!("usage: gf2_residual_replay <batches|solve> <dev|heldout> [reps]");
+            eprintln!(
+                "usage: gf2_residual_replay <batches|solve> <dev|heldout> [reps]\n       \
+                 gf2_residual_replay list <dev|heldout|big>\n       \
+                 gf2_residual_replay one <dev|heldout|big> <instance> <arm> [workers]"
+            );
             std::process::exit(64);
         }
     }

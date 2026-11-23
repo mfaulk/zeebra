@@ -102,6 +102,11 @@ pub enum Gf2Elimination {
     /// known-pivot columns eliminated through reducer tails. Same eligibility, budgets and result.
     #[cfg(feature = "research-gf2-residual")]
     Residual(super::packed_residual::ResidualTails),
+
+    /// Research (#1077): [`Auto`](Self::Auto)'s choice of batches, each packed one on the residual
+    /// route. What the default would run if the residual kernel replaced the full-width sweep.
+    #[cfg(feature = "research-gf2-residual")]
+    AutoResidual(super::packed_residual::ResidualTails),
 }
 
 impl Gf2Elimination {
@@ -168,6 +173,8 @@ impl Gf2Elimination {
             Self::Packed => true,
             #[cfg(feature = "research-gf2-residual")]
             Self::Residual(_) => true,
+            #[cfg(feature = "research-gf2-residual")]
+            Self::AutoResidual(_) => Self::prefers_packed(rows, pair_rows, columns, nonzeros),
             Self::Auto => Self::prefers_packed(rows, pair_rows, columns, nonzeros),
         }
     }

@@ -335,7 +335,8 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
                 super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes);
             #[cfg(feature = "research-gf2-residual")]
             let packed = match options.gf2_elimination {
-                super::options::Gf2Elimination::Residual(tails) => {
+                super::options::Gf2Elimination::Residual(tails)
+                | super::options::Gf2Elimination::AutoResidual(tails) => {
                     super::packed_residual::eliminate(
                         matrix,
                         &selected,
