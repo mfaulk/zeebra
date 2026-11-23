@@ -1,0 +1,141 @@
+{
+ "attempts": 210,
+ "job": {
+  "context": {
+   "agent": "ancient-humming-bachman@research/1033-dense-rebaseline",
+   "issue": 1033,
+   "session": "attribution",
+   "track": "attr-light"
+  },
+  "job_id": "be977ecb8383",
+  "manifest_sha256": "be977ecb8383f52f5471ddb7c9ce94d4c12a546c22ab598ef1ad5997897b7bba",
+  "mode": "dev"
+ },
+ "journal_sha256": "0f42413e1ab8d5e132dc204e36003a106f74f518163a30310e36199fd6860b2c",
+ "stop": {
+  "at": "2026-11-23T06:14:13+00:00",
+  "attempts": 210,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 201,
+    "sampled": 9
+   },
+   "contaminated": 11,
+   "flagged": {
+    "be977ecb8383:10:0": [
+     "bench clock 4126609 kHz is 4.6% off the session median"
+    ],
+    "be977ecb8383:115:0": [
+     "bench clock 3901526 kHz is 3.1% off the session median"
+    ],
+    "be977ecb8383:11:0": [
+     "bench clock 3917138 kHz is 7.5% off the session median"
+    ],
+    "be977ecb8383:166:0": [
+     "bench clock 3744075 kHz is 29.9% off the session median"
+    ],
+    "be977ecb8383:17:0": [
+     "bench clock 4161580 kHz is 3.8% off the session median"
+    ],
+    "be977ecb8383:183:0": [
+     "bench clock 3837049 kHz is 3.1% off the session median"
+    ],
+    "be977ecb8383:18:0": [
+     "bench clock 4047468 kHz is 4.3% off the session median"
+    ],
+    "be977ecb8383:32:0": [
+     "bench clock 4051622 kHz is 4.2% off the session median"
+    ],
+    "be977ecb8383:6:0": [
+     "bench clock 3258544 kHz is 12.3% off the session median"
+    ],
+    "be977ecb8383:96:0": [
+     "bench clock 3251966 kHz is 4.0% off the session median"
+    ],
+    "be977ecb8383:97:0": [
+     "bench clock 2022668 kHz is 29.9% off the session median"
+    ]
+   },
+   "grouping": "arm",
+   "median_khz": {
+    "gf31/mq-dense-12-s12@16w/entry": 1510102,
+    "gf31/mq-dense-12-s12@16w/entry/perf-cycles": 3666725.0,
+    "gf31/mq-dense-12-s12@16w/f4/perf-cycles": 2900557,
+    "gf31/mq-dense-12-s12@1w/entry/perf-cycles": 3972885,
+    "gf31/mq-dense-12-s12@1w/f4/perf-cycles": 3992619,
+    "gf31/mq-dense-12-s12@1w/grobx155": 1433184,
+    "gf31/mq-dense-12-s12@4w/entry/perf-cycles": 3920587,
+    "gf31/mq-dense-12-s12@4w/f4/perf-cycles": 3879620,
+    "gf31/mq-dense-15-s15@16w/entry/perf-cycles": 3924930,
+    "gf31/mq-dense-15-s15@16w/f4/perf-cycles": 3874324,
+    "gf31/mq-dense-15-s15@1w/entry/perf-cycles": 4412726,
+    "gf31/mq-dense-15-s15@1w/f4/perf-cycles": 4355473,
+    "gf31/mq-dense-15-s15@1w/grobx155/perf-cycles": 3776314,
+    "gf31/mq-dense-15-s15@4w/entry/perf-cycles": 4325488,
+    "gf31/mq-dense-15-s15@4w/f4/perf-cycles": 4236534,
+    "gf31/mq-dense-unplanted-15-s15@16w/entry/perf-cycles": 3929099,
+    "gf31/mq-dense-unplanted-15-s15@16w/f4/perf-cycles": 3873830,
+    "gf31/mq-dense-unplanted-15-s15@1w/entry/perf-cycles": 4410426,
+    "gf31/mq-dense-unplanted-15-s15@1w/f4/perf-cycles": 4376735,
+    "gf31/mq-dense-unplanted-15-s15@1w/grobx155/perf-cycles": 3755480,
+    "gf31/mq-dense-unplanted-15-s15@4w/entry/perf-cycles": 4324439,
+    "gf31/mq-dense-unplanted-15-s15@4w/f4/perf-cycles": 4228188,
+    "gf31/mq-random-10-s10@16w/entry/perf-cycles": 3700702,
+    "gf31/mq-random-10-s10@16w/f4/perf-cycles": 3694044,
+    "gf31/mq-random-10-s10@1w/entry/perf-cycles": 4088294,
+    "gf31/mq-random-10-s10@1w/f4/perf-cycles": 4319328,
+    "gf31/mq-random-10-s10@1w/grobx155/perf-cycles": 3722809,
+    "gf31/mq-random-10-s10@4w/entry/perf-cycles": 4036404,
+    "gf31/mq-random-10-s10@4w/f4/perf-cycles": 4028064,
+    "gf31/mq-random-11-s11@16w/entry/perf-cycles": 3583808,
+    "gf31/mq-random-11-s11@16w/f4/perf-cycles": 3932783,
+    "gf31/mq-random-11-s11@1w/entry/perf-cycles": 4417684,
+    "gf31/mq-random-11-s11@1w/f4/perf-cycles": 4418615,
+    "gf31/mq-random-11-s11@1w/grobx155/perf-cycles": 4315188,
+    "gf31/mq-random-11-s11@4w/entry/perf-cycles": 4243897,
+    "gf31/mq-random-11-s11@4w/f4/perf-cycles": 4331548,
+    "gf32003/mq-dense-12-s12@16w/entry": 1510445,
+    "gf32003/mq-dense-12-s12@16w/entry/perf-cycles": 2883371.5,
+    "gf32003/mq-dense-12-s12@16w/f4/perf-cycles": 3388458,
+    "gf32003/mq-dense-12-s12@1w/entry/perf-cycles": 3939795,
+    "gf32003/mq-dense-12-s12@1w/f4/perf-cycles": 3960955,
+    "gf32003/mq-dense-12-s12@1w/grobx155": 1433184,
+    "gf32003/mq-dense-12-s12@4w/entry/perf-cycles": 3890096,
+    "gf32003/mq-dense-12-s12@4w/f4/perf-cycles": 3870729,
+    "gf32003/mq-dense-15-s15@16w/entry/perf-cycles": 3933859,
+    "gf32003/mq-dense-15-s15@16w/f4/perf-cycles": 3878077,
+    "gf32003/mq-dense-15-s15@1w/entry/perf-cycles": 4409383,
+    "gf32003/mq-dense-15-s15@1w/f4/perf-cycles": 4339864,
+    "gf32003/mq-dense-15-s15@1w/grobx155/perf-cycles": 3740557,
+    "gf32003/mq-dense-15-s15@4w/entry/perf-cycles": 4340563,
+    "gf32003/mq-dense-15-s15@4w/f4/perf-cycles": 4227402,
+    "gf32003/mq-dense-18-s18@16w/entry/perf-cycles": 3954793,
+    "gf32003/mq-dense-18-s18@16w/f4": 1704516,
+    "gf32003/mq-dense-18-s18@16w/f4/perf-cycles": 4259662.5,
+    "gf32003/mq-dense-18-s18@1w/entry/perf-cycles": 4426984,
+    "gf32003/mq-dense-18-s18@1w/f4/perf-cycles": 4425277,
+    "gf32003/mq-dense-18-s18@1w/grobx155/perf-cycles": 4327032,
+    "gf32003/mq-dense-18-s18@4w/entry/perf-cycles": 4351484,
+    "gf32003/mq-dense-18-s18@4w/f4/perf-cycles": 4385266,
+    "m31/mq-random-10@16w/entry/perf-cycles": 3665682,
+    "m31/mq-random-10@16w/f4/perf-cycles": 3660011,
+    "m31/mq-random-10@1w/entry/perf-cycles": 4018521,
+    "m31/mq-random-10@1w/f4/perf-cycles": 4354929,
+    "m31/mq-random-10@1w/grobx155/perf-cycles": 3690885,
+    "m31/mq-random-10@4w/entry/perf-cycles": 4067689,
+    "m31/mq-random-10@4w/f4/perf-cycles": 4074015,
+    "wide64/mq-random-10-s10@16w/entry/perf-cycles": 3737509,
+    "wide64/mq-random-10-s10@16w/f4/perf-cycles": 3739870,
+    "wide64/mq-random-10-s10@1w/entry/perf-cycles": 3982279,
+    "wide64/mq-random-10-s10@1w/f4/perf-cycles": 4377330,
+    "wide64/mq-random-10-s10@1w/grobx155/perf-cycles": 4105925,
+    "wide64/mq-random-10-s10@4w/entry/perf-cycles": 4185191,
+    "wide64/mq-random-10-s10@4w/f4/perf-cycles": 4108855
+   },
+   "total": 210,
+   "version": 3,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}

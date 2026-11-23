@@ -1,0 +1,40 @@
+{
+ "attempts": 7,
+ "job": {
+  "context": {
+   "agent": "ancient-humming-bachman@research/1033-dense-rebaseline",
+   "issue": 1033,
+   "session": "attribution",
+   "track": "attr-heavy"
+  },
+  "job_id": "cdb2a71dfbef",
+  "manifest_sha256": "cdb2a71dfbef07dbc3852be14b03167c85907642b3e68236fae10da69e1aa1e4",
+  "mode": "dev"
+ },
+ "journal_sha256": "fb4ec321ad2b35dd80fd9b36cc7e9c020b24c669aea92f302b689e25025dbc07",
+ "stop": {
+  "at": "2026-11-23T06:47:29+00:00",
+  "attempts": 7,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 7
+   },
+   "contaminated": 0,
+   "flagged": {},
+   "grouping": "arm",
+   "median_khz": {
+    "gf32003/mq-dense-20-s20@16w/entry/perf-cycles": 3950429,
+    "gf32003/mq-dense-20-s20@16w/f4/perf-cycles": 3957552,
+    "gf32003/mq-dense-20-s20@1w/entry/perf-cycles": 4434073,
+    "gf32003/mq-dense-20-s20@1w/f4/perf-cycles": 4425365,
+    "gf32003/mq-dense-20-s20@1w/grobx155/perf-cycles": 4390507,
+    "gf32003/mq-dense-20-s20@4w/entry/perf-cycles": 4302083,
+    "gf32003/mq-dense-20-s20@4w/f4/perf-cycles": 4348434
+   },
+   "total": 7,
+   "version": 3,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}
