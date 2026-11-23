@@ -10,7 +10,8 @@
 set -euo pipefail
 out=$1 study=$2 gate=$3 captures=$4
 shift 4
-phases=("${@:-complete controls matrix}")
+phases=("$@")
+((${#phases[@]})) || phases=(complete controls matrix)
 here=$(cd "$(dirname "$0")/../.." && pwd)
 reserve=$here/tools/bench-reserve.sh
 
@@ -55,9 +56,16 @@ pairs() { # <label> <n> <cpus> <cap-s> <command...>: n pairs, order alternating,
   done
 }
 
-for phase in ${phases[*]}; do
+for phase in "${phases[@]}"; do
   case $phase in
     complete)
+      # The shipping dispatcher, to tie the `sigf4 --claim` mirror to #1033's `entry` baseline.
+      for ((i = 0; i < 3; i++)); do
+        attempt gf31-dense-18-w16 entry 8-23 180 "$study" --field gf31 --name mq-dense-18-s18 \
+          --generate --engine entry --workers 16 --digest-only
+      done
+      attempt gf31-dense-20-w16 entry 8-23 900 "$study" --field gf31 --name mq-dense-20-s20 \
+        --generate --engine entry --workers 16 --live-gib 8 --digest-only
       pairs gf31-dense-18-w16 9 8-23 180 "$study" --field gf31 --name mq-dense-18-s18 --generate \
         --engine sigf4 --claim --workers 16 --digest-only
       pairs gf32003-dense-18-w16 5 8-23 180 "$study" --field gf32003 --name mq-dense-18-s18 \
