@@ -151,6 +151,10 @@ name = "sig_f4_study"
 required-features = ["research-sigf4"]
 
 [[example]]
+name = "gf2_residual_replay"
+required-features = ["research-gf2-residual"]
+
+[[example]]
 name = "reuse_census"
 required-features = ["research-sigf4"]
 
