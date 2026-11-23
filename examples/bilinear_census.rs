@@ -13,6 +13,12 @@
 //! ```text
 //! cargo run --profile ci-release --features research-sigf4 --example bilinear_census -- [cap-seconds] > counts.tsv
 //! ```
+//!
+//! Two environment variables re-run part of the cohort past the shipping budgets. Each changes
+//! which instances complete, never what a completed instance counts.
+//! - `ZB_ENTRIES=<n>` sets F4's live-entry budget to `n` (`F4Options::with_live_entries`) and
+//!   lifts the row and column caps.
+//! - `ZB_SHAPES=<k>x<n_y>-<kind>,...` runs only those shapes, for example `7x7-affine`.
 
 use std::time::{Duration, Instant};
 
@@ -46,10 +52,18 @@ fn census<const N: usize, F: FiniteField>(
 ) -> (Outcome<(CensusSummary, usize)>, Duration) {
     let system = bilinear::<N, F>(spec).generators;
     let split = BlockSplit::two_blocks(N, spec.x_variables).expect("valid split");
-    let options = F4Options {
+    let mut options = F4Options {
         max_wall_time: Some(cap),
         ..F4Options::default()
     };
+    if let Some(entries) = std::env::var("ZB_ENTRIES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+    {
+        options = options.with_live_entries::<F>(entries);
+        options.max_matrix_rows = usize::MAX;
+        options.max_matrix_columns = usize::MAX;
+    }
     let start = Instant::now();
     let outcome = match bidegree_census(&system, &split, GREVLEX, &options) {
         Ok((basis, _, census)) => Outcome::Done((census.summary(), basis.len())),
@@ -81,6 +95,12 @@ fn shape<const N: usize>(k: usize, affine: bool, cap: Duration) {
     let mut censored = false;
     let kind = if affine { "affine" } else { "homogeneous" };
     let equations = if affine { N } else { N - 2 };
+    if let Ok(only) = std::env::var("ZB_SHAPES") {
+        let name = format!("{k}x{}-{kind}", N - k);
+        if !only.split(',').any(|s| s == name) {
+            return;
+        }
+    }
     for field in ["31", "32003", "2147483647"] {
         for support in SUPPORTS {
             for seed in SEEDS {
