@@ -266,6 +266,8 @@ fn f4_stage_statistics(s: &F4Statistics) -> Json {
         ("total_ns", Json::nanos(s.total)),
         ("parallel_batches", Json::size(p.batches)),
         ("parallel_fallback_batches", Json::size(p.fallback_batches)),
+        ("parallel_retained_batches", Json::size(p.retained_batches)),
+        ("parallel_retained_rows", Json::size(p.retained_rows)),
         ("passes", Json::size(p.passes)),
         ("worker_slots", Json::size(p.worker_slots)),
         ("busy_ns", Json::int(p.busy_ns)),

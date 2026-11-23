@@ -116,7 +116,114 @@ pub fn reduce<F: FiniteField + Send + Sync>(
     config: &Config,
     cancel: &AtomicBool,
 ) -> Result<Report, Error> {
-    reduce_hooked(matrix, split, config, cancel, &|_| {})
+    match reduce_inner(matrix, split, config, cancel, &|_| {}, false)? {
+        Outcome::Reduced(report) => Ok(report),
+        Outcome::Retained(_) => unreachable!("only a retaining pass hands rows back"),
+    }
+}
+
+/// What a [`reduce_retaining`] pass ended with.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Outcome<F: FiniteField> {
+    /// Every lower row was reduced and committed, as by [`reduce`].
+    Reduced(Report),
+    /// The ledger refused a reservation after workers had started; the matrix is untouched.
+    Retained(Partial<F>),
+}
+
+/// The rows a refused pass had finished, for [`continue_serially`] to keep (#1068).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Partial<F: FiniteField> {
+    /// The live count the refused reservation would have reached.
+    pub required: usize,
+    /// Finished lower rows by matrix index: a published monic pivot, or zero.
+    ///
+    /// Every pivot a finished row was reduced against is the prefix's or another entry here,
+    /// since publications are never withdrawn, so committing all of them preserves the row space.
+    pub completed: Vec<(usize, SparseRow<F>)>,
+    /// The workers' counters up to the refusal, finished rows or not.
+    pub report: Report,
+}
+
+/// [`reduce`], except that a live-entry refusal after workers started returns the finished rows
+/// as [`Outcome::Retained`] instead of discarding them. Every other failure is [`reduce`]'s.
+pub fn reduce_retaining<F: FiniteField + Send + Sync>(
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    config: &Config,
+    cancel: &AtomicBool,
+) -> Result<Outcome<F>, Error> {
+    reduce_inner(matrix, split, config, cancel, &|_| {}, true)
+}
+
+/// Commit a [`Partial`]'s rows and reduce the rest serially against the prefix and its pivots.
+///
+/// The result is a row echelon form of the input's row space with [`reduce`]'s guarantees, but
+/// not necessarily the rows a from-scratch serial run would leave. The finished pivots join the
+/// established block without a pivot scan, and rows keep their indices. On a refusal from the
+/// serial kernel the lower rows are restored to the input, so a caller that then runs the serial
+/// kernel from scratch meets exactly what it would have met without the parallel attempt.
+///
+/// # Errors
+/// The serial kernel's live count that crossed `max_entries`.
+pub fn continue_serially<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    partial: Partial<F>,
+    backend: super::Backend,
+    max_entries: usize,
+) -> Result<Report, usize> {
+    let Partial {
+        completed,
+        mut report,
+        ..
+    } = partial;
+    let rows = matrix.rows_mut();
+    let lower = rows.len() - split;
+    let mut displaced: Vec<Option<SparseRow<F>>> = vec![None; lower];
+    let mut pivot = vec![false; lower];
+    for (index, row) in completed {
+        pivot[index - split] = !row.is_zero();
+        displaced[index - split] = Some(std::mem::replace(&mut rows[index], row));
+    }
+    let backup: Vec<SparseRow<F>> = displaced
+        .into_iter()
+        .zip(&rows[split..])
+        .map(|(original, current)| original.unwrap_or_else(|| current.clone()))
+        .collect();
+    // The serial kernel takes its established pivots as a prefix, so the finished pivots move up
+    // beside the reducers for the call and back to their own indices after it.
+    let order: Vec<usize> = (0..lower)
+        .filter(|&row| pivot[row])
+        .chain((0..lower).filter(|&row| !pivot[row]))
+        .collect();
+    let mut taken: Vec<SparseRow<F>> = rows.drain(split..).collect();
+    rows.extend(order.iter().map(|&row| std::mem::take(&mut taken[row])));
+    let established = split + pivot.iter().filter(|&&pivot| pivot).count();
+    let serial = super::reduce_rows_against_pivots_with(backend, matrix, established, max_entries);
+    let rows = matrix.rows_mut();
+    let statistics = match serial {
+        Ok(statistics) => statistics,
+        Err(live) => {
+            rows.truncate(split);
+            rows.extend(backup);
+            return Err(live);
+        }
+    };
+    drop(backup);
+    let arranged: Vec<SparseRow<F>> = rows.drain(split..).collect();
+    for (row, &index) in arranged.into_iter().zip(&order) {
+        taken[index] = row;
+    }
+    rows.extend(taken);
+    report.statistics = EliminationStatistics {
+        initial_nonzeros: report.statistics.initial_nonzeros,
+        row_operations: report.statistics.row_operations + statistics.row_operations,
+        pivot_inversions: report.statistics.pivot_inversions + statistics.pivot_inversions,
+        peak_nonzeros: report.peak_reserved_entries.max(statistics.peak_nonzeros),
+        ..statistics
+    };
+    Ok(report)
 }
 
 /// [`reduce`], callable from code generic over [`FiniteField`] alone.
@@ -126,10 +233,13 @@ pub fn reduce<F: FiniteField + Send + Sync>(
 /// a field that cannot provide it gets the serial path rather than a compile error.
 pub struct Dispatch<F: FiniteField> {
     reduce: ReduceFn<F>,
+    reduce_retaining: RetainingFn<F>,
     sweep: ReduceFn<F>,
 }
 
 type ReduceFn<F> = fn(&mut SparseMatrix<F>, usize, &Config, &AtomicBool) -> Result<Report, Error>;
+type RetainingFn<F> =
+    fn(&mut SparseMatrix<F>, usize, &Config, &AtomicBool) -> Result<Outcome<F>, Error>;
 
 impl<F: FiniteField> Clone for Dispatch<F> {
     fn clone(&self) -> Self {
@@ -142,6 +252,7 @@ impl<F: FiniteField + Send + Sync> Dispatch<F> {
     pub fn new() -> Self {
         Self {
             reduce: reduce::<F>,
+            reduce_retaining: reduce_retaining::<F>,
             sweep: sweep::<F>,
         }
     }
@@ -166,6 +277,20 @@ impl<F: FiniteField> Dispatch<F> {
         cancel: &AtomicBool,
     ) -> Result<Report, Error> {
         (self.reduce)(matrix, split, config, cancel)
+    }
+
+    /// As [`reduce_retaining`].
+    ///
+    /// # Errors
+    /// As [`reduce_retaining`].
+    pub fn reduce_retaining(
+        self,
+        matrix: &mut SparseMatrix<F>,
+        split: usize,
+        config: &Config,
+        cancel: &AtomicBool,
+    ) -> Result<Outcome<F>, Error> {
+        (self.reduce_retaining)(matrix, split, config, cancel)
     }
 
     /// As [`sweep`].
@@ -384,6 +509,7 @@ fn sweep_worker<F: FiniteField>(
     Ok(report)
 }
 
+#[cfg(test)]
 fn reduce_hooked<F: FiniteField + Send + Sync>(
     matrix: &mut SparseMatrix<F>,
     split: usize,
@@ -391,6 +517,20 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
     cancel: &AtomicBool,
     hook: &(impl Fn(Event) + Sync),
 ) -> Result<Report, Error> {
+    match reduce_inner(matrix, split, config, cancel, hook, false)? {
+        Outcome::Reduced(report) => Ok(report),
+        Outcome::Retained(_) => unreachable!("only a retaining pass hands rows back"),
+    }
+}
+
+fn reduce_inner<F: FiniteField + Send + Sync>(
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    config: &Config,
+    cancel: &AtomicBool,
+    hook: &(impl Fn(Event) + Sync),
+    retain: bool,
+) -> Result<Outcome<F>, Error> {
     if config.workers == 0 {
         return Err(Error::InvalidWorkers);
     }
@@ -448,6 +588,12 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
         peak: initial,
     });
     let failed = AtomicBool::new(false);
+    // Rows a worker finished at zero, which leave no slot behind; only a retaining pass reads them.
+    let zeroed: Vec<AtomicBool> = if retain {
+        (0..tasks).map(|_| AtomicBool::new(false)).collect()
+    } else {
+        Vec::new()
+    };
     let input: &SparseMatrix<F> = matrix;
     let results = std::thread::scope(|scope| {
         let mut handles = Vec::new();
@@ -456,13 +602,15 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
             let known = &known;
             let ledger = &ledger;
             let failed = &failed;
+            let zeroed = &zeroed;
             handles.push(crate::util::team::spawn(scope, move || {
+                // Outside the unwind boundary, so a refused worker's counters survive its error.
+                let mut report = Report::default();
+                let mut rows = 0;
+                let started = Instant::now();
                 let result = catch_unwind(AssertUnwindSafe(|| {
-                    let run = || {
-                        let started = Instant::now();
+                    let mut run = || {
                         let mut accumulator = DenseAccumulator::new(columns);
-                        let mut report = Report::default();
-                        let mut rows = 0;
                         let mut index =
                             split + (tasks as u128 * worker as u128 / workers as u128) as usize;
                         let end = split
@@ -527,6 +675,9 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
                                 let Some(column) = accumulator.leading_column() else {
                                     report.statistics.zero_rows += 1;
                                     accumulator.take();
+                                    if let Some(flag) = zeroed.get(current - split) {
+                                        flag.store(true, Ordering::Relaxed);
+                                    }
                                     break;
                                 };
                                 let pivot = known[column]
@@ -582,19 +733,13 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
                             reservation.publish(published);
                             rows += 1;
                         }
-                        report.worker_rows.push(rows);
-                        report
-                            .worker_ns
-                            .push(started.elapsed().as_nanos().min(u64::MAX as u128) as u64);
-                        Ok(report)
+                        Ok(())
                     };
                     #[cfg(feature = "research-work")]
                     if config.measure_work {
                         let (result, work) = super::work::measure(run);
-                        return result.map(|mut report: Report| {
-                            report.work = work.outside_batch.forward;
-                            report
-                        });
+                        report.work = work.outside_batch.forward;
+                        return result;
                     }
                     run()
                 }))
@@ -602,25 +747,48 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
                 if result.is_err() {
                     failed.store(true, Ordering::Relaxed);
                 }
-                result
+                report.worker_rows.push(rows);
+                report
+                    .worker_ns
+                    .push(started.elapsed().as_nanos().min(u64::MAX as u128) as u64);
+                (report, result)
             }));
         }
         handles
             .into_iter()
-            .map(|handle| handle.join().unwrap_or(Err(Error::WorkerPanicked)))
+            .map(|handle| {
+                handle
+                    .join()
+                    .unwrap_or_else(|_| (Report::default(), Err(Error::WorkerPanicked)))
+            })
             .collect::<Vec<_>>()
     });
     // Prefer the original failure over another worker observing cancellation.
-    if let Some(error) = results
+    let failure = results
         .iter()
-        .filter_map(|result| result.as_ref().err())
+        .filter_map(|(_, result)| result.as_ref().err())
         .find(|error| **error != Error::Cancelled)
-    {
-        return Err(error.clone());
-    }
-    if cancel.load(Ordering::Relaxed) || results.iter().any(Result::is_err) {
-        return Err(Error::Cancelled);
-    }
+        .cloned();
+    let refused_alone = results.iter().all(|(_, result)| {
+        matches!(
+            result,
+            Ok(()) | Err(Error::Cancelled | Error::Entries { .. })
+        )
+    });
+    let retained = match failure {
+        Some(Error::Entries { required })
+            if retain && refused_alone && !cancel.load(Ordering::Relaxed) =>
+        {
+            Some(required)
+        }
+        Some(error) => return Err(error),
+        None if cancel.load(Ordering::Relaxed)
+            || results.iter().any(|(_, result)| result.is_err()) =>
+        {
+            return Err(Error::Cancelled)
+        }
+        None => None,
+    };
     let mut report = Report {
         peak_reserved_entries: ledger.lock().unwrap().peak,
         workspace_bytes,
@@ -632,7 +800,7 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
         },
         ..Default::default()
     };
-    for worker in results.into_iter().map(Result::unwrap) {
+    for (worker, _) in results {
         report.successful_publications += worker.successful_publications;
         report.failed_publications += worker.failed_publications;
         report.products += worker.products;
@@ -649,6 +817,25 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
         report.worker_rows.extend(worker.worker_rows);
         report.worker_ns.extend(worker.worker_ns);
     }
+    report.statistics.rank += report.successful_publications;
+    if let Some(required) = retained {
+        let mut completed: Vec<(usize, SparseRow<F>)> =
+            slots.into_iter().filter_map(OnceLock::into_inner).collect();
+        completed.extend(
+            zeroed
+                .iter()
+                .enumerate()
+                .filter(|(_, flag)| flag.load(Ordering::Relaxed))
+                .map(|(row, _)| (split + row, SparseRow::default())),
+        );
+        completed.sort_unstable_by_key(|&(index, _)| index);
+        report.statistics.peak_nonzeros = report.peak_reserved_entries;
+        return Ok(Outcome::Retained(Partial {
+            required,
+            completed,
+            report,
+        }));
+    }
     for row in &mut matrix.rows_mut()[split..] {
         *row = SparseRow::default();
     }
@@ -657,10 +844,9 @@ fn reduce_hooked<F: FiniteField + Send + Sync>(
             matrix.rows_mut()[index] = row;
         }
     }
-    report.statistics.rank += report.successful_publications;
     report.statistics.final_nonzeros = matrix.nonzeros();
     report.statistics.peak_nonzeros = report.peak_reserved_entries;
-    Ok(report)
+    Ok(Outcome::Reduced(report))
 }
 
 #[cfg(test)]
@@ -814,6 +1000,75 @@ mod tests {
         assert_eq!(matrix, input);
         reduce(&mut matrix, 1, &Config::default(), &AtomicBool::new(false)).unwrap();
         assert_eq!(canonical(matrix), canonical(input));
+    }
+
+    // A ledger refusal partway through hands back the finished rows, leaves the matrix untouched, and the serial continuation reaches the serial row space.
+    #[test]
+    fn a_refused_pass_retains_its_finished_rows() {
+        let input = fixture::<Zp13>();
+        let mut matrix = input.clone();
+        let config = Config {
+            workers: 1,
+            max_entries: input.nonzeros() + 2 * input.num_columns() + 1,
+            ..Config::default()
+        };
+        let Ok(Outcome::Retained(partial)) =
+            reduce_retaining(&mut matrix, 1, &config, &AtomicBool::new(false))
+        else {
+            panic!("the second row's reservation should have been refused");
+        };
+        assert_eq!(matrix, input);
+        assert_eq!(partial.completed.len(), 1);
+        assert_eq!(partial.report.successful_publications, 1);
+        let report = continue_serially(
+            &mut matrix,
+            1,
+            partial,
+            crate::linalg::Backend::Adaptive,
+            usize::MAX,
+        )
+        .unwrap();
+        assert_eq!(report.statistics.rank, matrix.nonzero_rows());
+        assert_eq!(report.statistics.initial_nonzeros, input.nonzeros());
+        assert_eq!(canonical(matrix), canonical(input));
+    }
+
+    // A continuation the budget refuses restores the lower rows, so a from-scratch serial run meets the input.
+    #[test]
+    fn a_refused_continuation_restores_the_input() {
+        let input = fixture::<Zp13>();
+        let mut matrix = input.clone();
+        let config = Config {
+            workers: 1,
+            max_entries: input.nonzeros() + 2 * input.num_columns() + 1,
+            ..Config::default()
+        };
+        let Ok(Outcome::Retained(partial)) =
+            reduce_retaining(&mut matrix, 1, &config, &AtomicBool::new(false))
+        else {
+            panic!("the second row's reservation should have been refused");
+        };
+        assert!(
+            continue_serially(&mut matrix, 1, partial, crate::linalg::Backend::Adaptive, 0)
+                .is_err()
+        );
+        assert_eq!(matrix, input);
+    }
+
+    // A refusal before any worker starts is an error, not an empty retention.
+    #[test]
+    fn an_up_front_refusal_retains_nothing() {
+        let input = fixture::<Zp13>();
+        let mut matrix = input.clone();
+        let config = Config {
+            max_entries: input.nonzeros() - 1,
+            ..Config::default()
+        };
+        assert!(matches!(
+            reduce_retaining(&mut matrix, 1, &config, &AtomicBool::new(false)),
+            Err(Error::Entries { .. })
+        ));
+        assert_eq!(matrix, input);
     }
 
     // A worker panic or cancellation during a claim discards every partial pivot and permits subsequent reuse.
