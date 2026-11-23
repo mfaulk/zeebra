@@ -265,18 +265,21 @@ pub(crate) fn residual_form<F: FiniteField>(
         + width * size_of::<usize>()
         + reducers.len() * (2 + 3 * size_of::<usize>());
     let tail_bytes = built * row_bytes;
-    let uses_bytes = statistics.known_entries * size_of::<(usize, usize)>();
+    // Per pair row a cursor, a queue link and a scratch use; per referenced tail a member and a head.
+    let queue_bytes = pairs.len() * (2 * size_of::<usize>() + size_of::<(usize, usize)>())
+        + statistics.referenced_tails * 2 * size_of::<usize>();
     let table_bytes = (1usize << MULTIPLY_TABLE_BITS) * row_bytes;
     let echelon = four_russians_workspace(pairs.len(), width, pair_table_bits(pairs.len())) + width;
     let workspace =
-        maps + pairs.len() * row_bytes + (tail_bytes + uses_bytes + table_bytes).max(echelon);
+        maps + pairs.len() * row_bytes + (tail_bytes + queue_bytes + table_bytes).max(echelon);
     statistics.workspace_bytes = workspace;
     statistics.tail_bytes = tail_bytes;
     if workspace > room {
         return Err(Decline::Bytes(workspace));
     }
 
-    // `D` packed; `C` kept as one (pair row, bits) use per row and group of referenced tails.
+    // Referenced tails in groups of up to `MULTIPLY_TABLE_BITS`, ascending, so a pair row's `C`
+    // entries visit its groups in order.
     let mut group_of = vec![(NONE, 0usize); reducers.len()];
     let mut members: Vec<Vec<usize>> = Vec::new();
     for (index, _) in referenced.iter().enumerate().filter(|(_, &r)| r) {
@@ -290,21 +293,35 @@ pub(crate) fn residual_form<F: FiniteField>(
         group_of[index] = (group, members[group].len());
         members[group].push(index);
     }
-    let mut uses: Vec<Vec<(usize, usize)>> = vec![Vec::new(); members.len()];
     let mut matrix = BitMatrix::zero(pairs.len(), width);
     for (target, row) in pairs.iter().enumerate() {
         let words = matrix.row_mut(target);
         for &(column, _) in row.entries() {
-            match known[column] {
-                NONE => flip_bit(words, compact[column]),
-                reducer => {
-                    let (group, bit) = group_of[reducer];
-                    match uses[group].last_mut() {
-                        Some((last, bits)) if *last == target => *bits |= 1 << bit,
-                        _ => uses[group].push((target, 1 << bit)),
-                    }
-                }
+            if known[column] == NONE {
+                flip_bit(words, compact[column]);
             }
+        }
+    }
+    // `C` stays in the sparse rows: each pair row waits in the queue of the next group it names,
+    // with a cursor into its entries, so a group visits exactly the rows that use it.
+    let upcoming = |target: usize, cursor: &mut usize| -> Option<usize> {
+        let entries = pairs[target].entries();
+        while *cursor < entries.len() {
+            let reducer = known[entries[*cursor].0];
+            if reducer != NONE {
+                return Some(group_of[reducer].0);
+            }
+            *cursor += 1;
+        }
+        None
+    };
+    let mut cursor = vec![0usize; pairs.len()];
+    let mut link = vec![NONE; pairs.len()];
+    let mut head = vec![NONE; members.len()];
+    for target in (0..pairs.len()).rev() {
+        if let Some(group) = upcoming(target, &mut cursor[target]) {
+            link[target] = head[group];
+            head[group] = target;
         }
     }
     statistics.pack = clock.elapsed();
@@ -339,7 +356,29 @@ pub(crate) fn residual_form<F: FiniteField>(
     let clock = Instant::now();
     let tail = |reducer: usize| &tail_words[slot[reducer] * stride..(slot[reducer] + 1) * stride];
     let mut table: Vec<u64> = Vec::new();
-    for (group, targets) in members.iter().zip(&uses) {
+    let mut targets: Vec<(usize, usize)> = Vec::new();
+    for (index, group) in members.iter().enumerate() {
+        targets.clear();
+        let mut target = head[index];
+        while target != NONE {
+            let after = link[target];
+            let entries = pairs[target].entries();
+            let mut bits = 0usize;
+            while let Some(&(column, _)) = entries.get(cursor[target]) {
+                match known[column] {
+                    NONE => {}
+                    reducer if group_of[reducer].0 == index => bits |= 1 << group_of[reducer].1,
+                    _ => break,
+                }
+                cursor[target] += 1;
+            }
+            targets.push((target, bits));
+            if let Some(later) = upcoming(target, &mut cursor[target]) {
+                link[target] = head[later];
+                head[later] = target;
+            }
+            target = after;
+        }
         let singles: usize = targets
             .iter()
             .map(|(_, bits)| bits.count_ones() as usize)
@@ -358,7 +397,7 @@ pub(crate) fn residual_form<F: FiniteField>(
             }
             statistics.tables += 1;
             statistics.table_bytes = statistics.table_bytes.max(entries * row_bytes);
-            for &(target, bits) in targets {
+            for &(target, bits) in &targets {
                 xor_into(
                     matrix.row_mut(target),
                     &table[bits * stride..(bits + 1) * stride],
@@ -366,7 +405,7 @@ pub(crate) fn residual_form<F: FiniteField>(
                 statistics.multiply_xors += 1;
             }
         } else {
-            for &(target, mut bits) in targets {
+            for &(target, mut bits) in &targets {
                 while bits != 0 {
                     xor_into(
                         matrix.row_mut(target),
