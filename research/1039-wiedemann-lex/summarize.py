@@ -112,9 +112,9 @@ def main():
         routes = [walls[k] for k in ('zb-classical', 'zb-wiedemann') if walls.get(k)]
         if walls.get('zb-adaptive') and routes:
             fastest = min(routes, key=lambda w: statistics.median(w.values()))
-            jobs = {r.get('job') for r in one if r['arm'] in ('zb-adaptive', 'zb-classical', 'zb-wiedemann')}
-            rs_ = bs.paired_ratios(walls['zb-adaptive'], fastest) if len(jobs) == 1 else []
-            if rs_:
+            # Repetitions are keyed job:rep, so pairs never cross jobs; pair when enough share a job.
+            rs_ = bs.paired_ratios(walls['zb-adaptive'], fastest)
+            if len(rs_) >= 3:
                 ci = bs.paired_ratio(rs_, seed=f'{row} regret')
                 regret = f'{ci.median:.2f} [{ci.lo:.2f}, {ci.hi:.2f}] paired'
             else:
