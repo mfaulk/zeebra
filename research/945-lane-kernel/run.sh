@@ -32,8 +32,12 @@ text = "\n".join(l for l in lines if not l.startswith("TIME "))
 start = text.find("{")
 record = json.JSONDecoder().raw_decode(text[start:])[0] if start >= 0 else {}
 wall, rss_kib = (time[-1].split()[1:3] if time else (None, None))
-keep = ("status", "call_ns", "basis_m33", "forward_seconds", "output_digest", "row_operations",
-        "peak_rss", "peak_nonzeros")
+keep = ("status", "call_ns", "basis_m33", "peak_rss_bytes", "forward_seconds", "output_digest",
+        "row_operations", "peak_rss", "peak_nonzeros")
+statistics = record.get("statistics") or {}
+record.update({k: statistics[k] for k in ("elimination_ns", "claim_peak_live_bytes")
+               if k in statistics})
+keep += ("elimination_ns", "claim_peak_live_bytes")
 print(json.dumps({"label": label, "arm": arm, "rc": int(rc),
                   "wall_s": float(wall) if wall else None,
                   "max_rss_kib": int(rss_kib) if rss_kib else None,
