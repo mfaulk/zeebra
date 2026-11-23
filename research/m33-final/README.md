@@ -65,7 +65,20 @@ per-arm clock rule), and every digest equal to its reference. One grobx certifie
 completed and the job was then refused on output size (#1020). `campaign.py inputs` now writes Track
 Gc's request with `digest_only: true`, so its reply carries the basis digest and not the 1.70 GB of
 certified text; a re-run is therefore a new input and a new job id, and job `d5db6121722d`'s record
-is the full-reply run. No row qualified for the n = 12
+is the full-reply run.
+
+**Track Gc digest-only re-run (#1065), 2026-11-23, job `16693d8f6a58`: void.** The same input with
+`digest_only: true` and the same manifest, at F3 = `db181c51`. The grobx 0.155.1 driver was built
+from `main` `28df047f` with `grobx-pin.sh`'s recipe (SHA-256 `e2572de9…`). Publication mode, CCDs 1–2
+reserved, 16:21–17:05Z. All 9 attempts were `ok`, digest-equal to the reference and under the
+600 s / 32 GiB caps, with process wall 272.6–299.1 s (median 296.4 s) and peak RSS 8.7 GiB. All 9
+were contaminated, though: other sessions' compilers, rest load ≥ 4 on 4 attempts, and the clock rule on
+3. Over 20% contaminated makes the session void, so it is not of record (`sessions.json`, `void`) and
+no certified-grobx timing is scored from it. The walls are reported here only to show that the
+job now completes n = 9. The job no longer stops on output size: the retained journal is 56 KB,
+against 1.70 GB for `d5db6121722d`.
+
+No row qualified for the n = 12
 extension: every inconclusive row is small or short of n, not spanning. No third session was run.
 
 Verdicts (plan §17.8): Minimum met. **T-G missed**: no development row wins against grobx raw.

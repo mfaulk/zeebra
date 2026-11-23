@@ -1,0 +1,68 @@
+{
+ "attempts": 9,
+ "job": {
+  "context": {
+   "agent": "agent-acf9ba1b4fa888172@research/1065-gc-digest-only",
+   "issue": 975,
+   "session": "final",
+   "track": "Gc"
+  },
+  "job_id": "16693d8f6a58",
+  "manifest_sha256": "16693d8f6a58019a46be7a850d11a2d124d4168ec6200530797e5287778b14e7",
+  "mode": "publication"
+ },
+ "journal_sha256": "6e883142e4c2966977ae29d459d906de2c5d0645e339529b3f772006b71a359c",
+ "stop": {
+  "at": "2026-11-23T17:05:33+00:00",
+  "attempts": 9,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 9
+   },
+   "contaminated": 9,
+   "flagged": {
+    "16693d8f6a58:0:0": [
+     "bench clock 4280658 kHz is 9.6% off the session median"
+    ],
+    "16693d8f6a58:1:0": [
+     "bench clock 4139038 kHz is 6.0% off the session median",
+     "2 compiler process(es)"
+    ],
+    "16693d8f6a58:2:0": [
+     "bench clock 4098979 kHz is 4.9% off the session median",
+     "2 compiler process(es)"
+    ],
+    "16693d8f6a58:3:0": [
+     "rest load 4.82 >= 4",
+     "2 compiler process(es)"
+    ],
+    "16693d8f6a58:4:0": [
+     "2 compiler process(es)"
+    ],
+    "16693d8f6a58:5:0": [
+     "6 compiler process(es)"
+    ],
+    "16693d8f6a58:6:0": [
+     "rest load 5.54 >= 4",
+     "6 compiler process(es)"
+    ],
+    "16693d8f6a58:7:0": [
+     "rest load 5.22 >= 4",
+     "5 compiler process(es)"
+    ],
+    "16693d8f6a58:8:0": [
+     "rest load 4.81 >= 4",
+     "5 compiler process(es)"
+    ]
+   },
+   "grouping": "arm",
+   "median_khz": {
+    "wide64/eco-12@1w/grobx155-certified/perf-cycles": 3905861
+   },
+   "total": 9,
+   "version": 3,
+   "void": true
+  },
+  "reason": "complete"
+ }
+}
