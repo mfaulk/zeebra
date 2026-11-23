@@ -370,6 +370,11 @@ impl LaneRow {
         }
     }
 
+    /// Nonzeros right of the lead: the products one application costs.
+    pub fn nonzeros(&self) -> u64 {
+        self.nonzeros
+    }
+
     /// Bytes the row holds on the heap.
     pub fn bytes(&self) -> usize {
         match &self.body {

@@ -30,6 +30,7 @@ use crate::{
             F4Error, F4Options,
         },
     },
+    linalg::lane::{Lane, LaneKernel, LaneRow, LaneWorkspace},
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
@@ -909,15 +910,29 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             reducer_at[entries[0].0 as usize] = k as u32;
         }
 
+        // #945: the reducer block in lane form, when the options and the field allow it.
+        let lane = if self.options.small_prime_lane {
+            F::small_prime_lane()
+        } else {
+            None
+        };
+        let lane_rows: Vec<LaneRow> = lane.as_ref().map_or_else(Vec::new, |lane| {
+            reducer_rows
+                .iter()
+                .map(|row| LaneRow::from_monic(lane, LaneKernel::default(), row))
+                .collect()
+        });
+        let lane_bytes: usize = lane_rows.iter().map(LaneRow::bytes).sum();
         let block = ReducerBlock {
             order,
             rows: &reducer_rows,
             sigs: &reducer_sigs,
             at: &reducer_at,
             ncols,
+            lane: lane.map(|lane| (lane, lane_rows.as_slice())),
         };
         if self.options.parallel_cascade {
-            return self.claim(&block, &targets, columns, clock);
+            return self.claim(&block, &targets, columns, clock, lane_bytes);
         }
         #[cfg(feature = "research-sigf4-split")]
         let mut split = super::BatchSplit {
@@ -942,6 +957,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             0
         };
         let fixed = batch_rows_bytes(&block, &targets)
+            + lane_bytes
             + 2 * ncols * size_of::<u32>()
             + (1 + phase_a_workers) * Workspace::<F>::bytes(ncols);
         if let Err(stop) = live.charge(fixed) {
@@ -981,7 +997,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let mut target_at: Vec<u32> = vec![NONE; ncols];
         // Every target's outcome in signature order; `target_at` indexes the elements among them.
         let mut finals: Vec<(Signature<N>, Kind, Vec<(u32, F)>, u64)> = Vec::new();
-        let mut workspace = Workspace::new(ncols);
+        let mut workspace = block.workspace();
+        // #945: each element's row in lane form, beside `finals`, when the batch uses lanes.
+        let mut final_lanes: Vec<Option<LaneRow>> = Vec::new();
         let check = self.options.check_signatures;
         #[cfg(feature = "research-sigf4-replay")]
         let mut replay = super::replay::Recorder::new(ncols);
@@ -990,8 +1008,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             let (entries, earlier) = prereduced.next().unwrap_or_else(|| (raw.clone(), 0));
             #[cfg(feature = "research-sigf4-split")]
             let mut cascade = 0u64;
-            let (mut out, later) = workspace.reduce(&entries, |c| {
-                let pivot = if let Some(pivot) = block.admissible(c, &t) {
+            let (mut out, later) = workspace.reduce_pivots(&entries, |c| {
+                let pivot = if let Some(pivot) = block.admissible_pivot(c, &t) {
                     Some(pivot)
                 } else if target_at[c] != NONE {
                     let (s, _, entries, _) = &finals[target_at[c] as usize];
@@ -1003,14 +1021,20 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                     {
                         cascade += (entries.len() - 1) as u64;
                     }
-                    Some(entries.as_slice())
+                    Some(match &final_lanes[target_at[c] as usize] {
+                        Some(row) => PivotRow::Lane(row),
+                        None => PivotRow::Field(entries.as_slice()),
+                    })
                 } else {
                     None
                 };
                 #[cfg(feature = "research-sigf4-replay")]
                 replay.step(
                     c,
-                    pivot.map(<[_]>::len),
+                    pivot.as_ref().map(|p| match p {
+                        PivotRow::Field(row) => row.len(),
+                        PivotRow::Lane(row) => row.nonzeros() as usize + 1,
+                    }),
                     pivot.is_some() && block.admissible(c, &t).is_none(),
                 );
                 pivot
@@ -1030,12 +1054,20 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                     *v *= inverse;
                 }
             }
-            if let Err(stop) = live.charge(std::mem::size_of_val(out.as_slice())) {
+            let out_lane = if kind == Kind::Element {
+                block.lane_row(&out)
+            } else {
+                None
+            };
+            let bytes =
+                std::mem::size_of_val(out.as_slice()) + out_lane.as_ref().map_or(0, LaneRow::bytes);
+            if let Err(stop) = live.charge(bytes) {
                 return Err(self.abandon(&live, clock, stop));
             }
             if kind == Kind::Element {
                 target_at[out[0].0 as usize] = finals.len() as u32;
             }
+            final_lanes.push(out_lane);
             finals.push((t, kind, out, earlier + later));
         }
         #[cfg(feature = "research-sigf4-replay")]
@@ -1118,8 +1150,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         targets: &[(Signature<N>, Vec<(u32, F)>)],
         columns: &[Monomial<N>],
         clock: Instant,
+        lane_bytes: usize,
     ) -> Result<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>, SigF4Error> {
-        let rows_bytes = batch_rows_bytes(block, targets);
+        let rows_bytes = batch_rows_bytes(block, targets) + lane_bytes;
         let job = Claim {
             block,
             targets,
@@ -1389,6 +1422,8 @@ pub(super) struct ReducerBlock<'a, const N: usize, F> {
     pub(super) sigs: &'a [Signature<N>],
     pub(super) at: &'a [u32],
     pub(super) ncols: usize,
+    /// #945: the field's lane and `rows` in lane form, when the batch reduces in `u32` lanes.
+    pub(super) lane: Option<(Lane<F>, &'a [LaneRow])>,
 }
 
 impl<const N: usize, F> ReducerBlock<'_, N, F> {
@@ -1412,12 +1447,50 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
         (r != NONE && self.sigs[r as usize].cmp_in(t, self.order) == Ordering::Less)
             .then(|| self.rows[r as usize].as_slice())
     }
+
+    /// [`Self::admissible`], in the representation the batch reduces in.
+    pub(super) fn admissible_pivot(&self, c: usize, t: &Signature<N>) -> Option<PivotRow<'_, F>> {
+        let r = self.at[c];
+        if r == NONE || self.sigs[r as usize].cmp_in(t, self.order) != Ordering::Less {
+            return None;
+        }
+        Some(match &self.lane {
+            Some((_, rows)) => PivotRow::Lane(&rows[r as usize]),
+            None => PivotRow::Field(self.rows[r as usize].as_slice()),
+        })
+    }
+
+    /// A workspace in the batch's representation.
+    pub(super) fn workspace(&self) -> Workspace<F>
+    where
+        F: FiniteField,
+    {
+        Workspace::with_lane(self.ncols, self.lane.as_ref().map(|(lane, _)| *lane))
+    }
+
+    /// A monic `row` in lane form, when the batch reduces in lanes.
+    pub(super) fn lane_row(&self, row: &[(u32, F)]) -> Option<LaneRow>
+    where
+        F: FiniteField,
+    {
+        self.lane
+            .as_ref()
+            .map(|(lane, _)| LaneRow::from_monic(lane, LaneKernel::default(), row))
+    }
+}
+
+/// A pivot in whichever representation its batch reduces in.
+pub(super) enum PivotRow<'p, F> {
+    Field(&'p [(u32, F)]),
+    Lane(&'p LaneRow),
 }
 
 /// A dense accumulator with a bitset of possibly-nonzero columns, reused across rows.
 pub(super) struct Workspace<F> {
     acc: Vec<F>,
     touched: Vec<u64>,
+    /// #945: when present, every row is reduced here and `acc` is empty.
+    lane: Option<LaneWorkspace<F>>,
 }
 
 impl<F> Workspace<F> {
@@ -1429,10 +1502,51 @@ impl<F> Workspace<F> {
 
 impl<F: FiniteField> Workspace<F> {
     pub(super) fn new(ncols: usize) -> Self {
-        Self {
-            acc: vec![F::zero(); ncols],
-            touched: vec![0; ncols.div_ceil(64)],
+        Self::with_lane(ncols, None)
+    }
+
+    /// A workspace that reduces in `lane` when one is given.
+    pub(super) fn with_lane(ncols: usize, lane: Option<Lane<F>>) -> Self {
+        match lane {
+            Some(lane) => Self {
+                acc: Vec::new(),
+                touched: Vec::new(),
+                lane: Some(LaneWorkspace::new(lane, ncols)),
+            },
+            None => Self {
+                acc: vec![F::zero(); ncols],
+                touched: vec![0; ncols.div_ceil(64)],
+                lane: None,
+            },
         }
+    }
+
+    /// [`Self::reduce`] against pivots in the workspace's own representation.
+    ///
+    /// # Panics
+    /// If a pivot's representation is not the workspace's.
+    pub(super) fn reduce_pivots<'p>(
+        &mut self,
+        entries: &[(u32, F)],
+        mut pivot: impl FnMut(usize) -> Option<PivotRow<'p, F>>,
+    ) -> Reduced<F>
+    where
+        F: 'p,
+    {
+        if let Some(lane) = &mut self.lane {
+            return lane.reduce(entries, |c| {
+                pivot(c).map(|p| match p {
+                    PivotRow::Lane(row) => row,
+                    PivotRow::Field(_) => unreachable!("a field pivot in a lane workspace"),
+                })
+            });
+        }
+        self.reduce(entries, |c| {
+            pivot(c).map(|p| match p {
+                PivotRow::Field(row) => row,
+                PivotRow::Lane(_) => unreachable!("a lane pivot in a field workspace"),
+            })
+        })
     }
 
     /// Reduces `entries` column by column with whatever `pivot` offers (monic rows, lead first);
@@ -1446,6 +1560,10 @@ impl<F: FiniteField> Workspace<F> {
     where
         F: 'p,
     {
+        assert!(
+            self.lane.is_none(),
+            "a lane workspace reduces through reduce_pivots"
+        );
         let Some(&(first, _)) = entries.first() else {
             return (Vec::new(), 0);
         };
@@ -1536,12 +1654,12 @@ struct PhaseA<'a, const N: usize, F> {
 impl<const N: usize, F: FiniteField> PhaseA<'_, N, F> {
     fn reduce_one(&self, workspace: &mut Workspace<F>, k: usize) -> Reduced<F> {
         let (t, entries) = &self.targets[k];
-        workspace.reduce(entries, |c| self.block.admissible(c, t))
+        workspace.reduce_pivots(entries, |c| self.block.admissible_pivot(c, t))
     }
 
     /// The same pass on one thread, for a field that cannot cross threads.
     fn serial(self) -> Vec<Reduced<F>> {
-        let mut workspace = Workspace::new(self.block.ncols);
+        let mut workspace = self.block.workspace();
         (0..self.targets.len())
             .map(|k| self.reduce_one(&mut workspace, k))
             .collect()
@@ -1563,7 +1681,7 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for PhaseA<'_, N, F> {
             let mut members = Vec::new();
             for _ in 0..workers {
                 members.push(crate::util::team::spawn(scope, || {
-                    let mut workspace = Workspace::new(self.block.ncols);
+                    let mut workspace = self.block.workspace();
                     loop {
                         let k = next.fetch_add(1, AtomicOrdering::Relaxed);
                         if k >= n {

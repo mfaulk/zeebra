@@ -32,7 +32,7 @@ use std::{
 };
 
 use super::{
-    engine::{Reduced, ReducerBlock, Workspace, NONE},
+    engine::{PivotRow, Reduced, ReducerBlock, Workspace, NONE},
     signature::Signature,
 };
 use crate::{fields::ConcurrentJob, FiniteField};
@@ -50,6 +50,17 @@ pub(super) struct Outcome<F> {
     pub(super) kind: Kind,
     pub(super) row: Vec<(u32, F)>,
     pub(super) products: u64,
+    /// #945: an element's row in lane form, when the batch reduces in lanes.
+    pub(super) lane: Option<crate::linalg::lane::LaneRow>,
+}
+
+impl<F> Outcome<F> {
+    fn pivot(&self) -> PivotRow<'_, F> {
+        match &self.lane {
+            Some(row) => PivotRow::Lane(row),
+            None => PivotRow::Field(self.row.as_slice()),
+        }
+    }
 }
 
 /// Why a batch was abandoned. Nothing of it reaches the basis (E3).
@@ -239,7 +250,7 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             barrier.wait();
             return;
         }
-        let mut workspace = Workspace::new(self.block.ncols);
+        let mut workspace = self.block.workspace();
         loop {
             let k = shared.next_a.fetch_add(1, Relaxed);
             if k >= m || shared.stopped() {
@@ -247,11 +258,11 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
             }
             let (t, entries) = &self.targets[k];
             let mut polls = 0;
-            let done = workspace.reduce(entries, |c| {
+            let done = workspace.reduce_pivots(entries, |c| {
                 if self.safe_point(shared, &mut polls, k) {
                     return None;
                 }
-                self.block.admissible(c, t)
+                self.block.admissible_pivot(c, t)
             });
             shared.charge(Self::entry_bytes(&done.0), self.live_limit);
             *shared.pre[k].lock().expect("never poisoned") = Some(done);
@@ -307,11 +318,11 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
         let mut known = false;
         let mut lead = false;
         let mut polls = 0;
-        let (mut row, later) = workspace.reduce(&entries, |c| {
+        let (mut row, later) = workspace.reduce_pivots(&entries, |c| {
             if self.safe_point(shared, &mut polls, k) {
                 return None;
             }
-            if let Some(pivot) = self.block.admissible(c, t) {
+            if let Some(pivot) = self.block.admissible_pivot(c, t) {
                 if self.check {
                     let r = self.block.at[c] as usize;
                     assert_eq!(
@@ -370,7 +381,7 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
                         "an earlier target must have a smaller signature"
                     );
                 }
-                return Some(pivot.row.as_slice());
+                return Some(pivot.pivot());
             }
             if !lead {
                 lead = true;
@@ -400,11 +411,18 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
                 *v *= inverse;
             }
         }
-        shared.charge(Self::entry_bytes(&row), self.live_limit);
+        let lane = if kind == Kind::Element {
+            self.block.lane_row(&row)
+        } else {
+            None
+        };
+        let lane_bytes = lane.as_ref().map_or(0, crate::linalg::lane::LaneRow::bytes);
+        shared.charge(Self::entry_bytes(&row) + lane_bytes, self.live_limit);
         let published = shared.finals[k].0.set(Outcome {
             kind,
             row,
             products: early + later,
+            lane,
         });
         assert!(published.is_ok(), "a target is finished once");
     }
