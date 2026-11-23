@@ -69,6 +69,10 @@ pub enum FglmError {
     ///
     /// Carries only the limit. Enumeration stops at the first crossing, so any count it could
     /// report would be the limit plus one rather than the dimension the ideal really has.
+    ///
+    /// From a conversion, the limit is the classical walk's cap. A strategy that may attempt
+    /// Wiedemann enumerates past it within the span budgets, and returns this when that attempt
+    /// declines or fails — the classical walk never runs above the cap (#1111).
     QuotientDimensionExceeded { limit: usize },
 }
 
