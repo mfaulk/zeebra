@@ -376,6 +376,14 @@ both.
 Design D is the cheaper first experiment. It needs no rollback and no randomness, and if it
 reaches the gate, Design R is unnecessary.
 
+**Implementation (#1080).** Design D is `HilbertSelection::CertifiedZeros { slack }`
+(`src/grobner/f4/count_route.rs`), opt-in and off by default. Two choices go beyond the text above.
+On affine input a certified degree's pairs are deferred rather than discarded, and are discarded
+only when the count reaches zero. Theorem 3 makes the output final only at that point, and the
+deferred pairs are promoted back if the route turns off first. For the same reason, affine input
+must also be square, since Theorem 3 concludes only for `m = n`. The gate measurement is the bench
+host's and has not been taken.
+
 ## 10. Transfer limits
 
 - Lemma 2 and Theorems 1 and 3 are proved here. The Lazard step in Theorem 3, that regular top
