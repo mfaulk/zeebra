@@ -168,7 +168,10 @@ impl LaneKernel {
             matrix.num_rows()
         );
         let columns = matrix.num_columns();
-        assert!(columns < NONE as usize, "{columns} columns do not fit a u32 index");
+        assert!(
+            columns < NONE as usize,
+            "{columns} columns do not fit a u32 index"
+        );
         let initial_nonzeros = matrix.nonzeros();
         let mut statistics = EliminationStatistics {
             initial_nonzeros,
@@ -489,7 +492,12 @@ mod tests {
             .unwrap();
         let mut actual = matrix;
         LaneKernel::default()
-            .reduce_rows_against_pivots(&F::small_prime_lane().unwrap(), &mut actual, columns - 1, usize::MAX)
+            .reduce_rows_against_pivots(
+                &F::small_prime_lane().unwrap(),
+                &mut actual,
+                columns - 1,
+                usize::MAX,
+            )
             .unwrap();
         assert_eq!(actual.rows(), expected.rows());
     }
@@ -527,7 +535,17 @@ mod tests {
         .map(|p| Lane::<Zp31>::new(p, |_| 0, |_| Zp31::one(), |_| 0).unwrap())
         {
             let p = lane.modulus();
-            for x in [0, 1, p - 1, p, p + 1, u32::MAX - 1, u32::MAX, 0x8000_0000, lane.bound] {
+            for x in [
+                0,
+                1,
+                p - 1,
+                p,
+                p + 1,
+                u32::MAX - 1,
+                u32::MAX,
+                0x8000_0000,
+                lane.bound,
+            ] {
                 assert_eq!(lane.reduce(x), x % p, "{x} mod {p}");
             }
         }
