@@ -3147,6 +3147,106 @@ fn test_certified_zeros_falls_back_where_it_does_not() {
     assert_eq!(basis.len(), 2, "(x², y)");
 }
 
+/// `M` dense affine quadratics in `N` variables, deterministic in `seed`. With `planted`, the
+/// constant terms are shifted so that a random point is a common zero.
+fn dense_affine_quadratics<const N: usize, const M: usize, G: FiniteField>(
+    seed: u64,
+    planted: bool,
+) -> Vec<MultivariatePolynomial<N, G>> {
+    let mut state = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    let mut next = move || {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (state >> 33) % 30_000 + 1
+    };
+    let mut monomials = vec![[0u32; N]];
+    for i in 0..N {
+        let mut linear = [0u32; N];
+        linear[i] = 1;
+        monomials.push(linear);
+        for j in i..N {
+            let mut quadratic = linear;
+            quadratic[j] += 1;
+            monomials.push(quadratic);
+        }
+    }
+    let point: Vec<G> = (0..N).map(|_| G::new(next())).collect();
+    (0..M)
+        .map(|_| {
+            let terms: Vec<(Monomial<N>, G)> = monomials
+                .iter()
+                .map(|e| (Monomial::new(e), G::new(next())))
+                .collect();
+            let f = MultivariatePolynomial::new(&terms);
+            if planted {
+                let at = f.eval(&point);
+                f - MultivariatePolynomial::new(&[(Monomial::new(&[0; N]), at)])
+            } else {
+                f
+            }
+        })
+        .collect()
+}
+
+/// Affine input that is not square (#1088). A certified degree's drops are final on any affine
+/// input with no fall so far (note §4.4), so the route runs on overdetermined and underdetermined
+/// systems, drops pairs there, and returns the deterministic basis.
+#[test]
+fn test_certified_zeros_drops_on_affine_input_that_is_not_square() {
+    use crate::grobner::{CountRoute, HilbertSelection};
+    type G = Zp2147483647;
+
+    fn check<const N: usize, const M: usize>(seed: u64, planted: bool, drops: bool) {
+        let system = dense_affine_quadratics::<N, M, G>(seed, planted);
+        let label = format!("n={N} m={M} seed {seed} planted {planted}");
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (expected, plain) =
+            f4_with_options(&system, order, &F4Options::default()).expect("within limits");
+        for slack in [0, 4] {
+            let (actual, statistics) = f4_with_options(
+                &system,
+                order,
+                &F4Options {
+                    hilbert: HilbertSelection::CertifiedZeros { slack },
+                    ..F4Options::default()
+                },
+            )
+            .expect("within limits");
+            let counts = statistics.hilbert;
+            assert_eq!(actual, expected, "{label}, slack {slack}: {counts:?}");
+            assert!(
+                !matches!(counts.count_route, CountRoute::Refused(_)),
+                "{label}: {counts:?}"
+            );
+            if drops {
+                assert!(counts.pairs_certified_zero > 0, "{label}: {counts:?}");
+                assert!(
+                    statistics.pairs_reduced < plain.pairs_reduced,
+                    "{label}, slack {slack}: reduced {} pairs against {}",
+                    statistics.pairs_reduced,
+                    plain.pairs_reduced
+                );
+            }
+        }
+    }
+    for seed in 0..3 {
+        for planted in [false, true] {
+            // Overdetermined, zero at degree 4: nothing to drop, since quadratics have no zero
+            // reductions below the Koszul syzygies of degree 4. The zero count turns the route off.
+            check::<5, 6>(seed, planted, false);
+            check::<6, 8>(seed, planted, false);
+            // Overdetermined with `S(4) > 0`, so degree 4 drops before the count reaches zero.
+            check::<7, 8>(seed, planted, true);
+            check::<8, 10>(seed, planted, true);
+            // Underdetermined: `S` never reaches zero.
+            check::<5, 3>(seed, planted, true);
+        }
+    }
+}
+
 /// Certification is reported, and its cost is visible, on an instance where it is not negligible.
 #[test]
 fn test_certification_cost_is_reported() {

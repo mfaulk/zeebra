@@ -7,16 +7,14 @@
 //! ideal under the no-fall witness (Theorem 3, affine input). At a certified degree every
 //! remaining pair reduces to zero, so the route drops them instead of reducing them.
 //!
-//! What a drop means differs between the two cases, and the route keeps them apart:
-//!
-//! - **Homogeneous input.** A certified degree is final: its pairs are discarded at once.
-//! - **Square affine input.** Theorem 3 certifies `L(G)` against the top-form ideal `T`, which
-//!   can be smaller than `LT(I)` until a zero count proves `T` regular. A drop is therefore a
-//!   deferral: the pairs are discarded only when the count reaches zero, and promoted back if the
-//!   route turns off first. Non-square affine input never reaches that proof and is refused.
+//! A drop is final on any input, affine of any shape included (Theorem 4): every dropped pair's
+//! S-polynomial has a standard representation over the basis in hand. A zero count is final only
+//! on homogeneous or square input (Theorem 3). Affine input that is not square can still fall into
+//! a degree the count has closed, so there a zero count turns the route off instead.
 //!
 //! The route turns off for the rest of the run at the first degree fall, the first degree that
-//! closes without matching `S`, or the first series it cannot compute. The run is then plain F4.
+//! closes without matching `S`, or the first series it cannot compute. The run is then plain F4,
+//! and the pairs already dropped stay dropped.
 
 use crate::{
     grobner::hilbert::{is_homogeneous, HilbertSeries},
@@ -37,8 +35,8 @@ pub enum CountRoute {
 
     /// The route stayed on until the queue emptied, without a zero count.
     ///
-    /// Only homogeneous input can end here: every dropped pair was a certified zero when it was
-    /// dropped, so the output satisfies Buchberger's criterion.
+    /// Every dropped pair was a certified zero when it was dropped, so the output satisfies
+    /// Buchberger's criterion.
     Open,
 
     /// The count reached zero at `degree`, which ended the run with every pair left discarded.
@@ -57,10 +55,6 @@ pub enum CountRefusal {
     /// A generator is a nonzero constant.
     ConstantGenerator,
 
-    /// Affine input with as many generators as variables is the only affine case Theorem 3 can
-    /// conclude on.
-    AffineNotSquare,
-
     /// `S` overflowed `i128`.
     Series,
 }
@@ -74,9 +68,9 @@ pub enum CountDisabled {
     /// A degree closed with `C ≠ S`: the input is not regular there.
     Mismatch,
 
-    /// Affine input ran out of pending pairs before the count reached zero, so its deferred pairs
-    /// were never certified.
-    Exhausted,
+    /// Affine input that is not square reached a zero count, which does not make its basis final:
+    /// an element of `I` can still fall into a degree the count has closed.
+    ZeroNotFinal,
 
     /// The leading-monomial series could not be computed within its budget.
     Series,
@@ -91,7 +85,7 @@ pub(crate) enum Step {
     DropDegree(u64),
     /// The count reached zero: drop every pair and end the run.
     Complete,
-    /// The route has just turned off: promote anything it deferred.
+    /// The route has just turned off.
     Disabled,
 }
 
@@ -99,7 +93,8 @@ pub(crate) enum Step {
 #[derive(Clone, Debug)]
 pub(crate) struct ZeroSkip {
     series: HilbertSeries,
-    homogeneous: bool,
+    /// Whether a zero count makes the basis final: homogeneous or square input.
+    zero_is_final: bool,
     /// Every degree up to and including this one is certified.
     certified_through: Option<u64>,
     /// The degree being processed and its current count `C`.
@@ -128,15 +123,12 @@ impl ZeroSkip {
         if degrees.contains(&0) {
             return Err(CountRefusal::ConstantGenerator);
         }
-        let homogeneous = is_homogeneous(generators);
-        if !homogeneous && degrees.len() != N {
-            return Err(CountRefusal::AffineNotSquare);
-        }
+        let zero_is_final = degrees.len() == N || is_homogeneous(generators);
         let series =
             HilbertSeries::of_regular_sequence(N, &degrees).map_err(|_| CountRefusal::Series)?;
         Ok(Self {
             series,
-            homogeneous,
+            zero_is_final,
             certified_through: None,
             open: None,
             outcome: CountRoute::Open,
@@ -146,11 +138,6 @@ impl ZeroSkip {
 
     pub(crate) fn is_live(&self) -> bool {
         self.outcome == CountRoute::Open
-    }
-
-    /// Whether a dropped pair may be discarded at once rather than deferred.
-    pub(crate) fn drops_are_final(&self) -> bool {
-        self.homogeneous
     }
 
     pub(crate) fn outcome(&self) -> CountRoute {
@@ -238,15 +225,6 @@ impl ZeroSkip {
         }
     }
 
-    /// Called when the pending set is empty but pairs remain deferred.
-    pub(crate) fn exhausted(&mut self) -> Step {
-        if !self.is_live() {
-            return Step::Continue;
-        }
-        let degree = self.open.map_or(0, |(d, _)| d);
-        self.disable(degree, CountDisabled::Exhausted)
-    }
-
     fn check(&mut self, degree: u64) -> Step {
         let Some((_, count)) = self.open else {
             return Step::Continue;
@@ -292,6 +270,9 @@ impl ZeroSkip {
     }
 
     fn complete(&mut self, degree: u64) -> Step {
+        if !self.zero_is_final {
+            return self.disable(degree, CountDisabled::ZeroNotFinal);
+        }
         self.outcome = CountRoute::Completed { degree };
         Step::Complete
     }
@@ -343,15 +324,45 @@ mod tests {
             ZeroSkip::new(&constant, GREVLEX).err(),
             Some(CountRefusal::ConstantGenerator)
         );
-        // Affine and not square: refused. Homogeneous and not square: accepted.
+        // Affine input of any shape is accepted, and so is homogeneous input.
         let affine = vec![poly::<2>(&[([2, 0], 1), ([0, 1], 1)])];
-        assert_eq!(
-            ZeroSkip::new(&affine, GREVLEX).err(),
-            Some(CountRefusal::AffineNotSquare)
-        );
+        assert!(ZeroSkip::new(&affine, GREVLEX).is_ok());
         assert!(ZeroSkip::new(&squares[..1], GREVLEX).is_ok());
-        let route = ZeroSkip::new(&katsura::<5, F>(), GREVLEX).expect("square affine");
-        assert!(route.is_live() && !route.drops_are_final());
+        assert!(ZeroSkip::new(&katsura::<5, F>(), GREVLEX).is_ok());
+    }
+
+    /// `(x, y, x² + 1)` has `S = 1 − t²`, so finding `x` and `y` makes the count zero at degree 1.
+    /// The pair `(x, x² + 1)` still falls to `1` at degree 2, so on affine input that is not square
+    /// a zero count turns the route off instead of ending the run (note §4.4.2).
+    #[test]
+    fn test_a_zero_count_ends_only_a_square_or_homogeneous_run() {
+        let (x, y) = (Monomial::<2>::new(&[1, 0]), Monomial::<2>::new(&[0, 1]));
+        let overdetermined = vec![
+            poly::<2>(&[([1, 0], 1)]),
+            poly::<2>(&[([0, 1], 1)]),
+            poly::<2>(&[([2, 0], 1), ([0, 0], 1)]),
+        ];
+        let mut route = ZeroSkip::new(&overdetermined, GREVLEX).unwrap();
+        assert_eq!(route.open::<2>(1, &[]), Step::Continue);
+        assert_eq!(route.record(1, 2, false), Step::Disabled);
+        assert_eq!(
+            route.outcome(),
+            CountRoute::Disabled {
+                degree: 1,
+                reason: CountDisabled::ZeroNotFinal
+            }
+        );
+        // The same count found as a later degree opens.
+        let mut route = ZeroSkip::new(&overdetermined, GREVLEX).unwrap();
+        assert_eq!(route.open(2, &[x, y]), Step::Disabled);
+
+        // Square affine input completes, by Theorem 3.
+        let square = vec![
+            poly::<2>(&[([1, 0], 1), ([0, 0], 1)]),
+            poly::<2>(&[([0, 1], 1)]),
+        ];
+        let mut route = ZeroSkip::new(&square, GREVLEX).unwrap();
+        assert_eq!(route.open(2, &[x, y]), Step::Complete);
     }
 
     fn squares() -> Vec<MultivariatePolynomial<3, F>> {
@@ -422,10 +433,5 @@ mod tests {
         assert_eq!(route.open(3, &[x2, y2, z2]), Step::DropDegree(3));
         assert_eq!(route.open(2, &[x2, y2, z2]), Step::Disabled);
         assert_eq!(route.outcome(), disabled(2, CountDisabled::Fell));
-
-        // Affine input that runs out of pending pairs before a zero count.
-        let mut route = ZeroSkip::new(&katsura::<3, F>(), GREVLEX).unwrap();
-        assert_eq!(route.exhausted(), Step::Disabled);
-        assert_eq!(route.outcome(), disabled(0, CountDisabled::Exhausted));
     }
 }

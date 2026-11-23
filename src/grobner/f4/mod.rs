@@ -393,9 +393,6 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 
     while pending.has_work() {
         if pending.is_empty() {
-            if let Some(route) = zero_skip.as_mut() {
-                route.exhausted();
-            }
             statistics.hilbert.pairs_promoted += pending.promote_deferred();
             continue;
         }
@@ -405,7 +402,7 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         let next_degree = pending.next_degree();
         if let (Some(route), Some(degree)) = (zero_skip.as_mut(), next_degree) {
             let step = route.open(degree, &leads);
-            match apply_count_step(step, route, &mut pending, &mut statistics.hilbert) {
+            match apply_count_step(step, &mut pending, &mut statistics.hilbert) {
                 CountAction::Proceed => {}
                 CountAction::Reselect => continue,
                 CountAction::Finish => break,
@@ -615,9 +612,9 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         statistics.peak_pair_queue = statistics.peak_pair_queue.max(&pending.footprint());
 
         // After the new elements' pairs are in, so a drop of this degree cannot miss one.
-        if let (Some(step), Some(route)) = (count_step, zero_skip.as_mut()) {
+        if let Some(step) = count_step {
             if let CountAction::Finish =
-                apply_count_step(step, route, &mut pending, &mut statistics.hilbert)
+                apply_count_step(step, &mut pending, &mut statistics.hilbert)
             {
                 break;
             }
@@ -849,32 +846,22 @@ enum CountAction {
 
 /// Carry out a count-route step on the queue.
 ///
-/// A certified degree's pairs are discarded on homogeneous input and deferred on affine input,
-/// where only a zero count makes the drop final (see [`count_route`]). A route that has just turned
-/// off returns whatever it deferred, so the rest of the run is plain F4.
+/// A certified degree's pairs are discarded, on affine input as on homogeneous input (see
+/// [`count_route`]). A route that has just turned off leaves the rest of the run to plain F4.
 fn apply_count_step<const N: usize>(
     step: Step,
-    route: &ZeroSkip,
     pending: &mut PairQueue<N>,
     counts: &mut HilbertCounts,
 ) -> CountAction {
     match step {
-        Step::Continue => CountAction::Proceed,
+        Step::Continue | Step::Disabled => CountAction::Proceed,
         Step::DropDegree(degree) => {
-            if route.drops_are_final() {
-                counts.pairs_certified_zero += pending.discard_degree(degree);
-            } else {
-                counts.pairs_deferred += pending.defer_degree(degree);
-            }
+            counts.pairs_certified_zero += pending.discard_degree(degree);
             CountAction::Reselect
         }
         Step::Complete => {
             counts.pairs_certified_zero += pending.discard_all();
             CountAction::Finish
-        }
-        Step::Disabled => {
-            counts.pairs_promoted += pending.promote_deferred();
-            CountAction::Proceed
         }
     }
 }

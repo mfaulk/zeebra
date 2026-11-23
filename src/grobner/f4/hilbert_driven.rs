@@ -85,10 +85,10 @@ pub enum HilbertSelection {
     ///
     /// Unlike the modes above this one **does** discard pairs, and only on a theorem: at a degree
     /// whose count of standard monomials meets `Π(1 − t^{d_i})/(1 − t)^n`, every remaining pair is
-    /// a zero (`docs/research/hilbert-count-acceptance.md`, Theorems 1 and 3). The route runs on
-    /// conventional F4 under a degree-compatible order only, for homogeneous input or square affine
-    /// input with no constant generator, and turns itself off at the first degree fall or mismatch,
-    /// after which the run is plain F4. See [`super::count_route`].
+    /// a zero (`docs/research/hilbert-count-acceptance.md`, Theorems 1, 3 and 4). The route runs
+    /// on conventional F4 under a degree-compatible order only, for input with no constant
+    /// generator, and turns itself off at the first degree fall or mismatch, after which the run is
+    /// plain F4. See [`super::count_route`].
     CertifiedZeros { slack: usize },
 }
 
