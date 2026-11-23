@@ -434,6 +434,11 @@ pub struct ParallelForwardStatistics {
     /// Batches that asked for workers but ran serially because the workers' reservation would
     /// have crossed the live-entry budget or the workspace cap.
     pub fallback_batches: usize,
+    /// Of those, the forward-order batches whose workers' finished rows were kept and only the
+    /// rest reduced serially, rather than the whole batch redone (#1068).
+    pub retained_batches: usize,
+    /// Rows those batches carried into the serial kernel already reduced: pivots and zero rows.
+    pub retained_rows: usize,
     /// The most threads any one batch used.
     pub max_workers: usize,
     /// Rows a worker reduced to a pivot that another worker had already published, so it reduced
@@ -469,6 +474,8 @@ impl ParallelForwardStatistics {
     fn record(&mut self, other: &Self) {
         self.batches += other.batches;
         self.fallback_batches += other.fallback_batches;
+        self.retained_batches += other.retained_batches;
+        self.retained_rows += other.retained_rows;
         self.max_workers = self.max_workers.max(other.max_workers);
         self.lost_publications += other.lost_publications;
         self.reserved_entries = self.reserved_entries.max(other.reserved_entries);

@@ -59,8 +59,10 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
         super::structured::check_reducer_block(matrix.matrix(), split),
         Ok(())
     );
-    match dispatch.reduce(matrix.matrix_mut(), split, &config, &AtomicBool::new(false)) {
-        Ok(report) => {
+    let outcome =
+        dispatch.reduce_retaining(matrix.matrix_mut(), split, &config, &AtomicBool::new(false));
+    match outcome {
+        Ok(concurrent::Outcome::Reduced(report)) => {
             *statistics = ParallelForwardStatistics {
                 batches: 1,
                 fallback_batches: 0,
@@ -70,6 +72,38 @@ pub(crate) fn forward<const N: usize, F: FiniteField>(
                 workspace_bytes: report.workspace_bytes,
                 ..Default::default()
             };
+            if measure {
+                statistics.record_pass(&report, workers);
+            }
+            Some(BlockOutcome {
+                statistics: report.statistics,
+                free_pivots: split,
+                back_substituted_rows: None,
+            })
+        }
+        // The workers' finished rows are kept and the rest reduced serially, unless that
+        // continuation is refused too, in which case the rows are restored and the caller's serial
+        // kernel redoes the batch exactly as it would have without the attempt.
+        Ok(concurrent::Outcome::Retained(partial)) => {
+            let retained = partial.completed.len();
+            let report = concurrent::continue_serially(
+                matrix.matrix_mut(),
+                split,
+                partial,
+                backend,
+                allowance,
+            );
+            *statistics = ParallelForwardStatistics {
+                fallback_batches: 1,
+                ..Default::default()
+            };
+            let report = report.ok()?;
+            statistics.retained_batches = 1;
+            statistics.retained_rows = retained;
+            statistics.max_workers = workers;
+            statistics.lost_publications = report.failed_publications;
+            statistics.reserved_entries = report.peak_reserved_entries;
+            statistics.workspace_bytes = report.workspace_bytes;
             if measure {
                 statistics.record_pass(&report, workers);
             }
@@ -353,6 +387,26 @@ mod tests {
         );
         assert!(matches!(refused, Err(F4Error::TooManyNonzeros { .. })));
         assert_eq!(refused.unwrap_err(), expected.unwrap_err());
+    }
+
+    // A pass the budget refuses partway keeps the rows its worker finished and still returns the serial basis.
+    #[test]
+    fn a_refused_pass_keeps_its_finished_rows() {
+        let system = katsura::<6, Zp32003>();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (_, baseline) = f4_reported(&system, order, &serial());
+        let peak = baseline.max_live_nonzeros;
+        let statistics = agree(
+            &system,
+            order,
+            &forced(1).with_live_entries::<Zp32003>(peak),
+        );
+        assert!(statistics.retained_batches > 0, "{statistics:?}");
+        assert!(statistics.retained_rows > 0, "{statistics:?}");
+        assert!(
+            statistics.retained_batches <= statistics.fallback_batches,
+            "{statistics:?}"
+        );
     }
 
     // A batch the gate leaves serial is returned unpermuted, so declining costs no row movement.

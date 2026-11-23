@@ -159,6 +159,8 @@ fn run<const N: usize, F: FiniteField>(problem: &str, modulus: u64, arm: &str, s
             ("batches", Json::size(statistics.batches)),
             ("parallel_batches", Json::size(p.batches)),
             ("parallel_fallback_batches", Json::size(p.fallback_batches)),
+            ("parallel_retained_batches", Json::size(p.retained_batches)),
+            ("parallel_retained_rows", Json::size(p.retained_rows)),
             ("parallel_max_workers", Json::size(p.max_workers)),
             ("lost_publications", Json::size(p.lost_publications)),
             ("reserved_entries", Json::size(p.reserved_entries)),

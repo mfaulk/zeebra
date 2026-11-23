@@ -30,6 +30,12 @@ the live-entry budget, or whose workspace exceeds 64 MiB, falls back to the seri
 untouched matrix, so no computation serial admits is refused. A worker panic propagates; nothing
 partial is returned.
 
+*Later change (#1068, not covered by the measurements below):* a live-entry refusal after the
+workers have started no longer discards their finished rows. They are committed, their pivots
+join the reducer block as established pivots, and the serial kernel reduces only the remaining
+rows. If that continuation would cross the budget, the lower rows are restored and the batch is
+redone serially from scratch as before, so no batch the serial kernel admits is refused.
+
 ## Predeclared gates
 
 Declared at commit `8ccea616`, before any complete-task campaign:
