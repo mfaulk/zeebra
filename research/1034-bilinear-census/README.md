@@ -1,6 +1,7 @@
 # #1034 bidegree census of F4 batch matrices
 
-**Measured at:** `73a14be0` (branch `feat/1034-bidegree-census`). The binary was built from that
+**Measured at:** `73a14be0` (tag `measured/1034-bilinear-census`; the counting code is unchanged on
+`main` as `53c0649c`). The binary was built from that
 tree before `cargo fmt` reformatted it, so the code is the same and only the whitespace differs.
 Machine: macOS/arm64 laptop, unpinned. Every figure here is a **count**, not a time, and does not
 depend on the machine. The wall cap decides only which instances complete.

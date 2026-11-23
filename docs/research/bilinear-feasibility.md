@@ -5,7 +5,7 @@ seeded bilinear generator and the bidegree census. So are the development matrix
 balanced affine instances they meet the pre-declared count criteria, but narrowly on one of them
 and on one shape only. The comparator arms and the deciding freeze are still open (§6).
 
-**Measured at:** `73a14be0` (matrix counts only; no timing or memory figure appears here).
+**Measured at:** `73a14be0`, tag `measured/1034-bilinear-census` (matrix counts only; no timing or memory figure appears here).
 
 Parent: #1028 (candidate C). Generator family: #1007. Shared verifier: #1010.
 
