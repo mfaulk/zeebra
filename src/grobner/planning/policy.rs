@@ -147,15 +147,21 @@ impl std::fmt::Display for PlanObjective {
 /// fallback starting with one batch left can spend one. F4 already counts batches and refuses at a
 /// limit; the budget rides that mechanism rather than inventing a second one.
 ///
-/// `max_elapsed` **gates attempts and does not interrupt one**, because F4 has no cooperative time
-/// check to ride. So it bounds whether a *second* route starts, not how long the first runs —
-/// which is the protection katsura-7 needs, and is not a wall-clock guarantee.
+/// `max_elapsed` **gates additional attempts and does not interrupt a running attempt**. The first
+/// attempt always starts, even with `Some(Duration::ZERO)`; a retry or fallback starts only if
+/// elapsed time remains. The planner does not pass the remaining allowance into
+/// [`F4Options::max_wall_time`](crate::grobner::F4Options::max_wall_time). That separate cooperative
+/// limit stays at the caller's value and applies to each F4 basis computation independently.
 ///
-/// The asymmetry is a property of what the solver can be told, not a design preference, and it is
-/// stated here rather than left for a caller to discover.
+/// Neither limit guarantees a wall bound for the whole plan: F4 can overrun its cooperative limit,
+/// and [`FglmOptions`](crate::grobner::FglmOptions) has no wall budget. Use an external supervisor
+/// when the complete solve must be bounded.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PlanBudget {
-    /// Wall clock across every attempt, checked **between** them. `None` for no limit.
+    /// Elapsed-time gate for retries and fallbacks, checked **between** attempts. `None` for no limit.
+    ///
+    /// The first attempt always starts, even with `Some(Duration::ZERO)`. Does not interrupt an
+    /// attempt or tighten the caller's [`F4Options::max_wall_time`](crate::grobner::F4Options::max_wall_time).
     pub max_elapsed: Option<Duration>,
 
     /// F4 batches summed over every attempt, discarded work included. `None` for no limit.

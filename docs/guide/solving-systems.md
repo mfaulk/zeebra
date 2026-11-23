@@ -175,8 +175,11 @@ exists, `D` is *counted* and the span requirement is a function of `D` alone, so
 `max_elapsed` and `max_total_batches`. A peak is not consumed by an attempt, so the entry and byte
 budgets stay per-attempt in `SolveOptions`. `SolvePlan` keeps the same split: `total_batches()`
 sums, `peak_estimated_bytes()` maxes. `max_elapsed` is checked *between* attempts, so it bounds
-whether a second route starts rather than how long the first runs. Separately,
-`SolveOptions::f4.max_wall_time` supplies F4's cooperative time limit for each basis computation.
+whether a retry or fallback starts rather than how long an attempt runs. The first attempt always
+starts, even with `max_elapsed: Some(Duration::ZERO)`. The planner does not pass the remaining
+allowance into `SolveOptions::f4.max_wall_time`: that separate cooperative limit keeps the caller's
+value for each basis computation. FGLM has no wall budget, so bounding the complete solve requires
+an external supervisor.
 
 An `Err` from the planner means **inconclusive**, never "no solution".
 `cargo run --release --example solve_auto` compares all four policies against an offline
