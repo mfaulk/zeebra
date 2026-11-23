@@ -1450,13 +1450,10 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
 
     /// [`Self::admissible`], in the representation the batch reduces in.
     pub(super) fn admissible_pivot(&self, c: usize, t: &Signature<N>) -> Option<PivotRow<'_, F>> {
-        let r = self.at[c];
-        if r == NONE || self.sigs[r as usize].cmp_in(t, self.order) != Ordering::Less {
-            return None;
-        }
+        let row = self.admissible(c, t)?;
         Some(match &self.lane {
-            Some((_, rows)) => PivotRow::Lane(&rows[r as usize]),
-            None => PivotRow::Field(self.rows[r as usize].as_slice()),
+            Some((_, rows)) => PivotRow::Lane(&rows[self.at[c] as usize]),
+            None => PivotRow::Field(row),
         })
     }
 
