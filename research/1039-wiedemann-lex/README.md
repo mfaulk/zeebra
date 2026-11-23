@@ -28,6 +28,20 @@ generated deterministically:
 | `katsura-N`, `cyclic-N` | `grobner::benchmark_systems` | 2^(N-1); cyclic-6/7: 156, 924 | dense operators; cyclic non-shape |
 | `pquad-N-s` | N dense quadratics in N variables with a planted point, seed s | 2^N | shape, dense operators |
 
+## Sessions
+
+| Job | Session | Cells | Contaminated |
+|---|---|---|---|
+| `05a26851f550` | `n9`: nine repetitions, scored arms at 1 and 16 workers | 486 | 56 (11.5%; 52 on the clock rule) |
+| `1bb75c879cf3` | `n3`: `wd-6-6`, `wd-5-10` and the controls, three repetitions | 60 | 2 |
+| `33d5de1b9ac7` | `classical` on the `n9` rows, three repetitions | 27 | 0 |
+| `f658dbec76f0` | `replace`: three more repetitions of every `n9` arm, for its contaminated attempts | 162 | 10 |
+| `94aed1e56361` | `replace-n3`: the two contaminated `n3` cells | 4 | 0 |
+
+Contaminated attempts are excluded and never timed; no session reached the 20% void limit.
+`summarize.py` pools sessions by row and arm and keys repetitions `job:rep`, so paired ratios never
+cross a session.
+
 ## Reproduce
 
 Build from the archive, so the bench-job provenance check holds. Keep target and temporary
