@@ -83,7 +83,7 @@ def main():
         failures = defaultdict(list)
         for r in one:
             if completed(r) and len(digests) == 1:
-                walls[r['arm']][r['rep']] = r['wall_ns']
+                walls[r['arm']][f"{r.get('job')}:{r['rep']}"] = r['wall_ns']
             else:
                 failures[r['arm']].append((r.get('report') or {}).get('status') or r['status'])
         g = walls.get('grobx155', {})
