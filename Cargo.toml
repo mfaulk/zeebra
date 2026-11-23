@@ -411,5 +411,10 @@ name = "parallel_forward_calibration"
 required-features = ["research-work"]
 
 [[example]]
+name = "forward_kernel_study"
+test = true
+required-features = ["external-runners"]
+
+[[example]]
 name = "parallel_forward_study"
 required-features = ["research-work"]
