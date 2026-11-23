@@ -1,6 +1,7 @@
 //! The opt-in entry point (#905): a pre-solve dispatch between the shipping F4 and the signature
-//! engine. The rule reads only the order, the input's size, degrees and density, the caller's
-//! worker cap and the field's width, never an instance name or digest, so it costs one pass over
+//! engine. The rule reads only the order, the input's size, degrees, density and pure powers in
+//! the top forms, the caller's worker cap and the field's width, never an instance name or digest,
+//! so it costs one pass over
 //! the generators' terms; it never hands a solve over midway (plan §4.2).
 //!
 //! The rule is asymmetric on purpose. Sending an input to the shipping F4 that the signature
@@ -44,6 +45,11 @@ pub const SIGNATURE_CROSSOVER_WORKERS: usize = 4;
 /// count, and no density, term count or degree feature separates MQ10 (95 terms, density 0.16)
 /// from them. The band only ever moves an input to the shipping F4, so a miss loses the saving and
 /// is never slower than the shipping F4 (`docs/research/m32-adaptive-dispatch.md`).
+///
+/// Inside the band the crossover also requires [`DispatchFeatures::infinity_witness`]. Ten
+/// variables alone caught katsura-10 / GF(2³¹−1) and the dense mq-random-10 / Goldilocks, where the
+/// signature engine is 0.55–0.60× the shipping F4 at 16 workers (#978). Both carry every square
+/// in their top forms; MQ10's sparse ladder row lacks `x1²`, so its top forms are not regular.
 pub const SIGNATURE_CROSSOVER_VARIABLES: RangeInclusive<usize> = 10..=10;
 
 /// Signature inputs in fewer variables than this run on at most [`SIGNATURE_SMALL_TEAM`] workers:
@@ -78,9 +84,10 @@ pub enum ShippingReason {
     /// katsura-9, katsura-11 and MQ11 it passed 8 GiB where conventional F4 takes seconds, and on
     /// MQ10 its signature basis reached 34× the grevlex run's (#961). Only grevlex is routed to it.
     Order,
-    /// A quadratic input in [`SIGNATURE_CROSSOVER_VARIABLES`] with at least
-    /// [`SIGNATURE_CROSSOVER_WORKERS`] workers, where the shipping F4's parallel elimination
-    /// outruns the signature engine's serial symbolic stage.
+    /// A quadratic input in [`SIGNATURE_CROSSOVER_VARIABLES`] with a solution at infinity
+    /// ([`DispatchFeatures::infinity_witness`]) and at least [`SIGNATURE_CROSSOVER_WORKERS`]
+    /// workers, where the shipping F4's parallel elimination outruns the signature engine's serial
+    /// symbolic stage.
     WorkerCrossover,
     /// The signature engine crossed one of its own size limits, which its signature basis and
     /// matrices can reach before the shipping F4's would, and the shipping F4 was run instead with
@@ -116,6 +123,10 @@ pub struct DispatchFeatures {
     pub workers: usize,
     /// Bits in the field element's in-memory representation.
     pub field_bits: u32,
+    /// The first appearing variable `x_k` whose coordinate point `e_k` is a zero of every
+    /// generator's top-degree form, i.e. no top form contains a pure power of `x_k`. Such a point
+    /// is a solution at infinity, so the top forms are not a regular sequence (#978).
+    pub infinity_witness: Option<usize>,
 }
 
 impl DispatchFeatures {
@@ -161,6 +172,8 @@ pub fn signature_route<const N: usize, F: FiniteField>(
     let started = Instant::now();
     engine::graded(order)?;
     let mut used = [false; N];
+    // Variables with a pure power in some top form; a nonzero constant covers them all.
+    let mut covered = [false; N];
     let mut degrees = Vec::with_capacity(generators.len());
     let mut features = DispatchFeatures {
         workers,
@@ -170,12 +183,19 @@ pub fn signature_route<const N: usize, F: FiniteField>(
     for p in generators.iter().filter(|p| !p.is_zero()) {
         features.generators += 1;
         features.terms += p.terms().len();
+        let degree = p.degree();
+        if degree == 0 {
+            covered = [true; N];
+        }
         for m in p.terms().keys() {
+            let mut support = m.exponents().iter().enumerate().filter(|(_, &e)| e > 0);
+            if let (Some((k, &e)), None) = (support.next(), support.next()) {
+                covered[k] |= u64::from(e) == degree;
+            }
             for (seen, &e) in used.iter_mut().zip(m.exponents()) {
                 *seen |= e > 0;
             }
         }
-        let degree = p.degree();
         degrees.push(degree);
         features.max_degree = features.max_degree.max(degree);
         if degree > 1
@@ -185,6 +205,7 @@ pub fn signature_route<const N: usize, F: FiniteField>(
         }
     }
     features.variables = used.iter().filter(|&&u| u).count();
+    features.infinity_witness = (0..N).find(|&k| used[k] && !covered[k]);
     features.monomials = degrees
         .iter()
         .map(|&d| monomials_up_to_degree(features.variables, d))
@@ -200,6 +221,7 @@ pub fn signature_route<const N: usize, F: FiniteField>(
     } else if features.workers >= SIGNATURE_CROSSOVER_WORKERS
         && features.max_degree == 2
         && SIGNATURE_CROSSOVER_VARIABLES.contains(&features.variables)
+        && features.infinity_witness.is_some()
     {
         SignatureRoute::Shipping(ShippingReason::WorkerCrossover)
     } else {
@@ -240,8 +262,9 @@ pub fn signature_route<const N: usize, F: FiniteField>(
 ///
 /// # Performance caveat
 /// The dispatch thresholds were fitted to the M31/M32 development corpus, eleven rows in five
-/// families. Dense quadratic inputs go to the shipping F4 from four workers up only to at most ten
-/// variables, a bound fitted to MQ10 against MQ11 alone (#927); other families are not covered.
+/// families. Quadratic inputs go to the shipping F4 from four workers up only at exactly ten
+/// variables and only with a solution at infinity, a band fitted to MQ10 against MQ11 alone (#927)
+/// and narrowed by #978; other families are not covered.
 /// Measure your own systems before preferring this entry point; [`f4_signature_reported`] reports
 /// which route ran, on how many workers. Graded-lex always runs the shipping F4
 /// ([`ShippingReason::Order`], #961).

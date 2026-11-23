@@ -298,15 +298,50 @@ fn test_dispatch_is_cheap_and_recorded() {
     );
 }
 
-/// A quadratic input in the crossover band takes the signature engine below
-/// `SIGNATURE_CROSSOVER_WORKERS` workers and the shipping F4 from there up, at three fields;
-/// quadratics just outside the band keep the signature engine at every worker count.
+/// `system` with every term `x_k^2` removed: no top form has a pure power of `x_k`, so the
+/// coordinate point `e_k` is a zero of every top form.
+fn without_square<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    k: usize,
+) -> Vec<MultivariatePolynomial<N, F>> {
+    system
+        .iter()
+        .map(|p| {
+            let terms: Vec<_> = p
+                .terms()
+                .iter()
+                .filter(|(m, _)| m.exponents()[k] != 2)
+                .map(|(m, c)| (*m, *c))
+                .collect();
+            MultivariatePolynomial::new(&terms)
+        })
+        .collect()
+}
+
+/// A quadratic input in the crossover band whose top forms share a coordinate zero takes the
+/// signature engine below `SIGNATURE_CROSSOVER_WORKERS` workers and the shipping F4 from there up,
+/// at three fields. Quadratics just outside the band, and dense quadratics inside it (every top
+/// form has every square, so there is no witness), keep the signature engine at every worker
+/// count (#978: mq-random-10 / Goldilocks is the dense shape).
 #[test]
 fn test_quadratic_in_the_band_crosses_to_shipping_at_the_worker_threshold() {
     fn crosses<const N: usize, F: FiniteField>() {
-        let system = dense_quadratic::<N, F>(N as u64);
+        let dense = dense_quadratic::<N, F>(N as u64);
+        let witnessed = without_square(&dense, N / 2);
+        assert_eq!(decide(&dense, 16).features.infinity_witness, None);
+        assert_eq!(
+            decide(&witnessed, 16).features.infinity_witness,
+            Some(N / 2)
+        );
         for count in 1..=16 {
-            let report = decide(&system, count);
+            let report = decide(&dense, count);
+            assert_eq!(
+                report.route,
+                SignatureRoute::Signature,
+                "dense, {N} variables, {count} workers"
+            );
+            assert_eq!(report.features.workers, count);
+            let report = decide(&witnessed, count);
             let expected = if SIGNATURE_CROSSOVER_VARIABLES.contains(&N)
                 && count >= SIGNATURE_CROSSOVER_WORKERS
             {
@@ -314,8 +349,10 @@ fn test_quadratic_in_the_band_crosses_to_shipping_at_the_worker_threshold() {
             } else {
                 SignatureRoute::Signature
             };
-            assert_eq!(report.route, expected, "{N} variables, {count} workers");
-            assert_eq!(report.features.workers, count);
+            assert_eq!(
+                report.route, expected,
+                "witnessed, {N} variables, {count} workers"
+            );
         }
     }
     assert_eq!(SIGNATURE_CROSSOVER_WORKERS, 4);
@@ -343,6 +380,7 @@ fn test_mq10_crosses_at_four_workers_at_both_fields() {
             .collect();
         for count in [1, 2, 3, 4, 8, 16] {
             let report = decide(&system, count);
+            assert!(report.features.infinity_witness.is_some());
             let crossed = report.route == SignatureRoute::Shipping(ShippingReason::WorkerCrossover);
             assert_eq!(
                 crossed,
@@ -354,6 +392,70 @@ fn test_mq10_crosses_at_four_workers_at_both_fields() {
     }
     mq10::<Zp32003>(32003);
     mq10::<Zp2147483647>(2147483647);
+}
+
+/// Katsura-10 is quadratic in ten variables, but each of its quadratics carries `x_k^2` for some
+/// `k` and together they carry every square, so it has no coordinate zero at infinity and keeps
+/// the signature engine at every worker count. At GF(2³¹−1) and 16 workers that engine is 0.601×
+/// conventional F4 (#978).
+#[test]
+fn test_katsura10_keeps_the_signature_engine_at_every_worker_count() {
+    fn keeps<F: FiniteField>() {
+        let system = katsura::<10, F>();
+        for count in [1, 2, 4, 8, 16] {
+            let report = decide(&system, count);
+            assert_eq!(report.features.variables, 10);
+            assert_eq!(report.features.infinity_witness, None);
+            assert_eq!(report.route, SignatureRoute::Signature, "{count} workers");
+        }
+    }
+    keeps::<Zp32003>();
+    keeps::<Zp2147483647>();
+}
+
+/// The witness reads each generator's top form only: a pure power of `x_k` below the generator's
+/// degree does not cover `x_k`, a linear generator covers the variables it contains, a nonzero
+/// constant covers every variable, and a variable that appears nowhere is never a witness.
+#[test]
+fn test_infinity_witness_reads_pure_powers_in_the_top_forms() {
+    type F = Zp32003;
+    let m = |e: [u32; 3]| crate::Monomial::new(&e);
+    let poly = |terms: &[([u32; 3], u64)]| {
+        let terms: Vec<_> = terms.iter().map(|&(e, c)| (m(e), F::new(c))).collect();
+        MultivariatePolynomial::<3, F>::new(&terms)
+    };
+    let witness = |system: &[MultivariatePolynomial<3, F>]| {
+        signature_route(system, GREVLEX, &workers(1))
+            .expect("graded")
+            .features
+            .infinity_witness
+    };
+    // x0^2 + x1*x2, x1^2 + x0 (x0 below the top degree), x2^2: e_0 zeros every top form.
+    let system = [
+        poly(&[([2, 0, 0], 1), ([0, 1, 1], 1)]),
+        poly(&[([0, 2, 0], 1), ([1, 0, 0], 1)]),
+        poly(&[([0, 0, 2], 1)]),
+    ];
+    assert_eq!(witness(&system[1..]), Some(0));
+    assert_eq!(witness(&system), None);
+    // x0*x1 + x2^2 and the linear x0 + x2: x1 has no pure power, x0 and x2 do.
+    let system = [
+        poly(&[([1, 1, 0], 1), ([0, 0, 2], 1)]),
+        poly(&[([1, 0, 0], 1), ([0, 0, 1], 1)]),
+    ];
+    assert_eq!(witness(&system), Some(1));
+    // A nonzero constant generator covers every variable.
+    let system = [
+        poly(&[([1, 1, 0], 1), ([0, 0, 2], 1)]),
+        poly(&[([0, 0, 0], 5)]),
+    ];
+    assert_eq!(witness(&system), None);
+    // Only x0 and x2 appear, and both have pure powers: the absent x1 is not a witness.
+    let system = [
+        poly(&[([2, 0, 0], 1)]),
+        poly(&[([0, 0, 2], 1), ([1, 0, 1], 1)]),
+    ];
+    assert_eq!(witness(&system), None);
 }
 
 /// Every #961 row shape goes to the shipping F4 under graded-lex at every worker count and two
@@ -487,8 +589,12 @@ fn test_entry_point_equals_shipping_f4_on_the_crossover_route() {
     fn squares<F: FiniteField>() -> Vec<MultivariatePolynomial<10, F>> {
         (0..10)
             .map(|i| {
+                // x_i^2, except x0*x2 in place of x0^2, so e_0 is a zero of every top form.
                 let mut e = [0; 10];
                 e[i] = 2;
+                if i == 0 {
+                    e = [1, 0, 1, 0, 0, 0, 0, 0, 0, 0];
+                }
                 let mut f = [0; 10];
                 f[(i + 1) % 10] = 1;
                 MultivariatePolynomial::new(&[

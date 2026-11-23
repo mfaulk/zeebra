@@ -95,6 +95,35 @@ the smallest full-team-preferring training row. Each family left out in turn, th
 The MQ fold misroutes by more than 5%, so **H4 is falsified on its own validation clause** whatever
 Gate R reads: the band is MQ10's, not a property the other families predict.
 
+### Addendum (#978): the band now requires a solution at infinity
+
+The M32 final cohort found the band catching two held-out rows of MQ10's shape where it is wrong:
+mq-random-10 / Goldilocks and katsura-10 / GF(2³¹−1). Forced, the signature engine there is
+0.552× and 0.601× conventional F4 at 16 w, so the routed path read 1.80× and 1.66× M31
+([M32 report](../MILESTONE-ADAPTIVE-F4.md) §15.4). The band row in the table above now reads
+"greatest degree 2, variables in `10..=10`, **a solution at infinity**, cap ≥ 4 workers".
+
+The added condition is structural, not fitted. Let `x_k` be a variable that appears in the input
+but has no pure power `x_k^d` in any degree-`d` generator's top-degree form. Then the coordinate
+point `e_k` is a common zero of the top forms, which therefore have a nontrivial projective zero.
+That means they are not a regular sequence, and the input has a solution at infinity. The signature
+criterion removes every zero reduction only on regular input, so this is where the signature
+engine's extra elements live. The test is one pass over the terms
+(`DispatchFeatures::infinity_witness`). It is a sufficient condition for non-regularity, not a
+characterization: a non-regular input can lack the witness.
+
+| Row (10 variables, quadratic) | Pure powers in the top forms | Witness | Route from 4 w |
+|---|---|---|---|
+| MQ10, sparse ladder (both fields) | `x3²`, `x10²` and the linear form's `x6`, `x9`, `x10` | `x1` | shipping (unchanged) |
+| katsura-10 (any field) | every `x_k²` | none | signature (was shipping) |
+| mq-random-10 / Goldilocks, dense | every `x_k²` | none | signature (was shipping) |
+
+Outside the band nothing changes. On every dev row the route is unchanged. The narrowing only moves
+rows from the shipping F4 back to the signature engine, which is M31's route for them, so on any
+row it returns M31's behaviour. Both rows above were read in the final cohort, so they are
+development data under #1005's cohort rule. Confirming the condition on rows nobody has read still
+needs a new held-out set on the bench host.
+
 ## 3. Gate R (plan §8.2)
 
 Method: plan §10.2–10.3. Fresh process per child, arms rotated one place per repetition, ratios
