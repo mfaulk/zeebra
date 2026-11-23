@@ -1,4 +1,4 @@
-//! #1077 research: F4's packed `GF(2)` route on the residual columns only.
+//! F4's packed `GF(2)` reducer sweep on the residual columns only (#1077, the default since #1092).
 //!
 //! A structured batch is `[A B; C D]`: reducer rows `[A B]` with `A` unit upper triangular on the
 //! columns the reducers lead, and pair rows `[C D]`. Over `GF(2)` the pair block after the reducer
@@ -47,16 +47,6 @@ fn flip_bit(words: &mut [u64], column: usize) {
 
 fn ones(words: &[u64]) -> usize {
     words.iter().map(|w| w.count_ones() as usize).sum()
-}
-
-/// Which reducer tails the residual route builds.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum ResidualTails {
-    /// Only the tails a pair row reaches, directly or through another tail.
-    #[default]
-    Lazy,
-    /// Every reducer's tail, reached or not.
-    Eager,
 }
 
 /// What the residual route did, summed over batches; byte counts are the largest of any batch.
@@ -180,7 +170,6 @@ pub(crate) fn residual_form<F: FiniteField>(
     reducers: &[SparseRow<F>],
     pairs: &[SparseRow<F>],
     columns: usize,
-    tails: ResidualTails,
     room: usize,
 ) -> Result<ResidualForm, Decline> {
     let clock = Instant::now();
@@ -235,35 +224,14 @@ pub(crate) fn residual_form<F: FiniteField>(
         }
     }
     statistics.referenced_tails = referenced.iter().filter(|&&r| r).count();
-    // A reducer names only later reducers, so one ascending pass closes the set under reference.
-    let mut needed = referenced.clone();
-    match tails {
-        ResidualTails::Eager => needed.fill(true),
-        ResidualTails::Lazy => {
-            for index in 0..reducers.len() {
-                if needed[index] {
-                    for &(column, _) in &reducers[index].entries()[1..] {
-                        if known[column] != NONE {
-                            needed[known[column]] = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    let mut slot = vec![NONE; reducers.len()];
-    let mut built = 0;
-    for (index, &need) in needed.iter().enumerate() {
-        if need {
-            slot[index] = built;
-            built += 1;
-        }
-    }
+    // Every tail is built: every F4 batch reaches every tail, so building only the reachable ones
+    // saved nothing measurable (#1077, §5).
+    let built = reducers.len();
 
     let row_bytes = stride * size_of::<u64>();
     let maps = columns * 2 * size_of::<usize>()
         + width * size_of::<usize>()
-        + reducers.len() * (2 + 3 * size_of::<usize>());
+        + reducers.len() * (1 + 2 * size_of::<usize>());
     let tail_bytes = built * row_bytes;
     // Per pair row a cursor, a queue link and a scratch use; per referenced tail a member and a head.
     let queue_bytes = pairs.len() * (2 * size_of::<usize>() + size_of::<(usize, usize)>())
@@ -329,18 +297,14 @@ pub(crate) fn residual_form<F: FiniteField>(
     // Back to front: every reducer a tail names comes later, so its tail is already built.
     let clock = Instant::now();
     let mut tail_words = vec![0u64; built * stride];
-    for index in (0..reducers.len()).rev() {
-        let at = slot[index];
-        if at == NONE {
-            continue;
-        }
+    for at in (0..built).rev() {
         let (head, rest) = tail_words.split_at_mut((at + 1) * stride);
         let tail = &mut head[at * stride..];
-        for &(column, _) in &reducers[index].entries()[1..] {
+        for &(column, _) in &reducers[at].entries()[1..] {
             match known[column] {
                 NONE => flip_bit(tail, compact[column]),
                 later => {
-                    let from = (slot[later] - at - 1) * stride;
+                    let from = (later - at - 1) * stride;
                     xor_into(tail, &rest[from..from + stride]);
                     statistics.tail_xors += 1;
                 }
@@ -354,7 +318,7 @@ pub(crate) fn residual_form<F: FiniteField>(
     statistics.tails = clock.elapsed();
 
     let clock = Instant::now();
-    let tail = |reducer: usize| &tail_words[slot[reducer] * stride..(slot[reducer] + 1) * stride];
+    let tail = |reducer: usize| &tail_words[reducer * stride..(reducer + 1) * stride];
     let mut table: Vec<u64> = Vec::new();
     let mut targets: Vec<(usize, usize)> = Vec::new();
     for (index, group) in members.iter().enumerate() {
@@ -436,7 +400,6 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
     selected: &[bool],
     max_entries: usize,
     max_bytes: usize,
-    tails: ResidualTails,
 ) -> Result<Option<Packed>, Refusal> {
     debug_assert!(super::packed::characteristic_two::<F>());
     let split = matrix.partition_reducers_first();
@@ -452,7 +415,7 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
     let Some(room) = max_bytes.checked_sub(initial_nonzeros.saturating_mul(entry_bytes)) else {
         return Ok(None);
     };
-    let Ok(mut form) = residual_form(reducers, pairs, columns, tails, room) else {
+    let Ok(mut form) = residual_form(reducers, pairs, columns, room) else {
         return Ok(None);
     };
 
@@ -537,7 +500,7 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{residual_form, Decline, ResidualTails};
+    use super::{residual_form, Decline};
     use crate::{
         fields::{Gf256, Zp13, Zp2},
         grobner::{
@@ -558,7 +521,6 @@ mod tests {
     };
     use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
-    const TAILS: [ResidualTails; 2] = [ResidualTails::Lazy, ResidualTails::Eager];
     const ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
 
     fn row(mut columns: Vec<usize>) -> SparseRow<Zp2> {
@@ -695,26 +657,19 @@ mod tests {
                         true,
                     );
                     let expected = full_width(&batch);
-                    for tails in TAILS {
-                        let form = residual_form(
-                            &batch.reducers,
-                            &batch.pairs,
-                            batch.columns,
-                            tails,
-                            usize::MAX,
-                        )
-                        .unwrap();
-                        assert_eq!(form.matrix.num_columns(), residual);
-                        assert_eq!(form.statistics.residual_columns, residual);
-                        for index in 0..batch.pairs.len() {
-                            let full = columns_of(&expected, index, None);
-                            assert!(full.iter().all(|&c| !batch.known[c]));
-                            assert_eq!(
-                                columns_of(&form.matrix, index, Some(&form.original)),
-                                full,
-                                "residual {residual}, reducers {reducers}, row {index}, {tails:?}"
-                            );
-                        }
+                    let form =
+                        residual_form(&batch.reducers, &batch.pairs, batch.columns, usize::MAX)
+                            .unwrap();
+                    assert_eq!(form.matrix.num_columns(), residual);
+                    assert_eq!(form.statistics.residual_columns, residual);
+                    for index in 0..batch.pairs.len() {
+                        let full = columns_of(&expected, index, None);
+                        assert!(full.iter().all(|&c| !batch.known[c]));
+                        assert_eq!(
+                            columns_of(&form.matrix, index, Some(&form.original)),
+                            full,
+                            "residual {residual}, reducers {reducers}, row {index}"
+                        );
                     }
                 }
             }
@@ -731,39 +686,30 @@ mod tests {
             let selected: Vec<bool> = (0..batch.columns).map(|_| rng.gen_bool(0.5)).collect();
             let mut full = full_width(&batch);
             let full_echelon = reduced_row_echelon_four_russians_selected(&mut full, 6, &selected);
-            for tails in TAILS {
-                let mut form = residual_form(
-                    &batch.reducers,
-                    &batch.pairs,
-                    batch.columns,
-                    tails,
-                    usize::MAX,
-                )
-                .unwrap();
-                let local: Vec<bool> = form.original.iter().map(|&c| selected[c]).collect();
-                let echelon =
-                    reduced_row_echelon_four_russians_selected(&mut form.matrix, 6, &local);
-                assert_eq!(echelon.rank, full_echelon.rank);
-                assert!(
-                    echelon.rank < batch.pairs.len(),
-                    "the batch is rank deficient"
-                );
-                for index in 0..echelon.rank {
-                    let ours = columns_of(&form.matrix, index, Some(&form.original));
-                    let theirs = columns_of(&full, index, None);
-                    assert_eq!(ours[0], theirs[0], "pivot columns agree");
-                    if selected[ours[0]] {
-                        assert_eq!(ours, theirs, "residual {residual}, row {index}");
-                    }
+            let mut form =
+                residual_form(&batch.reducers, &batch.pairs, batch.columns, usize::MAX).unwrap();
+            let local: Vec<bool> = form.original.iter().map(|&c| selected[c]).collect();
+            let echelon = reduced_row_echelon_four_russians_selected(&mut form.matrix, 6, &local);
+            assert_eq!(echelon.rank, full_echelon.rank);
+            assert!(
+                echelon.rank < batch.pairs.len(),
+                "the batch is rank deficient"
+            );
+            for index in 0..echelon.rank {
+                let ours = columns_of(&form.matrix, index, Some(&form.original));
+                let theirs = columns_of(&full, index, None);
+                assert_eq!(ours[0], theirs[0], "pivot columns agree");
+                if selected[ours[0]] {
+                    assert_eq!(ours, theirs, "residual {residual}, row {index}");
                 }
             }
         }
     }
 
-    /// Randomized shapes: residual and full-width sweeps agree on every row, and lazy tails are
-    /// the reachable subset of the eager ones.
+    /// Randomized shapes: residual and full-width sweeps agree on every row, and every reducer's
+    /// tail is built.
     #[test]
-    fn test_random_batches_agree_and_lazy_tails_are_a_subset() {
+    fn test_random_batches_agree_and_every_tail_is_built() {
         let mut rng = StdRng::seed_from_u64(1079);
         for _ in 0..200 {
             let reducers = rng.gen_range(0..200);
@@ -782,33 +728,17 @@ mod tests {
                 deficient,
             );
             let expected = full_width(&batch);
-            let lazy = residual_form(
-                &batch.reducers,
-                &batch.pairs,
-                batch.columns,
-                ResidualTails::Lazy,
-                usize::MAX,
-            )
-            .unwrap();
-            let eager = residual_form(
-                &batch.reducers,
-                &batch.pairs,
-                batch.columns,
-                ResidualTails::Eager,
-                usize::MAX,
-            )
-            .unwrap();
-            assert_eq!(lazy.matrix, eager.matrix);
-            assert_eq!(eager.statistics.tails_built, reducers);
-            assert!(lazy.statistics.tails_built <= reducers);
-            assert!(lazy.statistics.tails_built >= lazy.statistics.referenced_tails);
+            let form =
+                residual_form(&batch.reducers, &batch.pairs, batch.columns, usize::MAX).unwrap();
+            assert_eq!(form.statistics.tails_built, reducers);
+            assert!(form.statistics.referenced_tails <= reducers);
             assert_eq!(
-                lazy.statistics.known_entries + lazy.statistics.residual_entries,
+                form.statistics.known_entries + form.statistics.residual_entries,
                 batch.pairs.iter().map(SparseRow::nonzeros).sum::<usize>()
             );
             for index in 0..pairs {
                 assert_eq!(
-                    columns_of(&lazy.matrix, index, Some(&lazy.original)),
+                    columns_of(&form.matrix, index, Some(&form.original)),
                     columns_of(&expected, index, None)
                 );
             }
@@ -821,33 +751,12 @@ mod tests {
     fn test_residual_form_declines_coefficients_and_bytes() {
         let mut rng = StdRng::seed_from_u64(1080);
         let batch = synthetic(&mut rng, 30, 70, 20, 0.2, 0.2, false);
-        let fits = residual_form(
-            &batch.reducers,
-            &batch.pairs,
-            batch.columns,
-            ResidualTails::Lazy,
-            usize::MAX,
-        )
-        .unwrap();
+        let fits = residual_form(&batch.reducers, &batch.pairs, batch.columns, usize::MAX).unwrap();
         let bytes = fits.statistics.workspace_bytes;
         assert!(bytes > 0);
-        assert!(residual_form(
-            &batch.reducers,
-            &batch.pairs,
-            batch.columns,
-            ResidualTails::Lazy,
-            bytes
-        )
-        .is_ok());
+        assert!(residual_form(&batch.reducers, &batch.pairs, batch.columns, bytes).is_ok());
         assert_eq!(
-            residual_form(
-                &batch.reducers,
-                &batch.pairs,
-                batch.columns,
-                ResidualTails::Lazy,
-                bytes - 1
-            )
-            .unwrap_err(),
+            residual_form(&batch.reducers, &batch.pairs, batch.columns, bytes - 1).unwrap_err(),
             Decline::Bytes(bytes)
         );
 
@@ -865,26 +774,12 @@ mod tests {
                 .collect()
         };
         let (reducers, mut pairs) = (lift(&batch.reducers), lift(&batch.pairs));
-        assert!(residual_form(
-            &reducers,
-            &pairs,
-            batch.columns,
-            ResidualTails::Lazy,
-            usize::MAX
-        )
-        .is_ok());
+        assert!(residual_form(&reducers, &pairs, batch.columns, usize::MAX).is_ok());
         let (column, _) = pairs[3].entries()[0];
         let two = Gf256::new(2);
         pairs[3] = SparseRow::from_sorted(vec![(column, two)]).unwrap();
         assert_eq!(
-            residual_form(
-                &reducers,
-                &pairs,
-                batch.columns,
-                ResidualTails::Lazy,
-                usize::MAX
-            )
-            .unwrap_err(),
+            residual_form(&reducers, &pairs, batch.columns, usize::MAX).unwrap_err(),
             Decline::Coefficient
         );
     }
@@ -947,36 +842,36 @@ mod tests {
         reduce_batch(&batch.basis, &batch.pairs, ORDER, options)
     }
 
-    /// Replayed batch by batch, the residual route's candidates equal the shipped packed route's and
-    /// the Faugère–Lachartre route's coefficient for coefficient, rank-deficient and candidate-free
-    /// batches included.
+    /// Replayed batch by batch, the residual route's candidates equal the full-width packed
+    /// route's and the Faugère–Lachartre route's coefficient for coefficient, rank-deficient and
+    /// candidate-free batches included.
     #[test]
-    fn test_residual_candidates_equal_packed_and_fl_candidates_per_batch() {
+    fn test_residual_candidates_equal_full_width_and_fl_candidates_per_batch() {
         let system = random_mq::<10>(7, 12, 0.3);
         let (_, _, trace) =
             trace_batches(&system, ORDER, &options(Gf2Elimination::Generic)).unwrap();
         let (mut deficient, mut candidate_free, mut narrow) = (0, 0, 0);
         for batch in trace.batches() {
-            let packed = replay(batch, &options(Gf2Elimination::Packed)).unwrap();
+            let full = replay(batch, &options(Gf2Elimination::FullWidth)).unwrap();
             let fl = replay(batch, &fl_generic()).unwrap();
-            assert_eq!(packed.candidates, fl.candidates);
-            for tails in TAILS {
-                let residual = replay(batch, &options(Gf2Elimination::Residual(tails))).unwrap();
-                assert_eq!(residual.candidates, packed.candidates, "{tails:?}");
-                let (r, p) = (&residual.statistics, &packed.statistics);
-                assert_eq!(r.packed_gf2.batches, 1);
-                assert_eq!(r.packed_gf2.residual.batches, 1);
-                assert_eq!(r.elimination.rank, p.elimination.rank);
-                assert_eq!(r.elimination.zero_rows, p.elimination.zero_rows);
-                assert_eq!(r.back_substituted_rows, p.back_substituted_rows);
-                assert_eq!(
-                    r.packed_gf2.residual.residual_columns + r.packed_gf2.residual.reducers,
-                    r.columns
-                );
-                narrow += usize::from(r.packed_gf2.residual.residual_columns < r.columns);
-            }
-            deficient += usize::from(packed.statistics.elimination.zero_rows > 0);
-            candidate_free += usize::from(packed.candidates.is_empty());
+            assert_eq!(full.candidates, fl.candidates);
+            assert_eq!(full.statistics.packed_gf2.batches, 1);
+            assert_eq!(full.statistics.packed_gf2.residual, Default::default());
+            let residual = replay(batch, &options(Gf2Elimination::Packed)).unwrap();
+            assert_eq!(residual.candidates, full.candidates);
+            let (r, p) = (&residual.statistics, &full.statistics);
+            assert_eq!(r.packed_gf2.batches, 1);
+            assert_eq!(r.packed_gf2.residual.batches, 1);
+            assert_eq!(r.elimination.rank, p.elimination.rank);
+            assert_eq!(r.elimination.zero_rows, p.elimination.zero_rows);
+            assert_eq!(r.back_substituted_rows, p.back_substituted_rows);
+            assert_eq!(
+                r.packed_gf2.residual.residual_columns + r.packed_gf2.residual.reducers,
+                r.columns
+            );
+            narrow += usize::from(r.packed_gf2.residual.residual_columns < r.columns);
+            deficient += usize::from(full.statistics.elimination.zero_rows > 0);
+            candidate_free += usize::from(full.candidates.is_empty());
         }
         assert!(deficient > 0 && candidate_free > 0 && narrow > 0);
     }
@@ -1000,25 +895,18 @@ mod tests {
             for system in &systems {
                 let (generic, _) =
                     f4_with_options(system, order, &options(Gf2Elimination::Generic)).unwrap();
-                for tails in TAILS {
-                    let (basis, statistics) =
-                        f4_with_options(system, order, &options(Gf2Elimination::Residual(tails)))
-                            .unwrap();
-                    assert_eq!(basis, generic, "{} {tails:?}", order.name());
-                    assert_eq!(statistics.packed_gf2.batches, statistics.batches);
-                    assert_eq!(statistics.packed_gf2.residual.batches, statistics.batches);
-                    assert_eq!(statistics.packed_gf2.declined_batches, 0);
-                }
+                let (basis, statistics) =
+                    f4_with_options(system, order, &options(Gf2Elimination::Packed)).unwrap();
+                assert_eq!(basis, generic, "{}", order.name());
+                assert_eq!(statistics.packed_gf2.batches, statistics.batches);
+                assert_eq!(statistics.packed_gf2.residual.batches, statistics.batches);
+                assert_eq!(statistics.packed_gf2.declined_batches, 0);
             }
             let binary = cyclic::<5, Gf256>();
             let (generic, _) =
                 f4_with_options(&binary, order, &options(Gf2Elimination::Generic)).unwrap();
-            let (basis, statistics) = f4_with_options(
-                &binary,
-                order,
-                &options(Gf2Elimination::Residual(ResidualTails::Lazy)),
-            )
-            .unwrap();
+            let (basis, statistics) =
+                f4_with_options(&binary, order, &options(Gf2Elimination::Packed)).unwrap();
             assert_eq!(basis, generic);
             assert_eq!(
                 statistics.packed_gf2.batches + statistics.packed_gf2.declined_batches,
@@ -1029,10 +917,11 @@ mod tests {
     }
 
     /// Outside the contract — odd characteristic, a coefficient other than one over `GF(2^8)`,
-    /// echelon output — the residual setting runs the generic route, as the packed one does.
+    /// echelon output — the residual route runs generic, and declines exactly the batches the
+    /// full-width route declines.
     #[test]
-    fn test_residual_setting_keeps_the_packed_eligibility_check() {
-        let residual = options(Gf2Elimination::Residual(ResidualTails::Lazy));
+    fn test_residual_route_keeps_the_packed_eligibility_check() {
+        let residual = options(Gf2Elimination::Packed);
         let odd = katsura::<4, Zp13>();
         let (basis, statistics) = f4_with_options(&odd, ORDER, &residual).unwrap();
         assert_eq!(
@@ -1051,14 +940,14 @@ mod tests {
         let (generic, _) =
             f4_with_options(&system, ORDER, &options(Gf2Elimination::Generic)).unwrap();
         assert_eq!(basis, generic);
-        let (_, packed) =
-            f4_with_options(&system, ORDER, &options(Gf2Elimination::Packed)).unwrap();
+        let (_, full) =
+            f4_with_options(&system, ORDER, &options(Gf2Elimination::FullWidth)).unwrap();
         assert!(statistics.packed_gf2.declined_batches > 0);
         assert_eq!(
             statistics.packed_gf2.declined_batches,
-            packed.packed_gf2.declined_batches
+            full.packed_gf2.declined_batches
         );
-        assert_eq!(statistics.packed_gf2.batches, packed.packed_gf2.batches);
+        assert_eq!(statistics.packed_gf2.batches, full.packed_gf2.batches);
 
         let echelon = F4Options {
             reduce_batch_rows: false,
@@ -1071,7 +960,7 @@ mod tests {
     /// An empty batch and a batch whose rows all reduce to known leads pass through unchanged.
     #[test]
     fn test_degenerate_batches() {
-        let residual = options(Gf2Elimination::Residual(ResidualTails::Lazy));
+        let residual = options(Gf2Elimination::Packed);
         let system = random_mq::<4>(4, 4, 0.5);
         let basis = MonicBasis::new(&system, ORDER);
         let empty = reduce_batch(&basis, &[], ORDER, &residual).unwrap();
@@ -1109,34 +998,32 @@ mod tests {
     fn test_residual_bytes_are_charged_to_max_live_bytes() {
         let batch = largest_batch(&random_mq::<7>(77, 7, 0.5));
         let generic = replay(&batch, &options(Gf2Elimination::Generic)).unwrap();
-        for tails in TAILS {
-            let at = |bytes: usize| F4Options {
-                max_live_bytes: bytes,
-                max_live_nonzeros: usize::MAX,
-                ..options(Gf2Elimination::Residual(tails))
-            };
-            let unlimited = replay(&batch, &at(usize::MAX)).unwrap();
-            let s = &unlimited.statistics;
-            let workspace = s.packed_gf2.workspace_bytes;
-            assert_eq!(workspace, s.packed_gf2.residual.workspace_bytes);
-            let entry_bytes = F4Options::bytes_per_entry::<Zp2>();
-            let admitted = s.elimination.initial_nonzeros * entry_bytes + workspace;
-            let bit_matrix =
-                (s.rows - s.reducer_rows) * s.packed_gf2.residual.residual_columns.div_ceil(64) * 8;
-            let exact = admitted.max(s.elimination.peak_nonzeros * entry_bytes + bit_matrix);
-            let fits = replay(&batch, &at(exact)).unwrap();
-            assert_eq!(fits.statistics.packed_gf2.batches, 1);
-            assert_eq!(fits.candidates, generic.candidates);
+        let at = |bytes: usize| F4Options {
+            max_live_bytes: bytes,
+            max_live_nonzeros: usize::MAX,
+            ..options(Gf2Elimination::Packed)
+        };
+        let unlimited = replay(&batch, &at(usize::MAX)).unwrap();
+        let s = &unlimited.statistics;
+        let workspace = s.packed_gf2.workspace_bytes;
+        assert_eq!(workspace, s.packed_gf2.residual.workspace_bytes);
+        let entry_bytes = F4Options::bytes_per_entry::<Zp2>();
+        let admitted = s.elimination.initial_nonzeros * entry_bytes + workspace;
+        let bit_matrix =
+            (s.rows - s.reducer_rows) * s.packed_gf2.residual.residual_columns.div_ceil(64) * 8;
+        let exact = admitted.max(s.elimination.peak_nonzeros * entry_bytes + bit_matrix);
+        let fits = replay(&batch, &at(exact)).unwrap();
+        assert_eq!(fits.statistics.packed_gf2.batches, 1);
+        assert_eq!(fits.candidates, generic.candidates);
 
-            let declined = replay(&batch, &at(admitted - 1));
-            match declined {
-                Ok(outcome) => {
-                    assert_eq!(outcome.statistics.packed_gf2.batches, 0);
-                    assert_eq!(outcome.statistics.packed_gf2.declined_batches, 1);
-                    assert_eq!(outcome.candidates, generic.candidates);
-                }
-                Err(error) => assert!(matches!(error, F4Error::TooManyLiveBytes { .. })),
+        let declined = replay(&batch, &at(admitted - 1));
+        match declined {
+            Ok(outcome) => {
+                assert_eq!(outcome.statistics.packed_gf2.batches, 0);
+                assert_eq!(outcome.statistics.packed_gf2.declined_batches, 1);
+                assert_eq!(outcome.candidates, generic.candidates);
             }
+            Err(error) => assert!(matches!(error, F4Error::TooManyLiveBytes { .. })),
         }
     }
 
@@ -1145,8 +1032,9 @@ mod tests {
     #[test]
     fn test_residual_write_back_honours_the_entry_allowance() {
         let batch = largest_batch(&random_mq::<7>(78, 7, 0.5));
-        let residual = options(Gf2Elimination::Residual(ResidualTails::Lazy));
+        let residual = options(Gf2Elimination::Packed);
         let ours = replay(&batch, &residual).unwrap();
+        assert_eq!(ours.statistics.packed_gf2.residual.batches, 1);
         let peak = ours.statistics.elimination.peak_nonzeros;
         let at = |entries: usize| F4Options {
             max_live_nonzeros: entries,
@@ -1173,54 +1061,34 @@ mod tests {
             ..F4Options::default().with_live_entries::<Zp2>(200)
         };
         let generic = f4_with_options(&system, ORDER, &tight(Gf2Elimination::Generic)).unwrap_err();
-        let ours = f4_with_options(
-            &system,
-            ORDER,
-            &tight(Gf2Elimination::Residual(ResidualTails::Lazy)),
-        )
-        .unwrap_err();
+        let ours = f4_with_options(&system, ORDER, &tight(Gf2Elimination::Packed)).unwrap_err();
         assert_eq!(generic.stop_kind(), ours.stop_kind());
     }
 
-    /// `AutoResidual` packs exactly the batches `Auto` packs, all of them on the residual route,
-    /// and returns `Auto`'s basis.
+    /// The default (#1092): `Auto` packs exactly the batches `AutoFullWidth` packs, every one of
+    /// them on the residual route, and returns the same basis.
     #[test]
-    fn test_auto_residual_packs_auto_batches_on_the_residual_route() {
+    fn test_auto_packs_the_full_width_batches_on_the_residual_route() {
+        assert_eq!(F4Options::default().gf2_elimination, Gf2Elimination::Auto);
         for (n_system, system) in [
             (0, random_mq::<10>(3, 10, 0.3)),
             (1, random_mq::<10>(4, 20, 0.3)),
         ] {
-            let (auto_basis, auto) =
-                f4_with_options(&system, ORDER, &options(Gf2Elimination::Auto)).unwrap();
+            let (full_basis, full) =
+                f4_with_options(&system, ORDER, &options(Gf2Elimination::AutoFullWidth)).unwrap();
             assert!(
-                auto.packed_gf2.batches > 0,
-                "system {n_system} packs under Auto"
+                full.packed_gf2.batches > 0,
+                "system {n_system} packs under AutoFullWidth"
             );
             assert!(
-                auto.packed_gf2.batches < auto.batches,
-                "system {n_system} leaves some batches generic under Auto"
+                full.packed_gf2.batches < full.batches,
+                "system {n_system} leaves some batches generic"
             );
-            for tails in [ResidualTails::Lazy, ResidualTails::Eager] {
-                let (basis, ours) = f4_with_options(
-                    &system,
-                    ORDER,
-                    &options(Gf2Elimination::AutoResidual(tails)),
-                )
-                .unwrap();
-                assert_eq!(basis, auto_basis, "system {n_system} {tails:?}");
-                assert_eq!(ours.packed_gf2.batches, auto.packed_gf2.batches);
-                assert_eq!(ours.packed_gf2.residual.batches, auto.packed_gf2.batches);
-            }
+            assert_eq!(full.packed_gf2.residual, Default::default());
+            let (basis, ours) = f4_with_options(&system, ORDER, &F4Options::default()).unwrap();
+            assert_eq!(basis, full_basis, "system {n_system}");
+            assert_eq!(ours.packed_gf2.batches, full.packed_gf2.batches);
+            assert_eq!(ours.packed_gf2.residual.batches, full.packed_gf2.batches);
         }
-    }
-
-    /// The default never selects the residual route.
-    #[test]
-    fn test_no_default_selects_the_residual_route() {
-        assert_eq!(F4Options::default().gf2_elimination, Gf2Elimination::Auto);
-        assert_eq!(ResidualTails::default(), ResidualTails::Lazy);
-        let (_, statistics) =
-            f4_with_options(&random_mq::<6>(1, 6, 0.5), ORDER, &F4Options::default()).unwrap();
-        assert_eq!(statistics.packed_gf2.residual, Default::default());
     }
 }

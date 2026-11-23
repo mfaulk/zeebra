@@ -21,7 +21,9 @@ Instrument, raw tables and scoring script: [`research/gf2-residual/`](../../rese
 
 - **Adopt, with eager tails** (measured on the bench host, §5). Replace the full-width reducer
   sweep inside the packed route with the residual-width kernel, keeping `Auto`'s batch choice.
-  This PR changes no default; the swap is #1092's follow-up. In fresh pinned processes at one
+  This PR changes no default; the swap is #1092's follow-up, which made it the default: `Auto`
+  and `Packed` run the residual sweep, and `FullWidth`/`AutoFullWidth` are the former kernel
+  as a measurement arm (in `gf2_residual_replay one`, `packed` and `auto`). In fresh pinned processes at one
   worker, `Auto` with the residual kernel is **1.06x** faster in total on the held-out n = 15 set
   (1.01x–1.19x per instance) and **1.19x** on the second held-out set, n = 16 and n = 17 square MQ
   (1.04x–1.36x), with the elimination stage **1.37x** and **1.89x** faster. Peak RSS is

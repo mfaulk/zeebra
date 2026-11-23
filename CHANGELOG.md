@@ -18,10 +18,9 @@ change to `y` may break the public API.
   dispatch is #1123. Breaking: an exhaustive `SigF4Options` literal needs the new field.
 
 - `PackedGf2Statistics::xor_words` and `linalg::gf2::PackedStatistics::xor_words`: the `u64`
-  words the packed `GF(2)` kernels' `xor`s write. Behind the `research-gf2-residual` feature,
-  `Gf2Elimination::Residual` packs only the columns no reducer leads (#1077), and
-  `Gf2Elimination::AutoResidual` does so on the batches `Auto` packs. No preset selects either.
-  Breaking: an exhaustive literal of either statistics struct needs the new field.
+  words the packed `GF(2)` kernels' `xor`s write, and `PackedGf2Statistics::residual`, the
+  residual-width sweep's counters (#1077). Breaking: an exhaustive literal of either statistics
+  struct needs the new field.
 
 - `F4Options::graded_engine` and `GradedEngine`: with `GradedEngine::Adaptive`, `f4_with_options`,
   `f4_reported` and the solvers built on them run graded orders (grevlex, graded-lex) through
@@ -74,6 +73,16 @@ change to `y` may break the public API.
   example with optional exact msolve eliminant checks.
 
 ### Changed
+
+- The packed `GF(2)` route (`Gf2Elimination::Auto`, the default, and `Packed`) sweeps its pair
+  rows against the reducer block on the residual columns only, the columns no reducer leads,
+  instead of at the full width (#1092). Same eligibility, budgets, batch choice and basis. The
+  bench host measured `Auto` 1.03x, 1.06x and 1.19x faster in total on #1077's development,
+  held-out n = 15 and n = 16/17 square MQ sets, with peak RSS 0.89x–1.07x
+  (`docs/research/gf2-residual-packing.md` §5). The full-width sweep stays reachable for
+  measurement as the new `Gf2Elimination::FullWidth` and `AutoFullWidth`. The
+  `research-gf2-residual` feature and its `Residual`/`AutoResidual` variants are removed. Breaking:
+  an exhaustive match on `Gf2Elimination` needs the new variants.
 
 - The signature engine (`research-sigf4`) refuses `GradedLexicographic` with
   `SigF4Error::Unsupported` unless the new `SigF4Options::allow_graded_lex` is set, so forcing it
