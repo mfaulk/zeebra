@@ -59,6 +59,8 @@ JOBS = {
     # more repetitions of every n9 arm, pooled by summarize.py, so every cell reaches n >= 9 clean.
     'replace': (['wd-4-10', 'wdsq-4-10', 'wd-3-30', 'wd-4-12-p31', 'wdsq-5-6', 'wd-4-6', 'cyclic-7', 'katsura-11',
                  'pquad-10-1'], 3, [('grobx', [1]), ('adaptive', [1, 16]), ('wiedemann', [1]), ('direct-lex', [1, 16])]),
+    # Replaces n3's two contaminated attempts (clock rule): wdns-4-10 grobx and wd-5-10 classical.
+    'replace-n3': (['wdns-4-10', 'wd-5-10'], 1, [('grobx', [1]), ('classical', [1])]),
     'classical': (['wd-4-10', 'wdsq-4-10', 'wd-3-30', 'wd-4-12-p31', 'wdsq-5-6', 'wd-4-6', 'cyclic-7', 'katsura-11',
                    'pquad-10-1'], 3, [('classical', [1])]),
 }
