@@ -1,0 +1,80 @@
+{
+ "attempts": 15,
+ "job": {
+  "context": {
+   "agent": "ancient-humming-bachman@research/1033-dense-rebaseline",
+   "issue": 1033,
+   "session": "deciding-2",
+   "track": "n18-slow"
+  },
+  "job_id": "4b1015746d8a",
+  "manifest_sha256": "4b1015746d8a0919e33704b0342fb6c470bbfa06adb2089b22730a2b2dde733c",
+  "mode": "publication"
+ },
+ "journal_sha256": "3f12f50ab7456a27eae5bf28e7ee5b234c3f2b9dfe0ef089c4edd1e0411c032b",
+ "stop": {
+  "at": "2026-11-23T00:46:25+00:00",
+  "attempts": 15,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 14,
+    "sampled": 1
+   },
+   "contaminated": 13,
+   "flagged": {
+    "4b1015746d8a:10:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:11:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:12:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:13:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:14:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:2:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:3:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:4:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:5:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:6:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:7:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:8:0": [
+     "2 compiler process(es)"
+    ],
+    "4b1015746d8a:9:0": [
+     "2 compiler process(es)"
+    ]
+   },
+   "grouping": "arm",
+   "median_khz": {
+    "gf31/mq-dense-18-s18@16w/f4": 1717417,
+    "gf31/mq-dense-18-s18@16w/f4/perf-cycles": 4140891.5,
+    "gf31/mq-dense-18-s18@1w/entry/perf-cycles": 4404734,
+    "gf31/mq-dense-18-s18@1w/f4/perf-cycles": 4386774,
+    "gf31/mq-dense-18-s18@1w/sig/perf-cycles": 4398118,
+    "gf31/mq-dense-18-s18@4w/f4/perf-cycles": 4317562
+   },
+   "total": 15,
+   "version": 3,
+   "void": true
+  },
+  "reason": "complete"
+ }
+}

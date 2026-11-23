@@ -1,0 +1,59 @@
+# #1033: dense small-prime rebaseline
+
+The data behind [`docs/research/dense-small-prime-rebaseline.md`](../../docs/research/dense-small-prime-rebaseline.md), the gate for #945.
+
+**Frozen at:** `00c9f29f` (tag `measured/1033-dense-rebaseline`). grobx 0.155.1 at `8005a2a1` (the #1029 pin).
+
+| File | What it is |
+|---|---|
+| `bounds.py` | Deliverable 4: safe delayed-reduction products per field and accumulator. Exact arithmetic, self-checking |
+| `probe.py` | Development-mode probe: one row, shipping F4 against grobx. Decides nothing |
+| `campaign.py` | The deciding read: `inputs`, `manifest` (four `tools/bench-job` publication jobs) and `extract` |
+| `run-jobs.sh` | Runs the submitted jobs in order inside one CCD reservation, and releases it on exit |
+| `summarize.py` | `tables.md` and the Gate D-0 verdict, from the committed records and density files |
+| `records-<job>.jsonl.gz`, `.session.json` | One record per attempt, extracted from each job's journal |
+| `density-<engine>-<row>.json` | One serial `--density` attempt per engine and row (`research-work` build of the frozen tag) |
+| `captures.json` | Fingerprints and SHA-256s of the captured matrices (deliverable 3) |
+
+## Reproduce
+
+Build both binaries from the archive, so the bench-job provenance check holds. Keep target and temporary directories on `/buildcache`, never `$HOME`.
+
+```sh
+git archive measured/1033-dense-rebaseline | tar -x -C "$SRC"
+cd "$SRC"
+export RUSTC_WRAPPER="" CARGO_INCREMENTAL=0
+CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1033-pub \
+  cargo build --release --features research-sigf4 --example sig_f4_study
+CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1033-pubwork \
+  cargo build --release --features research-sigf4,research-work --example sig_f4_study
+```
+
+Run the deciding read. `/buildcache/bench-jobs` is root-owned until #982 is done.
+
+```sh
+export ZEEBRA_BENCH_JOBS=/buildcache/cargo-target/zeebra-1033/jobs
+P=/buildcache/cargo-target/zeebra-1033-pub/release/examples/sig_f4_study
+research/1033-dense-rebaseline/campaign.py inputs --study $P --out /buildcache/cargo-target/zeebra-1033/inputs
+for j in n18-fast n18-slow n20-fast n20-slow; do
+  research/1033-dense-rebaseline/campaign.py manifest --job $j --study $P --agent "$(scripts/agent/zb-claim.sh id)" \
+    --session deciding-2 > /buildcache/cargo-target/zeebra-1033/inputs/$j.json
+  tools/bench-job submit /buildcache/cargo-target/zeebra-1033/inputs/$j.json
+done
+setsid nohup research/1033-dense-rebaseline/run-jobs.sh <job-ids…> > "$ZEEBRA_BENCH_JOBS/runner.log" 2>&1 < /dev/null &
+research/1033-dense-rebaseline/campaign.py extract --job "$ZEEBRA_BENCH_JOBS/<job-id>"
+research/1033-dense-rebaseline/summarize.py
+```
+
+Every publication job takes the exclusive, machine-wide lock. `bench-job run` already wraps itself in `bench-reserve run`, so do not wrap it again: the nested lock waits on itself.
+
+Density traces and matrix captures, one serial attempt each, outside the reservation:
+
+```sh
+W=/buildcache/cargo-target/zeebra-1033-pubwork/release/examples/sig_f4_study
+$W --field gf31 --name mq-dense-18-s18 --generate --engine sigf4 --workers 1 --density --digest-only
+$W --field gf31 --name mq-dense-20-s20 --generate --engine f4 --workers 1 --density --live-gib 8 --stages --digest-only
+$P --field gf31 --name mq-dense-18-s18 --generate --engine f4 --capture DIR --batches 3,2
+```
+
+The captured `.zmat` archives are 100–700 MB each and are not committed. Rebuild them with the last command; `captures.json` pins their SHA-256s.
