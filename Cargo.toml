@@ -102,6 +102,10 @@ research-sigf4-usage = ["research-sigf4"]
 # a batch observer, the conventional one. Off in every timed binary.
 research-reuse = ["research-sigf4", "research-work"]
 
+# #1077's packed GF(2) route on the residual columns only (`Gf2Elimination::Residual`). Never
+# selected by default; with the feature off the variant does not exist.
+research-gf2-residual = []
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
@@ -145,6 +149,10 @@ required-features = ["external-runners"]
 [[example]]
 name = "sig_f4_study"
 required-features = ["research-sigf4"]
+
+[[example]]
+name = "gf2_residual_replay"
+required-features = ["research-gf2-residual"]
 
 [[example]]
 name = "reuse_census"

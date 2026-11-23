@@ -531,10 +531,15 @@ pub struct PackedGf2Statistics {
     pub declined_batches: usize,
     /// Whole-row `xor`s, including those that build tables.
     pub row_xors: usize,
+    /// `u64` words those `xor`s wrote.
+    pub xor_words: usize,
     /// Four Russians tables built.
     pub tables: usize,
     /// The largest packed working set of any batch: the bit matrix, tables and indices.
     pub workspace_bytes: usize,
+    /// The residual-width research route's counters (#1077); zero unless it ran.
+    #[cfg(feature = "research-gf2-residual")]
+    pub residual: super::packed_residual::ResidualGf2Statistics,
 }
 
 impl PackedGf2Statistics {
@@ -542,8 +547,11 @@ impl PackedGf2Statistics {
         self.batches += other.batches;
         self.declined_batches += other.declined_batches;
         self.row_xors = self.row_xors.saturating_add(other.row_xors);
+        self.xor_words = self.xor_words.saturating_add(other.xor_words);
         self.tables = self.tables.saturating_add(other.tables);
         self.workspace_bytes = self.workspace_bytes.max(other.workspace_bytes);
+        #[cfg(feature = "research-gf2-residual")]
+        self.residual.record(&other.residual);
     }
 }
 
