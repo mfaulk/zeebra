@@ -1,0 +1,313 @@
+{
+ "oracle": "Singular build 44105",
+ "references": {
+  "sd-bjoerk-8@p31": {
+   "basis_size": 1,
+   "dimension": -1,
+   "normalized_input_digest": "1bdd6ae278b7a34f5b1aa1d5325cc5f61f475bab3ec33cab618fe066e6cc92e5",
+   "reduced_basis_digest": "ebd0087ab2a76d93504a66ae9c74c1c35d854d60de7436b7e4d198799539beca",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-butcher@p31": {
+   "basis_size": 24,
+   "dimension": 3,
+   "normalized_input_digest": "d92c7f8f95d335dbb932ed8183a92564bf02700850b94f640e2aee4b516930fe",
+   "reduced_basis_digest": "5e5cb7f1b69a9462ab7e7608815845e531c273396b964bd7abcb815e54c63cbb",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-caprasse@p31": {
+   "basis_size": 26,
+   "dimension": 0,
+   "normalized_input_digest": "dcb1baa25e4c14b101b60bbe918db36f93b554fef8002c54cb9ca7cf686a854e",
+   "reduced_basis_digest": "6e7a13669609153e57ea1a674cc99b2f3c9377429d0cc2c2dffe3ab2c656b9e0",
+   "status": "reference",
+   "vdim": 56
+  },
+  "sd-cassou@p31": {
+   "basis_size": 8,
+   "dimension": 0,
+   "normalized_input_digest": "308bf9e1375a143e13046d996365edb201715fd94bd53fe6c37235abeb672715",
+   "reduced_basis_digest": "76523a58c30e00d392b8440c0acc13afea498f6164684576f7c7ee503bccb812",
+   "status": "reference",
+   "vdim": 16
+  },
+  "sd-czapor-86a@p31": {
+   "basis_size": 6,
+   "dimension": 0,
+   "normalized_input_digest": "7039d05ce7d0f6c1711cb2f6e0d92923562a5690c15fecbefc6addfba33cc069",
+   "reduced_basis_digest": "0a5c82011455acb0efb27ebeaa76ecc399e0875531389586d071818cd28b18d9",
+   "status": "reference",
+   "vdim": 8
+  },
+  "sd-ellipsoid-2@p31": {
+   "basis_size": 11,
+   "dimension": 6,
+   "normalized_input_digest": "78399e0cf54a3117d4175239e462d07b869b082b8d45c6d73d1036f46deb018e",
+   "reduced_basis_digest": "612d218747bdbfe4aff4cff51812623e4ca25c851980a470a379c628faaa0faa",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-ellipsoid-4@p31": {
+   "basis_size": 11,
+   "dimension": 6,
+   "normalized_input_digest": "f4087ee33f1bb146beed00019c193696ee595b0c4841bd442a1d9bafeb60b35b",
+   "reduced_basis_digest": "91eb7b1d694d756ebb72989aec6337193df62c025243912ceaffd6b547023e74",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-ellipsoid-m2@p31": {
+   "basis_size": 191,
+   "dimension": 6,
+   "normalized_input_digest": "1efd779151c4f8caaed8144f6b9375c2199520cd3c6a3bce5455eab02b0f9ccc",
+   "reduced_basis_digest": "94f5d27fad79c8a0a5dc34ec40550ebb8675acee0ff392aec8a194515bb0fe8c",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-fee-1@p31": {
+   "basis_size": 20,
+   "dimension": 0,
+   "normalized_input_digest": "b2e0c8646fccb62ac68b474e239f6887a40caadfb2fcac6ead015186e070b82e",
+   "reduced_basis_digest": "95ba778904d495ed3f6c1d7d0635ac0ef52f3b3a892c48337e1700c07039de57",
+   "status": "reference",
+   "vdim": 26
+  },
+  "sd-fourbodyproblem@p31": {
+   "basis_size": 57,
+   "dimension": 0,
+   "normalized_input_digest": "be2b5b570e3a5f8388cf567e57ba7bfe93841fdca842511d81d175fe600b68f8",
+   "reduced_basis_digest": "26198ca1f61e7e92e36d1f4ba82de30c9e46891bf3aab52ff1a1d88379294ac8",
+   "status": "reference",
+   "vdim": 84
+  },
+  "sd-fourcircles@p31": {
+   "basis_size": 5,
+   "dimension": 0,
+   "normalized_input_digest": "64b2d979d87bb0ce781db2506a276095f88f78cec4bdca4c5773900be080d38d",
+   "reduced_basis_digest": "700588c201ad2eec699102e836ed06f6e284a65e236ed2a8b7ec0dcea39a8351",
+   "status": "reference",
+   "vdim": 14
+  },
+  "sd-hairer-1@p31": {
+   "basis_size": 12,
+   "dimension": 2,
+   "normalized_input_digest": "fc8fc2bf234d445c20d557d4f6e7f30df3dc8a447c16ed0adca0deeab394d93b",
+   "reduced_basis_digest": "968c9c9bf5928b33691d4b267065f69328e9a7fca9b260a66314247cd0999394",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-hairer-2-1@p31": {
+   "basis_size": 72,
+   "dimension": 2,
+   "normalized_input_digest": "fd3db461efa103ebf3ec957d5ad029037df1e4537697bd2576cddd7c8f70a35c",
+   "reduced_basis_digest": "f5953af86325cf8e86c1931de5c293849c557e6a0518e7da44a461d0d6fe1cb3",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-hairer-2@p31": {
+   "basis_size": 72,
+   "dimension": 2,
+   "normalized_input_digest": "75d4ef1af92ff095fb7c07edd200d7d1f6759a7bb18355e3ed1cca91b9dfb2b6",
+   "reduced_basis_digest": "f5953af86325cf8e86c1931de5c293849c557e6a0518e7da44a461d0d6fe1cb3",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-heron@p31": {
+   "basis_size": 8,
+   "dimension": 3,
+   "normalized_input_digest": "f22c42f9f563bcc9d74c977b950be6fe1e140c353e4d654a692bd8741770713b",
+   "reduced_basis_digest": "b29618924dcd8600615fa2b35e07223674e1882d2016a8025572f2cf57cc1e08",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-raksanyi@p31": {
+   "basis_size": 5,
+   "dimension": 4,
+   "normalized_input_digest": "4447e82f47d99b1fd689d9d1abfa16c560b82607af848a4d13ee59333fc546b1",
+   "reduced_basis_digest": "280829aaf59ec5c6ad77a108fd852972d80426602652c510d3a6109aeb505acd",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-robot-fabrice24@p31": {
+   "basis_size": 54,
+   "dimension": 0,
+   "normalized_input_digest": "2e107aa4ef0c2236847caa273dcbab3da7bbc0b8d74f27379f19092da7e1b375",
+   "reduced_basis_digest": "9c518433b6ff122d72637f7eecf62b0e8acc4d1312495aad897bf124b324d7f5",
+   "status": "reference",
+   "vdim": 40
+  },
+  "sd-robot-jcf26@p31": {
+   "basis_size": 79,
+   "dimension": 0,
+   "normalized_input_digest": "5e3291c12c60d0bcadf942d169a1ab9825518279b77b99451404b66a91026d6c",
+   "reduced_basis_digest": "00ea45b5f1acb92fbd4cd7c0f62435d8a8f6800dbc5e71b703306a4c0d00971a",
+   "status": "reference",
+   "vdim": 40
+  },
+  "sd-robot-romin@p31": {
+   "basis_size": 30,
+   "dimension": 5,
+   "normalized_input_digest": "b66180ba07b28d77e4ff3479add465e79d5beaa89618a500bdbe88aa9b9ca347",
+   "reduced_basis_digest": "7c9f54ab29aa4b0871166cbea6238711360e67aeac824a2ada4cb1317d3d3627",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-robot-rr@p31": {
+   "basis_size": 54,
+   "dimension": 4,
+   "normalized_input_digest": "6e49d8ce957d2553aa0e12be49eebc388569f393738058169c8f1f911bdee765",
+   "reduced_basis_digest": "4555ab255dacc0d564196f013acc20e1ef8c55473b414ae704a267440bf61a78",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-rose@p31": {
+   "basis_size": 19,
+   "dimension": 0,
+   "normalized_input_digest": "5a457d661cce765717ecc3eee89700f310af971210ff7d0c91b25c88170c52fa",
+   "reduced_basis_digest": "8df61362287d88df906c24f11b66818de80cf0e9ea63975f3b2a9e8cd2907acf",
+   "status": "reference",
+   "vdim": 136
+  },
+  "sd-schiele@p31": {
+   "basis_size": 21,
+   "dimension": 1,
+   "normalized_input_digest": "a1ad60094cbb71d909f0c18546a7441854622c0eed25187bf49b3291c484f9f9",
+   "reduced_basis_digest": "eb1c5395afe47ca673c7569735d0a3c2f5172316759291ac2c45173e1697f4ab",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-signaltheory-f633@p31": {
+   "basis_size": 47,
+   "dimension": 2,
+   "normalized_input_digest": "0b9cfb8266072057b055f2d7d1f16b6dc7082e2d878278432cf80eca63034dcb",
+   "reduced_basis_digest": "4af8ac5b85bb95bce27247f92c56b1e21acff8ddf6ce89436d8a30e45ced7ecd",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-signaltheory-f744@p31": {
+   "basis_size": 87,
+   "dimension": 1,
+   "normalized_input_digest": "7859a6a91d4a3517123529ba072510f85207c2068cd0c9c9404a3f2dec82554f",
+   "reduced_basis_digest": "949baceb59013856956a796117807c5bfeddb1034a3e040c95f3bf43e2b65ccd",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-signaltheory-f855@p31": {
+   "basis_size": 148,
+   "dimension": 1,
+   "normalized_input_digest": "2a6cfe5b59f6e494487623261f7f436248d830075e791d2da6131b98ca2a7bf9",
+   "reduced_basis_digest": "d2fdab9fe56e62a7d8a0eeb83e40843029ee8543cfb158e283af5ca913ae690f",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-signaltheory-f966@p31": {
+   "normalized_input_digest": "ac7a3d9e486eb3db726a4896209d9f0d3b4b9dae61a60bedbeb5be512d7296d0",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "sd-singular-schwarz-10@p31": {
+   "basis_size": 396,
+   "dimension": 0,
+   "normalized_input_digest": "578c68e9b1e3876a8472d9c2d374a22631fd4dea114e1f9cc09e9f86140a4f6d",
+   "reduced_basis_digest": "400c8033ef80d50409e0c727fff649726a18d8fb30234187507fca652b132bfc",
+   "status": "reference",
+   "vdim": 1024
+  },
+  "sd-singular-schwarz-11@p31": {
+   "basis_size": 716,
+   "dimension": 0,
+   "normalized_input_digest": "e05bdd9532caae66290cb88c4a6a42dcfa32cffc226413b34f461b0215849dbd",
+   "reduced_basis_digest": "81a60717d4b35b86d02ed457c54a31b28a1779f43b6b549fdc835b8b2f1af5b7",
+   "status": "reference",
+   "vdim": 2048
+  },
+  "sd-singular-schwarz-7@p31": {
+   "basis_size": 64,
+   "dimension": 0,
+   "normalized_input_digest": "5bc04e99431d0ee8449002e3fbae36be8c998f6525b358798b76c86d97b2f567",
+   "reduced_basis_digest": "6098fad2f1c17bab1ac45cb7bdc559ebe7370d4df0a90a80412bf42a69cc8bd1",
+   "status": "reference",
+   "vdim": 128
+  },
+  "sd-singular-schwarz-8@p31": {
+   "basis_size": 119,
+   "dimension": 0,
+   "normalized_input_digest": "6857a649a70289b201a20208b2046259abbdd7830c7e215fdaca17f3c30cbba9",
+   "reduced_basis_digest": "6e47677b90d521b5b20b1417f17991682375d2d4631603e0722e7e701811681d",
+   "status": "reference",
+   "vdim": 256
+  },
+  "sd-singular-schwarz-9@p31": {
+   "basis_size": 210,
+   "dimension": 0,
+   "normalized_input_digest": "32be9b4cedf5e0850f32e3a57bc5998889596ca1c2b09a4a890f7d9fb099b169",
+   "reduced_basis_digest": "09a7f64510f590bba97a9d68e8f6d69ffe4231ed649eaa830fc7ea5d02b11d3c",
+   "status": "reference",
+   "vdim": 512
+  },
+  "sd-trinks-1@p31": {
+   "basis_size": 6,
+   "dimension": 0,
+   "normalized_input_digest": "ae9ad9267b5640f004e361a7c239c8ec9ae36798f4d44abf5ef118b506e6a542",
+   "reduced_basis_digest": "64ede969c5a9184b8fd72e8ad0b9696e3ea61ccfbaa12542481a3bde102acc18",
+   "status": "reference",
+   "vdim": 2
+  },
+  "sd-trinks@p31": {
+   "basis_size": 13,
+   "dimension": 0,
+   "normalized_input_digest": "037136c480f82be5280a9ad3f84b4ea187ffbc5e7dcb363d36a939186f74d35d",
+   "reduced_basis_digest": "417828b7a46c37416676f9f41c8e40aaf91a8048930b6dec27b2775eef342586",
+   "status": "reference",
+   "vdim": 10
+  },
+  "sd-verschelde-chemkin@p31": {
+   "basis_size": 56,
+   "dimension": 0,
+   "normalized_input_digest": "2b7fdd26c99b2c2faa25254b74ca7fe7bc7b98ccb22d6d2f69f26897a059ef33",
+   "reduced_basis_digest": "83349c2fe1c93eec2515fbc17ff5692dee82012ef9947545ac7d1397773566a7",
+   "status": "reference",
+   "vdim": 40
+  },
+  "sd-verschelde-gametwo5@p31": {
+   "basis_size": 44,
+   "dimension": 0,
+   "normalized_input_digest": "3817c45ece018c1c18a3aa4df263ab5594aa661de4debcb94a85b2dd46bc6b7f",
+   "reduced_basis_digest": "fc4929511f69ccfab9024c18fe942a46c72387ff1be46ee79d651a40b6343b0f",
+   "status": "reference",
+   "vdim": 44
+  },
+  "sd-verschelde-gametwo6@p31": {
+   "basis_size": 231,
+   "dimension": 0,
+   "normalized_input_digest": "98828a42d0ae0b33ee1c57fe2fead747d5e30005e76d72ac291620fd701b6835",
+   "reduced_basis_digest": "0236cd8743e173c3d57a565f00b0a97788d32c0aba4b2d52c7c1f6effa591a04",
+   "status": "reference",
+   "vdim": 265
+  },
+  "sd-verschelde-gametwo7@p31": {
+   "normalized_input_digest": "c03de50d109131c5ef267388803eefd019d0f8edccd132b65fb02088b04c642c",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "sd-verschelde-virasoro@p31": {
+   "basis_size": 128,
+   "dimension": 0,
+   "normalized_input_digest": "3e4808201d8332542d19890679a5d992cecc4ae954b91ecf493216cce8ac49a1",
+   "reduced_basis_digest": "543794332e4092da12eb79f0cc6e9dbc7e9324ade8a48c6c36bf5031d8e15e2b",
+   "status": "reference",
+   "vdim": 256
+  },
+  "sd-weispfenning-94@p31": {
+   "basis_size": 16,
+   "dimension": 0,
+   "normalized_input_digest": "f8d673c0e5800ed2ec5ba64b65bb4881ff3148a0f3ed6440ced8f441fb2d65cd",
+   "reduced_basis_digest": "bce1f69859e68c98da32b90ff88a0d2a38e45edea1f86a215e6dddf2806dc272",
+   "status": "reference",
+   "vdim": 54
+  }
+ },
+ "schema": "m34-public-reference-v1",
+ "timeout_seconds": 120.0
+}
