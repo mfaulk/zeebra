@@ -38,8 +38,8 @@ ROWS = {
 JOBS = {
     'n18-fast': ('n18', 9, [('grobx', None, [1]), ('entry', [], [4, 16]), ('sigclaim', ['--claim'], [4, 16])]),
     'n18-slow': ('n18', 3, [('entry', [], [1]), ('sig', [], [1]), ('f4', ['--stages'], [1, 4, 16])]),
-    'n20-fast': ('n20', 9, [('grobx', None, [1])]),
-    'n20-slow': ('n20', 3, [('entry', [], [1, 4, 16]), ('sigclaim', ['--claim'], [4, 16]),
+    'n20-fast': ('n20', 9, [('grobx', None, [1]), ('entry', [], [16]), ('sigclaim', ['--claim'], [16])]),
+    'n20-slow': ('n20', 3, [('entry', [], [1, 4]), ('sigclaim', ['--claim'], [4]),
                             ('f4', ['--stages'], [1, 4, 16])]),
 }
 ENGINE = {'entry': 'entry', 'sig': 'sigf4', 'sigclaim': 'sigf4', 'f4': 'f4'}
