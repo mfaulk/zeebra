@@ -4,8 +4,8 @@
 //!
 //! cargo run --release --features external-runners --example m29_cost_model -- \
 //!     --target mq10-32003 --workers 16 [--stages] [--pair-multiples every|distinct]
-//!     [--batch-order forward|fl] [--hilbert off|observe|limited+N|deferred+N] [--wall-s 180]
-//!     [--certify]
+//!     [--batch-order forward|fl] [--hilbert off|observe|limited+N|deferred+N|certified-zeros+N]
+//!     [--wall-s 180] [--certify]
 //!
 //! `--certify` runs F4's own certificate after the solve (#855). It is verification, not timing:
 //! its cost is inside the process wall, so it never runs in a timed campaign.
@@ -112,6 +112,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                     },
                     m if m.starts_with("deferred+") => HilbertSelection::Deferred {
                         slack: slack("deferred+")?,
+                    },
+                    m if m.starts_with("certified-zeros+") => HilbertSelection::CertifiedZeros {
+                        slack: slack("certified-zeros+")?,
                     },
                     other => return Err(format!("unknown Hilbert selection {other}")),
                 }
@@ -626,6 +629,10 @@ mod tests {
         assert_eq!(
             options(&with("deferred+0").unwrap()).hilbert,
             HilbertSelection::Deferred { slack: 0 }
+        );
+        assert_eq!(
+            options(&with("certified-zeros+4").unwrap()).hilbert,
+            HilbertSelection::CertifiedZeros { slack: 4 }
         );
         assert!(with("limited+x").is_err());
         assert!(with("sometimes").is_err());

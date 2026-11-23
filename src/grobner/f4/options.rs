@@ -809,7 +809,9 @@ pub struct F4Options {
     /// a capped batch leaves the rest pending, and a deferred degree's pairs are promoted back
     /// before the computation can end. A wrong prediction therefore costs batches and never the
     /// answer — which is asserted over the correctness corpus, because the prediction is wrong on
-    /// exactly the systems this milestone is about.
+    /// exactly the systems this milestone is about. The exception is the research mode
+    /// [`HilbertSelection::CertifiedZeros`], which drops pairs only once a Hilbert count has
+    /// certified them as zeros.
     pub hilbert: HilbertSelection,
 
     /// Check the returned basis independently before returning it.

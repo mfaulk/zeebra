@@ -2965,6 +2965,188 @@ fn test_certification_runs_and_passes() {
     }
 }
 
+/// The count route (#1080) returns the identical reduced basis on every corpus system, under every
+/// order and criteria set, and refuses an order that is not degree compatible.
+#[test]
+fn test_certified_zeros_returns_the_same_basis() {
+    use crate::grobner::{CountRefusal, CountRoute, HilbertSelection, PairCriteria};
+
+    let mut routes = HashSet::new();
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            let expected = f4_with_options(&f, order, &F4Options::baseline())
+                .expect("within limits")
+                .0;
+            for slack in [0, 3] {
+                for criteria in [PairCriteria::PRODUCT_ONLY, PairCriteria::ALL] {
+                    let hilbert = HilbertSelection::CertifiedZeros { slack };
+                    let (actual, statistics) = f4_with_options(
+                        &f,
+                        order,
+                        &F4Options {
+                            hilbert,
+                            criteria,
+                            ..F4Options::baseline()
+                        },
+                    )
+                    .expect("within limits");
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{:?} under {} with {} and {:?}: {:?}",
+                        strings,
+                        order.name(),
+                        hilbert.name(),
+                        criteria,
+                        statistics.hilbert
+                    );
+                    let route = statistics.hilbert.count_route;
+                    if order == MonomialOrder::Lexicographic {
+                        assert_eq!(route, CountRoute::Refused(CountRefusal::Order));
+                    }
+                    assert_ne!(route, CountRoute::Unused);
+                    routes.insert(std::mem::discriminant(&route));
+                }
+            }
+        }
+    }
+    // The corpus exercises refusal, completion and fallback alike.
+    assert!(routes.len() >= 3, "{} route outcomes", routes.len());
+}
+
+/// A dense homogeneous square quadratic system, deterministic in `seed`.
+fn dense_homogeneous_quadratics<const N: usize, G: FiniteField>(
+    seed: u64,
+) -> Vec<MultivariatePolynomial<N, G>> {
+    let mut state = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    let mut next = move || {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (state >> 33) % 30_000 + 1
+    };
+    (0..N)
+        .map(|_| {
+            let mut terms = Vec::new();
+            for i in 0..N {
+                for j in i..N {
+                    let mut exponents = [0u32; N];
+                    exponents[i] += 1;
+                    exponents[j] += 1;
+                    terms.push((Monomial::new(&exponents), G::new(next())));
+                }
+            }
+            MultivariatePolynomial::new(&terms)
+        })
+        .collect()
+}
+
+/// On inputs the certificate covers, the route certifies, drops pairs unreduced, completes at a
+/// zero count, and returns the deterministic basis.
+#[test]
+fn test_certified_zeros_skips_work_where_it_applies() {
+    use crate::grobner::{CountRoute, HilbertSelection};
+    type G = Zp2147483647;
+
+    fn check<const N: usize>(label: &str, system: Vec<MultivariatePolynomial<N, G>>) {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (expected, plain) =
+            f4_with_options(&system, order, &F4Options::default()).expect("within limits");
+        for slack in [0, 4, 1_000_000] {
+            let (actual, statistics) = f4_with_options(
+                &system,
+                order,
+                &F4Options {
+                    hilbert: HilbertSelection::CertifiedZeros { slack },
+                    ..F4Options::default()
+                },
+            )
+            .expect("within limits");
+            let counts = statistics.hilbert;
+            assert_eq!(actual, expected, "{label}, slack {slack}: {counts:?}");
+            assert!(
+                matches!(counts.count_route, CountRoute::Completed { .. }),
+                "{label}, slack {slack}: {counts:?}"
+            );
+            assert!(counts.degrees_certified > 0, "{label}: {counts:?}");
+            assert!(counts.pairs_certified_zero > 0, "{label}: {counts:?}");
+            assert!(
+                statistics.pairs_reduced < plain.pairs_reduced,
+                "{label}, slack {slack}: reduced {} pairs against {}",
+                statistics.pairs_reduced,
+                plain.pairs_reduced
+            );
+        }
+    }
+    check("katsura-6", katsura::<6, G>());
+    check(
+        "dense homogeneous MQ n=5",
+        dense_homogeneous_quadratics::<5, G>(1),
+    );
+    check(
+        "dense homogeneous MQ n=6",
+        dense_homogeneous_quadratics::<6, G>(2),
+    );
+}
+
+/// Where the certificate does not apply, the route turns itself off and the basis is unchanged:
+/// Cyclic's and Eco's top forms are not regular, and `(x² + y, x²)` falls to `y` in its first
+/// batch (note §4.1).
+#[test]
+fn test_certified_zeros_falls_back_where_it_does_not() {
+    use crate::grobner::{benchmark_systems::eco, CountDisabled, CountRoute, HilbertSelection};
+    type G = Zp2147483647;
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let options = F4Options {
+        hilbert: HilbertSelection::CertifiedZeros { slack: 0 },
+        ..F4Options::default()
+    };
+
+    fn same<const N: usize>(
+        system: &[MultivariatePolynomial<N, G>],
+        options: &F4Options,
+    ) -> crate::grobner::HilbertCounts {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let expected = f4(system, order).expect("within limits");
+        let (actual, statistics) = f4_with_options(system, order, options).expect("within limits");
+        assert_eq!(actual, expected, "{:?}", statistics.hilbert);
+        statistics.hilbert
+    }
+
+    for counts in [
+        same(&cyclic::<5, G>(), &options),
+        same(&cyclic::<6, G>(), &options),
+        same(&eco::<6, G>(), &options),
+        same(&eco::<7, G>(), &options),
+    ] {
+        assert!(
+            matches!(counts.count_route, CountRoute::Disabled { .. }),
+            "{counts:?}"
+        );
+    }
+
+    let x2 = Monomial::<2>::new(&[2, 0]);
+    let y = Monomial::<2>::new(&[0, 1]);
+    let hidden = [
+        MultivariatePolynomial::<2, G>::new(&[(x2, G::new(1)), (y, G::new(1))]),
+        MultivariatePolynomial::<2, G>::new(&[(x2, G::new(1))]),
+    ];
+    let counts = same(&hidden, &options);
+    assert_eq!(
+        counts.count_route,
+        CountRoute::Disabled {
+            degree: 2,
+            reason: CountDisabled::Fell
+        }
+    );
+    assert_eq!(counts.pairs_certified_zero, 0);
+    let basis = f4_with_options(&hidden, order, &options).unwrap().0;
+    assert_eq!(basis.len(), 2, "(x², y)");
+}
+
 /// Certification is reported, and its cost is visible, on an instance where it is not negligible.
 #[test]
 fn test_certification_cost_is_reported() {

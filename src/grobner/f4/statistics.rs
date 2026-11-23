@@ -2,6 +2,7 @@
 
 use std::time::{Duration, Instant};
 
+use super::count_route::CountRoute;
 use crate::{
     grobner::pairs::CriterionCounts, linalg::sparse::EliminationStatistics, poly::NormalFormCounts,
 };
@@ -369,6 +370,15 @@ pub struct HilbertCounts {
 
     /// The model's degree of regularity, if the expansion reached it.
     pub degree_of_regularity: Option<u64>,
+
+    /// What became of the count route; [`CountRoute::Unused`] under every other mode.
+    pub count_route: CountRoute,
+
+    /// Degrees the count route certified.
+    pub degrees_certified: usize,
+
+    /// Pairs the count route discarded as certified zeros, unreduced.
+    pub pairs_certified_zero: usize,
 }
 
 impl HilbertCounts {

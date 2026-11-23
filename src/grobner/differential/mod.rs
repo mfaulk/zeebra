@@ -318,6 +318,13 @@ mod tests {
                 },
             ),
             (
+                "hilbert certified-zeros+0",
+                F4Options {
+                    hilbert: HilbertSelection::CertifiedZeros { slack: 0 },
+                    ..F4Options::default()
+                },
+            ),
+            (
                 "certified",
                 F4Options {
                     certify: true,
@@ -402,6 +409,10 @@ mod tests {
         test_hilbert_deferred_agrees_with_the_recorded_oracle,
         "hilbert deferred+4"
     );
+    offline_oracle_test!(
+        test_hilbert_certified_zeros_agrees_with_the_recorded_oracle,
+        "hilbert certified-zeros+0"
+    );
     offline_oracle_test!(test_certified_agrees_with_the_recorded_oracle, "certified");
     offline_oracle_test!(test_combined_agrees_with_the_recorded_oracle, "combined");
 
@@ -421,6 +432,7 @@ mod tests {
             "hilbert observe",
             "hilbert limited+4",
             "hilbert deferred+4",
+            "hilbert certified-zeros+0",
             "certified",
             "combined",
         ];
@@ -592,6 +604,13 @@ mod tests {
                 "hilbert deferred+4",
                 F4Options {
                     hilbert: HilbertSelection::Deferred { slack: 4 },
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "hilbert certified-zeros+0",
+                F4Options {
+                    hilbert: HilbertSelection::CertifiedZeros { slack: 0 },
                     ..F4Options::default()
                 },
             ),

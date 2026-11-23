@@ -171,6 +171,22 @@ impl HilbertSeries {
         }
     }
 
+    /// `Π(1 − z^{d_i}) / (1 − z)^variables`, untruncated: the series of a regular sequence of forms
+    /// of the given degrees, whether or not any given sequence is one.
+    ///
+    /// # Errors
+    /// [`HilbertError::Overflow`].
+    pub fn of_regular_sequence(variables: usize, degrees: &[u64]) -> Result<Self, HilbertError> {
+        let mut numerator = vec![1i128];
+        for degree in degrees {
+            numerator = multiply_by_one_minus_power(&numerator, *degree)?;
+        }
+        Ok(Self {
+            numerator,
+            variables,
+        })
+    }
+
     /// The exact Hilbert series of `R/<generators>` for a **monomial** ideal, under
     /// [`DEFAULT_NODE_BUDGET`].
     ///
@@ -588,14 +604,7 @@ impl SemiregularSeries {
     /// # Errors
     /// [`HilbertError::Overflow`].
     pub fn new(variables: usize, degrees: &[u64], up_to: u64) -> Result<Self, HilbertError> {
-        let mut numerator = vec![1i128];
-        for degree in degrees {
-            numerator = multiply_by_one_minus_power(&numerator, *degree)?;
-        }
-        let series = HilbertSeries {
-            numerator,
-            variables,
-        };
+        let series = HilbertSeries::of_regular_sequence(variables, degrees)?;
         let raw = series.values(up_to)?;
 
         let mut degree_of_regularity = None;
