@@ -27,14 +27,37 @@ import admission  # noqa: E402
 import attempt_journal as aj  # noqa: E402
 from probe import grobx_stages  # noqa: E402
 
-FROZEN = None  # set to the tag's commit before submitting
+FROZEN = '5cce19f0bbb7929b14d31e7a0ad112cce6e3099b'  # tag measured/1039-wiedemann-lex
 GROBX = dict(commit='8005a2a1670a7264617a6f49eeb2618d7fa21701',
              comparand='grobx 0.155.1 (M33/M34 pin, #1029): research/m33-baseline/grobx-pin.sh')
 CAP_S, RSS = 600, 16 * 2**30
-# key -> (family name, modulus, cohort, class). Classes: shape, nonshape, nonradical.
-ROWS = {}
-# job -> (row keys, repetitions, arms); an arm is (name, workers).
-JOBS = {}
+P16, P31 = 65537, 2147483647
+# key -> (family name, modulus, cohort, class), as pre-declared on #1039.
+ROWS = {
+    'wd-4-10': ('wd-4-10', P16, 'development', 'shape'),
+    'wdsq-4-10': ('wdsq-4-10', P16, 'development', 'nonradical shape'),
+    'wd-6-6': ('wd-6-6', P16, 'development', 'shape'),
+    'wd-3-30': ('wd-3-30', P16, 'held-out', 'shape'),
+    'wd-4-12-p31': ('wd-4-12', P31, 'held-out', 'shape'),
+    'wdsq-5-6': ('wdsq-5-6', P16, 'held-out', 'nonradical shape'),
+    'wdns-4-10': ('wdns-4-10', P16, 'control', 'non-shape'),
+    'wdnr-4-10': ('wdnr-4-10', P16, 'control', 'nonradical non-shape'),
+    'wd-5-10': ('wd-5-10', P16, 'control', 'shape, D > 65535'),
+    'wd-4-6': ('wd-4-6', P16, 'context', 'shape'),
+    'cyclic-7': ('cyclic-7', P16, 'context', 'non-shape'),
+    'katsura-11': ('katsura-11', P16, 'context', 'dense operator'),
+    'pquad-10-1': ('pquad-10-1', P16, 'context', 'shape, dense operator'),
+}
+SCORED = ('grobx', [1]), ('adaptive', [1]), ('wiedemann', [1]), ('direct-lex', [1])
+# job -> (row keys, repetitions, arms); an arm is (name, workers). n = 9 where every arm is under
+# 60 s in development, n = 3 otherwise; `classical` runs apart because it is the slow arm.
+JOBS = {
+    'n9': (['wd-4-10', 'wdsq-4-10', 'wd-3-30', 'wd-4-12-p31', 'wdsq-5-6', 'wd-4-6', 'cyclic-7', 'katsura-11',
+            'pquad-10-1'], 9, [('grobx', [1]), ('adaptive', [1, 16]), ('wiedemann', [1]), ('direct-lex', [1, 16])]),
+    'n3': (['wd-6-6', 'wd-5-10', 'wdns-4-10', 'wdnr-4-10'], 3, [*SCORED, ('classical', [1])]),
+    'classical': (['wd-4-10', 'wdsq-4-10', 'wd-3-30', 'wd-4-12-p31', 'wdsq-5-6', 'wd-4-6', 'cyclic-7', 'katsura-11',
+                   'pquad-10-1'], 3, [('classical', [1])]),
+}
 ZEEBRA = ('adaptive', 'wiedemann', 'classical', 'direct-lex')
 
 
@@ -141,7 +164,7 @@ def extract(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('command', choices=['inputs', 'manifest', 'extract'])
+    p.add_argument('command', choices=['inputs', 'manifest', 'extract', 'jobs'])
     p.add_argument('--pipeline')
     p.add_argument('--grobx', default='/buildcache/cargo-target/zeebra-1029-grobx/release/grobx-driver')
     p.add_argument('--out')
@@ -152,7 +175,9 @@ def main():
     p.add_argument('--agent', default='')
     p.add_argument('--session', default='deciding')
     a = p.parse_args()
-    if a.command == 'inputs':
+    if a.command == 'jobs':
+        print(' '.join(JOBS))
+    elif a.command == 'inputs':
         inputs(a)
     elif a.command == 'manifest':
         manifest(a)
