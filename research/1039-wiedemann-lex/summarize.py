@@ -53,6 +53,10 @@ def completed(r):
     return r['arm'].startswith('grobx') or rep.get('status') == 'complete'
 
 
+def is_timeout(r):
+    return r['status'] == 'timeout' or r.get('stop') == 'wall' or r.get('stopped') == 'deadline'
+
+
 def ms(ns):
     return f'{ns / 1e6:,.1f}' if ns is not None else '—'
 
@@ -61,14 +65,16 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('files', nargs='*')
     p.add_argument('--dev', action='store_true')
+    p.add_argument('--cap-s', type=float, default=600)
     a = p.parse_args()
     files = a.files or sorted(HERE.glob('records-*.jsonl.gz'))
     recs = load(files, a.dev)
     rows = defaultdict(list)
     for r in recs:
         rows[r['row']].append(r)
-    print('| Row | D | grobx route | grobx ms | best Zeebra arm | Zeebra ms | Zeebra ÷ grobx [95%] | adaptive route | regret [95%] | digests |')
-    print('|---|---|---|---|---|---|---|---|---|---|')
+    print('| Row | D | grobx route | grobx ms | adaptive ÷ grobx [95%] | best Zeebra arm | Zeebra ms | best ÷ grobx [95%] '
+          '| adaptive route | regret [95%] | digests |')
+    print('|---|---|---|---|---|---|---|---|---|---|---|')
     stages = []
     for row, rs in rows.items():
         one = [r for r in rs if r['workers'] == 1]
@@ -89,21 +95,35 @@ def main():
             st = gr['stages']
             groute = 'FGLM' if 'change' in (st.get('fglm_verdicts') or []) else ('F4-lex' if st.get('lex_s') else '?')
         ad = next((r['report'] for r in one if r['arm'] == 'zb-adaptive' and completed(r)), {})
-        ratio = '—'
-        if g and best:
-            ci = bs.independent_ratio(list(zb[best].values()), list(g.values()), seed=f'{row} {best} grobx')
-            ratio = f'{ci.median:.2f} [{ci.lo:.2f}, {ci.hi:.2f}] n={ci.n}/{ci.n_ref}'
+        censored = sum(1 for r in one if r['arm'] == 'grobx155' and is_timeout(r))
+
+        def versus(arm):
+            if arm not in zb:
+                return '—'
+            if g:
+                ci = bs.independent_ratio(list(zb[arm].values()), list(g.values()), seed=f'{row} {arm} grobx')
+                return f'{ci.median:.2f} [{ci.lo:.2f}, {ci.hi:.2f}] n={ci.n}/{ci.n_ref}'
+            if censored:
+                return f'< {statistics.median(zb[arm].values()) / (a.cap_s * 1e9):.3f} (grobx > C on {censored})'
+            return '—'
+        ratio = versus(best) if best else '—'
+        pipeline = versus('zb-adaptive')
         regret = '—'
         routes = [walls[k] for k in ('zb-classical', 'zb-wiedemann') if walls.get(k)]
         if walls.get('zb-adaptive') and routes:
             fastest = min(routes, key=lambda w: statistics.median(w.values()))
-            rs_ = bs.paired_ratios(walls['zb-adaptive'], fastest)
+            jobs = {r.get('job') for r in one if r['arm'] in ('zb-adaptive', 'zb-classical', 'zb-wiedemann')}
+            rs_ = bs.paired_ratios(walls['zb-adaptive'], fastest) if len(jobs) == 1 else []
             if rs_:
                 ci = bs.paired_ratio(rs_, seed=f'{row} regret')
+                regret = f'{ci.median:.2f} [{ci.lo:.2f}, {ci.hi:.2f}] paired'
+            else:
+                ci = bs.independent_ratio(list(walls['zb-adaptive'].values()), list(fastest.values()),
+                                          seed=f'{row} regret')
                 regret = f'{ci.median:.2f} [{ci.lo:.2f}, {ci.hi:.2f}]'
         fail = '; '.join(f'{k}: {",".join(sorted(set(v)))}' for k, v in failures.items())
         print(f'| {row} | {ad.get("dimension", "—")} | {groute} | {ms(statistics.median(g.values())) if g else "—"} '
-              f'| {best or "—"} | {ms(statistics.median(zb[best].values())) if best else "—"} | {ratio} '
+              f'| {pipeline} | {best or "—"} | {ms(statistics.median(zb[best].values())) if best else "—"} | {ratio} '
               f'| {ad.get("route", "—")}{"/" + ad["fallback"] if ad.get("fallback") else ""} | {regret} '
               f'| {len(digests)}{" (" + fail + ")" if fail else ""} |')
         for arm in sorted(walls):
