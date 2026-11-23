@@ -426,3 +426,7 @@ required-features = ["external-runners"]
 [[example]]
 name = "parallel_forward_study"
 required-features = ["research-work"]
+
+[[example]]
+name = "bilinear_census"
+required-features = ["research-sigf4"]
