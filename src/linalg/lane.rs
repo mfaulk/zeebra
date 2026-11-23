@@ -343,6 +343,104 @@ impl LaneKernel {
     }
 }
 
+/// A monic row in lane form for [`LaneWorkspace`], its unit lead omitted.
+#[derive(Clone, Debug)]
+pub struct LaneRow {
+    body: Pivot,
+    nonzeros: u64,
+}
+
+impl LaneRow {
+    /// `row`, whose first entry is its lead with coefficient one, stored under `kernel`'s policy.
+    pub fn from_monic<F: FiniteField>(
+        lane: &Lane<F>,
+        kernel: LaneKernel,
+        row: &[(u32, F)],
+    ) -> Self {
+        debug_assert!(row.first().is_some_and(|e| e.1 == F::ONE), "a monic row");
+        let entries: Vec<(u32, u16)> = row
+            .iter()
+            .skip(1)
+            .map(|(c, v)| (*c, (lane.raw)(v) as u16))
+            .collect();
+        let lead = row.first().map_or(0, |e| e.0 as usize);
+        Self {
+            nonzeros: entries.len() as u64,
+            body: kernel.pivot(lead, &entries),
+        }
+    }
+
+    /// Bytes the row holds on the heap.
+    pub fn bytes(&self) -> usize {
+        match &self.body {
+            Pivot::Sparse { columns, values } => columns.len() * 4 + values.len() * 2,
+            Pivot::Dense { values, .. } => values.len() * 2,
+        }
+    }
+}
+
+/// A `u32`-lane working row that fully reduces, the shape of the signature engine's workspace.
+#[derive(Clone, Debug)]
+pub struct LaneWorkspace<F> {
+    lane: Lane<F>,
+    cells: Vec<u32>,
+    correct: bool,
+}
+
+impl<F: FiniteField> LaneWorkspace<F> {
+    /// A zero workspace over `columns` columns.
+    pub fn new(lane: Lane<F>, columns: usize) -> Self {
+        Self {
+            correct: lane.needs_correction(columns),
+            lane,
+            cells: vec![0; columns],
+        }
+    }
+
+    /// Reduces `entries` (ascending columns) column by column with whatever `pivot` offers, and
+    /// returns the entries left at unpivoted columns, unnormalized, and the products spent.
+    /// `pivot` is consulted once per column that is nonzero when reached, in ascending order.
+    pub fn reduce<'p>(
+        &mut self,
+        entries: &[(u32, F)],
+        pivot: impl FnMut(usize) -> Option<&'p LaneRow>,
+    ) -> (Vec<(u32, F)>, u64) {
+        let (Some(&(first, _)), Some(&(last, _))) = (entries.first(), entries.last()) else {
+            return (Vec::new(), 0);
+        };
+        let lane = self.lane;
+        for (c, v) in entries {
+            self.cells[*c as usize] = (lane.raw)(v);
+        }
+        let (mut column, mut tail) = (first as usize, last as usize + 1);
+        let (mut out, mut products) = (Vec::new(), 0);
+        let mut pivot = pivot;
+        while column < tail {
+            let x = std::mem::take(&mut self.cells[column]);
+            if x != 0 {
+                let r = lane.reduce(x);
+                if r != 0 {
+                    match pivot(column) {
+                        Some(row) => {
+                            let negated = lane.modulus - (lane.canonical)(&(lane.element)(r));
+                            if self.correct {
+                                apply::<true>(&mut self.cells, &row.body, negated, lane.bound);
+                            } else {
+                                apply::<false>(&mut self.cells, &row.body, negated, lane.bound);
+                            }
+                            products += row.nonzeros;
+                            tail = tail.max(row.body.tail());
+                        }
+                        None => out.push((column as u32, (lane.element)(r))),
+                    }
+                }
+            }
+            column += 1;
+        }
+        (out, products)
+    }
+}
+
 /// `cells += negated * pivot`, keeping every cell below `bound` when `CORRECT`.
 #[inline(always)]
 fn apply<const CORRECT: bool>(cells: &mut [u32], pivot: &Pivot, negated: u32, bound: u32) {
@@ -373,7 +471,7 @@ fn apply<const CORRECT: bool>(cells: &mut [u32], pivot: &Pivot, negated: u32, bo
 
 #[cfg(test)]
 mod tests {
-    use super::{Lane, LaneKernel, MAX_LANE_PRIME};
+    use super::{Lane, LaneKernel, LaneRow, LaneWorkspace, MAX_LANE_PRIME};
     use crate::{
         fields::{Mersenne31, Zp31, Zp32003},
         linalg::{
@@ -549,5 +647,99 @@ mod tests {
                 assert_eq!(lane.reduce(x), x % p, "{x} mod {p}");
             }
         }
+    }
+    /// The plain field-arithmetic full reduction the workspace must reproduce.
+    fn reference<F: FiniteField>(
+        columns: usize,
+        entries: &[(u32, F)],
+        pivots: &[Option<Vec<(u32, F)>>],
+    ) -> (Vec<(u32, F)>, u64) {
+        let mut cells = vec![F::zero(); columns];
+        for (c, v) in entries {
+            cells[*c as usize] = *v;
+        }
+        let (mut out, mut products) = (Vec::new(), 0);
+        for c in 0..columns {
+            let v = cells[c];
+            if v.is_zero() {
+                continue;
+            }
+            match &pivots[c] {
+                Some(row) => {
+                    for (cc, w) in &row[1..] {
+                        cells[*cc as usize] -= *w * v;
+                    }
+                    products += (row.len() - 1) as u64;
+                }
+                None => out.push((c as u32, v)),
+            }
+        }
+        (out, products)
+    }
+
+    fn agrees_with_reference<F: FiniteField>(seed: u64, dense_percent: u32) {
+        let lane = F::small_prime_lane().unwrap();
+        let kernel = LaneKernel { dense_percent };
+        let mut rng = StdRng::seed_from_u64(seed);
+        let columns = 70;
+        let random_tail = |rng: &mut StdRng, from: usize, density: f64| {
+            let mut row = Vec::new();
+            for c in from..columns {
+                if rng.gen_bool(density) {
+                    row.push((c as u32, F::new(rng.gen_range(1..u64::MAX))));
+                }
+            }
+            row
+        };
+        let pivots: Vec<Option<Vec<(u32, F)>>> = (0..columns)
+            .map(|c| {
+                rng.gen_bool(0.6).then(|| {
+                    let mut row = vec![(c as u32, F::one())];
+                    let density = if rng.gen_bool(0.5) { 0.9 } else { 0.05 };
+                    row.extend(random_tail(&mut rng, c + 1, density));
+                    row
+                })
+            })
+            .collect();
+        let lanes: Vec<Option<LaneRow>> = pivots
+            .iter()
+            .map(|p| {
+                p.as_ref()
+                    .map(|row| LaneRow::from_monic(&lane, kernel, row))
+            })
+            .collect();
+        let mut workspace = LaneWorkspace::new(lane, columns);
+        for _ in 0..8 {
+            let entries = random_tail(&mut rng, 0, 0.3);
+            let mut seen = Vec::new();
+            let actual = workspace.reduce(&entries, |c| {
+                seen.push(c);
+                lanes[c].as_ref()
+            });
+            assert_eq!(actual, reference(columns, &entries, &pivots), "seed {seed}");
+            assert!(seen.windows(2).all(|w| w[0] < w[1]), "ascending, once each");
+        }
+    }
+
+    /// The workspace's full reduction equals plain field arithmetic, product count included.
+    #[test]
+    fn test_workspace_matches_a_field_reference() {
+        for seed in 0..10 {
+            for dense_percent in [0, 25, 101] {
+                agrees_with_reference::<Zp31>(seed, dense_percent);
+                agrees_with_reference::<Zp32003>(seed, dense_percent);
+            }
+        }
+    }
+
+    /// A dense lane row is smaller than its sparse form, and both report their heap bytes.
+    #[test]
+    fn test_lane_row_bytes_follow_the_storage_policy() {
+        let lane = Zp31::small_prime_lane().unwrap();
+        let row: Vec<(u32, Zp31)> = (0..101).map(|c| (c, Zp31::one())).collect();
+        let dense = LaneRow::from_monic(&lane, LaneKernel { dense_percent: 0 }, &row);
+        let sparse = LaneRow::from_monic(&lane, LaneKernel { dense_percent: 101 }, &row);
+        assert_eq!(dense.bytes(), 100 * 2);
+        assert_eq!(sparse.bytes(), 100 * 6);
     }
 }
