@@ -9,7 +9,9 @@
 //! Under [`ParallelForward`] both passes may run on workers through the field's
 //! [`concurrent::Dispatch`], each behind the same gate as the forward order's pass. A pass whose
 //! workers' reservation does not fit falls back to its serial kernel; the sweep leaves rows the
-//! serial sweep finishes identically, and the concurrent echelon leaves `D'` untouched.
+//! serial sweep finishes identically, and the concurrent echelon leaves `D'` untouched. An echelon
+//! refused on the live-entry budget after its workers started instead keeps their finished rows
+//! and reduces only the rest serially, falling back from scratch only if that is refused too.
 
 use super::{
     candidate,
@@ -58,12 +60,32 @@ fn on_workers<F: FiniteField>(
     config.measure_work = measure;
     let cancel = AtomicBool::new(false);
     let result = match pass {
-        Pass::Sweep => dispatch.sweep(matrix, split, &config, &cancel),
-        Pass::Echelon => dispatch.reduce(matrix, split, &config, &cancel),
+        Pass::Sweep => dispatch
+            .sweep(matrix, split, &config, &cancel)
+            .map(concurrent::Outcome::Reduced),
+        Pass::Echelon => dispatch.reduce_retaining(matrix, split, &config, &cancel),
     };
     match result {
-        Ok(report) => {
+        Ok(concurrent::Outcome::Reduced(report)) => {
             record.batches = 1;
+            record.max_workers = record.max_workers.max(config.workers);
+            record.lost_publications += report.failed_publications;
+            record.workspace_bytes = record.workspace_bytes.max(report.workspace_bytes);
+            if measure {
+                record.record_pass(&report, config.workers);
+            }
+            Some(report)
+        }
+        // As for the forward order (#1068): a `D'` pass refused after its workers started keeps
+        // their finished rows and reduces the rest serially, unless that continuation is refused
+        // too, in which case `D'` is restored and the caller's serial kernel redoes it.
+        Ok(concurrent::Outcome::Retained(partial)) => {
+            record.fallback_batches = 1;
+            let retained = partial.completed.len();
+            let report =
+                concurrent::continue_serially(matrix, split, partial, backend, allowance).ok()?;
+            record.retained_batches = 1;
+            record.retained_rows += retained;
             record.max_workers = record.max_workers.max(config.workers);
             record.lost_publications += report.failed_publications;
             record.workspace_bytes = record.workspace_bytes.max(report.workspace_bytes);
@@ -458,6 +480,58 @@ mod tests {
         let (expected, _) = f4_reported(&system, order, &F4Options::default());
         assert_eq!(basis.unwrap(), expected.unwrap());
         assert!(statistics.parallel_forward.fallback_batches > 0);
+    }
+
+    // A `D'` pass the budget refuses partway keeps the rows its worker finished and still returns
+    // the serial basis (#1086).
+    #[test]
+    fn a_refused_d_prime_pass_keeps_its_finished_rows() {
+        let system = katsura::<6, Zp32003>();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let at = |parallel_forward, entries: usize| F4Options {
+            batch_order: BatchOrder::FaugereLachartre,
+            parallel_forward,
+            ..F4Options::default().with_live_entries::<Zp32003>(entries)
+        };
+        let (_, serial) = f4_reported(
+            &system,
+            order,
+            &at(ParallelForward::Serial, usize::MAX / 64),
+        );
+        // At the serial peak itself the one worker is refused before it finishes a row; a fifth
+        // above it lets it finish some `D'` rows first.
+        let budget = serial.max_live_nonzeros * 6 / 5;
+        let (basis, statistics) = f4_reported(
+            &system,
+            order,
+            &at(ParallelForward::Forced { workers: 1 }, budget),
+        );
+        let (expected, _) = f4_reported(&system, order, &F4Options::default());
+        assert_eq!(basis.unwrap(), *expected.as_ref().unwrap());
+        let parallel = statistics.parallel_forward;
+        assert!(parallel.retained_batches > 0, "{parallel:?}");
+        assert!(parallel.retained_rows > 0, "{parallel:?}");
+        assert!(
+            parallel.retained_batches <= parallel.fallback_batches,
+            "{parallel:?}"
+        );
+        // Wherever the refusal lands, and however many workers race for the pivots, the retained
+        // rows and the serial continuation reach the same basis.
+        for workers in [1, 2, 4] {
+            for percent in (100..=140).step_by(5) {
+                let budget = serial.max_live_nonzeros * percent / 100;
+                let (basis, _) = f4_reported(
+                    &system,
+                    order,
+                    &at(ParallelForward::Forced { workers }, budget),
+                );
+                assert_eq!(
+                    basis.as_ref().unwrap(),
+                    expected.as_ref().unwrap(),
+                    "{workers} workers at {percent}%"
+                );
+            }
+        }
     }
 
     // The route's reported peak is its budget boundary: admitted at the peak, refused one below.

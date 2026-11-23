@@ -444,8 +444,9 @@ pub struct ParallelForwardStatistics {
     /// Batches that asked for workers but ran serially because the workers' reservation would
     /// have crossed the live-entry budget or the workspace cap.
     pub fallback_batches: usize,
-    /// Of those, the forward-order batches whose workers' finished rows were kept and only the
-    /// rest reduced serially, rather than the whole batch redone (#1068).
+    /// Of those, the batches whose workers' finished rows were kept and only the rest reduced
+    /// serially, rather than the whole pass redone: the forward order's pass (#1068) or a
+    /// Faugère–Lachartre batch's `D'` echelon (#1086).
     pub retained_batches: usize,
     /// Rows those batches carried into the serial kernel already reduced: pivots and zero rows.
     pub retained_rows: usize,
