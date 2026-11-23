@@ -227,6 +227,19 @@ zb_claim_is_ours() { # <marker-agent> <marker-token> <our-id> <our-token> [alias
   return 1
 }
 
+# The claims on stdin (agent/at/until/token TSV) that no withdrawal retracts.
+# Every reader of the markers filters through this, so `state` and the resolver
+# cannot disagree about whether a withdrawn claim still counts (#1074).
+zb_standing_claims() { # [withdrawals-tsv]
+  local agent at until token
+  if [ -z "${1:-}" ]; then cat; return 0; fi
+  while IFS="$(printf '\t')" read -r agent at until token; do
+    [ -n "$at" ] || continue
+    zb_claim_is_withdrawn "$agent" "$token" "$at" "$1" && continue
+    printf '%s\t%s\t%s\t%s\n' "$agent" "$at" "$until" "$token"
+  done
+}
+
 # Who holds the claim, from an agent/at/until/token TSV on stdin.
 #
 # The resolution rule is untouched: among claims inside the current lease window
@@ -239,21 +252,8 @@ zb_claim_is_ours() { # <marker-agent> <marker-token> <our-id> <our-token> [alias
 #   prints "<held|lost|none>\t<winner-id>\t<id|token|->"
 #   0 — held by us   1 — lost, or no claim inside the window
 zb_resolve_claim() { # <our-id> <our-token> <cutoff-iso> [withdrawals-tsv]
-  local live standing winner winner_id winner_token how aliases
-  local agent at until token
-  live="$(awk -F'\t' -v c="$3" '$2 >= c')"
-  if [ -n "${4:-}" ] && [ -n "$live" ]; then
-    standing=""
-    while IFS="$(printf '\t')" read -r agent at until token; do
-      [ -n "$at" ] || continue
-      zb_claim_is_withdrawn "$agent" "$token" "$at" "$4" && continue
-      standing="$standing$agent	$at	$until	$token
-"
-    done <<EOF
-$live
-EOF
-    live="$(printf '%s' "$standing")"
-  fi
+  local live winner winner_id winner_token how aliases
+  live="$(awk -F'\t' -v c="$3" '$2 >= c' | zb_standing_claims "${4:-}")"
   if [ -z "$live" ]; then
     printf 'none\t-\t-\n'
     return 1
@@ -302,6 +302,16 @@ zb_lease_state() { # <until_iso> <now_iso> <has_open_pr 0|1> <last_commit_epoch|
     if [ $((now_e - last_commit)) -lt "$lease" ]; then echo live; return 0; fi
   fi
   echo stale
+}
+
+# live|stale for claims on stdin, judged by the newest one still standing.
+# Every claim withdrawn means nothing holds the lease: stale, unless a PR is open.
+zb_claims_lease_state() { # <now_iso> <has_open_pr 0|1> [withdrawals-tsv]
+  local newest until=""
+  if newest="$(zb_standing_claims "${3:-}" | zb_newest_claim)"; then
+    until="$(printf '%s' "$newest" | cut -f3)"
+  fi
+  zb_lease_state "$until" "$1" "$2" -
 }
 
 # The cursor to resume a paginated read from, given one GraphQL response.
@@ -472,17 +482,18 @@ zb_has_open_pr() { # <issue-number>
   [ "$n" -gt 0 ] && echo 1 || echo 0
 }
 
-# live|stale for the issue's most recent claim.
+# live|stale for the issue's most recent claim that has not been withdrawn.
 #   0 — state printed   1 — no claim on this issue   2 — UNREADABLE
 zb_issue_lease_state() { # <issue-number>
-  local claims rc=0 newest until has_pr
+  local claims rc=0 withdrawals has_pr
   claims="$(zb_issue_claims "$1")" || rc=$?
   [ "$rc" -eq 2 ] && return 2
   [ "$rc" -eq 1 ] && return 1
-  newest="$(printf '%s' "$claims" | zb_newest_claim)" || return 1
-  until="$(printf '%s' "$newest" | cut -f3)"
+  rc=0
+  withdrawals="$(zb_issue_withdrawals "$1")" || rc=$?
+  [ "$rc" -eq 2 ] && return 2
   has_pr="$(zb_has_open_pr "$1")" || return 2
-  zb_lease_state "$until" "$(zb_now)" "$has_pr" -
+  printf '%s\n' "$claims" | zb_claims_lease_state "$(zb_now)" "$has_pr" "$withdrawals"
 }
 
 # === mutations =============================================================

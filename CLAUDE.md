@@ -207,7 +207,9 @@ The lease is 4 hours. A claim is **live** if **any** of these hold, else
 **stale** and reclaimable:
 
 - an open linked PR exists (`Closes #NNN` / `Fixes #NNN`) — always live; or
-- the newest marker's `until=` is still in the future; or
+- the newest marker's `until=` is still in the future — a withdrawn claim is
+  skipped here exactly as the tiebreak skips it, so a race's loser does not
+  hold the lease open (#1074); or
 - a commit landed on the claim branch inside the lease window.
 
 The cleanest heartbeat is to **open a draft PR early** with `Closes #NNN` in the
