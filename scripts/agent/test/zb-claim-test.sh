@@ -574,6 +574,36 @@ check "resolve: a withdrawal retracts the pre-token claim of the same id" \
   "$(printf 'none\t-\t-')" \
   "$(printf 'zb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\t-\n' \
      | zb_resolve_claim zb-a@feat/old tok-1 "$CUTOFF" "$(printf 'zb-a@feat/old\t2026-01-01T03:00:00Z\ttok-1\n')")"
+# --- zb_claims_lease_state (#1074) -----------------------------------------
+
+LS_NOW=2026-01-01T06:00:00Z
+# The #1009 shape: A claimed and expired at 05:00; B claimed later, lost and withdrew.
+LS_CLAIMS="$(printf 'zb-a@feat/x\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-a\nzb-b@feat/y\t2026-01-01T02:00:00Z\t2026-01-01T06:30:00Z\ttok-b\n')"
+LS_W_B="$(printf 'zb-b@feat/y\t2026-01-01T02:05:00Z\ttok-b\n')"
+
+# A withdrawn newest claim does not hold the lease open; the expired standing claim decides.
+check "lease-state: a withdrawn newest claim is skipped, so the expired claim is stale" \
+  stale "$(printf '%s\n' "$LS_CLAIMS" | zb_claims_lease_state "$LS_NOW" 0 "$LS_W_B")"
+
+# Without the withdrawal the same markers are live, as before.
+check "lease-state: with no withdrawals the newest unexpired claim is live" \
+  live "$(printf '%s\n' "$LS_CLAIMS" | zb_claims_lease_state "$LS_NOW" 0 "")"
+
+# A claim followed by a withdrawal from the same token, and nothing else, is stale.
+check "lease-state: a lone claim withdrawn by its own token is stale" \
+  stale "$(printf 'zb-b@feat/y\t2026-01-01T05:00:00Z\t2026-01-01T09:00:00Z\ttok-b\n' \
+     | zb_claims_lease_state "$LS_NOW" 0 "$(printf 'zb-b@feat/y\t2026-01-01T05:10:00Z\ttok-b\n')")"
+
+# An open PR keeps the issue live even when every claim is withdrawn.
+check "lease-state: an open PR is live whatever the withdrawals" \
+  live "$(printf 'zb-b@feat/y\t2026-01-01T05:00:00Z\t2026-01-01T09:00:00Z\ttok-b\n' \
+     | zb_claims_lease_state "$LS_NOW" 1 "$(printf 'zb-b@feat/y\t2026-01-01T05:10:00Z\ttok-b\n')")"
+
+# Another agent's withdrawal cannot retract a claim that carries a different token.
+check "lease-state: a withdrawal under another token leaves the claim live" \
+  live "$(printf 'zb-b@feat/y\t2026-01-01T05:00:00Z\t2026-01-01T09:00:00Z\ttok-b\n' \
+     | zb_claims_lease_state "$LS_NOW" 0 "$(printf 'zb-b@feat/y\t2026-01-01T05:10:00Z\ttok-z\n')")"
+
 # ---------------------------------------------------------------------------
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
