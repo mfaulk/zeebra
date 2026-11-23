@@ -1211,6 +1211,37 @@ impl<const N: usize> PairQueue<N> {
         }
     }
 
+    /// Remove every pending pair of `degree` unprocessed, and return how many.
+    ///
+    /// Only for pairs a theorem has shown to reduce to zero: the Hilbert-count route's certified
+    /// degrees (`f4::count_route`). Not recorded as handled, so none becomes a chain-criterion
+    /// witness, which is the conservative reading.
+    pub fn discard_degree(&mut self, degree: u64) -> usize {
+        let mut discarded = 0;
+        loop {
+            self.drop_stale_top();
+            match self.pending.peek() {
+                Some(Reverse(next)) if next.pair.degree == degree => {
+                    self.take(false).expect("peeked at a pair that is there");
+                    discarded += 1;
+                }
+                _ => return discarded,
+            }
+        }
+    }
+
+    /// Remove every pair, pending and deferred, and return how many.
+    ///
+    /// For a computation a certificate has finished; see [`PairQueue::discard_degree`].
+    pub fn discard_all(&mut self) -> usize {
+        let discarded = self.live + self.deferred.len();
+        self.pending.clear();
+        self.removed.clear();
+        self.deferred.clear();
+        self.live = 0;
+        discarded
+    }
+
     /// Return every deferred pair to the pending set, and report how many.
     ///
     /// **This is what makes a deferring strategy complete**: the computation cannot end while

@@ -5,6 +5,7 @@ pub mod budget;
 #[doc(hidden)]
 pub mod candidate;
 pub mod certify;
+pub mod count_route;
 pub mod degrees;
 pub mod divmask;
 mod faugere_lachartre;
@@ -39,6 +40,7 @@ pub use certify::{
     certify_submitted_basis, CertificationReport, CertificationStage, CertificationStopped,
     Provenance,
 };
+pub use count_route::{CountDisabled, CountRefusal, CountRoute};
 pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use divmask::{DivmaskCalibration, DIVMASK_BITS};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
@@ -81,9 +83,12 @@ use crate::{
             minimal_basis_for_interreduction, reduce_grobner_basis_counted,
             reduce_grobner_basis_measured, reduce_grobner_basis_until, InterreductionReport,
         },
-        f4::interreduce::{
-            interreduce_by_matrix_with, MatrixInterreductionAborted, MatrixInterreductionMethod,
-            MatrixInterreductionRefused,
+        f4::{
+            count_route::{Step, ZeroSkip},
+            interreduce::{
+                interreduce_by_matrix_with, MatrixInterreductionAborted,
+                MatrixInterreductionMethod, MatrixInterreductionRefused,
+            },
         },
         pairs::{CriterionCounts, PairQueue},
     },
@@ -357,6 +362,19 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         None
     };
 
+    // The count route (#1080): on only when asked for and the input passes its predicate.
+    let mut zero_skip = if options.hilbert.certifies_zeros() {
+        match ZeroSkip::new(generators, order) {
+            Ok(route) => Some(route),
+            Err(refusal) => {
+                statistics.hilbert.count_route = CountRoute::Refused(refusal);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Terminates because each batch either consumes pairs without adding any, or produces a
     // candidate whose leading monomial is outside the leading-term ideal of the current basis —
     // which therefore grows strictly. An ascending chain of monomial ideals stabilizes, by
@@ -373,6 +391,9 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 
     while pending.has_work() {
         if pending.is_empty() {
+            if let Some(route) = zero_skip.as_mut() {
+                route.exhausted();
+            }
             statistics.hilbert.pairs_promoted += pending.promote_deferred();
             continue;
         }
@@ -380,19 +401,30 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         // The cap this batch is selected under: the caller's, and the prediction's where one
         // applies. The smaller of the two, so neither can be escaped by the other.
         let next_degree = pending.next_degree();
-        let predicted_cap = limits
-            .as_ref()
-            .filter(|_| options.hilbert.limits())
-            .and_then(|limits| {
-                let degree = next_degree?;
-                match limits.cap(degree, &leads) {
-                    Some(cap) => Some(cap),
-                    None => {
-                        statistics.hilbert.predictions_unavailable += 1;
-                        None
+        if let (Some(route), Some(degree)) = (zero_skip.as_mut(), next_degree) {
+            let step = route.open(degree, &leads);
+            match apply_count_step(step, route, &mut pending, &mut statistics.hilbert) {
+                CountAction::Proceed => {}
+                CountAction::Reselect => continue,
+                CountAction::Finish => break,
+            }
+        }
+        let predicted_cap = match zero_skip.as_ref().filter(|route| route.is_live()) {
+            Some(route) => route.cap(options.hilbert.slack()),
+            None => limits
+                .as_ref()
+                .filter(|_| options.hilbert.limits())
+                .and_then(|limits| {
+                    let degree = next_degree?;
+                    match limits.cap(degree, &leads) {
+                        Some(cap) => Some(cap),
+                        None => {
+                            statistics.hilbert.predictions_unavailable += 1;
+                            None
+                        }
                     }
-                }
-            });
+                }),
+        };
         let cap = match (options.max_pairs_per_batch, predicted_cap) {
             (Some(caller), Some(predicted)) => Some(caller.min(predicted)),
             (caller, None) => caller,
@@ -552,6 +584,12 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             statistics.hilbert.pairs_deferred += pending.defer_degree(degree);
         }
 
+        // Read before the candidates are consumed: how many rows were kept, and whether any fell.
+        let count_step = zero_skip.as_mut().map(|route| {
+            let fell = route.is_live() && outcome.candidates.iter().any(|c| c.degree() < degree);
+            route.record(degree, outcome.candidates.len(), fell)
+        });
+
         for candidate in outcome.candidates {
             statistics.max_terms = statistics.max_terms.max(candidate.terms().len());
             let added = basis.len();
@@ -573,6 +611,20 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         // `select_batch` drained a degree, which is a local *minimum* of the heap. The pairs of
         // this batch's new elements have just been pushed, so this is the high-water mark.
         statistics.peak_pair_queue = statistics.peak_pair_queue.max(&pending.footprint());
+
+        // After the new elements' pairs are in, so a drop of this degree cannot miss one.
+        if let (Some(step), Some(route)) = (count_step, zero_skip.as_mut()) {
+            if let CountAction::Finish =
+                apply_count_step(step, route, &mut pending, &mut statistics.hilbert)
+            {
+                break;
+            }
+        }
+    }
+
+    if let Some(route) = zero_skip.as_ref() {
+        statistics.hilbert.count_route = route.outcome();
+        statistics.hilbert.degrees_certified = route.degrees_certified();
     }
 
     statistics.criteria = criteria_counts;
@@ -784,6 +836,45 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     statistics.total = total_clock.elapsed();
 
     Ok(reduced)
+}
+
+/// What the main loop does after the count route has spoken.
+enum CountAction {
+    Proceed,
+    Reselect,
+    Finish,
+}
+
+/// Carry out a count-route step on the queue.
+///
+/// A certified degree's pairs are discarded on homogeneous input and deferred on affine input,
+/// where only a zero count makes the drop final (see [`count_route`]). A route that has just turned
+/// off returns whatever it deferred, so the rest of the run is plain F4.
+fn apply_count_step<const N: usize>(
+    step: Step,
+    route: &ZeroSkip,
+    pending: &mut PairQueue<N>,
+    counts: &mut HilbertCounts,
+) -> CountAction {
+    match step {
+        Step::Continue => CountAction::Proceed,
+        Step::DropDegree(degree) => {
+            if route.drops_are_final() {
+                counts.pairs_certified_zero += pending.discard_degree(degree);
+            } else {
+                counts.pairs_deferred += pending.defer_degree(degree);
+            }
+            CountAction::Reselect
+        }
+        Step::Complete => {
+            counts.pairs_certified_zero += pending.discard_all();
+            CountAction::Finish
+        }
+        Step::Disabled => {
+            counts.pairs_promoted += pending.promote_deferred();
+            CountAction::Proceed
+        }
+    }
 }
 
 /// Reject a basis larger than `options` allows.

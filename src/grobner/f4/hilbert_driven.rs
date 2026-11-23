@@ -25,7 +25,8 @@
 //!
 //! # How completeness is preserved
 //!
-//! Neither mode discards a pair:
+//! Neither prediction mode discards a pair (the count route, [`HilbertSelection::CertifiedZeros`],
+//! is the exception, and drops only what a count has certified):
 //!
 //! - [`HilbertSelection::CertifiedLimited`] caps the *batch*. The pairs it does not take stay
 //!   **pending**, and since the lcm degree is primary under every schedule they are the next thing
@@ -78,15 +79,27 @@ pub enum HilbertSelection {
     /// what it buys is that by the time they are processed the basis is larger, so more of them are
     /// eliminated by a criterion and the rest reduce against more reducers.
     Deferred { slack: usize },
+
+    /// Sub-batch each degree under a count cap, and drop the rest of a degree once the
+    /// Hilbert count certifies it (#1080, Design D).
+    ///
+    /// Unlike the modes above this one **does** discard pairs, and only on a theorem: at a degree
+    /// whose count of standard monomials meets `Π(1 − t^{d_i})/(1 − t)^n`, every remaining pair is
+    /// a zero (`docs/research/hilbert-count-acceptance.md`, Theorems 1 and 3). The route runs on
+    /// conventional F4 under a degree-compatible order only, for homogeneous input or square affine
+    /// input with no constant generator, and turns itself off at the first degree fall or mismatch,
+    /// after which the run is plain F4. See [`super::count_route`].
+    CertifiedZeros { slack: usize },
 }
 
 impl HilbertSelection {
     /// Every mode, for an ablation that should not need editing when one is added.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Off,
         Self::Observe,
         Self::CertifiedLimited { slack: 0 },
         Self::Deferred { slack: 0 },
+        Self::CertifiedZeros { slack: 0 },
     ];
 
     /// A short name, for a table column.
@@ -96,6 +109,7 @@ impl HilbertSelection {
             Self::Observe => "observe".to_string(),
             Self::CertifiedLimited { slack } => format!("limited+{}", slack),
             Self::Deferred { slack } => format!("deferred+{}", slack),
+            Self::CertifiedZeros { slack } => format!("certified-zeros+{}", slack),
         }
     }
 
@@ -104,7 +118,9 @@ impl HilbertSelection {
         !matches!(self, Self::Off)
     }
 
-    /// True if the mode caps the batch.
+    /// True if the mode caps the batch by the prediction.
+    ///
+    /// False for [`Self::CertifiedZeros`], whose cap is the count route's and lapses with it.
     pub fn limits(&self) -> bool {
         matches!(self, Self::CertifiedLimited { .. } | Self::Deferred { .. })
     }
@@ -114,10 +130,17 @@ impl HilbertSelection {
         matches!(self, Self::Deferred { .. })
     }
 
+    /// True if the mode drops pairs the Hilbert count certifies as zeros.
+    pub fn certifies_zeros(&self) -> bool {
+        matches!(self, Self::CertifiedZeros { .. })
+    }
+
     /// The allowance, or zero for a mode that does not limit.
     pub fn slack(&self) -> usize {
         match self {
-            Self::CertifiedLimited { slack } | Self::Deferred { slack } => *slack,
+            Self::CertifiedLimited { slack }
+            | Self::Deferred { slack }
+            | Self::CertifiedZeros { slack } => *slack,
             _ => 0,
         }
     }
@@ -253,8 +276,14 @@ mod tests {
         assert!(HilbertSelection::Deferred { slack: 1 }.limits());
         assert_eq!(HilbertSelection::CertifiedLimited { slack: 3 }.slack(), 3);
         assert_eq!(HilbertSelection::Off.slack(), 0);
-        assert_eq!(HilbertSelection::ALL.len(), 4);
+        assert_eq!(HilbertSelection::ALL.len(), 5);
         assert_eq!(HilbertSelection::Deferred { slack: 2 }.name(), "deferred+2");
+        let zeros = HilbertSelection::CertifiedZeros { slack: 2 };
+        assert_eq!(zeros.name(), "certified-zeros+2");
+        assert!(zeros.is_active() && zeros.certifies_zeros());
+        assert!(!zeros.limits() && !zeros.defers());
+        assert_eq!(zeros.slack(), 2);
+        assert!(!HilbertSelection::Deferred { slack: 2 }.certifies_zeros());
     }
 
     /// With nothing known, the cap at a degree is the whole predicted ideal dimension.

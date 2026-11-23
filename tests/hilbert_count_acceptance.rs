@@ -23,8 +23,8 @@ use zeebra::{
         benchmark_systems::{cyclic, eco, katsura},
         f4,
         f4::MonicBasis,
-        f4_observed, top_forms, BatchObserver, CriticalPair, F4Options, HilbertSeries,
-        SemiregularSeries,
+        f4_observed, f4_with_options, top_forms, BatchObserver, CountRoute, CriticalPair,
+        F4Options, HilbertSelection, HilbertSeries, SemiregularSeries,
     },
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
@@ -965,6 +965,122 @@ fn the_affine_square_certificate_accepts_katsura_and_refuses_eco_and_cyclic() {
         }
         assert_eq!(regular, label.starts_with("katsura"), "{label}");
     }
+}
+
+// ------------------------------------------------------------------------------------------------
+// Design D on real F4 (#1080): the count route must return the deterministic basis everywhere.
+// ------------------------------------------------------------------------------------------------
+
+/// The route's outcome on `system`, after asserting it returned the deterministic basis.
+fn design_d<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    label: &str,
+) -> CountRoute {
+    let expected = f4(system, GREVLEX).unwrap();
+    let mut outcome = CountRoute::Unused;
+    for slack in [0, 2] {
+        let options = F4Options {
+            hilbert: HilbertSelection::CertifiedZeros { slack },
+            ..F4Options::default()
+        };
+        let (basis, statistics) = f4_with_options(system, GREVLEX, &options).unwrap();
+        assert_eq!(
+            basis, expected,
+            "{label}, slack {slack}: {:?}",
+            statistics.hilbert
+        );
+        assert!(statistics.hilbert.pairs_promoted <= statistics.hilbert.pairs_deferred);
+        outcome = statistics.hilbert.count_route;
+    }
+    outcome
+}
+
+fn design_d_on_the_harness<const N: usize, F: FiniteField>(p: u64, outcomes: &mut Vec<CountRoute>) {
+    for seed in 0..4 {
+        for (label, system) in systems(N, p, seed) {
+            let zeebra: Vec<MultivariatePolynomial<N, F>> =
+                system.iter().map(|f| to_zeebra::<N, F>(f)).collect();
+            outcomes.push(design_d(
+                &zeebra,
+                &format!("GF({p}), n={N}, seed {seed}, {label}"),
+            ));
+        }
+    }
+}
+
+/// Every system the harness builds, regular or not, over GF(2) and GF(31). Both a completed route
+/// and a disabled one must occur, or the test is not testing the route.
+#[test]
+fn design_d_returns_the_exact_basis_on_the_harness_systems() {
+    let mut outcomes = Vec::new();
+    design_d_on_the_harness::<3, Zp2>(2, &mut outcomes);
+    design_d_on_the_harness::<3, Zp31>(31, &mut outcomes);
+    design_d_on_the_harness::<4, Zp31>(31, &mut outcomes);
+    let completed = outcomes
+        .iter()
+        .filter(|o| matches!(o, CountRoute::Completed { .. }))
+        .count();
+    let disabled = outcomes
+        .iter()
+        .filter(|o| matches!(o, CountRoute::Disabled { .. }))
+        .count();
+    assert!(
+        completed > 10 && disabled > 10,
+        "{completed} completed, {disabled} disabled"
+    );
+}
+
+/// On affine square input the route completes only where Theorem 3 says it may: Katsura, whose top
+/// forms are regular. Eco and Cyclic turn it off and still return the exact basis.
+#[test]
+fn design_d_completes_on_katsura_and_falls_back_on_eco_and_cyclic() {
+    type F = Zp32003;
+    for (label, outcome, regular) in [
+        ("katsura-5", design_d(&katsura::<5, F>(), "katsura-5"), true),
+        ("katsura-6", design_d(&katsura::<6, F>(), "katsura-6"), true),
+        ("eco-6", design_d(&eco::<6, F>(), "eco-6"), false),
+        ("cyclic-5", design_d(&cyclic::<5, F>(), "cyclic-5"), false),
+    ] {
+        assert_eq!(
+            matches!(outcome, CountRoute::Completed { .. }),
+            regular,
+            "{label}: {outcome:?}"
+        );
+    }
+}
+
+/// The sparse ladder generator's MQ rows, which the certificate mostly refuses. Whatever the route
+/// does, the basis is the deterministic one, and it completes only on regular top forms.
+#[cfg(feature = "external-runners")]
+#[test]
+fn design_d_falls_back_on_the_sparse_mq_ladder() {
+    use zeebra::grobner::external::corpus::random_mq_instance;
+    fn one<const N: usize>(seed: u64) -> CountRoute {
+        type F = Zp32003;
+        let instance = random_mq_instance(N, seed, 32003, GREVLEX);
+        let names: [&str; N] = std::array::from_fn(|i| instance.variables[i].as_str());
+        let system: Vec<MultivariatePolynomial<N, F>> = instance
+            .system
+            .iter()
+            .map(|s| MultivariatePolynomial::parse(s, names).unwrap())
+            .collect();
+        let outcome = design_d(&system, &format!("mq n={N} seed={seed}"));
+        if matches!(outcome, CountRoute::Completed { .. }) {
+            assert!(top_forms_regular(&system), "mq n={N} seed={seed}");
+        }
+        outcome
+    }
+    let mut outcomes = Vec::new();
+    for seed in 0..6 {
+        outcomes.push(one::<5>(seed));
+        outcomes.push(one::<6>(seed));
+    }
+    assert!(
+        outcomes
+            .iter()
+            .any(|o| matches!(o, CountRoute::Disabled { .. })),
+        "{outcomes:?}"
+    );
 }
 
 /// The corpus's MQ rows are square and affine. Report, for small seeds, which ones the certificate
