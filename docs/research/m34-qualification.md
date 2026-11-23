@@ -28,10 +28,10 @@ The owner decision is on #1043 ([comment](https://github.com/mfaulk/zeebra/issue
 
 | Binary | SHA-256 |
 |---|---|
-| `sig_f4_study` | Z0_SIG_SHA |
-| `m33_qualify` | Z0_QUAL_SHA |
+| `sig_f4_study` | `93463c2ba800517233dde3c4a2835879d47367c5d9e8cd77b2b5b7c02d5f0d49` |
+| `m33_qualify` | `11e52687b86dcf998debe12276ee2b0a7bd5e1a85f5be2145e906ea76254c817` |
 
-Toolchain: Z0_RUSTC.
+Toolchain: rustc 1.99.1 (58cf8f9c3 2026-10-13).
 
 ## 2. Safety prerequisites (plan §7.6)
 
