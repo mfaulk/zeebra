@@ -97,6 +97,11 @@ pub enum Gf2Elimination {
 
     /// Packed whenever the contract allows, regardless of density. For measurement.
     Packed,
+
+    /// Research (#1077): as [`Packed`](Self::Packed), but packed on the residual columns only, the
+    /// known-pivot columns eliminated through reducer tails. Same eligibility, budgets and result.
+    #[cfg(feature = "research-gf2-residual")]
+    Residual(super::packed_residual::ResidualTails),
 }
 
 impl Gf2Elimination {
@@ -161,6 +166,8 @@ impl Gf2Elimination {
         match self {
             Self::Generic => false,
             Self::Packed => true,
+            #[cfg(feature = "research-gf2-residual")]
+            Self::Residual(_) => true,
             Self::Auto => Self::prefers_packed(rows, pair_rows, columns, nonzeros),
         }
     }

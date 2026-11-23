@@ -330,7 +330,23 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         };
         if packed_eligible {
             let selected = candidate_columns(matrix);
-            match super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes) {
+            #[cfg(not(feature = "research-gf2-residual"))]
+            let packed =
+                super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes);
+            #[cfg(feature = "research-gf2-residual")]
+            let packed = match options.gf2_elimination {
+                super::options::Gf2Elimination::Residual(tails) => {
+                    super::packed_residual::eliminate(
+                        matrix,
+                        &selected,
+                        allowance,
+                        options.max_live_bytes,
+                        tails,
+                    )
+                }
+                _ => super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes),
+            };
+            match packed {
                 Ok(Some(packed)) => {
                     packed_gf2 = packed.statistics;
                     stages.forward = split_clock.lap();
