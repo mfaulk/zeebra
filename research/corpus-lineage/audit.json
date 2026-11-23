@@ -4972,7 +4972,7 @@
   "schema": "legacy-corpus-audit-v1",
   "sources": {
     "examples/wide_corpus.rs": "6074de6ac88fdb4e42a53b5b2009f6d493f8882bdae57389bcfb8b091f5f71f8",
-    "research/m33-baseline/admission.py": "c3dd1d63c2a89789629eec7828f196b5a1f31258375e073af7492fe0fd0c9a5b",
+    "research/m33-baseline/admission.py": "8b74fca8afdd581c882305ceecaadbce8f2315194f7310ad9f66c1841c59cb41",
     "research/m33-baseline/candidates.json": "5105decf80819b505ee9470d2dbbefa5f536fba38375ac65f97ada40cffd855d",
     "research/m33-baseline/held-out.json": "8587bd854510deedee6067d8cf99ff1cf434777ede7dc4f111605c8bc639fc9a",
     "research/m33-baseline/manifests/G-baseline.json": "4f18ef6b1bd6ac05446e22660ed8352418bf1c2b0366ca67c3e44cd1dde6d718",
