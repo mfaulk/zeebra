@@ -6,7 +6,9 @@ built from `2fe11b8d`, evidence in [`research/m29-c1/`](../../research/m29-c1/RE
 M29 cost model ([`m29-baseline-cost-model.md`](m29-baseline-cost-model.md), `7251e775` and
 `6a78e91a`/`6efb70a5` for §6b), M16's reducer measurements
 ([`MILESTONE-F4-OPTIMIZATION.md`](../MILESTONE-F4-OPTIMIZATION.md) §7.1.5 and §7.2.3, publication
-bound `914f1ef8`…`ca0b3dad`), and the two papers' own tables. Nothing was built, run or reserved.
+bound `914f1ef8`…`ca0b3dad`), #1031's reuse census
+([`reduced-multiple-reuse-census.md`](reduced-multiple-reuse-census.md), measured at `f6cafd44`)
+for §6.1 and §7, and the two papers' own tables. Nothing was built, run or reserved.
 Arithmetic on those figures is labelled as derived.
 
 This is #809, the follow-up that [`specialized-gb-engines.md`](specialized-gb-engines.md) §4.1 filed
@@ -310,23 +312,57 @@ the one missing credit is unmeasured.
 
 ### 6.1 Evidence that would reopen it
 
-Any one of these:
+*Revised by #1069.* The gate is the **counterfactual product census**. Recurrence alone does not
+reopen this note. #1031's census (§7) found conditions (b)–(d) below formally met on current routes,
+and (d) on 86 of 114 (row, engine) pairs, while a store of tail-reduced multiples cost more
+elimination products than it saved on every pinned row but one. The conditions are necessary-looking
+but not predictive, so they are now preconditions, and the census decides.
 
-- **Reducer rows start receiving work.** A ledger, on shipping or a successor default route, shows
+**Gate.** Reopen only when both of these hold:
+
+1. **Precondition: recurrence.** At least one of conditions (a)–(d) holds, on shipping or on a
+   successor default route.
+2. **Decision: the counterfactual saves work.** On at least **two** of §6.2 step 5's wide targets
+   (Eco-12, MQ11, MQ10, Katsura-11), on the same route, the census's *hits tail-reduced* arm saves
+   **≥ 10% of elimination products net of upkeep**. Net means the arm 3 − arm 1 difference less
+   the products spent tail-reducing the hit multiples
+   ([`reduced-multiple-reuse-census.md`](reduced-multiple-reuse-census.md) §1). It is measured with
+   `examples/reuse_census.rs` under `--features research-reuse`. The census's avoidable count is an
+   upper bound on what a real store saves, so a figure below the bar cannot be rescued by a better
+   store. A figure above it only admits §6.2, where wall time decides.
+
+On #1031's figures (`f6cafd44`) the decision half holds on no target. The best pinned figure is
+Eco-12 on the signature engine, which saves 5.2% gross and −56% net. The best dense-cohort figure is
+1.4% net.
+
+**Re-run the census only when an engine change alters its cost structure.** Recurrence moving is not
+enough. Two changes qualify:
+
+- **Reducer-block reduction becomes free.** For example, a full-RREF default or an elimination that
+  reduces its reducer block anyway. Rows would then be tail-reduced without upkeep, and the upkeep
+  column the census charges would no longer apply.
+- **A pair-at-a-time organization.** An M4GB- or M5GB-style backend (#1030, #1032) applies stored
+  rows to single reductions rather than to a batch's shared pivots. The census's batch replay does
+  not predict that organization's products.
+
+**Preconditions.** These are the original §6.1 conditions. The census labels them (a)–(d), and its
+§4 gives the operational thresholds for "collapse" and "large reducer fractions".
+
+- **(a) Reducer rows start receiving work.** A ledger, on shipping or a successor default route, shows
   `reducer_target_operations` that is a material share of forward products. Examples: a reducer
   interreduction route, a full-RREF default, or a sig-F4 elimination that reduces its reducer block.
   Rows would then be reduced anyway, and storing them costs only memory.
-- **The zero-row share collapses and inherited-pivot work dominates what remains.** Signature F4
+- **(b) The zero-row share collapses and inherited-pivot work dominates what remains.** Signature F4
   (M31) or #716-style pair pruning removes most zero reductions. A ledger on that route then shows
   inherited-pivot products ≥ 50% of process work, together with a `CacheMode::Count` repetition rate
   ≥ 50% on the same targets. A signature engine adds a constraint this note does not analyze: a
   retained row would also have to carry a signature compatible with `u·sig(f)`.
-- **The closure is the bottleneck.** A measured workload where reducer tails, rather than pair
+- **(c) The closure is the bottleneck.** A measured workload where reducer tails, rather than pair
   count, drive matrix size. Signs would be large reducer fractions per batch, as on MQ11 where late
   batches are > 90% reducer rows (`work.batches[].reducer_rows`), together with a symbolic stage
   ≥ 30% of wall.
-- **A dedicated measurement** (§6.2 step 1) shows a per-variable chain hit rate ≥ 50% on the pinned
-  wide targets.
+- **(d) A dedicated measurement** (§6.2 step 1) shows a per-variable chain hit rate ≥ 50% on the
+  pinned wide targets.
 
 ### 6.2 Prototype protocol, when reopened
 
@@ -335,13 +371,17 @@ Any one of these:
    with Faugère / OpenF4 per-variable parent links. Rows are stored as terms, not columns. A byte
    budget with safe eviction is charged in its own statistic. **Null arm:** a store capped at zero
    bytes must reproduce shipping F4's trajectory and `basis_sha256` bit for bit.
-1. **Free gates, before any elimination change.** Both use existing counters and change nothing
-   computed.
+1. **Gates, before any elimination change.** None of them changes anything computed. (a) and (b)
+   use existing counters. (c) replays each batch under `--features research-reuse`.
    - (a) `CacheMode::Count` repetition on the pinned targets.
    - (b) An offline replay over a `--discovery` record that marks each reducer product whose
      `(i, m / xⱼ)` ancestor was built in an earlier batch. That is the `Simplify` hit rate Remark 2.6
      describes.
-   - Stop if either is < 30% on the wide targets.
+   - Stop if (a) or (b) is < 30% on the wide targets.
+   - (c) The counterfactual product census of §6.1's gate. Stop unless the hits-tail-reduced arm
+     saves ≥ 10% of elimination products net of upkeep on at least two wide targets. Gates (a) and
+     (b) measure recurrence, which #1031 found high whatever the outcome. This gate is the one that
+     decides.
 2. **Arms.**
    - Shipping, which is `Structured` with an untouched reducer block.
    - Shipping with `Simplify` lookup and rows retained only where they are already reduced. On
@@ -394,5 +434,5 @@ defaults and the signature engine, over the M29 pinned rows and #1030's dense qu
   saved gross, but −56% once upkeep is charged. On the dense cohort it saves at most 2.4%, and 1.4% net.
 - **So §6.1's conditions are not predictive.** (d) passes where the counterfactual is negative.
   Before any §6.2 step 2 arm, the gate should be the counterfactual product census
-  (`--features research-reuse`, `examples/reuse_census.rs`), not recurrence. #1069 tracks revising
-  §6.1 to say so.
+  (`--features research-reuse`, `examples/reuse_census.rs`), not recurrence. §6.1 now says so
+  (#1069).
