@@ -364,6 +364,88 @@ class BenchJobTest(unittest.TestCase):
         self.assertIn('1 compiler process(es)', stop['refusals'])
         self.assertEqual(self.state(job)['attempts'], [])
 
+    def run_with_refusals(self, job, busy_after, clears):
+        """`run_job` in process, on a fake clock, with a compiler that appears after each attempt in
+        `busy_after` and clears after the next of `clears` polls (None: never). Returns the attempt
+        starts as (fake seconds, busy) and the JobError `run_job` raised, if any."""
+        clock = dict(now=0.0, busy=False, sleeps=0)
+        clears = list(clears)
+        starts = []
+
+        class FakeTime:
+            monotonic = staticmethod(lambda: clock['now'])
+            time = staticmethod(time.time)
+
+            @staticmethod
+            def sleep(seconds):
+                clock['now'] += seconds
+                clock['sleeps'] += 1
+                if clears[0] is not None and clock['sleeps'] >= clears[0]:
+                    clock['busy'], clock['sleeps'] = False, 0
+                    clears.pop(0)
+
+        def snapshot(cpus):
+            return dict(at='2026-11-23T00:00:00.000Z', load1=0.5, compilers=int(clock['busy']), runner_workers=0,
+                        benchlock_open=[], clock='boost', rapl_uj=None, cpus=[dict(cpu=0, khz=4000000)],
+                        stat=[dict(cpu=0, role='bench', busy=10, total=100)],
+                        rest_stat=dict(busy=0, total=100, cpus=1))
+
+        def run_attempt(m, command, cpus, *_args, **_kw):
+            starts.append((clock['now'], clock['busy']))
+            if len(starts) - 1 in busy_after:
+                clock['busy'] = True
+            quiet = snapshot(cpus)
+            return dict(cpus=cpus, process_wall_ns=1_000_000, returncode=0, cpu_seconds=0.001,
+                        peak_rss_bytes=1 << 20, solver_peak_rss_bytes=None, rss_guard_rc=None,
+                        rss_guard_stderr='', before=quiet, after=quiet, freq=None, perf=None, stopped=False,
+                        stdout=b'{"status":"ok"}\n', stderr=b'', harness_cpu_seconds=0.0, own_cpu_s=0.001)
+
+        saved = bj.time, bj.run_attempt, bj.campaign.snapshot
+        bj.time, bj.run_attempt, bj.campaign.snapshot = FakeTime, run_attempt, snapshot
+        try:
+            bj.run_job(self.jobs / job)
+            return starts, None
+        except bj.JobError as e:
+            return starts, e
+        finally:
+            bj.time, bj.run_attempt, bj.campaign.snapshot = saved
+
+    # A compiler that starts between attempts holds the next attempt until it clears (#1090).
+    def test_publication_waits_for_a_refusal_between_attempts(self):
+        m = self.manifest(mode='publication', reps=1)
+        m['run']['mode_wait_seconds'] = 600
+        job = self.job(m)
+        starts, error = self.run_with_refusals(job, busy_after={0}, clears=[3])
+        self.assertIsNone(error)
+        self.assertEqual(len(starts), 4)
+        self.assertEqual([busy for _, busy in starts], [False] * 4)
+        self.assertEqual(starts[1][0], 3 * bj.MODE_POLL_SECONDS)
+        state = self.state(job)
+        self.assertEqual(state['stop']['reason'], 'complete')
+        waits = [a['metadata']['mode_wait'] for a in state['attempts']]
+        self.assertEqual(waits[0], dict(waited_seconds=0, refusals=[]))
+        self.assertEqual(waits[1]['waited_seconds'], 3 * bj.MODE_POLL_SECONDS)
+        self.assertIn('1 compiler process(es)', waits[1]['refusals'])
+
+    # The wait budget is the job's, not each attempt's: once spent, the job stops mode-refused (#1090).
+    def test_publication_wait_exhausts_the_remaining_budget(self):
+        m = self.manifest(mode='publication', reps=1)
+        m['run']['mode_wait_seconds'] = 2.5 * bj.MODE_POLL_SECONDS
+        job = self.job(m)
+        # One poll's wait before attempt 1 leaves 1.5 polls; before attempt 2 the compiler never clears.
+        starts, error = self.run_with_refusals(job, busy_after={0, 1}, clears=[1, None])
+        self.assertEqual(starts, [(0, False), (bj.MODE_POLL_SECONDS, False)])
+        self.assertIsNotNone(error)
+        self.assertEqual(error.code, bj.EXIT_REFUSED)
+        state = self.state(job)
+        self.assertEqual(len(state['attempts']), 2)
+        stop = state['stop']
+        self.assertEqual(stop['reason'], 'mode-refused')
+        self.assertEqual(stop['attempt'], bj.attempt_id(job, 2, 0))
+        self.assertIn('1 compiler process(es)', stop['refusals'])
+        # A per-attempt budget would have waited two polls here.
+        self.assertEqual(stop['waited_seconds'], bj.MODE_POLL_SECONDS)
+
     # Publication mode starts when the machine is quiet, under an exclusive rather than CCD lock.
     def test_publication_runs_exclusive_when_quiet(self):
         self.fake_context()
