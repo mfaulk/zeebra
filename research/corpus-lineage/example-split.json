@@ -1,0 +1,14 @@
+{
+  "schema": "corpus-split-v1",
+  "protocol": "S2",
+  "assignments": [
+    {
+      "id": "katsura-4",
+      "partition": "development"
+    },
+    {
+      "id": "cyclic-7",
+      "partition": "evaluation"
+    }
+  ]
+}

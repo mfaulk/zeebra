@@ -70,6 +70,7 @@ bash tools/test/bench-reserve-test.sh
 bash tools/test/bench-clock-test.sh
 python3 tools/test/bench-contamination-test.py
 python3 tools/test/bench-stats-test.py
+python3 tools/test/corpus-lineage-test.py
 bash tools/check-measurement-provenance.sh      # the documents, not the script
 ```
 
