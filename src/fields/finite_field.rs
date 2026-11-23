@@ -176,6 +176,12 @@ where
         None
     }
 
+    /// This field as a `u32` delayed-reduction lane (#945), or `None` if it is not a prime field
+    /// small enough for one. See [`crate::linalg::lane`].
+    fn small_prime_lane() -> Option<crate::linalg::lane::Lane<Self>> {
+        None
+    }
+
     /// Runs `job` with `Self: Send + Sync` in scope, or hands it back for a field without them.
     ///
     /// [`Self::concurrent_elimination`]'s proof, for work whose types carry more parameters than

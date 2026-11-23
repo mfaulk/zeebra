@@ -300,6 +300,17 @@ impl<const P: u32> FiniteField for PrimeFieldElement32<P> {
     fn run_concurrent<J: crate::fields::ConcurrentJob<Self>>(job: J) -> Result<J::Output, J> {
         Ok(job.run())
     }
+
+    fn small_prime_lane() -> Option<crate::linalg::lane::Lane<Self>> {
+        // The lane works on the stored representative. Montgomery form is linear, so a raw cell
+        // times a canonical multiplier is the raw form of the product.
+        crate::linalg::lane::Lane::new(
+            P,
+            |element| element.value,
+            |raw| Self { value: raw },
+            Self::value,
+        )
+    }
 }
 
 impl<const P: u32> PrimeFieldElement32<P> {
