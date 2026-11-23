@@ -162,8 +162,9 @@ table width of 0. The harness re-asserts equality on every measured matrix and e
 - **Multicore XOR, cache blocking, M4RI/M4RIE as pinned external comparands** (#272's P2 comment):
   not attempted. The serial algorithmic factor measured here is the baseline those would be
   isolated against.
-- **Packing only the residual columns** (#1077): a research prototype, measured unpinned in
-  [`gf2-residual-packing.md`](gf2-residual-packing.md).
+- **Packing only the residual columns** (#1077): measured adopt in
+  [`gf2-residual-packing.md`](gf2-residual-packing.md). The default with the residual kernel in its
+  packed route is 1.06x faster on held-out n = 15 MQ and 1.19x on n = 16/17; #1092 makes the swap.
 
 ## 7. Wired into F4 (#777): measured solves
 

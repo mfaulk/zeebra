@@ -1,6 +1,10 @@
 # Packing only the residual columns over GF(2) (#1077)
 
-**Measured at:** `2ac6488f`. Every figure below is from that commit. The binary is
+**Measured at:** `7f223df4` (§5, the bench host: decision figures) and `2ac6488f` (§3–§4, the
+laptop). The kernel is unchanged between the two; `7f223df4` adds only the `AutoResidual` arm and
+the fresh-process mode. **§5:** AMD Threadripper PRO 5995WX, Linux x86_64, rustc 1.99.1, every
+process `taskset`-pinned under `tools/benchlock.sh 1077`, 1-minute load 0.8–1.1
+(`research/gf2-residual/bench-host/`). **§3–§4:** the binary is
 `examples/gf2_residual_replay.rs`, built `--release --features research-gf2-residual` with the
 repository's `.cargo/config.toml` and `RUSTC_WRAPPER=""`. **Unpinned macOS laptop**
 (Apple M4 Pro, 14 cores, Darwin arm64, rustc 1.95.0). One worker. No `taskset`, no
@@ -13,29 +17,37 @@ timing as a ratio between arms of the same run, not as an absolute.
 Parent #1028. Related: #777 (packed dispatch), #794 (threshold), #816 (Faugère–Lachartre order).
 Instrument, raw tables and scoring script: [`research/gf2-residual/`](../../research/gf2-residual/README.md).
 
-## Decision (provisional)
+## Decision
 
-- **Provisional adopt, pending pinned bench-host whole-solve measurement.** Use the residual-width
-  kernel in place of the full-width reducer sweep inside the packed route. **Until that
-  measurement lands, defer: no default changes.** On replayed batches it is **1.35x** (development)
-  and **1.46x** (held out) faster than the shipped full-width packed kernel in total. It is
-  **1.42x and 1.49x** faster in total on the batches that cost the packed route over 1 ms, and at
-  least 10% faster on each of those 32 batches. It writes 0.59x the `xor` words. Every batch it loses by 10% or more costs the packed route under 75 µs, and
-  those losses sum to 117 µs over 231 development batches.
+- **Adopt, with eager tails** (measured on the bench host, §5). Replace the full-width reducer
+  sweep inside the packed route with the residual-width kernel, keeping `Auto`'s batch choice.
+  This PR changes no default; the swap is #1092's follow-up. In fresh pinned processes at one
+  worker, `Auto` with the residual kernel is **1.06x** faster in total on the held-out n = 15 set
+  (1.01x–1.19x per instance) and **1.19x** on the second held-out set, n = 16 and n = 17 square MQ
+  (1.04x–1.36x), with the elimination stage **1.37x** and **1.89x** faster. Peak RSS is
+  0.89x–1.00x. Development is 1.03x in total. Its worst instance, 0.95x, is 0.1 ms of a 2.7 ms
+  solve, inside the 10% spread of its own repetitions. At 16 workers the gains hold: 1.06x and
+  1.18x.
+- **Per batch** on the bench host it is **1.27x** (development) and **1.39x** (held out) faster
+  than the shipped full-width packed kernel, and 1.34x and 1.42x on batches over 1 ms, each of
+  which it wins by at least 16%. The laptop measured 1.35x and 1.46x (§3).
 - **Reject lazy tail construction.** On every one of the 293 F4 batches replayed, a pair row reaches
   every reducer's tail, directly or through another tail: lazy built 43 143 of 43 143 tails
   (development) and 29 021 of 29 021 (held out). Symbolic preprocessing adds a reducer only because
   some row names its leading monomial, so the closure is the whole block by construction. Lazy is
   eager plus a closure pass, and is 1.2%–2.6% slower in total. The lazy/eager split only differs
   on the synthetic test batches.
-- **Whole solves gain less than batches** (Amdahl). At one worker: 1.05x in total on development
-  (per instance 0.98x–1.10x) and 1.09x on the held-out set (1.02x–1.22x). The elimination stage
-  alone is 1.00x–1.53x and 1.15x–1.71x.
+- **Whole solves gain less than batches** (Amdahl): elimination is 17%–28% of a square MQ-15
+  solve and about half of an n = 16 one, which is why the gain grows with n. The laptop's
+  in-process solves (§4) agree: 1.05x and 1.09x in total.
+- **No size floor.** Keeping small batches on the full-width sweep by an entry floor recovers at
+  most 0.04% of replayed elimination time; no floor is 0.45% and 0.28% above the per-batch oracle
+  of the two kernels (§5).
 - **Residual width predicts where there is nothing to gain. Batch cost predicts the losses
   better.** Batches whose residual is at least 75% of their columns break even (1.00x–1.02x in
   total) and hold most of the losses. Batches whose residual is 25%–50% gain the most (1.47x,
-  1.60x). But every loss is under 75 µs, at any residual fraction, so a size floor separates the
-  two sides as well as a width rule.
+  1.60x). Every loss is small at any residual fraction, and neither a width rule nor a size
+  floor is worth adding.
 
 ## 1. The kernel
 
@@ -106,10 +118,12 @@ kernel and seen failing against a stub.
   reduce to known leads.
 - **Default untouched.** `F4Options::default()` is `Auto`, and a default solve records no residual
   batch.
+- **`AutoResidual`** packs exactly the batches `Auto` packs, every one of them on the residual
+  route, and returns `Auto`'s basis, on systems where `Auto` leaves some batches generic.
 - **In the replay itself.** Every arm's candidates equal the packed route's on every repetition of
   all 293 batches, and every solve's basis equals the packed arm's.
 
-## 3. Per batch
+## 3. Per batch (laptop)
 
 `gf2_residual_replay batches {dev,heldout} 7`. The arms are `packed` (shipped, full width), `fl`
 (Faugère–Lachartre order, generic sparse kernel), and `lazy` and `eager` (residual width). Times
@@ -195,7 +209,7 @@ What the counters say:
   working set is 1.67 MB, and the packed route's largest is 1.96 MB. Simultaneous sparse and packed storage is charged
   as §1 describes. Peak RSS was not measured.
 
-## 4. Whole solves
+## 4. Whole solves (laptop)
 
 `gf2_residual_replay solve {dev,heldout} 7`. All three arms are forced (`Packed`,
 `Residual(Lazy)`, `Residual(Eager)`), so they are not compared against `Auto`.
@@ -221,21 +235,81 @@ What the counters say:
 The development rows are in `research/gf2-residual/solve-dev.tsv`. The whole-solve gain is
 bounded by the elimination share. On square MQ-15 that share is 17%–28% of the solve.
 
-## 5. What remains for the bench host
+## 5. Bench host
 
-The decision above is provisional until these are measured:
+`research/gf2-residual/bench-host/`, all at `7f223df4`: `run.sh` (in-process replay, 7
+repetitions, pinned to one core) and `fresh.sh` (whole solves, one solve per fresh process, five
+repetitions per arm with the arm order rotating, each process pinned). Fresh-process cells are
+medians; a ratio pairs two arms per instance. Every process re-solves under `packed` after timing
+and asserts the basis equal coefficient for coefficient. Peak RSS is the process's `VmHWM`, read
+before that check.
 
-1. **Pinned whole solves.** Fresh processes, `taskset` and `tools/benchlock.sh 1077`, arms
-   interleaved across processes, peak RSS recorded. This includes the two-binary A/B of `main`
-   against a branch where the residual kernel replaces the full-width sweep inside `Auto`'s packed
-   route, since `Auto` is what the default runs.
-2. **Sizes the laptop did not reach:** n = 16 square MQ, whose 12 840 × 9 622 batch dominates
-   #794's sweep, and n ≥ 17.
-3. **Multiworker.** Report one worker first, as here, and any worker count separately (#1028's
-   rules).
-4. Whether a **size floor** (about 100 µs of packed work, or an entry count) should keep small
-   batches on the full-width sweep. The development losses are 117 µs in total, so this is a
-   tidiness question, not a performance one.
+The fresh arms are `packed` and `eager` (forced on every eligible batch, as §4) and `auto` (the
+default dispatch) and `auto-eager` (`Gf2Elimination::AutoResidual`: `Auto`'s choice of batches,
+each packed one on the residual route). `auto` against `auto-eager` is the A/B of the default
+with and without the swap. Both come from one binary, so no code-layout difference separates
+them; the branch adds no ungated code to the default path except the `xor_words` counter, which
+both arms pay.
+
+**Second held-out set** (`big`), named in the instrument before it was run: square MQ at n = 16
+over #794's five densities and at n = 17 at densities 0.1 and 0.3, seed 1077.
+
+**Per batch**, in-process replay:
+
+| set | batches | packed ms | fl ms | lazy ms | eager ms | packed/eager | over 1 ms: packed/eager |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| development | 231 | 94.96 | 625.86 | 76.04 | 74.61 | 1.27x | 1.34x (min 1.16x, 18 batches) |
+| held out | 62 | 132.81 | 992.89 | 96.94 | 95.88 | 1.39x | 1.42x (min 1.24x, 14 batches) |
+
+The batches eager loses by 10% or more each cost the packed route under 285 µs, and the losses
+total 133 µs (development) and 110 µs (held out). Lazy again builds every tail (43 143 of 43 143,
+29 021 of 29 021) and is 1–2% slower than eager. The echelon is 46%–48% of the residual route's
+time, the multiply 29%–31%.
+
+The FL arm (generic sparse kernel, FL order) is 6.6x–7.5x the packed route here against 1.2x–1.6x
+on the laptop. It is the slowest arm on both machines and no decision rests on it, so the gap is
+recorded, not chased.
+
+**Entry floor.** Batches under the floor keep the full-width sweep:
+
+| set | floor 0 | 1 000 | 4 000 | 8 000 | 32 000 | oracle(packed, eager) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| development, ms | 74.61 | 74.57 | 74.91 | 75.29 | 77.20 | 74.27 |
+| held out, ms | 95.88 | 95.88 | 95.90 | 96.00 | 96.11 | 95.62 |
+
+**Whole solves, one worker, fresh processes:**
+
+| set | instances | auto ms | auto-eager ms | auto/auto-eager | per instance | elimination | peak RSS auto-eager/auto | packed/eager |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: |
+| development | 38 | 607.1 | 588.2 | 1.03x | 0.95x–1.08x | 1.25x | 0.95x–1.07x | 1.04x |
+| held out (n = 15) | 10 | 728.3 | 685.8 | 1.06x | 1.01x–1.19x | 1.37x | 0.94x–1.00x | 1.06x |
+| big (n = 16, 17) | 7 | 4319.6 | 3628.8 | 1.19x | 1.04x–1.36x | 1.89x | 0.89x–1.00x | 1.19x |
+
+| big instance | auto ms | auto elim ms | auto RSS MiB | auto-eager ms | auto-eager elim ms | auto-eager RSS MiB | auto/auto-eager |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mq-16-d0.05 | 230.53 | 19.88 | 32.1 | 221.88 | 12.42 | 32.1 | 1.04x |
+| mq-16-d0.10 | 470.49 | 220.76 | 91.0 | 348.88 | 103.10 | 82.7 | 1.35x |
+| mq-16-d0.15 | 483.43 | 231.03 | 93.2 | 356.02 | 105.77 | 83.2 | 1.36x |
+| mq-16-d0.20 | 474.96 | 226.34 | 93.6 | 352.69 | 103.56 | 83.6 | 1.35x |
+| mq-16-d0.30 | 381.65 | 141.30 | 83.8 | 340.42 | 97.42 | 79.8 | 1.12x |
+| mq-17-d0.10 | 1148.14 | 311.76 | 137.6 | 1010.76 | 175.15 | 127.4 | 1.14x |
+| mq-17-d0.30 | 1130.41 | 298.15 | 140.0 | 998.11 | 168.28 | 130.6 | 1.13x |
+
+The forced arms agree with the default ones to within 1% in total, because `Auto` packs every
+batch that matters on these families. Development's losing instances are its smallest:
+mq-12-d0.05 (2.70 against 2.83 ms) and cyclic-8 (1.27 against 1.33 ms), each inside the 9%–10%
+spread of its own repetitions. The residual route's smaller packed block (the residual width, not
+the full width) is why peak RSS falls on n = 16 and 17.
+
+**Sixteen workers** (`ParallelForward::Auto { max_workers: 16 }`, pinned to 16 physical cores),
+`auto` against `auto-eager`: 1.03x (development), 1.06x (held out, 1.02x–1.19x) and **1.18x**
+(big, 1.03x–1.34x), elimination 1.24x, 1.36x and 1.76x. The packed kernels are serial, so workers
+reach only the batches `Auto` leaves generic, the same in both arms. Peak RSS is 0.88x–1.20x of
+`auto`'s, the spread of parallel reservations that `ParallelForward` documents; on big it is
+0.92x–1.08x.
+
+**Not measured.** n ≥ 18, and families outside MQ, cyclic and katsura. Cyclic-8/9 and sparse
+MQ-12 are in development and gain nothing or a little.
 
 ## 6. Not done
 

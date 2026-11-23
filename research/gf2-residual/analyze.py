@@ -113,6 +113,24 @@ def summarize(path):
         )
     print()
 
+    # A size floor: batches under `floor` entries keep the full-width sweep. Entries are known at
+    # dispatch, unlike batch cost.
+    packed_total = totals["packed"]
+    best = sum(min(number(r, "packed_us"), number(r, "eager_us")) for r in data)
+    print("| entry floor | batches kept full width | total ms | packed/total | over oracle |")
+    print("| ---: | ---: | ---: | ---: | ---: |")
+    for floor in [0, 1_000, 2_000, 4_000, 8_000, 16_000, 32_000]:
+        kept = [r for r in data if number(r, "entries") < floor]
+        total = sum(
+            number(r, "packed_us") if number(r, "entries") < floor else number(r, "eager_us")
+            for r in data
+        )
+        print(
+            f"| {floor} | {len(kept)} | {total / 1e3:.2f} | {packed_total / total:.3f}x |"
+            f" {100 * (total / best - 1):+.2f}% |"
+        )
+    print(f"| oracle(packed, eager) | - | {best / 1e3:.2f} | {packed_total / best:.3f}x | +0.00% |\n")
+
     phases = ["pack", "tails", "multiply", "echelon", "write_back"]
     sums = {p: sum(number(r, f"lazy_{p}_us") for r in data) for p in phases}
     whole = sum(sums.values())
