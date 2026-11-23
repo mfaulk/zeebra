@@ -23,8 +23,8 @@ use zeebra::{
         differential::polynomial_to_string,
         f4_reported, f4_signature_reported,
         fglm::{
-            fglm_to_lex_with_options, shape_lex_basis, ConversionStrategy, FglmError, FglmOptions,
-            FglmStatistics, QuotientAlgebra,
+            fglm_to_lex_with_options, shape_lex_basis, ConversionRoute, ConversionStrategy,
+            FglmError, FglmOptions, FglmStatistics, QuotientAlgebra,
         },
         F4Options, ParallelForward, ParallelSymbolic,
     },
@@ -387,7 +387,7 @@ fn pipeline<const N: usize, F: FiniteField>(
                 }
                 shape_lex_basis(&algebra)
                     .map(Some)
-                    .map_err(|e| format!("refused: shape {e:?}"))
+                    .map_err(|e| format!("unsupported: shape {e:?}"))
             }),
         Arm::Probe => QuotientAlgebra::new(&source, GREVLEX, &budget_options)
             .map(|algebra| {
@@ -412,6 +412,8 @@ fn pipeline<const N: usize, F: FiniteField>(
         Err(e) => {
             outcome.status = if e.starts_with("refused") {
                 "refused"
+            } else if e.starts_with("unsupported") {
+                "unsupported"
             } else {
                 "error"
             };
@@ -422,13 +424,56 @@ fn pipeline<const N: usize, F: FiniteField>(
     outcome
 }
 
-/// A budget refusal is typed and distinct from an error (#1008).
+/// A budget refusal is typed and distinct from an unsupported input (#1008).
 fn fglm_error(e: &FglmError) -> String {
-    let refused = !matches!(
-        e,
-        FglmError::PositiveDimensional | FglmError::NotAGrobnerBasis
-    );
-    format!("{}{e:?}", if refused { "refused: " } else { "" })
+    let kind = match e {
+        FglmError::PositiveDimensional => "unsupported",
+        FglmError::NotAGrobnerBasis => "error",
+        _ => "refused",
+    };
+    format!("{kind}: {e:?}")
+}
+
+/// The `selection-outcome-v1` keys (`docs/research/benchmark-schema.md` §8.2) with the costs the
+/// complete task charges: a failed projection is discarded work and the classical walk after it is
+/// the fallback.
+fn selection<const N: usize, F: FiniteField>(outcome: &Outcome<N, F>) -> Vec<(&'static str, Json)> {
+    let error = outcome.error.as_deref().unwrap_or("");
+    let status = match outcome.status {
+        "complete" => "complete",
+        "refused" => "memory-refusal",
+        "unsupported" => "unsupported",
+        "stopped" if error.contains("Time") || error.contains("Wall") => "time-stop",
+        "stopped" if error.contains("Unsupported") => "unsupported",
+        "stopped" => "memory-refusal",
+        _ => "incorrect-output",
+    };
+    let (mut acceptance, mut verified) = ("deterministic", false);
+    let mut costs = vec![("conversion", Json::nanos(outcome.conversion_ns))];
+    if let Some(s) = &outcome.fglm {
+        let t = &s.timings;
+        let scalar = t.scalar_sequence + t.scalar_reconstruction + t.scalar_certificate;
+        if s.wiedemann_attempts > 0 {
+            acceptance = "certified-randomized";
+        }
+        if s.conversion_route == ConversionRoute::Wiedemann {
+            verified = true;
+            costs.push(("verification", Json::nanos(t.scalar_certificate)));
+        } else {
+            costs.push(("discarded", Json::nanos(scalar)));
+            costs.push(("fallback", Json::nanos(t.dependence.saturating_sub(scalar))));
+        }
+    }
+    vec![
+        ("selection_outcome", Json::string(status)),
+        (
+            "reason",
+            outcome.error.as_ref().map_or(Json::Null, Json::string),
+        ),
+        ("acceptance", Json::string(acceptance)),
+        ("verified", Json::Bool(verified)),
+        ("costs_ns", Json::object(costs)),
+    ]
 }
 
 /// `m33-basis-v1` over elements made monic at their grevlex leading term (`basis_digest.py`), so a
@@ -547,6 +592,7 @@ fn report<const N: usize, F: FiniteField>(
             ("estimated_bytes", Json::size(s.estimated_bytes())),
         ]);
     }
+    fields.extend(selection(&outcome));
     fields.extend(outcome.probe);
     fields
 }
@@ -689,7 +735,7 @@ mod tests {
         assert_eq!(outcome.basis, Some(reference));
         assert_eq!(
             run::<4>("wdns-3-6", Arm::Shape, Budget::Lifted).status,
-            "refused"
+            "unsupported"
         );
     }
 
@@ -739,7 +785,7 @@ mod tests {
         // Cyclic-4 is positive-dimensional; cyclic-5 (D = 70) is the smallest zero-dimensional one.
         assert_eq!(
             run::<4>("cyclic-4", Arm::Adaptive, Budget::Lifted).status,
-            "error"
+            "unsupported"
         );
         let reference = run::<5>("cyclic-5", Arm::DirectLex, Budget::Lifted)
             .basis
@@ -765,6 +811,37 @@ mod tests {
         };
         assert_eq!(get("dimension"), Some(Json::size(216)));
         assert!(get("last_stored_entries").is_some());
+    }
+
+    fn key<const N: usize>(outcome: &Outcome<N, F>, name: &str) -> Option<Json> {
+        selection(outcome)
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v)
+    }
+
+    /// The #1008 selection keys: typed budget refusals, unsupported inputs and acceptance modes.
+    #[test]
+    fn selection_outcome_names_refusals_and_acceptance() {
+        let outcome = |o: &str| Some(Json::string(o));
+        let refused = run::<2>("wd-2-70", Arm::Adaptive, Budget::Shipping);
+        assert_eq!(
+            key(&refused, "selection_outcome"),
+            outcome("memory-refusal")
+        );
+        let wiedemann = run::<2>("wd-2-70", Arm::Adaptive, Budget::Lifted);
+        assert_eq!(
+            key(&wiedemann, "acceptance"),
+            outcome("certified-randomized")
+        );
+        assert_eq!(key(&wiedemann, "verified"), Some(Json::Bool(true)));
+        let classical = run::<2>("wd-2-70", Arm::Classical, Budget::Lifted);
+        assert_eq!(key(&classical, "selection_outcome"), outcome("complete"));
+        assert_eq!(key(&classical, "acceptance"), outcome("deterministic"));
+        let positive = run::<4>("cyclic-4", Arm::Adaptive, Budget::Lifted);
+        assert_eq!(key(&positive, "selection_outcome"), outcome("unsupported"));
+        let shape = run::<4>("wdns-3-6", Arm::Shape, Budget::Lifted);
+        assert_eq!(key(&shape, "selection_outcome"), outcome("unsupported"));
     }
 
     /// A request survives the JSON round trip the grobx driver also reads.
