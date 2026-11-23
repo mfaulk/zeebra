@@ -55,10 +55,10 @@ JOBS = {
     'n9': (['wd-4-10', 'wdsq-4-10', 'wd-3-30', 'wd-4-12-p31', 'wdsq-5-6', 'wd-4-6', 'cyclic-7', 'katsura-11',
             'pquad-10-1'], 9, [('grobx', [1]), ('adaptive', [1, 16]), ('wiedemann', [1]), ('direct-lex', [1, 16])]),
     'n3': (['wd-6-6', 'wd-5-10', 'wdns-4-10', 'wdnr-4-10'], 3, [*SCORED, ('classical', [1])]),
-    # Replaces the six n9 attempts flagged contaminated (a foreign compiler, 17:38 UTC, rep 1): one
-    # clean repetition of every n9 arm on the two affected rows, pooled by summarize.py.
-    'replace': (['wd-4-10', 'wdsq-4-10'], 1, [('grobx', [1]), ('adaptive', [1, 16]), ('wiedemann', [1]),
-                                               ('direct-lex', [1, 16])]),
+    # Top-up for contaminated n9 attempts (56 of 486, 52 on the clock rule; session not void): three
+    # more repetitions of every n9 arm, pooled by summarize.py, so every cell reaches n >= 9 clean.
+    'replace': (['wd-4-10', 'wdsq-4-10', 'wd-3-30', 'wd-4-12-p31', 'wdsq-5-6', 'wd-4-6', 'cyclic-7', 'katsura-11',
+                 'pquad-10-1'], 3, [('grobx', [1]), ('adaptive', [1, 16]), ('wiedemann', [1]), ('direct-lex', [1, 16])]),
     'classical': (['wd-4-10', 'wdsq-4-10', 'wd-3-30', 'wd-4-12-p31', 'wdsq-5-6', 'wd-4-6', 'cyclic-7', 'katsura-11',
                    'pquad-10-1'], 3, [('classical', [1])]),
 }
