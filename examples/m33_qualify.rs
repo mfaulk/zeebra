@@ -1,12 +1,17 @@
 //! #974 M33-Q: one fresh-process solve for the correctness, regression and Gate D campaigns
-//! (`research/m33-qualification/`). It uses only public API that F0 (`31e334bd`) already had, so the
-//! same file is built against F0 and F2 and the two arms differ only in `src/`.
+//! (`research/m33-qualification/`), and the #1011 M34 portfolio arms (`research/m34-qualification/`).
+//! The M33 campaigns build this file at their recorded harness commit (`git show <harness>:…`), which
+//! used only public API that F0 (`31e334bd`) already had; the M34 engines need Z0.
 //!
 //! cargo run --release --example m33_qualify -- --field FIELD --name ROW [--order grevlex|grlex|lex]
-//!     [--engine entry|f4] [--workers N] [--wall-s S] [--repeat K] [--sample-threads] [--input-only]
-//!     [--measure-stages]
+//!     [--engine entry|f4|cap16|adaptive|fewest-fl|sig] [--workers N] [--wall-s S] [--repeat K]
+//!     [--sample-threads] [--input-only] [--measure-stages]
 //!
-//! `entry` is `f4_signature_reported` (the dispatch), `f4` the shipping default. A typed refusal or
+//! `entry` is `f4_signature_reported` (the dispatch), `f4` the shipping default. The #1011 arms:
+//! `cap16` is `f4` with `max_pairs_per_batch = Some(16)`, `adaptive` is `f4` under
+//! `GradedEngine::Adaptive`, `fewest-fl` is `f4` with `ReducerSelection::FewestTerms` and
+//! `BatchOrder::FaugereLachartre` (#997), and `sig` is the forced signature engine
+//! (`sig_f4_reported`, `--features research-sigf4` only). A typed refusal or
 //! budget stop is a normal exit with `status` "refused" or "stopped" and the error's `Debug` text.
 //! `basis_m33` normalizes each element by its grevlex leading coefficient, as `basis_digest.py`
 //! does, so graded-lex and lex bases digest like any reference's text; on a grevlex basis it equals
@@ -19,7 +24,8 @@ use zeebra::{
         benchmark_systems::{cyclic, eco, katsura, noon},
         differential::polynomial_to_string,
         external::{corpus, FieldSpec, Instance},
-        f4_reported, f4_signature_reported, F4Options, ParallelForward, ParallelSymbolic,
+        f4_reported, f4_signature_reported, BatchOrder, F4Options, GradedEngine, ParallelForward,
+        ParallelSymbolic, ReducerSelection,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -106,10 +112,28 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         .find(|f| f.0 == a.field)
         .ok_or("--field must be gf2, gf32003, m31, w59, wide64 or goldilocks")?
         .1;
-    if !["entry", "f4"].contains(&a.engine.as_str()) {
-        return Err("--engine must be entry or f4".into());
+    if !ENGINES.contains(&a.engine.as_str()) {
+        return Err(format!("--engine must be one of {}", ENGINES.join(", ")));
+    }
+    if a.engine == "sig" && !cfg!(feature = "research-sigf4") {
+        return Err("--engine sig needs --features research-sigf4".into());
     }
     Ok(a)
+}
+
+const ENGINES: [&str; 6] = ["entry", "f4", "cap16", "adaptive", "fewest-fl", "sig"];
+
+/// The forced signature engine's options for a `workers`-worker arm, as the dispatch builds them for
+/// its own team (`sigf4/dispatch.rs`, `signature_options`): the cascade runs on the team when it has
+/// more than one worker, and every other budget keeps the engine's default.
+#[cfg(feature = "research-sigf4")]
+fn sig_options(args: &Args) -> zeebra::grobner::sigf4::SigF4Options {
+    zeebra::grobner::sigf4::SigF4Options {
+        max_wall_time: Some(args.wall),
+        workers: args.workers,
+        parallel_cascade: args.workers > 1,
+        ..zeebra::grobner::sigf4::SigF4Options::default()
+    }
 }
 
 struct Input {
@@ -352,6 +376,27 @@ fn sampled<T>(on: bool, body: impl FnOnce() -> T) -> (T, Option<ThreadPeaks>) {
 }
 
 fn options(args: &Args) -> F4Options {
+    let shared = shared_options(args);
+    match args.engine.as_str() {
+        "cap16" => F4Options {
+            max_pairs_per_batch: Some(16),
+            ..shared
+        },
+        "adaptive" => F4Options {
+            graded_engine: GradedEngine::Adaptive,
+            ..shared
+        },
+        "fewest-fl" => F4Options {
+            reducer_selection: ReducerSelection::FewestTerms,
+            batch_order: BatchOrder::FaugereLachartre,
+            ..shared
+        },
+        _ => shared,
+    }
+}
+
+/// The options every engine starts from: the wall budget and `workers` as both teams' cap.
+fn shared_options(args: &Args) -> F4Options {
     let w = args.workers;
     F4Options {
         max_wall_time: Some(args.wall),
@@ -383,16 +428,35 @@ fn run<const N: usize, F: FiniteField>(input: &Input, args: &Args) -> Vec<(&'sta
     let ((), threads) = sampled(args.sample_threads, || {
         for _ in 0..args.repeat {
             let clock = Instant::now();
-            last = Some(if args.engine == "entry" {
-                let (result, report) = f4_signature_reported(&system, args.order, &options);
-                let route = format!("{:?}", report.route);
-                (
-                    result.map_err(|e| format!("{e:?}")),
-                    Some((route, report.workers)),
-                )
-            } else {
-                let (result, _) = f4_reported(&system, args.order, &options);
-                (result.map_err(|e| format!("{e:?}")), None)
+            last = Some(match args.engine.as_str() {
+                "entry" => {
+                    let (result, report) = f4_signature_reported(&system, args.order, &options);
+                    let route = format!("{:?}", report.route);
+                    (
+                        result.map_err(|e| format!("{e:?}")),
+                        Some((route, report.workers)),
+                    )
+                }
+                #[cfg(feature = "research-sigf4")]
+                "sig" => {
+                    let (result, _) = zeebra::grobner::sigf4::sig_f4_reported(
+                        &system,
+                        args.order,
+                        &sig_options(args),
+                    );
+                    (
+                        result.map_err(|e| format!("{e:?}")),
+                        Some(("Forced".to_string(), args.workers)),
+                    )
+                }
+                _ => {
+                    let (result, statistics) = f4_reported(&system, args.order, &options);
+                    // Only `adaptive` on a graded order records a dispatch decision.
+                    let route = statistics
+                        .graded_route
+                        .map(|d| (format!("{:?}", d.route), d.workers));
+                    (result.map_err(|e| format!("{e:?}")), route)
+                }
             });
             calls.push(clock.elapsed());
         }
@@ -542,6 +606,116 @@ mod tests {
         assert!(
             !options(&args(&["--field", "gf2", "--name", "katsura-4"]).unwrap()).measure_stages
         );
+    }
+
+    /// Each #1011 engine changes exactly its own option over the shared wall and worker settings, and
+    /// `sig` is accepted only in a `research-sigf4` build.
+    #[test]
+    fn m34_engines_set_only_their_own_options() {
+        let args = |engine: &str| {
+            let raw: Vec<String> = [
+                "--field",
+                "gf32003",
+                "--name",
+                "katsura-4",
+                "--workers",
+                "4",
+                "--engine",
+                engine,
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+            parse_args(&raw)
+        };
+        let base = options(&args("f4").unwrap());
+        assert_eq!(base.max_pairs_per_batch, None);
+        assert_eq!(base.graded_engine, GradedEngine::Conventional);
+        assert_eq!(base.reducer_selection, ReducerSelection::FirstApplicable);
+        assert_eq!(base.batch_order, BatchOrder::Forward);
+        assert_eq!(
+            base.parallel_forward,
+            ParallelForward::Auto { max_workers: 4 }
+        );
+        assert_eq!(
+            options(&args("cap16").unwrap()),
+            F4Options {
+                max_pairs_per_batch: Some(16),
+                ..base.clone()
+            }
+        );
+        assert_eq!(
+            options(&args("adaptive").unwrap()),
+            F4Options {
+                graded_engine: GradedEngine::Adaptive,
+                ..base.clone()
+            }
+        );
+        assert_eq!(
+            options(&args("fewest-fl").unwrap()),
+            F4Options {
+                reducer_selection: ReducerSelection::FewestTerms,
+                batch_order: BatchOrder::FaugereLachartre,
+                ..base.clone()
+            }
+        );
+        assert_eq!(
+            args("sig").is_ok(),
+            cfg!(feature = "research-sigf4"),
+            "sig needs research-sigf4"
+        );
+    }
+
+    fn solve(engine: &str, order: &str, workers: usize) -> (String, String) {
+        let raw: Vec<String> = [
+            "--field",
+            "gf32003",
+            "--name",
+            "katsura-4",
+            "--order",
+            order,
+            "--engine",
+            engine,
+            "--workers",
+            &workers.to_string(),
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let args = parse_args(&raw).unwrap();
+        let input = generated(&args.name, args.modulus).unwrap();
+        let out = run::<4, Zp32003>(&input, &args);
+        let get = |key: &str| {
+            out.iter()
+                .find(|(k, _)| *k == key)
+                .map(|(_, v)| v.to_json())
+                .unwrap()
+        };
+        (get("status"), get("basis_m33"))
+    }
+
+    /// Every #1011 engine returns the shipping F4's digest on Katsura-4 at one and four workers
+    /// under grevlex and lex, except the forced signature engine, which refuses lex.
+    #[test]
+    fn m34_engines_return_the_f4_digest() {
+        for order in ["grevlex", "lex"] {
+            let (status, reference) = solve("f4", order, 1);
+            assert_eq!(status, "\"complete\"");
+            let mut engines = vec!["cap16", "adaptive", "fewest-fl", "f4"];
+            if cfg!(feature = "research-sigf4") {
+                engines.push("sig");
+            }
+            for engine in engines {
+                for workers in [1, 4] {
+                    let (status, digest) = solve(engine, order, workers);
+                    if engine == "sig" && order == "lex" {
+                        assert_eq!(status, "\"refused\"", "{engine} {order} {workers}");
+                    } else {
+                        assert_eq!(digest, reference, "{engine} {order} {workers}");
+                    }
+                }
+            }
+        }
     }
 
     /// A thread of a team that has begun to exit, running beside a full new team, counts toward the

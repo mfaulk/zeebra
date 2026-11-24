@@ -24,7 +24,8 @@ use crate::{FiniteField, MultivariatePolynomial};
 /// Work units [`incidence`] spends on the elimination width before giving up.
 ///
 /// One unit is one adjacency check or update, so the cap bounds the width's cost whatever the
-/// input. Its cost in time is not yet measured: #1009 waits on the #1006/#1007 pilot panel.
+/// input. No record of the #1006 pilot panel reaches the cap, so its cost in time is unmeasured
+/// (`docs/research/input-features.md` §8).
 pub const DEFAULT_WIDTH_WORK: u64 = 1 << 20;
 
 /// The equation–variable incidence of a system.

@@ -396,27 +396,20 @@ pub fn sweep<F: FiniteField + Send + Sync>(
         peak: initial,
     });
     let failed = AtomicBool::new(false);
-    let results = std::thread::scope(|scope| {
-        let handles: Vec<_> = (0..workers)
-            .map(|_| {
-                let (queue, ledger, failed, known) = (&queue, &ledger, &failed, &known);
-                crate::util::team::spawn(scope, move || {
-                    let result = catch_unwind(AssertUnwindSafe(|| {
-                        sweep_worker(upper, known, queue, ledger, failed, cancel, config)
-                    }))
-                    .unwrap_or(Err(Error::WorkerPanicked));
-                    if result.is_err() {
-                        failed.store(true, Ordering::Relaxed);
-                    }
-                    result
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .map(|handle| handle.join().unwrap_or(Err(Error::WorkerPanicked)))
-            .collect::<Vec<_>>()
-    });
+    let (queue, ledger, failed_ref, known_ref) = (&queue, &ledger, &failed, &known);
+    let results = crate::util::team::run(workers, |_| {
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            sweep_worker(upper, known_ref, queue, ledger, failed_ref, cancel, config)
+        }))
+        .unwrap_or(Err(Error::WorkerPanicked));
+        if result.is_err() {
+            failed_ref.store(true, Ordering::Relaxed);
+        }
+        result
+    })
+    .into_iter()
+    .map(|outcome| outcome.unwrap_or(Err(Error::WorkerPanicked)))
+    .collect::<Vec<_>>();
     if let Some(error) = results
         .iter()
         .filter_map(|result| result.as_ref().err())
@@ -601,176 +594,165 @@ fn reduce_inner<F: FiniteField + Send + Sync>(
         Vec::new()
     };
     let input: &SparseMatrix<F> = matrix;
-    let results = std::thread::scope(|scope| {
-        let mut handles = Vec::new();
-        for worker in 0..workers {
-            let slots = &slots;
-            let known = &known;
-            let ledger = &ledger;
-            let failed = &failed;
-            let zeroed = &zeroed;
-            handles.push(crate::util::team::spawn(scope, move || {
-                // Outside the unwind boundary, so a refused worker's counters survive its error.
-                let mut report = Report::default();
-                let mut rows = 0;
-                let started = Instant::now();
-                let result = catch_unwind(AssertUnwindSafe(|| {
-                    let mut run = || {
-                        let mut accumulator = DenseAccumulator::new(columns);
-                        let mut index =
-                            split + (tasks as u128 * worker as u128 / workers as u128) as usize;
-                        let end = split
-                            + (tasks as u128 * (worker + 1) as u128 / workers as u128) as usize;
+    let results = {
+        let slots = &slots;
+        let known = &known;
+        let ledger = &ledger;
+        let failed = &failed;
+        let zeroed = &zeroed;
+        crate::util::team::run(workers, |worker| {
+            // Outside the unwind boundary, so a refused worker's counters survive its error.
+            let mut report = Report::default();
+            let mut rows = 0;
+            let started = Instant::now();
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                let mut run = || {
+                    let mut accumulator = DenseAccumulator::new(columns);
+                    let mut index =
+                        split + (tasks as u128 * worker as u128 / workers as u128) as usize;
+                    let end =
+                        split + (tasks as u128 * (worker + 1) as u128 / workers as u128) as usize;
+                    loop {
+                        if cancel.load(Ordering::Relaxed) || failed.load(Ordering::Relaxed) {
+                            return Err(Error::Cancelled);
+                        }
+                        let scheduling = config.measure_work.then(Instant::now);
+                        let (current, mut reservation) = {
+                            let mut state = ledger.lock().unwrap();
+                            let current = match config.schedule {
+                                Schedule::Static => {
+                                    if index == end {
+                                        break;
+                                    }
+                                    let current = index;
+                                    index += 1;
+                                    current
+                                }
+                                Schedule::Dynamic => {
+                                    if state.next == input.num_rows() {
+                                        break;
+                                    }
+                                    let current = state.next;
+                                    state.next += 1;
+                                    current
+                                }
+                            };
+                            let reserved = columns.checked_mul(2).ok_or(Error::Entries {
+                                required: usize::MAX,
+                            })?;
+                            let required =
+                                state.live.checked_add(reserved).ok_or(Error::Entries {
+                                    required: usize::MAX,
+                                })?;
+                            if required > config.max_entries {
+                                return Err(Error::Entries { required });
+                            }
+                            state.live = required;
+                            state.peak = state.peak.max(required);
+                            (
+                                current,
+                                Reservation {
+                                    ledger,
+                                    entries: reserved,
+                                },
+                            )
+                        };
+                        if let Some(started) = scheduling {
+                            report.scheduling_ns += started.elapsed().as_nanos() as u64;
+                        }
+                        hook(Event::Row);
+                        accumulator.load(input.row(current));
+                        let mut published = 0;
+                        let mut retry = false;
                         loop {
                             if cancel.load(Ordering::Relaxed) || failed.load(Ordering::Relaxed) {
                                 return Err(Error::Cancelled);
                             }
-                            let scheduling = config.measure_work.then(Instant::now);
-                            let (current, mut reservation) = {
-                                let mut state = ledger.lock().unwrap();
-                                let current = match config.schedule {
-                                    Schedule::Static => {
-                                        if index == end {
-                                            break;
-                                        }
-                                        let current = index;
-                                        index += 1;
-                                        current
-                                    }
-                                    Schedule::Dynamic => {
-                                        if state.next == input.num_rows() {
-                                            break;
-                                        }
-                                        let current = state.next;
-                                        state.next += 1;
-                                        current
-                                    }
-                                };
-                                let reserved = columns.checked_mul(2).ok_or(Error::Entries {
-                                    required: usize::MAX,
-                                })?;
-                                let required =
-                                    state.live.checked_add(reserved).ok_or(Error::Entries {
-                                        required: usize::MAX,
-                                    })?;
-                                if required > config.max_entries {
-                                    return Err(Error::Entries { required });
+                            let Some(column) = accumulator.leading_column() else {
+                                report.statistics.zero_rows += 1;
+                                accumulator.take();
+                                if let Some(flag) = zeroed.get(current - split) {
+                                    flag.store(true, Ordering::Relaxed);
                                 }
-                                state.live = required;
-                                state.peak = state.peak.max(required);
-                                (
-                                    current,
-                                    Reservation {
-                                        ledger,
-                                        entries: reserved,
-                                    },
-                                )
+                                break;
                             };
-                            if let Some(started) = scheduling {
-                                report.scheduling_ns += started.elapsed().as_nanos() as u64;
-                            }
-                            hook(Event::Row);
-                            accumulator.load(input.row(current));
-                            let mut published = 0;
-                            let mut retry = false;
-                            loop {
+                            let pivot = known[column]
+                                .map(|index| input.row(index))
+                                .or_else(|| slots[column].get().map(|(_, row)| row));
+                            if let Some(pivot) = pivot {
+                                let factor = accumulator.leading_coefficient().unwrap();
+                                accumulator.subtract_scaled(pivot, factor);
+                                report.statistics.row_operations += 1;
+                                if config.measure_work {
+                                    report.products += pivot.nonzeros();
+                                    if known[column].is_some() {
+                                        report.inherited_products += pivot.nonzeros();
+                                    } else {
+                                        report.discovered_products += pivot.nonzeros();
+                                    }
+                                    if retry {
+                                        report.retry_products += pivot.nonzeros();
+                                    }
+                                }
+                            } else {
+                                if accumulator.normalize() {
+                                    report.statistics.pivot_inversions += 1;
+                                }
+                                let row = accumulator.take();
+                                let entries = row.nonzeros();
+                                hook(Event::Claim { column });
                                 if cancel.load(Ordering::Relaxed) || failed.load(Ordering::Relaxed)
                                 {
                                     return Err(Error::Cancelled);
                                 }
-                                let Some(column) = accumulator.leading_column() else {
-                                    report.statistics.zero_rows += 1;
-                                    accumulator.take();
-                                    if let Some(flag) = zeroed.get(current - split) {
-                                        flag.store(true, Ordering::Relaxed);
+                                let publication = config.measure_work.then(Instant::now);
+                                let claim = slots[column].set((current, row));
+                                if let Some(started) = publication {
+                                    report.publication_ns += started.elapsed().as_nanos() as u64;
+                                }
+                                match claim {
+                                    Ok(()) => {
+                                        published = entries;
+                                        report.successful_publications += 1;
+                                        break;
                                     }
-                                    break;
-                                };
-                                let pivot = known[column]
-                                    .map(|index| input.row(index))
-                                    .or_else(|| slots[column].get().map(|(_, row)| row));
-                                if let Some(pivot) = pivot {
-                                    let factor = accumulator.leading_coefficient().unwrap();
-                                    accumulator.subtract_scaled(pivot, factor);
-                                    report.statistics.row_operations += 1;
-                                    if config.measure_work {
-                                        report.products += pivot.nonzeros();
-                                        if known[column].is_some() {
-                                            report.inherited_products += pivot.nonzeros();
-                                        } else {
-                                            report.discovered_products += pivot.nonzeros();
-                                        }
-                                        if retry {
-                                            report.retry_products += pivot.nonzeros();
-                                        }
-                                    }
-                                } else {
-                                    if accumulator.normalize() {
-                                        report.statistics.pivot_inversions += 1;
-                                    }
-                                    let row = accumulator.take();
-                                    let entries = row.nonzeros();
-                                    hook(Event::Claim { column });
-                                    if cancel.load(Ordering::Relaxed)
-                                        || failed.load(Ordering::Relaxed)
-                                    {
-                                        return Err(Error::Cancelled);
-                                    }
-                                    let publication = config.measure_work.then(Instant::now);
-                                    let claim = slots[column].set((current, row));
-                                    if let Some(started) = publication {
-                                        report.publication_ns +=
-                                            started.elapsed().as_nanos() as u64;
-                                    }
-                                    match claim {
-                                        Ok(()) => {
-                                            published = entries;
-                                            report.successful_publications += 1;
-                                            break;
-                                        }
-                                        Err((_, row)) => {
-                                            report.failed_publications += 1;
-                                            retry = true;
-                                            accumulator.load(&row);
-                                        }
+                                    Err((_, row)) => {
+                                        report.failed_publications += 1;
+                                        retry = true;
+                                        accumulator.load(&row);
                                     }
                                 }
                             }
-                            // Released only here, once the row is finished: a cancelled row's
-                            // input is still the row the matrix holds.
-                            reservation.publish(published, input.row(current).nonzeros());
-                            rows += 1;
                         }
-                        Ok(())
-                    };
-                    #[cfg(feature = "research-work")]
-                    if config.measure_work {
-                        let (result, work) = super::work::measure(run);
-                        report.work = work.outside_batch.forward;
-                        return result;
+                        // Released only here, once the row is finished: a cancelled row's
+                        // input is still the row the matrix holds.
+                        reservation.publish(published, input.row(current).nonzeros());
+                        rows += 1;
                     }
-                    run()
-                }))
-                .unwrap_or(Err(Error::WorkerPanicked));
-                if result.is_err() {
-                    failed.store(true, Ordering::Relaxed);
+                    Ok(())
+                };
+                #[cfg(feature = "research-work")]
+                if config.measure_work {
+                    let (result, work) = super::work::measure(run);
+                    report.work = work.outside_batch.forward;
+                    return result;
                 }
-                report.worker_rows.push(rows);
-                report
-                    .worker_ns
-                    .push(started.elapsed().as_nanos().min(u64::MAX as u128) as u64);
-                (report, result)
-            }));
-        }
-        handles
-            .into_iter()
-            .map(|handle| {
-                handle
-                    .join()
-                    .unwrap_or_else(|_| (Report::default(), Err(Error::WorkerPanicked)))
-            })
-            .collect::<Vec<_>>()
-    });
+                run()
+            }))
+            .unwrap_or(Err(Error::WorkerPanicked));
+            if result.is_err() {
+                failed.store(true, Ordering::Relaxed);
+            }
+            report.worker_rows.push(rows);
+            report
+                .worker_ns
+                .push(started.elapsed().as_nanos().min(u64::MAX as u128) as u64);
+            (report, result)
+        })
+        .into_iter()
+        .map(|outcome| outcome.unwrap_or_else(|_| (Report::default(), Err(Error::WorkerPanicked))))
+        .collect::<Vec<_>>()
+    };
     // Prefer the original failure over another worker observing cancellation.
     let failure = results
         .iter()

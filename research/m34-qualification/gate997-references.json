@@ -1,0 +1,17 @@
+{
+ "grevlex/gf32003/cyclic-8": {
+  "basis_m33": "50b8f4c13efef2256fc490f4849564a59b319fde4633ff9f0c0e30e54653c115",
+  "input_digest": "e2f6be738bd1f215766d7184e248663e1a03c4ded31db736fe1b57fb03fd8843",
+  "reference": "Singular std, redSB, dp"
+ },
+ "grevlex/m31/mq-random-10-s10": {
+  "basis_m33": "c49930fd8d6634bc87ed637e045245440a96622357274444ba5ed974e4727c4e",
+  "input_digest": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+  "reference": "Singular std, redSB (research/m33-baseline/references.json)"
+ },
+ "grevlex/wide64/cyclic-8": {
+  "basis_m33": "672c2b2ffff00a224fafd1b8ffbaf320a5ac983d9d3786341f753ea1e404ee4f",
+  "input_digest": "8397771c966d09e7f09d53909f5a98a5a790459f4302769802f0d059a2290bd8",
+  "reference": "grobx 0.155.1 certified, digest-only"
+ }
+}

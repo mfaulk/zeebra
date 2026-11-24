@@ -1497,6 +1497,21 @@ python3 research/1031-reuse-census/summarize.py research/1031-reuse-census/runs.
   | diff - research/1031-reuse-census/tables.md
 ```
 
+### Input-feature extraction cost (#1009)
+
+`feature_costs --catalog <catalog.json> --id <record>` times each `grobner::planning` feature
+extractor on one `corpus-instance-v1` record. Beside it, the same process times the `entry`
+(`f4_signature_reported`) and `f4` arms on the shipping defaults under `--wall-s`.
+`research/1009-feature-costs/run.sh` runs every record of a catalog in fresh processes. The
+[report](../research/input-features.md) §8–§10 has the cost table, the pilot panel's coverage and
+the stop-condition verdicts. Checks:
+
+```sh
+cargo test --example feature_costs
+python3 -m unittest discover -s research/1009-feature-costs -p 'test_*.py'
+python3 research/1009-feature-costs/summarize.py --check
+```
+
 ### Complete lex pipeline against grobx (#1039)
 
 `lex_pipeline --family <name> | --input <grobx request JSON> --arm
