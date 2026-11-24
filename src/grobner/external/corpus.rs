@@ -849,7 +849,7 @@ pub fn dense_mq_point(n: usize, seed: u64, characteristic: u64) -> Vec<u64> {
 /// constant is drawn like any other coefficient, so the system is almost surely inconsistent. The
 /// draws follow the point's, in a fixed order that does not depend on the variant, so the two
 /// variants of a seed differ only in their constants. This is denser than [`random_mq_instance`],
-/// which draws at most `4n` terms per generator.
+/// which draws at most `4n` terms per generator. [`dense_mq_shaped`] varies `m` and the density.
 ///
 /// # Panics
 /// If `characteristic` is below 3 or does not fit the coefficient arithmetic (`< 2^63`).
@@ -860,7 +860,30 @@ pub fn dense_mq_instance(
     order: MonomialOrder,
     planted: bool,
 ) -> Instance {
+    dense_mq_shaped(n, 2 * n, 1000, seed, characteristic, order, planted)
+}
+
+/// [`dense_mq_instance`] with `m` generators, each nonconstant monomial kept with probability
+/// `density_per_mille / 1000` (#1030's overdetermined cohort).
+///
+/// Generators are drawn in order, so rows that differ only in `m` share their first generators. At
+/// full density no keep draw is made, which is what makes `m = 2n` at 1000 exactly #945's row. A
+/// thinned generator that keeps no quadratic term keeps its first one, so every row stays
+/// quadratic. The planted constant is computed over the kept terms.
+///
+/// # Panics
+/// As [`dense_mq_instance`], or if `density_per_mille` is 0 or above 1000.
+pub fn dense_mq_shaped(
+    n: usize,
+    m: usize,
+    density_per_mille: u32,
+    seed: u64,
+    characteristic: u64,
+    order: MonomialOrder,
+    planted: bool,
+) -> Instance {
     assert!((3..1 << 63).contains(&characteristic));
+    assert!((1..=1000).contains(&density_per_mille));
     let p = characteristic as u128;
     let mut rng = StdRng::seed_from_u64(seed);
     let point: Vec<u128> = (0..n)
@@ -875,6 +898,7 @@ pub fn dense_mq_instance(
             monomials.push(exponents);
         }
     }
+    let quadratics = monomials.len();
     for i in 0..n {
         let mut exponents = vec![0; n];
         exponents[i] = 1;
@@ -886,13 +910,24 @@ pub fn dense_mq_instance(
             .zip(&point)
             .fold(1u128, |acc, (&e, &x)| (0..e).fold(acc, |a, _| a * x % p))
     };
-    let polynomials = (0..2 * n)
+    let polynomials = (0..m)
         .map(|_| {
+            let mut drawn: Vec<(usize, u64)> = Vec::with_capacity(monomials.len());
+            for index in 0..monomials.len() {
+                let kept = density_per_mille == 1000 || rng.gen_range(0..1000) < density_per_mille;
+                let coefficient = rng.gen_range(1..characteristic);
+                if kept {
+                    drawn.push((index, coefficient));
+                }
+            }
+            if !drawn.iter().any(|&(index, _)| index < quadratics) {
+                drawn.insert(0, (0, rng.gen_range(1..characteristic)));
+            }
             let mut sum = 0u128;
-            let mut terms: Vec<GeneratedTerm> = monomials
-                .iter()
-                .map(|exponents| {
-                    let coefficient = rng.gen_range(1..characteristic);
+            let mut terms: Vec<GeneratedTerm> = drawn
+                .into_iter()
+                .map(|(index, coefficient)| {
+                    let exponents = &monomials[index];
                     sum = (sum + coefficient as u128 * value(exponents)) % p;
                     GeneratedTerm {
                         exponents: exponents.clone(),
@@ -925,8 +960,29 @@ pub fn dense_mq_instance(
     } else {
         "mq-dense-unplanted"
     };
+    let variant = if planted {
+        "constant planted at dense_mq_point"
+    } else {
+        "unplanted"
+    };
+    let (name, shape) = if m == 2 * n && density_per_mille == 1000 {
+        (
+            format!("{family}-{n}"),
+            "m = 2n, every monomial of degree <= 2".to_string(),
+        )
+    } else if density_per_mille == 1000 {
+        (
+            format!("{family}-{n}-m{m}"),
+            format!("m = {m}, every monomial of degree <= 2"),
+        )
+    } else {
+        (
+            format!("{family}-{n}-m{m}-d{density_per_mille}"),
+            format!("m = {m}, each monomial of degree 1 or 2 kept at {density_per_mille}/1000"),
+        )
+    };
     Instance::new(
-        format!("{family}-{n}"),
+        name,
         family,
         FieldSpec::prime(characteristic),
         system.variables.clone(),
@@ -934,12 +990,7 @@ pub fn dense_mq_instance(
         order,
     )
     .transformed(format!(
-        "seeded dense generation (#945): seed {seed}, m = 2n, every monomial of degree <= 2, {}",
-        if planted {
-            "constant planted at dense_mq_point"
-        } else {
-            "unplanted"
-        }
+        "seeded dense generation (#945): seed {seed}, {shape}, {variant}"
     ))
 }
 
@@ -1568,10 +1619,10 @@ pub fn manifest() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ceilings, corroboration, corroboration_for, dense_mq_instance, dense_mq_point, instance,
-        ladder, manifest, CorpusEntry, Corroboration, Rung, ALTERNATE_CHARACTERISTIC,
-        KOALABEAR_CHARACTERISTIC, REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC,
-        WIDE_64_CHARACTERISTIC,
+        ceilings, corroboration, corroboration_for, dense_mq_instance, dense_mq_point,
+        dense_mq_shaped, instance, ladder, manifest, CorpusEntry, Corroboration, Rung,
+        ALTERNATE_CHARACTERISTIC, KOALABEAR_CHARACTERISTIC, REFERENCE_CHARACTERISTIC,
+        SMALL_PRIME_CHARACTERISTIC, WIDE_64_CHARACTERISTIC,
     };
     use crate::{
         fields::Zp2147483647,
@@ -2917,6 +2968,86 @@ mod tests {
             .map(|text| MultivariatePolynomial::parse(text, names::<4>()).expect("parses"))
             .collect();
         assert!(!satisfies(&parsed, &point));
+    }
+
+    /// #945's rows keep their exact text: these digests were taken before the shaped generator
+    /// existed, and every study that names `mq-dense-N-sS` depends on them.
+    #[test]
+    fn test_dense_mq_digests_are_pinned() {
+        assert_eq!(
+            dense_mq_instance(5, 7, 31, GREVLEX, true).digest(),
+            "2e9c6040aac20726685e933848175a3db80aa8872efe24f912cf19758b0f9076"
+        );
+        assert_eq!(
+            dense_mq_instance(4, 3, 32003, GREVLEX, false).digest(),
+            "54bb718396095d5342e8c505cc1a66a1fd5e0d0c20ace033bdb5002bad2fe273"
+        );
+    }
+
+    /// At `m = 2n` and full density the shaped generator is #945's row, name and provenance
+    /// included.
+    #[test]
+    fn test_the_shaped_generator_at_2n_and_full_density_is_the_dense_row() {
+        for planted in [true, false] {
+            let dense = dense_mq_instance(6, 11, 31, GREVLEX, planted);
+            let shaped = dense_mq_shaped(6, 12, 1000, 11, 31, GREVLEX, planted);
+            assert_eq!(shaped.digest(), dense.digest());
+            assert_eq!(shaped.name, dense.name);
+            assert_eq!(shaped.family, dense.family);
+            assert_eq!(shaped.transformation, dense.transformation);
+        }
+    }
+
+    /// A shaped row has `m` generators, a planted one vanishes at the seed's point, and rows that
+    /// differ only in `m` share their leading generators, so an `m/n` sweep is nested.
+    #[test]
+    fn test_a_shaped_dense_row_has_m_generators_and_nests_in_m() {
+        use crate::{fields::Zp31, FiniteField};
+        let point: [Zp31; 6] = {
+            let drawn = dense_mq_point(6, 5, 31);
+            std::array::from_fn(|i| Zp31::new(drawn[i]))
+        };
+        for density in [1000, 500] {
+            let narrow = dense_mq_shaped(6, 9, density, 5, 31, GREVLEX, true);
+            let wide = dense_mq_shaped(6, 18, density, 5, 31, GREVLEX, true);
+            assert_eq!(narrow.system.len(), 9);
+            assert_eq!(wide.system.len(), 18);
+            assert_eq!(narrow.system[..], wide.system[..9], "density {density}");
+            assert_ne!(narrow.name, wide.name);
+            let parsed: Vec<MultivariatePolynomial<6, Zp31>> = wide
+                .system
+                .iter()
+                .map(|text| MultivariatePolynomial::parse(text, names::<6>()).expect("parses"))
+                .collect();
+            assert!(satisfies(&parsed, &point), "density {density}");
+        }
+    }
+
+    /// At half density about half the nonconstant monomials survive, every generator stays
+    /// quadratic, and the density is part of the row's name.
+    #[test]
+    fn test_a_half_density_row_keeps_about_half_its_terms() {
+        use crate::fields::Zp31;
+        let row = dense_mq_shaped(8, 16, 500, 2, 31, GREVLEX, true);
+        let parsed: Vec<MultivariatePolynomial<8, Zp31>> = row
+            .system
+            .iter()
+            .map(|text| MultivariatePolynomial::parse(text, names::<8>()).expect("parses"))
+            .collect();
+        let full = 8 + 8 * 9 / 2;
+        let mut kept = 0;
+        for p in &parsed {
+            let degrees: Vec<u32> = p
+                .terms()
+                .keys()
+                .map(|m| m.exponents().iter().sum::<u32>())
+                .collect();
+            assert_eq!(degrees.iter().max(), Some(&2), "still quadratic");
+            kept += degrees.iter().filter(|&&d| d > 0).count();
+        }
+        let share = kept as f64 / (16 * full) as f64;
+        assert!((0.4..0.6).contains(&share), "kept {share}");
+        assert!(row.name.contains("d500"), "{}", row.name);
     }
 
     /// A random MQ rung is reproducible from its name alone, and is genuinely quadratic.
