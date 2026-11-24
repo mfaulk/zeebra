@@ -1,0 +1,12 @@
+# #1075 rows. Development: the pinned M29 rows #1031 censused, and grobx's control.
+mq10-32003
+mq10-m31
+katsura11-m31
+eco12-wide64
+mq11-goldilocks
+cyclic7-wide64
+# Held out, named before any measurement: an unstudied family and a larger MQ scale, plus one row
+# of #1030's dense cohort.
+noon8-wide64
+mq12-goldilocks
+dmq-n14-m28-m31-s0

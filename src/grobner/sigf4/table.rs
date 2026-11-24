@@ -107,6 +107,13 @@ impl<const N: usize> MonomialTable<N> {
     #[inline]
     pub(super) fn intern(&mut self, m: Monomial<N>, h: u64, work: &mut Vec<u32>) -> u32 {
         let id = self.find_or_insert(m, h);
+        self.local(id, work)
+    }
+
+    /// Run-wide id `id`'s first-occurrence id in this batch, appending it to `work` on first
+    /// sight: [`Self::intern`] without the product's probe.
+    #[inline]
+    pub(super) fn local(&mut self, id: u32, work: &mut Vec<u32>) -> u32 {
         let stamp = self.stamp;
         let entry = &mut self.entries[id as usize];
         if entry.stamp != stamp {
