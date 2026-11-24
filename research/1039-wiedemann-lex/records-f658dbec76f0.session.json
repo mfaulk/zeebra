@@ -1,0 +1,120 @@
+{
+ "attempts": 162,
+ "job": {
+  "context": {
+   "agent": "agent-ab238838d50fbb344@research/1039-wiedemann-lex",
+   "issue": 1039,
+   "session": "topup",
+   "track": "replace"
+  },
+  "job_id": "f658dbec76f0",
+  "manifest_sha256": "f658dbec76f0f0e7604e3072a4852f4045c3926673fbcce16a2e47e8ebf90e67",
+  "mode": "publication"
+ },
+ "journal_sha256": "2266b15dd8609f29948a2ed7d5ee5be1edd93f702a4ce0f552e6d224a5757012",
+ "stop": {
+  "at": "2026-11-23T20:32:08+00:00",
+  "attempts": 162,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 128,
+    "sampled": 34
+   },
+   "contaminated": 10,
+   "flagged": {
+    "f658dbec76f0:125:0": [
+     "bench clock 1587337 kHz is 5.1% off the session median"
+    ],
+    "f658dbec76f0:130:0": [
+     "bench clock 4344592 kHz is 3.8% off the session median"
+    ],
+    "f658dbec76f0:1:0": [
+     "bench clock 3992604 kHz is 5.7% off the session median"
+    ],
+    "f658dbec76f0:20:0": [
+     "bench clock 4121369 kHz is 4.3% off the session median"
+    ],
+    "f658dbec76f0:28:0": [
+     "bench clock 4329783 kHz is 3.2% off the session median"
+    ],
+    "f658dbec76f0:36:0": [
+     "bench clock 3031791 kHz is 6.6% off the session median"
+    ],
+    "f658dbec76f0:66:0": [
+     "bench clock 4201276 kHz is 3.3% off the session median"
+    ],
+    "f658dbec76f0:78:0": [
+     "bench clock 4066588 kHz is 5.5% off the session median"
+    ],
+    "f658dbec76f0:79:0": [
+     "bench clock 4042176 kHz is 4.9% off the session median"
+    ],
+    "f658dbec76f0:82:0": [
+     "bench clock 4002181 kHz is 3.8% off the session median"
+    ]
+   },
+   "grouping": "arm",
+   "median_khz": {
+    "cyclic-7@16w/zb-adaptive/perf-cycles": 3181874,
+    "cyclic-7@16w/zb-direct-lex/perf-cycles": 3342821,
+    "cyclic-7@1w/grobx155/perf-cycles": 3245963,
+    "cyclic-7@1w/zb-adaptive/perf-cycles": 4138961,
+    "cyclic-7@1w/zb-direct-lex/perf-cycles": 3954228,
+    "cyclic-7@1w/zb-wiedemann/perf-cycles": 4120015,
+    "katsura-11@16w/zb-adaptive/perf-cycles": 2883157,
+    "katsura-11@16w/zb-direct-lex/perf-cycles": 3387819,
+    "katsura-11@1w/grobx155/perf-cycles": 3853655,
+    "katsura-11@1w/zb-adaptive/perf-cycles": 4138531,
+    "katsura-11@1w/zb-direct-lex/perf-cycles": 3951690,
+    "katsura-11@1w/zb-wiedemann/perf-cycles": 4125268,
+    "pquad-10-1@16w/zb-adaptive/perf-cycles": 3753658,
+    "pquad-10-1@16w/zb-direct-lex": 1982750,
+    "pquad-10-1@16w/zb-direct-lex/perf-cycles": 3521713.0,
+    "pquad-10-1@1w/grobx155/perf-cycles": 3903103,
+    "pquad-10-1@1w/zb-adaptive/perf-cycles": 3949433,
+    "pquad-10-1@1w/zb-direct-lex/perf-cycles": 3885654,
+    "pquad-10-1@1w/zb-wiedemann/perf-cycles": 3942694,
+    "wd-3-30@16w/zb-adaptive/perf-cycles": 4323327,
+    "wd-3-30@16w/zb-direct-lex": 1510496,
+    "wd-3-30@1w/grobx155/perf-cycles": 3767258,
+    "wd-3-30@1w/zb-adaptive/perf-cycles": 4343294,
+    "wd-3-30@1w/zb-direct-lex": 1433184,
+    "wd-3-30@1w/zb-wiedemann/perf-cycles": 4301672,
+    "wd-4-10@16w/zb-adaptive/perf-cycles": 4228088,
+    "wd-4-10@16w/zb-direct-lex": 1510470,
+    "wd-4-10@1w/grobx155/perf-cycles": 3585015,
+    "wd-4-10@1w/zb-adaptive/perf-cycles": 4231904,
+    "wd-4-10@1w/zb-direct-lex": 1433184,
+    "wd-4-10@1w/zb-wiedemann/perf-cycles": 4308138,
+    "wd-4-12-p31@16w/zb-adaptive/perf-cycles": 4184520,
+    "wd-4-12-p31@16w/zb-direct-lex": 1510464,
+    "wd-4-12-p31@1w/grobx155/perf-cycles": 3861565,
+    "wd-4-12-p31@1w/zb-adaptive/perf-cycles": 4243022,
+    "wd-4-12-p31@1w/zb-direct-lex/perf-cycles": 1601715,
+    "wd-4-12-p31@1w/zb-wiedemann/perf-cycles": 4308188,
+    "wd-4-6@16w/zb-adaptive": 1510463,
+    "wd-4-6@16w/zb-direct-lex": 1510464,
+    "wd-4-6@1w/grobx155": 1433184,
+    "wd-4-6@1w/zb-adaptive": 1433184,
+    "wd-4-6@1w/zb-direct-lex": 1433184,
+    "wd-4-6@1w/zb-wiedemann": 1433184,
+    "wdsq-4-10@16w/zb-adaptive/perf-cycles": 4287290,
+    "wdsq-4-10@16w/zb-direct-lex/perf-cycles": 4161745,
+    "wdsq-4-10@1w/grobx155/perf-cycles": 3923846,
+    "wdsq-4-10@1w/zb-adaptive/perf-cycles": 4305282,
+    "wdsq-4-10@1w/zb-direct-lex/perf-cycles": 4261158,
+    "wdsq-4-10@1w/zb-wiedemann/perf-cycles": 4278322,
+    "wdsq-5-6@16w/zb-adaptive/perf-cycles": 4195481,
+    "wdsq-5-6@16w/zb-direct-lex/perf-cycles": 4158575,
+    "wdsq-5-6@1w/grobx155/perf-cycles": 3948501,
+    "wdsq-5-6@1w/zb-adaptive/perf-cycles": 4302616,
+    "wdsq-5-6@1w/zb-direct-lex/perf-cycles": 4203839,
+    "wdsq-5-6@1w/zb-wiedemann/perf-cycles": 4248529
+   },
+   "total": 162,
+   "version": 3,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}

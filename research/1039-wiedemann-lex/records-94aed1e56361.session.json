@@ -1,0 +1,37 @@
+{
+ "attempts": 4,
+ "job": {
+  "context": {
+   "agent": "agent-ab238838d50fbb344@research/1039-wiedemann-lex",
+   "issue": 1039,
+   "session": "topup-n3",
+   "track": "replace-n3"
+  },
+  "job_id": "94aed1e56361",
+  "manifest_sha256": "94aed1e56361bc509a53a032602675a04e0e58c8cc863cf9c21fecdbfae6da43",
+  "mode": "publication"
+ },
+ "journal_sha256": "facc93c2fada632cf56acd3f72198fd40270cb77cfcc2d40c346f5b525a20728",
+ "stop": {
+  "at": "2026-11-23T20:36:34+00:00",
+  "attempts": 4,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 4
+   },
+   "contaminated": 0,
+   "flagged": {},
+   "grouping": "arm",
+   "median_khz": {
+    "wd-5-10@1w/grobx155/perf-cycles": 3874053,
+    "wd-5-10@1w/zb-classical/perf-cycles": 3373690,
+    "wdns-4-10@1w/grobx155/perf-cycles": 3659086,
+    "wdns-4-10@1w/zb-classical/perf-cycles": 4258563
+   },
+   "total": 4,
+   "version": 3,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}
