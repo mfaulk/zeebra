@@ -102,6 +102,11 @@ research-sigf4-usage = ["research-sigf4"]
 # a batch observer, the conventional one. Off in every timed binary.
 research-reuse = ["research-sigf4", "research-work"]
 
+# #1075's adjacent-round census (`sigf4::adjacent`): a previous-batch buffer of each row's run-wide
+# monomial ids, counted (`Count`) or served in place of the products and interning (`Reuse`). Opt-in
+# per run; off in every shipping binary.
+research-adjacent = ["research-sigf4"]
+
 # #1077's packed GF(2) route on the residual columns only (`Gf2Elimination::Residual`). Never
 # selected by default; with the feature off the variant does not exist.
 research-gf2-residual = []

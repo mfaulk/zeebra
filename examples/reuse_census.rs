@@ -3,12 +3,18 @@
 //!
 //! cargo run --release --features research-reuse --example reuse_census -- \
 //!     --row eco12-wide64|katsura11-m31|mq10-32003|mq10-m31|mq11-goldilocks|dmq-n<N>-m<M>-<field>-s<S>[-u]
-//!     --engine f4|sigf4 [--census] [--stages] [--wall-s 180]
+//!     --engine f4|sigf4 [--census] [--stages] [--adjacent off|count|reuse] [--wall-s 180]
 //!
 //! Without `--census` the run is the timed arm: the engine as it ships at one worker (`--stages` adds
 //! the conventional engine's stage clocks, which cost it a few percent). With `--census`
 //! (`--features research-reuse`) every batch is replayed by `grobner::reuse_census`; that run is
 //! untimed. Both report `basis_sha256`, which must agree.
+//!
+//! `--adjacent` (`--features research-adjacent`, signature engine only) is #1075's previous-batch
+//! buffer of run-wide monomial ids: `count` keeps it and counts its hits, `reuse` serves them, and
+//! `off` is the same binary without it. Its per-batch record is `adjacent` in the report. #1075 adds
+//! the rows `cyclic7-wide64` (grobx's zero-reuse control) and the held-out `noon8-wide64` and
+//! `mq12-goldilocks`.
 //!
 //! `dmq-n<N>-m<M>-<field>-s<S>` is #1030's dense quadratic cohort: `M` equations in `N` variables
 //! over `gf31`, `gf32003`, `m31` (2^31-1) or `p64` (2^64-59), each of the 1 + N + N(N+1)/2 monomials
@@ -39,6 +45,9 @@ const PINNED: &[&str] = &[
     "mq10-32003",
     "mq10-m31",
     "mq11-goldilocks",
+    "cyclic7-wide64",
+    "noon8-wide64",
+    "mq12-goldilocks",
 ];
 /// The variable counts a generated row may have; each is a separate monomorphization.
 const SIZES: &[usize] = &[6, 7, 8, 9, 10, 11, 12, 13, 14];
@@ -56,7 +65,16 @@ struct Args {
     engine: Engine,
     census: bool,
     stages: bool,
+    adjacent: Adjacent,
     wall: Duration,
+}
+
+/// #1075's buffer mode, as the example names it whether or not the feature is compiled.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Adjacent {
+    Off,
+    Count,
+    Reuse,
 }
 
 /// A generated row's shape: `m` equations in `n` variables over `field`, support seed `seed`.
@@ -95,8 +113,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         engine: Engine::F4,
         census: false,
         stages: false,
+        adjacent: Adjacent::Off,
         wall: Duration::from_secs(180),
     };
+    let mut adjacent = None;
     let mut engine = None;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -112,6 +132,14 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             }
             "--census" => parsed.census = true,
             "--stages" => parsed.stages = true,
+            "--adjacent" => {
+                adjacent = Some(match value()?.as_str() {
+                    "off" => Adjacent::Off,
+                    "count" => Adjacent::Count,
+                    "reuse" => Adjacent::Reuse,
+                    other => return Err(format!("unknown --adjacent mode {other}")),
+                })
+            }
             "--wall-s" => {
                 parsed.wall = Duration::from_secs(
                     value()?
@@ -130,6 +158,15 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     }
     if parsed.census && !cfg!(feature = "research-reuse") {
         return Err("--census needs --features research-reuse".into());
+    }
+    if let Some(mode) = adjacent {
+        if !cfg!(feature = "research-adjacent") {
+            return Err("--adjacent needs --features research-adjacent".into());
+        }
+        if parsed.engine != Engine::SigF4 || parsed.census {
+            return Err("--adjacent is a timed signature-engine run".into());
+        }
+        parsed.adjacent = mode;
     }
     if parsed.census && parsed.stages {
         return Err("--stages times a run; --census runs are untimed".into());
@@ -284,6 +321,12 @@ fn sig_options(args: &Args) -> SigF4Options {
         max_wall_time: Some(args.wall),
         #[cfg(feature = "research-reuse")]
         reuse_census: args.census,
+        #[cfg(feature = "research-adjacent")]
+        adjacent: match args.adjacent {
+            Adjacent::Off => zeebra::grobner::sigf4::adjacent::AdjacentMode::Off,
+            Adjacent::Count => zeebra::grobner::sigf4::adjacent::AdjacentMode::Count,
+            Adjacent::Reuse => zeebra::grobner::sigf4::adjacent::AdjacentMode::Reuse,
+        },
         ..SigF4Options::default()
     }
 }
@@ -374,6 +417,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         .collect();
     let bytes_per_term = size_of::<Monomial<N>>() + size_of::<F>();
     let started = Instant::now();
+    let mut adjacent = Json::Null;
     let (result, statistics, census, ledger) = match args.engine {
         Engine::F4 => {
             let options = f4_options(args);
@@ -400,6 +444,10 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 });
             #[cfg(not(feature = "research-reuse"))]
             let census = Json::Null;
+            #[cfg(feature = "research-adjacent")]
+            if args.adjacent != Adjacent::Off {
+                adjacent = Json::Array(stats.adjacent.iter().map(|b| b.json()).collect());
+            }
             (
                 result.map_err(|e| e.to_string()),
                 sig_json(&stats),
@@ -431,6 +479,14 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ),
         ("census", Json::Bool(args.census)),
         ("stages", Json::Bool(args.stages)),
+        (
+            "adjacent_mode",
+            Json::string(match args.adjacent {
+                Adjacent::Off => "off",
+                Adjacent::Count => "count",
+                Adjacent::Reuse => "reuse",
+            }),
+        ),
         ("modulus", Json::string(&input.modulus)),
         ("variables", Json::size(N)),
         ("equations", Json::size(system.len())),
@@ -454,6 +510,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("statistics", statistics),
         ("ledger", ledger),
         ("reuse", census),
+        ("adjacent", adjacent),
     ])
 }
 
@@ -536,6 +593,9 @@ fn main() {
         "katsura11-m31" => run::<11, Zp2147483647>(ladder("katsura-11", 2147483647), &args),
         "eco12-wide64" => run::<12, Wide>(wide("wide64", "eco-12"), &args),
         "mq11-goldilocks" => run::<11, Goldilocks>(wide("goldilocks", "mq-random-11"), &args),
+        "cyclic7-wide64" => run::<7, Wide>(wide("wide64", "cyclic-7"), &args),
+        "noon8-wide64" => run::<8, Wide>(wide("wide64", "noon-8"), &args),
+        "mq12-goldilocks" => run::<12, Goldilocks>(wide("goldilocks", "mq-random-12"), &args),
         name => {
             let shape = parse_dense(name).expect("validated");
             dense_dispatch!(shape, &args, 6, 7, 8, 9, 10, 11, 12, 13, 14)
@@ -582,6 +642,9 @@ mod tests {
             args(&["--row", "mq10-m31", "--engine", "sigf4", "--census"]).is_ok(),
             cfg!(feature = "research-reuse")
         );
+        let adjacent = |engine| args(&["--row", "noon8-wide64", "--engine", engine, "--adjacent", "reuse"]);
+        assert_eq!(adjacent("sigf4").is_ok(), cfg!(feature = "research-adjacent"));
+        assert!(adjacent("f4").is_err());
     }
 
     // A generated row is deterministic, has its stated shape, and vanishes at its planted point.
@@ -621,6 +684,12 @@ mod tests {
         };
         let reference = digest(&["--row", row, "--engine", "f4"]);
         assert_eq!(digest(&["--row", row, "--engine", "sigf4"]), reference);
+        if cfg!(feature = "research-adjacent") {
+            for mode in ["count", "reuse"] {
+                let list = ["--row", row, "--engine", "sigf4", "--adjacent", mode];
+                assert_eq!(digest(&list), reference);
+            }
+        }
         if cfg!(feature = "research-reuse") {
             assert_eq!(
                 digest(&["--row", row, "--engine", "f4", "--census"]),

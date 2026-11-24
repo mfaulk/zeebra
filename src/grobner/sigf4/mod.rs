@@ -13,6 +13,8 @@
 //! (#905); this module and its research knobs are public only under `research-sigf4`.
 #![cfg_attr(not(feature = "research-sigf4"), allow(dead_code))]
 
+#[cfg(feature = "research-adjacent")]
+pub mod adjacent;
 #[cfg(all(test, feature = "research-sigf4"))]
 mod cascade_tests;
 mod claim;
@@ -76,6 +78,10 @@ pub struct SigF4Options {
     /// each elimination three times, so never on in a timed run.
     #[cfg(feature = "research-reuse")]
     pub reuse_census: bool,
+    /// #1075: keep each batch's rows as run-wide monomial ids for the next batch, and count or
+    /// serve the rows it repeats. Serial runs only.
+    #[cfg(feature = "research-adjacent")]
+    pub adjacent: adjacent::AdjacentMode,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
     /// Tests only: the column-space interreduction's live-entry budget, to force its fallback.
@@ -99,6 +105,8 @@ impl Default for SigF4Options {
             allow_graded_lex: false,
             #[cfg(feature = "research-reuse")]
             reuse_census: false,
+            #[cfg(feature = "research-adjacent")]
+            adjacent: adjacent::AdjacentMode::Off,
             #[cfg(test)]
             adversary: None,
             #[cfg(test)]
@@ -227,6 +235,9 @@ pub struct SigF4Statistics {
     /// #1031's census as `(summary, batches)`, when [`SigF4Options::reuse_census`] asked for it.
     #[cfg(feature = "research-reuse")]
     pub reuse: Option<(crate::util::Json, crate::util::Json)>,
+    /// #1075's per-batch adjacent-round census, when [`SigF4Options::adjacent`] asked for it.
+    #[cfg(feature = "research-adjacent")]
+    pub adjacent: Vec<adjacent::AdjacentBatch>,
 }
 
 /// One batch's elimination, split by pivot source. `reducer_*` is work against the batch's reducer
