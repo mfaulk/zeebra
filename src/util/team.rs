@@ -29,6 +29,33 @@ pub(crate) fn join<T>(handle: ScopedJoinHandle<'_, T>) -> T {
         .unwrap_or_else(|payload| std::panic::resume_unwind(payload))
 }
 
+/// Runs `work(0..workers)` as one team whose first member is the calling thread, and returns
+/// each member's outcome in index order. Only `workers - 1` threads are spawned and each is joined
+/// before this returns, so at most `workers` threads compute at any instant: a caller that spawned
+/// a full team and then blocked in `join` would be runnable beside all of it while spawning. A
+/// panic in any member, the caller's included, is returned as that member's `Err`. A team of zero
+/// runs nothing.
+pub(crate) fn run<T: Send>(
+    workers: usize,
+    work: impl Fn(usize) -> T + Sync,
+) -> Vec<std::thread::Result<T>> {
+    if workers == 0 {
+        return Vec::new();
+    }
+    let work = &work;
+    std::thread::scope(|scope| {
+        let members: Vec<_> = (1..workers)
+            .map(|index| spawn(scope, move || work(index)))
+            .collect();
+        let mut outcomes = Vec::with_capacity(workers);
+        outcomes.push(std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+            || work(0),
+        )));
+        outcomes.extend(members.into_iter().map(ScopedJoinHandle::join));
+        outcomes
+    })
+}
+
 /// [`join`] on every handle, in order.
 pub(crate) fn join_all<'scope, T>(
     handles: impl IntoIterator<Item = ScopedJoinHandle<'scope, T>>,
@@ -163,6 +190,39 @@ mod tests {
         team(4, false);
         team(4, false);
         assert!(census.peak() > 4, "peak {}", census.peak());
+    }
+
+    /// A team of `n` spawns `n - 1` threads, runs member 0 on the caller, and keeps index order.
+    #[test]
+    fn run_counts_the_caller_as_a_member() {
+        let census = Census::arm(LINGER);
+        let caller = std::thread::current().id();
+        let outcomes = run(4, |i| (i, std::thread::current().id() == caller));
+        let values: Vec<_> = outcomes.into_iter().map(Result::unwrap).collect();
+        assert_eq!(values, vec![(0, true), (1, false), (2, false), (3, false)]);
+        assert_eq!(census.spawned(), 3);
+        assert_eq!(census.live(), 0);
+    }
+
+    /// An empty team runs no member, not even on the caller.
+    #[test]
+    fn run_of_zero_workers_runs_nothing() {
+        let outcomes = run(0, |_| -> usize { unreachable!("no member") });
+        assert!(outcomes.is_empty());
+    }
+
+    /// A panic in any member, the caller's own included, comes back as that member's error.
+    #[test]
+    fn run_returns_each_members_panic() {
+        let outcomes = run(3, |i| {
+            if i != 1 {
+                panic!("member {i}");
+            }
+            i
+        });
+        assert!(outcomes[0].is_err());
+        assert_eq!(*outcomes[1].as_ref().unwrap(), 1);
+        assert!(outcomes[2].is_err());
     }
 
     #[test]
