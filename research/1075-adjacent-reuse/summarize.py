@@ -86,12 +86,13 @@ def main(path):
         c = census(arms["count"][min(arms["count"])])
         if c["mismatches"]:
             void.append(f"{row}: {c['mismatches']} stored rows differ from the fresh ones")
-        rss = statistics.median(r["peak_rss_bytes"] for r in arms["off"].values() if r.get("peak_rss_bytes"))
+        known = [r["peak_rss_bytes"] for r in arms["off"].values() if r.get("peak_rss_bytes")]
+        rss = statistics.median(known) if known else None  # macOS records none
         kind = "control" if row == CONTROL else "held out" if row in HELD_OUT else "development"
         out.append(f"| {row} | {kind} | {c['batches']} | {c['reducers']:,} | {c['reducer_hits']:,} "
                    f"({pct(c['reducer_hits'], c['reducers'])}) | {c['target_hits']:,} / {c['targets']:,} | "
                    f"{c['hit_terms']:,} / {c['terms']:,} ({pct(c['hit_terms'], c['terms'])}) | "
-                   f"{c['retained'] / 2**20:.2f} MiB | {pct(c['retained'], rss)} | {c['mismatches']} |")
+                   f"{c['retained'] / 2**20:.2f} MiB | {pct(c['retained'], rss) if rss else '—'} | {c['mismatches']} |")
     out += ["\n## Timed arms (medians over repetitions; ratios paired per repetition vs `off`, 95% bootstrap)\n",
             "| row | n | call ms (off) | symbolic ms (off) | symbolic share | symbolic: count ÷ off | "
             "symbolic: reuse ÷ off | call: count ÷ off | call: reuse ÷ off | peak RSS reuse ÷ off |",
@@ -104,13 +105,14 @@ def main(path):
         med = lambda arm, f: statistics.median(f(r) for r in arms[arm].values())  # noqa: E731
         call = med("off", lambda r: r["call_ns"]) / 1e6
         sym = med("off", lambda r: r["statistics"]["symbolic_ns"]) / 1e6
-        rss = med("reuse", lambda r: r["peak_rss_bytes"]) / med("off", lambda r: r["peak_rss_bytes"])
+        rss = (med("reuse", lambda r: r["peak_rss_bytes"]) / med("off", lambda r: r["peak_rss_bytes"])
+               if all(r.get("peak_rss_bytes") for a in ("off", "reuse") for r in arms[a].values()) else None)
         cis = {(arm, m): ratio(arms, arm, m, f"{row} {arm} {m}")
                for arm in ("count", "reuse") for m in ("symbolic_ns", "call_ns")}
         verdict_rows[row] = (cis[("reuse", "call_ns")], rss)
         out.append(f"| {row} | {len(arms['off'])} | {call:,.1f} | {sym:,.1f} | {pct(sym, call)} | "
                    f"{fmt(cis[('count', 'symbolic_ns')])} | {fmt(cis[('reuse', 'symbolic_ns')])} | "
-                   f"{fmt(cis[('count', 'call_ns')])} | {fmt(cis[('reuse', 'call_ns')])} | {rss:.3f} |")
+                   f"{fmt(cis[('count', 'call_ns')])} | {fmt(cis[('reuse', 'call_ns')])} | {'—' if rss is None else f'{rss:.3f}'} |")
     dev = {r: v for r, v in verdict_rows.items() if r not in HELD_OUT and r != CONTROL}
     if void:
         decision = "void: " + "; ".join(void)
@@ -119,8 +121,10 @@ def main(path):
     elif (any(ci.hi < 0.98 for ci, _ in dev.values())
           and not any(verdict_rows[r][0].lo > 1.02 for r in HELD_OUT if r in verdict_rows)
           and (CONTROL not in verdict_rows or verdict_rows[CONTROL][0].hi <= 1.02)
-          and all(rss <= 1.15 for _, rss in verdict_rows.values())):
-        decision = "**adopt-candidate**: confirm pinned on the bench host"
+          and all(rss is None or rss <= 1.15 for _, rss in verdict_rows.values())):
+        decision = "**adopt-candidate**: confirm pinned on the bench host" + (
+            "; peak RSS was not recorded, so the RSS rule is unchecked"
+            if any(rss is None for _, rss in verdict_rows.values()) else "")
     else:
         decision = "**defer**: some development row improves, but not past the adopt-candidate rules"
     out += ["\n## Decision (rules in this script's docstring)\n", decision]
