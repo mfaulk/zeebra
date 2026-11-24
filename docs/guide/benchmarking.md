@@ -287,6 +287,31 @@ Fields added for M33 (#968). Fields are only added, never renamed or removed:
 fraction is the difference between two snapshots, which is what `tools/bench_contamination.py`
 computes.
 
+Interference telemetry added by #1105 (`telemetry: 1`). These are **metrics, not rules**: no verdict
+reads them, and the old fields are unchanged, so `dev` and `publication` verdicts on the same
+snapshots are identical (`tools/test/bench-contamination-test.py` replays every retained M33
+journal to check). Each field is a value, `null`, or `{"unavailable": "<reason>"}`, and a missing
+source is never read as zero. None needs privilege beyond reading `/proc` and `/sys`.
+
+| field | source | meaning |
+|---|---|---|
+| `telemetry` | — | telemetry version; absent in older snapshots |
+| `compilers_on_bench`, `compilers_elsewhere` | `/proc/<pid>/comm`, `/proc/<pid>/status` `Cpus_allowed_list` | the `compilers` count split by whether the process's affinity (which reflects its cpuset) admits a bench CPU or sibling; a process whose status cannot be read counts as on the bench |
+| `runner_workers_on_bench` | the same | `Runner.Worker` processes that may run on a bench CPU or sibling |
+| `psi` | `/proc/pressure/{cpu,memory,io}` | `{some_us, full_us}` stall totals per resource; `full_us` is `null` where the kernel has no `full` line |
+| `psi_bench_slice` | `/sys/fs/cgroup/zbbench.slice/*.pressure` | the same for the slice `tools/bench-reserve.sh run` measures in; unavailable when the slice does not exist |
+| `vmstat` | `/proc/vmstat` | `pswpin`, `pswpout`, `pgscan` and `pgsteal` (summed over `pgscan_*`/`pgsteal_*`), `pgmajfault` |
+| `mbm_bytes` | `/sys/fs/resctrl/mon_data/mon_L3_*/mbm_total_bytes` | machine-wide memory bandwidth counter (AMD MBM, default group); unavailable unless the owner mounts resctrl |
+| `ccd_stat[]` | `/proc/stat`, `cache/index3/shared_cpu_list` | `{l3, busy, total, cpus}` per L3 domain over every online CPU; `rest_stat` is kept |
+| `bench_running[]` | `/proc/<pid>/stat` field 39 | runnable tasks (`R`) whose last CPU is a bench CPU or sibling, at most 16: names a foreign task at snapshot time only |
+
+`bench-job` adds the child tree's `wait4` rusage to each attempt's exit metadata (`rusage`:
+`nvcsw`, `nivcsw`, `majflt`, `minflt`, `inblock`, `oublock`). `attempt_metrics` turns the snapshot
+pairs into `psi` stall fractions of the attempt's wall, `vmstat` deltas, `mbm_bytes_per_s`,
+`ccd_load` (busy-CPU equivalents per domain) and the maximum placement counts, and `bench-job
+report` prints them per attempt under *Interference*. The per-attempt overhead A/A (#1105's
+±0.5% gate), per-CPU foreign time and the pre-attempt window snapshot are not done yet; see #1105.
+
 ### Measurement modes and contamination (#968)
 
 Every M33 figure is taken in one of two modes (plan §11.2,

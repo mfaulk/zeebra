@@ -356,6 +356,8 @@ def run_child(argv, cpus, timeout_s, kill_after_s=60, guard=None, should_stop=No
         return dict(cpus=cpus, process_wall_ns=wall, returncode=child.returncode,
                     cpu_seconds=usage.ru_utime + usage.ru_stime, peak_rss_bytes=usage.ru_maxrss * 1024,
                     solver_peak_rss_bytes=None if solver_kb is None else solver_kb * 1024,
+                    rusage=dict(nvcsw=usage.ru_nvcsw, nivcsw=usage.ru_nivcsw, majflt=usage.ru_majflt,
+                                minflt=usage.ru_minflt, inblock=usage.ru_inblock, oublock=usage.ru_oublock),
                     rss_guard_rc=guard_rc, rss_guard_stderr=guard_err, before=before, after=after,
                     freq=summarize_freq(sampler.samples), perf=cycles, stopped=stopped.is_set(),
                     stdout=out.read(), stderr=err.read())

@@ -510,7 +510,37 @@ def summarize(state, m, *, baseline=None, bound=1.05, references=None):
                     inconclusive=sum(r['verdict']['outcome'] == 'inconclusive' for r in ratios),
                     selection=dict(selected)),
         cells=cells, ratios=ratios, digests={k: sorted(v) for k, v in sorted(digests.items())},
-        verification=verification, selection=selection, timed=timed)
+        verification=verification, selection=selection, timed=timed,
+        interference=[r for r in map(interference_row, state['attempts']) if r is not None])
+
+
+def _psi_some(psi, resource):
+    """The `some` pressure fraction, 'n/a' when the source was unavailable, None when not recorded."""
+    v = (psi or {}).get(resource) if bc.available(psi) else psi
+    if v is None:
+        return None
+    return v.get('some') if bc.available(v) else 'n/a'
+
+
+def interference_row(attempt):
+    """One attempt's #1105 telemetry, summarized for the report; None for an attempt without any."""
+    md, cell = attempt['metadata'], attempt['cell']
+    t = ((md.get('contamination') or {}).get('metrics')) or {}
+    if t.get('telemetry') is None:
+        return None
+    ccd, vm, ru = t.get('ccd_load'), t.get('vmstat'), t.get('rusage') or {}
+    return dict(attempt=md['attempt_id'], arm=cell['arm'], instance=cell['instance'], workers=cell['workers'],
+                rep=cell['rep'], compilers=f"{t.get('compilers_on_bench')}/{t.get('compilers_elsewhere')}",
+                psi_cpu_some=_psi_some(t.get('psi'), 'cpu'), psi_memory_some=_psi_some(t.get('psi'), 'memory'),
+                psi_io_some=_psi_some(t.get('psi'), 'io'),
+                pgscan=vm.get('pgscan') if bc.available(vm) else None,
+                max_ccd_load=max(ccd.values()) if bc.available(ccd) and ccd else None,
+                nivcsw=ru.get('nivcsw'), majflt=ru.get('majflt'), bench_running=t.get('bench_running') or [])
+
+
+def _pct(value):
+    return value if isinstance(value, str) else _fmt(None if value is None else 100 * value, '.1f') + (
+        '%' if value is not None else '')
 
 
 def _fmt(value, spec='.1f'):
@@ -566,6 +596,20 @@ def render(doc):
     out += [f"- `{v['attempt']}` {v['arm']} {v['instance']} @{v['workers']} rep {v['rep']}: {v['status']}"
             f"{', contaminated' if v['contaminated'] else ''}"
             for v in doc['verification'] if v['status'] != 'ok' or v['contaminated']]
+    out += ['\n## Interference (#1105; recorded, not judged)\n']
+    rows = doc.get('interference') or []
+    if rows:
+        out += ['| attempt | arm | instance | w | rep | compilers on bench/elsewhere | PSI cpu | PSI mem | PSI io '
+                '| pgscan | max CCD load | nivcsw | majflt | on bench CPUs |',
+                '|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|']
+        out += [f"| `{r['attempt']}` | {r['arm']} | {r['instance']} | {r['workers']} | {r['rep']} | {r['compilers']} | "
+                f"{_pct(r['psi_cpu_some'])} | {_pct(r['psi_memory_some'])} | {_pct(r['psi_io_some'])} | "
+                f"{_fmt(r['pgscan'], 'd')} | {_fmt(r['max_ccd_load'], '.2f')} | {_fmt(r['nivcsw'], 'd')} | "
+                f"{_fmt(r['majflt'], 'd')} | {', '.join(r['bench_running']) or '—'} |" for r in rows]
+        out += ['\nPSI is the `some` stall fraction of the attempt\'s wall; `n/a` marks a source the machine '
+                'does not expose, `—` one the snapshots predate.']
+    else:
+        out += ['No interference telemetry recorded (the snapshots predate #1105).']
     return '\n'.join(out) + '\n'
 
 
@@ -716,7 +760,7 @@ def contamination(result, m, job_id):
         return dict(mode=m['mode'], verdict=None, error='cpu-context snapshots unusable')
     khz, source = campaign.attempt_clock(result)
     metrics = bc.attempt_metrics(before, after, own_cpu_s=result.get('own_cpu_s', result['cpu_seconds']),
-                                 khz_samples=[khz] if khz else None)
+                                 khz_samples=[khz] if khz else None, rusage=result.get('rusage'))
     return dict(mode=m['mode'], metrics=metrics, clock_source=source,
                 verdict=bc.attempt_verdict(metrics, m['mode'], owner=lock_owner(job_id)))
 
@@ -1026,7 +1070,7 @@ def run_job(directory, force_uncancel=False):
                         exit=r['returncode'], stop='cancelled' if r['stopped'] else None,
                         guard=dict(wall_seconds=limits['wall_seconds'], rss_bytes=limits.get('rss_bytes'),
                                    rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr']),
-                        before=r['before'], after=r['after'], freq=r['freq'], perf=r['perf'],
+                        before=r['before'], after=r['after'], freq=r['freq'], perf=r['perf'], rusage=r.get('rusage'),
                         contamination=contamination(r, m, directory.name))
         if mode_wait is not None:
             metadata['mode_wait'] = mode_wait
