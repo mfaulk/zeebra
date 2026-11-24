@@ -15,9 +15,11 @@
 //!   31-bit prime is out of reach. `GF(2)` is refused because upstream adds the field equations,
 //!   which changes the ideal.
 //!
-//! At the pinned revision M4GB does not terminate on the unit ideal: it stops making progress in
-//! pair selection (`docs/research/m4gb-m5gb-reference.md` §3). Such a run ends at the wall limit,
-//! and a wall stop on an inconsistent row is that defect, not a lower bound on M4GB's time.
+//! M4GB reports the unit ideal by throwing and exiting 1, which this adapter reads as the basis
+//! `{1}` and verifies like any other. It does not always get there: on some small unit ideals the
+//! pinned revision stops making progress in pair selection (`docs/research/m4gb-m5gb-reference.md`
+//! §3). Such a run ends at the wall limit, and that stop is the defect, not a lower bound on M4GB's
+//! time.
 use super::{
     contract::generators_agree,
     process::{Invocation, Supervisor},
@@ -94,6 +96,21 @@ fn engine_stages(log: &str) -> Vec<(String, Duration)> {
         stages.push(("engine-cpu".into(), Duration::from_secs_f64(s)));
     }
     stages
+}
+
+/// Whether M4GB's exception handler reported the unit ideal. Upstream throws
+/// `contradiction: I=(1)` or `contradiction: 1=0` and exits 1; its reduced basis is `{1}`.
+fn reports_unit_ideal(log: &str) -> bool {
+    let mut lines = log.lines().map(str::trim);
+    while let Some(line) = lines.next() {
+        if line == "Caught exception:" {
+            return matches!(
+                lines.next(),
+                Some("contradiction: I=(1)" | "contradiction: 1=0")
+            );
+        }
+    }
+    false
 }
 
 /// The sidecar's `revision=` line, which must name [`PINNED_REVISION`].
@@ -309,13 +326,17 @@ impl ExternalSolver for M4gbSolver {
                     elapsed: process.wall,
                 }));
             }
-            if !process.succeeded() {
+            let text = super::read_output(&log);
+            measurement.stages = engine_stages(&text);
+            let basis = if process.succeeded() {
+                parse_basis(&std::fs::read_to_string(&basis_path)?)?
+            } else if process.exit_code == Some(1) && reports_unit_ideal(&text) {
+                vec!["1".to_string()]
+            } else {
                 return Err(RunFailure::NonZeroExit {
                     code: process.exit_code,
                 });
-            }
-            measurement.stages = engine_stages(&super::read_output(&log));
-            let basis = parse_basis(&std::fs::read_to_string(&basis_path)?)?;
+            };
             let start = Instant::now();
             let trusted = self.reference.clone().run(
                 instance,
@@ -409,6 +430,22 @@ mod tests {
         assert_eq!(stages[0].1, Duration::from_secs_f64(8.2e-05));
         assert_eq!(stages[1].1, Duration::from_secs_f64(0.003181));
         assert!(engine_stages("nothing").is_empty());
+    }
+
+    // M4GB reports the unit ideal by an exception and exit 1; only its own two messages count.
+    #[test]
+    fn test_the_unit_ideal_is_read_from_the_exception() {
+        assert!(reports_unit_ideal(
+            "[m4gb] P lcmdegree=3\nCaught exception:\ncontradiction: I=(1)\n"
+        ));
+        assert!(reports_unit_ideal(
+            "Caught exception:\ncontradiction: 1=0\n"
+        ));
+        assert!(!reports_unit_ideal("Caught exception:\nupdate(p): p = 0\n"));
+        assert!(
+            !reports_unit_ideal("contradiction: I=(1)\n"),
+            "only as the caught exception"
+        );
     }
 
     // A sidecar must name the pinned revision.
