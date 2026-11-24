@@ -12,6 +12,27 @@ private target dir on `/buildcache`. **Host:** Threadripper PRO 5995WX.
 katsura-8 and cyclic-6 lose 3.6–7.3% at 16 workers. Under M34 §9.3 the prototype stops here, with
 its iteration spent. The kernel is not committed to ship, and the lane stays off by default.
 
+**Owner disposition, 2026-11-24: merge as an opt-in research capability (PR #1095).**
+
+| Gate | Verdict |
+|---|---|
+| Speed | pass |
+| Memory | pass |
+| Correctness | pass |
+| Sparse-control regression | **fail** |
+
+The overall predeclared gate was **not** satisfied, and this decision does not revise it.
+
+The owner kept the kernel for explicit use because it is correct and the dense gains are large. It
+stays **off by default**, and nothing selects it automatically. Automatic dispatch needs its own
+qualification under #1123.
+
+This merge establishes none of the following:
+- a default performance claim;
+- a benefit on every input;
+- a qualified automatic policy;
+- an equal-worker advantage over grobx.
+
 ### Session 3 (corrective: each pivot held once, `e3eec892`)
 
 Same placement, method and gate list as session 2, in a reservation `run.sh` took and released.

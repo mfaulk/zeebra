@@ -9,6 +9,14 @@ change to `y` may break the public API.
 
 ### Added
 
+- `linalg::lane`: a dense small-prime "lane" kernel for primes up to 46337, using `u32` delayed
+  reduction (#945). `FiniteField::small_prime_lane()` returns `None` by default; it is implemented
+  for `PrimeFieldElement32`. Behind `research-sigf4`, `SigF4Options::small_prime_lane` runs the
+  signature engine's reductions in it. The option is **off by default**, and nothing selects it
+  automatically. It gives the same basis and about 3× on dense MQ at 16 workers, but up to 7% slower
+  on 6–16 ms sparse solves, which fail #945's gate. Retained opt-in by owner decision; automatic
+  dispatch is #1123. Breaking: an exhaustive `SigF4Options` literal needs the new field.
+
 - `PackedGf2Statistics::xor_words` and `linalg::gf2::PackedStatistics::xor_words`: the `u64`
   words the packed `GF(2)` kernels' `xor`s write. Behind the `research-gf2-residual` feature,
   `Gf2Elimination::Residual` packs only the columns no reducer leads (#1077), and
