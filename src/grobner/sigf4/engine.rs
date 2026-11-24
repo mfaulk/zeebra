@@ -1521,6 +1521,7 @@ pub(super) enum PivotRow<'p, F> {
 
 impl<F> PivotRow<'_, F> {
     /// Products one application costs: the entries right of the lead.
+    #[cfg(any(feature = "research-sigf4-split", feature = "research-sigf4-replay"))]
     pub(super) fn products(&self) -> u64 {
         match self {
             PivotRow::Field(row) => row.len() as u64 - 1,
