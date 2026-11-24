@@ -1472,6 +1472,22 @@ python3 research/1031-reuse-census/summarize.py research/1031-reuse-census/runs.
   | diff - research/1031-reuse-census/tables.md
 ```
 
+### Complete lex pipeline against grobx (#1039)
+
+`lex_pipeline --family <name> | --input <grobx request JSON> --arm
+adaptive|wiedemann|classical|shape|direct-lex|probe [--budget shipping|lifted]` computes one
+complete lex basis per process: grevlex F4, then `fglm_to_lex_with_options` under the named
+`ConversionStrategy`, or lex F4 directly. Every stage is attributed, and the `m33-basis-v1` digest
+is taken after the timed region. `--budget lifted` raises `FglmOptions::recommended()`'s D ≤ 4096
+tripwire, which otherwise refuses every row the Wiedemann route wins. `research/1039-wiedemann-lex/`
+holds the campaign scripts and records. The [report](../research/wiedemann-pipeline-vs-grobx.md)
+records the demonstration and its M34-C conditions. Checks:
+
+```sh
+cargo test --example lex_pipeline
+python3 research/1039-wiedemann-lex/summarize.py | diff - research/1039-wiedemann-lex/tables.md
+```
+
 ### Persistent worker dispatch and border reduction
 
 The [worker-pool study](../../research/worker-pool/README.md) compares scoped threads, a bounded

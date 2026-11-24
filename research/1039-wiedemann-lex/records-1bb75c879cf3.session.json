@@ -1,0 +1,61 @@
+{
+ "attempts": 60,
+ "job": {
+  "context": {
+   "agent": "agent-ab238838d50fbb344@research/1039-wiedemann-lex",
+   "issue": 1039,
+   "session": "deciding",
+   "track": "n3"
+  },
+  "job_id": "1bb75c879cf3",
+  "manifest_sha256": "1bb75c879cf3c47c25f3fea87a7a82ed9faaace5db32aa16947c43c3271f607c",
+  "mode": "publication"
+ },
+ "journal_sha256": "9b3e85454cb7110616b7548b732f19bb1b3341d8827ad522a3bf687cde6e846e",
+ "stop": {
+  "at": "2026-11-23T19:25:13+00:00",
+  "attempts": 60,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 54,
+    "sampled": 6
+   },
+   "contaminated": 2,
+   "flagged": {
+    "1bb75c879cf3:10:0": [
+     "bench clock 3525037 kHz is 6.9% off the session median"
+    ],
+    "1bb75c879cf3:28:0": [
+     "bench clock 3475449 kHz is 3.2% off the session median"
+    ]
+   },
+   "grouping": "arm",
+   "median_khz": {
+    "wd-5-10@1w/grobx155/perf-cycles": 3888936,
+    "wd-5-10@1w/zb-adaptive/perf-cycles": 4349006,
+    "wd-5-10@1w/zb-classical/perf-cycles": 3366829,
+    "wd-5-10@1w/zb-direct-lex/perf-cycles": 4017120,
+    "wd-5-10@1w/zb-wiedemann/perf-cycles": 4386291,
+    "wd-6-6@1w/grobx155/perf-cycles": 4268397,
+    "wd-6-6@1w/zb-adaptive/perf-cycles": 4303220,
+    "wd-6-6@1w/zb-classical/perf-cycles": 3459289,
+    "wd-6-6@1w/zb-direct-lex/perf-cycles": 3340322,
+    "wd-6-6@1w/zb-wiedemann/perf-cycles": 4366376,
+    "wdnr-4-10@1w/grobx155/perf-cycles": 3787946,
+    "wdnr-4-10@1w/zb-adaptive/perf-cycles": 4331188,
+    "wdnr-4-10@1w/zb-classical/perf-cycles": 4323203,
+    "wdnr-4-10@1w/zb-direct-lex": 1433184,
+    "wdnr-4-10@1w/zb-wiedemann/perf-cycles": 4323248,
+    "wdns-4-10@1w/grobx155/perf-cycles": 3784823,
+    "wdns-4-10@1w/zb-adaptive/perf-cycles": 4302338,
+    "wdns-4-10@1w/zb-classical/perf-cycles": 4337014,
+    "wdns-4-10@1w/zb-direct-lex": 1433184,
+    "wdns-4-10@1w/zb-wiedemann/perf-cycles": 4337177
+   },
+   "total": 60,
+   "version": 3,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}

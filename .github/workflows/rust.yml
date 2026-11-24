@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        set: [default, delayed-reduction, comparand-replay, research-work, research-multirow, research-sigf4, research-sigf4-replay, research-sigf4-split, research-sigf4-usage, research-reuse]
+        set: [default, delayed-reduction, comparand-replay, research-work, research-multirow, research-sigf4, research-sigf4-replay, research-sigf4-split, research-sigf4-usage, research-reuse, research-gf2-residual]
     env:
       # The replay builds nothing and runs only when its inputs change (tools/ci-scope.sh).
       ACTIVE: ${{ matrix.set != 'comparand-replay' || needs.changes.outputs.comparand == 'true' }}
