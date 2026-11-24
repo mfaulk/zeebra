@@ -5436,8 +5436,9 @@ fn test_parallel_symbolic_f4_is_identical_to_serial_across_worker_counts() {
 }
 
 /// #1002: each batch's symbolic team and forward-elimination team are joined before the next one
-/// starts, so complete F4 never has more than `workers` worker threads alive, even while a
-/// finished team's threads are exiting.
+/// starts, so complete F4 never has more than `workers` threads computing, even while a finished
+/// team's threads are exiting. The calling thread is one of them, so at most `workers - 1` are
+/// spawned: a caller that spawns a full team and then joins it is runnable beside all of it.
 #[test]
 fn test_parallel_f4_teams_never_exceed_the_worker_cap() {
     use crate::{
@@ -5463,7 +5464,7 @@ fn test_parallel_f4_teams_never_exceed_the_worker_cap() {
         census.spawned()
     );
     assert_eq!(census.live(), 0);
-    assert!(census.peak() <= workers, "peak {}", census.peak());
+    assert!(census.peak() < workers, "peak {}", census.peak());
 }
 
 /// `tail_only_interreduction` returns the same reduced basis as the full echelon matrix route and

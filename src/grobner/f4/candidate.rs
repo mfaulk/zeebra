@@ -347,32 +347,21 @@ impl<F: FiniteField> ConcurrentJob<F> for Wave<'_, F> {
         let next = AtomicUsize::new(0);
         let mut slots: Vec<Option<Finished<F>>> = Vec::new();
         slots.resize_with(self.targets.len(), || None);
-        let parts = std::thread::scope(|scope| {
-            let handles: Vec<_> = (0..workers)
-                .map(|_| {
-                    let (wave, next) = (&self, &next);
-                    crate::util::team::spawn(scope, move || {
-                        let mut accumulator = DenseAccumulator::new(columns);
-                        let mut done = Vec::new();
-                        loop {
-                            let position = next.fetch_add(1, Ordering::Relaxed);
-                            let Some(&index) = wave.targets.get(position) else {
-                                break done;
-                            };
-                            done.push((position, wave.reduce(&mut accumulator, index)));
-                        }
-                    })
-                })
-                .collect();
-            handles
-                .into_iter()
-                .map(|handle| {
-                    handle
-                        .join()
-                        .unwrap_or_else(|_| panic!("a candidate-finishing worker panicked"))
-                })
-                .collect::<Vec<_>>()
-        });
+        let (wave, next) = (&self, &next);
+        let parts = crate::util::team::run(workers, |_| {
+            let mut accumulator = DenseAccumulator::new(columns);
+            let mut done = Vec::new();
+            loop {
+                let position = next.fetch_add(1, Ordering::Relaxed);
+                let Some(&index) = wave.targets.get(position) else {
+                    break done;
+                };
+                done.push((position, wave.reduce(&mut accumulator, index)));
+            }
+        })
+        .into_iter()
+        .map(|outcome| outcome.unwrap_or_else(|_| panic!("a candidate-finishing worker panicked")))
+        .collect::<Vec<_>>();
         for (position, finished) in parts.into_iter().flatten() {
             slots[position] = Some(finished);
         }
