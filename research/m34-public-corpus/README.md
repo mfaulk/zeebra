@@ -15,7 +15,7 @@ and the Singular reference runs are not measurements.
 | `panel.json` | Hand-curated selection: problem id, upstream entry, `family_id`, `source_id`, `formulation_id`, parameters and presentation parents |
 | `inputs.json` | Exact upstream equations, frozen by `import`, with each upstream file's SHA-256 |
 | `catalog.json` | Generated records, one per line. CI rebuilds them from `inputs.json` and compares the bytes |
-| `references.json` | Singular reduced-basis digests at `p31`. The basis text itself is not stored |
+| `references.json` | Reduced-basis digests for every record: Singular at `p31`, certified grobx at `p64`. The basis text itself is not stored |
 
 ## Reproduce
 
@@ -27,8 +27,9 @@ python3 tools/corpus_lineage.py validate research/m34-public-corpus/catalog.json
 gh api repos/symbolicdata/data/tarball/a5cdf5366150bffba22a2c91a86a012dd23831af > sd.tgz
 tar xzf sd.tgz && python3 tools/m34_public_corpus.py import symbolicdata-data-a5cdf53
 python3 tools/m34_public_corpus.py catalog
-# References (Singular build 44105 here; about 2 minutes at --jobs 8):
-python3 tools/m34_public_corpus.py references --timeout 120 --jobs 8
+# References: Singular (build 44105) at p31, certified grobx 0.155.1 at p64
+# (tools/external/grobx-driver); about 10 minutes at --jobs 12, untimed:
+python3 tools/m34_public_corpus.py references --timeout 120 --grobx-timeout 300 --jobs 12
 ```
 
 Run these from the repository root with Python 3.9 or newer, standard library only. Extract the
@@ -54,7 +55,8 @@ SymbolicData's `RDFData/Bibliography.ttl`.
 
 `n` and `m` are the number of variables and generators. *Dimension* is from Singular at `p31`.
 "Frontier" means Singular's `std` did not finish in 120 s; per #1006 such an input is retained with
-`reference: none`.
+`reference: none`. At `p64`, `sd-hairer-2` is also a frontier input: certified grobx did not finish
+in 300 s. Its `p31` twin has a reference.
 
 | Problem | Upstream entry | `family_id` | n | m | Dimension at p31 |
 |---|---|---|---:|---:|---|
@@ -113,10 +115,17 @@ with `references.json`. To compute that digest, make each basis element monic an
 way `normalized-input-v1` does, then hash `{format, field, variables, order, basis}`. The oracle is
 Singular, `option(redSB)`, `std` then `simplify(…, 1)`, run as a subprocess.
 
-`p64` records have **no reference yet**: Singular does not go above 2³¹. Before Gate H reads
-them, they need groebner-rs or certified grobx, per the
-[M33 protocol](../../docs/research/adaptive-selection-contracts.md). Frontier rows are kept with no
-reference.
+On a `p64` record the oracle is certified grobx 0.155.1 (`8005a2a1`, `tools/external/grobx-driver`),
+as the [M33 protocol](../../docs/research/adaptive-selection-contracts.md) allows above 2³¹. Its
+checker independently verifies every returned basis. The tool parses grobx's basis text and computes the
+same `reduced-basis-v1` digest. Making each element monic at its grevlex leading term means the two
+oracles' different scalars and orderings cannot change the digest; the `p31` digests were identical
+before and after that normalization was added. 36 of 39 `p64` records have a reference, and the three
+frontier rows are kept with no reference.
+
+The two fields check each other. On every problem with a reference at both primes, zero-dimensionality
+and `vdim` agree between Singular at `p31` and grobx at `p64`. grobx's `vdim` is counted from the
+staircase of its leading terms. `m34-public-corpus-test.py` asserts that agreement.
 
 ## Exclusions in this slice
 
@@ -135,10 +144,10 @@ reference.
 
 - **Done.** Licensing review of six sources. An exact admission path, with a CI-checked rebuild.
   39 base problems in 21 families. Six application families cover ≥ 2 scales or instances:
-  signal theory, gametwo, Schwarz, robot kinematics, Runge–Kutta and ellipsoid. Two frontier inputs.
-  Singular references at `p31`.
+  signal theory, gametwo, Schwarz, robot kinematics, Runge–Kutta and ellipsoid. Two frontier inputs at both fields, plus `sd-hairer-2` at `p64`.
+  References at both fields: Singular at `p31`, certified grobx at `p64`, which agree on dimension
+  and `vdim`.
 - **Open.**
-  - `p64` references.
   - Application sources outside SymbolicData: Groebner.jl's systems by independent definition,
     SIAN/StructuralIdentifiability exports, MathRepo.
   - Inequation and saturation tasks; none are in this slice.
