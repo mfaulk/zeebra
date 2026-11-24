@@ -26,8 +26,8 @@ def main(path):
         rows.setdefault(r["label"], {}).setdefault(r["arm"], []).append(r)
 
     print("| Row | Field / accumulator median | Lane median | Lane ÷ field [95% CI], n | Bound | "
-          "Peak RSS lane ÷ field | Digests agree | Verdict |")
-    print("|---|---|---|---|---|---|---|---|")
+          "Peak RSS lane ÷ field | Peak live bytes lane ÷ field | Digests agree | Verdict |")
+    print("|---|---|---|---|---|---|---|---|---|")
     for label, arms in rows.items():
         base_arm = "accumulator" if "accumulator" in arms else "field"
         base, lane = arms.get(base_arm, []), arms.get("lane", [])
@@ -38,19 +38,27 @@ def main(path):
         bound = (MATRIX_BOUND if base_arm == "accumulator"
                  else COMPLETE_BOUND if "dense" in label else CONTROL_BOUND)
         k = min(len(base), len(lane))
+        # Under a second, /usr/bin/time's 10 ms resolution decides nothing: use the call's own clock.
+        if wall == "wall_s" and k and min(r[wall] for r in base + lane) < 1.0:
+            for r in base + lane:
+                r["call_s"] = r["call_ns"] / 1e9
+            wall = "call_s"
         if failed or k == 0:
-            print(f"| {label} | | | | ≤ {bound} | | | INCOMPLETE ({len(failed)} failed) |")
+            print(f"| {label} | | | | ≤ {bound} | | | | INCOMPLETE ({len(failed)} failed) |")
             continue
         ratios = [lane[i][wall] / base[i][wall] for i in range(k)]
         ci = bench_stats.paired_ratio(ratios, seed=label)
         rss = statistics.median(lane[i]["max_rss_kib"] / base[i]["max_rss_kib"] for i in range(k))
+        live = [lane[i]["claim_peak_live_bytes"] / base[i]["claim_peak_live_bytes"] for i in range(k)
+                if base[i].get("claim_peak_live_bytes")]
+        live = f"{statistics.median(live):.2f}" if live else "—"
         agree = len(digests) == 1
         verdict = "PASS" if agree and ci.hi <= bound else "FAIL"
         entry = arms.get("entry")
         note = f" (entry {statistics.median(r['wall_s'] for r in entry):.2f} s)" if entry else ""
-        print(f"| {label} | {statistics.median(r[wall] for r in base[:k]):.2f} s{note} | "
-              f"{statistics.median(r[wall] for r in lane[:k]):.2f} s | "
-              f"{ci.median:.3f} [{ci.lo:.3f}, {ci.hi:.3f}], {k} | ≤ {bound} | {rss:.2f} | "
+        print(f"| {label} | {statistics.median(r[wall] for r in base[:k]):.3f} s{note} | "
+              f"{statistics.median(r[wall] for r in lane[:k]):.3f} s{' (call)' if wall == 'call_s' else ''} | "
+              f"{ci.median:.3f} [{ci.lo:.3f}, {ci.hi:.3f}], {k} | ≤ {bound} | {rss:.2f} | {live} | "
               f"{'yes' if agree else 'NO'} | {verdict} |")
 
 

@@ -1,14 +1,50 @@
 # #945: dense small-prime lane kernel, gate data
 
-**Measured at:** `26dae9ed` (matrix dev pair, `lane_matrix_gate`), `4b064a84` (complete-task dev
-pair, `sig_f4_study --features research-sigf4`), `ef985d5e` (void session 1: both binaries). Every
+**Measured at:** `ef985d5e` (deciding session 2 and void session 1: `sig_f4_study --features
+research-sigf4` SHA-256 `cd04d5d5…`, `lane_matrix_gate` `628b6537…`), `26dae9ed` (matrix dev pair),
+`4b064a84` (complete-task dev pair). Every
 binary was built in release with the repository's `x86-64-v3` floor, `RUSTC_WRAPPER=""`, and a
 private target dir on `/buildcache`. **Host:** Threadripper PRO 5995WX.
 
-**Status: the gate is undecided.** The development reads below clear every bar by a wide margin,
-but they ran on unreserved cores beside other sessions. They decide nothing. The deciding session
-(session 1) went void before any lane attempt ran (see *Void session 1*). A deciding re-run is
-pending. It needs a quiet machine and one CCD reservation of about 75 minutes.
+**Status: decided 2026-11-23 (session 2, `records-2.jsonl`, `tables.md`).** The speed gates pass
+by a wide margin. **The memory gate fails**, and so does the strict upper bound on one sparse
+control. Under M34 §9.3 a failed gate stops the prototype. One corrective iteration (memory) is
+proposed below.
+
+Session 2 ran on CCDs 1–2 (CPUs 8–23), in a reservation `run.sh` took and released itself, on a
+quiet machine. Each row's arms ran from the same frozen binary, interleaved in alternating order.
+Paired ratios are lane ÷ field: the median of per-pair ratios and a 95% bootstrap CI
+(`tools/bench_stats.paired_ratio`). Rows under 1 s use the solve call's own clock, not process
+wall.
+
+| Gate | Result | Bar | Verdict |
+|---|---|---|---|
+| Matrix: n = 20 b3 serial forward | 753.3 s → 144.1 s; **0.192** [0.189, 0.192], n = 3 (5.2×); echelon digests identical | ≥ 2× | **PASS** |
+| Complete: gf31 dense n = 18, 16 w | 5.83 s (`entry` 5.84 s) → 1.95 s; **0.334** [0.333, 0.336], n = 9 | upper ≤ 0.87 | **PASS** |
+| Complete: gf31 dense n = 20, 16 w, `--live-gib 8` | 48.43 s (`entry` 48.50 s) → 17.41 s; **0.359** [0.357, 0.363], n = 5 | upper ≤ 0.87 | **PASS** |
+| Complete: gf32003 dense n = 18, 16 w | 5.92 s → 2.07 s; **0.350** [0.348, 0.359], n = 5 | upper ≤ 0.87 | **PASS** |
+| Bases | identical on every pair; n = 18 and n = 20 are grobx's digests | same basis | **PASS** |
+| Peak live bytes (`claim_peak_live_bytes`), target rows | 1.23 / 1.23 / 1.22 | ≤ 1.15 | **FAIL** |
+| Process peak RSS, target rows | 1.24 / 1.09 / **1.27** (gf32003 n = 18) | ≤ 1.25 | **FAIL** (one row) |
+| Sparse controls, 16 w | cyclic-6 and mq-random-10 at both fields: upper ≤ 1.033. katsura-8 (6 ms solves): 1.031 [1.003, 1.067] and 1.025 [0.997, 1.059] | each loses ≤ 5% | medians pass; katsura-8 upper bounds exceed 1.05 |
+| Wide controls | no lane above p = 46337 | identical route | **PASS** by construction |
+
+The matrix ratio in a quiet reservation (0.19) is much better than the dev pair's (0.35). The dev
+pair ran its two arms concurrently next to other sessions, and the lane arm, being bandwidth-bound,
+lost more to that.
+
+### Why memory fails, and the corrective iteration
+
+In lane mode every pivot is held twice, as its field-form `Vec<(u32, F)>` and as its lane form:
+- the reducer block and every new element, for the length of the batch;
+- the lane copy is charged on top of the field rows (`lane_bytes` in `engine.rs` and `claim.rs`).
+
+That accounts for the 1.22–1.23× in live bytes. **Hypothesis:** keep only the lane form while a
+batch reduces. Drop the reducer block's field rows once they are converted, and materialize each
+element's field row only at settlement, as `LaneKernel` already does at matrix level, where peak RSS
+is 0.85×. Live bytes should then fall below 1.0×, since a dense `u16` cell (2 B) at span density
+≥ 25% costs at most 8 B per nonzero against a field entry's 8 B. The speed should not move.
+Budget: one corrective session, under §9.3's one-iteration, ≤ 2-session rule.
 
 ## What is measured
 
