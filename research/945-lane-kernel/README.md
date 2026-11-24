@@ -1,15 +1,49 @@
 # #945: dense small-prime lane kernel, gate data
 
-**Measured at:** `ef985d5e` (deciding session 2 and void session 1: `sig_f4_study --features
+**Measured at:** `e3eec892` (corrective session 3: `sig_f4_study` SHA-256 `6762da5e…`,
+`lane_matrix_gate` `9b137adb…`), `ef985d5e` (deciding session 2 and void session 1: `sig_f4_study --features
 research-sigf4` SHA-256 `cd04d5d5…`, `lane_matrix_gate` `628b6537…`), `26dae9ed` (matrix dev pair),
 `4b064a84` (complete-task dev pair). Every
 binary was built in release with the repository's `x86-64-v3` floor, `RUSTC_WRAPPER=""`, and a
 private target dir on `/buildcache`. **Host:** Threadripper PRO 5995WX.
 
-**Status: decided 2026-11-23 (session 2, `records-2.jsonl`, `tables.md`).** The speed gates pass
-by a wide margin. **The memory gate fails**, and so does the strict upper bound on one sparse
-control. Under M34 §9.3 a failed gate stops the prototype. One corrective iteration (memory) is
-proposed below.
+**Status: decided 2026-11-24, after the one corrective iteration (session 3, `records-3.jsonl`,
+`tables.md`).** The speed, memory and wide-control gates pass. **The sparse-control gate fails**:
+katsura-8 and cyclic-6 lose 3.6–7.3% at 16 workers. Under M34 §9.3 the prototype stops here, with
+its iteration spent. The kernel is not committed to ship, and the lane stays off by default.
+
+### Session 3 (corrective: each pivot held once, `e3eec892`)
+
+Same placement, method and gate list as session 2, in a reservation `run.sh` took and released.
+The sparse controls were re-read in full.
+
+| Gate | Result | Bar | Verdict |
+|---|---|---|---|
+| Matrix: n = 20 b3 serial forward | 752.8 s → 144.3 s; **0.192** [0.190, 0.192], n = 3 (5.2×); echelon digests identical | ≥ 2× | **PASS** |
+| Complete: gf31 dense n = 18, 16 w | 5.83 s (`entry` 5.86 s) → 1.94 s; **0.333** [0.328, 0.338], n = 9 | upper ≤ 0.87 | **PASS** |
+| Complete: gf31 dense n = 20, 16 w | 48.62 s (`entry` 48.72 s) → 17.30 s; **0.356** [0.351, 0.357], n = 5 | upper ≤ 0.87 | **PASS** |
+| Complete: gf32003 dense n = 18, 16 w | 5.95 s → 2.05 s; **0.345** [0.342, 0.346], n = 5 | upper ≤ 0.87 | **PASS** |
+| Bases | identical on every pair | same basis | **PASS** |
+| Peak live bytes, target rows | 0.88 / 0.87 / 0.88 (session 2: 1.22–1.23) | ≤ 1.15 | **PASS** |
+| Process peak RSS, target rows | 1.14 / 1.05 / 1.12 (session 2: 1.24 / 1.09 / 1.27) | ≤ 1.25 | **PASS** |
+| Sparse: katsura-8, 16 w (6 ms) | gf31 1.045 [1.015, 1.079]; gf32003 **1.073** [1.021, 1.089] | each loses ≤ 5% | **FAIL** |
+| Sparse: cyclic-6, 16 w (16 ms) | gf31 1.036 [1.007, 1.064]; gf32003 1.037 [1.016, 1.055] | each loses ≤ 5% | **FAIL** (upper) |
+| Sparse: mq-random-10, 16 w (230 ms) | gf31 0.987 [0.975, 0.992]; gf32003 1.033 [1.023, 1.040] | each loses ≤ 5% | PASS |
+| Wide controls | no lane above p = 46337 | identical route | **PASS** by construction |
+
+The corrective hypothesis held: holding each pivot once cut live bytes from 1.22–1.23× to
+0.87–0.88×, and speed did not move (0.333–0.356 against 0.334–0.359). The sparse controls are the
+open problem.
+- On solves of 6–16 ms, the lane route's fixed costs are a few percent of the call: per-batch
+  conversion of the reducer block, and per-element conversion into lane form and back.
+- Its per-product gain is too small to repay them.
+
+The controls were compared on the signature engine with and without `--lane`, which is the strict
+comparison. Under `entry`, a size rule that gives small batches the field route would make the
+controls' route identical. That is a selection rule, outside this prototype, and is #1011's
+question.
+
+### Session 2 (first deciding read, before the corrective iteration)
 
 Session 2 ran on CCDs 1–2 (CPUs 8–23), in a reservation `run.sh` took and released itself, on a
 quiet machine. Each row's arms ran from the same frozen binary, interleaved in alternating order.
