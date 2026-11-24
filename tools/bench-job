@@ -676,24 +676,36 @@ def lock_owner(job_id):
     return f'bench-job-{job_id}'
 
 
-def enforce_mode(m, journal, job_id):
-    """Publication mode starts only once the §11.2 start conditions hold (tools/bench_contamination.py),
-    re-checking every 60 s for up to `run.mode_wait_seconds`; otherwise the refusal is journaled. Dev
-    mode refuses nothing: its context is recorded per attempt."""
+MODE_POLL_SECONDS = 60
+
+
+def enforce_mode(m, journal, job_id, deadline, attempt, cancel_file):
+    """Publication mode starts each attempt only once the §11.2 start conditions hold
+    (tools/bench_contamination.py), re-checking every `MODE_POLL_SECONDS` until `deadline`, the end of
+    the job's `run.mode_wait_seconds` budget: a compiler that starts mid-job holds the next attempt
+    rather than contaminating it (#1090). Returns `{waited_seconds, refusals}` for the attempt's exit
+    metadata; a wait that would outrun the budget is journaled as the `mode-refused` stop. A cancel
+    ends the wait early, for the caller's cancel check. Dev mode refuses nothing: its context is
+    recorded per attempt."""
     if m['mode'] != 'publication':
-        return
-    deadline = time.monotonic() + m['run'].get('mode_wait_seconds', 0)
+        return None
+    started, seen = time.monotonic(), []
     while True:
         snap = campaign.snapshot(m['run']['cpus'])
         refusals = bc.publication_refusals(snap, lock_owner(job_id)) if 'stat' in snap \
             else [f'cpu-context failed: {snap}']
-        if not refusals:
-            return
-        if time.monotonic() + 60 > deadline:
+        waited = time.monotonic() - started
+        if not refusals or cancel_file.exists():
+            return dict(waited_seconds=waited, refusals=seen)
+        seen += [r for r in refusals if r not in seen]
+        if time.monotonic() + MODE_POLL_SECONDS > deadline:
             with Deferred():
-                journal.record_stop('mode-refused', at=now(), refusals=refusals)
+                journal.record_stop('mode-refused', at=now(), attempt=attempt, waited_seconds=waited,
+                                    refusals=refusals)
             raise JobError(f'publication mode refused: {"; ".join(refusals)}', EXIT_REFUSED)
-        time.sleep(60)
+        print(f'bench-job: {attempt} waits for publication conditions: {"; ".join(refusals)}',
+              file=sys.stderr, flush=True)
+        time.sleep(MODE_POLL_SECONDS)
 
 
 def contamination(result, m, job_id):
@@ -961,7 +973,7 @@ def run_job(directory, force_uncancel=False):
         with Deferred():
             journal.record_verdict(last['index'], classify(last['metadata']),
                                    dict(attempt_id=last['metadata']['attempt_id'], recovered=True))
-    enforce_mode(m, journal, directory.name)
+    mode_deadline = time.monotonic() + m['run'].get('mode_wait_seconds', 0)
     limits, retries = m['run']['limits'], m['run'].get('retries', 0)
     plan = journal.header['plan']
     (directory / 'scratch').mkdir(exist_ok=True)
@@ -976,6 +988,7 @@ def run_job(directory, force_uncancel=False):
     while (work := _next_work(journal, retries)) is not None:
         index, try_ = work
         cell, aid = plan[index], attempt_id(directory.name, index, try_)
+        mode_wait = enforce_mode(m, journal, directory.name, mode_deadline, aid, cancel_file)
         if cancel_file.exists():
             with Deferred():
                 journal.record_stop('cancelled', at=now(), boundary='between-attempts', next_attempt=aid)
@@ -1015,6 +1028,8 @@ def run_job(directory, force_uncancel=False):
                                    rss_guard_rc=r['rss_guard_rc'], rss_guard_stderr=r['rss_guard_stderr']),
                         before=r['before'], after=r['after'], freq=r['freq'], perf=r['perf'],
                         contamination=contamination(r, m, directory.name))
+        if mode_wait is not None:
+            metadata['mode_wait'] = mode_wait
         status = classify(metadata)
         with Deferred():
             journal.record_exit(index, cell, r['stdout'], r['stderr'], metadata, try_=try_)

@@ -535,10 +535,15 @@ than rewriting it.
 
 **Modes.** `mode` is `dev` or `publication` and is recorded in the manifest and journal header.
 A dev job runs under the CCD-scoped lock. A publication job takes the exclusive, machine-wide
-lock (`bench-reserve run` with `ZEEBRA_BENCH_RESERVE_EXCLUSIVE=1`). Before its first attempt it
-checks `bench_contamination.publication_refusals`, re-checking every 60 s for up to
-`run.mode_wait_seconds` (default 0). If the conditions never hold, it journals a `mode-refused`
-stop listing the refusals and exits 3.
+lock (`bench-reserve run` with `ZEEBRA_BENCH_RESERVE_EXCLUSIVE=1`). Before every attempt, not
+only the first, it checks `bench_contamination.publication_refusals` and re-checks every 60 s
+while they stand. A compiler that starts mid-job therefore holds the next attempt until it exits,
+where it would otherwise contaminate it (#1090). `run.mode_wait_seconds` (default 0) is one budget
+for the whole run, shared by every attempt's wait (a `resume` starts a fresh one). A wait that would outrun what remains of it
+journals a `mode-refused` stop, naming the attempt, its `waited_seconds` and the refusals, and
+exits 3. Each attempt's exit metadata records its wait as `mode_wait: {waited_seconds, refusals}`.
+A cancel ends a wait at the next poll. Contamination flagging (below) stays as the backstop for
+whatever starts during an attempt.
 
 Every attempt's exit metadata carries `contamination`, which holds `{mode, metrics, clock_source,
 verdict}`. The metrics come from the before/after `cpu-context` snapshots, with the child's `wait4`
