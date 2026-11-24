@@ -93,9 +93,10 @@ struct Reservation<'a> {
     entries: usize,
 }
 impl Reservation<'_> {
-    fn publish(&mut self, entries: usize) {
+    /// Release the reservation and the `replaced` entries a result of `entries` supersedes.
+    fn publish(&mut self, entries: usize, replaced: usize) {
         let mut ledger = self.ledger.lock().unwrap();
-        ledger.live = ledger.live - self.entries + entries;
+        ledger.live = ledger.live - self.entries - replaced + entries;
         self.entries = 0;
     }
 }
@@ -107,9 +108,14 @@ impl Drop for Reservation<'_> {
 
 /// Opt-in forward discovery only; callers retain the ordinary backward pass and serial fallback.
 ///
-/// Reserves original inputs, all published entries and two full-width rows per active task.
-/// Dense capacity and publication arrays have a separate workspace-byte cap. No mutation is
-/// committed until all workers succeed; cancellation, refusal and panic preserve `matrix`.
+/// Counts the live matrix as the serial kernel holds it, plus two full-width rows per active task:
+/// the prefix, each lower row's input until its result is published or found zero, and then that
+/// result in its place (#1085). Only the worker that claimed a lower row ever reads its input, so
+/// once the row is finished no reader of the input remains; the input stays allocated solely as
+/// the untouched-matrix rollback a refusal needs, which is no more a live entry than
+/// [`continue_serially`]'s backup. Dense capacity and publication arrays have a separate
+/// workspace-byte cap. No mutation is committed until all workers succeed; cancellation, refusal
+/// and panic preserve `matrix`.
 pub fn reduce<F: FiniteField + Send + Sync>(
     matrix: &mut SparseMatrix<F>,
     split: usize,
@@ -498,7 +504,7 @@ fn sweep_worker<F: FiniteField>(
                 let mut state = ledger.lock().unwrap();
                 state.live = state.live - before + after;
             }
-            reservation.publish(0);
+            reservation.publish(0, 0);
             rows += 1;
         }
     }
@@ -730,7 +736,9 @@ fn reduce_inner<F: FiniteField + Send + Sync>(
                                     }
                                 }
                             }
-                            reservation.publish(published);
+                            // Released only here, once the row is finished: a cancelled row's
+                            // input is still the row the matrix holds.
+                            reservation.publish(published, input.row(current).nonzeros());
                             rows += 1;
                         }
                         Ok(())
@@ -846,6 +854,7 @@ fn reduce_inner<F: FiniteField + Send + Sync>(
     }
     report.statistics.final_nonzeros = matrix.nonzeros();
     report.statistics.peak_nonzeros = report.peak_reserved_entries;
+    debug_assert_eq!(ledger.into_inner().unwrap().live, matrix.nonzeros());
     Ok(Outcome::Reduced(report))
 }
 
@@ -982,7 +991,7 @@ mod tests {
                 ..Config::default()
             },
             Config {
-                max_entries: input.nonzeros() + 2 * input.num_columns() + 1,
+                max_entries: input.nonzeros() + 2 * input.num_columns(),
                 ..Config::default()
             },
             Config {
@@ -1007,19 +1016,20 @@ mod tests {
     fn a_refused_pass_retains_its_finished_rows() {
         let input = fixture::<Zp13>();
         let mut matrix = input.clone();
+        // The second lower row's result is one entry wider than its input: the third reservation crosses.
         let config = Config {
             workers: 1,
-            max_entries: input.nonzeros() + 2 * input.num_columns() + 1,
+            max_entries: input.nonzeros() + 2 * input.num_columns(),
             ..Config::default()
         };
         let Ok(Outcome::Retained(partial)) =
             reduce_retaining(&mut matrix, 1, &config, &AtomicBool::new(false))
         else {
-            panic!("the second row's reservation should have been refused");
+            panic!("the third row's reservation should have been refused");
         };
         assert_eq!(matrix, input);
-        assert_eq!(partial.completed.len(), 1);
-        assert_eq!(partial.report.successful_publications, 1);
+        assert_eq!(partial.completed.len(), 2);
+        assert_eq!(partial.report.successful_publications, 2);
         let report = continue_serially(
             &mut matrix,
             1,
@@ -1040,13 +1050,13 @@ mod tests {
         let mut matrix = input.clone();
         let config = Config {
             workers: 1,
-            max_entries: input.nonzeros() + 2 * input.num_columns() + 1,
+            max_entries: input.nonzeros() + 2 * input.num_columns(),
             ..Config::default()
         };
         let Ok(Outcome::Retained(partial)) =
             reduce_retaining(&mut matrix, 1, &config, &AtomicBool::new(false))
         else {
-            panic!("the second row's reservation should have been refused");
+            panic!("the third row's reservation should have been refused");
         };
         assert!(
             continue_serially(&mut matrix, 1, partial, crate::linalg::Backend::Adaptive, 0)
@@ -1251,6 +1261,45 @@ mod tests {
         let split = rows.len();
         rows.extend(random(30));
         (SparseMatrix::new(columns, rows), split)
+    }
+
+    // A budget the serial kernel admits, plus one worker's in-flight input and reservation, admits the pass: published rows replace their inputs in the ledger (#1085).
+    #[test]
+    fn a_publication_releases_the_input_it_replaces() {
+        use crate::linalg::{reduce_rows_against_pivots_with, Backend};
+        for seed in 0..8 {
+            let (input, split) = sweep_fixture(seed, 48);
+            let mut serial = input.clone();
+            let statistics =
+                reduce_rows_against_pivots_with(Backend::Adaptive, &mut serial, split, usize::MAX)
+                    .unwrap();
+            let widest = input.rows()[split..]
+                .iter()
+                .map(SparseRow::nonzeros)
+                .max()
+                .unwrap();
+            let admitted = statistics.peak_nonzeros + widest + 2 * input.num_columns();
+            let mut matrix = input.clone();
+            let config = Config {
+                workers: 1,
+                max_entries: admitted,
+                ..Config::default()
+            };
+            let report = reduce(&mut matrix, split, &config, &AtomicBool::new(false))
+                .unwrap_or_else(|error| panic!("seed {seed}: {error:?}"));
+            assert!(report.peak_reserved_entries <= admitted, "seed {seed}");
+            assert_eq!(matrix, serial, "seed {seed}");
+            // Every worker count closes the ledger at the committed matrix (asserted inside).
+            for workers in [2, 4, 8] {
+                let mut matrix = input.clone();
+                let config = Config {
+                    workers,
+                    ..Config::default()
+                };
+                reduce(&mut matrix, split, &config, &AtomicBool::new(false)).unwrap();
+                assert_eq!(canonical(matrix), canonical(serial.clone()), "seed {seed}");
+            }
+        }
     }
 
     // The concurrent sweep writes the serial sweep's rows, in place, for every worker count and schedule.

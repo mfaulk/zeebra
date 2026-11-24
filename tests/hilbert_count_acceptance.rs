@@ -1049,6 +1049,101 @@ fn design_d_completes_on_katsura_and_falls_back_on_eco_and_cyclic() {
     }
 }
 
+/// The note's §4.4 counterexample to ending an overdetermined affine run at a zero count: `(x, y,
+/// x² + 1)` has `S = 1 − t²`, so `x` and `y` make the count zero at degree 1, with no fall. Yet
+/// `x · x − (x² + 1) = −1` falls at degree 2, and the ideal is the whole ring. The route must turn
+/// off there, not complete with `{x, y}`.
+#[test]
+fn a_zero_count_is_not_final_on_overdetermined_affine_input() {
+    use zeebra::grobner::CountDisabled;
+    type F = Zp31;
+    let system = [
+        to_zeebra::<2, F>(&vec![(vec![1, 0], 1)]),
+        to_zeebra::<2, F>(&vec![(vec![0, 1], 1)]),
+        to_zeebra::<2, F>(&vec![(vec![2, 0], 1), (vec![0, 0], 1)]),
+    ];
+    let outcome = design_d(&system, "(x, y, x² + 1)");
+    assert_eq!(
+        outcome,
+        CountRoute::Disabled {
+            degree: 1,
+            reason: CountDisabled::ZeroNotFinal
+        }
+    );
+    assert_eq!(f4(&system, GREVLEX).unwrap().len(), 1, "the basis is {{1}}");
+}
+
+/// A random affine system of `m` quadratics over GF(p): each has a sparse or dense degree-2 part,
+/// a random linear part and a constant, so every shape the route admits occurs, falls included.
+fn random_affine(rng: &mut StdRng, n: usize, m: usize, p: u64) -> Vec<Poly> {
+    let dense = Space::new(n, 2).len();
+    (0..m)
+        .map(|_| {
+            let terms = if rng.gen_bool(0.5) { 2 } else { dense };
+            let mut f = random_form(rng, n, 2, terms, p);
+            let (linear, constant) = (rng.gen_range(0..=n), rng.gen_range(0..=1));
+            f.extend(random_form(rng, n, 1, linear, p));
+            f.extend(random_form(rng, n, 0, constant, p));
+            f
+        })
+        .filter(|f: &Poly| !f.is_empty())
+        .collect()
+}
+
+/// #1088's search: affine systems of every shape, non-square ones included, over GF(2), GF(31)
+/// and GF(32003). Drops at certified degrees are final (note §4.4), so the basis must be the
+/// deterministic one every time. The search must also have dropped pairs on non-square input, or
+/// it is not testing the claim.
+fn affine_search<const N: usize, F: FiniteField>(p: u64, seeds: u64) -> (usize, usize) {
+    let (mut systems, mut dropped) = (0, 0);
+    for seed in 0..seeds {
+        let mut rng = StdRng::seed_from_u64(seed ^ (p << 16) ^ ((N as u64) << 40));
+        for m in 1..=N + 3 {
+            let system: Vec<MultivariatePolynomial<N, F>> = random_affine(&mut rng, N, m, p)
+                .iter()
+                .map(|f| to_zeebra::<N, F>(f))
+                .filter(|f| !f.is_zero())
+                .collect();
+            if system.len() == N {
+                continue;
+            }
+            let label = format!("GF({p}), n={N}, m={m}, seed {seed}");
+            let expected = f4(&system, GREVLEX).unwrap();
+            for slack in [0, 2] {
+                let options = F4Options {
+                    hilbert: HilbertSelection::CertifiedZeros { slack },
+                    ..F4Options::default()
+                };
+                let (basis, statistics) = f4_with_options(&system, GREVLEX, &options).unwrap();
+                assert_eq!(
+                    basis, expected,
+                    "{label}, slack {slack}: {:?}",
+                    statistics.hilbert
+                );
+                dropped += statistics.hilbert.pairs_certified_zero;
+            }
+            systems += 1;
+        }
+    }
+    (systems, dropped)
+}
+
+#[test]
+fn design_d_returns_the_exact_basis_on_random_non_square_affine_systems() {
+    for (systems, dropped) in [
+        affine_search::<3, Zp2>(2, 40),
+        affine_search::<3, Zp31>(31, 40),
+        affine_search::<4, Zp31>(31, 25),
+        affine_search::<4, Zp32003>(32003, 25),
+        affine_search::<5, Zp32003>(32003, 6),
+    ] {
+        assert!(
+            systems > 0 && dropped > 0,
+            "{systems} systems, {dropped} dropped"
+        );
+    }
+}
+
 /// The sparse ladder generator's MQ rows, which the certificate mostly refuses. Whatever the route
 /// does, the basis is the deterministic one, and it completes only on regular top forms.
 #[cfg(feature = "external-runners")]

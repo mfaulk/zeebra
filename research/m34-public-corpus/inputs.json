@@ -1,0 +1,1062 @@
+{
+ "Bjoerk_8": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Bjoerk_8.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "b0ef220bf9d4a674d97e85e09164777640f60eb0bfdeeb85410190b58df655a1",
+  "variables": [
+   "a",
+   "b",
+   "c",
+   "d",
+   "e",
+   "f",
+   "g",
+   "h"
+  ],
+  "equations": [
+   "a+e",
+   "a+b+c+d+e+f+g+h",
+   "a*b+b*c+c*d+d*e+e*f+f*g+a*h+g*h",
+   "a*b*c+b*c*d+c*d*e+d*e*f+a*b*h+a*g*h+f*g*h",
+   "a*b*c*d+b*c*d*e+c*d*e*f+d*e*f*g+a*b*c*h+a*b*g*h+a*f*g*h+e*f*g*h",
+   "a*b*c*d*e+b*c*d*e*f+c*d*e*f*g+a*b*c*d*h+a*b*c*g*h+a*b*f*g*h+a*e*f*g*h+d*e*f*g*h",
+   "a*b*c*d*e*f+b*c*d*e*f*g+a*b*c*d*e*h+a*b*c*d*g*h+a*b*c*f*g*h+a*b*e*f*g*h+a*d*e*f*g*h+c*d*e*f*g*h",
+   "a*b*c*d*e*f*g+a*b*c*d*e*f*h+a*b*c*d*e*g*h+a*b*c*d*f*g*h+a*b*c*e*f*g*h+a*b*d*e*f*g*h+a*c*d*e*f*g*h+b*c*d*e*f*g*h",
+   "a*b^2*c^3*d^2+a*b^2*c^2*d^2*f+a*b*c^3*d^2*f+a*b*c^2*d^2*f^2+a*b^2*c^3*d*g+a*b^2*c^2*d^2*g+a*b*c^3*d^2*g+a*b^2*c^2*d*f*g+a*b*c^3*d*f*g+a*b^2*c*d^2*f*g+2*a*b*c^2*d^2*f*g+a*c^3*d^2*f*g+a*b*c^2*d*f^2*g+a*b*c*d^2*f^2*g+a*c^2*d^2*f^2*g+a*b^2*c^2*d*g^2+a*b*c^3*d*g^2+a*b*c^2*d^2*g^2+a*b^2*c*d*f*g^2+2*a*b*c^2*d*f*g^2+a*c^3*d*f*g^2+a*b*c*d^2*f*g^2+a*c^2*d^2*f*g^2+a*b*c*d*f^2*g^2+a*c^2*d*f^2*g^2+a*c*d^2*f^2*g^2+a*b*c^2*d*g^3+a*b*c*d*f*g^3+a*c^2*d*f*g^3+a*c*d*f^2*g^3+a*b^2*c^3*d*h+a*b^2*c^2*d^2*h+a*b^2*c^2*d*f*h+a*b*c^3*d*f*h+a*b^2*c*d^2*f*h+a*b*c^2*d^2*f*h+a*b*c^2*d*f^2*h+a*b*c*d^2*f^2*h+a*b^2*c^3*g*h+2*a*b^2*c^2*d*g*h+a*b*c^3*d*g*h+a*b^2*c*d^2*g*h+a*b*c^2*d^2*g*h+a*b^2*c^2*f*g*h+a*b*c^3*f*g*h+2*a*b^2*c*d*f*g*h+3*a*b*c^2*d*f*g*h+a*c^3*d*f*g*h+a*b^2*d^2*f*g*h+2*a*b*c*d^2*f*g*h+a*c^2*d^2*f*g*h+a*b*c^2*f^2*g*h+2*a*b*c*d*f^2*g*h+a*c^2*d*f^2*g*h+a*b*d^2*f^2*g*h+a*c*d^2*f^2*g*h+a*b^2*c^2*g^2*h+a*b*c^3*g^2*h+a*b^2*c*d*g^2*h+2*a*b*c^2*d*g^2*h+a*b*c*d^2*g^2*h+a*b^2*c*f*g^2*h+2*a*b*c^2*f*g^2*h+a*c^3*f*g^2*h+a*b^2*d*f*g^2*h+3*a*b*c*d*f*g^2*h+2*a*c^2*d*f*g^2*h+a*b*d^2*f*g^2*h+a*c*d^2*f*g^2*h+a*b*c*f^2*g^2*h+a*c^2*f^2*g^2*h+a*b*d*f^2*g^2*h+2*a*c*d*f^2*g^2*h+a*d^2*f^2*g^2*h+a*b*c^2*g^3*h+a*b*c*d*g^3*h+a*b*c*f*g^3*h+a*c^2*f*g^3*h+a*b*d*f*g^3*h+a*c*d*f*g^3*h+a*c*f^2*g^3*h+a*d*f^2*g^3*h+a*b^2*c^2*d*h^2+a*b^2*c*d*f*h^2+a*b*c^2*d*f*h^2+a*b*c*d*f^2*h^2+a*b^2*c^2*g*h^2+a*b^2*c*d*g*h^2+a*b*c^2*d*g*h^2+a*b^2*c*f*g*h^2+a*b*c^2*f*g*h^2+a*b^2*d*f*g*h^2+2*a*b*c*d*f*g*h^2+a*c^2*d*f*g*h^2+a*b*c*f^2*g*h^2+a*b*d*f^2*g*h^2+a*c*d*f^2*g*h^2+a*b^2*c*g^2*h^2+a*b*c^2*g^2*h^2+a*b*c*d*g^2*h^2+a*b^2*f*g^2*h^2+2*a*b*c*f*g^2*h^2+a*c^2*f*g^2*h^2+a*b*d*f*g^2*h^2+a*c*d*f*g^2*h^2+a*b*f^2*g^2*h^2+a*c*f^2*g^2*h^2+a*d*f^2*g^2*h^2+a*b*c*g^3*h^2+a*b*f*g^3*h^2+a*c*f*g^3*h^2+a*f^2*g^3*h^2-1"
+  ]
+ },
+ "Butcher": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Butcher.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "462734b7ef0ffd937212ce560e85a36643ee0830d828fa3eed9ec8a983baeb8c",
+  "variables": [
+   "b",
+   "c2",
+   "c3",
+   "a",
+   "b3",
+   "b2",
+   "a32",
+   "b1"
+  ],
+  "equations": [
+   "-b-a+b3+b2+b1",
+   "-2*b^2+2*b*a+2*c3*b3+2*c2*b2-b-1",
+   "3*b^3-3*b^2*a+3*c3^2*b3+3*c2^2*b2+3*b^2+4*b-a",
+   "6*b^3-6*b^2*a+6*c2*b3*a32+6*b^2-3*b*a+4*b-a",
+   "-12*b^4+12*b^3*a+12*c2^2*b3*a32-18*b^3+12*b^2*a-14*b^2+8*b*a-b-1",
+   "-8*b^4+8*b^3*a+8*c2*c3*b3*a32-12*b^3+4*b^2*a-14*b^2+4*b*a-3*b-1",
+   "-4*b^4+4*b^3*a+4*c3^3*b3+4*c2^3*b2-6*b^3-10*b^2+4*b*a-b-1",
+   "24*b^4-24*b^3*a+36*b^3-24*b^2*a+26*b^2-8*b*a+7*b+1"
+  ]
+ },
+ "Caprasse": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Caprasse.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "f84770c468bdca1bc22f83333485c0e47590e23a0c06a23881e3f20596169ff9",
+  "variables": [
+   "x",
+   "y",
+   "z",
+   "t"
+  ],
+  "equations": [
+   "2*y*z*t+x*t^2-x-2*z",
+   "y^2*z+2*x*y*t-2*x-z",
+   "-x*z^3+4*y*z^2*t+4*x*z*t^2+2*y*t^3+4*x*z+4*z^2-10*y*t-10*t^2+2",
+   "-x^3*z+4*x*y^2*z+4*x^2*y*t+2*y^3*t+4*x^2-10*y^2+4*x*z-10*y*t+2"
+  ]
+ },
+ "Cassou": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Cassou.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "bd56c8d0aa731e7a77574ae64b8337228f0e58bf0073b48fb86597507be2c29c",
+  "variables": [
+   "b",
+   "c",
+   "d",
+   "e"
+  ],
+  "equations": [
+   "-4*b^2*c^2+4*b^2*c*d-3*b^2*d^2+22*c*e-22*d*e+261",
+   "-15*b^2*c^3*e+15*b^2*c^2*d*e-81*b^2*c^2+216*b^2*c*d-162*b^2*d^2+40*c^2*e^2-80*c*d*e^2+40*d^2*e^2+1008*c*e-1008*d*e+5184",
+   "6*b^4*c^3+21*b^4*c^2*d+15*b^4*c*d^2+9*b^4*d^3-8*b^2*c^2*e-28*b^2*c*d*e+36*b^2*d^2*e-144*b^2*c-648*b^2*d-120",
+   "9*b^4*c^4+30*b^4*c^3*d+39*b^4*c^2*d^2+18*b^4*c*d^3-24*b^2*c^3*e-16*b^2*c^2*d*e+16*b^2*c*d^2*e+24*b^2*d^3*e-432*b^2*c^2-720*b^2*c*d-432*b^2*d^2+16*c^2*e^2-32*c*d*e^2+16*d^2*e^2+576*c*e-576*d*e-240*c+5184"
+  ]
+ },
+ "Czapor-86a": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Czapor-86a.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "7f38976ddc8fe9aab232356c0a7ae99c7c32e36a7ca4c5d8883a2ecd4cc7cbd8",
+  "variables": [
+   "x",
+   "y",
+   "z"
+  ],
+  "equations": [
+   "5*x^2+8*x*y+9*y^2+4*x*z-6*y*z-z^2+8*x+2*y-7*z+5",
+   "8*x^2-2*x*y+3*y^2-6*x*z-7*y*z+10*z^2+3*x+10*y-8*z-4",
+   "10*x^2-2*x*y+9*y^2+6*x*z-y*z-2*z^2-6*x-4*y+5*z-9"
+  ]
+ },
+ "Ellipsoid_-2": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Ellipsoid_-2.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "3c1b4e4a60222664fb2afa58f637d25ebc20354aa139403fd7f2c00ff2d47f21",
+  "variables": [
+   "l",
+   "x",
+   "y",
+   "z",
+   "ma",
+   "mb",
+   "mc",
+   "a",
+   "b",
+   "c"
+  ],
+  "equations": [
+   "z^4-z^3*mc-2*l*c^2",
+   "y^4-y^3*mb-2*l*b^2",
+   "x^4-x^3*ma-2*l*a^2",
+   "-x^2*y^2*z^2+x^2*y^2*c^2+x^2*z^2*b^2+y^2*z^2*a^2"
+  ]
+ },
+ "Ellipsoid_2": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Ellipsoid_2.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "2661b94301e8831f200fe5a7cd580ac3ea33cc89fd04575c557198bfaf263168",
+  "variables": [
+   "l",
+   "x",
+   "y",
+   "z",
+   "ma",
+   "mb",
+   "mc",
+   "a",
+   "b",
+   "c"
+  ],
+  "equations": [
+   "2*l*z+z*c^2-mc*c^2",
+   "2*l*y+y*b^2-mb*b^2",
+   "x^2*b^2*c^2+y^2*a^2*c^2+z^2*a^2*b^2-a^2*b^2*c^2",
+   "2*l*x+x*a^2-ma*a^2"
+  ]
+ },
+ "Ellipsoid_4": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Ellipsoid_4.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "17be1865dd11d705fa70307eea5441f2934e56b079988df4c2981b6fb1b7c170",
+  "variables": [
+   "l",
+   "x",
+   "y",
+   "z",
+   "ma",
+   "mb",
+   "mc",
+   "a",
+   "b",
+   "c"
+  ],
+  "equations": [
+   "4*l*z^3+z*c^4-mc*c^4",
+   "4*l*y^3+y*b^4-mb*b^4",
+   "x^4*b^4*c^4+y^4*a^4*c^4+z^4*a^4*b^4-a^4*b^4*c^4",
+   "4*l*x^3+x*a^4-ma*a^4"
+  ]
+ },
+ "Fee_1": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Fee_1.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "164dd0e59fc01f7814115afbd6f7450ff8deaeeb2ef14da42c7ee9c5b0066e79",
+  "variables": [
+   "q",
+   "c",
+   "p",
+   "d"
+  ],
+  "equations": [
+   "-2*q*p-2*p^2-2*q+8*p-2",
+   "-3*q*c*p+2*q*p*d+4*p^2*d+3*c*p+q*d-7*p*d",
+   "q^2*c^2-2*q^2*c*d-2*q*c*p*d+q^2*d^2+2*q*p*d^2+p^2*d^2-2*q*c^2+4*q*c*p+2*q*c*d+2*c*p*d-4*q*d^2-4*p*d^2+c^2+2*q*p+10*p^2-4*c*d+4*d^2-2*q-8*p+2",
+   "3*q^2*c^2+12*q*c*p*d-3*q^2*d^2+6*q*p*d^2-3*p^2*d^2-6*q*c^2+12*q*c*d+12*c*p*d-4*q^2+3*c^2+5*p^2-12*c*d+12*d^2-6*p+5"
+  ]
+ },
+ "FourBodyProblem": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/FourBodyProblem.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "6c920ddc560bd0fd23460e698af67bad111b4fe6d0de792eeb4ed61ab842da3e",
+  "variables": [
+   "bb",
+   "b",
+   "dd",
+   "d",
+   "ff",
+   "f"
+  ],
+  "equations": [
+   "2+b*bb-bb*d-b*dd+d*dd-2*ff",
+   "2*bb+b*bb-bb*d-2*dd+b*dd-d*dd-2*b*ff+2*d*ff",
+   "1-2*b+b^2-2*d-2*b*d+d^2+f",
+   "-1+b^3*bb^2",
+   "-1+d^3*dd^2",
+   "-1+f^3*ff^2"
+  ]
+ },
+ "FourCircles": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/FourCircles.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "cc7e4a0a7763f490271f40111192675e1b06b6dfde257d25b950fa7a351f5e95",
+  "variables": [
+   "y",
+   "x"
+  ],
+  "equations": [
+   "8*y^6*x+24*y^4*x^3+24*y^2*x^5+8*x^7-12*y^5*x-24*y^3*x^3-12*y*x^5-14*y^4*x-44*y^2*x^3-30*x^5+24*y^3*x+40*y*x^3+8*y^2*x+16*x^3-16*y*x",
+   "8*y^7+24*y^5*x^2+24*y^3*x^4+8*y*x^6-14*y^6-30*y^4*x^2-18*y^2*x^4-2*x^6-6*y^5-28*y^3*x^2-22*y*x^4+10*y^4+36*y^2*x^2+10*x^4+8*y*x^2-8*x^2",
+   "y^8+4*y^6*x^2+6*y^4*x^4+4*y^2*x^6+x^8-2*y^7-6*y^5*x^2-6*y^3*x^4-2*y*x^6-y^6-7*y^4*x^2-11*y^2*x^4-5*x^6+2*y^5+12*y^3*x^2+10*y*x^4+4*y^2*x^2+4*x^4-8*y*x^2"
+  ]
+ },
+ "Hairer_1": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Hairer_1.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "005716a7973b4ac3f81104b7b6a16679d47e24b9d9fe5f57ff4304f2277e1ed9",
+  "variables": [
+   "c2",
+   "c3",
+   "b3",
+   "b2",
+   "b1",
+   "a21",
+   "a32",
+   "a31"
+  ],
+  "equations": [
+   "b3+b2+b1-1",
+   "c3-a32-a31",
+   "c2-a21",
+   "2*c3*b3+2*c2*b2-1",
+   "6*c2*b3*a32-1",
+   "3*c3^2*b3+3*c2^2*b2-1"
+  ]
+ },
+ "Hairer_2": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Hairer_2.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "ba8db815982819fcba8c176244dd2d3dbf6e282bbfa56e9605621772d40c9329",
+  "variables": [
+   "c2",
+   "c3",
+   "c4",
+   "b4",
+   "b3",
+   "b2",
+   "b1",
+   "a21",
+   "a31",
+   "a32",
+   "a41",
+   "a42",
+   "a43"
+  ],
+  "equations": [
+   "b4+b3+b2+b1-1",
+   "c4-a41-a42-a43",
+   "c3-a31-a32",
+   "c2-a21",
+   "2*c4*b4+2*c3*b3+2*c2*b2-1",
+   "6*c2*b3*a32+6*c2*b4*a42+6*c3*b4*a43-1",
+   "3*c4^2*b4+3*c3^2*b3+3*c2^2*b2-1",
+   "24*c2*b4*a32*a43-1",
+   "8*c2*c3*b3*a32+8*c2*c4*b4*a42+8*c3*c4*b4*a43-1",
+   "12*c2^2*b3*a32+12*c2^2*b4*a42+12*c3^2*b4*a43-1",
+   "4*c4^3*b4+4*c3^3*b3+4*c2^3*b2-1"
+  ]
+ },
+ "Hairer_2_1": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Hairer_2_1.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "547335561ede706c0346cea9b1edc7020ed5009ab37a00ed5af1eefb443f3c33",
+  "variables": [
+   "c2",
+   "c3",
+   "c4",
+   "b4",
+   "b3",
+   "b2",
+   "b1",
+   "a21",
+   "a31",
+   "a32",
+   "a41",
+   "a42",
+   "a43"
+  ],
+  "equations": [
+   "b4+b3+b2+b1-1",
+   "c4-1",
+   "c4-a41-a42-a43",
+   "c3-a31-a32",
+   "c2-a21",
+   "2*c4*b4+2*c3*b3+2*c2*b2-1",
+   "6*c2*b3*a32+6*c2*b4*a42+6*c3*b4*a43-1",
+   "3*c4^2*b4+3*c3^2*b3+3*c2^2*b2-1",
+   "24*c2*b4*a32*a43-1",
+   "8*c2*c3*b3*a32+8*c2*c4*b4*a42+8*c3*c4*b4*a43-1",
+   "12*c2^2*b3*a32+12*c2^2*b4*a42+12*c3^2*b4*a43-1",
+   "4*c4^3*b4+4*c3^3*b3+4*c2^3*b2-1"
+  ]
+ },
+ "Heron": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Heron.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "24ec3485b7e3f9bfe37d8585a505a511e90eca3bf09174959efec10f377e5d81",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "d",
+   "a",
+   "b",
+   "c"
+  ],
+  "equations": [
+   "x2^2+x3^2-a^2",
+   "x1^2-c^2",
+   "x1^2-2*x1*x2+x2^2+x3^2-b^2",
+   "x1^2*x3^2-4*d^2"
+  ]
+ },
+ "Raksanyi": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Raksanyi.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "8e0190df470ab478af8090c7d94f9c1b3a89acc6f49c0bc6be12c23d4721bfe5",
+  "variables": [
+   "x4",
+   "x3",
+   "x2",
+   "x1",
+   "a",
+   "b",
+   "c",
+   "d"
+  ],
+  "equations": [
+   "x4+b-d",
+   "x4+x3+x2+x1-a-c-d",
+   "x4*x3+x3*x2+x4*x1+x3*x1-a*c-a*d-c*d",
+   "x4*x3*x1-a*c*d"
+  ]
+ },
+ "Robot-Fabrice24": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Robot-Fabrice24.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "d0d14f2b279a6cc5ad07e77c5526ee236c90d88d01078f3b128d9a4d31517d7e",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "y1",
+   "y2",
+   "y3",
+   "z1",
+   "z2",
+   "z3"
+  ],
+  "equations": [
+   "3200*x2+1271",
+   "12500*x3^2+12500*y3^2+12500*z3^2+2500*x3-44975*y3-10982",
+   "2000000*x2*x3+2000000*y2*y3+2000000*z2*z3-2000000*x2+200000*x3-3598000*y3-1403",
+   "1000000*x1*x3+1000000*y1*y3+1000000*z1*z3+100000*x3-1799000*y3-805427",
+   "625*x2^2+625*y2^2+625*z2^2-1250*x2-2624",
+   "400000*x1*x2+400000*y1*y2+400000*z1*z2-400000*x2+178837",
+   "62500*x1^2+62500*y1^2+62500*z1^2-74529",
+   "-777600000000*x3*y2*z1+777600000000*x2*y3*z1+777600000000*x3*y1*z2-777600000000*x1*y3*z2-777600000000*x2*y1*z3+777600000000*x1*y2*z3-1409011200000*x2*y1+1409011200000*x3*y1+1409011200000*x1*y2-1409011200000*x3*y2-1409011200000*x1*y3+1409011200000*x2*y3-1065312000000*x2*z1+1065312000000*x3*z1-805593600000*y2*z1+805593600000*y3*z1+1065312000000*x1*z2-1065312000000*x3*z2+805593600000*y1*z2-805593600000*y3*z2-1065312000000*x1*z3+1065312000000*x2*z3-805593600000*y1*z3+805593600000*y2*z3+235685027200*x1+398417510400*x2+158626915200*x3-311668424000*y1-268090368000*y2+72704002800*y3+412221302400*z1+354583756800*z2+307085438400*z3+282499646407",
+   "113800000000000*x3*y2*z1-113800000000000*x2*y3*z1-113800000000000*x3*y1*z2+113800000000000*x1*y3*z2+113800000000000*x2*y1*z3-113800000000000*x1*y2*z3-206888400000000*x2*y1+206888400000000*x3*y1+206888400000000*x1*y2-206888400000000*x3*y2-206888400000000*x1*y3+206888400000000*x2*y3-2014260000000*x2*z1+2014260000000*x3*z1-61907200000000*y2*z1+61907200000000*y3*z1+2014260000000*x1*z2-2014260000000*x3*z2+61907200000000*y1*z2-61907200000000*y3*z2-2014260000000*x1*z3+2014260000000*x2*z3-61907200000000*y1*z3+61907200000000*y2*z3-362960716800000*x1+38025201600000*x2+292548849600000*x3+11809567440000*y1+1475978220000*y2-825269402280000*y3-1212982689600000*z1-151600474800000*z2+825859951200000*z3-19295432410527"
+  ]
+ },
+ "Robot-RR": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Robot-RR.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "821e758f67a55a8f44518d0c3c6e265aa23646b3ccd53335c525e12a01f3cc1f",
+  "variables": [
+   "sp",
+   "st",
+   "sf",
+   "cp",
+   "ct",
+   "cf",
+   "s2",
+   "s1",
+   "c2",
+   "c1",
+   "l1",
+   "l2",
+   "px",
+   "py",
+   "pz"
+  ],
+  "equations": [
+   "s2*l2+l1-pz",
+   "ct",
+   "c2*c1*l2-px",
+   "s1*c2*l2-py",
+   "s1^2+c1^2-1",
+   "s2^2+c2^2-1",
+   "-st*cf+s1",
+   "st*cp+s2",
+   "sf^2+cf^2-1",
+   "st^2+ct^2-1",
+   "-sp*st+c2",
+   "sp^2+cp^2-1",
+   "-cp*ct*cf+sp*sf+c2*c1",
+   "-sp*ct*cf+sf*cp-s2*c1",
+   "-sf*cp*ct-sp*cf+s1*c2",
+   "sp*sf*ct-cp*cf-s2*s1"
+  ]
+ },
+ "Robot-Romin": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Robot-Romin.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "e6cd73b3c3a16e599eb0e50dfd5aecffa6d4ec653c7a7d892ea105bb7e36f964",
+  "variables": [
+   "s1",
+   "s2",
+   "s3",
+   "c1",
+   "c2",
+   "c3",
+   "d",
+   "a",
+   "b",
+   "c",
+   "l2",
+   "l3"
+  ],
+  "equations": [
+   "c2*l2+c3*l3-d",
+   "s2*l2+s3*l3-c",
+   "c1*d-b",
+   "s1*d+a",
+   "s3^2+c3^2-1",
+   "s2^2+c2^2-1",
+   "s1^2+c1^2-1"
+  ]
+ },
+ "Robot-jcf26": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Robot-jcf26.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "b4a4fc0284029f600d2b21950fe0a4e780af20b744a0802e6e9d11e21f39a7ff",
+  "variables": [
+   "px2",
+   "px3",
+   "px4",
+   "px5",
+   "px6",
+   "py3",
+   "py4",
+   "py5",
+   "pz4",
+   "pz5",
+   "bx2",
+   "bx3",
+   "bx4",
+   "bx5",
+   "by3",
+   "by4",
+   "by5",
+   "bz4",
+   "bz5",
+   "D1",
+   "D2",
+   "D3",
+   "D4",
+   "D5",
+   "D6",
+   "x1",
+   "x2",
+   "x3",
+   "y1",
+   "y2",
+   "y3",
+   "z1",
+   "z2",
+   "z3"
+  ],
+  "equations": [
+   "625*D6+1143",
+   "10000*D5+31361",
+   "625*D4+1562",
+   "500*D3+1009",
+   "2500*D2+5809",
+   "2500*D1+2771",
+   "625*bz5+1134",
+   "10000*bz4-18203",
+   "2000*by5-2747",
+   "16000*by4+719",
+   "1000*by3-1799",
+   "5000*bx5+5113",
+   "10000*bx4-5203",
+   "5000*bx3+463",
+   "bx2-1",
+   "2500*pz5+4891",
+   "2500*pz4-1421",
+   "5000*py5-723",
+   "20000*py4+18129",
+   "2500000*py3-1471347",
+   "10000*px6+25081",
+   "10000*px5+9141",
+   "1250*px4+247",
+   "8000*px3+2661",
+   "10000*px2+25071",
+   "-D1^2+x1^2+y1^2+z1^2",
+   "bx3^2+by3^2-D3^2-2*bx3*x3+x3^2-2*by3*y3+y3^2+z3^2",
+   "bx2^2-D2^2-2*bx2*x2+x2^2+y2^2+z2^2",
+   "px3^2+py3^2+bx3^2+by3^2-D1^2-D3^2-2*bx3*x3+2*x1*x3-2*by3*y3+2*y1*y3+2*z1*z3",
+   "px2^2+bx2^2-D1^2-D2^2-2*bx2*x2+2*x1*x2+2*y1*y2+2*z1*z2",
+   "px2^2-2*px2*px3+px3^2+py3^2+bx2^2+bx3^2+by3^2-D2^2-D3^2-2*bx2*x2-2*bx3*x3+2*x2*x3-2*by3*y3+2*y2*y3+2*z2*z3",
+   "-2*px2^2*px6+2*px2*px6^2-2*px6*bx2^2+2*px2*D1^2-2*px6*D1^2+2*px6*D2^2-2*px2*D6^2+4*px6*bx2*x2",
+   "-2*px2^2*px5*py3+2*px2*px5^2*py3+2*px2^2*px3*py5-2*px2*px3^2*py5-2*px2*py3^2*py5+2*px2*py3*py5^2+2*px2*py3*pz5^2-2*px5*py3*bx2^2+2*px3*py5*bx2^2-2*px2*py5*bx3^2+2*px2*py3*bx5^2-2*px2*py5*by3^2+2*px2*py3*by5^2+2*px2*py3*bz5^2+2*px2*py3*D1^2-2*px5*py3*D1^2-2*px2*py5*D1^2+2*px3*py5*D1^2+2*px5*py3*D2^2-2*px3*py5*D2^2+2*px2*py5*D3^2-2*px2*py3*D5^2-4*px2*py3*bx5*x1+4*px5*py3*bx5*x1+4*px2*py5*bx5*x1-4*px3*py5*bx5*x1+4*px5*py3*bx2*x2-4*px3*py5*bx2*x2-4*px5*py3*bx5*x2+4*px3*py5*bx5*x2+4*px2*py5*bx3*x3-4*px2*py5*bx5*x3-4*px2*py3*by5*y1+4*px5*py3*by5*y1+4*px2*py5*by5*y1-4*px3*py5*by5*y1+4*pz5*bz5*x2*y1-4*pz5*bz5*x3*y1-4*px5*py3*by5*y2+4*px3*py5*by5*y2-4*pz5*bz5*x1*y2+4*pz5*bz5*x3*y2+4*px2*py5*by3*y3-4*px2*py5*by5*y3+4*pz5*bz5*x1*y3-4*pz5*bz5*x2*y3-4*px2*py3*bz5*z1+4*px5*py3*bz5*z1+4*px2*py5*bz5*z1-4*px3*py5*bz5*z1-4*pz5*by5*x2*z1+4*pz5*by5*x3*z1+4*pz5*bx5*y2*z1-4*pz5*x3*y2*z1-4*pz5*bx5*y3*z1+4*pz5*x2*y3*z1-4*px5*py3*bz5*z2+4*px3*py5*bz5*z2+4*pz5*by5*x1*z2-4*pz5*by5*x3*z2-4*pz5*bx5*y1*z2+4*pz5*x3*y1*z2+4*pz5*bx5*y3*z2-4*pz5*x1*y3*z2-4*px2*py5*bz5*z3-4*pz5*by5*x1*z3+4*pz5*by5*x2*z3+4*pz5*bx5*y1*z3-4*pz5*x2*y1*z3-4*pz5*bx5*y2*z3+4*pz5*x1*y2*z3",
+   "-2*px2^2*px4*py3+2*px2*px4^2*py3+2*px2^2*px3*py4-2*px2*px3^2*py4-2*px2*py3^2*py4+2*px2*py3*py4^2+2*px2*py3*pz4^2-2*px4*py3*bx2^2+2*px3*py4*bx2^2-2*px2*py4*bx3^2+2*px2*py3*bx4^2-2*px2*py4*by3^2+2*px2*py3*by4^2+2*px2*py3*bz4^2+2*px2*py3*D1^2-2*px4*py3*D1^2-2*px2*py4*D1^2+2*px3*py4*D1^2+2*px4*py3*D2^2-2*px3*py4*D2^2+2*px2*py4*D3^2-2*px2*py3*D4^2-4*px2*py3*bx4*x1+4*px4*py3*bx4*x1+4*px2*py4*bx4*x1-4*px3*py4*bx4*x1+4*px4*py3*bx2*x2-4*px3*py4*bx2*x2-4*px4*py3*bx4*x2+4*px3*py4*bx4*x2+4*px2*py4*bx3*x3-4*px2*py4*bx4*x3-4*px2*py3*by4*y1+4*px4*py3*by4*y1+4*px2*py4*by4*y1-4*px3*py4*by4*y1+4*pz4*bz4*x2*y1-4*pz4*bz4*x3*y1-4*px4*py3*by4*y2+4*px3*py4*by4*y2-4*pz4*bz4*x1*y2+4*pz4*bz4*x3*y2+4*px2*py4*by3*y3-4*px2*py4*by4*y3+4*pz4*bz4*x1*y3-4*pz4*bz4*x2*y3-4*px2*py3*bz4*z1+4*px4*py3*bz4*z1+4*px2*py4*bz4*z1-4*px3*py4*bz4*z1-4*pz4*by4*x2*z1+4*pz4*by4*x3*z1+4*pz4*bx4*y2*z1-4*pz4*x3*y2*z1-4*pz4*bx4*y3*z1+4*pz4*x2*y3*z1-4*px4*py3*bz4*z2+4*px3*py4*bz4*z2+4*pz4*by4*x1*z2-4*pz4*by4*x3*z2-4*pz4*bx4*y1*z2+4*pz4*x3*y1*z2+4*pz4*bx4*y3*z2-4*pz4*x1*y3*z2-4*px2*py4*bz4*z3-4*pz4*by4*x1*z3+4*pz4*by4*x2*z3+4*pz4*bx4*y1*z3-4*pz4*x2*y1*z3-4*pz4*bx4*y2*z3+4*pz4*x1*y2*z3"
+  ]
+ },
+ "Rose": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Rose.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "d07bc37366a7739d2a7bc6a864b9c93c07dfa29889eba5ce5a92f01b84979872",
+  "variables": [
+   "u3",
+   "u4",
+   "a"
+  ],
+  "equations": [
+   "7*u4^4-20*a^2",
+   "2160*u3^4*a^2+1512*u3^4*a+315*u3^4-4000*a^2-2800*a-490",
+   "40320000*u3*u4^2*a^6+28800000*u3*u4^2*a^5+67200000*u4^3*a^5-10080000*u3^3*a^4-23520000*u3^2*u4*a^4+94080000*u4^3*a^4-14112000*u3^3*a^3-41395200*u3^2*u4*a^3+21168000*u3*u4^2*a^3+40924800*u4^3*a^3-7644000*u3^3*a^2-26726560*u3^2*u4*a^2+4939200*u3*u4^2*a^2+2634240*u4^3*a^2-1978032*u3^3*a-7727104*u3^2*u4*a+347508*u3*u4^2*a-2300844*u4^3*a-180075*u3^3-852355*u3^2*u4-432180*u4^3"
+  ]
+ },
+ "Schiele": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Schiele.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "7894a0d4a4368d7e567d51c4982123a639f81eab03d944a3812c1dc7d53ebf18",
+  "variables": [
+   "s1",
+   "s2",
+   "c1",
+   "c2",
+   "p"
+  ],
+  "equations": [
+   "s2^2+c2^2-1",
+   "s1^2+c1^2-1",
+   "-s1^4*s2^3*c2-s1^2*s2^3*c1^2*c2-2*s1^3*s2^2*c1*c2^2-2*s1*s2^2*c1^3*c2^2-s1^2*s2*c1^2*c2^3-s2*c1^4*c2^3+2*s1^3*s2^2*c1+2*s1*s2^2*c1^3+2*s1^2*s2*c1^2*c2+2*s2*c1^4*c2+s1*s2^2*c1*c2^2-s1^2*s2*c2^3+s2*c1^2*c2^3-s1*c1*c2^4+2*s1^2*s2*c2-2*s2*c1^2*c2+4*s1*c1*c2^2-4*s1*c1+s1*p",
+   "-2*s1^3*s2^4*c1-4*s1^2*s2^3*c1^2*c2-2*s1^3*s2^2*c1*c2^2-2*s1*s2^2*c1^3*c2^2-4*s1^2*s2*c1^2*c2^3-2*s1*c1^3*c2^4-4*s1*s2^2*c1^3+2*s1^2*s2^3*c2+4*s1^2*s2*c1^2*c2-4*s2*c1^4*c2+2*s1*s2^2*c1*c2^2+4*s1*c1^3*c2^2+2*s1^2*s2*c2^3+2*s1*c1*c2^4+4*s1*s2^2*c1+8*s2*c1^2*c2-4*s1*c1*c2^2-4*s2*c2+s2*p"
+  ]
+ },
+ "SignalTheory.f633": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/SignalTheory.f633.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "71176047c494734c8c090f3ad0a66ae0bc5a3ee6363ef5067dfd65a28dfb7b0f",
+  "variables": [
+   "U6",
+   "U5",
+   "U4",
+   "U3",
+   "U2",
+   "u6",
+   "u5",
+   "u4",
+   "u3",
+   "u2"
+  ],
+  "equations": [
+   "2*u6+2*u5+2*u4+2*u3+2*u2+1",
+   "2*U6+2*U5+2*U4+2*U3+2*U2+1",
+   "U2*u2-1",
+   "U3*u3-1",
+   "U4*u4-1",
+   "U5*u5-1",
+   "-4*U5*u6-4*U4*u6-4*U3*u6-4*U2*u6+4*U6*u5-4*U4*u5-4*U3*u5-4*U2*u5+4*U6*u4+4*U5*u4-4*U3*u4-4*U2*u4+4*U6*u3+4*U5*u3+4*U4*u3-4*U2*u3+4*U6*u2+4*U5*u2+4*U4*u2+4*U3*u2+2*U6+2*U5+2*U4+2*U3+2*U2+1",
+   "4*U5*u6+4*U4*u6+4*U3*u6+4*U2*u6-4*U6*u5+4*U4*u5+4*U3*u5+4*U2*u5-4*U6*u4-4*U5*u4+4*U3*u4+4*U2*u4-4*U6*u3-4*U5*u3-4*U4*u3+4*U2*u3-4*U6*u2-4*U5*u2-4*U4*u2-4*U3*u2+2*u6+2*u5+2*u4+2*u3+2*u2+1",
+   "U6*u6-1"
+  ]
+ },
+ "SignalTheory.f744": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/SignalTheory.f744.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "5b02909c92476a39d2261cfbec372afe1682248b78d3392021d1cfe63542e9d9",
+  "variables": [
+   "U7",
+   "U6",
+   "U5",
+   "U4",
+   "U3",
+   "U2",
+   "u7",
+   "u6",
+   "u5",
+   "u4",
+   "u3",
+   "u2"
+  ],
+  "equations": [
+   "2*u7+2*u6+2*u5+2*u4+2*u3+2*u2+1",
+   "2*U7+2*U6+2*U5+2*U4+2*U3+2*U2+1",
+   "U2*u2-1",
+   "U3*u3-1",
+   "U4*u4-1",
+   "U5*u5-1",
+   "U6*u6-1",
+   "8*U7*u6+8*U6*u6+8*U7*u5+8*U6*u5+8*U5*u5+8*U7*u4+8*U6*u4+8*U5*u4+8*U4*u4+8*U7*u3+8*U6*u3+8*U5*u3+8*U4*u3+8*U3*u3+8*U7*u2+8*U6*u2+8*U5*u2+8*U4*u2+8*U3*u2+8*U2*u2-17",
+   "8*U6*u7+8*U5*u7+8*U4*u7+8*U3*u7+8*U2*u7+8*U6*u6+8*U5*u6+8*U4*u6+8*U3*u6+8*U2*u6+8*U5*u5+8*U4*u5+8*U3*u5+8*U2*u5+8*U4*u4+8*U3*u4+8*U2*u4+8*U3*u3+8*U2*u3+8*U2*u2-17",
+   "U7*u7-1",
+   "16*U4*u5*u3+16*U4*u5*u2+16*U3*u5*u2+16*U3*u4*u2+8*U4*u5+8*U3*u5+8*U2*u5+8*U3*u4+8*U2*u4+8*U2*u3+18*u5+18*u4+18*u3+18*u2+11",
+   "16*U5*U3*u4+16*U5*U2*u4+16*U5*U2*u3+16*U4*U2*u3+8*U5*u4+8*U5*u3+8*U4*u3+8*U5*u2+8*U4*u2+8*U3*u2+18*U5+18*U4+18*U3+18*U2+11"
+  ]
+ },
+ "SignalTheory.f855": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/SignalTheory.f855.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "8a7188042d748ddd00ec9f47dd5c71e9b52304a25a02bb8bcf38f70cbac71437",
+  "variables": [
+   "X8",
+   "X7",
+   "X6",
+   "X5",
+   "X4",
+   "X3",
+   "X2",
+   "x8",
+   "x7",
+   "x6",
+   "x5",
+   "x4",
+   "x3",
+   "x2"
+  ],
+  "equations": [
+   "2*x8+2*x7+2*x6+2*x5+2*x4+2*x3+2*x2+1",
+   "2*X8+2*X7+2*X6+2*X5+2*X4+2*X3+2*X2+1",
+   "X2*x2-1",
+   "X3*x3-1",
+   "X4*x4-1",
+   "X5*x5-1",
+   "X6*x6-1",
+   "X7*x7-1",
+   "-4*X7*x8-4*X6*x8-4*X5*x8-4*X4*x8-4*X3*x8-4*X2*x8+4*X8*x7-4*X6*x7-4*X5*x7-4*X4*x7-4*X3*x7-4*X2*x7+4*X8*x6+4*X7*x6-4*X5*x6-4*X4*x6-4*X3*x6-4*X2*x6+4*X8*x5+4*X7*x5+4*X6*x5-4*X4*x5-4*X3*x5-4*X2*x5+4*X8*x4+4*X7*x4+4*X6*x4+4*X5*x4-4*X3*x4-4*X2*x4+4*X8*x3+4*X7*x3+4*X6*x3+4*X5*x3+4*X4*x3-4*X2*x3+4*X8*x2+4*X7*x2+4*X6*x2+4*X5*x2+4*X4*x2+4*X3*x2+2*X8+2*X7+2*X6+2*X5+2*X4+2*X3+2*X2+1",
+   "4*X7*x8+4*X6*x8+4*X5*x8+4*X4*x8+4*X3*x8+4*X2*x8-4*X8*x7+4*X6*x7+4*X5*x7+4*X4*x7+4*X3*x7+4*X2*x7-4*X8*x6-4*X7*x6+4*X5*x6+4*X4*x6+4*X3*x6+4*X2*x6-4*X8*x5-4*X7*x5-4*X6*x5+4*X4*x5+4*X3*x5+4*X2*x5-4*X8*x4-4*X7*x4-4*X6*x4-4*X5*x4+4*X3*x4+4*X2*x4-4*X8*x3-4*X7*x3-4*X6*x3-4*X5*x3-4*X4*x3+4*X2*x3-4*X8*x2-4*X7*x2-4*X6*x2-4*X5*x2-4*X4*x2-4*X3*x2+2*x8+2*x7+2*x6+2*x5+2*x4+2*x3+2*x2+1",
+   "X8*x8-1",
+   "16*X5*x6*x4+16*X5*x6*x3+16*X4*x6*x3+16*X4*x5*x3+16*X5*x6*x2+16*X4*x6*x2+16*X3*x6*x2+16*X4*x5*x2+16*X3*x5*x2+16*X3*x4*x2+8*X5*x6+8*X4*x6+8*X3*x6+8*X2*x6+8*X4*x5+8*X3*x5+8*X2*x5+8*X3*x4+8*X2*x4+8*X2*x3+26*x6+26*x5+26*x4+26*x3+26*x2+15",
+   "16*X6*X4*x5+16*X6*X3*x5+16*X6*X2*x5+16*X6*X3*x4+16*X5*X3*x4+16*X6*X2*x4+16*X5*X2*x4+16*X6*X2*x3+16*X5*X2*x3+16*X4*X2*x3+8*X6*x5+8*X6*x4+8*X5*x4+8*X6*x3+8*X5*x3+8*X4*x3+8*X6*x2+8*X5*x2+8*X4*x2+8*X3*x2+26*X6+26*X5+26*X4+26*X3+26*X2+15",
+   "-2*X7*X5*x8*x6-2*X7*X4*x8*x6-2*X7*X3*x8*x6-2*X7*X2*x8*x6-2*X7*X4*x8*x5-2*X6*X4*x8*x5-2*X7*X3*x8*x5-2*X6*X3*x8*x5-2*X7*X2*x8*x5-2*X6*X2*x8*x5+2*X8*X6*x7*x5-2*X6*X4*x7*x5-2*X6*X3*x7*x5-2*X6*X2*x7*x5-2*X7*X3*x8*x4-2*X6*X3*x8*x4-2*X5*X3*x8*x4-2*X7*X2*x8*x4-2*X6*X2*x8*x4-2*X5*X2*x8*x4+2*X8*X6*x7*x4+2*X8*X5*x7*x4-2*X6*X3*x7*x4-2*X5*X3*x7*x4-2*X6*X2*x7*x4-2*X5*X2*x7*x4+2*X8*X5*x6*x4+2*X7*X5*x6*x4-2*X5*X3*x6*x4-2*X5*X2*x6*x4-2*X7*X2*x8*x3-2*X6*X2*x8*x3-2*X5*X2*x8*x3-2*X4*X2*x8*x3+2*X8*X6*x7*x3+2*X8*X5*x7*x3+2*X8*X4*x7*x3-2*X6*X2*x7*x3-2*X5*X2*x7*x3-2*X4*X2*x7*x3+2*X8*X5*x6*x3+2*X7*X5*x6*x3+2*X8*X4*x6*x3+2*X7*X4*x6*x3-2*X5*X2*x6*x3-2*X4*X2*x6*x3+2*X8*X4*x5*x3+2*X7*X4*x5*x3+2*X6*X4*x5*x3-2*X4*X2*x5*x3+2*X8*X6*x7*x2+2*X8*X5*x7*x2+2*X8*X4*x7*x2+2*X8*X3*x7*x2+2*X8*X5*x6*x2+2*X7*X5*x6*x2+2*X8*X4*x6*x2+2*X7*X4*x6*x2+2*X8*X3*x6*x2+2*X7*X3*x6*x2+2*X8*X4*x5*x2+2*X7*X4*x5*x2+2*X6*X4*x5*x2+2*X8*X3*x5*x2+2*X7*X3*x5*x2+2*X6*X3*x5*x2+2*X8*X3*x4*x2+2*X7*X3*x4*x2+2*X6*X3*x4*x2+2*X5*X3*x4*x2+X8*X6*x7+X8*X5*x7+X8*X4*x7+X8*X3*x7+X8*X2*x7+X8*X5*x6+X7*X5*x6+X8*X4*x6+X7*X4*x6+X8*X3*x6+X7*X3*x6+X8*X2*x6+X7*X2*x6-X7*x8*x6+X8*X4*x5+X7*X4*x5+X6*X4*x5+X8*X3*x5+X7*X3*x5+X6*X3*x5+X8*X2*x5+X7*X2*x5+X6*X2*x5-X7*x8*x5-X6*x8*x5-X6*x7*x5+X8*X3*x4+X7*X3*x4+X6*X3*x4+X5*X3*x4+X8*X2*x4+X7*X2*x4+X6*X2*x4+X5*X2*x4-X7*x8*x4-X6*x8*x4-X5*x8*x4-X6*x7*x4-X5*x7*x4-X5*x6*x4+X8*X2*x3+X7*X2*x3+X6*X2*x3+X5*X2*x3+X4*X2*x3-X7*x8*x3-X6*x8*x3-X5*x8*x3-X4*x8*x3-X6*x7*x3-X5*x7*x3-X4*x7*x3-X5*x6*x3-X4*x6*x3-X4*x5*x3-X7*x8*x2-X6*x8*x2-X5*x8*x2-X4*x8*x2-X3*x8*x2-X6*x7*x2-X5*x7*x2-X4*x7*x2-X3*x7*x2-X5*x6*x2-X4*x6*x2-X3*x6*x2-X4*x5*x2-X3*x5*x2-X3*x4*x2",
+   "2*X7*X5*x8*x6+2*X7*X4*x8*x6+2*X7*X3*x8*x6+2*X7*X2*x8*x6+2*X7*X4*x8*x5+2*X6*X4*x8*x5+2*X7*X3*x8*x5+2*X6*X3*x8*x5+2*X7*X2*x8*x5+2*X6*X2*x8*x5-2*X8*X6*x7*x5+2*X6*X4*x7*x5+2*X6*X3*x7*x5+2*X6*X2*x7*x5+2*X7*X3*x8*x4+2*X6*X3*x8*x4+2*X5*X3*x8*x4+2*X7*X2*x8*x4+2*X6*X2*x8*x4+2*X5*X2*x8*x4-2*X8*X6*x7*x4-2*X8*X5*x7*x4+2*X6*X3*x7*x4+2*X5*X3*x7*x4+2*X6*X2*x7*x4+2*X5*X2*x7*x4-2*X8*X5*x6*x4-2*X7*X5*x6*x4+2*X5*X3*x6*x4+2*X5*X2*x6*x4+2*X7*X2*x8*x3+2*X6*X2*x8*x3+2*X5*X2*x8*x3+2*X4*X2*x8*x3-2*X8*X6*x7*x3-2*X8*X5*x7*x3-2*X8*X4*x7*x3+2*X6*X2*x7*x3+2*X5*X2*x7*x3+2*X4*X2*x7*x3-2*X8*X5*x6*x3-2*X7*X5*x6*x3-2*X8*X4*x6*x3-2*X7*X4*x6*x3+2*X5*X2*x6*x3+2*X4*X2*x6*x3-2*X8*X4*x5*x3-2*X7*X4*x5*x3-2*X6*X4*x5*x3+2*X4*X2*x5*x3-2*X8*X6*x7*x2-2*X8*X5*x7*x2-2*X8*X4*x7*x2-2*X8*X3*x7*x2-2*X8*X5*x6*x2-2*X7*X5*x6*x2-2*X8*X4*x6*x2-2*X7*X4*x6*x2-2*X8*X3*x6*x2-2*X7*X3*x6*x2-2*X8*X4*x5*x2-2*X7*X4*x5*x2-2*X6*X4*x5*x2-2*X8*X3*x5*x2-2*X7*X3*x5*x2-2*X6*X3*x5*x2-2*X8*X3*x4*x2-2*X7*X3*x4*x2-2*X6*X3*x4*x2-2*X5*X3*x4*x2-X8*X6*x7-X8*X5*x7-X8*X4*x7-X8*X3*x7-X8*X2*x7-X8*X5*x6-X7*X5*x6-X8*X4*x6-X7*X4*x6-X8*X3*x6-X7*X3*x6-X8*X2*x6-X7*X2*x6+X7*x8*x6-X8*X4*x5-X7*X4*x5-X6*X4*x5-X8*X3*x5-X7*X3*x5-X6*X3*x5-X8*X2*x5-X7*X2*x5-X6*X2*x5+X7*x8*x5+X6*x8*x5+X6*x7*x5-X8*X3*x4-X7*X3*x4-X6*X3*x4-X5*X3*x4-X8*X2*x4-X7*X2*x4-X6*X2*x4-X5*X2*x4+X7*x8*x4+X6*x8*x4+X5*x8*x4+X6*x7*x4+X5*x7*x4+X5*x6*x4-X8*X2*x3-X7*X2*x3-X6*X2*x3-X5*X2*x3-X4*X2*x3+X7*x8*x3+X6*x8*x3+X5*x8*x3+X4*x8*x3+X6*x7*x3+X5*x7*x3+X4*x7*x3+X5*x6*x3+X4*x6*x3+X4*x5*x3+X7*x8*x2+X6*x8*x2+X5*x8*x2+X4*x8*x2+X3*x8*x2+X6*x7*x2+X5*x7*x2+X4*x7*x2+X3*x7*x2+X5*x6*x2+X4*x6*x2+X3*x6*x2+X4*x5*x2+X3*x5*x2+X3*x4*x2"
+  ]
+ },
+ "SignalTheory.f966": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/SignalTheory.f966.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "3f860ba17555dd64f887dacc8c56629eb58e954a0bd9a3afe467a3221139ddf0",
+  "variables": [
+   "U9",
+   "U8",
+   "U7",
+   "U6",
+   "U5",
+   "U4",
+   "U3",
+   "U2",
+   "u9",
+   "u8",
+   "u7",
+   "u6",
+   "u5",
+   "u4",
+   "u3",
+   "u2"
+  ],
+  "equations": [
+   "2*u9+2*u8+2*u7+2*u6+2*u5+2*u4+2*u3+2*u2+1",
+   "2*U9+2*U8+2*U7+2*U6+2*U5+2*U4+2*U3+2*U2+1",
+   "U2*u2-1",
+   "U2*u2-1",
+   "U3*u3-1",
+   "U3*u3-1",
+   "U4*u4-1",
+   "U4*u4-1",
+   "U5*u5-1",
+   "U5*u5-1",
+   "U6*u6-1",
+   "U6*u6-1",
+   "U7*u7-1",
+   "U7*u7-1",
+   "U8*u8-1",
+   "U8*u8-1",
+   "8*U9*u8+8*U8*u8+8*U9*u7+8*U8*u7+8*U7*u7+8*U9*u6+8*U8*u6+8*U7*u6+8*U6*u6+8*U9*u5+8*U8*u5+8*U7*u5+8*U6*u5+8*U5*u5+8*U9*u4+8*U8*u4+8*U7*u4+8*U6*u4+8*U5*u4+8*U4*u4+8*U9*u3+8*U8*u3+8*U7*u3+8*U6*u3+8*U5*u3+8*U4*u3+8*U3*u3+8*U9*u2+8*U8*u2+8*U7*u2+8*U6*u2+8*U5*u2+8*U4*u2+8*U3*u2+8*U2*u2-25",
+   "8*U8*u9+8*U7*u9+8*U6*u9+8*U5*u9+8*U4*u9+8*U3*u9+8*U2*u9+8*U8*u8+8*U7*u8+8*U6*u8+8*U5*u8+8*U4*u8+8*U3*u8+8*U2*u8+8*U7*u7+8*U6*u7+8*U5*u7+8*U4*u7+8*U3*u7+8*U2*u7+8*U6*u6+8*U5*u6+8*U4*u6+8*U3*u6+8*U2*u6+8*U5*u5+8*U4*u5+8*U3*u5+8*U2*u5+8*U4*u4+8*U3*u4+8*U2*u4+8*U3*u3+8*U2*u3+8*U2*u2-25",
+   "U9*u9-1",
+   "U9*u9-1",
+   "8*U8*u9*u7+8*U8*u9*u6+8*U7*u9*u6+8*U7*u8*u6+8*U8*u9*u5+8*U7*u9*u5+8*U6*u9*u5+8*U7*u8*u5+8*U6*u8*u5+8*U6*u7*u5+8*U8*u9*u4+8*U7*u9*u4+8*U6*u9*u4+8*U5*u9*u4+8*U7*u8*u4+8*U6*u8*u4+8*U5*u8*u4+8*U6*u7*u4+8*U5*u7*u4+8*U5*u6*u4+8*U8*u9*u3+8*U7*u9*u3+8*U6*u9*u3+8*U5*u9*u3+8*U4*u9*u3+8*U7*u8*u3+8*U6*u8*u3+8*U5*u8*u3+8*U4*u8*u3+8*U6*u7*u3+8*U5*u7*u3+8*U4*u7*u3+8*U5*u6*u3+8*U4*u6*u3+8*U4*u5*u3+8*U8*u9*u2+8*U7*u9*u2+8*U6*u9*u2+8*U5*u9*u2+8*U4*u9*u2+8*U3*u9*u2+8*U7*u8*u2+8*U6*u8*u2+8*U5*u8*u2+8*U4*u8*u2+8*U3*u8*u2+8*U6*u7*u2+8*U5*u7*u2+8*U4*u7*u2+8*U3*u7*u2+8*U5*u6*u2+8*U4*u6*u2+8*U3*u6*u2+8*U4*u5*u2+8*U3*u5*u2+8*U3*u4*u2+4*U8*u9+4*U7*u9+4*U6*u9+4*U5*u9+4*U4*u9+4*U3*u9+4*U2*u9+4*U7*u8+4*U6*u8+4*U5*u8+4*U4*u8+4*U3*u8+4*U2*u8+4*U6*u7+4*U5*u7+4*U4*u7+4*U3*u7+4*U2*u7+4*U5*u6+4*U4*u6+4*U3*u6+4*U2*u6+4*U4*u5+4*U3*u5+4*U2*u5+4*U3*u4+4*U2*u4+4*U2*u3+1",
+   "8*U9*U7*u8+8*U9*U6*u8+8*U9*U5*u8+8*U9*U4*u8+8*U9*U3*u8+8*U9*U2*u8+8*U9*U6*u7+8*U8*U6*u7+8*U9*U5*u7+8*U8*U5*u7+8*U9*U4*u7+8*U8*U4*u7+8*U9*U3*u7+8*U8*U3*u7+8*U9*U2*u7+8*U8*U2*u7+8*U9*U5*u6+8*U8*U5*u6+8*U7*U5*u6+8*U9*U4*u6+8*U8*U4*u6+8*U7*U4*u6+8*U9*U3*u6+8*U8*U3*u6+8*U7*U3*u6+8*U9*U2*u6+8*U8*U2*u6+8*U7*U2*u6+8*U9*U4*u5+8*U8*U4*u5+8*U7*U4*u5+8*U6*U4*u5+8*U9*U3*u5+8*U8*U3*u5+8*U7*U3*u5+8*U6*U3*u5+8*U9*U2*u5+8*U8*U2*u5+8*U7*U2*u5+8*U6*U2*u5+8*U9*U3*u4+8*U8*U3*u4+8*U7*U3*u4+8*U6*U3*u4+8*U5*U3*u4+8*U9*U2*u4+8*U8*U2*u4+8*U7*U2*u4+8*U6*U2*u4+8*U5*U2*u4+8*U9*U2*u3+8*U8*U2*u3+8*U7*U2*u3+8*U6*U2*u3+8*U5*U2*u3+8*U4*U2*u3+4*U9*u8+4*U9*u7+4*U8*u7+4*U9*u6+4*U8*u6+4*U7*u6+4*U9*u5+4*U8*u5+4*U7*u5+4*U6*u5+4*U9*u4+4*U8*u4+4*U7*u4+4*U6*u4+4*U5*u4+4*U9*u3+4*U8*u3+4*U7*u3+4*U6*u3+4*U5*u3+4*U4*u3+4*U9*u2+4*U8*u2+4*U7*u2+4*U6*u2+4*U5*u2+4*U4*u2+4*U3*u2+1",
+   "-2*U8*U6*u9*u7-2*U8*U5*u9*u7-2*U8*U4*u9*u7-2*U8*U3*u9*u7-2*U8*U2*u9*u7-2*U8*U5*u9*u6-2*U7*U5*u9*u6-2*U8*U4*u9*u6-2*U7*U4*u9*u6-2*U8*U3*u9*u6-2*U7*U3*u9*u6-2*U8*U2*u9*u6-2*U7*U2*u9*u6+2*U9*U7*u8*u6-2*U7*U5*u8*u6-2*U7*U4*u8*u6-2*U7*U3*u8*u6-2*U7*U2*u8*u6-2*U8*U4*u9*u5-2*U7*U4*u9*u5-2*U6*U4*u9*u5-2*U8*U3*u9*u5-2*U7*U3*u9*u5-2*U6*U3*u9*u5-2*U8*U2*u9*u5-2*U7*U2*u9*u5-2*U6*U2*u9*u5+2*U9*U7*u8*u5+2*U9*U6*u8*u5-2*U7*U4*u8*u5-2*U6*U4*u8*u5-2*U7*U3*u8*u5-2*U6*U3*u8*u5-2*U7*U2*u8*u5-2*U6*U2*u8*u5+2*U9*U6*u7*u5+2*U8*U6*u7*u5-2*U6*U4*u7*u5-2*U6*U3*u7*u5-2*U6*U2*u7*u5-2*U8*U3*u9*u4-2*U7*U3*u9*u4-2*U6*U3*u9*u4-2*U5*U3*u9*u4-2*U8*U2*u9*u4-2*U7*U2*u9*u4-2*U6*U2*u9*u4-2*U5*U2*u9*u4+2*U9*U7*u8*u4+2*U9*U6*u8*u4+2*U9*U5*u8*u4-2*U7*U3*u8*u4-2*U6*U3*u8*u4-2*U5*U3*u8*u4-2*U7*U2*u8*u4-2*U6*U2*u8*u4-2*U5*U2*u8*u4+2*U9*U6*u7*u4+2*U8*U6*u7*u4+2*U9*U5*u7*u4+2*U8*U5*u7*u4-2*U6*U3*u7*u4-2*U5*U3*u7*u4-2*U6*U2*u7*u4-2*U5*U2*u7*u4+2*U9*U5*u6*u4+2*U8*U5*u6*u4+2*U7*U5*u6*u4-2*U5*U3*u6*u4-2*U5*U2*u6*u4-2*U8*U2*u9*u3-2*U7*U2*u9*u3-2*U6*U2*u9*u3-2*U5*U2*u9*u3-2*U4*U2*u9*u3+2*U9*U7*u8*u3+2*U9*U6*u8*u3+2*U9*U5*u8*u3+2*U9*U4*u8*u3-2*U7*U2*u8*u3-2*U6*U2*u8*u3-2*U5*U2*u8*u3-2*U4*U2*u8*u3+2*U9*U6*u7*u3+2*U8*U6*u7*u3+2*U9*U5*u7*u3+2*U8*U5*u7*u3+2*U9*U4*u7*u3+2*U8*U4*u7*u3-2*U6*U2*u7*u3-2*U5*U2*u7*u3-2*U4*U2*u7*u3+2*U9*U5*u6*u3+2*U8*U5*u6*u3+2*U7*U5*u6*u3+2*U9*U4*u6*u3+2*U8*U4*u6*u3+2*U7*U4*u6*u3-2*U5*U2*u6*u3-2*U4*U2*u6*u3+2*U9*U4*u5*u3+2*U8*U4*u5*u3+2*U7*U4*u5*u3+2*U6*U4*u5*u3-2*U4*U2*u5*u3+2*U9*U7*u8*u2+2*U9*U6*u8*u2+2*U9*U5*u8*u2+2*U9*U4*u8*u2+2*U9*U3*u8*u2+2*U9*U6*u7*u2+2*U8*U6*u7*u2+2*U9*U5*u7*u2+2*U8*U5*u7*u2+2*U9*U4*u7*u2+2*U8*U4*u7*u2+2*U9*U3*u7*u2+2*U8*U3*u7*u2+2*U9*U5*u6*u2+2*U8*U5*u6*u2+2*U7*U5*u6*u2+2*U9*U4*u6*u2+2*U8*U4*u6*u2+2*U7*U4*u6*u2+2*U9*U3*u6*u2+2*U8*U3*u6*u2+2*U7*U3*u6*u2+2*U9*U4*u5*u2+2*U8*U4*u5*u2+2*U7*U4*u5*u2+2*U6*U4*u5*u2+2*U9*U3*u5*u2+2*U8*U3*u5*u2+2*U7*U3*u5*u2+2*U6*U3*u5*u2+2*U9*U3*u4*u2+2*U8*U3*u4*u2+2*U7*U3*u4*u2+2*U6*U3*u4*u2+2*U5*U3*u4*u2+U9*U7*u8+U9*U6*u8+U9*U5*u8+U9*U4*u8+U9*U3*u8+U9*U2*u8+U9*U6*u7+U8*U6*u7+U9*U5*u7+U8*U5*u7+U9*U4*u7+U8*U4*u7+U9*U3*u7+U8*U3*u7+U9*U2*u7+U8*U2*u7-U8*u9*u7+U9*U5*u6+U8*U5*u6+U7*U5*u6+U9*U4*u6+U8*U4*u6+U7*U4*u6+U9*U3*u6+U8*U3*u6+U7*U3*u6+U9*U2*u6+U8*U2*u6+U7*U2*u6-U8*u9*u6-U7*u9*u6-U7*u8*u6+U9*U4*u5+U8*U4*u5+U7*U4*u5+U6*U4*u5+U9*U3*u5+U8*U3*u5+U7*U3*u5+U6*U3*u5+U9*U2*u5+U8*U2*u5+U7*U2*u5+U6*U2*u5-U8*u9*u5-U7*u9*u5-U6*u9*u5-U7*u8*u5-U6*u8*u5-U6*u7*u5+U9*U3*u4+U8*U3*u4+U7*U3*u4+U6*U3*u4+U5*U3*u4+U9*U2*u4+U8*U2*u4+U7*U2*u4+U6*U2*u4+U5*U2*u4-U8*u9*u4-U7*u9*u4-U6*u9*u4-U5*u9*u4-U7*u8*u4-U6*u8*u4-U5*u8*u4-U6*u7*u4-U5*u7*u4-U5*u6*u4+U9*U2*u3+U8*U2*u3+U7*U2*u3+U6*U2*u3+U5*U2*u3+U4*U2*u3-U8*u9*u3-U7*u9*u3-U6*u9*u3-U5*u9*u3-U4*u9*u3-U7*u8*u3-U6*u8*u3-U5*u8*u3-U4*u8*u3-U6*u7*u3-U5*u7*u3-U4*u7*u3-U5*u6*u3-U4*u6*u3-U4*u5*u3-U8*u9*u2-U7*u9*u2-U6*u9*u2-U5*u9*u2-U4*u9*u2-U3*u9*u2-U7*u8*u2-U6*u8*u2-U5*u8*u2-U4*u8*u2-U3*u8*u2-U6*u7*u2-U5*u7*u2-U4*u7*u2-U3*u7*u2-U5*u6*u2-U4*u6*u2-U3*u6*u2-U4*u5*u2-U3*u5*u2-U3*u4*u2",
+   "2*U8*U6*u9*u7+2*U8*U5*u9*u7+2*U8*U4*u9*u7+2*U8*U3*u9*u7+2*U8*U2*u9*u7+2*U8*U5*u9*u6+2*U7*U5*u9*u6+2*U8*U4*u9*u6+2*U7*U4*u9*u6+2*U8*U3*u9*u6+2*U7*U3*u9*u6+2*U8*U2*u9*u6+2*U7*U2*u9*u6-2*U9*U7*u8*u6+2*U7*U5*u8*u6+2*U7*U4*u8*u6+2*U7*U3*u8*u6+2*U7*U2*u8*u6+2*U8*U4*u9*u5+2*U7*U4*u9*u5+2*U6*U4*u9*u5+2*U8*U3*u9*u5+2*U7*U3*u9*u5+2*U6*U3*u9*u5+2*U8*U2*u9*u5+2*U7*U2*u9*u5+2*U6*U2*u9*u5-2*U9*U7*u8*u5-2*U9*U6*u8*u5+2*U7*U4*u8*u5+2*U6*U4*u8*u5+2*U7*U3*u8*u5+2*U6*U3*u8*u5+2*U7*U2*u8*u5+2*U6*U2*u8*u5-2*U9*U6*u7*u5-2*U8*U6*u7*u5+2*U6*U4*u7*u5+2*U6*U3*u7*u5+2*U6*U2*u7*u5+2*U8*U3*u9*u4+2*U7*U3*u9*u4+2*U6*U3*u9*u4+2*U5*U3*u9*u4+2*U8*U2*u9*u4+2*U7*U2*u9*u4+2*U6*U2*u9*u4+2*U5*U2*u9*u4-2*U9*U7*u8*u4-2*U9*U6*u8*u4-2*U9*U5*u8*u4+2*U7*U3*u8*u4+2*U6*U3*u8*u4+2*U5*U3*u8*u4+2*U7*U2*u8*u4+2*U6*U2*u8*u4+2*U5*U2*u8*u4-2*U9*U6*u7*u4-2*U8*U6*u7*u4-2*U9*U5*u7*u4-2*U8*U5*u7*u4+2*U6*U3*u7*u4+2*U5*U3*u7*u4+2*U6*U2*u7*u4+2*U5*U2*u7*u4-2*U9*U5*u6*u4-2*U8*U5*u6*u4-2*U7*U5*u6*u4+2*U5*U3*u6*u4+2*U5*U2*u6*u4+2*U8*U2*u9*u3+2*U7*U2*u9*u3+2*U6*U2*u9*u3+2*U5*U2*u9*u3+2*U4*U2*u9*u3-2*U9*U7*u8*u3-2*U9*U6*u8*u3-2*U9*U5*u8*u3-2*U9*U4*u8*u3+2*U7*U2*u8*u3+2*U6*U2*u8*u3+2*U5*U2*u8*u3+2*U4*U2*u8*u3-2*U9*U6*u7*u3-2*U8*U6*u7*u3-2*U9*U5*u7*u3-2*U8*U5*u7*u3-2*U9*U4*u7*u3-2*U8*U4*u7*u3+2*U6*U2*u7*u3+2*U5*U2*u7*u3+2*U4*U2*u7*u3-2*U9*U5*u6*u3-2*U8*U5*u6*u3-2*U7*U5*u6*u3-2*U9*U4*u6*u3-2*U8*U4*u6*u3-2*U7*U4*u6*u3+2*U5*U2*u6*u3+2*U4*U2*u6*u3-2*U9*U4*u5*u3-2*U8*U4*u5*u3-2*U7*U4*u5*u3-2*U6*U4*u5*u3+2*U4*U2*u5*u3-2*U9*U7*u8*u2-2*U9*U6*u8*u2-2*U9*U5*u8*u2-2*U9*U4*u8*u2-2*U9*U3*u8*u2-2*U9*U6*u7*u2-2*U8*U6*u7*u2-2*U9*U5*u7*u2-2*U8*U5*u7*u2-2*U9*U4*u7*u2-2*U8*U4*u7*u2-2*U9*U3*u7*u2-2*U8*U3*u7*u2-2*U9*U5*u6*u2-2*U8*U5*u6*u2-2*U7*U5*u6*u2-2*U9*U4*u6*u2-2*U8*U4*u6*u2-2*U7*U4*u6*u2-2*U9*U3*u6*u2-2*U8*U3*u6*u2-2*U7*U3*u6*u2-2*U9*U4*u5*u2-2*U8*U4*u5*u2-2*U7*U4*u5*u2-2*U6*U4*u5*u2-2*U9*U3*u5*u2-2*U8*U3*u5*u2-2*U7*U3*u5*u2-2*U6*U3*u5*u2-2*U9*U3*u4*u2-2*U8*U3*u4*u2-2*U7*U3*u4*u2-2*U6*U3*u4*u2-2*U5*U3*u4*u2-U9*U7*u8-U9*U6*u8-U9*U5*u8-U9*U4*u8-U9*U3*u8-U9*U2*u8-U9*U6*u7-U8*U6*u7-U9*U5*u7-U8*U5*u7-U9*U4*u7-U8*U4*u7-U9*U3*u7-U8*U3*u7-U9*U2*u7-U8*U2*u7+U8*u9*u7-U9*U5*u6-U8*U5*u6-U7*U5*u6-U9*U4*u6-U8*U4*u6-U7*U4*u6-U9*U3*u6-U8*U3*u6-U7*U3*u6-U9*U2*u6-U8*U2*u6-U7*U2*u6+U8*u9*u6+U7*u9*u6+U7*u8*u6-U9*U4*u5-U8*U4*u5-U7*U4*u5-U6*U4*u5-U9*U3*u5-U8*U3*u5-U7*U3*u5-U6*U3*u5-U9*U2*u5-U8*U2*u5-U7*U2*u5-U6*U2*u5+U8*u9*u5+U7*u9*u5+U6*u9*u5+U7*u8*u5+U6*u8*u5+U6*u7*u5-U9*U3*u4-U8*U3*u4-U7*U3*u4-U6*U3*u4-U5*U3*u4-U9*U2*u4-U8*U2*u4-U7*U2*u4-U6*U2*u4-U5*U2*u4+U8*u9*u4+U7*u9*u4+U6*u9*u4+U5*u9*u4+U7*u8*u4+U6*u8*u4+U5*u8*u4+U6*u7*u4+U5*u7*u4+U5*u6*u4-U9*U2*u3-U8*U2*u3-U7*U2*u3-U6*U2*u3-U5*U2*u3-U4*U2*u3+U8*u9*u3+U7*u9*u3+U6*u9*u3+U5*u9*u3+U4*u9*u3+U7*u8*u3+U6*u8*u3+U5*u8*u3+U4*u8*u3+U6*u7*u3+U5*u7*u3+U4*u7*u3+U5*u6*u3+U4*u6*u3+U4*u5*u3+U8*u9*u2+U7*u9*u2+U6*u9*u2+U5*u9*u2+U4*u9*u2+U3*u9*u2+U7*u8*u2+U6*u8*u2+U5*u8*u2+U4*u8*u2+U3*u8*u2+U6*u7*u2+U5*u7*u2+U4*u7*u2+U3*u7*u2+U5*u6*u2+U4*u6*u2+U3*u6*u2+U4*u5*u2+U3*u5*u2+U3*u4*u2"
+  ]
+ },
+ "Singular.schwarz_10": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Singular.schwarz_10.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "efeadaec449a87046deb52c852517aa718cf61b6ad370bd27fa1b543d2361168",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "x4",
+   "x5",
+   "x6",
+   "x7",
+   "x8",
+   "x9",
+   "x10"
+  ],
+  "equations": [
+   "2*x5*x6+2*x4*x7+2*x3*x8+2*x2*x9+2*x1*x10+x10",
+   "x5^2+2*x4*x6+2*x3*x7+2*x2*x8+2*x1*x9+x10^2+x9",
+   "2*x4*x5+2*x3*x6+2*x2*x7+2*x1*x8+2*x9*x10+x8",
+   "x4^2+2*x3*x5+2*x2*x6+2*x1*x7+x9^2+2*x8*x10+x7",
+   "2*x3*x4+2*x2*x5+2*x1*x6+2*x8*x9+2*x7*x10+x6",
+   "x3^2+2*x2*x4+2*x1*x5+x8^2+2*x7*x9+2*x6*x10+x5",
+   "2*x2*x3+2*x1*x4+2*x7*x8+2*x6*x9+2*x5*x10+x4",
+   "x2^2+2*x1*x3+x7^2+2*x6*x8+2*x5*x9+2*x4*x10+x3",
+   "2*x1*x2+2*x6*x7+2*x5*x8+2*x4*x9+2*x3*x10+x2",
+   "x1^2+x6^2+2*x5*x7+2*x4*x8+2*x3*x9+2*x2*x10+x1"
+  ]
+ },
+ "Singular.schwarz_11": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Singular.schwarz_11.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "72f6d04c39655165aa3c7b14a9f3f4eb66f7428f06d92ef964c80be3ad562355",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "x4",
+   "x5",
+   "x6",
+   "x7",
+   "x8",
+   "x9",
+   "x10",
+   "x11"
+  ],
+  "equations": [
+   "x6^2+2*x5*x7+2*x4*x8+2*x3*x9+2*x2*x10+2*x1*x11+x11",
+   "2*x5*x6+2*x4*x7+2*x3*x8+2*x2*x9+2*x1*x10+x11^2+x10",
+   "x5^2+2*x4*x6+2*x3*x7+2*x2*x8+2*x1*x9+2*x10*x11+x9",
+   "2*x4*x5+2*x3*x6+2*x2*x7+2*x1*x8+x10^2+2*x9*x11+x8",
+   "x4^2+2*x3*x5+2*x2*x6+2*x1*x7+2*x9*x10+2*x8*x11+x7",
+   "2*x3*x4+2*x2*x5+2*x1*x6+x9^2+2*x8*x10+2*x7*x11+x6",
+   "x3^2+2*x2*x4+2*x1*x5+2*x8*x9+2*x7*x10+2*x6*x11+x5",
+   "2*x2*x3+2*x1*x4+x8^2+2*x7*x9+2*x6*x10+2*x5*x11+x4",
+   "x2^2+2*x1*x3+2*x7*x8+2*x6*x9+2*x5*x10+2*x4*x11+x3",
+   "2*x1*x2+x7^2+2*x6*x8+2*x5*x9+2*x4*x10+2*x3*x11+x2",
+   "x1^2+2*x6*x7+2*x5*x8+2*x4*x9+2*x3*x10+2*x2*x11+x1"
+  ]
+ },
+ "Singular.schwarz_7": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Singular.schwarz_7.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "600572bd9804b040902216399e5908dcffeaab8bcdade11278c32a23c5a18557",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "x4",
+   "x5",
+   "x6",
+   "x7"
+  ],
+  "equations": [
+   "x4^2+2*x3*x5+2*x2*x6+2*x1*x7+x7",
+   "2*x3*x4+2*x2*x5+2*x1*x6+x7^2+x6",
+   "x3^2+2*x2*x4+2*x1*x5+2*x6*x7+x5",
+   "2*x2*x3+2*x1*x4+x6^2+2*x5*x7+x4",
+   "x2^2+2*x1*x3+2*x5*x6+2*x4*x7+x3",
+   "2*x1*x2+x5^2+2*x4*x6+2*x3*x7+x2",
+   "x1^2+2*x4*x5+2*x3*x6+2*x2*x7+x1"
+  ]
+ },
+ "Singular.schwarz_8": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Singular.schwarz_8.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "63f05cc4c77f7525a4d082b5a9e150ed204e9d7d0c79ebb62aa9e7d0ecc28edd",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "x4",
+   "x5",
+   "x6",
+   "x7",
+   "x8"
+  ],
+  "equations": [
+   "2*x4*x5+2*x3*x6+2*x2*x7+2*x1*x8+x8",
+   "x4^2+2*x3*x5+2*x2*x6+2*x1*x7+x8^2+x7",
+   "2*x3*x4+2*x2*x5+2*x1*x6+2*x7*x8+x6",
+   "x3^2+2*x2*x4+2*x1*x5+x7^2+2*x6*x8+x5",
+   "2*x2*x3+2*x1*x4+2*x6*x7+2*x5*x8+x4",
+   "x2^2+2*x1*x3+x6^2+2*x5*x7+2*x4*x8+x3",
+   "2*x1*x2+2*x5*x6+2*x4*x7+2*x3*x8+x2",
+   "x1^2+x5^2+2*x4*x6+2*x3*x7+2*x2*x8+x1"
+  ]
+ },
+ "Singular.schwarz_9": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Singular.schwarz_9.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "f099792a3ccd2b69b38ad24bddbab930485574d0bc161a991d8ce64956809ce4",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "x4",
+   "x5",
+   "x6",
+   "x7",
+   "x8",
+   "x9"
+  ],
+  "equations": [
+   "x5^2+2*x4*x6+2*x3*x7+2*x2*x8+2*x1*x9+x9",
+   "2*x4*x5+2*x3*x6+2*x2*x7+2*x1*x8+x9^2+x8",
+   "x4^2+2*x3*x5+2*x2*x6+2*x1*x7+2*x8*x9+x7",
+   "2*x3*x4+2*x2*x5+2*x1*x6+x8^2+2*x7*x9+x6",
+   "x3^2+2*x2*x4+2*x1*x5+2*x7*x8+2*x6*x9+x5",
+   "2*x2*x3+2*x1*x4+x7^2+2*x6*x8+2*x5*x9+x4",
+   "x2^2+2*x1*x3+2*x6*x7+2*x5*x8+2*x4*x9+x3",
+   "2*x1*x2+x6^2+2*x5*x7+2*x4*x8+2*x3*x9+x2",
+   "x1^2+2*x5*x6+2*x4*x7+2*x3*x8+2*x2*x9+x1"
+  ]
+ },
+ "Trinks": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Trinks.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "d2df7dccba3ff80033343f8f963465c3cbca5093d3cc30106ec5e89290e9b06e",
+  "variables": [
+   "w",
+   "p",
+   "z",
+   "t",
+   "s",
+   "b"
+  ],
+  "equations": [
+   "35*p+40*z+25*t-27*s",
+   "45*p+35*s-165*b-36",
+   "-11*s*b+3*b^2+99*w",
+   "25*p*s-165*b^2+15*w+30*z-18*t",
+   "15*p*t+20*z*s-9*w",
+   "-11*b^3+w*p+2*z*t"
+  ]
+ },
+ "Trinks_1": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Trinks_1.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "84a685d59ff94713523781c5a0bd2353db51e6cf4bd7ecd5000c86b7eb88702f",
+  "variables": [
+   "w",
+   "p",
+   "z",
+   "t",
+   "s",
+   "b"
+  ],
+  "equations": [
+   "35*p+40*z+25*t-27*s",
+   "45*p+35*s-165*b-36",
+   "10000*b^2+6600*b+2673",
+   "-11*s*b+3*b^2+99*w",
+   "25*p*s-165*b^2+15*w+30*z-18*t",
+   "15*p*t+20*z*s-9*w",
+   "-11*b^3+w*p+2*z*t"
+  ]
+ },
+ "Verschelde.chemkin": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Verschelde.chemkin.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "a26fcff56e34cf9b43984f2d64f496201591e9b8d26e24e9e9f53015310cd28c",
+  "variables": [
+   "c1",
+   "c2",
+   "c3",
+   "z2",
+   "z3",
+   "z4",
+   "z5",
+   "y2",
+   "y3",
+   "y4",
+   "y5",
+   "x3",
+   "x4"
+  ],
+  "equations": [
+   "z2+z3+z4+z5",
+   "33461*c3-94642",
+   "c2+y2+y3+y4+y5",
+   "9*c2-8",
+   "36926*c1-208885",
+   "-3*c3*y2+3*x3+3*x4+8",
+   "-c1*y2+9*y2^2+z2",
+   "z5^2+y5^2-c2",
+   "3*z4*z5+3*y4*y5+x4-1",
+   "z4^2+y4^2+x4^2-1",
+   "3*z3*z4+3*y3*y4+3*x3*x4-1",
+   "z3^2+y3^2+x3^2-1",
+   "-3*c3*y2*x3+3*z2*z3+3*y2*y3+3*x3-1"
+  ]
+ },
+ "Verschelde.gametwo5": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Verschelde.gametwo5.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "792d8a5c30b355241e39173d8748db401a77e776e5d42254545eb71bbc4d1f64",
+  "variables": [
+   "p1",
+   "p2",
+   "p3",
+   "p4",
+   "p5"
+  ],
+  "equations": [
+   "-3779*p2*p3*p4*p5+3708*p2*p3*p4+2425*p2*p3*p5+422*p2*p4*p5+3354*p3*p4*p5-1226*p2*p3-308*p2*p4-3093*p3*p4-719*p2*p5-2256*p3*p5-873*p4*p5-593*p2+382*p3+652*p4+897*p5+455",
+   "-98*p1*p3*p4*p5-3376*p1*p3*p4+421*p1*p3*p5+942*p1*p4*p5+778*p3*p4*p5+1209*p1*p3+899*p1*p4+1510*p3*p4-1463*p1*p5+251*p3*p5+25*p4*p5+537*p1-868*p3-697*p4-27*p5+486",
+   "1480*p1*p2*p4*p5-61*p1*p2*p4-1228*p1*p2*p5-2337*p1*p4*p5-890*p2*p4*p5+1476*p1*p2+389*p1*p4+2161*p2*p4+637*p1*p5+245*p2*p5+622*p4*p5-762*p1-848*p2-482*p4-204*p5-210",
+   "2725*p1*p2*p3*p5-2522*p1*p2*p3-2257*p1*p2*p5-1939*p1*p3*p5-1264*p2*p3*p5+1987*p1*p2-1667*p1*p3+791*p2*p3+1428*p1*p5+384*p2*p5+1110*p3*p5+183*p1-951*p2+777*p3-235*p5-152",
+   "258*p1*p2*p3*p4-20*p1*p2*p3+2387*p1*p2*p4+157*p1*p3*p4+83*p2*p3*p4-597*p1*p2-182*p1*p3+62*p2*p3-1255*p1*p4-1012*p2*p4-299*p3*p4-646*p1+600*p2+147*p3+28*p4+88"
+  ]
+ },
+ "Verschelde.gametwo6": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Verschelde.gametwo6.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "6d4889b5e56bd89d853e9fa458d5e594e2dacebae374a4cd047660972f8af857",
+  "variables": [
+   "p6",
+   "p4",
+   "p3",
+   "p2",
+   "p5",
+   "p1"
+  ],
+  "equations": [
+   "-1036*p4*p3*p2*p5*p1-284*p4*p3*p2*p5+4667*p4*p3*p2*p1+2647*p4*p3*p5*p1+849*p4*p2*p5*p1+707*p3*p2*p5*p1-3444*p4*p3*p2-922*p4*p3*p5+1702*p4*p2*p5-883*p3*p2*p5-5608*p4*p3*p1-892*p4*p2*p1+227*p3*p2*p1-1434*p4*p5*p1-1368*p3*p5*p1-1258*p2*p5*p1+3221*p4*p3+320*p4*p2+2130*p3*p2-105*p4*p5+881*p3*p5-6*p2*p5+2546*p4*p1+4824*p3*p1+2063*p2*p1+698*p5*p1-779*p4-3832*p3-2074*p2-92*p5-3846*p1+2675",
+   "3516*p6*p3*p2*p5*p1-2436*p6*p3*p2*p5-1697*p6*p3*p2*p1-1809*p6*p3*p5*p1-475*p6*p2*p5*p1+2716*p3*p2*p5*p1+1309*p6*p3*p2+2287*p6*p3*p5-221*p6*p2*p5-1728*p3*p2*p5+640*p6*p3*p1-1054*p6*p2*p1-3076*p3*p2*p1+108*p6*p5*p1-2121*p3*p5*p1-2929*p2*p5*p1-1073*p6*p3+738*p6*p2+1657*p3*p2-868*p6*p5+689*p3*p5+1994*p2*p5+131*p6*p1+3452*p3*p1+705*p2*p1+768*p5*p1+395*p6-1044*p3+1119*p2-337*p5-1312*p1-600",
+   "167*p6*p4*p2*p5*p1+2982*p6*p4*p2*p5+201*p6*p4*p2*p1+1963*p6*p4*p5*p1-415*p6*p2*p5*p1+1064*p4*p2*p5*p1-984*p6*p4*p2-2170*p6*p4*p5-2210*p6*p2*p5-4398*p4*p2*p5-1885*p6*p4*p1-157*p6*p2*p1-863*p4*p2*p1-802*p6*p5*p1-2002*p4*p5*p1+88*p2*p5*p1+840*p6*p4+1505*p6*p2+942*p4*p2+1150*p6*p5+4074*p4*p5+1378*p2*p5+268*p6*p1+1091*p4*p1+168*p2*p1+1252*p5*p1-265*p6-1125*p4-1258*p2-1551*p5-1604*p1+1570",
+   "2296*p6*p4*p3*p5*p1+1045*p6*p4*p3*p5-331*p6*p4*p3*p1-3324*p6*p4*p5*p1-2659*p6*p3*p5*p1+514*p4*p3*p5*p1-1355*p6*p4*p3+1763*p6*p4*p5+400*p6*p3*p5-4125*p4*p3*p5+366*p6*p4*p1+2092*p6*p3*p1+1192*p4*p3*p1+2784*p6*p5*p1-258*p4*p5*p1-568*p3*p5*p1+178*p6*p4+331*p6*p3+465*p4*p3-1187*p6*p5+1324*p4*p5+2658*p3*p5-1547*p6*p1+939*p4*p1-939*p3*p1+229*p5*p1-110*p6-564*p4-2093*p3-1490*p5+1719*p1+631",
+   "-650*p6*p4*p3*p2*p1+589*p6*p4*p3*p2+1686*p6*p4*p3*p1+1510*p6*p4*p2*p1+3107*p6*p3*p2*p1-1595*p4*p3*p2*p1-1220*p6*p4*p3+893*p6*p4*p2-2071*p6*p3*p2+795*p4*p3*p2-903*p6*p4*p1-3003*p6*p3*p1+10*p4*p3*p1-2864*p6*p2*p1+859*p4*p2*p1-28*p3*p2*p1-383*p6*p4+2750*p6*p3+587*p4*p3+242*p6*p2-1745*p4*p2+1346*p3*p2+2411*p6*p1+360*p4*p1-5*p3*p1+328*p2*p1-1222*p6+790*p4-567*p3+91*p2-1172*p1-65",
+   "4116*p6*p4*p3*p2*p5-4285*p6*p4*p3*p2-1491*p6*p4*p3*p5-5928*p6*p4*p2*p5-1528*p6*p3*p2*p5-2959*p4*p3*p2*p5+1481*p6*p4*p3+3631*p6*p4*p2+1998*p6*p3*p2+2357*p4*p3*p2+2400*p6*p4*p5-247*p6*p3*p5+983*p4*p3*p5+2306*p6*p2*p5+1985*p4*p2*p5+1195*p3*p2*p5-1528*p6*p4-665*p6*p3+371*p4*p3-1317*p6*p2-49*p4*p2-1005*p3*p2-10*p6*p5-151*p4*p5-649*p3*p5-262*p2*p5+188*p6-627*p4-245*p3-1060*p2-630*p5+1179"
+  ]
+ },
+ "Verschelde.gametwo7": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Verschelde.gametwo7.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "81398a2bd42129dca09b8c64cce005ef2b1ff85b2814ab653b43816b7fb1b6b8",
+  "variables": [
+   "p1",
+   "p2",
+   "p3",
+   "p4",
+   "p5",
+   "p6",
+   "p7"
+  ],
+  "equations": [
+   "3821*p2*p3*p4*p5*p6*p7-7730*p2*p3*p4*p5*p6-164*p2*p3*p4*p5*p7-2536*p2*p3*p4*p6*p7-4321*p2*p3*p5*p6*p7-2161*p2*p4*p5*p6*p7-2188*p3*p4*p5*p6*p7-486*p2*p3*p4*p5+3491*p2*p3*p4*p6+4247*p2*p3*p5*p6+3528*p2*p4*p5*p6+2616*p3*p4*p5*p6-101*p2*p3*p4*p7+1765*p2*p3*p5*p7+258*p2*p4*p5*p7-378*p3*p4*p5*p7+1246*p2*p3*p6*p7+2320*p2*p4*p6*p7+1776*p3*p4*p6*p7+1715*p2*p5*p6*p7+728*p3*p5*p6*p7+842*p4*p5*p6*p7+69*p2*p3*p4-1660*p2*p3*p5+1863*p2*p4*p5+1520*p3*p4*p5-245*p2*p3*p6-804*p2*p4*p6-2552*p3*p4*p6-3152*p2*p5*p6+40*p3*p5*p6-1213*p4*p5*p6+270*p2*p3*p7-851*p2*p4*p7+327*p3*p4*p7-1151*p2*p5*p7+1035*p3*p5*p7-161*p4*p5*p7-230*p2*p6*p7-294*p3*p6*p7-973*p4*p6*p7-264*p5*p6*p7+874*p2*p3-2212*p2*p4+168*p3*p4+511*p2*p5-918*p3*p5-2017*p4*p5-76*p2*p6+465*p3*p6+1629*p4*p6+856*p5*p6-54*p2*p7-1355*p3*p7+227*p4*p7+77*p5*p7-220*p6*p7-696*p2+458*p3+486*p4+661*p5-650*p6+671*p7-439",
+   "-6157*p1*p3*p4*p5*p6*p7+13318*p1*p3*p4*p5*p6+5928*p1*p3*p4*p5*p7+1904*p1*p3*p4*p6*p7+2109*p1*p3*p5*p6*p7+8475*p1*p4*p5*p6*p7+2878*p3*p4*p5*p6*p7-8339*p1*p3*p4*p5-2800*p1*p3*p4*p6-9649*p1*p3*p5*p6-10964*p1*p4*p5*p6-4481*p3*p4*p5*p6+251*p1*p3*p4*p7-4245*p1*p3*p5*p7-7707*p1*p4*p5*p7-2448*p3*p4*p5*p7+1057*p1*p3*p6*p7-3605*p1*p4*p6*p7+546*p3*p4*p6*p7-3633*p1*p5*p6*p7-699*p3*p5*p6*p7-4126*p4*p5*p6*p7-730*p1*p3*p4+5519*p1*p3*p5+8168*p1*p4*p5+4366*p3*p4*p5+2847*p1*p3*p6+2058*p1*p4*p6-1416*p3*p4*p6+8004*p1*p5*p6+4740*p3*p5*p6+5361*p4*p5*p6-677*p1*p3*p7+1755*p1*p4*p7-760*p3*p4*p7+3384*p1*p5*p7+2038*p3*p5*p7+4119*p4*p5*p7+812*p1*p6*p7+11*p3*p6*p7+2022*p4*p6*p7+2642*p5*p6*p7+1276*p1*p3-1723*p1*p4+121*p3*p4-6456*p1*p5-3710*p3*p5-4525*p4*p5-2187*p1*p6-1559*p3*p6-848*p4*p6-4041*p5*p6-83*p1*p7-12*p3*p7-1180*p4*p7-2747*p5*p7-1970*p6*p7+2575*p1-161*p3+2149*p4+4294*p5+1687*p6+958*p7-1950",
+   "182*p1*p2*p4*p5*p6*p7-2824*p1*p2*p4*p5*p6-3513*p1*p2*p4*p5*p7-3386*p1*p2*p4*p6*p7-2330*p1*p2*p5*p6*p7-2838*p1*p4*p5*p6*p7+1294*p2*p4*p5*p6*p7+4764*p1*p2*p4*p5+1647*p1*p2*p4*p6+4221*p1*p2*p5*p6+814*p1*p4*p5*p6+2738*p2*p4*p5*p6+4057*p1*p2*p4*p7+2403*p1*p2*p5*p7+2552*p1*p4*p5*p7+471*p2*p4*p5*p7+448*p1*p2*p6*p7+2336*p1*p4*p6*p7+1617*p2*p4*p6*p7+2220*p1*p5*p6*p7-1543*p2*p5*p6*p7+402*p4*p5*p6*p7-5184*p1*p2*p4-3983*p1*p2*p5+44*p1*p4*p5-1327*p2*p4*p5-581*p1*p2*p6-389*p1*p4*p6-2722*p2*p4*p6+443*p1*p5*p6-2893*p2*p5*p6-154*p4*p5*p6-1277*p1*p2*p7-2018*p1*p4*p7-509*p2*p4*p7-1254*p1*p5*p7+602*p2*p5*p7-464*p4*p5*p7-647*p1*p6*p7+922*p2*p6*p7-1463*p4*p6*p7+729*p5*p6*p7+2665*p1*p2+591*p1*p4+981*p2*p4-444*p1*p5+1818*p2*p5-1985*p4*p5-1818*p1*p6+197*p2*p6+1038*p4*p6+340*p5*p6+399*p1*p7-835*p2*p7+787*p4*p7-753*p5*p7-221*p6*p7+481*p1+260*p2+1713*p4+1219*p5+794*p6+762*p7-1231",
+   "2923*p1*p2*p3*p5*p6*p7-4328*p1*p2*p3*p5*p6-3674*p1*p2*p3*p5*p7-3291*p1*p2*p3*p6*p7-4955*p1*p2*p5*p6*p7-8*p1*p3*p5*p6*p7-135*p2*p3*p5*p6*p7+7784*p1*p2*p3*p5+3471*p1*p2*p3*p6+1544*p1*p2*p5*p6+1607*p1*p3*p5*p6+1710*p2*p3*p5*p6+2434*p1*p2*p3*p7+1408*p1*p2*p5*p7-215*p1*p3*p5*p7+507*p2*p3*p5*p7+2208*p1*p2*p6*p7+1920*p1*p3*p6*p7-389*p2*p3*p6*p7+1304*p1*p5*p6*p7+2480*p2*p5*p6*p7+102*p3*p5*p6*p7-2683*p1*p2*p3-3508*p1*p2*p5-3505*p1*p3*p5-2400*p2*p3*p5-2236*p1*p2*p6-1727*p1*p3*p6-1354*p2*p3*p6-1022*p1*p5*p6-2099*p2*p5*p6-918*p3*p5*p6-495*p1*p2*p7-109*p1*p3*p7+474*p2*p3*p7+268*p1*p5*p7+1084*p2*p5*p7-190*p3*p5*p7-666*p1*p6*p7-497*p2*p6*p7+615*p3*p6*p7-912*p5*p6*p7+473*p1*p2+742*p1*p3+186*p2*p3+1021*p1*p5+2556*p2*p5+2312*p3*p5+1075*p1*p6+920*p2*p6+164*p3*p6+80*p5*p6-199*p1*p7-1270*p2*p7-1050*p3*p7-724*p5*p7+136*p6*p7+740*p1-474*p2+37*p3-1056*p5+303*p6+833*p7+736",
+   "4990*p1*p2*p3*p4*p6*p7-3067*p1*p2*p3*p4*p6-1661*p1*p2*p3*p4*p7-4064*p1*p2*p3*p6*p7-223*p1*p2*p4*p6*p7-5229*p1*p3*p4*p6*p7-4636*p2*p3*p4*p6*p7+5720*p1*p2*p3*p4+4872*p1*p2*p3*p6+1643*p1*p2*p4*p6+4536*p1*p3*p4*p6+2451*p2*p3*p4*p6+1264*p1*p2*p3*p7+70*p1*p2*p4*p7+2213*p1*p3*p4*p7+1734*p2*p3*p4*p7+1698*p1*p2*p6*p7+3799*p1*p3*p6*p7+1622*p2*p3*p6*p7+901*p1*p4*p6*p7-496*p2*p4*p6*p7+3782*p3*p4*p6*p7-5591*p1*p2*p3-1303*p1*p2*p4-6383*p1*p3*p4-2332*p2*p3*p4-3179*p1*p2*p6-6257*p1*p3*p6-3654*p2*p3*p6-1830*p1*p4*p6-1473*p2*p4*p6-3278*p3*p4*p6-1462*p1*p2*p7-1495*p1*p3*p7-468*p2*p3*p7-400*p1*p4*p7+431*p2*p4*p7-1907*p3*p4*p7-1547*p1*p6*p7-214*p2*p6*p7-1423*p3*p6*p7-1625*p4*p6*p7+5708*p1*p2+3809*p1*p3+2053*p2*p3+2824*p1*p4+1122*p2*p4+3653*p3*p4+3658*p1*p6+3001*p2*p6+3890*p3*p6+2371*p4*p6+602*p1*p7+185*p2*p7+899*p3*p7+963*p4*p7+560*p6*p7-4557*p1-3536*p2-1635*p3-2552*p4-2595*p6-207*p7+2740",
+   "-1407*p1*p2*p3*p4*p5*p7+4444*p1*p2*p3*p4*p5+2350*p1*p2*p3*p4*p7+5424*p1*p2*p3*p5*p7-2524*p1*p2*p4*p5*p7-985*p1*p3*p4*p5*p7-431*p2*p3*p4*p5*p7-2662*p1*p2*p3*p4-5342*p1*p2*p3*p5-39*p1*p2*p4*p5-2525*p1*p3*p4*p5-2650*p2*p3*p4*p5-3553*p1*p2*p3*p7-71*p1*p2*p4*p7-3268*p1*p3*p4*p7-1140*p2*p3*p4*p7-702*p1*p2*p5*p7-924*p1*p3*p5*p7-2198*p2*p3*p5*p7+4087*p1*p4*p5*p7+2709*p2*p4*p5*p7+587*p3*p4*p5*p7+968*p1*p2*p3-150*p1*p2*p4+909*p1*p3*p4+4587*p2*p3*p4+929*p1*p2*p5+1804*p1*p3*p5+2226*p2*p3*p5-916*p1*p4*p5+906*p2*p4*p5+2735*p3*p4*p5+1894*p1*p2*p7+2998*p1*p3*p7+1611*p2*p3*p7+304*p1*p4*p7-1601*p2*p4*p7+2066*p3*p4*p7-1971*p1*p5*p7-480*p2*p5*p7-500*p3*p5*p7-2617*p4*p5*p7-532*p1*p2+2016*p1*p3-2574*p2*p3+529*p1*p4-1251*p2*p4-2082*p3*p4+280*p1*p5-852*p2*p5-476*p3*p5-340*p4*p5-924*p1*p7+253*p2*p7-1090*p3*p7+170*p4*p7+1204*p5*p7-869*p1+1394*p2-264*p3+719*p4+219*p5-128*p7+506",
+   "-901*p1*p2*p3*p4*p5*p6+1805*p1*p2*p3*p4*p5-1103*p1*p2*p3*p4*p6-1746*p1*p2*p3*p5*p6-1968*p1*p2*p4*p5*p6+3957*p1*p3*p4*p5*p6+1293*p2*p3*p4*p5*p6-523*p1*p2*p3*p4-2498*p1*p2*p3*p5+693*p1*p2*p4*p5-2805*p1*p3*p4*p5-722*p2*p3*p4*p5-770*p1*p2*p3*p6+1088*p1*p2*p4*p6-232*p1*p3*p4*p6+2657*p2*p3*p4*p6+3281*p1*p2*p5*p6-1066*p1*p3*p5*p6+240*p2*p3*p5*p6-1174*p1*p4*p5*p6+1304*p2*p4*p5*p6-2070*p3*p4*p5*p6+2571*p1*p2*p3+115*p1*p2*p4+3899*p1*p3*p4-4641*p2*p3*p4-752*p1*p2*p5+1531*p1*p3*p5+1178*p2*p3*p5+11*p1*p4*p5-1144*p2*p4*p5-1701*p3*p4*p5+592*p1*p2*p6+1140*p1*p3*p6+130*p2*p3*p6+304*p1*p4*p6-2273*p2*p4*p6-1224*p3*p4*p6-2*p1*p5*p6-1090*p2*p5*p6+585*p3*p5*p6+670*p4*p5*p6-1867*p1*p2-4780*p1*p3+1079*p2*p3-2435*p1*p4+2901*p2*p4+2073*p3*p4+499*p1*p5+908*p2*p5+323*p3*p5+1631*p4*p5-966*p1*p6-315*p2*p6-481*p3*p6+759*p4*p6-595*p5*p6+3233*p1-1978*p2+729*p3-1184*p4-40*p5+446*p6+282"
+  ]
+ },
+ "Verschelde.virasoro": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Verschelde.virasoro.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "6ce349a09583591a99807cf05ab60ce4d6b774a9e4cdbaff0fd176bd3402b7f1",
+  "variables": [
+   "x1",
+   "x2",
+   "x3",
+   "x4",
+   "x5",
+   "x6",
+   "x7",
+   "x8"
+  ],
+  "equations": [
+   "-6*x4*x5-6*x6*x7+6*x4*x8+6*x5*x8+6*x6*x8+6*x7*x8+8*x8^2-x8",
+   "-2*x3*x4+2*x1*x5+2*x2*x5+2*x3*x5+8*x4*x5+8*x5^2-2*x1*x6+2*x5*x6-2*x2*x7+2*x5*x7-6*x4*x8+6*x5*x8-x5",
+   "-2*x2*x4-2*x1*x5+2*x1*x6+2*x2*x6+2*x3*x6+2*x4*x6+2*x5*x6+8*x6^2-2*x3*x7+8*x6*x7+6*x6*x8-6*x7*x8-x6",
+   "-2*x1*x4-2*x2*x5-2*x3*x6+2*x1*x7+2*x2*x7+2*x3*x7+2*x4*x7+2*x5*x7+8*x6*x7+8*x7^2-6*x6*x8+6*x7*x8-x7",
+   "2*x1*x4+2*x2*x4+2*x3*x4+8*x4^2-2*x3*x5+8*x4*x5-2*x2*x6+2*x4*x6-2*x1*x7+2*x4*x7+6*x4*x8-6*x5*x8-x4",
+   "-8*x1*x2+8*x1*x3+8*x2*x3+8*x3^2+2*x3*x4+2*x3*x5-2*x4*x5+2*x3*x6+2*x3*x7-2*x6*x7-x3",
+   "8*x1*x2+8*x2^2-8*x1*x3+8*x2*x3+2*x2*x4+2*x2*x5+2*x2*x6-2*x4*x6+2*x2*x7-2*x5*x7-x2",
+   "8*x1^2+8*x1*x2+8*x1*x3-8*x2*x3+2*x1*x4+2*x1*x5+2*x1*x6-2*x5*x6+2*x1*x7-2*x4*x7-x1"
+  ]
+ },
+ "Weispfenning-94": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Weispfenning-94.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "419cbfe92e6f5d6a698f0155a5519c6d672192b023dcab3ee887754115968002",
+  "variables": [
+   "x",
+   "y",
+   "z"
+  ],
+  "equations": [
+   "y^4+x*y^2*z+x^2-2*x*y+y^2+z^2",
+   "x*y^4+y*z^4-2*x^2*y-3",
+   "-x^3*y^2+x*y*z^3+y^4+x*y^2*z-2*x*y"
+  ]
+ }
+}

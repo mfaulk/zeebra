@@ -9,6 +9,12 @@ change to `y` may break the public API.
 
 ### Added
 
+- `PackedGf2Statistics::xor_words` and `linalg::gf2::PackedStatistics::xor_words`: the `u64`
+  words the packed `GF(2)` kernels' `xor`s write. Behind the `research-gf2-residual` feature,
+  `Gf2Elimination::Residual` packs only the columns no reducer leads (#1077), and
+  `Gf2Elimination::AutoResidual` does so on the batches `Auto` packs. No preset selects either.
+  Breaking: an exhaustive literal of either statistics struct needs the new field.
+
 - `F4Options::graded_engine` and `GradedEngine`: with `GradedEngine::Adaptive`, `f4_with_options`,
   `f4_reported` and the solvers built on them run graded orders (grevlex, graded-lex) through
   `f4_signature`'s pre-solve dispatch, with the same reduced basis; `F4Statistics::graded_route`

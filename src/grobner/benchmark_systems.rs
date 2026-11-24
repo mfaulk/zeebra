@@ -3,6 +3,9 @@
 
 use crate::{FiniteField, Monomial, MultivariatePolynomial};
 
+pub mod bilinear;
+pub use bilinear::{bilinear, BilinearSpec, BilinearSystem};
+
 /// The cyclic-n roots system, in n variables.
 ///
 /// ```text

@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        set: [default, delayed-reduction, comparand-replay, research-work, research-multirow, research-sigf4, research-sigf4-replay, research-sigf4-split, research-sigf4-usage, research-reuse]
+        set: [default, delayed-reduction, comparand-replay, research-work, research-multirow, research-sigf4, research-sigf4-replay, research-sigf4-split, research-sigf4-usage, research-reuse, research-gf2-residual, research-adjacent]
     env:
       # The replay builds nothing and runs only when its inputs change (tools/ci-scope.sh).
       ACTIVE: ${{ matrix.set != 'comparand-replay' || needs.changes.outputs.comparand == 'true' }}
@@ -297,6 +297,7 @@ jobs:
           bash tools/test/bench-job-test.sh
           python3 tools/test/bench-stats-test.py
           python3 tools/test/corpus-lineage-test.py
+          python3 tools/test/m34-public-corpus-test.py
           bash tools/test/check-archive-reproducible-test.sh
           bash tools/test/check-agent-authorship-test.sh
 
@@ -317,6 +318,16 @@ jobs:
       - name: M33 Q qualification manifests and verdicts
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m33-qualification -p 'test_*.py'
+
+      - name: M34 G2 qualification plan and verdicts
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s research/m34-qualification -p 'test_*.py'
+
+      - name: "#1009 feature extraction cost tables"
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/1009-feature-costs -p 'test_*.py'
+          python3 research/1009-feature-costs/summarize.py --check
 
       - name: M33 G1 attribution helpers and tables
         if: ${{ !cancelled() }}

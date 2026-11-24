@@ -25,8 +25,9 @@ use crate::{FiniteField, Monomial, MonomialOrder, MultivariatePolynomial};
 
 /// Insertions [`support_profile`] spends on generator overlap before giving up.
 ///
-/// One unit is one (generator, generator) pair recorded through a shared monomial. The cost in
-/// time is not yet measured: #1009 waits on the #1006/#1007 pilot panel.
+/// One unit is one (generator, generator) pair recorded through a shared monomial. No record of
+/// the #1006 pilot panel reaches the cap, so its cost in time is unmeasured
+/// (`docs/research/input-features.md` §8).
 pub const DEFAULT_OVERLAP_WORK: u64 = 1 << 20;
 
 /// Initial pairs [`leading_profile`] examines at most.

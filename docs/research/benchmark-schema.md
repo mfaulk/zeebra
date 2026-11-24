@@ -209,6 +209,15 @@ The journal it writes extends `StudyJournal` without forking it. An `exit` recor
 metadata carries `attempt_id` (`<job-id>:<index>:<try>`), `binary_sha256`, `cpus`, `argv`, the
 `cpu-context` snapshots and `contamination` (null until #968 fills it).
 
+From #1105 an exit also carries `rusage` (the child tree's `nvcsw`, `nivcsw`, `majflt`, `minflt`,
+`inblock`, `oublock` from `wait4`), and `contamination.metrics` adds the interference telemetry
+listed as `TELEMETRY_METRICS` in `tools/bench_contamination.py`: `telemetry` (its version),
+placement-aware compiler and runner counts, `psi` and `psi_bench_slice` stall fractions, `vmstat`
+deltas, `mbm_bytes_per_s`, `ccd_load` and `bench_running`. Each is a value, `null` (the snapshots
+predate it) or `{"unavailable": "<reason>"}`. No verdict rule reads them, so the session verdict
+version stays 3; sources and privileges are in `docs/guide/benchmarking.md`, *Recording the CPU
+context of a multicore timing*.
+
 The `complete` stop carries the session verdict, `{version, grouping, contaminated, total, void,
 median_khz, clock_sources, flagged}`. **Version 3** (#999) reads an attempt's clock from
 per-process cycle counts where `perf` could attach (`contamination.clock_source: "perf-cycles"`,

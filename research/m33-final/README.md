@@ -65,7 +65,32 @@ per-arm clock rule), and every digest equal to its reference. One grobx certifie
 completed and the job was then refused on output size (#1020). `campaign.py inputs` now writes Track
 Gc's request with `digest_only: true`, so its reply carries the basis digest and not the 1.70 GB of
 certified text; a re-run is therefore a new input and a new job id, and job `d5db6121722d`'s record
-is the full-reply run. No row qualified for the n = 12
+is the full-reply run.
+
+**Track Gc digest-only re-run (#1065), 2026-11-23, job `16693d8f6a58`: void.** The same input with
+`digest_only: true` and the same manifest, at F3 = `db181c51`. The grobx 0.155.1 driver was built
+from `main` `28df047f` with `grobx-pin.sh`'s recipe (SHA-256 `e2572de9…`). Publication mode, CCDs 1–2
+reserved, 16:21–17:05Z. All 9 attempts were `ok`, digest-equal to the reference and under the
+600 s / 32 GiB caps, with process wall 272.6–299.1 s (median 296.4 s) and peak RSS 8.7 GiB. All 9
+were contaminated, though: other sessions' compilers, rest load ≥ 4 on 4 attempts, and the clock rule on
+3. Over 20% contaminated makes the session void, so it is not of record (`sessions.json`, `void`) and
+no certified-grobx timing is scored from it. The walls are reported here only to show that the
+job now completes n = 9. The job no longer stops on output size: the retained journal is 56 KB,
+against 1.70 GB for `d5db6121722d`.
+
+**Track Gc of record: job `577f983483fb`, 2026-11-24 02:39–03:20Z.** This is a quiet-window re-run of
+the same manifest (only `context.session` = `rerun` differs, so it gets a new job id), at F3 =
+`db181c51` with grobx 0.155.1 `8005a2a1` (driver SHA-256 `e2572de9…`, built from `main` `28df047f`).
+- **Valid.** All 9 attempts are `ok`, certified, and digest-equal to the reference, and **0 of 9 are
+  contaminated**.
+- **Figures.** Process wall median 267,723.8 ms (range 265.7–272.0 s), peak RSS 8.7 GiB.
+- **Of-record list.** `sessions.json` now lists it as Track Gc's record. `d5db6121722d` is
+  `superseded`: a single full-reply attempt on a different input, which must not be pooled with the
+  digest-only attempts. `tables.md`'s certified reference row reads this job alone.
+- **Scoring.** It is still a reference row, never scoring (predeclaration). `history.json` is
+  append-only, so it is not re-appended here.
+
+No row qualified for the n = 12
 extension: every inconclusive row is small or short of n, not spanning. No third session was run.
 
 Verdicts (plan §17.8): Minimum met. **T-G missed**: no development row wins against grobx raw.
