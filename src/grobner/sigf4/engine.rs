@@ -83,6 +83,15 @@ enum RowSource {
     Element(u32),
 }
 
+/// #1075's buffer key for a row source: inputs with the top bit set, elements by id.
+#[cfg(feature = "research-adjacent")]
+fn source_key(source: RowSource) -> super::adjacent::SourceKey {
+    match source {
+        RowSource::Input(i) => i as u64 | 1 << 63,
+        RowSource::Element(id) => u64::from(id),
+    }
+}
+
 struct Engine<'a, const N: usize, F: FiniteField> {
     order: MonomialOrder,
     options: &'a SigF4Options,
@@ -105,6 +114,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     usage: super::usage::UsageLog<N>,
     #[cfg(feature = "research-reuse")]
     reuse: Option<crate::grobner::reuse_census::ReuseCensus<N, Signature<N>>>,
+    #[cfg(feature = "research-adjacent")]
+    adjacent: Option<super::adjacent::Adjacent<N>>,
 }
 
 pub(super) fn run<const N: usize, F: FiniteField>(
@@ -157,6 +168,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         #[cfg(feature = "research-reuse")]
         reuse: (options.reuse_census && options.workers <= 1 && !options.parallel_cascade)
             .then(Default::default),
+        #[cfg(feature = "research-adjacent")]
+        adjacent: super::adjacent::Adjacent::new(options.adjacent),
     };
     #[cfg(feature = "research-sigf4-split")]
     {
@@ -271,6 +284,10 @@ pub(super) fn run<const N: usize, F: FiniteField>(
             .iter()
             .map(|e| e.hashes.len() * size_of::<u64>())
             .sum::<usize>();
+    #[cfg(feature = "research-adjacent")]
+    if let Some(census) = engine.adjacent.take() {
+        engine.stats.adjacent = census.batches;
+    }
     #[cfg(feature = "research-reuse")]
     {
         let bytes_per_term = size_of::<Monomial<N>>() + size_of::<F>();
@@ -704,6 +721,23 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 }
             };
             let hm = hash(&t.mult);
+            #[cfg(feature = "research-adjacent")]
+            if let Some(adjacent) = self.adjacent.as_mut() {
+                let mut row = Vec::with_capacity(terms.len());
+                let products = terms.iter().map(|(m, _)| *m).zip(hashes.iter().copied());
+                let key = (source_key(t.source), t.mult);
+                adjacent.row(
+                    &mut self.table,
+                    key,
+                    products,
+                    (t.mult, hm),
+                    None,
+                    &mut work,
+                    &mut row,
+                );
+                handles.push(row);
+                continue;
+            }
             #[cfg(not(feature = "research-sigf4-split"))]
             handles.push(
                 terms
@@ -758,6 +792,33 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             let sig = e.sig.times(&mult);
             let mut row = Vec::with_capacity(e.terms.len());
             row.push(lead);
+            #[cfg(feature = "research-adjacent")]
+            if let Some(adjacent) = self.adjacent.as_mut() {
+                let products = e
+                    .terms
+                    .iter()
+                    .map(|(m, _)| *m)
+                    .zip(e.hashes.iter().copied());
+                let key = (source_key(RowSource::Element(id)), mult);
+                let lead = Some(column);
+                adjacent.row(
+                    &mut self.table,
+                    key,
+                    products,
+                    (mult, hm),
+                    lead,
+                    &mut work,
+                    &mut row,
+                );
+                handles.push(row);
+                rows.push(Row {
+                    sig,
+                    mult,
+                    source: RowSource::Element(id),
+                });
+                reducers += 1;
+                continue;
+            }
             #[cfg(not(feature = "research-sigf4-split"))]
             for ((tm, _), &th) in e.terms[1..].iter().zip(&e.hashes[1..]) {
                 row.push(
@@ -807,6 +868,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         #[cfg(feature = "research-sigf4-split")]
         {
             split.column_sort = sort.elapsed();
+        }
+        #[cfg(feature = "research-adjacent")]
+        if let Some(adjacent) = self.adjacent.as_mut() {
+            adjacent.finish();
+            adjacent.record(clock.elapsed().as_nanos() as u64);
         }
         self.stats.reducer_rows += reducers;
         self.stats.max_matrix_rows = self.stats.max_matrix_rows.max(rows.len());

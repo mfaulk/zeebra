@@ -1,0 +1,34 @@
+{
+ "attempts": 9,
+ "job": {
+  "context": {
+   "agent": "agent-acf9ba1b4fa888172@research/1065-gc-digest-only",
+   "issue": 975,
+   "session": "rerun",
+   "track": "Gc"
+  },
+  "job_id": "577f983483fb",
+  "manifest_sha256": "577f983483fb2af06398a3ef5e4a238d848bc3603dda1113eeee28af8c9f6cca",
+  "mode": "publication"
+ },
+ "journal_sha256": "0b801c947728b84e446917d98082f8f5c32117832d8979ea9f033d5403fa953f",
+ "stop": {
+  "at": "2026-11-24T03:19:58+00:00",
+  "attempts": 9,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 9
+   },
+   "contaminated": 0,
+   "flagged": {},
+   "grouping": "arm",
+   "median_khz": {
+    "wide64/eco-12@1w/grobx155-certified/perf-cycles": 4332181
+   },
+   "total": 9,
+   "version": 3,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}

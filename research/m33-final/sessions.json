@@ -1,4 +1,10 @@
 {
  "rule": "the first non-void session per track is of record, with its top-up job; a void session is dropped whole and re-run whole (README, predeclaration and amendment)",
- "of_record": ["92e26e267f3d", "7fa0250e1309", "d5db6121722d", "ea52bc970e59", "b5a15591d188"]
+ "of_record": ["92e26e267f3d", "7fa0250e1309", "577f983483fb", "ea52bc970e59", "b5a15591d188"],
+ "superseded": {
+  "d5db6121722d": "Track Gc full-reply run: 1 attempt, then stopped on output size (#1020). Its input differs from the digest-only input (#1064), so it is not pooled with 577f983483fb, which is Track Gc's record (#1065)"
+ },
+ "void": {
+  "16693d8f6a58": "Track Gc digest-only re-run (#1065), 2026-11-23: 9/9 ok and equal to the reference, but 9/9 contaminated (compilers from other sessions, rest load >= 4, clock rule), so void and not of record"
+ }
 }

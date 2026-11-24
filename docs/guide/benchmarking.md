@@ -287,6 +287,31 @@ Fields added for M33 (#968). Fields are only added, never renamed or removed:
 fraction is the difference between two snapshots, which is what `tools/bench_contamination.py`
 computes.
 
+Interference telemetry added by #1105 (`telemetry: 1`). These are **metrics, not rules**: no verdict
+reads them, and the old fields are unchanged, so `dev` and `publication` verdicts on the same
+snapshots are identical (`tools/test/bench-contamination-test.py` replays every retained M33
+journal to check). Each field is a value, `null`, or `{"unavailable": "<reason>"}`, and a missing
+source is never read as zero. None needs privilege beyond reading `/proc` and `/sys`.
+
+| field | source | meaning |
+|---|---|---|
+| `telemetry` | — | telemetry version; absent in older snapshots |
+| `compilers_on_bench`, `compilers_elsewhere` | `/proc/<pid>/comm`, `/proc/<pid>/status` `Cpus_allowed_list` | the `compilers` count split by whether the process's affinity (which reflects its cpuset) admits a bench CPU or sibling; a process whose status cannot be read counts as on the bench |
+| `runner_workers_on_bench` | the same | `Runner.Worker` processes that may run on a bench CPU or sibling |
+| `psi` | `/proc/pressure/{cpu,memory,io}` | `{some_us, full_us}` stall totals per resource; `full_us` is `null` where the kernel has no `full` line |
+| `psi_bench_slice` | `/sys/fs/cgroup/zbbench.slice/*.pressure` | the same for the slice `tools/bench-reserve.sh run` measures in; unavailable when the slice does not exist |
+| `vmstat` | `/proc/vmstat` | `pswpin`, `pswpout`, `pgscan` and `pgsteal` (summed over `pgscan_*`/`pgsteal_*`), `pgmajfault` |
+| `mbm_bytes` | `/sys/fs/resctrl/mon_data/mon_L3_*/mbm_total_bytes` | machine-wide memory bandwidth counter (AMD MBM, default group); unavailable unless the owner mounts resctrl |
+| `ccd_stat[]` | `/proc/stat`, `cache/index3/shared_cpu_list` | `{l3, busy, total, cpus}` per L3 domain over every online CPU; `rest_stat` is kept |
+| `bench_running[]` | `/proc/<pid>/stat` field 39 | runnable tasks (`R`) whose last CPU is a bench CPU or sibling, at most 16: names a foreign task at snapshot time only |
+
+`bench-job` adds the child tree's `wait4` rusage to each attempt's exit metadata (`rusage`:
+`nvcsw`, `nivcsw`, `majflt`, `minflt`, `inblock`, `oublock`). `attempt_metrics` turns the snapshot
+pairs into `psi` stall fractions of the attempt's wall, `vmstat` deltas, `mbm_bytes_per_s`,
+`ccd_load` (busy-CPU equivalents per domain) and the maximum placement counts, and `bench-job
+report` prints them per attempt under *Interference*. The per-attempt overhead A/A (#1105's
+±0.5% gate), per-CPU foreign time and the pre-attempt window snapshot are not done yet; see #1105.
+
 ### Measurement modes and contamination (#968)
 
 Every M33 figure is taken in one of two modes (plan §11.2,
@@ -535,10 +560,15 @@ than rewriting it.
 
 **Modes.** `mode` is `dev` or `publication` and is recorded in the manifest and journal header.
 A dev job runs under the CCD-scoped lock. A publication job takes the exclusive, machine-wide
-lock (`bench-reserve run` with `ZEEBRA_BENCH_RESERVE_EXCLUSIVE=1`). Before its first attempt it
-checks `bench_contamination.publication_refusals`, re-checking every 60 s for up to
-`run.mode_wait_seconds` (default 0). If the conditions never hold, it journals a `mode-refused`
-stop listing the refusals and exits 3.
+lock (`bench-reserve run` with `ZEEBRA_BENCH_RESERVE_EXCLUSIVE=1`). Before every attempt, not
+only the first, it checks `bench_contamination.publication_refusals` and re-checks every 60 s
+while they stand. A compiler that starts mid-job therefore holds the next attempt until it exits,
+where it would otherwise contaminate it (#1090). `run.mode_wait_seconds` (default 0) is one budget
+for the whole run, shared by every attempt's wait (a `resume` starts a fresh one). A wait that would outrun what remains of it
+journals a `mode-refused` stop, naming the attempt, its `waited_seconds` and the refusals, and
+exits 3. Each attempt's exit metadata records its wait as `mode_wait: {waited_seconds, refusals}`.
+A cancel ends a wait at the next poll. Contamination flagging (below) stays as the backstop for
+whatever starts during an attempt.
 
 Every attempt's exit metadata carries `contamination`, which holds `{mode, metrics, clock_source,
 verdict}`. The metrics come from the before/after `cpu-context` snapshots, with the child's `wait4`
@@ -1465,6 +1495,22 @@ cargo test --features research-reuse --lib grobner::reuse_census
 cargo test --features research-reuse --example reuse_census
 python3 research/1031-reuse-census/summarize.py research/1031-reuse-census/runs.jsonl.gz \
   | diff - research/1031-reuse-census/tables.md
+```
+
+### Complete lex pipeline against grobx (#1039)
+
+`lex_pipeline --family <name> | --input <grobx request JSON> --arm
+adaptive|wiedemann|classical|shape|direct-lex|probe [--budget shipping|lifted]` computes one
+complete lex basis per process: grevlex F4, then `fglm_to_lex_with_options` under the named
+`ConversionStrategy`, or lex F4 directly. Every stage is attributed, and the `m33-basis-v1` digest
+is taken after the timed region. `--budget lifted` raises `FglmOptions::recommended()`'s D ≤ 4096
+tripwire, which otherwise refuses every row the Wiedemann route wins. `research/1039-wiedemann-lex/`
+holds the campaign scripts and records. The [report](../research/wiedemann-pipeline-vs-grobx.md)
+records the demonstration and its M34-C conditions. Checks:
+
+```sh
+cargo test --example lex_pipeline
+python3 research/1039-wiedemann-lex/summarize.py | diff - research/1039-wiedemann-lex/tables.md
 ```
 
 ### Persistent worker dispatch and border reduction

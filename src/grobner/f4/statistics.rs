@@ -444,8 +444,9 @@ pub struct ParallelForwardStatistics {
     /// Batches that asked for workers but ran serially because the workers' reservation would
     /// have crossed the live-entry budget or the workspace cap.
     pub fallback_batches: usize,
-    /// Of those, the forward-order batches whose workers' finished rows were kept and only the
-    /// rest reduced serially, rather than the whole batch redone (#1068).
+    /// Of those, the batches whose workers' finished rows were kept and only the rest reduced
+    /// serially, rather than the whole pass redone: the forward order's pass (#1068) or a
+    /// Faugère–Lachartre batch's `D'` echelon (#1086).
     pub retained_batches: usize,
     /// Rows those batches carried into the serial kernel already reduced: pivots and zero rows.
     pub retained_rows: usize,
@@ -531,10 +532,15 @@ pub struct PackedGf2Statistics {
     pub declined_batches: usize,
     /// Whole-row `xor`s, including those that build tables.
     pub row_xors: usize,
+    /// `u64` words those `xor`s wrote.
+    pub xor_words: usize,
     /// Four Russians tables built.
     pub tables: usize,
     /// The largest packed working set of any batch: the bit matrix, tables and indices.
     pub workspace_bytes: usize,
+    /// The residual-width research route's counters (#1077); zero unless it ran.
+    #[cfg(feature = "research-gf2-residual")]
+    pub residual: super::packed_residual::ResidualGf2Statistics,
 }
 
 impl PackedGf2Statistics {
@@ -542,8 +548,11 @@ impl PackedGf2Statistics {
         self.batches += other.batches;
         self.declined_batches += other.declined_batches;
         self.row_xors = self.row_xors.saturating_add(other.row_xors);
+        self.xor_words = self.xor_words.saturating_add(other.xor_words);
         self.tables = self.tables.saturating_add(other.tables);
         self.workspace_bytes = self.workspace_bytes.max(other.workspace_bytes);
+        #[cfg(feature = "research-gf2-residual")]
+        self.residual.record(&other.residual);
     }
 }
 
