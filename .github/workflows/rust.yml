@@ -323,6 +323,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m34-qualification -p 'test_*.py'
 
+      - name: "#1009 feature extraction cost tables"
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/1009-feature-costs -p 'test_*.py'
+          python3 research/1009-feature-costs/summarize.py --check
+
       - name: M33 G1 attribution helpers and tables
         if: ${{ !cancelled() }}
         run: |

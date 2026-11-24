@@ -37,9 +37,14 @@ def record(id, cheapest, cost=100, **values):
     return {
         "id": id,
         "wall_s": 60,
-        "feature_costs": {f: {"median_ns": cost} for f in s.FEATURES},
+        "feature_costs": {f: {"median_ns": cost, "cold_ns": 3 * cost} for f in s.FEATURES},
         "features": {**VALUES, **values},
-        "entry": {"route": "Shipping"},
+        "entry": {
+            "route": "Shipping",
+            "status": "complete" if cheapest else "stopped",
+            "calls_ns": [cheapest or 5_000_000],
+        },
+        "f4": {"status": "complete" if cheapest else "stopped", "calls_ns": [cheapest or 8_000_000]},
         "cheapest_arm": None if cheapest is None else "entry",
         "cheapest_ns": cheapest,
     }
@@ -91,12 +96,24 @@ class Summary(unittest.TestCase):
         self.assertEqual(cov["solved"], 1)
         self.assertEqual(cov["under_determined"], 1)
 
-    # An unsolved record's ratio renders as a bound against the wall budget.
+    # An unsolved record's ratio is bounded by the shortest call that stopped, not the wall.
     def test_render_bounds_unsolved_records(self):
         text = s.render([record("a", 10_000), record("b", None)])
-        self.assertIn("> 60 s", text)
-        self.assertIn("| `b` |", text)
-        self.assertIn("< 0.000%", text)
+        self.assertIn("stopped ≥ 5.0 ms", text)
+        self.assertIn("< 0.014%", text)
+
+    # Failures are located by the slowest solve they occur on, and cold calls are reported apart.
+    def test_failing_solves_and_cold_ratio(self):
+        rows = s.feature_rows([record("a", 5_000), record("b", 8_000), record("c", 50_000)])
+        self.assertEqual(rows[0]["failing_below_ns"], 8_000)
+        self.assertAlmostEqual(rows[0]["worst_cold_ratio"], 300 / 5_000)
+        self.assertEqual(rows[0]["over"], 2)
+
+    # The repeat session gets its own verdict table.
+    def test_repeat_session_is_rendered(self):
+        text = s.render([record("a", 10_000)], [record("a", 5_000)])
+        self.assertIn("## Repeat session", text)
+        self.assertIn("| `system_shape` | 2.000% | 1 / 1 | FAIL |", text)
 
     # A process that failed is named and kept out of every table.
     def test_failed_process_is_excluded(self):

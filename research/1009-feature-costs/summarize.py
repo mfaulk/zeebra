@@ -12,8 +12,10 @@ and prints `tables.md`. The rules were declared on #1009 before the timed run:
 - A record where no arm completed is not small. Its ratio is reported as an upper bound against the
   wall budget and decides nothing.
 
-    python3 summarize.py records.jsonl.gz > tables.md
-    python3 summarize.py --check          # tables.md is what records.jsonl.gz gives
+The cold first call and a second, repeat session are reported beside the verdicts and decide nothing.
+
+    python3 summarize.py records.jsonl.gz records-repeat.jsonl.gz > tables.md
+    python3 summarize.py --check          # tables.md is what the two record files give
 """
 
 import gzip
@@ -51,6 +53,20 @@ def set_cost_ns(record):
     return sum(cost_ns(record, f) for f in FEATURES)
 
 
+def cold_set_ns(record):
+    return sum(record["feature_costs"][f]["cold_ns"] for f in FEATURES)
+
+
+def stopped_after_ns(record):
+    """The shortest call of an arm that did not complete: a lower bound on that arm's solve."""
+    calls = [
+        min(record[arm]["calls_ns"])
+        for arm in ("entry", "f4")
+        if record[arm]["calls_ns"] and record[arm]["status"] != "complete"
+    ]
+    return min(calls, default=None)
+
+
 def is_small(record):
     c = record.get("cheapest_ns")
     return c is not None and c <= SMALL_NS
@@ -76,10 +92,12 @@ def feature_rows(records):
         ("all seven", set_cost_ns, SET_FRACTION)
     ]:
         get = cost or (lambda r, f=name: cost_ns(r, f))
+        cold = cold_set_ns if cost else (lambda r, f=name: r["feature_costs"][f]["cold_ns"])
         absolute = [get(r) for r in records]
         ratios = [ratio(r, get(r)) for r in small]
         worst = max(ratios) if ratios else None
         worst_id = max(small, key=lambda r: ratio(r, get(r)))["id"] if small else None
+        failing = [r["cheapest_ns"] for r in small if ratio(r, get(r)) > fraction]
         rows.append(
             {
                 "feature": name,
@@ -87,7 +105,9 @@ def feature_rows(records):
                 "max_ns": max(absolute),
                 "median_ratio": statistics.median(ratios) if ratios else None,
                 "worst_ratio": worst,
+                "worst_cold_ratio": max((ratio(r, cold(r)) for r in small), default=None),
                 "worst_id": worst_id,
+                "failing_below_ns": max(failing, default=None),
                 "over": sum(1 for x in ratios if x > fraction),
                 "small": len(ratios),
                 "fraction": fraction,
@@ -172,11 +192,11 @@ def fmt_span(pair):
     if lo is None:
         return "—"
     if isinstance(lo, float):
-        return f"{lo:.3f}–{hi:.3f}"
+        return f"{lo:.2g}–{hi:.2g}"
     return f"{lo}–{hi}"
 
 
-def render(records):
+def render(records, repeat=None):
     failed = sorted(r["id"] for r in records if "feature_costs" not in r)
     records = [r for r in records if "feature_costs" in r]
     out = []
@@ -194,16 +214,29 @@ def render(records):
     w("## Extraction cost\n")
     w(
         "| feature | median cost | max cost | median ratio, small | worst ratio, small "
-        "| worst record | small inputs over threshold | verdict |"
+        "| worst record | small inputs over threshold | failing solves at most | verdict "
+        "| worst cold ratio, small |"
     )
-    w("|---|---:|---:|---:|---:|---|---:|---|")
+    w("|---|---:|---:|---:|---:|---|---:|---:|---|---:|")
     for r in rows:
         w(
             f"| `{r['feature']}` | {fmt_ns(r['median_ns'])} | {fmt_ns(r['max_ns'])} "
             f"| {fmt_ratio(r['median_ratio'])} | {fmt_ratio(r['worst_ratio'])} "
-            f"| `{r['worst_id']}` | {r['over']} / {r['small']} | {r['verdict']} |"
+            f"| `{r['worst_id']}` | {r['over']} / {r['small']} "
+            f"| {fmt_ns(r['failing_below_ns'])} | {r['verdict']} "
+            f"| {fmt_ratio(r['worst_cold_ratio'])} |"
         )
     w("")
+    if repeat is not None:
+        w("## Repeat session\n")
+        w("| feature | worst ratio, small | small inputs over threshold | verdict |")
+        w("|---|---:|---:|---|")
+        for r in feature_rows([x for x in repeat if "feature_costs" in x]):
+            w(
+                f"| `{r['feature']}` | {fmt_ratio(r['worst_ratio'])} "
+                f"| {r['over']} / {r['small']} | {r['verdict']} |"
+            )
+        w("")
     w("## Per record\n")
     w(
         "| record | n | m | cheapest arm | cheapest solve | entry route | all seven "
@@ -215,12 +248,15 @@ def render(records):
         total = set_cost_ns(r)
         top = max(FEATURES, key=lambda f: cost_ns(r, f))
         cheapest = r.get("cheapest_ns")
-        shown = fmt_ns(cheapest) if cheapest is not None else f"> {r['wall_s']} s"
+        stopped = stopped_after_ns(r)
         bound = ratio(r, total)
-        if bound is None:
-            bound_text = f"< {fmt_ratio(total / (r['wall_s'] * 1e9))}"
+        if cheapest is not None:
+            shown, bound_text = fmt_ns(cheapest), fmt_ratio(bound)
+        elif stopped:
+            shown = f"stopped ≥ {fmt_ns(stopped)}"
+            bound_text = f"< {fmt_ratio(total / stopped)}"
         else:
-            bound_text = fmt_ratio(bound)
+            shown, bound_text = "—", "—"
         w(
             f"| `{r['id']}` | {v['variables']} | {v['nonzero_generators']} "
             f"| {r.get('cheapest_arm', '—')} | {shown} | {r['entry'].get('route') or '—'} "
@@ -267,16 +303,18 @@ def render(records):
 
 def main(argv):
     if argv[:1] == ["--check"]:
-        expected = render(load(HERE / "records.jsonl.gz"))
+        expected = render(
+            load(HERE / "records.jsonl.gz"), load(HERE / "records-repeat.jsonl.gz")
+        )
         actual = (HERE / "tables.md").read_text()
         if expected != actual:
-            print("tables.md is stale: rerun summarize.py records.jsonl.gz", file=sys.stderr)
+            print("tables.md is stale: rerun summarize.py", file=sys.stderr)
             return 1
         return 0
-    if len(argv) != 1:
+    if len(argv) not in (1, 2):
         print(__doc__, file=sys.stderr)
         return 64
-    sys.stdout.write(render(load(argv[0])))
+    sys.stdout.write(render(load(argv[0]), load(argv[1]) if len(argv) == 2 else None))
     return 0
 
 
