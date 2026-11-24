@@ -167,5 +167,77 @@ ctx_snapshot 7 >/dev/null 2>&1; check "snapshot: missing loadavg is a read failu
 # The command line takes exactly one CPU list.
 bash "$SCRIPT" >/dev/null 2>&1; check "main: no argument is usage" 64 $?
 
+# Interference telemetry (#1105). Every field below is a value, or {"unavailable": reason}.
+printf '1.50 2.25 3.00 2/900 4242\n' >"$PROC/loadavg"
+fake_status() { printf 'Name:\t%s\nCpus_allowed_list:\t%s\n' "$2" "$3" >"$PROC/$1/status"; }
+fake_status 10 rustc 96-111       # pinned to another CCD
+fake_status 11 rustc 0-127        # free to run on the bench CPU
+# pid 12 (ld.lld) has no readable status: it may run anywhere, so it counts as on the bench CPUs
+fake_status 32 Runner.Worker 72   # the bench CPU's sibling
+
+# Placement-aware counts split the old machine-wide count; the old field is unchanged.
+check "placement: compilers on bench, elsewhere" "2 1" "$(ctx_placed_count 8 72 -- $CTX_COMPILERS)"
+check "placement: runner workers on bench" "1 0" "$(ctx_placed_count 8 72 -- Runner.Worker)"
+
+# Absent pressure, vmstat or resctrl files are unavailable, never zero.
+check "psi: no /proc/pressure" '{"unavailable":"no pressure/cpu"}' "$(ctx_psi_file "$PROC/pressure/cpu" pressure/cpu)"
+mkdir -p "$PROC/pressure"
+printf 'some avg10=0.00 avg60=0.00 avg300=0.00 total=1234\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=56\n' \
+  >"$PROC/pressure/memory"
+printf 'some avg10=0.00 avg60=0.00 avg300=0.00 total=99\n' >"$PROC/pressure/cpu"
+check "psi: some and full totals" '{"some_us":1234,"full_us":56}' "$(ctx_psi_file "$PROC/pressure/memory" x)"
+check "psi: a missing full line is null" '{"some_us":99,"full_us":null}' "$(ctx_psi_file "$PROC/pressure/cpu" x)"
+check "psi: system" '{"cpu":{"some_us":99,"full_us":null},"memory":{"some_us":1234,"full_us":56},"io":{"unavailable":"no pressure/io"}}' \
+  "$(ctx_psi "$PROC/pressure" pressure/ '')"
+CGROUP="$ROOT/cgroup" && export ZEEBRA_CPU_CONTEXT_CGROUP="$CGROUP"
+check "psi: no bench slice" '{"unavailable":"no zbbench.slice"}' "$(ctx_psi_slice)"
+mkdir -p "$CGROUP/zbbench.slice"
+printf 'some avg10=0.00 avg60=0.00 avg300=0.00 total=7\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=3\n' \
+  >"$CGROUP/zbbench.slice/cpu.pressure"
+check "psi: bench slice" '{"cpu":{"some_us":7,"full_us":3},"memory":{"unavailable":"no zbbench.slice/memory.pressure"},"io":{"unavailable":"no zbbench.slice/io.pressure"}}' \
+  "$(ctx_psi_slice)"
+
+check "vmstat: missing" '{"unavailable":"no vmstat"}' "$(ctx_vmstat)"
+printf 'nr_free_pages 9\npswpin 1\npswpout 2\npgscan_kswapd 10\npgscan_direct 5\npgsteal_kswapd 7\npgsteal_direct 3\npgmajfault 4\n' \
+  >"$PROC/vmstat"
+check "vmstat: swap, reclaim and major faults" '{"pswpin":1,"pswpout":2,"pgscan":15,"pgsteal":10,"pgmajfault":4}' "$(ctx_vmstat)"
+
+RESCTRL="$ROOT/resctrl" && export ZEEBRA_CPU_CONTEXT_RESCTRL="$RESCTRL"
+check "mbm: resctrl not mounted" '{"unavailable":"resctrl not mounted"}' "$(ctx_mbm)"
+mkdir -p "$RESCTRL/mon_data/mon_L3_00" "$RESCTRL/mon_data/mon_L3_01"
+printf '1000\n' >"$RESCTRL/mon_data/mon_L3_00/mbm_total_bytes"
+printf '2000\n' >"$RESCTRL/mon_data/mon_L3_01/mbm_total_bytes"
+check "mbm: total bytes over every L3 domain" 3000 "$(ctx_mbm)"
+printf 'Unavailable\n' >"$RESCTRL/mon_data/mon_L3_01/mbm_total_bytes"
+check "mbm: an unreadable domain makes the total unavailable" '{"unavailable":"mbm_total_bytes unreadable"}' "$(ctx_mbm)"
+
+# Load per L3 domain over every online CPU; a CPU whose L3 cannot be read is grouped as unknown.
+check "ccd: per-domain jiffies" \
+  '[{"l3":"0-7,64-71","busy":150,"total":1000,"cpus":1},{"l3":"8-15,72-79","busy":300,"total":2000,"cpus":2},{"l3":"unknown","busy":1500,"total":10000,"cpus":10}]' \
+  "$(ctx_ccd_stat)"
+
+# Runnable tasks whose last CPU is a bench CPU or sibling, by name (field 39 of /proc/<pid>/stat).
+fake_stat() { # <pid> <comm> <state> <processor>
+  local rest="" i
+  for i in $(seq 4 52); do rest+=" $([ "$i" = 39 ] && echo "$4" || echo 0)"; done
+  printf '%s (%s) %s%s\n' "$1" "$2" "$3" "$rest" >"$PROC/$1/stat"
+}
+mkdir -p "$PROC/40" "$PROC/41" "$PROC/42"
+fake_stat 40 "stress ng" R 72
+fake_stat 41 sleeper S 8
+fake_stat 42 elsewhere R 100
+check "running: foreign runnable task on a sibling" '[{"pid":40,"comm":"stress ng","cpu":72}]' "$(ctx_bench_running 8 72)"
+
+# The snapshot carries every telemetry field, and the telemetry version.
+if command -v python3 >/dev/null; then
+  fields="$(ctx_snapshot 8 | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+print(d["telemetry"], d["compilers"], d["compilers_on_bench"], d["compilers_elsewhere"],
+      d["runner_workers_on_bench"], d["psi"]["memory"]["some_us"], d["psi_bench_slice"]["cpu"]["full_us"],
+      d["vmstat"]["pgscan"], d["mbm_bytes"], len(d["ccd_stat"]), d["bench_running"][0]["comm"])')"
+  check "snapshot: telemetry fields" "1 3 2 1 1 1234 3 15 {'unavailable': 'mbm_total_bytes unreadable'} 3 stress ng" "$fields"
+fi
+
 printf 'cpu-context: %d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
