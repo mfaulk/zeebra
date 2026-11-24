@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools'))
+spec = importlib.util.spec_from_file_location('m34_public_corpus', ROOT / 'tools/m34_public_corpus.py')
+corpus = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(corpus)
+
+PROBLEM = dict(id='toy', formulation_id='toy', family_id='toy', source_id='toy', family_parameters=dict(n=2))
+
+
+def entry(*equations):
+    return dict(url='https://example.org/toy', revision='v1', license='CC0-1.0', variables=['x', 'y'],
+                equations=list(equations))
+
+
+class Parser(unittest.TestCase):
+    def test_coefficients_and_repeated_variables_combine(self):
+        """A mid-term coefficient multiplies, a repeated variable adds exponents, and like terms merge."""
+        self.assertEqual(corpus.parse_integer_polynomial('2*x*3*x^2 - 6*x^3 + y - 7', ['x', 'y']),
+                         {(0, 1): 1, (0, 0): -7})
+
+    def test_unknown_variable_is_rejected(self):
+        """A factor that is not a declared variable fails rather than becoming a parameter."""
+        with self.assertRaises(ValueError):
+            corpus.parse_integer_polynomial('x*u+1', ['x', 'y'])
+
+    def test_non_integer_coefficients_are_rejected(self):
+        """Decimal and rational coefficients are refused, never silently converted."""
+        for text in ('0.5*x+1', 'x/2+1', '(x+1)*y'):
+            with self.assertRaises(ValueError, msg=text):
+                corpus.parse_integer_polynomial(text, ['x', 'y'])
+
+
+class Reduction(unittest.TestCase):
+    def test_clean_reduction_preserves_support(self):
+        """Field twins whose reduction removes no term share one computed support id."""
+        a = corpus.reduce_record(PROBLEM, entry('3*x^2-y'), 'a', 7)
+        b = corpus.reduce_record(PROBLEM, entry('3*x^2-y'), 'b', 11)
+        self.assertEqual(a['lineage']['support_id'], b['lineage']['support_id'])
+        self.assertEqual([t['kind'] for t in a['transformations']], ['prime-reduction'])
+        self.assertEqual(a['equations'][0][0], {'exponents': [0, 1], 'coefficient': ['6']})
+
+    def test_vanishing_coefficient_is_an_exceptional_reduction(self):
+        """A coefficient divisible by p is labelled and changes the support id."""
+        clean = corpus.reduce_record(PROBLEM, entry('7*x^2-y'), 'a', 11)
+        exceptional = corpus.reduce_record(PROBLEM, entry('7*x^2-y'), 'b', 7)
+        self.assertIn('exceptional-reduction', [t['kind'] for t in exceptional['transformations']])
+        self.assertNotEqual(clean['lineage']['support_id'], exceptional['lineage']['support_id'])
+
+
+class BasisDigest(unittest.TestCase):
+    def test_digest_ignores_scalar_multiples_and_generator_order(self):
+        """Two oracles' renderings of one reduced basis, scaled and reordered, give one digest."""
+        record = corpus.reduce_record(PROBLEM, entry('x^2-y', 'y^2-1'), 'a', 7)
+        a = corpus.basis_digest(record, [{(2, 0): 1, (0, 1): -1}, {(0, 2): 1, (0, 0): -1}])
+        b = corpus.basis_digest(record, [{(0, 2): 3, (0, 0): 4}, {(2, 0): 2, (0, 1): 5}])
+        self.assertEqual(a, b)
+
+    def test_grevlex_leading_term_sets_the_scale(self):
+        """Scaling is by the grevlex leading coefficient, not by the first or largest-exponent term."""
+        record = corpus.reduce_record(PROBLEM, entry('x-y^2'), 'a', 7)
+        monic = corpus.basis_digest(record, [{(0, 2): 1, (1, 0): 6}])
+        self.assertEqual(corpus.basis_digest(record, [{(0, 2): 2, (1, 0): 5}]), monic)
+        self.assertNotEqual(corpus.basis_digest(record, [{(0, 2): 1, (1, 0): 1}]), monic)
+
+    def test_grobx_basis_text_parses(self):
+        """grobx's bracketed, colon-terminated basis text parses with non-negative residues."""
+        text = '[y^2+18446744073709551556*x,\nx^2*y+18446744073709551554*x+1]:\n'
+        self.assertEqual(corpus.parse_grobx_basis(text, ['x', 'y']),
+                         [{(0, 2): 1, (1, 0): 18446744073709551556},
+                          {(2, 1): 1, (1, 0): 18446744073709551554, (0, 0): 1}])
+
+    def test_generator_text_round_trips(self):
+        """Rendered reduced generators parse back to the record's equations."""
+        record = corpus.reduce_record(PROBLEM, entry('3*x^2*y-y+7'), 'a', 11)
+        text = corpus.generator_texts(record)
+        self.assertEqual(corpus.parse_integer_polynomial(text[0], ['x', 'y']), {(2, 1): 3, (0, 1): 10, (0, 0): 7})
+
+
+class Committed(unittest.TestCase):
+    def test_catalog_is_current_and_valid(self):
+        """The committed catalog equals a rebuild from inputs.json and every record validates."""
+        run = subprocess.run([sys.executable, str(ROOT / 'tools/m34_public_corpus.py'), 'check'],
+                             capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+
+    def test_references_match_catalog_digests(self):
+        """Every record has a reference row from its field's oracle, keyed to the input digest it used."""
+        catalog = {r['id']: r for r in json.loads(corpus.CATALOG.read_text())}
+        references = json.loads(corpus.REFERENCES.read_text())['references']
+        self.assertEqual(set(references), set(catalog))
+        for name, row in references.items():
+            self.assertEqual(row['normalized_input_digest'], catalog[name]['normalized_input_digest'], name)
+            self.assertIn(row['status'], ('reference', 'frontier'), name)
+            small = int(catalog[name]['field']['characteristic']) < 2 ** 31
+            self.assertEqual(row['oracle'], 'singular' if small else 'grobx-certified', name)
+
+    def test_field_twins_agree_on_shape(self):
+        """Where both fields have a reference, zero-dimensionality and vdim agree unless a coefficient vanished."""
+        catalog = {r['id']: r for r in json.loads(corpus.CATALOG.read_text())}
+        references = json.loads(corpus.REFERENCES.read_text())['references']
+        for name, row in references.items():
+            if not name.endswith('@p31') or row['status'] != 'reference':
+                continue
+            twin = references.get(name.replace('@p31', '@p64'))
+            exceptional = any(t['kind'] == 'exceptional-reduction' for t in catalog[name]['transformations'])
+            if twin and twin['status'] == 'reference' and not exceptional:
+                self.assertEqual((row['dimension'] == 0, row['vdim']), (twin['zero_dimensional'], twin['vdim']), name)
+
+    def test_staircase_counts_standard_monomials(self):
+        """vdim is the number of monomials outside the leading-term ideal, None when it is infinite."""
+        self.assertEqual(corpus.staircase_size([(2, 0), (0, 2)]), 4)
+        self.assertEqual(corpus.staircase_size([(2, 0), (1, 1), (0, 3)]), 4)
+        self.assertEqual(corpus.staircase_size([(0, 0)]), 0)
+        self.assertIsNone(corpus.staircase_size([(1, 1)]))
+
+
+if __name__ == '__main__':
+    unittest.main()

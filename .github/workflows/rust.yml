@@ -297,6 +297,7 @@ jobs:
           bash tools/test/bench-job-test.sh
           python3 tools/test/bench-stats-test.py
           python3 tools/test/corpus-lineage-test.py
+          python3 tools/test/m34-public-corpus-test.py
           bash tools/test/check-archive-reproducible-test.sh
           bash tools/test/check-agent-authorship-test.sh
 

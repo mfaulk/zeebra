@@ -1,0 +1,415 @@
+{
+ "schema": "m34-public-panel-v1",
+ "issue": 1006,
+ "fields": {
+  "p31": "2147483647",
+  "p64": "18446744073709551557"
+ },
+ "sources": {
+  "symbolicdata": {
+   "url": "https://github.com/symbolicdata/data",
+   "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+   "path": "XMLResources/IntPS",
+   "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems"
+  }
+ },
+ "problems": [
+  {
+   "id": "sd-signaltheory-f633",
+   "source_entry": "SignalTheory.f633",
+   "family_id": "sd/signal-theory",
+   "source_id": "symbolicdata/SignalTheory",
+   "formulation_id": "symbolicdata/SignalTheory.f633",
+   "family_parameters": {
+    "n": 10
+   }
+  },
+  {
+   "id": "sd-signaltheory-f744",
+   "source_entry": "SignalTheory.f744",
+   "family_id": "sd/signal-theory",
+   "source_id": "symbolicdata/SignalTheory",
+   "formulation_id": "symbolicdata/SignalTheory.f744",
+   "family_parameters": {
+    "n": 12
+   }
+  },
+  {
+   "id": "sd-signaltheory-f855",
+   "source_entry": "SignalTheory.f855",
+   "family_id": "sd/signal-theory",
+   "source_id": "symbolicdata/SignalTheory",
+   "formulation_id": "symbolicdata/SignalTheory.f855",
+   "family_parameters": {
+    "n": 14
+   }
+  },
+  {
+   "id": "sd-signaltheory-f966",
+   "source_entry": "SignalTheory.f966",
+   "family_id": "sd/signal-theory",
+   "source_id": "symbolicdata/SignalTheory",
+   "formulation_id": "symbolicdata/SignalTheory.f966",
+   "family_parameters": {
+    "n": 16
+   }
+  },
+  {
+   "id": "sd-verschelde-gametwo5",
+   "source_entry": "Verschelde.gametwo5",
+   "family_id": "sd/gametwo-nash",
+   "source_id": "symbolicdata/Verschelde.gametwo",
+   "formulation_id": "symbolicdata/Verschelde.gametwo5",
+   "family_parameters": {
+    "n": 5
+   }
+  },
+  {
+   "id": "sd-verschelde-gametwo6",
+   "source_entry": "Verschelde.gametwo6",
+   "family_id": "sd/gametwo-nash",
+   "source_id": "symbolicdata/Verschelde.gametwo",
+   "formulation_id": "symbolicdata/Verschelde.gametwo6",
+   "family_parameters": {
+    "n": 6
+   }
+  },
+  {
+   "id": "sd-verschelde-gametwo7",
+   "source_entry": "Verschelde.gametwo7",
+   "family_id": "sd/gametwo-nash",
+   "source_id": "symbolicdata/Verschelde.gametwo",
+   "formulation_id": "symbolicdata/Verschelde.gametwo7",
+   "family_parameters": {
+    "n": 7
+   }
+  },
+  {
+   "id": "sd-singular-schwarz-7",
+   "source_entry": "Singular.schwarz_7",
+   "family_id": "sd/schwarz",
+   "source_id": "symbolicdata/Singular.schwarz",
+   "formulation_id": "symbolicdata/Singular.schwarz_7",
+   "family_parameters": {
+    "n": 7
+   }
+  },
+  {
+   "id": "sd-singular-schwarz-8",
+   "source_entry": "Singular.schwarz_8",
+   "family_id": "sd/schwarz",
+   "source_id": "symbolicdata/Singular.schwarz",
+   "formulation_id": "symbolicdata/Singular.schwarz_8",
+   "family_parameters": {
+    "n": 8
+   }
+  },
+  {
+   "id": "sd-singular-schwarz-9",
+   "source_entry": "Singular.schwarz_9",
+   "family_id": "sd/schwarz",
+   "source_id": "symbolicdata/Singular.schwarz",
+   "formulation_id": "symbolicdata/Singular.schwarz_9",
+   "family_parameters": {
+    "n": 9
+   }
+  },
+  {
+   "id": "sd-singular-schwarz-10",
+   "source_entry": "Singular.schwarz_10",
+   "family_id": "sd/schwarz",
+   "source_id": "symbolicdata/Singular.schwarz",
+   "formulation_id": "symbolicdata/Singular.schwarz_10",
+   "family_parameters": {
+    "n": 10
+   }
+  },
+  {
+   "id": "sd-singular-schwarz-11",
+   "source_entry": "Singular.schwarz_11",
+   "family_id": "sd/schwarz",
+   "source_id": "symbolicdata/Singular.schwarz",
+   "formulation_id": "symbolicdata/Singular.schwarz_11",
+   "family_parameters": {
+    "n": 11
+   }
+  },
+  {
+   "id": "sd-robot-fabrice24",
+   "source_entry": "Robot-Fabrice24",
+   "family_id": "sd/robot-kinematics",
+   "source_id": "symbolicdata/Robot-Fabrice24",
+   "formulation_id": "symbolicdata/Robot-Fabrice24",
+   "family_parameters": {
+    "n": 9
+   }
+  },
+  {
+   "id": "sd-robot-romin",
+   "source_entry": "Robot-Romin",
+   "family_id": "sd/robot-kinematics",
+   "source_id": "symbolicdata/Robot-Romin",
+   "formulation_id": "symbolicdata/Robot-Romin",
+   "family_parameters": {
+    "n": 12
+   }
+  },
+  {
+   "id": "sd-robot-rr",
+   "source_entry": "Robot-RR",
+   "family_id": "sd/robot-kinematics",
+   "source_id": "symbolicdata/Robot-RR",
+   "formulation_id": "symbolicdata/Robot-RR",
+   "family_parameters": {
+    "n": 15
+   }
+  },
+  {
+   "id": "sd-robot-jcf26",
+   "source_entry": "Robot-jcf26",
+   "family_id": "sd/robot-kinematics",
+   "source_id": "symbolicdata/Robot-jcf26",
+   "formulation_id": "symbolicdata/Robot-jcf26",
+   "family_parameters": {
+    "n": 34
+   }
+  },
+  {
+   "id": "sd-butcher",
+   "source_entry": "Butcher",
+   "family_id": "sd/runge-kutta-order-conditions",
+   "source_id": "symbolicdata/Butcher",
+   "formulation_id": "symbolicdata/Butcher",
+   "family_parameters": {
+    "n": 8
+   }
+  },
+  {
+   "id": "sd-hairer-1",
+   "source_entry": "Hairer_1",
+   "family_id": "sd/runge-kutta-order-conditions",
+   "source_id": "symbolicdata/Hairer",
+   "formulation_id": "symbolicdata/Hairer_1",
+   "family_parameters": {
+    "n": 8
+   }
+  },
+  {
+   "id": "sd-hairer-2",
+   "source_entry": "Hairer_2",
+   "family_id": "sd/runge-kutta-order-conditions",
+   "source_id": "symbolicdata/Hairer",
+   "formulation_id": "symbolicdata/Hairer_2",
+   "family_parameters": {
+    "n": 13
+   }
+  },
+  {
+   "id": "sd-hairer-2-1",
+   "source_entry": "Hairer_2_1",
+   "family_id": "sd/runge-kutta-order-conditions",
+   "source_id": "symbolicdata/Hairer",
+   "formulation_id": "symbolicdata/Hairer_2_1",
+   "family_parameters": {
+    "n": 13
+   },
+   "presentation_parent": "sd-hairer-2",
+   "note": "Hairer_2 plus one generator: a different ideal kept in Hairer_2's presentation cluster"
+  },
+  {
+   "id": "sd-ellipsoid-2",
+   "source_entry": "Ellipsoid_2",
+   "family_id": "sd/ellipsoid",
+   "source_id": "symbolicdata/Ellipsoid",
+   "formulation_id": "symbolicdata/Ellipsoid_2",
+   "family_parameters": {
+    "n": 10,
+    "k": 2
+   }
+  },
+  {
+   "id": "sd-ellipsoid-4",
+   "source_entry": "Ellipsoid_4",
+   "family_id": "sd/ellipsoid",
+   "source_id": "symbolicdata/Ellipsoid",
+   "formulation_id": "symbolicdata/Ellipsoid_4",
+   "family_parameters": {
+    "n": 10,
+    "k": 4
+   }
+  },
+  {
+   "id": "sd-ellipsoid-m2",
+   "source_entry": "Ellipsoid_-2",
+   "family_id": "sd/ellipsoid",
+   "source_id": "symbolicdata/Ellipsoid",
+   "formulation_id": "symbolicdata/Ellipsoid_-2",
+   "family_parameters": {
+    "n": 10,
+    "k": -2
+   }
+  },
+  {
+   "id": "sd-verschelde-virasoro",
+   "source_entry": "Verschelde.virasoro",
+   "family_id": "sd/virasoro",
+   "source_id": "symbolicdata/Verschelde.virasoro",
+   "formulation_id": "symbolicdata/Verschelde.virasoro",
+   "family_parameters": {
+    "n": 8
+   }
+  },
+  {
+   "id": "sd-fourbodyproblem",
+   "source_entry": "FourBodyProblem",
+   "family_id": "sd/four-body",
+   "source_id": "symbolicdata/FourBodyProblem",
+   "formulation_id": "symbolicdata/FourBodyProblem",
+   "family_parameters": {
+    "n": 6
+   }
+  },
+  {
+   "id": "sd-verschelde-chemkin",
+   "source_entry": "Verschelde.chemkin",
+   "family_id": "sd/chemkin",
+   "source_id": "symbolicdata/Verschelde.chemkin",
+   "formulation_id": "symbolicdata/Verschelde.chemkin",
+   "family_parameters": {
+    "n": 13
+   }
+  },
+  {
+   "id": "sd-caprasse",
+   "source_entry": "Caprasse",
+   "family_id": "sd/classical/caprasse",
+   "source_id": "symbolicdata/Caprasse",
+   "formulation_id": "symbolicdata/Caprasse",
+   "family_parameters": {
+    "n": 4
+   }
+  },
+  {
+   "id": "sd-cassou",
+   "source_entry": "Cassou",
+   "family_id": "sd/classical/cassou",
+   "source_id": "symbolicdata/Cassou",
+   "formulation_id": "symbolicdata/Cassou",
+   "family_parameters": {
+    "n": 4
+   }
+  },
+  {
+   "id": "sd-trinks",
+   "source_entry": "Trinks",
+   "family_id": "sd/classical/trinks",
+   "source_id": "symbolicdata/Trinks",
+   "formulation_id": "symbolicdata/Trinks",
+   "family_parameters": {
+    "n": 6
+   }
+  },
+  {
+   "id": "sd-fee-1",
+   "source_entry": "Fee_1",
+   "family_id": "sd/classical/fee_1",
+   "source_id": "symbolicdata/Fee_1",
+   "formulation_id": "symbolicdata/Fee_1",
+   "family_parameters": {
+    "n": 4
+   }
+  },
+  {
+   "id": "sd-rose",
+   "source_entry": "Rose",
+   "family_id": "sd/classical/rose",
+   "source_id": "symbolicdata/Rose",
+   "formulation_id": "symbolicdata/Rose",
+   "family_parameters": {
+    "n": 3
+   }
+  },
+  {
+   "id": "sd-schiele",
+   "source_entry": "Schiele",
+   "family_id": "sd/classical/schiele",
+   "source_id": "symbolicdata/Schiele",
+   "formulation_id": "symbolicdata/Schiele",
+   "family_parameters": {
+    "n": 5
+   }
+  },
+  {
+   "id": "sd-czapor-86a",
+   "source_entry": "Czapor-86a",
+   "family_id": "sd/classical/czapor-86a",
+   "source_id": "symbolicdata/Czapor-86a",
+   "formulation_id": "symbolicdata/Czapor-86a",
+   "family_parameters": {
+    "n": 3
+   }
+  },
+  {
+   "id": "sd-weispfenning-94",
+   "source_entry": "Weispfenning-94",
+   "family_id": "sd/classical/weispfenning-94",
+   "source_id": "symbolicdata/Weispfenning-94",
+   "formulation_id": "symbolicdata/Weispfenning-94",
+   "family_parameters": {
+    "n": 3
+   }
+  },
+  {
+   "id": "sd-raksanyi",
+   "source_entry": "Raksanyi",
+   "family_id": "sd/classical/raksanyi",
+   "source_id": "symbolicdata/Raksanyi",
+   "formulation_id": "symbolicdata/Raksanyi",
+   "family_parameters": {
+    "n": 8
+   }
+  },
+  {
+   "id": "sd-bjoerk-8",
+   "source_entry": "Bjoerk_8",
+   "family_id": "sd/classical/bjoerk_8",
+   "source_id": "symbolicdata/Bjoerk_8",
+   "formulation_id": "symbolicdata/Bjoerk_8",
+   "family_parameters": {
+    "n": 8
+   }
+  },
+  {
+   "id": "sd-heron",
+   "source_entry": "Heron",
+   "family_id": "sd/classical/heron",
+   "source_id": "symbolicdata/Heron",
+   "formulation_id": "symbolicdata/Heron",
+   "family_parameters": {
+    "n": 7
+   }
+  },
+  {
+   "id": "sd-fourcircles",
+   "source_entry": "FourCircles",
+   "family_id": "sd/classical/fourcircles",
+   "source_id": "symbolicdata/FourCircles",
+   "formulation_id": "symbolicdata/FourCircles",
+   "family_parameters": {
+    "n": 2
+   }
+  },
+  {
+   "id": "sd-trinks-1",
+   "source_entry": "Trinks_1",
+   "family_id": "sd/classical/trinks",
+   "source_id": "symbolicdata/Trinks",
+   "formulation_id": "symbolicdata/Trinks_1",
+   "family_parameters": {
+    "n": 6
+   },
+   "presentation_parent": "sd-trinks",
+   "note": "Trinks plus one generator; same presentation cluster"
+  }
+ ]
+}
