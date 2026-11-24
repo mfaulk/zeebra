@@ -15,6 +15,17 @@ phases=("$@")
 here=$(cd "$(dirname "$0")/../.." && pwd)
 reserve=$here/tools/bench-reserve.sh
 
+# Reserve if nobody has, and release on exit; ride an existing reservation otherwise. The first
+# deciding run (2026-11-23) rode another agent's reservation, lost it after five attempts and
+# recorded 151 instant refusals as rc 2, so a lost reservation now stops the run instead.
+status_rc=0
+"$reserve" status > /dev/null || status_rc=$?
+case $status_rc in
+  0) ;;
+  1) "$reserve" reserve; trap '"$reserve" release' EXIT ;;
+  *) echo "bench-reserve status failed; refusing to measure" >&2; exit 2 ;;
+esac
+
 attempt() { # <label> <arm> <cpus> <cap-s> <command...>
   local label=$1 arm=$2 cpus=$3 cap=$4
   shift 4
@@ -43,6 +54,14 @@ print(json.dumps({"label": label, "arm": arm, "rc": int(rc),
                   "max_rss_kib": int(rss_kib) if rss_kib else None,
                   **{k: record[k] for k in keep if k in record}}))
 EOF
+  if ((rc != 0)); then
+    cp "$log" "$out.failed-$(date +%s%N)"
+    if ! "$reserve" status > /dev/null; then
+      echo "reservation lost after a failed attempt ($label $arm, rc $rc); stopping" >&2
+      rm -f "$log"
+      exit 3
+    fi
+  fi
   rm -f "$log"
 }
 
