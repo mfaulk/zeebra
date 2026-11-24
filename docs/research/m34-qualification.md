@@ -1,9 +1,8 @@
 # M34 candidate qualification (G2)
 
 **Issue:** #1011 (tracker #1043, plan [`docs/MILESTONE-GENERALIZABLE-SELECTION.md`](../MILESTONE-GENERALIZABLE-SELECTION.md)
-§7.2, §7.6, §8.6). **Measured at:** Z0 = `28df047f` (tag `measured/1011-z0`). **Status:** in progress.
-The safety prerequisites are recorded below. No timed qualification run has been made yet, and this
-document publishes no timing or memory figure.
+§7.2, §7.6, §8.6). **Measured at:** Z0 = `28df047f` (tag `measured/1011-z0`). **Status:** safety and correctness are done, and the timed regime reads are pending. No timed
+qualification run has been made yet, and this document publishes no timing or memory figure.
 
 ## 1. Z0 freeze
 
@@ -55,16 +54,16 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
 
 | Candidate | Port cost | Correctness (digest vs reference, 1 and max w) | Budgets and threads | Regime | Decision |
 |---|---|---|---|---|---|
-| P1 `conv-w1` | none (on Z0) | pending | `m33_safety` pass | pending | pending |
-| P2 `conv-w4` | none | pending | `m33_safety`, thread cap, #1042 pass | pending | pending |
-| P3 `conv-w16` | none | pending | as P2 | pending | pending |
-| P4 `sig-w1` (grevlex) | none | pending | `m33_safety` pass; grlex refused (#1049) | pending | pending |
-| P5 `sig-w8` (grevlex) | none | pending | as P2 | pending | pending |
-| P6 `sig-w16` (grevlex) | none | pending | as P2 | pending | pending |
-| P7 `conv-cap16` | none | pending (#1004: needs a digest check at a cap of 16) | pending | pending | pending |
-| P8 `adaptive` | none | pending | as P2; #961 routing pass | pending | pending |
+| P1 `conv-w1` | none (on Z0) | **pass**, 61 of 62 rows; 1 typed stop (§4.1) | `m33_safety` pass | timed, quiet window | pending |
+| P2 `conv-w4` | none | **pass**, 61/62; 1 typed stop | `m33_safety`, thread cap, #1042 pass | timed, quiet window | pending |
+| P3 `conv-w16` | none | **pass**, 61/62; 1 typed stop | as P2 | timed, quiet window | pending |
+| P4 `sig-w1` (grevlex) | none | **pass**, 40/40 grevlex; `Unsupported` on all 22 grlex/lex rows | `m33_safety` pass; grlex refused (#1049) | timed, quiet window | pending |
+| P5 `sig-w8` (grevlex) | none | **pass**, as P4 (team of 8) | as P2 | timed, quiet window | pending |
+| P6 `sig-w16` (grevlex) | none | **pass**, as P4 (team of 16) | as P2 | timed, quiet window | pending |
+| P7 `conv-cap16` | none | **pass**, 122/124 cells at 1 and 16 w; 2 typed stops. Cap-16 digest check done | `m33_safety` pass | timed, quiet window | pending |
+| P8 `adaptive` | none | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Signature route on 60 grevlex cells | as P2; #961 routing pass | timed, quiet window | pending |
 | #940 parallel symbolic (`measured/940-gate-s2`) | beyond the 2-session time-box (§6) | — | — | #1040's recommendation not posted | **deferred: port cost** |
-| #997 fewest-terms + FL order | none (options on Z0, §5) | pending (yes-with-check) | pending | timed, quiet window | pending |
+| #997 fewest-terms + FL order | none (options on Z0, §5) | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Eligible | the shipping F4's budgets | timed, quiet window (Cyclic-8 gate) | pending |
 | #955 randomized zero-skipping | — | — | — | — | excluded: no exact acceptance rule (#1004) |
 
 ## 4. Correctness harness
@@ -87,6 +86,40 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
     run for a basis.
   - **Stops.** A typed budget stop is reported as `stopped`, never as a pass.
 
+### 4.1 Correctness result
+
+- **Run.** All 744 cells ran on 2026-11-23, untimed, at Z0 `src/` with harness commit `2099df6e`.
+  - **Binary:** `m33_qualify` release with `research-sigf4`, SHA-256
+    `e4df6228cfb8b0ddb0948e532e75a15b37cf4e4d3fbe08bd0a14d9a2fe812ae4`.
+  - **CPUs:** three arm groups in parallel on CPUs 24–47, 48–71 and 88–127.
+  - **Records:** `research/m34-qualification/results/correctness.jsonl` and `correctness.md`.
+- **Totals.** 669 basis passes, 66 expected refusals and 9 typed budget stops. **No failure:** no
+  digest differs from its reference, no input drifted, nothing crashed, and nothing was refused
+  unexpectedly.
+
+| Arm | GF(32003) | GF(2³¹−1) | 2⁶⁴−59 | 2⁶⁴−353 | Goldilocks |
+|---|---|---|---|---|---|
+| P1 conv-w1 | pass 13 | pass 14 | pass 7 | pass 16 | pass 11, stopped 1 |
+| P2 conv-w4 | pass 13 | pass 14 | pass 7 | pass 16 | pass 11, stopped 1 |
+| P3 conv-w16 | pass 13 | pass 14 | pass 7 | pass 16 | pass 11, stopped 1 |
+| P4 sig-w1 | pass 13 | pass 14 | pass 7 | pass 16 | pass 12 |
+| P5 sig-w8 | pass 13 | pass 14 | pass 7 | pass 16 | pass 12 |
+| P6 sig-w16 | pass 13 | pass 14 | pass 7 | pass 16 | pass 12 |
+| P7 conv-cap16 (1 and 16 w) | pass 26 | pass 28 | pass 14 | pass 32 | pass 22, stopped 2 |
+| P8 adaptive (1 and 16 w) | pass 26 | pass 28 | pass 14 | pass 32 | pass 22, stopped 2 |
+| #997 fewest-fl (1 and 16 w) | pass 26 | pass 28 | pass 14 | pass 32 | pass 22, stopped 2 |
+
+- **Signature arms.** Their passes include the 22 grlex and lex rows, each refused with
+  `Unsupported` as the contract requires. The engine ran at its requested team on every grevlex
+  cell: 1, 8 and 16.
+- **The 9 stops.** All are on one row, graded-lex Goldilocks MQ11.
+  - Eight are `TooManyNonzeros` at the default 32 M budget: P1–P3, P7 at 16 w, P8 at both counts,
+    and #997 at both counts.
+  - One is P7 at 1 w, which reached the 180 s wall budget (`TimeBudgetExceeded`).
+  - This row is M33-Q's documented budget stop (#961's table), where the reference is recorded but
+    nothing is compared with it. P8 routes it to the shipping F4 by rule (`Shipping(Order)`), and
+    the signature arms refuse it.
+
 ## 5. #997 (fewest-terms reducer rule with the FL batch order)
 
 - **Port cost:** none. Both options are on Z0 (`ReducerSelection::FewestTerms`,
@@ -94,8 +127,8 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
 - **Eligibility.** The reducer rule changes which reducer row covers a column, not the pair set. The
   FL order changes how a batch is eliminated, not its row space (`BatchOrder` docs: both orders give
   the same candidate rows). The reduced basis is unique, so the arm is T-GB-eligible under every
-  order in principle. It is "yes-with-check" until the harness confirms it by digest on the
-  qualification set.
+  order in principle. The harness confirms it by digest on the qualification set (§4.1), so it is
+  **eligible** on T-GB under grevlex, grlex and lex.
 - **Already in tree.** `FewestTerms` alone is already in the differential sweep (`differential/mod.rs`).
   The combination is not.
 - **Regime.** #997's own gate (gated by monomial order, no Cyclic-8 regression) is a timed read, so
@@ -130,15 +163,9 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
 
 ## 7. Remaining work
 
-- **Build and run the harness.**
-  - The harness change is written but not yet compiled or committed: `cargo test --example
-    m33_qualify`, with and without `research-sigf4`.
-  - Then build at Z0 plus this harness and run `campaign.py run`, all 744 cells. This covers the P7
-    cap-16 check and #997's digest check.
-  - **Why it waits.** Compiling or running it adds compiler processes and load that #1039's
-    publication job (`05a26851f550`, 486 attempts) flags as contamination on its attempts. So the
-    build waits until that job and #945's queued run finish. Nothing here is timed, so the result
-    does not depend on a quiet machine. Only the other sessions' measurements do.
 - **Timed, needs a quiet machine.** Bounded regime reads for P1–P8 and #997 that the M32 records do
   not already answer, plus #997's own gate (Cyclic-8 no-regression). Before each run, load and other
   sessions' compilers are re-checked inside the bench lock.
+- **Then the admission decision** for every candidate (admit, defer or reject, with reasons). Each
+  arm with no pre-declared regime is not admitted.
+- **After the squash merge,** tag the cited commits (`2099df6e` harness) as `measured/1011-*`.
