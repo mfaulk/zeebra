@@ -151,5 +151,6 @@ staircase of its leading terms. `m34-public-corpus-test.py` asserts that agreeme
   - Application sources outside SymbolicData: Groebner.jl's systems by independent definition,
     SIAN/StructuralIdentifiability exports, MathRepo.
   - Inequation and saturation tasks; none are in this slice.
-  - Coverage by #1009's features.
+  - Its gaps in #1009's feature space ([`input-features.md`](../../docs/research/input-features.md) §9):
+    no record splits into incidence components, and homogeneous and wide inputs are one problem each.
   - The composition read across #1006 and #1007 together.

@@ -1,8 +1,11 @@
 # Structural input features: incidence, the linear part, supports and leading monomials (#1009)
 
-**Status:** definitions and implementation only. No timing or memory figure appears here. The
-measured cost table and the coverage summary #1009 asks for need the pilot panel from #1006/#1007,
-and both are still open.
+**Measured at:** `6d46e583` (tag `measured/1009-feature-costs`), on the #1006 public pilot panel.
+Dev mode, CCDs 1–2 reserved, CPUs 8–23. Data: [`research/1009-feature-costs/`](../../research/1009-feature-costs/README.md).
+
+**Status:** definitions (§1–§7), the measured extraction-cost table (§8), the coverage summary of
+the pilot panel (§9) and the stop-condition verdicts (§10). Four of the seven extractors fail the
+declared bound on the panel's smallest inputs and move to #1010 (§10).
 
 `src/grobner/planning/structure.rs` adds features that `SystemShape` (`planning/analysis.rs`) and
 `DispatchFeatures` (`sigf4/dispatch.rs`) lack: equation–variable incidence and the affine-linear
@@ -89,16 +92,13 @@ presentation features. Systems built from independent blocks, such as the plante
 `strategy-selection.md` §2, keep their components only while the presentation keeps the blocks
 apart.
 
-## 4. Still open in #1009
+## 4. Left to other issues
 
-- Measured extraction cost, absolute and as a fraction of the cheapest arm's solve time, on the
-  #1006/#1007 pilot panel. This needs that panel and a measurement host.
-- A feature-space coverage summary of the pilot panel, and the stop-condition check against the
-  measured costs.
 - Whether the dispatcher reads any of this through an allocation-free fast path. That is #1013's
-  decision, made after the costs are measured.
+  decision; §8 gives it the costs.
+- Coverage of #1007's controlled families, which are not available (§9).
 
-Scope items 2, 5 and 6, listed here as open before, are §5 and §6.
+Scope items 2, 5 and 6 are §5 and §6. The costs, coverage and stop condition are §8–§10.
 
 ## 5. Supports: `support_profile`
 
@@ -153,8 +153,8 @@ Notes:
 - **`divisible_leading > 0` means the input is not interreduced.** A generator whose leading
   monomial another divides is top-reducible before any pair is formed. A nonzero constant has
   leading monomial 1 and makes every other generator count.
-- The divisibility count is quadratic in `m` and has no cap. If the pilot panel shows it is too
-  expensive on wide inputs, it gets a work cap like `overlapping_pairs`.
+- The divisibility count is quadratic in `m` and has no cap. On the pilot panel (`m ≤ 34`) the
+  whole profile costs at most 16.8 µs and passes §10, so no cap is added yet.
 
 ## 7. Invariance of §5 and §6
 
@@ -176,3 +176,145 @@ The pair sample is taken over pair positions, so past the cap a reorder can chan
 sampled, but not `total_pairs` or `sampled_pairs`.
 
 `test_support_profile_invariance_under_reorder_and_scaling` checks reordering and scaling together.
+
+## 8. Measured extraction cost
+
+**Panel.** The 78 `corpus-instance-v1` records of `research/m34-public-corpus/catalog.json`: 39
+SymbolicData problems, each at 2³¹−1 and 2⁶⁴−59, grevlex, task T-GB (#1006, PR #1094).
+
+**Method.** `examples/feature_costs.rs` runs one record per fresh process and measures two things:
+
+- **Extractor cost.** Each extractor's median per-call time over 7 batches. Each batch repeats the
+  call until it takes at least 2 ms.
+- **Solve time.** The `entry` (`f4_signature_reported`) and `f4` (`f4_reported`) arms run
+  alternately on `F4Options::default()` with a 60 s wall, up to 5 calls or 10 s per arm. The
+  **cheapest arm** is the faster of their two medians.
+
+Taking the faster of the two lowers the denominator, so the ratio is conservative. Both arms are
+shipping entry points: `entry` is the dispatch every caller reaches, and `f4` is the engine it
+falls back to.
+
+Scope item 7 (field, order, task, worker cap) is read from the request in constant time and is
+not timed. `DispatchFeatures` is computed inside `entry` and is already in its wall.
+
+**Placement.** Dev mode: CCDs 1–2 reserved, CPUs 8–23, nothing compiled during the runs, builds
+allowed on the other CCDs. Absolute times were taken beside builds. Each ratio pairs two figures
+from one process.
+
+**Rules, declared on #1009 before the run.**
+
+- **Small inputs** are the records whose cheapest arm completes within 1 s: 72 of 78.
+- **Threshold.** A feature passes if its worst ratio over the small inputs is at most 1%. The
+  seven together are held to 2%.
+
+| feature | scope item | median cost | max cost | median ratio, small | worst ratio, small (repeat) | worst record | small inputs over | failing solves at most |
+|---|---|---:|---:|---:|---:|---|---:|---:|
+| `analyze` (`SystemShape`) | 1, 2 (existing) | 2.9 µs | 67.5 µs | 0.160% | 2.501% (2.937%) | `sd-fourcircles@p31` | 8 / 72 | 130.7 µs |
+| `is_homogeneous` | 2 | 15 ns | 301 ns | 0.001% | 0.067% (0.076%) | `sd-raksanyi@p31` | 0 / 72 | — |
+| `incidence` | 3 | 1.3 µs | 15.9 µs | 0.069% | 1.536% (1.664%) | `sd-raksanyi@p31` | 2 / 72 | 61.7 µs |
+| `linear_subsystem` | 4 | 112 ns | 10.1 µs | 0.009% | 0.991% (0.985%) | `sd-raksanyi@p64` | 0 / 72 | — |
+| `scalar_substitutions` | 4 | 495 ns | 39.0 µs | 0.033% | 1.114% (1.094%) | `sd-raksanyi@p31` | 2 / 72 | 61.7 µs |
+| `support_profile` | 1, 2, 6 | 6.0 µs | 84.1 µs | 0.327% | 6.545% (7.261%) | `sd-fourcircles@p31` | 20 / 72 | 372.6 µs |
+| `leading_profile` (grevlex) | 5 | 594 ns | 16.8 µs | 0.041% | 0.480% (0.481%) | `sd-czapor-86a@p31` | 0 / 72 | — |
+| all seven | | 11.6 µs | 213.3 µs | 0.616% | 10.530% (10.433%) | `sd-raksanyi@p64` | 19 / 72 | 372.6 µs |
+
+The parenthesized worst ratios come from the repeat session, which ran straight after. Both
+sessions give the same verdicts. "Failing solves at most" is the slowest cheapest-arm solve on which
+the feature exceeds its threshold. Per-record figures are in
+`research/1009-feature-costs/tables.md`.
+
+Readings:
+
+- **Every failure is on a solve under 0.4 ms.** On the 42 small records that take 1 ms to 1 s, no
+  extractor exceeds 1%, and the set exceeds 2% nowhere. The largest set ratio there is 1.56%, on
+  `sd-robot-jcf26` (n = 34, 10 ms). The 30 sub-millisecond records solve in 38–583 µs. On them, a
+  few microseconds of extraction is several percent of the solve.
+- **The cost scales with the input, as the bounds in §2 and §5 say.** The maxima are on
+  `sd-signaltheory-f966` (796 terms), which no arm solves. Neither work cap (`width_work`,
+  `overlap_work`) is reached on any record, so the panel does not measure what a cap costs.
+- **The cold first call is 3–67× the warm median** (median over records, per extractor). Most of
+  that is first-touch in a fresh process: `analyze` runs first and absorbs most of it. The verdicts
+  use warm medians on both sides, because the solve's median likewise discounts its cold first call. A
+  dispatcher that extracts once per process pays the cold figure. `tables.md` reports the worst
+  cold ratio for each extractor.
+- **Aside for #1011/#1012.** On the 32 records where `entry` routes to the signature engine, `entry`
+  takes a median 1.62× the wall of `f4`. That ranges from 0.36× on `sd-singular-schwarz-9` to 4.8×
+  on `sd-trinks-1`. These are 5-call dev-mode medians, not a qualification result.
+
+## 9. Coverage of the pilot panel
+
+**What the panel is.** It is #1006's public first slice only. #1007's controlled families are not
+available: their claim went stale with no PR. The two fields give identical feature values on
+every one of the 39 problems, because no record has a field-dependent rank or duplicate. The
+panel is therefore **39 points in feature space, from 21 families**, not 78.
+
+| region | records (of 78) |
+|---|---:|
+| variables `n` | 2–34; only `sd-robot-jcf26` above 16 |
+| generators `m` | 3–34 |
+| max degree | 2–12 |
+| terms | 12–796 |
+| `m > n` / `m = n` / `m < n` | 12 / 44 / 22 |
+| every generator homogeneous | 2 (`sd-raksanyi`) |
+| degree 2, no linear generator | 16 |
+| affine-linear rank > 0 | 32 |
+| a scalar substitution | 36 |
+| a univariate generator | 12 |
+| binomials > half the generators | 6 (`sd-robot-jcf26`, `sd-signaltheory-f633`, `-f966`) |
+| a monomial generator | 2 (`sd-robot-rr`) |
+| a duplicate generator | 4 (`sd-signaltheory-f855`, `-f966`) |
+| a leading monomial divisible by another | 50 |
+| greedy elimination width | 1–24; ≥ 10 on 10 records |
+| top-degree density | 3.3·10⁻⁵ (`sd-ellipsoid-4`) to 1 (`sd-czapor-86a`) |
+| cheapest solve | 38 µs – 7.8 s; 30 under 1 ms; 4 records refused by a budget (`sd-signaltheory-f966`, `sd-ellipsoid-m2`) |
+
+**Gaps.** These are regions the panel never reaches:
+
+- **The exact features are never exercised.** No record has more than one incidence component, an
+  unused variable, a constant generator or an inconsistent linear part. The exact
+  eligibility/decomposition facts of §1 are untested on public data. #1036 has no positive case
+  here.
+- **No caps.** Neither the width cap nor the overlap cap is reached, and no record has more than
+  `2^14` initial pairs. The pair sample is always exhaustive.
+- **One order, one task, two large primes.** The data never varies `leading_profile` by order, item
+  7 by task, or the field-dependent features (rank, duplicates) by characteristic.
+- **Thin at the extremes.** Homogeneous inputs are one problem. Wide inputs (`n > 16`) are one
+  problem. Every initial pair coprime occurs nowhere.
+- **Controlled scaling is absent.** That was #1007's role. Only signal theory, gametwo and Schwarz
+  are parameter ladders. Robot kinematics and Runge–Kutta change size across distinct models.
+
+A selector trained on this panel (#1013) sees too few distinct points to separate the features
+that vary together, such as `n`, terms and width along the signal-theory ladder.
+
+## 10. Stop-condition verdicts
+
+The stop condition: "a feature whose extraction cannot be bounded below a declared fraction of the
+cheapest arm's solve time on small inputs moves to #1010 or is dropped, with the measurement
+recorded." The fraction is 1% per feature and 2% for the set, judged at the worst small input
+(§8).
+
+| feature | verdict | action |
+|---|---|---|
+| `is_homogeneous` | pass (0.07%) | stays inexpensive |
+| `linear_subsystem` | pass, at the margin (0.99%) | stays inexpensive. It is within 0.01 points of the bound on `sd-raksanyi`, so any growth fails it |
+| `leading_profile` | pass (0.48%) | stays inexpensive |
+| `analyze` (`SystemShape`) | **fail** (2.5%) on `sd-czapor-86a`, `sd-ellipsoid-2`, `sd-fourcircles`, `sd-raksanyi` | moves to #1010 |
+| `incidence` | **fail** (1.5%) on `sd-raksanyi` | moves to #1010 |
+| `scalar_substitutions` | **fail** (1.1%) on `sd-raksanyi` | moves to #1010 |
+| `support_profile` | **fail** (6.5%) on 12 problems, every one solved under 0.4 ms | moves to #1010 |
+| all seven | **fail** (10.5%) | — |
+
+**Why "moves to #1010", not "dropped".** That is the conservative reading. The four extractors
+are kept in the crate and stay correct. They are simply not certified as inexpensive, so a policy
+that reads them is charged their measured cost (plan §9.1, VBS⁺). None of them is dropped, for
+three reasons:
+
+- Each fails only on inputs that solve in under 0.4 ms.
+- Each is under 1% on every small input that takes 1 ms or longer.
+- `analyze` is the planner's existing first pass.
+
+**For an owner decision (recorded on #1009).** The bound fails on 0.4 ms solves, and a selector has
+almost nothing to gain there. A size gate before extraction would restore the bound: for example,
+no extraction below a term count, with the default arm used instead. Whether to adopt such a
+gate, or to restate the bound per millisecond of solve, is #1013's design question. This document
+does not decide it.
