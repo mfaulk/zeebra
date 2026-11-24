@@ -1,6 +1,7 @@
 //! Grobner Basis algorithms
 
 pub mod benchmark_systems;
+pub mod bilinear_census;
 mod buchberger;
 pub mod differential;
 pub mod external;
