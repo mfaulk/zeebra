@@ -19,6 +19,8 @@
 #   ZEEBRA_CPU_CONTEXT_SYS    relocates /sys/devices/system/cpu (tests supply a synthetic tree)
 #   ZEEBRA_CPU_CONTEXT_PROC   relocates /proc
 #   ZEEBRA_CPU_CONTEXT_CLASS  relocates /sys/class (powercap, hwmon)
+#   ZEEBRA_CPU_CONTEXT_CGROUP   relocates /sys/fs/cgroup (zbbench.slice pressure)
+#   ZEEBRA_CPU_CONTEXT_RESCTRL  relocates /sys/fs/resctrl (MBM bandwidth counters)
 #   ZEEBRA_BENCHLOCK_DIR      where benchlock.log lives, as for tools/benchlock.sh
 #
 # Exit status: 0 snapshot printed; 2 the load or a listed CPU's topology could not be read — a
@@ -147,6 +149,128 @@ ctx_benchlock_open() { # -> JSON array of {owner, pid}
   printf '[%s]' "${out[*]-}"
 }
 
+# --- Interference telemetry (#1105). Metrics, not rules: no verdict reads these yet. Each is a
+# value, null, or {"unavailable": "<reason>"}, so a missing source is never read as zero.
+CTX_TELEMETRY=1
+
+ctx_unavailable() { printf '{"unavailable":"%s"}' "$1"; }
+
+ctx_list_meets() { # <cpulist> <cpu>...  ->  rc 0 when any of the CPUs is in the list
+  local list="$1"
+  shift
+  awk -v l="$list" -v want="$*" 'BEGIN { n = split(l, p, ","); m = split(want, w, " ")
+    for (i = 1; i <= n; i++) { k = split(p[i], r, "-"); lo = r[1] + 0; hi = (k > 1 ? r[2] : r[1]) + 0
+      for (j = 1; j <= m; j++) if (w[j] + 0 >= lo && w[j] + 0 <= hi) exit 0 }
+    exit 1 }'
+}
+
+# A process counts as on the bench when its affinity (`Cpus_allowed_list`, which already reflects
+# its cpuset) admits a bench CPU or sibling. One whose status cannot be read counts as on the bench:
+# it may run anywhere, and the conservative reading is the one that cannot hide interference.
+ctx_placed_count() { # <cpu>... -- <name>...  ->  "<on bench> <elsewhere>"
+  local cpus=() f allowed on=0 off=0
+  while [ $# -gt 0 ] && [ "$1" != -- ]; do cpus+=("$1"); shift; done
+  shift
+  [ $# -gt 0 ] || { printf '0 0'; return; }
+  for f in $(grep -l -x -F -f <(printf '%s\n' "$@") "$(ctx_proc)"/[0-9]*/comm 2>/dev/null); do
+    allowed="$(awk '$1 == "Cpus_allowed_list:" { print $2 }' "${f%/comm}/status" 2>/dev/null)"
+    if [ -z "$allowed" ] || ctx_list_meets "$allowed" "${cpus[@]}"; then on=$((on + 1)); else off=$((off + 1)); fi
+  done
+  printf '%d %d' "$on" "$off"
+}
+
+ctx_psi_file() { # <path> <label>  ->  {some_us, full_us} totals, or unavailable
+  [ -r "$1" ] || { ctx_unavailable "no $2"; return; }
+  awk '$1 == "some" || $1 == "full" { for (i = 2; i <= NF; i++) if ($i ~ /^total=/) v[$1] = substr($i, 7) }
+    END { printf "{\"some_us\":%s,\"full_us\":%s}", ("some" in v) ? v["some"] : "null",
+          ("full" in v) ? v["full"] : "null" }' "$1"
+}
+
+ctx_psi() { # <dir> <label prefix> <file suffix>  ->  {cpu, memory, io}
+  printf '{"cpu":%s,"memory":%s,"io":%s}' "$(ctx_psi_file "$1/cpu$3" "$2cpu$3")" \
+    "$(ctx_psi_file "$1/memory$3" "$2memory$3")" "$(ctx_psi_file "$1/io$3" "$2io$3")"
+}
+
+ctx_psi_slice() { # -> pressure of the cgroup tools/bench-reserve.sh runs measurements in
+  local d="${ZEEBRA_CPU_CONTEXT_CGROUP:-/sys/fs/cgroup}/zbbench.slice"
+  [ -d "$d" ] || { ctx_unavailable "no zbbench.slice"; return; }
+  ctx_psi "$d" zbbench.slice/ .pressure
+}
+
+ctx_vmstat() { # -> swap, reclaim scan/steal (summed over sources) and major faults, machine-wide
+  local f
+  f="$(ctx_proc)/vmstat"
+  [ -r "$f" ] || { ctx_unavailable "no vmstat"; return; }
+  awk 'function v(k) { return (k in s) ? sprintf("%.0f", s[k]) : "null" }
+    $1 == "pswpin" || $1 == "pswpout" || $1 == "pgmajfault" { s[$1] = $2 }
+    $1 ~ /^pgscan_/ { s["pgscan"] += $2 } $1 ~ /^pgsteal_/ { s["pgsteal"] += $2 }
+    END { printf "{\"pswpin\":%s,\"pswpout\":%s,\"pgscan\":%s,\"pgsteal\":%s,\"pgmajfault\":%s}",
+          v("pswpin"), v("pswpout"), v("pgscan"), v("pgsteal"), v("pgmajfault") }' "$f"
+}
+
+ctx_mbm() { # -> resctrl MBM total bytes over every L3 domain (default group: the whole machine)
+  local d f v sum=0 n=0
+  d="${ZEEBRA_CPU_CONTEXT_RESCTRL:-/sys/fs/resctrl}/mon_data"
+  [ -d "$d" ] || { ctx_unavailable "resctrl not mounted"; return; }
+  for f in "$d"/mon_L3_*/mbm_total_bytes; do
+    [ -e "$f" ] || continue
+    v="$(ctx_read "$f")" && [[ "$v" =~ ^[0-9]+$ ]] || { ctx_unavailable "mbm_total_bytes unreadable"; return; }
+    sum=$((sum + v)) n=$((n + 1))
+  done
+  [ "$n" -gt 0 ] || { ctx_unavailable "no mbm_total_bytes"; return; }
+  printf '%s' "$sum"
+}
+
+ctx_ccd_stat() { # -> JSON array of {l3, busy, total, cpus} per L3 domain over every online CPU
+  local online
+  online="$(ctx_read "$(ctx_sys)/online")" || { printf null; return; }
+  awk -v sys="$(ctx_sys)" -v want=" $(ctx_expand_cpulist "$online") " '
+    $1 ~ /^cpu[0-9]+$/ { c = substr($1, 4); if (!index(want, " " c " ")) next
+      l3 = "unknown"; f = sys "/cpu" c "/cache/index3/shared_cpu_list"; line = ""
+      if ((getline line < f) > 0 && line != "") l3 = line
+      close(f)
+      if (!(l3 in N)) order[++k] = l3
+      B[l3] += $2 + $3 + $4 + $7 + $8 + $9; T[l3] += $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9; N[l3]++ }
+    END { for (i = 2; i <= k; i++) { x = order[i]
+        for (j = i - 1; j > 0 && order[j] > x; j--) order[j + 1] = order[j]
+        order[j + 1] = x }
+      for (i = 1; i <= k; i++) out = out (i > 1 ? "," : "") \
+        sprintf("{\"l3\":\"%s\",\"busy\":%.0f,\"total\":%.0f,\"cpus\":%d}", order[i], B[order[i]], T[order[i]], N[order[i]])
+      printf "[%s]", out }' "$(ctx_proc)/stat"
+}
+
+# Runnable tasks whose last CPU (field 39 of /proc/<pid>/stat) is a bench CPU or sibling, other than
+# this script and its children. A snapshot names them; it does not see what ran between snapshots.
+ctx_bench_running() { # <cpu>...  ->  JSON array of {pid, comm, cpu}, at most 16
+  cat "$(ctx_proc)"/[0-9]*/stat 2>/dev/null | awk -v want=" $* " -v self="$$" '{
+    o = index($0, "("); r = 0
+    for (i = length($0); i > o; i--) if (substr($0, i, 1) == ")") { r = i; break }
+    if (!o || !r) next
+    pid = substr($0, 1, o - 2); comm = substr($0, o + 1, r - o - 1)
+    n = split(substr($0, r + 2), f, " ")
+    # Our children (cat, awk) by parent pid, unless we are init and every orphan is "ours".
+    if (n < 37 || f[1] != "R" || pid == self || (self > 1 && f[2] == self) || !index(want, " " f[37] " ")) next
+    if (++k > 16) next
+    gsub(/\\/, "\\\\", comm); gsub(/"/, "\\\"", comm)
+    out = out sep sprintf("{\"pid\":%s,\"comm\":\"%s\",\"cpu\":%s}", pid, comm, f[37]); sep = "," }
+    END { printf "[%s]", out }'
+}
+
+ctx_telemetry_json() { # <bench cpus> <sibling cpus>  ->  the #1105 fields, comma-led
+  local placed workers
+  # shellcheck disable=SC2086  # deliberate splitting of the CPU and name lists
+  placed="$(ctx_placed_count $1 $2 -- $CTX_COMPILERS)"
+  # shellcheck disable=SC2086
+  workers="$(ctx_placed_count $1 $2 -- Runner.Worker)"
+  printf ',"telemetry":%s,"compilers_on_bench":%s,"compilers_elsewhere":%s,"runner_workers_on_bench":%s' \
+    "$CTX_TELEMETRY" "${placed% *}" "${placed#* }" "${workers% *}"
+  printf ',"psi":%s,"psi_bench_slice":%s,"vmstat":%s,"mbm_bytes":%s,"ccd_stat":%s' \
+    "$(ctx_psi "$(ctx_proc)/pressure" pressure/ '')" "$(ctx_psi_slice)" "$(ctx_vmstat)" "$(ctx_mbm)" \
+    "$(ctx_ccd_stat)"
+  # shellcheck disable=SC2086
+  printf ',"bench_running":%s' "$(ctx_bench_running $1 $2)"
+}
+
 ctx_stat_json() { # <bench cpus> <sibling cpus>  ->  JSON array of {cpu, role, busy, total}
   local tok c b t role out=()
   for tok in $(ctx_stat_tokens $1 $2); do
@@ -207,6 +331,7 @@ ctx_snapshot() { # <cpulist> [stat tokens from the start of an interval]
     "$(ctx_num_or_null "$rapl/energy_uj")" "$(ctx_num_or_null "$rapl/max_energy_range_uj")" \
     "$(ctx_temp_mc)" "$(ctx_count_comm Runner.Listener)" "$(ctx_count_comm Runner.Worker)"
   printf '"benchlock_open":%s' "$(ctx_benchlock_open)"
+  ctx_telemetry_json "$cpus" "$sibs"
   # shellcheck disable=SC2086
   [ -z "${2:-}" ] || printf ',"interval_busy_pct":%s' "$(ctx_busy_pct "$2" "$(ctx_stat_tokens $cpus $sibs)")"
   printf '}\n'

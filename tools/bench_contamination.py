@@ -47,12 +47,85 @@ def _frac(busy, total):
     return busy / total if total > 0 else 0.0
 
 
-def attempt_metrics(before, after, own_cpu_s=None, khz_samples=None):
-    """Busy fractions, clock, power and process counts over one attempt.
+# Interference telemetry (#1105): metrics recorded beside the verdict for #1107 to correlate with
+# outcome. No rule reads them; a rule that does belongs to #1108 and bumps the verdict version.
+# Each is a value, None (the snapshots predate it), or {"unavailable": reason}.
+TELEMETRY_METRICS = ("telemetry", "compilers_on_bench", "compilers_elsewhere",
+                     "runner_workers_on_bench", "psi", "psi_bench_slice", "vmstat",
+                     "mbm_bytes_per_s", "ccd_load", "bench_running", "rusage")
+
+
+def available(value):
+    """Whether a telemetry value can be judged. A rule that needs one must fail closed without it."""
+    return value is not None and not (isinstance(value, dict) and "unavailable" in value)
+
+
+def _over(before, after, key, f):
+    """f(before[key], after[key]); None when either snapshot lacks the field, and the first
+    `unavailable` marker when either could not read it."""
+    b, a = before.get(key), after.get(key)
+    if b is None or a is None:
+        return None
+    for x in (b, a):
+        if isinstance(x, dict) and "unavailable" in x:
+            return x
+    return f(b, a)
+
+
+def _diff(b, a):
+    return None if b is None or a is None else a - b
+
+
+def _psi(seconds):
+    def fractions(b, a):
+        out = {}
+        for res in ("cpu", "memory", "io"):
+            rb, ra = b.get(res), a.get(res)
+            if not (available(rb) and available(ra)):
+                out[res] = rb if not available(rb) else ra
+                continue
+            out[res] = {}
+            for k in ("some", "full"):
+                d = _diff(rb.get(f"{k}_us"), ra.get(f"{k}_us"))
+                out[res][k] = None if d is None or seconds <= 0 else d / (seconds * 1e6)
+        return out
+    return fractions
+
+
+def _ccd_load(b, a):
+    """Busy-CPU equivalents per L3 domain, as `rest_load` is over the non-bench CPUs."""
+    before = {d["l3"]: d for d in b}
+    return {d["l3"]: d["cpus"] * _frac(d["busy"] - before[d["l3"]]["busy"], d["total"] - before[d["l3"]]["total"])
+            for d in a if d["l3"] in before}
+
+
+def _telemetry(before, after, seconds, rusage):
+    running = [r["comm"] for s in (before, after) for r in s.get("bench_running") or []]
+    return {
+        "telemetry": after.get("telemetry"),
+        "compilers_on_bench": _over(before, after, "compilers_on_bench", max),
+        "compilers_elsewhere": _over(before, after, "compilers_elsewhere", max),
+        "runner_workers_on_bench": _over(before, after, "runner_workers_on_bench", max),
+        "psi": _over(before, after, "psi", _psi(seconds)),
+        "psi_bench_slice": _over(before, after, "psi_bench_slice", _psi(seconds)),
+        "vmstat": _over(before, after, "vmstat", lambda b, a: {k: _diff(b.get(k), v) for k, v in a.items()}),
+        "mbm_bytes_per_s": _over(before, after, "mbm_bytes",
+                                 lambda b, a: (a - b) / seconds if seconds > 0 and a >= b else None),
+        "ccd_load": _over(before, after, "ccd_stat", _ccd_load),
+        "bench_running": sorted(set(running))
+        if any("bench_running" in s for s in (before, after)) else None,
+        "rusage": rusage,
+    }
+
+
+def attempt_metrics(before, after, own_cpu_s=None, khz_samples=None, rusage=None):
+    """Busy fractions, clock, power and process counts over one attempt, plus the #1105
+    telemetry (`TELEMETRY_METRICS`), which no verdict reads.
 
     `own_cpu_s` is the child's user + system CPU seconds (`os.wait4` rusage); without it the
     bench CPUs cannot be judged. `khz_samples` overrides the bench clocks read from the two
-    snapshots, for a runner that samples `scaling_cur_freq` during the attempt.
+    snapshots, for a runner that samples `scaling_cur_freq` during the attempt. `rusage` is the
+    child tree's context switches and faults, recorded as given.
     """
     sibling_busy, bench_busy, bench_b, bench_t = {}, {}, 0, 0
     for s in after["stat"]:
@@ -93,6 +166,7 @@ def attempt_metrics(before, after, own_cpu_s=None, khz_samples=None):
                                     for o in s.get("benchlock_open", [])}),
         "clock": after.get("clock"),
         "package_w": package_w,
+        **_telemetry(before, after, seconds, rusage),
     }
 
 

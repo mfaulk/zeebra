@@ -286,6 +286,12 @@ class BenchJobTest(unittest.TestCase):
         self.assertEqual(c['verdict']['contaminated'], False)
         self.assertEqual(c['mode'], 'dev')
         self.assertIn('bench_foreign', c['metrics'])
+        # #1105: the child tree's switches and faults are journaled, and the telemetry keys exist,
+        # None here because the fake snapshot predates them.
+        rusage = state['attempts'][0]['metadata']['rusage']
+        self.assertEqual(set(rusage), {'nvcsw', 'nivcsw', 'majflt', 'minflt', 'inblock', 'oublock'})
+        self.assertEqual(c['metrics']['rusage'], rusage)
+        self.assertIsNone(c['metrics']['psi'])
         session = state['stop']['contamination']
         self.assertEqual((session['contaminated'], session['total'], session['void']), (0, 4, False))
 
@@ -551,8 +557,28 @@ class BenchJobTest(unittest.TestCase):
         self.assertEqual(doc['provenance']['arms'][0]['commit'], COMMIT)
         md = self.cli('report', job, check=0).stdout
         for heading in ('## Provenance', '## Attempts', '## Wall and RSS', '## Stages', '## Scaling',
-                        '## Ratios', '## Verification'):
+                        '## Ratios', '## Verification', '## Interference'):
             self.assertIn(heading, md)
+
+    # The report summarizes each attempt's interference telemetry (#1105), and says when there is none.
+    def test_report_interference_summary(self):
+        state, m = self.synthetic(dict(a=[1.0, 1.0]))
+        self.assertIn('No interference telemetry', bj.render(bj.summarize(state, m)))
+        metrics = dict(telemetry=1, compilers=3, compilers_on_bench=1, compilers_elsewhere=2,
+                       psi=dict(cpu=dict(some=0.012, full=None), memory=dict(unavailable='no pressure/memory'),
+                                io=dict(some=0.0, full=0.0)),
+                       vmstat=dict(pgscan=40, pswpin=0), ccd_load={'0-7': 0.5, '8-15': 3.25},
+                       bench_running=['stress-ng'], rusage=dict(nivcsw=17, majflt=2))
+        state['attempts'][1]['metadata']['contamination'] = dict(metrics=metrics)
+        doc = bj.summarize(state, m)
+        row = doc['interference'][0]
+        self.assertEqual((row['attempt'], row['compilers'], row['psi_cpu_some'], row['psi_memory_some']),
+                         ('job:1:0', '1/2', 0.012, 'n/a'))
+        self.assertEqual((row['pgscan'], row['max_ccd_load'], row['nivcsw'], row['bench_running']),
+                         (40, 3.25, 17, ['stress-ng']))
+        self.assertEqual(len(doc['interference']), 1)  # the attempt without telemetry is not a row
+        md = bj.render(doc)
+        self.assertIn('| `job:1:0` | a | goldilocks/katsura-4 | 1 | 1 | 1/2 | 1.2% | n/a | 0.0% | 40 | 3.25 | 17 | 2 | stress-ng |', md)
 
     # Ratios are paired per repetition through bench_stats; contaminated attempts are excluded and counted.
     def test_report_ratio_and_contamination(self):
