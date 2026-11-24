@@ -374,6 +374,8 @@ impl<F: FiniteField> Synthetic<F> {
             sigs: &self.reducer_sigs,
             at: &self.reducer_at,
             ncols: self.ncols,
+            lane: None,
+            field_copies: true,
         }
     }
 

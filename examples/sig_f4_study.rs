@@ -40,6 +40,9 @@
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
 //!
+//! `--lane` (sigf4) reduces each batch in #945's `u32` delayed-reduction lanes
+//! (`SigF4Options::small_prime_lane`); the basis is unchanged.
+//!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
 //! `--features research-work`, `--density` (f4 or sigf4, one worker) adds #1033's
@@ -97,6 +100,7 @@ struct Args {
     density: bool,
     replay: bool,
     claim: bool,
+    lane: bool,
     symbolic: bool,
     min_frontier: usize,
     repeat: usize,
@@ -129,6 +133,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         density: false,
         replay: false,
         claim: false,
+        lane: false,
         symbolic: false,
         min_frontier: 512,
         repeat: 1,
@@ -172,6 +177,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--write-basis" => parsed.write_basis = Some(value()?),
             "--replay" => parsed.replay = true,
             "--claim" => parsed.claim = true,
+            "--lane" => parsed.lane = true,
             "--stages" => parsed.stages = true,
             "--fl" => parsed.fl = true,
             "--capture" => parsed.capture = Some(value()?),
@@ -249,6 +255,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     }
     if parsed.live_gib.is_some() && !["f4", "entry", "sigf4"].contains(&parsed.engine.as_str()) {
         return Err("--live-gib sets the live budget: --engine f4, entry or sigf4".into());
+    }
+    if parsed.lane && (parsed.engine != "sigf4" || parsed.replay) {
+        return Err("--lane configures the signature engine: --engine sigf4".into());
     }
     if parsed.claim && (parsed.engine != "sigf4" || parsed.replay) {
         return Err("--claim runs the signature engine's parallel cascade: --engine sigf4".into());
@@ -1403,6 +1412,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 max_wall_time: Some(args.wall),
                 workers: args.workers,
                 parallel_cascade: args.claim,
+                small_prime_lane: args.lane,
                 max_live_bytes: args
                     .live_gib
                     .map(|gib| gib << 30)
@@ -1517,6 +1527,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("digest", Json::string(&input.digest)),
         ("engine", Json::string(&args.engine)),
         ("workers", Json::size(args.workers)),
+        ("lane", Json::Bool(args.lane)),
         ("status", Json::string(status)),
         ("call_ns", Json::nanos(elapsed)),
         (

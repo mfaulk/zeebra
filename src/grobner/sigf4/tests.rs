@@ -710,3 +710,93 @@ const PINNED_TRACES: [u64; 12] = [
     0x9b98bdce6371dd1d,
     0x43a9cc6aca3d08de,
 ];
+
+/// Dense planted quadratics in `N` variables, `2N` equations: #945's family, small.
+fn dense_quadratics<const N: usize, F: FiniteField>(
+    seed: u64,
+) -> Vec<MultivariatePolynomial<N, F>> {
+    use rand::{rngs::StdRng, Rng, SeedableRng};
+    let mut rng = StdRng::seed_from_u64(seed);
+    let point: Vec<F> = (0..N).map(|_| F::new(rng.gen_range(0..u64::MAX))).collect();
+    let mut support = Vec::new();
+    for i in 0..N {
+        for j in i..N {
+            let mut e = [0; N];
+            e[i] += 1;
+            e[j] += 1;
+            support.push(Monomial::new(&e));
+        }
+        let mut e = [0; N];
+        e[i] = 1;
+        support.push(Monomial::new(&e));
+    }
+    (0..2 * N)
+        .map(|_| {
+            let mut terms: Vec<(Monomial<N>, F)> = support
+                .iter()
+                .map(|m| (*m, F::new(rng.gen_range(1..u64::MAX))))
+                .collect();
+            let value = terms.iter().fold(F::zero(), |acc, (m, c)| {
+                let mut v = *c;
+                for (x, e) in point.iter().zip(m.exponents()) {
+                    for _ in 0..*e {
+                        v *= *x;
+                    }
+                }
+                acc + v
+            });
+            terms.push((Monomial::new(&[0; N]), -value));
+            MultivariatePolynomial::new(&terms)
+        })
+        .collect()
+}
+
+fn lane_agrees<const N: usize, F: FiniteField>(seed: u64) {
+    let system = dense_quadratics::<N, F>(seed);
+    for (workers, parallel_cascade) in [(1, false), (3, false), (4, true)] {
+        let options = |small_prime_lane| SigF4Options {
+            workers,
+            parallel_cascade,
+            small_prime_lane,
+            check_signatures: true,
+            ..SigF4Options::default()
+        };
+        let (field, field_stats) = sig_f4_reported(&system, GREVLEX, &options(false));
+        let (lane, lane_stats) = sig_f4_reported(&system, GREVLEX, &options(true));
+        assert_eq!(lane.unwrap(), field.unwrap(), "{workers} workers");
+        // #945's corrective iteration: lane mode holds each pivot once, in lane form only.
+        assert!(
+            lane_stats.claim_peak_live_bytes <= field_stats.claim_peak_live_bytes,
+            "{workers} workers: lane {} > field {} live bytes",
+            lane_stats.claim_peak_live_bytes,
+            field_stats.claim_peak_live_bytes
+        );
+        assert_eq!(
+            (lane_stats.targets, lane_stats.elements_added),
+            (field_stats.targets, field_stats.elements_added)
+        );
+    }
+}
+
+/// #945: the lane route returns the field route's basis on dense quadratics over GF(31) and
+/// GF(32003), on design 1, design 2 and the parallel cascade, within the field route's live bytes.
+#[test]
+fn test_small_prime_lane_keeps_the_basis() {
+    for seed in 0..3 {
+        lane_agrees::<6, crate::fields::Zp31>(seed);
+        lane_agrees::<6, Zp32003>(seed);
+    }
+}
+
+/// #945: a field without a lane ignores the option.
+#[test]
+fn test_small_prime_lane_is_ignored_on_a_wide_field() {
+    lane_agrees::<5, Goldilocks>(1);
+}
+
+/// #945: the lane is opt-in; neither the default nor the checked options turn it on.
+#[test]
+fn test_small_prime_lane_is_off_by_default() {
+    assert!(!SigF4Options::default().small_prime_lane);
+    assert!(!checked_any_graded().small_prime_lane);
+}

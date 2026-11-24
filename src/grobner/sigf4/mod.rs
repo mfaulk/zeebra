@@ -74,6 +74,11 @@ pub struct SigF4Options {
     /// (#961), and the dispatcher never routes it there. A refusal is
     /// [`SigF4Error::Unsupported`]. Set it only to study #961 or on systems known to be small.
     pub allow_graded_lex: bool,
+    /// #945 prototype: reduce each batch in `u32` delayed-reduction lanes
+    /// ([`crate::linalg::lane`]) when the field is a prime below
+    /// [`crate::linalg::lane::MAX_LANE_PRIME`]; ignored otherwise. Every row is unchanged.
+    /// Off by default.
+    pub small_prime_lane: bool,
     /// #1031: census every serial batch's reducer reuse into [`SigF4Statistics::reuse`]. Replays
     /// each elimination three times, so never on in a timed run.
     #[cfg(feature = "research-reuse")]
@@ -103,6 +108,7 @@ impl Default for SigF4Options {
             parallel_cascade: false,
             max_live_bytes: Some(crate::grobner::F4Options::default().max_live_bytes),
             allow_graded_lex: false,
+            small_prime_lane: false,
             #[cfg(feature = "research-reuse")]
             reuse_census: false,
             #[cfg(feature = "research-adjacent")]
