@@ -7,7 +7,8 @@ coefficient, and M4GB is 10–29× faster than Zeebra's shipping F4 on every cel
 needs the bench host, a grobx arm and Zeebra's best qualified configuration (§7). M5GB has no
 licence grant and was not run (§3.2).
 
-**Measured at:** `52268421` (planted rows) and `4d1ec9b7` (unplanted rows),
+**Measured at:** `52268421` (planted rows, tag `measured/1030-m4gb-dev-planted`) and `4d1ec9b7`
+(unplanted rows, tag `measured/1030-m4gb-dev-unplanted`),
 `examples/m4gb_comparison.rs` in release, macOS arm64 (14 cores), unpinned, no RSS figure, one
 worker, 2026-11-24. Evidence: [`research/1030-m4gb-reference/`](../../research/1030-m4gb-reference/README.md).
 
