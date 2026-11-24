@@ -1,0 +1,18 @@
+{
+ "issue": 1011,
+ "candidate": "#997 fewest-terms reducer rule with the FL batch order",
+ "owner_decision": "https://github.com/mfaulk/zeebra/issues/1043#issuecomment-7135042005",
+ "z0": "28df047f28a87ab2da3e2077e07c56833d0cb0e1",
+ "harness": "2099df6e",
+ "arms": {"z0-f4": "the shipping F4 (--engine f4)", "z0-fewest-fl": "ReducerSelection::FewestTerms + BatchOrder::FaugereLachartre (--engine fewest-fl)"},
+ "statistic": "fewest-fl / f4 process wall, paired per repetition (bench_stats.paired_ratio, 20,000 draws, 95% percentile bootstrap), over clean attempts whose m33-basis-v1 digest equals the row's independent reference",
+ "repetitions": 9,
+ "mode": "publication, exclusive benchlock, CCDs 1-2 reserved, CPUs 8-23, arms rotated per repetition, one solve per fresh process",
+ "jobs": [
+  {"name": "cyclic8", "rows": ["grevlex/gf32003/cyclic-8", "grevlex/wide64/cyclic-8"], "workers": [1, 4, 16],
+   "pass": "every upper <= 1.05", "role": "no-regression gate"},
+  {"name": "mq10", "rows": ["grevlex/m31/mq-random-10-s10"], "workers": [4],
+   "pass": "upper < 1", "role": "regime read (#993's row)"}
+ ],
+ "decision": "admit only if every Cyclic-8 cell passes and the MQ10 read passes; reject if any Cyclic-8 cell fails; otherwise (MQ10 not a win, or a cell short of 9 counted pairs) defer"
+}
