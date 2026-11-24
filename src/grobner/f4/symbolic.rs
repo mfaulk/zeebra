@@ -1397,20 +1397,13 @@ pub fn symbolic_preprocessing_level_parallel_measured<const N: usize, F: FiniteF
         } else {
             let chunk = frontier.len().div_ceil(workers);
             let (covered, examined) = (&covered, &examined);
-            std::thread::scope(|scope| {
-                let handles: Vec<_> = frontier
-                    .chunks(chunk)
-                    .map(|slice| {
-                        crate::util::team::spawn(scope, move || {
-                            scan(basis, selection, covered, examined, slice)
-                        })
-                    })
-                    .collect();
-                handles
-                    .into_iter()
-                    .map(|handle| handle.join().expect("a symbolic worker panicked"))
-                    .collect()
+            let slices: Vec<_> = frontier.chunks(chunk).collect();
+            crate::util::team::run(slices.len(), |i| {
+                scan(basis, selection, covered, examined, slices[i])
             })
+            .into_iter()
+            .map(|outcome| outcome.expect("a symbolic worker panicked"))
+            .collect()
         };
         let scanned_in = scanning.elapsed();
         report.scan += scanned_in;
