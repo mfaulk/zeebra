@@ -25,6 +25,8 @@ pub struct PackedStatistics {
     pub rank: usize,
     /// Whole-row `xor`s performed, including those that build Four Russians tables.
     pub row_xors: usize,
+    /// `u64` words those `xor`s wrote.
+    pub xor_words: usize,
     /// Four Russians tables built; zero for plain Gauss-Jordan.
     pub tables: usize,
 }
@@ -142,11 +144,11 @@ impl BitMatrix {
             .map(|(w, word)| w * 64 + word.trailing_zeros() as usize)
     }
 
-    fn row(&self, index: usize) -> &[u64] {
+    pub(crate) fn row(&self, index: usize) -> &[u64] {
         &self.words[index * self.stride..(index + 1) * self.stride]
     }
 
-    fn row_mut(&mut self, index: usize) -> &mut [u64] {
+    pub(crate) fn row_mut(&mut self, index: usize) -> &mut [u64] {
         &mut self.words[index * self.stride..(index + 1) * self.stride]
     }
 
@@ -211,6 +213,7 @@ pub fn reduced_row_echelon_packed(matrix: &mut BitMatrix) -> PackedStatistics {
             if row != rank && matrix.word(row, word) & mask != 0 {
                 matrix.xor_rows(row, rank, word);
                 statistics.row_xors += 1;
+                statistics.xor_words += matrix.stride - word;
             }
         }
         rank += 1;
@@ -312,6 +315,7 @@ fn four_russians(matrix: &mut BitMatrix, k: usize, selected: Option<&[bool]>) ->
                 if (matrix.word(rank + j, word) >> pivot_bits[l]) & 1 == 1 {
                     matrix.xor_rows(rank + j, rank + l, word);
                     statistics.row_xors += 1;
+                    statistics.xor_words += stride - word;
                 }
             }
         }
@@ -320,6 +324,7 @@ fn four_russians(matrix: &mut BitMatrix, k: usize, selected: Option<&[bool]>) ->
                 if (matrix.word(rank + j, word) >> pivot_bits[l]) & 1 == 1 {
                     matrix.xor_rows(rank + j, rank + l, word);
                     statistics.row_xors += 1;
+                    statistics.xor_words += stride - word;
                 }
             }
         }
@@ -338,6 +343,7 @@ fn four_russians(matrix: &mut BitMatrix, k: usize, selected: Option<&[bool]>) ->
                 current.copy_from_slice(&before[previous * width..(previous + 1) * width]);
                 xor_into(current, &source[word..]);
                 statistics.row_xors += 1;
+                statistics.xor_words += width;
             }
             statistics.tables += 1;
 
@@ -363,6 +369,7 @@ fn four_russians(matrix: &mut BitMatrix, k: usize, selected: Option<&[bool]>) ->
                         &table[index * width..(index + 1) * width],
                     );
                     statistics.row_xors += 1;
+                    statistics.xor_words += width;
                 }
             }
         }
@@ -449,6 +456,7 @@ pub fn reduce_against_pivots<F: FiniteField>(
                     let (head, tail) = group_rows.split_at_mut(l * width);
                     xor_into(&mut head[j * width..(j + 1) * width], &tail[..width]);
                     statistics.row_xors += 1;
+                    statistics.xor_words += width;
                 }
             }
         }
@@ -464,6 +472,7 @@ pub fn reduce_against_pivots<F: FiniteField>(
                 current.copy_from_slice(&before[previous * width..(previous + 1) * width]);
                 xor_into(current, &group_rows[pivot * width..(pivot + 1) * width]);
                 statistics.row_xors += 1;
+                statistics.xor_words += width;
             }
             statistics.tables += 1;
             for (row, &index) in indices.iter().enumerate() {
@@ -474,6 +483,7 @@ pub fn reduce_against_pivots<F: FiniteField>(
                         &table[index * width..(index + 1) * width],
                     );
                     statistics.row_xors += 1;
+                    statistics.xor_words += width;
                 }
             }
         } else {
@@ -487,6 +497,7 @@ pub fn reduce_against_pivots<F: FiniteField>(
                         &group_rows[pivot * width..(pivot + 1) * width],
                     );
                     statistics.row_xors += 1;
+                    statistics.xor_words += width;
                     bits &= bits - 1;
                 }
             }
@@ -709,6 +720,29 @@ mod tests {
             "{four:?} against {plain:?}"
         );
         assert!(four.tables > 0 && plain.tables == 0);
+    }
+
+    /// Word counts: one word per `xor` on a one-word matrix, and between one and the stride per
+    /// `xor` on a wider one.
+    #[test]
+    fn test_xor_words_count_the_words_written() {
+        let mut rng = StdRng::seed_from_u64(8);
+        for columns in [64, 300] {
+            let matrix = BitMatrix::from_sparse(&random_sparse(&mut rng, 200, columns, 0.3));
+            let stride = columns.div_ceil(64);
+            for statistics in [
+                reduced_row_echelon_packed(&mut matrix.clone()),
+                reduced_row_echelon_four_russians(&mut matrix.clone(), 6),
+            ] {
+                assert!(statistics.row_xors > 0);
+                if stride == 1 {
+                    assert_eq!(statistics.xor_words, statistics.row_xors);
+                } else {
+                    assert!(statistics.xor_words > statistics.row_xors);
+                    assert!(statistics.xor_words <= statistics.row_xors * stride);
+                }
+            }
+        }
     }
 
     /// A table width of zero is refused rather than looping forever.

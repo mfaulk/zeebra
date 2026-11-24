@@ -114,8 +114,20 @@ pub struct FglmOptions {
     ///
     /// This is `D`, which controls everything else: the operators hold up to `N * D` columns and
     /// the conversion's dense blocks are `D^2 + D (D + 1)` field elements.
-    /// The adaptive route does not raise this conservative enumeration tripwire; a caller
-    /// deliberately converting larger quotients must lift it explicitly.
+    ///
+    /// **It caps the classical walk, not every route** (#1111). Under
+    /// [`ConversionStrategy::Adaptive`] or [`ConversionStrategy::Wiedemann`] a conversion
+    /// enumerates past it, up to the largest `D` whose `O(D)` Wiedemann workspace fits
+    /// [`max_span_entries`](Self::max_span_entries) and [`max_span_bytes`](Self::max_span_bytes),
+    /// and converts a quotient above the cap only if Wiedemann does. If that attempt declines or
+    /// fails, the conversion returns
+    /// [`QuotientDimensionExceeded`](super::FglmError::QuotientDimensionExceeded) with this limit:
+    /// the classical fallback is not run above it. That costs the operator construction (bounded by
+    /// the operator budgets) and the attempt before the refusal, where it used to cost the
+    /// enumeration alone.
+    ///
+    /// [`QuotientAlgebra::new`](super::QuotientAlgebra::new) and the other direct callers of the
+    /// enumeration apply it as written, whatever the strategy.
     pub max_quotient_dimension: usize,
 
     /// Multiplication-operator entries stored, summed over all `N` operators.
@@ -229,6 +241,11 @@ pub const RECOMMENDED_MAX_SPAN_ENTRIES: usize = 20_000_000;
 /// [`FglmOptions::max_span_bytes`] are, and this is the pre-enumeration tripwire for a walk so far
 /// out of envelope that enumerating `N * D` operator columns is itself the waste.
 ///
+/// It is the *classical* walk's envelope. The Wiedemann route needs `O(D)` workspace, so a
+/// conversion that may take it enumerates past this cap within the span budgets — at the
+/// recommended budgets and 14 variables over a 64-bit field, to `D = 166,665` (#1111). See
+/// [`FglmOptions::max_quotient_dimension`].
+///
 /// # Why it is derived and not read off the corpus
 /// It used to be justified as "26x the largest quotient dimension in the benchmark corpus, which
 /// is cyclic-6's 156". That was true when written and false by #261, whose cross-library corpus
@@ -286,7 +303,8 @@ impl FglmOptions {
     /// span budget rather than from the corpus: the next power of two at or above the 3,162 that
     /// `max_span_entries` admits. The enumeration itself is cheap at any such dimension, so this
     /// limit is there to stop a walk that should not have started; the entry budgets below are what
-    /// bound memory, and they are the ones that bind first.
+    /// bound memory, and they are the ones that bind first. The cap is the classical walk's: the
+    /// adaptive route's Wiedemann attempt may convert a larger quotient, within those budgets.
     ///
     /// **The corpus contains rungs outside this envelope, deliberately.** The planted MQ family's
     /// quotient dimension is `2^N`, so `mq-planted-14` is 16,384 and the conversion refuses it —
