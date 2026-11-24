@@ -19,6 +19,8 @@ pub mod groebner_jl;
 #[cfg(feature = "external-runners")]
 pub mod groebner_rs;
 #[cfg(feature = "external-runners")]
+pub mod m4gb;
+#[cfg(feature = "external-runners")]
 pub mod msolve;
 pub mod process;
 #[cfg(feature = "external-runners")]
@@ -56,6 +58,8 @@ pub use grobx::GrobxSolver;
 pub use groebner_jl::GroebnerJlSolver;
 #[cfg(feature = "external-runners")]
 pub use groebner_rs::GroebnerRsSolver;
+#[cfg(feature = "external-runners")]
+pub use m4gb::M4gbSolver;
 #[cfg(feature = "external-runners")]
 pub use msolve::MsolveSolver;
 pub use process::{
