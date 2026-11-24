@@ -1,8 +1,9 @@
 # M34 candidate qualification (G2)
 
 **Issue:** #1011 (tracker #1043, plan [`docs/MILESTONE-GENERALIZABLE-SELECTION.md`](../MILESTONE-GENERALIZABLE-SELECTION.md)
-§7.2, §7.6, §8.6). **Measured at:** Z0 = `28df047f` (tag `measured/1011-z0`). **Status:** safety and correctness are done, and the timed regime reads are pending. No timed
-qualification run has been made yet, and this document publishes no timing or memory figure.
+§7.2, §7.6, §8.6). **Measured at:** Z0 = `28df047f` (tag `measured/1011-z0`). **Status:** complete. Every candidate has a decision (§3, §7). The only timed figures are #997's
+gate ratios (§7.1), measured at Z0 `28df047f` with harness `2099df6e`, jobs `1076f513f424` and
+`d05e8d60ef86` (2026-11-24).
 
 ## 1. Z0 freeze
 
@@ -63,7 +64,7 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
 | P7 `conv-cap16` | none | **pass**, 122/124 cells at 1 and 16 w; 2 typed stops. Cap-16 digest check done | `m33_safety` pass | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
 | P8 `adaptive` | none | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Signature route on 60 grevlex cells | as P2; #961 routing pass | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
 | #940 parallel symbolic (`measured/940-gate-s2`) | beyond the 2-session time-box (§6) | — | — | #1040's recommendation not posted | **deferred: port cost** |
-| #997 fewest-terms + FL order | none (options on Z0, §5) | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Eligible | the shipping F4's budgets | MQ10 / GF(2³¹−1) at 4 w (#993), preregistered (§7) | pending the preregistered gate (§7) |
+| #997 fewest-terms + FL order | none (options on Z0, §5) | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Eligible | the shipping F4's budgets | MQ10 / GF(2³¹−1) at 4 w (#993), preregistered (§7) | **reject**: Cyclic-8 regresses in 5 of 6 cells (§7.1) |
 | #955 randomized zero-skipping | — | — | — | — | excluded: no exact acceptance rule (#1004) |
 
 ## 4. Correctness harness
@@ -173,7 +174,7 @@ before any deciding read.
   - Admission makes no performance claim. #1012's matrix and Gate H test the regimes.
 - **#940: deferred, port cost** (§6).
 - **#955: excluded.** No exact acceptance rule exists (#1004).
-- **#997: pending its preregistered gate.** The rule is
+- **#997: rejected** by its preregistered gate (§7.1). The rule is
   [`research/m34-qualification/gate997.json`](../../research/m34-qualification/gate997.json),
   committed before the read.
   - **Statistic.** `fewest-fl` ÷ the shipping F4, process wall, paired per repetition, with a 95%
@@ -191,7 +192,36 @@ before any deciding read.
       driver is not provisioned on this machine.
     - MQ10: M33's Singular reference, with the same input digest.
   - **Committed manifests:** `research/m34-qualification/manifests/`.
-- **To run in a quiet window:**
+- **How it ran:**
   `ZB975_THREADS=0 ZEEBRA_BENCH_JOBS=<jobs> research/m33-final/session.sh 997 1076f513f424 d05e8d60ef86`
-  (reserve, run both, release), then `gate997.py verdict --job-dir <jobs>/1076f513f424 <jobs>/d05e8d60ef86`.
-- **After the squash merge,** tag the cited commits (harness `2099df6e`) as `measured/1011-*`.
+  (one reservation for both jobs), then `gate997.py verdict --job-dir <jobs>/1076f513f424 <jobs>/d05e8d60ef86`.
+
+### 7.1 #997 gate result
+
+- **Run.** 2026-11-24 19:12–19:20Z, publication mode, CCDs 1–2 reserved and then released. Measured
+  at Z0 `28df047f` with harness `2099df6e` (`m33_qualify` SHA-256 `e4df6228…`). The table is
+  [`research/m34-qualification/gate997.md`](../../research/m34-qualification/gate997.md), and the
+  journals are retained under `research/m34-qualification/journals/`.
+- **Cyclic-8 job `1076f513f424`:** 108 of 108 attempts clean, and every one equals its reference.
+- **MQ10 job `d05e8d60ef86`:** 16 of 18 clean. Two were flagged by the clock rule, which is 11%, under
+  the 20% void limit. Every digest equals its reference.
+
+| Row | Workers | Pairs | fewest-fl ÷ f4 [95%] | Rule | Verdict |
+|---|---:|---:|---|---|---|
+| Cyclic-8 / GF(32003) | 1 | 9 | 1.028 [1.018, 1.034] | upper ≤ 1.05 | pass |
+| Cyclic-8 / GF(32003) | 4 | 9 | 1.114 [1.102, 1.117] | upper ≤ 1.05 | fail |
+| Cyclic-8 / GF(32003) | 16 | 9 | 1.193 [1.183, 1.203] | upper ≤ 1.05 | fail |
+| Cyclic-8 / 2⁶⁴−353 | 1 | 9 | 1.056 [1.054, 1.060] | upper ≤ 1.05 | fail |
+| Cyclic-8 / 2⁶⁴−353 | 4 | 9 | 1.122 [1.110, 1.126] | upper ≤ 1.05 | fail |
+| Cyclic-8 / 2⁶⁴−353 | 16 | 9 | 1.185 [1.172, 1.192] | upper ≤ 1.05 | fail |
+| MQ10 / GF(2³¹−1) | 4 | 7 | — | upper < 1 | short |
+
+- **Decision: reject #997** under the preregistered rule, which rejects on any Cyclic-8 failure.
+  - The candidate regresses Cyclic-8 by 11–19% at 4 and 16 workers on both fields. At 1 worker it
+    reads 1.028 (a pass) on GF(32003) and 1.056 (a fail) on 2⁶⁴−353.
+  - The MQ10 cell has 7 counted pairs, so it is short and was not read. No extension was run,
+    because no MQ10 outcome could change a reject.
+- **Scope.** The reject applies to #997's candidate as one portfolio arm (fewest-terms with the FL
+  order, ungated). An order- or family-gated variant would be a new candidate.
+- **After the squash merge,** tag the cited commits as `measured/1011-*`: Z0 is already tagged
+  `measured/1011-z0`, and the harness `2099df6e` needs its own tag.
