@@ -6,7 +6,9 @@
 come from one untimed-protocol run of its ignored study `applicability_on_the_benchmark_rows`,
 built with `--profile ci-release` on a macOS/arm64 laptop. That is not the bench host. Each ratio
 is the check's cost over the same run's exact solve, taken in the same process. They are
-order-of-magnitude estimates, not a timing campaign; the issue asks for none.
+order-of-magnitude estimates, not a timing campaign; the issue asks for none. **Updated** for #1088
+(2026-11-23): §4.4 adds Theorem 4, that drops at certified degrees are final on any affine input,
+and a counterexample showing that a zero count is not final on affine input that is not square.
 
 ## Outcome
 
@@ -22,7 +24,9 @@ order-of-magnitude estimates, not a timing campaign; the issue asks for none.
    Degree falls make `C(e) < S_top(e)` possible, so the one-sided error is lost. §4.1 gives a basis
    built from ideal elements that matches `S_top` in every degree and is not a Gröbner basis. The
    rule is sound again when **no kept row fell in degree** during the run. For square systems,
-   reaching `C = 0` then also certifies the final basis.
+   reaching `C = 0` then also certifies the final basis. Under the same witness, **the pairs a
+   certified degree drops are final on affine input of any shape** (Theorem 4, #1088). A zero
+   count is final only for square input (§4.4.2 gives the counterexample).
 3. **Applicability on the named rows (§8).** The certificate accepts the exact run on **MQ11 /
    Goldilocks** (dense) and on **Katsura-11**. It refuses **Eco-12** and **MQ10 / GF(2³¹−1)**, whose
    top forms are not regular. MQ10 is the sparse ladder generator's row, and one of its equations is
@@ -221,6 +225,119 @@ wrong side. So a second-prime Hilbert series is a *candidate* for `H_{GF(p)}`, n
 and it stays Monte Carlo. Lemma 2 makes it unnecessary for regular inputs, and nothing makes it
 exact for the rest.
 
+### 4.4 Theorem 4: certified drops are final on any affine input (#1088)
+
+Theorem 3 concludes about `I` only at a zero count, and only for `m = n`. The count route needs
+less: that the pairs it drops at a certified degree are not needed by the final basis, whatever
+happens later in the run. That holds on affine input of any shape. What needs the square
+hypothesis is only the completion claim, and §4.4.2 shows that it really does.
+
+Notation: `W_e = span_F{ t · f_i : deg(t · f_i) ≤ e }` is the generators' degree-`e` Macaulay space,
+`T_i = (top f_1, …, top f_i)`, `A_i = R/T_i`, and `S_i` is `S` for the first `i` degrees. All
+`d_i ≥ 1` (the route refuses constant generators).
+
+**Lemma 5 (a matched count leaves only Koszul syzygies).** If `H_T(k) = S(k)` for every `k ≤ e`, then
+every homogeneous syzygy `(s_1, …, s_m)` of `(top f_1, …, top f_m)` of degree `D ≤ e` (each `s_i`
+homogeneous of degree `D − d_i`, or zero) is a combination of the Koszul syzygies
+`top f_j · ε_i − top f_i · ε_j` with homogeneous coefficients.
+
+*Proof.* Lemma 2's identity at step `i` reads
+
+```text
+H_{A_i}(k) − S_i(k) = [H_{A_{i−1}}(k) − S_{i−1}(k)] − [H_{A_{i−1}}(k − d_i) − S_{i−1}(k − d_i)] + δ_i(k),
+δ_i(k) = dim (0 :_{A_{i−1}} top f_i)_{k − d_i}.
+```
+
+Suppose `H_{A_i} = S_i` through `e`, and let `a` be the least degree with `H_{A_{i−1}}(a) ≠ S_{i−1}(a)`.
+If `a ≤ e`, Lemma 2 makes the first bracket positive at `k = a`, the second vanishes because
+`a − d_i < a`, and `δ_i ≥ 0`, so `H_{A_i}(a) > S_i(a)`, a contradiction. So `H_{A_{i−1}} = S_{i−1}`
+through `e`, both brackets vanish there, and `δ_i(k) = 0` for `k ≤ e`. By downward induction from
+`i = m`, this holds for every `i`: multiplication by `top f_i` is injective from `(A_{i−1})_{k − d_i}`
+to `(A_{i−1})_k` for every `k ≤ e`.
+
+Now induct on the largest index `i` with `s_i ≠ 0`. `s_i · top f_i = −Σ_{j<i} s_j · top f_j` lies in
+`T_{i−1}` in degree `D ≤ e`, so injectivity gives `s_i ∈ (T_{i−1})_{D − d_i}`: `s_i = Σ_{j<i} c_j ·
+top f_j` with `c_j` homogeneous of degree `D − d_i − d_j`. Subtracting `Σ_j c_j (top f_j · ε_i −
+top f_i · ε_j)` clears entry `i` and leaves a syzygy of degree `D` on indices below `i`. At `i = 1`,
+`s_1 · top f_1 = 0` forces `s_1 = 0`. ∎
+
+**Lemma 6 (no fall inside the Macaulay space).** Under Lemma 5's hypothesis, every `w ∈ W_e` lies in
+`W_{deg w}`.
+
+*Proof.* Write `w = Σ a_i f_i` with `D = max deg(a_i f_i) ≤ e`, and suppose `D > deg w`. Let `s_i`
+be the degree-`(D − d_i)` component of `a_i`. The degree-`D` component of `Σ a_i f_i` is
+`Σ s_i · top f_i`, and it is zero because `deg w < D`. By Lemma 5, `s = Σ_{j<k} c_{jk} (top f_k · ε_j −
+top f_j · ε_k)`. Replace `a` by `a − Σ c_{jk} (f_k · ε_j − f_j · ε_k)`. The subtracted vector is a
+syzygy of the `f_i` themselves, so the sum is still `w`. Entry `j` has lost exactly its
+degree-`(D − d_j)` component, so `D` drops. Repeat until `D = deg w`. ∎
+
+**Theorem 4 (final drops).** Let `>` be degree compatible, and run degree by degree on affine
+`f_1, …, f_m` with no constant generator and **any** `m`, under Theorem 3's (a) and (b) through `d`.
+Let `e ≤ d` be a degree with `C(e') = S(e')` for every `e' ≤ e`. Then every element of `W_e`
+reduces to zero modulo `G_{≤e}`, the elements of `G` of degree at most `e`, under *any* sequence of
+top reductions, and so has a standard representation over `G_{≤e}`. In particular every pair of
+degree `e` (an S-polynomial `u·g − u'·g'` with `deg(u·g) = e`) and every generator of degree `e` is
+a certified zero, and may be discarded at once.
+
+*Proof.* Theorem 1, applied inside Theorem 3's proof, gives `H_T = S` and `L(G)_{e'} = LT(T)_{e'}`
+for `e' ≤ e`, so Lemmas 5 and 6 apply through `e`.
+
+1. *`G_{≤e} ⊆ W_e`.* A kept row of degree `e'` is a combination of rows `t · g`, each of degree at
+   most `e'`, with `g` a generator or an earlier kept element. By induction `g ∈ W_{deg g}`, so
+   `t · g ∈ W_{e'}`, and by (a) the kept row has degree `e'`, so it lies in `W_{e'}`. Hence a pair
+   of degree `e` and a generator of degree `e` both lie in `W_e`.
+2. *Every nonzero `w ∈ W_e` has `LM(w) ∈ L(G)`.* Let `e' = deg w ≤ e`. Lemma 6 writes `w = Σ a_i f_i`
+   with every `deg(a_i f_i) ≤ e'`, so `top(w) = Σ_{deg(a_i f_i) = e'} top(a_i) · top f_i ∈ T_{e'}`,
+   and `LM(w) = LM(top w) ∈ LT(T)_{e'} = L(G)_{e'}`.
+3. *`W_e` is closed under top reduction by `G`.* If `LM(g)` divides `LM(w)`, then `deg g ≤ deg w ≤ e`
+   under a degree-compatible order, so `g ∈ G_{≤e} ⊆ W_{deg g}` and `t · g ∈ W_{deg w} ⊆ W_e`.
+
+By 2 and 3, a top reduction of `w ∈ W_e` can always continue until it reaches zero, and it
+terminates because `>` is a well order. Recording the reducers gives `w = Σ c · t · g` with
+`LM(t · g) ≤ LM(w)`. ∎
+
+**What this buys the run.** A dropped pair's S-polynomial has a standard representation over the
+basis in hand, which stays one as the basis grows. That is the form of Buchberger's criterion
+F4 needs for it, so a dropped pair is as good as a reduced one, whatever the run does next: complete,
+stay on until the queue empties, or turn off at a later fall or mismatch and finish as plain F4.
+The route does not record a dropped pair as processed, so it never serves as a chain-criterion
+witness, which is the conservative reading. Underdetermined input (`m < n`), whose `S` never
+reaches zero, therefore ends `Open` with a Gröbner basis.
+
+Note what the theorem does *not* say, and where the issue's sketch overreached: it covers
+`W_e`, the elements of `I` that have a representation of degree at most `e`. It says nothing about
+`I_{≤e} ∖ W_e`, the elements of `I` of degree at most `e` whose every representation has a higher
+degree. The drops never need them, because a pair or generator of degree `e` lies in `W_e` by
+construction. Completion does need them.
+
+#### 4.4.1 The implementation
+
+`count_route` admits affine input of every shape and discards a certified degree's pairs at once
+(#1088). The deferral #1080 used for affine input is gone, along with `CountRefusal::AffineNotSquare`
+and `CountDisabled::Exhausted`, which only that deferral could reach. A zero count still ends the
+run on homogeneous or square input (Theorems 1 and 3). On affine input that is not square it turns
+the route off instead (`CountDisabled::ZeroNotFinal`), and the run finishes as plain F4 with the
+drops already made.
+
+#### 4.4.2 Why the square hypothesis is needed for completion
+
+Take `I = (x, y, x² + 1)` in `F[x, y]`, so `S = 1 − t²`. Degree 1 keeps `x` and `y`, with no fall,
+and `C(1) = 0 = S(1)`. Ending the run there returns `{x, y}`. But the degree-2 pair gives
+`x · x − (x² + 1) = −1`, so `I = (1)`. The element `−1` lies in `I_{≤1}` and not in `W_1`: in any
+representation `a·x + b·y + c·(x² + 1) = −1`, setting `x = y = 0` gives `c(0, 0) = −1`, so `c ≠ 0`
+and the representation has degree at least 2. Above the zero degree, `T` has syzygies that are not
+Koszul (here `x² · ε_1 − x · ε_3`), so a representation of higher degree can cancel in its top degree
+and fall into a degree the count has closed. When `m = n` and the count reaches zero, `T` is a
+regular sequence and every syzygy is Koszul, which is Theorem 3's square case.
+
+Tests: `test_a_zero_count_ends_only_a_square_or_homogeneous_run` (the state machine) and
+`a_zero_count_is_not_final_on_overdetermined_affine_input` (real F4) run this counterexample. A
+mutant that ends every affine run at a zero count fails both, and also fails
+`test_certified_zeros_drops_on_affine_input_that_is_not_square`.
+`design_d_returns_the_exact_basis_on_random_non_square_affine_systems` searches random affine systems
+of every non-square shape over GF(2), GF(31) and GF(32003), falls included, and requires the
+deterministic basis and some drops.
+
 ## 5. The signature route (Q4)
 
 `sigf4` uses shifted Schreyer signatures (`src/grobner/sigf4/signature.rs`). A row it finds to be
@@ -294,6 +411,8 @@ function as Zeebra's F4 (`the_toy_engine_computes_the_hilbert_function_zeebra_do
 | `an_element_outside_the_ideal_forges_the_count` | `G ⊆ I` is load-bearing |
 | `affine_degree_falls_break_the_one_sided_error`, `affine_count_without_the_no_fall_witness_certifies_a_wrong_basis` | §4.1 |
 | `the_affine_square_certificate_accepts_katsura_and_refuses_eco_and_cyclic` | Theorem 3 on real F4 runs, against an independent regularity test |
+| `a_zero_count_is_not_final_on_overdetermined_affine_input` | §4.4.2: the route turns off at a zero count on `(x, y, x² + 1)` and returns `{1}` |
+| `design_d_returns_the_exact_basis_on_random_non_square_affine_systems` | Theorem 4: random non-square affine systems, falls included, return the exact basis with pairs dropped |
 
 The harness was checked against a mutant. Accepting `C(e) ≤ S(e) + 1` fails three tests: the
 forged count, the short random reduction and the dropped pivot.
@@ -377,16 +496,15 @@ Design D is the cheaper first experiment. It needs no rollback and no randomness
 reaches the gate, Design R is unnecessary.
 
 **Implementation (#1080).** Design D is `HilbertSelection::CertifiedZeros { slack }`
-(`src/grobner/f4/count_route.rs`), opt-in and off by default. Two choices go beyond the text above.
-On affine input a certified degree's pairs are deferred rather than discarded, and are discarded
-only when the count reaches zero. Theorem 3 makes the output final only at that point, and the
-deferred pairs are promoted back if the route turns off first. For the same reason, affine input
-must also be square, since Theorem 3 concludes only for `m = n`. The gate measurement is the bench
+(`src/grobner/f4/count_route.rs`), opt-in and off by default. #1080 deferred an affine certified
+degree's pairs until a zero count and refused affine input that was not square. Theorem 4 (#1088)
+makes those drops final, so the route now discards them at once on any affine input, and a zero
+count ends the run only on homogeneous or square input (§4.4.1). The gate measurement is the bench
 host's and has not been taken.
 
 ## 10. Transfer limits
 
-- Lemma 2 and Theorems 1 and 3 are proved here. The Lazard step in Theorem 3, that regular top
+- Lemmas 2, 5 and 6 and Theorems 1, 3 and 4 are proved here. The Lazard step in Theorem 3, that regular top
   forms admit no degree fall, and the Cohen–Macaulay characterization of regular sequences are
   standard and were not re-derived. Fröberg's coefficientwise inequality is deliberately **not**
   used.
