@@ -497,7 +497,7 @@ fn apply<const CORRECT: bool>(cells: &mut [u32], pivot: &Pivot, negated: u32, bo
 mod tests {
     use super::{Lane, LaneKernel, LaneRow, LaneWorkspace, MAX_LANE_PRIME};
     use crate::{
-        fields::{Mersenne31, Zp31, Zp32003},
+        fields::{Mersenne31, PrimeFieldElement32, Zp31, Zp32003},
         linalg::{
             reduce_rows_against_pivots_with,
             sparse::{EliminationStatistics, SparseMatrix, SparseRow},
@@ -598,7 +598,30 @@ mod tests {
     /// Hundreds of row operations land on one cell, far past GF(32003)'s four-product headroom.
     #[test]
     fn test_one_cell_survives_many_maximal_products() {
-        type F = Zp32003;
+        maximal_products_on_one_cell::<Zp32003>();
+    }
+
+    /// The largest supported prime: one cell takes maximal products with one product of headroom.
+    #[test]
+    fn test_the_largest_lane_prime_is_exact() {
+        type F = PrimeFieldElement32<MAX_LANE_PRIME>;
+        assert_eq!(F::small_prime_lane().unwrap().modulus(), MAX_LANE_PRIME);
+        maximal_products_on_one_cell::<F>();
+        for seed in 0..6 {
+            for dense_percent in [0, 25, 101] {
+                agrees_with_accumulator::<F>(seed, LaneKernel { dense_percent }, 0.3);
+                agrees_with_reference::<F>(seed, dense_percent);
+            }
+        }
+    }
+
+    /// The first prime above the bound keeps the field route.
+    #[test]
+    fn test_the_first_prime_above_the_bound_gets_no_lane() {
+        assert!(PrimeFieldElement32::<46_349>::small_prime_lane().is_none());
+    }
+
+    fn maximal_products_on_one_cell<F: FiniteField>() {
         let columns = 400;
         let minus_one = -F::one();
         // Reducer k leads at column k and carries p - 1 in the last column.
@@ -766,6 +789,7 @@ mod tests {
         assert_eq!(dense.bytes(), 100 * 2);
         assert_eq!(sparse.bytes(), 100 * 6);
     }
+
     /// A lane row converts back to the monic field row it was made from, under either storage.
     #[test]
     fn test_lane_row_round_trips_to_its_field_row() {

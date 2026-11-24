@@ -793,3 +793,10 @@ fn test_small_prime_lane_keeps_the_basis() {
 fn test_small_prime_lane_is_ignored_on_a_wide_field() {
     lane_agrees::<5, Goldilocks>(1);
 }
+
+/// #945: the lane is opt-in; neither the default nor the checked options turn it on.
+#[test]
+fn test_small_prime_lane_is_off_by_default() {
+    assert!(!SigF4Options::default().small_prime_lane);
+    assert!(!checked_any_graded().small_prime_lane);
+}
