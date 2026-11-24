@@ -54,16 +54,16 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
 
 | Candidate | Port cost | Correctness (digest vs reference, 1 and max w) | Budgets and threads | Regime | Decision |
 |---|---|---|---|---|---|
-| P1 `conv-w1` | none (on Z0) | **pass**, 61 of 62 rows; 1 typed stop (§4.1) | `m33_safety` pass | timed, quiet window | pending |
-| P2 `conv-w4` | none | **pass**, 61/62; 1 typed stop | `m33_safety`, thread cap, #1042 pass | timed, quiet window | pending |
-| P3 `conv-w16` | none | **pass**, 61/62; 1 typed stop | as P2 | timed, quiet window | pending |
-| P4 `sig-w1` (grevlex) | none | **pass**, 40/40 grevlex; `Unsupported` on all 22 grlex/lex rows | `m33_safety` pass; grlex refused (#1049) | timed, quiet window | pending |
-| P5 `sig-w8` (grevlex) | none | **pass**, as P4 (team of 8) | as P2 | timed, quiet window | pending |
-| P6 `sig-w16` (grevlex) | none | **pass**, as P4 (team of 16) | as P2 | timed, quiet window | pending |
-| P7 `conv-cap16` | none | **pass**, 122/124 cells at 1 and 16 w; 2 typed stops. Cap-16 digest check done | `m33_safety` pass | timed, quiet window | pending |
-| P8 `adaptive` | none | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Signature route on 60 grevlex cells | as P2; #961 routing pass | timed, quiet window | pending |
+| P1 `conv-w1` | none (on Z0) | **pass**, 61 of 62 rows; 1 typed stop (§4.1) | `m33_safety` pass | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
+| P2 `conv-w4` | none | **pass**, 61/62; 1 typed stop | `m33_safety`, thread cap, #1042 pass | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
+| P3 `conv-w16` | none | **pass**, 61/62; 1 typed stop | as P2 | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
+| P4 `sig-w1` (grevlex) | none | **pass**, 40/40 grevlex; `Unsupported` on all 22 grlex/lex rows | `m33_safety` pass; grlex refused (#1049) | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
+| P5 `sig-w8` (grevlex) | none | **pass**, as P4 (team of 8) | as P2 | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
+| P6 `sig-w16` (grevlex) | none | **pass**, as P4 (team of 16) | as P2 | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
+| P7 `conv-cap16` | none | **pass**, 122/124 cells at 1 and 16 w; 2 typed stops. Cap-16 digest check done | `m33_safety` pass | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
+| P8 `adaptive` | none | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Signature route on 60 grevlex cells | as P2; #961 routing pass | #1004 §5 (pre-declared; #1012 tests it) | **admit to #1012** (owner decision, §7) |
 | #940 parallel symbolic (`measured/940-gate-s2`) | beyond the 2-session time-box (§6) | — | — | #1040's recommendation not posted | **deferred: port cost** |
-| #997 fewest-terms + FL order | none (options on Z0, §5) | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Eligible | the shipping F4's budgets | timed, quiet window (Cyclic-8 gate) | pending |
+| #997 fewest-terms + FL order | none (options on Z0, §5) | **pass**, 122/124 at 1 and 16 w; 2 typed stops. Eligible | the shipping F4's budgets | MQ10 / GF(2³¹−1) at 4 w (#993), preregistered (§7) | pending the preregistered gate (§7) |
 | #955 randomized zero-skipping | — | — | — | — | excluded: no exact acceptance rule (#1004) |
 
 ## 4. Correctness harness
@@ -161,11 +161,37 @@ The candidates come from #1004 (`docs/research/adaptive-selection-contracts.md` 
 - **If #1040 posts a feature-predicted regime here,** that changes the case for a port, not this
   estimate.
 
-## 7. Remaining work
+## 7. Owner decision, admissions and the #997 gate
 
-- **Timed, needs a quiet machine.** Bounded regime reads for P1–P8 and #997 that the M32 records do
-  not already answer, plus #997's own gate (Cyclic-8 no-regression). Before each run, load and other
-  sessions' compilers are re-checked inside the bench lock.
-- **Then the admission decision** for every candidate (admit, defer or reject, with reasons). Each
-  arm with no pre-declared regime is not admitted.
-- **After the squash merge,** tag the cited commits (`2099df6e` harness) as `measured/1011-*`.
+The owner adopted the proposal on #1043
+([comment](https://github.com/mfaulk/zeebra/issues/1043#issuecomment-7135042005), 2026-11-24),
+before any deciding read.
+
+- **P1–P8: admitted to #1012** on the regimes #1004 pre-declared
+  (`adaptive-selection-contracts.md` §5). There is no new timed read in #1011.
+  - Each passed correctness (§4.1) and the safety prerequisites (§2) on Z0.
+  - Admission makes no performance claim. #1012's matrix and Gate H test the regimes.
+- **#940: deferred, port cost** (§6).
+- **#955: excluded.** No exact acceptance rule exists (#1004).
+- **#997: pending its preregistered gate.** The rule is
+  [`research/m34-qualification/gate997.json`](../../research/m34-qualification/gate997.json),
+  committed before the read.
+  - **Statistic.** `fewest-fl` ÷ the shipping F4, process wall, paired per repetition, with a 95%
+    bootstrap interval. Only clean attempts whose digest equals an independent reference count.
+  - **Run.** n = 9 in publication mode on CCDs 1–2, with the arms rotated.
+  - **No-regression gate.** Cyclic-8 (grevlex) on GF(32003) and 2⁶⁴−353 at 1, 4 and 16 workers. It
+    passes only if every upper bound is ≤ 1.05. This is job `1076f513f424`, 108 attempts.
+  - **Regime read.** MQ10 (`mq-random-10-s10`) on GF(2³¹−1) at 4 workers. It passes only if the
+    upper bound is < 1. This is job `d05e8d60ef86`, 18 attempts.
+  - **Decision.** Admit only if both pass. Reject if any Cyclic-8 cell fails. Otherwise (no MQ10
+    win, or a cell short of 9 counted pairs) defer.
+  - **References** (`gate997-references.json`, untimed, CPUs 24–39):
+    - Cyclic-8 on GF(32003): Singular `std`/`redSB` in `dp`.
+    - Cyclic-8 on 2⁶⁴−353: grobx 0.155.1 in certified mode, a proof-checked basis. The groebner-rs
+      driver is not provisioned on this machine.
+    - MQ10: M33's Singular reference, with the same input digest.
+  - **Committed manifests:** `research/m34-qualification/manifests/`.
+- **To run in a quiet window:**
+  `ZB975_THREADS=0 ZEEBRA_BENCH_JOBS=<jobs> research/m33-final/session.sh 997 1076f513f424 d05e8d60ef86`
+  (reserve, run both, release), then `gate997.py verdict --job-dir <jobs>/1076f513f424 <jobs>/d05e8d60ef86`.
+- **After the squash merge,** tag the cited commits (harness `2099df6e`) as `measured/1011-*`.

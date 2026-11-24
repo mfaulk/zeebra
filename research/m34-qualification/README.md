@@ -1,8 +1,9 @@
 # #1011 M34 G2: portfolio candidate qualification
 
 **Measured at:** Z0 = `28df047f` (tag `measured/1011-z0`), harness `2099df6e`. The report is
-[`docs/research/m34-qualification.md`](../../docs/research/m34-qualification.md). Nothing in this
-directory is timed, and no wall or memory figure is read from it.
+[`docs/research/m34-qualification.md`](../../docs/research/m34-qualification.md). The correctness
+campaign is untimed. The only timed read is #997's preregistered gate (`gate997.*`), and every
+figure it publishes carries Z0 and the harness commit.
 
 | File | What |
 |---|---|
@@ -10,6 +11,11 @@ directory is timed, and no wall or memory figure is read from it.
 | [test_campaign.py](test_campaign.py) | Plan and verdict rules. Run in CI |
 | `results/correctness.jsonl` | One line per cell: the arm, row, verdict, reference and the harness's typed outcome |
 | `results/correctness.md` | The per-arm, per-field verdict table `summarize` writes |
+| [gate997.json](gate997.json) | #997's preregistered gate (owner decision on #1043): rows, workers, n, thresholds, decision rule |
+| [gate997.py](gate997.py) | `references` (untimed), `manifest --job cyclic8\|mq10`, `verdict --job-dir …` → `gate997.md` |
+| [test_gate997.py](test_gate997.py) | The preregistration, manifests and verdict rules. Run in CI |
+| `gate997-references.json` | Independent references for the gate's rows |
+| `manifests/` | The two submitted #997 job manifests (`1076f513f424`, `d05e8d60ef86`) |
 
 ```bash
 python3 -m unittest discover -s research/m34-qualification -p 'test_*.py'
