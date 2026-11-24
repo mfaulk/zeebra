@@ -44,7 +44,7 @@ const FORWARD_TABLE_BITS: usize = 8;
 
 /// Four Russians table width for the pair block, from #272's crossover table (§4): 6 up to about a
 /// thousand rows, 8 beyond.
-fn pair_table_bits(rows: usize) -> usize {
+pub(super) fn pair_table_bits(rows: usize) -> usize {
     match rows {
         0..128 => 4,
         128..1024 => 6,
@@ -171,8 +171,11 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
             batches: 1,
             declined_batches: 0,
             row_xors,
+            xor_words: forward.xor_words + echelon.xor_words,
             tables: forward.tables + echelon.tables,
             workspace_bytes: workspace,
+            #[cfg(feature = "research-gf2-residual")]
+            residual: Default::default(),
         },
     }))
 }

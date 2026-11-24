@@ -113,8 +113,24 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     // dependent on the empty span with no coefficients, and the relation that produces is `1` —
     // the correct lex basis. The walk then stops, because a dependent candidate enqueues no
     // children. A branch was written for this and removed when it proved to be dead.
+    //
+    // `max_quotient_dimension` caps the classical walk only. A strategy that may attempt Wiedemann
+    // enumerates up to what its linear workspace budget admits, and a quotient above the cap is
+    // refused unless Wiedemann converts it (#1111).
+    let cap_exceeded = FglmError::QuotientDimensionExceeded {
+        limit: options.max_quotient_dimension,
+    };
+    let enumeration = FglmOptions {
+        max_quotient_dimension: super::wiedemann::dimension_ceiling::<N, F>(options),
+        ..*options
+    };
     let (algebra, quotient_statistics) =
-        QuotientAlgebra::new_with_statistics(source_basis, source_order, options)?;
+        QuotientAlgebra::new_with_statistics(source_basis, source_order, &enumeration).map_err(
+            |e| match e {
+                FglmError::QuotientDimensionExceeded { .. } => cap_exceeded,
+                e => e,
+            },
+        )?;
     let dimension = algebra.dimension();
     statistics.quotient_dimension = dimension;
     statistics.border = quotient_statistics.border;
@@ -131,6 +147,9 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
         statistics.target_basis_elements = basis.len();
         statistics.timings.dependence = walk.elapsed();
         return Ok((basis, statistics));
+    }
+    if dimension > options.max_quotient_dimension {
+        return Err(cap_exceeded);
     }
 
     // Every dense cell the dependence machinery needs at full rank: the span's two triangular
@@ -328,7 +347,8 @@ mod tests {
             benchmark_systems::{cyclic, katsura, planted},
             buchberger, buchberger_with_criteria, f4,
             fglm::{
-                FglmError, FglmOptions, FglmStageTimings, OperatorConstruction, OperatorStorage,
+                ConversionRoute, ConversionStrategy, FglmError, FglmOptions, FglmStageTimings,
+                OperatorConstruction, OperatorStorage,
             },
             reference::buchberger_reference,
             PairCriteria,
@@ -1030,6 +1050,90 @@ mod tests {
         );
         options.max_span_bytes = bytes;
         assert!(fglm_to_lex_with_options(&source, source_order, &options).is_ok());
+    }
+
+    /// A two-variable chain whose last operator is a companion matrix: `D = 200`, Wiedemann-eligible.
+    fn sparse_chain() -> Vec<MultivariatePolynomial<2, F>> {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        f4(&parse(&["x - y^2", "y^200 - y - 1"], ["x", "y"]), order).expect("within limits")
+    }
+
+    /// The dimension cap bounds the classical walk only, not a Wiedemann conversion (#1111).
+    ///
+    /// The Wiedemann route needs `O(D)` workspace, so a cap derived from the classical walk's
+    /// `O(D^2)` blocks refused every quotient it wins on before the adaptive rule was consulted.
+    #[test]
+    fn test_the_dimension_cap_does_not_refuse_a_wiedemann_conversion() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let source = sparse_chain();
+        let reference = fglm_to_lex_with_options(&source, order, &FglmOptions::unbounded())
+            .expect("unbounded classical")
+            .0;
+
+        for strategy in [ConversionStrategy::Adaptive, ConversionStrategy::Wiedemann] {
+            let options = FglmOptions {
+                conversion_strategy: strategy,
+                max_quotient_dimension: 64,
+                ..FglmOptions::recommended()
+            };
+            let (basis, statistics) = fglm_to_lex_with_options(&source, order, &options)
+                .unwrap_or_else(|e| panic!("{strategy:?} refused D = 200 under a cap of 64: {e}"));
+            assert_eq!(statistics.quotient_dimension, 200);
+            assert_eq!(statistics.conversion_route, ConversionRoute::Wiedemann);
+            assert_eq!(basis, reference);
+        }
+
+        // The classical walk is still capped.
+        let options = FglmOptions {
+            conversion_strategy: ConversionStrategy::Classical,
+            max_quotient_dimension: 64,
+            ..FglmOptions::recommended()
+        };
+        assert_eq!(
+            fglm_to_lex_with_options(&source, order, &options).unwrap_err(),
+            FglmError::QuotientDimensionExceeded { limit: 64 }
+        );
+    }
+
+    /// Above the cap, a quotient Wiedemann declines is refused rather than walked classically.
+    ///
+    /// Katsura-5's `D = 16` is below the adaptive rule's 128, so it declines; the classical walk
+    /// would have fitted every other budget, and the cap must still refuse it.
+    #[test]
+    fn test_above_the_cap_a_declined_wiedemann_attempt_is_refused() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let source = f4(&katsura::<5, F>(), order).expect("within limits");
+        let options = FglmOptions {
+            max_quotient_dimension: 8,
+            ..FglmOptions::recommended()
+        };
+        assert_eq!(options.conversion_strategy, ConversionStrategy::Adaptive);
+        assert_eq!(
+            fglm_to_lex_with_options(&source, order, &options).unwrap_err(),
+            FglmError::QuotientDimensionExceeded { limit: 8 }
+        );
+    }
+
+    /// Above the cap, the span budgets bound enumeration at the Wiedemann workspace they admit.
+    ///
+    /// Two variables price `(D + 1) * (4 * 2 + 64)` cells: 14,472 at `D = 200`.
+    #[test]
+    fn test_above_the_cap_the_wiedemann_workspace_budget_binds() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let source = sparse_chain();
+        let mut options = FglmOptions {
+            max_quotient_dimension: 64,
+            max_span_entries: 14_471,
+            ..FglmOptions::recommended()
+        };
+        assert_eq!(
+            fglm_to_lex_with_options(&source, order, &options).unwrap_err(),
+            FglmError::QuotientDimensionExceeded { limit: 64 }
+        );
+        options.max_span_entries = 14_472;
+        let (_, statistics) = fglm_to_lex_with_options(&source, order, &options).unwrap();
+        assert_eq!(statistics.conversion_route, ConversionRoute::Wiedemann);
+        assert_eq!(statistics.memory.krylov_workspace_cells, 14_472);
     }
 
     /// Lifting one span budget takes effect; the other goes on binding in its own unit.

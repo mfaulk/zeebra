@@ -1,0 +1,11 @@
+commit=7f223df4
+host=Linux x86_64
+reps=7
+START batches dev 2026-11-23T15:40:40Z load=0.84, 1.13, 1.01
+END   batches dev 2026-11-23T15:40:51Z load=0.87, 1.13, 1.01
+START batches heldout 2026-11-23T15:40:51Z load=0.87, 1.13, 1.01
+END   batches heldout 2026-11-23T15:41:06Z load=0.97, 1.14, 1.01
+START solve dev 2026-11-23T15:41:06Z load=0.97, 1.14, 1.01
+END   solve dev 2026-11-23T15:41:18Z load=0.97, 1.13, 1.01
+START solve heldout 2026-11-23T15:41:18Z load=0.97, 1.13, 1.01
+END   solve heldout 2026-11-23T15:41:32Z load=0.98, 1.12, 1.01

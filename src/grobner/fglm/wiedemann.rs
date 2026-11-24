@@ -45,6 +45,26 @@ fn workspace_cells<const N: usize>(dimension: usize) -> Option<usize> {
         .checked_mul(N.checked_mul(4)?.checked_add(64)?)
 }
 
+/// The largest quotient dimension a conversion under `options` may enumerate.
+///
+/// `max_quotient_dimension` caps the classical walk, whose dense blocks are `O(D^2)`. A strategy
+/// that may attempt Wiedemann can enumerate past it, up to the largest `D` whose linear workspace
+/// allowance fits both span budgets — so the enumeration stays bounded by the budgets that bound
+/// memory, and a quotient above the cap is only ever converted by Wiedemann (#1111).
+pub(super) fn dimension_ceiling<const N: usize, F: FiniteField>(options: &FglmOptions) -> usize {
+    let cap = options.max_quotient_dimension;
+    if options.conversion_strategy == ConversionStrategy::Classical || N == 0 {
+        return cap;
+    }
+    let Some(per_dimension) = workspace_cells::<N>(0) else {
+        return cap;
+    };
+    let cell_bytes = std::mem::size_of::<F>() + std::mem::size_of::<usize>();
+    let rows = (options.max_span_entries / per_dimension)
+        .min(options.max_span_bytes / cell_bytes / per_dimension);
+    cap.max(rows.saturating_sub(1))
+}
+
 pub(super) fn try_conversion<const N: usize, F: FiniteField>(
     algebra: &QuotientAlgebra<N, F>,
     options: &FglmOptions,
@@ -245,7 +265,10 @@ fn certify<const N: usize, F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{certify, numerator_for, numerator_for_classical, reconstruct};
+    use super::{
+        certify, dimension_ceiling, numerator_for, numerator_for_classical, reconstruct,
+        ConversionStrategy,
+    };
     use crate::grobner::FglmStatistics;
     use crate::{
         fields::Zp13 as F,
@@ -255,6 +278,34 @@ mod tests {
         },
         FiniteField, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
+
+    // The enumeration ceiling is the largest D whose linear workspace fits both span budgets.
+    #[test]
+    fn dimension_ceiling_is_the_workspace_budget_inverse() {
+        type P = crate::fields::Zp2147483647;
+        let recommended = FglmOptions::recommended();
+        // (D + 1) * (4 * 14 + 64) <= 20,000,000 cells, and the 320 MB byte budget at 16 bytes a
+        // cell admits the same 20,000,000.
+        assert_eq!(dimension_ceiling::<14, P>(&recommended), 166_665);
+        let classical = FglmOptions {
+            conversion_strategy: ConversionStrategy::Classical,
+            ..recommended
+        };
+        assert_eq!(dimension_ceiling::<14, P>(&classical), 4_096);
+        // A cap above what the workspace admits is never lowered.
+        let tight = FglmOptions {
+            max_span_entries: 1_000,
+            ..recommended
+        };
+        assert_eq!(dimension_ceiling::<14, P>(&tight), 4_096);
+        assert_eq!(
+            dimension_ceiling::<14, P>(&FglmOptions {
+                max_quotient_dimension: 0,
+                ..tight
+            }),
+            7
+        );
+    }
 
     // Rational numerators reconstruct a shifted moment series modulo its recurrence polynomial.
     #[test]

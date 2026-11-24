@@ -1,0 +1,11 @@
+commit=2ac6488f
+host=Darwin arm64
+reps=7
+START batches dev 2026-11-23T02:30:26Z load=3.70 4.00 5.49
+END   batches dev 2026-11-23T02:30:33Z load=3.89 4.03 5.49
+START batches heldout 2026-11-23T02:30:33Z load=3.89 4.03 5.49
+END   batches heldout 2026-11-23T02:30:40Z load=4.05 4.06 5.50
+START solve dev 2026-11-23T02:30:40Z load=4.05 4.06 5.50
+END   solve dev 2026-11-23T02:30:50Z load=3.89 4.03 5.47
+START solve heldout 2026-11-23T02:30:50Z load=3.89 4.03 5.47
+END   solve heldout 2026-11-23T02:31:00Z load=3.83 4.01 5.44

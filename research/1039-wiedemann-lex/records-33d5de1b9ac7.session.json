@@ -1,0 +1,42 @@
+{
+ "attempts": 27,
+ "job": {
+  "context": {
+   "agent": "agent-ab238838d50fbb344@research/1039-wiedemann-lex",
+   "issue": 1039,
+   "session": "deciding",
+   "track": "classical"
+  },
+  "job_id": "33d5de1b9ac7",
+  "manifest_sha256": "33d5de1b9ac7dde6751c6e304255eea613632f6091fb18f65bcb3a0402d0ee86",
+  "mode": "publication"
+ },
+ "journal_sha256": "c9301c66759b884e569f718ec4ad1655b8aa45c4dbf6579b296930349156ffc4",
+ "stop": {
+  "at": "2026-11-23T20:18:32+00:00",
+  "attempts": 27,
+  "contamination": {
+   "clock_sources": {
+    "perf-cycles": 27
+   },
+   "contaminated": 0,
+   "flagged": {},
+   "grouping": "arm",
+   "median_khz": {
+    "cyclic-7@1w/zb-classical/perf-cycles": 3981363,
+    "katsura-11@1w/zb-classical/perf-cycles": 4081138,
+    "pquad-10-1@1w/zb-classical/perf-cycles": 3918675,
+    "wd-3-30@1w/zb-classical/perf-cycles": 4241857,
+    "wd-4-10@1w/zb-classical/perf-cycles": 4248727,
+    "wd-4-12-p31@1w/zb-classical/perf-cycles": 4263160,
+    "wd-4-6@1w/zb-classical/perf-cycles": 3730119,
+    "wdsq-4-10@1w/zb-classical/perf-cycles": 4297416,
+    "wdsq-5-6@1w/zb-classical/perf-cycles": 4256605
+   },
+   "total": 27,
+   "version": 3,
+   "void": false
+  },
+  "reason": "complete"
+ }
+}

@@ -395,11 +395,15 @@ mod tests {
         let system = katsura::<6, Zp32003>();
         let order = MonomialOrder::GradedReverseLexicographic;
         let (_, baseline) = f4_reported(&system, order, &serial());
-        let peak = baseline.max_live_nonzeros;
+        // One entry below the one-worker pass's own peak refuses its high-water reservation, after
+        // the rows ahead of it finished; the serial continuation fits, being under the serial peak.
+        let unbounded = agree(&system, order, &forced(1));
+        let budget = unbounded.reserved_entries - 1;
+        assert!(budget >= baseline.max_live_nonzeros, "{unbounded:?}");
         let statistics = agree(
             &system,
             order,
-            &forced(1).with_live_entries::<Zp32003>(peak),
+            &forced(1).with_live_entries::<Zp32003>(budget),
         );
         assert!(statistics.retained_batches > 0, "{statistics:?}");
         assert!(statistics.retained_rows > 0, "{statistics:?}");

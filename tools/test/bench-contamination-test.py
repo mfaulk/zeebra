@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unit tests for tools/bench_contamination.py; run: python3 tools/test/bench-contamination-test.py"""
 
+import gzip
 import json
 import os
 import pathlib
@@ -167,6 +168,102 @@ class PublicationCheckTest(unittest.TestCase):
             pub = subprocess.run(cmd + ["--mode", "publication"], env=env, capture_output=True,
                                  text=True)
             self.assertEqual(pub.returncode, 0, pub.stdout + pub.stderr)
+
+
+def psi(some, full=None):
+    return {"some_us": some, "full_us": full}
+
+
+def telemetry(compilers_on_bench=0, compilers_elsewhere=0, psi_cpu=0, pgscan=0, mbm=0,
+              ccd=(0, 0), running=()):
+    """The #1105 snapshot fields, as tools/cpu-context.sh prints them."""
+    return dict(telemetry=1, compilers_on_bench=compilers_on_bench,
+                compilers_elsewhere=compilers_elsewhere, runner_workers_on_bench=0,
+                psi={"cpu": psi(psi_cpu), "memory": psi(0, 0), "io": {"unavailable": "no pressure/io"}},
+                psi_bench_slice={"unavailable": "no zbbench.slice"},
+                vmstat={"pswpin": 0, "pswpout": 0, "pgscan": pgscan, "pgsteal": 0, "pgmajfault": None},
+                mbm_bytes=mbm, ccd_stat=[{"l3": "8-15,72-79", "busy": ccd[0], "total": ccd[1], "cpus": 2}],
+                bench_running=[{"pid": 9, "comm": c, "cpu": 72} for c in running])
+
+
+class TelemetryTest(unittest.TestCase):
+    """Interference telemetry (#1105) is metrics, not rules: it never changes a verdict."""
+
+    def pair(self, **after):
+        before = snap(T0, {8: (0, 0)}, {72: (0, 0)}, rest=(0, 0, 4), **telemetry())
+        a = snap(T1, {8: (1000, 1000)}, {72: (0, 1000)}, rest=(0, 4000, 4), **telemetry(**after))
+        return before, a
+
+    def test_deltas_over_the_attempt(self):
+        """Pressure is a fraction of the attempt's wall, counters are deltas, load is per domain."""
+        m = bc.attempt_metrics(*self.pair(psi_cpu=1_000_000, pgscan=40, mbm=5_000_000,
+                                          ccd=(1000, 2000), running=("rustc",)), own_cpu_s=10.0)
+        self.assertEqual(m["telemetry"], 1)
+        self.assertEqual(m["psi"]["cpu"], {"some": 0.1, "full": None})
+        self.assertEqual(m["psi"]["memory"], {"some": 0.0, "full": 0.0})
+        self.assertEqual(m["vmstat"]["pgscan"], 40)
+        self.assertIsNone(m["vmstat"]["pgmajfault"])
+        self.assertEqual(m["mbm_bytes_per_s"], 500_000.0)
+        self.assertEqual(m["ccd_load"], {"8-15,72-79": 1.0})
+        self.assertEqual(m["bench_running"], ["rustc"])
+
+    def test_placement_counts_take_the_larger_snapshot(self):
+        m = bc.attempt_metrics(*self.pair(compilers_on_bench=2, compilers_elsewhere=5))
+        self.assertEqual((m["compilers_on_bench"], m["compilers_elsewhere"]), (2, 5))
+
+    def test_unavailable_is_never_a_value(self):
+        """An unavailable source stays unavailable through the deltas, and `available` says so."""
+        m = bc.attempt_metrics(*self.pair())
+        self.assertEqual(m["psi"]["io"], {"unavailable": "no pressure/io"})
+        self.assertEqual(m["psi_bench_slice"], {"unavailable": "no zbbench.slice"})
+        for value in (None, m["psi"]["io"], m["psi_bench_slice"]):
+            self.assertFalse(bc.available(value))
+        self.assertTrue(bc.available(0))
+
+    def test_old_snapshots_record_nothing(self):
+        """A snapshot from before #1105 has no telemetry: every new metric is None, not zero."""
+        m = bc.attempt_metrics(*pair(), own_cpu_s=10.0)
+        for key in bc.TELEMETRY_METRICS:
+            self.assertIsNone(m[key], key)
+
+    def test_verdicts_ignore_telemetry(self):
+        """Placement does not yet excuse a compiler elsewhere: publication still counts them all."""
+        before, after = self.pair(compilers_on_bench=0, compilers_elsewhere=2)
+        after["compilers"] = 2
+        m = bc.attempt_metrics(before, after, own_cpu_s=10.0)
+        bare = {k: v for k, v in m.items() if k not in bc.TELEMETRY_METRICS}
+        for mode in bc.MODES:
+            self.assertEqual(bc.attempt_verdict(m, mode), bc.attempt_verdict(bare, mode))
+        self.assertIn("2 compiler process(es)", bc.attempt_verdict(m, "publication")["reasons"])
+
+
+def retained_attempts():
+    """(job, mode, exit metadata) for every attempt in the repository's retained bench-job journals."""
+    for journal in sorted(TOOLS.parent.glob("research/*/journals/*/journal.jsonl.gz")):
+        header = json.loads((journal.parent / "header.json").read_text())["header"]["bench_job"]
+        for line in gzip.decompress(journal.read_bytes()).splitlines():
+            r = json.loads(line)
+            c = r.get("metadata", {}).get("contamination") or {} if r["kind"] == "exit" else {}
+            if c.get("metrics") and all("stat" in (r["metadata"].get(s) or {}) for s in ("before", "after")):
+                yield header["job_id"], c["mode"], r["metadata"]
+
+
+class ReplayTest(unittest.TestCase):
+    """Old snapshots give the metrics and verdicts on record (#1105's bit-identity requirement)."""
+
+    def test_retained_journals_replay_identically(self):
+        n = 0
+        for job, mode, md in retained_attempts():
+            stored = md["contamination"]["metrics"]
+            khz = [stored["median_khz"]] if stored["median_khz"] else None
+            m = json.loads(json.dumps(bc.attempt_metrics(md["before"], md["after"], khz_samples=khz)))
+            for key in set(stored) - {"bench_foreign"}:  # own CPU time is not journaled on its own
+                self.assertEqual(m[key], stored[key], f"{job} {md['attempt_id']} {key}")
+            merged = dict(stored, **{k: m[k] for k in bc.TELEMETRY_METRICS})
+            self.assertEqual(bc.attempt_verdict(merged, mode, owner=f"bench-job-{job}"),
+                             md["contamination"]["verdict"], f"{job} {md['attempt_id']}")
+            n += 1
+        self.assertGreater(n, 100, "the retained journals should hold the M33 sessions")
 
 
 if __name__ == "__main__":
