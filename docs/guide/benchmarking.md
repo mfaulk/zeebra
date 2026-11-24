@@ -1512,6 +1512,22 @@ python3 -m unittest discover -s research/1009-feature-costs -p 'test_*.py'
 python3 research/1009-feature-costs/summarize.py --check
 ```
 
+### M4GB reference on dense overdetermined MQ (#1030)
+
+`tools/external/provision-m4gb.sh "<n…>" "<p…>"` builds the pinned M4GB (GPL-3.0-or-later) as one
+binary per `(n, p)`, each with a `.build` sidecar. `m4gb_comparison`, built with `--features
+external-runners`, runs one `corpus::dense_mq_shaped` row with one engine, `zeebra` or `m4gb`, per
+process. Every M4GB basis is verified against Zeebra's. `tools/external/m4gb-cohort.py` alternates
+engine order across repetitions, warms each binary's first exec, and refuses the held-out `m/n` = 1.8
+and GF(65521). `--summarize FILE` prints the table. M4GB serves grevlex and odd primes up to 65,521
+only. The [report](../research/m4gb-m5gb-reference.md) has the development results and what the
+bench host still has to run. Checks:
+
+```sh
+cargo test --features external-runners --lib grobner::external::m4gb
+cargo test --features external-runners --lib grobner::external::corpus::tests::test_dense_mq_digests_are_pinned
+```
+
 ### Complete lex pipeline against grobx (#1039)
 
 `lex_pipeline --family <name> | --input <grobx request JSON> --arm
