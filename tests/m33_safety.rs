@@ -14,6 +14,9 @@ use zeebra::{
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
+/// A few batches of katsura-11 at most, on any team and build, so the wall budget is what stops the
+/// solve: release at 16 workers needs about fifty times this for the whole basis.
+const WALL_BUDGET_MILLIS: u64 = 5;
 /// 2⁶⁴−353, Track G's field.
 type Wide = PrimeFieldElement64<18446744073709551263>;
 const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
@@ -73,11 +76,14 @@ fn entry<const N: usize, F: FiniteField>(
 
 /// A wall budget shorter than the solve stops it typed at both counts (as a time stop, not a size
 /// fallback), within one batch of the budget, on the signature route Track G times.
+///
+/// The budget must stay far below the solve at every worker count and build profile: at 300 ms,
+/// 16 workers in release finished katsura-11 inside it and returned a basis (#1119).
 #[test]
 fn test_wall_budget_stops_the_signature_route_typed_at_1_and_16_workers() {
     let system = signature_row::<Wide>();
     for workers in [1, 16] {
-        let budget = Duration::from_millis(300);
+        let budget = Duration::from_millis(WALL_BUDGET_MILLIS);
         let options = F4Options {
             max_wall_time: Some(budget),
             ..at(workers)
@@ -89,7 +95,7 @@ fn test_wall_budget_stops_the_signature_route_typed_at_1_and_16_workers() {
             | Err(SigF4Error::Budget(F4Error::InterreductionTimeBudgetExceeded {
                 budget_millis,
                 ..
-            })) => assert_eq!(budget_millis, 300),
+            })) => assert_eq!(budget_millis, WALL_BUDGET_MILLIS),
             other => panic!("{workers} workers: expected a typed time stop, got {other:?}"),
         }
         assert!(
