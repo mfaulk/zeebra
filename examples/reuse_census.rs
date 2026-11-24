@@ -642,8 +642,20 @@ mod tests {
             args(&["--row", "mq10-m31", "--engine", "sigf4", "--census"]).is_ok(),
             cfg!(feature = "research-reuse")
         );
-        let adjacent = |engine| args(&["--row", "noon8-wide64", "--engine", engine, "--adjacent", "reuse"]);
-        assert_eq!(adjacent("sigf4").is_ok(), cfg!(feature = "research-adjacent"));
+        let adjacent = |engine| {
+            args(&[
+                "--row",
+                "noon8-wide64",
+                "--engine",
+                engine,
+                "--adjacent",
+                "reuse",
+            ])
+        };
+        assert_eq!(
+            adjacent("sigf4").is_ok(),
+            cfg!(feature = "research-adjacent")
+        );
         assert!(adjacent("f4").is_err());
     }
 

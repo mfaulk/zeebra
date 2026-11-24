@@ -224,7 +224,11 @@ mod tests {
                 .collect()
         };
         assert_eq!(untimed(&count), untimed(&reuse));
-        assert_eq!(count[0].target_hits + count[0].reducer_hits, 0, "nothing precedes batch 0");
+        assert_eq!(
+            count[0].target_hits + count[0].reducer_hits,
+            0,
+            "nothing precedes batch 0"
+        );
         count.iter().map(|b| b.target_hits + b.reducer_hits).sum()
     }
 

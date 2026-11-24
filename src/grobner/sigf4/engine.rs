@@ -726,7 +726,15 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 let mut row = Vec::with_capacity(terms.len());
                 let products = terms.iter().map(|(m, _)| *m).zip(hashes.iter().copied());
                 let key = (source_key(t.source), t.mult);
-                adjacent.row(&mut self.table, key, products, (t.mult, hm), None, &mut work, &mut row);
+                adjacent.row(
+                    &mut self.table,
+                    key,
+                    products,
+                    (t.mult, hm),
+                    None,
+                    &mut work,
+                    &mut row,
+                );
                 handles.push(row);
                 continue;
             }
@@ -786,10 +794,22 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             row.push(lead);
             #[cfg(feature = "research-adjacent")]
             if let Some(adjacent) = self.adjacent.as_mut() {
-                let products = e.terms.iter().map(|(m, _)| *m).zip(e.hashes.iter().copied());
+                let products = e
+                    .terms
+                    .iter()
+                    .map(|(m, _)| *m)
+                    .zip(e.hashes.iter().copied());
                 let key = (source_key(RowSource::Element(id)), mult);
                 let lead = Some(column);
-                adjacent.row(&mut self.table, key, products, (mult, hm), lead, &mut work, &mut row);
+                adjacent.row(
+                    &mut self.table,
+                    key,
+                    products,
+                    (mult, hm),
+                    lead,
+                    &mut work,
+                    &mut row,
+                );
                 handles.push(row);
                 rows.push(Row {
                     sig,
