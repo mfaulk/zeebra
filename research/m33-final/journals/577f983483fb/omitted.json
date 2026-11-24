@@ -1,0 +1,5 @@
+{
+ "payloads": {},
+ "rule": "payloads of 65536 gzipped bytes or more are not committed",
+ "source": "/buildcache/cargo-target/zeebra-bench-m34/jobs/577f983483fb/journal"
+}
