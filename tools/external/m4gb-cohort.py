@@ -12,6 +12,7 @@ and field (GF(65521)) are refused here: they are read only for the decision
 import argparse
 import json
 import os
+import statistics
 import subprocess
 import sys
 from pathlib import Path
@@ -25,7 +26,35 @@ def m_for(n, ratio):
     return int(round(n * ratio))
 
 
+def summarize(path):
+    """Per row: median process wall per engine over answered reps, and M4GB's speedup."""
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    cells = {}
+    for r in rows:
+        key = (r['modulus'], r['n'], r['m'], r['density'], r['seed'], r['planted'])
+        cells.setdefault(key, {}).setdefault(r['engine'], []).append(r)
+    print('| p | n | m | m/n | density | seed | planted | Zeebra s | M4GB s | M4GB speedup '
+          '| M4GB status |')
+    print('|---|---|---|---|---|---|---|---|---|---|---|')
+    for key in sorted(cells):
+        p, n, m, d, s, planted = key
+        z = [r['wall_ns'] / 1e9 for r in cells[key].get('zeebra', [])
+             if r['status'] in ('complete', 'verified')]
+        g = [r['wall_ns'] / 1e9 for r in cells[key].get('m4gb', []) if r['status'] == 'verified']
+        statuses = sorted({r['status'][:24] for r in cells[key].get('m4gb', [])})
+        zm = statistics.median(z) if z else None
+        gm = statistics.median(g) if g else None
+        ratio = f'{zm / gm:.1f}x' if zm and gm else '—'
+        fmt = (lambda v: f'{v:.3f}' if v is not None else '—')
+        print(f'| {p} | {n} | {m} | {m / n:.1f} | {d} | {s} | {"yes" if planted else "no"} '
+              f'| {fmt(zm)} | {fmt(gm)} | {ratio} '
+              f'| {", ".join(statuses)} |')
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == '--summarize':
+        summarize(Path(sys.argv[2]))
+        return
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
