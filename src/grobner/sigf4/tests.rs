@@ -764,6 +764,13 @@ fn lane_agrees<const N: usize, F: FiniteField>(seed: u64) {
         let (field, field_stats) = sig_f4_reported(&system, GREVLEX, &options(false));
         let (lane, lane_stats) = sig_f4_reported(&system, GREVLEX, &options(true));
         assert_eq!(lane.unwrap(), field.unwrap(), "{workers} workers");
+        // #945's corrective iteration: lane mode holds each pivot once, in lane form only.
+        assert!(
+            lane_stats.claim_peak_live_bytes <= field_stats.claim_peak_live_bytes,
+            "{workers} workers: lane {} > field {} live bytes",
+            lane_stats.claim_peak_live_bytes,
+            field_stats.claim_peak_live_bytes
+        );
         assert_eq!(
             (lane_stats.targets, lane_stats.elements_added),
             (field_stats.targets, field_stats.elements_added)
@@ -772,7 +779,7 @@ fn lane_agrees<const N: usize, F: FiniteField>(seed: u64) {
 }
 
 /// #945: the lane route returns the field route's basis on dense quadratics over GF(31) and
-/// GF(32003), on design 1, design 2 and the parallel cascade.
+/// GF(32003), on design 1, design 2 and the parallel cascade, within the field route's live bytes.
 #[test]
 fn test_small_prime_lane_keeps_the_basis() {
     for seed in 0..3 {

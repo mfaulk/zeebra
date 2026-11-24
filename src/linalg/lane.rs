@@ -346,6 +346,7 @@ impl LaneKernel {
 /// A monic row in lane form for [`LaneWorkspace`], its unit lead omitted.
 #[derive(Clone, Debug)]
 pub struct LaneRow {
+    lead: u32,
     body: Pivot,
     nonzeros: u64,
 }
@@ -365,9 +366,27 @@ impl LaneRow {
             .collect();
         let lead = row.first().map_or(0, |e| e.0 as usize);
         Self {
+            lead: lead as u32,
             nonzeros: entries.len() as u64,
             body: kernel.pivot(lead, &entries),
         }
+    }
+
+    /// The lead column.
+    pub fn lead(&self) -> u32 {
+        self.lead
+    }
+
+    /// The monic field row this was made from.
+    pub fn to_field<F: FiniteField>(&self, lane: &Lane<F>) -> Vec<(u32, F)> {
+        let mut row = Vec::with_capacity(self.nonzeros as usize + 1);
+        row.push((self.lead, F::ONE));
+        row.extend(
+            self.body
+                .entries()
+                .map(|(c, v)| (c as u32, (lane.element)(v))),
+        );
+        row
     }
 
     /// Nonzeros right of the lead: the products one application costs.
@@ -746,5 +765,22 @@ mod tests {
         let sparse = LaneRow::from_monic(&lane, LaneKernel { dense_percent: 101 }, &row);
         assert_eq!(dense.bytes(), 100 * 2);
         assert_eq!(sparse.bytes(), 100 * 6);
+    }
+    /// A lane row converts back to the monic field row it was made from, under either storage.
+    #[test]
+    fn test_lane_row_round_trips_to_its_field_row() {
+        let lane = Zp32003::small_prime_lane().unwrap();
+        let mut rng = StdRng::seed_from_u64(3);
+        let mut row = vec![(5u32, Zp32003::one())];
+        for c in 6..90u32 {
+            if rng.gen_bool(0.4) {
+                row.push((c, Zp32003::new(rng.gen_range(1..32003))));
+            }
+        }
+        for dense_percent in [0, 101] {
+            let lane_row = LaneRow::from_monic(&lane, LaneKernel { dense_percent }, &row);
+            assert_eq!(lane_row.lead(), 5);
+            assert_eq!(lane_row.to_field(&lane), row);
+        }
     }
 }

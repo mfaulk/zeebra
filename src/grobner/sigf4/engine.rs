@@ -898,7 +898,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             .collect();
         let ncols = columns.len();
         let mut reducer_at: Vec<u32> = vec![NONE; ncols];
-        let reducer_rows: Vec<Vec<(u32, F)>> = sparse_rows.split_off(target_count);
+        let mut reducer_rows: Vec<Vec<(u32, F)>> = sparse_rows.split_off(target_count);
         let reducer_sigs: Vec<Signature<N>> = rows[target_count..].iter().map(|r| r.sig).collect();
         let targets: Vec<(Signature<N>, Vec<(u32, F)>)> = rows[..target_count]
             .iter()
@@ -916,12 +916,25 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         } else {
             None
         };
-        let lane_rows: Vec<LaneRow> = lane.as_ref().map_or_else(Vec::new, |lane| {
-            reducer_rows
+        // Each pivot is held once (#945's corrective iteration): in lane form only, unless a
+        // research census reads the field rows.
+        #[cfg(feature = "research-reuse")]
+        let field_copies = lane.is_none() || self.reuse.is_some();
+        #[cfg(not(feature = "research-reuse"))]
+        let field_copies = lane.is_none();
+        #[cfg(feature = "research-sigf4-split")]
+        let reducer_entries: u64 = reducer_rows.iter().map(|r| r.len() as u64).sum();
+        let lane_rows: Vec<LaneRow> = match &lane {
+            None => Vec::new(),
+            Some(lane) if field_copies => reducer_rows
                 .iter()
                 .map(|row| LaneRow::from_monic(lane, LaneKernel::default(), row))
-                .collect()
-        });
+                .collect(),
+            Some(lane) => std::mem::take(&mut reducer_rows)
+                .into_iter()
+                .map(|row| LaneRow::from_monic(lane, LaneKernel::default(), &row))
+                .collect(),
+        };
         let lane_bytes: usize = lane_rows.iter().map(LaneRow::bytes).sum();
         let block = ReducerBlock {
             order,
@@ -930,6 +943,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             at: &reducer_at,
             ncols,
             lane: lane.map(|lane| (lane, lane_rows.as_slice())),
+            field_copies,
         };
         if self.options.parallel_cascade {
             return self.claim(&block, &targets, columns, clock, lane_bytes);
@@ -939,11 +953,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             targets: target_count,
             reducers: reducer_count,
             columns: ncols,
-            entries: targets
-                .iter()
-                .map(|t| t.1.len() as u64)
-                .chain(reducer_rows.iter().map(|r| r.len() as u64))
-                .sum(),
+            entries: targets.iter().map(|t| t.1.len() as u64).sum::<u64>() + reducer_entries,
             setup: clock.elapsed(),
             ..Default::default()
         };
@@ -1017,25 +1027,23 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                         !check || s.cmp_in(&t, order) == Ordering::Less,
                         "an earlier target must have a smaller signature"
                     );
-                    #[cfg(feature = "research-sigf4-split")]
-                    {
-                        cascade += (entries.len() - 1) as u64;
-                    }
-                    Some(match &final_lanes[target_at[c] as usize] {
+                    let pivot = match &final_lanes[target_at[c] as usize] {
                         Some(row) => PivotRow::Lane(row),
                         None => PivotRow::Field(entries.as_slice()),
-                    })
+                    };
+                    #[cfg(feature = "research-sigf4-split")]
+                    {
+                        cascade += pivot.products();
+                    }
+                    Some(pivot)
                 } else {
                     None
                 };
                 #[cfg(feature = "research-sigf4-replay")]
                 replay.step(
                     c,
-                    pivot.as_ref().map(|p| match p {
-                        PivotRow::Field(row) => row.len(),
-                        PivotRow::Lane(row) => row.nonzeros() as usize + 1,
-                    }),
-                    pivot.is_some() && block.admissible(c, &t).is_none(),
+                    pivot.as_ref().map(|p| p.products() as usize + 1),
+                    pivot.is_some() && !block.admits(c, &t),
                 );
                 pivot
             });
@@ -1054,18 +1062,21 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                     *v *= inverse;
                 }
             }
+            if kind == Kind::Element {
+                target_at[out[0].0 as usize] = finals.len() as u32;
+            }
             let out_lane = if kind == Kind::Element {
                 block.lane_row(&out)
             } else {
                 None
             };
+            if out_lane.is_some() && !block.field_copies {
+                out = Vec::new();
+            }
             let bytes =
                 std::mem::size_of_val(out.as_slice()) + out_lane.as_ref().map_or(0, LaneRow::bytes);
             if let Err(stop) = live.charge(bytes) {
                 return Err(self.abandon(&live, clock, stop));
-            }
-            if kind == Kind::Element {
-                target_at[out[0].0 as usize] = finals.len() as u32;
             }
             final_lanes.push(out_lane);
             finals.push((t, kind, out, earlier + later));
@@ -1081,7 +1092,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         self.stats.claim_peak_live_bytes = self.stats.claim_peak_live_bytes.max(live.peak);
         let mut results = Vec::new();
-        for (t, kind, row, products) in finals {
+        for ((t, kind, row, products), lane_row) in finals.into_iter().zip(final_lanes) {
+            let row = block.field_row(row, lane_row);
             self.settle(t, kind, &row, products, columns);
             if kind == Kind::Element {
                 results.push((t, row));
@@ -1194,9 +1206,10 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             self.stats.claim_peak_live_bytes.max(report.peak_live_bytes);
         let mut results = Vec::new();
         for ((t, _), outcome) in targets.iter().zip(report.outcomes) {
-            self.settle(*t, outcome.kind, &outcome.row, outcome.products, columns);
+            let row = block.field_row(outcome.row, outcome.lane);
+            self.settle(*t, outcome.kind, &row, outcome.products, columns);
             if outcome.kind == Kind::Element {
-                results.push((*t, outcome.row));
+                results.push((*t, row));
             }
         }
         self.stats.elimination += clock.elapsed();
@@ -1424,6 +1437,9 @@ pub(super) struct ReducerBlock<'a, const N: usize, F> {
     pub(super) ncols: usize,
     /// #945: the field's lane and `rows` in lane form, when the batch reduces in `u32` lanes.
     pub(super) lane: Option<(Lane<F>, &'a [LaneRow])>,
+    /// Whether `rows` and each element's field row are kept beside their lane forms. Without
+    /// lanes, always; with them, only for a research census, so each pivot is held once.
+    pub(super) field_copies: bool,
 }
 
 impl<const N: usize, F> ReducerBlock<'_, N, F> {
@@ -1441,20 +1457,41 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
         }
     }
 
-    /// The reducer at column `c` if its signature is strictly below `t`.
+    /// The reducer at column `c` if its signature is strictly below `t`, as a field row.
+    #[cfg(test)]
     pub(super) fn admissible(&self, c: usize, t: &Signature<N>) -> Option<&[(u32, F)]> {
+        self.admits(c, t)
+            .then(|| self.rows[self.at[c] as usize].as_slice())
+    }
+
+    /// Whether the reducer at column `c` has a signature strictly below `t`.
+    pub(super) fn admits(&self, c: usize, t: &Signature<N>) -> bool {
         let r = self.at[c];
-        (r != NONE && self.sigs[r as usize].cmp_in(t, self.order) == Ordering::Less)
-            .then(|| self.rows[r as usize].as_slice())
+        r != NONE && self.sigs[r as usize].cmp_in(t, self.order) == Ordering::Less
     }
 
     /// [`Self::admissible`], in the representation the batch reduces in.
     pub(super) fn admissible_pivot(&self, c: usize, t: &Signature<N>) -> Option<PivotRow<'_, F>> {
-        let row = self.admissible(c, t)?;
+        if !self.admits(c, t) {
+            return None;
+        }
+        let r = self.at[c] as usize;
         Some(match &self.lane {
-            Some((_, rows)) => PivotRow::Lane(&rows[self.at[c] as usize]),
-            None => PivotRow::Field(row),
+            Some((_, rows)) => PivotRow::Lane(&rows[r]),
+            None => PivotRow::Field(self.rows[r].as_slice()),
         })
+    }
+
+    /// A target's field row for settlement: `row` itself, or its lane form converted back when
+    /// only that was kept.
+    pub(super) fn field_row(&self, row: Vec<(u32, F)>, lane_row: Option<LaneRow>) -> Vec<(u32, F)>
+    where
+        F: FiniteField,
+    {
+        match (&self.lane, lane_row) {
+            (Some((lane, _)), Some(lane_row)) if row.is_empty() => lane_row.to_field(lane),
+            _ => row,
+        }
     }
 
     /// A workspace in the batch's representation.
@@ -1480,6 +1517,16 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
 pub(super) enum PivotRow<'p, F> {
     Field(&'p [(u32, F)]),
     Lane(&'p LaneRow),
+}
+
+impl<F> PivotRow<'_, F> {
+    /// Products one application costs: the entries right of the lead.
+    pub(super) fn products(&self) -> u64 {
+        match self {
+            PivotRow::Field(row) => row.len() as u64 - 1,
+            PivotRow::Lane(row) => row.nonzeros(),
+        }
+    }
 }
 
 /// A dense accumulator with a bitset of possibly-nonzero columns, reused across rows.

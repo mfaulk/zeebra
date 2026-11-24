@@ -416,6 +416,10 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
         } else {
             None
         };
+        // Each pivot is held once: the field row is rebuilt from the lane form at settlement.
+        if lane.is_some() && !self.block.field_copies {
+            row = Vec::new();
+        }
         let lane_bytes = lane.as_ref().map_or(0, crate::linalg::lane::LaneRow::bytes);
         shared.charge(Self::entry_bytes(&row) + lane_bytes, self.live_limit);
         let published = shared.finals[k].0.set(Outcome {
