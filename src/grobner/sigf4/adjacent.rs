@@ -10,7 +10,7 @@
 //!   repeated row's fresh ids against the stored ones. It pays the buffer's upkeep and its misses
 //!   and saves nothing.
 //! - [`AdjacentMode::Reuse`] serves a repeated row from the stored ids: one table read per term
-//!   ([`MonomialTable::local`]) in place of a product, an additive hash and a probe. Both paths
+//!   (`MonomialTable::local`) in place of a product, an additive hash and a probe. Both paths
 //!   append the same first-occurrence ids in the same order, so the matrix, and with it the basis,
 //!   is unchanged; `Count`'s mismatch count is what shows the stored ids are the fresh ones.
 
