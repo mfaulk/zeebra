@@ -291,7 +291,10 @@ Interference telemetry added by #1105 (`telemetry: 1`). These are **metrics, not
 reads them, and the old fields are unchanged, so `dev` and `publication` verdicts on the same
 snapshots are identical (`tools/test/bench-contamination-test.py` replays every retained M33
 journal to check). Each field is a value, `null`, or `{"unavailable": "<reason>"}`, and a missing
-source is never read as zero. None needs privilege beyond reading `/proc` and `/sys`.
+source is never read as zero. None needs privilege beyond reading `/proc` and `/sys`. The fields
+add about 0.18 CPU-s to each snapshot. They did not move timed walls: an A/A with telemetry on vs
+off (`ZEEBRA_CPU_CONTEXT_TELEMETRY=0` omits them) gave off/on 1.004 on both MQ10 16w and Eco-12 1w,
+with both CIs covering 1.0 ([`research/bench-telemetry-overhead/`](../../research/bench-telemetry-overhead/README.md)).
 
 | field | source | meaning |
 |---|---|---|
