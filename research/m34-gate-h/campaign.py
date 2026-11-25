@@ -193,11 +193,12 @@ def development():
 # --- Matrix --------------------------------------------------------------------------------------
 
 def ladder_key(r):
-    """#1012 J6 as refined: records of one generated construction differing only in n."""
-    if r['generator'] is None or scale(r) is None:
+    """#1012 J6 as refined twice: records of one generated construction differing only in scale."""
+    if (r['generator'] is None and not r['id'].startswith('gen-')) or scale(r) is None:
         return None
-    params = {k: v for k, v in r['lineage']['family_parameters'].items() if k != 'n'}
-    return json.dumps([r['lineage']['family_id'], r['field']['characteristic'], params], sort_keys=True)
+    params = {k: v for k, v in r['lineage']['family_parameters'].items() if k not in ('n', 'sites')}
+    derived = r['lineage']['presentation_parent'] is not None
+    return json.dumps([r['lineage']['family_id'], r['field']['characteristic'], derived, params], sort_keys=True)
 
 
 def tiers(rs):
