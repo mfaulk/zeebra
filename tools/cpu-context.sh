@@ -21,6 +21,7 @@
 #   ZEEBRA_CPU_CONTEXT_CLASS  relocates /sys/class (powercap, hwmon)
 #   ZEEBRA_CPU_CONTEXT_CGROUP   relocates /sys/fs/cgroup (zbbench.slice pressure)
 #   ZEEBRA_CPU_CONTEXT_RESCTRL  relocates /sys/fs/resctrl (MBM bandwidth counters)
+#   ZEEBRA_CPU_CONTEXT_TELEMETRY=0  omits the #1105 telemetry fields (overhead A/A only)
 #   ZEEBRA_BENCHLOCK_DIR      where benchlock.log lives, as for tools/benchlock.sh
 #
 # Exit status: 0 snapshot printed; 2 the load or a listed CPU's topology could not be read — a
@@ -331,7 +332,8 @@ ctx_snapshot() { # <cpulist> [stat tokens from the start of an interval]
     "$(ctx_num_or_null "$rapl/energy_uj")" "$(ctx_num_or_null "$rapl/max_energy_range_uj")" \
     "$(ctx_temp_mc)" "$(ctx_count_comm Runner.Listener)" "$(ctx_count_comm Runner.Worker)"
   printf '"benchlock_open":%s' "$(ctx_benchlock_open)"
-  ctx_telemetry_json "$cpus" "$sibs"
+  # ZEEBRA_CPU_CONTEXT_TELEMETRY=0 leaves the #1105 fields out, for measuring what they cost.
+  [ "${ZEEBRA_CPU_CONTEXT_TELEMETRY:-1}" = 0 ] || ctx_telemetry_json "$cpus" "$sibs"
   # shellcheck disable=SC2086
   [ -z "${2:-}" ] || printf ',"interval_busy_pct":%s' "$(ctx_busy_pct "$2" "$(ctx_stat_tokens $cpus $sibs)")"
   printf '}\n'
