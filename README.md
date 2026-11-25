@@ -102,11 +102,15 @@ Katsura-11 and random MQ systems. In the
 (M33), grobx stays 1.08–1.48× ahead at one worker on wide primes (2.35× on a held-out random MQ
 row), and msolve 1.9–2.8× ahead on MQ10 at 4–8 workers. Zeebra beat msolve on Katsura-11 at 8 workers, but that win did not
 hold on the held-out rows. The [competitive board](research/competitive/COMPETITIVE.md) records
-every attempt, including those that failed or hit a limit. The current milestone,
+every attempt, including those that failed or hit a limit. The previous milestone,
 [M34](docs/MILESTONE-GENERALIZABLE-SELECTION.md), measured whether choosing among Zeebra's
 algorithms per input pays, and looked for one class of systems where Zeebra leads. Its
 [integration report](docs/MILESTONE-GENERALIZABLE-SELECTION.md#18-integration-report-m34-i-1046)
 found no selection headroom robust enough to build a selector on
-([findings](docs/research/m34-selection-findings.md)), and no confirmed competitive class.
+([findings](docs/research/m34-selection-findings.md)), and no confirmed competitive class. The
+current milestone, [M35](docs/MILESTONE-FINITE-FIELD-COMPETITIVENESS.md), tries to close the
+one-worker gap to grobx on prime-field reduced bases by improving the engines themselves: exact
+certified zero skipping, carrying signature work into conventional F4, and narrower matrix
+storage. Zeebra's exact correctness guarantee is unchanged.
 
 Licensed under the [MIT licence](LICENSE-MIT).
