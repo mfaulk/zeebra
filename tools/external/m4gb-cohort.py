@@ -3,8 +3,9 @@
 
 Runs `examples/m4gb_comparison` once per (row, engine, repetition), alternating engine order
 between repetitions, and appends one JSON line per run to --output. The held-out ratio (m/n = 1.8)
-and field (GF(65521)) are refused here: they are read only for the decision
-(docs/research/m4gb-m5gb-reference.md §4).
+and field (GF(65521)) are refused unless `--deciding-run` is given: they are read only for the
+decision (docs/research/m4gb-m5gb-reference.md §4). `--engines` picks the arms (default zeebra and
+m4gb), rotated one place per repetition; `--cpus` pins every child with `taskset`.
 
     m4gb-cohort.py --binary target/release/examples/m4gb_comparison --output rows.jsonl \\
         --sizes 31:10,12,14 --sizes 32003:10,12 --reps 3
@@ -27,28 +28,37 @@ def m_for(n, ratio):
 
 
 def summarize(path):
-    """Per row: median process wall per engine over answered reps, and M4GB's speedup."""
+    """Per row: median wall per engine over answered reps, and M4GB's speedup over each other arm.
+    `best` is the faster of the two Zeebra arms (shipping F4 and `GradedEngine::Adaptive`)."""
     rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     cells = {}
     for r in rows:
         key = (r['modulus'], r['n'], r['m'], r['density'], r['seed'], r['planted'])
         cells.setdefault(key, {}).setdefault(r['engine'], []).append(r)
-    print('| p | n | m | m/n | density | seed | planted | Zeebra s | M4GB s | M4GB speedup '
-          '| M4GB status |')
-    print('|---|---|---|---|---|---|---|---|---|---|---|')
+    engines = [e for e in ('zeebra', 'zeebra-adaptive', 'grobx', 'm4gb')
+               if any(e in c for c in cells.values())]
+    fmt = (lambda v: f'{v:.3f}' if v is not None else '—')
+    head = ' | '.join(f'{e} s' for e in engines)
+    others = [e for e in engines if e != 'm4gb'] + (['best'] if 'zeebra-adaptive' in engines else [])
+    print(f'| p | n | m | m/n | density | seed | planted | {head} | '
+          + ' | '.join(f'{e} ÷ M4GB' for e in others) + ' | M4GB peak RSS MiB | M4GB status |')
+    print('|' + '---|' * (7 + len(engines) + len(others) + 2))
     for key in sorted(cells):
         p, n, m, d, s, planted = key
-        z = [r['wall_ns'] / 1e9 for r in cells[key].get('zeebra', [])
-             if r['status'] in ('complete', 'verified')]
-        g = [r['wall_ns'] / 1e9 for r in cells[key].get('m4gb', []) if r['status'] == 'verified']
+        med = {}
+        for e in engines:
+            ok = ('verified',) if e in ('m4gb', 'grobx') else ('complete', 'verified')
+            w = [r['wall_ns'] / 1e9 for r in cells[key].get(e, []) if r['status'] in ok]
+            med[e] = statistics.median(w) if w else None
+        zs = [med.get(e) for e in ('zeebra', 'zeebra-adaptive') if med.get(e)]
+        med['best'] = min(zs) if zs else None
+        g = med.get('m4gb')
+        rss = [r['peak_rss_bytes'] / 2**20 for r in cells[key].get('m4gb', []) if r.get('peak_rss_bytes')]
         statuses = sorted({r['status'][:24] for r in cells[key].get('m4gb', [])})
-        zm = statistics.median(z) if z else None
-        gm = statistics.median(g) if g else None
-        ratio = f'{zm / gm:.1f}x' if zm and gm else '—'
-        fmt = (lambda v: f'{v:.3f}' if v is not None else '—')
+        ratios = ' | '.join(f'{med[e] / g:.1f}x' if med.get(e) and g else '—' for e in others)
         print(f'| {p} | {n} | {m} | {m / n:.1f} | {d} | {s} | {"yes" if planted else "no"} '
-              f'| {fmt(zm)} | {fmt(gm)} | {ratio} '
-              f'| {", ".join(statuses)} |')
+              f'| {" | ".join(fmt(med[e]) for e in engines)} | {ratios} '
+              f'| {fmt(max(rss)) if rss else "—"} | {", ".join(statuses)} |')
 
 
 def main():
@@ -66,6 +76,10 @@ def main():
     parser.add_argument('--reps', type=int, default=3)
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--wall', type=int, default=180)
+    parser.add_argument('--engines', default='zeebra,m4gb')
+    parser.add_argument('--cpus', help='taskset CPU list for every child')
+    parser.add_argument('--deciding-run', action='store_true',
+                        help='admit the held-out ratio and field (the decision run only)')
     parser.add_argument('--unplanted', action='store_true',
                         help='also run the unplanted (inconsistent) variant')
     args = parser.parse_args()
@@ -75,7 +89,8 @@ def main():
     for spec in args.sizes:
         prime, ns = spec.split(':')
         sizes += [(int(prime), int(n)) for n in ns.split(',')]
-    if HELD_OUT_RATIO in ratios or any(p == HELD_OUT_PRIME for p, _ in sizes):
+    held_out = HELD_OUT_RATIO in ratios or any(p == HELD_OUT_PRIME for p, _ in sizes)
+    if held_out and not args.deciding_run:
         parser.error('m/n = 1.8 and GF(65521) are held out until the decision is posted')
 
     cells = [(p, n, m_for(n, r), d, s, planted)
@@ -93,10 +108,12 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open('a') as out:
         for rep in range(args.reps):
-            engines = ('zeebra', 'm4gb') if rep % 2 == 0 else ('m4gb', 'zeebra')
+            arms = args.engines.split(',')
+            engines = arms[rep % len(arms):] + arms[:rep % len(arms)]
             for p, n, m, d, s, planted in cells:
                 for engine in engines:
-                    command = [str(args.binary), '--n', str(n), '--m', str(m),
+                    command = (['taskset', '-c', args.cpus] if args.cpus else []) + [
+                               str(args.binary), '--n', str(n), '--m', str(m),
                                '--density', str(d), '--seed', str(s), '--modulus', str(p),
                                '--engine', engine, '--workers', str(args.workers),
                                '--wall', str(args.wall)]
@@ -108,6 +125,7 @@ def main():
                         sys.exit(1)
                     row = json.loads(done.stdout)
                     row['rep'] = rep
+                    row['load_start'] = os.getloadavg()[0]
                     out.write(json.dumps(row) + '\n')
                     out.flush()
                     print(rep, row['row'], p, engine, row['status'],
