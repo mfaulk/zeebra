@@ -490,7 +490,9 @@ fn run(record: &Record, args: &Args) -> Result<Json, String> {
                   ($p, 10) => measure::<10, $f>(record, args), ($p, 11) => measure::<11, $f>(record, args),
                   ($p, 12) => measure::<12, $f>(record, args), ($p, 13) => measure::<13, $f>(record, args),
                   ($p, 14) => measure::<14, $f>(record, args), ($p, 15) => measure::<15, $f>(record, args),
-                  ($p, 16) => measure::<16, $f>(record, args), ($p, 34) => measure::<34, $f>(record, args),)*
+                  ($p, 16) => measure::<16, $f>(record, args), ($p, 18) => measure::<18, $f>(record, args),
+                  ($p, 21) => measure::<21, $f>(record, args), ($p, 22) => measure::<22, $f>(record, args),
+                  ($p, 24) => measure::<24, $f>(record, args), ($p, 34) => measure::<34, $f>(record, args),)*
                 (p, n) => return Err(format!("no instantiation for p = {p} with {n} variables")),
             }
         };

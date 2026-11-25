@@ -28,6 +28,7 @@ PANEL = PANEL_DIR / 'panel.json'
 INPUTS = PANEL_DIR / 'inputs.json'
 CATALOG = PANEL_DIR / 'catalog.json'
 REFERENCES = PANEL_DIR / 'references.json'
+COMPOSITION = PANEL_DIR / 'composition.json'
 
 TERM = re.compile(r'([+-]?)([^+-]+)')
 FACTOR = re.compile(r'^([A-Za-z_][A-Za-z_0-9]*)(?:\^(\d+))?$')
@@ -161,6 +162,33 @@ def problem_entry(problem, panel, inputs):
     source = panel['sources'][problem['source']]
     entry = GENERATORS[problem['generator']](**problem['generator_parameters'])
     return dict(entry, url=source['url'], revision=source['revision'], license=source['license'])
+
+
+def composition(panel, references):
+    """Per-family base problems, scales (distinct n) and frontier rows: #1006's side of the §8.2 read."""
+    families = {}
+    for problem in panel['problems']:
+        family = families.setdefault(problem['family_id'], dict(
+            base_problems=0, scales=set(), sources=set(), frontier={'p31': 0, 'p64': 0}))
+        family['base_problems'] += 1
+        family['scales'].add(problem['family_parameters']['n'])
+        family['sources'].add(problem['source_id'])
+        for field in family['frontier']:
+            if references.get(f'{problem["id"]}@{field}', {}).get('status') == 'frontier':
+                family['frontier'][field] += 1
+    for family in families.values():
+        family.update(scales=sorted(family['scales']), sources=sorted(family['sources']),
+                      multi_scale=len(family['scales']) > 1)
+    return dict(schema='m34-public-composition-v1', base_problems=len(panel['problems']),
+                families=dict(sorted(families.items())))
+
+
+def dump_composition(panel):
+    references = json.loads(REFERENCES.read_text())['references'] if REFERENCES.exists() else {}
+    summary = composition(panel, references)
+    rows = ',\n'.join(f'  {json.dumps(k)}: {json.dumps(v)}' for k, v in summary['families'].items())
+    return (f'{{"schema": {json.dumps(summary["schema"])}, "base_problems": {summary["base_problems"]},\n'
+            f' "families": {{\n{rows}\n }}}}\n')
 
 
 def reduce_record(problem, entry, field_name, p):
@@ -399,8 +427,10 @@ def main():
         return 0
     inputs = json.loads(INPUTS.read_text())
     records = build_catalog(panel, inputs)
+    summary = dump_composition(panel)
     if args.command == 'catalog':
         CATALOG.write_text(dump_catalog(records))
+        COMPOSITION.write_text(summary)
         return 0
     if args.command == 'check':
         for record in records:
@@ -413,6 +443,9 @@ def main():
             if REFERENCES.exists() else []
         if stale:
             print(f'references.json names unknown records: {stale}', file=sys.stderr)
+            return 1
+        if not COMPOSITION.exists() or COMPOSITION.read_text() != summary:
+            print('composition.json is stale: run tools/m34_public_corpus.py catalog', file=sys.stderr)
             return 1
         print(f'ok: {len(panel["problems"])} base problems, {len(records)} records')
         return 0
@@ -437,6 +470,7 @@ def main():
                     'grobx-certified': {'version': grobx_version(args.grobx),
                                         'timeout_seconds': args.grobx_timeout}},
         'references': references}, indent=1, sort_keys=True) + '\n')
+    COMPOSITION.write_text(dump_composition(panel))
     return 0
 
 

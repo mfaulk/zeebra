@@ -153,6 +153,20 @@ class Generators(unittest.TestCase):
         self.assertEqual(child['equations'][-1], 't*E*F*S0*S1-1')
         self.assertIn('rabinowitsch-augmentation', [t['kind'] for t in child['transformations']])
 
+    def test_composition_counts_scales_per_family(self):
+        """The #1007 hand-off groups base problems by family, with distinct n as scales and frontier rows counted."""
+        panel = dict(problems=[
+            dict(id='a1', family_id='A', source_id='s1', family_parameters=dict(n=3)),
+            dict(id='a2', family_id='A', source_id='s1', family_parameters=dict(n=4)),
+            dict(id='b1', family_id='B', source_id='s2', family_parameters=dict(n=5))])
+        references = {'a1@p31': dict(status='reference'), 'a2@p31': dict(status='frontier'),
+                      'b1@p31': dict(status='reference'), 'a2@p64': dict(status='frontier')}
+        summary = corpus.composition(panel, references)
+        self.assertEqual(summary['base_problems'], 3)
+        self.assertEqual(summary['families']['A'], dict(base_problems=2, scales=[3, 4], sources=['s1'],
+                                                        multi_scale=True, frontier={'p31': 1, 'p64': 1}))
+        self.assertFalse(summary['families']['B']['multi_scale'])
+
     def test_reduction_refuses_a_prime_dividing_a_denominator(self):
         """A prime that divides a cleared denominator cannot reduce the rational system."""
         entry = dict(corpus.chandrasekhar_h(n=2, c=[51, 50]), url='u', revision='r', license='l')

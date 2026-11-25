@@ -91,7 +91,8 @@ evaluation splits. Validate a catalog with `python3 tools/corpus_lineage.py vali
 or check for leakage with `python3 tools/corpus_lineage.py check CATALOG.json SPLIT.json`.
 The [retained-corpus audit](research/corpus-lineage/README.md) records known relationships and
 unresolved metadata without running solvers. The [M34 public application panel](research/m34-public-corpus/README.md)
-admits exact SymbolicData systems as lineage-checked catalog records, and the
+admits exact SymbolicData systems and two generated application families (Chandrasekhar H-equation,
+multisite phosphorylation) as lineage-checked catalog records, and the
 [controlled structural families](research/m34-structural-corpus/README.md) add seeded generators
 that each vary one structural property.
 
