@@ -1,7 +1,7 @@
 # Bench isolation audit data (#1104)
 
 Raw data behind [`docs/research/bench-isolation-audit.md`](../../docs/research/bench-isolation-audit.md).
-Measured at `a63c5568`, with `tools/bench-isolation-audit.sh` as of `41519df3`, on 2026-11-25.
+Measured at `a63c5568`, with `tools/bench-isolation-audit.sh` as added in the same change (#1104), on 2026-11-25.
 
 | Path | What |
 |---|---|

@@ -1,7 +1,7 @@
 # Bench isolation audit: what a CCD reservation fences (#1104)
 
 **Measured at:** `a63c5568` (main; `tools/bench-reserve.sh`, `tools/bench_campaign.py` and
-`tools/bench-job` as there), with `tools/bench-isolation-audit.sh` from `41519df3`; 2026-11-25,
+`tools/bench-job` as there), with `tools/bench-isolation-audit.sh` as added beside this document (#1104; zombie handling came after the window-1 snapshots, §2); 2026-11-25,
 Threadripper PRO 5995WX, kernel 7.3.3-200.fc44, two reservation windows (12:11–12:31 and
 12:32:15–12:32:19 EST) announced in `benchlock.log` as `#1104-isolation-audit-window1`.
 Raw data and scripts: [`research/bench-isolation-audit/`](../../research/bench-isolation-audit/).
