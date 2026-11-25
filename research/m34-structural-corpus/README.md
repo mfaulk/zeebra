@@ -175,3 +175,166 @@ definition. The wide catalog's dense MQ is not reproduced: its draws are Rust `S
 Pairs across families are also available, with equal n and m. Examples are `tri-hidden-8-d2` beside
 `pd-8-8-d2` and `nr-8-e1-*`, all dense quadratic with n = m = 8, and `det-2x6-lin-n8` beside the
 unsliced toric systems.
+
+## Panel
+
+65 base problems in 13 families, 130 records in [`catalog.json`](catalog.json). Each record cites
+generator revision `d35b7639` (#1129). [`references.json`](references.json) holds a
+`reduced-basis-v1` digest per record. At `p31` the oracle is Singular build 44105 (`std`, 120 s); at
+`p64` it is certified grobx 0.155.1 (`8005a2a1`, 300 s). These are the same oracles and digest
+function as [#1006](../m34-public-corpus/README.md#verification-procedure). The reference runs are
+untimed, and *frontier* means neither oracle finished. Every exact claim agrees with both oracles,
+and so does every generic expectation; `m34-structural-corpus-test.py` asserts the exact ones.
+
+| Problem | `family_id` | n | m | Expected | p31 (Singular) | p64 (grobx) |
+|---|---|---:|---:|---|---|---|
+| `zb-col-path-8` | `zb/graph-3colouring` | 8 | 15 | vdim 384 (exact) | 0, vdim 384 | 0, vdim 384 |
+| `zb-col-tree-8-s1` | `zb/graph-3colouring` | 8 | 15 | vdim 384 (exact) | 0, vdim 384 | 0, vdim 384 |
+| `zb-col-path-12` | `zb/graph-3colouring` | 12 | 23 | vdim 6144 (exact) | 0, vdim 6144 | 0, vdim 6144 |
+| `zb-col-tree-12-s1` | `zb/graph-3colouring` | 12 | 23 | vdim 6144 (exact) | 0, vdim 6144 | 0, vdim 6144 |
+| `zb-col-grid-3x4` | `zb/graph-3colouring` | 12 | 29 | vdim 1122 (exact) | 0, vdim 1122 | 0, vdim 1122 |
+| `zb-col-gnm-12-17-s1` | `zb/graph-3colouring` | 12 | 29 | vdim 300 (exact) | 0, vdim 300 | 0, vdim 300 |
+| `zb-col-gnm-12-17-s2` | `zb/graph-3colouring` | 12 | 29 | vdim 0 (exact) | unit ideal | unit ideal |
+| `zb-col-ktree2-12-s1` | `zb/graph-3colouring` | 12 | 33 | vdim 6 (exact) | 0, vdim 6 | 0, vdim 6 |
+| `zb-col-gnm-12-21-s1` | `zb/graph-3colouring` | 12 | 33 | vdim 72 (exact) | 0, vdim 72 | 0, vdim 72 |
+| `zb-col-wheel-5` | `zb/graph-3colouring` | 6 | 16 | vdim 0 (exact) | unit ideal | unit ideal |
+| `zb-col-grid-4x5` | `zb/graph-3colouring` | 20 | 51 | — | 0, vdim 54450 | 0, vdim 54450 |
+| `zb-col-grid-5x5` | `zb/graph-3colouring` | 25 | 65 | — | 0, vdim 580986 | 0, vdim 580986 |
+| `zb-tri-6-d2-s1` | `zb/hidden-triangular` | 6 | 6 | vdim 64 (exact) | 0, vdim 64 | 0, vdim 64 |
+| `zb-tri-hidden-6-d2-s1` | `zb/hidden-triangular` | 6 | 6 | vdim 64 (exact) | 0, vdim 64 | 0, vdim 64 |
+| `zb-tri-8-d2-s1` | `zb/hidden-triangular` | 8 | 8 | vdim 256 (exact) | 0, vdim 256 | 0, vdim 256 |
+| `zb-tri-hidden-8-d2-s1` | `zb/hidden-triangular` | 8 | 8 | vdim 256 (exact) | 0, vdim 256 | 0, vdim 256 |
+| `zb-tri-5-d3-s1` | `zb/hidden-triangular` | 5 | 5 | vdim 243 (exact) | 0, vdim 243 | 0, vdim 243 |
+| `zb-tri-hidden-5-d3-s1` | `zb/hidden-triangular` | 5 | 5 | vdim 243 (exact) | 0, vdim 243 | 0, vdim 243 |
+| `zb-tri-hidden-11-d2-s1` | `zb/hidden-triangular` | 11 | 11 | vdim 2048 (exact) | frontier | frontier |
+| `zb-nr-6-e1-distinct-s1` | `zb/nonradical-triangular` | 6 | 6 | vdim 64 (exact) | 0, vdim 64 | 0, vdim 64 |
+| `zb-nr-6-e1-collide-s1` | `zb/nonradical-triangular` | 6 | 6 | vdim 64 (exact); radical vdim 1 | 0, vdim 64 | 0, vdim 64 |
+| `zb-nr-8-e1-distinct-s1` | `zb/nonradical-triangular` | 8 | 8 | vdim 256 (exact) | 0, vdim 256 | 0, vdim 256 |
+| `zb-nr-8-e1-collide-s1` | `zb/nonradical-triangular` | 8 | 8 | vdim 256 (exact); radical vdim 1 | 0, vdim 256 | 0, vdim 256 |
+| `zb-nr-5-e2-collide-s1` | `zb/nonradical-triangular` | 5 | 5 | vdim 243 (exact); radical vdim 1 | 0, vdim 243 | 0, vdim 243 |
+| `zb-nr-10-e1-collide-s1` | `zb/nonradical-triangular` | 10 | 10 | vdim 1024 (exact); radical vdim 1 | 0, vdim 1024 | 0, vdim 1024 |
+| `zb-nr-12-e1-collide-s1` | `zb/nonradical-triangular` | 12 | 12 | vdim 4096 (exact); radical vdim 1 | frontier | frontier |
+| `zb-blk-2x4-c0-s1` | `zb/coupled-blocks` | 8 | 8 | planted witness | 0, vdim 256 | 0, vdim 256 |
+| `zb-blk-2x4-c1-s1` | `zb/coupled-blocks` | 8 | 8 | planted witness | 0, vdim 256 | 0, vdim 256 |
+| `zb-blk-2x4-c2-s1` | `zb/coupled-blocks` | 8 | 8 | planted witness | 0, vdim 256 | 0, vdim 256 |
+| `zb-blk-3x3-c0-s1` | `zb/coupled-blocks` | 9 | 9 | planted witness | 0, vdim 512 | 0, vdim 512 |
+| `zb-blk-3x3-c3-s1` | `zb/coupled-blocks` | 9 | 9 | planted witness | 0, vdim 512 | 0, vdim 512 |
+| `zb-blk-2x6-c0-s1` | `zb/coupled-blocks` | 12 | 12 | planted witness | 0, vdim 4096 | 0, vdim 4096 |
+| `zb-blk-2x6-c2-s1` | `zb/coupled-blocks` | 12 | 12 | planted witness | frontier | frontier |
+| `zb-blk-3x4-c3-s1` | `zb/coupled-blocks` | 12 | 12 | planted witness | frontier | frontier |
+| `zb-toric-rnc-5` | `zb/toric` | 6 | 10 | dim 2 (exact) | dim 2 | positive-dim |
+| `zb-toric-rnc-8-slice-s1` | `zb/toric` | 9 | 30 | vdim 8 (generic) | 0, vdim 8 | 0, vdim 8 |
+| `zb-toric-segre-3x3` | `zb/toric` | 9 | 9 | dim 5 (exact) | dim 5 | positive-dim |
+| `zb-toric-segre-3x3-slice-s1` | `zb/toric` | 9 | 14 | vdim 6 (generic) | 0, vdim 6 | 0, vdim 6 |
+| `zb-toric-segre-3x5-slice-s1` | `zb/toric` | 15 | 37 | vdim 15 (generic) | 0, vdim 15 | 0, vdim 15 |
+| `zb-toric-segre-4x4-slice-s1` | `zb/toric` | 16 | 43 | vdim 20 (generic) | 0, vdim 20 | 0, vdim 20 |
+| `zb-det-2x4-lin-s1` | `zb/determinantal` | 3 | 6 | vdim 4 (generic) | 0, vdim 4 | 0, vdim 4 |
+| `zb-det-2x6-lin-s1` | `zb/determinantal` | 5 | 15 | vdim 6 (generic) | 0, vdim 6 | 0, vdim 6 |
+| `zb-det-3x5-lin-s1` | `zb/determinantal` | 3 | 10 | vdim 10 (generic) | 0, vdim 10 | 0, vdim 10 |
+| `zb-det-2x4-quad-s1` | `zb/determinantal` | 3 | 6 | vdim 32 (generic) | 0, vdim 32 | 0, vdim 32 |
+| `zb-det-2x6-lin-n8-s1` | `zb/determinantal` | 8 | 15 | dim 3 (generic) | dim 3 | positive-dim |
+| `zb-pd-8-8-d2-s1` | `zb/planted-dense` | 8 | 8 | planted witness | 0, vdim 256 | 0, vdim 256 |
+| `zb-pd-6-6-d3-s1` | `zb/planted-dense` | 6 | 6 | planted witness | 0, vdim 729 | 0, vdim 729 |
+| `zb-pd-7-10-mixed-s1` | `zb/planted-dense` | 7 | 10 | planted witness | 0, vdim 1 | 0, vdim 1 |
+| `zb-pd-12-24-d2-s1` | `zb/planted-dense` | 12 | 24 | planted witness | 0, vdim 1 | 0, vdim 1 |
+| `zb-pd-14-14-d2-s1` | `zb/planted-dense` | 14 | 14 | planted witness | frontier | frontier |
+| `zb-ps-10-15-d2-t12-s1` | `zb/planted-sparse` | 10 | 15 | planted witness | 0, vdim 1 | 0, vdim 1 |
+| `zb-ps-10-15-d2-t12-s2` | `zb/planted-sparse` | 10 | 15 | planted witness | 0, vdim 1 | 0, vdim 1 |
+| `zb-ps-14-21-d2-t16-s1` | `zb/planted-sparse` | 14 | 21 | planted witness | 0, vdim 1 | 0, vdim 1 |
+| `zb-ps-8-8-d3-t10-s1` | `zb/planted-sparse` | 8 | 8 | planted witness | frontier | frontier |
+| `zb-ps-16-16-d2-t18-s1` | `zb/planted-sparse` | 16 | 16 | planted witness | frontier | frontier |
+| `zb-katsura-9` | `katsura` | 9 | 9 | — | 0, vdim 256 | 0, vdim 256 |
+| `zb-katsura-12` | `katsura` | 12 | 12 | — | frontier | frontier |
+| `zb-cyclic-6` | `cyclic` | 6 | 6 | — | 0, vdim 156 | 0, vdim 156 |
+| `zb-cyclic-7` | `cyclic` | 7 | 7 | — | 0, vdim 924 | 0, vdim 924 |
+| `zb-eco-8` | `eco` | 8 | 8 | — | 0, vdim 64 | 0, vdim 64 |
+| `zb-eco-12` | `eco` | 12 | 12 | — | frontier | frontier |
+| `zb-noon-5` | `noon` | 5 | 5 | — | 0, vdim 233 | 0, vdim 233 |
+| `zb-noon-7` | `noon` | 7 | 7 | — | 0, vdim 2173 | 0, vdim 2173 |
+| `zb-reimer-4` | `reimer` | 4 | 4 | — | 0, vdim 36 | 0, vdim 36 |
+| `zb-reimer-6` | `reimer` | 6 | 6 | — | 0, vdim 576 | 0, vdim 576 |
+
+```sh
+python3 tools/m34_structural_corpus.py check            # catalog current, records valid
+python3 tools/corpus_lineage.py validate research/m34-structural-corpus/catalog.json
+python3 tools/m34_structural_corpus.py references --jobs 12   # about 10 minutes, untimed
+python3 tools/m34_structural_corpus.py compose          # the table below
+```
+
+## Pilot composition (#1006 + #1007)
+
+Read with `compose` at this commit, over `research/m34-public-corpus` (39 problems) and this panel
+(65 problems). A base problem is its `p31` record. The table is a snapshot: #1006's remainder
+can add rows, so rerun `compose` after it lands. #1005's freeze commit is the binding read.
+
+| Family | Issue | Base problems | Share | n | m | Scales (distinct n) | Supports | Frontier |
+|---|---|---:|---:|---|---|---:|---:|---:|
+| `sd/chemkin` | #1006 | 1 | 1.0% | 13 | 13 | 1 | 1 | 0 |
+| `sd/classical/bjoerk_8` | #1006 | 1 | 1.0% | 8 | 9 | 1 | 1 | 0 |
+| `sd/classical/caprasse` | #1006 | 1 | 1.0% | 4 | 4 | 1 | 1 | 0 |
+| `sd/classical/cassou` | #1006 | 1 | 1.0% | 4 | 4 | 1 | 1 | 0 |
+| `sd/classical/czapor-86a` | #1006 | 1 | 1.0% | 3 | 3 | 1 | 1 | 0 |
+| `sd/classical/fee_1` | #1006 | 1 | 1.0% | 4 | 4 | 1 | 1 | 0 |
+| `sd/classical/fourcircles` | #1006 | 1 | 1.0% | 2 | 3 | 1 | 1 | 0 |
+| `sd/classical/heron` | #1006 | 1 | 1.0% | 7 | 4 | 1 | 1 | 0 |
+| `sd/classical/raksanyi` | #1006 | 1 | 1.0% | 8 | 4 | 1 | 1 | 0 |
+| `sd/classical/rose` | #1006 | 1 | 1.0% | 3 | 3 | 1 | 1 | 0 |
+| `sd/classical/schiele` | #1006 | 1 | 1.0% | 5 | 4 | 1 | 1 | 0 |
+| `sd/classical/trinks` | #1006 | 2 | 1.9% | 6 | 6–7 | 1 | 2 | 0 |
+| `sd/classical/weispfenning-94` | #1006 | 1 | 1.0% | 3 | 3 | 1 | 1 | 0 |
+| `sd/ellipsoid` | #1006 | 3 | 2.9% | 10 | 4 | 1 | 3 | 0 |
+| `sd/four-body` | #1006 | 1 | 1.0% | 6 | 6 | 1 | 1 | 0 |
+| `sd/gametwo-nash` | #1006 | 3 | 2.9% | 5–7 | 5–7 | 3 | 3 | 1 |
+| `sd/robot-kinematics` | #1006 | 4 | 3.8% | 9–34 | 7–34 | 4 | 4 | 0 |
+| `sd/runge-kutta-order-conditions` | #1006 | 4 | 3.8% | 8–13 | 6–12 | 2 | 4 | 0 |
+| `sd/schwarz` | #1006 | 5 | 4.8% | 7–11 | 7–11 | 5 | 5 | 0 |
+| `sd/signal-theory` | #1006 | 4 | 3.8% | 10–16 | 9–24 | 4 | 4 | 1 |
+| `sd/virasoro` | #1006 | 1 | 1.0% | 8 | 8 | 1 | 1 | 0 |
+| `cyclic` | #1007 | 2 | 1.9% | 6–7 | 6–7 | 2 | 2 | 0 |
+| `eco` | #1007 | 2 | 1.9% | 8–12 | 8–12 | 2 | 2 | 1 |
+| `katsura` | #1007 | 2 | 1.9% | 9–12 | 9–12 | 2 | 2 | 1 |
+| `noon` | #1007 | 2 | 1.9% | 5–7 | 5–7 | 2 | 2 | 0 |
+| `reimer` | #1007 | 2 | 1.9% | 4–6 | 4–6 | 2 | 2 | 0 |
+| `zb/coupled-blocks` | #1007 | 8 | 7.7% | 8–12 | 8–12 | 3 | 4 | 2 |
+| `zb/determinantal` | #1007 | 5 | 4.8% | 3–8 | 6–15 | 3 | 5 | 0 |
+| `zb/graph-3colouring` | #1007 | 12 | 11.5% | 6–25 | 15–65 | 5 | 12 | 0 |
+| `zb/hidden-triangular` | #1007 | 7 | 6.7% | 5–11 | 5–11 | 4 | 4 | 1 |
+| `zb/nonradical-triangular` | #1007 | 7 | 6.7% | 5–12 | 5–12 | 5 | 5 | 1 |
+| `zb/planted-dense` | #1007 | 5 | 4.8% | 6–14 | 6–24 | 5 | 5 | 1 |
+| `zb/planted-sparse` | #1007 | 5 | 4.8% | 8–16 | 8–21 | 4 | 5 | 2 |
+| `zb/toric` | #1007 | 6 | 5.8% | 6–16 | 9–43 | 4 | 6 | 0 |
+
+- met: 34 families (≥ 10)
+- met: 104 base problems (≥ 60)
+- met: 21 families from #1006, 13 families from #1007 (≥ 4 each)
+- met: largest family 12 of 104 (≤ 15%)
+- met: seeded families with < 2 supports: none
+- **not met**: families with one scale: 16
+- met: 11 frontier base problems, 10.6% (≥ 10%)
+
+- **Families with one scale.** All 16 are #1006's: the 12 `sd/classical/*` models, `sd/chemkin`,
+  `sd/four-body` and `sd/virasoro`, plus `sd/ellipsoid`, whose three problems share n = 10. Every
+  #1007 family covers at least two scales. Closing this gap is #1006's remainder, or an owner
+  waiver of the two-scale rule for single-model public families.
+- **Small inputs** (best arm under 300 ms) are not read here, because no arm has been timed. Ladders
+  such as `reimer-4` and `noon-5`, the colouring paths, `det-2x4-*` and the sliced toric systems are
+  the expected small rows; #1012's matrix decides.
+- **Exposure.** The 10 ladder problems are M29–M33 relatives (development only, §8.3).
+- **Field constraint.** Colouring needs char ≠ 3; Noon needs char ∤ 10. Both primes satisfy both.
+
+## Status against #1007
+
+- **Done.**
+  - Generators with written specifications for eight controlled families, plus the five retained
+    ladders.
+  - Deterministic SHA-256 draws, lineage under #1005, and tests: determinism, a pinned panel
+    digest, catalog currency, witnesses, toric parametrizations, determinant-one transforms,
+    matched shapes, and oracle agreement with every exact claim.
+  - Matched pairs or ladders for incidence, hidden triangular structure, radicality and block
+    coupling.
+  - Retained tiny, interactive, memory-heavy (`col-grid-5x5`, vdim 580,986) and nine frontier
+    inputs.
+- **Open.**
+  - Admitting #1034's bilinear family; it needs an integer-coefficient emitter.
+  - Lattice-basis binomial ideals.
+  - The small-input share, which needs #1012's timings.

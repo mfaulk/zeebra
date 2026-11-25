@@ -180,6 +180,10 @@ class References(unittest.TestCase):
             raise unittest.SkipTest('references.json is not committed yet')
         cls.refs = json.loads(corpus.REFERENCES.read_text())['references']
 
+    def test_committed_catalog_is_current(self):
+        """catalog.json is byte-identical to what the generators at this tree produce."""
+        self.assertEqual(corpus.CATALOG.read_text(), corpus.oracle.dump_catalog(corpus.build_catalog()))
+
     def test_every_record_has_a_reference_row_with_its_digest(self):
         """references.json covers every record and pins the input digest it was computed on."""
         recs = records()
