@@ -13,6 +13,336 @@
   }
  },
  "references": {
+  "gen-chandrasekhar-h-10@p31": {
+   "basis_size": 1023,
+   "dimension": 0,
+   "normalized_input_digest": "17071289eeefbb502d46e7727f1739989f410913d7a1c31c08090f9546b2397c",
+   "oracle": "singular",
+   "reduced_basis_digest": "687b47bcbe787176269b7f6dd94b86f019fec27154d042b6991a119e7fb8d83b",
+   "status": "reference",
+   "vdim": 1024
+  },
+  "gen-chandrasekhar-h-10@p64": {
+   "basis_size": 1023,
+   "normalized_input_digest": "aaf09575e5716308abe08cc6e095148cb9eb088cf1e82d3f385f205dfcf95e1b",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "bcc65e29d02cc78c289dfb28ea8806230266d87b63cf9606b9748c63233a8029",
+   "status": "reference",
+   "vdim": 1024,
+   "zero_dimensional": true
+  },
+  "gen-chandrasekhar-h-11@p31": {
+   "basis_size": 2047,
+   "dimension": 0,
+   "normalized_input_digest": "c20326c034ae646a080fe63abe8c0b4aec0b1ba31cf2292b19c61c19c5d6a0db",
+   "oracle": "singular",
+   "reduced_basis_digest": "0f820a8e0df248e18432794f08e1ccad8d29d2e7289e5ae9e254ff44aa652433",
+   "status": "reference",
+   "vdim": 2048
+  },
+  "gen-chandrasekhar-h-11@p64": {
+   "basis_size": 2047,
+   "normalized_input_digest": "2aac0831abcb5c00567e16cafb547b45ba5acf94bd6ab19f9aa1661211c0245d",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "493feda84e9beb52283c9c58dce2aecbd629adb794a26b8d172151b1b3937fb0",
+   "status": "reference",
+   "vdim": 2048,
+   "zero_dimensional": true
+  },
+  "gen-chandrasekhar-h-12@p31": {
+   "normalized_input_digest": "089f4bc9acdb8e0614495bc183131a5a221cc57cee11d9740244c084e19a5281",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "gen-chandrasekhar-h-12@p64": {
+   "normalized_input_digest": "94a0d495f59f60ef4b56b007839ede8bb99ab03a76f2f12f1f48076cf8f60542",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "gen-chandrasekhar-h-13@p31": {
+   "normalized_input_digest": "0c4e2edd99744a609c25346972937fbb6f6a47f5b8f905848373c478ef44da75",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "gen-chandrasekhar-h-13@p64": {
+   "normalized_input_digest": "81bdcc90713d528e449bec0ab7a39453577a2a07e40f907f4ab009bd2e3821d3",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "gen-chandrasekhar-h-4@p31": {
+   "basis_size": 15,
+   "dimension": 0,
+   "normalized_input_digest": "653e21e6dfe1e41a7037334e21e4decb337ed64e1911a16ab57459e726ac7fc3",
+   "oracle": "singular",
+   "reduced_basis_digest": "47db666d1822caef022067e5d42483a0a766e0da9acd0234e76f28b774a4e314",
+   "status": "reference",
+   "vdim": 16
+  },
+  "gen-chandrasekhar-h-4@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "0039104356220c6d9e4e70770a367c0e13639430cbcd8657d73dd5c88979c007",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "7a4ce2849947df9163535b572dbbabf2be401541714bc21c7c225d4db5bf3347",
+   "status": "reference",
+   "vdim": 16,
+   "zero_dimensional": true
+  },
+  "gen-chandrasekhar-h-5@p31": {
+   "basis_size": 31,
+   "dimension": 0,
+   "normalized_input_digest": "e962951c65b7191a68628d7488d2f58dd429d3c56067b07233f0d4e9628eb796",
+   "oracle": "singular",
+   "reduced_basis_digest": "92d6fdb7eda9162e0542611cf5fc8f50f0574d5ff51f03da4bdb01ede66b0c58",
+   "status": "reference",
+   "vdim": 32
+  },
+  "gen-chandrasekhar-h-5@p64": {
+   "basis_size": 31,
+   "normalized_input_digest": "fb61c1fb4892dec5336e49306252be35ec2b8398225469ec70dcf3c53bf24ad6",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "5775a677dced6745df3711e6c988a929d2163c167bb456ae89cc19fcae918cf1",
+   "status": "reference",
+   "vdim": 32,
+   "zero_dimensional": true
+  },
+  "gen-chandrasekhar-h-6@p31": {
+   "basis_size": 63,
+   "dimension": 0,
+   "normalized_input_digest": "72f5a1dc2f388b1a2d4000c7a205fe13ef87dad628f93655fae440ea3542728e",
+   "oracle": "singular",
+   "reduced_basis_digest": "f067a6576604ee660462ac622d71c80c839bab8363f1e8449c0552274613c85d",
+   "status": "reference",
+   "vdim": 64
+  },
+  "gen-chandrasekhar-h-6@p64": {
+   "basis_size": 63,
+   "normalized_input_digest": "a24a20a77cf1d800586a1f0646f2290ab3df97fc13b2a92996a63056d7522990",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "be5b079ed95e25233a5d4f5d9b50bc02f7c67283381a300aad37dcda3df7c4f1",
+   "status": "reference",
+   "vdim": 64,
+   "zero_dimensional": true
+  },
+  "gen-chandrasekhar-h-7@p31": {
+   "basis_size": 127,
+   "dimension": 0,
+   "normalized_input_digest": "352df7f1e2aa578454e224a54281cab3dc81b7813ca81e3455a9388fcbdbcd8e",
+   "oracle": "singular",
+   "reduced_basis_digest": "450440cd00863f0bfa10ce1fa934cec95c806a187e551d4efa44a4a1325b244b",
+   "status": "reference",
+   "vdim": 128
+  },
+  "gen-chandrasekhar-h-7@p64": {
+   "basis_size": 127,
+   "normalized_input_digest": "3b724fef6c4b5f572d27395ae4c6cacdf64684400ff9c3c5d7138ed17cccf0e0",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "a5a1744fb96efdfbf38e890a7a959286495130593c938558917fec2416da374e",
+   "status": "reference",
+   "vdim": 128,
+   "zero_dimensional": true
+  },
+  "gen-chandrasekhar-h-8@p31": {
+   "basis_size": 255,
+   "dimension": 0,
+   "normalized_input_digest": "7397105f8f5591de58d0f47b27090c2ba8e1cd3754a6f210cc219a822fa9d3c5",
+   "oracle": "singular",
+   "reduced_basis_digest": "1da7d6677313be62ba16e3e3845ad747dab73409aa895413c80385049d967b7b",
+   "status": "reference",
+   "vdim": 256
+  },
+  "gen-chandrasekhar-h-8@p64": {
+   "basis_size": 255,
+   "normalized_input_digest": "42b3b2a76fc4cf0071ab660d8b4b956ba7f68f37873b62077cb64be23c9dec05",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "7094d67508db2fe3d3789e26fadfd90913afa7b9a37a10f5d1448fc528762db4",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "gen-chandrasekhar-h-9@p31": {
+   "basis_size": 511,
+   "dimension": 0,
+   "normalized_input_digest": "de23cf1d2c12635cd7e51fc869b8cd5fd4780d30ae80937201642b6a32b0d222",
+   "oracle": "singular",
+   "reduced_basis_digest": "33fdacbb6c3385fe066a9f8ec098a0033864f7b92dc4d762e1ba149ec3aff363",
+   "status": "reference",
+   "vdim": 512
+  },
+  "gen-chandrasekhar-h-9@p64": {
+   "basis_size": 511,
+   "normalized_input_digest": "7721476fe7f62c92c8e6e723557b4c67bac83e08c05e143dfdfb229fc35f49db",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "3ae1f0bb8ee21a33138d7b6e7092b68122614a9c30946503b5a4f92ff31388ab",
+   "status": "reference",
+   "vdim": 512,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-2-nonzero@p31": {
+   "basis_size": 16,
+   "dimension": 0,
+   "normalized_input_digest": "6cccd63f18f559cca99a6e8810a17f28da8be5d946a2a0e68ff811840c4c5940",
+   "oracle": "singular",
+   "reduced_basis_digest": "e578c8fb8a84237081458e906da5c4589307b0557bea0f3277f0fd5576e32c0e",
+   "status": "reference",
+   "vdim": 5
+  },
+  "gen-phosphorylation-2-nonzero@p64": {
+   "basis_size": 16,
+   "normalized_input_digest": "102427299646d3350c9562094a104fe934ab96131383b2c61ee1b2a168b6d611",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "c9649d576c70d944a873ed0af9a31eb67adbc1d0f97d523406c0c89b302c4c73",
+   "status": "reference",
+   "vdim": 5,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-2@p31": {
+   "basis_size": 15,
+   "dimension": 0,
+   "normalized_input_digest": "e408a833d0f5e356d9e24db602d778436ef2a997b6ff8dccbe1cd8e7868973a3",
+   "oracle": "singular",
+   "reduced_basis_digest": "0c0457133e8b18cebac148e53b287c602e1cd8930d2a7f45e784ecd519cf8782",
+   "status": "reference",
+   "vdim": 5
+  },
+  "gen-phosphorylation-2@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "23a0adb6e9be542bfa4c774de8dc22a219bdf7d43cc2bfa9458ede5501e057d2",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "6027c72640c704d9c39dc2cf08ce1cb38f90861bbeedc5056d80849037292033",
+   "status": "reference",
+   "vdim": 5,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-3@p31": {
+   "basis_size": 27,
+   "dimension": 0,
+   "normalized_input_digest": "0a55cc9e9b60177302c2c64d7ded5a662c95fd301b12d1da0bd06af5300c453d",
+   "oracle": "singular",
+   "reduced_basis_digest": "320dc219399ca6e8dbd4f935aab9868aad18835960e9dfe65be06425ea05a6cc",
+   "status": "reference",
+   "vdim": 7
+  },
+  "gen-phosphorylation-3@p64": {
+   "basis_size": 27,
+   "normalized_input_digest": "4066a7122fe1baafad940efed9389a71de8baf6fe2cc2492f0522a6ca38adae0",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "0a6b1335e5507a70ad63d57fef6854271f8ba53b0c3344e6aa7cbd31888e4827",
+   "status": "reference",
+   "vdim": 7,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-4-nonzero@p31": {
+   "basis_size": 44,
+   "dimension": 0,
+   "normalized_input_digest": "8f81c835bdd1b4ca562b2494c2bd18d9f7a38abf02ad000034eba49616ab9b0f",
+   "oracle": "singular",
+   "reduced_basis_digest": "4f445c0be883e5135610e30dfaf48b67613ec1fbc5a7228c6f81e5451b5787d4",
+   "status": "reference",
+   "vdim": 9
+  },
+  "gen-phosphorylation-4-nonzero@p64": {
+   "basis_size": 44,
+   "normalized_input_digest": "c1f8dd8c381243544980894f3a84f6b92dfd538050e751f47312f8ecffddacc0",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "2d8786e8205e1c901298bcc4ef3bd3a0786801f24655eef5f548301f92b102cb",
+   "status": "reference",
+   "vdim": 9,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-4@p31": {
+   "basis_size": 43,
+   "dimension": 0,
+   "normalized_input_digest": "6afb813c07d4114b5d4fa46ba9e09322c2e88f79b97d6ae37f82a30e084be103",
+   "oracle": "singular",
+   "reduced_basis_digest": "9298479d01f5d17058fb2b210d55d64e06be1ef20213a3bc56f235042a35ffd5",
+   "status": "reference",
+   "vdim": 9
+  },
+  "gen-phosphorylation-4@p64": {
+   "basis_size": 43,
+   "normalized_input_digest": "b1262307a256debc37e214a71c1556f1e3dbb64f2869ea3003986156110576a9",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "d996b431fda798b49a52ba582786afef238dadcabe955900994ae1f5c39fe5b2",
+   "status": "reference",
+   "vdim": 9,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-5@p31": {
+   "basis_size": 63,
+   "dimension": 0,
+   "normalized_input_digest": "984ada08dc62ed7392a8c299fc63fe29a9774e2a169248022f39d687c0c1dff4",
+   "oracle": "singular",
+   "reduced_basis_digest": "5936d2202406890ed61657fb62f3300a29dfdd2dc659cc59f0407ad582dd4bad",
+   "status": "reference",
+   "vdim": 11
+  },
+  "gen-phosphorylation-5@p64": {
+   "basis_size": 63,
+   "normalized_input_digest": "26a753991ae0fd9cd91375a3650a8f260f1e8286a8b6cc1c32b95b9178994c93",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "cf752cf1066ed514530a6b73ee133749dba5bfc15566c1aba1fc5609146fc22e",
+   "status": "reference",
+   "vdim": 11,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-6-nonzero@p31": {
+   "basis_size": 88,
+   "dimension": 0,
+   "normalized_input_digest": "88b4b69efd7a4c433d7d5ab4e10e2cefee033b60ccc6bad3c6c86d0d64e0db00",
+   "oracle": "singular",
+   "reduced_basis_digest": "bc7947c29476ff933be3e15dfd7a6c12688460831d76dd1a165995073445c43e",
+   "status": "reference",
+   "vdim": 13
+  },
+  "gen-phosphorylation-6-nonzero@p64": {
+   "basis_size": 88,
+   "normalized_input_digest": "d9705475282fe56f3dd87c36dfb31a9ed18c6bbd6106eb5bc4958fc86d77cc47",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "648c38bfd4e2683aa4c07a60c9db69ddf1ca2ccedb9a77172d447560d64a8e8f",
+   "status": "reference",
+   "vdim": 13,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-6@p31": {
+   "basis_size": 87,
+   "dimension": 0,
+   "normalized_input_digest": "c7808eed5d191ba3c7019b8727e3d9798919b86c7e95c14252637c4b57618557",
+   "oracle": "singular",
+   "reduced_basis_digest": "a35e3be1ca8b2c4d6a447756f4c36701dd1d9a7e19288fc497fcad52f848d9d1",
+   "status": "reference",
+   "vdim": 13
+  },
+  "gen-phosphorylation-6@p64": {
+   "basis_size": 87,
+   "normalized_input_digest": "cae4e7cbdb82cfcc3b7f3a3fc4e6a2e59d971a9d6f1da8a2af93862af96df9fe",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "e7ed5a9de6dd320b320dd0bc0dd659483f3e647346eb76a0a784823f0a998980",
+   "status": "reference",
+   "vdim": 13,
+   "zero_dimensional": true
+  },
+  "gen-phosphorylation-7@p31": {
+   "basis_size": 115,
+   "dimension": 0,
+   "normalized_input_digest": "8258be44a0a41f2433a4bcc7f410a11bcf662a463caf90a9bb7a7747d30ee8f2",
+   "oracle": "singular",
+   "reduced_basis_digest": "f6a03ae2620fbb4bcdadbb5e36e70edfbdebaa1d886e9f0c763a17f4aca702d2",
+   "status": "reference",
+   "vdim": 15
+  },
+  "gen-phosphorylation-7@p64": {
+   "basis_size": 115,
+   "normalized_input_digest": "e1d69ab8f7e360165bb88cb19bb28ab1ced898a74278b6cf34387213d14fcc7f",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "4744085a25071b441adc36ee7f0268a08f837d3a289e540fb0891a72181b1f8a",
+   "status": "reference",
+   "vdim": 15,
+   "zero_dimensional": true
+  },
   "sd-bjoerk-8@p31": {
    "basis_size": 1,
    "dimension": -1,
@@ -175,6 +505,21 @@
    "vdim": 26,
    "zero_dimensional": true
   },
+  "sd-fee-2@p31": {
+   "basis_size": 175,
+   "dimension": 1,
+   "normalized_input_digest": "a27782eca17117c89a615a290e448c3a65a1db2dc58e4fa69fb78cfd60f0aec8",
+   "oracle": "singular",
+   "reduced_basis_digest": "b9c64f41b3f4076c08f47b2dc61adad9026b36033c9f968f2419e57844956368",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-fee-2@p64": {
+   "normalized_input_digest": "75010d23f77ca57a22378b7b084df803c64e05bdf1f9e5a26401a938014d50ec",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
   "sd-fourbodyproblem@p31": {
    "basis_size": 57,
    "dimension": 0,
@@ -210,6 +555,24 @@
    "status": "reference",
    "vdim": 14,
    "zero_dimensional": true
+  },
+  "sd-geometry-heron-1@p31": {
+   "basis_size": 3,
+   "dimension": 3,
+   "normalized_input_digest": "d7ef53e2fd669c321ccfd9c5ede43b3478d5a0d5414ad1d6a980ac0095cc27a6",
+   "oracle": "singular",
+   "reduced_basis_digest": "2a785fe7a346f2597583e9f8b6c77cdde18f88eb23854c37b22bf5f387863a04",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-geometry-heron-1@p64": {
+   "basis_size": 3,
+   "normalized_input_digest": "bc521a0cb766fd6744359f07e279576fc9142967aa2f7954124dabdfb0a27a2f",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "079c35e05a725642d41ce468d3585dcef40eaa3b52934d4def24c0f97564202d",
+   "status": "reference",
+   "vdim": null,
+   "zero_dimensional": false
   },
   "sd-hairer-1@p31": {
    "basis_size": 12,
@@ -387,6 +750,42 @@
    "status": "reference",
    "vdim": 136,
    "zero_dimensional": true
+  },
+  "sd-schiele-1-1@p31": {
+   "basis_size": 6,
+   "dimension": 0,
+   "normalized_input_digest": "568535e4988d781f7a2e20b318c60c305965c7fa2b8e1d6e8a33f7c416705627",
+   "oracle": "singular",
+   "reduced_basis_digest": "819f2547b232a0164a0450df617a7899ae2c0c9e0e6fdc90353128ba052a0ecc",
+   "status": "reference",
+   "vdim": 38
+  },
+  "sd-schiele-1-1@p64": {
+   "basis_size": 6,
+   "normalized_input_digest": "5be0e4f6d4f929a082705f573794fb037adedf5650431c0ce323184d42aad841",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "a5dd42968d457e6df383de4dfbd1f1c75aa470b7bbe9e4b81ebd09c3b78a0a06",
+   "status": "reference",
+   "vdim": 38,
+   "zero_dimensional": true
+  },
+  "sd-schiele-1@p31": {
+   "basis_size": 15,
+   "dimension": 1,
+   "normalized_input_digest": "3f9943f0115c45dfa7ce14cfb3bee9787ec9245564d38cdbb2598962078fb44f",
+   "oracle": "singular",
+   "reduced_basis_digest": "51b3cba305dc3a01e029d462ba2c8048ad1bd82689be95d97c1898b59e1ba6a9",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-schiele-1@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "9faf69a2cc2b4f32f313f7a4570dd337b181eb9d1ba298d3bc8ebc003f68f459",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "68c79813f5d62ce624fe5b051c78ad06367173bfeece089e3dd5f2bf0ed0285e",
+   "status": "reference",
+   "vdim": null,
+   "zero_dimensional": false
   },
   "sd-schiele@p31": {
    "basis_size": 21,

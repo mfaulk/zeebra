@@ -11,6 +11,16 @@
    "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
    "path": "XMLResources/IntPS",
    "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems"
+  },
+  "chandrasekhar-h": {
+   "url": "https://doi.org/10.1063/1.524647",
+   "revision": "m34-generator-v1 (tools/m34_public_corpus.py chandrasekhar_h)",
+   "license": "MIT: independently written generator of the model in S. Chandrasekhar, Radiative Transfer (1950), as collocated in C. T. Kelley, J. Math. Phys. 21 (1980) 1625; no third-party code"
+  },
+  "multisite-phosphorylation": {
+   "url": "https://doi.org/10.1007/s00285-007-0145-z",
+   "revision": "m34-generator-v1 (tools/m34_public_corpus.py multisite_phosphorylation)",
+   "license": "MIT: independently written generator of the reaction network in L. Wang and E. D. Sontag, J. Math. Biol. 57 (2008) 29-52; no third-party code"
   }
  },
  "problems": [
@@ -317,7 +327,9 @@
    "formulation_id": "symbolicdata/Fee_1",
    "family_parameters": {
     "n": 4
-   }
+   },
+   "presentation_parent": "sd-fee-2",
+   "note": "Fee_2 specialized at b=2"
   },
   {
    "id": "sd-rose",
@@ -400,6 +412,52 @@
    }
   },
   {
+   "id": "sd-fee-2",
+   "source_entry": "Fee_2",
+   "family_id": "sd/classical/fee_1",
+   "source_id": "symbolicdata/Fee_1",
+   "formulation_id": "symbolicdata/Fee_2",
+   "family_parameters": {
+    "n": 5
+   },
+   "note": "Fee_1 is Fee_2(b=2) (SymbolicData PolynomialSystems.ttl); b kept as a variable"
+  },
+  {
+   "id": "sd-schiele-1",
+   "source_entry": "Schiele_1",
+   "family_id": "sd/classical/schiele",
+   "source_id": "symbolicdata/Schiele",
+   "formulation_id": "symbolicdata/Schiele_1",
+   "family_parameters": {
+    "n": 3
+   },
+   "presentation_parent": "sd-schiele",
+   "note": "Schiele after the half-tangent substitution (upstream comment)"
+  },
+  {
+   "id": "sd-schiele-1-1",
+   "source_entry": "Schiele_1_1",
+   "family_id": "sd/classical/schiele",
+   "source_id": "symbolicdata/Schiele",
+   "formulation_id": "symbolicdata/Schiele_1_1",
+   "family_parameters": {
+    "n": 2
+   },
+   "presentation_parent": "sd-schiele-1",
+   "note": "Schiele_1(p=1) (upstream comment)"
+  },
+  {
+   "id": "sd-geometry-heron-1",
+   "source_entry": "Geometry.Heron_1",
+   "family_id": "sd/classical/heron",
+   "source_id": "symbolicdata/Heron",
+   "formulation_id": "symbolicdata/Geometry.Heron_1",
+   "family_parameters": {
+    "n": 6
+   },
+   "note": "Heron's area formula in a second coordinatization by the same contributor; not a transform of Heron"
+  },
+  {
    "id": "sd-trinks-1",
    "source_entry": "Trinks_1",
    "family_id": "sd/classical/trinks",
@@ -410,6 +468,330 @@
    },
    "presentation_parent": "sd-trinks",
    "note": "Trinks plus one generator; same presentation cluster"
+  },
+  {
+   "id": "gen-chandrasekhar-h-4",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 4,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=4,c=51/50",
+   "family_parameters": {
+    "n": 4
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-5",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 5,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=5,c=51/50",
+   "family_parameters": {
+    "n": 5
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-6",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 6,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=6,c=51/50",
+   "family_parameters": {
+    "n": 6
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-7",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 7,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=7,c=51/50",
+   "family_parameters": {
+    "n": 7
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-8",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 8,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=8,c=51/50",
+   "family_parameters": {
+    "n": 8
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-9",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 9,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=9,c=51/50",
+   "family_parameters": {
+    "n": 9
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-10",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 10,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=10,c=51/50",
+   "family_parameters": {
+    "n": 10
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-11",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 11,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=11,c=51/50",
+   "family_parameters": {
+    "n": 11
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-12",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 12,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=12,c=51/50",
+   "family_parameters": {
+    "n": 12
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-13",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 13,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=13,c=51/50",
+   "family_parameters": {
+    "n": 13
+   }
+  },
+  {
+   "id": "gen-phosphorylation-2",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 2
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=2",
+   "family_parameters": {
+    "n": 9,
+    "sites": 2
+   }
+  },
+  {
+   "id": "gen-phosphorylation-3",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 3
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=3",
+   "family_parameters": {
+    "n": 12,
+    "sites": 3
+   }
+  },
+  {
+   "id": "gen-phosphorylation-4",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 4
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=4",
+   "family_parameters": {
+    "n": 15,
+    "sites": 4
+   }
+  },
+  {
+   "id": "gen-phosphorylation-5",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 5
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=5",
+   "family_parameters": {
+    "n": 18,
+    "sites": 5
+   }
+  },
+  {
+   "id": "gen-phosphorylation-6",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 6
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=6",
+   "family_parameters": {
+    "n": 21,
+    "sites": 6
+   }
+  },
+  {
+   "id": "gen-phosphorylation-7",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 7
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=7",
+   "family_parameters": {
+    "n": 24,
+    "sites": 7
+   }
+  },
+  {
+   "id": "gen-phosphorylation-2-nonzero",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 2,
+    "nonzero": true
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=2,nonzero",
+   "family_parameters": {
+    "n": 10,
+    "sites": 2
+   },
+   "presentation_parent": "gen-phosphorylation-2",
+   "note": "Rabinowitsch inequation: free species nonzero; T-GB of the augmented ideal, not the saturation"
+  },
+  {
+   "id": "gen-phosphorylation-4-nonzero",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 4,
+    "nonzero": true
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=4,nonzero",
+   "family_parameters": {
+    "n": 16,
+    "sites": 4
+   },
+   "presentation_parent": "gen-phosphorylation-4",
+   "note": "Rabinowitsch inequation: free species nonzero; T-GB of the augmented ideal, not the saturation"
+  },
+  {
+   "id": "gen-phosphorylation-6-nonzero",
+   "source": "multisite-phosphorylation",
+   "generator": "multisite-phosphorylation",
+   "generator_parameters": {
+    "n": 6,
+    "nonzero": true
+   },
+   "family_id": "app/multisite-phosphorylation",
+   "source_id": "multisite-phosphorylation/wang-sontag-2008",
+   "formulation_id": "multisite-phosphorylation/n=6,nonzero",
+   "family_parameters": {
+    "n": 22,
+    "sites": 6
+   },
+   "presentation_parent": "gen-phosphorylation-6",
+   "note": "Rabinowitsch inequation: free species nonzero; T-GB of the augmented ideal, not the saturation"
   }
  ]
 }
