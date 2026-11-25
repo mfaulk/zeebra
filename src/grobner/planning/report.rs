@@ -28,11 +28,12 @@ pub enum Choice {
 
     /// The conservative policy's opening move.
     ///
-    /// Grevlex-then-FGLM, because **a refusal from that route is cheap by construction**: FGLM's
-    /// binding budget is computed from `D` and checked before anything is allocated, while F4's is
-    /// discovered during elimination and so costs the whole elimination up to the crossing. §4.3
-    /// of `docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md` measures the difference at 28.3 s
-    /// against 36 ms.
+    /// Grevlex-then-FGLM, because **a refusal from that route is cheap next to F4's**: the classical
+    /// walk's binding budget is computed from `D` and checked before its dense blocks are
+    /// allocated, while F4's is discovered during elimination and so costs the whole elimination up
+    /// to the crossing. §4.3 of `docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md` measures the
+    /// difference at 28.3 s against 36 ms. Since #1114 a quotient outside the classical envelope is
+    /// first offered to Wiedemann, so a refusal also pays for the multiplication operators.
     ConservativeOpening,
 
     /// The alternative, after the first route crossed a budget.

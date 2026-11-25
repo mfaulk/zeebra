@@ -220,10 +220,9 @@ fn main() {
     );
     println!("{}", plan);
     println!();
-    println!("planted-12 is the case the policy exists for. The conversion is ruled out from a");
-    println!("*counted* quotient dimension before a single operator column is built — not from an");
-    println!(
-        "estimate, and not after a budget was crossed — and the direct route then finishes in"
-    );
-    println!("about a millisecond. The grevlex basis is discarded, and the plan says so.");
+    println!("planted-12 is the case the policy exists for. The classical walk is ruled out from");
+    println!("a *counted* quotient dimension before its dense blocks are allocated — not from an");
+    println!("estimate, and not after a budget was crossed. Wiedemann is offered the quotient and");
+    println!("declines its dense operator, and the direct route then finishes in about a");
+    println!("millisecond. The grevlex basis and operators are discarded, and the plan says so.");
 }

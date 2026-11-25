@@ -10,7 +10,10 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     grobner::{
         f4_reported,
-        fglm::{classify_ideal, fglm_to_lex_with_options, FglmMemory, QuotientBasis},
+        fglm::{
+            classify_ideal, dimension_ceiling, fglm_to_lex_with_options, ConversionStrategy,
+            FglmError, FglmMemory, FglmOptions, QuotientBasis,
+        },
         planning::{
             analyze,
             report::{Attempt, Choice, OutcomeClass, SolvePlan},
@@ -154,7 +157,7 @@ impl std::fmt::Display for PlanObjective {
 /// limit stays at the caller's value and applies to each F4 basis computation independently.
 ///
 /// Neither limit guarantees a wall bound for the whole plan: F4 can overrun its cooperative limit,
-/// and [`FglmOptions`](crate::grobner::FglmOptions) has no wall budget. Use an external supervisor
+/// and [`FglmOptions`] has no wall budget. Use an external supervisor
 /// when the complete solve must be bounded.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PlanBudget {
@@ -453,6 +456,43 @@ fn class<const N: usize, F: KnownOrder>(outcome: &SolveOutcome<N, F>) -> Outcome
     }
 }
 
+/// Why the classical walk cannot convert a quotient of `dimension` under `fglm`, if it cannot.
+///
+/// The cap is reported as the conversion reports it. The dense blocks are reported as
+/// [`SolveError::ConversionInfeasible`], checked in the order the budgets are documented in and in
+/// the unit of whichever bound: the two differ by `size_of::<F>()`, so quoting one budget's limit
+/// against the other's requirement would be wrong by a factor of 4 over BN254.
+fn classical_refusal<F: KnownOrder>(dimension: usize, fglm: &FglmOptions) -> Option<SolveError> {
+    if dimension > fglm.max_quotient_dimension {
+        let limit = fglm.max_quotient_dimension;
+        return Some(SolveError::Fglm(FglmError::QuotientDimensionExceeded {
+            limit,
+        }));
+    }
+    let infeasible = |needed, limit, budget| {
+        Some(SolveError::ConversionInfeasible {
+            dimension,
+            needed,
+            limit,
+            budget,
+        })
+    };
+    // Not representable at all: the cell count overflows a `usize`, so no budget could admit it.
+    // Reported with the limit it could not meet rather than as an overflow.
+    let Some((span_cells, accepted_cells, bytes)) = FglmMemory::dense_blocks_for::<F>(dimension)
+    else {
+        return infeasible(usize::MAX, fglm.max_span_bytes, "span bytes");
+    };
+    let cells = span_cells.saturating_add(accepted_cells);
+    if cells > fglm.max_span_entries {
+        return infeasible(cells, fglm.max_span_entries, "span cells");
+    }
+    if bytes > fglm.max_span_bytes {
+        return infeasible(bytes, fglm.max_span_bytes, "span bytes");
+    }
+    None
+}
+
 /// One route, composed from the stages rather than reimplemented.
 ///
 /// The grevlex route is driven stage by stage here, which the explicit entry point cannot do: the
@@ -510,67 +550,47 @@ fn attempt<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     let lex = match strategy {
         SolveStrategy::DirectLexF4 => basis,
         SolveStrategy::GrevlexF4ThenFglm => {
-            // Steps 4 and 5. `D` is *counted* here, not estimated, and the conversion's dense
-            // blocks are a function of it alone — so whether the conversion fits is a fact before
-            // a single operator column is built. This is the one decision in the policy that rests
-            // on a measurement rather than a guess, and it is the decision planted-12 needs.
-            let quotient =
-                match QuotientBasis::new(&basis, order, per_attempt.fglm.max_quotient_dimension) {
-                    Ok(quotient) => quotient,
-                    Err(e) => return (Err(SolveError::Fglm(e)), statistics),
-                };
-            let dimension = quotient.dimension();
-
-            match FglmMemory::dense_blocks_for::<F>(dimension) {
-                // Not representable at all: the cell count overflows a `usize`, so no budget could
-                // admit it. Reported with the limit it could not meet rather than as an overflow.
-                None => {
-                    return (
-                        Err(SolveError::ConversionInfeasible {
-                            dimension,
-                            needed: usize::MAX,
-                            limit: per_attempt.fglm.max_span_bytes,
-                            budget: "span bytes",
-                        }),
-                        statistics,
-                    )
+            // Steps 4 and 5. `D` is *counted* here, not estimated, and the classical walk's dense
+            // blocks are a function of it alone — so whether the classical walk fits is a fact
+            // before a single operator column is built. This is the one decision in the policy
+            // that rests on a measurement rather than a guess, and it is the decision planted-12
+            // needs.
+            //
+            // The gate admits what the conversion admits (#1114). The dimension cap and the dense
+            // blocks bound the classical walk only; a strategy that may take Wiedemann enumerates
+            // to what its `O(D)` workspace fits (#1111), and whether Wiedemann converts depends on
+            // the last operator, which only the conversion builds. So the classical refusal is
+            // returned at once under a classical-only strategy, and otherwise held for when the
+            // conversion declines: its refusal then is the classical walk's budget, and the
+            // counted `D` names that better.
+            let fglm = &per_attempt.fglm;
+            let quotient = match QuotientBasis::new(&basis, order, dimension_ceiling::<N, F>(fglm))
+            {
+                Ok(quotient) => quotient,
+                Err(FglmError::QuotientDimensionExceeded { .. }) => {
+                    let limit = fglm.max_quotient_dimension;
+                    let e = FglmError::QuotientDimensionExceeded { limit };
+                    return (Err(SolveError::Fglm(e)), statistics);
                 }
-                Some((span_cells, accepted_cells, bytes)) => {
-                    let cells = span_cells.saturating_add(accepted_cells);
-                    // Checked in the order the budgets are documented in, and reported in the
-                    // unit of whichever bound — the two differ by `size_of::<F>()`, so quoting
-                    // one budget's limit against the other's requirement would be wrong by a
-                    // factor of 4 over BN254.
-                    if cells > per_attempt.fglm.max_span_entries {
-                        return (
-                            Err(SolveError::ConversionInfeasible {
-                                dimension,
-                                needed: cells,
-                                limit: per_attempt.fglm.max_span_entries,
-                                budget: "span cells",
-                            }),
-                            statistics,
-                        );
-                    }
-                    if bytes > per_attempt.fglm.max_span_bytes {
-                        return (
-                            Err(SolveError::ConversionInfeasible {
-                                dimension,
-                                needed: bytes,
-                                limit: per_attempt.fglm.max_span_bytes,
-                                budget: "span bytes",
-                            }),
-                            statistics,
-                        );
-                    }
+                Err(e) => return (Err(SolveError::Fglm(e)), statistics),
+            };
+            let classical = classical_refusal::<F>(quotient.dimension(), fglm);
+            if let Some(error) = classical {
+                if fglm.conversion_strategy == ConversionStrategy::Classical {
+                    return (Err(error), statistics);
                 }
             }
 
-            match fglm_to_lex_with_options(&basis, order, &per_attempt.fglm) {
+            match fglm_to_lex_with_options(&basis, order, fglm) {
                 Ok((lex, fglm)) => {
                     statistics.fglm = Some(fglm);
                     lex
                 }
+                Err(
+                    e @ (FglmError::QuotientDimensionExceeded { .. }
+                    | FglmError::SpanStorageExceeded { .. }
+                    | FglmError::SpanBytesExceeded { .. }),
+                ) => return (Err(classical.unwrap_or(SolveError::Fglm(e))), statistics),
                 Err(e) => return (Err(SolveError::Fglm(e)), statistics),
             }
         }
@@ -601,7 +621,8 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, eco, katsura, planted},
             planning::report::{Choice, OutcomeClass},
-            F4Options, FglmOptions, SolveError, SolveOptions, SolveOutcome, SolveStrategy,
+            ConversionRoute, ConversionStrategy, F4Options, FglmError, FglmOptions, SolveError,
+            SolveOptions, SolveOutcome, SolveStrategy,
         },
         FiniteField, MultivariatePolynomial, Zero,
     };
@@ -814,8 +835,9 @@ mod tests {
 
     /// A conversion ruled out from a counted `D` is not a conversion that ran and failed.
     ///
-    /// The distinction matters because the two cost different amounts: nothing was spent on the
-    /// conversion here, and reporting `SpanStorageExceeded` would claim otherwise.
+    /// The distinction matters because the two cost different amounts: the classical walk never
+    /// started here, and reporting `SpanStorageExceeded` would claim otherwise. Under the adaptive
+    /// strategy the conversion did build its operators to ask Wiedemann, which declined (#1114).
     #[test]
     fn test_a_ruled_out_conversion_is_not_a_crossed_budget() {
         let system = planted::<12, F>(&point(12));
@@ -848,9 +870,89 @@ mod tests {
         }
         assert_eq!(plan.attempts.len(), 1);
         assert!(plan.is_inconclusive());
-        // The source basis was computed and is reported; the conversion never ran.
+        // The source basis was computed and is reported; the conversion produced no basis.
         assert!(plan.attempts[0].statistics.f4.is_some());
         assert_eq!(plan.attempts[0].statistics.fglm, None);
+    }
+
+    /// A two-variable chain whose last operator is a companion matrix: `D = 200`, which the
+    /// adaptive conversion takes by Wiedemann.
+    fn sparse_chain() -> Vec<MultivariatePolynomial<2, F>> {
+        parse(&["x - y^2", "y^200 - y - 1"], ["x", "y"])
+    }
+
+    /// The planner's gate admits what the conversion admits (#1114).
+    ///
+    /// The dimension cap bounds the classical walk only (#1111). A gate that counted `D` against
+    /// it, or priced the classical dense blocks, refused a quotient the Wiedemann route converts
+    /// in `O(D)` workspace before the conversion was asked.
+    #[test]
+    fn test_the_gate_admits_a_wiedemann_conversion_above_the_classical_envelope() {
+        let mut options = PlannedSolveOptions::with_policy(SolvePolicy::ConservativeAuto);
+        options.attempt.fglm = FglmOptions {
+            max_quotient_dimension: 64,
+            ..FglmOptions::recommended()
+        };
+        let (outcome, plan) =
+            solve_one_planned(&sparse_chain(), &mut StdRng::seed_from_u64(4), &options);
+        assert!(outcome.is_ok(), "refused: {outcome:?}");
+        let fglm = plan.attempts[0]
+            .statistics
+            .fglm
+            .as_ref()
+            .expect("the conversion ran");
+        assert_eq!(fglm.quotient_dimension, 200);
+        assert_eq!(fglm.conversion_route, ConversionRoute::Wiedemann);
+
+        // The same quotient inside the cap but over the classical dense-block budget: 200 * 200 +
+        // 200 * 201 = 80,200 cells. Wiedemann's workspace is (D + 1) * (4 * 2 + 64) = 14,472.
+        options.attempt.fglm = FglmOptions {
+            max_span_entries: 20_000,
+            ..FglmOptions::recommended()
+        };
+        let (outcome, plan) =
+            solve_one_planned(&sparse_chain(), &mut StdRng::seed_from_u64(5), &options);
+        assert!(outcome.is_ok(), "refused: {outcome:?}");
+        let fglm = plan.attempts[0].statistics.fglm.as_ref().unwrap();
+        assert_eq!(fglm.conversion_route, ConversionRoute::Wiedemann);
+    }
+
+    /// A classical-only conversion is still refused from the counted `D`, before it runs.
+    #[test]
+    fn test_the_gate_still_refuses_a_classical_conversion_from_a_counted_dimension() {
+        let mut options = PlannedSolveOptions::with_policy(SolvePolicy::ConservativeAuto);
+        options.attempt.fglm = FglmOptions {
+            conversion_strategy: ConversionStrategy::Classical,
+            max_span_entries: 20_000,
+            ..FglmOptions::recommended()
+        };
+        let (outcome, plan) =
+            solve_one_planned(&sparse_chain(), &mut StdRng::seed_from_u64(6), &options);
+        assert!(
+            matches!(
+                outcome,
+                Err(SolveError::ConversionInfeasible {
+                    dimension: 200,
+                    needed: 80_200,
+                    limit: 20_000,
+                    budget: "span cells",
+                })
+            ),
+            "{outcome:?}"
+        );
+        assert_eq!(plan.attempts[0].statistics.fglm, None);
+
+        options.attempt.fglm = FglmOptions {
+            conversion_strategy: ConversionStrategy::Classical,
+            max_quotient_dimension: 64,
+            ..FglmOptions::recommended()
+        };
+        let (outcome, _) =
+            solve_one_planned(&sparse_chain(), &mut StdRng::seed_from_u64(7), &options);
+        assert_eq!(
+            outcome.unwrap_err(),
+            SolveError::Fglm(FglmError::QuotientDimensionExceeded { limit: 64 })
+        );
     }
 
     /// A positive-dimensional ideal is never sent through FGLM, and never falls back.

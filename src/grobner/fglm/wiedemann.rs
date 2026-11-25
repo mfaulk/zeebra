@@ -51,7 +51,7 @@ fn workspace_cells<const N: usize>(dimension: usize) -> Option<usize> {
 /// that may attempt Wiedemann can enumerate past it, up to the largest `D` whose linear workspace
 /// allowance fits both span budgets — so the enumeration stays bounded by the budgets that bound
 /// memory, and a quotient above the cap is only ever converted by Wiedemann (#1111).
-pub(super) fn dimension_ceiling<const N: usize, F: FiniteField>(options: &FglmOptions) -> usize {
+pub(crate) fn dimension_ceiling<const N: usize, F: FiniteField>(options: &FglmOptions) -> usize {
     let cap = options.max_quotient_dimension;
     if options.conversion_strategy == ConversionStrategy::Classical || N == 0 {
         return cap;
