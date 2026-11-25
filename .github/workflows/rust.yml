@@ -307,6 +307,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m29-baseline -p 'test_*.py'
 
+      - name: "#1107 concurrent calibration cells, gates and limit fit"
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s research/concurrent-calibration -p 'test_*.py'
+
       - name: M33 admission draw and basis digest
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m33-baseline -p 'test_*.py'

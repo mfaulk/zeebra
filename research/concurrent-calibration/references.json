@@ -1,0 +1,30 @@
+{
+ "cyclic7-wide64": {
+  "raw": "31c838c1df12307110124e249e6a632bcb6a99faa39c58ec33bbd191055e6bff"
+ },
+ "gf31/mq-dense-15-s15": {
+  "m33": "85756681c294a77bd224d68dd7cea272b78b4935b5e74b490a0e2ae848bae98b"
+ },
+ "gf32003/katsura-11": {
+  "m33": "c0a645952aa5f42777ac426625902d6601025b7b033671d6e5b7d1772c08c983"
+ },
+ "gf32003/mq-random-10": {
+  "m33": "392b0175882433234c62a617009e9f42f31ff470b92b1d3b07cc5a38887fc1db"
+ },
+ "katsura11-m31": {
+  "raw": "379de35930b971da9592f45991d56ef01e6085b3cdc6db934e7d4f6cb809ef71"
+ },
+ "mq10-32003": {
+  "raw": "ccee8a5618352232385d9e47697f29bb4ed553e8950e3cc62ab16de6c5886201"
+ },
+ "wide64/cyclic-7": {
+  "m33": "f4280f116480d7691ffa3d08fed70b2b1104763308ee8522c4d2467c9b0dc4f3"
+ },
+ "wide64/eco-12": {
+  "m33": "d4afa8a5a6f7f4cad7ad81a2c19f30851d9ca0592e1245ce669b6c91f276cae5"
+ },
+ "wide64/katsura-11": {
+  "m33": "ae1041e0996364ef4766614bb3882a6f39d2f799a929edc705e0d2a2fe38daa0"
+ },
+ "_source": "every arm of every cell, one smoke repetition each (jobs bc352c3ddefc, ab00701d3318), C 5451e9f8; sig_f4_study, grobx 0.155.1 and msolve 0.11.0 agree on each m33 digest"
+}
