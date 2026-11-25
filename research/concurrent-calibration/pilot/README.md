@@ -20,15 +20,17 @@ decision.
 | §4.2 `m5` tuning | **Tuned on 1 of 6 cells.** Eco-12 1w: 32 MiB, 13 passes, validated at 1.043. On every sub-second cell, allocation and first touch alone exceed the 5% budget even at 32 MiB: t₀ = 58 ms for 1 thread and 256 ms for 16, against budgets of 12–23 ms. So `m5/a` reads 1.20 (1w) and 1.55–2.12 (16w) and the cells are untuned. As specified, H2's and H6's contention-sensitive control exists only on C-E1, which is a calibration cell, so no held-out cell has one. |
 | Binaries | `C` and the four SHA-256s are in `session-1/summary.md`; `grobx-driver` and `msolve` were not needed by the pilot. |
 
-## Decisions this hands the owner (before signing §6)
+## Decisions this handed the owner
 
-1. **The A/A CI band versus n ≤ 30.** Options are to widen the band for 16-worker cells, to lift
-   the cap (n = 60 would predict about ±2.2% for C-P16), or to accept that 16-worker cells cannot
-   pass H1. The protocol should fix this before #1107, not after.
-2. **`m5` on sub-second cells.** As written, it cannot be tuned there. Options: keep the allocation
-   out of the timed region (have the wrapper allocate before the binary runs, then sweep after);
-   use one sweep thread whatever the worker count; or drop `m5` from cells under about 1.5 s and
-   let H2/H6's positive control rest on Eco-12 and H-P1. Each one is a protocol amendment.
+Settled 2026-11-25 and written into the protocol (§4.2, §5.6, §6, §7.2):
+
+1. **The A/A CI band against n ≤ 30.** The 16-worker cells' band is widened to [0.960, 1.040], and n
+   stays 30. Lifting the cap to 60 was declined. The pilot's harness time per attempt (1.4–1.9 s,
+   most of the cost on sub-second cells) put it at about 6.5 h of extra reserved CCDs.
+2. **`m5` on sub-second cells.** It is dropped on cells under 1.5 s and kept on C-E1. Two
+   alternatives were rejected. Smaller arrays fit in L3, which defeats a bandwidth control.
+   Allocating before the binary still falls inside the timed wall, because `bench-job` times the
+   whole child process.
 
 ## Files
 

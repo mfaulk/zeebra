@@ -1,8 +1,10 @@
 # Concurrent-benchmark calibration: preregistered protocol (#1106)
 
-**Status:** preregistration, written before any deciding measurement. **The gates in §6 are
-proposed, not accepted.** They bind #1107 only once the owner signs them off verbatim in a comment
-on #1106. Until then #1107 stays `blocked`.
+**Status:** preregistration, written before any deciding measurement. **The gates in §6 were
+accepted by the owner on 2026-11-25**, after the pilot (§7.1), with two amendments: the A/A CI band
+of the 16-worker cells is widened to ±4% (§6), and `m5` is dropped on every cell whose idle wall is
+under 1.5 s (§4.2). They bind #1107 once this amendment merges. The sign-off package (§11) is on
+#1106.
 
 **Measured at:** not measured here — every figure is quoted from a cited source: #985 at binary
 `31e334bd` (`research/m33-calibration/`), #848 at `faa015e6` (`research/bench-reserve/`), #841 at
@@ -49,7 +51,7 @@ against W0 from the same day. Gate values are in §6.
 | | Statement | Falsified by |
 |---|---|---|
 | **H1** A/A | Under each workload, the A/A paired ratio on reserved CCDs meets the A/A gate | Any held-out cell × workload whose A/A median or CI is outside the gate, or whose loaded CI is wider than the allowed multiple of its idle width |
-| **H2** A/B ranking | For pairs whose arms differ in memory intensity (`m5`, the real pairs), the loaded paired ratio stays within the A/B gate of the idle ratio, and its sign does not change | Any such pair × workload outside the gate, or whose loaded median is on the other side of 1.0 from its idle median |
+| **H2** A/B ranking | For pairs whose arms differ in memory intensity (the real pairs H-S16 and H-P1; `m5` is not on any held-out cell, §4.2), the loaded paired ratio stays within the A/B gate of the idle ratio, and its sign does not change | Any such pair × workload outside the gate, or whose loaded median is on the other side of 1.0 from its idle median |
 | **H3** small effects | A true 2–5% effect detected idle (CI excludes 1) is still detected under load | Detection in fewer loaded sessions than the gate's fraction |
 | **H4** cross-engine | Zeebra ÷ grobx at 1 worker and Zeebra ÷ msolve at 16 workers stay within the cross-engine gate of their idle ratio. Clock treatment per #954's state (§5.5) | Any cross-engine pair × workload outside the gate |
 | **H5** absolute | An absolute wall under load stays within ±2% of idle | Any held-out cell × loaded workload whose median wall of arm `a` differs from idle by more than 2%. **Expected to fail** on #985 (Eco-12 1 w: 1.175x under STREAM, 1.088x under builds). Testing it settles whether any absolute figure may ever come from a concurrent session |
@@ -111,7 +113,7 @@ Families: Eco, random MQ. Scales: Eco n = 12, MQ n = 10.
 | H-D16 | `gf31/mq-dense-15-s15` (`--generate`) | `sig_f4_study --engine entry` | 16 | 0.49 s (#1033 attribution) | the dense GF(31) MQ family of #945/#1068 |
 | H-C1 | `wide64/cyclic-7` | `sig_f4_study --engine entry` | 1 | 0.61 s, `sig` arm (M33-0 Track G) | a wide-prime family #985 did not use |
 | H-P1 | `katsura11-m31` | `m29_cost_model`, `--pair-multiples every` vs `distinct` | 1 | 9.3 s vs 7.5 s F4 call (#841) | the real large-effect pair (§4.4) |
-| H-S16 | first qualifying candidate of §4.3 | `m29_cost_model`, `--pair-multiples every` vs `distinct` | 16 | to be qualified (§4.3) | the real small-effect pair |
+| H-S16 | `cyclic7-wide64` (qualified in the pilot, §4.3) | `m29_cost_model`, `--pair-multiples every` vs `distinct` | 16 | 0.157 s `every` (pilot) | the real small-effect pair |
 | X-G1 | `wide64/katsura-11` | `sig_f4_study --engine entry` vs `grobx-driver` 0.155.1 | 1 | 0.87 s vs 0.57 s (M33-0 Track G) | H4, Zeebra ÷ grobx at equal workers |
 | X-M16 | `gf32003/katsura-11` | `sig_f4_study --engine entry` vs `msolve -t 16` | 16 | 0.49 s vs 0.68 s (M33-0 Track M) | H4, Zeebra ÷ msolve at 16 workers, small prime |
 
@@ -183,6 +185,15 @@ If `t_0` alone exceeds `0.05 · t_A` (allocation too costly for a sub-second cel
 per-thread arrays to 32 MiB, still beyond any one CCD's 32 MiB L3 once three arrays are counted,
 and repeat from step 2. Record the size used.
 
+**Amended after the pilot (owner, 2026-11-25): `m5` runs only on cells whose idle wall is at
+least 1.5 s.** The pilot (`research/concurrent-calibration/pilot/`) found that on every sub-second
+cell, allocation and first touch alone take longer than the 5% budget, even at 32 MiB. `t_0` was
+58 ms for 1 thread and 256 ms for 16, against budgets of 12–23 ms, so `m5/a` read 1.20–2.12 and
+could not be tuned. Smaller arrays would fit in L3 and stop being a bandwidth control. Of the cells
+here, only C-E1 qualifies, tuned at 32 MiB and 13 passes and validated at 1.043. So `m5` is a
+calibration-cohort control, used by H6's fit (§8.4). On the held-out cohort, H2's and H3's positive
+control is the real small pair H-S16 (§4.3), and the large pair H-P1 (§4.4).
+
 ### 4.3 Real, small effect (2–5%, arms differ in memory traffic)
 
 `F4Options::pair_multiples` (#841): `Distinct`, the default, seeds each repeated pair multiple once;
@@ -214,6 +225,9 @@ effect is somewhat smaller.
   at loaded data, so it fits nothing that is later judged. The qualifying target becomes H-S16 and
   is recorded in the sign-off package.
 
+  **Qualified in the pilot: H-S16 = `cyclic7-wide64`**, `distinct/every` 0.965 [0.953, 0.973] idle
+  (`katsura11-wide64` 0.891 and `katsura11-m31` 0.895, both too large).
+
 If none qualifies, the protocol does what #1106's stop condition says: H3's held-out evidence is
 the synthetic `m5` and `s5` arms only, and the missing real small pair is a stated limitation that
 #1110 must carry. MQ10 is not used as a held-out substitute: it is a calibration family.
@@ -228,7 +242,8 @@ gate row.
 
 | Cells | Arms (rotated each repetition) |
 |---|---|
-| C-E1, C-M1, C-M16, H-K16, H-D16, H-C1 | `a`, `a2` (the same binary: A/A), `s5`, `m5` |
+| C-E1 | `a`, `a2` (the same binary: A/A), `s5`, `m5` |
+| C-M1, C-M16, H-K16, H-D16, H-C1 | `a`, `a2` (A/A), `s5`. No `m5`: idle wall under 1.5 s (§4.2) |
 | C-P16, H-P1, H-S16 | `every`, `distinct`, `distinct2` (A/A on the default arm) |
 | X-G1 | `entry`, `entry2` (A/A), `grobx155` |
 | X-M16 | `entry`, `entry2` (A/A), `msolve` |
@@ -308,20 +323,32 @@ A campaign that changes clock mode partway restarts from the pilot.
 Rough per-session cost at n = 15, from the idle walls in §3 and `bench-job`'s ~0.5 CPU-s snapshot
 per attempt: about 5 minutes per workload for the calibration cohort, and about 13 minutes per
 workload for the held-out cohort (H-P1 dominates at ~25 s per repetition). With W0 twice and eight
-loaded workloads, a session is about 3 hours of reserved CCDs, two sessions about 6 hours. #1107
+loaded workloads, a session is about 3 hours of reserved CCDs, two sessions about 6 hours.
+
+**Corrected after the pilot.** That estimate understated the harness. The pilot measured 1.4 s
+(1 worker) to 1.9 s (16 workers) of harness time per attempt beyond the timed wall. At n = 30
+(§7.2), with `m5` only on C-E1 (§4.2), the estimate is about 49 minutes per workload (calibration
+~15, held-out ~33), **about 8 hours of reserved CCDs per session and 16 hours over two
+sessions**. #1107 splits a session across days only if every workload's W0 is still the same
+day's (§5.4). #1107
 schedules it around M34's campaigns (check `benchlock.log` and the M34 board first).
 
-## 6. Gates (PROPOSED — for the owner to accept or change)
+## 6. Gates (ACCEPTED 2026-11-25)
 
-These are the starting values #1106 proposed, made precise. Nothing in #1107 may be decided until
-the owner records the accepted values verbatim in a comment on #1106. Values the owner changes are
-changed here in the same PR that records the sign-off.
+These are the starting values #1106 proposed, made precise, as the owner accepted them after the
+pilot. The one change is the A/A CI band on 16-worker cells. At n = 30, the cap of §7.2, the
+pilot predicts idle A/A half-widths of about ±2.8% (C-M16) and ±3.1% (C-P16). Against ±2.5%, those
+cells would fail H1 idle, which §7.3 treats as an instrument failure. Raising n to 60 instead was
+considered and declined: at the pilot's ~1.4–1.9 s of harness time per attempt, it adds about
+6.5 h of reserved CCDs (§5.6). The cost of the wider band is that a 16-worker A/A cannot rule out a
+4% instrument error, so 16-worker conclusions are weaker than 1-worker ones, and the report says
+so. The sign-off is recorded on #1106.
 
-| Gate | Proposed value | Unit judged |
+| Gate | Accepted value | Unit judged |
 |---|---|---|
-| **A/A** (H1) | Median within 1.000 ± 0.010. 95% CI within [0.975, 1.025]. Loaded CI width ≤ 1.5× the idle CI width of the same cell and session | held-out cell × workload × session |
-| **A/B** (H2) | \|loaded median − idle median\| ≤ 1.5 percentage points, with the 95% CI of that difference within ±2.5 pp. Sign unchanged: loaded and idle medians on the same side of 1.0 | `m5` and real pair × held-out cell × workload × session |
-| **Small-effect detection** (H3) | Of the loaded sessions in which the 2–5% pair was detected idle (CI excludes 1), ≥ 90% also detect it loaded | real small pair and `m5`, per workload, pooled over sessions |
+| **A/A** (H1) | Median within 1.000 ± 0.010. 95% CI within [0.975, 1.025] on 1-worker cells and **[0.960, 1.040] on 16-worker cells**. Loaded CI width ≤ 1.5× the idle CI width of the same cell and session | held-out cell × workload × session |
+| **A/B** (H2) | \|loaded median − idle median\| ≤ 1.5 percentage points, with the 95% CI of that difference within ±2.5 pp. Sign unchanged: loaded and idle medians on the same side of 1.0 | real pair (H-S16, H-P1) × workload × session |
+| **Small-effect detection** (H3) | Of the loaded sessions in which the 2–5% pair was detected idle (CI excludes 1), ≥ 90% also detect it loaded | real small pair H-S16, per workload, pooled over sessions |
 | **Cross-engine** (H4) | \|loaded ratio ÷ idle ratio − 1\| ≤ 0.03 | X-G1, X-M16 × workload × session |
 | **Absolute** (H5) | \|loaded median wall ÷ idle median wall − 1\| ≤ 0.02, arm `a` (or `entry`, or `distinct`) | held-out cell × workload × session |
 | **Telemetry** (H6) | On the held-out cohort, the frozen limit flags ≥ 90% of moved pairs (recall), and ≤ 20% of the pairs it flags are unmoved (false-flag rate) | held-out cohort, per workload class |
@@ -363,6 +390,10 @@ n = min(30, max(15, ceil(n₀ · (h / 0.010)²)))
 so the predicted A/A half-width is at most 1%. The largest `n` over the calibration cells is used
 for every cell of both cohorts. If the cap of 30 binds, the report says so and the A/A gate is
 judged at n = 30 regardless. n is recorded in the sign-off package before the first deciding job.
+
+**Fixed by the pilot: n = 30 for every cell. The cap binds on all four calibration cells.** The
+larger half-widths at n₀ = 9 were C-E1 2.6%, C-M1 2.4%, C-M16 5.1% and C-P16 5.8%, all idle. The
+16-worker cells' predicted half-widths at n = 30 are why §6 widens their A/A band.
 
 ### 7.3 Stopping
 
@@ -497,6 +528,9 @@ Before #1107's first deciding job, a comment on #1106 records, verbatim:
 
 Items 2–5 come from the pilot and the build. Only item 1 needs the owner. Until item 1 is posted,
 #1107 stays `blocked`.
+
+**Posted on #1106, 2026-11-25:** items 2–5 from the pilot (`C` = `5451e9f8`), and item 1, the
+owner's acceptance of §6 with the two amendments above.
 
 ## 12. What this protocol does not do
 
