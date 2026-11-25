@@ -6,6 +6,8 @@ the owner's two-scale waiver); T-S not attempted (Gate H no-go); T-C missed; no 
 **Predecessor:** M33 — Competitive F4 Performance and Reproducible Benchmarking
 ([`MILESTONE-COMPETITIVE-BENCHMARKING.md`](MILESTONE-COMPETITIVE-BENCHMARKING.md); tracker #965,
 report #975 / PR #1018). M33 Minimum met, T-G and T-M missed.
+**Successor:** M35 — Exact Finite-Field Competitiveness at One Worker
+([`MILESTONE-FINITE-FIELD-COMPETITIVENESS.md`](MILESTONE-FINITE-FIELD-COMPETITIVENESS.md); tracker #1161).
 **Planning base:** `main` at `03e1ab2f` (2026-11-22, after #1042).
 **Measured at:** not measured here. Every figure is quoted from M33's integration report (§17 of the
 M33 plan; F3 = `db181c51`, `research/m33-final/`) or from the issue that states it, each named
