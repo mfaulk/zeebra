@@ -122,5 +122,46 @@ class Committed(unittest.TestCase):
         self.assertIsNone(corpus.staircase_size([(1, 1)]))
 
 
+class Generators(unittest.TestCase):
+    def test_chandrasekhar_clears_each_equation_denominator(self):
+        """Chandrasekhar n=2 at c=51/50 is each H-equation row scaled by the lcm of its denominators."""
+        entry = corpus.chandrasekhar_h(n=2, c=[51, 50])
+        self.assertEqual(entry['variables'], ['H1', 'H2'])
+        self.assertEqual(corpus.parse_integer_polynomial(entry['equations'][0], entry['variables']),
+                         {(1, 0): 400, (2, 0): -51, (1, 1): -34, (0, 0): -400})
+        self.assertEqual(entry['excluded_primes'], [2, 5])
+
+    def test_phosphorylation_is_square_and_conserves_mass(self):
+        """The n-site steady state has 3n+3 equations in 3n+3 species, three of them conservation laws."""
+        for n in (1, 3):
+            entry = corpus.multisite_phosphorylation(n=n)
+            self.assertEqual(len(entry['variables']), 3 * n + 3)
+            self.assertEqual(len(entry['equations']), 3 * n + 3)
+        entry = corpus.multisite_phosphorylation(n=1)
+        index = entry['variables'].index
+        total = corpus.parse_integer_polynomial(entry['equations'][-1], entry['variables'])
+        linear = {k for k in total if sum(k) == 1}
+        self.assertEqual({k.index(1) for k in linear},
+                         {index(v) for v in ('S0', 'S1', 'ES0', 'FS1')})
+
+    def test_rabinowitsch_variant_appends_the_inequation(self):
+        """The nonzero variant adds t and t*E*F*S0*...*Sn - 1 to the parent's equations unchanged."""
+        parent = corpus.multisite_phosphorylation(n=1)
+        child = corpus.multisite_phosphorylation(n=1, nonzero=True)
+        self.assertEqual(child['variables'], parent['variables'] + ['t'])
+        self.assertEqual(child['equations'][:-1], parent['equations'])
+        self.assertEqual(child['equations'][-1], 't*E*F*S0*S1-1')
+        self.assertIn('rabinowitsch-augmentation', [t['kind'] for t in child['transformations']])
+
+    def test_reduction_refuses_a_prime_dividing_a_denominator(self):
+        """A prime that divides a cleared denominator cannot reduce the rational system."""
+        entry = dict(corpus.chandrasekhar_h(n=2, c=[51, 50]), url='u', revision='r', license='l')
+        with self.assertRaises(ValueError):
+            corpus.reduce_record(PROBLEM, entry, 'p5', 5)
+        record = corpus.reduce_record(PROBLEM, entry, 'p7', 7)
+        self.assertEqual([t['kind'] for t in record['transformations']],
+                         ['parameter-specialization', 'clear-denominators', 'prime-reduction'])
+
+
 if __name__ == '__main__':
     unittest.main()
