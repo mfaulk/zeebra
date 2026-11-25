@@ -1,0 +1,93 @@
+{
+ "C": "5451e9f853c8f24bafed6875218a175de441e3f0",
+ "binaries": {
+  "sig_f4_study": "6ffc1e8819d82327f5c01286c0e607370b8e59827d0b2ecd26a0f52a469c0bc2",
+  "m29_cost_model": "cb2c17ce7611a3cf8f1524336e5b1d9047f5b3c4ef20d7ccee000cc00ea04576",
+  "sweep": "7b48f39b3b1bbe430adeea99ca203aa9ba0f9e9515ec8b3b3bd6a29912d5329f",
+  "stream": "bc0bf4ac66866fff1511b38fa26fe9115c6898a7a7d7773694299c2b423a9682"
+ },
+ "reservation": "CCDs 1-2 (fallback, \u00a75.3)",
+ "m5": {
+  "wide64/eco-12@1w": {
+   "threads": 1,
+   "t_A": 1.921666287,
+   "t_0": 0.057908055,
+   "t_1": 0.062239759,
+   "passes": 13,
+   "mib": 32,
+   "t0_exceeds": false,
+   "validation1": 1.035674294670959,
+   "validation2": 1.0426625035592938,
+   "accepted": true
+  },
+  "gf32003/mq-random-10@1w": {
+   "threads": 1,
+   "t_A": 0.281186539,
+   "t_0": 0.057908055,
+   "t_1": 0.062239759,
+   "passes": 1,
+   "mib": 32,
+   "t0_exceeds": true,
+   "validation1": 1.1989668336883186,
+   "validation2": 1.2047426455935755,
+   "untuned": true
+  },
+  "wide64/cyclic-7@1w": {
+   "threads": 1,
+   "t_A": 0.274779825,
+   "t_0": 0.057908055,
+   "t_1": 0.062239759,
+   "passes": 1,
+   "mib": 32,
+   "t0_exceeds": true,
+   "validation1": 1.197959165711266,
+   "validation2": 1.1922378249893784,
+   "untuned": true
+  },
+  "gf32003/mq-random-10@16w": {
+   "threads": 16,
+   "t_A": 0.242478833,
+   "t_0": 0.256100735,
+   "t_1": 0.272963435,
+   "passes": 1,
+   "mib": 32,
+   "t0_exceeds": true,
+   "validation1": 2.1231725101075316,
+   "validation2": 2.074275828695933,
+   "untuned": true
+  },
+  "gf32003/katsura-11@16w": {
+   "threads": 16,
+   "t_A": 0.320709751,
+   "t_0": 0.256100735,
+   "t_1": 0.272963435,
+   "passes": 1,
+   "mib": 32,
+   "t0_exceeds": true,
+   "validation1": 1.8558534983363475,
+   "validation2": 1.8285753009139962,
+   "untuned": true
+  },
+  "gf31/mq-dense-15-s15@16w": {
+   "threads": 16,
+   "t_A": 0.46789679,
+   "t_0": 0.256100735,
+   "t_1": 0.272963435,
+   "passes": 1,
+   "mib": 32,
+   "t0_exceeds": true,
+   "validation1": 1.5622852442430295,
+   "validation2": 1.5507273199090514,
+   "untuned": true
+  }
+ },
+ "jobs": {
+  "S1-W0": "8ad743468b0d",
+  "S16-W0": "61afc8eb64ca",
+  "P-W0": "eebf24fd6aa2",
+  "SW-W0": "4ef3ab5d64b0",
+  "S1-W4": "02d7448efa3b",
+  "S16-W4": "ce985ee3daf5",
+  "P-W4": "b3c3254b370e"
+ }
+}
