@@ -224,7 +224,7 @@ for an exact entry of the same model at a different `n`. Three exist, and each i
 
 The Chandrasekhar ladder was also extended to n = 12 and 13. Both are frontier at both fields.
 
-**Single-scale families, for the owner's waiver decision.** No exact public second scale exists for
+**Single-scale families: waived (#1043, decision 8).** No exact public second scale exists for
 these at the pinned revision, so none was added and none was invented.
 
 | Family | Problems | Why there is no second scale |
@@ -235,14 +235,14 @@ these at the pinned revision, so none was added and none was invented.
 | `sd/virasoro`, `sd/chemkin` | 1 each | Single systems in Verschelde's collection |
 | `sd/four-body` | 1 | One fixed-size celestial-mechanics system |
 
-The combined read over 127 base problems in 36 families meets every rule except this one:
-13 families have one scale. The owner has two ways to resolve it:
-
-- **Waive the two-scale rule** for single-model public families. They then enter S1, S2 and S5 and
-  are left out of S3, which needs a scale ladder.
-- **Leave the 16 problems out of the pilot.** The combined read is then 111 base problems in 23
-  families, and 13 of them, 11.7%, are frontier. Every §8.2 rule is met. The problems stay admitted
-  in this catalog either way.
+The combined read covers 127 base problems in 36 families and meets every rule except this one:
+13 families have one scale. The owner waived the two-scale rule for single-model public families
+that have no exact public second scale (#1043, decision 8). The waiver covers exactly these 13:
+`sd/classical/caprasse`, `sd/classical/czapor-86a`, `sd/classical/weispfenning-94`,
+`sd/classical/raksanyi`, `sd/classical/bjoerk_8`, `sd/classical/cassou`, `sd/classical/rose`,
+`sd/classical/fourcircles`, `sd/classical/trinks`, `sd/ellipsoid`, `sd/virasoro`, `sd/chemkin`
+and `sd/four-body`, which hold 16 problems in all. They enter S1, S2 and S5 and are left out of
+S3, which needs a scale ladder. Every other §8.2 rule is met with or without them.
 
 No family exceeds the 15% cap. The largest #1006 family, `app/chandrasekhar-h`, has 10 problems.
 
@@ -311,7 +311,8 @@ done > features.jsonl
     exclusion until #1004 writes a contract for it.
   - Feature coverage, above.
   - The composition hand-off in `composition.json`, with every available second scale added.
-- **Owner decision.** The single-scale waiver above, or leaving those 16 problems out of the pilot.
+- **Owner decision, recorded.** The two-scale waiver for the 13 single-model families above
+  (#1043, decision 8).
 - **Left to later work, not blocking M34.**
   - The unreviewed SymbolicData entries in *Exclusions*.
   - The ladder relatives, which need #1005's parent links.

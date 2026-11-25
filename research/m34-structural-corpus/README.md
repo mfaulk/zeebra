@@ -317,10 +317,9 @@ binding read.
 - **Families with one scale.** All 13 are #1006's: nine `sd/classical/*` models, `sd/ellipsoid`
   (three problems, all at n = 10), `sd/chemkin`, `sd/four-body` and `sd/virasoro`. Every #1007
   family covers at least two scales. #1006 added each exact public second scale that exists (Fee,
-  Schiele, Heron). Its README records, family by family, why the rest have none, and gives the
-  owner's options. One option waives the rule for single-model public families. The other leaves
-  their 16 problems out of the pilot: 111 base problems in 23 families with 13 frontier (11.7%),
-  where every rule is met.
+  Schiele, Heron). Its README records, family by family,
+  why the rest have none. The owner waived the two-scale rule for these single-model public
+  families (#1043, decision 8). With the waiver, the pilot composition is met.
 - **Small inputs** (best arm under 300 ms) are not read here, because no arm has been timed. Ladders
   such as `reimer-4` and `noon-5`, the colouring paths, `det-2x4-*` and the sliced toric systems are
   the expected small rows; #1012's matrix decides.
