@@ -11,13 +11,15 @@
 //! pinned driver, raw mode). Both references are verified coefficient for coefficient against
 //! Zeebra, outside the timed region.
 //! `--unplanted` draws the inconsistent variant. `tools/external/m4gb-cohort.py` runs the cohort.
+//! For `m4gb`, `counters` carries the iteration counters folded from its log (`M4gbCounters`), and
+//! `stages` its update, matrix and selection totals; other engines print `counters: null`.
 use std::time::Duration;
 use zeebra::{
     fields::{PrimeFieldElement32, Zp31, Zp32003},
     grobner::{
         external::{
             contract::generators_agree, corpus::dense_mq_shaped, grobx, ExternalSolver,
-            GrobxSolver, Limits, M4gbSolver, RunStatus, Task, ZeebraSolver,
+            GrobxSolver, Limits, M4gbCounters, M4gbSolver, RunStatus, Task, ZeebraSolver,
         },
         F4Options, GradedEngine,
     },
@@ -73,6 +75,7 @@ fn main() {
     let task = Task::ReducedGrobnerBasis;
     let zeebra = || register!(ZeebraSolver::new(), 8, 9, 10, 11, 12, 13, 14, 15, 16);
     let mut verified = None;
+    let mut counters: Option<M4gbCounters> = None;
     let report = match engine.as_str() {
         "zeebra" => zeebra().measuring_one_row().run(&instance, task, &limits),
         "zeebra-adaptive" => zeebra()
@@ -120,6 +123,7 @@ fn main() {
                 .expect("scratch directory")
                 .with_reference(zeebra());
             let report = solver.run(&instance, task, &limits);
+            counters = solver.last_counters();
             let _ = std::fs::remove_dir_all(scratch);
             report
         }
@@ -171,6 +175,21 @@ fn main() {
                     .map(|(k, d)| (k.as_str(), Json::nanos(*d)))
                     .collect::<Vec<_>>(),
             ),
+        ),
+        (
+            "counters",
+            counters.map_or(Json::Null, |c| {
+                Json::object([
+                    ("rounds", Json::int(c.rounds)),
+                    ("max_lcm_degree", Json::int(c.max_lcm_degree)),
+                    ("polynomials_added", Json::int(c.polynomials_added)),
+                    ("peak_basis", Json::int(c.peak_basis)),
+                    ("final_basis", Json::int(c.final_basis)),
+                    ("peak_pairs", Json::int(c.peak_pairs)),
+                    ("peak_store", Json::int(c.peak_store)),
+                    ("peak_dense_columns", Json::int(c.peak_dense_columns)),
+                ])
+            }),
         ),
         (
             "version",

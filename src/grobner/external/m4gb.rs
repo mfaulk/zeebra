@@ -88,14 +88,74 @@ fn engine_stages(log: &str) -> Vec<(String, Duration)> {
             value.trim().parse::<f64>().ok()
         })
     };
-    let mut stages = Vec::new();
-    if let Some(s) = seconds("total time") {
-        stages.push(("engine-solve".into(), Duration::from_secs_f64(s)));
+    [
+        ("total time", "engine-solve"),
+        ("Total CPU time", "engine-cpu"),
+        ("total update time", "engine-update"),
+        ("total matrix time", "engine-matrix"),
+        ("total selection time", "engine-selection"),
+    ]
+    .into_iter()
+    .filter_map(|(marker, name)| Some((name.into(), Duration::from_secs_f64(seconds(marker)?))))
+    .collect()
+}
+
+/// M4GB's per-iteration counters, folded from its `--loglevel 3` log.
+///
+/// Each iteration logs `#b` (basis size), `#cp` (pending critical pairs), `#mr` (entries in the
+/// store of tail-reduced multiples, keyed by leading monomial; entries are computed lazily, so this
+/// counts entries, not materialized rows) and `#mc` (the dense tail width: monomials no basis
+/// element reduces), after each of its update, matrix and selection phases.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct M4gbCounters {
+    /// Selection phases run.
+    pub rounds: u64,
+    /// Highest pair lcm degree selected.
+    pub max_lcm_degree: u64,
+    /// New polynomials returned by selection, summed over rounds.
+    pub polynomials_added: u64,
+    /// Largest basis before the final interreduction.
+    pub peak_basis: u64,
+    /// Basis size at termination.
+    pub final_basis: u64,
+    /// Most critical pairs pending at once.
+    pub peak_pairs: u64,
+    /// Most entries in the store of multiples at once.
+    pub peak_store: u64,
+    /// Widest dense tail representation.
+    pub peak_dense_columns: u64,
+}
+
+impl M4gbCounters {
+    /// `None` when the log holds no iteration line.
+    pub fn parse(log: &str) -> Option<Self> {
+        let field = |line: &str, key: &str| -> Option<u64> {
+            let (_, rest) = line.split_once(key)?;
+            rest.split_whitespace().next()?.parse().ok()
+        };
+        let mut c = Self::default();
+        let mut seen = false;
+        for line in log.lines() {
+            let Some(body) = line.strip_prefix("[m4gb]") else {
+                continue;
+            };
+            let body = body.trim_start();
+            if let Some(d) = field(body, "P lcmdegree=") {
+                c.max_lcm_degree = c.max_lcm_degree.max(d);
+            } else if let Some(added) = field(body, "P #n:") {
+                c.rounds += 1;
+                c.polynomials_added += added;
+            } else if let Some(b) = field(body, "#b:") {
+                seen = true;
+                c.peak_basis = c.peak_basis.max(b);
+                c.final_basis = b;
+                c.peak_pairs = c.peak_pairs.max(field(body, "#cp:")?);
+                c.peak_store = c.peak_store.max(field(body, "#mr:")?);
+                c.peak_dense_columns = c.peak_dense_columns.max(field(body, "#mc:")?);
+            }
+        }
+        seen.then_some(c)
     }
-    if let Some(s) = seconds("Total CPU time") {
-        stages.push(("engine-cpu".into(), Duration::from_secs_f64(s)));
-    }
-    stages
 }
 
 /// Whether M4GB's exception handler reported the unit ideal. Upstream throws
@@ -150,9 +210,15 @@ pub struct M4gbSolver {
     work_dir: PathBuf,
     runs: u64,
     reference: ZeebraSolver,
+    last_counters: Option<M4gbCounters>,
 }
 
 impl M4gbSolver {
+    /// The iteration counters of the most recent run, if its log had any.
+    pub fn last_counters(&self) -> Option<M4gbCounters> {
+        self.last_counters
+    }
+
     /// The Zeebra solver every basis is verified against, for widths the stock adapter lacks.
     pub fn with_reference(mut self, reference: ZeebraSolver) -> Self {
         self.reference = reference;
@@ -173,6 +239,7 @@ impl M4gbSolver {
             work_dir,
             runs: 0,
             reference: ZeebraSolver::new(),
+            last_counters: None,
         })
     }
 
@@ -291,6 +358,7 @@ impl ExternalSolver for M4gbSolver {
             );
         }
         self.runs += 1;
+        self.last_counters = None;
         let input = self.work_dir.join(format!("{}.in", self.runs));
         let basis_path = self.work_dir.join(format!("{}.basis", self.runs));
         let log = self.work_dir.join(format!("{}.log", self.runs));
@@ -328,6 +396,7 @@ impl ExternalSolver for M4gbSolver {
             }
             let text = super::read_output(&log);
             measurement.stages = engine_stages(&text);
+            self.last_counters = M4gbCounters::parse(&text);
             let basis = if process.succeeded() {
                 parse_basis(&std::fs::read_to_string(&basis_path)?)?
             } else if process.exit_code == Some(1) && reports_unit_ideal(&text) {
@@ -430,6 +499,81 @@ mod tests {
         assert_eq!(stages[0].1, Duration::from_secs_f64(8.2e-05));
         assert_eq!(stages[1].1, Duration::from_secs_f64(0.003181));
         assert!(engine_stages("nothing").is_empty());
+    }
+
+    /// A real `--loglevel 3` log: n = 14, m = 25, GF(31), planted, one thread, pinned revision.
+    const ITERATION_LOG: &str = "\
+[m4gb]  I 0 0 25 0
+[m4gb]  U #b:  25 #cp:    94 #mr:   25 #mc:  120 s=0.000138051
+[m4gb]  M #b:  25 #cp:    94 #mr:   25 #mc:   95 s=8.296e-06
+[m4gb]  P lcmdegree=3
+[m4gb]  P #b:  25 #cp:     0 #mr:  281 #mc:  399 s=0.00433722
+[m4gb]  P #n:94
+[m4gb]  U #b: 119 #cp:   825 #mr:  375 #mc:  399 s=0.00289277
+[m4gb]  M #b: 119 #cp:   825 #mr:  375 #mc:  305 s=1.7493e-05
+[m4gb]  P lcmdegree=4
+[m4gb]  P #b: 119 #cp:   313 #mr: 2340 #mc:  720 s=0.107379
+[m4gb]  P #n:360
+[m4gb]  U #b: 479 #cp:  4702 #mr: 2700 #mc:  720 s=0.044014
+[m4gb]  M #b: 479 #cp:  4702 #mr: 2700 #mc:  360 s=7.5403e-05
+[m4gb]  P lcmdegree=4
+[m4gb]  P #b: 479 #cp:  4389 #mr: 2700 #mc:  360 s=0.0651819
+[m4gb]  P #n:0
+[m4gb]  U #b: 479 #cp:  4389 #mr: 2700 #mc:  360 s=1.71e-07
+[m4gb]  M #b: 479 #cp:  4389 #mr: 2700 #mc:  360 s=3.486e-06
+[m4gb]  P lcmdegree=5
+[m4gb]  P #b: 479 #cp:  3877 #mr:11213 #mc:  415 s=0.0767836
+[m4gb]  P #n:14
+[m4gb]  U #b:  14 #cp:     0 #mr:   14 #mc:   15 s=0.000923819
+[m4gb]  M #b:  14 #cp:     0 #mr:   14 #mc:    1 s=4.879e-06
+[m4gb]  upper_bound = 15 = X13^2
+[m4gb]  total update time   : 0.0479688s
+[m4gb]  total matrix time   : 0.000109557s
+[m4gb]  total selection time: 0.253681s
+[m4gb]  total time          : 0.30176s
+Total CPU time : 0.313676 s
+";
+
+    // The per-iteration counters are folded into peaks and totals, including an unpadded `#mr:11213`.
+    #[test]
+    fn test_iteration_counters_are_read_from_the_log() {
+        let c = M4gbCounters::parse(ITERATION_LOG).expect("an iteration log");
+        assert_eq!(c.rounds, 4);
+        assert_eq!(c.max_lcm_degree, 5);
+        assert_eq!(c.polynomials_added, 94 + 360 + 14);
+        assert_eq!(c.peak_basis, 479);
+        assert_eq!(c.final_basis, 14);
+        assert_eq!(c.peak_pairs, 4702);
+        assert_eq!(c.peak_store, 11213);
+        assert_eq!(c.peak_dense_columns, 720);
+    }
+
+    // A log with no iteration lines (unit ideal, crash, a tool that never started) has no counters.
+    #[test]
+    fn test_iteration_counters_are_absent_without_iteration_lines() {
+        assert_eq!(
+            M4gbCounters::parse("Caught exception:\ncontradiction: I=(1)\n"),
+            None
+        );
+        assert_eq!(M4gbCounters::parse(""), None);
+    }
+
+    // M4GB's three phase totals are reported as stages beside the solve and CPU totals.
+    #[test]
+    fn test_phase_totals_are_read_as_stages() {
+        let stages = engine_stages(ITERATION_LOG);
+        let names: Vec<&str> = stages.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "engine-solve",
+                "engine-cpu",
+                "engine-update",
+                "engine-matrix",
+                "engine-selection"
+            ]
+        );
+        assert_eq!(stages[4].1, Duration::from_secs_f64(0.253681));
     }
 
     // M4GB reports the unit ideal by an exception and exit 1; only its own two messages count.
