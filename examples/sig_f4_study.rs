@@ -24,6 +24,10 @@
 //! text render, so the process renders nothing (plan §11.3); `--write-basis PATH` writes the rendered
 //! basis, one element per line, for a verification run.
 //!
+//! `--catalog FILE` reads `--name` as a record id of a `corpus-instance-v1` catalog instead, such as
+//! M34's public panel (`research/m34-public-corpus/catalog.json`), at the `--field` whose modulus is
+//! the record's characteristic (#1136).
+//!
 //! `--stages` (f4) turns on stage measurement and reports the stage clocks, the concurrent passes'
 //! worker time and products, and the work counters (#972); `--fl` (f4) runs the Faugère–Lachartre
 //! batch order, whose forward clock `--stages` splits into the sweep and `D'` (#918); `--reducer
@@ -116,6 +120,7 @@ struct Args {
     capture: Option<String>,
     batches: Vec<usize>,
     live_gib: Option<usize>,
+    catalog: Option<String>,
 }
 
 /// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
@@ -149,6 +154,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         capture: None,
         batches: Vec::new(),
         live_gib: None,
+        catalog: None,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -172,6 +178,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--discovery" => parsed.discovery = true,
             "--density" => parsed.density = true,
             "--generate" => parsed.generate = true,
+            "--catalog" => parsed.catalog = Some(value()?),
             "--input-only" => parsed.input_only = true,
             "--digest-only" => parsed.digest_only = true,
             "--write-basis" => parsed.write_basis = Some(value()?),
@@ -460,6 +467,63 @@ fn held_out(field: &str, name: &str) -> Option<Input> {
         digest: instance.digest(),
         variables: instance.variables.clone(),
         generators: instance.system.clone(),
+    })
+}
+
+/// `--catalog`: record `id` of a `corpus-instance-v1` catalog (#1006), rendered in the generator
+/// syntax. The record's characteristic must be `field`'s modulus; only grevlex records are read.
+fn catalog_input(catalog: &str, id: &str, field: &str) -> Result<Input, String> {
+    let records = Json::parse(catalog).map_err(|e| format!("catalog is not JSON: {e:?}"))?;
+    let record = records
+        .items()
+        .iter()
+        .find(|r| r.get("id").and_then(Json::as_str) == Some(id))
+        .ok_or(format!("no record {id}"))?;
+    let text = |j: Option<&Json>| j.and_then(Json::as_str).unwrap_or("").to_string();
+    if text(record.get("schema")) != "corpus-instance-v1" || text(record.get("order")) != "grevlex"
+    {
+        return Err(format!("{id}: not a grevlex corpus-instance-v1 record"));
+    }
+    let characteristic = text(record.get("field").and_then(|f| f.get("characteristic")));
+    if characteristic != modulus(field).to_string() {
+        return Err(format!(
+            "{id}: characteristic {characteristic} is not --field {field}'s"
+        ));
+    }
+    let variables: Vec<String> = record
+        .get("variables")
+        .map_or(&[][..], Json::items)
+        .iter()
+        .map(|v| v.as_str().unwrap_or("").to_string())
+        .collect();
+    let mut generators = Vec::new();
+    for equation in record.get("equations").map_or(&[][..], Json::items) {
+        let mut terms = Vec::new();
+        for term in equation.items() {
+            let coefficient = text(term.get("coefficient").and_then(|c| c.items().first()));
+            let mut factors: Vec<String> = term
+                .get("exponents")
+                .map_or(&[][..], Json::items)
+                .iter()
+                .zip(&variables)
+                .filter_map(|(e, v)| match e.as_int() {
+                    Some(0) => None,
+                    Some(1) => Some(v.clone()),
+                    Some(k) => Some(format!("{v}^{k}")),
+                    None => Some(format!("{v}^?")),
+                })
+                .collect();
+            if coefficient != "1" || factors.is_empty() {
+                factors.insert(0, coefficient);
+            }
+            terms.push(factors.join("*"));
+        }
+        generators.push(terms.join(" + "));
+    }
+    Ok(Input {
+        digest: text(record.get("normalized_input_digest")),
+        variables,
+        generators,
     })
 }
 
@@ -1468,6 +1532,11 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 ("elements_added", Json::size(stats.elements_added)),
                 ("max_matrix_rows", Json::size(stats.max_matrix_rows)),
                 ("max_matrix_columns", Json::size(stats.max_matrix_columns)),
+                ("max_pair_degree", Json::int(stats.max_pair_degree)),
+                (
+                    "step_degrees",
+                    Json::Array(stats.step_degrees.iter().map(|&d| Json::int(d)).collect()),
+                ),
                 (
                     "stages",
                     if args.stages {
@@ -1573,7 +1642,10 @@ fn main() {
     let started = Instant::now();
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let args = parse_args(&raw).unwrap_or_else(|e| panic!("{e}"));
-    let input = if args.generate {
+    let input = if let Some(path) = &args.catalog {
+        let catalog = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        catalog_input(&catalog, &args.name, &args.field).unwrap_or_else(|e| panic!("{e}"))
+    } else if args.generate {
         generated(&args.field, &args.name).unwrap_or_else(|e| panic!("{e}"))
     } else {
         input(&args.field, &args.name)
@@ -1608,6 +1680,9 @@ fn main() {
                     ($field, 13) => run::<13, $f>(input, &args),
                     ($field, 14) => run::<14, $f>(input, &args),
                 )*
+                // M34 panel records with 3 or 5 variables (`--catalog`, #1136).
+                ("m31", 3) => run::<3, Zp2147483647>(input, &args),
+                ("m31", 5) => run::<5, Zp2147483647>(input, &args),
                 // #1033's dense MQ rows, at the two small primes only.
                 ("gf31" | "gf32003", 15 | 18 | 20) => large(input, &args),
                 (field, n) => panic!("no instantiation for {field} with {n} variables"),
@@ -1823,6 +1898,32 @@ mod tests {
         assert_eq!(planted.generators.len(), 12);
         assert_eq!(unplanted.generators.len(), 12);
         assert_ne!(planted.digest, unplanted.digest);
+    }
+
+    const CATALOG: &str = r#"[{"schema":"corpus-instance-v1","id":"x@p31","order":"grevlex",
+        "field":{"characteristic":"2147483647","extension_degree":1,"defining_polynomial":[]},
+        "variables":["x1","x2"],"normalized_input_digest":"d",
+        "equations":[[{"exponents":[2,0],"coefficient":["3"]},{"exponents":[0,1],"coefficient":["1"]}],
+                     [{"exponents":[0,2],"coefficient":["1"]},{"exponents":[0,0],"coefficient":["2147483646"]}]]}]"#;
+
+    /// `--catalog` renders a `corpus-instance-v1` record in the generator syntax, at its field only.
+    #[test]
+    fn catalog_record_becomes_an_input() {
+        let input = catalog_input(CATALOG, "x@p31", "m31").unwrap();
+        assert_eq!(input.digest, "d");
+        assert_eq!(input.variables, ["x1", "x2"]);
+        assert_eq!(input.generators, ["3*x1^2 + x2", "x2^2 + 2147483646"]);
+        assert!(catalog_input(CATALOG, "x@p31", "wide64").is_err());
+        assert!(catalog_input(CATALOG, "y@p31", "m31").is_err());
+    }
+
+    /// The record parses and both engines agree on it.
+    #[test]
+    fn catalog_record_solves() {
+        let input = catalog_input(CATALOG, "x@p31", "m31").unwrap();
+        let a = args(&["--field", "m31", "--name", "x@p31", "--engine", "sigf4"]).unwrap();
+        let sig = run::<2, Zp2147483647>(input, &a);
+        assert_eq!(sig.get("status").and_then(Json::as_str), Some("complete"));
     }
 
     // The two engines agree on a small frozen row, which is what the basis digest relies on.
