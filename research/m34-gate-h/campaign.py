@@ -277,7 +277,52 @@ def pending(rs, pass_no):
                 extra = wanted(have) - len(have)
                 if extra > 0:
                     todo.append((0, r, config, extra))
+    if pass_no == 3:
+        for rid, config in topup_cells(rs, done):
+            have = done.get((rid, config), [])
+            if len(have) < TOPUP_N:
+                todo.append((0, next(r for r in rs if r['id'] == rid), config, TOPUP_N - len(have)))
     return todo
+
+
+TOPUP_N = 9
+TOPUP = RESULTS / 'topup.json'
+
+
+def ordered(cell_attempts):
+    order = {j['job']: i for i, j in enumerate(json.loads(JOBS.read_text()))} if JOBS.exists() else {}
+    return sorted(cell_attempts, key=lambda a: (order.get(a['job'], 0), a['rep']))
+
+
+def topup_cells(rs, done):
+    """§8.5's one predeclared top-up (#1012, J5 as recorded before pass 2): cells under 60 s whose paired
+    interval against the per-row best spans 1, with that best. Chosen once, from pass 2, and frozen."""
+    if TOPUP.exists():
+        return [tuple(x) for x in json.loads(TOPUP.read_text())]
+    import bench_stats as bs
+    chosen = set()
+    for r in rs:
+        walls = {}
+        for config in CONFIGS:
+            xs = ordered(done.get((r['id'], config), []))
+            if xs and all(a['status'].startswith('completed-') for a in xs):
+                walls[config] = {i: a['wall_ms'] for i, a in enumerate(xs)}
+        if len(walls) < 2:
+            continue
+        median = {c: sorted(v.values())[len(v) // 2] for c, v in walls.items()}
+        best = min(median, key=lambda c: (median[c], c))
+        for c in walls:
+            if c == best or median[c] >= SLOW_MS:
+                continue
+            pairs = bs.paired_ratios(walls[c], walls[best])
+            if len(pairs) < 2:
+                continue
+            ci = bs.paired_ratio(pairs, seed=f"{r['id']} {c} {best}")
+            if ci.lo <= 1 <= ci.hi:
+                chosen.update({(r['id'], c), (r['id'], best)})
+    out = sorted(chosen)
+    TOPUP.write_text(json.dumps(out, indent=0) + '\n')
+    return out
 
 
 def jobs_for(todo):
@@ -450,7 +495,7 @@ def features(args):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('command', choices=('seal', 'plan', 'drive', 'features', 'collect'))
-    p.add_argument('--pass', dest='pass_no', type=int, choices=(1, 2), default=1)
+    p.add_argument('--pass', dest='pass_no', type=int, choices=(1, 2, 3), default=1)
     p.add_argument('--binary')
     p.add_argument('--harness', default='6c77117a')
     args = p.parse_args(argv)

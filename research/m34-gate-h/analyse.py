@@ -279,6 +279,55 @@ def winners(m, arms):
     return out
 
 
+def completion_counts(m, arms):
+    """Per arm: verified completions, censored or failed cells, out of the development records."""
+    out = {}
+    for c in arms:
+        done = sum(1 for rid in m.records if m.cell(rid, c) < 2 * C_MS)
+        out[c] = dict(completed=done, penalized=len(m.records) - done)
+    return out
+
+
+def render(out, m):
+    lines = [f"# Gate H read (#1012)", '',
+             f"**Verdict: {out['verdict']['verdict']}.** Contexts passing: {out['verdict']['contexts_passing'] or 'none'}; "
+             f"single-decision arm sets passing: {out['verdict']['decisions_passing'] or 'none'}.", '',
+             f"Pilot: {out['pilot']['base_problems']} base problems, {out['pilot']['families']} families. "
+             f"Development: {out['development']['records']} records, {out['development']['problems']} base problems, "
+             f"{out['development']['families']} families. Disqualified arms: {out['disqualified'] or 'none'}.", '',
+             'Costs are PAR-2 penalized (2C = 600 s for every attempt that is not a verified completion), not runtimes.', '',
+             '| Arm set | H | 95% interval | families ≤ 0.85 | H without largest contributor | split halves | Go clauses met |',
+             '|---|---:|---|---:|---|---|---|']
+    rows = list(out['contexts'].items()) + list(out['decisions'].items())
+    for name, r in rows:
+        if 'h' not in r:
+            lines.append(f"| {name} | — | — | — | — | — | {r.get('reason')} |")
+            continue
+        met = ', '.join(k for k, v in r['clauses'].items() if v) or 'none'
+        lines.append(f"| {name} | {r['h']:.3f} | [{r['lo']:.3f}, {r['hi']:.3f}] | {r['families_at_or_below']} | "
+                     f"{r['h_without_largest']:.3f} ({r['largest_contributor']}) | "
+                     f"{r['split_half'][0]:.3f} / {r['split_half'][1]:.3f} | {met} |")
+    for name, r in out['contexts'].items():
+        lines += ['', f'## Context {name}', '',
+                  f"PAR-10 H {r['par10']:.3f}; completed-intersection H "
+                  + (f"{r['completed_intersection']['h']:.3f} over {r['completed_intersection']['problems']} problems "
+                     f"in {r['completed_intersection']['families']} families" if r['completed_intersection'] else '—')
+                  + ' (sensitivity views; they do not decide).', '',
+                  '| Family | problems | LOFO best fixed | VBS⁺ ÷ BF |', '|---|---:|---|---:|']
+        for f in sorted(r['family_ratio']):
+            lines.append(f"| `{f}` | {len(m.families[f])} | {r['bf'][f]} | {r['family_ratio'][f]:.3f} |")
+        lines += ['', '| Arm | verified cells | penalized cells | marginal (VBS⁺ without ÷ with) |', '|---|---:|---:|---:|']
+        for c, v in r['completions'].items():
+            lines.append(f"| {c} | {v['completed']} | {v['penalized']} | {r['marginal'][c]:.3f} |")
+    wins = defaultdict(lambda: defaultdict(int))
+    for rid, c in out['winners'].items():
+        wins[m.family_of[m.problem_of[rid]]][c or 'none'] += 1
+    lines += ['', '## Cheapest arm per record (W16 arms)', '', '| Family | wins |', '|---|---|']
+    for f in sorted(wins):
+        lines.append(f"| `{f}` | " + ', '.join(f'{c} {n}' for c, n in sorted(wins[f].items(), key=lambda x: -x[1])) + ' |')
+    return '\n'.join(lines) + '\n'
+
+
 def load(paths=None):
     rs = campaign.development()
     attempts = []
@@ -292,6 +341,9 @@ def load(paths=None):
             row = json.loads(line)
             if 'feature_costs' in row:
                 features[row['id']] = sum(v['median_ns'] for v in row['feature_costs'].values()) / 1e6
+    # J4 fallback: a record feature_costs cannot instantiate is charged the largest measured set cost.
+    worst = max(features.values()) if features else 0.0
+    features = {r['id']: features.get(r['id'], worst) for r in rs}
     jobs = [j['job'] for j in json.loads(campaign.JOBS.read_text())] if campaign.JOBS.exists() else []
     return Matrix(rs, attempts, features, campaign.references(), jobs)
 
@@ -305,6 +357,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--draws', type=int, default=20_000)
     p.add_argument('--json', default=str(campaign.RESULTS / 'gate-h.json'))
+    p.add_argument('--markdown', default=str(campaign.RESULTS / 'gate-h.md'))
     args = p.parse_args(argv)
     m = load()
     problems, families = pilot_size()
@@ -317,6 +370,7 @@ def main(argv=None):
         r['par10'] = read(m, arms, 10, 0 if args.draws == 0 else min(args.draws, 2000))['h']
         r['completed_intersection'] = completed_intersection(m, arms)
         r['marginal'] = marginal(m, arms)
+        r['completions'] = completion_counts(m, arms)
         out['contexts'][name] = r
     for name, arms in DECISIONS.items():
         out['decisions'][name] = read(m, arms, 2, args.draws)
@@ -334,6 +388,7 @@ def main(argv=None):
     out['verdict'] = dict(verdict=verdict, contexts_passing=go, decisions_passing=narrow,
                           scoring_context='W16' if 'W16' in go else (go[0] if go else None))
     Path(args.json).write_text(json.dumps(out, indent=1, sort_keys=True, default=list) + '\n')
+    Path(args.markdown).write_text(render(out, m))
     print(json.dumps(out['verdict']))
     for name, r in out['contexts'].items():
         print(name, f"H {r['h']:.3f} [{r['lo']:.3f}, {r['hi']:.3f}]", r['clauses'])
