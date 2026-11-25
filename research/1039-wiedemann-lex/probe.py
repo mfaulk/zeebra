@@ -2,7 +2,7 @@
 """#1039 development probe: Zeebra's complete lex pipeline arms against pinned grobx's lex route.
 
     probe.py --pipeline BIN --grobx BIN --rows wd-4-10,katsura-12 [--modulus 65537]
-             [--arms grobx,adaptive,classical,direct-lex] [--workers 1] [--reps 3]
+             [--arms grobx,grobx-f4lex,adaptive,classical,direct-lex] [--workers 1] [--reps 3]
              [--wall-s 600] [--rss-gib 16] [--cpus 8-23] [--out records.jsonl]
 
 Development mode only (`docs/guide/benchmarking.md`): it decides nothing; the deciding read is the
@@ -32,9 +32,10 @@ def case_for(pipeline, row, modulus):
     return json.loads(r['stdout'])
 
 
-def grobx_request(case, mode, wall_s, rss_bytes):
+def grobx_request(case, mode, wall_s, rss_bytes, lex_route='auto'):
     return dict(variables=case['variables'], modulus=int(case['modulus']), order='lex', workers=1,
-                generators=case['generators'], mode=mode, wall_ns=wall_s * 10**9, rss_bytes=rss_bytes)
+                generators=case['generators'], mode=mode, wall_ns=wall_s * 10**9, rss_bytes=rss_bytes,
+                lex_route=lex_route)
 
 
 def grobx_stages(report):
@@ -50,7 +51,7 @@ def grobx_stages(report):
             out['runs'].append(dict(order=f.get('order'), engine=f.get('engine'), why=f.get('why'),
                                     reduce=f.get('reduce')))
         elif kind == 'ran':
-            key = 'lex_s' if order.get(f.get('number')) == 'lex' else 'grevlex_s'
+            key = 'lex_s' if order.get(f.get('number')) in ('lex', 'block') else 'grevlex_s'
             out[key] += float(f.get('time', 0))
         elif kind == 'fglm':
             out['fglm_verdicts'].append(f.get('verdict'))
@@ -67,12 +68,14 @@ def grobx_digest(stdout, case, mode):
         return None
 
 
-def run_grobx(binary, case, mode, wall_s, rss_bytes, scratch):
-    path = scratch / f'{case["name"]}.grobx-{mode}.json'
-    path.write_text(json.dumps(grobx_request(case, mode, wall_s, rss_bytes)))
+def run_grobx(binary, case, mode, wall_s, rss_bytes, scratch, lex_route='auto'):
+    """`lex_route='f4'` forces grobx's F4-lex route through the exact-lex block order (#1127)."""
+    path = scratch / f'{case["name"]}.grobx-{mode}-{lex_route}.json'
+    path.write_text(json.dumps(grobx_request(case, mode, wall_s, rss_bytes, lex_route)))
     r = admission.guarded([binary, str(path)], wall_s + 5)
     raw = json.loads(r['stdout']) if r['rc'] == 0 and r['stdout'].strip() else {}
-    rec = dict(solver=f'grobx-{mode}', workers=1, wall_ns=r['wall_ns'], peak=r['peak'], stop=r['stop'],
+    solver = f'grobx-{mode}' + ('-f4lex' if lex_route == 'f4' else '')
+    rec = dict(solver=solver, lex_route=raw.get('lex_route'), grobx_order=raw.get('grobx_order'), workers=1, wall_ns=r['wall_ns'], peak=r['peak'], stop=r['stop'],
                rc=r['rc'], stopped=raw.get('stopped'), certified=raw.get('certified'),
                solve_ns=raw.get('solve_ns'), basis_m33=grobx_digest(r['stdout'] if r['rc'] == 0 else '', case, mode),
                stages=grobx_stages(raw.get('report') or ''))
@@ -122,8 +125,9 @@ def main():
             for arm in arms:
                 if arm.startswith('grobx'):
                     admission.CPUS = str(first)
-                    mode = 'certified' if arm == 'grobx-certified' else 'raw'
-                    rec = run_grobx(a.grobx, case, mode, a.wall_s, admission.CAP_BYTES, scratch)
+                    mode = 'certified' if arm.startswith('grobx-certified') else 'raw'
+                    route = 'f4' if arm.endswith('-f4lex') else 'auto'
+                    rec = run_grobx(a.grobx, case, mode, a.wall_s, admission.CAP_BYTES, scratch, route)
                     recs = [rec]
                 else:
                     assert arm in ZEEBRA_ARMS, arm

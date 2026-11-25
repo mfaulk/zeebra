@@ -24,8 +24,13 @@ compiler and effective settings; `--version` emits it, while `--startup` measure
 
 Contract 1 accepts one JSON file: `variables` (ordered names), `modulus` (u64 prime), `order`
 (`grevlex` or `lex`), `generators` (expanded polynomial strings), `workers` (exactly 1), `mode`
-(`raw` or `certified`), `wall_ns` (internal deadline), optional `rss_bytes` and optional
-`digest_only` (boolean, default false). The pinned revision
+(`raw` or `certified`), `wall_ns` (internal deadline), optional `rss_bytes`, optional
+`digest_only` (boolean, default false) and optional `lex_route` (`auto`, the default, or `f4`;
+#1127). `f4` needs `order: lex` and two or more variables and calls grobx with
+`Block(vec![1; n-1])`, which is exactly lex: one variable per block. grobx runs a block order by F4
+in that order, with no grevlex run and no FGLM. It is the F4-lex route grobx's own `lex` takes only
+past D = 65535, minus that route's grevlex prelude, and its comparator reads exponents one at a
+time. Every reply echoes `lex_route` and the `grobx_order` it called. The pinned revision
 computes serially even when given a larger thread allowance; the adapter refuses multiworker
 cohorts. Seed is fixed at zero and the complete engine report retains signatures, handovers,
 field kernel, orders and phases. No cheap/probabilistic certification objective is exposed.
