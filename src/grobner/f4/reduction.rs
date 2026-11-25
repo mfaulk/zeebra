@@ -330,22 +330,17 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         };
         if packed_eligible {
             let selected = candidate_columns(matrix);
-            #[cfg(not(feature = "research-gf2-residual"))]
-            let packed =
-                super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes);
-            #[cfg(feature = "research-gf2-residual")]
             let packed = match options.gf2_elimination {
-                super::options::Gf2Elimination::Residual(tails)
-                | super::options::Gf2Elimination::AutoResidual(tails) => {
-                    super::packed_residual::eliminate(
-                        matrix,
-                        &selected,
-                        allowance,
-                        options.max_live_bytes,
-                        tails,
-                    )
+                super::options::Gf2Elimination::FullWidth
+                | super::options::Gf2Elimination::AutoFullWidth => {
+                    super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes)
                 }
-                _ => super::packed::eliminate(matrix, &selected, allowance, options.max_live_bytes),
+                _ => super::packed_residual::eliminate(
+                    matrix,
+                    &selected,
+                    allowance,
+                    options.max_live_bytes,
+                ),
             };
             match packed {
                 Ok(Some(packed)) => {

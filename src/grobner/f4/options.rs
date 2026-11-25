@@ -80,6 +80,11 @@ pub enum PairMultiples {
 /// identical** whichever path ran — asserted on every measured instance. Anywhere else a batch
 /// takes the generic path whatever this says.
 ///
+/// A packed batch sweeps its pair rows against the reducer block on the residual columns only,
+/// the columns no reducer leads (#1092; `docs/research/gf2-residual-packing.md`).
+/// [`FullWidth`](Self::FullWidth) and [`AutoFullWidth`](Self::AutoFullWidth) keep the earlier
+/// full-width sweep reachable for measurement.
+///
 /// It also declines, rather than refuses, a batch whose packed working set would not fit in
 /// [`F4Options::max_live_bytes`] beside the sparse matrix: the generic path then runs under its own
 /// budget, so selecting packing never refuses a computation the generic path admits.
@@ -98,15 +103,13 @@ pub enum Gf2Elimination {
     /// Packed whenever the contract allows, regardless of density. For measurement.
     Packed,
 
-    /// Research (#1077): as [`Packed`](Self::Packed), but packed on the residual columns only, the
-    /// known-pivot columns eliminated through reducer tails. Same eligibility, budgets and result.
-    #[cfg(feature = "research-gf2-residual")]
-    Residual(super::packed_residual::ResidualTails),
+    /// For measurement: as [`Packed`](Self::Packed), but with the full-width reducer sweep that
+    /// the residual-width kernel replaced (#1092). Same eligibility, budgets and basis.
+    FullWidth,
 
-    /// Research (#1077): [`Auto`](Self::Auto)'s choice of batches, each packed one on the residual
-    /// route. What the default would run if the residual kernel replaced the full-width sweep.
-    #[cfg(feature = "research-gf2-residual")]
-    AutoResidual(super::packed_residual::ResidualTails),
+    /// For measurement: [`Auto`](Self::Auto)'s choice of batches, each packed one swept at the
+    /// full width. The default dispatch before #1092.
+    AutoFullWidth,
 }
 
 impl Gf2Elimination {
@@ -170,12 +173,10 @@ impl Gf2Elimination {
     ) -> bool {
         match self {
             Self::Generic => false,
-            Self::Packed => true,
-            #[cfg(feature = "research-gf2-residual")]
-            Self::Residual(_) => true,
-            #[cfg(feature = "research-gf2-residual")]
-            Self::AutoResidual(_) => Self::prefers_packed(rows, pair_rows, columns, nonzeros),
-            Self::Auto => Self::prefers_packed(rows, pair_rows, columns, nonzeros),
+            Self::Packed | Self::FullWidth => true,
+            Self::Auto | Self::AutoFullWidth => {
+                Self::prefers_packed(rows, pair_rows, columns, nonzeros)
+            }
         }
     }
 }

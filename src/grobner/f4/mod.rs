@@ -19,7 +19,6 @@ pub mod membership;
 pub mod observer;
 pub mod options;
 mod packed;
-#[cfg(feature = "research-gf2-residual")]
 pub mod packed_residual;
 mod parallel;
 pub mod reduction;

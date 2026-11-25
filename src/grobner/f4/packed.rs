@@ -174,7 +174,6 @@ pub(crate) fn eliminate<const N: usize, F: FiniteField>(
             xor_words: forward.xor_words + echelon.xor_words,
             tables: forward.tables + echelon.tables,
             workspace_bytes: workspace,
-            #[cfg(feature = "research-gf2-residual")]
             residual: Default::default(),
         },
     }))
@@ -293,7 +292,7 @@ mod tests {
             ];
             for system in &systems {
                 let (generic, generic_stats) = solve(system, order, Gf2Elimination::Generic);
-                let (packed, packed_stats) = solve(system, order, Gf2Elimination::Packed);
+                let (packed, packed_stats) = solve(system, order, Gf2Elimination::FullWidth);
                 assert_eq!(packed, generic, "{}", order.name());
                 assert_eq!(generic_stats.packed_gf2.batches, 0);
                 assert_eq!(
@@ -317,7 +316,7 @@ mod tests {
         let (mut deficient, mut candidate_free) = (0, 0);
         for batch in trace.batches() {
             let generic = replay(batch, &options(Gf2Elimination::Generic)).unwrap();
-            let packed = replay(batch, &options(Gf2Elimination::Packed)).unwrap();
+            let packed = replay(batch, &options(Gf2Elimination::FullWidth)).unwrap();
             assert_eq!(packed.candidates, generic.candidates);
             assert_eq!(packed.statistics.packed_gf2.batches, 1);
             assert_eq!(
@@ -344,7 +343,7 @@ mod tests {
         let order = MonomialOrder::GradedReverseLexicographic;
         let system = random_mq::<4>(4, 4, 0.5);
         let basis = crate::grobner::f4::MonicBasis::new(&system, order);
-        let empty = reduce_batch(&basis, &[], order, &options(Gf2Elimination::Packed)).unwrap();
+        let empty = reduce_batch(&basis, &[], order, &options(Gf2Elimination::FullWidth)).unwrap();
         assert!(empty.candidates.is_empty());
         assert_eq!(empty.statistics.elimination.rank, 0);
 
@@ -358,7 +357,8 @@ mod tests {
         )];
         let generic =
             reduce_batch(&basis, &pairs, order, &options(Gf2Elimination::Generic)).unwrap();
-        let packed = reduce_batch(&basis, &pairs, order, &options(Gf2Elimination::Packed)).unwrap();
+        let packed =
+            reduce_batch(&basis, &pairs, order, &options(Gf2Elimination::FullWidth)).unwrap();
         assert_eq!(packed.candidates, generic.candidates);
         assert!(packed.candidates.is_empty());
         assert_eq!(packed.statistics.packed_gf2.batches, 1);
@@ -374,7 +374,7 @@ mod tests {
         let order = MonomialOrder::GradedReverseLexicographic;
         let odd = katsura::<4, Zp13>();
         let (basis, stats) =
-            f4_with_options(&odd, order, &options(Gf2Elimination::Packed)).unwrap();
+            f4_with_options(&odd, order, &options(Gf2Elimination::FullWidth)).unwrap();
         assert_eq!(
             basis,
             f4_with_options(&odd, order, &options(Gf2Elimination::Generic))
@@ -388,7 +388,7 @@ mod tests {
             MultivariatePolynomial::<2, Gf256>::parse("x*y + y^2 + x", ["x", "y"]).unwrap(),
         ];
         let (basis, stats) =
-            f4_with_options(&system, order, &options(Gf2Elimination::Packed)).unwrap();
+            f4_with_options(&system, order, &options(Gf2Elimination::FullWidth)).unwrap();
         assert_eq!(
             basis,
             f4_with_options(&system, order, &options(Gf2Elimination::Generic))
@@ -403,7 +403,7 @@ mod tests {
         let system = random_mq::<5>(5, 5, 0.5);
         let echelon = F4Options {
             reduce_batch_rows: false,
-            ..options(Gf2Elimination::Packed)
+            ..options(Gf2Elimination::FullWidth)
         };
         let (_, stats) = f4_with_options(&system, order, &echelon).unwrap();
         assert_eq!(stats.packed_gf2, Default::default());
@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn test_packed_bytes_are_charged_to_max_live_bytes() {
         let batch = largest_batch(&random_mq::<7>(77, 7, 0.5));
-        let unlimited = options(Gf2Elimination::Packed);
+        let unlimited = options(Gf2Elimination::FullWidth);
         let packed = replay(&batch, &unlimited).unwrap();
         let generic = replay(&batch, &options(Gf2Elimination::Generic)).unwrap();
         let entry_bytes = F4Options::bytes_per_entry::<Zp2>();
@@ -463,12 +463,12 @@ mod tests {
     #[test]
     fn test_packed_write_back_honours_the_entry_allowance() {
         let batch = largest_batch(&random_mq::<7>(78, 7, 0.5));
-        let packed = replay(&batch, &options(Gf2Elimination::Packed)).unwrap();
+        let packed = replay(&batch, &options(Gf2Elimination::FullWidth)).unwrap();
         let peak = packed.statistics.elimination.peak_nonzeros;
         let at = |entries: usize| F4Options {
             max_live_nonzeros: entries,
             max_live_bytes: usize::MAX,
-            ..options(Gf2Elimination::Packed)
+            ..options(Gf2Elimination::FullWidth)
         };
         assert_eq!(
             replay(&batch, &at(peak)).unwrap().candidates,
@@ -495,7 +495,8 @@ mod tests {
             ..F4Options::default().with_live_entries::<Zp2>(200)
         };
         let generic = f4_with_options(&system, order, &tight(Gf2Elimination::Generic)).unwrap_err();
-        let packed = f4_with_options(&system, order, &tight(Gf2Elimination::Packed)).unwrap_err();
+        let packed =
+            f4_with_options(&system, order, &tight(Gf2Elimination::FullWidth)).unwrap_err();
         assert_eq!(generic.stop_kind(), packed.stop_kind());
     }
 
@@ -552,6 +553,11 @@ mod tests {
         assert!(!Gf2Elimination::prefers_packed(0, 0, 0, 0));
         assert!(!Gf2Elimination::Generic.selects_packed(1000, 1000, 1000, 1_000_000));
         assert!(Gf2Elimination::Packed.selects_packed(1, 0, 1, 0));
+        assert!(Gf2Elimination::FullWidth.selects_packed(1, 0, 1, 0));
+        for setting in [Gf2Elimination::Auto, Gf2Elimination::AutoFullWidth] {
+            assert!(setting.selects_packed(1000, pairs, columns, dense));
+            assert!(!setting.selects_packed(1000, pairs, columns, dense - 1));
+        }
         assert_eq!(F4Options::default().gf2_elimination, Gf2Elimination::Auto);
         assert_eq!(
             F4Options::baseline().gf2_elimination,
