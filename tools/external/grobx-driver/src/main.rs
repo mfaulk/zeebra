@@ -178,6 +178,25 @@ fn solve(input: &Value) -> Result<Value, String> {
         Some("lex") => grobx::MonomialOrder::Lex,
         _ => return Err("unsupported order".into()),
     };
+    // #1127: `Block(vec![1; n - 1])` is exactly lex (one variable per block), and grobx runs a
+    // block order by F4 in that order: no grevlex run, no FGLM.
+    let lex_route = match input.get("lex_route") {
+        None => "auto",
+        Some(v) => match v.as_str() {
+            Some("auto") => "auto",
+            Some("f4") if order == grobx::MonomialOrder::Lex && variables.len() > 1 => "f4",
+            Some("f4") => {
+                return Err("lex_route f4 needs order lex and two or more variables".into());
+            }
+            _ => return Err("invalid lex_route".into()),
+        },
+    };
+    let order = if lex_route == "f4" {
+        grobx::MonomialOrder::Block(vec![1; variables.len() - 1])
+    } else {
+        order
+    };
+    let grobx_order = order.to_string();
     // A multi-worker request is refused unless it is #966's thread probe, which asks the library
     // for `workers` threads to observe how many it computes on; no timing row uses it.
     let workers = input["workers"].as_u64().unwrap_or(0) as usize;
@@ -234,6 +253,8 @@ fn solve(input: &Value) -> Result<Value, String> {
     output["input"] = input.clone();
     output["input_text"] = json!(text);
     output["input_sha256"] = json!(grobx::digest(&text));
+    output["lex_route"] = json!(lex_route);
+    output["grobx_order"] = json!(grobx_order);
     output["generator_echoes"] = json!(engine_echo);
     output["checker_echoes"] = json!(checker_echo);
     if digest_only {
@@ -383,6 +404,60 @@ mod tests {
         assert_eq!(digest["basis_bytes"], full["basis"].as_str().unwrap().len());
         input["digest_only"] = json!("yes");
         assert!(solve(&input).is_err());
+    }
+    // #1127: `lex_route: "f4"` runs F4 in the exact-lex block order, so it skips FGLM and returns
+    // the same lex basis as the default route.
+    #[test]
+    fn forced_f4_lex_route_skips_fglm_and_returns_the_lex_basis() {
+        let mut input = json!({"variables":["x","y","z"],"modulus":32003,"order":"lex","workers":1,
+            "mode":"raw","wall_ns":10000000000u64,"rss_bytes":1073741824u64,
+            "generators":["x^2+y*z-3","y^2-x*z+z","z^3+x*y-2"]});
+        let variables = strings(&input, "variables").unwrap();
+        let auto = solve(&input).unwrap();
+        let auto_report = auto["report"].as_str().unwrap();
+        assert!(
+            auto_report.contains(" fglm "),
+            "the default route is FGLM: {auto_report}"
+        );
+        assert_eq!(auto["lex_route"], "auto");
+        input["lex_route"] = json!("f4");
+        let forced = solve(&input).unwrap();
+        let report = forced["report"].as_str().unwrap();
+        assert!(!report.contains(" fglm "), "{report}");
+        assert!(report.contains("order=block"), "{report}");
+        assert!(
+            !report.contains("order=grevlex"),
+            "no grevlex prelude: {report}"
+        );
+        assert_eq!(forced["lex_route"], "f4");
+        assert_eq!(forced["grobx_order"], "block:1,1");
+        assert_eq!(
+            basis_m33(forced["basis"].as_str().unwrap(), 32003, &variables).unwrap(),
+            basis_m33(auto["basis"].as_str().unwrap(), 32003, &variables).unwrap()
+        );
+        input["mode"] = json!("certified");
+        assert_eq!(solve(&input).unwrap()["certified"], true);
+    }
+    // A forced route is refused where it cannot mean F4 in lex.
+    #[test]
+    fn refuses_a_forced_route_it_cannot_honour() {
+        let base = json!({"variables":["x","y"],"modulus":32003,"order":"lex","workers":1,
+            "mode":"raw","wall_ns":10000000000u64,"rss_bytes":1073741824u64,
+            "generators":["x^2-y","y^2-1"],"lex_route":"f4"});
+        assert!(solve(&base).is_ok());
+        for (key, value) in [
+            ("order", json!("grevlex")),
+            ("lex_route", json!("fglm")),
+            ("lex_route", json!(1)),
+            ("variables", json!(["x"])),
+        ] {
+            let mut input = base.clone();
+            input[key] = value;
+            if key == "variables" {
+                input["generators"] = json!(["x^2-1"]);
+            }
+            assert!(solve(&input).is_err(), "{key}={}", input[key]);
+        }
     }
     // An exhausted internal budget returns a stop with no usable answer or certification.
     #[test]
