@@ -103,7 +103,10 @@ Katsura-11 and random MQ systems. In the
 row), and msolve 1.9–2.8× ahead on MQ10 at 4–8 workers. Zeebra beat msolve on Katsura-11 at 8 workers, but that win did not
 hold on the held-out rows. The [competitive board](research/competitive/COMPETITIVE.md) records
 every attempt, including those that failed or hit a limit. The current milestone,
-[M34](docs/MILESTONE-GENERALIZABLE-SELECTION.md), measures whether choosing among Zeebra's
-algorithms per input pays, and looks for one class of systems where Zeebra leads.
+[M34](docs/MILESTONE-GENERALIZABLE-SELECTION.md), measured whether choosing among Zeebra's
+algorithms per input pays, and looked for one class of systems where Zeebra leads. Its
+[integration report](docs/MILESTONE-GENERALIZABLE-SELECTION.md#18-integration-report-m34-i-1046)
+found no selection headroom robust enough to build a selector on
+([findings](docs/research/m34-selection-findings.md)), and no confirmed competitive class.
 
 Licensed under the [MIT licence](LICENSE-MIT).
