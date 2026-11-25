@@ -75,7 +75,7 @@ actually is, which is only sometimes a root licence file.
 | FFLAS-FFPACK | `linbox-team/fflas-ffpack` | `06aec3f8` | **LGPL-2.1-or-later** | `README.md:16`; `fflas-ffpack/ffpack/ffpack_ludivine.inl:10-12` | linking only |
 | LinBox | `linbox-team/linbox` | `60d7d0bc` | **LGPL-2.1-or-later** | `linbox/algorithms/wiedemann.h:42-45` (`README.md` has **no** licence section) | linking only |
 | M4GB (#1030, read 2026-11-24) | `cr-marcstevens/m4gb` | `01860a52` | **GPL-3.0-or-later** | `COPYRIGHT.txt`; `src/config.hpp:9-12`; `LICENSE.txt` (GPL-3 verbatim) | algorithmic reference only; run as a subprocess |
-| M5GB (#1030, read 2026-11-24) | `manschga/M5GB` | `2d063f74` | **no grant**: no licence file, no source header | the whole tree (12 files) | **no grant**: not built or run |
+| M5GB (#1030, read 2026-11-24) | `manschga/M5GB` | `2d063f74` | **no grant**: no licence file, no source header | the whole tree (12 files) | **no grant**: not vendored. Built and run once in a scratch directory under an owner exception (2026-11-25, #1030); nothing committed |
 | Fukuoka MQ Challenge data | — (not a repository) | — | **"All Rights Reserved", no stated licence** | `README.md:122-124`, and `tools/fetch-mq-challenge.sh` (moved out in #668) exists so the files are fetched and never redistributed | **no grant** |
 
 The fourth class is not empty, and its occupant is already handled correctly: the MQ Challenge
