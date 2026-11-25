@@ -432,6 +432,7 @@ PANEL = [
     P('zb-nr-8-e1-collide-s1', NR, 1, group='nr-8-e1-s1', n=8, e=1, collide=True),
     P('zb-nr-5-e2-collide-s1', NR, 1, n=5, e=2, collide=True),
     P('zb-nr-10-e1-collide-s1', NR, 1, n=10, e=1, collide=True),
+    P('zb-nr-12-e1-collide-s1', NR, 1, n=12, e=1, collide=True),
     # Block coupling count at fixed (n, m, degree, terms): the same draws with c terms moved.
     P('zb-blk-2x4-c0-s1', BLK, 1, group='blk-2x4-s1', k=2, b=4, coupling=0),
     P('zb-blk-2x4-c1-s1', BLK, 1, group='blk-2x4-s1', k=2, b=4, coupling=1),
@@ -440,6 +441,7 @@ PANEL = [
     P('zb-blk-3x3-c3-s1', BLK, 1, group='blk-3x3-s1', k=3, b=3, coupling=3),
     P('zb-blk-2x6-c0-s1', BLK, 1, group='blk-2x6-s1', k=2, b=6, coupling=0),
     P('zb-blk-2x6-c2-s1', BLK, 1, group='blk-2x6-s1', k=2, b=6, coupling=2),
+    P('zb-blk-3x4-c3-s1', BLK, 1, k=3, b=4, coupling=3),
     # Binomial: exact toric ideals, unsliced (positive-dimensional) and generically sliced.
     P('zb-toric-rnc-5', TOR, kind='rnc', d=5),
     P('zb-toric-rnc-8-slice-s1', TOR, 1, kind='rnc', d=8, sliced=True),
@@ -539,6 +541,50 @@ def singular_reference(record, singular, timeout):
     return oracle.singular_reference(record, entry, singular, timeout)
 
 
+def composition(panels):
+    """§8.2's composition read over (issue, catalog, references) panels, one row per family.
+    A base problem is a record at p31; it is frontier when the p31 oracle did not finish."""
+    rows = {}
+    for issue, catalog, references in panels:
+        refs = json.loads(Path(references).read_text())['references']
+        for rec in json.loads(Path(catalog).read_text()):
+            if not rec['id'].endswith('@p31'):
+                continue
+            lineage = rec['lineage']
+            row = rows.setdefault(lineage['family_id'], dict(issue=issue, bases=0, n=set(), m=set(),
+                                                             supports=set(), frontier=0, seeded=False))
+            row['bases'] += 1
+            row['n'].add(len(rec['variables']))
+            row['m'].add(len(rec['equations']))
+            row['supports'].add(lineage['support_id'])
+            row['seeded'] |= bool(rec['generator'] and rec['generator']['seed'] is not None)
+            row['frontier'] += refs[rec['id']]['status'] == 'frontier'
+    total = sum(r['bases'] for r in rows.values())
+    span = lambda s: f'{min(s)}–{max(s)}' if len(s) > 1 else f'{min(s)}'  # noqa: E731
+    lines = ['| Family | Issue | Base problems | Share | n | m | Scales (distinct n) | Supports | Frontier |',
+             '|---|---|---:|---:|---|---|---:|---:|---:|']
+    for family, r in sorted(rows.items(), key=lambda kv: (kv[1]['issue'], kv[0])):
+        lines.append(f'| `{family}` | {r["issue"]} | {r["bases"]} | {100 * r["bases"] / total:.1f}% | {span(r["n"])} | '
+                     f'{span(r["m"])} | {len(r["n"])} | {len(r["supports"])} | {r["frontier"]} |')
+    frontier = sum(r['frontier'] for r in rows.values())
+    by_issue = {i: sum(1 for r in rows.values() if r['issue'] == i) for i, _, _ in panels}
+    checks = [
+        (f'{len(rows)} families (≥ 10)', len(rows) >= 10),
+        (f'{total} base problems (≥ 60)', total >= 60),
+        (', '.join(f'{k} families from {i}' for i, k in by_issue.items()) + ' (≥ 4 each)',
+         all(k >= 4 for k in by_issue.values())),
+        (f'largest family {max(r["bases"] for r in rows.values())} of {total} (≤ 15%)',
+         all(r['bases'] <= 0.15 * total for r in rows.values())),
+        ('seeded families with < 2 supports: ' + (', '.join(f for f, r in sorted(rows.items())
+         if r['seeded'] and len(r['supports']) < 2) or 'none'),
+         all(len(r['supports']) >= 2 for r in rows.values() if r['seeded'])),
+        (f'families with one scale: {sum(1 for r in rows.values() if len(r["n"]) < 2)}',
+         all(len(r['n']) >= 2 for r in rows.values())),
+        (f'{frontier} frontier base problems, {100 * frontier / total:.1f}% (≥ 10%)', frontier >= 0.1 * total),
+    ]
+    return '\n'.join(lines), checks
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     sub = parser.add_subparsers(dest='command', required=True)
@@ -552,7 +598,16 @@ def main():
     ref.add_argument('--timeout', type=float, default=120.0)
     ref.add_argument('--grobx-timeout', type=float, default=300.0)
     ref.add_argument('--jobs', type=int, default=8)
+    sub.add_parser('compose', help='composition table over the #1006 and #1007 panels (plan §8.2)')
     args = parser.parse_args()
+
+    if args.command == 'compose':
+        public = ROOT / 'research' / 'm34-public-corpus'
+        table, checks = composition([('#1006', public / 'catalog.json', public / 'references.json'),
+                                     ('#1007', CATALOG, REFERENCES)])
+        print(table + '\n')
+        print('\n'.join(f'- {"met" if ok else "**not met**"}: {text}' for text, ok in checks))
+        return 0
 
     if args.command == 'emit':
         problem = next(p for p in PANEL if p['id'] == args.problem)

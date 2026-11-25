@@ -13,7 +13,7 @@ import m34_structural_corpus as corpus  # noqa: E402
 
 PROBLEMS = {p['id']: p for p in corpus.PANEL}
 # Regenerate only when a generator change is intended: every published digest moves with it.
-PANEL_DIGEST = 'd4a1f521a57759845a87e0541dfcecd6b1598aa8f54a9b6e0392d4b5112f568d'
+PANEL_DIGEST = '9b8b6121c6300bae27326c86b887bfc04443f6f586b421b1f9826edb448e4191'
 
 
 def records():
