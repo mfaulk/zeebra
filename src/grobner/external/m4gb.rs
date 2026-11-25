@@ -116,7 +116,8 @@ pub struct M4gbCounters {
     pub polynomials_added: u64,
     /// Largest basis before the final interreduction.
     pub peak_basis: u64,
-    /// Basis size at termination.
+    /// Basis size at the last logged iteration: the final basis on a normal exit, but not on the
+    /// unit-ideal exit, which throws before the basis is reduced to `{1}`.
     pub final_basis: u64,
     /// Most critical pairs pending at once.
     pub peak_pairs: u64,

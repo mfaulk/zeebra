@@ -1534,12 +1534,14 @@ python3 research/1009-feature-costs/summarize.py --check
 
 `tools/external/provision-m4gb.sh "<n…>" "<p…>"` builds the pinned M4GB (GPL-3.0-or-later) as one
 binary per `(n, p)`, each with a `.build` sidecar. `m4gb_comparison`, built with `--features
-external-runners`, runs one `corpus::dense_mq_shaped` row with one engine, `zeebra` or `m4gb`, per
-process. Every M4GB basis is verified against Zeebra's. `tools/external/m4gb-cohort.py` alternates
+external-runners`, runs one `corpus::dense_mq_shaped` row with one engine (`zeebra`, `zeebra-adaptive`, `m4gb` or
+`grobx`) per process. Every M4GB and grobx basis is verified against Zeebra's. An `m4gb` row also
+carries M4GB's iteration counters (`counters`: rounds, peak basis, pairs, store and dense width)
+and its update, matrix and selection totals (`stages`), read from its `--loglevel 3` log. `tools/external/m4gb-cohort.py` alternates
 engine order across repetitions, warms each binary's first exec, and refuses the held-out `m/n` = 1.8
 and GF(65521). `--summarize FILE` prints the table. M4GB serves grevlex and odd primes up to 65,521
-only. The [report](../research/m4gb-m5gb-reference.md) has the development results and what the
-bench host still has to run. Checks:
+only. The [report](../research/m4gb-m5gb-reference.md) has the development results, the
+deciding run (§8) and the counters (§9). Checks:
 
 ```sh
 cargo test --features external-runners --lib grobner::external::m4gb
