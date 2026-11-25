@@ -30,7 +30,7 @@ FIELDS = {'p31': 2 ** 31 - 1, 'p64': 2 ** 64 - 59}
 REPOSITORY = 'https://github.com/mfaulk/zeebra'
 # The main commit that introduced these generators. Records cite it as their recipe revision; the
 # CI check regenerates the catalog from the current file, so a generator change shows up as a diff.
-GENERATOR_REVISION = None
+GENERATOR_REVISION = 'd35b7639f8d4287878b7129c94ff5d32b7cc65a1'
 PATH = 'tools/m34_structural_corpus.py'
 COEFFICIENT_BOUND = 2 ** 15
 

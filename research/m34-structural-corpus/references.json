@@ -1,0 +1,1134 @@
+{
+ "oracles": {
+  "grobx-certified": {
+   "timeout_seconds": 300.0,
+   "version": {
+    "revision": "8005a2a1670a7264617a6f49eeb2618d7fa21701",
+    "version": "0.155.1"
+   }
+  },
+  "singular": {
+   "timeout_seconds": 120.0,
+   "version": "Singular build 44105"
+  }
+ },
+ "references": {
+  "zb-blk-2x4-c0-s1@p31": {
+   "basis_size": 24,
+   "dimension": 0,
+   "normalized_input_digest": "303dd56334dd0a431ba5aea00d5e3e64b0f6b4cb02c150f575d3edacd1d16d22",
+   "oracle": "singular",
+   "reduced_basis_digest": "f7f1ad6715aa381fe626bdb2e90d0e865dc56f8a7c2ed6f5a34b5fa5d3e92f8c",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-blk-2x4-c0-s1@p64": {
+   "basis_size": 24,
+   "normalized_input_digest": "bc3c1fe00eff0d5f48c1355fb9ceb0bca4b0d4a286ef096694977c908b6864e2",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "17ab2ce43d8f78b75d05a84872b67e1b5a2900f37d241ebe70d69aa6198d50f7",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-blk-2x4-c1-s1@p31": {
+   "basis_size": 24,
+   "dimension": 0,
+   "normalized_input_digest": "280c54a69f27981b38fe261af848efd8b4bcd9a6e344155131ee106a34839c09",
+   "oracle": "singular",
+   "reduced_basis_digest": "8ba0bb6c0a177d129c77a4d58630382bc94f3a2d6266b15539372be546da7fa7",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-blk-2x4-c1-s1@p64": {
+   "basis_size": 24,
+   "normalized_input_digest": "829cfbce54c62f5f22f3290f73cee539a6822214070b9b55e59fc1029e3d973b",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "6f23dc0c0af6a54cc8fd8e1b1318e9e5fa8b06aa2047da6e123e3930acc5b8c2",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-blk-2x4-c2-s1@p31": {
+   "basis_size": 108,
+   "dimension": 0,
+   "normalized_input_digest": "5f7b8352b3398cea0f01ca42453aa0afed108fb92dfd826f3d9dc270eb398dc8",
+   "oracle": "singular",
+   "reduced_basis_digest": "e80ece269f7d1d5902c0c6f6dab5095a9f2e600767c98980ce521f94bcef6eb9",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-blk-2x4-c2-s1@p64": {
+   "basis_size": 108,
+   "normalized_input_digest": "48769dc3c322bae551333de163b0963ad93961acfe2372a3dbc65fee956c0e0b",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "65d620e4860f6063cf702084eba74df77e5aa51e25d81e2deca450937d88df50",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-blk-2x6-c0-s1@p31": {
+   "basis_size": 78,
+   "dimension": 0,
+   "normalized_input_digest": "d4747fd018f6afa429ced4548cd030e3ef79deb16b5e60e43ad47dfc57f34e7f",
+   "oracle": "singular",
+   "reduced_basis_digest": "ed28bd11ce02ec17292c6f64f180f22cf70eda1553f5888afe280881b4173ae3",
+   "status": "reference",
+   "vdim": 4096
+  },
+  "zb-blk-2x6-c0-s1@p64": {
+   "basis_size": 78,
+   "normalized_input_digest": "959d7714145885e43dac44bc7e6ca0409c6670dd2c57dfaed548aafc02668995",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "d2a1463a54d8639d957a266e74a944c65480529d3562a8fd97d39ca11af884db",
+   "status": "reference",
+   "vdim": 4096,
+   "zero_dimensional": true
+  },
+  "zb-blk-2x6-c2-s1@p31": {
+   "normalized_input_digest": "f01535e5ea738908085df2ad1b00610b98cbf09522455a294098be64e42d6c34",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-blk-2x6-c2-s1@p64": {
+   "normalized_input_digest": "e4d1b1ce49c10b7c301fbce9b7b713ffccacbf3910945fdc6f374698fed93c8d",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-blk-3x3-c0-s1@p31": {
+   "basis_size": 18,
+   "dimension": 0,
+   "normalized_input_digest": "7b13159ddf37acb125ed07c9cbdb462f8f860e160de4cdbfbe2b201e500c603b",
+   "oracle": "singular",
+   "reduced_basis_digest": "33f2baea9f05faf3f5f28f899cff2ea62d2aa85a812fdb648268099d88ea007c",
+   "status": "reference",
+   "vdim": 512
+  },
+  "zb-blk-3x3-c0-s1@p64": {
+   "basis_size": 18,
+   "normalized_input_digest": "e1e5494b965a10529a8ca94b5000a5838732aaf1bbdbeb46f9804d00791456c0",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "b74a638ce23b4a14df2f4f0aab5886b605187d80d2bae1e43177497a9961bca3",
+   "status": "reference",
+   "vdim": 512,
+   "zero_dimensional": true
+  },
+  "zb-blk-3x3-c3-s1@p31": {
+   "basis_size": 121,
+   "dimension": 0,
+   "normalized_input_digest": "363e3933a5ce2c96add38f098966b42b23f16a67f28e00f9b7dc3670898224df",
+   "oracle": "singular",
+   "reduced_basis_digest": "3af56f2a954e99f8039480eaf32e72607bc7822f2fe020ed9c3345ced66b9756",
+   "status": "reference",
+   "vdim": 512
+  },
+  "zb-blk-3x3-c3-s1@p64": {
+   "basis_size": 121,
+   "normalized_input_digest": "e154c4c72cd0d06828570eff6512074c52428302624babbd577e8aabfc032733",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "3cc26c810db7681f846a9b812538c9932c117a9eaaa514981af5ddf0d2aec903",
+   "status": "reference",
+   "vdim": 512,
+   "zero_dimensional": true
+  },
+  "zb-blk-3x4-c3-s1@p31": {
+   "normalized_input_digest": "74aab2f67b65fa3c5a92d47d58d769025f89f716eff779c076a33586bd4b4c06",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-blk-3x4-c3-s1@p64": {
+   "normalized_input_digest": "a73eb537dc3f547449fe76cf11d07fa961c17f3e3c168195a6c620a4c67f7cbf",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-col-gnm-12-17-s1@p31": {
+   "basis_size": 28,
+   "dimension": 0,
+   "normalized_input_digest": "7890cf65ec6da47c0bda89be099c77260c1cbdcd0c10db727ec2299243c12dcf",
+   "oracle": "singular",
+   "reduced_basis_digest": "f55a11fad18fe92821c9c1a9553659f9afb6cb2eea0db89ce8fd8f0396f0eed4",
+   "status": "reference",
+   "vdim": 300
+  },
+  "zb-col-gnm-12-17-s1@p64": {
+   "basis_size": 28,
+   "normalized_input_digest": "fa7a246685cce62b3f6290a40c67bdb983b16fac33f7028fb02ec8e88cbc9856",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "7acd93bf96554263980e55672c4a68d1e28b78d0267dd808c79b538a114e9072",
+   "status": "reference",
+   "vdim": 300,
+   "zero_dimensional": true
+  },
+  "zb-col-gnm-12-17-s2@p31": {
+   "basis_size": 1,
+   "dimension": -1,
+   "normalized_input_digest": "9c2ccc1bc5b9764944bac53b988854a29904b873b56a89a8f8843521949c90a8",
+   "oracle": "singular",
+   "reduced_basis_digest": "230fc56b51e8801c09180e50cecc144d0e4c93bc889df976d418c17fa0240100",
+   "status": "reference",
+   "vdim": 0
+  },
+  "zb-col-gnm-12-17-s2@p64": {
+   "basis_size": 1,
+   "normalized_input_digest": "9555929fa282b81c907d2788b6d9c9e0a2e1f0cc0cb2a0c142bc66239b65273f",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "78fa4e8f3228371418529fdab45e1e732a880ffb848e8a903aa1dfb68499d052",
+   "status": "reference",
+   "vdim": 0,
+   "zero_dimensional": false
+  },
+  "zb-col-gnm-12-21-s1@p31": {
+   "basis_size": 15,
+   "dimension": 0,
+   "normalized_input_digest": "6092bc5baa4c23deb89c0847ab2a745b2c6659cab76e1c64b65d409d75fab84d",
+   "oracle": "singular",
+   "reduced_basis_digest": "e422373f251e47ea9a3fc8ce72fbd1a0588cc655a25e1903eb6e048a6f7b5f85",
+   "status": "reference",
+   "vdim": 72
+  },
+  "zb-col-gnm-12-21-s1@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "d46df91ab255ee0c2f72de69b0d42528b0ea17db9dfbaa9b2efcc02c833a74ff",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "18ab3bb7da5143c37933c02e470374423ded5d7b765ca132e36f449cfcc1e5b5",
+   "status": "reference",
+   "vdim": 72,
+   "zero_dimensional": true
+  },
+  "zb-col-grid-3x4@p31": {
+   "basis_size": 31,
+   "dimension": 0,
+   "normalized_input_digest": "a5f7384495ade74e9ff17b4ab31ac45e2aed2b3a2f2d76808657c6c87ea903e9",
+   "oracle": "singular",
+   "reduced_basis_digest": "f5e8c8032d1c7fafd1e23cd7d0296971853bc1e903bcf0d7a48e68aa3b982a35",
+   "status": "reference",
+   "vdim": 1122
+  },
+  "zb-col-grid-3x4@p64": {
+   "basis_size": 31,
+   "normalized_input_digest": "3525a79936caf5eb7dac80a682ab8953f0f206d30ffe585ff6415b286fac2421",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "01454a0fe38e9998589867986feea7590fd466202c30529efa7b6c03bf872107",
+   "status": "reference",
+   "vdim": 1122,
+   "zero_dimensional": true
+  },
+  "zb-col-grid-4x5@p31": {
+   "basis_size": 196,
+   "dimension": 0,
+   "normalized_input_digest": "cd79c464f763e894ba9644f38cbf51e3474a15a4fd539bb25bc643253361d7a7",
+   "oracle": "singular",
+   "reduced_basis_digest": "7488d5fcb6058388547d351ff5912378ca18a6533becdb2062cfd41c641d029a",
+   "status": "reference",
+   "vdim": 54450
+  },
+  "zb-col-grid-4x5@p64": {
+   "basis_size": 196,
+   "normalized_input_digest": "37e38da3a74a96327a9b4b4746d71ee5db62f7cbdbaae04541e08045017be59b",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "17706d312b09dfe222dc7c36a0ba3678d00a88a9595cd244e60c7857984a456b",
+   "status": "reference",
+   "vdim": 54450,
+   "zero_dimensional": true
+  },
+  "zb-col-grid-5x5@p31": {
+   "basis_size": 633,
+   "dimension": 0,
+   "normalized_input_digest": "f43bd3dfaadd7c5c0c01e10186694a591ef6d746103c973c7270060b4e9c9076",
+   "oracle": "singular",
+   "reduced_basis_digest": "7ae8f268fe59d64f5c21a8f2f0007be293a6da13f8ce6b38758ac7b563273905",
+   "status": "reference",
+   "vdim": 580986
+  },
+  "zb-col-grid-5x5@p64": {
+   "basis_size": 633,
+   "normalized_input_digest": "daa15aed519303a7cff658af7bd3b100865c24194011c329cb8d9ef4e449a87c",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "55483977e23c8cabe5c060293dc83ff3188aa58e55d71c1d41a42582c94af5dd",
+   "status": "reference",
+   "vdim": 580986,
+   "zero_dimensional": true
+  },
+  "zb-col-ktree2-12-s1@p31": {
+   "basis_size": 12,
+   "dimension": 0,
+   "normalized_input_digest": "4e948dd5b6c55ed42b858e446c16b35203060f163b49f7e953905c1c69c354b0",
+   "oracle": "singular",
+   "reduced_basis_digest": "0184b1fd3657fd978ec0dabaed54eaee4b6149e0390e5bd1e92c79d2890f9595",
+   "status": "reference",
+   "vdim": 6
+  },
+  "zb-col-ktree2-12-s1@p64": {
+   "basis_size": 12,
+   "normalized_input_digest": "cce6ad4f883061caf716c108c1dc6531453538aff68c4f3d79976cc6bbedaa6b",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "45ec34fce175406eff53552643ecde590ecc634cb080035cc3a19d97547204e4",
+   "status": "reference",
+   "vdim": 6,
+   "zero_dimensional": true
+  },
+  "zb-col-path-12@p31": {
+   "basis_size": 12,
+   "dimension": 0,
+   "normalized_input_digest": "bd0999db07ad45bffb8d35ea0aafc27263503724dc0c95f89cdc0f67d35ad54c",
+   "oracle": "singular",
+   "reduced_basis_digest": "6ece07b823f55b27d03a0e6e7b7d251d9aa8af18a2eec6d91c9b58def4da7370",
+   "status": "reference",
+   "vdim": 6144
+  },
+  "zb-col-path-12@p64": {
+   "basis_size": 12,
+   "normalized_input_digest": "cc9822b53ac4a91a29363469d53ffa0d7d8908b0cdf8f8c3e91dcf30c3adffc4",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "e3138d47f97f2f940e3e0e9c9b18490e406b6aa2258cf07bd29f9296f816681b",
+   "status": "reference",
+   "vdim": 6144,
+   "zero_dimensional": true
+  },
+  "zb-col-path-8@p31": {
+   "basis_size": 8,
+   "dimension": 0,
+   "normalized_input_digest": "0f1fe5b351a9ef6ce216e2ffb9a673e4b8e5dd4c047a45ccc4445739bca1abae",
+   "oracle": "singular",
+   "reduced_basis_digest": "3b7f495987b958b86ca766ec8f576708131b8b051090464b2d1fe84a0650eeff",
+   "status": "reference",
+   "vdim": 384
+  },
+  "zb-col-path-8@p64": {
+   "basis_size": 8,
+   "normalized_input_digest": "e59f4e5c31221e8bdcdb9c4338bf3ac92be2388d09ede47cc96dbe0a0b8a1963",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "461b55df462840199ea382b34dc0f9db279259b8047d42283bae4ef3d1348e32",
+   "status": "reference",
+   "vdim": 384,
+   "zero_dimensional": true
+  },
+  "zb-col-tree-12-s1@p31": {
+   "basis_size": 45,
+   "dimension": 0,
+   "normalized_input_digest": "8e35265890eb06478a421962fc716930d35ca659e137d30ce6ae3aab78299391",
+   "oracle": "singular",
+   "reduced_basis_digest": "2a8c8ce55f959be4c2879c50d952bc98a6b72fce812eadaf15b3900fc5913ded",
+   "status": "reference",
+   "vdim": 6144
+  },
+  "zb-col-tree-12-s1@p64": {
+   "basis_size": 45,
+   "normalized_input_digest": "789b6d73b2992ed6571e75c2d18ae89fd08d25a71af024a4a4e271620311f2f2",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "7ea4c6cae5ee314ddfca36da9029a3a8a3d542abf46ae7a84bc4049aaeeddb82",
+   "status": "reference",
+   "vdim": 6144,
+   "zero_dimensional": true
+  },
+  "zb-col-tree-8-s1@p31": {
+   "basis_size": 14,
+   "dimension": 0,
+   "normalized_input_digest": "3c8d97c37e8a9c3e870955b1793fe7b4e3e4c9eb49648fb218f08f3368473a40",
+   "oracle": "singular",
+   "reduced_basis_digest": "c97155c3c681cab2f9a0aa96cc1fac86438671cac3071b0f64619418687c1f45",
+   "status": "reference",
+   "vdim": 384
+  },
+  "zb-col-tree-8-s1@p64": {
+   "basis_size": 14,
+   "normalized_input_digest": "6c372816ce45ac6bc695d5cee1aeb5ef730a00f4758c21622411ebbad5b8c106",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "e08c77a268594dc5c292094aa41a3ff10d56ea4c3b2faf533dcfd1302c340eb7",
+   "status": "reference",
+   "vdim": 384,
+   "zero_dimensional": true
+  },
+  "zb-col-wheel-5@p31": {
+   "basis_size": 1,
+   "dimension": -1,
+   "normalized_input_digest": "d558c801c30ea65abbc06346864af49666852a10c76963047d962dc305ab93ac",
+   "oracle": "singular",
+   "reduced_basis_digest": "71a05b85f67772eb25b718907920ca6c69b8176fbb0fdff8889e623fed365c4d",
+   "status": "reference",
+   "vdim": 0
+  },
+  "zb-col-wheel-5@p64": {
+   "basis_size": 1,
+   "normalized_input_digest": "975596ca81972ea6decb00f10690737b7b5093a5dba6fb759c600888e15acf7c",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "5b18b49a467515d92178f8c1b0348ec7ba691d15d43aad24350f4496c01de4f7",
+   "status": "reference",
+   "vdim": 0,
+   "zero_dimensional": false
+  },
+  "zb-cyclic-6@p31": {
+   "basis_size": 45,
+   "dimension": 0,
+   "normalized_input_digest": "fd541a07bf33b5304b48d1ea6f1cec700fc9033b4412528a13e81dc05d6999cd",
+   "oracle": "singular",
+   "reduced_basis_digest": "7a45bff1405c0f1881a94f30c17e05539a428226d1907560c5e43550d14846de",
+   "status": "reference",
+   "vdim": 156
+  },
+  "zb-cyclic-6@p64": {
+   "basis_size": 45,
+   "normalized_input_digest": "099d25565352168f6f46c02454ce976d3c7738af7ddf01bf747dcc6655e008d2",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "1393674daa5819aa21e212d969de0d2e1ddcf2c56321a1649e8238bc8658e38b",
+   "status": "reference",
+   "vdim": 156,
+   "zero_dimensional": true
+  },
+  "zb-cyclic-7@p31": {
+   "basis_size": 209,
+   "dimension": 0,
+   "normalized_input_digest": "a6ca3d8a17905a34a8f565904b0327e8b4203a9c2bbb3a211aabc30dbaa3fe00",
+   "oracle": "singular",
+   "reduced_basis_digest": "b20be81117db9ff2bffb0f420c2db233e0589ba2c4a33d01b6d0e029e7d41091",
+   "status": "reference",
+   "vdim": 924
+  },
+  "zb-cyclic-7@p64": {
+   "basis_size": 209,
+   "normalized_input_digest": "b6988be479866ca1e14a93e47ae8b6c1e5bc349e731bb7c8ee5b9aad23c3437c",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "98346f535342a6254c51cbaada2eea2598f815af68662af51d3d55a2ce383439",
+   "status": "reference",
+   "vdim": 924,
+   "zero_dimensional": true
+  },
+  "zb-det-2x4-lin-s1@p31": {
+   "basis_size": 6,
+   "dimension": 0,
+   "normalized_input_digest": "cb6006898ad736e374ce5d6c13d21400a56a5bab7e8d88f1a03e6bf26da59724",
+   "oracle": "singular",
+   "reduced_basis_digest": "f58c0fc9cb4db8f7406e56dc65ad4e7abd7231ef85c2579f19237ad76d0e5329",
+   "status": "reference",
+   "vdim": 4
+  },
+  "zb-det-2x4-lin-s1@p64": {
+   "basis_size": 6,
+   "normalized_input_digest": "96e0dfbddbe3d7de8cff385515ea219370a423abd6436ea00a5e008b0d6f015a",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "a3c634313f28e656b47d0de4afbc2161129f99b947acb7b6b9d44f509c60d7fa",
+   "status": "reference",
+   "vdim": 4,
+   "zero_dimensional": true
+  },
+  "zb-det-2x4-quad-s1@p31": {
+   "basis_size": 15,
+   "dimension": 0,
+   "normalized_input_digest": "bd636f4b4400139264b8380446ae386a842735f1217f345b119475f558416ef5",
+   "oracle": "singular",
+   "reduced_basis_digest": "7dbeb186dea50abb528672686da49e56e8e4fce7cfc6e377739b168bc3a07780",
+   "status": "reference",
+   "vdim": 32
+  },
+  "zb-det-2x4-quad-s1@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "a4b00772922dbb0bfafc5cce4f6db87b0ad8234e44e83b4a132452f1a90d0f17",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "fe9c47d4b920e9b8de1d557bc36c3be4a3c3aa4676bf8af594e4d2e6bad89165",
+   "status": "reference",
+   "vdim": 32,
+   "zero_dimensional": true
+  },
+  "zb-det-2x6-lin-n8-s1@p31": {
+   "basis_size": 15,
+   "dimension": 3,
+   "normalized_input_digest": "237f97e36597c6ac850a598e7474906a032356c5eb310826fdadc3cdc3157fea",
+   "oracle": "singular",
+   "reduced_basis_digest": "2bdd2553a332287ba9fc458f52ac6c6f94a9cbaf1e93100ffe42e2285c5f2ce3",
+   "status": "reference",
+   "vdim": null
+  },
+  "zb-det-2x6-lin-n8-s1@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "e4f529fceba35656e0a315f95b1759f72fb62527086b4f27eb03208bb1103acf",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "8c76e68b65705b9e72b1116439920f3b4ca91693659724cb42e4cd2f9d6cd67a",
+   "status": "reference",
+   "vdim": null,
+   "zero_dimensional": false
+  },
+  "zb-det-2x6-lin-s1@p31": {
+   "basis_size": 15,
+   "dimension": 0,
+   "normalized_input_digest": "ccf26673c3503b97ffe5dd458784e1087d41b976857d5497f74d119bf7750417",
+   "oracle": "singular",
+   "reduced_basis_digest": "6075f6e616e3dc2eb5edc13c66253e052175b91e7e0ac405c32edc7c16fd5148",
+   "status": "reference",
+   "vdim": 6
+  },
+  "zb-det-2x6-lin-s1@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "af13014cbe6b22a8d23a076e303df71a175a3c880dd09c99aa565a61a8446b3d",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "98a81b1bf87191ac034c5680efd999792cd940c8f3d6cfa661f6ee5f0876cbd3",
+   "status": "reference",
+   "vdim": 6,
+   "zero_dimensional": true
+  },
+  "zb-det-3x5-lin-s1@p31": {
+   "basis_size": 10,
+   "dimension": 0,
+   "normalized_input_digest": "4cfea3d493daaafcd51a0963a51d71123621898388d76607685adc3373c5394f",
+   "oracle": "singular",
+   "reduced_basis_digest": "6b32700108b24e0bf511069b4bf84bd0169b541fbcc67c8a610047f3eac1914e",
+   "status": "reference",
+   "vdim": 10
+  },
+  "zb-det-3x5-lin-s1@p64": {
+   "basis_size": 10,
+   "normalized_input_digest": "a22c9243a674c15d7d631cee3c2318c3fad22231bf0409efa3f7594d4daded69",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "f39c97c3fed21b7277ee4c64a27c87fdf746e067bc483f0cd30c74371068e216",
+   "status": "reference",
+   "vdim": 10,
+   "zero_dimensional": true
+  },
+  "zb-eco-12@p31": {
+   "normalized_input_digest": "10eb962fb9c96028d04a4a9db6df21a9ab3e3cb3a3648486aed3b93283ec0614",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-eco-12@p64": {
+   "normalized_input_digest": "7f46ad782bdbe9b5ed4c09b26fe7c3d6503ba9373c5f2daebe1170fbd9434b9a",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-eco-8@p31": {
+   "basis_size": 59,
+   "dimension": 0,
+   "normalized_input_digest": "3c85d045c1bdfcf15a03897b58815372a719cfa1ecafecfcad5eea50a1a67b4c",
+   "oracle": "singular",
+   "reduced_basis_digest": "7e16fb6df1857982daf83421e775539cfd2d4fe7fded1c17c60745dd24d7e689",
+   "status": "reference",
+   "vdim": 64
+  },
+  "zb-eco-8@p64": {
+   "basis_size": 59,
+   "normalized_input_digest": "a7fcb26fba1ee474d9ff003858975098decb2907862a41046a40a75c7551fad7",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "3072fc273ff74fd6ba81fa25ce0e17cc94f4cb1ec1dadebcd496766316321935",
+   "status": "reference",
+   "vdim": 64,
+   "zero_dimensional": true
+  },
+  "zb-katsura-12@p31": {
+   "normalized_input_digest": "59cf18ff316301b9e39e95a3b647df7306d31f2a2648f24642a88b7e6ecd1b3b",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-katsura-12@p64": {
+   "normalized_input_digest": "38545dbb1a21421528a2781d7176d4c836da4fb64c0a7ef8536eb31af4c70607",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-katsura-9@p31": {
+   "basis_size": 143,
+   "dimension": 0,
+   "normalized_input_digest": "a7dda345e977f24dcf5833f2cc31e0350829ec3cbb28aac852737666358e8af8",
+   "oracle": "singular",
+   "reduced_basis_digest": "fe639d9b8e2c2a6d8381aed1ebb5820b5f4a7066ac062bfe408d52ebd6009a54",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-katsura-9@p64": {
+   "basis_size": 143,
+   "normalized_input_digest": "f48b2058c0daaa8afdd4b1ac18a8905ee4a028a285c58a9d28a166c43b3cad25",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "f4bbfac55314dce1b7e5037e685a2613b6178ae28aa5c3bb8422a5d535b61af0",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-noon-5@p31": {
+   "basis_size": 72,
+   "dimension": 0,
+   "normalized_input_digest": "1e0ca5ea812d23b059c06f0b833cc0ad7b4f73df7f7175d4b3106831bd1a6374",
+   "oracle": "singular",
+   "reduced_basis_digest": "acf3dd5f339136f3d8997b5c0d78b8bd8fde6aca59e72ce3f24ac4b3f57e2522",
+   "status": "reference",
+   "vdim": 233
+  },
+  "zb-noon-5@p64": {
+   "basis_size": 72,
+   "normalized_input_digest": "eb44fce4403307631be195059986b31448e03552f233c8b814849c87427c99f1",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "b3e59334fbb2923f79c7e2e3a2e5acbaa07e9a239916953cfd03cb6661cd5b16",
+   "status": "reference",
+   "vdim": 233,
+   "zero_dimensional": true
+  },
+  "zb-noon-7@p31": {
+   "basis_size": 495,
+   "dimension": 0,
+   "normalized_input_digest": "2f1a399c86cf70f15d66ea4bfd4fc8d6e3a465a2be03fe43dc10c6a088b77971",
+   "oracle": "singular",
+   "reduced_basis_digest": "6351f5bfc9c9988dac4ae26e359ff078627ba1876e298afe2333720afc7a2585",
+   "status": "reference",
+   "vdim": 2173
+  },
+  "zb-noon-7@p64": {
+   "basis_size": 495,
+   "normalized_input_digest": "5409113fa91351164abc009ad7ab9919ec24bcb3ca4e832a2ea91eccb7772d7c",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "d4fb9ae7b6a95d23c8deeefaa04dfb75a5a4df1e54b3718486d271a3f3c919e6",
+   "status": "reference",
+   "vdim": 2173,
+   "zero_dimensional": true
+  },
+  "zb-nr-10-e1-collide-s1@p31": {
+   "basis_size": 427,
+   "dimension": 0,
+   "normalized_input_digest": "049953a94c934fc30b3b46c62db0817052341dfb78d7953500d56d7431453a31",
+   "oracle": "singular",
+   "reduced_basis_digest": "affbda1c6d87efca7d59ecea843782e66277c6bbbf85ca3ec49882aa3811d1a1",
+   "status": "reference",
+   "vdim": 1024
+  },
+  "zb-nr-10-e1-collide-s1@p64": {
+   "basis_size": 427,
+   "normalized_input_digest": "b577691d309535b00f1759e78ca2d281d2df617d9f6cbddd2f39dd5b9feaab53",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "94b30c84e881d729539940224e0a223c60fa063d1134d51e1ac758d3b0dcd540",
+   "status": "reference",
+   "vdim": 1024,
+   "zero_dimensional": true
+  },
+  "zb-nr-12-e1-collide-s1@p31": {
+   "normalized_input_digest": "26efa9fcaca22166ee8e2d98fad56ba88e100f44184801bdbd475d3bb89dd097",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-nr-12-e1-collide-s1@p64": {
+   "normalized_input_digest": "463343605ec112e1ead6959e4f52e73875ba697cf12ce0d52eb34e4a334b4f51",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-nr-5-e2-collide-s1@p31": {
+   "basis_size": 77,
+   "dimension": 0,
+   "normalized_input_digest": "787cb677cf3e6aa957a72562a408b59ec21f82e5591ec25cfa1a7d50592558b3",
+   "oracle": "singular",
+   "reduced_basis_digest": "9a09ed76520282c76444a0609ee880817aa042f5f40d91d8b12cb1b2db069e5c",
+   "status": "reference",
+   "vdim": 243
+  },
+  "zb-nr-5-e2-collide-s1@p64": {
+   "basis_size": 77,
+   "normalized_input_digest": "f16f99d606de5a64b5fcd113e3b6ee647121fc711fc39842d5d341c3d9751d4a",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "2cdd46153bdd0cc01be8be4652877170e223b64d270baba102dac0f14c51be8c",
+   "status": "reference",
+   "vdim": 243,
+   "zero_dimensional": true
+  },
+  "zb-nr-6-e1-collide-s1@p31": {
+   "basis_size": 39,
+   "dimension": 0,
+   "normalized_input_digest": "18686388a585c3c6d98d1abba31c38a55ac4a7a36aba95d8377f7db59a2b3b42",
+   "oracle": "singular",
+   "reduced_basis_digest": "050654e000cd4e4d3d02003fee165830808ad9169a5fa7d0b5bfd986776ce712",
+   "status": "reference",
+   "vdim": 64
+  },
+  "zb-nr-6-e1-collide-s1@p64": {
+   "basis_size": 39,
+   "normalized_input_digest": "f031d401fcaa48d1590284927121876a0208f1494b6416da83b45e7d25a160fa",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "45094af37bc828e45e6ce6b2a36438c8e2b2ddbf3cfa597284676d9925d6b211",
+   "status": "reference",
+   "vdim": 64,
+   "zero_dimensional": true
+  },
+  "zb-nr-6-e1-distinct-s1@p31": {
+   "basis_size": 39,
+   "dimension": 0,
+   "normalized_input_digest": "bd876d2b136b1e69ec8127e2c6e43af792dc2e300fc830605a2b349b8aee73b1",
+   "oracle": "singular",
+   "reduced_basis_digest": "6631645af24bd6d5cff7896a4742441b996c004c2188fc13a00c0951c51746b9",
+   "status": "reference",
+   "vdim": 64
+  },
+  "zb-nr-6-e1-distinct-s1@p64": {
+   "basis_size": 39,
+   "normalized_input_digest": "77b97d912ebc85195c39baac2c5c2fdaf565b66ad452875deda2bbc71dadf671",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "a0498a6abe04a8669c6130bca2cde5db7bed7f7adf2086194c530b39581b251a",
+   "status": "reference",
+   "vdim": 64,
+   "zero_dimensional": true
+  },
+  "zb-nr-8-e1-collide-s1@p31": {
+   "basis_size": 128,
+   "dimension": 0,
+   "normalized_input_digest": "55cb249dc1692b1b48a90f5010089c00d9ae08829917867876fc19a34af00a24",
+   "oracle": "singular",
+   "reduced_basis_digest": "492a31cdb347b9b3eb71d91b55cd036b45f85bbeef4b0ba765e156c7531fd311",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-nr-8-e1-collide-s1@p64": {
+   "basis_size": 128,
+   "normalized_input_digest": "dfb071b0c7f9ed57045a52af7e9342087a4f4fd2d234b7017ac3ffbb33fafe50",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "9e2d6bf19c9e27fbd94e3ecb764158e6ae0c107120941e8b06bd67e16b0b06c7",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-nr-8-e1-distinct-s1@p31": {
+   "basis_size": 128,
+   "dimension": 0,
+   "normalized_input_digest": "bd84c41450494f19ebfa93b21b9689319f470860fec6b24bb96d040a8a0728a6",
+   "oracle": "singular",
+   "reduced_basis_digest": "0ccc681669c11bf7e39348c6c48cac07f88b407a9061f52e81927bc86c19f3c6",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-nr-8-e1-distinct-s1@p64": {
+   "basis_size": 128,
+   "normalized_input_digest": "c34a41d7d0d9c071103821b33c75b9f9db3bcb149cb80240f1833cbd2490b070",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "c081c9ab296248083e20fc5dc74a49c51186d8c7c3da658b93dd2411ce5f60ff",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-pd-12-24-d2-s1@p31": {
+   "basis_size": 12,
+   "dimension": 0,
+   "normalized_input_digest": "b8e8eda9a10ee268a24f6f4e76d972f256a1d3b391b96b3fe721e5f1fb3b558f",
+   "oracle": "singular",
+   "reduced_basis_digest": "bb917cb97ef26013a2f75221325ada9136fa814159eb1f409e2d29578693a5bb",
+   "status": "reference",
+   "vdim": 1
+  },
+  "zb-pd-12-24-d2-s1@p64": {
+   "basis_size": 12,
+   "normalized_input_digest": "c0a59da98122576f858983fefa7d4c3a631ec620ad573cda303cc02333b616d0",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "98a2c271cf3180c9b6921368dd73d651759f3746c2ed62014d98201b943d7e4b",
+   "status": "reference",
+   "vdim": 1,
+   "zero_dimensional": true
+  },
+  "zb-pd-14-14-d2-s1@p31": {
+   "normalized_input_digest": "f7d117b271a41c48ff899ffc7209b8ed3c2ad18960e9905f3e67513fc38bc02b",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-pd-14-14-d2-s1@p64": {
+   "normalized_input_digest": "ab1e8324b78ed15a22f9acc84b23c915ba739970ca9fcd543f6c13975da6daf5",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-pd-6-6-d3-s1@p31": {
+   "basis_size": 205,
+   "dimension": 0,
+   "normalized_input_digest": "4bc5f3a2af1852b228c168a2e937a3c3339e15bbd4cbe54d1cf2bd3493c04e7b",
+   "oracle": "singular",
+   "reduced_basis_digest": "c45644a5fd2ab0f79db9d0128e2f297f686b6a0ec66d7d525c51046eb31b043b",
+   "status": "reference",
+   "vdim": 729
+  },
+  "zb-pd-6-6-d3-s1@p64": {
+   "basis_size": 205,
+   "normalized_input_digest": "1a73eea49f4ae0935b99e417e4fc6883a8a9b58b00bd1dffb9ae5079c934accb",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "07d2826640367c045c038accada015599e430febac4b13b12507b6708afae4e8",
+   "status": "reference",
+   "vdim": 729,
+   "zero_dimensional": true
+  },
+  "zb-pd-7-10-mixed-s1@p31": {
+   "basis_size": 7,
+   "dimension": 0,
+   "normalized_input_digest": "5d4325f877155d178bba8989aa2788d94adab4251a2adfaf108b9a7399240a17",
+   "oracle": "singular",
+   "reduced_basis_digest": "1a71cfc36fd2b95b876686d42749ecbd6cd2f26687301d10a18ed8ff4701b737",
+   "status": "reference",
+   "vdim": 1
+  },
+  "zb-pd-7-10-mixed-s1@p64": {
+   "basis_size": 7,
+   "normalized_input_digest": "70656bcb570db4785c88b12f3b8965b5f3cb398ac69ead21251a6339910389c4",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "271bc4537b375ad96965d57a3b4e5e73bd6f78c519d9e288f3081d6daba195fd",
+   "status": "reference",
+   "vdim": 1,
+   "zero_dimensional": true
+  },
+  "zb-pd-8-8-d2-s1@p31": {
+   "basis_size": 128,
+   "dimension": 0,
+   "normalized_input_digest": "b925c4026144e0b79f73f9958f36fd51990c488d0a295579e779c7e11b445001",
+   "oracle": "singular",
+   "reduced_basis_digest": "7613d7f03358eba52a5acaeb688a02a682bc01be0400f8e962992172bab2c555",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-pd-8-8-d2-s1@p64": {
+   "basis_size": 128,
+   "normalized_input_digest": "b029c19f75298d2ab682391badb4a1a47fbbb1768b4806369926f1e4713b8acb",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "dc01208f9dd3522a11a8cdc1598b63f44a9a95425a3598ecf0db3400c4fff94d",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-ps-10-15-d2-t12-s1@p31": {
+   "basis_size": 10,
+   "dimension": 0,
+   "normalized_input_digest": "d5c0a9d5b178ae8648415d85caacece2a1dc20251fc07e58b01189ec52e2b133",
+   "oracle": "singular",
+   "reduced_basis_digest": "b7b486c402b7324dde6765632579079583a62d98a47c734c7f6270e724d718a7",
+   "status": "reference",
+   "vdim": 1
+  },
+  "zb-ps-10-15-d2-t12-s1@p64": {
+   "basis_size": 10,
+   "normalized_input_digest": "3ba58efeeb34f00281366ee5103986ede7faa382827cbfa604eccd315eed5ee0",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "a74ac496a848060c0234c8432aacacfe7e387b787fb6dadc091dc3312618415b",
+   "status": "reference",
+   "vdim": 1,
+   "zero_dimensional": true
+  },
+  "zb-ps-10-15-d2-t12-s2@p31": {
+   "basis_size": 10,
+   "dimension": 0,
+   "normalized_input_digest": "0a05aa2343e28a545c47f0381ac8569eb37beecffd8b55a040fad0d7fcdf9273",
+   "oracle": "singular",
+   "reduced_basis_digest": "8e94cec97f8121a43017549f23634237bc6a2372685b3ea90eebbb0ccbdda7af",
+   "status": "reference",
+   "vdim": 1
+  },
+  "zb-ps-10-15-d2-t12-s2@p64": {
+   "basis_size": 10,
+   "normalized_input_digest": "316cb4f9994c0fa50dc077f4e7404c24c5db9e9829b7e97cf94d80925a197d66",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "6d308abfa686ff03c3e010c26135d1b05921c35765d559137124b4a172d46d57",
+   "status": "reference",
+   "vdim": 1,
+   "zero_dimensional": true
+  },
+  "zb-ps-14-21-d2-t16-s1@p31": {
+   "basis_size": 14,
+   "dimension": 0,
+   "normalized_input_digest": "28dd88571fd2b6ff01aacc429211ce5e0d0cbafb2787184ca2a2675ec355e778",
+   "oracle": "singular",
+   "reduced_basis_digest": "ca33a8a8f18a91b4e3d26100a5f49bee810d60524b0a24364b1d80ac1cb3165f",
+   "status": "reference",
+   "vdim": 1
+  },
+  "zb-ps-14-21-d2-t16-s1@p64": {
+   "basis_size": 14,
+   "normalized_input_digest": "5107c8e4d4acc4567b5c5421407dd5b9e724dd066aeeca53c061183e11d90ab7",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "bb423e7d02e9fcd711b2642c80ea8e8e11d9943028c6f916b4907292f949c518",
+   "status": "reference",
+   "vdim": 1,
+   "zero_dimensional": true
+  },
+  "zb-ps-16-16-d2-t18-s1@p31": {
+   "normalized_input_digest": "3ecb1dd2b27e36464f26f3e02377c2e581e410484c732b3a21df931f70708cc2",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-ps-16-16-d2-t18-s1@p64": {
+   "normalized_input_digest": "76ec6b7f30e2c5773a13aa92cfe6633111f524f0cac98467caadf8a15e4bf660",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-ps-8-8-d3-t10-s1@p31": {
+   "normalized_input_digest": "1c33fca11d8e883e8ee348a6115a0470d372f40e416bcd11876fb10eae5dbc5e",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-ps-8-8-d3-t10-s1@p64": {
+   "normalized_input_digest": "d09136f70001f9962278f7fe38400fe5f80410d10fb1825ab4a0a5a18649f961",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-reimer-4@p31": {
+   "basis_size": 17,
+   "dimension": 0,
+   "normalized_input_digest": "2b3313894bb3a2cdcd538963df84497e160a0c54b48bdee180052416fb0cc3b1",
+   "oracle": "singular",
+   "reduced_basis_digest": "ed3517c6f7305c05c894a5743f69e49a9375530fc46e2f98c91b795160c89ffa",
+   "status": "reference",
+   "vdim": 36
+  },
+  "zb-reimer-4@p64": {
+   "basis_size": 17,
+   "normalized_input_digest": "6c8b7ab4c2e3e8552e1cd775829f7624103409564b8a104e6592ced5f4194a0c",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "46076929464b6641b56c1242b940acb68c6303ce4622415e0005bca3b62ee35d",
+   "status": "reference",
+   "vdim": 36,
+   "zero_dimensional": true
+  },
+  "zb-reimer-6@p31": {
+   "basis_size": 95,
+   "dimension": 0,
+   "normalized_input_digest": "e5676821f5b541e949573e569272ffcde0c1e8cb14c3f250f133dbd619454ddf",
+   "oracle": "singular",
+   "reduced_basis_digest": "eaa213265bb1458c01452e2d854cf230218d1476c30ab0487ef7388792732f64",
+   "status": "reference",
+   "vdim": 576
+  },
+  "zb-reimer-6@p64": {
+   "basis_size": 95,
+   "normalized_input_digest": "ea7c6e3c26863eb0feeb6b5c9d89947423f1746b597df70305159cbbfb4915ed",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "3212c1c69ec6d05971406d730546e2f4709ace00883444232de1e565e1ae881f",
+   "status": "reference",
+   "vdim": 576,
+   "zero_dimensional": true
+  },
+  "zb-toric-rnc-5@p31": {
+   "basis_size": 10,
+   "dimension": 2,
+   "normalized_input_digest": "d11b34329222356dfd756f3729276db30c4141f61a237e6accaf9ec9b867d9f5",
+   "oracle": "singular",
+   "reduced_basis_digest": "11dd904476662d234cc74a593d545f57e417d8132dd57895d426afa333324202",
+   "status": "reference",
+   "vdim": null
+  },
+  "zb-toric-rnc-5@p64": {
+   "basis_size": 10,
+   "normalized_input_digest": "b603590139d01d327a0a913ad293677ccc12ac94cabc2e47ba642ba20c20dca3",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "7115628baa617992ceeee2fedb3f84c05cd519a2d9dacc1f74a79a0590e10350",
+   "status": "reference",
+   "vdim": null,
+   "zero_dimensional": false
+  },
+  "zb-toric-rnc-8-slice-s1@p31": {
+   "basis_size": 30,
+   "dimension": 0,
+   "normalized_input_digest": "2eb7830d1ed197b30773838e7eb31efc89e7069f9d5e8ee89c74ebed66319ce3",
+   "oracle": "singular",
+   "reduced_basis_digest": "9542da0068d350beaf37a32ea98d17e683dda1dda9c8fc90bd2601544ff75c7c",
+   "status": "reference",
+   "vdim": 8
+  },
+  "zb-toric-rnc-8-slice-s1@p64": {
+   "basis_size": 30,
+   "normalized_input_digest": "7e3bb8ae98f31a5d29370774cfe5fc09e93517502233b64380c17af6b8e0de62",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "2b17488e842ee28323639061ea389ce94e29c2f28ad69024ff6d044b9829ba42",
+   "status": "reference",
+   "vdim": 8,
+   "zero_dimensional": true
+  },
+  "zb-toric-segre-3x3-slice-s1@p31": {
+   "basis_size": 15,
+   "dimension": 0,
+   "normalized_input_digest": "4daa0bae4d61241f15389c526f27c1e06244d76d90a4414539c84e8f629bb2b6",
+   "oracle": "singular",
+   "reduced_basis_digest": "cc0d6d07f5556783a23b7657f7ab3dfc44c017df2a2ef88ae8e76b2620856f20",
+   "status": "reference",
+   "vdim": 6
+  },
+  "zb-toric-segre-3x3-slice-s1@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "877b135479fe028d1c1efce91e8b1c89d73dd30675c99135f64cd0ba27b707ee",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "0cbf5cd897c42851c1033e9832b9a781aebaa8f3d0fbd0115619215c8bec30bd",
+   "status": "reference",
+   "vdim": 6,
+   "zero_dimensional": true
+  },
+  "zb-toric-segre-3x3@p31": {
+   "basis_size": 9,
+   "dimension": 5,
+   "normalized_input_digest": "646b5a5b34b59048fc4e4868896ea0c4996c16772952ec53c009253bc65f44e1",
+   "oracle": "singular",
+   "reduced_basis_digest": "1c2bd1fd1e05a7533fbf76bd2b08afb8252af3955dbcde89b5470db4c0c41686",
+   "status": "reference",
+   "vdim": null
+  },
+  "zb-toric-segre-3x3@p64": {
+   "basis_size": 9,
+   "normalized_input_digest": "ccb465a91a9f732a0dca9a2e52a4fe72326c0bbf82946acdf9c258aa49cfb26f",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "c5d12e58bed4ff24105a0574727069073171802abdddcb14a2c5f071b069fe75",
+   "status": "reference",
+   "vdim": null,
+   "zero_dimensional": false
+  },
+  "zb-toric-segre-3x5-slice-s1@p31": {
+   "basis_size": 43,
+   "dimension": 0,
+   "normalized_input_digest": "d2c4249bcfcb79ee0c813438fc90dc599fd9096a5404d5676e0dbe1e9d64390c",
+   "oracle": "singular",
+   "reduced_basis_digest": "940209cb75d03b42760971ee200bcdef1008ea349d5b3e9572e5a6f4d3e61d77",
+   "status": "reference",
+   "vdim": 15
+  },
+  "zb-toric-segre-3x5-slice-s1@p64": {
+   "basis_size": 43,
+   "normalized_input_digest": "933ba59b26a15bd40c9bbb4dd1da8b86f06862fc4215c692b6eefcbc67f57548",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "4cad9afb1cb71b016fcfd796d53ec18cf7338170b2ebcd07cdf4d1b41be86364",
+   "status": "reference",
+   "vdim": 15,
+   "zero_dimensional": true
+  },
+  "zb-toric-segre-4x4-slice-s1@p31": {
+   "basis_size": 52,
+   "dimension": 0,
+   "normalized_input_digest": "1bb34686bd2423348b4d075f2c8bafb665c0c19383681c2355980731a0d360a8",
+   "oracle": "singular",
+   "reduced_basis_digest": "44ed13fc0a037fd3d77a1d8164cd30b226594db5e50018a6d37366d5e4efc1d7",
+   "status": "reference",
+   "vdim": 20
+  },
+  "zb-toric-segre-4x4-slice-s1@p64": {
+   "basis_size": 52,
+   "normalized_input_digest": "49e1c3e124130e4f5028191c998dcdcf09ea101ddbb108f256dce804f794ab35",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "f16f75486f77f60f0fe227e40d60a5af809b40d5bf2f07a188c0b8af5ce270a5",
+   "status": "reference",
+   "vdim": 20,
+   "zero_dimensional": true
+  },
+  "zb-tri-5-d3-s1@p31": {
+   "basis_size": 76,
+   "dimension": 0,
+   "normalized_input_digest": "fac67c1ef59e7371b63883bbc5f6fc784c280534adf140f25c65f668ce49ef45",
+   "oracle": "singular",
+   "reduced_basis_digest": "951c2e38f4a63eebe264b7f1f3f0cbc932b12eadf7b338de8ea3b405fa31ab57",
+   "status": "reference",
+   "vdim": 243
+  },
+  "zb-tri-5-d3-s1@p64": {
+   "basis_size": 76,
+   "normalized_input_digest": "432e1d0c98330e8c2e0a841e9ea27dbc9f2c39d1c955d480f1dec4a1ff4856d2",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "c57dde024c78fa674eae49bc6948317eb84fdf36ec49dd5d9e33f4095cfc480a",
+   "status": "reference",
+   "vdim": 243,
+   "zero_dimensional": true
+  },
+  "zb-tri-6-d2-s1@p31": {
+   "basis_size": 39,
+   "dimension": 0,
+   "normalized_input_digest": "a0902662523829c57ad58cbdb97f9633c8fa3a2cbd504305d2934ba7ad48a9f6",
+   "oracle": "singular",
+   "reduced_basis_digest": "954e232e55b7b3fbc8e13c1655e0f764e7138548a3c213c51331a1406afd52df",
+   "status": "reference",
+   "vdim": 64
+  },
+  "zb-tri-6-d2-s1@p64": {
+   "basis_size": 39,
+   "normalized_input_digest": "eaf70eff2ad17b0a1f5b1ba7f31a9da1cd088a63c8c09a27a1cb64132daad4af",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "d124f7f78591ca31c1da79dfb23f4a1a082e09c95c3755ac9fcd5d09de5ddf93",
+   "status": "reference",
+   "vdim": 64,
+   "zero_dimensional": true
+  },
+  "zb-tri-8-d2-s1@p31": {
+   "basis_size": 128,
+   "dimension": 0,
+   "normalized_input_digest": "f10aad8d460a6c095126c8be4cbdad9ff15f942d1b8959eead1932e585d0681f",
+   "oracle": "singular",
+   "reduced_basis_digest": "47629000059dba1f3712b8c90ef11b7335bafdff3e9c7555846b8c6d3b0fc74f",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-tri-8-d2-s1@p64": {
+   "basis_size": 128,
+   "normalized_input_digest": "fdd0194ec076b1f21b76667610c7b00e377d6702e337b38d511757c83217ed1f",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "5aa9085c1a2c8d54216c25d3107b02e2aa7452fe18d694faa1a11b583820a883",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  },
+  "zb-tri-hidden-11-d2-s1@p31": {
+   "normalized_input_digest": "5df535e9b85b8ec358cecceec1f239507b318a3613c2a29755dd43b12e43c76e",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "zb-tri-hidden-11-d2-s1@p64": {
+   "normalized_input_digest": "5f3741864c02ec8d7e41c35ad3760593f1860e329e58de33b31d24c8fa9d7ca2",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "zb-tri-hidden-5-d3-s1@p31": {
+   "basis_size": 76,
+   "dimension": 0,
+   "normalized_input_digest": "6552c8551b5a7fe08166f7c716e45296ca85b7ffe9e537e5f08968a75dd9055d",
+   "oracle": "singular",
+   "reduced_basis_digest": "6581462d26c5a320f9eed5a399b5da1fb37cc4ea2bfef44c58524d4659bc0ea4",
+   "status": "reference",
+   "vdim": 243
+  },
+  "zb-tri-hidden-5-d3-s1@p64": {
+   "basis_size": 76,
+   "normalized_input_digest": "2b6759b0ca05dde26a18f20420c647160d6d6c2e8319a888c595740e721cbc09",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "ec4dd9d8d96f7e3a14af3607d74ed88c9a09bf59671c3dd3e8144f78ff09d97e",
+   "status": "reference",
+   "vdim": 243,
+   "zero_dimensional": true
+  },
+  "zb-tri-hidden-6-d2-s1@p31": {
+   "basis_size": 39,
+   "dimension": 0,
+   "normalized_input_digest": "5ba089561bd59736d164ca777eb61f5a61687aca8d9ffe1878d24114be7b676e",
+   "oracle": "singular",
+   "reduced_basis_digest": "50472aef4745b2c012455e6ea6e6c9b016b717ee7f6dde63ac1dd12e955596aa",
+   "status": "reference",
+   "vdim": 64
+  },
+  "zb-tri-hidden-6-d2-s1@p64": {
+   "basis_size": 39,
+   "normalized_input_digest": "a0007e41eeb76399594794c87b5409ae556597cd5f8bb0532a09d88f8247a1dc",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "e6b11485cba2343a3ba40702afa7ef13e3ae48e8169152ab0c5cbe49c67ecaac",
+   "status": "reference",
+   "vdim": 64,
+   "zero_dimensional": true
+  },
+  "zb-tri-hidden-8-d2-s1@p31": {
+   "basis_size": 128,
+   "dimension": 0,
+   "normalized_input_digest": "b7c91eb90bfb620038603531a8916a5aa766a0c9bcf035676458d9b5f5188394",
+   "oracle": "singular",
+   "reduced_basis_digest": "a8c57cf4c9e78a0c1724222783ab2ab7e70b44d0cd124fcb67f008937b265696",
+   "status": "reference",
+   "vdim": 256
+  },
+  "zb-tri-hidden-8-d2-s1@p64": {
+   "basis_size": 128,
+   "normalized_input_digest": "590ec4b3d79eab583c708e251f7d9591421c8f58dcbfc841a81f8d818f3e21b8",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "4c60e08d17f23f4c42a17ded7a175b4745429802e1f5c45d77f6eec155c57c10",
+   "status": "reference",
+   "vdim": 256,
+   "zero_dimensional": true
+  }
+ },
+ "schema": "m34-public-reference-v2"
+}
