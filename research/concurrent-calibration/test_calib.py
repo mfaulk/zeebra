@@ -158,6 +158,57 @@ class ExtractTest(unittest.TestCase):
         self.assertIsNone(calib.pair_signals(s, s)['mbm_bytes_per_s'])
 
 
+def rec(cell, role, rep, wall, **kw):
+    c = next(x for x in calib.CELLS if x.name == cell)
+    r = dict(cohort=c.cohort, workload='W0', session='s', slot=0, cell=cell, role=role, instance=c.instance,
+             workers=c.workers, rep=rep, status='ok', wall_s=wall, digest='d', dev=False, publication=False,
+             signals={'psi_cpu_some': 0.0})
+    r.update(kw)
+    return r
+
+
+class AnalysisTest(unittest.TestCase):
+    # raw keeps complete attempts with the reference digest; dev and publication also drop what their rules flag.
+    def test_rule_sets(self):
+        refs = {'wide64/eco-12': {'m33': 'd'}}
+        rs = [rec('C-E1', 'a', 0, 1.0), rec('C-E1', 'a', 1, 1.0, digest='x'), rec('C-E1', 'a', 2, 1.0, status='timeout'),
+              rec('C-E1', 'a', 3, 1.0, dev=True), rec('C-E1', 'a', 4, 1.0, publication=True)]
+        self.assertEqual([r['rep'] for r in calib.select(rs, 'raw', refs)], [0, 3, 4])
+        self.assertEqual([r['rep'] for r in calib.select(rs, 'dev', refs)], [0, 4])
+        self.assertEqual([r['rep'] for r in calib.select(rs, 'publication', refs)], [0, 3])
+
+    # Pairs are one repetition of one arm pair in one cell: the A/A pair and each A/B pair, ratio = role / base.
+    def test_pairs(self):
+        rs = [rec('C-E1', r, k, w) for k in range(2) for r, w in (('a', 2.0), ('a2', 2.02), ('s5', 2.1), ('m5', 2.08))]
+        got = {(p['cell'], p['num'], p['den'], p['rep']): round(p['ratio'], 4) for p in calib.pairs(rs)}
+        self.assertEqual(got[('C-E1', 'a2', 'a', 1)], 1.01)
+        self.assertEqual(got[('C-E1', 's5', 'a', 0)], 1.05)
+        self.assertEqual(got[('C-E1', 'm5', 'a', 0)], 1.04)
+        self.assertEqual(len(got), 6)
+
+    # The candidate rule set drops a whole pair when either attempt's signal is over the limit.
+    def test_candidate_drops_flagged_pairs(self):
+        rule = {'signals': {'psi_cpu_some': 0.5}}
+        rs = [rec('C-E1', 'a', 0, 2.0), rec('C-E1', 'a2', 0, 2.0, signals={'psi_cpu_some': 0.9}),
+              rec('C-E1', 'a', 1, 2.0), rec('C-E1', 'a2', 1, 2.0)]
+        self.assertEqual([p['rep'] for p in calib.pairs(rs, rule=rule)], [1])
+
+    # H6 is scored as recall over moved pairs and the share of flagged pairs that did not move.
+    def test_h6_score(self):
+        s = calib.h6_score(flags=[True, True, True, False, False], moved=[True, True, False, True, False])
+        self.assertAlmostEqual(s['recall'], 2 / 3)
+        self.assertAlmostEqual(s['false_flag'], 1 / 3)
+        self.assertFalse(s['ok'])
+
+    # A decision entry is `allowed` on raw, else the first rule set that passes, else quiet machine only.
+    def test_decide(self):
+        self.assertEqual(calib.decide({'raw': True, 'dev': True}), 'allowed')
+        self.assertEqual(calib.decide({'raw': False, 'dev': False, 'publication': True, 'candidate': True}),
+                         'allowed under rule set publication')
+        self.assertEqual(calib.decide({'raw': False, 'dev': False, 'publication': False, 'candidate': False}),
+                         'quiet machine only')
+
+
 class DriftTest(unittest.TestCase):
     # Drift is the median over the first third of repetitions ÷ the median over the last third.
     def test_drift(self):

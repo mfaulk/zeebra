@@ -9,7 +9,7 @@ import random
 import statistics
 import sys
 import time
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -343,6 +343,68 @@ def pair_signals(a, b):
     return {k: (None if a[k] is None or b[k] is None else max(a[k], b[k])) for k in a}
 
 
+# Analysis (§8.1–§8.5, §9) ------------------------------------------------------------------------
+RULE_SETS = ('raw', 'dev', 'publication', 'candidate')
+
+
+def select(recs, rule_set, refs):
+    """§8.2: raw = complete attempts with the reference digest; dev / publication drop what those rules flag.
+    The candidate set is pair-level (`pairs(..., rule=)`), so here it is raw."""
+    def ok(r):
+        kind = 'raw' if r['role'] in M29_ROLES else 'm33'
+        return r['status'] == 'ok' and r['digest'] is not None and r['digest'] == refs[r['instance']][kind]
+    out = [r for r in recs if ok(r)]
+    if rule_set in ('dev', 'publication'):
+        out = [r for r in out if not r.get(rule_set)]
+    return out
+
+
+def pair_roles(cell):
+    base = next(r for r in cell.roles if r in AA)
+    return [(AA[base], base)] + [(r, AB_ROLES[r]) for r in cell.roles if r in AB_ROLES]
+
+
+def pairs(recs, rule=None):
+    """One repetition of one arm pair in one cell (§8.4): the A/A pair and each A/B pair, ratio = num / den."""
+    by = defaultdict(dict)
+    for r in recs:
+        by[(r['session'], r.get('slot'), r['workload'], r['cell'], r['rep'])][r['role']] = r
+    cells = {c.name: c for c in CELLS}
+    out = []
+    for (session, slot, workload, cell, rep), roles in sorted(by.items(), key=lambda kv: tuple(map(str, kv[0]))):
+        c = cells[cell]
+        for num, den in pair_roles(c):
+            if num not in roles or den not in roles:
+                continue
+            a, b = roles[num], roles[den]
+            sig = pair_signals(a['signals'], b['signals']) if a.get('signals') and b.get('signals') else None
+            if rule and sig and apply_rule(rule, sig):
+                continue
+            out.append(dict(session=session, slot=slot, workload=workload, cohort=c.cohort, cell=cell,
+                            workers=c.workers, num=num, den=den, rep=rep, ratio=a['wall_s'] / b['wall_s'], signals=sig))
+    return out
+
+
+def h6_score(flags, moved):
+    m = sum(moved)
+    f = sum(flags)
+    tp = sum(1 for x, y in zip(flags, moved) if x and y)
+    recall = tp / m if m else None
+    false_flag = (f - tp) / f if f else None
+    ok = (recall is None or recall >= 0.9) and (false_flag is None or false_flag <= 0.2)
+    return dict(recall=recall, false_flag=false_flag, moved=m, flagged=f, ok=ok)
+
+
+def decide(passes):
+    """§9: `allowed` on raw data, else the first rule set under which every unit passes."""
+    if passes.get('raw'):
+        return 'allowed'
+    for rs in RULE_SETS[1:]:
+        if passes.get(rs):
+            return f'allowed under rule set {rs}'
+    return 'quiet machine only'
+
+
 def drift(ratios_by_rep):
     reps = sorted(ratios_by_rep)
     k = len(reps) // 3
@@ -378,7 +440,7 @@ def records(job_dir, w=W):
             case = cases[c.instance]
         v = {mode: verdicts[mode].get(i) for mode in verdicts}
         out.append(dict(
-            cohort=ctx['cohort'], workload=ctx['workload'], session=ctx['session'], job=hdr['job_id'],
+            cohort=ctx['cohort'], workload=ctx['workload'], session=ctx['session'], slot=ctx.get('slot'), job=hdr['job_id'],
             reservation=ctx.get('reservation'), clock=(md.get('before') or {}).get('clock'),
             cell=c.name, role=role, instance=c.instance, workers=cell['workers'], rep=cell['rep'],
             attempt=md['attempt_id'], status=a['status'], exit=md.get('exit'),
