@@ -5,14 +5,21 @@
 //!     --n 12 --m 24 --density 1000 --seed 1 --modulus 31 --engine m4gb --workers 1 --wall 180
 //! ```
 //!
-//! `--engine` is `zeebra` (shipping F4 options, in-process) or `m4gb` (the pinned reference from
-//! `tools/external/provision-m4gb.sh`, verified coefficient for coefficient against Zeebra).
+//! `--engine` is `zeebra` (shipping F4 options, in-process), `zeebra-adaptive`
+//! (`GradedEngine::Adaptive`: `f4_signature`'s dispatch, which sends these rows to the signature
+//! engine), `m4gb` (the pinned reference from `tools/external/provision-m4gb.sh`) or `grobx` (the
+//! pinned driver, raw mode). Both references are verified coefficient for coefficient against
+//! Zeebra, outside the timed region.
 //! `--unplanted` draws the inconsistent variant. `tools/external/m4gb-cohort.py` runs the cohort.
 use std::time::Duration;
 use zeebra::{
-    fields::{Zp31, Zp32003},
-    grobner::external::{
-        corpus::dense_mq_shaped, ExternalSolver, Limits, M4gbSolver, RunStatus, Task, ZeebraSolver,
+    fields::{PrimeFieldElement32, Zp31, Zp32003},
+    grobner::{
+        external::{
+            contract::generators_agree, corpus::dense_mq_shaped, grobx, ExternalSolver,
+            GrobxSolver, Limits, M4gbSolver, RunStatus, Task, ZeebraSolver,
+        },
+        F4Options, GradedEngine,
     },
     util::Json,
     MonomialOrder,
@@ -24,6 +31,7 @@ macro_rules! register {
         $(
             solver = solver.with_instantiation::<$n, Zp31>().unwrap();
             solver = solver.with_instantiation::<$n, Zp32003>().unwrap();
+            solver = solver.with_instantiation::<$n, PrimeFieldElement32<65521>>().unwrap();
         )+
         solver
     }};
@@ -64,8 +72,42 @@ fn main() {
     let limits = Limits::wall(Duration::from_secs(wall)).with_workers(workers);
     let task = Task::ReducedGrobnerBasis;
     let zeebra = || register!(ZeebraSolver::new(), 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    let mut verified = None;
     let report = match engine.as_str() {
         "zeebra" => zeebra().measuring_one_row().run(&instance, task, &limits),
+        "zeebra-adaptive" => zeebra()
+            .with_f4_options(F4Options {
+                graded_engine: GradedEngine::Adaptive,
+                ..F4Options::default()
+            })
+            .measuring_one_row()
+            .run(&instance, task, &limits),
+        "grobx" => {
+            let scratch = std::env::temp_dir().join(format!("grobx-{}", std::process::id()));
+            let mut solver =
+                GrobxSolver::from_env(&scratch, grobx::Mode::Raw).expect("scratch directory");
+            let mut report = solver.run(&instance, task, &limits);
+            let _ = std::fs::remove_dir_all(scratch);
+            // Verified the way the M4GB adapter verifies, after the timed solve.
+            if let Some(basis) = report.status.answer().and_then(|a| a.basis.clone()) {
+                let trusted = zeebra().run(&instance, task, &Limits { workers: 1, ..limits.clone() });
+                let agrees = trusted
+                    .status
+                    .answer()
+                    .and_then(|a| a.basis.as_ref())
+                    .is_some_and(|r| generators_agree(r, &basis, modulus).is_ok());
+                if !agrees {
+                    report.status = RunStatus::Failed(
+                        zeebra::grobner::external::RunFailure::Incomplete {
+                            detail: "grobx basis disagrees with Zeebra's".into(),
+                        },
+                    );
+                } else if let RunStatus::Complete(answer) = &report.status {
+                    verified = Some(answer.basis.as_ref().map_or(0, Vec::len));
+                }
+            }
+            report
+        }
         "m4gb" => {
             let scratch = std::env::temp_dir().join(format!("m4gb-{}", std::process::id()));
             let mut solver = M4gbSolver::from_env(&scratch)
@@ -79,6 +121,7 @@ fn main() {
     };
     let status = match &report.status {
         RunStatus::Verified(..) => "verified".to_string(),
+        RunStatus::Complete(..) if verified.is_some() => "verified".to_string(),
         RunStatus::Complete(..) => "complete".to_string(),
         other => format!("{other:?}"),
     };
