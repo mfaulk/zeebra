@@ -1,5 +1,7 @@
 # External provenance and licensing: what may be read, what may be reused, and how to cite it
 
+**Measured at:** not measured here. This document holds licences, not timings; the provenance lint reads the names M4GB and M5GB in the table as memory figures.
+
 Policy for #274, gating code-level reuse in #264–#273. Zeebra is MIT (`Cargo.toml:10`,
 `LICENSE-MIT`), and the governing fact about epic #256 is that **almost every competing Gröbner
 engine is GPL or LGPL**, so for most of the survey the only lawful product of a source reading is
@@ -72,6 +74,8 @@ actually is, which is only sometimes a root licence file.
 | FLINT | `flintlib/flint` | `f5c2181a` | **LGPL-3.0-or-later** | `README.md:71-72`; `COPYING.LESSER` (LGPL-3 verbatim) | linking only |
 | FFLAS-FFPACK | `linbox-team/fflas-ffpack` | `06aec3f8` | **LGPL-2.1-or-later** | `README.md:16`; `fflas-ffpack/ffpack/ffpack_ludivine.inl:10-12` | linking only |
 | LinBox | `linbox-team/linbox` | `60d7d0bc` | **LGPL-2.1-or-later** | `linbox/algorithms/wiedemann.h:42-45` (`README.md` has **no** licence section) | linking only |
+| M4GB (#1030, read 2026-11-24) | `cr-marcstevens/m4gb` | `01860a52` | **GPL-3.0-or-later** | `COPYRIGHT.txt`; `src/config.hpp:9-12`; `LICENSE.txt` (GPL-3 verbatim) | algorithmic reference only; run as a subprocess |
+| M5GB (#1030, read 2026-11-24) | `manschga/M5GB` | `2d063f74` | **no grant**: no licence file, no source header | the whole tree (12 files) | **no grant**: not built or run |
 | Fukuoka MQ Challenge data | — (not a repository) | — | **"All Rights Reserved", no stated licence** | `README.md:122-124`, and `tools/fetch-mq-challenge.sh` (moved out in #668) exists so the files are fetched and never redistributed | **no grant** |
 
 The fourth class is not empty, and its occupant is already handled correctly: the MQ Challenge

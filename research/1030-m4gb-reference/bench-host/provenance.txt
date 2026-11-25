@@ -1,0 +1,9 @@
+commit=41a36e93
+host=Linux x86_64 AMD Ryzen Threadripper PRO 5995WX 64-Cores
+rustc=rustc 1.99.1 (58cf8f9c3 2026-10-13)
+m4gb_comparison_sha256=7117ad9b140d73c1c8b4eb33aa6f6417d43330723a1b2d6f0b5593330db10ed8
+grobx_driver=8005a2a1670a7264617a6f49eeb2618d7fa21701 x86-64-v3 6eeccf567344f2a124b8cebbca70230270870a1db9f64b389dece1862b544590
+placement=tools/bench-reserve.sh CCDs 1-2 reserved; tools/bench-reserve.sh run 1030 8-23; every child taskset to CPU 8; one worker
+START held-out 2026-11-25T02:13:41Z load=1.99 3.92 5.55
+END   held-out 2026-11-25T05:18:18Z load=1.05 1.29 1.36 status=143
+note=status=143 is the planned stop after 3 complete repetitions (384 records; issue 1030 comment 7150986750); the in-flight 385th child was killed and its record dropped.
