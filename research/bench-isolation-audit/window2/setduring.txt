@@ -1,0 +1,2 @@
+pid 2886580's current affinity list: 0-7,24-71,88-127
+pid 2886580's new affinity list: 0-7,24-71,88-127

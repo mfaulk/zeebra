@@ -326,6 +326,7 @@ bash scripts/test/pre-push-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/cpu-context-test.sh
 bash tools/test/bench-reserve-test.sh
+bash tools/test/bench-isolation-audit-test.sh
 bash tools/test/bench-clock-test.sh
 python3 tools/test/bench-contamination-test.py
 bash tools/test/bench-job-test.sh

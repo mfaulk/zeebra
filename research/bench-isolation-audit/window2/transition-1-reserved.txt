@@ -1,0 +1,7 @@
+P_WIDE allowed=0-7,24-71,88-127
+P_DISJ8 allowed=0-7,24-71,88-127
+P_STRADDLE allowed=0
+P_PLAIN allowed=0-7,24-71,88-127
+P_SCOPE8 allowed=0-7,24-71,88-127
+P_SETDURING allowed=0-7,24-71,88-127
+status=reserved ccds=1,2 bench=8-23,72-87 rest=0-7,24-71,88-127 app.slice=0-7,24-71,88-127

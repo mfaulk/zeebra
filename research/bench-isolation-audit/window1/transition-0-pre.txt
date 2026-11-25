@@ -1,0 +1,26 @@
+P_WIDE pid=2701047 allowed=0-127 last_cpu=100 cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-391a851f-72e0-49da-83cb-0fc7065dc7b7.scope
+P_DISJ8 pid=2701048 allowed=8 last_cpu=8 cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-391a851f-72e0-49da-83cb-0fc7065dc7b7.scope
+P_BUSY8 pid=2701049 allowed=8 last_cpu=8 cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-391a851f-72e0-49da-83cb-0fc7065dc7b7.scope
+P_PLAIN pid=2701050 allowed=0-127 last_cpu=79 cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-391a851f-72e0-49da-83cb-0fc7065dc7b7.scope
+P_SCOPE8 pid=2701051 allowed=8 last_cpu=8 cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/zb1104-pin8.scope
+status=released ccds= bench=- rest=- app.slice=0-127
+app.slice cpuset.cpus= effective=0-127
+background.slice cpuset.cpus= effective=0-127
+session.slice cpuset.cpus= effective=0-127
+zbbench.slice cpuset.cpus=8-23,72-87 effective=8-23,72-87
+app.slice/zb1104-pin8.scope cpuset.cpus=8 effective=8
+Id=app.slice
+EffectiveCPUs=0-127
+AllowedCPUs=
+
+Id=zbbench.slice
+EffectiveCPUs=8-23 72-87
+AllowedCPUs=8-23 72-87
+
+Id=zb1104-pin8.scope
+EffectiveCPUs=8
+AllowedCPUs=8
+P_BUSY8 se.nr_migrations                             :                    4
+P_BUSY8 nr_switches                                  :                    6
+P_BUSY8 nr_involuntary_switches                      :                    5
+P_BUSY8 utime+stime=213
