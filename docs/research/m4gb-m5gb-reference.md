@@ -5,7 +5,8 @@ bench host, pinned), M4GB is 16.0× and 5.8× faster than Zeebra's best qualifie
 well past the 1.5× gate. But pinned grobx is faster than M4GB on every cell, at 0.59× and 0.19×
 M4GB's wall. The hypothesis needs M4GB to beat both, so it is disproved. Every M4GB and grobx
 basis agrees with Zeebra's coefficient for coefficient. The macOS development figures (§5) stand
-as development only. M5GB has no licence grant and was not run (§3.2).
+as development only. M5GB's only public code was run locally under an owner exception and cannot
+run this cohort at all: it is a GF(2) implementation (§3.2).
 
 **Measured at:** `52268421` (planted rows, tag `measured/1030-m4gb-dev-planted`) and `4d1ec9b7`
 (unplanted rows, tag `measured/1030-m4gb-dev-unplanted`),
@@ -72,9 +73,35 @@ writing its basis, because the basis is its output.
 ### 3.2 M5GB
 
 The only public implementation found is `manschga/M5GB` at `2d063f74`. It has **no licence grant**:
-no licence file, and no header in any of its 12 files. Under the policy that is the no-grant class,
-so it was not built or run. It is also a standalone program, not the Mathic-based proof of concept
-the paper describes. Running it, or obtaining the paper's code, is an owner decision.
+no licence file, and no header in any of its 12 files. It is also a standalone program, not the
+Mathic-based proof of concept the paper describes.
+
+**Owner exception (2026-11-25).** The owner allowed it to be built and run locally, with nothing
+vendored or committed. It was fetched to a scratch directory, read in full, and driven by a
+throwaway `main` that builds the input polynomials directly (upstream `main` hardcodes n = 20,
+p = 2 and an input file that is not in the repository, and its parser reads one character per
+coefficient). Each run was checked against a planted dense quadratic system with m = 2n, whose
+reduced basis is {x_i − a_i}.
+
+| Build | GF(2) | GF(31) |
+|---|---|---|
+| upstream, unmodified | correct basis (n = 6 and n = 12) | segmentation fault (n = 6 and n = 8) |
+| field equations removed (local patch) | segmentation fault | terminates with a wrong basis: at n = 8, 21 polynomials of degree 2–3, none vanishing at the planted point |
+
+The reasons are structural, so neither is a driver defect:
+
+- **Field equations are built in.** `Initialize` always appends x_i^p − x_i, and the rest of the
+  code assumes they are the first n generators. Monomials are indexed through a dense table of every
+  term up to a fixed degree, so x^31 at n = 16 needs about 1.5 × 10¹² entries. The GF(31) crash is that.
+- **Arithmetic is written for p = 2.** The source says so (`case p=2 should work`, `need to check
+  for monomials with p != 2`). Coefficients are 32-bit `int` multiplied as `(a*b) % p`, which
+  overflows for p > 46 341, so GF(65521) could not be correct either. Inverses are found by linear
+  search over F_p.
+
+So this code is a Boolean-ring (Fukuoka Type IV style) solver, and the #1030 cohort (GF(31),
+GF(65521)) is outside what it can compute. **M5GB is not an arm of this comparison**, and that
+needs no further licence decision. What would change it is the paper's Mathic-based code, which
+is not public. No timing is reported, because no run was on a cohort cell.
 
 ## 4. Cohort
 
@@ -182,7 +209,8 @@ which its log prints at `--loglevel 3`.
    5.8× and 16×. A 3× lane would leave 1.9× and 5.3×, still past the gate.
 3. Counters from M4GB's log (`--loglevel 3`), for the attribution in §6.
 
-For the owner: M5GB has no licence grant (§3.2).
+M5GB: run under an owner exception and found unable to compute over GF(31) or GF(65521) (§3.2).
+The paper's Mathic-based code is the only route to an M5GB arm.
 
 ## 8. Deciding run (bench host)
 
