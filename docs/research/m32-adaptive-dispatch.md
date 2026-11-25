@@ -4,7 +4,7 @@
 **after revision 1 every criterion passes.** H4 is falsified on its leave-one-family-out clause: the
 MQ10 crossover is fitted to MQ10 alone (§2).
 **Measured at:** first read head `8544cf24` (tag `measured/927-head`), revision 1 head `588d2a44`
-(tag `measured/927-rev1`), both against base `c1d93389` (tag
+(tag `measured/927-rev1`), #978's held-out check `e3a25264` (tag `measured/978-held-out`, Addendum), both against base `c1d93389` (tag
 `measured/927-base`; `src/` identical to `main` at `ce67df76`, plus the library-neutral
 `sig_f4_study --calls` harness), each built from a `git archive` into its own target directory
 (release, fat LTO, one codegen unit, x86-64-v3, `--features research-sigf4`, `RUSTC_WRAPPER=""`,
@@ -123,6 +123,28 @@ rows from the shipping F4 back to the signature engine, which is M31's route for
 row it returns M31's behaviour. Both rows above were read in the final cohort, so they are
 development data under #1005's cohort rule. Confirming the condition on rows nobody has read still
 needs a new held-out set on the bench host.
+
+**Held-out check (bench host, `e3a25264`, tag `measured/978-held-out`): not confirmed.** The set,
+protocol and rule were posted on #978 before any timed run; the evidence is in
+[`research/978-worker-crossover/`](../../research/978-worker-crossover/README.md). Nine rows nobody
+had read, 9 fresh pinned processes per engine and worker count, CCDs 1–2 reserved. A cell agrees
+when the engine the band picks is within 5% of the other forced engine. Every route the entry point
+took matched the witness, and every basis agreed across engines.
+
+| Group | Rows | sigf4 ÷ f4 at 4 / 8 / 16 w | Cells that agree |
+|---|---|---|---|
+| no witness → signature | katsura-10 over GF(32003), Goldilocks, wide64 | 0.22–0.24 / 0.31–0.32 / 0.37–0.39 | 9 of 9 |
+| witness → conventional F4 | ladder MQ, seed 11 over both fields | 1.02–1.13 / 1.21–1.28 / 1.30–1.42 | 6 of 6 |
+| witness → conventional F4 | ladder MQ, seeds 12 and 13 over both fields | 0.46–0.64 / 0.67–0.85 / 0.95–1.24 | 3 of 12 |
+
+The narrowing itself holds on unseen rows: every no-witness row belongs on the signature engine,
+which is 2.6–4.4× faster than conventional F4 there. The band's *remaining* rows do not all hold.
+On ladder seeds 12 and 13 the signature engine is faster at 4 and 8 workers (0.46× at worst,
+seed 13 / GF(32003) at 4 w), so the band still costs up to 2.2× on rows it keeps. It crosses over
+only at about 16 workers. The witness separates katsura-like inputs from MQ10's shape. It does not
+locate the worker crossover within that shape. The four dense planted `m = 2n` rows fell under the
+20 ms floor and were dropped. Whether to narrow further, refit the worker threshold, or accept the
+residual cost is an owner decision (#978).
 
 ## 3. Gate R (plan §8.2)
 
