@@ -1,14 +1,17 @@
 # M34 — Generalizable Algorithm Selection and One New Competitive Regime
 
-**Status:** plan, 2026-11-22. No M34 measurement has been taken. §§1–16 are fixed before
-measurement. §17 is the template the integration report (M34-I, #1046) fills in as §18.
+**Status:** integration report written, 2026-11-25 (§18, M34-I #1046). Minimum met (M-2 under
+the owner's two-scale waiver); T-S not attempted (Gate H no-go); T-C missed; no stretch chosen.
+§§1–16 were fixed before measurement and are unchanged. §17 is the template §18 follows.
 **Predecessor:** M33 — Competitive F4 Performance and Reproducible Benchmarking
 ([`MILESTONE-COMPETITIVE-BENCHMARKING.md`](MILESTONE-COMPETITIVE-BENCHMARKING.md); tracker #965,
 report #975 / PR #1018). M33 Minimum met, T-G and T-M missed.
 **Planning base:** `main` at `03e1ab2f` (2026-11-22, after #1042).
 **Measured at:** not measured here. Every figure is quoted from M33's integration report (§17 of the
 M33 plan; F3 = `db181c51`, `research/m33-final/`) or from the issue that states it, each named
-where used. Historical figures are evidence for hypotheses, never M34 findings.
+where used. Historical figures are evidence for hypotheses, never M34 findings. §18 measures
+nothing either: it quotes M34's tagged records (Z0 `28df047f`, Gate H `36fd4137`, #1033
+`00c9f29f`, #945 `e3eec892`, #1039 `5cce19f0`), each named where used.
 **Tracking issue:** [#1043](https://github.com/mfaulk/zeebra/issues/1043).
 **Project:** [Zeebra #7](https://github.com/users/mfaulk/projects/7); label `M34`. Priority is the
 Project field. A dependent issue carries `blocked` until its prerequisite posts its evidence.
@@ -816,3 +819,363 @@ These are recorded so they can be settled on the tracker **before** the measurem
 - **18.11 Dispositions and follow-ups.** Every M34 issue's outcome, an entry in #1028's outcomes
   log for #1033 and #1039, and follow-ups filed on Project #7 with Priority, linked to the
   tracker.
+
+## 18. Integration report (M34-I, #1046)
+
+Written 2026-11-25 from §17's template. No new measurement and no library change (§12.2). Every
+figure is quoted from the tagged source named beside it. §10's tiers are scored as declared, with
+no threshold revised.
+
+### 18.0 Header
+
+- **Z0:** `28df047f` (tag `measured/1011-z0`), owner decision on #1043 (2026-11-23). It contains
+  #1002's fix (its twin of `03e1ab2f` on the rewritten history is `de9d9f2c`).
+- **ZF:** not frozen. No session needed one: Gate A (#1014) did not open, and M34-C (#1044) never
+  reached a publication session.
+- **Comparand pins (#1029, owner decision 2):** grobx 0.155.1 `8005a2a1`; msolve 0.11.0. No M34
+  deciding read used msolve.
+- **Revisions and binaries per package:**
+
+| Package | Measured at (tag) | Binary SHA-256 |
+|---|---|---|
+| #1011 qualification | `28df047f` (`measured/1011-z0`); #997 harness `2099df6e` (`measured/1011-harness`) | recorded in `docs/research/m34-qualification.md` §1 |
+| #1012 Gate H | harness `6c77117a` (`measured/1012-harness`, `src/` = Z0); records `36fd4137` (`measured/1012-matrix`); S0 `2db433b2` (`measured/1012-s0`) | `m34_matrix` `ee381510…7683` |
+| #1009 feature costs | `6d46e583` (`measured/1009-feature-costs`) | `research/1009-feature-costs/` |
+| #1033 dense rebaseline | `00c9f29f` (`measured/1033-dense-rebaseline`) | `sig_f4_study` `3a202886…`, `research-work` `a31bbee5…` |
+| #945 lane prototype | `e3eec892` (`measured/945-single-copy`), `ef985d5e` (`measured/945-session2`), dev `26dae9ed`, `4b064a84` | `sig_f4_study` `6762da5e…`, `lane_matrix_gate` `9b137adb…` |
+| #1039 lex pipeline | `5cce19f0` (`measured/1039-wiedemann-lex`) | `lex_pipeline` `a2b9f5e7…424d`; grobx driver `fdd6aeec…83bc` |
+
+- **Sessions.** All ran on the Threadripper PRO 5995WX bench host, on CCDs 1–2 (CPUs 8–23) reserved
+  with `tools/bench-reserve.sh`, with the clock rule `bench-job` applies per arm (§8.5):
+
+| Package | Mode | Sessions |
+|---|---|---|
+| #1011 (#997 gate) | publication | 1 (jobs `1076f513f424`, `d05e8d60ef86`) |
+| #1012 Gate H | dev | 3 passes, 9.98 of 40 machine-hours |
+| #1033 | publication (deciding), dev (attribution) | 4 publication (2 jobs void and re-run), 2 dev |
+| #945 | as `run.sh` records | void session 1, deciding session 2, corrective session 3 |
+| #1039 | publication | 4 (`n9`, `n3`, `classical`, `replace`) |
+
+- **Attempt counts by §8.4 status (Gate H, 7,012 attempts):**
+
+| `completed-verified` | `completed-unverified` | `timeout` | `memory-refusal` | `rss-limit` | `unsupported` | `process-failure` | `incorrect-output` | `not-run` |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 6,558 | 414 | 3 | 37 | 0 | 0 | 0 | 0 | 0 |
+
+- **Corpus by cohort (S0):** development 122 records (64 base problems, 17 families); validation 44
+  records (7 groups); untouched 88 records (10 groups plus two carve-outs). Pilot: 127 base problems,
+  36 families (§18.2).
+- **Evidence:** `research/m34-gate-h/`, `research/m34-selection-findings/`,
+  `research/m34-public-corpus/`, `research/m34-structural-corpus/`, `research/m34-qualification/`,
+  `research/1033-dense-rebaseline/`, `research/945-lane-kernel/`, `research/1039-wiedemann-lex/`.
+  The write-ups are `docs/research/adaptive-selection-contracts.md`, `corpus-lineage.md`,
+  `benchmark-schema.md` §8, `input-features.md`, `m34-qualification.md`, `m34-gate-h.md`,
+  `m34-selection-findings.md`, `dense-small-prime-rebaseline.md` and
+  `wiedemann-pipeline-vs-grobx.md`. No `research/m34-final/` summary was regenerated: every figure
+  below is already in a tagged record.
+
+### 18.1 Status
+
+**Minimum: met.** M-2 is met only under the owner's two-scale waiver (#1043, decision 8), and its
+S0 seal was executed under #1012 rather than #1005. Every Minimum deliverable is merged: contracts
+and the grobx pin, the corpus with its sealed cohorts and selection-grade records, the qualified
+matrix and its Gate H decision, the findings (#1015), the dense go/no-go, and the lex-pipeline
+table.
+
+**Target: not met.**
+- **T-S: not attempted (gate).** Gate H read no-go, so no selector was built and the untouched
+  cohort was never read.
+- **T-C: missed.** The one candidate (#1039's chain family) met §9.5's development bar against
+  grobx's automatic lex route. A development probe of grobx's forced F4-lex route, which §9.4 names
+  as the comparand when it is faster, makes the radical rows 93–339× losses. No confirmation was run.
+  #1044 stays open for the owner's disposition.
+
+**Stretch: not attempted.** No §6.3 item was chosen on the tracker.
+
+**The three claims, kept apart (§5):**
+- **C1, regime win: none established.** #1039's demonstration is a development result against
+  grobx's automatic route only, and it does not survive the faster route in development (§18.7).
+  The #945 lane kernel's dense gains are measured against Zeebra's own signature route. Against
+  grobx they hold only at 16 workers versus grobx's one, which is reported and never scored.
+- **C2, generalization: not tested.** Gate H stopped the selection line before any validation or
+  untouched read. Both cohorts are sealed and unspent.
+- **C3, adoption: none.** M34-Q (#1045) was not requested. No default changed under M34. #945's
+  kernel merged opt-in, off by default, by owner disposition, with its failed gate unrevised.
+
+### 18.2 Corpus and splits
+
+- **Composition** (`research/m34-structural-corpus/README.md`, *Pilot composition*): 127 base
+  problems in 36 families. 23 families (62 problems) are public applications (#1006, PRs #1094 and
+  #1128), and 13 families (65 problems) are controlled structural families and retained ladders
+  (#1007, PRs #1129 and #1130). The largest family is 12 of 127 (9.4%). Every seeded family has at
+  least two supports, and 13 problems (10.2%) are labelled frontier.
+- **§8.2 clause not met: two scales per family.** 13 single-model public families have one scale.
+  The owner waived the clause for them before S0 (#1043, decision 8), and they cannot carry a
+  scale-generalization claim. Decision 7 counts the corpus line cap on hand-written code only
+  (about 1,612 lines).
+- **Lineage** (#1005, PR #1062, `docs/research/corpus-lineage.md`): `family_id`, `formulation_id`,
+  `support_id` and presentation parent per instance, with a scripted leakage checker.
+- **Sealing.** #1005 closed without the freeze commit, so S0 was sealed under #1012 (its J1, declared
+  beforehand) with #1005's tool. It was sealed at `2db433b2` (`measured/1012-s0`), before the
+  matrix was read, with draw S2, salt `m34-s0-v1` and `hash-groups-v1` over 34 groups.
+  - Carve-outs to untouched: `zb/toric` p64 (S5) and `sd-singular-schwarz-11` (S3).
+  - The S2, S3 and S5-field checks pass.
+- **Spent cohorts:** development only. The five M29–M33 ladders were exposed and forced into
+  development. Validation and untouched remain sealed.
+
+### 18.3 Performance matrix
+
+From `docs/research/m34-gate-h.md` and `research/m34-gate-h/results/gate-h.md`. Costs are PAR-2
+penalized (2C = 600 s), never runtimes.
+
+- **Arms:** P1/P2/P3 conventional F4 at 1/4/16 w; P4/P5/P6 signature F4 at 1/8/16 w (grevlex);
+  P7 `MEMORY_PAIR_CAP` at 1 and 16 w; P8 `GradedEngine::Adaptive` at 1 and 16 w. All are T-GB, and
+  every development record is grevlex.
+- **Completion by status:** §18.0. Verified cells per arm range from 116 of 122 (conventional and
+  cap16) to 120 (signature). No arm was disqualified.
+- **BF per context:** P8-w1 is the leave-one-family-out best fixed arm in 16 of 17 families at both
+  W16 and W1. P4 is the LOFO best fixed arm when `sd/runge-kutta-order-conditions` is held out.
+- **VBS⁺** is charged #1009's measured feature cost. Descriptively, it is 0.645 of P3's
+  family-weighted PAR-2 cost, against 0.811 for P8-w1.
+- **Marginal contribution:** at most 1.1% per arm at W16. At W1 it is 14.4% for P4, the only W1 arm
+  that completes `sd-ellipsoid-m2`.
+
+| Arm set | H | 95% interval | families ≤ 0.85 | H without largest contributor | split halves | Verdict |
+|---|---:|---|---:|---|---|---|
+| Go rule | ≤ 0.80 | upper ≤ 0.87 | ≥ 3 | ≤ 0.85 | ≤ 0.85 | |
+| W16 | 0.703 | [0.392, 0.942] | 6 | 0.895 (`sd/ellipsoid`) | 0.702 / 0.701 | fails upper bound, drop-one |
+| W1 | 0.767 | [0.446, 0.988] | 2 | 0.981 (`sd/ellipsoid`) | 0.765 / 0.764 | fails upper bound, families, drop-one |
+| engine@1w | 0.767 | [0.446, 0.988] | 2 | 0.981 | 0.765 / 0.764 | fails upper bound, families, drop-one |
+| engine@16w | 0.845 | [0.399, 0.975] | 3 | 0.953 | 0.844 / 0.844 | fails H, upper bound, drop-one |
+| workers@conv | 0.868 | [0.757, 0.953] | 4 | 0.926 | 0.868 / 0.864 | fails all but families |
+| workers@sig | 0.952 | [0.832, 0.998] | 2 | 0.975 | 0.953 / 0.953 | fails all |
+| workers@cap16 | 0.894 | [0.802, 0.998] | 5 | 0.953 | 0.871 / 0.901 | fails all but families |
+| workers@adaptive | 0.925 | [0.779, 0.985] | 4 | 0.944 | 0.925 / 0.925 | fails all but families |
+
+**Gate H: no-go**, with no context and no single-decision set passing. Sensitivity views (they do
+not decide): PAR-10 H is 0.681 (W16) and 0.743 (W1). On the 61-problem completed intersection, H
+is 0.898 and 0.980. The headroom is carried by `sd-ellipsoid-m2`, a memory refusal on
+conventional F4 and the shipping dispatch, and by the cost of LOFO choosing P4 on the Runge–Kutta
+problems. `docs/research/m34-selection-findings.md` §7 has the analysis.
+
+### 18.4 Selection
+
+**Not attempted (gate).** Gate H's no-go (#1012, PR #1132) closed #1013 and #1014 *not planned*
+under §6.2. There is no G4 or Gate A result, no severe-regression list, no small-system table and
+no fallback rate. The findings and next-stage recommendation are #1015 (PR #1137,
+`docs/research/m34-selection-findings.md`):
+- stop the general selector;
+- keep `GradedEngine::Adaptive` as the reference fixed arm, with adoption blocked on #961 and #978;
+- three bounded follow-ups: #1134, #1135 and #1136;
+- a corpus richer in 1–300 s problems before any future headroom gate.
+
+### 18.5 Dense elimination
+
+**#1033, Gate D-0: opens #945, not narrowed to D′** (`docs/research/dense-small-prime-rebaseline.md`,
+`measured/1033-dense-rebaseline`, PR #1066). Deciding rows are dense planted MQ over GF(31),
+m = 2n, at n = 18 and 20. At n = 20 the run used `--live-gib 8` under the owner decision of
+2026-11-22: the shipping 32 M-entry live budget refuses that row, and the refusal is reported as
+its own status.
+
+| Metric | n = 18 | n = 20 | Bar |
+|---|---|---|---|
+| F: elimination share of wall, best configuration (`entry` 16 w, signature route) | 0.810 | 0.801 | ≥ 0.60 |
+| D: share of products on rows ≥ 50% span density | 0.899 | 0.908 | ≥ 0.50 |
+| R: `entry` 1 w ÷ grobx 1 w [95%] | 31.45 [31.33, 32.57] | 32.49 [32.44, 32.55] | ≥ 1.5 |
+| Best 16 w ÷ grobx 1 w (reported, not deciding) | 3.15 | 3.08 | — |
+
+grobx 1 w takes 2.03 s (n = 18) and 17.42 s (n = 20). Zeebra's best (`entry` 16 w) takes 6.39 s
+and 53.66 s.
+
+**#945 prototype (one corrective iteration; `research/945-lane-kernel/README.md`):**
+
+| Gate | Predicted (#945 / §9.3 bar) | Measured (session 3, `e3eec892`) | Verdict |
+|---|---|---|---|
+| Matrix: n = 20 serial forward | ≥ 2× | 752.8 s → 144.3 s, 0.192 [0.190, 0.192] (5.2×); echelon identical | pass |
+| Complete, gf31 n = 18, 16 w | upper ≤ 0.87 | 0.333 [0.328, 0.338] | pass |
+| Complete, gf31 n = 20, 16 w | upper ≤ 0.87 | 0.356 [0.351, 0.357] | pass |
+| Complete, gf32003 n = 18, 16 w | upper ≤ 0.87 | 0.345 [0.342, 0.346] | pass |
+| Peak live bytes | ≤ 1.15 | 0.87–0.88 | pass |
+| Process peak RSS | ≤ 1.25 | 1.05–1.14 | pass |
+| Sparse control katsura-8, 16 w | each ≤ 5% loss | gf31 1.045 [1.015, 1.079]; gf32003 1.073 [1.021, 1.089] | **fail** |
+| Sparse control cyclic-6, 16 w | each ≤ 5% loss | gf31 1.036 [1.007, 1.064]; gf32003 1.037 [1.016, 1.055] | **fail** (upper) |
+| Sparse control mq-random-10, 16 w | each ≤ 5% loss | gf31 0.987; gf32003 1.033 [1.023, 1.040] | pass |
+| Wide-field controls | identical route | no lane above p = 46337 | pass by construction |
+
+- **The prototype's gate failed** on the sparse controls, with its one iteration spent.
+- **Owner disposition (#1043, 2026-11-24):** merge as an opt-in research capability (PR #1095,
+  `48778879`; `SigF4Options::small_prime_lane = false`). The disposition revises no gate and
+  authorizes no automatic dispatch. Automatic selection is #1123's question, with its own criteria.
+- **Against grobx:** the lane's 1.94 s at 16 w on the n = 18 row is beside grobx's 2.03 s at one
+  worker. That is reported, never scored, and no equal-worker advantage is established.
+
+### 18.6 Lex pipeline
+
+**#1039: demonstration holds against grobx's automatic lex route, on an artificial family; no
+routing change** (`docs/research/wiedemann-pipeline-vs-grobx.md`, `measured/1039-wiedemann-lex`,
+PR #1093). Publication mode, one worker, grobx raw. Zeebra's guarantee is certified randomized
+where Wiedemann ran and deterministic otherwise. grobx's is probabilistic, and grobx certified is
+not scored.
+
+| Row | Split | D | `adaptive` ÷ grobx (auto route) [95%] |
+|---|---|---:|---|
+| `wd-4-10` | development | 10,000 | 0.24 [0.24, 0.25] |
+| `wdsq-4-10` (nonradical) | development | 20,000 | 0.10 [0.10, 0.10] |
+| `wd-3-30` | held out | 27,000 | 0.39 [0.38, 0.39] |
+| `wd-4-12` over 2³¹−1 | held out | 20,736 | 0.13 [0.13, 0.13] |
+| `wdsq-5-6` (nonradical) | held out | 15,552 | 0.07 [0.07, 0.07] |
+
+- **Per stage:** grevlex takes under a millisecond on every deciding row (the input is already a
+  grevlex basis). The whole difference is in conversion.
+- **Controls:**
+  - non-shape `wdns-4-10` and `wdnr-4-10` are 28× slower (classical fallback);
+  - `wd-5-10` (D > 65535, where grobx switches to F4-lex) is 60× slower;
+  - Katsura, Cyclic and dense planted quadratics are 2.4–4.6× slower.
+- **Zeebra's own `direct-lex`** beats the pipeline by 27–123× on the radical chain rows. The
+  pipeline is Zeebra's best route only on the nonradical rows.
+- **`FglmOptions::recommended()`** refuses every winning row (D > 4096) before the adaptive rule
+  runs. Every figure used a caller-lifted budget.
+- **Routing finding:** no change. The adaptive rule's regret exceeds 1.2× on one row only
+  (`cyclic-7`, 1.36), not on two families. #731 stands for the family it modelled, with a note for dense-operator shapes.
+
+### 18.7 Competitive claims
+
+| Candidate | Contract | Zeebra / comparand guarantee | Workers | Development (§9.5 bar: ≥ 2 rows, median ≤ 0.667, upper < 0.75) | Confirmation (ZF, publication) |
+|---|---|---|---|---|---|
+| #1039 chain family, class "box-staircase grevlex input, 10⁴ ≤ D ≤ 65535, last operator ≤ 1 stored entry per column" | T-GB-conv | certified randomized / probabilistic (raw) | 1 vs 1 | met against grobx's auto route (above). **Not met** against grobx's forced F4-lex route in an unpinned development probe (#1044, PR #1131 for #1127): `wd-4-10` 93×, `wd-3-30` 339×, `wd-4-12` 152× slower. Only the nonradical `wdsq-*` rows survive (0.11–0.15) | **not run** |
+
+- §9.4 sets the comparand to the faster of grobx's FGLM and F4-lex routes. #1039 could measure only
+  grobx's own choice. The forced F4-lex route became measurable through the driver in PR #1131,
+  which is still open at this writing.
+- A nonradical-only class would be a new predicate chosen after this read. It cannot inherit
+  #1039's declaration.
+- **T-C is scored missed.** If the owner wants a nonradical class, it needs a fresh declaration on a
+  new producing issue and its own development read before any confirmation.
+- **Zeebra at 16 w against a serial comparand (reported, never scored):**
+  - #1033's best Zeebra is 3.08–3.15× slower than grobx;
+  - #945's lane is 1.94 s against 2.03 s at n = 18 (gf31).
+
+### 18.8 Safety and qualification
+
+- **On Z0** (`docs/research/m34-qualification.md`):
+  - `m33_safety` passes 4/4 (cancellation, live bytes, matrix rows, wall);
+  - `m33_thread_cap`, the #1042 team test and #961's routing test (graded-lex goes to shipping F4 at
+    1/4/8/16 w) pass;
+  - correctness is 744 cells with 0 failures (PR #1100).
+- **Found after Z0, both fixed on `main`, neither re-qualified for M34:**
+  - #1119: `m33_safety`'s wall-budget test raced the signature route at 16 w in release (PR #1120).
+  - #1122: shipping F4's parallel teams briefly ran one thread over the worker cap while spawning
+    (fixed in `158ff0f0`, #1124). It was present at Z0, so Gate H's parallel conventional cells
+    (P2, P3, P7-w16) ran with it. Its timing effect was not measured. It is transient, at about
+    6–10 samples in 38,000 on the bench host.
+- **#1049** (forced `sig_f4_reported` accepted graded-lex) was fixed before Z0 (`b38bd833`,
+  PR #1055). #961's engine defect stays open, and no signature-route configuration is called
+  production-safe.
+- **M34-Q (#1045): not attempted.** No adoption was requested.
+
+### 18.9 Success criteria
+
+| Criterion | Score | Evidence |
+|---|---|---|
+| **M-1** Contracts | **met** | #1004: `adaptive-selection-contracts.md` (PR #1051), with G0 passed. #1029: §8 of that document (PR #1054), with the pin moved in #1053 and recorded as owner decision 2 on #1043 |
+| **M-2** Corpus and freeze | **met, under waiver** | 127 base problems, 36 families (#1006: PRs #1094, #1128; #1007: PRs #1129, #1130). The two-scale clause fails for 13 families and is waived (decision 8). Lineage and leakage checker in PR #1062. S0 sealed at `2db433b2` under #1012 J1, not #1005. Records with every §8.4 status in PR #1059 (`benchmark-schema.md` §8) |
+| **M-3** Matrix and headroom | **met** | #1011 (PR #1100), Gate H no-go (#1012, PR #1132), findings #1015 (PR #1137) |
+| **M-4** Dense go/no-go | **met** | #1033 (PR #1066). Decision "open" posted on #945 (2026-11-23) |
+| **M-5** Lex pipeline | **met** | #1039 (PR #1093): a demonstration (against the automatic route), no routing change |
+| **M-6** Report | **met** | This section, with dispositions in §18.11 |
+| **T-S** | **not attempted (gate)** | Gate H no-go (§18.3) |
+| **T-C** | **missed** | No confirmation was run. The only candidate fails the development bar against the §9.4 comparand in development (§18.7). #1044 is open for the owner |
+| **S-1, S-2** | **not attempted** | No stretch item was chosen on #1043 (decision 10 deferred the picks until Gate H) |
+
+### 18.10 Negative, incomplete and contaminated results
+
+- **Failed gates:**
+  - Gate H, no-go (#1012).
+  - #945's sparse-control gate (katsura-8 up to 1.073, cyclic-6 up to 1.037 against ≤ 1.05),
+    merged opt-in regardless by owner disposition, gate unrevised.
+  - #997's Cyclic-8 gate in #1011: 11–19% slower at 4 and 16 w, rejected.
+  - #1009's cost bound: `analyze`, `incidence`, `scalar_substitutions` and `support_profile` fail
+    on sub-0.4 ms solves and moved to #1010.
+- **Stopped or skipped:**
+  - #1013, #1014: *not planned* (gate).
+  - #1016: closed *not planned* by the #1012 agent, before the owner ruled on stretch picks. The
+    owner may reverse it.
+  - #940: deferred on port cost. #955: excluded (no exact acceptance rule).
+  - M34-C: not run past its prerequisite probe.
+- **Censored and penalized cells (Gate H):**
+  - `gen-chandrasekhar-h-13`, both fields: penalized on every arm. It has no reference, and no
+    signature arm completes it, so J3 cannot verify it. It is the cohort's one frontier problem.
+  - `sd-ellipsoid-m2`: memory refusal on conventional, cap16 and adaptive.
+  - `zb-col-grid-5x5`: memory refusal on conventional and cap16.
+  - 3 timeouts. No `not-run` or ladder-censored cell: all 1,220 cells ran in pass 1.
+- **Contaminated sessions:**
+  - #1033's first session: two jobs void (`4b101574…`, 13 of 15 contaminated; `214b560f…`, 5 of
+    18), re-run clean.
+  - #945's session 1 was void (`records-void-1.jsonl`), and its deciding read is session 2 plus
+    corrective session 3.
+  - #1039's `n9` session was 11.5% contaminated, under the 20% void rule. Its `replace` top-up job
+    was **not declared before the read**. It refilled every `n9` cell to at least nine clean
+    attempts, and its repetitions are pooled into the medians.
+  - Gate H: 173 of 7,012 attempts were flagged. Cells use clean repetitions.
+- **Refusals and excluded instances:**
+  - #1033 n = 20 is refused by the shipping live budget, and was scored at `--live-gib 8` by owner
+    decision.
+  - #1039: `FglmOptions::recommended()` refuses D > 4096. The classical walk refuses with
+    `SpanStorageExceeded` where its dense blocks exceed 12 GiB.
+  - #1006: 3 of 39 `p64` rows have no grobx certificate.
+  - Gate H's four `zb-col-grid-4x5`/`5x5` records take the J4 feature-cost fallback.
+- **Incomplete:**
+  - T-C's forced-route comparison exists only as an unpinned development probe (#1044).
+  - #1115, the #978 band fix, was left as a draft with its rule unconfirmed on the bench host. It is
+    an owner action.
+- **Not reported as a runtime anywhere above:** a capped or penalized cell.
+
+### 18.11 Dispositions and follow-ups
+
+| Issue | Outcome |
+|---|---|
+| #1004 contracts | closed, met (PR #1051) |
+| #1029 pin and contract | closed, met (PRs #1053, #1054) |
+| #1005 lineage, splits | closed (PR #1062); S0 executed under #1012 |
+| #1006 public panel | closed (PRs #1094, #1128) |
+| #1007 controlled families | closed (PRs #1129, #1130) |
+| #1008 records | closed (PR #1059) |
+| #1009 features | closed (PRs #1025, #1121); four extractors moved to #1010 |
+| #1011 qualification | closed (PR #1100); P1–P8 admitted, #997 rejected, #940 deferred |
+| #1012 Gate H | closed, no-go (PR #1132) |
+| #1013, #1014 | closed *not planned* (gate) |
+| #1015 findings | closed (PR #1137) |
+| #1033 dense gate | closed, opens #945 (PR #1066) |
+| #945 dense prototype | closed; gate failed on sparse controls; merged opt-in by owner disposition (PR #1095) |
+| #1039 lex pipeline | closed, demonstration handed to #1044 (PR #1093) |
+| #1044 M34-C | **open, owner action**: close *not planned* (T-C missed for this candidate) or declare a fresh nonradical predicate on a new producing issue |
+| #1045 M34-Q | open, conditional; not attempted (no adoption request) |
+| #1046 M34-I | this report |
+| #1049, #1050 | closed (PRs #1055, #1057) |
+| #1065 Track Gc re-run | closed (PR #1099; M33 record, `measured/1065-gc-rerun`) |
+| #1123 lane dispatch | open, owner-directed research (#945 disposition) |
+| #1127 forced grobx F4-lex | open; PR #1131 open |
+| #961 | open, outside M34; mitigation preserved |
+| #1043 tracker | open; closing is the owner's decision (#1044 is conditional and still open) |
+
+- **#1028 outcomes log:** #1033 (open #945) and #945 (prototype gate failed, merged opt-in) are
+  added. #1039's entry is annotated with #1044's forced-route probe.
+- **Follow-ups filed** (Project #7, linked to #1043; parent #1003):
+  - #1134 (Medium): typed-refusal fallback from conventional F4 to signature F4.
+  - #1135 (Low): size-gated worker count for `GradedEngine::Adaptive`.
+  - #1136 (Low): attribute the signature engine's slowdown on `sd-hairer-2`.
+- **Related, not M34 deliverables:**
+  - #1030 (M4GB) rejected against grobx (PR #1125, `measured/1030-m4gb-held-out`), with the M5GB
+    licence an owner action;
+  - #1092's GF(2) residual sweep became the packed default (PR #1098);
+  - #978 and #1115 are open (owner action);
+  - #954 and #1103 are measurement infrastructure.
+- **Owner actions outstanding:**
+  1. #1044: close *not planned*, or declare a new predicate.
+  2. PR #1131 (#1127): review and merge the forced F4-lex driver route.
+  3. #1016: confirm or reverse the *not planned* closure.
+  4. Stretch picks: none were made. Confirm that M34 closes with none.
+  5. #1115 / #978: the band fix's unconfirmed rule.
+  6. #1030: the M5GB licence.
+  7. Whether to spend the sealed validation and untouched cohorts on any follow-up.
+  8. Closing #1043.
