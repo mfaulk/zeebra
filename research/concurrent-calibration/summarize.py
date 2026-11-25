@@ -20,7 +20,7 @@ from fit_limits import idle_ratios  # noqa: E402
 
 CELLS = {c.name: c for c in calib.CELLS}
 REAL_AB = {('H-S16', 'distinct', 'every'), ('H-P1', 'distinct', 'every'), ('C-P16', 'distinct', 'every')}
-H5_ROLE = {'a': 'a', 'every': 'distinct', 'entry': 'entry'}  # §6 H5: arm a (or entry, or distinct)
+H5_ROLE = {'a': 'a', 'distinct': 'distinct', 'entry': 'entry'}  # §6 H5: arm a (or entry, or distinct)
 LOADED = [w for w in calib.WORKLOADS if w not in calib.DROPPED]
 CLASS = {'W4-8': 'W4', 'W4-16': 'W4', 'W4-32': 'W4'}
 

@@ -51,7 +51,7 @@ CELLS = [
 GENERATED = {'gf31/mq-dense-15-s15'}
 INPUTS = {'wide64/katsura-11': 'grobx', 'gf32003/katsura-11': 'ms'}  # instance -> comparand input key
 # (A, B) per cell for the A/A pair and for the A/B pair: ratio = B / A
-AA = {'a': 'a2', 'every': 'distinct2', 'entry': 'entry2'}
+AA = {'a': 'a2', 'distinct': 'distinct2', 'entry': 'entry2'}  # A/A on the default arm (§4.5)
 AB_ROLES = {'s5': 'a', 'm5': 'a', 'distinct': 'every'}  # A/B: role / base
 CROSS = {'grobx': 'entry', 'msolve': 'entry'}  # H4: entry / comparand, as Zeebra ÷ competitor
 

@@ -186,6 +186,13 @@ class AnalysisTest(unittest.TestCase):
         self.assertEqual(got[('C-E1', 'm5', 'a', 0)], 1.04)
         self.assertEqual(len(got), 6)
 
+    # An m29 cell's A/A is distinct2 / distinct (the default arm, §4.5) and its A/B distinct / every.
+    def test_m29_pair_roles(self):
+        cell = next(c for c in calib.CELLS if c.name == 'C-P16')
+        self.assertEqual(calib.pair_roles(cell), [('distinct2', 'distinct'), ('distinct', 'every')])
+        x = next(c for c in calib.CELLS if c.name == 'X-G1')
+        self.assertEqual(calib.pair_roles(x), [('entry2', 'entry')])
+
     # The candidate rule set drops a whole pair when either attempt's signal is over the limit.
     def test_candidate_drops_flagged_pairs(self):
         rule = {'signals': {'psi_cpu_some': 0.5}}
