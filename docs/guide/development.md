@@ -72,6 +72,7 @@ python3 tools/test/bench-contamination-test.py
 python3 tools/test/bench-stats-test.py
 python3 tools/test/corpus-lineage-test.py
 python3 tools/test/m34-public-corpus-test.py
+python3 tools/test/m34-structural-corpus-test.py
 bash tools/check-measurement-provenance.sh      # the documents, not the script
 ```
 
