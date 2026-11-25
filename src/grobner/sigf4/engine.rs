@@ -42,6 +42,9 @@ pub mod symbolic_replay;
 #[path = "interreduce.rs"]
 mod columns;
 
+#[path = "lead_ideal.rs"]
+mod lead_ideal;
+
 pub(super) const NONE: u32 = u32::MAX;
 
 /// A row after reduction: its remaining entries in column order, and the products spent.
@@ -107,6 +110,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     syzygies: SyzygyStore<N>,
     queue: BTreeMap<u64, Vec<Pending<N>>>,
     pending: usize,
+    /// Elements inserted with a lead no earlier lead divides (#1140).
+    new_leads: usize,
     /// Every column monomial of the run, with its least-ratio reducer search cached.
     table: MonomialTable<N>,
     wall: Option<(Instant, Duration)>,
@@ -155,6 +160,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         lead_masks: Vec::new(),
         queue: BTreeMap::new(),
         pending: 0,
+        new_leads: 0,
         table: MonomialTable::default(),
         wall: options.max_wall_time.map(|budget| (started, budget)),
         input_hashes: inputs
@@ -186,6 +192,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
 
     let wall = options.max_wall_time.map(|budget| (Instant::now(), budget));
     let mut inconsistent = false;
+    let mut stop = lead_ideal::LeadIdealStop::new(order, options.lead_ideal_stop);
+    let mut early = None;
     while let Some(degree) = engine.queue.keys().next().copied() {
         if let Some((clock, budget)) = wall {
             if engine.stats.batches > 0 && clock.elapsed() >= budget {
@@ -198,8 +206,14 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         }
         let entries = engine.queue.remove(&degree).unwrap_or_default();
         engine.pending -= entries.len();
+        stop.observe(degree, engine.new_leads);
         if engine.batch(entries)? {
             inconsistent = true;
+            break;
+        }
+        let next = engine.queue.keys().next().copied();
+        if stop.due(engine.new_leads, next, engine.pending) {
+            early = Some(engine.hand_off(generators, wall)?);
             break;
         }
     }
@@ -207,7 +221,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     // Interreduce from the engine's rows (G2-2); a budget refusal falls back to the polynomial
     // route below, which materializes the whole signature basis first.
     let interreduction = Instant::now();
-    let direct = if inconsistent {
+    let direct = if inconsistent || early.is_some() {
         None
     } else {
         let defaults = F4Options::default();
@@ -239,7 +253,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         }
     };
     let mut interreduction_time = interreduction.elapsed();
-    let materialized = direct.is_none()
+    let materialized = (direct.is_none() && early.is_none())
         || cfg!(any(
             feature = "research-sigf4-split",
             feature = "research-sigf4-usage"
@@ -314,9 +328,10 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     }
 
     stats.interreduction_in_columns = direct.is_some();
-    let (reduced, matrix) = match direct {
-        Some(done) => done,
-        None => {
+    let (reduced, matrix) = match (early, direct) {
+        (Some(reduced), _) => (reduced, MatrixInterreductionReport::default()),
+        (None, Some(done)) => done,
+        (None, None) => {
             let clock = Instant::now();
             let done = interreduce(basis, order, wall)?;
             interreduction_time += clock.elapsed();
@@ -1426,10 +1441,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         terms: Vec<(Monomial<N>, F)>,
     ) -> Result<(), SigF4Error> {
         let lead = terms[0].0;
+        let lead_mask = mask(&lead);
         let id = self.basis.len() as u32;
         let order = self.order;
+        let mut covered = false;
         for g in 0..self.basis.len() {
             let (g_sig, g_lead) = (self.basis[g].sig, self.basis[g].lead);
+            covered = covered || (self.lead_masks[g] & !lead_mask == 0 && divides(&g_lead, &lead));
             let k_new = sig.times(&g_lead);
             let k_old = g_sig.times(&lead);
             match k_new.cmp_in(&k_old, order) {
@@ -1475,8 +1493,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 source: Source::Pair { element, other },
             });
         }
+        self.new_leads += usize::from(!covered);
         self.by_index[sig.index as usize].push((mask(&sig.mono), id));
-        self.lead_masks.push(mask(&lead));
+        self.lead_masks.push(lead_mask);
         let hashing = Instant::now();
         let hashes = terms.iter().map(|(m, _)| hash(m)).collect();
         self.stats.element_hashing += hashing.elapsed();

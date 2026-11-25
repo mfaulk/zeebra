@@ -6,7 +6,9 @@
 //! Correctness rests on Lairez Thm 62 (Algorithm 8): every row is reduced only by rows of strictly
 //! smaller signature, a batch's rows are processed in increasing signature order, and its results
 //! join the basis only after the batch. The reduced basis is unique, so the output must equal
-//! [`crate::grobner::f4()`]'s coefficient for coefficient.
+//! [`crate::grobner::f4()`]'s coefficient for coefficient. Under graded-lex a run may instead
+//! end in conventional F4 over its elements (#1140, `lead_ideal.rs`), which returns the same
+//! basis because the elements lie in the input ideal.
 
 //!
 //! Compiled into every build for [`crate::grobner::f4_signature`], the supported opt-in entry
@@ -74,6 +76,10 @@ pub struct SigF4Options {
     /// (#961), and the dispatcher never routes it there. A refusal is
     /// [`SigF4Error::Unsupported`]. Set it only to study #961 or on systems known to be small.
     pub allow_graded_lex: bool,
+    /// #1140, graded-lex only: once a signature degree adds no new minimal lead, finish with
+    /// conventional F4 over the elements at minimal leads and the inputs, instead of completing
+    /// the signature basis. The basis is the same. On by default.
+    pub lead_ideal_stop: bool,
     /// #945 prototype: reduce each batch in `u32` delayed-reduction lanes
     /// ([`crate::linalg::lane`]) when the field is a prime below
     /// [`crate::linalg::lane::MAX_LANE_PRIME`]; ignored otherwise. Every row is unchanged.
@@ -108,6 +114,7 @@ impl Default for SigF4Options {
             parallel_cascade: false,
             max_live_bytes: Some(crate::grobner::F4Options::default().max_live_bytes),
             allow_graded_lex: false,
+            lead_ideal_stop: true,
             small_prime_lane: false,
             #[cfg(feature = "research-reuse")]
             reuse_census: false,
@@ -198,6 +205,11 @@ pub struct SigF4Statistics {
     pub max_matrix_rows: usize,
     pub max_matrix_columns: usize,
     pub elements_added: usize,
+    /// #1140: the run handed its elements at minimal leads to conventional F4 once a signature
+    /// degree added no new lead, whether F4 kept exactly those leads, and the handoff's wall.
+    pub lead_ideal_stop: bool,
+    pub lead_ideal_complete: bool,
+    pub lead_ideal_handoff: Duration,
     pub signature_basis_elements: usize,
     pub reduced_basis_elements: usize,
     /// Columns of the final interreduction matrix (0 when no matrix was needed).

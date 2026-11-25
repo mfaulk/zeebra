@@ -43,8 +43,10 @@ fn solve<const N: usize, F: FiniteField>(
     options: &SigF4Options,
 ) -> Run<N, F> {
     // Every system here is small, so graded-lex runs despite #961 (#1049).
+    // #1140's stop is timed, so it may end design 1 and the cascade at different batches.
     let options = SigF4Options {
         allow_graded_lex: true,
+        lead_ideal_stop: false,
         ..options.clone()
     };
     let (result, statistics) = sig_f4_reported(system, order, &options);

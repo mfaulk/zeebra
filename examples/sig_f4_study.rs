@@ -670,6 +670,12 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("max_matrix_rows", size(s.max_matrix_rows)),
         ("max_matrix_columns", size(s.max_matrix_columns)),
         ("elements_added", size(s.elements_added)),
+        ("lead_ideal_stop", Json::Bool(s.lead_ideal_stop)),
+        ("lead_ideal_complete", Json::Bool(s.lead_ideal_complete)),
+        (
+            "lead_ideal_handoff_ms",
+            Json::int(s.lead_ideal_handoff.as_millis() as u64),
+        ),
         ("signature_basis_elements", size(s.signature_basis_elements)),
         ("reduced_basis_elements", size(s.reduced_basis_elements)),
         ("interreduction_columns", size(s.interreduction_columns)),
@@ -1480,6 +1486,8 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             let options = SigF4Options {
                 max_wall_time: Some(args.wall),
                 workers: args.workers,
+                // Graded-lex is opt-in on the engine (#961); this arm studies it directly.
+                allow_graded_lex: args.order == MonomialOrder::GradedLexicographic,
                 parallel_cascade: args.claim,
                 small_prime_lane: args.lane,
                 max_live_bytes: args

@@ -664,9 +664,11 @@ type Wide = PrimeFieldElement64<18446744073709551263>;
 /// the engine before #971's run-wide monomial table.
 #[test]
 fn test_batch_traces_are_pinned_across_families() {
+    // The pins are the full signature runs; #1140's stop would end the graded-lex rows early.
     let checked = SigF4Options {
         check_signatures: true,
         allow_graded_lex: true,
+        lead_ideal_stop: false,
         ..SigF4Options::default()
     };
     let cascade = SigF4Options {
@@ -832,4 +834,83 @@ fn test_each_signature_degree_is_one_batch_without_degree_falls() {
     }
     check(&katsura::<7, Goldilocks>(), "katsura-7");
     check(&cyclic::<6, Goldilocks>(), "cyclic-6");
+}
+
+/// #1140: under graded-lex the run hands off to conventional F4 once a signature degree adds no
+/// new lead, the basis is still the shipping F4's, and the leads it handed over were complete.
+#[test]
+fn test_graded_lex_hands_off_once_the_leads_stop_changing() {
+    fn check<const N: usize, F: FiniteField>(
+        system: &[MultivariatePolynomial<N, F>],
+        name: &str,
+        full_run: bool,
+    ) {
+        let grlex = MonomialOrder::GradedLexicographic;
+        let stop = SigF4Options {
+            allow_graded_lex: true,
+            ..SigF4Options::default()
+        };
+        let full = SigF4Options {
+            lead_ideal_stop: false,
+            ..stop.clone()
+        };
+        let expected = f4(system, grlex).unwrap();
+        let (stopped, s) = sig_f4_reported(system, grlex, &stop);
+        assert_eq!(stopped.unwrap(), expected, "{name}: stopped basis");
+        assert!(s.lead_ideal_stop, "{name}: the stop never fired");
+        assert!(s.lead_ideal_complete, "{name}: F4 found a new lead");
+        if !full_run {
+            return;
+        }
+        let (ran, f) = sig_f4_reported(system, grlex, &full);
+        assert_eq!(ran.unwrap(), expected, "{name}: full basis");
+        assert!(!f.lead_ideal_stop, "{name}");
+        assert!(
+            s.batches < f.batches && s.elements_added < f.elements_added,
+            "{name}: {} batches and {} elements with the stop, {} and {} without",
+            s.batches,
+            s.elements_added,
+            f.batches,
+            f.elements_added
+        );
+    }
+    check(&katsura::<6, Zp32003>(), "katsura-6", true);
+    check(&katsura::<5, Goldilocks>(), "katsura-5", true);
+    check(&cyclic::<6, Zp32003>(), "cyclic-6", true);
+    // Katsura-7's full graded-lex run takes seconds even optimized (#961).
+    check(&katsura::<7, Zp32003>(), "katsura-7", false);
+}
+
+/// #1140: with fewer entries pending than minimal leads (eco-9's last quiet degree: 13 against
+/// 119), the signature run finishes itself, and the basis is unchanged.
+#[test]
+fn test_graded_lex_finishes_itself_when_little_is_pending() {
+    let system = eco::<9, Zp32003>();
+    let grlex = MonomialOrder::GradedLexicographic;
+    let options = SigF4Options {
+        allow_graded_lex: true,
+        ..SigF4Options::default()
+    };
+    let (result, s) = sig_f4_reported(&system, grlex, &options);
+    assert_eq!(result.unwrap(), f4(&system, grlex).unwrap());
+    assert!(!s.lead_ideal_stop);
+}
+
+/// #1140: the handoff is graded-lex only, so a grevlex run never takes it.
+#[test]
+fn test_grevlex_never_hands_off() {
+    let system = katsura::<6, Zp32003>();
+    let (result, s) = sig_f4_reported(&system, GREVLEX, &SigF4Options::default());
+    assert_eq!(result.unwrap(), f4(&system, GREVLEX).unwrap());
+    assert!(!s.lead_ideal_stop);
+}
+
+/// #1140: a run that hands off still passes `certify` and the signature checks up to the handoff.
+#[test]
+fn test_lead_ideal_handoff_under_checked_options() {
+    let system = katsura::<6, Zp32003>();
+    let grlex = MonomialOrder::GradedLexicographic;
+    let (result, s) = sig_f4_reported(&system, grlex, &checked_any_graded());
+    assert_eq!(result.unwrap(), f4(&system, grlex).unwrap());
+    assert!(s.lead_ideal_stop && s.lead_ideal_complete);
 }
