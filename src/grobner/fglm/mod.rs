@@ -48,6 +48,7 @@ pub use shape::{separating_variables, shape_lex_basis, shape_report, ShapeError,
 pub use spectra::{SpectralError, SpectralOptions, SpectralStatistics};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};
 
+pub(crate) use wiedemann::dimension_ceiling;
 pub use wiedemann::{ConversionRoute, WiedemannFallback};
 
 #[cfg(feature = "research-work")]

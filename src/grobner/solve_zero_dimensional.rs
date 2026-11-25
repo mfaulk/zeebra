@@ -201,12 +201,15 @@ pub enum SolveError {
     /// The conversion crossed one of its limits.
     Fglm(FglmError),
 
-    /// The conversion was **not attempted**: a computed quotient dimension put it out of budget.
+    /// The classical walk was **not attempted**: a computed quotient dimension put its dense blocks
+    /// out of budget.
     ///
-    /// Distinct from `Fglm(FglmError::SpanStorageExceeded)`, which means the conversion ran and
-    /// crossed the limit. Here nothing was spent on it at all — the source basis exists and its
-    /// quotient basis was enumerated, and that was enough to know the conversion could not fit. A
-    /// predicted crossing reported as a real one would misattribute the cost.
+    /// Distinct from `Fglm(FglmError::SpanStorageExceeded)`, which means the walk ran and crossed
+    /// the limit. Here no dense block was allocated: the source basis exists and its quotient basis
+    /// was enumerated, and that was enough to know the walk could not fit. A predicted crossing
+    /// reported as a real one would misattribute the cost. Under a strategy that may take
+    /// Wiedemann, the conversion first builds its operators and offers the quotient to Wiedemann,
+    /// and this is returned when Wiedemann declines (#1114).
     ///
     /// Produced only by the policy layer; the explicit strategies never predict.
     ConversionInfeasible {
@@ -250,7 +253,8 @@ impl Display for SolveError {
                 budget,
             } => write!(
                 f,
-                "conversion was not attempted: quotient dimension {} needs {} {}, over the limit \
+                "classical conversion was not attempted: quotient dimension {} needs {} {}, over \
+                 the limit \
                  of {}",
                 dimension, needed, budget, limit
             ),

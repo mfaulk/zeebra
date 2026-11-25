@@ -159,17 +159,25 @@ println!("{}", plan);                            // every decision, with its rea
 ```
 
 **The conservative opening is grevlex-then-FGLM**, while the explicit solver's default strategy
-is `DirectLexF4`. Conversion loses on the measured planted family, but **its refusals are cheap by
-construction**: FGLM's binding budget is the span's `D² + D(D+1)` cells, computed from `D` and
-checked before anything is allocated, while F4's is discovered during elimination and so costs the
-whole elimination up to the crossing. Measured: katsura-7's direct attempt burns 28.3 s and 1.3 GB
-before refusing; planted-12's conversion refuses after 36 ms. The conservative question is not
-which route usually wins but **which route's failure is affordable**.
+is `DirectLexF4`. Conversion loses on the measured planted family, but **its refusals are cheap
+next to F4's**: the classical walk's binding budget is the span's `D² + D(D+1)` cells, computed
+from `D` and checked before its dense blocks are allocated, while F4's is discovered during
+elimination and so costs the whole elimination up to the crossing. Measured: katsura-7's direct
+attempt burns 28.3 s and 1.3 GB before refusing; planted-12's conversion refuses after 36 ms. The
+conservative question is not which route usually wins but **which route's failure is affordable**.
 
-The one decision made on a measured quantity is the conversion's feasibility: after a source basis
-exists, `D` is *counted* and the span requirement is a function of `D` alone, so
-`SolveError::ConversionInfeasible` means the conversion was never started — distinct from
+The one decision made on a measured quantity is the classical walk's feasibility: after a source
+basis exists, `D` is *counted* and the span requirement is a function of `D` alone, so
+`SolveError::ConversionInfeasible` means the classical walk was never started — distinct from
 `Fglm(SpanStorageExceeded)`, which means it ran and crossed the limit.
+
+**The gate admits what the conversion admits** (#1114). The dimension cap and the dense blocks bound
+the classical walk only. Under the default `ConversionStrategy::Adaptive`, a quotient outside them
+goes to the conversion anyway, which offers it to Wiedemann in `O(D)` workspace (#1111). That
+converts sparse quotients the classical walk cannot hold. When Wiedemann declines, the planner
+reports the counted `ConversionInfeasible` as before, but only after the conversion has built the
+multiplication operators, which the 36 ms figure above predates. A classical-only strategy is
+still refused from `D` alone.
 
 `PlanBudget` is shared across attempts, and holds only quantities that are *spent* —
 `max_elapsed` and `max_total_batches`. A peak is not consumed by an attempt, so the entry and byte
