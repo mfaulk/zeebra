@@ -188,6 +188,7 @@ missing.
 | `arms[].build.{profile,flags,recipe}` | strings; `recipe` must contain `git archive <commit>` |
 | `arms[].build.comparand` | optional; an externally provisioned comparand's provenance (provision script, upstream pin). It stands in for the `git archive` recipe, which a Zeebra arm still needs (#966) |
 | `arms[].workers` | optional subset of `run.workers`; the arm runs only at those counts (Track G's 16-worker best-supported arm beside 1-worker arms, #966) |
+| `arms[].instances` | optional list of instance names; the arm runs only on those (a cell whose A/B arms differ by instance, #1107) |
 | `arms[].argv` | template; `{field}` placeholders take `instance.params` and `instance`, `input`, `inputs[<key>]`, `workers`, `seed`, `rep`, `cpus`, `wall_seconds`, `live_bytes` |
 | `arms[].contract` | optional task contract: `T-GB`, `T-GB-conv`, `T-RAD`, `T-PT1`, `T-PTALL` or `T-ALG` (`adaptive-selection-contracts.md` §2, #1004) |
 | `arms[].configuration` | optional portfolio configuration id, a plain name (default: the arm's name) |
