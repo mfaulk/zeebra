@@ -334,5 +334,237 @@
    "zb-katsura-12@p31",
    "zb-katsura-12@p64"
   ]
+ },
+ {
+  "job": "fb7dc8414a5a",
+  "pass_no": 2,
+  "tier": 0,
+  "configs": [
+   "P7-w1",
+   "P7-w16"
+  ],
+  "reps": 2,
+  "records": [
+   "gen-chandrasekhar-h-12@p31",
+   "gen-chandrasekhar-h-12@p64"
+  ]
+ },
+ {
+  "job": "6cad1e774fdc",
+  "pass_no": 2,
+  "tier": 0,
+  "configs": [
+   "P1",
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "P7-w1",
+   "P7-w16",
+   "P8-w1",
+   "P8-w16"
+  ],
+  "reps": 4,
+  "records": [
+   "gen-chandrasekhar-h-10@p31",
+   "gen-chandrasekhar-h-10@p64",
+   "gen-chandrasekhar-h-11@p31",
+   "gen-chandrasekhar-h-11@p64",
+   "gen-chandrasekhar-h-4@p31",
+   "gen-chandrasekhar-h-4@p64",
+   "gen-chandrasekhar-h-5@p31",
+   "gen-chandrasekhar-h-5@p64",
+   "gen-chandrasekhar-h-6@p31",
+   "gen-chandrasekhar-h-6@p64",
+   "gen-chandrasekhar-h-7@p31",
+   "gen-chandrasekhar-h-7@p64",
+   "gen-chandrasekhar-h-8@p31",
+   "gen-chandrasekhar-h-8@p64",
+   "gen-chandrasekhar-h-9@p31",
+   "gen-chandrasekhar-h-9@p64",
+   "gen-phosphorylation-2-nonzero@p31",
+   "gen-phosphorylation-2-nonzero@p64",
+   "gen-phosphorylation-2@p31",
+   "gen-phosphorylation-2@p64",
+   "gen-phosphorylation-3@p31",
+   "gen-phosphorylation-3@p64",
+   "gen-phosphorylation-4-nonzero@p31",
+   "gen-phosphorylation-4-nonzero@p64",
+   "gen-phosphorylation-4@p31",
+   "gen-phosphorylation-4@p64",
+   "gen-phosphorylation-5@p31",
+   "gen-phosphorylation-5@p64",
+   "gen-phosphorylation-6-nonzero@p31",
+   "gen-phosphorylation-6-nonzero@p64",
+   "gen-phosphorylation-6@p31",
+   "gen-phosphorylation-6@p64",
+   "gen-phosphorylation-7@p31",
+   "gen-phosphorylation-7@p64",
+   "sd-butcher@p31",
+   "sd-butcher@p64",
+   "sd-cassou@p31",
+   "sd-cassou@p64",
+   "sd-ellipsoid-2@p31",
+   "sd-ellipsoid-2@p64",
+   "sd-ellipsoid-4@p31",
+   "sd-ellipsoid-4@p64",
+   "sd-fourbodyproblem@p31",
+   "sd-fourbodyproblem@p64",
+   "sd-geometry-heron-1@p31",
+   "sd-geometry-heron-1@p64",
+   "sd-hairer-1@p31",
+   "sd-hairer-1@p64",
+   "sd-hairer-2-1@p31",
+   "sd-hairer-2-1@p64",
+   "sd-hairer-2@p31",
+   "sd-hairer-2@p64",
+   "sd-heron@p31",
+   "sd-heron@p64",
+   "sd-raksanyi@p31",
+   "sd-raksanyi@p64",
+   "sd-singular-schwarz-10@p31",
+   "sd-singular-schwarz-10@p64",
+   "sd-singular-schwarz-7@p31",
+   "sd-singular-schwarz-7@p64",
+   "sd-singular-schwarz-8@p31",
+   "sd-singular-schwarz-8@p64",
+   "sd-singular-schwarz-9@p31",
+   "sd-singular-schwarz-9@p64",
+   "sd-weispfenning-94@p31",
+   "sd-weispfenning-94@p64",
+   "zb-col-gnm-12-17-s1@p31",
+   "zb-col-gnm-12-17-s1@p64",
+   "zb-col-gnm-12-17-s2@p31",
+   "zb-col-gnm-12-17-s2@p64",
+   "zb-col-gnm-12-21-s1@p31",
+   "zb-col-gnm-12-21-s1@p64",
+   "zb-col-grid-3x4@p31",
+   "zb-col-grid-3x4@p64",
+   "zb-col-grid-4x5@p31",
+   "zb-col-grid-4x5@p64",
+   "zb-col-ktree2-12-s1@p31",
+   "zb-col-ktree2-12-s1@p64",
+   "zb-col-path-12@p31",
+   "zb-col-path-12@p64",
+   "zb-col-path-8@p31",
+   "zb-col-path-8@p64",
+   "zb-col-tree-12-s1@p31",
+   "zb-col-tree-12-s1@p64",
+   "zb-col-tree-8-s1@p31",
+   "zb-col-tree-8-s1@p64",
+   "zb-col-wheel-5@p31",
+   "zb-col-wheel-5@p64",
+   "zb-cyclic-6@p31",
+   "zb-cyclic-6@p64",
+   "zb-cyclic-7@p31",
+   "zb-cyclic-7@p64",
+   "zb-eco-12@p31",
+   "zb-eco-12@p64",
+   "zb-eco-8@p31",
+   "zb-eco-8@p64",
+   "zb-katsura-9@p31",
+   "zb-katsura-9@p64",
+   "zb-noon-5@p31",
+   "zb-noon-5@p64",
+   "zb-noon-7@p31",
+   "zb-noon-7@p64",
+   "zb-reimer-4@p31",
+   "zb-reimer-4@p64",
+   "zb-reimer-6@p31",
+   "zb-reimer-6@p64",
+   "zb-toric-rnc-5@p31",
+   "zb-toric-rnc-8-slice-s1@p31",
+   "zb-toric-segre-3x3-slice-s1@p31",
+   "zb-toric-segre-3x3@p31",
+   "zb-toric-segre-3x5-slice-s1@p31",
+   "zb-toric-segre-4x4-slice-s1@p31"
+  ]
+ },
+ {
+  "job": "6a0e0c33e140",
+  "pass_no": 2,
+  "tier": 0,
+  "configs": [
+   "P1",
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "P8-w1",
+   "P8-w16"
+  ],
+  "reps": 4,
+  "records": [
+   "gen-chandrasekhar-h-12@p31",
+   "gen-chandrasekhar-h-12@p64"
+  ]
+ },
+ {
+  "job": "afd7e8673baa",
+  "pass_no": 2,
+  "tier": 0,
+  "configs": [
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "P7-w16",
+   "P8-w1",
+   "P8-w16"
+  ],
+  "reps": 4,
+  "records": [
+   "zb-katsura-12@p31",
+   "zb-katsura-12@p64"
+  ]
+ },
+ {
+  "job": "fa572192cc30",
+  "pass_no": 2,
+  "tier": 0,
+  "configs": [
+   "P4",
+   "P5",
+   "P6"
+  ],
+  "reps": 4,
+  "records": [
+   "sd-ellipsoid-m2@p31",
+   "sd-ellipsoid-m2@p64"
+  ]
+ },
+ {
+  "job": "3968e16d2db2",
+  "pass_no": 2,
+  "tier": 0,
+  "configs": [
+   "P4",
+   "P5",
+   "P6",
+   "P8-w1",
+   "P8-w16"
+  ],
+  "reps": 4,
+  "records": [
+   "zb-col-grid-5x5@p31",
+   "zb-col-grid-5x5@p64"
+  ]
+ },
+ {
+  "job": "80814a568987",
+  "pass_no": 2,
+  "tier": 0,
+  "configs": [
+   "P4",
+   "P8-w1"
+  ],
+  "reps": 4,
+  "records": [
+   "gen-chandrasekhar-h-13@p31",
+   "gen-chandrasekhar-h-13@p64"
+  ]
  }
 ]
