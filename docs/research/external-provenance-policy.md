@@ -1,5 +1,7 @@
 # External provenance and licensing: what may be read, what may be reused, and how to cite it
 
+**Measured at:** not measured here. This document holds licences, not timings; the provenance lint reads the names M4GB and M5GB in the table as memory figures.
+
 Policy for #274, gating code-level reuse in #264–#273. Zeebra is MIT (`Cargo.toml:10`,
 `LICENSE-MIT`), and the governing fact about epic #256 is that **almost every competing Gröbner
 engine is GPL or LGPL**, so for most of the survey the only lawful product of a source reading is

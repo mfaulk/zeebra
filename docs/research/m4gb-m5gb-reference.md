@@ -1,16 +1,18 @@
 # M4GB/M5GB reference comparison on dense overdetermined MQ (#1030)
 
-**Status:** in progress, no decision. M4GB is provisioned at a pinned commit and runs behind a
-verified adapter. On the development cohort, every M4GB basis agrees with Zeebra's coefficient for
-coefficient, and M4GB is 10–29× faster than Zeebra's shipping F4 on every cell above the 0.3 s floor
-(§5). These figures come from an unpinned macOS session and do not decide anything. The deciding run
-needs the bench host, a grobx arm and Zeebra's best qualified configuration (§7). M5GB has no
-licence grant and was not run (§3.2).
+**Status:** decided, **reject** (§8). On the held-out cells (m/n = 1.8, GF(31) and GF(65521),
+bench host, pinned), M4GB is 16.0× and 5.8× faster than Zeebra's best qualified configuration,
+well past the 1.5× gate. But pinned grobx is faster than M4GB on every cell, at 0.59× and 0.19×
+M4GB's wall. The hypothesis needs M4GB to beat both, so it is disproved. Every M4GB and grobx
+basis agrees with Zeebra's coefficient for coefficient. The macOS development figures (§5) stand
+as development only. M5GB has no licence grant and was not run (§3.2).
 
 **Measured at:** `52268421` (planted rows, tag `measured/1030-m4gb-dev-planted`) and `4d1ec9b7`
 (unplanted rows, tag `measured/1030-m4gb-dev-unplanted`),
 `examples/m4gb_comparison.rs` in release, macOS arm64 (14 cores), unpinned, no RSS figure, one
-worker, 2026-11-24. Evidence: [`research/1030-m4gb-reference/`](../../research/1030-m4gb-reference/README.md).
+worker, 2026-11-24. **§8 (the decision):** `41a36e93` (tag `measured/1030-m4gb-held-out`), AMD
+Threadripper PRO 5995WX, Linux x86_64, rustc 1.99.1, CCDs 1–2 reserved, each child on CPU 8, with
+peak RSS. Evidence: [`research/1030-m4gb-reference/`](../../research/1030-m4gb-reference/README.md).
 
 Parent: #1028 (candidate A). Census this reconciles with: #1031. Gated prototype: #1032.
 Pre-declared cohort and rule: [#1030 comment](https://github.com/mfaulk/zeebra/issues/1030#issuecomment-7145421369).
@@ -171,15 +173,58 @@ which its log prints at `--loglevel 3`.
 
 ## 7. What is open
 
-On the bench host, at a frozen tag:
-
-1. The pinned, interleaved run of the development cells at n ≥ 14, with process wall and RSS for
-   both arms. Ratios must be recomputed there; the Mac figures are not transferable.
-2. **A grobx arm.** The hypothesis is "faster than both". `tools/external/grobx-driver` is built for
-   x86-64-v3 and does not run on this Mac.
-3. **Zeebra's best qualified configuration** as its arm, not only `F4Options::default()`: the
-   signature engine, and the #945 lane if PR #1095 merges.
-4. Then the held-out run: `m/n` = 1.8 and GF(65521), under the rule posted on #1030.
-5. Counters from M4GB's log, for the attribution in §6.
+1. **The pinned re-run of the development cells.** It was not done: the held-out run took 3.1 h of
+   reserved CCDs at 3 repetitions, and another gate was waiting for them. The decision does not
+   depend on it.
+2. **#945's lane** (`SigF4Options::small_prime_lane`) as a Zeebra arm. It is reachable only through
+   `sig_f4`, not through `F4Options` or the external-contract adapter. It cannot change the
+   decision: the decision fails against grobx, not against Zeebra. Against Zeebra the margins are
+   5.8× and 16×. A 3× lane would leave 1.9× and 5.3×, still past the gate.
+3. Counters from M4GB's log (`--loglevel 3`), for the attribution in §6.
 
 For the owner: M5GB has no licence grant (§3.2).
+
+## 8. Deciding run (bench host)
+
+The arms, placement and decision procedure were posted on #1030 before any held-out cell was read
+([comment](https://github.com/mfaulk/zeebra/issues/1030#issuecomment-7150169799)). The cut from 5
+repetitions to 3 was posted before the medians were read
+([comment](https://github.com/mfaulk/zeebra/issues/1030#issuecomment-7150986750)). That comment
+also discloses a smoke row at m/n = 1.8 on seed 9, outside the cohort.
+
+- **Arms.** `zeebra` is `F4Options::default()`. `zeebra-adaptive` is `GradedEngine::Adaptive`,
+  `f4_signature`'s pre-solve dispatch. `m4gb` is `01860a52`, built `-march=x86-64-v3`.
+  `grobx` is the pinned driver `8005a2a1` in raw mode, built x86-64-v3 with fat LTO. Every M4GB
+  and grobx basis is re-solved by Zeebra outside the timed region and compared coefficient for
+  coefficient.
+- **"Zeebra" is the faster Zeebra arm per cell.** That was `zeebra-adaptive` in all 32 cells,
+  2.2–3.5× faster than the shipping default at n = 16.
+- **Cells.** m/n = 1.8, n ∈ {14, 16}, GF(31) and GF(65521), densities 1000 and 500, seeds 1 and 2,
+  planted and unplanted. Three repetitions, with engines rotated one place per repetition, each
+  child `taskset` to CPU 8 on reserved CCDs 1–2.
+- **The floor removes n = 14.** grobx takes 0.08–0.10 s there, under the 0.3 s floor on the faster
+  arm. The decision therefore rests on the 4 n = 16 cells per field.
+- **Every row answered and verified.** No M4GB row stopped at the cap, unplanted included.
+
+Medians over the counted (n = 16) planted cells, with every cell's value in the range:
+
+| field | best Zeebra s | M4GB s | grobx s | M4GB vs best Zeebra | M4GB vs grobx | peak RSS MiB: Zeebra adaptive / M4GB / grobx |
+|---|---|---|---|---|---|---|
+| GF(31) | 18.4–18.9 | 1.16–1.18 | 0.68–0.69 | **16.0×** (15.7–16.2) | **0.59×** (0.58–0.59) | 148–159 / 16–17 / 32–42 |
+| GF(65521) | 20.8–20.9 | 3.59–3.68 | 0.67 | **5.8×** (5.7–5.8) | **0.19×** (0.18–0.19) | 152–164 / 23 / 33–42 |
+
+Unplanted, reported and not decided: M4GB is 11.0× and 4.1× faster than the best Zeebra arm, and
+grobx is again faster than M4GB (0.48× and 0.16× of M4GB's wall). The full table is in
+[`bench-host/tables.md`](../../research/1030-m4gb-reference/bench-host/tables.md).
+
+**Decision: reject.** The pre-declared rule needs M4GB to be at least 1.5× faster than both
+comparators on both held-out fields. Against Zeebra it is, by 5.8–16×. Against grobx it is slower
+on every cell, by 1.7× at GF(31) and 5.3× at GF(65521). The gap to grobx also *widens* with the
+field width, as the Mac development cells suggested between GF(31) and GF(32003). This is
+consistent with M4GB's log-table field arithmetic.
+
+**For #1032:** **none** as a separate M4GB backend. The reference that Zeebra trails on this family
+is grobx, which M33-G1 already attributes (symbolic preprocessing, bookkeeping and interreduction,
+`docs/research/m33-grobx-attribution.md`). M4GB's 5.8–16× over Zeebra is real and is not a reuse
+saving (§6, #1031). It is evidence for that attribution, not for M4GB's organization: grobx is an
+F4 and beats M4GB without it.
