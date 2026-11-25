@@ -1,0 +1,47 @@
+{
+ "assignments": [
+  {
+   "id": "sd-singular-schwarz-10@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-10@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-11@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-singular-schwarz-11@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-singular-schwarz-7@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-7@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-8@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-8@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-9@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-9@p64",
+   "partition": "development"
+  }
+ ],
+ "protocol": "S3",
+ "scale_parameter": "n",
+ "schema": "corpus-split-v1"
+}

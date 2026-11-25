@@ -1,0 +1,1050 @@
+{
+ "assignments": [
+  {
+   "id": "gen-chandrasekhar-h-10@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-10@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-11@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-11@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-12@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-12@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-13@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-13@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-4@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-4@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-5@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-6@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-6@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-7@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-7@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-8@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-8@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-9@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-chandrasekhar-h-9@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-2-nonzero@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-2-nonzero@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-2@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-2@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-3@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-3@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-4-nonzero@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-4-nonzero@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-4@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-4@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-5@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-6-nonzero@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-6-nonzero@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-6@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-6@p64",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-7@p31",
+   "partition": "development"
+  },
+  {
+   "id": "gen-phosphorylation-7@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-bjoerk-8@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-bjoerk-8@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-butcher@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-butcher@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-caprasse@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-caprasse@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-cassou@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-cassou@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-czapor-86a@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-czapor-86a@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-ellipsoid-2@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-ellipsoid-2@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-ellipsoid-4@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-ellipsoid-4@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-ellipsoid-m2@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-ellipsoid-m2@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-fee-1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-fee-1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-fee-2@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-fee-2@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-fourbodyproblem@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-fourbodyproblem@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-fourcircles@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-fourcircles@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-geometry-heron-1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-geometry-heron-1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-hairer-1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-hairer-1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-hairer-2-1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-hairer-2-1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-hairer-2@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-hairer-2@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-heron@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-heron@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-raksanyi@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-raksanyi@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-robot-fabrice24@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-robot-fabrice24@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-robot-jcf26@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-robot-jcf26@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-robot-romin@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-robot-romin@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-robot-rr@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-robot-rr@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-rose@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-rose@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-schiele-1-1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-schiele-1-1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-schiele-1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-schiele-1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-schiele@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-schiele@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f633@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f633@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f744@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f744@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f855@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f855@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f966@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-signaltheory-f966@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-singular-schwarz-10@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-10@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-11@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-11@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-7@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-7@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-8@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-8@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-9@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-singular-schwarz-9@p64",
+   "partition": "development"
+  },
+  {
+   "id": "sd-trinks-1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-trinks-1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-trinks@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-trinks@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-chemkin@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-chemkin@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-gametwo5@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-gametwo5@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-gametwo6@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-gametwo6@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-gametwo7@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-gametwo7@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-virasoro@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-verschelde-virasoro@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "sd-weispfenning-94@p31",
+   "partition": "development"
+  },
+  {
+   "id": "sd-weispfenning-94@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-blk-2x4-c0-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x4-c0-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x4-c1-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x4-c1-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x4-c2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x4-c2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x6-c0-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x6-c0-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x6-c2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-2x6-c2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-3x3-c0-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-3x3-c0-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-3x3-c3-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-3x3-c3-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-3x4-c3-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-blk-3x4-c3-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-col-gnm-12-17-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-gnm-12-17-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-gnm-12-17-s2@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-gnm-12-17-s2@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-gnm-12-21-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-gnm-12-21-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-grid-3x4@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-grid-3x4@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-grid-4x5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-grid-4x5@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-grid-5x5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-grid-5x5@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-ktree2-12-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-ktree2-12-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-path-12@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-path-12@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-path-8@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-path-8@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-tree-12-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-tree-12-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-tree-8-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-tree-8-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-wheel-5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-col-wheel-5@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-cyclic-6@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-cyclic-6@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-cyclic-7@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-cyclic-7@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-det-2x4-lin-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-2x4-lin-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-2x4-quad-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-2x4-quad-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-2x6-lin-n8-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-2x6-lin-n8-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-2x6-lin-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-2x6-lin-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-3x5-lin-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-det-3x5-lin-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-eco-12@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-eco-12@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-eco-8@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-eco-8@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-katsura-12@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-katsura-12@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-katsura-9@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-katsura-9@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-noon-5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-noon-5@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-noon-7@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-noon-7@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-nr-10-e1-collide-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-10-e1-collide-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-12-e1-collide-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-12-e1-collide-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-5-e2-collide-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-5-e2-collide-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-6-e1-collide-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-6-e1-collide-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-6-e1-distinct-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-6-e1-distinct-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-8-e1-collide-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-8-e1-collide-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-8-e1-distinct-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-nr-8-e1-distinct-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-12-24-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-12-24-d2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-14-14-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-14-14-d2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-6-6-d3-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-6-6-d3-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-7-10-mixed-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-7-10-mixed-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-8-8-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-pd-8-8-d2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-10-15-d2-t12-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-10-15-d2-t12-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-10-15-d2-t12-s2@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-10-15-d2-t12-s2@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-14-21-d2-t16-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-14-21-d2-t16-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-16-16-d2-t18-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-16-16-d2-t18-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-8-8-d3-t10-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-ps-8-8-d3-t10-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-reimer-4@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-reimer-4@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-reimer-6@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-reimer-6@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-rnc-5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-rnc-5@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-rnc-8-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-rnc-8-slice-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x3-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x3-slice-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x3@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x3@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x5-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x5-slice-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-4x4-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-4x4-slice-s1@p64",
+   "partition": "development"
+  },
+  {
+   "id": "zb-tri-5-d3-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-5-d3-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-6-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-6-d2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-8-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-8-d2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-11-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-11-d2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-5-d3-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-5-d3-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-6-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-6-d2-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-8-d2-s1@p31",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-tri-hidden-8-d2-s1@p64",
+   "partition": "evaluation"
+  }
+ ],
+ "draw": {
+  "algorithm": "hash-groups-v1",
+  "catalog_sha256": "95e4523e09f86214925c0fc6c455483db8629eeb3261290fd5c19261cc2c5a36",
+  "evaluation_groups": 17,
+  "exposed_ids": [
+   "zb-cyclic-6@p31",
+   "zb-cyclic-6@p64",
+   "zb-cyclic-7@p31",
+   "zb-cyclic-7@p64",
+   "zb-eco-12@p31",
+   "zb-eco-12@p64",
+   "zb-eco-8@p31",
+   "zb-eco-8@p64",
+   "zb-katsura-12@p31",
+   "zb-katsura-12@p64",
+   "zb-katsura-9@p31",
+   "zb-katsura-9@p64",
+   "zb-noon-5@p31",
+   "zb-noon-5@p64",
+   "zb-noon-7@p31",
+   "zb-noon-7@p64",
+   "zb-reimer-4@p31",
+   "zb-reimer-4@p64",
+   "zb-reimer-6@p31",
+   "zb-reimer-6@p64"
+  ],
+  "salt": "m34-s0-v1"
+ },
+ "protocol": "S2",
+ "schema": "corpus-split-v1"
+}
