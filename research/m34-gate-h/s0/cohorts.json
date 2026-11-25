@@ -1,0 +1,701 @@
+{
+ "assignments": {
+  "gen-chandrasekhar-h-10@p31": "development",
+  "gen-chandrasekhar-h-10@p64": "development",
+  "gen-chandrasekhar-h-11@p31": "development",
+  "gen-chandrasekhar-h-11@p64": "development",
+  "gen-chandrasekhar-h-12@p31": "development",
+  "gen-chandrasekhar-h-12@p64": "development",
+  "gen-chandrasekhar-h-13@p31": "development",
+  "gen-chandrasekhar-h-13@p64": "development",
+  "gen-chandrasekhar-h-4@p31": "development",
+  "gen-chandrasekhar-h-4@p64": "development",
+  "gen-chandrasekhar-h-5@p31": "development",
+  "gen-chandrasekhar-h-5@p64": "development",
+  "gen-chandrasekhar-h-6@p31": "development",
+  "gen-chandrasekhar-h-6@p64": "development",
+  "gen-chandrasekhar-h-7@p31": "development",
+  "gen-chandrasekhar-h-7@p64": "development",
+  "gen-chandrasekhar-h-8@p31": "development",
+  "gen-chandrasekhar-h-8@p64": "development",
+  "gen-chandrasekhar-h-9@p31": "development",
+  "gen-chandrasekhar-h-9@p64": "development",
+  "gen-phosphorylation-2-nonzero@p31": "development",
+  "gen-phosphorylation-2-nonzero@p64": "development",
+  "gen-phosphorylation-2@p31": "development",
+  "gen-phosphorylation-2@p64": "development",
+  "gen-phosphorylation-3@p31": "development",
+  "gen-phosphorylation-3@p64": "development",
+  "gen-phosphorylation-4-nonzero@p31": "development",
+  "gen-phosphorylation-4-nonzero@p64": "development",
+  "gen-phosphorylation-4@p31": "development",
+  "gen-phosphorylation-4@p64": "development",
+  "gen-phosphorylation-5@p31": "development",
+  "gen-phosphorylation-5@p64": "development",
+  "gen-phosphorylation-6-nonzero@p31": "development",
+  "gen-phosphorylation-6-nonzero@p64": "development",
+  "gen-phosphorylation-6@p31": "development",
+  "gen-phosphorylation-6@p64": "development",
+  "gen-phosphorylation-7@p31": "development",
+  "gen-phosphorylation-7@p64": "development",
+  "sd-bjoerk-8@p31": "untouched",
+  "sd-bjoerk-8@p64": "untouched",
+  "sd-butcher@p31": "development",
+  "sd-butcher@p64": "development",
+  "sd-caprasse@p31": "untouched",
+  "sd-caprasse@p64": "untouched",
+  "sd-cassou@p31": "development",
+  "sd-cassou@p64": "development",
+  "sd-czapor-86a@p31": "untouched",
+  "sd-czapor-86a@p64": "untouched",
+  "sd-ellipsoid-2@p31": "development",
+  "sd-ellipsoid-2@p64": "development",
+  "sd-ellipsoid-4@p31": "development",
+  "sd-ellipsoid-4@p64": "development",
+  "sd-ellipsoid-m2@p31": "development",
+  "sd-ellipsoid-m2@p64": "development",
+  "sd-fee-1@p31": "untouched",
+  "sd-fee-1@p64": "untouched",
+  "sd-fee-2@p31": "untouched",
+  "sd-fee-2@p64": "untouched",
+  "sd-fourbodyproblem@p31": "development",
+  "sd-fourbodyproblem@p64": "development",
+  "sd-fourcircles@p31": "validation",
+  "sd-fourcircles@p64": "validation",
+  "sd-geometry-heron-1@p31": "development",
+  "sd-geometry-heron-1@p64": "development",
+  "sd-hairer-1@p31": "development",
+  "sd-hairer-1@p64": "development",
+  "sd-hairer-2-1@p31": "development",
+  "sd-hairer-2-1@p64": "development",
+  "sd-hairer-2@p31": "development",
+  "sd-hairer-2@p64": "development",
+  "sd-heron@p31": "development",
+  "sd-heron@p64": "development",
+  "sd-raksanyi@p31": "development",
+  "sd-raksanyi@p64": "development",
+  "sd-robot-fabrice24@p31": "validation",
+  "sd-robot-fabrice24@p64": "validation",
+  "sd-robot-jcf26@p31": "validation",
+  "sd-robot-jcf26@p64": "validation",
+  "sd-robot-romin@p31": "validation",
+  "sd-robot-romin@p64": "validation",
+  "sd-robot-rr@p31": "validation",
+  "sd-robot-rr@p64": "validation",
+  "sd-rose@p31": "untouched",
+  "sd-rose@p64": "untouched",
+  "sd-schiele-1-1@p31": "validation",
+  "sd-schiele-1-1@p64": "validation",
+  "sd-schiele-1@p31": "validation",
+  "sd-schiele-1@p64": "validation",
+  "sd-schiele@p31": "validation",
+  "sd-schiele@p64": "validation",
+  "sd-signaltheory-f633@p31": "validation",
+  "sd-signaltheory-f633@p64": "validation",
+  "sd-signaltheory-f744@p31": "validation",
+  "sd-signaltheory-f744@p64": "validation",
+  "sd-signaltheory-f855@p31": "validation",
+  "sd-signaltheory-f855@p64": "validation",
+  "sd-signaltheory-f966@p31": "validation",
+  "sd-signaltheory-f966@p64": "validation",
+  "sd-singular-schwarz-10@p31": "development",
+  "sd-singular-schwarz-10@p64": "development",
+  "sd-singular-schwarz-11@p31": "untouched",
+  "sd-singular-schwarz-11@p64": "untouched",
+  "sd-singular-schwarz-7@p31": "development",
+  "sd-singular-schwarz-7@p64": "development",
+  "sd-singular-schwarz-8@p31": "development",
+  "sd-singular-schwarz-8@p64": "development",
+  "sd-singular-schwarz-9@p31": "development",
+  "sd-singular-schwarz-9@p64": "development",
+  "sd-trinks-1@p31": "validation",
+  "sd-trinks-1@p64": "validation",
+  "sd-trinks@p31": "validation",
+  "sd-trinks@p64": "validation",
+  "sd-verschelde-chemkin@p31": "untouched",
+  "sd-verschelde-chemkin@p64": "untouched",
+  "sd-verschelde-gametwo5@p31": "validation",
+  "sd-verschelde-gametwo5@p64": "validation",
+  "sd-verschelde-gametwo6@p31": "validation",
+  "sd-verschelde-gametwo6@p64": "validation",
+  "sd-verschelde-gametwo7@p31": "validation",
+  "sd-verschelde-gametwo7@p64": "validation",
+  "sd-verschelde-virasoro@p31": "untouched",
+  "sd-verschelde-virasoro@p64": "untouched",
+  "sd-weispfenning-94@p31": "development",
+  "sd-weispfenning-94@p64": "development",
+  "zb-blk-2x4-c0-s1@p31": "untouched",
+  "zb-blk-2x4-c0-s1@p64": "untouched",
+  "zb-blk-2x4-c1-s1@p31": "untouched",
+  "zb-blk-2x4-c1-s1@p64": "untouched",
+  "zb-blk-2x4-c2-s1@p31": "untouched",
+  "zb-blk-2x4-c2-s1@p64": "untouched",
+  "zb-blk-2x6-c0-s1@p31": "untouched",
+  "zb-blk-2x6-c0-s1@p64": "untouched",
+  "zb-blk-2x6-c2-s1@p31": "untouched",
+  "zb-blk-2x6-c2-s1@p64": "untouched",
+  "zb-blk-3x3-c0-s1@p31": "untouched",
+  "zb-blk-3x3-c0-s1@p64": "untouched",
+  "zb-blk-3x3-c3-s1@p31": "untouched",
+  "zb-blk-3x3-c3-s1@p64": "untouched",
+  "zb-blk-3x4-c3-s1@p31": "untouched",
+  "zb-blk-3x4-c3-s1@p64": "untouched",
+  "zb-col-gnm-12-17-s1@p31": "development",
+  "zb-col-gnm-12-17-s1@p64": "development",
+  "zb-col-gnm-12-17-s2@p31": "development",
+  "zb-col-gnm-12-17-s2@p64": "development",
+  "zb-col-gnm-12-21-s1@p31": "development",
+  "zb-col-gnm-12-21-s1@p64": "development",
+  "zb-col-grid-3x4@p31": "development",
+  "zb-col-grid-3x4@p64": "development",
+  "zb-col-grid-4x5@p31": "development",
+  "zb-col-grid-4x5@p64": "development",
+  "zb-col-grid-5x5@p31": "development",
+  "zb-col-grid-5x5@p64": "development",
+  "zb-col-ktree2-12-s1@p31": "development",
+  "zb-col-ktree2-12-s1@p64": "development",
+  "zb-col-path-12@p31": "development",
+  "zb-col-path-12@p64": "development",
+  "zb-col-path-8@p31": "development",
+  "zb-col-path-8@p64": "development",
+  "zb-col-tree-12-s1@p31": "development",
+  "zb-col-tree-12-s1@p64": "development",
+  "zb-col-tree-8-s1@p31": "development",
+  "zb-col-tree-8-s1@p64": "development",
+  "zb-col-wheel-5@p31": "development",
+  "zb-col-wheel-5@p64": "development",
+  "zb-cyclic-6@p31": "development",
+  "zb-cyclic-6@p64": "development",
+  "zb-cyclic-7@p31": "development",
+  "zb-cyclic-7@p64": "development",
+  "zb-det-2x4-lin-s1@p31": "validation",
+  "zb-det-2x4-lin-s1@p64": "validation",
+  "zb-det-2x4-quad-s1@p31": "validation",
+  "zb-det-2x4-quad-s1@p64": "validation",
+  "zb-det-2x6-lin-n8-s1@p31": "validation",
+  "zb-det-2x6-lin-n8-s1@p64": "validation",
+  "zb-det-2x6-lin-s1@p31": "validation",
+  "zb-det-2x6-lin-s1@p64": "validation",
+  "zb-det-3x5-lin-s1@p31": "validation",
+  "zb-det-3x5-lin-s1@p64": "validation",
+  "zb-eco-12@p31": "development",
+  "zb-eco-12@p64": "development",
+  "zb-eco-8@p31": "development",
+  "zb-eco-8@p64": "development",
+  "zb-katsura-12@p31": "development",
+  "zb-katsura-12@p64": "development",
+  "zb-katsura-9@p31": "development",
+  "zb-katsura-9@p64": "development",
+  "zb-noon-5@p31": "development",
+  "zb-noon-5@p64": "development",
+  "zb-noon-7@p31": "development",
+  "zb-noon-7@p64": "development",
+  "zb-nr-10-e1-collide-s1@p31": "untouched",
+  "zb-nr-10-e1-collide-s1@p64": "untouched",
+  "zb-nr-12-e1-collide-s1@p31": "untouched",
+  "zb-nr-12-e1-collide-s1@p64": "untouched",
+  "zb-nr-5-e2-collide-s1@p31": "untouched",
+  "zb-nr-5-e2-collide-s1@p64": "untouched",
+  "zb-nr-6-e1-collide-s1@p31": "untouched",
+  "zb-nr-6-e1-collide-s1@p64": "untouched",
+  "zb-nr-6-e1-distinct-s1@p31": "untouched",
+  "zb-nr-6-e1-distinct-s1@p64": "untouched",
+  "zb-nr-8-e1-collide-s1@p31": "untouched",
+  "zb-nr-8-e1-collide-s1@p64": "untouched",
+  "zb-nr-8-e1-distinct-s1@p31": "untouched",
+  "zb-nr-8-e1-distinct-s1@p64": "untouched",
+  "zb-pd-12-24-d2-s1@p31": "untouched",
+  "zb-pd-12-24-d2-s1@p64": "untouched",
+  "zb-pd-14-14-d2-s1@p31": "untouched",
+  "zb-pd-14-14-d2-s1@p64": "untouched",
+  "zb-pd-6-6-d3-s1@p31": "untouched",
+  "zb-pd-6-6-d3-s1@p64": "untouched",
+  "zb-pd-7-10-mixed-s1@p31": "untouched",
+  "zb-pd-7-10-mixed-s1@p64": "untouched",
+  "zb-pd-8-8-d2-s1@p31": "untouched",
+  "zb-pd-8-8-d2-s1@p64": "untouched",
+  "zb-ps-10-15-d2-t12-s1@p31": "untouched",
+  "zb-ps-10-15-d2-t12-s1@p64": "untouched",
+  "zb-ps-10-15-d2-t12-s2@p31": "untouched",
+  "zb-ps-10-15-d2-t12-s2@p64": "untouched",
+  "zb-ps-14-21-d2-t16-s1@p31": "untouched",
+  "zb-ps-14-21-d2-t16-s1@p64": "untouched",
+  "zb-ps-16-16-d2-t18-s1@p31": "untouched",
+  "zb-ps-16-16-d2-t18-s1@p64": "untouched",
+  "zb-ps-8-8-d3-t10-s1@p31": "untouched",
+  "zb-ps-8-8-d3-t10-s1@p64": "untouched",
+  "zb-reimer-4@p31": "development",
+  "zb-reimer-4@p64": "development",
+  "zb-reimer-6@p31": "development",
+  "zb-reimer-6@p64": "development",
+  "zb-toric-rnc-5@p31": "development",
+  "zb-toric-rnc-5@p64": "untouched",
+  "zb-toric-rnc-8-slice-s1@p31": "development",
+  "zb-toric-rnc-8-slice-s1@p64": "untouched",
+  "zb-toric-segre-3x3-slice-s1@p31": "development",
+  "zb-toric-segre-3x3-slice-s1@p64": "untouched",
+  "zb-toric-segre-3x3@p31": "development",
+  "zb-toric-segre-3x3@p64": "untouched",
+  "zb-toric-segre-3x5-slice-s1@p31": "development",
+  "zb-toric-segre-3x5-slice-s1@p64": "untouched",
+  "zb-toric-segre-4x4-slice-s1@p31": "development",
+  "zb-toric-segre-4x4-slice-s1@p64": "untouched",
+  "zb-tri-5-d3-s1@p31": "untouched",
+  "zb-tri-5-d3-s1@p64": "untouched",
+  "zb-tri-6-d2-s1@p31": "untouched",
+  "zb-tri-6-d2-s1@p64": "untouched",
+  "zb-tri-8-d2-s1@p31": "untouched",
+  "zb-tri-8-d2-s1@p64": "untouched",
+  "zb-tri-hidden-11-d2-s1@p31": "untouched",
+  "zb-tri-hidden-11-d2-s1@p64": "untouched",
+  "zb-tri-hidden-5-d3-s1@p31": "untouched",
+  "zb-tri-hidden-5-d3-s1@p64": "untouched",
+  "zb-tri-hidden-6-d2-s1@p31": "untouched",
+  "zb-tri-hidden-6-d2-s1@p64": "untouched",
+  "zb-tri-hidden-8-d2-s1@p31": "untouched",
+  "zb-tri-hidden-8-d2-s1@p64": "untouched"
+ },
+ "carve_outs": {
+  "S3": {
+   "group": [
+    "sd-singular-schwarz-10@p31",
+    "sd-singular-schwarz-10@p64",
+    "sd-singular-schwarz-11@p31",
+    "sd-singular-schwarz-11@p64",
+    "sd-singular-schwarz-7@p31",
+    "sd-singular-schwarz-7@p64",
+    "sd-singular-schwarz-8@p31",
+    "sd-singular-schwarz-8@p64",
+    "sd-singular-schwarz-9@p31",
+    "sd-singular-schwarz-9@p64"
+   ],
+   "moved": [
+    "sd-singular-schwarz-11@p31",
+    "sd-singular-schwarz-11@p64"
+   ],
+   "n": 11
+  },
+  "S5": {
+   "field": "18446744073709551557",
+   "group": [
+    "zb-toric-rnc-5@p31",
+    "zb-toric-rnc-5@p64",
+    "zb-toric-rnc-8-slice-s1@p31",
+    "zb-toric-rnc-8-slice-s1@p64",
+    "zb-toric-segre-3x3-slice-s1@p31",
+    "zb-toric-segre-3x3-slice-s1@p64",
+    "zb-toric-segre-3x3@p31",
+    "zb-toric-segre-3x3@p64",
+    "zb-toric-segre-3x5-slice-s1@p31",
+    "zb-toric-segre-3x5-slice-s1@p64",
+    "zb-toric-segre-4x4-slice-s1@p31",
+    "zb-toric-segre-4x4-slice-s1@p64"
+   ],
+   "moved": [
+    "zb-toric-rnc-5@p64",
+    "zb-toric-rnc-8-slice-s1@p64",
+    "zb-toric-segre-3x3-slice-s1@p64",
+    "zb-toric-segre-3x3@p64",
+    "zb-toric-segre-3x5-slice-s1@p64",
+    "zb-toric-segre-4x4-slice-s1@p64"
+   ]
+  }
+ },
+ "catalog_sha256": "95e4523e09f86214925c0fc6c455483db8629eeb3261290fd5c19261cc2c5a36",
+ "catalogs": {
+  "research/m34-public-corpus/catalog.json": "23d7a7815a12af654c9eb07647d0251e79342eebfb5e1e09bb0eea26ce45c296",
+  "research/m34-structural-corpus/catalog.json": "4d4902b3fb2da259795d75c679509c7dd40e011d760c8e74ecd925eeb113d3ad"
+ },
+ "counts": {
+  "development": 122,
+  "untouched": 88,
+  "validation": 44
+ },
+ "group_table": [
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/virasoro"
+   ],
+   "hash": "091bd7c97dfd52f25cc65911cbb53a4262f987fd96aa16070de4faa6198d760b",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": true,
+   "families": [
+    "cyclic"
+   ],
+   "hash": "0d1b45beaed15ddaec22d64096a95ac4bc5b3b54b3c5ce5161a626f18c6d8fe1",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/caprasse"
+   ],
+   "hash": "16764a62567aebf37b8ad04782b03790cca69a8eadd90c77893eaf6c4a4fe0e1",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": true,
+   "families": [
+    "noon"
+   ],
+   "hash": "2326c052ea05c2ed13fcd5893b42bb1f27f02b1fee02d6c3a5489dad12bd8794",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/czapor-86a"
+   ],
+   "hash": "2355b06a742654e5feccaeb994c6e3694622e05b988e0a8a55f1009c1da0bdeb",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/rose"
+   ],
+   "hash": "26c636fdc31cab703cfabf1da72f901e48ab68bb834ffa1dad555783323e38f7",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/chemkin"
+   ],
+   "hash": "327970137d4413261a43f736a1dbafcd21c870ad4c75c68312dc346f25f7a0de",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "zb/coupled-blocks"
+   ],
+   "hash": "3bf3485846a44116ec184f4a5e5fc16cd4b4add594479a09c38d5616f320ff39",
+   "records": 16
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/fee_1"
+   ],
+   "hash": "420bcbf3d2d5bca28828ec800dd5943dbdcf6216650450f69279782f4a97c18c",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": true,
+   "families": [
+    "eco"
+   ],
+   "hash": "4eabb483ff720047f677f03d4ce2263bef962a0f28831a483cb044baf67e9fb2",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "zb/planted-sparse"
+   ],
+   "hash": "4feb800fc62391fd5e6e80891bba5b0c1e686d22d9ad17595683710d77fdd78c",
+   "records": 10
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/bjoerk_8"
+   ],
+   "hash": "56875123d5025916ef333f6bd0b02c37ff03d2d0294c33fd48703dd1b339d2ce",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "zb/hidden-triangular",
+    "zb/nonradical-triangular",
+    "zb/planted-dense"
+   ],
+   "hash": "590581826e84ea52ed43a375fc88731756c41547716ed90604aeeba1c3d7a779",
+   "records": 38
+  },
+  {
+   "cohort": [
+    "validation"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/schiele"
+   ],
+   "hash": "5ec563b2325449290b397ecb857593e9565f5368e63892041f51937671292603",
+   "records": 6
+  },
+  {
+   "cohort": [
+    "validation"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/signal-theory"
+   ],
+   "hash": "62b3c65a40c687332dafff3dcf46e8d8c9a61fddea16db4898ae9511662800b3",
+   "records": 8
+  },
+  {
+   "cohort": [
+    "validation"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/trinks"
+   ],
+   "hash": "69fb1ce76732a683e9cc64318ae5a2dbec04dec5d323ef9d3e8e4a1684ba870c",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "validation"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/fourcircles"
+   ],
+   "hash": "6bd4b60d82570327af9773bf83cae4bad34f236cff18dbe41f599e79a37fb9ca",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "validation"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/robot-kinematics"
+   ],
+   "hash": "776462583d82b0b399a9ee9cf18e580d1b98a2669326f2b1941fd7fdf03ee862",
+   "records": 8
+  },
+  {
+   "cohort": [
+    "validation"
+   ],
+   "exposed": false,
+   "families": [
+    "zb/determinantal"
+   ],
+   "hash": "784ae0630f7dac59567087b1f3681c48d11e2ebe093540b714907ed38c291cd2",
+   "records": 10
+  },
+  {
+   "cohort": [
+    "validation"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/gametwo-nash"
+   ],
+   "hash": "8aff681ff71b13794955dd60b33aee6a1da5405af48d504749f32c51e9b25901",
+   "records": 6
+  },
+  {
+   "cohort": [
+    "development",
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "zb/toric"
+   ],
+   "hash": "8f7e43c4e0af0d4f13a5045a888ba5f3b23953beadb626fc767dbf0c4f712cdf",
+   "records": 12
+  },
+  {
+   "cohort": [
+    "development",
+    "untouched"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/schwarz"
+   ],
+   "hash": "924184e1e2fce43c2b479756b2ff6a9303d4d91968db0bee3da2e5b4b0bf824d",
+   "records": 10
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/four-body"
+   ],
+   "hash": "94809c48c18a20266db986f42bd26b4b12636399ddbc4a9de024a7b2d361cf38",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/weispfenning-94"
+   ],
+   "hash": "9a906dd6f340c81e6da276303d963284f0bfa921198eca1342d4016f93577c6b",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/heron"
+   ],
+   "hash": "9e8a746bd5aa40f7e59089c62429ad2a8f3fb00071ef19f060a8f2f347f32155",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "zb/graph-3colouring"
+   ],
+   "hash": "ad3c793e5a40d6eedb5ba641bd5d06bfa0f9bcee0d6d0a3865b6da68e3110021",
+   "records": 24
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "app/chandrasekhar-h"
+   ],
+   "hash": "cb41652882ec47c8a65eb40000015e6edc92be9d7cd0011e6e2211156f038388",
+   "records": 20
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/runge-kutta-order-conditions"
+   ],
+   "hash": "d0c6dd1ddd5483984d670987c1bdba500b0121f8ac6621524e437dcc30eaa483",
+   "records": 8
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": true,
+   "families": [
+    "katsura"
+   ],
+   "hash": "d6b335075f38ce6c8904114f7db65ee27528e5f1257853f45d6400545808e23b",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "app/multisite-phosphorylation"
+   ],
+   "hash": "dab8e766f0fce32bd89a3ca3083abfeb87cccc9288468ff709bf4b3504e9ed8c",
+   "records": 18
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/raksanyi"
+   ],
+   "hash": "e1b7495fa4894a4a621943c0bbe2d42cea92ae611ddf65697c177e0438e053de",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": true,
+   "families": [
+    "reimer"
+   ],
+   "hash": "ed1d75e2c52fa3f182bfdf37c360452574b2c24ad718a3d3804901f0608ccc74",
+   "records": 4
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/classical/cassou"
+   ],
+   "hash": "ed9a498c0ec301562ad64a4435657facf9c265bbfe65fd9adba23004184efa9b",
+   "records": 2
+  },
+  {
+   "cohort": [
+    "development"
+   ],
+   "exposed": false,
+   "families": [
+    "sd/ellipsoid"
+   ],
+   "hash": "f15fd1dcf20f7dfab31b69e1753eb3a7b0c07d10a8476818eb8d96b16d549b9e",
+   "records": 6
+  }
+ ],
+ "groups": 34,
+ "protocol": "S2",
+ "rule": "#1012 J1 (issuecomment-7151054452)",
+ "salt": "m34-s0-v1",
+ "schema": "m34-cohorts-v1",
+ "untouched_groups": 10,
+ "validation_groups": 7
+}

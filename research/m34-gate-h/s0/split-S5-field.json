@@ -1,0 +1,54 @@
+{
+ "assignments": [
+  {
+   "id": "zb-toric-rnc-5@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-rnc-5@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-toric-rnc-8-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-rnc-8-slice-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-toric-segre-3x3-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x3-slice-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-toric-segre-3x3@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x3@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-toric-segre-3x5-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-3x5-slice-s1@p64",
+   "partition": "evaluation"
+  },
+  {
+   "id": "zb-toric-segre-4x4-slice-s1@p31",
+   "partition": "development"
+  },
+  {
+   "id": "zb-toric-segre-4x4-slice-s1@p64",
+   "partition": "evaluation"
+  }
+ ],
+ "protocol": "S5-field",
+ "schema": "corpus-split-v1"
+}
