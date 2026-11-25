@@ -44,6 +44,14 @@ Jobs: `S1`/`S16` = `sig_f4_study` `a`, `a2` on the 1- and 16-worker cells (held-
 32 MiB. `V*-try*` = `a` vs `m5` validation. `-W4` = the same under W4-32 (`stream 32` on
 `0-7,24-71,88-127`), calibration cells only.
 
+**Defect in session 1's loaded steps.** The loader was started as `setsid taskset … stream 32` in a
+new session. `setsid`, already a group leader, forked, so `stream` landed outside the group that
+`killpg` stopped, and every loader outlived its step. `S1-W4` ran under one W4-32 loader, `S16-W4`
+under two, `P-W4` under three. The three were killed by pid at 15:38, after running ~1.5 h with the
+machine otherwise released; `benchlock.log` shows no other bench run in that window. So the W4 rows
+of `summary.md` are W4-32, W4-64 and W4-96 respectively, not W4-32. n is unaffected, because every
+cell's larger half-width is its idle one. `pilot.py` now launches the loader without `setsid`.
+
 Side finding: `bench_running` (#1105) lists the snapshot's own `cat`/`awk` in 343 of 1,049
 snapshots. Its self-exclusion skips children of the script, but these are grandchildren, so the
 field reports the harness as foreign work. Noted on #1148.

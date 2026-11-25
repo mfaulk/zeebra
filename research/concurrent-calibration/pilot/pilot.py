@@ -78,7 +78,7 @@ def run_job(label, m, load=None):
             if runner.poll() is not None:
                 raise SystemExit(f'{label}: runner exited before starting')
             time.sleep(2)
-        loader = subprocess.Popen(['setsid', 'taskset', '-c', REST, str(STREAM), '32'], start_new_session=True)
+        loader = subprocess.Popen(['taskset', '-c', REST, str(STREAM), '32'], start_new_session=True)  # no setsid: as a group leader it forks, and killpg misses stream
         log(f'{label}: W4-32 started pid={loader.pid}')
     rc = runner.wait()
     if loader:
