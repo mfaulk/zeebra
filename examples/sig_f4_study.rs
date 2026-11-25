@@ -1691,6 +1691,12 @@ fn main() {
                 // M34 panel records with 3 or 5 variables (`--catalog`, #1136).
                 ("m31", 3) => run::<3, Zp2147483647>(input, &args),
                 ("m31", 5) => run::<5, Zp2147483647>(input, &args),
+                // Phosphorylation at 4–7 sites, with and without `-nonzero` (#1035).
+                ("m31", 16) => run::<16, Zp2147483647>(input, &args),
+                ("m31", 18) => run::<18, Zp2147483647>(input, &args),
+                ("m31", 21) => run::<21, Zp2147483647>(input, &args),
+                ("m31", 22) => run::<22, Zp2147483647>(input, &args),
+                ("m31", 24) => run::<24, Zp2147483647>(input, &args),
                 // #1033's dense MQ rows, at the two small primes only.
                 ("gf31" | "gf32003", 15 | 18 | 20) => large(input, &args),
                 (field, n) => panic!("no instantiation for {field} with {n} variables"),
