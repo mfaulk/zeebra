@@ -263,59 +263,64 @@ python3 tools/m34_structural_corpus.py compose          # the table below
 
 ## Pilot composition (#1006 + #1007)
 
-Read with `compose` at this commit, over `research/m34-public-corpus` (39 problems) and this panel
-(65 problems). A base problem is its `p31` record. The table is a snapshot: #1006's remainder
-can add rows, so rerun `compose` after it lands. #1005's freeze commit is the binding read.
+Read with `compose` after #1006's remainder (#1128), over `research/m34-public-corpus` (62 problems)
+and this panel (65 problems). A base problem is its `p31` record. #1005's freeze commit is the
+binding read.
 
 | Family | Issue | Base problems | Share | n | m | Scales (distinct n) | Supports | Frontier |
 |---|---|---:|---:|---|---|---:|---:|---:|
-| `sd/chemkin` | #1006 | 1 | 1.0% | 13 | 13 | 1 | 1 | 0 |
-| `sd/classical/bjoerk_8` | #1006 | 1 | 1.0% | 8 | 9 | 1 | 1 | 0 |
-| `sd/classical/caprasse` | #1006 | 1 | 1.0% | 4 | 4 | 1 | 1 | 0 |
-| `sd/classical/cassou` | #1006 | 1 | 1.0% | 4 | 4 | 1 | 1 | 0 |
-| `sd/classical/czapor-86a` | #1006 | 1 | 1.0% | 3 | 3 | 1 | 1 | 0 |
-| `sd/classical/fee_1` | #1006 | 1 | 1.0% | 4 | 4 | 1 | 1 | 0 |
-| `sd/classical/fourcircles` | #1006 | 1 | 1.0% | 2 | 3 | 1 | 1 | 0 |
-| `sd/classical/heron` | #1006 | 1 | 1.0% | 7 | 4 | 1 | 1 | 0 |
-| `sd/classical/raksanyi` | #1006 | 1 | 1.0% | 8 | 4 | 1 | 1 | 0 |
-| `sd/classical/rose` | #1006 | 1 | 1.0% | 3 | 3 | 1 | 1 | 0 |
-| `sd/classical/schiele` | #1006 | 1 | 1.0% | 5 | 4 | 1 | 1 | 0 |
-| `sd/classical/trinks` | #1006 | 2 | 1.9% | 6 | 6–7 | 1 | 2 | 0 |
-| `sd/classical/weispfenning-94` | #1006 | 1 | 1.0% | 3 | 3 | 1 | 1 | 0 |
-| `sd/ellipsoid` | #1006 | 3 | 2.9% | 10 | 4 | 1 | 3 | 0 |
-| `sd/four-body` | #1006 | 1 | 1.0% | 6 | 6 | 1 | 1 | 0 |
-| `sd/gametwo-nash` | #1006 | 3 | 2.9% | 5–7 | 5–7 | 3 | 3 | 1 |
-| `sd/robot-kinematics` | #1006 | 4 | 3.8% | 9–34 | 7–34 | 4 | 4 | 0 |
-| `sd/runge-kutta-order-conditions` | #1006 | 4 | 3.8% | 8–13 | 6–12 | 2 | 4 | 0 |
-| `sd/schwarz` | #1006 | 5 | 4.8% | 7–11 | 7–11 | 5 | 5 | 0 |
-| `sd/signal-theory` | #1006 | 4 | 3.8% | 10–16 | 9–24 | 4 | 4 | 1 |
-| `sd/virasoro` | #1006 | 1 | 1.0% | 8 | 8 | 1 | 1 | 0 |
-| `cyclic` | #1007 | 2 | 1.9% | 6–7 | 6–7 | 2 | 2 | 0 |
-| `eco` | #1007 | 2 | 1.9% | 8–12 | 8–12 | 2 | 2 | 1 |
-| `katsura` | #1007 | 2 | 1.9% | 9–12 | 9–12 | 2 | 2 | 1 |
-| `noon` | #1007 | 2 | 1.9% | 5–7 | 5–7 | 2 | 2 | 0 |
-| `reimer` | #1007 | 2 | 1.9% | 4–6 | 4–6 | 2 | 2 | 0 |
-| `zb/coupled-blocks` | #1007 | 8 | 7.7% | 8–12 | 8–12 | 3 | 4 | 2 |
-| `zb/determinantal` | #1007 | 5 | 4.8% | 3–8 | 6–15 | 3 | 5 | 0 |
-| `zb/graph-3colouring` | #1007 | 12 | 11.5% | 6–25 | 15–65 | 5 | 12 | 0 |
-| `zb/hidden-triangular` | #1007 | 7 | 6.7% | 5–11 | 5–11 | 4 | 4 | 1 |
-| `zb/nonradical-triangular` | #1007 | 7 | 6.7% | 5–12 | 5–12 | 5 | 5 | 1 |
-| `zb/planted-dense` | #1007 | 5 | 4.8% | 6–14 | 6–24 | 5 | 5 | 1 |
-| `zb/planted-sparse` | #1007 | 5 | 4.8% | 8–16 | 8–21 | 4 | 5 | 2 |
-| `zb/toric` | #1007 | 6 | 5.8% | 6–16 | 9–43 | 4 | 6 | 0 |
+| `app/chandrasekhar-h` | #1006 | 10 | 7.9% | 4–13 | 4–13 | 10 | 10 | 2 |
+| `app/multisite-phosphorylation` | #1006 | 9 | 7.1% | 9–24 | 9–24 | 9 | 9 | 0 |
+| `sd/chemkin` | #1006 | 1 | 0.8% | 13 | 13 | 1 | 1 | 0 |
+| `sd/classical/bjoerk_8` | #1006 | 1 | 0.8% | 8 | 9 | 1 | 1 | 0 |
+| `sd/classical/caprasse` | #1006 | 1 | 0.8% | 4 | 4 | 1 | 1 | 0 |
+| `sd/classical/cassou` | #1006 | 1 | 0.8% | 4 | 4 | 1 | 1 | 0 |
+| `sd/classical/czapor-86a` | #1006 | 1 | 0.8% | 3 | 3 | 1 | 1 | 0 |
+| `sd/classical/fee_1` | #1006 | 2 | 1.6% | 4–5 | 4 | 2 | 2 | 0 |
+| `sd/classical/fourcircles` | #1006 | 1 | 0.8% | 2 | 3 | 1 | 1 | 0 |
+| `sd/classical/heron` | #1006 | 2 | 1.6% | 6–7 | 3–4 | 2 | 2 | 0 |
+| `sd/classical/raksanyi` | #1006 | 1 | 0.8% | 8 | 4 | 1 | 1 | 0 |
+| `sd/classical/rose` | #1006 | 1 | 0.8% | 3 | 3 | 1 | 1 | 0 |
+| `sd/classical/schiele` | #1006 | 3 | 2.4% | 2–5 | 2–4 | 3 | 3 | 0 |
+| `sd/classical/trinks` | #1006 | 2 | 1.6% | 6 | 6–7 | 1 | 2 | 0 |
+| `sd/classical/weispfenning-94` | #1006 | 1 | 0.8% | 3 | 3 | 1 | 1 | 0 |
+| `sd/ellipsoid` | #1006 | 3 | 2.4% | 10 | 4 | 1 | 3 | 0 |
+| `sd/four-body` | #1006 | 1 | 0.8% | 6 | 6 | 1 | 1 | 0 |
+| `sd/gametwo-nash` | #1006 | 3 | 2.4% | 5–7 | 5–7 | 3 | 3 | 1 |
+| `sd/robot-kinematics` | #1006 | 4 | 3.1% | 9–34 | 7–34 | 4 | 4 | 0 |
+| `sd/runge-kutta-order-conditions` | #1006 | 4 | 3.1% | 8–13 | 6–12 | 2 | 4 | 0 |
+| `sd/schwarz` | #1006 | 5 | 3.9% | 7–11 | 7–11 | 5 | 5 | 0 |
+| `sd/signal-theory` | #1006 | 4 | 3.1% | 10–16 | 9–24 | 4 | 4 | 1 |
+| `sd/virasoro` | #1006 | 1 | 0.8% | 8 | 8 | 1 | 1 | 0 |
+| `cyclic` | #1007 | 2 | 1.6% | 6–7 | 6–7 | 2 | 2 | 0 |
+| `eco` | #1007 | 2 | 1.6% | 8–12 | 8–12 | 2 | 2 | 1 |
+| `katsura` | #1007 | 2 | 1.6% | 9–12 | 9–12 | 2 | 2 | 1 |
+| `noon` | #1007 | 2 | 1.6% | 5–7 | 5–7 | 2 | 2 | 0 |
+| `reimer` | #1007 | 2 | 1.6% | 4–6 | 4–6 | 2 | 2 | 0 |
+| `zb/coupled-blocks` | #1007 | 8 | 6.3% | 8–12 | 8–12 | 3 | 4 | 2 |
+| `zb/determinantal` | #1007 | 5 | 3.9% | 3–8 | 6–15 | 3 | 5 | 0 |
+| `zb/graph-3colouring` | #1007 | 12 | 9.4% | 6–25 | 15–65 | 5 | 12 | 0 |
+| `zb/hidden-triangular` | #1007 | 7 | 5.5% | 5–11 | 5–11 | 4 | 4 | 1 |
+| `zb/nonradical-triangular` | #1007 | 7 | 5.5% | 5–12 | 5–12 | 5 | 5 | 1 |
+| `zb/planted-dense` | #1007 | 5 | 3.9% | 6–14 | 6–24 | 5 | 5 | 1 |
+| `zb/planted-sparse` | #1007 | 5 | 3.9% | 8–16 | 8–21 | 4 | 5 | 2 |
+| `zb/toric` | #1007 | 6 | 4.7% | 6–16 | 9–43 | 4 | 6 | 0 |
 
-- met: 34 families (≥ 10)
-- met: 104 base problems (≥ 60)
-- met: 21 families from #1006, 13 families from #1007 (≥ 4 each)
-- met: largest family 12 of 104 (≤ 15%)
+- met: 36 families (≥ 10)
+- met: 127 base problems (≥ 60)
+- met: 23 families from #1006, 13 families from #1007 (≥ 4 each)
+- met: largest family 12 of 127 (≤ 15%)
 - met: seeded families with < 2 supports: none
-- **not met**: families with one scale: 16
-- met: 11 frontier base problems, 10.6% (≥ 10%)
+- **not met**: families with one scale: 13
+- met: 13 frontier base problems, 10.2% (≥ 10%)
 
-- **Families with one scale.** All 16 are #1006's: the 12 `sd/classical/*` models, `sd/chemkin`,
-  `sd/four-body` and `sd/virasoro`, plus `sd/ellipsoid`, whose three problems share n = 10. Every
-  #1007 family covers at least two scales. Closing this gap is #1006's remainder, or an owner
-  waiver of the two-scale rule for single-model public families.
+- **Families with one scale.** All 13 are #1006's: nine `sd/classical/*` models, `sd/ellipsoid`
+  (three problems, all at n = 10), `sd/chemkin`, `sd/four-body` and `sd/virasoro`. Every #1007
+  family covers at least two scales. #1006 added each exact public second scale that exists (Fee,
+  Schiele, Heron). Its README records, family by family, why the rest have none, and gives the
+  owner's options. One option waives the rule for single-model public families. The other leaves
+  their 16 problems out of the pilot: 111 base problems in 23 families with 13 frontier (11.7%),
+  where every rule is met.
 - **Small inputs** (best arm under 300 ms) are not read here, because no arm has been timed. Ladders
   such as `reimer-4` and `noon-5`, the colouring paths, `det-2x4-*` and the sliced toric systems are
   the expected small rows; #1012's matrix decides.

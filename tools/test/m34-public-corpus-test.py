@@ -131,6 +131,11 @@ class Generators(unittest.TestCase):
                          {(1, 0): 400, (2, 0): -51, (1, 1): -34, (0, 0): -400})
         self.assertEqual(entry['excluded_primes'], [2, 5])
 
+    def test_chandrasekhar_excluded_primes_are_the_small_denominator_primes(self):
+        """At n=13 the excluded primes are the reduced denominators' factors: 17 cancels against c = 51/50."""
+        excluded = corpus.chandrasekhar_h(n=13, c=[51, 50])['excluded_primes']
+        self.assertEqual(excluded, [2, 3, 5, 7, 11, 13, 19, 23])
+
     def test_phosphorylation_is_square_and_conserves_mass(self):
         """The n-site steady state has 3n+3 equations in 3n+3 species, three of them conservation laws."""
         for n in (1, 3):

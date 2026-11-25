@@ -327,7 +327,9 @@
    "formulation_id": "symbolicdata/Fee_1",
    "family_parameters": {
     "n": 4
-   }
+   },
+   "presentation_parent": "sd-fee-2",
+   "note": "Fee_2 specialized at b=2"
   },
   {
    "id": "sd-rose",
@@ -408,6 +410,52 @@
    "family_parameters": {
     "n": 2
    }
+  },
+  {
+   "id": "sd-fee-2",
+   "source_entry": "Fee_2",
+   "family_id": "sd/classical/fee_1",
+   "source_id": "symbolicdata/Fee_1",
+   "formulation_id": "symbolicdata/Fee_2",
+   "family_parameters": {
+    "n": 5
+   },
+   "note": "Fee_1 is Fee_2(b=2) (SymbolicData PolynomialSystems.ttl); b kept as a variable"
+  },
+  {
+   "id": "sd-schiele-1",
+   "source_entry": "Schiele_1",
+   "family_id": "sd/classical/schiele",
+   "source_id": "symbolicdata/Schiele",
+   "formulation_id": "symbolicdata/Schiele_1",
+   "family_parameters": {
+    "n": 3
+   },
+   "presentation_parent": "sd-schiele",
+   "note": "Schiele after the half-tangent substitution (upstream comment)"
+  },
+  {
+   "id": "sd-schiele-1-1",
+   "source_entry": "Schiele_1_1",
+   "family_id": "sd/classical/schiele",
+   "source_id": "symbolicdata/Schiele",
+   "formulation_id": "symbolicdata/Schiele_1_1",
+   "family_parameters": {
+    "n": 2
+   },
+   "presentation_parent": "sd-schiele-1",
+   "note": "Schiele_1(p=1) (upstream comment)"
+  },
+  {
+   "id": "sd-geometry-heron-1",
+   "source_entry": "Geometry.Heron_1",
+   "family_id": "sd/classical/heron",
+   "source_id": "symbolicdata/Heron",
+   "formulation_id": "symbolicdata/Geometry.Heron_1",
+   "family_parameters": {
+    "n": 6
+   },
+   "note": "Heron's area formula in a second coordinatization by the same contributor; not a transform of Heron"
   },
   {
    "id": "sd-trinks-1",
@@ -563,6 +611,42 @@
    "formulation_id": "chandrasekhar-h/n=11,c=51/50",
    "family_parameters": {
     "n": 11
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-12",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 12,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=12,c=51/50",
+   "family_parameters": {
+    "n": 12
+   }
+  },
+  {
+   "id": "gen-chandrasekhar-h-13",
+   "source": "chandrasekhar-h",
+   "generator": "chandrasekhar-h",
+   "generator_parameters": {
+    "n": 13,
+    "c": [
+     51,
+     50
+    ]
+   },
+   "family_id": "app/chandrasekhar-h",
+   "source_id": "chandrasekhar-h/kelley-1980",
+   "formulation_id": "chandrasekhar-h/n=13,c=51/50",
+   "family_parameters": {
+    "n": 13
    }
   },
   {

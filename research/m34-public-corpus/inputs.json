@@ -194,6 +194,25 @@
    "3*q^2*c^2+12*q*c*p*d-3*q^2*d^2+6*q*p*d^2-3*p^2*d^2-6*q*c^2+12*q*c*d+12*c*p*d-4*q^2+3*c^2+5*p^2-12*c*d+12*d^2-6*p+5"
   ]
  },
+ "Fee_2": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Fee_2.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "6f7813d2e3d8e67b97b6749ead5333fde699770885b154be4241dfee4ef2ce91",
+  "variables": [
+   "q",
+   "c",
+   "p",
+   "d",
+   "b"
+  ],
+  "equations": [
+   "-2*q*p-p^2*b^2+2*p^2-2*q+2*p*b^2-b^2+2",
+   "-q*c*p*b-q*c*p+2*q*p*d+p^2*d*b^2+p^2*d*b-2*p^2*d+q*c*b-2*q*c+c*p*b+c*p+q*d-2*p*d*b^2+p*d*b-p*d-c*b+2*c+d*b^2-2*d*b",
+   "q^2*c^2-2*q^2*c*d-2*q*c*p*d*b+2*q*c*p*d+q^2*d^2+2*q*p*d^2*b-2*q*p*d^2+p^2*d^2*b^2-2*p^2*d^2*b+p^2*d^2-2*q*c^2+2*q*c*p*b+2*q*c*d+2*c*p*d*b-2*c*p*d-2*q*d^2*b-2*p*d^2*b^2+2*p*d^2*b+c^2+2*q*p*b-2*q*p+2*p^2*b^2+2*p^2-2*c*d*b+d^2*b^2-2*q*b+2*q-4*p*b^2+4*p*b+2*b^2-4*b+2",
+   "3*q^2*c^2+6*q*c*p*d*b-3*q^2*d^2+6*q*p*d^2-3*p^2*d^2-6*q*c^2+6*q*c*d*b+6*c*p*d*b-4*q^2+3*c^2+p^2*b^2+p^2-6*c*d*b+3*d^2*b^2-2*p*b^2+2*p+b^2+1"
+  ]
+ },
  "FourBodyProblem": {
   "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/FourBodyProblem.xml",
   "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
@@ -229,6 +248,25 @@
    "8*y^6*x+24*y^4*x^3+24*y^2*x^5+8*x^7-12*y^5*x-24*y^3*x^3-12*y*x^5-14*y^4*x-44*y^2*x^3-30*x^5+24*y^3*x+40*y*x^3+8*y^2*x+16*x^3-16*y*x",
    "8*y^7+24*y^5*x^2+24*y^3*x^4+8*y*x^6-14*y^6-30*y^4*x^2-18*y^2*x^4-2*x^6-6*y^5-28*y^3*x^2-22*y*x^4+10*y^4+36*y^2*x^2+10*x^4+8*y*x^2-8*x^2",
    "y^8+4*y^6*x^2+6*y^4*x^4+4*y^2*x^6+x^8-2*y^7-6*y^5*x^2-6*y^3*x^4-2*y*x^6-y^6-7*y^4*x^2-11*y^2*x^4-5*x^6+2*y^5+12*y^3*x^2+10*y*x^4+4*y^2*x^2+4*x^4-8*y*x^2"
+  ]
+ },
+ "Geometry.Heron_1": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Geometry.Heron_1.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "deda4799fdfc6c3745257e6726faa877956e8b9172005e4fc831644aaeadf888",
+  "variables": [
+   "x1",
+   "x2",
+   "a",
+   "b",
+   "c",
+   "area"
+  ],
+  "equations": [
+   "-x2*c+area",
+   "x1^2+x2^2-b^2",
+   "x1^2+x2^2-a^2-2*x1*c+c^2"
   ]
  },
  "Hairer_1": {
@@ -576,6 +614,35 @@
    "s1^2+c1^2-1",
    "-s1^4*s2^3*c2-s1^2*s2^3*c1^2*c2-2*s1^3*s2^2*c1*c2^2-2*s1*s2^2*c1^3*c2^2-s1^2*s2*c1^2*c2^3-s2*c1^4*c2^3+2*s1^3*s2^2*c1+2*s1*s2^2*c1^3+2*s1^2*s2*c1^2*c2+2*s2*c1^4*c2+s1*s2^2*c1*c2^2-s1^2*s2*c2^3+s2*c1^2*c2^3-s1*c1*c2^4+2*s1^2*s2*c2-2*s2*c1^2*c2+4*s1*c1*c2^2-4*s1*c1+s1*p",
    "-2*s1^3*s2^4*c1-4*s1^2*s2^3*c1^2*c2-2*s1^3*s2^2*c1*c2^2-2*s1*s2^2*c1^3*c2^2-4*s1^2*s2*c1^2*c2^3-2*s1*c1^3*c2^4-4*s1*s2^2*c1^3+2*s1^2*s2^3*c2+4*s1^2*s2*c1^2*c2-4*s2*c1^4*c2+2*s1*s2^2*c1*c2^2+4*s1*c1^3*c2^2+2*s1^2*s2*c2^3+2*s1*c1*c2^4+4*s1*s2^2*c1+8*s2*c1^2*c2-4*s1*c1*c2^2-4*s2*c2+s2*p"
+  ]
+ },
+ "Schiele_1": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Schiele_1.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "c378527af03e62a8f9ee57b8d3ab295eb22d71c4af290f4bb2577cf34caf290f",
+  "variables": [
+   "x",
+   "y",
+   "p"
+  ],
+  "equations": [
+   "x^2*y^4*p+x^2*y^4+2*x^2*y^2*p+6*x^2*y^2-4*x*y^3+y^4*p-y^4+x^2*p+x^2+4*x*y+2*y^2*p-6*y^2+p-1",
+   "x^8*y^3*p+x^8*y*p+4*x^6*y^3*p-8*x^6*y^3+8*x^5*y^4+4*x^6*y*p+8*x^6*y-48*x^5*y^2+6*x^4*y^3*p+48*x^4*y^3-8*x^3*y^4+8*x^5+6*x^4*y*p-48*x^4*y+48*x^3*y^2+4*x^2*y^3*p-8*x^2*y^3-8*x^3+4*x^2*y*p+8*x^2*y+y^3*p+y*p"
+  ]
+ },
+ "Schiele_1_1": {
+  "url": "https://github.com/symbolicdata/data/blob/a5cdf5366150bffba22a2c91a86a012dd23831af/XMLResources/IntPS/Schiele_1_1.xml",
+  "revision": "a5cdf5366150bffba22a2c91a86a012dd23831af",
+  "license": "CC0-1.0: SymbolicData Data Catalogue (RDFData/SymbolicData.ttl:13); exact integer IntPS systems",
+  "file_sha256": "a07cc345d517d47bc1b31a9c14196be0b10fa4352b58df405f596fa56f73e34e",
+  "variables": [
+   "x",
+   "y"
+  ],
+  "equations": [
+   "x^2*y^4+4*x^2*y^2-2*x*y^3+x^2+2*x*y-2*y^2",
+   "x^8*y^3+x^8*y-4*x^6*y^3+8*x^5*y^4+12*x^6*y-48*x^5*y^2+54*x^4*y^3-8*x^3*y^4+8*x^5-42*x^4*y+48*x^3*y^2-4*x^2*y^3-8*x^3+12*x^2*y+y^3+y"
   ]
  },
  "SignalTheory.f633": {

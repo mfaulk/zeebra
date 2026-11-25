@@ -1,11 +1,11 @@
 # #1006: public application panel
 
 This is M34's public application corpus ([plan §8.2](../../docs/MILESTONE-GENERALIZABLE-SELECTION.md)).
-It holds **56 base problems in 23 families**. 39 are exact integer systems from the SymbolicData
-collection. 17 come from two application models outside it, built by independently written
+It holds **62 base problems in 23 families**. 43 are exact integer systems from the SymbolicData
+collection. 19 come from two application models outside it, built by independently written
 generators: the Chandrasekhar H-equation and n-site phosphorylation steady states. Each problem is
 admitted at two fields, 2³¹−1 (`p31`) and 2⁶⁴−59 (`p64`), with grevlex and task `T-GB`. That gives
-112 `corpus-instance-v1` records under the [lineage contract](../../docs/research/corpus-lineage.md).
+124 `corpus-instance-v1` records under the [lineage contract](../../docs/research/corpus-lineage.md).
 
 This slice is **not a cohort freeze**. The panel is admitted but unsplit; #1005's separate freeze
 commit draws the cohorts once #1006 and #1007 are complete. No solver timings are recorded here,
@@ -32,7 +32,7 @@ python3 tools/m34_public_corpus.py catalog
 # References: Singular (build 44105) at p31, certified grobx 0.155.1 at p64
 # (tools/external/grobx-driver); about 10 minutes at --jobs 12, untimed:
 python3 tools/m34_public_corpus.py references --timeout 120 --grobx-timeout 300 --jobs 12
-# Only rows that are missing or whose input digest changed (about 3 minutes for the 34 generated rows):
+# Only rows that are missing or whose input digest changed (new or changed rows only):
 python3 tools/m34_public_corpus.py references --missing --timeout 120 --grobx-timeout 300 --jobs 12
 ```
 
@@ -89,28 +89,33 @@ in 300 s. Its `p31` twin has a reference.
 | `sd-caprasse` | `Caprasse` | `sd/classical/caprasse` | 4 | 4 | 0, vdim 56 |
 | `sd-cassou` | `Cassou` | `sd/classical/cassou` | 4 | 4 | 0, vdim 16 |
 | `sd-trinks`, `sd-trinks-1` | `Trinks`, `Trinks_1` (parent `sd-trinks`) | `sd/classical/trinks` | 6 | 6, 7 | 0, vdim 10 and 2 |
-| `sd-fee-1` | `Fee_1` | `sd/classical/fee_1` | 4 | 4 | 0, vdim 26 |
+| `sd-fee-2` | `Fee_2` | `sd/classical/fee_1` | 5 | 4 | 1; p64 frontier |
+| `sd-fee-1` | `Fee_1` = `Fee_2(b=2)` (parent `sd-fee-2`) | `sd/classical/fee_1` | 4 | 4 | 0, vdim 26 |
 | `sd-rose` | `Rose` | `sd/classical/rose` | 3 | 3 | 0, vdim 136 |
 | `sd-schiele` | `Schiele` | `sd/classical/schiele` | 5 | 4 | 1 |
+| `sd-schiele-1`, `sd-schiele-1-1` | `Schiele_1` (half-tangent substitution, parent `sd-schiele`), `Schiele_1_1` = `Schiele_1(p=1)` (parent `sd-schiele-1`) | `sd/classical/schiele` | 3, 2 | 2, 2 | 1; 0, vdim 38 |
 | `sd-czapor-86a` | `Czapor-86a` | `sd/classical/czapor-86a` | 3 | 3 | 0, vdim 8 |
 | `sd-weispfenning-94` | `Weispfenning-94` | `sd/classical/weispfenning-94` | 3 | 3 | 0, vdim 54 |
 | `sd-raksanyi` | `Raksanyi` | `sd/classical/raksanyi` | 8 | 4 | 4 |
 | `sd-bjoerk-8` | `Bjoerk_8` | `sd/classical/bjoerk_8` | 8 | 9 | unit ideal (basis {1}) |
 | `sd-heron` | `Heron` | `sd/classical/heron` | 7 | 4 | 3 |
+| `sd-geometry-heron-1` | `Geometry.Heron_1`: the same Heron area derivation in other coordinates, same contributor | `sd/classical/heron` | 6 | 3 | 3 |
 | `sd-fourcircles` | `FourCircles` | `sd/classical/fourcircles` | 2 | 3 | 0, vdim 14 |
 
 **Cross-check.** For every zero-dimensional problem where SymbolicData publishes a degree
 (`sd:hasDegree`), Singular's `vdim` at `p31` agrees with it: Caprasse 56, Trinks 10, Trinks_1 2,
-Fee_1 26, Rose 136, Czapor-86a 8, Weispfenning-94 54 and FourCircles 14. That is evidence that the
+Fee_1 26, Rose 136, Czapor-86a 8, Weispfenning-94 54, FourCircles 14 and Schiele_1_1 38. That is evidence that the
 import and the reduction modulo `p31` did not alter these ideals.
 
 **Lineage choices.**
 - `formulation_id` is the upstream entry, so a field twin is the same formulation (§8.2).
-- `presentation_parent` links an `_1` variant to its base where both are admitted.
+- `presentation_parent` links an `_1` variant or an upstream specialization (`Fee_1 = Fee_2(b=2)`,
+  `Schiele_1_1 = Schiele_1(p=1)`) to its base where both are admitted.
 - `support_id` is the computed `support-v1` digest; reduction removed no term at either prime.
 - Each robot model has its own `source_id` but shares the family, so S2 keeps the family whole.
 - The `sd/classical/*` problems are separate models from different authors, so each is its own
-  family and source. They cover one scale each and do not satisfy §8.2's two-scale rule.
+  family and source. Fee, Schiele and Heron have upstream entries at a second size and now cover
+  two or three scales. The other nine cover one scale (see *Composition hand-off*).
 - The `sd/schwarz` family comes from Singular's example collection. No application model is
   claimed for it.
 
@@ -122,16 +127,18 @@ prime reduction.
 
 | Problem | `family_id` | n | m | Dimension at p31 |
 |---|---|---:|---:|---|
-| `gen-chandrasekhar-h-4` … `-11` | `app/chandrasekhar-h` | 4–11 | 4–11 | 0, vdim 2ⁿ (16 … 2048) |
+| `gen-chandrasekhar-h-4` … `-13` | `app/chandrasekhar-h` | 4–13 | 4–13 | 0, vdim 2ⁿ (16 … 2048) for n ≤ 11; n = 12, 13 frontier at both fields |
 | `gen-phosphorylation-2` … `-7` | `app/multisite-phosphorylation` | 9–24 | 9–24 | 0, vdim 2·sites+1 (5 … 15) |
 | `gen-phosphorylation-{2,4,6}-nonzero` (parent: the same `sites` without `-nonzero`) | `app/multisite-phosphorylation` | 10, 16, 22 | 10, 16, 22 | 0, vdim equal to the parent |
 
 - **Chandrasekhar H-equation.** H(μ) = 1 + (c/2)·μ·H(μ)·∫₀¹ H(ν)/(μ+ν) dν, collocated at
   μᵢ = i/n with the n-point right-endpoint rule: 2n·Hᵢ − c·Hᵢ·Σⱼ i/(i+j)·Hⱼ − 2n = 0 for
   i = 1..n, with albedo c = 51/50. Each equation is scaled by the lcm of its denominators, which is
-  exact over ℚ. Reduction refuses a prime dividing any of those denominators. They are all
-  primes ≤ 2n, for example 2, 3, 5, 7, 11, 13 and 19 at n = 11, and each record's
-  `clear-denominators` transformation lists them. The Bézout bound 2ⁿ is attained at both primes.
+  exact over ℚ. Reduction refuses a prime dividing any of those denominators. They are primes
+  ≤ 2n. 17 never appears, because it cancels against c = 51/50. At n = 13 they are 2, 3, 5, 7, 11, 13, 19 and 23, and each record's
+  `clear-denominators` transformation lists them. Where a reference exists (n ≤ 11), the Bézout
+  bound 2ⁿ is attained at both primes. n = 12 and 13 exceed both oracles' limits and are kept as
+  frontier inputs.
 - **Phosphorylation.** The sequential distributive network Sᵢ + E ⇌ ESᵢ → Sᵢ₊₁ + E and
   Sᵢ₊₁ + F ⇌ FSᵢ₊₁ → Sᵢ + F for i = 0..sites−1, under mass action. The equations are the ODE
   right-hand sides of every complex and of S₀..S_{sites−1}. The dependent rows (S_sites, E, F) are
@@ -182,7 +189,8 @@ staircase of its leading terms. `m34-public-corpus-test.py` asserts that agreeme
 | `Geometry.*` without parameters (135), `Curves.*`, `ZeroDim.*` | Not reviewed yet: generated test sets whose provenance needs per-entry review. Next slice |
 | `satlib.*` | Boolean SAT encodings. This is a different task class from T-GB over a large prime |
 | `Paris.fronville`, `Paris.safey` | 130–165 kB inputs. Deferred until the matrix budget C is fixed (owner decision 3, #1043) |
-| `Amrhein`, `Czapor-86c_2`, `Meintjes`, `Singular.schwarz_6`, `ZeroDim.example_33`, `Cassou_1` | Flagged by the first screen; not reviewed |
+| `Amrhein`, `Czapor-86c_2`, `Meintjes`, `Singular.schwarz_6`, `ZeroDim.example_33` | Flagged by the first screen; not reviewed |
+| `Cassou_1`, `Rose_1`, `FourCircles_1` | Same-size variants of admitted models. They add no scale (see *Composition hand-off*) |
 | The remaining IntPS entries (`Gerdt-*`, `Wang-*`, `Czapor-*`, `Pfister_*`, `Vermeer*` and others) | Not reviewed yet. Candidates for later slices |
 | `ModPS` | Systems that are already modular, at a fixed prime. Not yet reviewed |
 | Saturation outputs I : g^∞ | No #1004 contract or schema `task` for them. The augmented-ideal `T-GB` is admitted instead and labelled as such (see *Inequations and saturation*) |
@@ -196,70 +204,89 @@ staircase of its leading terms. `m34-public-corpus-test.py` asserts that agreeme
 `composition.json` is #1006's side of the combined composition table. `catalog` writes it, and
 `check` fails when it is stale. For each `family_id` it lists the base problems, the scales (the
 distinct values of `n`, the variable count), the `source_id`s, a `multi_scale` flag, and the
-reference-frontier rows at each field. "Frontier" here means the oracle did not finish. It is a
-proxy: §8.2's frontier is "no arm finishes within C", which #1012 measures.
+reference-frontier rows at each field. Frontier here means the oracle did not finish, which is a
+proxy. §8.2's frontier is "no arm finishes within C", and #1012 measures that. The combined table,
+from `python3 tools/m34_structural_corpus.py compose`, is in
+[`research/m34-structural-corpus/README.md`](../m34-structural-corpus/README.md#pilot-composition-1006--1007).
 
 | | Base problems | Families |
 |---|---:|---:|
-| Whole panel | 56 | 23 |
-| Families with ≥ 2 scales (§8.2's rule) | 37 | 7 |
-| Single-scale families: `sd/classical/*` (12), `sd/ellipsoid`, `sd/virasoro`, `sd/four-body`, `sd/chemkin` | 19 | 16 |
+| Whole #1006 panel | 62 | 23 |
+| Families with ≥ 2 scales | 46 | 10 |
+| Single-scale families | 16 | 13 |
 
-The seven multi-scale families are `app/chandrasekhar-h` (8), `app/multisite-phosphorylation` (9),
-`sd/schwarz` (5), `sd/signal-theory` (4), `sd/robot-kinematics` (4),
-`sd/runge-kutta-order-conditions` (4) and `sd/gametwo-nash` (3). All are public applications except
-`sd/schwarz`, which comes from Singular's example collection, so #1006 meets the "≥ 4 public
-application families" part by itself.
+**Second scales added.** Every `sd/*` family was checked against the pinned SymbolicData revision
+for an exact entry of the same model at a different `n`. Three exist, and each is admitted:
 
-- **Single-scale families.** They remain admitted and are usable under S1, S2 and S5. They cannot
-  meet §8.2's two-scale rule, so #1006 counts only the 37 multi-scale problems toward the pilot.
-  Merging them into one family would let them in, but it would turn 16 unrelated models into one
-  S2 group that holds a quarter of #1006's problems. That merge is not made here.
-- **15% cap.** The largest #1006 family, `app/multisite-phosphorylation`, has 9 problems. That is
-  within 15% for any pilot of 60 or more base problems.
-- **Frontier and small.** At `p31`, 2 of 56 problems are oracle-frontier: `sd-signaltheory-f966`
-  and `sd-verschelde-gametwo7`. The phosphorylation problems are all well under a second in
-  Singular. §8.2's ≥ 10% frontier and ≥ 10% small shares are read on arm timings by #1012, not
-  here.
+- `Fee_2` (n = 5), of which `Fee_1` is the specialization b = 2.
+- `Schiele_1` (n = 3, the half-tangent substitution) and `Schiele_1_1` (n = 2, p = 1).
+- `Geometry.Heron_1` (n = 6), the same Heron area derivation in another coordinatization.
+
+The Chandrasekhar ladder was also extended to n = 12 and 13. Both are frontier at both fields.
+
+**Single-scale families, for the owner's waiver decision.** No exact public second scale exists for
+these at the pinned revision, so none was added and none was invented.
+
+| Family | Problems | Why there is no second scale |
+|---|---:|---|
+| `sd/classical/caprasse`, `czapor-86a`, `weispfenning-94`, `raksanyi`, `bjoerk_8` | 1 each | One fixed-size model, with no other entry of the model upstream. Czapor-86b and -86c are different models from the same paper, not scales of 86a |
+| `sd/classical/cassou`, `rose`, `fourcircles`, `trinks` | 1, 1, 1, 2 | Upstream variants (`Cassou_1`: c → c+2; `Rose_1`; `FourCircles_1`: first equation dropped; `Trinks_1`: one generator added) have the same `n`. `Trinks_1` is admitted. The others are not, because they add no scale |
+| `sd/ellipsoid` | 3 | `Ellipsoid_k` for k ∈ {2, 4, −2} all have n = 10. No other size is published |
+| `sd/virasoro`, `sd/chemkin` | 1 each | Single systems in Verschelde's collection |
+| `sd/four-body` | 1 | One fixed-size celestial-mechanics system |
+
+The combined read over 127 base problems in 36 families meets every rule except this one:
+13 families have one scale. The owner has two ways to resolve it:
+
+- **Waive the two-scale rule** for single-model public families. They then enter S1, S2 and S5 and
+  are left out of S3, which needs a scale ladder.
+- **Leave the 16 problems out of the pilot.** The combined read is then 111 base problems in 23
+  families, and 13 of them, 11.7%, are frontier. Every §8.2 rule is met. The problems stay admitted
+  in this catalog either way.
+
+No family exceeds the 15% cap. The largest #1006 family, `app/chandrasekhar-h`, has 10 problems.
 
 ## Coverage by #1009's features
 
-These values come from `examples/feature_costs.rs --skip-solve`, run on all 112 records of this
+These values come from `examples/feature_costs.rs --skip-solve`, run on all 124 records of this
 catalog. The counting rules are `coverage()` in
-[`research/1009-feature-costs/summarize.py`](../1009-feature-costs/summarize.py). These are feature
-*values*, not timings. #1009's cost verdicts stay those of its own campaign, which covered the
-78 first-slice records. Counts are records; each problem has two records, and both fields give the
-same values.
+[`research/1009-feature-costs/summarize.py`](../1009-feature-costs/summarize.py). They are feature
+*values*, not timings. #1009's cost verdicts stay those of its own campaign over the 78 first-slice
+records. Counts are records: each problem has two, and both fields give the same values.
 
-| Question | First slice (78) | Added here (34) | Panel (112) |
+| Question | First slice (78) | Added here (46) | Panel (124) |
 |---|---:|---:|---:|
-| variables `n` | 2–34 | 4–24 | 2–34 |
+| variables `n` | 2–34 | 2–24 | 2–34 |
 | wide inputs, `n > 16` | 2 | 8 | 10 |
-| max degree | 2–12 | 2–10 | 2–12 |
-| terms | 12–796 | 24–143 | 12–796 |
-| `m > n` / `m = n` / `m < n` | 12 / 44 / 22 | 0 / 34 / 0 | 12 / 78 / 22 |
+| max degree | 2–12 | 2–12 | 2–12 |
+| terms | 12–796 | 10–195 | 10–796 |
+| `m > n` / `m = n` / `m < n` | 12 / 44 / 22 | 0 / 40 / 6 | 12 / 84 / 28 |
 | every generator homogeneous | 2 | 0 | 2 |
-| degree 2, no linear generator | 16 | 16 | 32 |
+| degree 2, no linear generator | 16 | 22 | 38 |
 | affine-linear rank > 0 | 32 | 18 | 50 |
-| a scalar substitution | 36 | 18 | 54 |
+| a scalar substitution | 36 | 20 | 56 |
 | binomials > half the generators | 6 | 12 | 18 |
-| a leading monomial divisible by another | 50 | 18 | 68 |
-| greedy elimination width | 1–24 | 3–22 | 1–24 |
+| a leading monomial divisible by another | 50 | 22 | 72 |
+| greedy elimination width | 1–24 | 1–22 | 1–24 |
 | top-degree density | 3.3·10⁻⁵ – 1 | 1.3·10⁻⁶ – 0.4 | 1.3·10⁻⁶ – 1 |
 | incidence splits, unused variable, constant generator, inconsistent linear part, all initial pairs coprime, a cap reached | 0 | 0 | 0 |
 
-- **What the generated families add.** The wide region `n > 16` goes from one problem to five: phosphorylation
-  at 5, 6 and 7 sites, the 6-site nonzero presentation, and `sd-robot-jcf26`. There is now a
-  controlled-size ladder of dense square quadratics (Chandrasekhar, every Hᵢ coupled to every Hⱼ).
-  There is also a ladder whose linear conservation laws and binomial-heavy complex equations grow
-  with size (phosphorylation).
-- **Still uncovered by public data.** No public problem splits into incidence components. Only
-  `sd-raksanyi` is homogeneous, and no problem has all initial pairs coprime. Those are structural
-  properties that #1007's controlled families (`zb/coupled-blocks`, `zb/toric`, …) vary on
-  purpose. Public applications were not bent to fill them.
+- **What the additions bring.**
+  - The wide region `n > 16` goes from one problem to five: phosphorylation at 5, 6 and 7 sites,
+    the 6-site nonzero presentation, and `sd-robot-jcf26`.
+  - There is now a size ladder of dense square quadratics, Chandrasekhar, where every Hᵢ is coupled
+    to every Hⱼ.
+  - There is also a ladder whose linear conservation laws and binomial-heavy complex equations grow
+    with size, phosphorylation.
+- **Still uncovered by public data.**
+  - No public problem splits into incidence components.
+  - Only `sd-raksanyi` is homogeneous.
+  - No problem has all initial pairs coprime.
+  - #1007's controlled families (`zb/coupled-blocks`, `zb/toric`, …) vary these properties on
+    purpose. Public applications were not bent to fill them.
 
 `examples/feature_costs.rs` gains instantiations for 18, 21, 22 and 24 variables, so every record
-in this catalog can be read. Reproduce, with a private `CARGO_TARGET_DIR`:
+in this catalog can be read. To reproduce, use a private `CARGO_TARGET_DIR`:
 
 ```sh
 cargo build --release --example feature_costs
@@ -272,16 +299,21 @@ done > features.jsonl
 ## Status against #1006
 
 - **Done.**
-  - Licensing review of the sources in *Sources and licensing*. Admitted: SymbolicData, the
-    Chandrasekhar H-equation and n-site phosphorylation. Excluded with reasons: MathRepo, SIAN and
-    StructuralIdentifiability exports, BioModels, Henrion, Hexapod and IPP.
-  - 56 base problems in 23 families, 112 records, each with an exact admission path that CI
+  - Licensing review of the sources in *Sources and licensing*.
+    - Admitted: SymbolicData, the Chandrasekhar H-equation and n-site phosphorylation.
+    - Excluded with reasons: MathRepo, SIAN and StructuralIdentifiability exports, BioModels,
+      Henrion, Hexapod and IPP.
+  - 62 base problems in 23 families, 124 records. Each has an exact admission path that CI
     rebuilds.
-  - References at both fields for every record except five frontier rows: `sd-signaltheory-f966` and `sd-verschelde-gametwo7` at both fields, and `sd-hairer-2` at `p64`.
-    Zero-dimensionality and `vdim` agree across fields on every pair.
+  - References at both fields for every record except the frontier rows, which are kept with no
+    reference. Zero-dimensionality and `vdim` agree across fields on every pair.
   - Inequations: three Rabinowitsch presentations under `T-GB`. Saturation is a documented
     exclusion until #1004 writes a contract for it.
-  - Feature coverage above. Composition hand-off in `composition.json`.
-- **Left to later work, not blocking M34.** The unreviewed SymbolicData entries in *Exclusions*.
-  The ladder relatives, which need #1005's parent links. A saturation contract, which is #1004's.
-  A SIAN export, if a toolchain is provisioned.
+  - Feature coverage, above.
+  - The composition hand-off in `composition.json`, with every available second scale added.
+- **Owner decision.** The single-scale waiver above, or leaving those 16 problems out of the pilot.
+- **Left to later work, not blocking M34.**
+  - The unreviewed SymbolicData entries in *Exclusions*.
+  - The ladder relatives, which need #1005's parent links.
+  - A saturation contract, which is #1004's to write.
+  - A SIAN export, if a toolchain is provisioned.

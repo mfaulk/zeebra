@@ -49,6 +49,30 @@
    "vdim": 2048,
    "zero_dimensional": true
   },
+  "gen-chandrasekhar-h-12@p31": {
+   "normalized_input_digest": "089f4bc9acdb8e0614495bc183131a5a221cc57cee11d9740244c084e19a5281",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "gen-chandrasekhar-h-12@p64": {
+   "normalized_input_digest": "94a0d495f59f60ef4b56b007839ede8bb99ab03a76f2f12f1f48076cf8f60542",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
+  "gen-chandrasekhar-h-13@p31": {
+   "normalized_input_digest": "0c4e2edd99744a609c25346972937fbb6f6a47f5b8f905848373c478ef44da75",
+   "oracle": "singular",
+   "reason": "Singular std exceeded 120.0 s",
+   "status": "frontier"
+  },
+  "gen-chandrasekhar-h-13@p64": {
+   "normalized_input_digest": "81bdcc90713d528e449bec0ab7a39453577a2a07e40f907f4ab009bd2e3821d3",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
   "gen-chandrasekhar-h-4@p31": {
    "basis_size": 15,
    "dimension": 0,
@@ -481,6 +505,21 @@
    "vdim": 26,
    "zero_dimensional": true
   },
+  "sd-fee-2@p31": {
+   "basis_size": 175,
+   "dimension": 1,
+   "normalized_input_digest": "a27782eca17117c89a615a290e448c3a65a1db2dc58e4fa69fb78cfd60f0aec8",
+   "oracle": "singular",
+   "reduced_basis_digest": "b9c64f41b3f4076c08f47b2dc61adad9026b36033c9f968f2419e57844956368",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-fee-2@p64": {
+   "normalized_input_digest": "75010d23f77ca57a22378b7b084df803c64e05bdf1f9e5a26401a938014d50ec",
+   "oracle": "grobx-certified",
+   "reason": "grobx stopped: deadline",
+   "status": "frontier"
+  },
   "sd-fourbodyproblem@p31": {
    "basis_size": 57,
    "dimension": 0,
@@ -516,6 +555,24 @@
    "status": "reference",
    "vdim": 14,
    "zero_dimensional": true
+  },
+  "sd-geometry-heron-1@p31": {
+   "basis_size": 3,
+   "dimension": 3,
+   "normalized_input_digest": "d7ef53e2fd669c321ccfd9c5ede43b3478d5a0d5414ad1d6a980ac0095cc27a6",
+   "oracle": "singular",
+   "reduced_basis_digest": "2a785fe7a346f2597583e9f8b6c77cdde18f88eb23854c37b22bf5f387863a04",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-geometry-heron-1@p64": {
+   "basis_size": 3,
+   "normalized_input_digest": "bc521a0cb766fd6744359f07e279576fc9142967aa2f7954124dabdfb0a27a2f",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "079c35e05a725642d41ce468d3585dcef40eaa3b52934d4def24c0f97564202d",
+   "status": "reference",
+   "vdim": null,
+   "zero_dimensional": false
   },
   "sd-hairer-1@p31": {
    "basis_size": 12,
@@ -693,6 +750,42 @@
    "status": "reference",
    "vdim": 136,
    "zero_dimensional": true
+  },
+  "sd-schiele-1-1@p31": {
+   "basis_size": 6,
+   "dimension": 0,
+   "normalized_input_digest": "568535e4988d781f7a2e20b318c60c305965c7fa2b8e1d6e8a33f7c416705627",
+   "oracle": "singular",
+   "reduced_basis_digest": "819f2547b232a0164a0450df617a7899ae2c0c9e0e6fdc90353128ba052a0ecc",
+   "status": "reference",
+   "vdim": 38
+  },
+  "sd-schiele-1-1@p64": {
+   "basis_size": 6,
+   "normalized_input_digest": "5be0e4f6d4f929a082705f573794fb037adedf5650431c0ce323184d42aad841",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "a5dd42968d457e6df383de4dfbd1f1c75aa470b7bbe9e4b81ebd09c3b78a0a06",
+   "status": "reference",
+   "vdim": 38,
+   "zero_dimensional": true
+  },
+  "sd-schiele-1@p31": {
+   "basis_size": 15,
+   "dimension": 1,
+   "normalized_input_digest": "3f9943f0115c45dfa7ce14cfb3bee9787ec9245564d38cdbb2598962078fb44f",
+   "oracle": "singular",
+   "reduced_basis_digest": "51b3cba305dc3a01e029d462ba2c8048ad1bd82689be95d97c1898b59e1ba6a9",
+   "status": "reference",
+   "vdim": null
+  },
+  "sd-schiele-1@p64": {
+   "basis_size": 15,
+   "normalized_input_digest": "9faf69a2cc2b4f32f313f7a4570dd337b181eb9d1ba298d3bc8ebc003f68f459",
+   "oracle": "grobx-certified",
+   "reduced_basis_digest": "68c79813f5d62ce624fe5b051c78ad06367173bfeece089e3dd5f2bf0ed0285e",
+   "status": "reference",
+   "vdim": null,
+   "zero_dimensional": false
   },
   "sd-schiele@p31": {
    "basis_size": 21,

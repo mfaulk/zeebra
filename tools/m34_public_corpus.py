@@ -75,6 +75,16 @@ def format_polynomial(terms, variables):
     return ''.join(parts).lstrip('+') or '0'
 
 
+def prime_factors(d):
+    factors, q = set(), 2
+    while q * q <= d:
+        while d % q == 0:
+            factors.add(q)
+            d //= q
+        q += 1
+    return factors | ({d} if d > 1 else set())
+
+
 def chandrasekhar_h(n, c):
     """Chandrasekhar's H-equation H(mu) = 1 + (c/2) mu H(mu) int_0^1 H(nu)/(mu+nu) dnu, collocated
     at mu_i = i/n with the n-point right-endpoint rule: 2n H_i - c H_i sum_j i/(i+j) H_j - 2n = 0,
@@ -94,8 +104,7 @@ def chandrasekhar_h(n, c):
         scale = lcm(*(v.denominator for v in row.values()))
         denominators.add(scale)
         equations.append(format_polynomial({k: int(v * scale) for k, v in row.items()}, variables))
-    excluded = sorted({q for d in denominators for q in range(2, d + 1)
-                       if d % q == 0 and all(q % r for r in range(2, q))})
+    excluded = sorted(set().union(*map(prime_factors, denominators)))
     return dict(variables=variables, equations=equations, excluded_primes=excluded, transformations=[
         dict(kind='parameter-specialization', description=f'albedo c = {albedo}; nodes mu_i = i/n, n = {n}'),
         dict(kind='clear-denominators',
