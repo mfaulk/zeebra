@@ -164,8 +164,9 @@ fn test_mask_matches_its_per_level_definition() {
     }
 }
 
-/// Pair and rejection counts by mechanism on Eco-7 and Katsura-7 stay at the values the M30
-/// engine produced, so bookkeeping changes cannot move which pairs are rejected or why.
+/// Pair and rejection counts by mechanism on Eco-7 and Katsura-7 stay pinned, so bookkeeping
+/// changes cannot move which pairs are rejected or why. Re-pinned for #961, whose promoted reducer
+/// rows reduce in their own batch pairs a later batch used to take.
 #[test]
 fn test_rejection_counts_by_mechanism_are_pinned() {
     let counts = |s: &super::SigF4Statistics| {
@@ -196,8 +197,8 @@ fn test_rejection_counts_by_mechanism_are_pinned() {
     assert_eq!(counts(&katsura), KATSURA_7);
 }
 
-const ECO_7: [usize; 13] = [2192, 19, 807, 643, 486, 118, 52, 93, 528, 26, 31033, 67, 57];
-const KATSURA_7: [usize; 13] = [1270, 5, 507, 471, 149, 62, 25, 63, 427, 12, 79774, 51, 54];
+const ECO_7: [usize; 13] = [2126, 19, 772, 629, 493, 120, 38, 92, 462, 26, 28322, 66, 57];
+const KATSURA_7: [usize; 13] = [1030, 5, 417, 383, 137, 26, 19, 58, 377, 12, 79607, 46, 54];
 
 /// Katsura-4 agrees with the shipping F4 over GF(32003) and Goldilocks under both graded orders.
 #[test]
@@ -691,24 +692,25 @@ fn test_batch_traces_are_pinned_across_families() {
     assert_eq!(digests, PINNED_TRACES, "{digests:#x?}");
 }
 
-/// Re-pinned for #1056. The digest includes the reduced basis's `Debug` text. Before #1022 that
+/// Re-pinned for #961: promoted reducer rows change the batches of every row whose engine run
+/// promotes one; the reduced bases are unchanged. Earlier, re-pinned for #1056. The digest includes the reduced basis's `Debug` text. Before #1022 that
 /// text listed terms in `HashMap` iteration order, which follows hashbrown's SIMD group width, so
 /// these pins held on x86_64 only. #1022 made `Debug` canonical, which moved every digest and made
 /// them the same on aarch64 and x86_64. The batch traces print no polynomial, so only the basis
 /// part moved.
 const PINNED_TRACES: [u64; 12] = [
-    0xcdddc794bae7419a,
-    0xbc23765fa7032021,
-    0x3cb9624e7e7ab233,
-    0x2462e69dcf1d2247,
-    0xe19b0598b781cf64,
-    0x25440d4ddeabbd7c,
-    0x84d0192b8b3c568c,
-    0x7dd02d541fdbedf3,
-    0xa461cdf1d86f0ce7,
-    0x6b9ba6b2f40e7cb5,
-    0x9b98bdce6371dd1d,
-    0x43a9cc6aca3d08de,
+    0x7aa4379e59afc74e,
+    0x75ee21999af59906,
+    0xa6e80d160fce6ba0,
+    0x2cdd6ca4dc84f8f8,
+    0x8b8760c931cc325a,
+    0x5c758ef80a2bfee5,
+    0x8a8d2a386756505b,
+    0xee08298a80bbe28e,
+    0x508de2381fee4a34,
+    0x8b44df1ac45806d4,
+    0x1ac9454fb8972d6d,
+    0xfdd3f1c32a46b688,
 ];
 
 /// Dense planted quadratics in `N` variables, `2N` equations: #945's family, small.
@@ -799,4 +801,35 @@ fn test_small_prime_lane_is_ignored_on_a_wide_field() {
 fn test_small_prime_lane_is_off_by_default() {
     assert!(!SigF4Options::default().small_prime_lane);
     assert!(!checked_any_graded().small_prime_lane);
+}
+
+/// #961: a reducer multiple of the batch's degree whose lead an element of smaller signature has
+/// just taken is reduced in that batch, so on these inputs, which have no degree falls, every
+/// signature degree is one batch. Before, the pair naming it waited for another batch of the same
+/// degree: 14 batches over Katsura-7's 7 degrees, and 94 over Cyclic-6's 16.
+#[test]
+fn test_each_signature_degree_is_one_batch_without_degree_falls() {
+    fn check<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>], name: &str) {
+        let claim = SigF4Options {
+            workers: 3,
+            parallel_cascade: true,
+            ..SigF4Options::default()
+        };
+        for options in [SigF4Options::default(), claim] {
+            let (result, s) = sig_f4_reported(system, GREVLEX, &options);
+            assert_eq!(result.unwrap(), f4(system, GREVLEX).unwrap(), "{name}");
+            let degrees = &s.batch_degrees;
+            assert!(
+                degrees.windows(2).all(|w| w[0] < w[1]),
+                "{name} at {} workers: batch degrees {degrees:?}",
+                options.workers
+            );
+            assert!(
+                s.promoted_reducers > 0,
+                "{name}: no reducer row was promoted"
+            );
+        }
+    }
+    check(&katsura::<7, Goldilocks>(), "katsura-7");
+    check(&cyclic::<6, Goldilocks>(), "cyclic-6");
 }

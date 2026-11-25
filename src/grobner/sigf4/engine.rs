@@ -2,7 +2,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     mem::size_of,
     sync::{
         atomic::{AtomicUsize, Ordering as AtomicOrdering},
@@ -638,6 +638,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         self.stats.batches += 1;
+        #[cfg(test)]
+        self.stats.batch_degrees.push(targets[0].sig.degree());
         self.stats.targets += targets.len();
 
         let (columns, rows, handles, reducer_count) = self.symbolic(&targets)?;
@@ -1012,7 +1014,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             field_copies,
         };
         if self.options.parallel_cascade {
-            return self.claim(&block, &targets, columns, clock, lane_bytes);
+            if let Some(done) = self.claim(&block, &targets, columns, clock, lane_bytes)? {
+                return Ok(done);
+            }
         }
         #[cfg(feature = "research-sigf4-split")]
         let mut split = super::BatchSplit {
@@ -1027,8 +1031,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         // workspace up front, then each reduced row as it is made. A crossing abandons the batch
         // before any of it is settled.
         let mut live = LiveBudget::new(self.options.max_live_bytes);
-        let phase_a_workers = if self.options.workers > 1 {
-            self.options.workers
+        // A claim batch redone here (#961) keeps the cascade's phase A, even at one worker, so
+        // its products stay the cascade's.
+        let phase_a = self.options.workers > 1 || self.options.parallel_cascade;
+        let phase_a_workers = if phase_a {
+            self.options.workers.max(1)
         } else {
             0
         };
@@ -1041,11 +1048,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         #[cfg(feature = "research-sigf4-split")]
         let pass_clock = Instant::now();
-        let prereduced: Vec<Reduced<F>> = if self.options.workers > 1 {
+        let prereduced: Vec<Reduced<F>> = if phase_a {
             let job = PhaseA {
                 block: &block,
                 targets: &targets,
-                workers: self.options.workers,
+                workers: phase_a_workers,
             };
             match F::run_concurrent(job) {
                 Ok(done) => done,
@@ -1079,9 +1086,36 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let check = self.options.check_signatures;
         #[cfg(feature = "research-sigf4-replay")]
         let mut replay = super::replay::Recorder::new(ncols);
-        for (t, raw) in &targets {
-            let t = *t;
-            let (entries, earlier) = prereduced.next().unwrap_or_else(|| (raw.clone(), 0));
+        // #961: a reducer multiple of this degree whose lead an element of smaller signature now
+        // holds is itself a row to reduce, at its own signature: promoted to a target here, as a
+        // whole-matrix echelon in signature order would reduce it, rather than left to a pair a
+        // later batch of this degree takes. Its row and every column it reaches are already in
+        // the matrix. Largest signature first, so the least pops from the end.
+        let mut taken: HashSet<Signature<N>> = targets.iter().map(|(t, _)| *t).collect();
+        let mut promoted: Vec<(Signature<N>, u32)> = Vec::new();
+        // The census replays the rows this pass reduced, promoted ones included, in its order.
+        #[cfg(feature = "research-reuse")]
+        let mut reduced_rows: Vec<(Signature<N>, Vec<(u32, F)>)> = Vec::new();
+        let mut next = 0;
+        loop {
+            let from_targets = match (targets.get(next), promoted.last()) {
+                (None, None) => break,
+                (Some((t, _)), Some((p, _))) => t.cmp_in(p, order) == Ordering::Less,
+                (target, _) => target.is_some(),
+            };
+            let (t, entries, earlier) = if from_targets {
+                let (t, raw) = &targets[next];
+                next += 1;
+                let (entries, earlier) = prereduced.next().unwrap_or_else(|| (raw.clone(), 0));
+                (*t, entries, earlier)
+            } else {
+                let (t, r) = promoted.pop().expect("matched above");
+                (t, block.reducer_entries(r as usize), 0)
+            };
+            #[cfg(feature = "research-reuse")]
+            if self.reuse.is_some() {
+                reduced_rows.push((t, entries.clone()));
+            }
             #[cfg(feature = "research-sigf4-split")]
             let mut cascade = 0u64;
             let (mut out, later) = workspace.reduce_pivots(&entries, |c| {
@@ -1129,7 +1163,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 }
             }
             if kind == Kind::Element {
-                target_at[out[0].0 as usize] = finals.len() as u32;
+                let lead = out[0].0;
+                target_at[lead as usize] = finals.len() as u32;
+                if let Some((s, r)) = self.promotion(&block, &t, lead, &taken) {
+                    taken.insert(s);
+                    let at =
+                        promoted.partition_point(|(p, _)| p.cmp_in(&s, order) == Ordering::Greater);
+                    promoted.insert(at, (s, r));
+                    self.stats.targets += 1;
+                    self.stats.promoted_reducers += 1;
+                }
             }
             let out_lane = if kind == Kind::Element {
                 block.lane_row(&out)
@@ -1150,9 +1193,10 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         #[cfg(feature = "research-sigf4-replay")]
         replay.finish();
         #[cfg(feature = "research-reuse")]
-        self.census_reuse(&block, rows, &targets, &finals);
+        self.census_reuse(&block, &rows[target_count..], &reduced_rows, &finals);
         #[cfg(feature = "research-sigf4-split")]
         {
+            split.targets = finals.len();
             split.serial_pass = pass_clock.elapsed();
             self.stats.split.batches.push(split);
         }
@@ -1170,12 +1214,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     }
 
     /// #1031: census this batch's reducer reuse, with the engine's own product count beside it.
+    /// `targets` are the rows the serial pass reduced, in its order, promoted rows (#961) included.
     #[cfg(feature = "research-reuse")]
     #[allow(clippy::type_complexity)]
     fn census_reuse(
         &mut self,
         block: &ReducerBlock<'_, N, F>,
-        rows: &[Row<N>],
+        reducer_rows: &[Row<N>],
         targets: &[(Signature<N>, Vec<(u32, F)>)],
         finals: &[(Signature<N>, Kind, Vec<(u32, F)>, u64)],
     ) {
@@ -1183,7 +1228,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let Some(census) = self.reuse.as_mut() else {
             return;
         };
-        let reducers: Vec<Reducer<'_, N, Signature<N>, F>> = rows[targets.len()..]
+        let reducers: Vec<Reducer<'_, N, Signature<N>, F>> = reducer_rows
             .iter()
             .zip(block.rows)
             .map(|(row, entries)| {
@@ -1219,8 +1264,34 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         stop
     }
 
+    /// #961's promotion test for an element of signature `t` with lead column `lead`: the
+    /// reducer row there, when it has `t`'s degree, a larger signature, is not yet a target of the
+    /// batch, and no known syzygy covers it.
+    fn promotion(
+        &self,
+        block: &ReducerBlock<'_, N, F>,
+        t: &Signature<N>,
+        lead: u32,
+        taken: &HashSet<Signature<N>>,
+    ) -> Option<(Signature<N>, u32)> {
+        let r = block.at[lead as usize];
+        if r == NONE {
+            return None;
+        }
+        let s = block.sigs[r as usize];
+        (s.degree() == t.degree()
+            && s.cmp_in(t, self.order) == Ordering::Greater
+            && !taken.contains(&s)
+            && self.syzygies.covering(&s).is_none())
+        .then_some((s, r))
+    }
+
     /// The parallel cascade (M31-S2): #902's prereduce + claim schedule, then design 1's
     /// accounting in signature order. A stopped batch is abandoned whole, before any insertion.
+    ///
+    /// `None` when design 1 would promote a reducer row (#961): the cascade's target set is fixed,
+    /// so the batch is redone by design 1 and its rows stay design 1's. The first promotion is
+    /// found from these outcomes, which equal design 1's up to it.
     #[allow(clippy::type_complexity)]
     fn claim(
         &mut self,
@@ -1229,7 +1300,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         columns: &[Monomial<N>],
         clock: Instant,
         lane_bytes: usize,
-    ) -> Result<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>, SigF4Error> {
+    ) -> Result<Option<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>>, SigF4Error> {
         let rows_bytes = batch_rows_bytes(block, targets) + lane_bytes;
         let job = Claim {
             block,
@@ -1270,6 +1341,20 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats.claim_cascade += report.cascade;
         self.stats.claim_peak_live_bytes =
             self.stats.claim_peak_live_bytes.max(report.peak_live_bytes);
+        let taken: HashSet<Signature<N>> = targets.iter().map(|(t, _)| *t).collect();
+        let promotes = targets.iter().zip(&report.outcomes).any(|((t, _), o)| {
+            let lead = o
+                .row
+                .first()
+                .map(|e| e.0)
+                .or(o.lane.as_ref().map(LaneRow::lead));
+            o.kind == Kind::Element
+                && lead.is_some_and(|lead| self.promotion(block, t, lead, &taken).is_some())
+        });
+        if promotes {
+            self.stats.claim_promotion_fallbacks += 1;
+            return Ok(None);
+        }
         let mut results = Vec::new();
         for ((t, _), outcome) in targets.iter().zip(report.outcomes) {
             let row = block.field_row(outcome.row, outcome.lane);
@@ -1279,7 +1364,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         self.stats.elimination += clock.elapsed();
-        Ok(finish_batch(results, columns))
+        Ok(Some(finish_batch(results, columns)))
     }
 
     /// Design 1's per-target accounting: a zero row records its syzygy signature (RFC T6), a
@@ -1557,6 +1642,17 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
         match (&self.lane, lane_row) {
             (Some((lane, _)), Some(lane_row)) if row.is_empty() => lane_row.to_field(lane),
             _ => row,
+        }
+    }
+
+    /// Reducer `k`'s row in field form, from its lane form when no field copy was kept.
+    pub(super) fn reducer_entries(&self, k: usize) -> Vec<(u32, F)>
+    where
+        F: FiniteField,
+    {
+        match &self.lane {
+            Some((lane, rows)) if !self.field_copies => rows[k].to_field(lane),
+            _ => self.rows[k].clone(),
         }
     }
 

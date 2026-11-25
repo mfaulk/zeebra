@@ -178,6 +178,10 @@ pub struct SigF4Statistics {
     pub rejected_duplicate: usize,
     /// Rows reduced as S-pair or input reductants.
     pub targets: usize,
+    /// Of `targets`, the reducer rows reduced as targets of their own batch (#961).
+    pub promoted_reducers: usize,
+    /// Claim-cascade batches redone by design 1 because design 1 promotes a reducer row there.
+    pub claim_promotion_fallbacks: usize,
     /// Reducer multiples built by symbolic preprocessing.
     pub reducer_rows: usize,
     /// Targets that reduced to zero. Only targets are reduced, so this equals `zero_rows`.
@@ -231,6 +235,9 @@ pub struct SigF4Statistics {
     /// Theorem 1 of #902 makes per-batch.
     #[cfg(test)]
     pub(crate) batch_trace: Vec<Vec<String>>,
+    /// Per batch run, its signature degree.
+    #[cfg(test)]
+    pub(crate) batch_degrees: Vec<u64>,
     /// #901's elimination split and glue clocks; collected only under `research-sigf4-split`.
     #[cfg(feature = "research-sigf4-split")]
     pub split: SplitLog,

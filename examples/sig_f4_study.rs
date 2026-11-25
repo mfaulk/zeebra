@@ -591,6 +591,7 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("rejected_rewrite", size(s.rejected_rewrite)),
         ("rejected_duplicate", size(s.rejected_duplicate)),
         ("targets", size(s.targets)),
+        ("promoted_reducers", size(s.promoted_reducers)),
         ("reducer_rows", size(s.reducer_rows)),
         ("reductions_to_zero", size(s.reductions_to_zero)),
         ("zero_rows", size(s.zero_rows)),
@@ -627,6 +628,10 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
             Json::int(s.claim_announcement_waits),
         ),
         ("claim_final_waits", Json::int(s.claim_final_waits)),
+        (
+            "claim_promotion_fallbacks",
+            size(s.claim_promotion_fallbacks),
+        ),
         ("claim_peak_live_bytes", size(s.claim_peak_live_bytes)),
         ("claim_phase_a_ns", Json::nanos(s.claim_phase_a)),
         ("claim_cascade_ns", Json::nanos(s.claim_cascade)),
