@@ -90,18 +90,24 @@ fn main() {
             let _ = std::fs::remove_dir_all(scratch);
             // Verified the way the M4GB adapter verifies, after the timed solve.
             if let Some(basis) = report.status.answer().and_then(|a| a.basis.clone()) {
-                let trusted = zeebra().run(&instance, task, &Limits { workers: 1, ..limits.clone() });
+                let trusted = zeebra().run(
+                    &instance,
+                    task,
+                    &Limits {
+                        workers: 1,
+                        ..limits.clone()
+                    },
+                );
                 let agrees = trusted
                     .status
                     .answer()
                     .and_then(|a| a.basis.as_ref())
                     .is_some_and(|r| generators_agree(r, &basis, modulus).is_ok());
                 if !agrees {
-                    report.status = RunStatus::Failed(
-                        zeebra::grobner::external::RunFailure::Incomplete {
+                    report.status =
+                        RunStatus::Failed(zeebra::grobner::external::RunFailure::Incomplete {
                             detail: "grobx basis disagrees with Zeebra's".into(),
-                        },
-                    );
+                        });
                 } else if let RunStatus::Complete(answer) = &report.status {
                     verified = Some(answer.basis.as_ref().map_or(0, Vec::len));
                 }
