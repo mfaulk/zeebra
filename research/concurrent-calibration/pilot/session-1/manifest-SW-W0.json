@@ -1,0 +1,108 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 1106,
+  "label": "pilot",
+  "step": "SW",
+  "condition": "W0",
+  "agent": "synchronous-mapping-dove@research/1105-telemetry-overhead",
+  "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+  "session": "2026-11-25T13:53:33-0500"
+ },
+ "arms": [
+  {
+   "name": "sweep0-64",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/bin/sweep",
+   "sha256": "7b48f39b3b1bbe430adeea99ca203aa9ba0f9e9515ec8b3b3bd6a29912d5329f",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "cc -O2 -pthread research/concurrent-calibration/sweep.c",
+    "comparand": "sweep.c sha256 7d4ca63a8eae777c5f178afcc842286492bfc7aff991ababa36a1d8b5a80e096 (#1106 pilot; not in 5451e9f8)"
+   },
+   "argv": [
+    "{workers}",
+    "0",
+    "64"
+   ]
+  },
+  {
+   "name": "sweep1-64",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/bin/sweep",
+   "sha256": "7b48f39b3b1bbe430adeea99ca203aa9ba0f9e9515ec8b3b3bd6a29912d5329f",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "cc -O2 -pthread research/concurrent-calibration/sweep.c",
+    "comparand": "sweep.c sha256 7d4ca63a8eae777c5f178afcc842286492bfc7aff991ababa36a1d8b5a80e096 (#1106 pilot; not in 5451e9f8)"
+   },
+   "argv": [
+    "{workers}",
+    "1",
+    "64"
+   ]
+  },
+  {
+   "name": "sweep0-32",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/bin/sweep",
+   "sha256": "7b48f39b3b1bbe430adeea99ca203aa9ba0f9e9515ec8b3b3bd6a29912d5329f",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "cc -O2 -pthread research/concurrent-calibration/sweep.c",
+    "comparand": "sweep.c sha256 7d4ca63a8eae777c5f178afcc842286492bfc7aff991ababa36a1d8b5a80e096 (#1106 pilot; not in 5451e9f8)"
+   },
+   "argv": [
+    "{workers}",
+    "0",
+    "32"
+   ]
+  },
+  {
+   "name": "sweep1-32",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/bin/sweep",
+   "sha256": "7b48f39b3b1bbe430adeea99ca203aa9ba0f9e9515ec8b3b3bd6a29912d5329f",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "cc -O2 -pthread research/concurrent-calibration/sweep.c",
+    "comparand": "sweep.c sha256 7d4ca63a8eae777c5f178afcc842286492bfc7aff991ababa36a1d8b5a80e096 (#1106 pilot; not in 5451e9f8)"
+   },
+   "argv": [
+    "{workers}",
+    "1",
+    "32"
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "sweep",
+   "params": {}
+  }
+ ],
+ "run": {
+  "workers": [
+   1,
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 600,
+   "kill_after_seconds": 60,
+   "rss_bytes": 17179869184,
+   "live_bytes": null
+  }
+ }
+}

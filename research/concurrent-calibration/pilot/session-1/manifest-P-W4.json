@@ -1,0 +1,104 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 1106,
+  "label": "pilot",
+  "step": "P",
+  "condition": "W4-32",
+  "agent": "synchronous-mapping-dove@research/1105-telemetry-overhead",
+  "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+  "session": "2026-11-25T14:07:46-0500"
+ },
+ "arms": [
+  {
+   "name": "every",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/target/release/examples/m29_cost_model",
+   "sha256": "cb2c17ce7611a3cf8f1524336e5b1d9047f5b3c4ef20d7ccee000cc00ea04576",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "git archive 5451e9f853c8f24bafed6875218a175de441e3f0 | tar -x; cargo build --release --locked --features external-runners --example m29_cost_model"
+   },
+   "argv": [
+    "--target",
+    "{target}",
+    "--workers",
+    "{workers}",
+    "--pair-multiples",
+    "every",
+    "--wall-s",
+    "600"
+   ]
+  },
+  {
+   "name": "distinct",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/target/release/examples/m29_cost_model",
+   "sha256": "cb2c17ce7611a3cf8f1524336e5b1d9047f5b3c4ef20d7ccee000cc00ea04576",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "git archive 5451e9f853c8f24bafed6875218a175de441e3f0 | tar -x; cargo build --release --locked --features external-runners --example m29_cost_model"
+   },
+   "argv": [
+    "--target",
+    "{target}",
+    "--workers",
+    "{workers}",
+    "--pair-multiples",
+    "distinct",
+    "--wall-s",
+    "600"
+   ]
+  },
+  {
+   "name": "distinct2",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/target/release/examples/m29_cost_model",
+   "sha256": "cb2c17ce7611a3cf8f1524336e5b1d9047f5b3c4ef20d7ccee000cc00ea04576",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "git archive 5451e9f853c8f24bafed6875218a175de441e3f0 | tar -x; cargo build --release --locked --features external-runners --example m29_cost_model"
+   },
+   "argv": [
+    "--target",
+    "{target}",
+    "--workers",
+    "{workers}",
+    "--pair-multiples",
+    "distinct",
+    "--wall-s",
+    "600"
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "mq10-32003",
+   "params": {
+    "target": "mq10-32003"
+   }
+  }
+ ],
+ "run": {
+  "workers": [
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 600,
+   "kill_after_seconds": 60,
+   "rss_bytes": 17179869184,
+   "live_bytes": null
+  }
+ }
+}

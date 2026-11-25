@@ -1,0 +1,109 @@
+{
+ "schema": "bench-job-manifest-v1",
+ "mode": "dev",
+ "context": {
+  "issue": 1106,
+  "label": "pilot",
+  "step": "S16",
+  "condition": "W0",
+  "agent": "synchronous-mapping-dove@research/1105-telemetry-overhead",
+  "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+  "session": "2026-11-25T13:46:19-0500"
+ },
+ "arms": [
+  {
+   "name": "a",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/target/release/examples/sig_f4_study",
+   "sha256": "6ffc1e8819d82327f5c01286c0e607370b8e59827d0b2ecd26a0f52a469c0bc2",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "git archive 5451e9f853c8f24bafed6875218a175de441e3f0 | tar -x; cargo build --release --locked --features research-sigf4 --example sig_f4_study"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{flag1}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "600"
+   ]
+  },
+  {
+   "name": "a2",
+   "commit": "5451e9f853c8f24bafed6875218a175de441e3f0",
+   "binary": "/buildcache/cargo-target/zeebra-1106/target/release/examples/sig_f4_study",
+   "sha256": "6ffc1e8819d82327f5c01286c0e607370b8e59827d0b2ecd26a0f52a469c0bc2",
+   "build": {
+    "profile": "release",
+    "flags": ".cargo/config.toml (x86-64-v3, fat LTO, 1 CGU)",
+    "recipe": "git archive 5451e9f853c8f24bafed6875218a175de441e3f0 | tar -x; cargo build --release --locked --features research-sigf4 --example sig_f4_study"
+   },
+   "argv": [
+    "--field",
+    "{field}",
+    "--name",
+    "{name}",
+    "{flag1}",
+    "--engine",
+    "entry",
+    "--workers",
+    "{workers}",
+    "--digest-only",
+    "--wall-s",
+    "600"
+   ]
+  }
+ ],
+ "instances": [
+  {
+   "name": "gf32003/mq-random-10",
+   "params": {
+    "field": "gf32003",
+    "name": "mq-random-10",
+    "flag1": "--digest-only"
+   }
+  },
+  {
+   "name": "gf32003/katsura-11",
+   "params": {
+    "field": "gf32003",
+    "name": "katsura-11",
+    "flag1": "--digest-only"
+   }
+  },
+  {
+   "name": "gf31/mq-dense-15-s15",
+   "params": {
+    "field": "gf31",
+    "name": "mq-dense-15-s15",
+    "flag1": "--generate"
+   }
+  }
+ ],
+ "run": {
+  "workers": [
+   16
+  ],
+  "cpus": "8-23",
+  "repetitions": 9,
+  "interleave": "rotate",
+  "seeds": [
+   0
+  ],
+  "retries": 0,
+  "limits": {
+   "wall_seconds": 600,
+   "kill_after_seconds": 60,
+   "rss_bytes": 17179869184,
+   "live_bytes": null
+  }
+ }
+}

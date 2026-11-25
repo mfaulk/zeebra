@@ -1,0 +1,36 @@
+2026-11-25T13:44:20-0500 pilot start C=5451e9f853c8f24bafed6875218a175de441e3f0 agent=synchronous-mapping-dove@research/1105-telemetry-overhead
+2026-11-25T13:44:20-0500 reserve rc=0 status=reserved ccds=1,2 bench=8-23,72-87 rest=0-7,24-71,88-127 app.slice=0-7,24-71,88-127
+2026-11-25T13:44:21-0500 S1-W0: job=8ad743468b0d load=W0
+2026-11-25T13:46:19-0500 S1-W0: rc=0
+2026-11-25T13:46:19-0500 S16-W0: job=61afc8eb64ca load=W0
+2026-11-25T13:48:19-0500 S16-W0: rc=0
+2026-11-25T13:48:19-0500 P-W0: job=eebf24fd6aa2 load=W0
+2026-11-25T13:52:57-0500 P-W0: rc=0
+2026-11-25T13:52:57-0500 release rc=0 status=released ccds= bench=- rest=- app.slice=0-127 
+2026-11-25T13:53:32-0500 pilot start C=5451e9f853c8f24bafed6875218a175de441e3f0 agent=synchronous-mapping-dove@research/1105-telemetry-overhead
+2026-11-25T13:53:32-0500 reserve rc=0 status=reserved ccds=1,2 bench=8-23,72-87 rest=0-7,24-71,88-127 app.slice=0-7,24-71,88-127
+2026-11-25T13:53:33-0500 S1-W0: reusing done job=8ad743468b0d
+2026-11-25T13:53:33-0500 S16-W0: reusing done job=61afc8eb64ca
+2026-11-25T13:53:33-0500 P-W0: reusing done job=eebf24fd6aa2
+2026-11-25T13:53:33-0500 SW-W0: job=4ef3ab5d64b0 load=W0
+2026-11-25T13:57:32-0500 SW-W0: rc=0
+2026-11-25T13:57:32-0500 m5 tuning {"wide64/eco-12@1w": {"threads": 1, "t_A": 1.921666287, "t_0": 0.057908055, "t_1": 0.062239759, "passes": 9, "mib": 32, "t0_exceeds": false}, "gf32003/mq-random-10@1w": {"threads": 1, "t_A": 0.281186539, "t_0": 0.057908055, "t_1": 0.062239759, "passes": 1, "mib": 32, "t0_exceeds": true}, "wide64/cyclic-7@1w": {"threads": 1, "t_A": 0.274779825, "t_0": 0.057908055, "t_1": 0.062239759, "passes": 1, "mib": 32, "t0_exceeds": true}, "gf32003/mq-random-10@16w": {"threads": 16, "t_A": 0.242478833, "t_0": 0.256100735, "t_1": 0.272963435, "passes": 1, "mib": 32, "t0_exceeds": true}, "gf32003/katsura-11@16w": {"threads": 16, "t_A": 0.320709751, "t_0": 0.256100735, "t_1": 0.272963435, "passes": 1, "mib": 32, "t0_exceeds": true}, "gf31/mq-dense-15-s15@16w": {"threads": 16, "t_A": 0.46789679, "t_0": 0.256100735, "t_1": 0.272963435, "passes": 1, "mib": 32, "t0_exceeds": true}}
+2026-11-25T13:57:32-0500 V1-try1: job=9903bb8e7c4c load=W0
+2026-11-25T13:59:31-0500 V1-try1: rc=0
+2026-11-25T13:59:31-0500 V16-try1: job=cac457504f0c load=W0
+2026-11-25T14:01:31-0500 V16-try1: rc=0
+2026-11-25T14:01:31-0500 V1-try2: job=5dcd45bb2a41 load=W0
+2026-11-25T14:03:31-0500 V1-try2: rc=0
+2026-11-25T14:03:31-0500 V16-try2: job=6ff1767bff27 load=W0
+2026-11-25T14:05:31-0500 V16-try2: rc=0
+2026-11-25T14:05:31-0500 m5 validated {"wide64/eco-12@1w": {"threads": 1, "t_A": 1.921666287, "t_0": 0.057908055, "t_1": 0.062239759, "passes": 13, "mib": 32, "t0_exceeds": false, "validation1": 1.035674294670959, "validation2": 1.0426625035592938, "accepted": true}, "gf32003/mq-random-10@1w": {"threads": 1, "t_A": 0.281186539, "t_0": 0.057908055, "t_1": 0.062239759, "passes": 1, "mib": 32, "t0_exceeds": true, "validation1": 1.1989668336883186, "validation2": 1.2047426455935755, "untuned": true}, "wide64/cyclic-7@1w": {"threads": 1, "t_A": 0.274779825, "t_0": 0.057908055, "t_1": 0.062239759, "passes": 1, "mib": 32, "t0_exceeds": true, "validation1": 1.197959165711266, "validation2": 1.1922378249893784, "untuned": true}, "gf32003/mq-random-10@16w": {"threads": 16, "t_A": 0.242478833, "t_0": 0.256100735, "t_1": 0.272963435, "passes": 1, "mib": 32, "t0_exceeds": true, "validation1": 2.1231725101075316, "validation2": 2.074275828695933, "untuned": true}, "gf32003/katsura-11@16w": {"threads": 16, "t_A": 0.320709751, "t_0": 0.256100735, "t_1": 0.272963435, "passes": 1, "mib": 32, "t0_exceeds": true, "validation1": 1.8558534983363475, "validation2": 1.8285753009139962, "untuned": true}, "gf31/mq-dense-15-s15@16w": {"threads": 16, "t_A": 0.46789679, "t_0": 0.256100735, "t_1": 0.272963435, "passes": 1, "mib": 32, "t0_exceeds": true, "validation1": 1.5622852442430295, "validation2": 1.5507273199090514, "untuned": true}}
+2026-11-25T14:05:31-0500 S1-W4: job=02d7448efa3b load=W4-32
+2026-11-25T14:05:34-0500 S1-W4: W4-32 started pid=614358
+2026-11-25T14:07:02-0500 S1-W4: rc=0
+2026-11-25T14:07:03-0500 S16-W4: job=ce985ee3daf5 load=W4-32
+2026-11-25T14:07:05-0500 S16-W4: W4-32 started pid=626327
+2026-11-25T14:07:46-0500 S16-W4: rc=0
+2026-11-25T14:07:49-0500 P-W4: job=b3c3254b370e load=W4-32
+2026-11-25T14:07:54-0500 P-W4: W4-32 started pid=646345
+2026-11-25T14:08:56-0500 P-W4: rc=0
+2026-11-25T14:08:57-0500 release rc=0 status=released ccds= bench=- rest=- app.slice=0-127 
