@@ -1,0 +1,9 @@
+[
+{"id":"sd-ellipsoid-4","n":10,"m":4,"blocks":[[4,1],[6,12]],"vdim":null,"sparse":null,"note":"fewer generators than variables: not zero-dimensional, Lemma 5 does not apply"},
+{"id":"gen-phosphorylation-5","n":18,"m":18,"blocks":[[16,1],[2,1]],"vdim":11,"sparse":{"witness_degree":3,"columns":9690,"rank_rows":9537,"full_rows":16524,"normalized_volume":153}},
+{"id":"gen-phosphorylation-6","n":21,"m":21,"blocks":[[2,1],[19,1]],"vdim":13,"sparse":{"witness_degree":3,"columns":15400,"rank_rows":15190,"full_rows":26460,"normalized_volume":210}},
+{"id":"gen-phosphorylation-7","n":24,"m":24,"blocks":[[2,1],[22,1]],"vdim":15,"sparse":{"witness_degree":3,"columns":23000,"rank_rows":22724,"full_rows":39744,"normalized_volume":276}},
+{"id":"gen-phosphorylation-2-nonzero","n":10,"m":10,"blocks":[[5,5],[5,1]],"vdim":5,"sparse":{"witness_degree":6,"columns":149979984,"rank_rows":149192484,"full_rows":359115120,"normalized_volume":787500}},
+{"id":"gen-phosphorylation-4-nonzero","n":16,"m":16,"blocks":[[7,7],[9,1]],"vdim":9,"sparse":{"witness_degree":8,"columns":13450010012010,"rank_rows":13440588680090,"full_rows":42450160896000,"normalized_volume":9421331920}},
+{"id":"gen-phosphorylation-6-nonzero","n":22,"m":22,"blocks":[[9,9],[13,1]],"vdim":13,"sparse":{"witness_degree":10,"columns":1980413649859148504,"rank_rows":1980220939159510124,"full_rows":7728690921404961200,"normalized_volume":192710699638380}}
+]
