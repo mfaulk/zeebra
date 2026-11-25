@@ -1,0 +1,5 @@
+2026-11-25T13:18:21-05:00 released; reserving load=4.74
+status=reserved ccds=1,2 bench=8-23,72-87 rest=0-7,24-71,88-127 app.slice=0-7,24-71,88-127
+2026-11-25T13:19:53-05:00 aa rc=0
+status=released ccds= bench=- rest=- app.slice=0-127
+2026-11-25T13:19:53-05:00 release rc=0

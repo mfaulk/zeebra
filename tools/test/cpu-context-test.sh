@@ -237,6 +237,12 @@ print(d["telemetry"], d["compilers"], d["compilers_on_bench"], d["compilers_else
       d["runner_workers_on_bench"], d["psi"]["memory"]["some_us"], d["psi_bench_slice"]["cpu"]["full_us"],
       d["vmstat"]["pgscan"], d["mbm_bytes"], len(d["ccd_stat"]), d["bench_running"][0]["comm"])')"
   check "snapshot: telemetry fields" "1 3 2 1 1 1234 3 15 {'unavailable': 'mbm_total_bytes unreadable'} 3 stress ng" "$fields"
+  # ZEEBRA_CPU_CONTEXT_TELEMETRY=0 omits every #1105 field, as a pre-#1105 snapshot did, for the overhead A/A.
+  off="$(ZEEBRA_CPU_CONTEXT_TELEMETRY=0 ctx_snapshot 8 | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+print(sorted(k for k in ("telemetry","compilers_on_bench","psi","vmstat","ccd_stat","bench_running") if k in d), d["compilers"])')"
+  check "snapshot: telemetry off" "[] 3" "$off"
 fi
 
 printf 'cpu-context: %d passed, %d failed\n' "$pass" "$fail"
