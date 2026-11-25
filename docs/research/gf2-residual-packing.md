@@ -1,6 +1,7 @@
 # Packing only the residual columns over GF(2) (#1077)
 
-**Measured at:** `7f223df4` (§5, the bench host: decision figures) and `2ac6488f` (§3–§4, the
+**Measured at:** `7f223df4` (§5, the bench host: decision figures), `7ceea6fd` (§5.1, the bench
+host: #1092's confirmation, tag `measured/1092-residual-sweep`) and `2ac6488f` (§3–§4, the
 laptop). The kernel is unchanged between the two; `7f223df4` adds only the `AutoResidual` arm and
 the fresh-process mode. **§5:** AMD Threadripper PRO 5995WX, Linux x86_64, rustc 1.99.1, every
 process `taskset`-pinned under `tools/benchlock.sh 1077`, 1-minute load 0.8–1.1
@@ -312,6 +313,27 @@ reach only the batches `Auto` leaves generic, the same in both arms. Peak RSS is
 
 **Not measured.** n ≥ 18, and families outside MQ, cyclic and katsura. Cyclic-8/9 and sparse
 MQ-12 are in development and gain nothing or a little.
+
+### 5.1 Confirmation after the swap (#1092)
+
+At `7ceea6fd` (#1092's branch rebased onto `main` `48778879`; tag `measured/1092-residual-sweep`),
+the same `fresh.sh` protocol on the same three sets, five repetitions per arm, `auto`
+(`AutoFullWidth`, the former default) against `auto-eager` (the new default `Auto`) from one
+binary. CCDs 1–2 were reserved with `tools/bench-reserve.sh` and every process ran under
+`tools/bench-reserve.sh run 1092 8-23`: one worker on CPU 8, sixteen on CPUs 8–23. Other sessions
+were building on the unreserved CCDs, so the 1-minute load was 5.9–16.6 (evidence and provenance:
+`research/gf2-residual/bench-host-1092/`). Every process's basis equals the full-width arm's on all
+55 instances at both worker counts.
+
+| set | instances | 1 worker: auto/auto-eager | per instance | elimination | 16 workers: auto/auto-eager | per instance | elimination |
+| --- | ---: | ---: | --- | ---: | ---: | --- | ---: |
+| development | 38 | 1.04x | 0.96x–1.10x | 1.27x | 1.04x | 0.97x–1.07x | 1.26x |
+| held out (n = 15) | 10 | 1.05x | 0.98x–1.18x | 1.38x | 1.07x | 1.03x–1.18x | 1.39x |
+| big (n = 16, 17) | 7 | 1.17x | 1.01x–1.34x | 1.85x | 1.20x | 1.04x–1.40x | 1.85x |
+
+#1092's acceptance asked for #1089's 1.03x / 1.06x / 1.19x (one worker) and 1.03x / 1.06x / 1.18x
+(sixteen) within noise; these are 1.04x / 1.05x / 1.17x and 1.04x / 1.07x / 1.20x. Peak RSS of the
+new default is 0.89x–1.00x of the full width's on big at one worker and 0.91x–1.08x at sixteen.
 
 ## 6. Not done
 

@@ -13,6 +13,7 @@ document's header and in `provenance.txt`.
 | `fresh.sh` | Whole solves, one per fresh pinned process, arms rotated (`gf2_residual_replay one`) |
 | `analyze_fresh.py` | Fresh-solve totals, per-instance ratio ranges and peak RSS |
 | `bench-host/` | The bench host's runs at `7f223df4`: the four tables above, `solve-fresh-1w.tsv` and `solve-fresh-16w.tsv`, and both provenance files |
+| `bench-host-1092/` | #1092's confirmation at `7ceea6fd` (`measured/1092-residual-sweep`): `fresh-1w.tsv`, `fresh-16w.tsv` (`auto` against `auto-eager`) and `provenance.txt` |
 
 Reproduce. `run.sh` and `analyze.py` need the example's `batches` and `solve` modes and its
 `lazy` arm, which #1092 removed with the `research-gf2-residual` feature; check out `7f223df4` for
