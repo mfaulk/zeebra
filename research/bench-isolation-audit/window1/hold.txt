@@ -1,0 +1,2 @@
+/user.slice/user-1000.slice/user@1000.service/zbbench.slice/run-p2701821-i132102299.scope
+Cpus_allowed_list:	8-23,72-87

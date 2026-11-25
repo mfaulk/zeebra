@@ -1,0 +1,7 @@
+P_WIDE allowed=0-127
+P_DISJ8 allowed=8
+P_STRADDLE allowed=0,8
+P_PLAIN allowed=0-127
+P_SCOPE8 allowed=8
+P_SETDURING allowed=0-127
+status=released ccds= bench=- rest=- app.slice=0-127

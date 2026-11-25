@@ -93,6 +93,21 @@ state; an unscoped `benchlock` run now warns and records `reserved=<cpus>` on ST
 up; and when a pin fails with `Invalid argument`, run `tools/bench-reserve.sh status` before
 anything else.
 
+**What the fence covers** ([#1104 audit](../research/bench-isolation-audit.md)). It covers every
+task in `app.slice`, `background.slice` and `session.slice`: terminals, agents, their `cargo`, and
+the self-hosted GitHub runners, which are user services. Under a 17-minute build loop, those slices
+put no time on a reserved CPU. It does not cover `system.slice` (docker, rootful containers),
+rootless podman (`user@.service/user.slice`), `systemd --user` itself, login `session-*.scope`s, or
+anything started with `systemd-run --user --slice=<new slice>`, which gets all 128 CPUs without
+root. Kernel threads, unbound workqueues and IRQs are not covered either. While reserved, a
+`taskset` that straddles the fence succeeds silently with only the CPUs outside it. Check a live
+reservation with
+
+```sh
+tools/bench-isolation-audit.sh inventory | jq '.escapes'   # user tasks that can still run on the bench
+tools/bench-isolation-audit.sh policy 1 8 16               # CCDs a w-worker M29 placement needs
+```
+
 Placement is part of a figure. A 16-worker run means 16 physical cores, CPUs 8-23 across CCDs 1-2
 with their siblings idle — not one CCD's 16 hardware threads, which would pair every worker with
 another on one core and measure something else.

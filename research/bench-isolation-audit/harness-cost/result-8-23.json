@@ -1,0 +1,191 @@
+{
+  "cpus": "8-23",
+  "perf": "/usr/bin/perf",
+  "rss_reporter": "/usr/bin/time",
+  "snapshot": [
+    {
+      "cpu": 0.588113,
+      "wall": 0.5021610410185531
+    },
+    {
+      "cpu": 0.5895980000000001,
+      "wall": 0.5026240969309583
+    },
+    {
+      "cpu": 0.581523,
+      "wall": 0.4944266590755433
+    },
+    {
+      "cpu": 0.5908699999999998,
+      "wall": 0.503750619944185
+    },
+    {
+      "cpu": 0.5807960000000003,
+      "wall": 0.4938293379964307
+    }
+  ],
+  "cells": [
+    {
+      "T": 0.24,
+      "config": "full",
+      "n": 15,
+      "harness_median": 0.23601099999999864,
+      "harness_max": 0.24118199999999357,
+      "child_median": 3.69927,
+      "wall_median": 0.247271756,
+      "vcsw_median": 89,
+      "perf_rc": [
+        "-2"
+      ],
+      "guard_rc": [
+        "0"
+      ],
+      "frac_of_capacity": 0.05965374994142038,
+      "frac_of_child_cpu": 0.0637993441949354
+    },
+    {
+      "T": 0.24,
+      "config": "sampler_only",
+      "n": 15,
+      "harness_median": 0.004247999999991592,
+      "harness_max": 0.004688000000002912,
+      "child_median": 3.826385,
+      "wall_median": 0.244444243,
+      "vcsw_median": 15,
+      "perf_rc": [
+        "None"
+      ],
+      "guard_rc": [
+        "None"
+      ],
+      "frac_of_capacity": 0.0010861372587100547,
+      "frac_of_child_cpu": 0.0011101862462850945
+    },
+    {
+      "T": 0.24,
+      "config": "no_perf",
+      "n": 15,
+      "harness_median": 0.20921699999999133,
+      "harness_max": 0.21673500000001056,
+      "child_median": 3.7273989999999997,
+      "wall_median": 0.247139835,
+      "vcsw_median": 79,
+      "perf_rc": [
+        "None"
+      ],
+      "guard_rc": [
+        "0"
+      ],
+      "frac_of_capacity": 0.05290957040575615,
+      "frac_of_child_cpu": 0.056129488686344375
+    },
+    {
+      "T": 1.0,
+      "config": "full",
+      "n": 15,
+      "harness_median": 0.23348400000002556,
+      "harness_max": 0.24023499999998243,
+      "child_median": 15.808135,
+      "wall_median": 1.007160574,
+      "vcsw_median": 73,
+      "perf_rc": [
+        "-2"
+      ],
+      "guard_rc": [
+        "0"
+      ],
+      "frac_of_capacity": 0.014489000440163772,
+      "frac_of_child_cpu": 0.014769863744206737
+    },
+    {
+      "T": 1.0,
+      "config": "sampler_only",
+      "n": 15,
+      "harness_median": 0.012669999999856074,
+      "harness_max": 0.012900999999969187,
+      "child_median": 15.931911000000001,
+      "wall_median": 1.004537308,
+      "vcsw_median": 46,
+      "perf_rc": [
+        "None"
+      ],
+      "guard_rc": [
+        "None"
+      ],
+      "frac_of_capacity": 0.0007882982480437697,
+      "frac_of_child_cpu": 0.0007952592755417773
+    },
+    {
+      "T": 1.0,
+      "config": "no_perf",
+      "n": 15,
+      "harness_median": 0.2031520000000917,
+      "harness_max": 0.2074059999998923,
+      "child_median": 15.831267,
+      "wall_median": 1.007114988,
+      "vcsw_median": 65,
+      "perf_rc": [
+        "None"
+      ],
+      "guard_rc": [
+        "0"
+      ],
+      "frac_of_capacity": 0.012607299217361792,
+      "frac_of_child_cpu": 0.012832327317838281
+    },
+    {
+      "T": 5.0,
+      "config": "full",
+      "n": 15,
+      "harness_median": 0.6516890000002746,
+      "harness_max": 0.6549949999999427,
+      "child_median": 79.167385,
+      "wall_median": 5.007386769,
+      "vcsw_median": 271,
+      "perf_rc": [
+        "-2"
+      ],
+      "guard_rc": [
+        "0"
+      ],
+      "frac_of_capacity": 0.008134095563013852,
+      "frac_of_child_cpu": 0.00823178636000513
+    },
+    {
+      "T": 5.0,
+      "config": "sampler_only",
+      "n": 15,
+      "harness_median": 0.05644399999985694,
+      "harness_max": 0.056966999999886525,
+      "child_median": 79.649827,
+      "wall_median": 5.005037261,
+      "vcsw_median": 202,
+      "perf_rc": [
+        "None"
+      ],
+      "guard_rc": [
+        "None"
+      ],
+      "frac_of_capacity": 0.0007048399074827704,
+      "frac_of_child_cpu": 0.0007086518844523911
+    },
+    {
+      "T": 5.0,
+      "config": "no_perf",
+      "n": 15,
+      "harness_median": 0.6280269999997756,
+      "harness_max": 0.6458609999997833,
+      "child_median": 79.184068,
+      "wall_median": 5.007486408,
+      "vcsw_median": 264,
+      "perf_rc": [
+        "None"
+      ],
+      "guard_rc": [
+        "0"
+      ],
+      "frac_of_capacity": 0.007838600907089268,
+      "frac_of_child_cpu": 0.007931229297284596
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+7012 attempts from 39 jobs
+w spare n med_harness_s med_attempt_cpu_s med_wall_s med(h/c) frac(h/c<1%) med_foreign p90_foreign
+1 True 3288 1.089 0.007 0.008 151.7041 0.0 0.0 0.00347
+4 True 634 1.15 0.01 0.011 118.3761 0.0 0.0 0.00157
+8 True 630 1.253 0.017 0.014 74.0436 0.0 4e-05 0.00115
+16 False 2460 1.547 0.015 0.013 101.3541 0.0 0.0 0.0
+16w spare=False 0.1-0.5 s walls: n 171 med harness 1.377 med cpu 0.341 med h/c 4.039 insts ['gen-chandrasekhar-h-10.p31', 'gen-chandrasekhar-h-10.p64', 'gen-chandrasekhar-h-8.p31', 'gen-chandrasekhar-h-8.p64']

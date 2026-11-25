@@ -1,0 +1,25 @@
+## taskset -c 8 true (new process onto a reserved CPU)
+taskset: failed to set pid 2701730's affinity: Invalid argument
+rc=1
+## taskset -cp 8 <running app.slice pid>
+taskset: failed to set pid 2701050's affinity: Invalid argument
+pid 2701050's current affinity list: 0-7,24-71,88-127
+rc=1
+## taskset -cp 0-127 <running pid> (wider than cpuset)
+pid 2701050's current affinity list: 0-7,24-71,88-127
+pid 2701050's new affinity list: 0-7,24-71,88-127
+rc=0
+P_PLAIN pid=2701050 allowed=0-7,24-71,88-127 last_cpu=79 cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-391a851f-72e0-49da-83cb-0fc7065dc7b7.scope
+## taskset -cp 0,8 <running pid> (straddling)
+pid 2701050's current affinity list: 0-7,24-71,88-127
+pid 2701050's new affinity list: 0
+rc=0
+P_PLAIN pid=2701050 allowed=0 last_cpu=79 cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-391a851f-72e0-49da-83cb-0fc7065dc7b7.scope
+## new scope with AllowedCPUs=8 while reserved
+Cpus_allowed_list:	0-7,24-71,88-127
+/user.slice/user-1000.slice/user@1000.service/app.slice/run-p2701746-i131811547.scope
+rc=0
+## systemd-run --user --slice=zb1104-escape.slice (a non-fenced user slice)
+Cpus_allowed_list:	0-127
+/user.slice/user-1000.slice/user@1000.service/zb1104.slice/zb1104-escape.slice/run-p2701748-i132736049.scope
+rc=0
