@@ -19,7 +19,8 @@ judgement calls J1–J8 and the two J6 refinements.
 | `results/attempts.jsonl` | One selection-grade record per attempt (`selection-outcome-v1` status, wall, digest), collected from the bench-job reports |
 | `results/jobs.json` | Every bench-job this campaign submitted, in run order |
 | `results/features.jsonl` | `feature_costs --skip-solve` per development record |
-| `results/gate-h.json`, `results/gate-h.md` | The read |
+| `results/gate-h.json`, `results/gate-h.md` | The read (verdict: no-go) |
+| `summary.py`, `results/summary.md` | Descriptive per-arm aggregates and cohort composition; they do not decide |
 
 ## Reproduce
 
@@ -29,7 +30,10 @@ git archive 6c77117a | tar -x -C <dir> && (cd <dir> && cargo build --release --l
 python3 research/m34-gate-h/campaign.py seal            # rewrites s0/ byte for byte from the merged catalogs
 research/m34-gate-h/session.sh 1 <m34_matrix>           # pass 1, one repetition per cell, in scale tiers
 research/m34-gate-h/session.sh 2 <m34_matrix> <feature_costs>   # top-up to n = 5 / 3, then feature costs
+python3 research/m34-gate-h/campaign.py plan --pass 3        # freezes results/topup.json
+research/m34-gate-h/session.sh 3 <m34_matrix>           # §8.5 top-up to n = 9
 python3 research/m34-gate-h/campaign.py collect
 python3 research/m34-gate-h/analyse.py
+python3 research/m34-gate-h/summary.py > research/m34-gate-h/results/summary.md
 python3 research/m34-gate-h/test_analyse.py
 ```
