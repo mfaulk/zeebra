@@ -4,7 +4,8 @@
 **after revision 1 every criterion passes.** H4 is falsified on its leave-one-family-out clause: the
 MQ10 crossover is fitted to MQ10 alone (§2).
 **Measured at:** first read head `8544cf24` (tag `measured/927-head`), revision 1 head `588d2a44`
-(tag `measured/927-rev1`), #978's held-out check `e3a25264` (tag `measured/978-held-out`, Addendum), both against base `c1d93389` (tag
+(tag `measured/927-rev1`), #978's held-out check `e3a25264` (tag `measured/978-held-out`, Addendum), #1141's held-out check
+`e98322f4` (tag `measured/1141-held-out`, Addendum), the first three against base `c1d93389` (tag
 `measured/927-base`; `src/` identical to `main` at `ce67df76`, plus the library-neutral
 `sig_f4_study --calls` harness), each built from a `git archive` into its own target directory
 (release, fat LTO, one codegen unit, x86-64-v3, `--features research-sigf4`, `RUSTC_WRAPPER=""`,
@@ -145,6 +146,18 @@ only at about 16 workers. The witness separates katsura-like inputs from MQ10's 
 locate the worker crossover within that shape. The four dense planted `m = 2n` rows fell under the
 20 ms floor and were dropped. Whether to narrow further, refit the worker threshold, or accept the
 residual cost is an owner decision (#978).
+
+**#1141: a term-count refit, not confirmed (`e98322f4`, tag `measured/1141-held-out`).** On
+ladder MQ seeds 10–13 only the term count separates the rows F4 wins at 4 w (95, 107 terms) from
+the ones it loses (120, 121); monomials and quadratic generators do not (seed 12 has MQ10's 605
+and 9). The candidate, posted on #1141 before any timed run, kept the band's shipping route at
+`workers >= 16`, or at `workers >= 4` with `terms < 114`. On 20 fresh rows (seeds 14–25 over both
+fields, 9 pinned processes per cell) it agreed on 53 of 60 cells, short of the pre-declared 90%,
+against the incumbent's 35; seed 18 (115 terms) at 8 w and seed 24 at 16 w missed by 1.30–1.51×.
+The band is not removed either: low-term rows lose 1.3–23× on the signature engine (seed 22, 94
+terms, 13–23×). MQ10 itself now favours the signature engine at 4 w (0.66 / 0.75), so the band's
+own fitting row no longer sits at parity there. The rule is unchanged; evidence and the
+descriptive breakdown are in [`research/1141-worker-crossover/`](../../research/1141-worker-crossover/README.md).
 
 ## 3. Gate R (plan §8.2)
 
