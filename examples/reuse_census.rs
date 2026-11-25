@@ -417,6 +417,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         .collect();
     let bytes_per_term = size_of::<Monomial<N>>() + size_of::<F>();
     let started = Instant::now();
+    #[cfg_attr(not(feature = "research-adjacent"), allow(unused_mut))]
     let mut adjacent = Json::Null;
     let (result, statistics, census, ledger) = match args.engine {
         Engine::F4 => {
