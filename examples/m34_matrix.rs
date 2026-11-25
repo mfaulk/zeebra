@@ -2,7 +2,13 @@
 //! for the development-panel performance matrix (`research/m34-gate-h/`).
 //!
 //! cargo run --release --features research-sigf4 --example m34_matrix -- --catalog FILE --id ID
-//!     [--engine f4|cap16|adaptive|sig] [--workers N] [--wall-s S]
+//!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S]
+//!
+//! `fallback` (#1134, research only) is `adaptive` followed by one rule. When the dispatcher's
+//! conventional route stops with a size refusal (`TooManyRows`, `TooManyColumns`,
+//! `TooManyNonzeros`, `TooManyLiveBytes`), the forced signature engine (`sig`'s options) runs with
+//! the wall budget that remains. The discarded attempt is charged to `call_ns` and reported as
+//! `fallback_from`.
 //!
 //! The engines set exactly the options `examples/m33_qualify.rs` gives the #1011 arms on Z0, so a
 //! cell here is the arm #1011 qualified. A typed refusal or budget stop is a normal exit with
@@ -12,6 +18,8 @@
 //! `references.json`.
 
 use std::time::{Duration, Instant};
+#[cfg(feature = "research-sigf4")]
+use zeebra::grobner::{F4Error, ShippingReason, SignatureRoute};
 use zeebra::{
     fields::{Zp18446744073709551557, Zp2147483647},
     grobner::{f4_reported, F4Options, GradedEngine, ParallelForward, ParallelSymbolic},
@@ -20,7 +28,7 @@ use zeebra::{
 };
 
 const ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
-const ENGINES: [&str; 4] = ["f4", "cap16", "adaptive", "sig"];
+const ENGINES: [&str; 5] = ["f4", "cap16", "adaptive", "sig", "fallback"];
 
 #[derive(Debug, PartialEq)]
 struct Args {
@@ -237,7 +245,7 @@ fn options(args: &Args) -> F4Options {
             max_pairs_per_batch: Some(16),
             ..shared
         },
-        "adaptive" => F4Options {
+        "adaptive" | "fallback" => F4Options {
             graded_engine: GradedEngine::Adaptive,
             ..shared
         },
@@ -245,10 +253,75 @@ fn options(args: &Args) -> F4Options {
     }
 }
 
+/// #1134's trigger: the conventional engine's size refusals. Time and batch budgets are the
+/// caller's and never fall back.
 #[cfg(feature = "research-sigf4")]
-fn sig_options(args: &Args) -> zeebra::grobner::sigf4::SigF4Options {
+fn is_size_refusal(error: &F4Error) -> bool {
+    matches!(
+        error,
+        F4Error::TooManyRows { .. }
+            | F4Error::TooManyColumns { .. }
+            | F4Error::TooManyNonzeros { .. }
+            | F4Error::TooManyLiveBytes { .. }
+    )
+}
+
+/// What [`fallback`] did: the discarded attempt's error and wall, when the rule fired, and the
+/// route the answer came from.
+#[cfg(feature = "research-sigf4")]
+struct Fallback {
+    first: Option<(String, Duration)>,
+    route: Option<(String, usize)>,
+}
+
+/// `adaptive` under `options`, then on a size refusal from its conventional route the signature
+/// engine with `sig(remaining wall)`. A refusal the dispatcher already fell back from
+/// (`Shipping(Fallback)`) or one from the signature route is returned as it is: the signature
+/// engine has run.
+#[cfg(feature = "research-sigf4")]
+fn fallback<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    options: &F4Options,
+    sig: impl Fn(Duration) -> zeebra::grobner::sigf4::SigF4Options,
+) -> (Result<Vec<MultivariatePolynomial<N, F>>, String>, Fallback) {
+    let clock = Instant::now();
+    let (result, statistics) = f4_reported(system, ORDER, options);
+    let dispatch = statistics.graded_route;
+    let route = dispatch
+        .as_ref()
+        .map(|d| (format!("{:?}", d.route), d.workers));
+    let conventional = matches!(
+        dispatch.as_ref().map(|d| &d.route),
+        Some(SignatureRoute::Shipping(reason)) if !matches!(reason, ShippingReason::Fallback(_))
+    );
+    match result {
+        Err(error) if conventional && is_size_refusal(&error) => {
+            let first = clock.elapsed();
+            let remaining = options
+                .max_wall_time
+                .map_or(Duration::MAX, |w| w.saturating_sub(first));
+            let (result, _) =
+                zeebra::grobner::sigf4::sig_f4_reported(system, ORDER, &sig(remaining));
+            let workers = sig(remaining).workers;
+            (
+                result.map_err(|e| format!("{e:?}")),
+                Fallback {
+                    first: Some((format!("{error:?}"), first)),
+                    route: Some(("Fallback".to_string(), workers)),
+                },
+            )
+        }
+        result => (
+            result.map_err(|e| format!("{e:?}")),
+            Fallback { first: None, route },
+        ),
+    }
+}
+
+#[cfg(feature = "research-sigf4")]
+fn sig_options(args: &Args, wall: Duration) -> zeebra::grobner::sigf4::SigF4Options {
     zeebra::grobner::sigf4::SigF4Options {
-        max_wall_time: Some(args.wall),
+        max_wall_time: Some(wall),
         workers: args.workers,
         parallel_cascade: args.workers > 1,
         ..zeebra::grobner::sigf4::SigF4Options::default()
@@ -258,18 +331,32 @@ fn sig_options(args: &Args) -> zeebra::grobner::sigf4::SigF4Options {
 fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'static str, Json)> {
     let system = polynomials::<N, F>(record);
     let clock = Instant::now();
+    #[cfg_attr(not(feature = "research-sigf4"), allow(unused_mut))]
+    let mut fallback_from = Json::Null;
     let (result, route) = match args.engine.as_str() {
         #[cfg(feature = "research-sigf4")]
         "sig" => {
-            let (result, _) =
-                zeebra::grobner::sigf4::sig_f4_reported(&system, ORDER, &sig_options(args));
+            let options = sig_options(args, args.wall);
+            let (result, _) = zeebra::grobner::sigf4::sig_f4_reported(&system, ORDER, &options);
             (
                 result.map_err(|e| format!("{e:?}")),
                 Some(("Forced".to_string(), args.workers)),
             )
         }
+        #[cfg(feature = "research-sigf4")]
+        "fallback" => {
+            let (result, report) =
+                fallback(&system, &options(args), |wall| sig_options(args, wall));
+            if let Some((error, wall)) = report.first {
+                fallback_from = Json::object([
+                    ("error", Json::string(error)),
+                    ("call_ns", Json::nanos(wall)),
+                ]);
+            }
+            (result, report.route)
+        }
         #[cfg(not(feature = "research-sigf4"))]
-        "sig" => (
+        "sig" | "fallback" => (
             Err("Unsupported: built without research-sigf4".to_string()),
             None,
         ),
@@ -287,7 +374,7 @@ fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'s
         Err(e) if e.contains("Unsupported") => "refused",
         Err(_) => "stopped",
     };
-    vec![
+    let mut fields = vec![
         ("status", Json::string(status)),
         (
             "error",
@@ -312,7 +399,11 @@ fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'s
             result.as_ref().map_or(Json::Null, |b| Json::size(b.len())),
         ),
         ("call_ns", Json::nanos(call)),
-    ]
+    ];
+    if args.engine == "fallback" {
+        fields.push(("fallback_from", fallback_from));
+    }
+    fields
 }
 
 fn solve(record: &Record, args: &Args) -> Result<Vec<(&'static str, Json)>, String> {
@@ -417,11 +508,62 @@ mod tests {
         );
     }
 
+    /// #1134's trigger is the four size refusals; batch budgets are the caller's and never fall back.
+    #[cfg(feature = "research-sigf4")]
+    #[test]
+    fn fallback_triggers_on_size_refusals_only() {
+        assert!(is_size_refusal(&F4Error::TooManyColumns { limit: 1 }));
+        assert!(is_size_refusal(&F4Error::TooManyRows { limit: 1 }));
+        assert!(is_size_refusal(&F4Error::TooManyNonzeros {
+            nonzeros: 2,
+            limit: 1
+        }));
+        assert!(is_size_refusal(&F4Error::TooManyLiveBytes {
+            bytes: 2,
+            limit: 1
+        }));
+        assert!(!is_size_refusal(&F4Error::TooManyBatches { limit: 1 }));
+        assert!(!is_size_refusal(&F4Error::StoppedByObserver));
+    }
+
+    /// A conventional size refusal re-runs the signature engine, which completes with the same
+    /// basis; a conventional completion is returned as it is, with no second attempt.
+    #[cfg(feature = "research-sigf4")]
+    #[test]
+    fn fallback_reruns_the_signature_engine_after_a_size_refusal() {
+        // Cyclic-4's degrees spread 1..4, so the dispatch keeps it on conventional F4.
+        let system = zeebra::grobner::benchmark_systems::cyclic::<4, Zp2147483647>();
+        let wall = Duration::from_secs(10);
+        let sig = |remaining| zeebra::grobner::sigf4::SigF4Options {
+            max_wall_time: Some(remaining),
+            ..Default::default()
+        };
+        let adaptive = F4Options {
+            max_wall_time: Some(wall),
+            graded_engine: GradedEngine::Adaptive,
+            ..F4Options::default()
+        };
+        let (plain, quiet) = fallback(&system, &adaptive, sig);
+        assert!(quiet.first.is_none(), "a completion never falls back");
+        let tight = F4Options {
+            max_matrix_columns: 1,
+            ..adaptive
+        };
+        let (rescued, fired) = fallback(&system, &tight, sig);
+        let first = fired.first.expect("the size refusal falls back");
+        assert!(first.0.contains("TooManyColumns"), "{}", first.0);
+        assert_eq!(rescued.unwrap(), plain.unwrap());
+    }
+
     /// Every engine on a small record returns the same reduced basis.
     #[test]
     fn engines_agree_on_a_small_record() {
         let record = find_record(CATALOG, "x@p31").unwrap();
-        let digests: Vec<String> = ["f4", "cap16", "adaptive"]
+        let mut engines = vec!["f4", "cap16", "adaptive"];
+        if cfg!(feature = "research-sigf4") {
+            engines.push("fallback");
+        }
+        let digests: Vec<String> = engines
             .iter()
             .map(|engine| {
                 let a = Args {
