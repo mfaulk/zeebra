@@ -9,6 +9,12 @@ change to `y` may break the public API.
 
 ### Added
 
+- Behind `research-sigf4`, `SigF4Options::lead_ideal_stop` (on by default, graded-lex only): once
+  a signature degree adds no new minimal lead, the engine finishes with conventional F4 over its
+  elements at minimal leads and the inputs, which returns the same basis (#1140).
+  `SigF4Statistics::lead_ideal_stop`, `lead_ideal_complete` and `lead_ideal_handoff` report it.
+  Breaking: an exhaustive `SigF4Options` or `SigF4Statistics` literal needs the new fields.
+
 - `linalg::lane`: a dense small-prime "lane" kernel for primes up to 46337, using `u32` delayed
   reduction (#945). `FiniteField::small_prime_lane()` returns `None` by default; it is implemented
   for `PrimeFieldElement32`. Behind `research-sigf4`, `SigF4Options::small_prime_lane` runs the
