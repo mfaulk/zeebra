@@ -90,7 +90,7 @@ pub use solve::solve;
 pub use solve_zero_dimensional::{
     solve_from_lex_basis, solve_one, solve_one_reported, solve_one_with_options,
     solve_one_with_outcome, solve_zero_dimensional, solve_zero_dimensional_with_options,
-    SolveError, SolveOptions, SolveOutcome, SolveStatistics, SolveStrategy,
+    RootExtraction, SolveError, SolveOptions, SolveOutcome, SolveStatistics, SolveStrategy,
 };
 
 #[cfg(test)]

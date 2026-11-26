@@ -54,8 +54,9 @@ pub use poly::{
     BlockOrderKind, BuildMonomialHasher, DivisionRoute, GcdError, GcdRoute, GraeffeError,
     GraeffeStats, ModularComposer, Monomial, MonomialHasher, MonomialMap, MonomialOrder,
     MonomialSet, MultivariatePolynomial, NormalFormError, Polynomial, PolynomialParams,
-    PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial, WeightedOrder,
-    WeightedOrderError, WeightedTieBreak, Xgcd, KRONECKER_CROSSOVER,
+    PowerPermutation, RootStream, RootStreamCounters, RootStreamError, SquarefreeError,
+    SubgroupRoute, UnivariatePolynomial, WeightedOrder, WeightedOrderError, WeightedTieBreak, Xgcd,
+    KRONECKER_CROSSOVER,
 };
 #[doc(hidden)]
 pub use poly::{

@@ -33,6 +33,8 @@ mod pow_mod;
 mod power_permutation;
 mod resultant;
 pub use resultant::{resultant, resultant_at_formal_degrees, resultant_from_coefficients};
+mod root_stream;
+pub use root_stream::{RootStream, RootStreamCounters, RootStreamError};
 mod roots;
 mod subproduct_tree;
 pub use subproduct_tree::multipoint_evaluate;

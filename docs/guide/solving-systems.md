@@ -109,6 +109,48 @@ figure is an estimate of the *representation* — on katsura-7 under lex it is 3
 measured 1,303 MB of process RSS, so use `util::peak_resident_bytes` when the question is about the
 process.
 
+### Extracting candidate roots lazily (opt-in)
+
+Each level of the search tries the base-field roots of the constraints univariate in its variable.
+By default (`RootExtraction::Eager`) it computes all of them before trying the first one. When the
+first one extends to a point, the splitting spent on the rest was wasted. `RootExtraction::Lazy`
+draws them from a `RootStream` instead. The stream computes `gcd(f, x^q - x)` once, splits only
+as far as the next root needs, and keeps the unsplit factors. A branch that dies resumes the
+stream. `RootExtraction::GcdFirst` takes the gcd of all the level's constraints before streaming.
+Every route tries the same values, so the solution set is the same. Only the work done before the
+first point differs, and `SolveStatistics::roots` counts it.
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{fields::Zp2147483647, grobner::{solve_one_with_options, RootExtraction, SolveOptions},
+             MultivariatePolynomial};
+
+type F = Zp2147483647;
+let parse = |s| MultivariatePolynomial::<2, F>::parse(s, ["x", "y"]).unwrap();
+// 9 divides 2^31 - 2, so y has nine roots here, and each extends to x = y + 1.
+let system = vec![parse("x - y - 1"), parse("y^9 - 1")];
+let options = SolveOptions { root_extraction: RootExtraction::Lazy, ..SolveOptions::default() };
+let (point, statistics) =
+    solve_one_with_options(&system, &mut StdRng::seed_from_u64(1), &options).unwrap();
+assert!(point.is_some());
+assert_eq!(statistics.roots.roots_available, 9 + 1); // nine for y, one for x
+// One root of y was split out, so fewer than the eight splits that separating all nine takes.
+assert!(statistics.roots.splits < 8);
+```
+
+A stream that stops early is an error, not an answer. A split that runs out of attempts
+(`SolveOptions::max_split_attempts`, 1000 by default) returns
+`SolveError::RootExtraction(RootStreamError::RetryExhausted { .. })`, and the roots it had not
+reached are still candidates. `RootStream` can be used on its own, too. It also reports
+`Interrupted` when its caller's check between splits says stop, and `EveryElementIsARoot` for the
+zero polynomial, where `roots` panics.
+
+Measured on a laptop (`examples/lazy_roots_ablation.rs`, #1166), lazy extraction cut
+back-substitution time by 1.7x to 3x when the eliminant had 16 to 256 base-field roots. It did so
+even when 37 dead branches came before the one that extended. It was no faster, and on katsura-5
+slower, when each level has only one or two roots. It stays opt-in until a whole-`solve_one`
+measurement says otherwise.
+
 ### Structural analysis, which decides nothing
 
 `grobner::analyze` reads a system's shape off its terms without computing anything:
