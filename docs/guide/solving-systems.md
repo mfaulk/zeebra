@@ -497,3 +497,41 @@ so there is no cache cliff to model — and below it 2.79, which is fixed per-de
 small orders cannot amortize. `fit_power_law` and `time_sylvester_determinants` are the public
 instruments. See [`docs/research/resultant-elimination.md`](../research/resultant-elimination.md)
 §6.9.
+
+### Points over GF(2) by enumeration
+
+`grobner::gf2_solve_one` and `grobner::gf2_all_points` find the `GF(2)` points of a quadratic system
+in at most 64 variables without a Gröbner basis (#1156). They return the same points as adjoining
+the field equations and calling `solve_one` or `solve_zero_dimensional`, because every exponent
+above one is read as `x_i² = x_i`, which is exact on `GF(2)` points. Every returned point has been
+substituted into the original generators. The route is opt-in: no planner chooses it.
+
+```rust
+use zeebra::{
+    fields::Zp2,
+    grobner::{gf2_all_points, Gf2PointOptions},
+    MultivariatePolynomial,
+};
+
+let vars = ["x", "y", "z"];
+let system: Vec<MultivariatePolynomial<3, Zp2>> = ["x*y + z", "x + y + 1"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, vars).unwrap())
+    .collect();
+let (points, _report) = gf2_all_points(&system, &Gf2PointOptions::default()).unwrap();
+// x + y = 1 forces xy = 0, so z = 0: (1, 0, 0) and (0, 1, 0).
+assert_eq!(points.len(), 2);
+```
+
+`Gf2PointOptions::method` picks one of two methods, and both are complete:
+
+- `Gf2Method::Exhaustive`, the default: a bitsliced Gray-code walk over all `2^n` points, two word
+  operations per point for 64 equations at once.
+- `Gf2Method::Crossbred(CrossbredParameters { kept: k, degree: D })`: Joux–Vitse at `d = 1`. One
+  Macaulay elimination at degree `D`, then `2^(n−k)` guesses, each a linear system in `k` unknowns.
+  The parameters are the caller's; `research/1041-point-solving/model.py` predicts good ones.
+
+`workers` splits the walk over threads without changing which point `gf2_solve_one` returns.
+`BooleanQuadraticSystem` takes equations as monomial bitmasks directly, for callers that have no
+field polynomials. The design and the measurements are in
+[`docs/research/gf2-point-solving.md`](../research/gf2-point-solving.md).
