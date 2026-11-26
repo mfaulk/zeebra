@@ -4,7 +4,7 @@
 use std::fmt::{Display, Formatter};
 
 use crate::{
-    grobner::fglm::{incremental_span::Dependence, IncrementalSpan, QuotientAlgebra},
+    grobner::fglm::{incremental_span::Dependence, FglmStage, IncrementalSpan, QuotientAlgebra},
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
@@ -292,6 +292,20 @@ pub(super) fn shape_relations_vanish<const N: usize, F: FiniteField>(
     polynomials: &[MultivariatePolynomial<N, F>],
     t: usize,
 ) -> bool {
+    let unlimited = super::FglmControl::unlimited();
+    shape_relations_vanish_controlled(algebra, polynomials, t, &unlimited, FglmStage::Wiedemann)
+        .expect("an unlimited control never stops")
+}
+
+/// As [`shape_relations_vanish`], polling `control` in `stage` every
+/// [`SAFE_POINT_STRIDE`](super::SAFE_POINT_STRIDE) powers of `t`.
+pub(super) fn shape_relations_vanish_controlled<const N: usize, F: FiniteField>(
+    algebra: &QuotientAlgebra<N, F>,
+    polynomials: &[MultivariatePolynomial<N, F>],
+    t: usize,
+    control: &super::FglmControl<'_>,
+    stage: FglmStage,
+) -> Result<bool, super::FglmError> {
     let mut totals = vec![vec![F::zero(); algebra.dimension()]; polynomials.len()];
     let mut powers = vec![Vec::new(); polynomials.len()];
     let mut highest = 0;
@@ -324,6 +338,9 @@ pub(super) fn shape_relations_vanish<const N: usize, F: FiniteField>(
     let mut power = algebra.one();
     let mut positions = vec![0; polynomials.len()];
     for k in 0..=highest {
+        if k.is_multiple_of(super::SAFE_POINT_STRIDE) {
+            control.poll(stage)?;
+        }
         for ((terms, position), total) in powers.iter().zip(&mut positions).zip(&mut totals) {
             if let Some((degree, coefficient)) = terms.get(*position) {
                 if *degree == k {
@@ -338,7 +355,7 @@ pub(super) fn shape_relations_vanish<const N: usize, F: FiniteField>(
             power = algebra.multiply_by_variable(t, &power);
         }
     }
-    totals.iter().flatten().all(|value| value.is_zero())
+    Ok(totals.iter().flatten().all(|value| value.is_zero()))
 }
 
 /// `leading - sum_k coefficients[k] * t^k`, monic in `leading`.

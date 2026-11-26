@@ -27,7 +27,8 @@ use crate::{
         fglm::{
             incremental_span::IncrementalSpan,
             statistics::{FglmMemory, FglmStatistics},
-            FglmError, FglmOptions, QuotientAlgebra,
+            FglmControl, FglmError, FglmOptions, FglmStage, QuotientAlgebra, QuotientStatistics,
+            SAFE_POINT_STRIDE,
         },
         s_polynomial,
     },
@@ -103,11 +104,87 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     source_order: MonomialOrder,
     options: &FglmOptions,
 ) -> Result<(Vec<MultivariatePolynomial<N, F>>, FglmStatistics), FglmError> {
+    let (result, statistics) = fglm_to_lex_with_control(
+        source_basis,
+        source_order,
+        options,
+        &FglmControl::unlimited(),
+    );
+    result.map(|basis| (basis, statistics))
+}
+
+/// As [`fglm_to_lex_with_options`], under a cooperative deadline and cancellation, returning the
+/// statistics whether or not the conversion completed.
+///
+/// One `control` governs the whole conversion — enumeration, operator construction, every
+/// Wiedemann attempt and the classical fallback — so a declined or failed Wiedemann attempt leaves
+/// the fallback only what remains of the same deadline. The control is polled at the safe points
+/// [`FglmStage`] lists; nothing between two of them is interrupted, so the overrun past a deadline
+/// is bounded by the running stage's indivisible unit, not by zero.
+///
+/// A completed conversion returns the complete reduced lex basis, exactly as
+/// [`fglm_to_lex_with_options`] would, with identical statistics. A stopped one returns
+/// [`FglmError::DeadlineExceeded`] or [`FglmError::Cancelled`] naming the stage, never a partial
+/// basis; [`FglmStatistics::stopped_at`] records the same stage, and the rest of the statistics
+/// describe the stages that ran. Any other error is returned as it would be without a control, and
+/// its statistics are likewise those of the stages that ran.
+///
+/// # Example
+/// ```
+/// use std::time::Duration;
+/// use zeebra::{
+///     fields::Zp2147483647 as F,
+///     grobner::{f4, fglm_to_lex_with_control, FglmControl, FglmOptions},
+///     MonomialOrder, MultivariatePolynomial,
+/// };
+///
+/// let order = MonomialOrder::GradedReverseLexicographic;
+/// let system: Vec<MultivariatePolynomial<2, F>> = ["x^2 - y", "y^3 - 1"]
+///     .iter()
+///     .map(|s| MultivariatePolynomial::parse(s, ["x", "y"]).unwrap())
+///     .collect();
+/// let source = f4(&system, order).unwrap();
+///
+/// let control = FglmControl::unlimited().with_time_limit(Duration::from_secs(60));
+/// let (result, statistics) =
+///     fglm_to_lex_with_control(&source, order, &FglmOptions::default(), &control);
+/// assert_eq!(result.unwrap().len(), statistics.target_basis_elements);
+/// assert_eq!(statistics.stopped_at, None);
+/// ```
+pub fn fglm_to_lex_with_control<const N: usize, F: FiniteField>(
+    source_basis: &[MultivariatePolynomial<N, F>],
+    source_order: MonomialOrder,
+    options: &FglmOptions,
+    control: &FglmControl<'_>,
+) -> (
+    Result<Vec<MultivariatePolynomial<N, F>>, FglmError>,
+    FglmStatistics,
+) {
     let mut statistics = FglmStatistics {
         source_basis_elements: source_basis.len(),
         ..FglmStatistics::default()
     };
+    let result = convert(
+        source_basis,
+        source_order,
+        options,
+        control,
+        &mut statistics,
+    );
+    if let Err(FglmError::DeadlineExceeded { stage } | FglmError::Cancelled { stage }) = result {
+        statistics.stopped_at = Some(stage);
+    }
+    (result, statistics)
+}
 
+/// The conversion, leaving in `statistics` what each stage that ran did.
+fn convert<const N: usize, F: FiniteField>(
+    source_basis: &[MultivariatePolynomial<N, F>],
+    source_order: MonomialOrder,
+    options: &FglmOptions,
+    control: &FglmControl<'_>,
+    statistics: &mut FglmStatistics,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, FglmError> {
     // The unit ideal needs no special case, which is worth saying because it looks as though it
     // should. Its quotient is the zero space, so `one()` is the empty vector, the empty vector is
     // dependent on the empty span with no coefficients, and the relation that produces is `1` —
@@ -124,18 +201,23 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
         max_quotient_dimension: super::wiedemann::dimension_ceiling::<N, F>(options),
         ..*options
     };
-    let (algebra, quotient_statistics) =
-        QuotientAlgebra::new_with_statistics(source_basis, source_order, &enumeration).map_err(
-            |e| match e {
-                FglmError::QuotientDimensionExceeded { .. } => cap_exceeded,
-                e => e,
-            },
-        )?;
-    let dimension = algebra.dimension();
-    statistics.quotient_dimension = dimension;
+    let mut quotient_statistics = QuotientStatistics::default();
+    let built = QuotientAlgebra::new_controlled(
+        source_basis,
+        source_order,
+        &enumeration,
+        control,
+        &mut quotient_statistics,
+    );
     statistics.border = quotient_statistics.border;
     statistics.timings = quotient_statistics.timings;
     statistics.batches = quotient_statistics.batches;
+    let algebra = built.map_err(|e| match e {
+        FglmError::QuotientDimensionExceeded { .. } => cap_exceeded,
+        e => e,
+    })?;
+    let dimension = algebra.dimension();
+    statistics.quotient_dimension = dimension;
     statistics.operator_entries = algebra.operator_entries();
     statistics.memory.operator_entries = statistics.operator_entries;
     statistics.memory.operator_cells = algebra.operator_cells();
@@ -143,10 +225,13 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     statistics.memory.dense_columns = algebra.dense_columns();
 
     let walk = StageClock::new(options.measure_stages);
-    if let Some(basis) = super::wiedemann::try_conversion(&algebra, options, &mut statistics) {
+    let attempted = super::wiedemann::try_conversion(&algebra, options, control, statistics);
+    if let Some(basis) =
+        attempted.inspect_err(|_| statistics.timings.dependence = walk.elapsed())?
+    {
         statistics.target_basis_elements = basis.len();
         statistics.timings.dependence = walk.elapsed();
-        return Ok((basis, statistics));
+        return Ok(basis);
     }
     if dimension > options.max_quotient_dimension {
         return Err(cap_exceeded);
@@ -193,6 +278,13 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
         });
     }
 
+    // Safe point: a stop observed during or after a declined Wiedemann attempt keeps the fallback
+    // from starting at all, rather than after it has allocated its blocks.
+    if let Err(stop) = control.poll(FglmStage::ClassicalWalk) {
+        statistics.timings.dependence = walk.elapsed();
+        return Err(stop);
+    }
+
     let mut span = IncrementalSpan::new(dimension);
     let mut accepted_monomials: Vec<Monomial<N>> = Vec::new();
     let mut accepted_vectors: Vec<Vec<F>> = Vec::new();
@@ -204,6 +296,14 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     frontier.push((Reverse(ByTargetOrder(Monomial::one())), Origin::Identity));
 
     while let Some((Reverse(ByTargetOrder(monomial)), origin)) = frontier.pop() {
+        // Safe point every `SAFE_POINT_STRIDE` candidates. The first was polled above.
+        if statistics.candidates_considered % SAFE_POINT_STRIDE == SAFE_POINT_STRIDE - 1 {
+            if let Err(stop) = control.poll(FglmStage::ClassicalWalk) {
+                statistics.span_row_operations = span.row_operations();
+                statistics.timings.dependence = walk.elapsed();
+                return Err(stop);
+            }
+        }
         statistics.candidates_considered += 1;
 
         // The target staircase, as far as it is known. A multiple of an emitted leading monomial
@@ -270,7 +370,7 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     statistics.target_basis_elements = relations.len();
     statistics.span_row_operations = span.row_operations();
     statistics.timings.dependence = walk.elapsed();
-    Ok((relations, statistics))
+    Ok(relations)
 }
 
 /// As [`fglm_to_lex`], after verifying that the source really is a Gröbner basis.

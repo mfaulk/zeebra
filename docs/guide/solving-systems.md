@@ -186,8 +186,40 @@ sums, `peak_estimated_bytes()` maxes. `max_elapsed` is checked *between* attempt
 whether a retry or fallback starts rather than how long an attempt runs. The first attempt always
 starts, even with `max_elapsed: Some(Duration::ZERO)`. The planner does not pass the remaining
 allowance into `SolveOptions::f4.max_wall_time`: that separate cooperative limit keeps the caller's
-value for each basis computation. FGLM has no wall budget, so bounding the complete solve requires
-an external supervisor.
+value for each basis computation. The planner passes no deadline to FGLM either, so bounding the
+complete solve still requires an external supervisor; wiring the remaining allowance into FGLM's
+control (below) is a separate decision, not a reinterpretation of `max_elapsed`.
+
+### Bounding one conversion: `FglmControl`
+
+A direct caller can bound or cancel a single conversion in-process with
+`fglm_to_lex_with_control(source, order, &options, &control)`, where
+`FglmControl::unlimited().with_time_limit(d)`, `.with_deadline(t)` and `.with_cancellation(&flag)`
+set a wall deadline and an `AtomicBool` cancellation. It returns the result **and** the statistics
+either way. A stop is `FglmError::DeadlineExceeded { stage }` or `FglmError::Cancelled { stage }`
+(`FglmError::is_stop()`), never a partial basis and never a verdict about the ideal; the
+statistics record `stopped_at` and the figures of the stages that ran. Storage refusals keep their
+own variants. An unlimited control gives the same basis and statistics as
+`fglm_to_lex_with_options`.
+
+One control governs the whole conversion. A Wiedemann attempt that declines or fails does not give
+the classical fallback a fresh allowance: the fallback polls the same deadline, and a stop observed
+before it starts keeps it from allocating at all.
+
+**The granularity is cooperative.** Safe points are polled per stage (`FglmStage`); nothing between
+two is interrupted, so the overrun past a deadline is bounded by the running stage's largest
+indivisible unit:
+
+| stage | polled | indivisible unit |
+|---|---|---|
+| quotient enumeration | every 64 frontier pops | 64 divisibility tests, then the final sort of `D` monomials |
+| border classification | on entry | the whole classification, `N * D` monomial products and lookups |
+| operator construction | per border normal form (scalar), per batch claim on every worker (batched), every 64 columns | one normal form, or one batch's closure and reduction |
+| Wiedemann | per attempt, every 64 Krylov steps, before reconstruction and certification, every 64 certificate powers | Berlekamp–Massey on `2D` terms and the numerator inversion and reductions, `O(N D^2)` |
+| classical walk | on entry, every 64 candidates | 64 operator applications and dependence tests, `O(64 D^2)` |
+
+Batch workers poll before each claim and are joined before the conversion returns. The
+`src/linalg/` kernels have no internal safe points.
 
 An `Err` from the planner means **inconclusive**, never "no solution".
 `cargo run --release --example solve_auto` compares all four policies against an offline

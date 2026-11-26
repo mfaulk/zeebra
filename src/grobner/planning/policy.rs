@@ -157,8 +157,11 @@ impl std::fmt::Display for PlanObjective {
 /// limit stays at the caller's value and applies to each F4 basis computation independently.
 ///
 /// Neither limit guarantees a wall bound for the whole plan: F4 can overrun its cooperative limit,
-/// and [`FglmOptions`] has no wall budget. Use an external supervisor
-/// when the complete solve must be bounded.
+/// and the planner passes no deadline to FGLM. A single conversion can be bounded in-process with
+/// [`FglmControl`](crate::grobner::FglmControl) through
+/// [`fglm_to_lex_with_control`](crate::grobner::fglm_to_lex_with_control), but the planner does
+/// not use it: `max_elapsed` keeps its meaning above. Use an external supervisor when the complete
+/// solve must be bounded.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PlanBudget {
     /// Elapsed-time gate for retries and fallbacks, checked **between** attempts. `None` for no limit.

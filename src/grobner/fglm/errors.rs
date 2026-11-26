@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+use super::FglmStage;
+
 /// Why an FGLM computation stopped without a result.
 ///
 /// Modelled on [`F4Error`](crate::grobner::F4Error), including its discipline about what a variant
@@ -74,6 +76,25 @@ pub enum FglmError {
     /// Wiedemann enumerates past it within the span budgets, and returns this when that attempt
     /// declines or fails — the classical walk never runs above the cap (#1111).
     QuotientDimensionExceeded { limit: usize },
+
+    /// The [`FglmControl`](super::FglmControl)'s deadline passed, observed at a safe point in
+    /// `stage`.
+    ///
+    /// A stop outcome, not a verdict about the ideal: a longer deadline may convert it. The overrun
+    /// past the deadline is bounded by the stage's indivisible unit; see [`FglmStage`].
+    DeadlineExceeded { stage: FglmStage },
+
+    /// The [`FglmControl`](super::FglmControl)'s cancellation was set, observed at a safe point in
+    /// `stage`.
+    Cancelled { stage: FglmStage },
+}
+
+impl FglmError {
+    /// Whether this is a deadline or a cancellation, as opposed to a resource refusal or a fact
+    /// about the input.
+    pub fn is_stop(&self) -> bool {
+        matches!(self, Self::DeadlineExceeded { .. } | Self::Cancelled { .. })
+    }
 }
 
 impl Display for FglmError {
@@ -116,6 +137,12 @@ impl Display for FglmError {
                 "the quotient algebra has more than the {} dimensions allowed",
                 limit
             ),
+            Self::DeadlineExceeded { stage } => {
+                write!(f, "the conversion's deadline passed during {}", stage)
+            }
+            Self::Cancelled { stage } => {
+                write!(f, "the conversion was cancelled during {}", stage)
+            }
         }
     }
 }

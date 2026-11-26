@@ -3,7 +3,8 @@
 use rand::{rngs::StdRng, SeedableRng};
 
 use super::{
-    shape::shape_relations_vanish, ConversionStrategy, FglmOptions, FglmStatistics, QuotientAlgebra,
+    shape::shape_relations_vanish_controlled, ConversionStrategy, FglmControl, FglmError,
+    FglmOptions, FglmStage, FglmStatistics, QuotientAlgebra, SAFE_POINT_STRIDE,
 };
 use crate::{
     berlekamp_massey, poly::PreparedDivisor, xgcd, FiniteField, Monomial, MonomialOrder,
@@ -65,19 +66,25 @@ pub(crate) fn dimension_ceiling<const N: usize, F: FiniteField>(options: &FglmOp
     cap.max(rows.saturating_sub(1))
 }
 
+/// A Wiedemann conversion of `algebra`, `Ok(None)` if it was declined or every attempt failed, or
+/// the stop `control` ordered at one of the attempts' safe points.
+///
+/// The control is the caller's and is not reset, so a classical fallback after `Ok(None)` polls
+/// the same deadline this spent from.
 pub(super) fn try_conversion<const N: usize, F: FiniteField>(
     algebra: &QuotientAlgebra<N, F>,
     options: &FglmOptions,
+    control: &FglmControl<'_>,
     stats: &mut FglmStatistics,
-) -> Option<Vec<MultivariatePolynomial<N, F>>> {
+) -> Result<Option<Vec<MultivariatePolynomial<N, F>>>, FglmError> {
     let d = algebra.dimension();
     if options.conversion_strategy == ConversionStrategy::Classical || N == 0 || d == 0 {
-        return None;
+        return Ok(None);
     }
     if options.conversion_strategy == ConversionStrategy::Adaptive {
         if d < 128 {
             stats.wiedemann_fallback = Some(WiedemannFallback::SmallQuotient);
-            return None;
+            return Ok(None);
         }
         let operator = algebra.operator(N - 1);
         let cost = operator
@@ -85,7 +92,7 @@ pub(super) fn try_conversion<const N: usize, F: FiniteField>(
             .saturating_add(operator.standard_columns());
         if cost > d.saturating_mul(d) / 4 {
             stats.wiedemann_fallback = Some(WiedemannFallback::DenseOperator);
-            return None;
+            return Ok(None);
         }
     }
     let Some((cells, bytes)) = workspace_cells::<N>(d)
@@ -99,32 +106,39 @@ pub(super) fn try_conversion<const N: usize, F: FiniteField>(
         })
     else {
         stats.wiedemann_fallback = Some(WiedemannFallback::WorkspaceBudget);
-        return None;
+        return Ok(None);
     };
     stats.memory.krylov_workspace_cells = cells;
     stats.memory.krylov_workspace_bytes = bytes;
     let mut rng = StdRng::seed_from_u64(0x368_f61a);
     for _ in 0..3 {
+        control.poll(FglmStage::Wiedemann)?;
         stats.wiedemann_attempts += 1;
         let projection: Vec<F> = (0..d).map(|_| F::random(&mut rng)).collect();
-        match reconstruct(algebra, projection, options.measure_stages, stats) {
+        match reconstruct(algebra, projection, options.measure_stages, control, stats)? {
             Ok(basis) => {
                 stats.conversion_route = ConversionRoute::Wiedemann;
                 stats.wiedemann_fallback = None;
-                return Some(basis);
+                return Ok(Some(basis));
             }
             Err(reason) => stats.wiedemann_fallback = Some(reason),
         }
     }
-    None
+    Ok(None)
 }
+
+/// One scalar attempt: the certified shape basis, why it was rejected, or the stop `control`
+/// ordered at one of its safe points.
+type Attempt<const N: usize, F> =
+    Result<Result<Vec<MultivariatePolynomial<N, F>>, WiedemannFallback>, FglmError>;
 
 fn reconstruct<const N: usize, F: FiniteField>(
     algebra: &QuotientAlgebra<N, F>,
     mut projection: Vec<F>,
     measured: bool,
+    control: &FglmControl<'_>,
     stats: &mut FglmStatistics,
-) -> Result<Vec<MultivariatePolynomial<N, F>>, WiedemannFallback> {
+) -> Attempt<N, F> {
     let mut clock = crate::grobner::f4::StageClock::new(measured);
     let d = algebra.dimension();
     let last = N - 1;
@@ -142,6 +156,12 @@ fn reconstruct<const N: usize, F: FiniteField>(
     let mut moments: Vec<Vec<F>> = (0..last).map(|_| Vec::with_capacity(d)).collect();
     let mut sequence = Vec::with_capacity(2 * d);
     for k in 0..2 * d {
+        if k.is_multiple_of(SAFE_POINT_STRIDE) {
+            if let Err(stop) = control.poll(FglmStage::Wiedemann) {
+                stats.timings.scalar_sequence += clock.lap();
+                return Err(stop);
+            }
+        }
         let dot = |class: &[(usize, F)]| {
             class
                 .iter()
@@ -159,6 +179,7 @@ fn reconstruct<const N: usize, F: FiniteField>(
         }
     }
     stats.timings.scalar_sequence += clock.lap();
+    control.poll(FglmStage::Wiedemann)?;
     let reconstructed = (|| {
         let p = berlekamp_massey(&sequence);
         if p.len() != d + 1 {
@@ -184,11 +205,15 @@ fn reconstruct<const N: usize, F: FiniteField>(
         Ok(result)
     })();
     stats.timings.scalar_reconstruction += clock.lap();
-    let mut result = reconstructed?;
-    let certified = certify(algebra, &result);
+    let mut result = match reconstructed {
+        Ok(result) => result,
+        Err(reason) => return Ok(Err(reason)),
+    };
+    control.poll(FglmStage::Wiedemann)?;
+    let certified = certify(algebra, &result, control);
     stats.timings.scalar_certificate += clock.lap();
-    if !certified {
-        return Err(WiedemannFallback::VerificationFailed);
+    if !certified? {
+        return Ok(Err(WiedemannFallback::VerificationFailed));
     }
     result.sort_by(|a, b| {
         MonomialOrder::Lexicographic.cmp(
@@ -196,7 +221,7 @@ fn reconstruct<const N: usize, F: FiniteField>(
             &a.leading_monomial(MonomialOrder::Lexicographic),
         )
     });
-    Ok(result)
+    Ok(Ok(result))
 }
 
 /// For moments s_k, [p(t) sum s_k t^(-k-1)]_+ has degree below deg(p).
@@ -247,9 +272,10 @@ fn shape_relation<const N: usize, F: FiniteField>(
 fn certify<const N: usize, F: FiniteField>(
     algebra: &QuotientAlgebra<N, F>,
     basis: &[MultivariatePolynomial<N, F>],
-) -> bool {
+    control: &FglmControl<'_>,
+) -> Result<bool, FglmError> {
     let last = N - 1;
-    basis.len() == N
+    let shaped = basis.len() == N
         && basis.iter().enumerate().all(|(at, p)| {
             let (variable, exponent) = if at == 0 {
                 (last, algebra.dimension())
@@ -259,8 +285,11 @@ fn certify<const N: usize, F: FiniteField>(
             let lead = Monomial::univariate(variable, exponent as u32);
             p.leading_monomial(MonomialOrder::Lexicographic) == lead
                 && p.terms().get(&lead) == Some(&F::one())
-        })
-        && shape_relations_vanish(algebra, basis, last)
+        });
+    if !shaped {
+        return Ok(false);
+    }
+    shape_relations_vanish_controlled(algebra, basis, last, control, FglmStage::Wiedemann)
 }
 
 #[cfg(test)]
@@ -274,7 +303,7 @@ mod tests {
         fields::Zp13 as F,
         grobner::{
             f4,
-            fglm::{FglmOptions, QuotientAlgebra},
+            fglm::{FglmControl, FglmOptions, QuotientAlgebra},
         },
         FiniteField, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
@@ -360,24 +389,34 @@ mod tests {
             &algebra,
             vec![F::one(), F::new(2), F::new(3)],
             false,
+            &FglmControl::unlimited(),
             &mut FglmStatistics::default(),
         )
+        .unwrap()
         .unwrap();
-        assert!(certify(&algebra, &{
-            let mut v = result.clone();
-            v.reverse();
-            v
-        }));
+        let unlimited = FglmControl::unlimited();
+        assert!(certify(
+            &algebra,
+            &{
+                let mut v = result.clone();
+                v.reverse();
+                v
+            },
+            &unlimited
+        )
+        .unwrap());
         let constant = MultivariatePolynomial::parse("1", ["x", "y"]).unwrap();
         result[0] = &result[0] + &constant;
         result.reverse();
-        assert!(!certify(&algebra, &result));
+        assert!(!certify(&algebra, &result, &unlimited).unwrap());
         assert!(reconstruct(
             &algebra,
             vec![F::zero(); 3],
             false,
+            &unlimited,
             &mut FglmStatistics::default()
         )
+        .unwrap()
         .is_err());
     }
     // Fast conversion and classical FGLM agree across prime, binary, extension and wide fields.

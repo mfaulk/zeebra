@@ -10,6 +10,7 @@
 
 mod batch;
 mod border;
+mod control;
 mod conversion;
 mod errors;
 mod incremental_span;
@@ -32,8 +33,10 @@ pub use batch::{
     BorderReduction,
 };
 pub use border::{BorderIndex, ColumnTarget};
+pub use control::{FglmControl, FglmStage, SAFE_POINT_STRIDE};
 pub use conversion::{
-    fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
+    fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_control, fglm_to_lex_with_options,
+    is_grobner_basis,
 };
 pub use errors::FglmError;
 pub use incremental_span::{Dependence, IncrementalSpan};
