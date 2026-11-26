@@ -21,8 +21,9 @@ the original equations. Gröbner computations take explicit memory, matrix-size 
 an infeasible instance returns a typed error instead of exhausting the machine.
 
 The planner's `PlanBudget::max_elapsed` gates retries and fallbacks; its first attempt always
-starts. It does not tighten F4's separate cooperative `max_wall_time` limit, and FGLM has no wall
-budget. Use an external supervisor to bound the complete solve; see the
+starts. It does not tighten F4's separate cooperative `max_wall_time` limit, and passes no deadline
+to FGLM. A direct caller can bound or cancel one conversion with `FglmControl`. Use an external
+supervisor to bound the complete solve; see the
 [planner budget contract](docs/guide/solving-systems.md#letting-the-solver-choose).
 
 ## Applications

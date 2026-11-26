@@ -4,7 +4,8 @@
 use crate::poly::{MonomialMap, MonomialSet};
 
 use crate::{
-    grobner::fglm::FglmError, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
+    grobner::fglm::{FglmControl, FglmError, FglmStage, SAFE_POINT_STRIDE},
+    FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
 /// What a Gröbner basis says about the dimension of the ideal it generates.
@@ -180,12 +181,26 @@ impl<const N: usize> QuotientBasis<N> {
         order: MonomialOrder,
         max_dimension: usize,
     ) -> Result<Self, FglmError> {
+        Self::new_controlled(basis, order, max_dimension, &FglmControl::unlimited())
+    }
+
+    /// As [`Self::new`], polling `control` during the enumeration.
+    ///
+    /// # Errors
+    /// As [`Self::new`], and [`FglmError::DeadlineExceeded`] or [`FglmError::Cancelled`] at the
+    /// enumeration's safe points.
+    pub(crate) fn new_controlled<F: FiniteField>(
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        max_dimension: usize,
+        control: &FglmControl<'_>,
+    ) -> Result<Self, FglmError> {
         if !classify_ideal(basis, order).is_finite_dimensional() {
             return Err(FglmError::PositiveDimensional);
         }
 
         let leading = leading_monomials(basis, order);
-        let mut monomials = enumerate_standard(&leading, max_dimension)?;
+        let mut monomials = enumerate_standard(&leading, max_dimension, control)?;
 
         // The traversal order is an artifact of the walk. Sorting by the source order makes the
         // index of a monomial a function of the ideal and the order alone, which the coordinate
@@ -244,12 +259,19 @@ impl<const N: usize> QuotientBasis<N> {
 fn enumerate_standard<const N: usize>(
     leading: &[Monomial<N>],
     max_dimension: usize,
+    control: &FglmControl<'_>,
 ) -> Result<Vec<Monomial<N>>, FglmError> {
     let mut accepted: Vec<Monomial<N>> = Vec::new();
     let mut seen: MonomialSet<N> = MonomialSet::from_iter([Monomial::one()]);
     let mut frontier: Vec<Monomial<N>> = vec![Monomial::one()];
 
+    let mut pops = 0usize;
     while let Some(m) = frontier.pop() {
+        // Safe point: every `SAFE_POINT_STRIDE` pops, the first included.
+        if pops.is_multiple_of(SAFE_POINT_STRIDE) {
+            control.poll(FglmStage::QuotientEnumeration)?;
+        }
+        pops += 1;
         if leading.iter().any(|lm| m.checked_div(lm).is_some()) {
             continue;
         }

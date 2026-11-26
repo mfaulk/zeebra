@@ -52,13 +52,13 @@ pub use f4::{
     WitnessCertificationReport, WitnessError, WitnessLimit, DIVMASK_BITS,
 };
 pub use fglm::{
-    classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
-    krull_dimension, largest_quotient_dimension_within, BorderIndex, BorderStatistics,
-    ColumnTarget, ConversionRoute, ConversionStrategy, FglmError, FglmMemory, FglmOptions,
-    FglmStageTimings, FglmStatistics, IdealClass, MultiplicationOperator, OperatorConstruction,
-    OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics, SpectralError,
-    SpectralOptions, SpectralStatistics, WiedemannFallback, RECOMMENDED_MAX_QUOTIENT_DIMENSION,
-    RECOMMENDED_MAX_SPAN_ENTRIES,
+    classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_control,
+    fglm_to_lex_with_options, is_grobner_basis, krull_dimension, largest_quotient_dimension_within,
+    BorderIndex, BorderStatistics, ColumnTarget, ConversionRoute, ConversionStrategy, FglmControl,
+    FglmError, FglmMemory, FglmOptions, FglmStage, FglmStageTimings, FglmStatistics, IdealClass,
+    MultiplicationOperator, OperatorConstruction, OperatorStorage, QuotientAlgebra, QuotientBasis,
+    QuotientStatistics, SpectralError, SpectralOptions, SpectralStatistics, WiedemannFallback,
+    RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES,
 };
 pub use field_equations::{
     field_equations, rational_points_by_enumeration, with_field_equations, FieldEquationError,

@@ -9,6 +9,15 @@ change to `y` may break the public API.
 
 ### Added
 
+- `fglm_to_lex_with_control` and `FglmControl`: a cooperative wall deadline and `AtomicBool`
+  cancellation for one FGLM conversion (#1167). One control spans enumeration, operator
+  construction (batch workers poll and are joined), every Wiedemann attempt and the classical
+  fallback, which gets no fresh allowance. A stop is the new `FglmError::DeadlineExceeded` or
+  `FglmError::Cancelled`, naming an `FglmStage`, and `FglmStatistics::stopped_at` records it with
+  partial statistics; an unlimited control changes neither basis nor statistics. The planner does
+  not use it. Breaking: an exhaustive `FglmError` match or `FglmStatistics` literal needs the new
+  variants or field.
+
 - Behind `research-sigf4`, `SigF4Options::lead_ideal_stop` (on by default, graded-lex only): once
   a signature degree adds no new minimal lead, the engine finishes with conventional F4 over its
   elements at minimal leads and the inputs, which returns the same basis (#1140).

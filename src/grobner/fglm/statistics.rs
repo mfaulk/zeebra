@@ -296,6 +296,15 @@ pub struct FglmStatistics {
 
     /// What the batched border reduction did, or zeros under the scalar strategies.
     pub batches: BorderBatchStatistics,
+
+    /// Where a controlled conversion stopped, or `None` if it did not stop.
+    ///
+    /// Set only by [`fglm_to_lex_with_control`](super::fglm_to_lex_with_control) when its
+    /// [`FglmControl`](super::FglmControl) stops it. The figures above then describe the stages
+    /// that ran: a stage that never started reports zeros, and the stopped stage reports what it
+    /// had done at its last safe point, or zeros where a stage's figures are recorded only on its
+    /// completion.
+    pub stopped_at: Option<super::FglmStage>,
 }
 
 impl FglmStatistics {

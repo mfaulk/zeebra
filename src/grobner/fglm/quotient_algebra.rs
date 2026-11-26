@@ -14,6 +14,7 @@ use crate::{
         fglm::{
             batch::{self, BatchOverflow, BorderBatch, BorderBatchStatistics},
             border::{BorderIndex, ColumnTarget},
+            control::{FglmControl, FglmStage, SAFE_POINT_STRIDE},
             multiplication::{MultiplicationOperator, OperatorBuilder},
             options::OperatorConstruction,
             statistics::{BorderStatistics, FglmStageTimings},
@@ -88,13 +89,40 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         order: MonomialOrder,
         options: &FglmOptions,
     ) -> Result<(Self, QuotientStatistics), FglmError> {
-        let mut clock = StageClock::new(options.measure_stages);
         let mut statistics = QuotientStatistics::default();
+        let algebra = Self::new_controlled(
+            basis,
+            order,
+            options,
+            &FglmControl::unlimited(),
+            &mut statistics,
+        )?;
+        Ok((algebra, statistics))
+    }
 
-        let quotient = QuotientBasis::new(basis, order, options.max_quotient_dimension)?;
-        let dimension = quotient.dimension();
+    /// As [`Self::new_with_statistics`], polling `control` at the construction's safe points and
+    /// leaving in `statistics` what the stages that ran did, whether or not construction finished.
+    ///
+    /// # Errors
+    /// As [`Self::new`], and [`FglmError::DeadlineExceeded`] or [`FglmError::Cancelled`] at a safe
+    /// point; see [`FglmStage`] for where they are. Batch workers poll before claiming each batch
+    /// and are joined before this returns.
+    pub(crate) fn new_controlled(
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        options: &FglmOptions,
+        control: &FglmControl<'_>,
+        statistics: &mut QuotientStatistics,
+    ) -> Result<Self, FglmError> {
+        let mut clock = StageClock::new(options.measure_stages);
+
+        let quotient =
+            QuotientBasis::new_controlled(basis, order, options.max_quotient_dimension, control);
         statistics.timings.quotient_basis = clock.lap();
+        let quotient = quotient?;
+        let dimension = quotient.dimension();
 
+        control.poll(FglmStage::BorderClassification)?;
         let index = BorderIndex::new(&quotient);
         statistics.border = BorderStatistics {
             operator_columns: index.columns(),
@@ -104,6 +132,7 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             normal_form_calls: 0,
         };
         statistics.timings.border_classification = clock.lap();
+        control.poll(FglmStage::OperatorConstruction)?;
 
         // The shared answers, when they are shared. Indexed by border index, so a column's answer
         // is a lookup — and `|∂B|` coordinate vectors are held at once, which the per-column path
@@ -119,13 +148,9 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             OperatorConstruction::DeduplicatedBorder => {
                 let mut shared = Vec::with_capacity(index.monomials().len());
                 for monomial in index.monomials() {
+                    control.poll(FglmStage::OperatorConstruction)?;
                     shared.push(reduce_border_monomial(
-                        *monomial,
-                        basis,
-                        order,
-                        &quotient,
-                        &mut statistics,
-                        &mut clock,
+                        *monomial, basis, order, &quotient, statistics, &mut clock,
                     ));
                 }
                 shared
@@ -136,7 +161,8 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
                 order,
                 &quotient,
                 options,
-                &mut statistics,
+                control,
+                statistics,
                 &mut clock,
             )?,
         };
@@ -167,9 +193,20 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         let mut entries = 0usize;
         let mut bytes = 0usize;
 
+        let mut columns = 0usize;
         for i in 0..N {
             let mut builder = OperatorBuilder::new(dimension, options.operator_storage);
             for target in index.column_targets(i) {
+                // Safe point: every border normal form on the per-column path, whose unit is one,
+                // and every `SAFE_POINT_STRIDE` columns otherwise, whose unit is a clone or a unit
+                // column.
+                let per_column_border = options.operator_construction
+                    == OperatorConstruction::PerColumn
+                    && matches!(target, ColumnTarget::Border(_));
+                if per_column_border || columns.is_multiple_of(SAFE_POINT_STRIDE) {
+                    control.poll(FglmStage::OperatorConstruction)?;
+                }
+                columns += 1;
                 let column = match *target {
                     ColumnTarget::Standard(standard) => {
                         builder.push_standard(standard);
@@ -186,7 +223,7 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
                             basis,
                             order,
                             &quotient,
-                            &mut statistics,
+                            statistics,
                             &mut clock,
                         ),
                     },
@@ -230,14 +267,11 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         // them. What is in this lap is the column loop's own bookkeeping and the clones.
         statistics.timings.column_assembly += clock.lap();
 
-        Ok((
-            Self {
-                basis: quotient,
-                operators,
-                source: basis.to_vec(),
-            },
-            statistics,
-        ))
+        Ok(Self {
+            basis: quotient,
+            operators,
+            source: basis.to_vec(),
+        })
     }
 
     /// Entries the `N` operators hold between them.
@@ -380,6 +414,7 @@ fn batched_border<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     quotient: &QuotientBasis<N>,
     options: &FglmOptions,
+    control: &FglmControl<'_>,
     statistics: &mut QuotientStatistics,
     clock: &mut StageClock,
 ) -> Result<Vec<Vec<(usize, F)>>, FglmError> {
@@ -415,10 +450,12 @@ fn batched_border<const N: usize, F: FiniteField>(
             limits: &options.border_batch,
             measure: options.measure_stages,
             workers,
+            control,
         };
         if let Ok(outcomes) = F::run_concurrent(job) {
             statistics.timings.border_symbolic += clock.lap();
-            precomputed = Some(outcomes);
+            // Every worker has been joined; a stop any of them observed is latched and returned.
+            precomputed = Some(outcomes?);
         }
     }
     let mut precomputed = precomputed.map(Vec::into_iter);
@@ -429,6 +466,7 @@ fn batched_border<const N: usize, F: FiniteField>(
         let outcome = match precomputed.as_mut() {
             Some(outcomes) => outcomes.next().expect("one outcome per batch"),
             None => {
+                control.poll(FglmStage::OperatorConstruction)?;
                 let outcome = batch::reduce_batch(
                     group,
                     &monic,
@@ -461,6 +499,7 @@ fn batched_border<const N: usize, F: FiniteField>(
                     statistics.batches.batches += 1;
                     statistics.batches.fallbacks += 1;
                     for monomial in group {
+                        control.poll(FglmStage::OperatorConstruction)?;
                         shared.push(reduce_border_monomial(
                             *monomial, basis, order, quotient, statistics, clock,
                         ));
@@ -495,11 +534,12 @@ struct BorderJob<'a, const N: usize, F: FiniteField> {
     limits: &'a BorderBatch,
     measure: bool,
     workers: usize,
+    control: &'a FglmControl<'a>,
 }
 
 impl<const N: usize, F: FiniteField> ConcurrentJob<F> for BorderJob<'_, N, F> {
-    /// One outcome per batch, in batch order.
-    type Output = Vec<BatchOutcome<F>>;
+    /// One outcome per batch, in batch order, or the stop a worker observed.
+    type Output = Result<Vec<BatchOutcome<F>>, FglmError>;
 
     fn run(self) -> Self::Output
     where
@@ -516,6 +556,11 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for BorderJob<'_, N, F> {
                     crate::util::team::spawn(scope, move || {
                         let mut done = Vec::new();
                         loop {
+                            // Safe point before each claim. A stopping worker returns what it has;
+                            // the others observe the latched stop at their next claim.
+                            if job.control.poll(FglmStage::OperatorConstruction).is_err() {
+                                return done;
+                            }
                             let index = next.fetch_add(1, Ordering::Relaxed);
                             let Some(group) = job.groups.get(index) else {
                                 return done;
@@ -549,9 +594,12 @@ impl<const N: usize, F: FiniteField> ConcurrentJob<F> for BorderJob<'_, N, F> {
                 })
                 .collect()
         });
+        if let Some(stop) = self.control.stopped() {
+            return Err(stop);
+        }
         claimed.sort_unstable_by_key(|(index, _)| *index);
         debug_assert_eq!(claimed.len(), self.groups.len());
-        claimed.into_iter().map(|(_, outcome)| outcome).collect()
+        Ok(claimed.into_iter().map(|(_, outcome)| outcome).collect())
     }
 }
 
