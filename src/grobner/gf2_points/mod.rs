@@ -373,18 +373,16 @@ impl BooleanQuadraticSystem {
     }
 }
 
+/// Walks one chunk, passing each point to the callback until it returns `false`.
+type ChunkWalk<'a> = dyn Fn(u64, &mut dyn FnMut(u64) -> bool) + Sync + 'a;
+
 /// Walks chunks `0..chunks` on `workers` threads. `walk(chunk, emit)` calls `emit` with each point
 /// of the chunk in its own order and stops when `emit` returns `false`.
 ///
 /// With `first`, the result is the first point of the lowest chunk that has one — the same point a
 /// serial walk returns — and chunks above it are skipped. Otherwise every point, sorted. Also
 /// returns the number of chunks walked.
-fn drive(
-    chunks: u64,
-    workers: usize,
-    first: bool,
-    walk: &(dyn Fn(u64, &mut dyn FnMut(u64) -> bool) + Sync),
-) -> (Vec<u64>, u64) {
+fn drive(chunks: u64, workers: usize, first: bool, walk: &ChunkWalk<'_>) -> (Vec<u64>, u64) {
     let next = AtomicU64::new(0);
     let settled = AtomicU64::new(u64::MAX);
     let walked = AtomicU64::new(0);
