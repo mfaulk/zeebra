@@ -44,3 +44,8 @@ python3 -I research/concurrent-calibration/summarize.py --records $W/sessions/*/
   `distinct2`/`distinct`. The fix has a test (`1420417d`). The stop is recorded in
   `harness-bug-stops.json`, not counted toward §7.3, and the session resumed at 17:01, reusing the
   finished W0 job.
+- **2026-11-25, W2 is lighter than its name.** A clean `cargo build -j48 --tests` of this crate spends
+  most of its wall in one `rustc --crate-name zeebra` at about 2 CPUs. Load average under W2 was
+  4–8 (under W5, which adds `stream 16`, 15–19). The command is the protocol's (§2), and #985's, so
+  it stays. But W2's row in the decision table speaks for "a Zeebra rebuild", not for a parallel
+  multi-crate build of 48 jobs.
