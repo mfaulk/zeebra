@@ -3,11 +3,23 @@
   "issue": 1162,
   "z0": "125658bbf065a0ec73cba5049d475bb65d525674",
   "z0_tag": "measured/1162-z0",
-  "grobx": {"version": "0.155.1", "rev": "8005a2a1", "driver_sha256_prefix": "e2572de9e89a2be2"},
+  "grobx": {
+    "version": "0.155.1",
+    "rev": "8005a2a1",
+    "driver_sha256_prefix": "e2572de9e89a2be2"
+  },
   "decisions": "https://github.com/mfaulk/zeebra/issues/1161#issuecomment-7177641123",
   "envelopes": {
-    "ordinary": {"wall_s": 300, "rss_gib": 16, "zeebra_limits": "shipping defaults"},
-    "frontier": {"wall_s": 900, "rss_gib": 64, "zeebra_limits": "shipping defaults; a row that needs a raised internal limit is labelled and never credited"}
+    "ordinary": {
+      "wall_s": 300,
+      "rss_gib": 16,
+      "zeebra_limits": "shipping defaults"
+    },
+    "frontier": {
+      "wall_s": 900,
+      "rss_gib": 64,
+      "zeebra_limits": "shipping defaults; a row that needs a raised internal limit is labelled and never credited"
+    }
   },
   "splits": {
     "development": "M34 development families (research/m34-gate-h/s0/cohorts.json) plus the M35 lineages declared here",
@@ -20,25 +32,206 @@
     "grobx": "tools/external/grobx-driver, one input JSON per row from --input-only"
   },
   "families": [
-    {"lineage": "m35/dense-mq", "role": "target", "split": "development", "rows": ["mq-dense-15-s15", "mq-dense-18-s18"], "frontier": ["mq-dense-20-s20"], "fields": ["m31"], "ladder": {"row": "mq-dense-15-s15", "fields": ["gf32003", "m31"]},
-     "why": "The largest measured one-worker gap: #1033 found Zeebra about 31-32x slower than grobx at n = 18 and 20. Dense quadratic systems are the canonical MQ workload. Construction overlaps M34's zb/planted-dense, now in G's confirmation (decision 2026-11-25)."},
-    {"lineage": "m35/sparse-mq", "role": "target", "split": "development", "rows": ["mq-random-12-s12", "mq-random-14-s14", "mq-random-16-s16"], "fields": ["m31"],
-     "why": "Sampled sparse MQ (4n terms per equation): the sparse-matrix regime, where index and coefficient traffic rather than dense arithmetic should dominate (D). Construction overlaps zb/planted-sparse (G's confirmation)."},
-    {"lineage": "app/chandrasekhar-h", "role": "target", "split": "development", "rows": ["gen-chandrasekhar-h-11", "gen-chandrasekhar-h-12"], "frontier": ["gen-chandrasekhar-h-13"], "fields": ["p31", "p64"],
-     "why": "Genuinely application-derived (radiative transfer, Chandrasekhar 1950; M34 #1006). The only public development family with rows in the 1-300 s band; vdim 2^n, so it also exercises FGLM-scale bases."},
-    {"lineage": "noon", "role": "target (mixed degree)", "split": "development", "rows": ["noon-8", "noon-9"], "fields": ["m31"],
-     "why": "Mixed-degree (cubic plus linear terms) structured systems from neural-network models. The mixed-degree M34 public rows (Runge-Kutta) are all under 0.1 s, and zb/planted-dense's mixed rows are sealed."},
-    {"lineage": "gf2/mq-random", "role": "target", "split": "development", "rows": ["mq-random-14-s14", "mq-random-16-s16"], "fields": ["gf2"],
-     "why": "GF(2) MQ: plan section 4.5 needs whole-pipeline attribution for GF(2), where grobx selects its gf2 kernel."},
-    {"lineage": "katsura", "role": "control", "split": "development", "rows": ["katsura-9", "katsura-12"], "fields": ["m31", "w59"]},
-    {"lineage": "eco", "role": "control", "split": "development", "rows": ["eco-8", "eco-12"], "frontier": ["eco-13"], "fields": ["m31", "w59"]},
-    {"lineage": "cyclic", "role": "control", "split": "development", "rows": ["cyclic-7", "cyclic-8"], "fields": ["m31"]},
-    {"lineage": "m35/sparse-mq", "role": "control (low-term MQ)", "split": "development", "rows": ["mq-random-10-s10"], "fields": ["m31"]},
-    {"lineage": "sd/runge-kutta-order-conditions", "role": "control (degree fall; failed forced-signature control, #1146)", "split": "development", "rows": ["sd-hairer-2", "sd-butcher"], "fields": ["p31", "p64"]},
-    {"lineage": "sd/ellipsoid", "role": "control and frontier (memory refusal under default f4 at M34 Z0)", "split": "development", "rows": ["sd-ellipsoid-m2"], "fields": ["p31"]},
-    {"lineage": "zb/graph-3colouring", "role": "control and frontier (grid-5x5 refused by f4 at M34 Z0)", "split": "development", "rows": ["zb-col-grid-4x5", "zb-col-grid-5x5"], "fields": ["p31"]},
-    {"lineage": "app/multisite-phosphorylation", "role": "control (small sparse)", "split": "development", "rows": ["gen-phosphorylation-7"], "fields": ["p31"]},
-    {"lineage": "zb/toric", "role": "control (small sparse binomial)", "split": "development", "rows": ["zb-toric-segre-4x4-slice-s1"], "fields": ["p31"]}
+    {
+      "lineage": "m35/dense-mq",
+      "role": "target",
+      "split": "development",
+      "rows": [
+        "mq-dense-15-s15",
+        "mq-dense-18-s18"
+      ],
+      "frontier": [
+        "mq-dense-20-s20"
+      ],
+      "fields": [
+        "m31"
+      ],
+      "ladder": {
+        "row": "mq-dense-15-s15",
+        "fields": [
+          "gf32003",
+          "m31"
+        ]
+      },
+      "why": "The largest measured one-worker gap: #1033 found Zeebra about 31-32x slower than grobx at n = 18 and 20. Dense quadratic systems are the canonical MQ workload. Construction overlaps M34's zb/planted-dense, now in G's confirmation (decision 2026-11-25)."
+    },
+    {
+      "lineage": "m35/sparse-mq",
+      "role": "target",
+      "split": "development",
+      "rows": [
+        "mq-random-11-s11",
+        "mq-random-12-s12"
+      ],
+      "fields": [
+        "m31"
+      ],
+      "why": "Sampled sparse MQ (4n terms per equation): the sparse-matrix regime, where index and coefficient traffic rather than dense arithmetic should dominate (D). Construction overlaps zb/planted-sparse (G's confirmation).",
+      "frontier": [
+        "mq-random-14-s14",
+        "mq-random-16-s16"
+      ]
+    },
+    {
+      "lineage": "app/chandrasekhar-h",
+      "role": "target",
+      "split": "development",
+      "rows": [
+        "gen-chandrasekhar-h-11",
+        "gen-chandrasekhar-h-12",
+        "gen-chandrasekhar-h-13"
+      ],
+      "frontier": [],
+      "fields": [
+        "p31",
+        "p64"
+      ],
+      "why": "Genuinely application-derived (radiative transfer, Chandrasekhar 1950; M34 #1006). The only public development family with rows in the 1-300 s band; vdim 2^n, so it also exercises FGLM-scale bases.",
+      "note": "gen-chandrasekhar-h-13 completes on the adaptive (signature) route at Z0 although shipping F4 stops on it, so it is a target, not a frontier."
+    },
+    {
+      "lineage": "noon",
+      "role": "target (mixed degree)",
+      "split": "development",
+      "rows": [
+        "noon-9"
+      ],
+      "fields": [
+        "m31"
+      ],
+      "why": "Mixed-degree (cubic plus linear terms) structured systems from neural-network models. The mixed-degree M34 public rows (Runge-Kutta) are all under 0.1 s, and zb/planted-dense's mixed rows are sealed.",
+      "frontier": [
+        "noon-10"
+      ],
+      "note": "noon-8 (<1 s at Z0) is dropped from the target band. noon-10 is a default-limit frontier: adaptive's signature attempt falls back on TooManyRows and shipping F4 then stops on TooManyColumns, while the forced signature engine completes it (dev probe)."
+    },
+    {
+      "lineage": "gf2/mq-random",
+      "role": "target",
+      "split": "development",
+      "rows": [
+        "mq-random-10-s10",
+        "mq-random-12-s12"
+      ],
+      "fields": [
+        "gf2"
+      ],
+      "why": "GF(2) MQ: plan section 4.5 needs whole-pipeline attribution for GF(2), where grobx selects its gf2 kernel.",
+      "frontier": [
+        "mq-random-14-s14",
+        "mq-random-16-s16"
+      ]
+    },
+    {
+      "lineage": "katsura",
+      "role": "control",
+      "split": "development",
+      "rows": [
+        "katsura-9",
+        "katsura-12"
+      ],
+      "fields": [
+        "m31",
+        "w59"
+      ]
+    },
+    {
+      "lineage": "eco",
+      "role": "control",
+      "split": "development",
+      "rows": [
+        "eco-8",
+        "eco-12"
+      ],
+      "frontier": [
+        "eco-13"
+      ],
+      "fields": [
+        "m31",
+        "w59"
+      ]
+    },
+    {
+      "lineage": "cyclic",
+      "role": "control",
+      "split": "development",
+      "rows": [
+        "cyclic-7",
+        "cyclic-8"
+      ],
+      "fields": [
+        "m31"
+      ]
+    },
+    {
+      "lineage": "m35/sparse-mq",
+      "role": "control (low-term MQ)",
+      "split": "development",
+      "rows": [
+        "mq-random-10-s10"
+      ],
+      "fields": [
+        "m31"
+      ]
+    },
+    {
+      "lineage": "sd/runge-kutta-order-conditions",
+      "role": "control (degree fall; failed forced-signature control, #1146)",
+      "split": "development",
+      "rows": [
+        "sd-hairer-2",
+        "sd-butcher"
+      ],
+      "fields": [
+        "p31",
+        "p64"
+      ]
+    },
+    {
+      "lineage": "sd/ellipsoid",
+      "role": "control and frontier (memory refusal under default f4 at M34 Z0)",
+      "split": "development",
+      "rows": [
+        "sd-ellipsoid-m2"
+      ],
+      "fields": [
+        "p31"
+      ]
+    },
+    {
+      "lineage": "zb/graph-3colouring",
+      "role": "control and frontier (grid-5x5 refused by f4 at M34 Z0)",
+      "split": "development",
+      "rows": [
+        "zb-col-grid-4x5",
+        "zb-col-grid-5x5"
+      ],
+      "fields": [
+        "p31"
+      ]
+    },
+    {
+      "lineage": "app/multisite-phosphorylation",
+      "role": "control (small sparse)",
+      "split": "development",
+      "rows": [
+        "gen-phosphorylation-7"
+      ],
+      "fields": [
+        "p31"
+      ]
+    },
+    {
+      "lineage": "zb/toric",
+      "role": "control (small sparse binomial)",
+      "split": "development",
+      "rows": [
+        "zb-toric-segre-4x4-slice-s1"
+      ],
+      "fields": [
+        "p31"
+      ]
+    }
   ],
   "characteristic_ladder": {
     "2": "gf2 (m33_qualify; grobx gf2 kernel)",

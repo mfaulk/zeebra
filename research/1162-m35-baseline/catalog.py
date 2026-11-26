@@ -9,6 +9,7 @@ generators through `--input-only`: `m33_qualify` for katsura/eco/cyclic/noon and
 `sig_f4_study --generate` for `mq-dense-N-sS`, which `m33_qualify` cannot generate.
 """
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -90,7 +91,12 @@ def build(args):
     ids = [r['id'] for r in out]
     assert len(ids) == len(set(ids)), 'duplicate record ids'
     # The M34 catalogs' layout: a JSON array, one record per line.
-    Path(args.out).write_text('[\n' + ',\n'.join(json.dumps(r, sort_keys=True) for r in out) + '\n]\n')
+    text = '[\n' + ',\n'.join(json.dumps(r, sort_keys=True) for r in out) + '\n]\n'
+    Path(args.out).write_text(text)
+    # The catalog (about 3 MB) is rebuilt, not committed; its digests are, so a rebuild is checkable.
+    digests = {'catalog_sha256': hashlib.sha256(text.encode()).hexdigest(),
+               'records': {r['id']: r['normalized_input_digest'] for r in out}}
+    (HERE / 'catalog-digests.json').write_text(json.dumps(digests, indent=1, sort_keys=True) + '\n')
 
 
 def main():
@@ -98,7 +104,7 @@ def main():
     p.add_argument('command', choices=['build'])
     p.add_argument('--qualify', required=True)
     p.add_argument('--study', required=True)
-    p.add_argument('--out', default=str(HERE / 'catalog.json'))
+    p.add_argument('--out', default='/buildcache/cargo-target/zeebra-1162/catalog.json')
     build(p.parse_args())
 
 

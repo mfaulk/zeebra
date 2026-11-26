@@ -8,8 +8,11 @@ Per record, in fresh processes pinned to one CPU:
   * `f4-stages`: Zeebra's shipping F4 with `--stages` (stage clocks + always-on counters; the clocks
     cost 4-12%, so this attempt attributes and is never a timing record);
   * `f4`, `adaptive`: Zeebra's shipping default and `GradedEngine::Adaptive`, no stages;
+  * `sig-stages` (on request): the forced signature engine with its always-on counters;
   * `grobx`: grobx 0.155.1 raw (its default: randomized, uncertified) with its report, from which the
-    engines, handovers, field kernel, reduce mode and per-stage seconds are read.
+    engines, handovers, field kernel, reduce mode and per-stage seconds are read;
+  * `grobx-certified` (on request): grobx's exact mode, deterministic `rows` reduction plus the exact
+    checker. Not passive: it changes grobx's trajectory, so it is the exact-guarantee comparator.
 Development mode (`docs/guide/benchmarking.md`): no reservation, no load gate. It fixes the panel's
 time bands and the phase shares; it decides nothing.
 """
@@ -84,9 +87,9 @@ def zeebra(args, record, engine, stages):
             'counters': out.get('counters')}
 
 
-def grobx(args, record):
+def grobx(args, record, mode='raw'):
     request = dict(variables=record['variables'], modulus=int(record['field']['characteristic']),
-                   order='grevlex', workers=1, generators=public.generator_texts(record), mode='raw',
+                   order='grevlex', workers=1, generators=public.generator_texts(record), mode=mode,
                    wall_ns=args.wall_s * 10**9, rss_bytes=16 * 2**30)
     with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as handle:
         json.dump(request, handle)
@@ -100,7 +103,7 @@ def grobx(args, record):
     digest = None
     if status == 'complete':
         digest = public.basis_digest(record, public.parse_grobx_basis(reply['basis'], record['variables']))
-    return {'arm': 'grobx', 'process_wall_ns': r['wall_ns'], 'rc': r['rc'], 'status': status,
+    return {'arm': 'grobx' if mode == 'raw' else f'grobx-{mode}', 'process_wall_ns': r['wall_ns'], 'rc': r['rc'], 'status': status,
             'error': reply.get('stopped') or (r['stderr'] or None), 'call_ns': reply.get('solve_ns'),
             'parse_ns': reply.get('parse_ns'), 'peak_rss_bytes': reply.get('kernel_peak_rss_bytes'),
             'basis_sha256': digest, 'report': grobx_report(reply.get('report', ''))}
@@ -114,6 +117,8 @@ def main():
     p.add_argument('--cpu', type=int, required=True)
     p.add_argument('--ids')
     p.add_argument('--wall-s', type=int, default=300)
+    p.add_argument('--arms', default='f4-stages,f4,adaptive,grobx',
+                   help='comma-separated; sig-stages adds the forced signature engine with counters')
     p.add_argument('--out', default=str(HERE / 'probe.jsonl'))
     args = p.parse_args()
     records = json.loads(Path(args.catalog).read_text())
@@ -122,10 +127,13 @@ def main():
         for record in records:
             if wanted and record['id'] not in wanted:
                 continue
-            for attempt in (lambda: zeebra(args, record, 'f4', True),
-                            lambda: zeebra(args, record, 'f4', False),
-                            lambda: zeebra(args, record, 'adaptive', False),
-                            lambda: grobx(args, record)):
+            arms = {'f4-stages': lambda: zeebra(args, record, 'f4', True),
+                    'f4': lambda: zeebra(args, record, 'f4', False),
+                    'adaptive': lambda: zeebra(args, record, 'adaptive', False),
+                    'sig-stages': lambda: zeebra(args, record, 'sig', True),
+                    'grobx': lambda: grobx(args, record),
+                    'grobx-certified': lambda: grobx(args, record, 'certified')}
+            for attempt in (arms[a] for a in args.arms.split(',')):
                 row = dict(attempt(), id=record['id'], family=record['lineage']['family_id'],
                            role=record['lineage'].get('role'), mode='development')
                 out.write(json.dumps(row, sort_keys=True) + '\n')
