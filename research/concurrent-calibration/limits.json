@@ -1,0 +1,108 @@
+{
+ "C": "5451e9f853c8f24bafed6875218a175de441e3f0",
+ "eligible": [
+  "bench_foreign",
+  "ccd_load_rest_max",
+  "compilers_on_bench",
+  "psi_cpu_full",
+  "psi_cpu_some",
+  "psi_memory_full",
+  "psi_memory_some",
+  "runner_workers_on_bench",
+  "sibling_busy_max",
+  "vmstat_majfault",
+  "vmstat_reclaim",
+  "vmstat_swap"
+ ],
+ "issue": 1107,
+ "j": 0.29363487819370176,
+ "moved": 612,
+ "pairs": 3780,
+ "protocol": "docs/research/concurrent-benchmark-calibration-protocol.md \u00a78.4",
+ "records": {
+  "records-00-calibration-W0-1c846ea59708.jsonl.gz": "9533196d31674d0984413894406cb668ad6191eb81c2bf5507dc68ce0b098c75",
+  "records-00-calibration-W0-bc5398bb0608.jsonl.gz": "9e5565053827abc84cb4a14b870971d90bcd73b57e8d484bb54f863d578720ad",
+  "records-01-calibration-W5-633dbbf73f60.jsonl.gz": "b909fb23e8191785f673d657819212da34c6c7dd0d8aeef18b4f037511abacb1",
+  "records-01-calibration-W5-ebe7c10a0baa.jsonl.gz": "dd0e8a5b31207be23ac1aa3f261b3a6976b5bcbdeb4a10f3db366bceedb44011",
+  "records-02-calibration-W3-7d6922a65957.jsonl.gz": "3d1d00a58571000c43e772f8bf60e2a56aa52eb9aea2c347ccd69505f158376d",
+  "records-02-calibration-W4-32-2ab8612bf615.jsonl.gz": "ffc4375bcae3ec96ad8d6de60dc2f19c16fc512a773d61672e2130266b4976f4",
+  "records-03-calibration-W2-404e48d592bf.jsonl.gz": "93a3e015ee2dd8f10928605e5c393cbf4f77fbe2604047893d9d14a78da6dddd",
+  "records-03-calibration-W2-43b48056f872.jsonl.gz": "fe65292ef84513e23ef1860433660ba604fd74be7d26972ce1401e68fb893c3d",
+  "records-04-calibration-W4-16-6d699a61e174.jsonl.gz": "50bd46b6f355ca30bfe830d579b02c9970b6852296c12447e57b1ae80abc7a2a",
+  "records-04-calibration-W4-32-107b5935b5c7.jsonl.gz": "b8581bf8753cbf295ac2137185afef498946e31b6e01662dfa8b96972c102fa5",
+  "records-05-calibration-W4-16-b55b5ee28d80.jsonl.gz": "62a38634ee4fec98cca6fef8800c9e8b891bf505edc87a7f920de53efa81edbc",
+  "records-05-calibration-W4-8-8e3428ac125e.jsonl.gz": "25c6d8e9a10e2e71dae83f242cf05323ba37673fa6a4964c7f7d8fc8f040034a",
+  "records-06-calibration-W1-a5aa21d39e67.jsonl.gz": "ae3721392bf03b7b8781540b0b118d45aec871fcd432698e99b50fb8f9d1d2d0",
+  "records-06-calibration-W3-99f2e6b300a1.jsonl.gz": "280ea7401382d0409b8cca5a338d43311a239f8ab454466fc3dcb4a1a8a17fc4",
+  "records-07-calibration-W1-87c494060f95.jsonl.gz": "5a3835edf023dc36acdf15f468708f29f4d4a3dadb09272993af8d686e589469",
+  "records-07-calibration-W4-8-f011a62a93cf.jsonl.gz": "cd02f262e9a4c69ea0226f3e71cc701af80acf02d3d5be561d5e2848e5fc1a02",
+  "records-08-calibration-W0-7f13d865fe3a.jsonl.gz": "651b78a29354407da2c290311ad250028505d893c59a0e636d6bbaae9c56d7b1",
+  "records-08-calibration-W0-bfa82b9dfd54.jsonl.gz": "d3a1bf2b0133e9e9d0a8c526858a4845a9940e8c1fa5bab72604667db4136ead"
+ },
+ "rule": {
+  "vmstat_majfault": 2
+ },
+ "sessions": [
+  "s1-20261125",
+  "s2-20261126"
+ ],
+ "single": {
+  "bench_foreign": {
+   "j": 0.2562017231134878,
+   "limit": 0.0013935897435897525
+  },
+  "ccd_load_rest_max": {
+   "j": 0.03607768865121806,
+   "limit": 8.108329913828477
+  },
+  "compilers_on_bench": {
+   "j": 0.11567884729649436,
+   "limit": 0
+  },
+  "psi_cpu_full": {
+   "j": 0.0,
+   "limit": 0.0
+  },
+  "psi_cpu_some": {
+   "j": 0.2370395127748069,
+   "limit": 0.0017798569929340445
+  },
+  "psi_memory_full": {
+   "j": 0.014984402852049909,
+   "limit": 0.0
+  },
+  "psi_memory_some": {
+   "j": 0.014668746286393343,
+   "limit": 0.0
+  },
+  "runner_workers_on_bench": {
+   "j": 0.0,
+   "limit": 0
+  },
+  "sibling_busy_max": {
+   "j": 0.009915329768270946,
+   "limit": 0.04433497536945813
+  },
+  "vmstat_majfault": {
+   "j": 0.29363487819370176,
+   "limit": 2
+  },
+  "vmstat_reclaim": {
+   "j": 0.010602346999405822,
+   "limit": 1146912
+  },
+  "vmstat_swap": {
+   "j": 0.0,
+   "limit": 24
+  }
+ },
+ "workloads": [
+  "W1",
+  "W2",
+  "W3",
+  "W4-16",
+  "W4-32",
+  "W4-8",
+  "W5"
+ ]
+}
