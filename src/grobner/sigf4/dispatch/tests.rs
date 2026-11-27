@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use super::{
-    f4_signature, f4_signature_reported, signature_route, Cascade, ShippingReason,
-    SignatureDispatch, SignatureRoute, SIGNATURE_CROSSOVER_VARIABLES, SIGNATURE_CROSSOVER_WORKERS,
-    SIGNATURE_MIN_VARIABLES, SIGNATURE_SMALL_TEAM, SIGNATURE_SMALL_TEAM_VARIABLES,
+    f4_signature, f4_signature_reported, signature_options, signature_route, Cascade,
+    ShippingReason, SignatureDispatch, SignatureRoute, SIGNATURE_CROSSOVER_VARIABLES,
+    SIGNATURE_CROSSOVER_WORKERS, SIGNATURE_MIN_VARIABLES, SIGNATURE_SMALL_TEAM,
+    SIGNATURE_SMALL_TEAM_VARIABLES,
 };
 use crate::{
     fields::{PrimeFieldElement64, Zp2147483647, Zp32003},
@@ -13,7 +14,7 @@ use crate::{
             certify_f4_output, f4_with_options, F4Error, F4Options, ParallelForward,
             ParallelSymbolic,
         },
-        sigf4::SigF4Error,
+        sigf4::{SigF4Error, SigF4Options},
     },
     poly::{BlockOrder, BlockOrderKind, MonomialOrder, WeightedTieBreak},
     FiniteField, MultivariatePolynomial,
@@ -611,4 +612,55 @@ fn test_entry_point_equals_shipping_f4_on_the_crossover_route() {
     );
     agrees(&system);
     agrees(&squares::<Goldilocks>());
+}
+
+/// #1186, Noon-10 in small: the caller's matrix limits are sized for conventional F4's matrices,
+/// and the signature engine reads them in proportion to its own defaults. Noon-6's signature
+/// matrices peak at 999 rows and 1,511 columns, conventional F4's at 3,817 and 4,432; at a limit of
+/// 1,000 both engines stopped when the signature engine was held to it unscaled, as Noon-10 does at
+/// the default 200,000.
+#[test]
+fn test_noon_completes_on_the_signature_route_under_a_conventional_matrix_limit() {
+    let system = noon::<6, Zp2147483647>();
+    let tight = F4Options {
+        max_matrix_rows: 1_000,
+        max_matrix_columns: 1_000,
+        ..F4Options::default()
+    };
+    assert!(matches!(
+        f4_with_options(&system, GREVLEX, &tight),
+        Err(F4Error::TooManyRows { .. } | F4Error::TooManyColumns { .. })
+    ));
+    let (result, report) = f4_signature_reported(&system, GREVLEX, &tight);
+    assert_eq!(report.route, SignatureRoute::Signature);
+    let expected = f4_with_options(&system, GREVLEX, &F4Options::default())
+        .unwrap()
+        .0;
+    assert_eq!(result.unwrap(), expected);
+}
+
+/// The signature engine's matrix limits scale with the caller's: the default maps to the
+/// signature engine's own default, a tightened limit tightens it, and nothing overflows.
+#[test]
+fn test_signature_matrix_limits_scale_with_the_callers() {
+    let defaults = SigF4Options::default();
+    let at_default = signature_options::<Zp32003>(&F4Options::default(), 1);
+    assert_eq!(at_default.max_matrix_rows, defaults.max_matrix_rows);
+    assert_eq!(at_default.max_matrix_columns, defaults.max_matrix_columns);
+    let tight = F4Options {
+        max_matrix_rows: 1,
+        max_matrix_columns: 20_000,
+        ..F4Options::default()
+    };
+    let scaled = signature_options::<Zp32003>(&tight, 1);
+    assert_eq!(scaled.max_matrix_rows, 10);
+    assert_eq!(scaled.max_matrix_columns, 200_000);
+    let wide = F4Options {
+        max_matrix_rows: usize::MAX,
+        ..F4Options::default()
+    };
+    assert_eq!(
+        signature_options::<Zp32003>(&wide, 1).max_matrix_rows,
+        usize::MAX
+    );
 }

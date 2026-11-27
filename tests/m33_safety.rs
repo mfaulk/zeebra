@@ -106,14 +106,15 @@ fn test_wall_budget_stops_the_signature_route_typed_at_1_and_16_workers() {
 }
 
 /// A matrix-row cap the signature engine crosses falls back to the shipping F4 under the same cap,
-/// whose own typed refusal is returned, at both counts and at a 31-bit field.
+/// whose own typed refusal is returned, at both counts and at a 31-bit field. The signature engine
+/// reads the cap scaled by its default over F4's, 10× (#1186), so 20 rows is 200 there.
 #[test]
 fn test_matrix_row_budget_falls_back_typed_at_1_and_16_workers() {
     fn check<F: FiniteField>() {
         let system = signature_row::<F>();
         for workers in [1, 16] {
             let options = F4Options {
-                max_matrix_rows: 200,
+                max_matrix_rows: 20,
                 ..at(workers)
             };
             let (result, route, _) = entry(&system, &options, workers);
@@ -127,7 +128,7 @@ fn test_matrix_row_budget_falls_back_typed_at_1_and_16_workers() {
                 "{workers} workers: {route:?}"
             );
             let shipping = f4_reported(&system, GREVLEX, &options).0;
-            assert!(matches!(shipping, Err(F4Error::TooManyRows { limit: 200 })));
+            assert!(matches!(shipping, Err(F4Error::TooManyRows { limit: 20 })));
             assert_eq!(result, shipping.map_err(SigF4Error::Budget));
         }
     }

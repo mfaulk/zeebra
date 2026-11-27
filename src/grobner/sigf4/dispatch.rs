@@ -255,7 +255,8 @@ pub fn signature_route<const N: usize, F: FiniteField>(
 /// dispatch expects it to win and by the shipping F4 elsewhere. The output is the same reduced
 /// basis [`crate::grobner::f4_with_options`] returns, coefficient for coefficient.
 ///
-/// From `options` the signature engine takes the wall, basis-size, matrix and live-byte budgets,
+/// From `options` the signature engine takes the wall, basis-size and live-byte budgets, the
+/// matrix limits scaled by its own default over F4's (10× at the presets, #1186),
 /// [`F4Options::certify`] with [`F4Options::max_certify_time`], and a team of at most the larger
 /// of the `parallel_forward` and `parallel_symbolic` caps, never more; more than one worker runs
 /// its parallel cascade. The shipping route uses `options` unchanged.
@@ -423,16 +424,32 @@ fn caller_workers(options: &F4Options) -> usize {
 ///
 /// The live budget is the smaller of `max_live_bytes` and the live-entry allowance in bytes, so a
 /// tightened `max_live_nonzeros` binds here too; at the presets the two are equal.
-fn signature_options<F: FiniteField>(options: &F4Options, workers: usize) -> SigF4Options {
+///
+/// The matrix limits are scaled by the ratio of the signature engine's default to F4's (#1186):
+/// the caller's limits are sized for conventional F4's matrices, and held to them unscaled the
+/// signature engine stopped on Noon-10 at 200,000 rows, where it completes at 526,074.
+pub(super) fn signature_options<F: FiniteField>(
+    options: &F4Options,
+    workers: usize,
+) -> SigF4Options {
     let live = options
         .live_entry_allowance::<F>()
         .saturating_mul(F4Options::bytes_per_entry::<F>())
         .min(options.max_live_bytes);
+    let (conventional, signature) = (F4Options::default(), SigF4Options::default());
     SigF4Options {
         max_wall_time: options.max_wall_time,
         max_basis_elements: options.max_basis_elements,
-        max_matrix_rows: options.max_matrix_rows,
-        max_matrix_columns: options.max_matrix_columns,
+        max_matrix_rows: scaled(
+            options.max_matrix_rows,
+            signature.max_matrix_rows,
+            conventional.max_matrix_rows,
+        ),
+        max_matrix_columns: scaled(
+            options.max_matrix_columns,
+            signature.max_matrix_columns,
+            conventional.max_matrix_columns,
+        ),
         certify: options.certify,
         max_certify_time: options.max_certify_time,
         workers,
@@ -440,6 +457,12 @@ fn signature_options<F: FiniteField>(options: &F4Options, workers: usize) -> Sig
         max_live_bytes: Some(live),
         ..SigF4Options::default()
     }
+}
+
+/// `limit * numerator / denominator`, saturating at `usize::MAX`.
+fn scaled(limit: usize, numerator: usize, denominator: usize) -> usize {
+    let wide = limit as u128 * numerator as u128 / denominator.max(1) as u128;
+    usize::try_from(wide).unwrap_or(usize::MAX)
 }
 
 /// Limits on quantities the signature engine holds more of than the shipping F4 does: its
