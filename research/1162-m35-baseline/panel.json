@@ -141,15 +141,15 @@
       "split": "development",
       "rows": [
         "eco-8",
-        "eco-12"
-      ],
-      "frontier": [
+        "eco-12",
         "eco-13"
       ],
+      "frontier": [],
       "fields": [
         "m31",
         "w59"
-      ]
+      ],
+      "note": "#1200 (Amendment 1): eco-13 moves from frontier to rows. It is an R2 regime row, and it completes under default limits at Z0 on both fields (f4 110-170 s, adaptive 14-19 s in #1162's probe); it was listed as a frontier for f4's time, not for a refusal."
     },
     {
       "lineage": "cyclic",
@@ -231,6 +231,49 @@
       "fields": [
         "p31"
       ]
+    },
+    {
+      "lineage": "app/chandrasekhar-h",
+      "role": "target (R3, conditional on E2)",
+      "split": "development",
+      "rows": [
+        "gen-chandrasekhar-h-11",
+        "gen-chandrasekhar-h-12",
+        "gen-chandrasekhar-h-13"
+      ],
+      "frontier": [],
+      "fields": [
+        "babybear",
+        "koalabear"
+      ],
+      "why": "#1200 (Amendment 1, #1189 item 1): R1's family at the 31-bit primes that arithmetization-oriented systems use. Reduced from the same M34 public generator entry as p31 and p64."
+    },
+    {
+      "lineage": "katsura",
+      "role": "target (R3, conditional on E2)",
+      "split": "development",
+      "rows": [
+        "katsura-12"
+      ],
+      "fields": [
+        "babybear",
+        "koalabear"
+      ],
+      "why": "#1200: R2's Katsura row at BabyBear and KoalaBear."
+    },
+    {
+      "lineage": "eco",
+      "role": "target (R3, conditional on E2)",
+      "split": "development",
+      "rows": [
+        "eco-12",
+        "eco-13"
+      ],
+      "fields": [
+        "babybear",
+        "koalabear"
+      ],
+      "why": "#1200: R2's Eco rows at BabyBear and KoalaBear."
     }
   ],
   "characteristic_ladder": {
@@ -241,6 +284,62 @@
     "2^31-1": "m31 / p31",
     "near 2^61": "no compiled field or CLI at Z0 (nearest Zp4611624995532046337, about 2^62); recorded as a gap",
     "goldilocks": "goldilocks on ladder rows only; dense_mq_shaped asserts p < 2^63",
-    "2^64-59": "w59 / p64"
+    "2^64-59": "w59 / p64",
+    "babybear": "babybear (m33_qualify, m34_matrix; M34 public rows re-keyed by catalog.py), #1200",
+    "koalabear": "koalabear (m33_qualify, m34_matrix; M34 public rows re-keyed by catalog.py), #1200"
+  },
+  "regimes": {
+    "declared": "Amendment 1 (plan §3, §2.1), 2026-11-27, before any deciding read; recorded here by #1200",
+    "R1": {
+      "name": "application-derived, wide prime",
+      "rows": [
+        "gen-chandrasekhar-h-11@p64",
+        "gen-chandrasekhar-h-12@p64",
+        "gen-chandrasekhar-h-13@p64"
+      ],
+      "depends_on": [
+        "#1185 H",
+        "#1080 B"
+      ]
+    },
+    "R2": {
+      "name": "classical structured, wide prime",
+      "rows": [
+        "katsura-12@w59",
+        "eco-12@w59",
+        "eco-13@w59"
+      ],
+      "depends_on": [
+        "#1185 H"
+      ],
+      "note": "These rows keep their control role for every package and are also scored as a regime."
+    },
+    "R3": {
+      "name": "structured, 31-bit primes (conditional on E2; secondary scores only)",
+      "rows": [
+        "gen-chandrasekhar-h-11@p31",
+        "gen-chandrasekhar-h-12@p31",
+        "gen-chandrasekhar-h-13@p31",
+        "gen-chandrasekhar-h-11@babybear",
+        "gen-chandrasekhar-h-12@babybear",
+        "gen-chandrasekhar-h-13@babybear",
+        "gen-chandrasekhar-h-11@koalabear",
+        "gen-chandrasekhar-h-12@koalabear",
+        "gen-chandrasekhar-h-13@koalabear",
+        "katsura-12@m31",
+        "eco-12@m31",
+        "eco-13@m31",
+        "katsura-12@babybear",
+        "eco-12@babybear",
+        "eco-13@babybear",
+        "katsura-12@koalabear",
+        "eco-12@koalabear",
+        "eco-13@koalabear"
+      ],
+      "depends_on": [
+        "#1183 E2"
+      ],
+      "note": "Shares its generators with R1 and R2, so it cannot be one of the two regimes the competitive target counts."
+    }
   }
 }
