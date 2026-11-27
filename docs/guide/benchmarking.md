@@ -933,6 +933,7 @@ cargo run --release --example transform_tree_ab -- all   # #606: transform-kerne
 cargo run --release --example transform_tree_ab -- koalabear sizes=13123,16384 thresholds=256,1024 reps=5
 cargo run --release --example multiplication_dispatch  # schoolbook vs Karatsuba vs transform, and the crossings
 cargo run --release --example multiplication_dispatch -- koalabear max_log=17
+cargo run --release --example multimodular_crossover -- max_log=17  # #1226: Karatsuba vs the CRT product, low-two-adicity fields
 cargo run --release --example multivariate_mul     # multivariate multiply: time and live heap per route
 cargo run --release --example multivariate_mul -- chunk         # block size sensitivity
 cargo run --release --example multivariate_mul -- max_degree=90 # stop short of the six-round size

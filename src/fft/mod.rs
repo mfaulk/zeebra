@@ -4,6 +4,7 @@ mod bluestein;
 mod domain;
 mod evaluate;
 mod interpolate;
+pub(crate) mod multimodular;
 pub(crate) mod multiply;
 pub(crate) mod prime_factor;
 pub(crate) mod transform;
@@ -17,9 +18,10 @@ pub use domain::{DomainError, FFTDomain};
 // Measurement hooks for `examples/bluestein_crossover.rs`, not API.
 pub use evaluate::evaluate;
 pub use interpolate::{interpolate, try_interpolate, InterpolateError};
+pub use multimodular::{try_multiply_multimodular, MultimodularError, AUXILIARY_PRIMES};
 pub use multiply::{
-    fft_multiplication_crossover, multiply, multiply_above, multiply_over_domain,
-    try_multiply_via_fft,
+    fft_multiplication_crossover, multimodular_multiplication_crossover, multiply, multiply_above,
+    multiply_over_domain, try_multiply_via_fft,
 };
 #[doc(hidden)]
 pub use prime_factor::{bluestein_crossover_unstable, dft_unstable};
