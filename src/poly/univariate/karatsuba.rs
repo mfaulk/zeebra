@@ -17,8 +17,9 @@
 //! bit-identical to the schoolbook product because it *is* schoolbook. See
 //! `docs/research/fast-univariate.md` §4.1 and `examples/karatsuba_crossover.rs`.
 //!
-//! Since #231 this is what `DensePolynomial`'s `Mul` runs, through [`multiply_dense`], so it is no
-//! longer reachable only from `fft::multiply`'s dispatcher. The comparand for its tests is
+//! Since #231 this is what `DensePolynomial`'s `Mul` runs below the transform's crossover, now
+//! through `product`'s dispatcher (#1225), and what it runs at every degree over a field with no
+//! usable root. [`multiply_dense`] is the Karatsuba-only form `fft::multiply` falls back to. The comparand for its tests is
 //! `test_support::schoolbook_product` rather than the operator, which would otherwise be checking
 //! itself.
 

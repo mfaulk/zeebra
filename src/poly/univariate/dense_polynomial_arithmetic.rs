@@ -6,7 +6,7 @@ use crate::{
     poly::univariate::div_with_remainder::{div_with_remainder, quotient},
 };
 use crate::{
-    poly::univariate::{dense_polynomial::DensePolynomial, karatsuba::multiply_dense},
+    poly::univariate::{dense_polynomial::DensePolynomial, product::multiply_polynomials},
     FiniteField, Polynomial,
 };
 use std::{cmp::max, ops};
@@ -79,22 +79,20 @@ impl<F: FiniteField> ops::Neg for DensePolynomial<F> {
 impl<F: FiniteField> ops::Mul<&DensePolynomial<F>> for &DensePolynomial<F> {
     type Output = DensePolynomial<F>;
 
-    /// Schoolbook below `karatsuba_base_case` and Karatsuba above it.
+    /// Schoolbook below `karatsuba_base_case`, Karatsuba above it, and the transform above
+    /// `fft_multiplication_crossover` over a field whose `transform_root_of_unity` serves the
+    /// domain (#1225). See `product`.
     ///
-    /// The operator rather than only `fft::multiply`'s fallbacks, because the whole univariate
-    /// layer is built out of it: `pow_mod`'s two products per bit of the exponent, `lcm`'s `a * b`,
-    /// `from_zeros`, `Polynomial::pow` and the `compose` and `shift` built on it. #231 measured
-    /// `roots` — the binding univariate stage — 1.28x to 1.61x faster for this one line.
+    /// The operator rather than only `fft::multiply`, because the whole univariate layer is built
+    /// out of it: `pow_mod`'s two products per bit of the exponent, Newton division, `compose_mod`,
+    /// the subproduct trees, half-GCD, `lcm`, `from_zeros`, `Polynomial::pow`, `compose` and
+    /// `shift`.
     ///
-    /// Bit-identical to the schoolbook loop it replaces at every size, and below the base case it
-    /// *is* that loop, reached through `multiply_dense`: the recursion takes its schoolbook
-    /// branch. So this is not a different answer anywhere, and no caller has to opt in.
-    ///
-    /// Needs nothing of the field but a ring, which is why it can live on the operator where the
-    /// transform cannot — a domain needs `KnownOrder` and randomness, and the Gröbner core refuses
-    /// to require the first of a coefficient type.
+    /// The same polynomial on every route, and no randomness: the root is the field's
+    /// deterministic one, and over a field with none every product stays on Karatsuba. So no
+    /// caller has to opt in, and the operator needs nothing of the field beyond `FiniteField`.
     fn mul(self, rhs: &DensePolynomial<F>) -> Self::Output {
-        multiply_dense(self, rhs)
+        multiply_polynomials(self, rhs)
     }
 }
 

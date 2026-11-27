@@ -16,7 +16,7 @@
 //!    §4.1.1 has the Karatsuba curves and §4.1.2 the dispatched ones.
 //! 2. **fftmul** — the same product through the transform, so the two rows are the crossover.
 //!    Needs a domain of `2n` points and so one more power of two than **ntt** does.
-//!    **Verified against the `Mul` operator only up to `n = 2^12`**; above that by evaluation agreement at
+//!    **Verified against Karatsuba only up to `n = 2^12`**; above that by evaluation agreement at
 //!    a few random points, which is `O(n)` a point. A quadratic check on a quasi-linear subject
 //!    makes the reported ceiling a property of the checker, and it moves the wrong way as the
 //!    multiply gets faster. Each curve prints the verification it actually performed.
@@ -60,8 +60,8 @@ use zeebra::{
     evaluate,
     fields::{two_adic::two_adic_decomposition, Bn254Fr, KoalaBear, PrimeFieldElement64},
     integers::highest_set_bit,
-    interpolate, karatsuba_unstable, lagrange_interpolate, roots, try_multiply_via_fft, FFTDomain,
-    FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
+    interpolate, karatsuba_base_case_unstable, karatsuba_unstable, lagrange_interpolate, roots,
+    try_multiply_via_fft, FFTDomain, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
 };
 
 // === the fields ===
@@ -94,11 +94,11 @@ const FIRST_LOG: u32 = 6;
 /// No sweep goes past `2^30`, whatever the budget allows.
 const CEILING_LOG: u32 = 30;
 
-/// Largest operand size the **fftmul** stage checks against the `Mul` operator, as `log2 n`.
+/// Largest operand size the **fftmul** stage checks against Karatsuba, as `log2 n`.
 ///
-/// The operator rather than schoolbook since #231, which is still an independent check — `Mul` is
-/// Karatsuba above its base case, verified against `test_support::schoolbook_product` — but it is
-/// no longer the *same* implementation as the **mul** row above.
+/// Karatsuba at the shipped base case, called directly. Not the `Mul` operator: since #1225 the
+/// operator takes the transform above its crossover, so checking the transform against it would
+/// check the transform against itself.
 ///
 /// Schoolbook is `O(n^2)` and the stage's subject is quasi-linear, so a schoolbook check stops
 /// being a check and becomes the measurement: at `n = 2^20` it is on the order of `10^12` field
@@ -330,10 +330,10 @@ fn print_curve(curve: &Curve) {
 fn fftmul_verification(reached: usize) -> String {
     let bound = 1usize << SCHOOLBOOK_CHECK_LOG;
     if reached <= bound {
-        format!("every row against the `Mul` operator, n <= {}", bound)
+        format!("every row against Karatsuba, n <= {}", bound)
     } else {
         format!(
-            "against the `Mul` operator up to n = {}, and above that by evaluation agreement at {} \
+            "against Karatsuba up to n = {}, and above that by evaluation agreement at {} \
              random points per row — so no row's cost includes a check more expensive than the \
              multiply",
             bound, EVALUATION_CHECKS
@@ -421,7 +421,12 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
             });
             if log_n <= SCHOOLBOOK_CHECK_LOG {
                 // Same seed as `mul`, so this is the same product by the other route.
-                assert_eq!(product, &a * &b, "the transform's product at n = {n}");
+                let karatsuba = UnivariatePolynomial::<F>::new(&karatsuba_unstable(
+                    a.coefficients(),
+                    b.coefficients(),
+                    karatsuba_base_case_unstable::<F>(),
+                ));
+                assert_eq!(product, karatsuba, "the transform's product at n = {n}");
             } else {
                 // Schoolbook here would cost more than the measurement it is checking, and the
                 // sweep would report where the check stopped rather than where the multiply did.

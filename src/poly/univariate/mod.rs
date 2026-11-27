@@ -31,6 +31,7 @@ mod lagrange_interpolation;
 mod polynomial_trait;
 mod pow_mod;
 mod power_permutation;
+mod product;
 mod resultant;
 pub use resultant::{
     half_gcd_resultant_crossover_unstable, resultant, resultant_at_formal_degrees,
