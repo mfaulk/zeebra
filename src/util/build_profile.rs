@@ -175,6 +175,15 @@ lto = "off"
             at("/t/x86_64-unknown-linux-gnu/release/build/zeebra-0123/out").as_deref(),
             Some("release")
         );
+        // The build-dir layout newer cargo uses: one more level between `build` and `out`.
+        assert_eq!(
+            at("/t/debug/build/zeebra/0123abcd/out").as_deref(),
+            Some("dev")
+        );
+        assert_eq!(
+            at("/t/release-fat/build/zeebra/0123abcd/out").as_deref(),
+            Some("release-fat")
+        );
     }
 
     /// The artifact running this test carries a resolved stamp, not a placeholder.

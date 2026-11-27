@@ -23,17 +23,17 @@ const KEYS: [&str; 4] = ["opt-level", "lto", "codegen-units", "debug-assertions"
 
 /// The profile a build script is running for, from the directory cargo put its `OUT_DIR` in.
 ///
-/// `OUT_DIR` is `<target>[/<triple>]/<profile-dir>/build/<pkg>-<hash>/out`, and `<profile-dir>` is
-/// the profile's name except that `dev` and `test` build into `debug` and `bench` into `release`.
-/// Read back as `dev` and `release`: in this manifest `test` and `bench` restate nothing, so they
-/// resolve to the same settings as the profile whose directory they share.
+/// `OUT_DIR` is `<target>[/<triple>]/<profile-dir>/build/<pkg>-<hash>/out`, or under the newer
+/// build-dir layout `…/<profile-dir>/build/<pkg>/<hash>/out`, so the profile directory is the
+/// parent of the nearest ancestor named `build`, whichever layout cargo uses. It is the profile's
+/// name except that `dev` and `test` build into `debug` and `bench` into `release`. Read back as
+/// `dev` and `release`: in this manifest `test` and `bench` restate nothing, so they resolve to the
+/// same settings as the profile whose directory they share.
 pub fn profile_from_out_dir(out_dir: &Path) -> Option<String> {
-    let dir = out_dir
-        .parent()?
-        .parent()?
-        .parent()?
-        .file_name()?
-        .to_str()?;
+    let build = out_dir
+        .ancestors()
+        .find(|ancestor| ancestor.file_name().and_then(|name| name.to_str()) == Some("build"))?;
+    let dir = build.parent()?.file_name()?.to_str()?;
     Some(if dir == "debug" { "dev" } else { dir }.to_string())
 }
 
