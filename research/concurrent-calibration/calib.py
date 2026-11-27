@@ -220,6 +220,8 @@ def cross_gate(idle_ratio, loaded_ratio):
 
 
 def abs_gate(idle_walls, loaded_walls):
+    if len(idle_walls) < 2 or len(loaded_walls) < 2:
+        return Gate(False, ['too few samples'])
     r = statistics.median(loaded_walls) / statistics.median(idle_walls) - 1
     return Gate(abs(r) <= 0.02, [] if abs(r) <= 0.02 else [f'loaded/idle wall − 1 = {r:+.4f}'])
 

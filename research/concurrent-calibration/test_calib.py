@@ -94,6 +94,11 @@ class GatesTest(unittest.TestCase):
         self.assertTrue(calib.abs_gate([1.0] * 5, [1.019] * 5).ok)
         self.assertFalse(calib.abs_gate([1.0] * 5, [1.021] * 5).ok)
 
+    # An absolute unit a rule set has emptied fails rather than vanishing from the workload's verdict.
+    def test_absolute_gate_fails_without_samples(self):
+        self.assertFalse(calib.abs_gate([], [1.0] * 5).ok)
+        self.assertFalse(calib.abs_gate([1.0] * 5, [1.0]).ok)
+
 
 class LimitsTest(unittest.TestCase):
     # A loaded pair is moved when it falls outside the 2.5–97.5 percentile range of the same cell's idle ratios.

@@ -105,10 +105,10 @@ def judge(recs, rs, refs, rule, cohort):
                                           why=['no samples'], value=None))
                 base = H5_ROLE[next(r for r in c.roles if r in calib.AA)]
                 wi, wl_ = w.get((s, 0, 'W0', c.name, base), {}), w.get((s, slot, wl, c.name, base), {})
-                if wi and wl_:
-                    g = calib.abs_gate(list(wi.values()), list(wl_.values()))
-                    units.append(dict(h='H5', session=s, slot=slot, workload=wl, cell=c.name, ok=g.ok and not cen,
-                                      why=g.why, value=statistics.median(wl_.values()) / statistics.median(wi.values())))
+                g = calib.abs_gate(list(wi.values()), list(wl_.values()))
+                units.append(dict(h='H5', session=s, slot=slot, workload=wl, cell=c.name, ok=g.ok and not cen,
+                                  why=g.why, value=statistics.median(wl_.values()) / statistics.median(wi.values())
+                                  if wi and wl_ else None))
     # H3 (§6): of loaded sessions where the real small pair was detected idle, >= 90% also detect it loaded
     small = 'H-S16' if cohort == 'held-out' else 'C-P16'
     for wl in LOADED:
