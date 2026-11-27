@@ -1,0 +1,86 @@
+2026-11-26T08:00:02-0500 chain: announced on #1107
+2026-11-26T08:00:02-0500 session s2-20261126 start, seed 20261126, order ['W0', 'W5', 'W3', 'W2', 'W4-32', 'W4-16', 'W1', 'W4-8', 'W0'], C=5451e9f853c8f24bafed6875218a175de441e3f0, agent=synchronous-mapping-dove@research/1107-concurrent-calibration
+2026-11-26T08:00:02-0500 reserve rc=0 status=reserved ccds=1,2 bench=8-23,72-87 rest=0-7,24-71,88-127 app.slice=0-7,24-71,88-127
+2026-11-26T08:00:03-0500 calibration W0: job=1c846ea59708 run load1=0.02
+2026-11-26T08:15:20-0500 calibration W0: job=1c846ea59708 rc=0 load1=1.04
+2026-11-26T08:15:21-0500 calibration idle A/A: pass
+2026-11-26T08:15:22-0500 held-out W0: job=8225a1cdc479 run load1=1.04
+2026-11-26T08:47:39-0500 held-out W0: job=8225a1cdc479 rc=0 load1=1.18
+2026-11-26T08:50:34-0500 held-out idle A/A: pass
+2026-11-26T08:50:34-0500 heavy window W5 calibration begins (announced on #1107)
+2026-11-26T08:50:35-0500 calibration W5: job=633dbbf73f60 run load1=1.34
+2026-11-26T08:50:37-0500 calibration W5: load pgid=2871972 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo clean -q; CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo build -q -j48 --tests; done load1=1.31
+2026-11-26T08:50:37-0500 calibration W5: load pgid=2871973 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 16 load1=1.31
+2026-11-26T09:07:23-0500 load pgid=2871972 stopped
+2026-11-26T09:07:39-0500 load pgid=2871973 stopped
+2026-11-26T09:07:39-0500 calibration W5: job=633dbbf73f60 rc=0 load1=14.71
+2026-11-26T09:07:39-0500 heavy window W5 held-out begins (announced on #1107)
+2026-11-26T09:07:40-0500 held-out W5: job=151f3db9bd6f run load1=14.71
+2026-11-26T09:07:42-0500 held-out W5: load pgid=3151858 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo clean -q; CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo build -q -j48 --tests; done load1=13.69
+2026-11-26T09:07:42-0500 held-out W5: load pgid=3151860 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 16 load1=13.69
+2026-11-26T09:44:17-0500 load pgid=3151858 stopped
+2026-11-26T09:44:33-0500 load pgid=3151860 stopped
+2026-11-26T09:44:33-0500 held-out W5: job=151f3db9bd6f rc=0 load1=15.86
+2026-11-26T09:47:28-0500 calibration W3: job=7d6922a65957 run load1=1.89
+2026-11-26T09:47:30-0500 calibration W3: load pgid=3683537 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w3 cargo test -q -j16 --lib -- --test-threads=16; done load1=1.89
+2026-11-26T10:03:06-0500 load pgid=3683537 stopped
+2026-11-26T10:03:06-0500 calibration W3: job=7d6922a65957 rc=0 load1=4.73
+2026-11-26T10:03:07-0500 held-out W3: job=487907b9183d run load1=4.43
+2026-11-26T10:03:10-0500 held-out W3: load pgid=160887 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w3 cargo test -q -j16 --lib -- --test-threads=16; done load1=4.43
+2026-11-26T10:36:05-0500 load pgid=160887 stopped
+2026-11-26T10:36:05-0500 held-out W3: job=487907b9183d rc=0 load1=3.93
+2026-11-26T10:39:01-0500 heavy window W2 calibration begins (announced on #1107)
+2026-11-26T10:39:01-0500 calibration W2: job=43b48056f872 run load1=1.32
+2026-11-26T10:39:04-0500 calibration W2: load pgid=1503855 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo clean -q; CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo build -q -j48 --tests; done load1=1.29
+2026-11-26T10:55:54-0500 load pgid=1503855 stopped
+2026-11-26T10:55:54-0500 calibration W2: job=43b48056f872 rc=0 load1=4.47
+2026-11-26T10:55:54-0500 heavy window W2 held-out begins (announced on #1107)
+2026-11-26T10:55:55-0500 held-out W2: job=927b6392b1c4 run load1=4.47
+2026-11-26T10:55:57-0500 held-out W2: load pgid=1832234 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo clean -q; CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w2 cargo build -q -j48 --tests; done load1=4.11
+2026-11-26T11:30:49-0500 load pgid=1832234 stopped
+2026-11-26T11:30:49-0500 held-out W2: job=927b6392b1c4 rc=0 load1=5.84
+2026-11-26T11:33:42-0500 heavy window W4-32 calibration begins (announced on #1107)
+2026-11-26T11:33:43-0500 calibration W4-32: job=107b5935b5c7 run load1=1.47
+2026-11-26T11:33:45-0500 calibration W4-32: load pgid=2435539 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 32 load1=1.47
+2026-11-26T11:50:57-0500 load pgid=2435539 stopped
+2026-11-26T11:50:57-0500 calibration W4-32: job=107b5935b5c7 rc=0 load1=26.15
+2026-11-26T11:50:57-0500 m5 positive control under W4-32: shift +0.0307 [+0.0243, +0.0361]
+2026-11-26T11:50:57-0500 heavy window W4-32 held-out begins (announced on #1107)
+2026-11-26T11:50:59-0500 held-out W4-32: job=cc27f7ed87d5 run load1=24.13
+2026-11-26T11:51:01-0500 held-out W4-32: load pgid=2699224 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 32 load1=24.13
+2026-11-26T12:27:08-0500 load pgid=2699224 stopped
+2026-11-26T12:27:08-0500 held-out W4-32: job=cc27f7ed87d5 rc=0 load1=23.85
+2026-11-26T12:30:03-0500 calibration W4-16: job=b55b5ee28d80 run load1=2.49
+2026-11-26T12:30:05-0500 calibration W4-16: load pgid=3171492 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 16 load1=2.37
+2026-11-26T12:46:18-0500 load pgid=3171492 stopped
+2026-11-26T12:46:18-0500 calibration W4-16: job=b55b5ee28d80 rc=0 load1=13.60
+2026-11-26T12:46:19-0500 held-out W4-16: job=53b0cad7637f run load1=12.59
+2026-11-26T12:46:21-0500 held-out W4-16: load pgid=3433833 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 16 load1=12.59
+2026-11-26T13:21:19-0500 load pgid=3433833 stopped
+2026-11-26T13:21:19-0500 held-out W4-16: job=53b0cad7637f rc=0 load1=13.42
+2026-11-26T13:24:14-0500 calibration W1: job=a5aa21d39e67 run load1=1.71
+2026-11-26T13:24:16-0500 calibration W1: load pgid=3905379 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do touch src/lib.rs; CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w1 cargo build -q -j8 --tests; done load1=1.71
+2026-11-26T13:43:08-0500 load pgid=3905379 stopped
+2026-11-26T13:43:08-0500 calibration W1: job=a5aa21d39e67 rc=0 load1=12.08
+2026-11-26T13:43:09-0500 held-out W1: job=4787834eab1e run load1=11.27
+2026-11-26T13:43:11-0500 held-out W1: load pgid=301349 on 0-7,24-71,88-127: cd /buildcache/cargo-target/zeebra-1107/src && export RUSTC_WRAPPER= TMPDIR=/buildcache/cargo-target/zeebra-1107/tmp; while :; do touch src/lib.rs; CARGO_TARGET_DIR=/buildcache/cargo-target/zeebra-1107/load-w1 cargo build -q -j8 --tests; done load1=11.27
+2026-11-26T14:23:07-0500 load pgid=301349 stopped
+2026-11-26T14:23:07-0500 held-out W1: job=4787834eab1e rc=0 load1=7.82
+2026-11-26T14:26:01-0500 calibration W4-8: job=f011a62a93cf run load1=1.54
+2026-11-26T14:26:03-0500 calibration W4-8: load pgid=1431394 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 8 load1=1.54
+2026-11-26T14:41:40-0500 load pgid=1431394 stopped
+2026-11-26T14:41:40-0500 calibration W4-8: job=f011a62a93cf rc=0 load1=7.46
+2026-11-26T14:41:42-0500 held-out W4-8: job=4dea90b89511 run load1=7.46
+2026-11-26T14:41:44-0500 held-out W4-8: load pgid=1693044 on 0-7,24-71,88-127: exec /buildcache/cargo-target/zeebra-1107/bin/stream 8 load1=7.46
+2026-11-26T15:14:58-0500 load pgid=1693044 stopped
+2026-11-26T15:14:58-0500 held-out W4-8: job=4dea90b89511 rc=0 load1=7.54
+2026-11-26T15:17:53-0500 calibration W0: job=7f13d865fe3a run load1=1.43
+2026-11-26T15:33:09-0500 calibration W0: job=7f13d865fe3a rc=0 load1=2.76
+2026-11-26T15:33:10-0500 calibration idle A/A: pass
+2026-11-26T15:33:11-0500 held-out W0: job=4a4de53f2d0b run load1=2.61
+2026-11-26T16:05:24-0500 held-out W0: job=4a4de53f2d0b rc=0 load1=1.05
+2026-11-26T16:08:18-0500 held-out idle A/A: pass
+2026-11-26T16:08:18-0500 session s2-20261126 complete
+2026-11-26T16:08:18-0500 release rc=0 status=released ccds= bench=- rest=- app.slice=0-127 
+2026-11-26T16:08:18-0500 chain: session rc=0
+2026-11-26T19:32:55-0500 chain: throughput rc=0
