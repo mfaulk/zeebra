@@ -19,7 +19,10 @@
 
 use std::time::{Duration, Instant};
 use zeebra::{
-    fields::{PrimeFieldElement64, Zp18446744073709551557, Zp2, Zp2147483647, Zp32003},
+    fields::{
+        BabyBear, KoalaBear, PrimeFieldElement64, Zp18446744073709551557, Zp2, Zp2147483647,
+        Zp32003,
+    },
     grobner::{
         benchmark_systems::{cyclic, eco, katsura, noon},
         differential::polynomial_to_string,
@@ -34,10 +37,12 @@ use zeebra::{
 type Goldilocks = PrimeFieldElement64<18446744069414584321>;
 type Wide = PrimeFieldElement64<18446744073709551263>;
 const CANONICAL: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
-const FIELDS: [(&str, u64); 6] = [
+const FIELDS: [(&str, u64); 8] = [
     ("gf2", 2),
     ("gf32003", 32003),
     ("m31", 2147483647),
+    ("babybear", 2013265921),
+    ("koalabear", 2130706433),
     ("w59", 18446744073709551557),
     ("wide64", 18446744073709551263),
     ("goldilocks", 18446744069414584321),
@@ -110,7 +115,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
     a.modulus = FIELDS
         .iter()
         .find(|f| f.0 == a.field)
-        .ok_or("--field must be gf2, gf32003, m31, w59, wide64 or goldilocks")?
+        .ok_or("--field must be gf2, gf32003, m31, babybear, koalabear, w59, wide64 or goldilocks")?
         .1;
     if !ENGINES.contains(&a.engine.as_str()) {
         return Err(format!("--engine must be one of {}", ENGINES.join(", ")));
@@ -229,6 +234,8 @@ fn generated(name: &str, p: u64) -> Result<Input, String> {
             2 => family::<Zp2>(name, fam, n, p),
             32003 => family::<Zp32003>(name, fam, n, p),
             2147483647 => family::<Zp2147483647>(name, fam, n, p),
+            2013265921 => family::<BabyBear>(name, fam, n, p),
+            2130706433 => family::<KoalaBear>(name, fam, n, p),
             18446744073709551557 => family::<Zp18446744073709551557>(name, fam, n, p),
             18446744073709551263 => family::<Wide>(name, fam, n, p),
             _ => family::<Goldilocks>(name, fam, n, p),
@@ -548,6 +555,7 @@ fn main() {
         }
         fields.extend(dispatch!(
             2 => Zp2, 32003 => Zp32003, 2147483647 => Zp2147483647,
+            2013265921 => BabyBear, 2130706433 => KoalaBear,
             18446744073709551557 => Zp18446744073709551557, 18446744073709551263 => Wide,
             18446744069414584321 => Goldilocks
         ));
@@ -582,6 +590,32 @@ mod tests {
             basis_m33(&parse(&["2*x2^2+32001", "x1*x2+2", "x1^2+3*x2"]), 32003),
             pinned
         );
+    }
+
+    /// #1200: BabyBear and KoalaBear are accepted, and their generated rows carry residues of their
+    /// own prime (Katsura's `-1` as `p - 1`), not of the Goldilocks fallback.
+    #[test]
+    fn thirty_one_bit_ao_primes_generate_in_their_own_field() {
+        for (field, p) in [("babybear", 2013265921u64), ("koalabear", 2130706433)] {
+            let raw: Vec<String> = ["--field", field, "--name", "katsura-4"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            assert_eq!(parse_args(&raw).unwrap().modulus, p);
+            let input = generated("katsura-4", p).unwrap();
+            let numbers: Vec<u64> = input
+                .generators
+                .iter()
+                .flat_map(|g| g.split(|c: char| !c.is_ascii_digit() && c != 'x'))
+                .filter(|t| !t.is_empty() && !t.starts_with('x'))
+                .map(|t| t.parse().unwrap())
+                .collect();
+            assert!(numbers.iter().all(|&c| c < p), "{field}: {numbers:?}");
+            assert!(
+                numbers.contains(&(p - 1)),
+                "{field}: no p - 1 in {numbers:?}"
+            );
+        }
     }
 
     /// Fields, orders and engines outside the suites are refused before any solve.

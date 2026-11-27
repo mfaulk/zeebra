@@ -683,6 +683,19 @@ mod tests {
         }
     }
 
+    /// #1200: BabyBear and KoalaBear records solve, not refuse.
+    #[test]
+    fn thirty_one_bit_ao_primes_are_instantiated() {
+        for p in ["2013265921", "2130706433"] {
+            let out = solve(&record_at(p), &args(&[]).unwrap()).unwrap();
+            assert_eq!(
+                field_of(&out, "status").unwrap().to_json(),
+                "\"complete\"",
+                "p = {p}"
+            );
+        }
+    }
+
     /// `--stages` attaches the F4 stage clocks and always-on counters; without it neither appears.
     #[test]
     fn stages_are_reported_only_when_requested() {
