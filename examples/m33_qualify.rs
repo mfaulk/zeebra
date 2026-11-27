@@ -17,6 +17,7 @@
 //! does, so graded-lex and lex bases digest like any reference's text; on a grevlex basis it equals
 //! `examples/support/basis_digest.rs`.
 
+use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant};
 use zeebra::{
     fields::{
@@ -188,8 +189,35 @@ fn catalog(field: &str, name: &str) -> Result<Input, String> {
     })
 }
 
-/// `katsura-N`, `eco-N`, `cyclic-N`, `noon-N` or `mq-random-N-sS` at `p`, in the external contract's
-/// canonical form, exactly as `sig_f4_study --generate` builds the M33 rows.
+/// Dense MQ with every coefficient of degree ≤ 2 nonzero: `examples/wide_corpus.rs`'s
+/// construction with its seed exposed, so `mq-full-N-s0` is the frozen `mq-random-N` row and any
+/// other `S` is a fresh support (#1080's held-out rows). The seed is `0x73800000 + N + S·2³²`.
+fn full_mq<const N: usize, F: FiniteField>(seed: u64) -> Vec<MultivariatePolynomial<N, F>> {
+    let names: Vec<_> = (1..=N).map(|i| format!("x{i}")).collect();
+    let refs: [&str; N] = std::array::from_fn(|i| names[i].as_str());
+    let mut rng = StdRng::seed_from_u64(0x73800000 + N as u64 + (seed << 32));
+    let mut coefficient = || loop {
+        let c = F::random(&mut rng);
+        if !c.is_zero() {
+            break c;
+        }
+    };
+    (0..N)
+        .map(|_| {
+            let mut terms = vec![coefficient().to_string()];
+            for i in 0..N {
+                terms.push(format!("{}*x{}", coefficient(), i + 1));
+                for j in i..N {
+                    terms.push(format!("{}*x{}*x{}", coefficient(), i + 1, j + 1));
+                }
+            }
+            MultivariatePolynomial::parse(&terms.join("+"), refs).expect("dense polynomial")
+        })
+        .collect()
+}
+
+/// `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, `mq-random-N-sS` or `mq-full-N-sS` at `p`, in the
+/// external contract's canonical form, exactly as `sig_f4_study --generate` builds the M33 rows.
 fn generated(name: &str, p: u64) -> Result<Input, String> {
     fn render<const N: usize, F: FiniteField>(
         name: &str,
@@ -219,9 +247,20 @@ fn generated(name: &str, p: u64) -> Result<Input, String> {
         }
         sized!(4 5 6 7 8 9 10 11 12 13)
     }
+    fn full<F: FiniteField>(name: &str, n: usize, seed: u64, p: u64) -> Option<Instance> {
+        macro_rules! sized {
+            ($($k:literal)*) => {
+                match n {
+                    $($k => Some(render(name, "mq-full", &full_mq::<$k, F>(seed), p)),)*
+                    _ => None,
+                }
+            };
+        }
+        sized!(4 5 6 7 8 9 10 11 12 13 14 15 16)
+    }
     let refused = || format!("no generator for {name}");
     let (stem, seed) = match name.rsplit_once("-s") {
-        Some((stem, seed)) if stem.starts_with("mq-random-") => {
+        Some((stem, seed)) if stem.starts_with("mq-random-") || stem.starts_with("mq-full-") => {
             (stem, Some(seed.parse::<u64>().map_err(|_| refused())?))
         }
         _ => (name, None),
@@ -230,6 +269,16 @@ fn generated(name: &str, p: u64) -> Result<Input, String> {
     let n: usize = n.parse().map_err(|_| refused())?;
     let instance = match (fam, seed) {
         ("mq-random", Some(seed)) => corpus::random_mq_instance(n, seed, p, CANONICAL),
+        ("mq-full", Some(seed)) => match p {
+            2147483647 => full::<Zp2147483647>(name, n, seed, p),
+            2013265921 => full::<BabyBear>(name, n, seed, p),
+            2130706433 => full::<KoalaBear>(name, n, seed, p),
+            18446744073709551557 => full::<Zp18446744073709551557>(name, n, seed, p),
+            18446744073709551263 => full::<Wide>(name, n, seed, p),
+            18446744069414584321 => full::<Goldilocks>(name, n, seed, p),
+            _ => None,
+        }
+        .ok_or_else(refused)?,
         (_, None) => match p {
             2 => family::<Zp2>(name, fam, n, p),
             32003 => family::<Zp32003>(name, fam, n, p),
@@ -616,6 +665,28 @@ mod tests {
                 "{field}: no p - 1 in {numbers:?}"
             );
         }
+    }
+
+    /// #1080: `mq-full-N-s0` is the frozen wide-corpus dense row, polynomial for polynomial, and
+    /// another seed is a different full-support system of the same shape.
+    #[test]
+    fn full_mq_seed_zero_is_the_frozen_wide_row() {
+        let names: Vec<String> = (1..=10).map(|i| format!("x{i}")).collect();
+        let refs: [&str; 10] = std::array::from_fn(|i| names[i].as_str());
+        let parse = |input: &Input| -> Vec<MultivariatePolynomial<10, Goldilocks>> {
+            input
+                .generators
+                .iter()
+                .map(|g| MultivariatePolynomial::parse(g, refs).unwrap())
+                .collect()
+        };
+        let p = 18446744069414584321;
+        let frozen = catalog("goldilocks", "mq-random-10").unwrap();
+        let zero = generated("mq-full-10-s0", p).unwrap();
+        assert_eq!(parse(&zero), parse(&frozen));
+        let fresh = generated("mq-full-10-s1", p).unwrap();
+        assert_ne!(parse(&fresh), parse(&frozen));
+        assert!(parse(&fresh).iter().all(|q| q.terms().len() == 1 + 10 + 55));
     }
 
     /// Fields, orders and engines outside the suites are refused before any solve.
