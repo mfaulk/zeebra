@@ -98,6 +98,9 @@ pub struct SigF4Options {
     /// serve the rows it repeats. Serial runs only.
     #[cfg(feature = "research-adjacent")]
     pub adjacent: adjacent::AdjacentMode,
+    /// #1075: the flat modes' arena budget, in run-wide ids; rows past it are built and not kept.
+    #[cfg(feature = "research-adjacent")]
+    pub adjacent_budget: usize,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
     /// Tests only: the column-space interreduction's live-entry budget, to force its fallback.
@@ -130,6 +133,8 @@ impl Default for SigF4Options {
             reuse_census: false,
             #[cfg(feature = "research-adjacent")]
             adjacent: adjacent::AdjacentMode::Off,
+            #[cfg(feature = "research-adjacent")]
+            adjacent_budget: adjacent::FLAT_BUDGET,
             #[cfg(test)]
             adversary: None,
             #[cfg(test)]
