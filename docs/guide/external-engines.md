@@ -137,6 +137,17 @@ inputs after checking the factorizations agree. The recipe is
 [`tools/external/flint-factor-driver/README.md`](../../tools/external/flint-factor-driver/README.md);
 the results are [`modular-composition.md`](../research/modular-composition.md) §6.
 
+FLINT and **NTL** are also **per-primitive univariate comparands** (#1206).
+`tools/external/provision-univariate-primitives.sh` builds two small drivers, one per library,
+from the prefix's FLINT or from Homebrew's FLINT and NTL. `tools/external/univariate-primitives-compare.sh`
+times ten primitives against Zeebra's entry points on identical jobs, after checking that the
+outputs agree byte for byte. The primitives are multiplication, division, gcd, xgcd, the Frobenius
+power, roots, multipoint evaluation, interpolation, modular composition and the resultant. The
+recipe is
+[`tools/external/univariate-primitives/README.md`](../../tools/external/univariate-primitives/README.md),
+and the results are in
+[`univariate-primitives-comparison.md`](../research/univariate-primitives-comparison.md).
+
 Two **SAT solvers** are provisioned as oracles for #220, never as components:
 `tools/external/provision-sat.sh` builds kissat 4.0.4 and CryptoMiniSat 5.18.0 (with GMP, and with
 CaDiCaL/CadiBack disabled so configure fetches nothing over git) from pinned tarballs, plus the
