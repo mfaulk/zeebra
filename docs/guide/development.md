@@ -355,6 +355,65 @@ measurements still use the production profile and `tools/benchlock.sh`: a quiet 
 absolute figure, or a reserved CCD (`tools/bench-reserve.sh`) for an interleaved A/B ratio — see
 `docs/guide/benchmarking.md`, *Reserved CCDs*.
 
+## Gating a performance candidate
+
+A milestone plan or anchor issue fixes a candidate's gates before the read they govern; how a
+ratio becomes a verdict is in [`benchmarking.md`](benchmarking.md), *Statistics and verdicts*.
+This section is the shape those gates take. It comes from a review of about twenty rejected or
+deferred candidates (#1195), several of which were rejected on a question they never asked.
+
+Before the read, a plan's gate section states for each candidate: whether it is global or
+conditional; for a conditional one, its regime rows, the properties its rule may read and its
+controls; each gate's comparator; any bundle it belongs to; and the thresholds.
+
+**Global or conditional.** A *global* candidate runs on every input its route accepts. Its
+adverse controls are measured with it on, and a regression there is evidence against it. A
+*conditional* candidate is meant to run only on a regime — a field band, an input shape, an order,
+a batch size — and has two gates, scored and reported separately:
+
+- **Regime gate.** It wins by its declared margin on development and held-out rows of the regime
+  it claims.
+- **Dispatch gate.** A frozen rule over properties known before the solve or per batch admits the
+  regime rows and keeps the mechanism off the rows it hurts. The adverse controls are measured
+  **with the rule applied**, and the rule's own cost — feature extraction, a discarded probe,
+  conversion — is inside complete-task time. Variable count or family name alone is not a
+  property a rule may read.
+
+A control measured with a conditional mechanism forced on is diagnostic: it specifies the rule and
+decides nothing. #945's lane kernel gained 2.8–3× on dense rows and lost 3.6–7.3% on Katsura-8 and
+Cyclic-6 with the lane forced on. Those losses are #1123's specification, not a finding against the
+kernel.
+
+| Regime gate | Dispatch gate | Disposition |
+|---|---|---|
+| pass | pass | eligible for default adoption under the plan's adoption rule |
+| pass | fail, or not yet scored | opt-in; the rule failed, not the mechanism |
+| fail | — | rejected for that regime |
+| untested | — | deferred |
+
+**One comparator per rule.** Each gate names one comparator: the frozen Zeebra baseline, or the
+best qualified Zeebra configuration, for an adoption claim; a named external route (grobx,
+msolve) for a competitive claim. No rule requires both. The other ratio is reported beside the
+verdict and decides nothing. #1030's M4GB reference was 5.8–16× faster than Zeebra's best qualified
+arm on held-out dense MQ and was rejected because its rule also required beating grobx, which
+answered whether M4GB is the fastest engine and left open whether its organization would help
+Zeebra.
+
+**Bundles.** A per-candidate wall threshold rejects independent gains that would clear it
+together: M33's 8% Gate A bar stopped interreduction in column space at −5.2% on Eco-12 until a
+different target row was named (G2-2, then adopted). A plan may declare, before the read, a bundle
+of independent candidates — different stages or mechanisms — scored jointly against the wall
+threshold. The bundle is measured as one build, never multiplied from its parts, and each
+component's own paired ratio must have an upper 95% bound ≤ 1.0, so no component is carried by the
+others. M35 §9.9 is the worked form.
+
+**Untested is not rejected.** A conditional mechanism whose trigger fires on no held-out row has
+produced no evidence about itself, and is recorded as *untested* with the rows it was tried on:
+#1134's refusal fallback fired on none of 14 out-of-sample rows. A frozen rule that admits no
+held-out regime row likewise leaves the regime gate untested. Both are deferrals, never rejections.
+Insufficient precision at the budget cap is *inconclusive* under the plan's stopping rule, which
+is also a deferral.
+
 ## Build configuration
 
 `.cargo/config.toml` sets an instruction-set floor of `x86-64-v3` — the Haswell/Excavator feature

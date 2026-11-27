@@ -681,7 +681,9 @@ itself.
 
 New M33 campaigns read their ratios and verdicts through [`tools/bench_stats.py`](../../tools/bench_stats.py)
 (standard library only) instead of copying an `interval()` into their `summarize.py`. Older
-`summarize.py` files stay as published: they are evidence.
+`summarize.py` files stay as published: they are evidence. Which gates a candidate faces, and
+against which comparator, is in [`development.md`](development.md), *Gating a performance
+candidate*.
 
 ```python
 import bench_stats as bs                       # sys.path.insert(0, 'tools') first

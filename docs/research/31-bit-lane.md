@@ -181,7 +181,8 @@ decide nothing.
 - §9.8's regime clauses: ≥ 1.5× complete-task gain on two R3 families with an upper 95% bound
   below 1, a ratio ≤ 0.70, and reproduction at BabyBear or KoalaBear and on one held-out scale.
 - Sparse controls (Katsura-8, Cyclic-6, mq-random-10) and Noon-6, measured with the lane forced on.
-  They score the dispatch gate, which is #1123's.
+  They specify #1123's dispatch rule and decide nothing; the dispatch gate is scored with that rule
+  applied (plan §9.1).
 - Peak RSS against the field route on the regime rows (§5).
 - Optionally, the matrix-level read: `lane_matrix_gate <archive> <vars> m31 accumulator|lane` on a
   captured 2³¹ − 1 batch.
