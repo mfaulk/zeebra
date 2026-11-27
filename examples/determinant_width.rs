@@ -142,11 +142,13 @@ fn subjects() -> Vec<Subject> {
         .map(|(at, _)| match args.get(at + 1).map(String::as_str) {
             Some("euclidean") => Subject::Determinant(DeterminantKernel::Euclidean),
             Some("dense") => Subject::Determinant(DeterminantKernel::Dense),
+            Some("half-gcd") => Subject::Determinant(DeterminantKernel::HalfGcd),
             Some("clock") => Subject::Clock,
             Some("specialize") => Subject::Specialize,
             Some("remainder") => Subject::Remainder,
             other => panic!(
-                "--kernel takes euclidean, dense, clock, specialize or remainder, not {other:?}"
+                "--kernel takes euclidean, dense, half-gcd, clock, specialize or remainder, not \
+                 {other:?}"
             ),
         })
         .collect();
