@@ -225,6 +225,10 @@ fn split_arm<F: FiniteField>(args: &Args, matrix: SparseMatrix<F>, split: usize,
     let residual_entries = residual.nonzeros();
     let cells = residual.rows() * residual.columns();
     let residual_rows = residual.rows();
+    // Cells at or right of each row's lead: the part a dense kernel over the active span touches.
+    let span_cells: usize = (0..residual_rows)
+        .map(|r| residual.columns() - residual.leading_column(r).expect("nonzero"))
+        .sum();
     let residual_sparse: Option<SparseMatrix<F>> = (args.lane_residual || args.accumulator_sweep)
         .then(|| to_sparse(&residual, &free, columns));
 
@@ -291,6 +295,7 @@ fn split_arm<F: FiniteField>(args: &Args, matrix: SparseMatrix<F>, split: usize,
     println!(
         "{{{head},\"free_columns\":{},\"residual_rows\":{residual_rows},\
          \"residual_entries\":{residual_entries},\"residual_density\":{:.4},\
+         \"residual_span_fraction\":{:.4},\"residual_span_density\":{:.4},\
          \"sweep_seconds\":{sweep_seconds:.3},\"sweep_products\":{},\
          \"blocked_seconds\":{blocked_seconds:.3},\
          \"leaf_rows\":{},\"winograd_from\":{},\"rank\":{},\"products\":{},\"reductions\":{},\
@@ -298,6 +303,8 @@ fn split_arm<F: FiniteField>(args: &Args, matrix: SparseMatrix<F>, split: usize,
          \"output_digest\":\"{ours_digest}\"{tail}}}",
         free.len(),
         residual_entries as f64 / cells.max(1) as f64,
+        span_cells as f64 / cells.max(1) as f64,
+        residual_entries as f64 / span_cells.max(1) as f64,
         sweep_counts.products,
         o.leaf_rows,
         if o.winograd_from == usize::MAX {
