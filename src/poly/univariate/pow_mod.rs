@@ -10,7 +10,10 @@
 
 use crate::{
     integers::{bit, highest_set_bit},
-    poly::univariate::{Polynomial, UnivariatePolynomial},
+    poly::univariate::{
+        div_with_remainder::{inversion_products, newton_is_cheaper},
+        Polynomial, PreparedDivisor, UnivariatePolynomial,
+    },
     FiniteField,
 };
 
@@ -43,39 +46,161 @@ pub fn pow_mod_limbs<F: FiniteField>(
     exponent: &[u64],
     modulus: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
+    pow_mod_limbs_with_route(base, exponent, modulus, PowModRoute::Classical).0
+}
+
+/// How [`pow_mod_limbs_with_route`] reduces each product modulo the fixed modulus (#1205).
+///
+/// A measurement and differential-testing hook, not API. `Classical` is what [`pow_mod_limbs`]
+/// ships; `Auto` is the candidate, which stays off the default until the bench host clears the
+/// #1205 gate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PowModRoute {
+    /// `p % modulus` per step. On the Newton route that re-inverts `rev(modulus)` every step.
+    Classical,
+    /// Invert `rev(modulus)` once, then reduce every step by two truncated products
+    /// (`powmod_preinv`), at every degree.
+    Prepared,
+    /// `Prepared` exactly when `%` would take Newton for a full-width product, else `Classical`.
+    /// Below the division crossover it is the classical loop step for step.
+    Auto,
+}
+
+/// What one modular exponentiation spent, counted at the polynomial level.
+///
+/// Every product is Karatsuba (`Mul` and the division routes call no transform), so a transform
+/// count would be identically zero and is not kept.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PowModStats {
+    /// Squarings of the running power.
+    pub squarings: usize,
+    /// Products of the result by the running power, one per set bit.
+    pub multiplications: usize,
+    /// Reductions by long division.
+    pub long_reductions: usize,
+    /// Reductions by Newton division, each inverting `rev(modulus)` afresh.
+    pub newton_reductions: usize,
+    /// Reductions against the cached inverse.
+    pub prepared_reductions: usize,
+    /// Newton inversions of `rev(modulus)`, wherever they happened.
+    pub inversions: usize,
+    /// Every polynomial product, the truncated ones inside reductions and inversions included.
+    pub products: usize,
+}
+
+/// [`pow_mod_limbs`] on the stated route, with what it spent.
+///
+/// # Panics
+/// Panics if `modulus` is the zero polynomial.
+pub fn pow_mod_limbs_with_route<F: FiniteField>(
+    base: &UnivariatePolynomial<F>,
+    exponent: &[u64],
+    modulus: &UnivariatePolynomial<F>,
+    route: PowModRoute,
+) -> (UnivariatePolynomial<F>, PowModStats) {
     assert!(
         !modulus.is_zero(),
         "the modulus must be a nonzero polynomial"
     );
+    let mut stats = PowModStats::default();
 
     // Reducing the identity is not redundant: modulo a nonzero constant, F[x]/(c) is the zero
     // ring, where 1 and 0 coincide. Starting from an unreduced `one` would wrongly report 1.
-    let mut result = reduce(&UnivariatePolynomial::one(), modulus);
+    let mut result = reduce_classical(&UnivariatePolynomial::one(), modulus, &mut stats);
 
     let Some(highest) = highest_set_bit(exponent) else {
         // A zero exponent leaves the identity, reduced.
-        return result;
+        return (result, stats);
     };
 
-    let mut square = reduce(base, modulus);
+    // The base is the one dividend of unbounded degree, so it is reduced classically and the
+    // prepared precision only has to cover products of two reduced operands.
+    let mut square = reduce_classical(base, modulus, &mut stats);
+    let reducer = Reducer::new(modulus, route, &mut stats);
     for index in 0..=highest {
         if bit(exponent, index) {
-            result = reduce(&(&result * &square), modulus);
+            stats.multiplications += 1;
+            stats.products += 1;
+            result = reducer.reduce(&(&result * &square), &mut stats);
         }
         // The last squaring would be discarded, and for a wide exponent it is not cheap.
         if index < highest {
-            square = reduce(&(&square * &square), modulus);
+            stats.squarings += 1;
+            stats.products += 1;
+            square = reducer.reduce(&(&square * &square), &mut stats);
         }
     }
 
-    result
+    (result, stats)
 }
 
-/// The remainder of `p` on division by `modulus`.
-fn reduce<F: FiniteField>(
+/// The reduction a [`PowModRoute`] resolves to for one modulus.
+enum Reducer<'a, F: FiniteField> {
+    Classical(&'a UnivariatePolynomial<F>),
+    Prepared(PreparedDivisor<F>),
+}
+
+impl<'a, F: FiniteField> Reducer<'a, F> {
+    fn new(
+        modulus: &'a UnivariatePolynomial<F>,
+        route: PowModRoute,
+        stats: &mut PowModStats,
+    ) -> Self {
+        let n = modulus.degree() as usize;
+        // A product of two operands of degree below n has at most 2n - 1 coefficients, so its
+        // quotient by the n + 1 coefficients of the modulus has at most n - 1.
+        let quotient_len = n.saturating_sub(1);
+        let prepare = match route {
+            PowModRoute::Classical => false,
+            PowModRoute::Prepared => true,
+            PowModRoute::Auto => newton_is_cheaper::<F>(quotient_len, n + 1),
+        };
+        if !prepare {
+            return Reducer::Classical(modulus);
+        }
+        let precision = quotient_len.max(1);
+        stats.inversions += 1;
+        stats.products += inversion_products(precision);
+        Reducer::Prepared(PreparedDivisor::new(modulus, precision))
+    }
+
+    fn reduce(
+        &self,
+        p: &UnivariatePolynomial<F>,
+        stats: &mut PowModStats,
+    ) -> UnivariatePolynomial<F> {
+        match self {
+            Reducer::Classical(modulus) => reduce_classical(p, modulus, stats),
+            Reducer::Prepared(divisor) => {
+                if !p.is_zero() && p.coefficients().len() >= divisor.divisor_len() {
+                    stats.prepared_reductions += 1;
+                    // The truncated quotient and the low half of quotient times modulus.
+                    stats.products += 2;
+                }
+                divisor.rem(p)
+            }
+        }
+    }
+}
+
+/// `p % modulus`, counted by the route `div_with_remainder` takes for it.
+fn reduce_classical<F: FiniteField>(
     p: &UnivariatePolynomial<F>,
     modulus: &UnivariatePolynomial<F>,
+    stats: &mut PowModStats,
 ) -> UnivariatePolynomial<F> {
+    if !p.is_zero() && p.degree() >= modulus.degree() {
+        let (f, g) = (p.coefficients().len(), modulus.coefficients().len());
+        let k = f - g + 1;
+        if newton_is_cheaper::<F>(k, g) {
+            stats.newton_reductions += 1;
+            stats.inversions += 1;
+            // The inversion, the truncated quotient and the full product `q * modulus`.
+            stats.products += inversion_products(k) + 2;
+        } else {
+            stats.long_reductions += 1;
+        }
+    }
     p % modulus
 }
 
@@ -273,5 +398,216 @@ mod tests {
         );
         // Modulo a nonzero constant the quotient ring is trivial, so 1 and 0 coincide.
         assert!(pow_mod_limbs(&base, &[0], &poly(&[3])).is_zero());
+    }
+
+    // === #1205: the cached-inverse route ===
+
+    use crate::{
+        fields::{Bn254Fr, Gf13Pow4, Gf256, KoalaBear, Zp18446744069414584321, Zp2},
+        poly::univariate::{
+            div_with_remainder::newton_is_cheaper,
+            pow_mod::{pow_mod_limbs_with_route, PowModRoute, PowModStats},
+            roots::roots_with_frobenius_route,
+        },
+        KnownOrder,
+    };
+    use rand::{rngs::StdRng, SeedableRng};
+
+    const ROUTES: [PowModRoute; 3] = [
+        PowModRoute::Classical,
+        PowModRoute::Prepared,
+        PowModRoute::Auto,
+    ];
+
+    /// A random polynomial of exactly degree `degree`, with a random nonzero, non-one leading
+    /// coefficient where the field allows it, so a non-monic modulus is exercised.
+    fn random_of_degree<G: FiniteField>(
+        degree: usize,
+        rng: &mut StdRng,
+    ) -> UnivariatePolynomial<G> {
+        let mut c: Vec<G> = (0..degree).map(|_| G::random(rng)).collect();
+        let mut lead = G::random(rng);
+        while lead.is_zero() {
+            lead = G::random(rng);
+        }
+        c.push(lead);
+        UnivariatePolynomial::new(&c)
+    }
+
+    /// Every route returns the classical answer, for random moduli and bases at small degrees and
+    /// exponents both short and as wide as the field's order.
+    fn assert_routes_agree<G: FiniteField>(order: &[u64], seed: u64) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let x = UnivariatePolynomial::new(&[G::zero(), G::one()]);
+        for degree in [0usize, 1, 2, 3, 5, 17, 40] {
+            let modulus = random_of_degree::<G>(degree, &mut rng);
+            let bases = [
+                x.clone(),
+                random_of_degree::<G>(degree / 2, &mut rng),
+                // Longer than the modulus, so the base reduction is a real one.
+                random_of_degree::<G>(2 * degree + 3, &mut rng),
+            ];
+            let exponents: [&[u64]; 5] = [&[0], &[1], &[2], &[0x1d3f], order];
+            for base in &bases {
+                for exponent in exponents {
+                    let expected = pow_mod_limbs(base, exponent, &modulus);
+                    for route in ROUTES {
+                        let (got, _) = pow_mod_limbs_with_route(base, exponent, &modulus, route);
+                        assert_eq!(
+                            got, expected,
+                            "{route:?}, degree {degree}, exponent {exponent:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_routes_agree_over_gf7() {
+        assert_routes_agree::<F>(F::order_limbs(), 1);
+    }
+
+    /// Characteristic two, where `2 - g*h` in the inversion is `g*h` and a sign slip would hide.
+    #[test]
+    fn test_routes_agree_in_characteristic_two() {
+        assert_routes_agree::<Zp2>(Zp2::order_limbs(), 2);
+        assert_routes_agree::<Gf256>(Gf256::order_limbs(), 3);
+    }
+
+    /// An odd-characteristic extension field: x^(13^4) mod f.
+    #[test]
+    fn test_routes_agree_over_an_extension_field() {
+        assert_routes_agree::<Gf13Pow4>(&[13u64.pow(4)], 4);
+    }
+
+    #[test]
+    fn test_routes_agree_over_wide_primes() {
+        assert_routes_agree::<KoalaBear>(KoalaBear::order_limbs(), 5);
+        assert_routes_agree::<Zp18446744069414584321>(Zp18446744069414584321::order_limbs(), 6);
+        assert_routes_agree::<Bn254Fr>(Bn254Fr::order_limbs(), 7);
+    }
+
+    /// The smallest modulus degree at which `Auto` takes the cached inverse.
+    fn auto_threshold<G: FiniteField>() -> usize {
+        (2..)
+            .find(|&n| newton_is_cheaper::<G>(n - 1, n + 1))
+            .expect("Newton wins somewhere")
+    }
+
+    /// Below the division crossover `Auto` is the classical loop exactly — the same products, the
+    /// same reductions on the same routes — which is the small-degree parity the dispatch owes.
+    #[test]
+    fn test_auto_is_classical_below_the_crossover() {
+        fn check<G: FiniteField>(order: &[u64], seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let x = UnivariatePolynomial::new(&[G::zero(), G::one()]);
+            let below = auto_threshold::<G>() - 1;
+            for degree in [1, 8, below / 2, below] {
+                let modulus = random_of_degree::<G>(degree, &mut rng);
+                let (classical, classical_stats) =
+                    pow_mod_limbs_with_route(&x, order, &modulus, PowModRoute::Classical);
+                let (auto, auto_stats) =
+                    pow_mod_limbs_with_route(&x, order, &modulus, PowModRoute::Auto);
+                assert_eq!(auto, classical, "degree {degree}");
+                assert_eq!(auto_stats, classical_stats, "degree {degree}");
+                assert_eq!(auto_stats.prepared_reductions, 0, "degree {degree}");
+            }
+        }
+        check::<Zp18446744069414584321>(Zp18446744069414584321::order_limbs(), 8);
+        check::<Bn254Fr>(&[0xdead_beef_1234_5678], 9);
+    }
+
+    /// Above the crossover `Auto` inverts once where the classical loop inverts every step, and
+    /// so spends strictly fewer products for the same answer.
+    #[test]
+    fn test_auto_inverts_once_above_the_crossover() {
+        fn check<G: FiniteField>(order: &[u64], seed: u64) -> (PowModStats, PowModStats) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let x = UnivariatePolynomial::new(&[G::zero(), G::one()]);
+            let degree = auto_threshold::<G>() + 3;
+            let modulus = random_of_degree::<G>(degree, &mut rng);
+            let (classical, classical_stats) =
+                pow_mod_limbs_with_route(&x, order, &modulus, PowModRoute::Classical);
+            let (auto, auto_stats) =
+                pow_mod_limbs_with_route(&x, order, &modulus, PowModRoute::Auto);
+            assert_eq!(auto, classical, "degree {degree}");
+
+            // The same exponent walk on both.
+            assert_eq!(auto_stats.squarings, classical_stats.squarings);
+            assert_eq!(auto_stats.multiplications, classical_stats.multiplications);
+            // One inversion, and no step re-inverts.
+            assert_eq!(auto_stats.inversions, 1);
+            assert_eq!(auto_stats.newton_reductions, 0);
+            assert!(auto_stats.prepared_reductions > 0);
+            // The classical loop pays an inversion for each of its Newton reductions.
+            assert!(classical_stats.newton_reductions > 0);
+            assert_eq!(
+                classical_stats.inversions,
+                classical_stats.newton_reductions
+            );
+            assert!(auto_stats.products < classical_stats.products);
+            (classical_stats, auto_stats)
+        }
+        check::<Zp18446744069414584321>(Zp18446744069414584321::order_limbs(), 10);
+        // A 254-bit order, so the walk is BN254's own length.
+        let (classical, auto) = check::<Bn254Fr>(Bn254Fr::order_limbs(), 11);
+        assert!(classical.squarings >= 253);
+        // Each classical Newton reduction is an inversion plus two products, each prepared one is
+        // two products; the inversion is the whole difference, so more than halving the total.
+        assert!(
+            2 * auto.products < classical.products,
+            "{classical:?} {auto:?}"
+        );
+    }
+
+    /// `roots` is the same set on every route.
+    #[test]
+    fn test_roots_agree_on_every_route() {
+        fn check<G: KnownOrder>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for degree in [1usize, 4, 30] {
+                let planted: Vec<G> = (0..3).map(|_| G::random(&mut rng)).collect();
+                let cofactor = random_of_degree::<G>(degree, &mut rng);
+                let f = &UnivariatePolynomial::from_zeros(&planted) * &cofactor;
+                let mut expected = roots_with_frobenius_route(
+                    &f,
+                    PowModRoute::Classical,
+                    &mut StdRng::seed_from_u64(seed),
+                );
+                expected.sort_by_key(|a| format!("{a:?}"));
+                for route in ROUTES {
+                    let mut got =
+                        roots_with_frobenius_route(&f, route, &mut StdRng::seed_from_u64(seed));
+                    got.sort_by_key(|a| format!("{a:?}"));
+                    assert_eq!(got, expected, "{route:?}, degree {degree}");
+                    for a in &planted {
+                        assert!(got.contains(a), "{route:?} lost planted root {a:?}");
+                    }
+                }
+            }
+        }
+        check::<Zp2>(12);
+        check::<Gf256>(13);
+        check::<KoalaBear>(14);
+        check::<Bn254Fr>(15);
+    }
+
+    /// The prepared route keeps the trivial-ring and zero-exponent conventions.
+    #[test]
+    fn test_prepared_route_edge_cases() {
+        let base = poly(&[2, 3, 1]);
+        for route in ROUTES {
+            assert!(pow_mod_limbs_with_route(&base, &[5], &poly(&[3]), route)
+                .0
+                .is_zero());
+            assert!(pow_mod_limbs_with_route(&base, &[0], &poly(&[3]), route)
+                .0
+                .is_zero());
+            assert_eq!(
+                pow_mod_limbs_with_route(&base, &[0], &poly(&[6, 1, 1, 1]), route).0,
+                UnivariatePolynomial::one()
+            );
+        }
     }
 }

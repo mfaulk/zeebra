@@ -260,6 +260,11 @@ impl<F: FiniteField> PreparedDivisor<F> {
         }
     }
 
+    /// Coefficients of the divisor, so `deg + 1`.
+    pub(crate) fn divisor_len(&self) -> usize {
+        self.divisor.len()
+    }
+
     /// `dividend mod divisor`.
     ///
     /// # Panics
@@ -393,7 +398,7 @@ fn invert_mod_xk<F: FiniteField>(g: &[F], k: usize) -> Vec<F> {
 
     let mut h = vec![g[0].inverse()];
     let mut precision = 1;
-    while precision < k {
+    for _ in 0..newton_steps(k) {
         let next = (2 * precision).min(k);
         // `g*h` is 1 mod x^precision, so negating and adding two leaves `2 - g*h` with the right
         // constant term without a special case for it.
@@ -406,6 +411,16 @@ fn invert_mod_xk<F: FiniteField>(g: &[F], k: usize) -> Vec<F> {
         precision = next;
     }
     h
+}
+
+/// Doublings [`invert_mod_xk`] takes to reach precision `k >= 1`: `ceil(log2 k)`.
+fn newton_steps(k: usize) -> usize {
+    (usize::BITS - (k - 1).leading_zeros()) as usize
+}
+
+/// Polynomial products [`invert_mod_xk`] spends on precision `k >= 1`, two per doubling.
+pub(crate) fn inversion_products(k: usize) -> usize {
+    2 * newton_steps(k)
 }
 
 /// `a * b mod x^k`, as a vector of length exactly `k`.
@@ -487,7 +502,7 @@ mod tests {
     use super::{
         div_with_remainder, div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
         invert_mod_xk, karatsuba_base_case, multiply_truncated, newton_crossover,
-        newton_is_cheaper, newton_is_cheaper_at, newton_is_cheaper_within, quotient,
+        newton_is_cheaper, newton_is_cheaper_at, newton_is_cheaper_within, newton_steps, quotient,
         PreparedDivisor, KARATSUBA_EXPONENT,
     };
     use crate::{
@@ -657,6 +672,24 @@ mod tests {
                 expected[0] = F::one();
                 assert_eq!(product, expected, "length {} k {}", length, k);
             }
+        }
+    }
+
+    /// The doubling count is `ceil(log2 k)`, and the iteration lands exactly on `k`.
+    #[test]
+    fn test_newton_steps_is_the_ceiling_log() {
+        for (k, steps) in [
+            (1, 0),
+            (2, 1),
+            (3, 2),
+            (4, 2),
+            (5, 3),
+            (1024, 10),
+            (1025, 11),
+        ] {
+            assert_eq!(newton_steps(k), steps, "k = {k}");
+            let reached = (0..steps).fold(1usize, |precision, _| (2 * precision).min(k));
+            assert_eq!(reached, k, "k = {k}");
         }
     }
 

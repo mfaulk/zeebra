@@ -39,10 +39,11 @@ pub use univariate::{
     karatsuba_base_case_unstable, karatsuba_unstable, newton_crossover_unstable,
     newton_floor_unstable, newton_is_cheaper_at_unstable, newton_is_cheaper_unstable,
     partial_bezout_classical_unstable, partial_bezout_half_unstable, pow_mod_limbs_unstable,
-    product_of_factors_unstable, subproduct_evaluate_unstable, subproduct_interpolate_unstable,
-    transform_tree_interpolate_unstable, tree_crossover_unstable, xgcd_classical_unstable,
-    xgcd_half_unstable, DistinctDegreeRoute, FrobeniusRoute, IrreducibilityRoute, TransformKernel,
-    TransformTree,
+    pow_mod_limbs_with_route_unstable, product_of_factors_unstable,
+    roots_with_frobenius_route_unstable, subproduct_evaluate_unstable,
+    subproduct_interpolate_unstable, transform_tree_interpolate_unstable, tree_crossover_unstable,
+    xgcd_classical_unstable, xgcd_half_unstable, DistinctDegreeRoute, FrobeniusRoute,
+    IrreducibilityRoute, PowModRoute, PowModStats, TransformKernel, TransformTree,
 };
 
 #[cfg(test)]
