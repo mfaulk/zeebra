@@ -468,8 +468,9 @@ order and the characteristic are genuinely different; both are reported.
 itself, so algorithms bounded on `FiniteField` alone can use a transform (#783). It takes no rng,
 returns the same root on every call, and defaults to `None`; the prime-field families override it
 up to their two-adicity. `lagrange_interpolate` and `multipoint_evaluate` use it to move the
-subproduct tree's large products onto the transform. A field implemented outside the crate keeps
-the Karatsuba tree unless it overrides the hook, and any `Some` it returns must have order exactly
+subproduct tree's large products onto the transform, and the univariate `Mul` uses it to take the
+transform above `fft_multiplication_crossover` (#1225). A field implemented outside the crate keeps
+the Karatsuba tree and the Karatsuba product unless it overrides the hook, and any `Some` it returns must have order exactly
 `2^log_n`.
 
 Constructing a generator or a root of unity **fails as a value**. Whether `n` divides `q - 1`, and

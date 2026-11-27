@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its #850 planted, call-site and caller A/B were measured at `f3de297b`, the caller A/B against that tree with the dispatch disabled. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries. §4.5's #1207 subsection was measured at `dbba0700`, both kernels in one binary.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its #850 planted, call-site and caller A/B were measured at `f3de297b`, the caller A/B against that tree with the dispatch disabled. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries. §4.5's #1207 subsection was measured at `dbba0700`, both kernels in one binary. **§4.1.3 was taken at `6ac0337b`** (the pre-rebase #1225 branch commit, not on `main`; its rebased equivalent is `62bb6662`, and the rebase onto `3879a2be` changed nothing under `src/`) against `d1f863f2` (`origin/main` at the time), two binaries, unpinned on an Apple M4 Pro laptop.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -563,6 +563,9 @@ after #189, against 1.95–2.01 for schoolbook in the same run.
 > the dispatcher uses**; they are kept because they are what §4.1.1's and §3.3's figures were taken
 > against. §4.1.2 has the thresholds that replaced them and the measurement that produced them.
 
+> **#1225: it now does**, through the deterministic root #783 added; §4.1.3. The paragraph below
+> is the state before that.
+
 `Mul` cannot reach the transform, and that part has not changed: choosing a domain needs a
 primitive `2^k`-th root of unity, so it needs `KnownOrder` and a source of randomness, neither of
 which `Mul`'s signature can carry — and `KnownOrder` is exactly what the Gröbner core refuses to
@@ -1021,6 +1024,92 @@ multivariate products in tests, and `grobner::resultant`'s `&result * p` is mult
 Checked by grep rather than assumed, which is what #231 asked for. So #185's worry about small
 products dominating by count in F4 does not apply to this operator — though it did apply, in a
 different place, and §4.1.2's step two is where it showed up.
+
+#### 4.1.3 The operator reaches the transform (#1225)
+
+#1206 found the largest univariate gap to FLINT on every NTT-friendly field was routing: `&a * &b`
+stopped at Karatsuba, so Newton `divrem`, `pow_mod`, `compose_mod`, the subproduct trees and
+half-GCD, all built on it, climbed at `n^0.58` above the point where `fft::multiply` had long since
+switched. #1225 gives the operator, and Newton division's slice products, a third route, in
+`src/poly/univariate/product.rs`.
+
+**The obstacle was the signature, and #783 had already removed it.** A domain needs a primitive
+`2^k`-th root of unity. `fft::multiply` finds one with `KnownOrder` and an rng, and `Mul` carries
+neither. `FiniteField::transform_root_of_unity`, added for the transform tree, returns a
+deterministic root with no rng and no `KnownOrder` bound. The operator takes its root from that hook and
+multiplies through `multiply_over_domain`, the entry point `fft::multiply` uses, so later work
+on the transform reaches both. There is no randomness anywhere in the route, and both routes
+compute the exact product, so the output is the Karatsuba output at every size. The tests check
+this against `test_support::schoolbook_product` across the crossover on KoalaBear, BabyBear,
+Goldilocks, Zp65537 and BN254. Fields with no usable root keep Karatsuba at every degree:
+Mersenne-31, `Zp7`, `GF(2^8)` and `GF(13^4)`, and `Zp12289` past its 4096-point limit. Every
+primitive named above gives the same answer with the route on and forced off.
+
+**The decision is a cost comparison, not `fft::multiply`'s degree rule.** Taking the transform at
+every product degree from `fft_multiplication_crossover` measured **0.85x** on a whole BN254
+division (dividend 511, divisor 255). Its Newton quotient product is 257 x 257, length 513,
+and pays for a 1024-point domain. #185's crossings were taken on power-of-two operands, whose
+products nearly fill their domains, so they never showed that padding. The route therefore
+compares `blocks * size * log2 size` against Karatsuba's `long * short^(log2 3 - 1)`. The two
+scales are set equal where #185 measured them equal: two `c/2` operands on a `c`-point domain,
+with `c` the shipped crossover. A product that barely fills its domain stays on Karatsuba until
+its operands are about 0.8 of the next power of two.
+
+**Unbalanced products are blocked.** A single domain sized for the whole product loses to
+Karatsuba, which cuts the long operand into blocks of the short one's length and so pays `O(n)` in
+the long length. The first unblocked version measured **0.85x** on Goldilocks at 513 x 32 769. The
+transform now blocks the same way, choosing the power-of-two block domain that minimizes the cost
+above. Nothing is costed while the product's degree, or the short operand's own square, is below
+the crossover, so `from_zeros`'s `n x 2` fold and every small product run the code they ran
+before.
+
+##### Laptop development figures, old route against new
+
+**Unpinned, Apple M4 Pro laptop, shared with other build jobs (load 5–13), so indicative only; they
+are not a deciding measurement.** Old is `d1f863f2` (origin/main at the time), new is `6ac0337b`'s library source, both built
+`--release` with `CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16` from a
+throwaway probe that calls only the public operators. Two interleaved rounds, minimum of 3–7
+repetitions per round, minimum kept. `n` is the operand length: `mul` is `n x n`, `mul_unbal` is
+`8n x n/8`, `divrem` divides length `2n` by length `n`, `powmod` is `a^(2^32-1) mod b` with `b` of
+length `n`, and `compose` is `compose_mod` with all three of length `n`. Ratios are old time over
+new.
+
+| field | primitive | ratio by `n` |
+|---|---|---|
+| KoalaBear | `mul` | 2048: 1.00 · 4096: **4.19** · 16384: 8.69 · 2¹⁸: **29.3** |
+| KoalaBear | `mul_unbal` | 8192: 1.00 · 16384: 4.74 · 2¹⁸: 16.0 |
+| KoalaBear | `divrem` | 2048: 1.00 · 4096: 1.62 · 16384: 5.19 · 2¹⁸: **20.3** |
+| KoalaBear | `powmod` | 2048: 1.02 · 4096: 1.84 · 16384: 5.70 |
+| KoalaBear | `compose` | 2048: 1.00 · 4096: 1.83 · 8192: 3.33 |
+| Goldilocks | `mul` | 256: 1.00 · 512: 1.29 · 4096: 3.94 · 2¹⁶: 13.4 |
+| Goldilocks | `divrem` | 256: 1.00 · 512: 1.12 · 4096: 2.70 · 2¹⁶: 9.24 |
+| Goldilocks | `powmod` | 256: 0.98 · 512: 1.13 · 4096: 3.03 |
+| Goldilocks | `compose` | 256: 1.01 · 512: 1.16 · 2048: 2.10 |
+| BN254 `Fr` | `mul` | 256: 0.97 · 512: 1.76 · 16384: 9.07 |
+| BN254 `Fr` | `divrem` | 256: 0.98 · 512: 1.24 · 16384: 6.06 |
+| BN254 `Fr` | `powmod` | 256: 0.99 · 512: 1.36 · 1024: 1.92 |
+| BN254 `Fr` | `compose` | 256: 1.00 · 512: 1.35 |
+
+The cells at the smallest `n` run identical code in both binaries, so 0.97–1.02 there is this
+machine's spread. No cell above the crossover is slower.
+
+##### What this does not establish
+
+- **No pinned figure.** The deciding per-primitive measurement against FLINT and NTL
+  (`tools/external/univariate-primitives-compare.sh`, #1206) and a solve-level caller (§4.3.4) are
+  bench-host work.
+- **The crossover is not re-tuned.** The cost model is anchored on the shipped
+  `fft_multiplication_crossover`. On this laptop KoalaBear's transform is already 4.19x ahead at
+  `n` = 4096, which suggests the real 4-byte crossing is lower here, as #244 predicts for a build
+  without the vectorized schoolbook loop. The model errs toward Karatsuba, as the threshold does.
+- **Newton division's crossover rule still assumes Karatsuba's exponent.** Above the transform's
+  crossover it overstates Newton's cost. The constants sit far below that degree, so this only
+  leaves long division in place at a few large unbalanced shapes, and none of the rows above.
+- **The short operand is transformed once per block.** Reusing its transform, and the transform's
+  own constant, are #1208's work.
+- **Fields with no usable root** keep Karatsuba. #1226's multi-modular product lives in
+  `fft::multiply`, which needs `KnownOrder`. Reaching it from the operator would need a
+  `FiniteField`-bounded entry, and the fallback arm of `product::plan` is where it would go.
 
 ### 4.2 Modular composition: absent
 
