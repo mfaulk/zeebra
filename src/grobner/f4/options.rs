@@ -638,8 +638,9 @@ pub enum GradedEngine {
 
     /// [`f4_signature`](crate::grobner::f4_signature)'s pre-solve dispatch: the signature engine
     /// where its thresholds expect it to win, conventional F4 elsewhere and as the fallback from a
-    /// signature-engine size limit. Wall, matrix, basis-size and certification budgets keep their
-    /// meaning, and the team never exceeds the caller's worker caps. The live budget binds on the
+    /// signature-engine size limit. Wall, basis-size and certification budgets keep their meaning;
+    /// the signature engine reads the matrix limits scaled by its own default over F4's (10× at the
+    /// presets, #1186), since its matrices are not conventional F4's. The team never exceeds the caller's worker caps. The live budget binds on the
     /// signature engine's parallel cascade only; at one worker it is not charged. A call with
     /// `max_batches` or `max_pairs_per_batch` set stays on conventional F4, whose batches those
     /// count.
