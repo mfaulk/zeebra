@@ -15,6 +15,8 @@ extern crate pest;
 // macros should be at the top in order for macros to be accessible in subsequent modules
 #[macro_use]
 pub mod macros;
+#[cfg(feature = "research-zdd")]
+pub mod boolean;
 pub mod codes;
 mod fft;
 pub mod fields;
