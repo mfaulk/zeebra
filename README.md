@@ -114,6 +114,9 @@ one-worker gap to grobx on prime-field reduced bases by improving the engines th
 certified zero skipping, carrying signature work into conventional F4, and narrower matrix
 storage. Zeebra's exact correctness guarantee is unchanged. Its development-mode
 [baseline](docs/research/m35-baseline.md) puts most of the structured-row gap at p ≈ 2³¹, where
-grobx's 31-bit lane gains and Zeebra does not. The largest residual gap is dense MQ.
+grobx's 31-bit lane gains and Zeebra does not. The largest residual gap is dense MQ. The plan was
+[amended](docs/MILESTONE-FINITE-FIELD-COMPETITIVENESS.md#21-amendment-1-2026-11-27) on that
+evidence: it adds a lane for 31-bit primes (Mersenne31, BabyBear, KoalaBear) and cheaper signature
+pair bookkeeping, and scores conditional mechanisms on a regime gate and a dispatch gate.
 
 Licensed under the [MIT licence](LICENSE-MIT).
