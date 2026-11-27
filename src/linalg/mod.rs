@@ -1,3 +1,4 @@
+pub mod blocked;
 pub mod concurrent;
 mod crout;
 pub mod dense;
