@@ -246,7 +246,9 @@ salvage usable commits rather than silently dropping them.
 - **Abandoning or handing off** → never leave a silent dangling claim. Comment
   what was and was not done and why, then:
   `./scripts/agent/zb-claim.sh release 119 --abandon`, which also removes the
-  assignee and returns the board row to Todo.
+  assignee, returns the board row to Todo, and writes the same withdrawal marker
+  `withdraw` does, so the abandoned lease stops counting and the next claimer
+  does not lose a race to it (#1177). No separate `withdraw` is needed.
 - **Lost a race** → `withdraw`, never `release`. See §3.
 
 Both `release` forms refuse if another agent holds the claim, because both touch

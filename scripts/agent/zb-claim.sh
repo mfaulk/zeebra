@@ -606,8 +606,22 @@ zb_withdraw() { # <issue-number>
   token="$(zb_agent_token)" || { echo "zb-claim: could not read this checkout's claim token" >&2; return 2; }
   gh issue comment "$1" --repo "$ZB_REPO" --body \
 "🚫 \`$id\` withdraws its claim on this issue. No label, assignee or board state was changed.
-<!-- zb-withdraw agent=\"$id\" token=\"$token\" at=\"$now\" -->" >/dev/null || return 2
+$(zb_withdraw_marker "$id" "$token" "$now")" >/dev/null || return 2
   echo "withdrew this checkout's claim on #$1 (shared state untouched)"
+}
+
+# The marker the resolver reads as a retraction. `withdraw` and `release --abandon`
+# both write it, so the two cannot drift apart.
+zb_withdraw_marker() { # <id> <token> <at-iso>
+  printf '<!-- zb-withdraw agent="%s" token="%s" at="%s" -->' "$1" "$2" "$3"
+}
+
+# The comment `release --abandon` posts. It carries a withdrawal: without one the
+# abandoned claim keeps its lease, so `state` stays live and the next claimer loses
+# the race to a claim nobody is working (#1177).
+zb_abandon_comment() { # <id> <token> <at-iso>
+  printf '%s\n%s' "↩️ \`$1\` abandons its claim on this issue; label and assignee removed, board back to Todo." \
+    "$(zb_withdraw_marker "$1" "$2" "$3")"
 }
 
 # Drop the working label, and optionally the assignee and the board row.
@@ -617,7 +631,7 @@ zb_withdraw() { # <issue-number>
 # refusal names; `reclaim` already refuses a live lease and this is the mutation
 # that used to trust its caller instead (#544).
 zb_release() { # <issue-number> [--abandon] [--force]
-  local issue="$1" abandon=0 force=0 arg resolution verdict winner
+  local issue="$1" abandon=0 force=0 arg resolution verdict winner id token
   shift
   for arg in "$@"; do
     case "$arg" in
@@ -641,6 +655,12 @@ zb_release() { # <issue-number> [--abandon] [--force]
   fi
 
   if [ "$abandon" -eq 1 ]; then
+    # The withdrawal goes first: if it cannot be written, nothing shared is touched,
+    # rather than leaving an unlabeled issue behind a lease that is still live.
+    id="$(zb_agent_id)"
+    token="$(zb_agent_token)" || { echo "zb-claim: could not read this checkout's claim token" >&2; return 2; }
+    gh issue comment "$issue" --repo "$ZB_REPO" \
+      --body "$(zb_abandon_comment "$id" "$token" "$(zb_now)")" >/dev/null || return 2
     gh issue edit "$issue" --repo "$ZB_REPO" --remove-label "$ZB_CLAIM_LABEL" --remove-assignee "@me" >/dev/null || return 2
     zb_set_status "$issue" "$ZB_STATUS_TODO" || return 2
     echo "abandoned #$issue — label and assignee removed, board back to Todo"
@@ -695,7 +715,7 @@ zb-claim.sh — issue claiming for parallel agents
   state <N>                  live | stale
   reclaim <N> "<intent>"     take over #N, only if its lease is stale
   release <N>                drop the label (finished; PR keeps it In Progress)
-  release <N> --abandon      drop label + assignee and return the board to Todo
+  release <N> --abandon      withdraw, drop label + assignee, return the board to Todo
   release <N> --force        release even when another agent holds the claim
   withdraw <N>               retract your own claim, touching no shared state
   reap                       every claimed issue whose lease has expired
