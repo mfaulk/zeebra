@@ -51,7 +51,7 @@ fn measure<const N: usize, F: KnownOrder>(
         machine: std::env::var("ZEEBRA_MACHINE").unwrap_or_else(|_| "unrecorded".into()),
         cpu: std::env::var("ZEEBRA_AFFINITY").unwrap_or_else(|_| "unrecorded".into()),
         concurrency: 1,
-        build: "release; target-cpu=x86-64-v3; fat LTO; codegen-units=1".into(),
+        build: zeebra::util::build_profile().into(),
         policy: "1000 rows, 1000 columns; other F4 limits default".into(),
         ..Environment::from_git()
     };

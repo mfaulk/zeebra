@@ -1,3 +1,4 @@
+mod build_profile;
 mod duplicates;
 mod impl_add_variants;
 mod impl_div_variants;
@@ -12,6 +13,7 @@ mod sha256;
 mod shake128;
 pub(crate) mod team;
 
+pub use build_profile::build_profile;
 pub use duplicates::contains_duplicates;
 pub use isa_floor::{has_isa_floor, isa_floor};
 pub use json::{Json, JsonError};

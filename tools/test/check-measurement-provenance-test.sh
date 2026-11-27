@@ -134,6 +134,49 @@ write_doc frozen.md \
   '|---|---:|' \
   '| cyclic-8 | 41.2 s |'
 
+# Figures from two build profiles in one table, with no note saying the comparison crosses them.
+write_doc mixed-profiles.md \
+  '# Across the switch' \
+  '' \
+  '**Measured at:** `93bb1c2` and `7ab1e86`.' \
+  '' \
+  '| row | build | time |' \
+  '|---|---|---:|' \
+  '| a | profile=release; lto=fat; codegen-units=1 | 3.6 ms |' \
+  '| a | profile=release; lto=thin; codegen-units=16 | 3.9 ms |'
+
+# The same table, with the header saying which figures came from which profile.
+write_doc mixed-noted.md \
+  '# Across the switch' \
+  '' \
+  '**Measured at:** `93bb1c2` and `7ab1e86`.' \
+  '**Across profiles:** the first row is release-fat (`lto=fat`), the second the thin release.' \
+  '' \
+  '| row | build | time |' \
+  '|---|---|---:|' \
+  '| a | profile=release; lto=fat; codegen-units=1 | 3.6 ms |' \
+  '| a | profile=release; lto=thin; codegen-units=16 | 3.9 ms |'
+
+# Two profile names but no figures: nothing is compared, so nothing needs the note.
+write_doc profiles-no-figures.md \
+  '# Profiles' \
+  '' \
+  '| name | settings |' \
+  '|---|---|' \
+  '| release-fat | profile=release-fat; lto=fat |' \
+  '| release | profile=release; lto=thin |'
+
+# One profile throughout, stated in every row: one build, nothing crosses.
+write_doc one-profile.md \
+  '# One build' \
+  '' \
+  '**Measured at:** `93bb1c2`.' \
+  '' \
+  '| row | build | time |' \
+  '|---|---|---:|' \
+  '| a | profile=release; lto=fat; codegen-units=1 | 3.6 ms |' \
+  '| b | profile=release; lto=fat; codegen-units=1 | 4.1 ms |'
+
 echo "== cases =="
 expect_status 0 'a declared document passes' "$WORK/declared.md"
 expect_status 1 'an undeclared document fails' "$WORK/undeclared.md"
@@ -145,6 +188,14 @@ expect_status 1 'a declaration naming no commit fails' "$WORK/vague.md"
 expect_status 1 'a declaration below the header window fails' "$WORK/late.md"
 expect_status 0 'a table of ratios and counts needs no declaration' "$WORK/ratios.md"
 expect_status 0 'the "Frozen at" spelling is accepted' "$WORK/frozen.md"
+
+# #1172: a document mixing figures from two build profiles must say so.
+expect_status 1 'figures from two profiles without a note fail' "$WORK/mixed-profiles.md"
+expect_output_contains 'mixed-profiles.md' 'the profile violation names the file' \
+  "$WORK/mixed-profiles.md"
+expect_status 0 'figures from two profiles with a note pass' "$WORK/mixed-noted.md"
+expect_status 0 'profiles named without figures need no note' "$WORK/profiles-no-figures.md"
+expect_status 0 'one profile throughout needs no note' "$WORK/one-profile.md"
 
 # One violation among several files is still a violation, and the passing files are not reported.
 expect_status 1 'a mixed file set fails' "$WORK/declared.md" "$WORK/undeclared.md"

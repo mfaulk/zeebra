@@ -581,7 +581,8 @@ fn detect_environment(wall: Duration, measure: bool, workers: usize) -> Environm
         cpu: format!("{}, affinity {}", cpu, affinity),
         concurrency: workers,
         build: format!(
-            "release, rustc {}",
+            "{}, rustc {}",
+            zeebra::util::build_profile(),
             std::process::Command::new("rustc")
                 .arg("--version")
                 .output()

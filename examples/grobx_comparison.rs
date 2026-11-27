@@ -104,7 +104,8 @@ fn main() {
         "build with x86-64-v3"
     );
     environment.build = format!(
-        "release; fat LTO; codegen-units=1; x86-64-v3; subprocess allocator recorded in driver; {}",
+        "{}; x86-64-v3; subprocess allocator recorded in driver; {}",
+        zeebra::util::build_profile(),
         String::from_utf8(
             std::process::Command::new("rustc")
                 .arg("-Vv")

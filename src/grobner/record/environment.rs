@@ -88,6 +88,10 @@ pub struct Environment {
     pub concurrency: usize,
 
     /// `RUSTFLAGS` and the profile, which decide whether two timings are comparable at all.
+    ///
+    /// Writers put [`crate::util::build_profile`] here: the concrete `lto`, `codegen-units` and
+    /// `opt-level` resolved at build time, not the word "release", which stopped naming one build
+    /// when the release profile changed (#1172). Records written before that carry free text.
     pub build: String,
 
     /// The resource policy the run was given, in its own words.

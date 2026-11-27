@@ -118,7 +118,7 @@ measurement method is unstated is a field two runs can disagree on without eithe
 | Solver id | `singular`, `msolve`, `groebner.jl`, `sagebrush`, `zeebra`. `ExternalSolver::id()`. |
 | Version | Obtained by **running the tool**, once per sweep, through `probe_version()` — never read from a package manifest, which can describe a build that is not the one on the path. Singular reports a build number (`4.4.1`, build `44105`); Groebner.jl a package version; msolve a version string. The raw text is kept beside the parsed value so a misparse is recoverable. |
 | Source commit | For Zeebra: the SHA the measured binary was built from, `Environment::commit`, read with `git rev-parse` at run time — never a branch name, which stops identifying a binary as soon as the branch moves, and never a date, which at this repository's commit rate names no commit at all. A commit alone is not enough to be *resolvable* after the branch merges, so `Environment::from_git` also records `base_commit` and `patch_id` (§10.3, #505). For a comparand: the version or pin `external-comparands.md` records. A figure without any of it cannot be re-taken, which is #335; what a commit does and does not buy is §10. |
-| Build configuration | For Zeebra: the cargo profile and `RUSTFLAGS`, which is `Environment::build` in the existing scoreboard. For an external tool: how it was obtained (distribution package, source build) and the relevant flags. A source build at `-march=native` and a distribution build are different software. |
+| Build configuration | For Zeebra: the cargo profile and `RUSTFLAGS`, which is `Environment::build` in the existing scoreboard, filled from `zeebra::util::build_profile()` — the `lto`, `codegen-units` and `opt-level` resolved at build time, never the bare word "release" (§10.4). For an external tool: how it was obtained (distribution package, source build) and the relevant flags. A source build at `-march=native` and a distribution build are different software. |
 | CPU ISA floor | The instruction-set baseline the binary was compiled for. This repo has measured a 4-byte-vector loss from an unset `-C target-cpu` (`util::isa_floor`, and the figures corrected in #185/#231) — a comparison between a tool built for its distribution's baseline and one built for the host is not a comparison of algorithms. Record it; where it cannot be determined for an external binary, record that it could not. **For a comparand this repository builds from source, match it rather than record it** — see below. |
 
 #### A comparand built here is built like Zeebra's side
@@ -723,3 +723,55 @@ whether or not a reader can check that commit out. `Environment::from_git` fills
 A record written before those fields existed reads back with both empty and reports as unresolvable,
 which is the fact about it rather than a defect in the reader. The register's transcribed rows are
 exactly that case, and no stamp can be retrofitted to them: their commit was never written down.
+
+### 10.4 The build profile, and a baseline frozen under the old one
+
+"Release" names a build only while the release profile stays put. #1170 replaces fat LTO with a
+parallel profile, after which a row taken before the switch and a row taken after it would both say
+"release" and compare as equals. So the profile travels with the figure the way the ISA floor does
+(#385): `build.rs` resolves the concrete settings from `Cargo.toml` and the `CARGO_PROFILE_*`
+overrides at build time, and `zeebra::util::build_profile()` returns them as
+
+```text
+profile=release; opt-level=3; lto=fat; codegen-units=1; debug-assertions=false; rustflags=-C target-cpu=x86-64-v3
+```
+
+which every harness writes into `Environment::build` (#1172). An override the resolver cannot see —
+`--config 'profile.….'` or a profile table in `.cargo/config.toml` — shows up as a disagreement with
+cargo's own `OPT_LEVEL` and is printed as `UNSEEN OVERRIDE` rather than hidden; an `lto` or
+`codegen-units` override by those routes alone is not caught, so set profile overrides through the
+environment or the manifest. Built as a dependency, the stamp reads this crate's manifest rather
+than the consumer's, so it describes this repository's builds only.
+
+A document whose figures come from more than one profile says so in its header:
+
+| Declaration | Means |
+|---|---|
+| **Across profiles:** … | which figures came from which profile, and why the comparison between them is the one intended. |
+
+`tools/check-measurement-provenance.sh` requires it when a document that publishes a figure names
+two values of any one of `profile=`, `lto=`, `codegen-units=` or `opt-level=`. It catches stamps
+copied into a document; it cannot catch a document that never wrote the build down, which is the
+first rule's job.
+
+**A baseline frozen under the old profile is not re-frozen.** A milestone that is open when the
+release profile changes keeps measuring **every** row — its frozen baseline, its new rows and the
+comparands' matched builds — under `release-fat`, the old profile under its new name, until the
+milestone closes. Milestones opened after the switch freeze their baseline under the new `release`.
+
+The alternative, re-freezing under the new profile, was rejected:
+
+- it spends a benchmark session re-taking figures that already exist, and a frozen baseline whose
+  panel or cohorts have been allocated (M35's validation and confirmation sets) cannot be re-drawn
+  without reopening decisions already signed off;
+- a milestone's question is whether an engine change moved a row, and that answer needs one build
+  for both sides — a profile change inside the milestone confounds every ratio it reports with the
+  profile's own cost, which is what #1171 measures separately;
+- `release-fat` exists (#1173) precisely so the old instrument stays reachable, and the comparand
+  drivers gain the same named profile, so matching it costs one `--profile release-fat` flag.
+
+The cost is that an open milestone's figures stay on the slower-building profile until it closes;
+that is accepted. Applied to the milestone open when #1173 merges: today that is M35 (#1161), whose
+Z0 baseline (#1162) was frozen under fat LTO. If #1173 lands while M35 is open, M35 measures under
+`release-fat` to its close, and its records carry `lto=fat; codegen-units=1` in `build`, which is
+what lets a reader see that it did.
