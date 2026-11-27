@@ -3,11 +3,22 @@
 //!
 //! cargo run --release --features research-sigf4 --example m34_matrix -- --catalog FILE --id ID
 //!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S] [--stages]
+//!     [--hilbert off|observe|certified-zeros+N] [--research-envelope]
 //!
 //! `--stages` (#1162) sets `F4Options::measure_stages` and adds the conventional engine's stage
 //! clocks (`stages`) and always-on counters (`counters`); `sig` adds its always-on
 //! `SigF4Statistics` as `counters`. The stage clocks cost 4–12% (`F4Options::measure_stages`), so a
 //! staged attempt attributes time and is never a timing record.
+//!
+//! `--hilbert` (#1080) sets `F4Options::hilbert` on the conventional arms. An active mode adds
+//! `hilbert`: the count route's outcome, the degrees it certified, the pairs it dropped as certified
+//! zeros and the pairs its sub-batch cap withheld (over-splitting). These are always-on counters,
+//! so a `--hilbert` attempt is still a timing record.
+//!
+//! `--research-envelope` (#1076's limit check, M35 plan §7.3) lifts the forced signature engine's
+//! size limits for the `sig` arm: 20 M matrix rows and columns and a 48 GiB live-byte budget, inside
+//! the plan's 64 GiB research envelope. A result under it is labelled and never credited as a
+//! default-limit completion (plan §8.3).
 //!
 //! `fallback` (#1134, research only) is `adaptive` followed by one rule. When the dispatcher's
 //! conventional route stops with a size refusal (`TooManyRows`, `TooManyColumns`,
@@ -28,7 +39,8 @@ use zeebra::grobner::{F4Error, ShippingReason, SignatureRoute};
 use zeebra::{
     fields::{BabyBear, KoalaBear, Zp18446744073709551557, Zp2, Zp2147483647, Zp32003},
     grobner::{
-        f4_reported, F4Options, F4Statistics, GradedEngine, ParallelForward, ParallelSymbolic,
+        f4_reported, F4Options, F4Statistics, GradedEngine, HilbertSelection, ParallelForward,
+        ParallelSymbolic,
     },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
@@ -45,6 +57,8 @@ struct Args {
     workers: usize,
     wall: Duration,
     stages: bool,
+    hilbert: HilbertSelection,
+    research_envelope: bool,
 }
 
 fn parse_args(raw: &[String]) -> Result<Args, String> {
@@ -55,6 +69,8 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         workers: 1,
         wall: Duration::from_secs(300),
         stages: false,
+        hilbert: HilbertSelection::Off,
+        research_envelope: false,
     };
     let mut it = raw.iter();
     while let Some(arg) = it.next() {
@@ -66,6 +82,8 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--workers" => a.workers = value()?.parse().map_err(|_| "--workers")?,
             "--wall-s" => a.wall = Duration::from_secs(value()?.parse().map_err(|_| "--wall-s")?),
             "--stages" => a.stages = true,
+            "--hilbert" => a.hilbert = hilbert_selection(&value()?)?,
+            "--research-envelope" => a.research_envelope = true,
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -79,6 +97,17 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         return Err("--workers must be positive".into());
     }
     Ok(a)
+}
+
+fn hilbert_selection(mode: &str) -> Result<HilbertSelection, String> {
+    match mode {
+        "off" => Ok(HilbertSelection::Off),
+        "observe" => Ok(HilbertSelection::Observe),
+        m => match m.strip_prefix("certified-zeros+").map(str::parse) {
+            Some(Ok(slack)) => Ok(HilbertSelection::CertifiedZeros { slack }),
+            _ => Err(format!("unknown Hilbert selection {mode}")),
+        },
+    }
 }
 
 #[derive(Debug)]
@@ -239,6 +268,7 @@ fn options(args: &Args) -> F4Options {
     let shared = F4Options {
         max_wall_time: Some(args.wall),
         measure_stages: args.stages,
+        hilbert: args.hilbert,
         parallel_forward: if w == 1 {
             ParallelForward::Serial
         } else {
@@ -331,13 +361,28 @@ fn fallback<const N: usize, F: FiniteField>(
 
 #[cfg(feature = "research-sigf4")]
 fn sig_options(args: &Args, wall: Duration) -> zeebra::grobner::sigf4::SigF4Options {
-    zeebra::grobner::sigf4::SigF4Options {
+    let shipping = zeebra::grobner::sigf4::SigF4Options {
         max_wall_time: Some(wall),
         workers: args.workers,
         parallel_cascade: args.workers > 1,
         ..zeebra::grobner::sigf4::SigF4Options::default()
+    };
+    if !args.research_envelope {
+        return shipping;
+    }
+    zeebra::grobner::sigf4::SigF4Options {
+        max_matrix_rows: RESEARCH_MATRIX_SIDE,
+        max_matrix_columns: RESEARCH_MATRIX_SIDE,
+        max_live_bytes: Some(RESEARCH_LIVE_BYTES),
+        ..shipping
     }
 }
+
+/// The research envelope's signature-engine limits (`--research-envelope`).
+#[cfg(feature = "research-sigf4")]
+const RESEARCH_MATRIX_SIDE: usize = 20_000_000;
+#[cfg(feature = "research-sigf4")]
+const RESEARCH_LIVE_BYTES: usize = 48 << 30;
 
 fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'static str, Json)> {
     let system = polynomials::<N, F>(record);
@@ -381,6 +426,9 @@ fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'s
             if args.stages {
                 staged.push(("stages", f4_stages(&statistics)));
                 staged.push(("counters", f4_counters(&statistics)));
+            }
+            if args.hilbert.is_active() {
+                staged.push(("hilbert", hilbert_counts(&statistics)));
             }
             let route = statistics
                 .graded_route
@@ -441,6 +489,23 @@ fn f4_stages(s: &F4Statistics) -> Json {
         ("extraction_ns", Json::nanos(st.extraction)),
         ("interreduction_ns", Json::nanos(st.interreduction)),
         ("total_ns", Json::nanos(s.total)),
+    ])
+}
+
+/// What the Hilbert selection did (#1080): always-on, so it costs a timed attempt nothing.
+fn hilbert_counts(s: &F4Statistics) -> Json {
+    let h = &s.hilbert;
+    Json::object([
+        ("count_route", Json::string(format!("{:?}", h.count_route))),
+        ("degrees_certified", Json::size(h.degrees_certified)),
+        ("pairs_certified_zero", Json::size(h.pairs_certified_zero)),
+        ("pairs_withheld", Json::size(h.pairs_withheld)),
+        (
+            "predictions_unavailable",
+            Json::size(h.predictions_unavailable),
+        ),
+        ("batches", Json::size(s.batches)),
+        ("zero_rows", Json::size(s.zero_rows)),
     ])
 }
 
@@ -672,6 +737,51 @@ mod tests {
         }
     }
 
+    /// #1080: `--hilbert` sets the selection on every conventional arm, refuses an unknown mode, and
+    /// an active mode reports the count route's outcome without `--stages`.
+    #[test]
+    fn hilbert_selection_is_selectable_and_reported() {
+        assert_eq!(options(&args(&[]).unwrap()).hilbert, HilbertSelection::Off);
+        for engine in ["f4", "adaptive"] {
+            let a = args(&["--engine", engine, "--hilbert", "certified-zeros+2"]).unwrap();
+            assert_eq!(
+                options(&a).hilbert,
+                HilbertSelection::CertifiedZeros { slack: 2 }
+            );
+        }
+        assert!(args(&["--hilbert", "certified-zeros+x"]).is_err());
+        assert!(args(&["--hilbert", "sometimes"]).is_err());
+        let record = find_record(CATALOG, "x@p31").unwrap();
+        let plain = solve(&record, &args(&[]).unwrap()).unwrap();
+        assert!(field_of(&plain, "hilbert").is_none());
+        let counted = solve(&record, &args(&["--hilbert", "certified-zeros+0"]).unwrap()).unwrap();
+        let hilbert = field_of(&counted, "hilbert").expect("hilbert").to_json();
+        assert!(hilbert.contains("\"count_route\""), "{hilbert}");
+        assert!(hilbert.contains("\"pairs_certified_zero\""), "{hilbert}");
+    }
+
+    /// #1076: `--research-envelope` lifts only the signature engine's size limits; without it the
+    /// `sig` arm keeps the shipping limits.
+    #[cfg(feature = "research-sigf4")]
+    #[test]
+    fn research_envelope_lifts_only_the_signature_limits() {
+        let wall = Duration::from_secs(9);
+        let shipping = sig_options(&args(&["--engine", "sig"]).unwrap(), wall);
+        let default = zeebra::grobner::sigf4::SigF4Options::default();
+        assert_eq!(shipping.max_matrix_rows, default.max_matrix_rows);
+        assert_eq!(shipping.max_live_bytes, default.max_live_bytes);
+        let a = args(&["--engine", "sig", "--research-envelope"]).unwrap();
+        let lifted = sig_options(&a, wall);
+        assert_eq!(lifted.max_matrix_rows, RESEARCH_MATRIX_SIDE);
+        assert_eq!(lifted.max_matrix_columns, RESEARCH_MATRIX_SIDE);
+        assert_eq!(lifted.max_live_bytes, Some(RESEARCH_LIVE_BYTES));
+        assert_eq!(lifted.max_wall_time, Some(wall));
+        assert_eq!(
+            options(&a).max_live_bytes,
+            zeebra::grobner::F4Options::default().max_live_bytes
+        );
+    }
+
     /// #1200: BabyBear and KoalaBear records solve, not refuse.
     #[test]
     fn thirty_one_bit_ao_primes_are_instantiated() {
@@ -718,6 +828,8 @@ mod tests {
                     workers: 1,
                     wall: Duration::from_secs(10),
                     stages: false,
+                    hilbert: HilbertSelection::Off,
+                    research_envelope: false,
                 };
                 let out = solve(&record, &a).unwrap();
                 let get = |k| out.iter().find(|(key, _)| *key == k).unwrap().1.to_json();
