@@ -55,13 +55,15 @@ def main(path):
                 area=area,
                 block=int(r["largest_block"]),
                 sig=sig,
+                control=r["control_degree"] if not r["control_degree"].isdigit() else "done",
             )
         )
 
     print("| kind | k × n_y | done / failed / censored / skipped | F4 degree | control degree "
           "| largest matrix (median) | S median [min, max] | D median [min, max] "
-          "| share median [min, max] | column duplication | sig extents ÷ largest block (median) |")
-    print("|---|---|---|---|---|---:|---:|---:|---:|---:|---:|")
+          "| share median [min, max] | column duplication | sig extents ÷ largest block (median) "
+          "| controls |")
+    print("|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|")
     keys = sorted({k[:3] for k in status}, key=lambda k: (k[0], int(k[1]) + int(k[2]), k[1]))
     for key in keys:
         v = groups.get(key, [])
@@ -69,7 +71,7 @@ def main(path):
             str(status[key + (s,)]) for s in ("done", "failed", "censored", "skipped")
         )
         if not v:
-            print(f"| {key[0]} | {key[1]} × {key[2]} | {counts} | — | — | — | — | — | — | — | — |")
+            print(f"| {key[0]} | {key[1]} × {key[2]} | {counts} | — | — | — | — | — | — | — | — | — |")
             continue
         degrees = ",".join(map(str, sorted({x["degree"] for x in v})))
         cdeg = sorted({int(x["control_degree"]) for x in v if x["control_degree"].isdigit()})
@@ -77,12 +79,15 @@ def main(path):
         area = int(statistics.median(x["area"] for x in v))
         sig = [x["sig"] / x["block"] for x in v if x["sig"]]
         sig = f"{statistics.median(sig):.1f}" if sig else "—"
+        # failed:<F4 error> is a shipping-budget refusal; keep only its kind.
+        controls = Counter(x["control"].split(":")[0] for x in v)
+        controls = ", ".join(f"{n} {c}" for c, n in sorted(controls.items()))
         print(
             f"| {key[0]} | {key[1]} × {key[2]} | {counts} | {degrees} | {cdeg} | {area:,} "
             f"| {fmt([x['s'] for x in v])} "
             f"| {fmt([x['d'] for x in v if x['d']], '{:.0f}')} "
             f"| {fmt([x['share'] for x in v if x['share'] is not None], '{:.3f}')} "
-            f"| {statistics.median(x['dup'] for x in v):.2f} | {sig} |"
+            f"| {statistics.median(x['dup'] for x in v):.2f} | {sig} | {controls} |"
         )
 
     decided = [x for k, v in groups.items() if k[0] == "affine" and k[1:] in BALANCED for x in v]
@@ -95,6 +100,11 @@ def main(path):
     print(f"- Median S = {statistics.median(s):.2f} (needs ≥ 2; disproved below 1.5).")
     print(f"- Median share = {statistics.median(share):.3f} over {len(share)} instances with a "
           f"completed control (needs < 0.75).")
+    for shape in shapes:
+        v = [x["share"] for x in groups[("affine",) + shape] if x["share"] is not None]
+        if v:
+            print(f"  - {'×'.join(shape)}: median {statistics.median(v):.4f} over {len(v)}, "
+                  f"{sum(x >= 0.75 for x in v)} at or above 0.75.")
 
 
 if __name__ == "__main__":
