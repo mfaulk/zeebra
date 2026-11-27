@@ -16,6 +16,7 @@ pub mod live_symbolic;
 pub mod macaulay;
 pub mod matrix_corpus;
 pub mod membership;
+pub mod monte_carlo;
 pub mod observer;
 pub mod options;
 mod packed;
@@ -54,6 +55,9 @@ pub use matrix_corpus::{
 pub use membership::{
     certify_submitted_basis_with_witnesses, verify_ideal_membership, MembershipLimits,
     MembershipStatus, WitnessCertificationReport, WitnessError, WitnessLimit,
+};
+pub use monte_carlo::{
+    MonteCarloBasis, MonteCarloGuarantee, MonteCarloStatistics, MonteCarloZeros,
 };
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
@@ -94,7 +98,7 @@ use crate::{
         pairs::{CriterionCounts, PairQueue},
     },
     poly::MonomialOrder,
-    FiniteField, Monomial, MultivariatePolynomial,
+    FiniteField, KnownOrder, Monomial, MultivariatePolynomial,
 };
 
 /// The reduced Gröbner basis for the given polynomials, with respect to the given monomial order.
@@ -139,6 +143,10 @@ fn graded_engine<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     options: &F4Options,
 ) -> Option<crate::grobner::sigf4::dispatch::Reported<N, F>> {
+    // The Monte Carlo mode is conventional F4's; `f4_into` refuses it on these entry points.
+    if options.monte_carlo.is_some() {
+        return None;
+    }
     match options.graded_engine {
         GradedEngine::Conventional => None,
         GradedEngine::Adaptive => {
@@ -257,6 +265,81 @@ fn new_statistics<F: FiniteField>() -> F4Statistics {
 /// which would put work and failure in one type and make every existing `match` on `F4Error`
 /// stop compiling.
 fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+    observer: &mut O,
+    statistics: &mut F4Statistics,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, F4Error> {
+    if options.monte_carlo.is_some() {
+        return Err(F4Error::InvalidOptions {
+            reason: "monte_carlo is accepted only by f4_monte_carlo, whose result says it is \
+                     probabilistic",
+        });
+    }
+    f4_run(generators, order, options, observer, statistics)
+}
+
+/// The reduced basis under #1184's Monte Carlo zero skipping, with the bound it holds under.
+///
+/// Conventional F4 whatever [`F4Options::graded_engine`] says, with `options.monte_carlo` required.
+/// Every returned element is in the input ideal; the basis is the reduced Gröbner basis with
+/// probability at least `1 - whole_call_bound` under ideal draws. With [`F4Options::certify`] set,
+/// a dropped relation is [`F4Error::CertificationFailed`] instead, and a returned basis is exact.
+/// See `docs/research/monte-carlo-zero-skipping.md`.
+///
+/// ```
+/// use zeebra::{fields::Zp2147483647, grobner::{f4, f4_monte_carlo, F4Options, MonteCarloZeros},
+///     MonomialOrder, MultivariatePolynomial};
+///
+/// let names = ["x", "y", "z"];
+/// let system: Vec<MultivariatePolynomial<3, Zp2147483647>> =
+///     ["x^2 + y*z - 1", "y^2 + x*z - 2", "z^2 + x*y - 3"]
+///         .iter().map(|s| MultivariatePolynomial::parse(s, names).unwrap()).collect();
+/// let order = MonomialOrder::GradedReverseLexicographic;
+/// let options = F4Options { monte_carlo: Some(MonteCarloZeros::new(7)), ..F4Options::default() };
+/// let result = f4_monte_carlo(&system, order, &options).unwrap();
+/// assert!(result.guarantee.whole_call_bound < 1e-12);
+/// assert_eq!(result.basis, f4(&system, order).unwrap());
+/// ```
+///
+/// # Errors
+/// As [`f4_with_options`], and [`F4Error::InvalidOptions`] without `options.monte_carlo`.
+pub fn f4_monte_carlo<const N: usize, F: KnownOrder>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+) -> Result<MonteCarloBasis<N, F>, F4Error> {
+    let Some(configuration) = options.monte_carlo else {
+        return Err(F4Error::InvalidOptions {
+            reason: "f4_monte_carlo needs options.monte_carlo",
+        });
+    };
+    let mut statistics = new_statistics::<F>();
+    let basis = f4_run(
+        generators,
+        order,
+        options,
+        &mut observer::Ignore,
+        &mut statistics,
+    )?;
+    let atom = monte_carlo::atom::<F>();
+    let per_block_bound = monte_carlo::per_block_bound(atom, configuration.zero_tests);
+    Ok(MonteCarloBasis {
+        basis,
+        guarantee: MonteCarloGuarantee {
+            configuration,
+            atom,
+            per_block_bound,
+            whole_call_bound: (per_block_bound * configuration.max_blocks as f64).min(1.0),
+            certified: options.certify,
+        },
+        statistics,
+    })
+}
+
+/// [`f4_into`] without the Monte Carlo refusal.
+fn f4_run<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     generators: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     options: &F4Options,
@@ -551,8 +634,27 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 
         observer.batch(&monic, &batch);
 
-        let outcome =
-            reduce_batch_observed_in(&monic, &batch, order, options, &mut cache, observer)?;
+        // #1184: each batch screens under its own derived seed and what is left of the call's cap.
+        let outcome = match options.monte_carlo {
+            None => reduce_batch_observed_in(&monic, &batch, order, options, &mut cache, observer)?,
+            Some(configuration) => {
+                let batch_options = F4Options {
+                    monte_carlo: Some(configuration.for_batch(
+                        statistics.batches as u64,
+                        statistics.monte_carlo.blocks as u64,
+                    )),
+                    ..options.clone()
+                };
+                reduce_batch_observed_in(
+                    &monic,
+                    &batch,
+                    order,
+                    &batch_options,
+                    &mut cache,
+                    observer,
+                )?
+            }
+        };
         statistics.record(&outcome.statistics);
         // Beside `record`, which is what increments `batches`, so the sequence and the count stay
         // the same length by construction rather than by agreement.
@@ -789,8 +891,8 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     };
 
     // The independent check, when asked for. It is not what makes the computation complete — no
-    // strategy here discards a pair on heuristic grounds, and the deferred set is drained by the
-    // loop's own termination test — but a correctness claim that cannot fail is not a check, and
+    // exact strategy here discards a pair on heuristic grounds, and the deferred set is drained by
+    // the loop's own termination test. Under #1184's Monte Carlo mode it is what makes it exact — but a correctness claim that cannot fail is not a check, and
     // the plan's §8.5 needs its cost reported separately from the work it is checking.
     if options.certify {
         // `certify_f4_output` and not the submitted-basis entry point: this *is* F4's output,

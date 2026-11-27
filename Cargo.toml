@@ -375,6 +375,10 @@ test = true
 required-features = ["external-runners"]
 
 [[example]]
+name = "monte_carlo_zeros"
+required-features = ["external-runners"]
+
+[[example]]
 name = "zeebra_driver"
 test = true
 required-features = ["external-runners"]

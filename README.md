@@ -119,6 +119,9 @@ grobx's 31-bit lane gains and Zeebra does not. The largest residual gap is dense
 evidence: it adds a lane for 31-bit primes (Mersenne31, BabyBear, KoalaBear) and cheaper signature
 pair bookkeeping, and scores conditional mechanisms on a regime gate and a dispatch gate. The
 31-bit lane's kernel, overflow proof and bit-identical tests are in, opt-in and off by default
-([design note](docs/research/31-bit-lane.md)); its timings wait for the bench host.
+([design note](docs/research/31-bit-lane.md)); its timings wait for the bench host. An opt-in
+Monte Carlo zero-skipping mode for conventional F4 (`f4_monte_carlo`) returns a distinct result
+type that carries its stated error bound, and certification makes its output exact
+([note](docs/research/monte-carlo-zero-skipping.md)). It is never a default.
 
 Licensed under the [MIT licence](LICENSE-MIT).
