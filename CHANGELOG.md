@@ -9,6 +9,10 @@ change to `y` may break the public API.
 
 ### Added
 
+- `util::build_profile()`: the concrete cargo profile the artifact was built with
+  (`profile=…; opt-level=…; lto=…; codegen-units=…; debug-assertions=…; rustflags=…`), resolved by
+  a new `build.rs` from `Cargo.toml` and the `CARGO_PROFILE_*` overrides. The comparison harnesses
+  write it into `Environment::build` instead of a hand-typed "release; fat LTO" (#1172).
 - `fglm_to_lex_with_control` and `FglmControl`: a cooperative wall deadline and `AtomicBool`
   cancellation for one FGLM conversion (#1167). One control spans enumeration, operator
   construction (batch workers poll and are joined), every Wiedemann attempt and the classical

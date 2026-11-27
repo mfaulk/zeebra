@@ -333,11 +333,11 @@ impl CompetitiveRecord {
     /// `Environment::comparable` covers machine, cpu and build and **not** `commit` or `policy`,
     /// and both omissions let the board compare two different things.
     ///
-    /// **Commit.** `build` is `release, rustc <version>`, which is identical across every source
-    /// change, so without this a re-measure taken after an engine change pairs against the rows the
-    /// change superseded — a ratio between two versions of this crate, rendered as a ratio against
-    /// a competitor. Caught when a rebase picked up an F4 change and the stale rows were still on
-    /// the board.
+    /// **Commit.** `build` is the resolved profile and `rustc <version>`, which is identical across
+    /// every source change, so without this a re-measure taken after an engine change pairs against
+    /// the rows the change superseded — a ratio between two versions of this crate, rendered as a
+    /// ratio against a competitor. Caught when a rebase picked up an F4 change and the stale rows
+    /// were still on the board.
     ///
     /// **Policy** is where the measurement discipline lives — `many rows per process (no memory
     /// figure)` against `one row per process`. Two different measurements of the same row: one is cold in a fresh

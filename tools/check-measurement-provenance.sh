@@ -21,6 +21,14 @@
 #   **Measured at:** not measured here — …  every figure is quoted from a cited source, so there is
 #                                           no commit of ours to name
 #
+# A second rule, from #1172: a document whose figures come from more than one build profile says so
+# in its header, because "release" stopped naming one build when the release profile changed
+# (#1170). Builds are recognised by the settings a record's `build` stamp spells out
+# (`profile=`, `lto=`, `codegen-units=`, `opt-level=`, as `zeebra::util::build_profile` writes
+# them); two distinct values of any one of them, in a document that publishes a figure, need
+#
+#   **Across profiles:** <which figures came from which profile, and why they may be compared>
+#
 # `Frozen at:` is accepted as the same thing; `docs/research/m27-baseline.md` already spells it that
 # way. The declaration must be in the first 40 lines, because a declaration below the figures is one
 # the reader meets too late.
@@ -54,6 +62,8 @@ readonly FIGURE_RE='^[[:space:]]*\|.*[0-9]([.,][0-9]+)?[[:space:]]?(ms|µs|μs|n
 readonly DECLARATION_RE='\*\*(Measured at|Frozen at):\*\*'
 readonly COMMIT_RE='`[0-9a-f]{7,40}`'
 readonly UNRECORDED_RE='unrecorded|not measured here'
+readonly ACROSS_PROFILES_RE='\*\*Across profiles:\*\*'
+readonly PROFILE_SETTING_RE='(^|[^[:alnum:]_-])(profile|lto|codegen-units|opt-level)=[A-Za-z0-9_"-]+'
 
 # The leading comment block, less its `#` markers: the usage text and the file header are the same
 # text, so neither can drift from the other.
@@ -112,6 +122,15 @@ declaration_state() {
   return 1
 }
 
+# The build-profile settings the document names that take more than one value, one per line.
+conflicting_profile_settings() {
+  grep -oE "$PROFILE_SETTING_RE" -- "$1" |
+    sed -E 's/^[^[:alnum:]]*//; s/"//g' |
+    sort -u |
+    cut -d= -f1 |
+    uniq -d
+}
+
 violations=0
 for file in "${files[@]}"; do
   if [[ ! -r "$file" ]]; then
@@ -137,12 +156,20 @@ for file in "${files[@]}"; do
       violations=$((violations + 1))
       ;;
   esac
+
+  conflicting="$(conflicting_profile_settings "$file" | paste -sd, -)"
+  if [[ -n "$conflicting" ]] && ! head -n "$HEADER_LINES" -- "$file" | grep -qE "$ACROSS_PROFILES_RE"; then
+    printf '%s: mixes figures from more than one build profile (%s differ) and has no **Across profiles:** note (#1172)\n' \
+      "$file" "$conflicting"
+    violations=$((violations + 1))
+  fi
 done
 
 if [[ "$violations" -gt 0 ]]; then
-  printf '\n%s document(s) publish a measurement without saying which commit it came from (#335).\n' \
+  printf '\n%s finding(s): a measurement must say which commit (#335) and, when it mixes builds,\n' \
     "$violations"
-  printf 'Add to the header: **Measured at:** `<sha>` — or `unrecorded`, with the reason.\n'
+  printf 'which profile (#1172) it came from. Add to the header: **Measured at:** `<sha>` — or\n'
+  printf '`unrecorded`, with the reason — and **Across profiles:** <which figure is which build>.\n'
   exit 1
 fi
 

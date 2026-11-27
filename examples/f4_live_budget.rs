@@ -83,11 +83,7 @@ fn run<const N: usize, F: KnownOrder>(name: &str, text: &str, entries: &str, red
         machine: std::env::var("ZEEBRA_MACHINE").unwrap_or_else(|_| "unrecorded".into()),
         cpu: std::env::var("ZEEBRA_AFFINITY").unwrap_or_else(|_| "unrecorded".into()),
         concurrency: 1,
-        build: if cfg!(debug_assertions) {
-            "debug".into()
-        } else {
-            "release; x86-64-v3; fat LTO; codegen-units=1".into()
-        },
+        build: zeebra::util::build_profile().into(),
         policy: format!(
             "{}; reduced batch rows={reduced}; rows={}; columns={}; wall={:?}",
             options.live_budget_policy::<F>(),

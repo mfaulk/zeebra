@@ -367,6 +367,12 @@ function call per field operation. A single codegen unit also makes benchmarks r
 the default of 16, moving code between modules repartitions the crate and can shift a measurement
 for reasons unrelated to the change. The cost is build time.
 
+Which profile a figure was taken under is recorded, not assumed: `build.rs` resolves the concrete
+`lto`, `codegen-units` and `opt-level` of the profile being built, and `zeebra::util::build_profile()`
+returns them for a measurement record's `build` field. Override profile settings through
+`CARGO_PROFILE_<NAME>_<KEY>` or the manifest, which the stamp reads; a `--config` override is only
+partly visible to it (`docs/research/external-comparison-protocol.md` §10.4).
+
 `x86-64-v3` rather than `native`: `native` makes a build artifact depend on the machine that
 produced it, so the same commit benchmarks differently on two machines. To measure with everything
 the local CPU has:
