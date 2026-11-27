@@ -10,14 +10,13 @@
 //! the three were joined, and its finding is that the threshold has to be measured against
 //! Karatsuba rather than inherited from the schoolbook-versus-transform figure.
 //!
-//! **`Mul` covers the first two routes and cannot cover the third.** Since #231 the operator
-//! dispatches to [`multiply_dense`] itself, so a caller who only writes `a * b` already gets
-//! Karatsuba. The transform it cannot reach: finding a domain needs a primitive `2^k`-th root of
-//! unity, which needs [`KnownOrder`] and a source of randomness — neither of which `Mul`'s
-//! signature can carry, and the first of which the Gröbner core deliberately does not require of a
-//! coefficient type (`test_the_grobner_stack_needs_no_field_cardinality` fails to compile if it
-//! starts to). So the transform is reached through the functions here, of which [`multiply`] is
-//! the one to call when the degree is not known in advance.
+//! **`Mul` reaches the transforms too, since #1225**, without `KnownOrder` or randomness:
+//! `poly::univariate::product` takes the in-field root from the deterministic
+//! `FiniteField::transform_root_of_unity` and calls [`multiply_over_domain`], or calls
+//! [`try_multiply_multimodular`], which reads its modulus off `FiniteField::word_residue`. Its
+//! choice is a padding-aware cost comparison anchored at the same two crossovers, so it can keep
+//! Karatsuba on a product this dispatcher would transform. [`multiply`] remains the entry for a
+//! caller with `KnownOrder` and an rng.
 //!
 //! One consequence for the tests below: they compare against
 //! `test_support::schoolbook_product` rather than against `a * b`, because the operator is now one

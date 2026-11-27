@@ -88,8 +88,8 @@
 
 use crate::{
     poly::univariate::{
-        karatsuba::{karatsuba_base_case, multiply_karatsuba},
-        Polynomial, UnivariatePolynomial,
+        karatsuba::karatsuba_base_case, product::multiply_coefficients, Polynomial,
+        UnivariatePolynomial,
     },
     FiniteField,
 };
@@ -99,6 +99,10 @@ use crate::{
 /// `Mul` dispatches to `multiply_karatsuba` above its own base case (#231), so this is a property
 /// of the crate's multiplication rather than a tuning constant — which is why fixing it does not
 /// make the crossover rule two-parameter.
+///
+/// Since #1225 the products above `fft_multiplication_crossover` go through the transform, whose
+/// exponent is lower, so above that degree the rule overstates Newton's cost and errs toward long
+/// division. The crossovers themselves sit far below that degree, where it is still Karatsuba.
 const KARATSUBA_EXPONENT: f64 = 1.584_962_500_721_156;
 
 /// Quotient length at which Newton inversion overtakes long division on a balanced division, for
@@ -347,7 +351,7 @@ fn divide_newton<F: FiniteField>(dividend: &[F], divisor: &[F]) -> (Vec<F>, Vec<
     // r = f - q*g. The product has length exactly `dividend.len()`, and its top `deg g + 1`
     // coefficients cancel the dividend's, so the result is left untrimmed for the caller's `new`.
     let mut remainder = dividend.to_vec();
-    for (slot, c) in remainder.iter_mut().zip(multiply_karatsuba(&q, divisor)) {
+    for (slot, c) in remainder.iter_mut().zip(multiply_coefficients(&q, divisor)) {
         *slot -= c;
     }
     (q, remainder)
@@ -425,7 +429,7 @@ pub(crate) fn inversion_products(k: usize) -> usize {
 
 /// `a * b mod x^k`, as a vector of length exactly `k`.
 fn multiply_truncated<F: FiniteField>(a: &[F], b: &[F], k: usize) -> Vec<F> {
-    let mut product = multiply_karatsuba(&a[..a.len().min(k)], &b[..b.len().min(k)]);
+    let mut product = multiply_coefficients(&a[..a.len().min(k)], &b[..b.len().min(k)]);
     product.resize(k, F::zero());
     product
 }

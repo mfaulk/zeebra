@@ -99,6 +99,15 @@ change to `y` may break the public API.
 
 ### Changed
 
+- The univariate `Mul` (`&a * &b`) and Newton division's products take the transform above
+  `fft_multiplication_crossover` on a field whose `FiniteField::transform_root_of_unity` serves
+  the domain (#1225), so `pow_mod`, `compose_mod`, the subproduct trees and half-GCD get it too.
+  The root is deterministic: no rng, no `KnownOrder` bound, and the same product as Karatsuba.
+  Word primes without the two-adicity (Mersenne-31, `2^64 - 59`) take the multi-modular product
+  (#1226) above its crossover. Unbalanced products are blocked. Binary and extension fields keep
+  Karatsuba.
+  Pinned bench-host figures are still to be taken; the laptop development figures are in
+  `docs/research/fast-univariate.md` §4.1.3.
 - The packed `GF(2)` route (`Gf2Elimination::Auto`, the default, and `Packed`) sweeps its pair
   rows against the reducer block on the residual columns only, the columns no reducer leads,
   instead of at the full width (#1092). Same eligibility, budgets, batch choice and basis. The
