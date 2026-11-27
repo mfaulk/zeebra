@@ -32,7 +32,12 @@ mod polynomial_trait;
 mod pow_mod;
 mod power_permutation;
 mod resultant;
-pub use resultant::{resultant, resultant_at_formal_degrees, resultant_from_coefficients};
+pub use resultant::{
+    half_gcd_resultant_crossover_unstable, resultant, resultant_at_formal_degrees,
+    resultant_from_coefficients, resultant_from_coefficients_auto_unstable,
+    resultant_from_coefficients_half_gcd_unstable, resultant_half_gcd_unstable,
+    resultant_half_gcd_with_base_case_unstable,
+};
 mod root_stream;
 pub use root_stream::{RootStream, RootStreamCounters, RootStreamError};
 mod roots;

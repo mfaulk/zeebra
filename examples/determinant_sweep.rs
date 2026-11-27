@@ -113,7 +113,8 @@ fn kernel_flag() -> DeterminantKernel {
     match args.get(at + 1).map(String::as_str) {
         Some("dense") | None => DeterminantKernel::Dense,
         Some("euclidean") => DeterminantKernel::Euclidean,
-        Some(other) => panic!("--kernel takes dense or euclidean, not {other}"),
+        Some("half-gcd") => DeterminantKernel::HalfGcd,
+        Some(other) => panic!("--kernel takes dense, euclidean or half-gcd, not {other}"),
     }
 }
 
@@ -331,12 +332,12 @@ fn main() {
     // Stated before any figure: the two kernels differ by three orders of magnitude at the same
     // order, so a table that does not name its kernel is a number nothing can be compared with.
     println!("Kernel: **{kernel}**.\n");
-    if kernel == DeterminantKernel::Euclidean {
+    if kernel != DeterminantKernel::Dense {
         println!(
             "The matrix and live-set columns below are the **dense** footprint, reported for \
              reference only: the remainder sequence never forms the Sylvester matrix and holds two \
              coefficient vectors instead. The predicted-wall column is likewise the cubic dense \
-             anchor and does **not** model this kernel — it is `O(n²)`, so expect the prediction \
+             anchor and does **not** model this kernel — it is `O(n²)` or less, so expect the prediction \
              to overshoot by orders of magnitude.\n"
         );
     }

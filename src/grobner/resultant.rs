@@ -87,8 +87,8 @@ use crate::{
     interpolate,
     linalg::Matrix,
     poly::{
-        lagrange_interpolate, resultant_from_coefficients, Monomial, Polynomial,
-        UnivariatePolynomial,
+        lagrange_interpolate, resultant_from_coefficients,
+        resultant_from_coefficients_auto_unstable, Monomial, Polynomial, UnivariatePolynomial,
     },
     FFTDomain, FiniteField, KnownOrder, MultivariatePolynomial,
 };
@@ -1028,6 +1028,7 @@ fn determinant_of<F: FiniteField>(a: &[F], b: &[F], kernel: DeterminantKernel) -
     match kernel {
         DeterminantKernel::Dense => sylvester_determinant_of(a, b),
         DeterminantKernel::Euclidean => resultant_from_coefficients(a, b),
+        DeterminantKernel::HalfGcd => resultant_from_coefficients_auto_unstable(a, b),
     }
 }
 
@@ -1048,6 +1049,17 @@ pub enum DeterminantKernel {
 
     /// `Res(f, g)` down the polynomial remainder sequence. `O(n²)` per evaluation.
     Euclidean,
+
+    /// `Res(f, g)` from the remainder sequence's degrees and leading coefficients, by half-GCD,
+    /// once both true degrees reach `half_gcd_resultant_crossover_unstable` (2 048, 1 536 or
+    /// 1 024 for 4-byte, 8-byte or wider elements), and as [`DeterminantKernel::Euclidean`] below
+    /// it. `O(M(n) log n)` per evaluation above the crossover, `M(n)` being the cost of a
+    /// degree-`n` product (#1207).
+    ///
+    /// The degree corrections are the Euclidean kernel's own code, so the specialization trap is
+    /// closed the same way; only the exact-degree resultant underneath differs. Not the default:
+    /// the crossover lies above the operand degrees the registered rows reach.
+    HalfGcd,
 }
 
 impl Display for DeterminantKernel {
@@ -1055,6 +1067,7 @@ impl Display for DeterminantKernel {
         match self {
             Self::Dense => write!(formatter, "dense"),
             Self::Euclidean => write!(formatter, "euclidean"),
+            Self::HalfGcd => write!(formatter, "half-gcd"),
         }
     }
 }
@@ -1072,6 +1085,11 @@ fn determinant_at<F: FiniteField>(
     match kernel {
         DeterminantKernel::Dense => sylvester_determinant(fc, gc, at),
         DeterminantKernel::Euclidean => sylvester_resultant_euclid(fc, gc, at),
+        DeterminantKernel::HalfGcd => {
+            let a: Vec<F> = fc.iter().map(|c| c.eval(&at)).collect();
+            let b: Vec<F> = gc.iter().map(|c| c.eval(&at)).collect();
+            resultant_from_coefficients_auto_unstable(&a, &b)
+        }
     }
 }
 
@@ -1991,7 +2009,11 @@ mod tests {
         let g = random_bivariate(1, 5, &mut rng);
         let at: Vec<Koala> = (1..=40u64).map(Koala::new).collect();
         // Both kernels, because the indexed hand-out is shared and neither may depend on width.
-        for kernel in [DeterminantKernel::Dense, DeterminantKernel::Euclidean] {
+        for kernel in [
+            DeterminantKernel::Dense,
+            DeterminantKernel::Euclidean,
+            DeterminantKernel::HalfGcd,
+        ] {
             let (serial, _) =
                 super::time_sylvester_determinants(&f, &g, 1, &at, 1, kernel).expect("ok");
             for workers in [8usize, 32] {
@@ -2021,6 +2043,8 @@ mod tests {
             let dense = super::sylvester_determinant(&fc, &gc, at);
             let euclid = super::sylvester_resultant_euclid(&fc, &gc, at);
             assert_eq!(dense, euclid, "at x = {i}");
+            let half = super::determinant_at(&fc, &gc, at, DeterminantKernel::HalfGcd);
+            assert_eq!(dense, half, "half-GCD at x = {i}");
             if fc[fc.len() - 1].eval(&at).is_zero() {
                 saw_specialization = true;
             }
@@ -2040,10 +2064,16 @@ mod tests {
             let gc = super::coefficients_in(&g, 1);
             for i in 0..8u64 {
                 let at = Koala::new(i * 7 + 1);
+                let dense = super::sylvester_determinant(&fc, &gc, at);
                 assert_eq!(
-                    super::sylvester_determinant(&fc, &gc, at),
+                    dense,
                     super::sylvester_resultant_euclid(&fc, &gc, at),
                     "degree {degree}, at {i}"
+                );
+                assert_eq!(
+                    dense,
+                    super::determinant_at(&fc, &gc, at, DeterminantKernel::HalfGcd),
+                    "half-GCD, degree {degree}, at {i}"
                 );
             }
         }
@@ -2164,7 +2194,11 @@ mod tests {
         let gc = coefficient_run::<G>(3, 0x0598_0104);
         let at: Vec<G> = (0..37u64).map(G::new).collect();
 
-        for kernel in [DeterminantKernel::Dense, DeterminantKernel::Euclidean] {
+        for kernel in [
+            DeterminantKernel::Dense,
+            DeterminantKernel::Euclidean,
+            DeterminantKernel::HalfGcd,
+        ] {
             // The per-point reference, which is what the sweep did before #598.
             let expected: Vec<G> = at
                 .iter()

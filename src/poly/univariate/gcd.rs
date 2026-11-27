@@ -423,6 +423,80 @@ struct Reduced<F: FiniteField> {
     matrix: Option<Transition<F>>,
     c: UnivariatePolynomial<F>,
     d: UnivariatePolynomial<F>,
+    /// Whether `d` is a remainder this reduction produced and did not record in its trace, because
+    /// it fell below the reduction's target. The caller records it if it clears the caller's own,
+    /// lower target. False when `d` is the input `b`, which whoever produced it already recorded.
+    fresh: bool,
+}
+
+/// Where a traced reduction writes `(degree, leading coefficient)` of each remainder it produces.
+///
+/// The degrees are absolute: a truncated recursion works on `p / x^offset`, so it adds `offset`
+/// back. A remainder is recorded only by a reduction whose target it clears, which is where its
+/// top coefficients are known to be those of the full-length remainder: the lift adds
+/// `M * (a_low, b_low)`, whose degree stays below that target.
+struct Tracer<'t, F: FiniteField> {
+    offset: i64,
+    out: &'t mut Vec<(i64, F)>,
+}
+
+impl<F: FiniteField> Tracer<'_, F> {
+    fn reborrow(&mut self) -> Tracer<'_, F> {
+        Tracer {
+            offset: self.offset,
+            out: &mut *self.out,
+        }
+    }
+
+    fn shifted(self, by: usize) -> Self {
+        Tracer {
+            offset: self.offset + by as i64,
+            out: self.out,
+        }
+    }
+
+    fn record(&mut self, p: &UnivariatePolynomial<F>) {
+        self.out.push((
+            signed_degree(p) + self.offset,
+            *p.coefficients().last().unwrap(),
+        ));
+    }
+}
+
+/// `(degree, leading coefficient)` of every nonzero entry of the remainder sequence of `(a, b)`,
+/// `a` and `b` included, by half-GCD with a classical base case of `base_case` degrees.
+///
+/// This is all a resultant needs from the sequence: `Res(a, b)` is a product of powers of those
+/// leading coefficients, with exponents and signs given by the degrees.
+///
+/// # Panics
+/// If `a` or `b` is zero, or `deg a < deg b`.
+pub(crate) fn remainder_degrees_and_leads<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    base_case: i64,
+) -> Vec<(i64, F)> {
+    assert!(
+        !a.is_zero() && !b.is_zero(),
+        "both operands must be nonzero"
+    );
+    assert!(signed_degree(a) >= signed_degree(b), "deg a < deg b");
+    let mut out = Vec::new();
+    let mut tracer = Tracer {
+        offset: 0,
+        out: &mut out,
+    };
+    tracer.record(a);
+    tracer.record(b);
+    reduce_traced(
+        a,
+        b,
+        signed_degree(a),
+        base_case.max(1),
+        false,
+        Some(tracer),
+    );
+    out
 }
 
 impl<F: FiniteField> Reduced<F> {
@@ -440,6 +514,7 @@ impl<F: FiniteField> Reduced<F> {
             c: shifted_sum(&self.c, shift, &low_c),
             d: shifted_sum(&self.d, shift, &low_d),
             matrix: Some(matrix),
+            fresh: self.fresh,
         }
     }
 }
@@ -483,6 +558,18 @@ fn reduce<F: FiniteField>(
     base_case: i64,
     want_matrix: bool,
 ) -> Reduced<F> {
+    reduce_traced(a, b, budget, base_case, want_matrix, None)
+}
+
+/// [`reduce`], recording each remainder it produces into `trace` when one is given.
+fn reduce_traced<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    budget: i64,
+    base_case: i64,
+    want_matrix: bool,
+    mut trace: Option<Tracer<'_, F>>,
+) -> Reduced<F> {
     let degree = signed_degree(a);
     let target = degree - budget;
 
@@ -492,17 +579,22 @@ fn reduce<F: FiniteField>(
             matrix: want_matrix.then(Transition::identity),
             c: a.clone(),
             d: b.clone(),
+            fresh: false,
         };
     }
 
     if budget <= base_case {
-        return classical_reduce(a, b, target, want_matrix);
+        return classical_reduce(a, b, target, want_matrix, trace);
     }
 
     // The truncation below sizes itself off `deg a`, so it needs `deg a >= deg b`. Otherwise the
     // sequence's first step has quotient zero and only swaps the pair: take it here, as the
     // column swap it is, and reduce `(b, a)` to the same target.
     if signed_degree(b) > degree {
+        // The swap is not a remainder step, so a trace would miss `a` as the sequence's third
+        // entry. Only the top of a reduction can land here, and the traced entry point orders
+        // its operands.
+        debug_assert!(trace.is_none(), "a traced reduction needs deg a >= deg b");
         let mut swapped = reduce(b, a, signed_degree(b) - target, base_case, want_matrix);
         if let Some(matrix) = &mut swapped.matrix {
             for row in &mut matrix.rows {
@@ -523,12 +615,31 @@ fn reduce<F: FiniteField>(
         mut matrix,
         mut c,
         mut d,
-    } = reduce_truncated(a, b, shift, half, base_case, want_matrix);
+        fresh,
+    } = reduce_truncated(
+        a,
+        b,
+        shift,
+        half,
+        base_case,
+        want_matrix,
+        trace.as_mut().map(Tracer::reborrow),
+    );
     if !want_matrix {
         matrix = None;
     }
     if signed_degree(&d) < target {
-        return Reduced { matrix, c, d };
+        return Reduced {
+            matrix,
+            c,
+            d,
+            fresh,
+        };
+    }
+    if fresh {
+        if let Some(trace) = &mut trace {
+            trace.record(&d);
+        }
     }
 
     // One full-length division step, to cross the boundary the truncation could not see past.
@@ -539,7 +650,15 @@ fn reduce<F: FiniteField>(
     c = d;
     d = remainder;
     if signed_degree(&d) < target {
-        return Reduced { matrix, c, d };
+        return Reduced {
+            matrix,
+            c,
+            d,
+            fresh: true,
+        };
+    }
+    if let Some(trace) = &mut trace {
+        trace.record(&d);
     }
 
     // Second half, on what is left of the budget after the first half and the step.
@@ -549,10 +668,15 @@ fn reduce<F: FiniteField>(
         // Unreachable: control only arrives here with `deg d >= target`, hence
         // `deg c > deg d >= target`, hence `spent = deg a - deg c < budget`. Kept as a guard
         // because the alternative to an impossible branch here is an infinite recursion.
-        return Reduced { matrix, c, d };
+        return Reduced {
+            matrix,
+            c,
+            d,
+            fresh: false,
+        };
     }
     let shift = (signed_degree(&c) - 2 * remaining).max(0) as usize;
-    let tail = reduce_truncated(&c, &d, shift, remaining, base_case, want_matrix);
+    let tail = reduce_truncated(&c, &d, shift, remaining, base_case, want_matrix, trace);
     Reduced {
         matrix: matrix.map(|head| {
             tail.matrix
@@ -562,6 +686,7 @@ fn reduce<F: FiniteField>(
         }),
         c: tail.c,
         d: tail.d,
+        fresh: tail.fresh,
     }
 }
 
@@ -573,16 +698,18 @@ fn reduce_truncated<F: FiniteField>(
     budget: i64,
     base_case: i64,
     want_matrix: bool,
+    trace: Option<Tracer<'_, F>>,
 ) -> Reduced<F> {
     if shift == 0 {
-        return reduce(a, b, budget, base_case, want_matrix);
+        return reduce_traced(a, b, budget, base_case, want_matrix, trace);
     }
-    reduce(
+    reduce_traced(
         &drop_low(a, shift),
         &drop_low(b, shift),
         budget,
         base_case,
         true,
+        trace.map(|t| t.shifted(shift)),
     )
     .lift(a, b, shift)
 }
@@ -593,10 +720,12 @@ fn classical_reduce<F: FiniteField>(
     b: &UnivariatePolynomial<F>,
     target: i64,
     want_matrix: bool,
+    mut trace: Option<Tracer<'_, F>>,
 ) -> Reduced<F> {
     let mut matrix = want_matrix.then(Transition::identity);
     let mut c = a.clone();
     let mut d = b.clone();
+    let mut fresh = false;
     while signed_degree(&d) >= target {
         let (quotient, remainder) = c.div_with_remainder(&d);
         if let Some(matrix) = &mut matrix {
@@ -604,8 +733,19 @@ fn classical_reduce<F: FiniteField>(
         }
         c = d;
         d = remainder;
+        fresh = true;
+        if signed_degree(&d) >= target {
+            if let Some(trace) = &mut trace {
+                trace.record(&d);
+            }
+        }
     }
-    Reduced { matrix, c, d }
+    Reduced {
+        matrix,
+        c,
+        d,
+        fresh,
+    }
 }
 
 /// Computes the monic GCD using recursive half-GCD with a classical base case.

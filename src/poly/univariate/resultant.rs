@@ -14,7 +14,126 @@
 //! coefficients vanish. So the asymptotic win is available without the case analysis being left to
 //! the caller. See `docs/research/structured-sylvester.md`.
 
+use super::gcd::{remainder_degrees_and_leads, HALF_GCD_BASE_CASE};
 use crate::{FiniteField, Polynomial, UnivariatePolynomial};
+
+/// `Res(f, g)` by half-GCD at every degree: the remainder sequence's degrees and leading
+/// coefficients, which are all the resultant needs, without forming its remainders at full length.
+///
+/// The same value as [`resultant`], in `O(M(d) log d)` field operations rather than `O(d²)`, where
+/// `M(d)` is the cost of a degree-`d` product. Which wins at a given degree is measured, not assumed:
+/// see `docs/research/fast-univariate.md`.
+pub fn resultant_half_gcd_unstable<F: FiniteField>(
+    f: &UnivariatePolynomial<F>,
+    g: &UnivariatePolynomial<F>,
+) -> F {
+    resultant_half_gcd_with_base_case_unstable(f, g, HALF_GCD_BASE_CASE as u32)
+}
+
+/// [`resultant_half_gcd_unstable`] with the classical base case's budget as a parameter, so tests
+/// can force the recursion at small degrees and a sweep can tune it.
+pub fn resultant_half_gcd_with_base_case_unstable<F: FiniteField>(
+    f: &UnivariatePolynomial<F>,
+    g: &UnivariatePolynomial<F>,
+    base_case: u32,
+) -> F {
+    if f.is_zero() || g.is_zero() {
+        return F::zero();
+    }
+    // `Res(f, g) = (−1)^{deg f · deg g} Res(g, f)`, so the operands can be put in the order the
+    // trace needs.
+    let (a, b, flip) = if f.degree() < g.degree() {
+        (g, f, (f.degree() * g.degree()) % 2 == 1)
+    } else {
+        (f, g, false)
+    };
+    let value = resultant_of_trace(&remainder_degrees_and_leads(a, b, i64::from(base_case)));
+    if flip {
+        -value
+    } else {
+        value
+    }
+}
+
+/// `Res(r_0, r_1)` from `(deg r_i, lc r_i)` over the whole nonzero remainder sequence.
+///
+/// Each step contributes `(−1)^{d_{i−1} d_i} · lc(r_i)^{d_{i−1} − d_{i+1}}`, the recurrence
+/// [`resultant`] applies, and the sequence ending at a nonconstant remainder means a shared factor.
+fn resultant_of_trace<F: FiniteField>(trace: &[(i64, F)]) -> F {
+    let last = trace.len() - 1;
+    if trace[last].0 > 0 {
+        return F::zero();
+    }
+    let mut accumulated = F::one();
+    for i in 1..=last {
+        let (previous, (degree, lead)) = (trace[i - 1].0, trace[i]);
+        let next = if i < last { trace[i + 1].0 } else { 0 };
+        if (previous * degree) % 2 == 1 {
+            accumulated = -accumulated;
+        }
+        accumulated *= lead.pow((previous - next) as u128);
+    }
+    accumulated
+}
+
+/// [`resultant_from_coefficients`] with the exact-degree resultant taken by half-GCD.
+///
+/// The formal-degree corrections are the same code [`resultant_from_coefficients`] runs, so the
+/// specialization trap is closed identically; only the kernel under them differs.
+///
+/// # Panics
+/// If either slice is empty, as [`resultant_from_coefficients`] does.
+pub fn resultant_from_coefficients_half_gcd_unstable<F: FiniteField>(a: &[F], b: &[F]) -> F {
+    assert!(
+        !a.is_empty() && !b.is_empty(),
+        "a formal degree needs at least a constant term"
+    );
+    formal_determinant(a, a.len() - 1, b, b.len() - 1, exact_resultant_half_gcd)
+}
+
+/// Smaller-operand degree from which the half-GCD resultant beats the Euclidean one, by element
+/// width: at most 4 bytes, 5 to 8, and wider. Measured by `examples/resultant_crossover.rs` on an
+/// unpinned M4 Pro (#1207); below these, half-GCD's base case allocates per step where the
+/// Euclidean kernel runs in two buffers, and loses by 5–30%.
+const HALF_GCD_RESULTANT_CROSSOVER: [usize; 3] = [2048, 1536, 1024];
+
+/// The smaller-operand degree from which [`resultant_from_coefficients_auto_unstable`] takes
+/// half-GCD for `F`.
+pub fn half_gcd_resultant_crossover_unstable<F: FiniteField>() -> usize {
+    match std::mem::size_of::<F>() {
+        0..=4 => HALF_GCD_RESULTANT_CROSSOVER[0],
+        5..=8 => HALF_GCD_RESULTANT_CROSSOVER[1],
+        _ => HALF_GCD_RESULTANT_CROSSOVER[2],
+    }
+}
+
+/// [`resultant_from_coefficients`], taking half-GCD once both true degrees reach
+/// [`half_gcd_resultant_crossover_unstable`] and the Euclidean kernel below it.
+///
+/// # Panics
+/// If either slice is empty, as [`resultant_from_coefficients`] does.
+pub fn resultant_from_coefficients_auto_unstable<F: FiniteField>(a: &[F], b: &[F]) -> F {
+    assert!(
+        !a.is_empty() && !b.is_empty(),
+        "a formal degree needs at least a constant term"
+    );
+    formal_determinant(a, a.len() - 1, b, b.len() - 1, exact_resultant_auto)
+}
+
+fn exact_resultant_auto<F: FiniteField>(a: &[F], b: &[F]) -> F {
+    if a.len().min(b.len()) > half_gcd_resultant_crossover_unstable::<F>() {
+        exact_resultant_half_gcd(a, b)
+    } else {
+        exact_resultant(a, b)
+    }
+}
+
+fn exact_resultant_half_gcd<F: FiniteField>(a: &[F], b: &[F]) -> F {
+    resultant_half_gcd_unstable(
+        &UnivariatePolynomial::from_coefficients(a.to_vec()),
+        &UnivariatePolynomial::from_coefficients(b.to_vec()),
+    )
+}
 
 /// `Res(f, g)`, the resultant of two univariate polynomials, by the Euclidean algorithm.
 ///
@@ -202,12 +321,18 @@ pub fn resultant_from_coefficients<F: FiniteField>(a: &[F], b: &[F]) -> F {
         !a.is_empty() && !b.is_empty(),
         "a formal degree needs at least a constant term"
     );
-    formal_determinant(a, a.len() - 1, b, b.len() - 1)
+    formal_determinant(a, a.len() - 1, b, b.len() - 1, exact_resultant)
 }
 
 /// [`resultant_from_coefficients`] with the formal degrees passed explicitly, so the recursion can
-/// lower them without reallocating the caller's slices.
-fn formal_determinant<F: FiniteField>(a: &[F], n: usize, b: &[F], m: usize) -> F {
+/// lower them without reallocating the caller's slices, and the exact-degree kernel as `exact`.
+fn formal_determinant<F: FiniteField>(
+    a: &[F],
+    n: usize,
+    b: &[F],
+    m: usize,
+    exact: fn(&[F], &[F]) -> F,
+) -> F {
     // `Syl_{n,0}` is `n` rows of the constant `lc(b)` down the diagonal, and `Syl_{0,m}` likewise.
     // This also covers the empty matrix at `n = m = 0`, whose determinant is one.
     if m == 0 {
@@ -231,7 +356,8 @@ fn formal_determinant<F: FiniteField>(a: &[F], n: usize, b: &[F], m: usize) -> F
     }
     if n_true < n {
         let deficit = n - n_true;
-        let corrected = b[m].pow(deficit as u128) * formal_determinant(&a_true, n_true, b, m);
+        let corrected =
+            b[m].pow(deficit as u128) * formal_determinant(&a_true, n_true, b, m, exact);
         return if (m * deficit) % 2 == 1 {
             -corrected
         } else {
@@ -240,16 +366,19 @@ fn formal_determinant<F: FiniteField>(a: &[F], n: usize, b: &[F], m: usize) -> F
     }
     if m_true < m {
         let deficit = m - m_true;
-        return a[n].pow(deficit as u128) * formal_determinant(a, n, &b_true, m_true);
+        return a[n].pow(deficit as u128) * formal_determinant(a, n, &b_true, m_true, exact);
     }
 
-    exact_resultant(&a_true, &b_true)
+    exact(&a_true, &b_true)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        remainder_in_place, resultant, resultant_at_formal_degrees, resultant_from_coefficients,
+        half_gcd_resultant_crossover_unstable, remainder_in_place, resultant,
+        resultant_at_formal_degrees, resultant_from_coefficients,
+        resultant_from_coefficients_auto_unstable, resultant_from_coefficients_half_gcd_unstable,
+        resultant_half_gcd_unstable, resultant_half_gcd_with_base_case_unstable,
     };
     use crate::{
         fields::Zp2147483647,
@@ -501,6 +630,186 @@ mod tests {
             steps > 2,
             "the sequence should run several steps, ran {steps}"
         );
+    }
+
+    /// A random polynomial of exactly `degree`.
+    fn random_poly<G: FiniteField>(degree: usize, rng: &mut StdRng) -> UnivariatePolynomial<G> {
+        let mut coefficients: Vec<G> = (0..=degree).map(|_| G::random(rng)).collect();
+        while coefficients[degree].is_zero() {
+            coefficients[degree] = G::random(rng);
+        }
+        UnivariatePolynomial::new(&coefficients)
+    }
+
+    /// Half-GCD against the Euclidean resultant over `G`, at base cases small enough that the
+    /// recursion, its truncations and the middle step all run at these degrees.
+    fn check_half_gcd_against_euclid<G: FiniteField>(seed: u64, max_degree: usize) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut zeros = 0usize;
+        for degree_f in 0..=max_degree {
+            for degree_g in [
+                0,
+                1,
+                degree_f / 3,
+                degree_f.saturating_sub(1),
+                degree_f,
+                degree_f + 3,
+            ] {
+                let mut f = random_poly::<G>(degree_f, &mut rng);
+                let mut g = random_poly::<G>(degree_g, &mut rng);
+                // Every fourth pair shares a planted factor, so the zero exit is exercised.
+                if (degree_f + degree_g) % 4 == 0 {
+                    let shared = random_poly::<G>(1 + degree_f % 3, &mut rng);
+                    f = &f * &shared;
+                    g = &g * &shared;
+                }
+                let expected = resultant(&f, &g);
+                zeros += usize::from(expected.is_zero());
+                for base_case in [1, 2, 3, 5, 64] {
+                    assert_eq!(
+                        resultant_half_gcd_with_base_case_unstable(&f, &g, base_case),
+                        expected,
+                        "deg f = {degree_f}, deg g = {}, base case {base_case}",
+                        g.degree()
+                    );
+                }
+            }
+        }
+        assert!(zeros > 0, "no pair exercised the zero exit");
+    }
+
+    /// Shared factors, planted explicitly: the sequence ends at a nonconstant remainder.
+    fn check_planted_common_factor<G: FiniteField>(seed: u64) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        for shared_degree in 1..=6 {
+            let shared = random_poly::<G>(shared_degree, &mut rng);
+            let f = &random_poly::<G>(17, &mut rng) * &shared;
+            let g = &random_poly::<G>(11, &mut rng) * &shared;
+            for base_case in [1, 2, 7] {
+                assert!(resultant_half_gcd_with_base_case_unstable(&f, &g, base_case).is_zero());
+            }
+        }
+    }
+
+    #[test]
+    fn half_gcd_resultant_matches_euclid_over_a_31_bit_prime() {
+        check_half_gcd_against_euclid::<F>(1207, 40);
+        check_planted_common_factor::<F>(1);
+    }
+
+    #[test]
+    fn half_gcd_resultant_matches_euclid_in_characteristic_two() {
+        // Tiny fields make shared factors and multi-degree drops frequent by chance. In
+        // characteristic 2 a sign error is invisible, so GF(3) is here to catch one.
+        check_half_gcd_against_euclid::<crate::fields::PrimeFieldElement64<2>>(2, 30);
+        check_half_gcd_against_euclid::<crate::fields::PrimeFieldElement64<3>>(3, 30);
+    }
+
+    #[test]
+    fn half_gcd_resultant_matches_euclid_over_wide_and_extension_fields() {
+        check_half_gcd_against_euclid::<crate::fields::Bn254Fr>(4, 24);
+        check_half_gcd_against_euclid::<crate::fields::KoalaBear>(5, 24);
+        check_planted_common_factor::<crate::fields::Bn254Fr>(6);
+        type Gf13Pow4 = crate::fields::ExtensionFieldElement<13, 4, crate::fields::Modulus13Pow4>;
+        check_half_gcd_against_euclid::<Gf13Pow4>(7, 16);
+    }
+
+    /// Sparse operands, whose sequences drop many degrees in one step: `x^n - 1` against `x^k - 1`
+    /// and `x^n + x` against `x^k + 1`. Exercises steps whose quotient spans a recursion boundary.
+    #[test]
+    fn half_gcd_resultant_matches_euclid_on_large_degree_drops() {
+        for n in 2..=48usize {
+            for k in 1..n {
+                let mut a = vec![F::zero(); n + 1];
+                a[n] = F::one();
+                a[0] = -F::one();
+                let mut b = vec![F::zero(); k + 1];
+                b[k] = F::one();
+                b[0] = F::new(5);
+                a[1] += F::new(3);
+                let (a, b) = (UnivariatePolynomial::new(&a), UnivariatePolynomial::new(&b));
+                for base_case in [1, 2, 4] {
+                    assert_eq!(
+                        resultant_half_gcd_with_base_case_unstable(&a, &b, base_case),
+                        resultant(&a, &b),
+                        "n = {n}, k = {k}, base case {base_case}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Above the default base case, so the shipped configuration's recursion runs too.
+    #[test]
+    fn half_gcd_resultant_matches_euclid_above_the_default_base_case() {
+        let mut rng = StdRng::seed_from_u64(64);
+        for (degree_f, degree_g) in [(300, 299), (257, 128), (400, 1), (200, 200)] {
+            let f = random_poly::<F>(degree_f, &mut rng);
+            let g = random_poly::<F>(degree_g, &mut rng);
+            assert_eq!(resultant_half_gcd_unstable(&f, &g), resultant(&f, &g));
+            assert_eq!(resultant_half_gcd_unstable(&g, &f), resultant(&g, &f));
+        }
+    }
+
+    #[test]
+    fn half_gcd_resultant_on_zero_and_constant_arguments() {
+        let f = poly(&[1, 2, 3]);
+        assert_eq!(resultant_half_gcd_unstable(&f, &poly(&[5])), F::new(25));
+        assert_eq!(resultant_half_gcd_unstable(&poly(&[5]), &f), F::new(25));
+        assert_eq!(
+            resultant_half_gcd_unstable(&poly(&[5]), &poly(&[7])),
+            F::one()
+        );
+        assert!(resultant_half_gcd_unstable(&poly(&[0]), &f).is_zero());
+        assert!(resultant_half_gcd_unstable(&f, &poly(&[0])).is_zero());
+    }
+
+    /// The half-GCD coefficient form agrees with the Euclidean one over the full formal-degree
+    /// sweep, degree drops on either side included: the specialization trap is closed the same way.
+    #[test]
+    fn half_gcd_coefficient_form_agrees_over_planted_degree_drops() {
+        let mut rng = StdRng::seed_from_u64(12075);
+        for formal_a in 0..=20usize {
+            for formal_b in 0..=20usize {
+                for drop in [(0, 0), (1, 0), (0, 1), (3, 0), (0, 2), (1, 1)] {
+                    let mut a: Vec<F> = (0..=formal_a).map(|_| F::random(&mut rng)).collect();
+                    let mut b: Vec<F> = (0..=formal_b).map(|_| F::random(&mut rng)).collect();
+                    for slot in a.iter_mut().rev().take(drop.0) {
+                        *slot = F::zero();
+                    }
+                    for slot in b.iter_mut().rev().take(drop.1) {
+                        *slot = F::zero();
+                    }
+                    assert_eq!(
+                        resultant_from_coefficients_half_gcd_unstable(&a, &b),
+                        resultant_from_coefficients(&a, &b),
+                        "formal ({formal_a}, {formal_b}), drop {drop:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The dispatched form agrees with the Euclidean one either side of each width tier's
+    /// crossover, so both of its branches run.
+    #[test]
+    fn auto_coefficient_form_agrees_across_the_crossover() {
+        fn check<G: FiniteField>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let crossover = half_gcd_resultant_crossover_unstable::<G>();
+            for degree in [crossover - 1, crossover] {
+                let a: Vec<G> = (0..=degree + 1).map(|_| G::random(&mut rng)).collect();
+                let b: Vec<G> = (0..=degree).map(|_| G::random(&mut rng)).collect();
+                assert_eq!(
+                    resultant_from_coefficients_auto_unstable(&a, &b),
+                    resultant_from_coefficients(&a, &b),
+                    "degree {degree}"
+                );
+            }
+        }
+        check::<crate::fields::KoalaBear>(1);
+        check::<crate::fields::Zp18446744069414584321>(2);
+        check::<crate::fields::Bn254Fr>(3);
     }
 
     /// The two implementations agree over every combination of formal degrees up to 2 on a
