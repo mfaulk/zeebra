@@ -1,39 +1,51 @@
-//! The univariate layer's product dispatcher: schoolbook, Karatsuba, then the transform (#1225).
+//! The univariate layer's product dispatcher: schoolbook, Karatsuba, then a transform (#1225).
 //!
-//! `&a * &b` and the Newton division's slice products come here. Below the measured crossover, and
-//! over every field the transform cannot serve, the route is [`multiply_karatsuba`] exactly as
-//! before. Above it, over a field whose [`FiniteField::transform_root_of_unity`] serves the
-//! domain, the product goes through [`multiply_over_domain`], the same entry point
-//! `fft::multiply` uses, so an improvement to the transform reaches both.
+//! `&a * &b` and the Newton division's slice products come here. Below the measured crossovers,
+//! and over every field no transform serves, the route is [`multiply_karatsuba`] exactly as before.
+//! Above them there are two transforms, the same two `fft::multiply` has:
+//!
+//! - over a field whose [`FiniteField::transform_root_of_unity`] serves the domain,
+//!   [`multiply_over_domain`] in the field itself;
+//! - over a word-size prime field without such a root — Mersenne-31, `2^64 - 59` — the
+//!   multi-modular product [`try_multiply_multimodular`] (#1226), which transforms over auxiliary
+//!   NTT primes and recombines by CRT.
+//!
+//! Both are `fft`'s own entry points, so an improvement there reaches the operator too.
 //!
 //! **No `KnownOrder` and no randomness.** `Mul`'s signature carries neither, which is what kept the
-//! operator off the transform until now (`docs/research/fast-univariate.md` §4.1). The root comes
-//! from the deterministic `FiniteField` hook #783 added for the transform tree, so the operator
-//! stays bounded on `FiniteField` alone and returns the same polynomial on every call. Fields that
-//! do not override the hook — the binary fields, the extension fields — and fields whose
-//! two-adicity cannot host the domain, Mersenne-31 among them, keep Karatsuba at every degree.
+//! operator off the transform until now (`docs/research/fast-univariate.md` §4.1). The in-field
+//! root comes from the deterministic `FiniteField` hook #783 added for the transform tree, and the
+//! multi-modular product reads its modulus off [`FiniteField::word_residue`], so the operator stays
+//! bounded on `FiniteField` alone. Fields with neither — the binary fields, the extension fields —
+//! keep Karatsuba at every degree.
 //!
-//! **Bit-identical to Karatsuba everywhere.** Both routes compute the product exactly over the
+//! **Bit-identical to Karatsuba everywhere.** Every route computes the product exactly over the
 //! field, so the choice changes the work and never the answer.
 
 use crate::{
-    fft::{fft_multiplication_crossover, multiply_over_domain, FFTDomain},
+    fft::{
+        fft_multiplication_crossover, multimodular_multiplication_crossover, multiply_over_domain,
+        try_multiply_multimodular, FFTDomain,
+    },
     poly::univariate::{karatsuba::multiply_karatsuba, Polynomial, UnivariatePolynomial},
     FiniteField,
 };
 
 #[cfg(test)]
 thread_local! {
-    /// How many products this thread has sent through the transform: the tests' proof that a
+    /// How many products this thread has sent through either transform: the tests' proof that a
     /// route was taken, since its output is by design indistinguishable from Karatsuba's.
-    pub(crate) static TRANSFORM_PRODUCTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static TRANSFORM_PRODUCTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+
+    /// How many of those went through the multi-modular product.
+    static MULTIMODULAR_PRODUCTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 
     /// Set by [`karatsuba_only`]: every product on this thread takes the old route, so a primitive
     /// can be run both ways and its outputs compared.
     static KARATSUBA_ONLY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// `f` with the transform route switched off on this thread.
+/// `f` with both transform routes switched off on this thread.
 #[cfg(test)]
 pub(crate) fn karatsuba_only<T>(f: impl FnOnce() -> T) -> T {
     KARATSUBA_ONLY.with(|flag| flag.set(true));
@@ -42,43 +54,93 @@ pub(crate) fn karatsuba_only<T>(f: impl FnOnce() -> T) -> T {
     result
 }
 
-/// Products this thread has sent through the transform so far.
+/// Products this thread has sent through either transform so far.
 #[cfg(test)]
 pub(crate) fn transform_products() -> usize {
     TRANSFORM_PRODUCTS.with(std::cell::Cell::get)
 }
 
-/// How a product goes through the transform: the domain, and the block length the longer operand
-/// is cut into so that every block's product with the shorter one fits in it.
+/// Products this thread has sent through the multi-modular product so far.
+#[cfg(test)]
+pub(crate) fn multimodular_products() -> usize {
+    MULTIMODULAR_PRODUCTS.with(std::cell::Cell::get)
+}
+
+/// Which transform a block product goes through.
+enum Route<F: FiniteField> {
+    InField(FFTDomain<F>),
+    Multimodular,
+}
+
+/// How a product goes through a transform: the route, and the block length the longer operand is
+/// cut into so that every block's product with the shorter one fits one transform size.
 struct Plan<F: FiniteField> {
-    domain: FFTDomain<F>,
+    route: Route<F>,
     block: usize,
 }
 
 /// `log2 3`, Karatsuba's exponent.
 const KARATSUBA_EXPONENT: f64 = 1.584_962_500_721_156;
 
-/// The transform plan for a product of `short_len` by `long_len` coefficients, or `None` to keep it
-/// on Karatsuba.
+/// A transform of `size` points, blocked over the long operand: `blocks * size * log2 size`.
+fn transform_cost(short_len: usize, long_len: usize, size: usize) -> f64 {
+    let blocks = long_len.div_ceil(size - short_len + 1) as f64;
+    blocks * size as f64 * f64::from(size.trailing_zeros())
+}
+
+/// Karatsuba's `long * short^(log2 3 - 1)`, on the scale where it equals [`transform_cost`] for two
+/// `c / 2` operands on a `c`-point domain: the shape the crossover `c` was measured on.
+fn karatsuba_cost(short_len: usize, long_len: usize, crossover: usize) -> f64 {
+    let c = crossover as f64;
+    let scale = c * c.log2() / (c / 2.0).powf(KARATSUBA_EXPONENT);
+    scale * long_len as f64 * (short_len as f64).powf(KARATSUBA_EXPONENT - 1.0)
+}
+
+/// Whether a product is past crossover `c` at all: its degree, and the short operand's square's.
+fn past(short_len: usize, long_len: usize, crossover: usize) -> bool {
+    short_len + long_len - 2 >= crossover && 2 * short_len - 2 >= crossover
+}
+
+/// The smallest transform size holding a block of the short operand's length.
+fn smallest_size(short_len: usize) -> usize {
+    (2 * short_len - 1).next_power_of_two()
+}
+
+/// The power of two minimizing [`transform_cost`], from [`smallest_size`] up to the size holding
+/// the whole product.
+fn cheapest_size(short_len: usize, long_len: usize) -> usize {
+    let whole = (short_len + long_len - 1).next_power_of_two();
+    let mut size = smallest_size(short_len);
+    let mut best = size;
+    while size < whole {
+        size *= 2;
+        if transform_cost(short_len, long_len, size) < transform_cost(short_len, long_len, best) {
+            best = size;
+        }
+    }
+    best
+}
+
+/// The plan for a product of `short_len` by `long_len` coefficients, or `None` to keep it on
+/// Karatsuba.
 ///
-/// A cost comparison anchored at [`fft_multiplication_crossover`] `c`, which #185 measured against
-/// Karatsuba on balanced operands of power-of-two length, so on domains the product nearly fills.
-/// The transform is costed at `blocks * size * log2 size`, Karatsuba at `long * short^(log2 3 - 1)`
-/// (it cuts an unbalanced product into blocks the short operand's length), and the two scales are
-/// set equal where #185 measured them equal: two `c / 2` operands on a `c`-point domain.
+/// A cost comparison anchored at the route's measured crossover `c`:
+/// [`fft_multiplication_crossover`] in the field, [`multimodular_multiplication_crossover`] through
+/// CRT. Both were measured against Karatsuba on balanced operands of power-of-two length, so on
+/// domains the product nearly fills, and [`karatsuba_cost`] is scaled to agree with
+/// [`transform_cost`] there.
 ///
-/// That is stricter than `fft::multiply`'s rule, which takes the transform at every product
-/// degree from `c`. The difference is padding. A product one coefficient past a power of two pays
-/// for a domain twice its length, which is why `fft::multiply`'s measured points do not show it,
-/// and over BN254 a 257 x 257 product inside Newton division measured 0.85x on the whole division
-/// under the plain degree rule.
+/// That is stricter than `fft::multiply`'s rule, which takes a transform at every product degree
+/// from `c`. The difference is padding. A product one coefficient past a power of two pays for a
+/// domain twice its length, which the measured points do not show, and over BN254 a 257 x 257
+/// product inside Newton division measured 0.85x on the whole division under the plain degree rule.
 ///
 /// The transform is blocked the way Karatsuba is: one domain sized for the whole product would pay
-/// `O(n log n)` in the long length where Karatsuba pays `O(n)`. The domain is the power of two
-/// minimizing that cost, from the smallest that holds a block of the short operand's length up to
-/// the one that holds the whole product, and smaller if the field's two-adicity runs out first.
-/// Below `c`, and while the short operand's own square is below it, nothing is costed: that keeps
-/// `from_zeros`'s `n x 2` fold and every small product on exactly the route they had.
+/// `O(n log n)` in the long length where Karatsuba pays `O(n)`. The size is [`cheapest_size`], or
+/// smaller if the field's two-adicity runs out first. Only when the two-adicity cannot hold even
+/// [`smallest_size`] is the multi-modular product considered, as in `fft::multiply`. Below `c`, and
+/// while the short operand's own square is below it, nothing is costed, which keeps `from_zeros`'s
+/// `n x 2` fold and every small product on exactly the route they had.
 fn plan<F: FiniteField>(short_len: usize, long_len: usize) -> Option<Plan<F>> {
     if short_len == 0 {
         return None;
@@ -87,48 +149,76 @@ fn plan<F: FiniteField>(short_len: usize, long_len: usize) -> Option<Plan<F>> {
     if KARATSUBA_ONLY.with(std::cell::Cell::get) {
         return None;
     }
-    let crossover = fft_multiplication_crossover::<F>() as usize;
-    if short_len + long_len - 2 < crossover || 2 * short_len - 2 < crossover {
+    // The multi-modular crossover is never below the in-field one, so a product short of the
+    // latter is short of both.
+    let in_field = fft_multiplication_crossover::<F>() as usize;
+    if !past(short_len, long_len, in_field) {
         return None;
     }
-    let transform = |size: usize| {
-        let blocks = long_len.div_ceil(size - short_len + 1) as f64;
-        blocks * size as f64 * f64::from(size.trailing_zeros())
-    };
-    let c = crossover as f64;
-    let scale = c * c.log2() / (c / 2.0).powf(KARATSUBA_EXPONENT);
-    let karatsuba = scale * long_len as f64 * (short_len as f64).powf(KARATSUBA_EXPONENT - 1.0);
 
-    let smallest = (2 * short_len - 1).next_power_of_two();
-    let whole = (short_len + long_len - 1).next_power_of_two();
-    let mut size = smallest;
-    let mut best = smallest;
-    while size < whole {
-        size *= 2;
-        if transform(size) < transform(best) {
-            best = size;
-        }
-    }
-    let mut size = best;
+    let smallest = smallest_size(short_len);
+    let mut size = cheapest_size(short_len, long_len);
     let root = loop {
         if let Some(root) = F::transform_root_of_unity(size.trailing_zeros()) {
-            break root;
+            break Some(root);
         }
         if size == smallest {
-            return None;
+            break None;
         }
         size /= 2;
     };
-    if transform(size) > karatsuba {
-        return None;
-    }
+    let plan = match root {
+        Some(root) => {
+            let karatsuba = karatsuba_cost(short_len, long_len, in_field);
+            if transform_cost(short_len, long_len, size) > karatsuba {
+                return None;
+            }
+            Plan {
+                // The hook promises a root of order exactly `size`, which is all the domain checks.
+                route: Route::InField(FFTDomain::from_generator(root, size)),
+                block: size - short_len + 1,
+            }
+        }
+        None => {
+            let crossover = multimodular_multiplication_crossover::<F>() as usize;
+            if (-F::one()).word_residue().is_none() || !past(short_len, long_len, crossover) {
+                return None;
+            }
+            let size = cheapest_size(short_len, long_len);
+            let karatsuba = karatsuba_cost(short_len, long_len, crossover);
+            if transform_cost(short_len, long_len, size) > karatsuba {
+                return None;
+            }
+            #[cfg(test)]
+            MULTIMODULAR_PRODUCTS.with(|count| count.set(count.get() + 1));
+            Plan {
+                route: Route::Multimodular,
+                block: size - short_len + 1,
+            }
+        }
+    };
     #[cfg(test)]
     TRANSFORM_PRODUCTS.with(|count| count.set(count.get() + 1));
-    Some(Plan {
-        // The hook promises a root of order exactly `size`, which is all the domain checks.
-        domain: FFTDomain::from_generator(root, size),
-        block: size - short_len + 1,
-    })
+    Some(plan)
+}
+
+/// One block product through `route`, both operands nonzero.
+fn multiply_routed<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    route: &Route<F>,
+) -> UnivariatePolynomial<F> {
+    match route {
+        Route::InField(domain) => multiply_over_domain(a, b, domain),
+        // `Err` only past the auxiliary primes' transform length or coefficient bound, which no
+        // block reaches; Karatsuba is the same answer if one ever does.
+        Route::Multimodular => try_multiply_multimodular(a, b).unwrap_or_else(|_| {
+            UnivariatePolynomial::from_coefficients(multiply_karatsuba(
+                a.coefficients(),
+                b.coefficients(),
+            ))
+        }),
+    }
 }
 
 /// `short * long` block by block through `plan`, as `a.len() + b.len() - 1` coefficients.
@@ -143,7 +233,7 @@ fn multiply_blocked<F: FiniteField>(short: &[F], long: &[F], plan: &Plan<F>) -> 
         if block.is_zero() {
             continue;
         }
-        let piece = multiply_over_domain(&short, &block, &plan.domain);
+        let piece = multiply_routed(&short, &block, &plan.route);
         for (slot, c) in product[i * plan.block..]
             .iter_mut()
             .zip(piece.coefficients())
@@ -172,7 +262,7 @@ pub(crate) fn multiply_polynomials<F: FiniteField>(
     if !a.is_zero() && !b.is_zero() {
         if let Some(plan) = plan::<F>(short.len(), long.len()) {
             if long.len() <= plan.block {
-                return multiply_over_domain(a, b, &plan.domain);
+                return multiply_routed(a, b, &plan.route);
             }
             return UnivariatePolynomial::from_coefficients(multiply_blocked(short, long, &plan));
         }
@@ -195,12 +285,12 @@ pub(crate) fn multiply_coefficients<F: FiniteField>(a: &[F], b: &[F]) -> Vec<F> 
 mod tests {
     use rand::{prelude::StdRng, SeedableRng};
 
-    use super::{karatsuba_only, multiply_coefficients, transform_products};
+    use super::{karatsuba_only, multimodular_products, multiply_coefficients, transform_products};
     use crate::{
-        fft::fft_multiplication_crossover,
+        fft::{fft_multiplication_crossover, multimodular_multiplication_crossover},
         fields::{
             BabyBear, Bn254Fr, Gf13Pow4, Gf256, KoalaBear, Mersenne31, PrimeFieldElement64,
-            Zp18446744069414584321 as Goldilocks, Zp65537, Zp7,
+            Zp18446744069414584321 as Goldilocks, Zp18446744073709551557 as P64m59, Zp65537, Zp7,
         },
         identities::Zero,
         poly::univariate::{
@@ -300,9 +390,9 @@ mod tests {
         assert!(product_route::<Zp12289>(999, 9999, 84));
     }
 
-    /// Fields the transform cannot serve keep Karatsuba at every degree and still agree with the
-    /// definition: two-adicity too small for any domain past the crossover (Mersenne-31, `Zp7`),
-    /// characteristic two, and an extension field, whose hooks return `None`.
+    /// Fields without a usable root keep Karatsuba around the in-field crossover, which is below
+    /// the multi-modular one (Mersenne-31, `Zp7`), and at every degree when they have no word
+    /// residue either: characteristic two, and an extension field.
     #[test]
     fn test_fields_without_a_usable_root_keep_karatsuba_above_the_crossover() {
         fn check<F: FiniteField>(label: &str, seed: u64) {
@@ -316,6 +406,46 @@ mod tests {
         check::<Zp7>("Zp7", 50);
         check::<Gf256>("GF(2^8)", 60);
         check::<Gf13Pow4>("GF(13^4)", 70);
+        // Past the multi-modular crossover too: no word residue, so no CRT route.
+        let crossover = multimodular_multiplication_crossover::<Gf256>() as usize;
+        assert!(!product_route::<Gf256>(crossover - 1, crossover - 1, 71));
+    }
+
+    /// A word-size prime with two-adicity 2 takes the multi-modular product (#1226) where the cost
+    /// model says, anchored at its own crossover, and agrees with the definition on both sides.
+    #[test]
+    fn test_a_low_two_adicity_word_prime_takes_the_multimodular_product() {
+        let crossover = multimodular_multiplication_crossover::<P64m59>() as usize;
+        for (i, (da, db, expected)) in crossover_shapes(crossover).into_iter().enumerate() {
+            let before = multimodular_products();
+            let took = product_route::<P64m59>(da, db, 200 + i as u64);
+            assert_eq!(took, expected, "2^64 - 59: route at degrees {da} x {db}");
+            assert_eq!(
+                multimodular_products() > before,
+                expected,
+                "2^64 - 59: CRT at {da} x {db}"
+            );
+        }
+        // Blocked: a 3000-long operand against a 20 000-long one.
+        assert!(product_route::<P64m59>(20_000, 2999, 210));
+    }
+
+    /// Mersenne-31 reaches the multi-modular product only at its own, much later, 4-byte crossover.
+    /// Checked against Karatsuba, since the definition is too slow at this size.
+    #[test]
+    fn test_mersenne_31_takes_the_multimodular_product_past_its_crossover() {
+        type F = Mersenne31;
+        let c = multimodular_multiplication_crossover::<F>() as usize;
+        let mut rng = StdRng::seed_from_u64(220);
+        let (a, b) = (exact::<F>(c - 1, &mut rng), exact::<F>(c - 1, &mut rng));
+        let before = multimodular_products();
+        let product = &a * &b;
+        assert!(
+            multimodular_products() > before,
+            "Mersenne-31 did not take CRT"
+        );
+        let expected = multiply_karatsuba(a.coefficients(), b.coefficients());
+        assert_eq!(product, UnivariatePolynomial::new(&expected));
     }
 
     /// Past the field's two-adicity the operator falls back to Karatsuba rather than failing, and
@@ -410,5 +540,18 @@ mod tests {
         // The subproduct tree's node products. `multipoint_evaluate` and `lagrange_interpolate`
         // are not here: over these fields they already take #783's transform tree, not `Mul`.
         both_routes("from_zeros", || UnivariatePolynomial::from_zeros(&points));
+
+        // A word prime without the two-adicity: the same primitives through the CRT product.
+        type P = P64m59;
+        let f = exact::<P>(12_000, &mut rng);
+        let g = exact::<P>(6_000, &mut rng);
+        let before = multimodular_products();
+        both_routes("divrem over 2^64 - 59", || (&f / &g, &f % &g));
+        assert!(multimodular_products() > before, "divrem did not take CRT");
+        let h = exact::<P>(4_096, &mut rng);
+        let base = exact::<P>(4_095, &mut rng);
+        both_routes("pow_mod over 2^64 - 59", || {
+            pow_mod_limbs(&base, &[0xffff], &h)
+        });
     }
 }
