@@ -31,6 +31,9 @@ import catalog as panel_catalog  # noqa: E402
 import m34_public_corpus as public  # noqa: E402
 import summarize  # noqa: E402
 
+# grobx prints its basis (137 MB gzipped for Chandrasekhar-H 13 at p64); the 1 GiB default stopped
+# the first primary-9 job after 189 of 1161 attempts.
+OUTPUT_BYTES = 32 << 30
 CAP_S = 300
 CAP_BYTES = 16 * 2**30
 GROBX = dict(commit='8005a2a1670a7264617a6f49eeb2618d7fa21701',
@@ -128,7 +131,7 @@ def manifest(args):
              run=dict(workers=[1], cpus=args.cpus, repetitions=reps, interleave='rotate', seeds=[0], retries=0,
                       mode_wait_seconds=3600,
                       limits=dict(wall_seconds=CAP_S + 30, kill_after_seconds=30, rss_bytes=CAP_BYTES,
-                                  live_bytes=None)))
+                                  live_bytes=None, output_bytes=OUTPUT_BYTES)))
     json.dump(m, sys.stdout, indent=1)
     print()
     print(f'{args.job}: {len(instances)} instances, '
