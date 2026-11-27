@@ -62,7 +62,7 @@ struct Element<const N: usize, F> {
 /// What a pending signature reduces: an input, or `mult·element` (the pair's larger half), where
 /// `mult = sig / s(element)` and the smaller half is `(lcm / lm(other))·other`. Multipliers are
 /// recomputed when the batch reads them, which keeps a pending entry at a third of its size.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Source {
     Input(u32),
     Pair { element: u32, other: u32 },
@@ -107,6 +107,11 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     lead_masks: Vec<u64>,
     /// Per signature index, the elements in insertion order with their signature masks.
     by_index: Vec<Vec<(u64, u32)>>,
+    /// Per element, its place in the sig-lead ratio order (`ratio_cmp`), equal ratios sharing
+    /// one: comparing two ratios is one integer comparison (Roune–Stillman 2012 §3.4).
+    ratio_rank: Vec<u32>,
+    /// The elements in ascending ratio order, to place the next one.
+    by_ratio: Vec<u32>,
     syzygies: SyzygyStore<N>,
     queue: BTreeMap<u64, Vec<Pending<N>>>,
     pending: usize,
@@ -155,6 +160,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         order,
         options,
         by_index: vec![Vec::new(); inputs.len()],
+        ratio_rank: Vec::new(),
+        by_ratio: Vec::new(),
         syzygies: SyzygyStore::new(inputs.len()),
         basis: Vec::new(),
         lead_masks: Vec::new(),
@@ -456,6 +463,15 @@ fn sorted_monic<const N: usize, F: FiniteField>(
     terms
 }
 
+/// `a / gcd(a, b)`, which is `lcm(a, b) / b`.
+fn quotient_by_gcd<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> Monomial<N> {
+    let mut q = *a;
+    for (x, y) in q.exponents.iter_mut().zip(b.exponents()) {
+        *x = x.saturating_sub(*y);
+    }
+    q
+}
+
 fn gcd_is_one<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
     a.exponents()
         .iter()
@@ -505,6 +521,10 @@ fn least_ratio<const N: usize, F>(
 
 impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     fn push(&mut self, pending: Pending<N>) {
+        #[cfg(test)]
+        self.stats
+            .pair_trace
+            .push(format!("{:?} {:?}", pending.sig, pending.source));
         self.queue
             .entry(pending.sig.degree())
             .or_default()
@@ -513,8 +533,54 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats.peak_pending = self.stats.peak_pending.max(self.pending);
     }
 
-    fn ratio_cmp(&self, a: u32, b: u32) -> Ordering {
-        ratio_cmp(&self.basis, self.order, a, b)
+    /// `ratio_cmp(a, b)` from the ranks; by cross-multiplication under the test-only reference.
+    fn newer_ratio_cmp(&self, a: u32, b: u32) -> Ordering {
+        #[cfg(test)]
+        if self.options.reference_pairs {
+            return ratio_cmp(&self.basis, self.order, a, b);
+        }
+        self.ratio_rank[a as usize].cmp(&self.ratio_rank[b as usize])
+    }
+
+    /// Places a new element, `(sig, lead)`, in the ratio order and ranks it, before it joins the
+    /// basis. Ranks at or above a new distinct ratio's move up by one.
+    fn rank(&mut self, sig: &Signature<N>, lead: &Monomial<N>) {
+        let order = self.order;
+        let basis = &self.basis;
+        let cmp = |id: u32| {
+            let e = &basis[id as usize];
+            order
+                .cmp(&(e.sig.mono * *lead), &(sig.mono * e.lead))
+                .then(e.sig.index.cmp(&sig.index))
+        };
+        let at = self
+            .by_ratio
+            .partition_point(|&id| cmp(id) == Ordering::Less);
+        let rank = match self.by_ratio.get(at) {
+            Some(&next) if cmp(next) == Ordering::Equal => self.ratio_rank[next as usize],
+            Some(&next) => {
+                let rank = self.ratio_rank[next as usize];
+                for r in &mut self.ratio_rank {
+                    *r += u32::from(*r >= rank);
+                }
+                rank
+            }
+            None => self
+                .by_ratio
+                .last()
+                .map_or(0, |&id| self.ratio_rank[id as usize] + 1),
+        };
+        if self.options.check_signatures {
+            for id in 0..self.basis.len() as u32 {
+                assert_eq!(
+                    self.ratio_rank[id as usize].cmp(&rank),
+                    cmp(id),
+                    "a ratio rank disagrees with the ratios"
+                );
+            }
+        }
+        self.by_ratio.insert(at, self.basis.len() as u32);
+        self.ratio_rank.push(rank);
     }
 
     /// The canonical rewriter of `t`: the `⊴_rat`-maximal element whose signature divides `t`
@@ -522,21 +588,28 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     /// smallest lead; the newest on a tie. Greatest, not least: an element reduced from a multiple
     /// of `α` has a larger ratio than `α` and must supersede it, which the least-ratio choice
     /// does not (it lost pairs on katsura-4).
-    fn rewriter(&self, t: &Signature<N>) -> u32 {
+    fn rewriter(&mut self, t: &Signature<N>) -> u32 {
         let m = mask(&t.mono);
         let mut best = NONE;
-        for &(sig_mask, id) in &self.by_index[t.index as usize] {
-            let divisible =
-                sig_mask & !m == 0 && divides(&self.basis[id as usize].sig.mono, &t.mono);
+        let candidates = &self.by_index[t.index as usize];
+        let mut tests = 0;
+        for &(sig_mask, id) in candidates {
+            let passes = sig_mask & !m == 0;
+            tests += u64::from(passes);
+            let divisible = passes && divides(&self.basis[id as usize].sig.mono, &t.mono);
             #[cfg(feature = "research-sigf4-usage")]
             self.usage.report.rewriter_scan(divisible);
             if !divisible {
                 continue;
             }
-            if best == NONE || self.ratio_cmp(id, best) != Ordering::Less {
+            if best == NONE || self.newer_ratio_cmp(id, best) != Ordering::Less {
                 best = id;
             }
         }
+        let work = &mut self.stats.pair_work;
+        work.rewriter_calls += 1;
+        work.rewriter_scanned += candidates.len() as u64;
+        work.rewriter_divisibility += tests;
         #[cfg(feature = "research-sigf4-usage")]
         self.usage.report.rewriter_returned(best);
         best
@@ -559,10 +632,17 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         best
     }
 
-    fn reject_by_syzygy(&mut self, t: &Signature<N>) -> bool {
+    /// The syzygy criterion, counted with the pair-creation queries or the selection ones.
+    fn reject_by_syzygy(&mut self, t: &Signature<N>, at_creation: bool) -> bool {
         #[cfg(feature = "research-sigf4-usage")]
         self.usage.ops.push(super::usage::StoreOp::Query(*t));
-        match self.syzygies.covering(t) {
+        let work = &mut self.stats.pair_work;
+        let work = if at_creation {
+            &mut work.creation_queries
+        } else {
+            &mut work.selection_queries
+        };
+        match self.syzygies.covering_counted(t, work) {
             Some(SyzygySource::Koszul) => self.stats.rejected_koszul += 1,
             Some(SyzygySource::ZeroRow) => self.stats.rejected_zero_row += 1,
             None => return false,
@@ -588,7 +668,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             let group = &entries[start..end];
             let t = group[0].sig;
             start = end;
-            if self.reject_by_syzygy(&t) {
+            if self.reject_by_syzygy(&t, false) {
                 self.stats.rejected_duplicate += group.len() - 1;
                 continue;
             }
@@ -640,9 +720,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 });
             }
         }
-        self.stats.bookkeeping += clock.elapsed();
-        #[cfg(feature = "research-sigf4-usage")]
         let select = clock.elapsed();
+        self.stats.bookkeeping += select;
+        self.stats.bookkeeping_select += select;
         if targets.is_empty() {
             return Ok(false);
         }
@@ -1411,7 +1491,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 self.usage
                     .ops
                     .push(super::usage::StoreOp::Insert(t, SyzygySource::ZeroRow));
-                self.syzygies.insert(t, SyzygySource::ZeroRow);
+                self.syzygies.insert_counted(
+                    t,
+                    SyzygySource::ZeroRow,
+                    &mut self.stats.pair_work.zero_row,
+                );
             }
             Kind::Singular => {
                 self.stats.singular_rows += 1;
@@ -1451,16 +1535,128 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let lead = terms[0].0;
         let lead_mask = mask(&lead);
         let id = self.basis.len() as u32;
+        self.rank(&sig, &lead);
+        #[cfg(test)]
+        let covered = if self.options.reference_pairs {
+            self.pairs_reference(sig, lead, lead_mask)
+        } else {
+            self.pairs(sig, lead, lead_mask)
+        };
+        #[cfg(not(test))]
+        let covered = self.pairs(sig, lead, lead_mask);
+        self.new_leads += usize::from(!covered);
+        self.by_index[sig.index as usize].push((mask(&sig.mono), id));
+        self.lead_masks.push(lead_mask);
+        let hashing = Instant::now();
+        let hashes = terms.iter().map(|(m, _)| hash(m)).collect();
+        self.stats.element_hashing += hashing.elapsed();
+        self.basis.push(Element {
+            sig,
+            lead,
+            terms,
+            hashes,
+        });
+        self.stats.elements_added += 1;
+        if let Some(limit) = self.options.max_basis_elements {
+            if self.basis.len() > limit {
+                return Err(SigF4Error::Budget(F4Error::TooManyBasisElements {
+                    elements: self.basis.len(),
+                    limit,
+                }));
+            }
+        }
+        Ok(())
+    }
+
+    /// Creates the new element's pairs with every older element, recording Koszul syzygies, and
+    /// returns whether an older lead divides its lead. Exact against `pairs_reference`: the same
+    /// pairs are queued, rejected by the same criteria with the same attribution, and the syzygy
+    /// store ends each call identical.
+    ///
+    /// - The ratio ranks decide which half is larger, so only that half's signature `T` and its
+    ///   Koszul signature `K` are built. `K = gcd(leads)·T` and both compare the same two ratios,
+    ///   so the rank comparison is the comparison of both pairs of candidates.
+    /// - The syzygy criterion runs on `T` before `K` is inserted, and a covered `T` skips the
+    ///   insert: whatever covers `T` covers `K`, so the insert is a no-op (Roune–Stillman 2012
+    ///   §3.3). The order does not change the query's answer: past the product criterion `gcd ≠
+    ///   1`, so `K` does not divide `T`, and the entries a kept `K` drops are its multiples, which
+    ///   do not divide `T` either. The order of the remaining entries is kept.
+    fn pairs(&mut self, sig: Signature<N>, lead: Monomial<N>, lead_mask: u64) -> bool {
+        let id = self.basis.len() as u32;
+        let rank = self.ratio_rank[id as usize];
+        let mut covered = false;
+        for g in 0..self.basis.len() {
+            self.stats.pair_work.visited += 1;
+            let other = &self.basis[g];
+            let (g_sig, g_lead) = (other.sig, other.lead);
+            covered = covered || (self.lead_masks[g] & !lead_mask == 0 && divides(&g_lead, &lead));
+            let (element, partner, winner, w_lead, o_lead) = match rank.cmp(&self.ratio_rank[g]) {
+                Ordering::Equal => {
+                    self.stats.pairs_singular += 1;
+                    continue;
+                }
+                Ordering::Greater => (id, g as u32, sig, lead, g_lead),
+                Ordering::Less => (g as u32, id, g_sig, g_lead, lead),
+            };
+            self.stats.pairs_created += 1;
+            let koszul = Signature::new(winner.mono * o_lead, winner.index);
+            if gcd_is_one(&lead, &g_lead) {
+                self.stats.rejected_product += 1;
+                self.insert_koszul(koszul);
+                continue;
+            }
+            let t = Signature::new(
+                winner.mono * quotient_by_gcd(&o_lead, &w_lead),
+                winner.index,
+            );
+            if self.reject_by_syzygy(&t, true) {
+                self.stats.pair_work.koszul_skipped += 1;
+                continue;
+            }
+            self.insert_koszul(koszul);
+            self.stats.pair_work.pushed += 1;
+            self.push(Pending {
+                sig: t,
+                source: Source::Pair {
+                    element,
+                    other: partner,
+                },
+            });
+        }
+        covered
+    }
+
+    fn insert_koszul(&mut self, k: Signature<N>) {
+        #[cfg(feature = "research-sigf4-usage")]
+        self.usage
+            .ops
+            .push(super::usage::StoreOp::Insert(k, SyzygySource::Koszul));
+        self.syzygies
+            .insert_counted(k, SyzygySource::Koszul, &mut self.stats.pair_work.koszul);
+    }
+
+    /// The pair loop as it stood before #1185, kept as the oracle `pairs` is tested against: both
+    /// Koszul signatures and both halves computed per pair, the Koszul insert before the query.
+    #[cfg(test)]
+    fn pairs_reference(&mut self, sig: Signature<N>, lead: Monomial<N>, lead_mask: u64) -> bool {
+        let id = self.basis.len() as u32;
         let order = self.order;
         let mut covered = false;
         for g in 0..self.basis.len() {
             let (g_sig, g_lead) = (self.basis[g].sig, self.basis[g].lead);
             covered = covered || (self.lead_masks[g] & !lead_mask == 0 && divides(&g_lead, &lead));
+            self.stats.pair_work.visited += 1;
             let k_new = sig.times(&g_lead);
             let k_old = g_sig.times(&lead);
+            let koszul = &mut self.stats.pair_work.koszul;
             match k_new.cmp_in(&k_old, order) {
-                Ordering::Greater => self.syzygies.insert(k_new, SyzygySource::Koszul),
-                Ordering::Less => self.syzygies.insert(k_old, SyzygySource::Koszul),
+                Ordering::Greater => {
+                    self.syzygies
+                        .insert_counted(k_new, SyzygySource::Koszul, koszul)
+                }
+                Ordering::Less => self
+                    .syzygies
+                    .insert_counted(k_old, SyzygySource::Koszul, koszul),
                 Ordering::Equal => false,
             };
             #[cfg(feature = "research-sigf4-usage")]
@@ -1493,36 +1689,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 continue;
             }
             let (t, element, other) = source;
-            if self.reject_by_syzygy(&t) {
+            if self.reject_by_syzygy(&t, true) {
                 continue;
             }
+            self.stats.pair_work.pushed += 1;
             self.push(Pending {
                 sig: t,
                 source: Source::Pair { element, other },
             });
         }
-        self.new_leads += usize::from(!covered);
-        self.by_index[sig.index as usize].push((mask(&sig.mono), id));
-        self.lead_masks.push(lead_mask);
-        let hashing = Instant::now();
-        let hashes = terms.iter().map(|(m, _)| hash(m)).collect();
-        self.stats.element_hashing += hashing.elapsed();
-        self.basis.push(Element {
-            sig,
-            lead,
-            terms,
-            hashes,
-        });
-        self.stats.elements_added += 1;
-        if let Some(limit) = self.options.max_basis_elements {
-            if self.basis.len() > limit {
-                return Err(SigF4Error::Budget(F4Error::TooManyBasisElements {
-                    elements: self.basis.len(),
-                    limit,
-                }));
-            }
-        }
-        Ok(())
+        covered
     }
 
     /// RFC §4's invariants for a new element, checked against the basis before its batch (Lairez

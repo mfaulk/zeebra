@@ -90,13 +90,35 @@ struct Bucket<const N: usize> {
 
 impl<const N: usize> Bucket<N> {
     /// The first entry, in insertion order, dividing `mono` (whose mask is `m`).
-    fn first_dividing(&self, mono: &Monomial<N>, m: u64) -> Option<usize> {
+    fn first_dividing(&self, mono: &Monomial<N>, m: u64, work: &mut ScanWork) -> Option<usize> {
         first_hit(
             &self.masks,
             |e| e & !m == 0,
             |k| divides(&self.monos[k], mono),
+            work,
         )
     }
+}
+
+/// #1185's count of one kind of syzygy-store scan: the calls, the entry masks filtered, the full
+/// divisibility tests the filter let through, and the calls that found a dividing entry.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ScanWork {
+    pub calls: u64,
+    pub masks: u64,
+    pub divisibility: u64,
+    pub hits: u64,
+}
+
+/// #1185's count of syzygy-store inserts: calls, the covering check each starts with, the sweep
+/// for stored multiples that an uncovered insert runs, and the entries kept and dropped.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct InsertWork {
+    pub calls: u64,
+    pub covering: ScanWork,
+    pub sweep: ScanWork,
+    pub kept: u64,
+    pub dropped: u64,
 }
 
 /// The first `k` in order with `filter(masks[k])` and `confirm(k)`. The filter is evaluated
@@ -105,29 +127,40 @@ fn first_hit(
     masks: &[u64],
     filter: impl Fn(u64) -> bool,
     mut confirm: impl FnMut(usize) -> bool,
+    work: &mut ScanWork,
 ) -> Option<usize> {
     const LANES: usize = 8;
+    work.calls += 1;
     let (chunks, remainder) = masks.as_chunks::<LANES>();
     let mut base = 0;
     for chunk in chunks {
+        work.masks += LANES as u64;
         let mut hits = 0u32;
         for (j, &e) in chunk.iter().enumerate() {
             hits |= u32::from(filter(e)) << j;
         }
         while hits != 0 {
             let k = base + hits.trailing_zeros() as usize;
+            work.divisibility += 1;
             if confirm(k) {
+                work.hits += 1;
                 return Some(k);
             }
             hits &= hits - 1;
         }
         base += LANES;
     }
-    remainder
-        .iter()
-        .enumerate()
-        .find(|&(j, &e)| filter(e) && confirm(base + j))
-        .map(|(j, _)| base + j)
+    for (j, &e) in remainder.iter().enumerate() {
+        work.masks += 1;
+        if filter(e) {
+            work.divisibility += 1;
+            if confirm(base + j) {
+                work.hits += 1;
+                return Some(base + j);
+            }
+        }
+    }
+    None
 }
 
 /// Minimal generators of the known syzygy signatures, bucketed by index.
@@ -156,18 +189,41 @@ impl<const N: usize> SyzygyStore<N> {
     /// The source of the earliest-inserted stored signature dividing `t`, if any. Earliest, so
     /// the rejection counts by mechanism do not depend on the store's layout.
     pub fn covering(&self, t: &Signature<N>) -> Option<SyzygySource> {
-        self.covering_masked(t, mask(&t.mono))
+        self.covering_counted(t, &mut ScanWork::default())
     }
 
-    fn covering_masked(&self, t: &Signature<N>, m: u64) -> Option<SyzygySource> {
+    /// [`Self::covering`], adding its scan to `work`.
+    pub fn covering_counted(&self, t: &Signature<N>, work: &mut ScanWork) -> Option<SyzygySource> {
+        self.covering_masked(t, mask(&t.mono), work)
+    }
+
+    fn covering_masked(
+        &self,
+        t: &Signature<N>,
+        m: u64,
+        work: &mut ScanWork,
+    ) -> Option<SyzygySource> {
         let bucket = &self.buckets[t.index as usize];
-        bucket.first_dividing(&t.mono, m).map(|k| bucket.sources[k])
+        bucket
+            .first_dividing(&t.mono, m, work)
+            .map(|k| bucket.sources[k])
     }
 
     /// Insert `s` unless it is already covered; drops entries `s` divides. True if kept.
     pub fn insert(&mut self, s: Signature<N>, source: SyzygySource) -> bool {
+        self.insert_counted(s, source, &mut InsertWork::default())
+    }
+
+    /// [`Self::insert`], adding its work to `work`.
+    pub fn insert_counted(
+        &mut self,
+        s: Signature<N>,
+        source: SyzygySource,
+        work: &mut InsertWork,
+    ) -> bool {
+        work.calls += 1;
         let m = mask(&s.mono);
-        if self.covering_masked(&s, m).is_some() {
+        if self.covering_masked(&s, m, &mut work.covering).is_some() {
             return false;
         }
         let bucket = &mut self.buckets[s.index as usize];
@@ -179,8 +235,10 @@ impl<const N: usize> SyzygyStore<N> {
             &bucket.masks,
             |e| m & !e == 0,
             |k| divides(&s.mono, &bucket.monos[k]),
+            &mut work.sweep,
         );
         if let Some(first) = first {
+            work.sweep.masks += (before - first - 1) as u64;
             let mut kept = first;
             for k in first + 1..before {
                 if !dropped(bucket, k) {
@@ -194,7 +252,9 @@ impl<const N: usize> SyzygyStore<N> {
             bucket.monos.truncate(kept);
             bucket.sources.truncate(kept);
             self.len -= before - kept;
+            work.dropped += (before - kept) as u64;
         }
+        work.kept += 1;
         bucket.masks.push(m);
         bucket.monos.push(s.mono);
         bucket.sources.push(source);
