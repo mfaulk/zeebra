@@ -109,7 +109,8 @@ H1–H3 on these data.
 The follow-up issue preregisters a replacement for H1's width clause that is calibrated against the
 idle-vs-idle spread, and decides #1108 on fresh sessions under it. This campaign's records are
 retained so that its criterion can be checked for sense on them, but a criterion chosen after seeing
-these data does not decide on them.
+these data does not decide on them. That follow-up is #1180; its draft amendment and the check are
+in [aa-width-criterion-preregistration.md](aa-width-criterion-preregistration.md).
 
 ## 8. Data
 

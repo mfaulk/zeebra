@@ -311,6 +311,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/concurrent-calibration -p 'test_*.py'
 
+      - name: "#1180 idle-vs-idle check of A/A width criteria"
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s research/1180-aa-width -p 'test_*.py'
+
       - name: M33 admission draw and basis digest
         if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s research/m33-baseline -p 'test_*.py'
