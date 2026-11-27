@@ -577,6 +577,9 @@ allocation.
 M33 never took this candidate up because its predicted 6% sat under an 8% single-row bar. H is
 scored on R2 as a whole and may be bundled (§9.9).
 
+Laptop stage: [`m35-pair-bookkeeping.md`](research/m35-pair-bookkeeping.md) (counters, the exact
+change, and why base divisors do not apply under unchanged per-criterion counts).
+
 Gate: §9.9.
 
 ## 8. Measurement and comparison rules
