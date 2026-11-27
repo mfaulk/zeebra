@@ -2,7 +2,12 @@
 //! for the development-panel performance matrix (`research/m34-gate-h/`).
 //!
 //! cargo run --release --features research-sigf4 --example m34_matrix -- --catalog FILE --id ID
-//!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S] [--stages]
+//!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S] [--stages] [--lane31]
+//!
+//! `--lane31` (#1183) sets `F4Options::prime31_lane` and `SigF4Options::prime31_lane`: the 31-bit
+//! lane on F4's serial forward pass and in the signature engine's reduction, for primes between
+//! 46,337 and 2^31. Elsewhere it changes nothing. BabyBear and KoalaBear records are instantiated
+//! with the library's `BabyBear` and `KoalaBear` (`u32`-backed); 2^31 - 1 stays `Zp2147483647`.
 //!
 //! `--stages` (#1162) sets `F4Options::measure_stages` and adds the conventional engine's stage
 //! clocks (`stages`) and always-on counters (`counters`); `sig` adds its always-on
@@ -26,7 +31,7 @@ use std::time::{Duration, Instant};
 #[cfg(feature = "research-sigf4")]
 use zeebra::grobner::{F4Error, ShippingReason, SignatureRoute};
 use zeebra::{
-    fields::{Zp18446744073709551557, Zp2, Zp2147483647, Zp32003},
+    fields::{BabyBear, KoalaBear, Zp18446744073709551557, Zp2, Zp2147483647, Zp32003},
     grobner::{
         f4_reported, F4Options, F4Statistics, GradedEngine, ParallelForward, ParallelSymbolic,
     },
@@ -45,6 +50,7 @@ struct Args {
     workers: usize,
     wall: Duration,
     stages: bool,
+    lane31: bool,
 }
 
 fn parse_args(raw: &[String]) -> Result<Args, String> {
@@ -55,6 +61,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         workers: 1,
         wall: Duration::from_secs(300),
         stages: false,
+        lane31: false,
     };
     let mut it = raw.iter();
     while let Some(arg) = it.next() {
@@ -66,6 +73,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--workers" => a.workers = value()?.parse().map_err(|_| "--workers")?,
             "--wall-s" => a.wall = Duration::from_secs(value()?.parse().map_err(|_| "--wall-s")?),
             "--stages" => a.stages = true,
+            "--lane31" => a.lane31 = true,
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -239,6 +247,7 @@ fn options(args: &Args) -> F4Options {
     let shared = F4Options {
         max_wall_time: Some(args.wall),
         measure_stages: args.stages,
+        prime31_lane: args.lane31,
         parallel_forward: if w == 1 {
             ParallelForward::Serial
         } else {
@@ -335,6 +344,7 @@ fn sig_options(args: &Args, wall: Duration) -> zeebra::grobner::sigf4::SigF4Opti
         max_wall_time: Some(wall),
         workers: args.workers,
         parallel_cascade: args.workers > 1,
+        prime31_lane: args.lane31,
         ..zeebra::grobner::sigf4::SigF4Options::default()
     }
 }
@@ -514,6 +524,7 @@ fn solve(record: &Record, args: &Args) -> Result<Vec<(&'static str, Json)>, Stri
     }
     Ok(dispatch!(
         2 => Zp2, 32003 => Zp32003, 2147483647 => Zp2147483647,
+        2013265921 => BabyBear, 2130706433 => KoalaBear,
         18446744073709551557 => Zp18446744073709551557
     ))
 }
@@ -533,6 +544,7 @@ fn main() {
         ),
         ("engine", Json::string(&args.engine)),
         ("workers", Json::size(args.workers)),
+        ("lane31", Json::Bool(args.lane31)),
     ];
     match solve(&record, &args) {
         Ok(solved) => fields.extend(solved),
@@ -686,6 +698,29 @@ mod tests {
         assert!(counters.get("zero_rows").is_some());
     }
 
+    /// #1183: BabyBear and KoalaBear records solve, and `--lane31` leaves every engine's basis
+    /// digest unchanged at all three 31-bit primes.
+    #[test]
+    fn lane31_keeps_the_digest_at_31_bit_primes() {
+        assert!(!args(&[]).unwrap().lane31);
+        let mut engines = vec!["f4"];
+        if cfg!(feature = "research-sigf4") {
+            engines.push("sig");
+        }
+        for p in ["2147483647", "2013265921", "2130706433"] {
+            for engine in &engines {
+                let digest = |extra: &[&str]| {
+                    let mut flags = vec!["--engine", engine];
+                    flags.extend(extra);
+                    let out = solve(&record_at(p), &args(&flags).unwrap()).unwrap();
+                    assert_eq!(field_of(&out, "status").unwrap().to_json(), "\"complete\"");
+                    field_of(&out, "basis_sha256").unwrap().to_json()
+                };
+                assert_eq!(digest(&["--lane31"]), digest(&[]), "p = {p}, {engine}");
+            }
+        }
+    }
+
     /// Every engine on a small record returns the same reduced basis.
     #[test]
     fn engines_agree_on_a_small_record() {
@@ -704,6 +739,7 @@ mod tests {
                     workers: 1,
                     wall: Duration::from_secs(10),
                     stages: false,
+                    lane31: false,
                 };
                 let out = solve(&record, &a).unwrap();
                 let get = |k| out.iter().find(|(key, _)| *key == k).unwrap().1.to_json();

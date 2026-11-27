@@ -311,6 +311,18 @@ impl<const P: u32> FiniteField for PrimeFieldElement32<P> {
             Self::value,
         )
     }
+
+    fn prime31_lane() -> Option<crate::linalg::lane::Lane<Self>> {
+        if P <= crate::linalg::lane::MAX_LANE_PRIME {
+            return None;
+        }
+        crate::linalg::lane::Lane::new_31(
+            P,
+            |element| element.value,
+            |raw| Self { value: raw },
+            Self::value,
+        )
+    }
 }
 
 impl<const P: u32> PrimeFieldElement32<P> {

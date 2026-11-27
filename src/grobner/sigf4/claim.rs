@@ -205,7 +205,7 @@ impl<const N: usize, F: FiniteField> Claim<'_, N, F> {
                 + size_of::<Padded<OnceLock<Outcome<F>>>>()
                 + size_of::<AtomicBool>())
             + ncols * size_of::<AtomicU32>();
-        let workspaces = workers * Workspace::<F>::bytes(ncols);
+        let workspaces = workers * self.block.workspace_bytes();
         shared.charge(self.fixed_bytes + metadata + workspaces, self.live_limit);
         if self.deadline.is_some_and(|d| Instant::now() >= d) {
             shared.halt(WALL);

@@ -85,6 +85,11 @@ pub struct SigF4Options {
     /// [`crate::linalg::lane::MAX_LANE_PRIME`]; ignored otherwise. Every row is unchanged.
     /// Off by default.
     pub small_prime_lane: bool,
+    /// #1183: reduce each batch in the 31-bit lane (`u32` values, `u64` cells; see
+    /// [`crate::linalg::lane`]) when the field is a prime above
+    /// [`crate::linalg::lane::MAX_LANE_PRIME`] and below 2^31; ignored otherwise. Every row is
+    /// unchanged. Off by default; dispatch is #1123's.
+    pub prime31_lane: bool,
     /// #1031: census every serial batch's reducer reuse into [`SigF4Statistics::reuse`]. Replays
     /// each elimination three times, so never on in a timed run.
     #[cfg(feature = "research-reuse")]
@@ -116,6 +121,7 @@ impl Default for SigF4Options {
             allow_graded_lex: false,
             lead_ideal_stop: true,
             small_prime_lane: false,
+            prime31_lane: false,
             #[cfg(feature = "research-reuse")]
             reuse_census: false,
             #[cfg(feature = "research-adjacent")]

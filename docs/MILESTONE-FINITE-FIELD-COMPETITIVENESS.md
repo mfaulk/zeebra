@@ -556,6 +556,10 @@ Deliverables: the overflow proof for every admitted prime; bit-identical echelon
 Zeebra's own 2³¹/2⁶⁴ ratio before and after on R3's rows; peak RSS. Dispatch is E's (#1123), and
 E's rule covers both lanes.
 
+Laptop stage done: kernel, proof and bit-identical tests, opt-in as `SigF4Options::prime31_lane` and
+`F4Options::prime31_lane` ([`31-bit-lane.md`](research/31-bit-lane.md)). The timings are the bench
+host's.
+
 Gate: §9.8.
 
 ### 7.9 WP H — signature pair bookkeeping (#1185)
