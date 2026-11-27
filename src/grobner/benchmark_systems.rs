@@ -233,6 +233,63 @@ pub fn reimer<const N: usize, F: FiniteField>() -> Vec<MultivariatePolynomial<N,
         .collect()
 }
 
+/// Seeded dense quadratic blocks on disjoint variables: `sizes[β]` generators in `sizes[β]`
+/// variables per block `β`, every monomial of degree at most two in the block's variables present
+/// with a pseudo-random coefficient.
+///
+/// The blocks **interleave** in the variable order (variables are dealt round-robin to the blocks
+/// that still need one), so no block is a contiguous prefix and lex or block orders do not happen
+/// to align with the partition. Generic coefficients make each block zero-dimensional with high
+/// probability, but nothing here plants or checks a solution. Coefficients come from a SplitMix64
+/// stream on `seed` reduced into `F`, so a seed is reproducible over one field.
+///
+/// # Panics
+/// If the sizes do not sum to `N`.
+pub fn dense_blocks<const N: usize, F: FiniteField>(
+    sizes: &[usize],
+    seed: u64,
+) -> Vec<MultivariatePolynomial<N, F>> {
+    let mut state = seed;
+    let mut next = move || {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    };
+    let mut owners: Vec<Vec<usize>> = vec![Vec::new(); sizes.len()];
+    let mut v = 0;
+    while owners.iter().zip(sizes).any(|(o, &s)| o.len() < s) {
+        for (block, &size) in sizes.iter().enumerate() {
+            if owners[block].len() < size {
+                owners[block].push(v);
+                v += 1;
+            }
+        }
+    }
+    assert_eq!(v, N, "block sizes must sum to N");
+    let mut system = Vec::new();
+    for vars in &owners {
+        for _ in 0..vars.len() {
+            let mut terms = Vec::new();
+            for (a, &i) in vars.iter().enumerate() {
+                for &j in &vars[a..] {
+                    let mut e = [0u32; N];
+                    e[i] += 1;
+                    e[j] += 1;
+                    terms.push((Monomial::new(&e), F::new(next())));
+                }
+                let mut e = [0u32; N];
+                e[i] = 1;
+                terms.push((Monomial::new(&e), F::new(next())));
+            }
+            terms.push((Monomial::new(&[0u32; N]), F::new(next())));
+            system.push(MultivariatePolynomial::new(&terms));
+        }
+    }
+    system
+}
+
 #[cfg(test)]
 mod public_family_tests {
     use super::{eco, noon, reimer};
