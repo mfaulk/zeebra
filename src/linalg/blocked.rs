@@ -39,6 +39,8 @@ const NR: usize = 8;
 const KC: usize = 256;
 /// Width of one packed block of the right operand.
 const NC: usize = 1024;
+/// Lower rows the sweep reduces together.
+const SWEEP: usize = 4;
 
 /// A prime below [`PRIME_LIMIT`], with what reduction in doubles needs.
 #[derive(Clone, Copy, Debug)]
@@ -137,7 +139,8 @@ impl Modulus {
     }
 }
 
-/// Which kernel a product uses, and where the echelon's recursion stops.
+/// Which kernel a product uses, and where the echelon's recursion stops. The defaults are the laptop
+/// development tuning of `docs/research/blocked-dense-elimination.md` §6, not a measured decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BlockedOptions {
     /// Row count at or below which the echelon is the row-at-a-time leaf.
@@ -150,8 +153,8 @@ pub struct BlockedOptions {
 impl Default for BlockedOptions {
     fn default() -> Self {
         Self {
-            leaf_rows: 64,
-            winograd_from: usize::MAX,
+            leaf_rows: 128,
+            winograd_from: 1024,
         }
     }
 }
@@ -229,6 +232,11 @@ impl DenseMatrix {
     /// Row-major residues.
     pub fn residues(&self) -> Vec<u32> {
         self.cells.iter().map(|&c| c as u32).collect()
+    }
+
+    /// The first nonzero column of `row`.
+    pub fn leading_column(&self, row: usize) -> Option<usize> {
+        self.row(row).iter().position(|&c| c != 0.0)
     }
 
     /// Nonzero cells.
@@ -897,9 +905,11 @@ enum Reducer {
 /// The sparse top of a reducers-first batch: every row from `split` on swept against the reducer
 /// rows `[..split]`, as the dense `D' = D - C A^-1 B` on the columns no reducer leads.
 ///
-/// The working row is a row of `f64` accumulators, reduced only when a reducer's lead is reached
-/// or after [`Modulus::depth`] applications, as in the classical kernel. A reducer is stored dense
-/// over its span when at least a quarter of the span is nonzero, as the lane kernel does.
+/// Lower rows are reduced four at a time in `f64` accumulators interleaved by column, so a reducer
+/// entry is loaded once for four rows. A cell is reduced only when a reducer's lead is reached or
+/// after [`Modulus::depth`] applications, as in the classical kernel; a row whose multiplier is
+/// zero takes the reducer with multiplier zero. A reducer is stored dense over its span when at
+/// least a quarter of the span is nonzero, as the lane kernel does.
 ///
 /// Returns `D'` (one row per lower row, zero rows kept) and its columns, ascending.
 ///
@@ -966,51 +976,73 @@ fn sweep<F: FiniteField>(
         .collect();
     let lower = &matrix.rows()[split..];
     let mut out = DenseMatrix::zero(lower.len(), free.len());
-    let mut work = vec![0.0f64; width];
-    for (i, row) in lower.iter().enumerate() {
-        let (Some(lead), Some(last)) = (row.leading_column(), row.trailing_column()) else {
-            continue;
-        };
-        for (c, v) in row.entries() {
-            work[*c] = f64::from(lane.canonical(v));
-        }
-        let mut tail = last + 1;
-        let mut held = 0usize;
-        for column in lead..width {
-            if column >= tail {
-                break;
+    // SWEEP rows at a time, interleaved by column, so each reducer entry is loaded once per group.
+    let mut work = vec![0.0f64; width * SWEEP];
+    for (g, group) in lower.chunks(SWEEP).enumerate() {
+        let (mut lead, mut tail) = (usize::MAX, 0);
+        for (r, row) in group.iter().enumerate() {
+            if let (Some(l), Some(t)) = (row.leading_column(), row.trailing_column()) {
+                lead = lead.min(l);
+                tail = tail.max(t + 1);
+                for (c, v) in row.entries() {
+                    work[c * SWEEP + r] = f64::from(lane.canonical(v));
+                }
             }
+        }
+        if lead == usize::MAX {
+            continue;
+        }
+        let mut held = 0usize;
+        let mut column = lead;
+        while column < tail {
             let slot = reducer_at[column];
-            if slot == usize::MAX || work[column] == 0.0 {
+            column += 1;
+            if slot == usize::MAX {
                 continue;
             }
-            let x = modulus.reduce(work[column]);
-            work[column] = 0.0;
-            if x == 0.0 {
+            let cell = &mut work[(column - 1) * SWEEP..column * SWEEP];
+            let mut negated = [0.0f64; SWEEP];
+            let mut any = false;
+            for (w, n) in cell.iter_mut().zip(negated.iter_mut()) {
+                if *w != 0.0 {
+                    let x = modulus.reduce(*w);
+                    *w = 0.0;
+                    if x != 0.0 {
+                        *n = modulus.p - x;
+                        any = true;
+                    }
+                }
+            }
+            if !any {
                 continue;
             }
             if held == modulus.depth {
-                for w in work[column..tail].iter_mut() {
+                for w in work[column * SWEEP..tail * SWEEP].iter_mut() {
                     *w = modulus.reduce(*w);
                 }
-                counts.reductions += (tail - column) as u64;
+                counts.reductions += ((tail - column) * SWEEP) as u64;
                 held = 0;
             }
-            let negated = modulus.p - x;
             match &reducers[slot] {
                 Reducer::Dense { start, values } => {
-                    for (w, &v) in work[*start..*start + values.len()].iter_mut().zip(values) {
-                        *w = multiply_add(negated, v, *w);
+                    let span = &mut work[start * SWEEP..(start + values.len()) * SWEEP];
+                    for (w, &v) in span.chunks_exact_mut(SWEEP).zip(values) {
+                        for r in 0..SWEEP {
+                            w[r] = multiply_add(negated[r], v, w[r]);
+                        }
                     }
-                    counts.products += values.len() as u64;
+                    counts.products += (values.len() * SWEEP) as u64;
                     tail = tail.max(start + values.len());
                 }
                 Reducer::Sparse { columns, values } => {
                     for (&c, &v) in columns.iter().zip(values) {
-                        let w = &mut work[c as usize];
-                        *w = multiply_add(negated, v, *w);
+                        let c = c as usize;
+                        let w = &mut work[c * SWEEP..(c + 1) * SWEEP];
+                        for r in 0..SWEEP {
+                            w[r] = multiply_add(negated[r], v, w[r]);
+                        }
                     }
-                    counts.products += values.len() as u64;
+                    counts.products += (values.len() * SWEEP) as u64;
                     if let Some(&c) = columns.last() {
                         tail = tail.max(c as usize + 1);
                     }
@@ -1018,14 +1050,16 @@ fn sweep<F: FiniteField>(
             }
             held += 1;
         }
-        let to = out.row_mut(i);
-        for (t, &c) in to.iter_mut().zip(&free) {
-            if c >= lead && c < tail {
-                *t = modulus.reduce(work[c]);
+        for r in 0..group.len() {
+            let to = out.row_mut(g * SWEEP + r);
+            for (t, &c) in to.iter_mut().zip(&free) {
+                if c >= lead && c < tail {
+                    *t = modulus.reduce(work[c * SWEEP + r]);
+                }
             }
         }
-        counts.reductions += free.len() as u64;
-        work[lead..tail].fill(0.0);
+        counts.reductions += (free.len() * group.len()) as u64;
+        work[lead * SWEEP..tail * SWEEP].fill(0.0);
     }
     (out, free)
 }
