@@ -27,6 +27,7 @@ mod sigf4;
 mod solve;
 mod solve_zero_dimensional;
 pub mod transform;
+pub mod weight_detector;
 // Singular's weighted bases, committed as literals. Test data only: nothing on a shipping path
 // reads it, and `weighted_reference_bases::tests` is the differential check #624 asked for.
 #[cfg(test)]
