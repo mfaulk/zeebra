@@ -183,7 +183,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         reuse: (options.reuse_census && options.workers <= 1 && !options.parallel_cascade)
             .then(Default::default),
         #[cfg(feature = "research-adjacent")]
-        adjacent: super::adjacent::Adjacent::new(options.adjacent),
+        adjacent: super::adjacent::Adjacent::new(options.adjacent, options.adjacent_budget),
     };
     #[cfg(feature = "research-sigf4-split")]
     {

@@ -3,7 +3,8 @@
 //!
 //! cargo run --release --features research-reuse --example reuse_census -- \
 //!     --row eco12-wide64|katsura11-m31|mq10-32003|mq10-m31|mq11-goldilocks|dmq-n<N>-m<M>-<field>-s<S>[-u]
-//!     --engine f4|sigf4 [--census] [--stages] [--adjacent off|count|reuse] [--wall-s 180]
+//!     --engine f4|sigf4 [--census] [--stages] [--adjacent off|count|reuse|flat|flat-count]
+//!     [--wall-s 180]
 //!
 //! Without `--census` the run is the timed arm: the engine as it ships at one worker (`--stages` adds
 //! the conventional engine's stage clocks, which cost it a few percent). With `--census`
@@ -14,7 +15,10 @@
 //! buffer of run-wide monomial ids: `count` keeps it and counts its hits, `reuse` serves them, and
 //! `off` is the same binary without it. Its per-batch record is `adjacent` in the report. #1075 adds
 //! the rows `cyclic7-wide64` (grobx's zero-reuse control) and the held-out `noon8-wide64` and
-//! `mq12-goldilocks`.
+//! `mq12-goldilocks`. Its flat buffer is `flat` (served) and `flat-count` (kept, every row built),
+//! with the rows M35's probe found symbolic-heavy (`docs/research/m35-baseline.md` §2): `noon9-m31`
+//! (`benchmark_systems::noon`, as `m33_qualify` generates it) and `grid5x5-m31`, the
+//! `zb-col-grid-5x5@p31` record of `research/m34-structural-corpus/catalog.json`.
 //!
 //! `dmq-n<N>-m<M>-<field>-s<S>` is #1030's dense quadratic cohort: `M` equations in `N` variables
 //! over `gf31`, `gf32003`, `m31` (2^31-1) or `p64` (2^64-59), each of the 1 + N + N(N+1)/2 monomials
@@ -48,6 +52,8 @@ const PINNED: &[&str] = &[
     "cyclic7-wide64",
     "noon8-wide64",
     "mq12-goldilocks",
+    "noon9-m31",
+    "grid5x5-m31",
 ];
 /// The variable counts a generated row may have; each is a separate monomorphization.
 const SIZES: &[usize] = &[6, 7, 8, 9, 10, 11, 12, 13, 14];
@@ -75,6 +81,8 @@ enum Adjacent {
     Off,
     Count,
     Reuse,
+    Flat,
+    FlatCount,
 }
 
 /// A generated row's shape: `m` equations in `n` variables over `field`, support seed `seed`.
@@ -137,6 +145,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                     "off" => Adjacent::Off,
                     "count" => Adjacent::Count,
                     "reuse" => Adjacent::Reuse,
+                    "flat" => Adjacent::Flat,
+                    "flat-count" => Adjacent::FlatCount,
                     other => return Err(format!("unknown --adjacent mode {other}")),
                 })
             }
@@ -226,6 +236,95 @@ fn wide(field: &str, name: &str) -> Input {
         digest,
         variables: strings("variables"),
         generators: strings("generators"),
+    }
+}
+
+/// `noon-N` at `p` as `m33_qualify --input-only` renders it, so its digest is that tool's.
+fn noon_row<const N: usize, F: FiniteField>(p: u64) -> Input {
+    let names: Vec<String> = (1..=N).map(|i| format!("x{i}")).collect();
+    let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+    let system = zeebra::grobner::benchmark_systems::noon::<N, F>()
+        .iter()
+        .map(|g| polynomial_to_string(g, &refs, ORDER))
+        .collect();
+    let instance = zeebra::grobner::external::Instance::new(
+        format!("noon-{N}"),
+        "noon",
+        zeebra::grobner::external::FieldSpec::prime(p),
+        names,
+        system,
+        ORDER,
+    );
+    Input {
+        modulus: p.to_string(),
+        digest: instance.digest(),
+        variables: instance.variables.clone(),
+        generators: instance.system.clone(),
+    }
+}
+
+/// A `corpus-instance-v1` record of a committed catalog, read at run time and refused unless its
+/// characteristic is `p`. Its digest is the record's `normalized_input_digest`.
+fn catalog_row(path: &str, id: &str, p: u64) -> Input {
+    let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+    let text = std::fs::read_to_string(&file).expect("catalog reads");
+    let records = Json::parse(&text).expect("catalog is JSON");
+    let record = records
+        .items()
+        .iter()
+        .find(|r| r.get("id").and_then(Json::as_str) == Some(id))
+        .expect("catalog record");
+    let field = |r: &Json, key| r.get(key).and_then(Json::as_str).unwrap_or("").to_string();
+    assert_eq!(field(record, "schema"), "corpus-instance-v1");
+    assert_eq!(field(record, "order"), "grevlex");
+    let characteristic = record.get("field").map(|f| field(f, "characteristic"));
+    assert_eq!(characteristic, Some(p.to_string()));
+    let variables: Vec<String> = record
+        .get("variables")
+        .unwrap()
+        .items()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    let generators = record
+        .get("equations")
+        .unwrap()
+        .items()
+        .iter()
+        .map(|equation| {
+            let terms: Vec<String> = equation
+                .items()
+                .iter()
+                .map(|term| {
+                    let c = term.get("coefficient").unwrap().items()[0]
+                        .as_str()
+                        .unwrap();
+                    let mut factors: Vec<String> = term
+                        .get("exponents")
+                        .unwrap()
+                        .items()
+                        .iter()
+                        .zip(&variables)
+                        .filter_map(|(e, v)| match e.as_int().unwrap() {
+                            0 => None,
+                            1 => Some(v.clone()),
+                            k => Some(format!("{v}^{k}")),
+                        })
+                        .collect();
+                    if c != "1" || factors.is_empty() {
+                        factors.insert(0, c.to_string());
+                    }
+                    factors.join("*")
+                })
+                .collect();
+            terms.join(" + ")
+        })
+        .collect();
+    Input {
+        modulus: p.to_string(),
+        digest: field(record, "normalized_input_digest"),
+        variables,
+        generators,
     }
 }
 
@@ -326,6 +425,8 @@ fn sig_options(args: &Args) -> SigF4Options {
             Adjacent::Off => zeebra::grobner::sigf4::adjacent::AdjacentMode::Off,
             Adjacent::Count => zeebra::grobner::sigf4::adjacent::AdjacentMode::Count,
             Adjacent::Reuse => zeebra::grobner::sigf4::adjacent::AdjacentMode::Reuse,
+            Adjacent::Flat => zeebra::grobner::sigf4::adjacent::AdjacentMode::Flat,
+            Adjacent::FlatCount => zeebra::grobner::sigf4::adjacent::AdjacentMode::FlatCount,
         },
         ..SigF4Options::default()
     }
@@ -486,6 +587,8 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 Adjacent::Off => "off",
                 Adjacent::Count => "count",
                 Adjacent::Reuse => "reuse",
+                Adjacent::Flat => "flat",
+                Adjacent::FlatCount => "flat-count",
             }),
         ),
         ("modulus", Json::string(&input.modulus)),
@@ -597,6 +700,15 @@ fn main() {
         "cyclic7-wide64" => run::<7, Wide>(wide("wide64", "cyclic-7"), &args),
         "noon8-wide64" => run::<8, Wide>(wide("wide64", "noon-8"), &args),
         "mq12-goldilocks" => run::<12, Goldilocks>(wide("goldilocks", "mq-random-12"), &args),
+        "noon9-m31" => run::<9, Zp2147483647>(noon_row::<9, Zp2147483647>(2147483647), &args),
+        "grid5x5-m31" => run::<25, Zp2147483647>(
+            catalog_row(
+                "research/m34-structural-corpus/catalog.json",
+                "zb-col-grid-5x5@p31",
+                2147483647,
+            ),
+            &args,
+        ),
         name => {
             let shape = parse_dense(name).expect("validated");
             dense_dispatch!(shape, &args, 6, 7, 8, 9, 10, 11, 12, 13, 14)
@@ -698,7 +810,7 @@ mod tests {
         let reference = digest(&["--row", row, "--engine", "f4"]);
         assert_eq!(digest(&["--row", row, "--engine", "sigf4"]), reference);
         if cfg!(feature = "research-adjacent") {
-            for mode in ["count", "reuse"] {
+            for mode in ["count", "reuse", "flat", "flat-count"] {
                 let list = ["--row", row, "--engine", "sigf4", "--adjacent", mode];
                 assert_eq!(digest(&list), reference);
             }

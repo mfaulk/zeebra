@@ -1,0 +1,17 @@
+# #1075 flat-buffer rows, named before any run.
+# Development: MQ10 first (the census's largest symbolic share), the other census rows, and the two
+# rows M35's probe found symbolic-heavy (docs/research/m35-baseline.md §2).
+mq10-32003
+mq10-m31
+katsura11-m31
+eco12-wide64
+mq11-goldilocks
+grid5x5-m31
+noon9-m31
+# Control: grobx's zero-reuse row, which is not zero-reuse in Zeebra (census §2).
+cyclic7-wide64
+# Adverse control: the census's held-out regression (1.044×). Held out: a larger MQ scale and one
+# dense row.
+noon8-wide64
+mq12-goldilocks
+dmq-n14-m28-m31-s0
