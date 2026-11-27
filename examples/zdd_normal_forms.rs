@@ -4,8 +4,8 @@
 //!
 //! Each row is one family, size and order (`natural`, or `scrambled-<seed>`, a random topological
 //! order) and times both complete routes, the median of 5 runs. The ZDD route verifies the rules,
-//! converts the rules and targets ANF→ZDD and normalizes every target; `zdd_out_s` adds converting
-//! the results back to ANF. The ANF route verifies the rules and substitutes heads into each target.
+//! converts the rules and targets ANF→ZDD and normalizes every target; `zdd_out_s` is converting
+//! the results back to ANF, timed once and refused on its own past the term budget. The ANF route verifies the rules and substitutes heads into each target.
 //! A ladder stops at the first size where either route refuses, or where a run exceeds the wall cap.
 //! Then the predeclared go/no-go (#1168 issue comment) is evaluated on the natural-order rows.
 //!
@@ -33,11 +33,12 @@ const SCRAMBLES: u64 = 5;
 const WALL_CAP_S: f64 = 30.0;
 const PEAK_CAP_BYTES: usize = 256 << 20;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct ZddRun {
     in_s: f64,
     nf_s: f64,
-    out_s: f64,
+    /// Converting the results back to ANF: its time and the results, or its refusal.
+    out: Result<(f64, Vec<Anf>), ZddError>,
     allocated: usize,
     result_nodes: usize,
     result_terms: u128,
@@ -47,7 +48,6 @@ struct ZddRun {
     cache_lookups: u64,
     cache_hits: u64,
     heap_bytes: usize,
-    results: Vec<Anf>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -74,17 +74,17 @@ fn zdd_route(inst: &Instance, rules: &TriangularRules) -> Result<ZddRun, ZddErro
         .map(|&r| z.normal_form(r))
         .collect::<Result<_, _>>()?;
     let nf_s = start.elapsed().as_secs_f64() - in_s;
-    let out = Instant::now();
-    let results: Vec<Anf> = nfs
+    let clock = Instant::now();
+    let out = nfs
         .iter()
         .map(|&r| z.to_anf(r, TERM_BUDGET))
-        .collect::<Result<_, _>>()?;
-    let out_s = out.elapsed().as_secs_f64();
+        .collect::<Result<Vec<_>, _>>()
+        .map(|results| (clock.elapsed().as_secs_f64(), results));
     let stats = z.stats();
     Ok(ZddRun {
         in_s,
         nf_s,
-        out_s,
+        out,
         allocated: z.allocated_nodes(),
         result_nodes: z.reachable_nodes(&nfs),
         result_terms: nfs.iter().map(|&r| z.term_count(r)).sum(),
@@ -94,7 +94,6 @@ fn zdd_route(inst: &Instance, rules: &TriangularRules) -> Result<ZddRun, ZddErro
         cache_lookups: stats.cache_lookups,
         cache_hits: stats.cache_hits,
         heap_bytes: z.heap_bytes(),
-        results,
     })
 }
 
@@ -156,7 +155,8 @@ impl Row {
     }
     fn ratio_out(&self) -> Option<f64> {
         let z = self.zdd.as_ref().ok()?;
-        Some(self.anf.as_ref().ok()?.total_s / (z.in_s + z.nf_s + z.out_s))
+        let out_s = z.out.as_ref().ok()?.0;
+        Some(self.anf.as_ref().ok()?.total_s / (z.in_s + z.nf_s + out_s))
     }
     fn anf_bytes(&self) -> Option<usize> {
         // A lower bound: one table of the peak size, 32-byte terms plus a control byte.
@@ -189,8 +189,9 @@ fn measure(
         |a, t| a.total_s = t,
     );
     if let (Ok(z), Ok(a)) = (&zdd, &anf) {
+        let zdd_results = &z.out.as_ref().expect("the ANF route fit the same budget").1;
         assert_eq!(
-            z.results, a.results,
+            zdd_results, &a.results,
             "{} {order}: the routes disagree",
             inst.name
         );
@@ -206,7 +207,7 @@ fn measure(
 }
 
 fn csv_header() -> &'static str {
-    "family,size,order,vars,zdd_status,zdd_in_s,zdd_nf_s,zdd_s,zdd_out_s,allocated_nodes,result_nodes,\
+    "family,size,order,vars,zdd_status,zdd_out_status,zdd_in_s,zdd_nf_s,zdd_s,zdd_out_s,allocated_nodes,result_nodes,\
      result_terms,terms_avoided,cache_entries,unique_lookups,unique_hits,cache_lookups,cache_hits,\
      zdd_heap_bytes,anf_status,anf_s,anf_peak_terms,anf_products,anf_bytes_lb,ratio,ratio_out"
 }
@@ -232,10 +233,11 @@ fn csv_row(r: &Row) -> String {
         r.order.clone(),
         r.vars.to_string(),
         status(&r.zdd),
+        z.map(|z| status(&z.out)).unwrap_or_default(),
         f(z.map(|z| z.in_s)),
         f(z.map(|z| z.nf_s)),
         f(r.zdd_s()),
-        f(z.map(|z| z.out_s)),
+        f(z.and_then(|z| z.out.as_ref().ok().map(|o| o.0))),
         opt(z.map(|z| z.allocated)),
         opt(z.map(|z| z.result_nodes)),
         opt(z.map(|z| z.result_terms)),
