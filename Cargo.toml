@@ -107,6 +107,10 @@ research-reuse = ["research-sigf4", "research-work"]
 # per run; off in every shipping binary.
 research-adjacent = ["research-sigf4"]
 
+# #1168's bounded ZDD normal-form prototype (`boolean`): Boolean polynomials in GF(2)[x]/<x_i^2+x_i>
+# under verified triangular rules. Research only; nothing else in the crate reads it.
+research-zdd = []
+
 # `Arbitrary` impls for the public types (fields, integers, monomials, polynomials, vectors and
 # matrices). Purely additive: `Ring` does not require `Arbitrary`, so a downstream `Ring` impl is
 # unaffected by whether some other crate in the build turns this on.
@@ -146,6 +150,10 @@ test = true
 [[example]]
 name = "batch_order_study"
 required-features = ["external-runners"]
+
+[[example]]
+name = "zdd_normal_forms"
+required-features = ["research-zdd"]
 
 [[example]]
 name = "sig_f4_study"

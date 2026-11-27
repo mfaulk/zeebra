@@ -1,0 +1,22 @@
+adder: meets (1)-(2) [size 20 R=15663.73 R_out=3.69 zdd=10688B anf>=34602975B; size 18 R=4040.88 R_out=3.62 zdd=8784B anf>=8650719B] scrambled median R at size 20 = 11362.75
+ladder: meets (1)-(2) [size 18 R=5170.58 R_out=2.28 zdd=7248B anf>=25952190B; size 16 R=1129.60 R_out=2.89 zdd=5344B anf>=6487998B] scrambled median R at size 18 = 3074.92
+chi8: fails [size 8 R=3.11 R_out=3.08 zdd=2830336B anf>=30525B; size 7 R=4.74 R_out=4.70 zdd=2830336B anf>=30525B] scrambled median R at size 8 = 10.35
+verdict: GO (2 of 3 structured families meet the criterion; GO needs 2)
+      569.90 real       530.76 user        18.56 sys
+          4965842944  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             2477124  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   2  voluntary context switches
+              188311  involuntary context switches
+       5926502362828  instructions retired
+       2063665857309  cycles elapsed
+          1248579520  peak memory footprint
