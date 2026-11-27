@@ -142,14 +142,7 @@ pub(crate) fn candidate_values<const N: usize, F: KnownOrder, R: RngCore + Crypt
     index: usize,
     rng: &mut R,
 ) -> Option<Vec<F>> {
-    let constraints: Vec<UnivariatePolynomial<F>> = basis
-        .iter()
-        .filter_map(|p| as_univariate(p, index))
-        // A constant carries no information about the variable: zero is satisfied by every value,
-        // and a nonzero constant is caught by the contradiction check instead.
-        .filter(|u| !u.is_zero() && u.degree() > 0)
-        .collect();
-
+    let constraints = univariate_constraints(basis, index)?;
     let (first, rest) = constraints.split_first()?;
 
     // Take the roots of one constraint and keep those satisfying the others. Equivalent to the
@@ -159,6 +152,21 @@ pub(crate) fn candidate_values<const N: usize, F: KnownOrder, R: RngCore + Crypt
         candidates.retain(|value| constraint.eval(value).is_zero());
     }
     Some(candidates)
+}
+
+/// The nonconstant basis polynomials univariate in variable `index`, or `None` if there are none.
+pub(crate) fn univariate_constraints<const N: usize, F: FiniteField>(
+    basis: &[MultivariatePolynomial<N, F>],
+    index: usize,
+) -> Option<Vec<UnivariatePolynomial<F>>> {
+    let constraints: Vec<UnivariatePolynomial<F>> = basis
+        .iter()
+        .filter_map(|p| as_univariate(p, index))
+        // A constant carries no information about the variable: zero is satisfied by every value,
+        // and a nonzero constant is caught by the contradiction check instead.
+        .filter(|u| !u.is_zero() && u.degree() > 0)
+        .collect();
+    (!constraints.is_empty()).then_some(constraints)
 }
 
 /// `p` as a polynomial in variable `index` alone, or `None` if another variable appears in it.

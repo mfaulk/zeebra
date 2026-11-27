@@ -11,10 +11,11 @@ use crate::{
     grobner::{
         f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmError, FglmOptions, FglmStatistics},
-        solve::{candidate_values, is_nonzero_constant},
+        solve::{is_nonzero_constant, univariate_constraints},
         F4Error, F4Options, F4Statistics, StopKind,
     },
-    FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
+    poly::{roots, Polynomial, RootStream, RootStreamCounters, RootStreamError},
+    FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial, UnivariatePolynomial,
 };
 
 /// Which route to the lexicographic basis solving needs.
@@ -60,6 +61,38 @@ pub struct SolveOptions {
     /// Exceeding it is an error and not a truncated list: a list that looks complete and is not is
     /// worse than a failure. Ignored by [`solve_one`], which stops at one by construction.
     pub max_solutions: Option<usize>,
+
+    /// How each search level gets its candidate values from the univariate constraints.
+    ///
+    /// Opt-in and experimental (#1166): the default is the original eager route, and the others
+    /// return the same solution set.
+    pub root_extraction: RootExtraction,
+
+    /// Random attempts each root split may take under a streaming [`RootExtraction`] before the
+    /// search stops with [`SolveError::RootExtraction`]. `None` for the default of 1000, which only
+    /// a defect exhausts. Ignored by [`RootExtraction::Eager`].
+    pub max_split_attempts: Option<usize>,
+}
+
+/// How a search level turns the constraints univariate in its variable into candidate values.
+///
+/// Every route tries exactly the common base-field roots of those constraints, so the solution
+/// set is the same under each. What differs is how much splitting is done before the first
+/// candidate is tried, which matters to [`solve_one`]: it stops at the first point and never
+/// looks at the rest.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RootExtraction {
+    /// Every root of one constraint, then those the others also vanish at. The original route.
+    #[default]
+    Eager,
+
+    /// A [`RootStream`] over one constraint, each emitted root filtered by the others. A dead
+    /// branch resumes the stream for the next root.
+    Lazy,
+
+    /// The gcd of every constraint first, then a [`RootStream`] over that. Pays the extra gcds to
+    /// make the one exponentiation, and every split, modulo a smaller polynomial.
+    GcdFirst,
 }
 
 impl SolveOptions {
@@ -120,6 +153,11 @@ pub struct SolveStatistics {
     /// Separate from `f4` so each basis computation keeps its own counters; batch counts add
     /// and byte estimates take the maximum across the two stages.
     pub diagnosis: Option<F4Statistics>,
+
+    /// Root-extraction work across every search level, under [`RootExtraction::Lazy`] or
+    /// [`RootExtraction::GcdFirst`]. All zero under [`RootExtraction::Eager`], which does not
+    /// count.
+    pub roots: RootStreamCounters,
 }
 
 impl SolveStatistics {
@@ -235,6 +273,12 @@ pub enum SolveError {
     /// Carries only the limit, and no partial list: the solutions found so far are a prefix of an
     /// unknown whole, and returning them would be indistinguishable from completeness.
     TooManySolutions { limit: usize },
+
+    /// A [`RootStream`] stopped without exhausting its roots, under [`RootExtraction::Lazy`] or
+    /// [`RootExtraction::GcdFirst`].
+    ///
+    /// Never evidence of no solution: the roots it had not reached are still candidates.
+    RootExtraction(RootStreamError),
 }
 
 impl Display for SolveError {
@@ -266,6 +310,7 @@ impl Display for SolveError {
             Self::TooManySolutions { limit } => {
                 write!(f, "there are more than the {} solutions allowed", limit)
             }
+            Self::RootExtraction(e) => write!(f, "root extraction stopped: {}", e),
         }
     }
 }
@@ -601,6 +646,109 @@ struct Budget {
     branches: usize,
     max_branches: Option<usize>,
     max_solutions: Option<usize>,
+    root_extraction: RootExtraction,
+    max_split_attempts: Option<usize>,
+    roots: RootStreamCounters,
+}
+
+/// The candidate values for one search level, by the chosen [`RootExtraction`].
+enum Candidates<F: KnownOrder> {
+    Eager(std::vec::IntoIter<F>),
+    Stream {
+        stream: RootStream<F>,
+        /// Constraints each emitted root must also satisfy. Empty under `GcdFirst`, whose stream
+        /// already covers all of them.
+        rest: Vec<UnivariatePolynomial<F>>,
+        /// The stream's counters when last charged to the budget.
+        charged: RootStreamCounters,
+    },
+}
+
+impl<F: KnownOrder> Candidates<F> {
+    fn new<R: RngCore + CryptoRng>(
+        constraints: Vec<UnivariatePolynomial<F>>,
+        route: RootExtraction,
+        max_split_attempts: Option<usize>,
+        rng: &mut R,
+    ) -> Result<Self, SolveError> {
+        let stream = |stream: Result<RootStream<F>, RootStreamError>, rest| {
+            let mut stream = stream.map_err(SolveError::RootExtraction)?;
+            if let Some(attempts) = max_split_attempts {
+                stream = stream.with_max_split_attempts(attempts);
+            }
+            Ok(Self::Stream {
+                stream,
+                rest,
+                charged: RootStreamCounters::default(),
+            })
+        };
+        match route {
+            RootExtraction::Eager => {
+                // Exactly the original `candidate_values`, so the default consumes the generator
+                // as it always has.
+                let (first, rest) = constraints.split_first().expect("at least one constraint");
+                let mut candidates = roots(first, rng);
+                for constraint in rest {
+                    candidates.retain(|value| constraint.eval(value).is_zero());
+                }
+                Ok(Self::Eager(candidates.into_iter()))
+            }
+            RootExtraction::Lazy => {
+                let mut constraints = constraints;
+                let first = constraints.remove(0);
+                stream(RootStream::new(&first), constraints)
+            }
+            RootExtraction::GcdFirst => {
+                stream(RootStream::of_common_roots(&constraints), Vec::new())
+            }
+        }
+    }
+
+    /// The next value satisfying every constraint, charging the stream's work to `counters`.
+    fn next<R: RngCore + CryptoRng>(
+        &mut self,
+        rng: &mut R,
+        counters: &mut RootStreamCounters,
+    ) -> Result<Option<F>, SolveError> {
+        match self {
+            Self::Eager(values) => Ok(values.next()),
+            Self::Stream {
+                stream,
+                rest,
+                charged,
+            } => {
+                let found = loop {
+                    match stream.next_root(rng) {
+                        Ok(Some(v)) if rest.iter().all(|c| c.eval(&v).is_zero()) => {
+                            break Ok(Some(v))
+                        }
+                        Ok(Some(_)) => continue,
+                        Ok(None) => break Ok(None),
+                        Err(e) => break Err(SolveError::RootExtraction(e)),
+                    }
+                };
+                let now = stream.counters();
+                add_counters(counters, &now, charged);
+                *charged = now;
+                found
+            }
+        }
+    }
+}
+
+/// `total += now - before`, field by field.
+fn add_counters(
+    total: &mut RootStreamCounters,
+    now: &RootStreamCounters,
+    before: &RootStreamCounters,
+) {
+    total.pow_mods += now.pow_mods - before.pow_mods;
+    total.traces += now.traces - before.traces;
+    total.gcds += now.gcds - before.gcds;
+    total.split_attempts += now.split_attempts - before.split_attempts;
+    total.splits += now.splits - before.splits;
+    total.roots_available += now.roots_available - before.roots_available;
+    total.roots_emitted += now.roots_emitted - before.roots_emitted;
 }
 
 impl Budget {
@@ -641,6 +789,9 @@ fn search<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
             Stop::AtFirst => None,
             Stop::AtEvery => options.max_solutions,
         },
+        root_extraction: options.root_extraction,
+        max_split_attempts: options.max_split_attempts,
+        roots: RootStreamCounters::default(),
     };
     let mut solutions = Vec::new();
     let mut assignment = [F::zero(); N];
@@ -669,6 +820,7 @@ fn search<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     }
 
     statistics.branches = budget.branches;
+    statistics.roots = budget.roots;
     statistics.solutions = solutions.len();
     Ok(solutions)
 }
@@ -706,18 +858,23 @@ fn extend<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     }
 
     let index = remaining - 1;
-    let candidates = candidate_values(basis, index, rng).unwrap_or_else(|| {
+    let constraints = univariate_constraints(basis, index).unwrap_or_else(|| {
         panic!(
             "variable {} is unconstrained in a zero-dimensional ideal, which the elimination \
              property of lex forbids — see this module's header for the argument",
             index
         )
     });
+    let mut candidates = Candidates::new(
+        constraints,
+        budget.root_extraction,
+        budget.max_split_attempts,
+        rng,
+    )?;
 
-    for value in candidates {
-        if stop == Stop::AtFirst && !solutions.is_empty() {
-            return Ok(());
-        }
+    // Under a streaming route, a value is extracted only when the previous one's subtree is
+    // exhausted, so stopping at the first point leaves the rest of the splitting undone.
+    while let Some(value) = candidates.next(rng, &mut budget.roots)? {
         budget.charge_branch()?;
         assignment[index] = value;
         let substituted: Vec<MultivariatePolynomial<N, F>> =
@@ -751,6 +908,11 @@ fn extend<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
             budget,
             rng,
         )?;
+
+        // Checked before asking for another candidate, which a streaming route would split for.
+        if stop == Stop::AtFirst && !solutions.is_empty() {
+            return Ok(());
+        }
     }
 
     Ok(())
@@ -1879,6 +2041,189 @@ mod outcome_tests {
             let old = solve_one(system, &mut StdRng::seed_from_u64(11));
             let new = solve_one_with_outcome(system, &mut rng, &options).map(|(o, _)| o.point());
             assert_eq!(old, new, "{:?}", strategy);
+        }
+    }
+}
+
+#[cfg(test)]
+mod root_extraction_tests {
+    use std::collections::HashSet;
+
+    use rand::{prelude::StdRng, SeedableRng};
+
+    use super::{
+        solve_one_with_options, solve_zero_dimensional_with_options, RootExtraction, SolveError,
+        SolveOptions,
+    };
+    use crate::{
+        fields::{PrimeFieldElement64, Zp2147483647},
+        grobner::benchmark_systems::{cyclic, katsura, planted},
+        FiniteField, KnownOrder, MultivariatePolynomial, RootStreamError, Zero,
+    };
+
+    const STREAMING: [RootExtraction; 2] = [RootExtraction::Lazy, RootExtraction::GcdFirst];
+    const ROUTES: [RootExtraction; 3] = [
+        RootExtraction::Eager,
+        RootExtraction::Lazy,
+        RootExtraction::GcdFirst,
+    ];
+
+    fn with(route: RootExtraction) -> SolveOptions {
+        SolveOptions {
+            root_extraction: route,
+            ..SolveOptions::default()
+        }
+    }
+
+    fn parse<const N: usize, F: FiniteField>(
+        polynomials: &[&str],
+        names: [&str; N],
+    ) -> Vec<MultivariatePolynomial<N, F>> {
+        polynomials
+            .iter()
+            .map(|s| MultivariatePolynomial::parse(s, names).unwrap())
+            .collect()
+    }
+
+    /// y in {3, 4, 5, 6} and x^2 = y over GF(7): only y = 4 is a square, so three of the four
+    /// candidates for y lead to a dead branch.
+    fn dead_branches() -> Vec<MultivariatePolynomial<2, PrimeFieldElement64<7>>> {
+        // (y - 3)(y - 4)(y - 5)(y - 6), expanded mod 7.
+        parse(&["x^2 - y", "y^4 + 3*y^3 + y + 3"], ["x", "y"])
+    }
+
+    /// Every route returns the same solution set, on systems with and without dead branches.
+    #[test]
+    fn test_every_route_returns_the_same_solution_set() {
+        fn check<const N: usize, F: KnownOrder>(system: &[MultivariatePolynomial<N, F>]) {
+            let sets: Vec<HashSet<[F; N]>> = ROUTES
+                .iter()
+                .map(|route| {
+                    let mut rng = StdRng::seed_from_u64(1);
+                    let (found, _) =
+                        solve_zero_dimensional_with_options(system, &mut rng, &with(*route))
+                            .expect("within limits");
+                    found.into_iter().collect()
+                })
+                .collect();
+            assert_eq!(sets[0], sets[1], "lazy differs from eager");
+            assert_eq!(sets[0], sets[2], "gcd-first differs from eager");
+        }
+        type F = Zp2147483647;
+        let point: Vec<F> = (0..4).map(|i| F::new(5 * i as u64 + 2)).collect();
+        check(&planted::<4, F>(&point));
+        check(&katsura::<4, F>());
+        check(&cyclic::<5, F>());
+        check(&dead_branches());
+    }
+
+    /// The full solution set agrees with trying every point of GF(7)^2.
+    #[test]
+    fn test_streaming_routes_agree_with_exhaustive_enumeration() {
+        type F7 = PrimeFieldElement64<7>;
+        let system = dead_branches();
+        let expected: HashSet<[F7; 2]> = (0..49)
+            .map(|i| [F7::new(i / 7), F7::new(i % 7)])
+            .filter(|p| system.iter().all(|f| f.eval(p).is_zero()))
+            .collect();
+        assert_eq!(expected.len(), 2, "x = 2 and x = 5, both with y = 4");
+        for route in STREAMING {
+            let mut rng = StdRng::seed_from_u64(2);
+            let (found, _) = solve_zero_dimensional_with_options(&system, &mut rng, &with(route))
+                .expect("within limits");
+            assert_eq!(found.into_iter().collect::<HashSet<_>>(), expected);
+        }
+    }
+
+    /// A first candidate that dies resumes the stream, and the point is still found.
+    #[test]
+    fn test_solve_one_resumes_the_stream_after_a_dead_branch() {
+        for route in STREAMING {
+            let mut resumed = false;
+            for seed in 0..16 {
+                let mut rng = StdRng::seed_from_u64(seed);
+                let (point, statistics) =
+                    solve_one_with_options(&dead_branches(), &mut rng, &with(route))
+                        .expect("within limits");
+                let point = point.expect("y = 4 extends");
+                assert_eq!(point[1], PrimeFieldElement64::new(4));
+                // More than two branches means at least one y died before y = 4 was reached.
+                resumed |= statistics.branches > 2;
+            }
+            assert!(
+                resumed,
+                "no seed tried a dead branch first under {:?}",
+                route
+            );
+        }
+    }
+
+    /// Stopping at the first point leaves most of a 64-root eliminant unsplit.
+    #[test]
+    fn test_first_point_avoids_splitting_the_other_roots() {
+        type F = Zp2147483647;
+        // y has 64 roots, each extending to the single point x = y + 1.
+        let eliminant = (1..=64).fold(MultivariatePolynomial::<2, F>::one(), |acc, i| {
+            &acc * &parse::<2, F>(&[&format!("y - {}", i)], ["x", "y"])[0]
+        });
+        let mut system = parse::<2, F>(&["x - y - 1"], ["x", "y"]);
+        system.push(eliminant);
+
+        let mut rng = StdRng::seed_from_u64(3);
+        let (point, first) = solve_one_with_options(&system, &mut rng, &with(RootExtraction::Lazy))
+            .expect("within limits");
+        let point = point.expect("a point");
+        assert_eq!(point[0], point[1] + F::new(1));
+
+        let (all, every) =
+            solve_zero_dimensional_with_options(&system, &mut rng, &with(RootExtraction::Lazy))
+                .expect("within limits");
+        assert_eq!(all.len(), 64);
+        assert_eq!(
+            every.roots.splits, 63,
+            "every root of y, split out one at a time"
+        );
+        assert!(
+            first.roots.splits <= 16,
+            "{} splits for one root of 64",
+            first.roots.splits
+        );
+        assert_eq!(first.roots.roots_available, 64 + 1, "64 for y, one for x");
+    }
+
+    /// The default route is the original one and counts nothing.
+    #[test]
+    fn test_the_default_is_eager_and_uncounted() {
+        assert_eq!(
+            SolveOptions::default().root_extraction,
+            RootExtraction::Eager
+        );
+        let mut rng = StdRng::seed_from_u64(4);
+        let (_, statistics) =
+            solve_one_with_options(&dead_branches(), &mut rng, &SolveOptions::default())
+                .expect("within limits");
+        assert_eq!(statistics.roots, Default::default());
+    }
+
+    /// A split that runs out of attempts is a typed error, never a missing solution.
+    #[test]
+    fn test_retry_exhaustion_is_a_typed_solve_error() {
+        for route in STREAMING {
+            let options = SolveOptions {
+                max_split_attempts: Some(0),
+                ..with(route)
+            };
+            let mut rng = StdRng::seed_from_u64(5);
+            let error = solve_one_with_options(&dead_branches(), &mut rng, &options).unwrap_err();
+            assert!(
+                matches!(
+                    error,
+                    SolveError::RootExtraction(RootStreamError::RetryExhausted { attempts: 0, .. })
+                ),
+                "{:?}",
+                error
+            );
+            assert!(error.is_resource_failure());
         }
     }
 }

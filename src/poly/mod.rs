@@ -26,8 +26,8 @@ pub use univariate::{
     inverse_exponent, is_irreducible, is_permutation_exponent, is_permutation_polynomial,
     lagrange_interpolate, lcm, multipoint_evaluate, partial_bezout, permutation_exponents, pow_mod,
     resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd, GraeffeError,
-    GraeffeStats, ModularComposer, Polynomial, PolynomialParams, PowerPermutation, SubgroupRoute,
-    UnivariatePolynomial, Xgcd,
+    GraeffeStats, ModularComposer, Polynomial, PolynomialParams, PowerPermutation, RootStream,
+    RootStreamCounters, RootStreamError, SubgroupRoute, UnivariatePolynomial, Xgcd,
 };
 #[doc(hidden)]
 pub use univariate::{

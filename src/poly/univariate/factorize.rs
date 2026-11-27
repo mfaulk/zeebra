@@ -70,7 +70,7 @@ fn characteristic_two_degree<F: KnownOrder>() -> u32 {
 
 /// Each splitting attempt succeeds with probability near one half, so exhausting this many means
 /// a defect rather than bad luck. Failing loudly beats looping forever.
-const MAX_SPLIT_ATTEMPTS: usize = 1000;
+pub(crate) const MAX_SPLIT_ATTEMPTS: usize = 1000;
 
 /// The monic irreducible factors of `f` and their multiplicities, in unspecified order.
 ///
@@ -500,6 +500,42 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
     rng: &mut R,
     route: &SplitRoute<'_, F>,
 ) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
+    let (parts, _) = try_split(g, d, rng, route, MAX_SPLIT_ATTEMPTS);
+    parts.unwrap_or_else(|| {
+        panic!(
+            "failed to split {} in {} attempts; it may not be a product of distinct irreducibles \
+             of degree {}",
+            g, MAX_SPLIT_ATTEMPTS, d
+        )
+    })
+}
+
+/// The two parts of a split, if one was found, and the attempts spent either way.
+pub(crate) type SplitAttempt<F> = (
+    Option<(UnivariatePolynomial<F>, UnivariatePolynomial<F>)>,
+    usize,
+);
+
+/// Split a squarefree product of two or more distinct monic linear factors into two parts, in at
+/// most `max_attempts` random tries.
+///
+/// The fallible form of the degree-one split, for a caller that must report exhaustion rather than
+/// panic.
+pub(crate) fn try_split_linear<F: KnownOrder, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    rng: &mut R,
+    max_attempts: usize,
+) -> SplitAttempt<F> {
+    try_split(g, 1, rng, &SplitRoute::default(), max_attempts)
+}
+
+fn try_split<F: KnownOrder, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    d: u32,
+    rng: &mut R,
+    route: &SplitRoute<'_, F>,
+    max_attempts: usize,
+) -> SplitAttempt<F> {
     debug_assert!(g.degree() > d);
 
     // Only the norm of a degree d > 1 split applies the Frobenius map, so only then is a composer
@@ -513,7 +549,7 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
         _ => Frobenius::new(FrobeniusRoute::PowMod, g, g),
     };
 
-    for _ in 0..MAX_SPLIT_ATTEMPTS {
+    for attempt in 0..max_attempts {
         let h = random_element_of_quotient(g, rng);
 
         // Each irreducible factor of g independently either divides the candidate or does not,
@@ -540,15 +576,11 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
         let divisor = gcd(g, &candidate);
         if !divisor.is_zero() && divisor.degree() > 0 && divisor.degree() < g.degree() {
             let quotient = g / &divisor;
-            return (divisor, quotient);
+            return (Some((divisor, quotient)), attempt + 1);
         }
     }
 
-    panic!(
-        "failed to split {} in {} attempts; it may not be a product of distinct irreducibles of \
-         degree {}",
-        g, MAX_SPLIT_ATTEMPTS, d
-    );
+    (None, max_attempts)
 }
 
 /// The norm `h * h^q * h^(q^2) * ... * h^(q^(d-1))` in F[x]/(g).
