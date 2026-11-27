@@ -1,6 +1,7 @@
 //! #1168's measurements: the ZDD normal form against the expanded-ANF route on every fixture.
 //!
 //! cargo run --release --features research-zdd --example zdd_normal_forms -- [--quick] [--out FILE]
+//!     [--mq-max K]   (cap the dense MQ control at K inputs; default 64)
 //!
 //! Each row is one family, size and order (`natural`, or `scrambled-<seed>`, a random topological
 //! order) and times both complete routes, the median of 5 runs. The ZDD route verifies the rules,
@@ -266,8 +267,8 @@ type Ladder = (
     Box<dyn Fn(usize) -> Vec<Instance>>,
 );
 
-/// The ladders, each capped below `MAX_VARS` variables.
-fn ladders(quick: bool) -> Vec<Ladder> {
+/// The ladders, each capped below `MAX_VARS` variables; the MQ control also at `mq_max` inputs.
+fn ladders(quick: bool, mq_max: usize) -> Vec<Ladder> {
     let up = |from: usize, step: usize, to: usize| (from..=to).step_by(step).collect::<Vec<_>>();
     let cap = |full: usize, small: usize| if quick { small } else { full };
     vec![
@@ -284,17 +285,17 @@ fn ladders(quick: bool) -> Vec<Ladder> {
         ),
         (
             "mq",
-            up(6, 2, cap(64, 6)),
+            up(6, 2, cap(mq_max.min(64), 6)),
             Box::new(|k| (1..=3).map(|s| dense_mq(k, s)).collect()),
         ),
     ]
 }
 
-fn run(quick: bool, out: &mut dyn Write) -> Vec<Row> {
+fn run(quick: bool, mq_max: usize, out: &mut dyn Write) -> Vec<Row> {
     let runs = if quick { 1 } else { RUNS };
     let mut rows = Vec::new();
     writeln!(out, "{}", csv_header()).unwrap();
-    for (family, sizes, build) in ladders(quick) {
+    for (family, sizes, build) in ladders(quick, mq_max) {
         'sizes: for size in sizes {
             for inst in build(size) {
                 let mut orders = vec![("natural".to_string(), inst.natural_rules())];
@@ -389,7 +390,11 @@ fn main() {
         Some(i) => Box::new(File::create(&args[i + 1]).expect("--out FILE")),
         None => Box::new(std::io::stdout()),
     };
-    let rows = run(quick, &mut *out);
+    let mq_max = match args.iter().position(|a| a == "--mq-max") {
+        Some(i) => args[i + 1].parse().expect("--mq-max K"),
+        None => 64,
+    };
+    let rows = run(quick, mq_max, &mut *out);
     eprintln!("{}", verdict(&rows));
 }
 
@@ -400,7 +405,7 @@ mod tests {
     /// The quick ladder runs every family through both routes, and they agree (`measure` asserts).
     #[test]
     fn the_quick_ladder_runs_and_the_routes_agree() {
-        let rows = run(true, &mut std::io::sink());
+        let rows = run(true, 64, &mut std::io::sink());
         assert!(rows.iter().all(|r| r.zdd.is_ok() && r.anf.is_ok()));
         assert!(verdict(&rows).contains("verdict:"));
     }
