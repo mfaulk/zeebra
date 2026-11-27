@@ -32,6 +32,10 @@ is unchanged.
     reported apart, in `constant_generators`.
   - Unused variables are free and belong to no block. They are listed in `unused_variables`.
 
+  `grobner::f4_decomposed` (#1036) uses this to solve the blocks separately.
+  [`component-decomposition.md`](component-decomposition.md) has what that saves and what it does
+  not.
+
 A small separator or a low elimination width, short of exact disconnection, is only a performance
 hypothesis.
 

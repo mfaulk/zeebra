@@ -3,6 +3,7 @@
 pub mod benchmark_systems;
 pub mod bilinear_census;
 mod buchberger;
+pub mod decompose;
 pub mod differential;
 pub mod external;
 pub mod f4;
@@ -38,6 +39,7 @@ pub use buchberger::{
     interreduce_for_benchmark, interreduce_with_route_for_benchmark,
     leading_monomials_are_pairwise_coprime, Statistics,
 };
+pub use decompose::{f4_decomposed, ComponentReport, DecomposeReport, DecomposeRoute};
 pub use f4::{
     certify_f4_output, certify_f4_output_with_workers, certify_f4_output_within,
     certify_submitted_basis, certify_submitted_basis_with_witnesses, f4, f4_observed,
