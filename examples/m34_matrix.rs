@@ -2,7 +2,12 @@
 //! for the development-panel performance matrix (`research/m34-gate-h/`).
 //!
 //! cargo run --release --features research-sigf4 --example m34_matrix -- --catalog FILE --id ID
-//!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S]
+//!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S] [--stages]
+//!
+//! `--stages` (#1162) sets `F4Options::measure_stages` and adds the conventional engine's stage
+//! clocks (`stages`) and always-on counters (`counters`); `sig` adds its always-on
+//! `SigF4Statistics` as `counters`. The stage clocks cost 4–12% (`F4Options::measure_stages`), so a
+//! staged attempt attributes time and is never a timing record.
 //!
 //! `fallback` (#1134, research only) is `adaptive` followed by one rule. When the dispatcher's
 //! conventional route stops with a size refusal (`TooManyRows`, `TooManyColumns`,
@@ -21,8 +26,10 @@ use std::time::{Duration, Instant};
 #[cfg(feature = "research-sigf4")]
 use zeebra::grobner::{F4Error, ShippingReason, SignatureRoute};
 use zeebra::{
-    fields::{Zp18446744073709551557, Zp2147483647},
-    grobner::{f4_reported, F4Options, GradedEngine, ParallelForward, ParallelSymbolic},
+    fields::{Zp18446744073709551557, Zp2, Zp2147483647, Zp32003},
+    grobner::{
+        f4_reported, F4Options, F4Statistics, GradedEngine, ParallelForward, ParallelSymbolic,
+    },
     util::{peak_resident_bytes, sha256_hex, Json},
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
@@ -37,6 +44,7 @@ struct Args {
     engine: String,
     workers: usize,
     wall: Duration,
+    stages: bool,
 }
 
 fn parse_args(raw: &[String]) -> Result<Args, String> {
@@ -46,6 +54,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         engine: "f4".into(),
         workers: 1,
         wall: Duration::from_secs(300),
+        stages: false,
     };
     let mut it = raw.iter();
     while let Some(arg) = it.next() {
@@ -56,6 +65,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--engine" => a.engine = value()?,
             "--workers" => a.workers = value()?.parse().map_err(|_| "--workers")?,
             "--wall-s" => a.wall = Duration::from_secs(value()?.parse().map_err(|_| "--wall-s")?),
+            "--stages" => a.stages = true,
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -228,6 +238,7 @@ fn options(args: &Args) -> F4Options {
     let w = args.workers;
     let shared = F4Options {
         max_wall_time: Some(args.wall),
+        measure_stages: args.stages,
         parallel_forward: if w == 1 {
             ParallelForward::Serial
         } else {
@@ -333,11 +344,16 @@ fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'s
     let clock = Instant::now();
     #[cfg_attr(not(feature = "research-sigf4"), allow(unused_mut))]
     let mut fallback_from = Json::Null;
+    let mut staged: Vec<(&'static str, Json)> = Vec::new();
     let (result, route) = match args.engine.as_str() {
         #[cfg(feature = "research-sigf4")]
         "sig" => {
             let options = sig_options(args, args.wall);
-            let (result, _) = zeebra::grobner::sigf4::sig_f4_reported(&system, ORDER, &options);
+            let (result, statistics) =
+                zeebra::grobner::sigf4::sig_f4_reported(&system, ORDER, &options);
+            if args.stages {
+                staged.push(("counters", sig_counters(&statistics)));
+            }
             (
                 result.map_err(|e| format!("{e:?}")),
                 Some(("Forced".to_string(), args.workers)),
@@ -362,6 +378,10 @@ fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'s
         ),
         _ => {
             let (result, statistics) = f4_reported(&system, ORDER, &options(args));
+            if args.stages {
+                staged.push(("stages", f4_stages(&statistics)));
+                staged.push(("counters", f4_counters(&statistics)));
+            }
             let route = statistics
                 .graded_route
                 .map(|d| (format!("{:?}", d.route), d.workers));
@@ -403,7 +423,74 @@ fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'s
     if args.engine == "fallback" {
         fields.push(("fallback_from", fallback_from));
     }
+    fields.extend(staged);
     fields
+}
+
+/// The stage clocks `F4Options::measure_stages` fills (`src/grobner/f4/statistics.rs`).
+fn f4_stages(s: &F4Statistics) -> Json {
+    let st = &s.stages;
+    Json::object([
+        ("symbolic_ns", Json::nanos(st.symbolic)),
+        ("construction_ns", Json::nanos(st.construction)),
+        ("elimination_ns", Json::nanos(st.elimination)),
+        ("forward_ns", Json::nanos(st.forward)),
+        ("fl_sweep_ns", Json::nanos(st.fl_sweep)),
+        ("fl_echelon_ns", Json::nanos(st.fl_echelon)),
+        ("backward_ns", Json::nanos(st.backward)),
+        ("extraction_ns", Json::nanos(st.extraction)),
+        ("interreduction_ns", Json::nanos(st.interreduction)),
+        ("total_ns", Json::nanos(s.total)),
+    ])
+}
+
+/// Conventional F4's always-on counters; none of them needs `measure_stages`.
+fn f4_counters(s: &F4Statistics) -> Json {
+    Json::object([
+        ("batches", Json::size(s.batches)),
+        ("pairs_reduced", Json::size(s.pairs_reduced)),
+        ("zero_rows", Json::size(s.zero_rows)),
+        ("elements_added", Json::size(s.elements_added)),
+        ("max_matrix_rows", Json::size(s.max_matrix_rows)),
+        ("max_matrix_columns", Json::size(s.max_matrix_columns)),
+        ("row_operations", Json::size(s.row_operations)),
+        ("pivot_inversions", Json::size(s.pivot_inversions)),
+        ("reducer_rows", Json::size(s.reducer_rows)),
+        ("initial_nonzeros", Json::size(s.total_initial_nonzeros)),
+        ("final_nonzeros", Json::size(s.total_final_nonzeros)),
+        ("max_live_nonzeros", Json::size(s.max_live_nonzeros)),
+        (
+            "backward_products",
+            Json::size(s.candidate_reduction.coefficient_products),
+        ),
+    ])
+}
+
+/// The forced signature engine's always-on counters and clocks.
+#[cfg(feature = "research-sigf4")]
+fn sig_counters(s: &zeebra::grobner::sigf4::SigF4Statistics) -> Json {
+    Json::object([
+        ("batches", Json::size(s.batches)),
+        ("pairs_created", Json::size(s.pairs_created)),
+        ("targets", Json::size(s.targets)),
+        ("reducer_rows", Json::size(s.reducer_rows)),
+        ("reductions_to_zero", Json::size(s.reductions_to_zero)),
+        ("zero_rows", Json::size(s.zero_rows)),
+        ("coefficient_products", Json::int(s.coefficient_products)),
+        ("products_on_zero_rows", Json::int(s.products_on_zero_rows)),
+        ("max_matrix_rows", Json::size(s.max_matrix_rows)),
+        ("max_matrix_columns", Json::size(s.max_matrix_columns)),
+        (
+            "signature_basis_elements",
+            Json::size(s.signature_basis_elements),
+        ),
+        ("bookkeeping_ns", Json::nanos(s.bookkeeping)),
+        ("element_hashing_ns", Json::nanos(s.element_hashing)),
+        ("symbolic_ns", Json::nanos(s.symbolic)),
+        ("elimination_ns", Json::nanos(s.elimination)),
+        ("interreduction_ns", Json::nanos(s.interreduction)),
+        ("total_ns", Json::nanos(s.total)),
+    ])
 }
 
 fn solve(record: &Record, args: &Args) -> Result<Vec<(&'static str, Json)>, String> {
@@ -426,7 +513,8 @@ fn solve(record: &Record, args: &Args) -> Result<Vec<(&'static str, Json)>, Stri
         };
     }
     Ok(dispatch!(
-        2147483647 => Zp2147483647, 18446744073709551557 => Zp18446744073709551557
+        2 => Zp2, 32003 => Zp32003, 2147483647 => Zp2147483647,
+        18446744073709551557 => Zp18446744073709551557
     ))
 }
 
@@ -555,6 +643,49 @@ mod tests {
         assert_eq!(rescued.unwrap(), plain.unwrap());
     }
 
+    /// `--stages` is off by default and parsed when given.
+    #[test]
+    fn stages_flag_is_parsed() {
+        assert!(!args(&[]).unwrap().stages);
+        assert!(args(&["--stages"]).unwrap().stages);
+    }
+
+    fn record_at(p: &str) -> Record {
+        find_record(&CATALOG.replace("2147483647", p), "x@p31").unwrap()
+    }
+
+    fn field_of<'a>(out: &'a [(&'static str, Json)], key: &str) -> Option<&'a Json> {
+        out.iter().find(|(k, _)| *k == key).map(|(_, v)| v)
+    }
+
+    /// M35's characteristic ladder: GF(2) and GF(32003) records solve, not refuse.
+    #[test]
+    fn small_characteristics_are_instantiated() {
+        for p in ["2", "32003"] {
+            let out = solve(&record_at(p), &args(&[]).unwrap()).unwrap();
+            assert_eq!(
+                field_of(&out, "status").unwrap().to_json(),
+                "\"complete\"",
+                "p = {p}"
+            );
+        }
+    }
+
+    /// `--stages` attaches the F4 stage clocks and always-on counters; without it neither appears.
+    #[test]
+    fn stages_are_reported_only_when_requested() {
+        let record = find_record(CATALOG, "x@p31").unwrap();
+        let plain = solve(&record, &args(&[]).unwrap()).unwrap();
+        assert!(field_of(&plain, "stages").is_none());
+        assert!(field_of(&plain, "counters").is_none());
+        let staged = solve(&record, &args(&["--stages"]).unwrap()).unwrap();
+        let stages = field_of(&staged, "stages").expect("stages");
+        assert!(stages.get("forward_ns").is_some());
+        assert!(stages.get("interreduction_ns").is_some());
+        let counters = field_of(&staged, "counters").expect("counters");
+        assert!(counters.get("zero_rows").is_some());
+    }
+
     /// Every engine on a small record returns the same reduced basis.
     #[test]
     fn engines_agree_on_a_small_record() {
@@ -572,6 +703,7 @@ mod tests {
                     engine: engine.to_string(),
                     workers: 1,
                     wall: Duration::from_secs(10),
+                    stages: false,
                 };
                 let out = solve(&record, &a).unwrap();
                 let get = |k| out.iter().find(|(key, _)| *key == k).unwrap().1.to_json();

@@ -112,6 +112,8 @@ found no selection headroom robust enough to build a selector on
 current milestone, [M35](docs/MILESTONE-FINITE-FIELD-COMPETITIVENESS.md), tries to close the
 one-worker gap to grobx on prime-field reduced bases by improving the engines themselves: exact
 certified zero skipping, carrying signature work into conventional F4, and narrower matrix
-storage. Zeebra's exact correctness guarantee is unchanged.
+storage. Zeebra's exact correctness guarantee is unchanged. Its development-mode
+[baseline](docs/research/m35-baseline.md) puts most of the structured-row gap at p ≈ 2³¹, where
+grobx's 31-bit lane gains and Zeebra does not. The largest residual gap is dense MQ.
 
 Licensed under the [MIT licence](LICENSE-MIT).

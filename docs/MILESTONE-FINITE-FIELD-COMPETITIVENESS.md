@@ -292,6 +292,14 @@ fixed-budget completion limitation. An operation-count reduction is evidence of 
 speedup promise. Stop once panel and attribution are adequate — not another 7,000-attempt
 selector campaign.
 
+**Status (#1162):**
+- **Done.** Z0 is frozen at `125658bb`. The panel, the development-mode gap table and the priced
+  manifest are in [`research/m35-baseline.md`](research/m35-baseline.md).
+  - B, C (narrowly) and E clear the 20% rule.
+  - D's copying share does not.
+  - F has no evidence in this panel.
+- **Outstanding.** The publication-mode read of the manifest, about 3.5 h.
+
 ### 7.2 WP B — qualify the implemented exact zero-skipping route (#1080)
 
 **Priority: first bench-host opportunity.**
