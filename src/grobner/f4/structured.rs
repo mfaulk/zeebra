@@ -32,6 +32,7 @@ use crate::{
     grobner::f4::{macaulay::MacaulayMatrix, symbolic::RowKind},
     linalg::{
         echelon::{reduce_rows_against_pivots_with, row_echelon_with, Backend},
+        lane::{Lane, LaneKernel},
         sparse::{back_substitute_pivots_within, EliminationStatistics, SparseMatrix},
     },
     FiniteField,
@@ -216,7 +217,28 @@ pub fn eliminate_to<const N: usize, F: FiniteField>(
     matrix: &mut MacaulayMatrix<N, F>,
     max_nonzeros: usize,
 ) -> Result<BlockOutcome, usize> {
-    let mut outcome = eliminate_in_echelon(plan, backend, matrix, max_nonzeros)?;
+    eliminate_to_in(plan, form, backend, None, matrix, max_nonzeros)
+}
+
+/// [`eliminate_to`], with the forward pass against the reducer block run in `lane` when one is
+/// given (#1183). The lane reproduces [`Backend::Adaptive`]'s rows entry for entry, so a caller
+/// passes one only under that backend.
+///
+/// # Panics
+/// As [`eliminate`].
+///
+/// # Errors
+/// As [`eliminate_to`].
+pub(crate) fn eliminate_to_in<const N: usize, F: FiniteField>(
+    plan: BlockPlan,
+    form: RowForm,
+    backend: Backend,
+    lane: Option<&Lane<F>>,
+    matrix: &mut MacaulayMatrix<N, F>,
+    max_nonzeros: usize,
+) -> Result<BlockOutcome, usize> {
+    debug_assert!(lane.is_none() || backend == Backend::Adaptive);
+    let mut outcome = eliminate_in_echelon(plan, backend, lane, matrix, max_nonzeros)?;
     if form == RowForm::Reduced {
         // The second pass is sparse whatever the backend chose for the first. The dense and
         // accumulated kernels exist for the pivot-discovery sweep over a batch matrix; this pass
@@ -237,9 +259,16 @@ pub fn eliminate_to<const N: usize, F: FiniteField>(
 fn eliminate_in_echelon<const N: usize, F: FiniteField>(
     plan: BlockPlan,
     backend: Backend,
+    lane: Option<&Lane<F>>,
     matrix: &mut MacaulayMatrix<N, F>,
     max_nonzeros: usize,
 ) -> Result<BlockOutcome, usize> {
+    let forward = |matrix: &mut SparseMatrix<F>, split| match lane {
+        Some(lane) => {
+            LaneKernel::default().reduce_rows_against_pivots(lane, matrix, split, max_nonzeros)
+        }
+        None => reduce_rows_against_pivots_with(backend, matrix, split, max_nonzeros),
+    };
     if plan == BlockPlan::Baseline {
         let statistics = row_echelon_with(backend, matrix.matrix_mut(), max_nonzeros)?;
         return Ok(BlockOutcome {
@@ -269,12 +298,7 @@ fn eliminate_in_echelon<const N: usize, F: FiniteField>(
         }),
 
         BlockPlan::ReducersFirstBlock => Ok(BlockOutcome {
-            statistics: reduce_rows_against_pivots_with(
-                backend,
-                matrix.matrix_mut(),
-                split,
-                max_nonzeros,
-            )?,
+            statistics: forward(matrix.matrix_mut(), split)?,
             free_pivots: split,
             back_substituted_rows: None,
         }),
@@ -288,8 +312,7 @@ fn eliminate_in_echelon<const N: usize, F: FiniteField>(
             };
             interreduce_prefix(matrix.matrix_mut(), split, max_nonzeros, &mut preparation)?;
 
-            let mut statistics =
-                reduce_rows_against_pivots_with(backend, matrix.matrix_mut(), split, max_nonzeros)?;
+            let mut statistics = forward(matrix.matrix_mut(), split)?;
             // The elimination measured the matrix it was handed, which interreduction had already
             // rewritten. Reported against the matrix as built, so the counters stay comparable
             // with the other plans.
@@ -860,5 +883,109 @@ mod tests {
             check_reducer_block(&SparseMatrix::<F>::new(0, Vec::new()), 0),
             Ok(())
         );
+    }
+
+    /// #1183: on every batch of each system, the 31-bit lane leaves the adaptive backend's
+    /// echelon and reduced rows exactly, with its work counters, under both block plans.
+    fn lane_reproduces_every_batch<const N: usize, G: FiniteField>(
+        generators: &[MultivariatePolynomial<N, G>],
+    ) {
+        use super::{eliminate_to_in, RowForm};
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let lane = G::prime31_lane().expect("a 31-bit prime");
+        let (_, _, trace) =
+            trace_batches(generators, order, &F4Options::default()).expect("within limits");
+        assert!(!trace.batches().is_empty());
+        for (index, batch) in trace.batches().iter().enumerate() {
+            let preprocessed = symbolic_preprocessing(&batch.basis, &batch.pairs);
+            let built = MacaulayMatrix::build(&batch.basis, &preprocessed, order);
+            for plan in [BlockPlan::ReducersFirstBlock, BlockPlan::InterreducedBlock] {
+                for form in [RowForm::Echelon, RowForm::Reduced] {
+                    let run = |lane| {
+                        let mut matrix = built.clone();
+                        let outcome = eliminate_to_in(
+                            plan,
+                            form,
+                            Backend::Adaptive,
+                            lane,
+                            &mut matrix,
+                            usize::MAX,
+                        )
+                        .unwrap();
+                        (matrix, outcome)
+                    };
+                    let (expected, reference) = run(None);
+                    let (actual, outcome) = run(Some(&lane));
+                    assert_eq!(actual, expected, "batch {index}, {plan:?}, {form:?}");
+                    let (s, r) = (&outcome.statistics, &reference.statistics);
+                    assert_eq!(
+                        (s.rank, s.zero_rows, s.row_operations, s.pivot_inversions),
+                        (r.rank, r.zero_rows, r.row_operations, r.pivot_inversions),
+                        "batch {index}, {plan:?}, {form:?}"
+                    );
+                    assert_eq!(s.final_nonzeros, r.final_nonzeros);
+                    assert_eq!(outcome.free_pivots, reference.free_pivots);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_31_bit_lane_reproduces_the_adaptive_echelon_form() {
+        use crate::fields::{BabyBear, KoalaBear, Mersenne31};
+        lane_reproduces_every_batch(&katsura::<6, Mersenne31>());
+        lane_reproduces_every_batch(&cyclic::<5, BabyBear>());
+        lane_reproduces_every_batch(&katsura::<5, KoalaBear>());
+        lane_reproduces_every_batch(&cyclic::<5, Zp2147483647>());
+    }
+
+    /// #1183: F4 with the 31-bit lane on its serial forward pass returns the reduced basis and
+    /// batch counters it returns without it.
+    fn lane_keeps_the_basis<const N: usize, G: FiniteField>(
+        generators: &[MultivariatePolynomial<N, G>],
+    ) {
+        use crate::grobner::f4::{f4_reported, ParallelForward};
+        let options = |prime31_lane| F4Options {
+            prime31_lane,
+            parallel_forward: ParallelForward::Serial,
+            ..F4Options::default()
+        };
+        for order in ALL_ORDERS {
+            let (expected, reference) = f4_reported(generators, order, &options(false));
+            let (actual, statistics) = f4_reported(generators, order, &options(true));
+            assert_eq!(actual.unwrap(), expected.unwrap(), "{order:?}");
+            let work = |s: &crate::grobner::f4::F4Statistics| {
+                (
+                    s.batches,
+                    s.elements_added,
+                    s.row_operations,
+                    s.total_initial_nonzeros,
+                    s.total_final_nonzeros,
+                )
+            };
+            assert_eq!(work(&statistics), work(&reference), "{order:?}");
+        }
+    }
+
+    #[test]
+    fn test_31_bit_lane_keeps_the_f4_basis() {
+        use crate::{
+            fields::{BabyBear, KoalaBear, Mersenne31},
+            grobner::benchmark_systems::eco,
+        };
+        lane_keeps_the_basis(&katsura::<6, Mersenne31>());
+        lane_keeps_the_basis(&cyclic::<5, BabyBear>());
+        lane_keeps_the_basis(&eco::<6, KoalaBear>());
+        lane_keeps_the_basis(&katsura::<5, Zp2147483647>());
+        // Outside the range the option is ignored.
+        lane_keeps_the_basis(&katsura::<5, F>());
+    }
+
+    /// #1183: the lane is opt-in at every preset.
+    #[test]
+    fn test_31_bit_lane_is_off_at_every_preset() {
+        assert!(!F4Options::default().prime31_lane);
+        assert!(!F4Options::baseline().prime31_lane);
+        assert!(!F4Options::recommended().prime31_lane);
     }
 }

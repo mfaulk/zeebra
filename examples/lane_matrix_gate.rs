@@ -1,6 +1,7 @@
-//! #945's matrix-level gate: one serial forward pass over a captured GF(31) or GF(32003) batch.
+//! #945's matrix-level gate: one serial forward pass over a captured GF(31), GF(32003) or GF(2^31 - 1)
+//! batch (the last in #1183's 31-bit lane).
 //!
-//! `lane_matrix_gate <archive.zmat> <vars> <gf31|gf32003> <accumulator|lane> [dense-percent]`
+//! `lane_matrix_gate <archive.zmat> <vars> <gf31|gf32003|m31> <accumulator|lane> [dense-percent]`
 //!
 //! Loads the archive (untimed), puts the reducer block first, then times one forward pass: the
 //! shipped accumulator kernel (`Backend::Adaptive`, what `F4Options::recommended()` runs) or the
@@ -10,7 +11,7 @@
 use std::{fs::File, io::BufReader, time::Instant};
 
 use zeebra::{
-    fields::{Zp31, Zp32003},
+    fields::{Zp2147483647, Zp31, Zp32003},
     grobner::f4::{
         macaulay::io::{read_matrix, ReadLimits},
         matrix_corpus::digest_of,
@@ -24,7 +25,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() < 4 || args.len() > 5 {
         eprintln!(
-            "usage: lane_matrix_gate <archive> <vars> <gf31|gf32003> <accumulator|lane> [dense-percent]"
+            "usage: lane_matrix_gate <archive> <vars> <gf31|gf32003|m31> <accumulator|lane> [dense-percent]"
         );
         std::process::exit(64);
     }
@@ -39,6 +40,7 @@ fn main() {
                 $(
                     (stringify!($n), "gf31") => run::<$n, Zp31>(&args[0], &args[3], dense_percent),
                     (stringify!($n), "gf32003") => run::<$n, Zp32003>(&args[0], &args[3], dense_percent),
+                    (stringify!($n), "m31") => run::<$n, Zp2147483647>(&args[0], &args[3], dense_percent),
                 )*
                 _ => {
                     eprintln!("unsupported vars/field {} {}", args[1], args[2]);
@@ -73,7 +75,9 @@ fn run<const N: usize, F: FiniteField>(path: &str, arm: &str, dense_percent: u32
             usize::MAX,
         ),
         "lane" => {
-            let lane = F::small_prime_lane().expect("a lane prime");
+            let lane = F::small_prime_lane()
+                .or_else(F::prime31_lane)
+                .expect("a lane prime");
             LaneKernel { dense_percent }.reduce_rows_against_pivots(
                 &lane,
                 matrix.matrix_mut(),

@@ -182,6 +182,13 @@ where
         None
     }
 
+    /// This field as a 31-bit lane (#1183), or `None` unless it is a prime field with
+    /// [`crate::linalg::lane::MAX_LANE_PRIME`] < p < 2^31. Disjoint from
+    /// [`Self::small_prime_lane`]. See [`crate::linalg::lane`].
+    fn prime31_lane() -> Option<crate::linalg::lane::Lane<Self>> {
+        None
+    }
+
     /// Runs `job` with `Self: Send + Sync` in scope, or hands it back for a field without them.
     ///
     /// [`Self::concurrent_elimination`]'s proof, for work whose types carry more parameters than

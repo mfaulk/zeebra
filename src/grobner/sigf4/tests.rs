@@ -805,6 +805,75 @@ fn test_small_prime_lane_is_off_by_default() {
     assert!(!checked_any_graded().small_prime_lane);
 }
 
+/// #1183: the 31-bit lane's basis, targets and elements against the field route's, on design 1,
+/// design 2 and the parallel cascade. Returns each run's lane and field peak live bytes.
+fn prime31_lane_agrees<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+) -> Vec<(usize, usize)> {
+    let mut bytes = Vec::new();
+    for (workers, parallel_cascade) in [(1, false), (3, false), (4, true)] {
+        let options = |prime31_lane| SigF4Options {
+            workers,
+            parallel_cascade,
+            prime31_lane,
+            check_signatures: true,
+            ..SigF4Options::default()
+        };
+        let (field, field_stats) = sig_f4_reported(system, GREVLEX, &options(false));
+        let (lane, lane_stats) = sig_f4_reported(system, GREVLEX, &options(true));
+        assert_eq!(lane.unwrap(), field.unwrap(), "{workers} workers");
+        assert_eq!(
+            (lane_stats.targets, lane_stats.elements_added),
+            (field_stats.targets, field_stats.elements_added)
+        );
+        bytes.push((
+            lane_stats.claim_peak_live_bytes,
+            field_stats.claim_peak_live_bytes,
+        ));
+    }
+    bytes
+}
+
+/// #1183: the 31-bit lane keeps the basis over Mersenne31, BabyBear and KoalaBear, on dense
+/// quadratics and on Katsura-5 and Eco-6.
+#[test]
+fn test_prime31_lane_keeps_the_basis() {
+    use crate::fields::{BabyBear, KoalaBear, Mersenne31};
+    for seed in 0..2 {
+        prime31_lane_agrees(&dense_quadratics::<6, Mersenne31>(seed));
+        prime31_lane_agrees(&dense_quadratics::<6, BabyBear>(seed));
+        prime31_lane_agrees(&dense_quadratics::<6, KoalaBear>(seed));
+    }
+    prime31_lane_agrees(&katsura::<5, Mersenne31>());
+    prime31_lane_agrees(&eco::<6, KoalaBear>());
+}
+
+/// #1183: over the `u64`-backed 2^31 - 1 the lane halves coefficient bytes, so it holds no more
+/// live bytes than the field route.
+#[test]
+fn test_prime31_lane_on_a_u64_field_keeps_the_basis_within_its_bytes() {
+    use crate::fields::Zp2147483647;
+    for seed in 0..2 {
+        for (lane, field) in prime31_lane_agrees(&dense_quadratics::<6, Zp2147483647>(seed)) {
+            assert!(lane <= field, "lane {lane} > field {field} live bytes");
+        }
+    }
+}
+
+/// #1183: fields outside the 31-bit range ignore the option.
+#[test]
+fn test_prime31_lane_is_ignored_outside_its_range() {
+    prime31_lane_agrees(&dense_quadratics::<5, Goldilocks>(1));
+    prime31_lane_agrees(&dense_quadratics::<5, Zp32003>(1));
+}
+
+/// #1183: the 31-bit lane is opt-in.
+#[test]
+fn test_prime31_lane_is_off_by_default() {
+    assert!(!SigF4Options::default().prime31_lane);
+    assert!(!checked_any_graded().prime31_lane);
+}
+
 /// #961: a reducer multiple of the batch's degree whose lead an element of smaller signature has
 /// just taken is reduced in that batch, so on these inputs, which have no degree falls, every
 /// signature degree is one batch. Before, the pair naming it waited for another batch of the same

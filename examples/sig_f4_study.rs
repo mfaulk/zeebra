@@ -44,8 +44,9 @@
 //! `--claim` (sigf4) runs #904's parallel cascade, #902's prereduce + claim schedule, on
 //! `--workers` threads instead of design 2's serial cascade pass.
 //!
-//! `--lane` (sigf4) reduces each batch in #945's `u32` delayed-reduction lanes
-//! (`SigF4Options::small_prime_lane`); the basis is unchanged.
+//! `--lane` (sigf4) reduces each batch in a `u32` delayed-reduction lane: #945's below 46,337
+//! (`SigF4Options::small_prime_lane`) or #1183's 31-bit one above it, for `m31`
+//! (`SigF4Options::prime31_lane`); the basis is unchanged.
 //!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
@@ -1490,6 +1491,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 allow_graded_lex: args.order == MonomialOrder::GradedLexicographic,
                 parallel_cascade: args.claim,
                 small_prime_lane: args.lane,
+                prime31_lane: args.lane,
                 max_live_bytes: args
                     .live_gib
                     .map(|gib| gib << 30)

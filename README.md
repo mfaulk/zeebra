@@ -117,6 +117,8 @@ storage. Zeebra's exact correctness guarantee is unchanged. Its development-mode
 grobx's 31-bit lane gains and Zeebra does not. The largest residual gap is dense MQ. The plan was
 [amended](docs/MILESTONE-FINITE-FIELD-COMPETITIVENESS.md#21-amendment-1-2026-11-27) on that
 evidence: it adds a lane for 31-bit primes (Mersenne31, BabyBear, KoalaBear) and cheaper signature
-pair bookkeeping, and scores conditional mechanisms on a regime gate and a dispatch gate.
+pair bookkeeping, and scores conditional mechanisms on a regime gate and a dispatch gate. The
+31-bit lane's kernel, overflow proof and bit-identical tests are in, opt-in and off by default
+([design note](docs/research/31-bit-lane.md)); its timings wait for the bench host.
 
 Licensed under the [MIT licence](LICENSE-MIT).

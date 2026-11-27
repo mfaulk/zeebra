@@ -9,7 +9,7 @@ use crate::{
             observer::{BatchObserver, Ignore},
             options::{BatchOrder, F4Error, F4Options, ReductionStrategy},
             statistics::{BatchStatistics, StageClock, StageTimings},
-            structured::{eliminate_to, BlockPlan, RowForm},
+            structured::{eliminate_to_in, BlockPlan, RowForm},
             symbolic::{
                 symbolic_preprocessing_seeded, MonicBasis, Preprocessed, ReducerCache, RowKind,
             },
@@ -401,10 +401,11 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
         );
         let mut block = match parallel {
             Some(block) => block,
-            None => eliminate_to(
+            None => eliminate_to_in(
                 plan,
                 RowForm::Echelon,
                 options.elimination,
+                options.forward_lane::<F>().as_ref(),
                 matrix,
                 allowance,
             )

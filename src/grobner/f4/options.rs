@@ -976,6 +976,15 @@ pub struct F4Options {
     ///
     /// [`GradedEngine::Conventional`] at every preset; nothing changes unless a caller opts in.
     pub graded_engine: GradedEngine,
+
+    /// #1183: run a structured batch's serial forward pass in the 31-bit lane
+    /// ([`crate::linalg::lane`]) when the field is a prime between
+    /// [`crate::linalg::lane::MAX_LANE_PRIME`] and 2^31 and the backend is [`Backend::Adaptive`],
+    /// whose echelon form the lane reproduces entry for entry. Worker passes and the
+    /// Faugère–Lachartre order are unchanged.
+    ///
+    /// Off at every preset; dispatch is #1123's.
+    pub prime31_lane: bool,
 }
 
 impl F4Options {
@@ -1016,6 +1025,17 @@ impl F4Options {
             pair_multiples: PairMultiples::Every,
             parallel_symbolic: ParallelSymbolic::Serial,
             graded_engine: GradedEngine::Conventional,
+            prime31_lane: false,
+        }
+    }
+
+    /// The lane a structured batch's serial forward pass runs in, if
+    /// [`prime31_lane`](Self::prime31_lane) asks for one and the field and backend admit it.
+    pub(crate) fn forward_lane<F: FiniteField>(&self) -> Option<crate::linalg::lane::Lane<F>> {
+        if self.prime31_lane && self.elimination == Backend::Adaptive {
+            F::prime31_lane()
+        } else {
+            None
         }
     }
 

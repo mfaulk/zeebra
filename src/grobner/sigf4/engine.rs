@@ -993,12 +993,20 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             reducer_at[entries[0].0 as usize] = k as u32;
         }
 
-        // #945: the reducer block in lane form, when the options and the field allow it.
+        // #945, #1183: the reducer block in lane form, when the options and the field allow it.
+        // A field has at most one of the two lanes.
         let lane = if self.options.small_prime_lane {
             F::small_prime_lane()
         } else {
             None
-        };
+        }
+        .or_else(|| {
+            if self.options.prime31_lane {
+                F::prime31_lane()
+            } else {
+                None
+            }
+        });
         // Each pivot is held once (#945's corrective iteration): in lane form only, unless a
         // research census reads the field rows.
         #[cfg(feature = "research-reuse")]
@@ -1057,7 +1065,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let fixed = batch_rows_bytes(&block, &targets)
             + lane_bytes
             + 2 * ncols * size_of::<u32>()
-            + (1 + phase_a_workers) * Workspace::<F>::bytes(ncols);
+            + (1 + phase_a_workers) * block.workspace_bytes();
         if let Err(stop) = live.charge(fixed) {
             return Err(self.abandon(&live, clock, stop));
         }
@@ -1683,6 +1691,13 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
         Workspace::with_lane(self.ncols, self.lane.as_ref().map(|(lane, _)| *lane))
     }
 
+    /// What [`Self::workspace`] holds, as the live budget charges it: a lane's cells where they
+    /// are wider than `F` (#1183's are `u64`).
+    pub(super) fn workspace_bytes(&self) -> usize {
+        let cell = self.lane.as_ref().map_or(0, |(lane, _)| lane.cell_bytes());
+        Workspace::<F>::bytes_with_cells(self.ncols, cell)
+    }
+
     /// A monic `row` in lane form, when the batch reduces in lanes.
     pub(super) fn lane_row(&self, row: &[(u32, F)]) -> Option<LaneRow>
     where
@@ -1721,8 +1736,9 @@ pub(super) struct Workspace<F> {
 
 impl<F> Workspace<F> {
     /// What one workspace over `ncols` columns holds, as the live budget charges it.
-    pub(super) fn bytes(ncols: usize) -> usize {
-        ncols * size_of::<F>() + ncols.div_ceil(64) * size_of::<u64>()
+    /// Each column takes at least `cell` bytes: a lane's cells may be wider than `F`.
+    pub(super) fn bytes_with_cells(ncols: usize, cell: usize) -> usize {
+        ncols * size_of::<F>().max(cell) + ncols.div_ceil(64) * size_of::<u64>()
     }
 }
 

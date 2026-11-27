@@ -260,6 +260,23 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
         Ok(job.run())
     }
 
+    fn prime31_lane() -> Option<crate::linalg::lane::Lane<Self>> {
+        if P <= crate::linalg::lane::MAX_LANE_PRIME as u64
+            || P > crate::linalg::lane::MAX_LANE31_PRIME as u64
+        {
+            return None;
+        }
+        // The stored representative, Montgomery or not, is below P < 2^31 and linear.
+        crate::linalg::lane::Lane::new_31(
+            P as u32,
+            |element| element.value as u32,
+            |raw| Self {
+                value: u64::from(raw),
+            },
+            |element| element.value() as u32,
+        )
+    }
+
     fn new(val: u64) -> Self {
         Self {
             value: montgomery::to_internal::<P>(val % P),
