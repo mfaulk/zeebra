@@ -4,7 +4,8 @@
 //! interpolate: `O(n log n)` against the schoolbook `O(d^2)` of `Mul`.
 //!
 //! [`multiply`] dispatches over **three** routes by measured threshold — schoolbook, Karatsuba,
-//! then the transform. The first two are [`multiply_dense`]'s own choice on its base case; this
+//! then a transform: the field's own where its two-adicity hosts the domain, and otherwise the
+//! multi-modular product of [`try_multiply_multimodular`] (#1226), on its own crossover. The first two are [`multiply_dense`]'s own choice on its base case; this
 //! module chooses between that and the transform on [`fft_multiplication_crossover`]. #185 is where
 //! the three were joined, and its finding is that the threshold has to be measured against
 //! Karatsuba rather than inherited from the schoolbook-versus-transform figure.
@@ -25,7 +26,11 @@
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    evaluate, fft::domain::FFTDomain, fields::RootOfUnityError, interpolate, poly::multiply_dense,
+    evaluate,
+    fft::{domain::FFTDomain, multimodular::try_multiply_multimodular},
+    fields::RootOfUnityError,
+    interpolate,
+    poly::multiply_dense,
     FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
 };
 
@@ -106,6 +111,31 @@ pub fn fft_multiplication_crossover<F: FiniteField>() -> u32 {
     }
 }
 
+/// The product degree at and above which [`try_multiply_multimodular`] beats `multiply_dense`,
+/// per element width, for a field whose two-adicity cannot host the product's domain.
+///
+/// `examples/multimodular_crossover.rs` is the instrument: Karatsuba against the multi-modular
+/// product, interleaved, minimum of up to seven repetitions, agreement checked outside the timing.
+/// **Unpinned development figures** from an M4 Pro laptop under concurrent builds (#1226), so the
+/// bench host has to confirm them:
+///
+/// | field | element | primes | Karatsuba-vs-CRT crossing | threshold |
+/// |---|---|---:|---|---|
+/// | `2^64 - 59` | 8 bytes | 3 | (3070, 4094] | **4096** |
+/// | `2^31 - 1` in a `u64` | 8 bytes | 2 | (3070, 4094] | **4096** |
+/// | Mersenne-31 | 4 bytes | 2 | (24574, 32766] | **32768** |
+///
+/// The 4-byte crossing is where the CRT side stays ahead; it first edges ahead at (12286, 16382]
+/// and loses again at 24574, because a length of `3 * 2^k` pays for a `2^(k+2)`-point transform.
+/// Rounded up, as [`fft_multiplication_crossover`] rounds. No word prime is wider than 8 bytes, so
+/// the wider arm is never reached through the multi-modular route.
+pub fn multimodular_multiplication_crossover<F: FiniteField>() -> u32 {
+    match std::mem::size_of::<F>() {
+        0..=4 => 32768,
+        _ => 4096,
+    }
+}
+
 /// The product of `a` and `b`, evaluated and interpolated over `domain`.
 ///
 /// The domain is a parameter because one domain serves any number of products that fit in it, and
@@ -153,7 +183,7 @@ pub fn multiply_over_domain<F: FiniteField>(
 ///
 /// Fails if the field's two-adicity is below `log2` of the points the product needs, where no
 /// power-of-two domain of that size exists — a fact about the field, so a value rather than a
-/// panic. [`multiply`] falls back to `multiply_dense` on exactly that failure.
+/// panic. [`multiply`] falls back to the multi-modular product on exactly that failure.
 pub fn try_multiply_via_fft<F: KnownOrder, R: RngCore + CryptoRng>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
@@ -175,23 +205,45 @@ pub fn try_multiply_via_fft<F: KnownOrder, R: RngCore + CryptoRng>(
 
 /// The product of `a` and `b`, by whichever route is faster for their degree.
 ///
-/// Three routes, by measured threshold: schoolbook, then Karatsuba, then the transform. The first
-/// two are `multiply_dense`'s own choice on `karatsuba_base_case`; this function chooses between
-/// that and the transform on [`fft_multiplication_crossover`]. A field that cannot host a domain
-/// that large falls back to `multiply_dense` rather than to schoolbook. Always returns the same
-/// polynomial as `a * b`.
+/// Three routes, by measured threshold: schoolbook, then Karatsuba, then a transform. The first
+/// two are `multiply_dense`'s own choice on `karatsuba_base_case`. The transform is the field's
+/// own above [`fft_multiplication_crossover`] where its two-adicity hosts the product's domain, and
+/// the multi-modular product above [`multimodular_multiplication_crossover`] where it does not. A
+/// field that has neither — not a word-size prime and without the two-adicity — falls back to
+/// `multiply_dense`. Always returns the same polynomial as `a * b`.
 pub fn multiply<F: KnownOrder, R: RngCore + CryptoRng>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
     rng: &mut R,
 ) -> UnivariatePolynomial<F> {
-    multiply_above(a, b, fft_multiplication_crossover::<F>(), rng)
+    if a.is_zero() || b.is_zero() {
+        return UnivariatePolynomial::zero();
+    }
+    multiply_above(a, b, transform_crossover::<F>(product_degree(a, b)), rng)
+}
+
+/// The crossover [`multiply`] applies at this product degree: the field's own transform's where its
+/// two-adicity hosts the domain, and the multi-modular product's where it does not.
+fn transform_crossover<F: KnownOrder>(degree: u32) -> u32 {
+    let in_field = fft_multiplication_crossover::<F>();
+    if degree < in_field.min(multimodular_multiplication_crossover::<F>()) {
+        // Dense either way; skips reading the two-adicity, which allocates, on a small product.
+        return in_field;
+    }
+    let points = u64::from(degree) + 1;
+    if points.next_power_of_two().trailing_zeros() <= F::two_adicity() {
+        in_field
+    } else {
+        multimodular_multiplication_crossover::<F>()
+    }
 }
 
 /// [`multiply`] with the crossover stated rather than taken from the measurement.
 ///
 /// For a caller who has measured their own field, or whose polynomials are sparse enough that the
-/// schoolbook loop skips most of its work and the default threshold is too low.
+/// schoolbook loop skips most of its work and the default threshold is too low. At and above
+/// `crossover` it tries the field's own transform, then the multi-modular product, then
+/// `multiply_dense`.
 pub fn multiply_above<F: KnownOrder, R: RngCore + CryptoRng>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
@@ -206,10 +258,13 @@ pub fn multiply_above<F: KnownOrder, R: RngCore + CryptoRng>(
         return multiply_dense(a, b);
     }
 
-    // The fallback is `multiply_dense`, not schoolbook. This arm is not a rare corner: a field
-    // whose two-adicity cannot host the domain takes it at *every* degree above the crossover, and
-    // Mersenne-31 — two-adicity 1 — is one such field, so this is where its large products land.
-    try_multiply_via_fft(a, b, rng).unwrap_or_else(|_| multiply_dense(a, b))
+    // Not a rare corner: a field whose two-adicity cannot host the domain takes the multi-modular
+    // arm at *every* degree above the crossover. Mersenne-31 and 2^64 - 59 are such fields. Only a
+    // field that is neither NTT-friendly nor a word-size prime reaches `multiply_dense` here.
+    try_multiply_via_fft(a, b, rng)
+        .ok()
+        .or_else(|| try_multiply_multimodular(a, b).ok())
+        .unwrap_or_else(|| multiply_dense(a, b))
 }
 
 /// The degree of the product, which over a field is the sum of the degrees.
@@ -225,15 +280,19 @@ mod tests {
     use rand::{prelude::StdRng, Rng, SeedableRng};
 
     use crate::{
-        fft::multiply::{
-            fft_multiplication_crossover, multiply, multiply_above, multiply_over_domain,
-            try_multiply_via_fft,
+        fft::{
+            multimodular::try_multiply_multimodular,
+            multiply::{
+                fft_multiplication_crossover, multimodular_multiplication_crossover, multiply,
+                multiply_above, multiply_over_domain, transform_crossover, try_multiply_via_fft,
+            },
         },
         fields::{
-            BabyBear, Bn254Fr, KoalaBear, Mersenne31, RootOfUnityError, Zp18446744069414584321,
-            Zp65537,
+            BabyBear, Bn254Fr, Gf13Pow4, KoalaBear, Mersenne31, RootOfUnityError,
+            Zp18446744069414584321, Zp18446744073709551557, Zp65537,
         },
         karatsuba_base_case_unstable,
+        poly::multiply_dense,
         test_support::schoolbook_product,
         FFTDomain, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
     };
@@ -307,14 +366,9 @@ mod tests {
         );
     }
 
-    /// The dispatcher falls back to `multiply_dense` rather than failing on such a field.
-    ///
-    /// The last two degrees put the product above the 4-byte transform threshold of 4096, so they
-    /// reach the `unwrap_or_else` arm — the one a field of two-adicity 1 takes at *every* degree
-    /// above the crossover — rather than only the below-crossover branch. Both are asserted equal
-    /// to schoolbook, so the fallback is exercised and not merely entered.
+    /// The dispatcher stays exact on such a field, below and above the in-field crossover.
     #[test]
-    fn test_the_dispatcher_falls_back_when_the_field_cannot_host_a_domain() {
+    fn test_the_dispatcher_is_exact_when_the_field_cannot_host_a_domain() {
         let mut rng = StdRng::seed_from_u64(11);
         assert_eq!(Mersenne31::two_adicity(), 1);
         for degree in [1, 8, 64, 2049, 3000] {
@@ -326,21 +380,81 @@ mod tests {
         }
     }
 
-    /// The fallback arm is reached, not merely reachable: a product degree above the crossover over
-    /// a field of two-adicity 1 has no domain, which `try_multiply_via_fft` must report as the
-    /// error `multiply_above` catches.
+    /// Above the in-field crossover over a field of two-adicity 1, `try_multiply_via_fft` reports
+    /// the error `multiply_above` catches, and the multi-modular arm then gives the product.
     #[test]
-    fn test_the_fallback_arm_is_the_one_a_low_two_adicity_field_takes() {
+    fn test_a_low_two_adicity_field_takes_the_multimodular_arm() {
         let mut rng = StdRng::seed_from_u64(1_111);
         let degree = 2_049;
-        assert!(2 * degree >= fft_multiplication_crossover::<Mersenne31>() as usize);
         let a = random_polynomial::<Mersenne31, _>(degree, &mut rng);
         let b = random_polynomial::<Mersenne31, _>(degree, &mut rng);
         assert!(
             try_multiply_via_fft(&a, &b, &mut rng).is_err(),
-            "a two-adicity of 1 cannot host this domain, so the dispatcher's fallback is live"
+            "a two-adicity of 1 cannot host this domain, so the fallback is live"
         );
-        assert_eq!(multiply(&a, &b, &mut rng), schoolbook_product(&a, &b));
+        let expected = schoolbook_product(&a, &b);
+        assert_eq!(try_multiply_multimodular(&a, &b).unwrap(), expected);
+        assert_eq!(multiply_above(&a, &b, 0, &mut rng), expected);
+        assert_eq!(multiply(&a, &b, &mut rng), expected);
+    }
+
+    /// A field with neither the two-adicity nor a word residue reaches `multiply_dense`.
+    ///
+    /// GF(13^4) has `q - 1 = 2^4 * 1785`, so a product of degree 38 needs 64 points it cannot host,
+    /// and as an extension field it has no word residue.
+    #[test]
+    fn test_a_field_with_neither_transform_falls_back_to_dense() {
+        let mut rng = StdRng::seed_from_u64(1_226);
+        assert_eq!(Gf13Pow4::two_adicity(), 4);
+        let a = random_polynomial::<Gf13Pow4, _>(19, &mut rng);
+        let b = random_polynomial::<Gf13Pow4, _>(19, &mut rng);
+        assert!(try_multiply_via_fft(&a, &b, &mut rng).is_err());
+        assert!(try_multiply_multimodular(&a, &b).is_err());
+        assert_eq!(
+            multiply_above(&a, &b, 0, &mut rng),
+            schoolbook_product(&a, &b)
+        );
+    }
+
+    /// 2^64 - 59, the issue's field: the dispatcher agrees with Karatsuba on both sides of the
+    /// multi-modular crossover, at product degrees 4095 and 4096.
+    #[test]
+    fn test_the_dispatcher_agrees_across_the_multimodular_crossover() {
+        type F = Zp18446744073709551557;
+        let mut rng = StdRng::seed_from_u64(12_262);
+        let half = multimodular_multiplication_crossover::<F>() as usize / 2;
+        for (da, db) in [(half - 1, half), (half, half)] {
+            let a = random_polynomial::<F, _>(da, &mut rng);
+            let b = random_polynomial::<F, _>(db, &mut rng);
+            assert_eq!(
+                multiply(&a, &b, &mut rng),
+                multiply_dense(&a, &b),
+                "{da}, {db}"
+            );
+        }
+    }
+
+    /// `multiply` takes the multi-modular crossover exactly where the field cannot host the domain.
+    #[test]
+    fn test_the_crossover_depends_on_whether_the_field_hosts_the_domain() {
+        // 2^64 - 59: two-adicity 2, so any product past 4 points takes the multi-modular crossover.
+        assert_eq!(transform_crossover::<Zp18446744073709551557>(5_000), 4096);
+        assert_eq!(transform_crossover::<Mersenne31>(40_000), 32768);
+        // Goldilocks hosts it, so the in-field figure applies.
+        assert_eq!(transform_crossover::<Zp18446744069414584321>(5_000), 512);
+        // Zp65537 hosts 2^16 points and no more: past that, the multi-modular figure.
+        assert_eq!(transform_crossover::<Zp65537>(65_535), 512);
+        assert_eq!(transform_crossover::<Zp65537>(65_536), 4096);
+    }
+
+    /// The multi-modular crossover is indexed by element width, as measured.
+    #[test]
+    fn test_the_multimodular_crossover_follows_the_element_width() {
+        assert_eq!(multimodular_multiplication_crossover::<Mersenne31>(), 32768);
+        assert_eq!(
+            multimodular_multiplication_crossover::<Zp18446744073709551557>(),
+            4096
+        );
     }
 
     /// The dispatcher agrees with schoolbook across all three routes' thresholds.

@@ -38,9 +38,10 @@ pub(crate) mod test_support;
 
 pub use fft::{
     bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform, evaluate,
-    fft_multiplication_crossover, interpolate, multiply, multiply_above, multiply_over_domain,
-    powers_of, try_interpolate, try_multiply_via_fft, with_bluestein, DomainError, FFTDomain,
-    InterpolateError,
+    fft_multiplication_crossover, interpolate, multimodular_multiplication_crossover, multiply,
+    multiply_above, multiply_over_domain, powers_of, try_interpolate, try_multiply_multimodular,
+    try_multiply_via_fft, with_bluestein, DomainError, FFTDomain, InterpolateError,
+    MultimodularError, AUXILIARY_PRIMES,
 };
 #[doc(hidden)]
 pub use fft::{bluestein_crossover_unstable, dft_unstable};

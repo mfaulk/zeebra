@@ -323,6 +323,17 @@ where
     fn transform_root_of_unity(_log_n: u32) -> Option<Self> {
         None
     }
+
+    /// This element's canonical residue in `[0, p)`, or `None` unless the field is a prime field
+    /// of characteristic `p < 2^64`.
+    ///
+    /// What lets the multi-modular product (#1226) lift coefficients to integers without a
+    /// `KnownOrder` bound: the modulus itself is `word_residue(-1) + 1`. The default is `None`,
+    /// which keeps a field on its other routes. A `Some` must be the residue the integer embedding
+    /// [`Self::new`] maps back to this element.
+    fn word_residue(&self) -> Option<u64> {
+        None
+    }
 }
 
 /// A field element prepared as a repeated multiplier, with up to two words of precomputation.

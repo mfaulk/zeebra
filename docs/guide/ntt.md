@@ -602,8 +602,9 @@ odd-order transforms. #161 sharpened that finding rather than softening it: maki
 ### The multiplication crossover, measured
 
 `multiply` dispatches over three routes by measured threshold — the schoolbook `Mul`, Karatsuba,
-then the transform — and the fallback for a field that cannot host a domain is Karatsuba rather
-than schoolbook. Where it should switch between Karatsuba and the transform is **not** one number:
+then the transform. A word-size prime field that cannot host the domain takes the multi-modular
+product instead (see below), and only a field with neither falls back to Karatsuba. Where it should
+switch between Karatsuba and the transform is **not** one number:
 
 | element | Karatsuba base case | transform threshold | measured crossing |
 |---|---:|---:|---|
@@ -624,6 +625,37 @@ cargo run --release --example multiplication_dispatch -- koalabear max_log=17
 Over **Mersenne-31**, whose two-adicity of 1 rules the transform out at every degree, the fallback
 is the whole of what the dispatcher buys: **1.80x** at operand length 16 rising to **11.19x** at
 16384, from a route that was previously unreachable there.
+
+#### Fields without the two-adicity: the multi-modular product
+
+`try_multiply_multimodular` (#1226) multiplies over any prime field of characteristic below `2^64`
+without a root of unity in it. It lifts the coefficients to integers in `[0, p)` and multiplies them
+modulo one, two or three NTT primes `2^64 - 2^e + 1` (`e` = 32, 34, 40). It then recombines the
+residues by CRT in Garner's mixed radix and reduces into the field. A product coefficient sums at most
+`m = min(len a, len b)` terms of size at most `(p - 1)^2`, so it is recovered exactly when
+`m (p - 1)^2` is below the product of the primes used. The planner takes the fewest primes that
+satisfy that, checked exactly: one for a tiny `p`, two up to about `2^48` even at the longest products, and three above. Products
+are limited to `2^32` coefficients, Goldilocks' two-adicity. `multiply` takes this route above
+`multimodular_multiplication_crossover` wherever the field cannot host the product's domain:
+2⁶⁴ − 59 and Mersenne-31 at every degree, and Zp65537 beyond `2^16` points.
+
+Unpinned development timings on the M4 Pro laptop with concurrent builds running, from the #1226
+branch on top of `8abf1b4e`, built with thin LTO and 16 codegen units. They are not deciding
+figures, and the bench host has to re-measure the crossovers:
+
+| field | primes | operand len | Karatsuba µs | multi-modular µs | ratio |
+|---|---:|---:|---:|---:|---:|
+| 2⁶⁴ − 59 | 3 | 2048 | 576.5 | 500.8 | 1.15x |
+| 2⁶⁴ − 59 | 3 | 8192 | 5 278 | 2 244 | 2.35x |
+| 2⁶⁴ − 59 | 3 | 32768 | 48 187 | 11 822 | 4.08x |
+| 2⁶⁴ − 59 | 3 | 131072 | 462 334 | 55 313 | 8.36x |
+| Mersenne-31 | 2 | 8192 | 1 512 | 1 400 | 1.08x |
+| Mersenne-31 | 2 | 32768 | 13 687 | 7 432 | 1.84x |
+| Mersenne-31 | 2 | 131072 | 125 701 | 35 287 | 3.56x |
+
+```text
+cargo run --release --example multimodular_crossover -- max_log=17
+```
 
 The older schoolbook-versus-transform figures are kept below, because they are what the `fftmul`
 rows above were taken against. Median of interleaved runs, pinned to one core, product degree

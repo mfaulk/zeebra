@@ -284,6 +284,10 @@ impl<const P: u32> FiniteField for PrimeFieldElement32<P> {
         crate::fields::two_adic::deterministic_two_adic_root(log_n)
     }
 
+    fn word_residue(&self) -> Option<u64> {
+        Some(u64::from(self.value()))
+    }
+
     fn inverse(&self) -> Self {
         assert_ne!(
             *self,
