@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its #850 planted, call-site and caller A/B were measured at `f3de297b`, the caller A/B against that tree with the dispatch disabled. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its #850 planted, call-site and caller A/B were measured at `f3de297b`, the caller A/B against that tree with the dispatch disabled. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries. §4.5's #1207 subsection was measured at `dbba0700`, both kernels in one binary.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -2039,6 +2039,51 @@ on that: in exact arithmetic the inequality reduces to `t > t` there, so only `p
 disturb it, and the floor's integer test covered it. Now that they differ by 16x the balanced case
 needs its own guard, and it has one — `k == m` returns `k > crossover` with no floating point at
 all. `test_the_balanced_case_still_follows_the_crossover_not_the_floor` pins it.
+
+#### #1207: the half-GCD resultant, and where it crosses the Euclidean kernel
+
+**Measured at `dbba0700`** (the #1207 branch commit), on an unpinned M4 Pro laptop with thin LTO
+and 16 codegen units. These are indicative figures, not a deciding measurement.
+
+`resultant_half_gcd_unstable` runs the same recursion `gcd` does and records `(deg r_i, lc r_i)`
+for each remainder. Those values are all `Res(f, g)` needs: each step contributes
+`(−1)^{d_{i−1} d_i} · lc(r_i)^{d_{i−1} − d_{i+1}}`. A remainder is recorded only by a reduction
+whose target it clears. A truncated reduction's remainders agree with the full-length ones down to
+its target, because the lift's correction `M · (a_low, b_low)` has degree below it. Degrees in a
+truncated reduction are offset by its shift. The specialization trap (`structured-sylvester.md`
+§5.3) is closed by the Euclidean kernel's own formal-degree code, which now takes the exact-degree
+kernel as a parameter.
+
+`examples/resultant_crossover` runs both coefficient-form kernels on seeded `(n, n − 1)` pairs,
+alternating arm order. It reports the best of up to 7 repetitions, after asserting that the two
+kernels agree. The table gives Euclidean time over half-GCD time:
+
+| n | KoalaBear | Goldilocks | BN254 Fr |
+|--:|--:|--:|--:|
+| 128 | 0.908 | 0.938 | 0.942 |
+| 512 | 0.747 | 0.845 | 0.909 |
+| 1 024 | 0.837 | 0.929 | **1.048** |
+| 1 536 | 0.962 | **1.088** | 1.177 |
+| 2 048 | **1.028** | 1.166 | 1.291 |
+| 3 072 | 1.207 | 1.362 | 1.513 |
+| 4 096 | 1.276 | 1.458 | 1.658 |
+| 8 192 | 1.688 | 1.850 | 2.181 |
+| 16 384 | 2.198 | 2.575 | — |
+
+Below the crossover, half-GCD loses by 5–30% even inside its own classical base case. That base
+case divides `UnivariatePolynomial`s and allocates on every step, while `exact_resultant` runs the
+whole sequence in two buffers (#599). `resultant_from_coefficients_auto_unstable` therefore
+dispatches on the smaller true degree: half-GCD from 2 048, 1 536 or 1 024 for 4-byte, 8-byte or
+wider elements, and the Euclidean kernel below. `DeterminantKernel::HalfGcd` is that dispatch.
+
+**Gate.** #1207 asks for at least 1.3x over Euclidean at an operand degree a current caller
+reaches, on two fields. Half-GCD reaches 1.3x at n = 3 072 on Goldilocks and BN254. The resultant
+route's in-scope Sylvester order is 1 458 (`resultant-elimination.md` §6.9). At that order the
+smaller operand has degree at most 729, and between n = 512 and 768 half-GCD measures 0.75–0.98x. So the crossover lies
+above every reachable degree. The kernel stays opt-in, `Dense` stays the default, and the
+Euclidean kernel's #412 wide-field penalty was not re-measured, because no default changed.
+Re-deciding the default would need a caller that reaches operand degree ≥ 3 072, and then
+`determinant_sweep --kernel half-gcd` at 1 and 32 workers on the bench host.
 
 #### Protocol
 
