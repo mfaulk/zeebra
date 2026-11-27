@@ -983,3 +983,160 @@ fn test_lead_ideal_handoff_under_checked_options() {
     assert_eq!(result.unwrap(), f4(&system, grlex).unwrap());
     assert!(s.lead_ideal_stop && s.lead_ideal_complete);
 }
+
+/// #1185: the pair bookkeeping against its pre-#1185 form (`SigF4Options::reference_pairs`). The
+/// same pending entries are queued in the same order, every criterion rejects the same count, the
+/// batches and bases are identical, and the syzygy store keeps and drops the same entries; only
+/// the Koszul inserts that were no-ops are gone.
+fn assert_pairs_match_reference<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &SigF4Options,
+) {
+    let reference = SigF4Options {
+        reference_pairs: true,
+        ..options.clone()
+    };
+    let (expected, before) = sig_f4_reported(system, order, &reference);
+    let (actual, after) = sig_f4_reported(system, order, options);
+    assert_eq!(actual.unwrap(), expected.unwrap(), "bases differ");
+    assert_eq!(after.pair_trace, before.pair_trace, "queued pairs differ");
+    assert_eq!(after.batch_trace, before.batch_trace, "batches differ");
+    let counts = |s: &super::SigF4Statistics| {
+        [
+            s.pairs_created,
+            s.pairs_singular,
+            s.rejected_product,
+            s.rejected_koszul,
+            s.rejected_zero_row,
+            s.rejected_rewrite,
+            s.rejected_duplicate,
+            s.targets,
+            s.reducer_rows,
+            s.reductions_to_zero,
+            s.signature_basis_elements,
+            s.syzygy_signatures,
+            s.peak_pending,
+        ]
+    };
+    assert_eq!(counts(&after), counts(&before));
+    let (w, r) = (&after.pair_work, &before.pair_work);
+    // A query that misses scans its whole bucket, which may hold one Koszul entry fewer now.
+    let answered = |s: &super::signature::ScanWork| (s.calls, s.hits);
+    assert_eq!(answered(&w.creation_queries), answered(&r.creation_queries));
+    assert_eq!(w.selection_queries, r.selection_queries);
+    assert_eq!(w.zero_row, r.zero_row);
+    assert_eq!(
+        (w.visited, w.pushed, w.rewriter_calls, w.rewriter_scanned),
+        (r.visited, r.pushed, r.rewriter_calls, r.rewriter_scanned)
+    );
+    assert_eq!(
+        (w.koszul.kept, w.koszul.dropped),
+        (r.koszul.kept, r.koszul.dropped)
+    );
+    assert_eq!(w.koszul.calls + w.koszul_skipped, r.koszul.calls);
+    assert_eq!(r.koszul_skipped, 0);
+}
+
+#[test]
+fn test_pair_bookkeeping_matches_the_reference_across_families() {
+    let checked = SigF4Options {
+        check_signatures: true,
+        ..SigF4Options::default()
+    };
+    let lex = SigF4Options {
+        allow_graded_lex: true,
+        lead_ideal_stop: false,
+        ..checked.clone()
+    };
+    let grlex = MonomialOrder::GradedLexicographic;
+    assert_pairs_match_reference(&eco::<7, Goldilocks>(), GREVLEX, &checked);
+    assert_pairs_match_reference(&eco::<8, Wide>(), GREVLEX, &checked);
+    assert_pairs_match_reference(&katsura::<7, Goldilocks>(), GREVLEX, &checked);
+    assert_pairs_match_reference(&katsura::<5, Zp32003>(), grlex, &lex);
+    assert_pairs_match_reference(&cyclic::<5, Zp32003>(), GREVLEX, &checked);
+    assert_pairs_match_reference(&cyclic::<5, Wide>(), grlex, &lex);
+    assert_pairs_match_reference(&noon::<5, Wide>(), GREVLEX, &checked);
+    assert_pairs_match_reference(&reimer::<4, Zp32003>(), GREVLEX, &checked);
+    assert_pairs_match_reference(&dense_quadratics::<6, Zp32003>(7), GREVLEX, &checked);
+}
+
+/// The parallel cascade settles zero rows in its own order; the pairs still match.
+#[test]
+fn test_pair_bookkeeping_matches_the_reference_under_the_parallel_cascade() {
+    let cascade = SigF4Options {
+        workers: 3,
+        parallel_cascade: true,
+        ..SigF4Options::default()
+    };
+    assert_pairs_match_reference(&katsura::<6, Goldilocks>(), GREVLEX, &cascade);
+}
+
+/// #1185's counters add up: every created pair is rejected by the product criterion or queried,
+/// every query that misses is queued, and every Koszul signature is offered or skipped.
+#[test]
+fn test_pair_work_counts_add_up() {
+    let (result, s) = sig_f4_reported(&katsura::<7, Zp32003>(), GREVLEX, &SigF4Options::default());
+    result.unwrap();
+    let w = &s.pair_work;
+    let n = s.signature_basis_elements as u64;
+    assert_eq!(w.visited, n * (n - 1) / 2);
+    assert_eq!(w.visited, (s.pairs_created + s.pairs_singular) as u64);
+    assert_eq!(
+        s.pairs_created as u64,
+        s.rejected_product as u64 + w.creation_queries.calls
+    );
+    assert_eq!(w.pushed, w.creation_queries.calls - w.creation_queries.hits);
+    assert_eq!(w.koszul.calls + w.koszul_skipped, s.pairs_created as u64);
+    assert_eq!(w.koszul_skipped, w.creation_queries.hits);
+    assert_eq!(
+        (s.rejected_koszul + s.rejected_zero_row) as u64,
+        w.creation_queries.hits + w.selection_queries.hits
+    );
+    assert_eq!(w.zero_row.calls, s.zero_rows as u64);
+    assert!(w.creation_queries.masks >= w.creation_queries.divisibility);
+    assert!(w.creation_queries.divisibility >= w.creation_queries.hits);
+    assert!(s.bookkeeping_select <= s.bookkeeping);
+}
+
+/// #1185: the store against a naive model on random inserts and queries: an insert is kept iff no
+/// stored entry divides it (whatever order the store scans in), it drops exactly its multiples,
+/// and a query reports the earliest dividing entry's source.
+#[test]
+fn test_syzygy_store_matches_a_naive_model() {
+    use rand::{rngs::StdRng, Rng, SeedableRng};
+    let mut rng = StdRng::seed_from_u64(1185);
+    for _ in 0..20 {
+        let mut store = SyzygyStore::<3>::new(2);
+        let mut model: Vec<(Signature<3>, SyzygySource)> = Vec::new();
+        for _ in 0..300 {
+            let s = Signature::new(
+                monomial([
+                    rng.gen_range(0..6),
+                    rng.gen_range(0..6),
+                    rng.gen_range(0..6),
+                ]),
+                rng.gen_range(0..2),
+            );
+            let source = if rng.gen_bool(0.5) {
+                SyzygySource::Koszul
+            } else {
+                SyzygySource::ZeroRow
+            };
+            let expected = model
+                .iter()
+                .find(|(e, _)| e.divides(&s))
+                .map(|&(_, src)| src);
+            assert_eq!(store.covering(&s), expected);
+            if rng.gen_bool(0.5) {
+                let kept = expected.is_none();
+                assert_eq!(store.insert(s, source), kept);
+                if kept {
+                    model.retain(|(e, _)| !s.divides(e));
+                    model.push((s, source));
+                }
+            }
+            assert_eq!(store.len(), model.len());
+        }
+    }
+}

@@ -103,6 +103,10 @@ pub struct SigF4Options {
     /// Tests only: the column-space interreduction's live-entry budget, to force its fallback.
     #[cfg(test)]
     pub(crate) interreduction_live_entries: Option<usize>,
+    /// Tests only: create pairs and compare ratios as before #1185, the oracle the engine's pair
+    /// bookkeeping is checked against.
+    #[cfg(test)]
+    pub(crate) reference_pairs: bool,
 }
 
 impl Default for SigF4Options {
@@ -130,6 +134,8 @@ impl Default for SigF4Options {
             adversary: None,
             #[cfg(test)]
             interreduction_live_entries: None,
+            #[cfg(test)]
+            reference_pairs: false,
         }
     }
 }
@@ -233,6 +239,11 @@ pub struct SigF4Statistics {
     pub bookkeeping: Duration,
     /// The part of `bookkeeping` spent hashing new elements' terms for the monomial table.
     pub element_hashing: Duration,
+    /// The part of `bookkeeping` spent selecting each batch's targets from the pending pairs;
+    /// the rest is inserting new elements and creating their pairs.
+    pub bookkeeping_select: Duration,
+    /// #1185: the criteria's and the pair store's work, counted.
+    pub pair_work: PairWork,
     pub symbolic: Duration,
     pub elimination: Duration,
     pub interreduction: Duration,
@@ -256,6 +267,9 @@ pub struct SigF4Statistics {
     /// Per batch run, its signature degree.
     #[cfg(test)]
     pub(crate) batch_degrees: Vec<u64>,
+    /// Every pending entry queued, in order, with its source (#1185's exactness oracle).
+    #[cfg(test)]
+    pub(crate) pair_trace: Vec<String>,
     /// #901's elimination split and glue clocks; collected only under `research-sigf4-split`.
     #[cfg(feature = "research-sigf4-split")]
     pub split: SplitLog,
@@ -269,6 +283,32 @@ pub struct SigF4Statistics {
     /// #1075's per-batch adjacent-round census, when [`SigF4Options::adjacent`] asked for it.
     #[cfg(feature = "research-adjacent")]
     pub adjacent: Vec<adjacent::AdjacentBatch>,
+}
+
+/// #1185: where pair bookkeeping does its work, by criterion and data structure. Counts only, so a
+/// run's figures do not depend on the machine.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PairWork {
+    /// `(new, older)` pairs `insert` visits, singular ones included: `C(elements, 2)`.
+    pub visited: u64,
+    /// Koszul signatures offered to the syzygy store.
+    pub koszul: signature::InsertWork,
+    /// Koszul inserts skipped because the pair's own signature was already covered, which makes
+    /// the insert a no-op.
+    pub koszul_skipped: u64,
+    /// Zero-row signatures offered to the syzygy store.
+    pub zero_row: signature::InsertWork,
+    /// The syzygy criterion at pair creation, on each pair that passes the product criterion.
+    pub creation_queries: signature::ScanWork,
+    /// The syzygy criterion at selection, once per distinct pending signature.
+    pub selection_queries: signature::ScanWork,
+    /// Pairs pushed to the pending queue.
+    pub pushed: u64,
+    /// The rewrite criterion: calls, same-index elements scanned, and the full divisibility tests
+    /// the signature masks let through.
+    pub rewriter_calls: u64,
+    pub rewriter_scanned: u64,
+    pub rewriter_divisibility: u64,
 }
 
 /// One batch's elimination, split by pivot source. `reducer_*` is work against the batch's reducer

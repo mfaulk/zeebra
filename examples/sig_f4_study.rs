@@ -81,7 +81,11 @@ use zeebra::{
         external::{corpus, ExternalSolver, FieldSpec, Instance, Limits, SingularSolver, Task},
         f4_reported, f4_signature_reported,
         reference::buchberger_reference,
-        sigf4::{sig_f4_reported, SigF4Options, SigF4Statistics},
+        sigf4::{
+            sig_f4_reported,
+            signature::{InsertWork, ScanWork},
+            PairWork, SigF4Options, SigF4Statistics,
+        },
         BatchOrder, F4Options, F4Statistics, GradedEngine, ParallelForward, ParallelSymbolic,
         ReducerSelection,
     },
@@ -690,6 +694,8 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("signature_metadata_bytes", size(s.signature_metadata_bytes)),
         ("bookkeeping_ns", Json::nanos(s.bookkeeping)),
         ("element_hashing_ns", Json::nanos(s.element_hashing)),
+        ("bookkeeping_select_ns", Json::nanos(s.bookkeeping_select)),
+        ("pair_work", pair_work(&s.pair_work)),
         ("symbolic_ns", Json::nanos(s.symbolic)),
         ("elimination_ns", Json::nanos(s.elimination)),
         ("interreduction_ns", Json::nanos(s.interreduction)),
@@ -710,6 +716,39 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("split", split(&s.split)),
         #[cfg(feature = "research-sigf4-usage")]
         ("usage", usage(&s.usage)),
+    ])
+}
+
+/// #1185: the criteria's and the syzygy store's work, counted.
+fn pair_work(w: &PairWork) -> Json {
+    let scan = |s: &ScanWork| {
+        Json::object([
+            ("calls", Json::int(s.calls)),
+            ("masks", Json::int(s.masks)),
+            ("divisibility", Json::int(s.divisibility)),
+            ("hits", Json::int(s.hits)),
+        ])
+    };
+    let insert = |i: &InsertWork| {
+        Json::object([
+            ("calls", Json::int(i.calls)),
+            ("covering", scan(&i.covering)),
+            ("sweep", scan(&i.sweep)),
+            ("kept", Json::int(i.kept)),
+            ("dropped", Json::int(i.dropped)),
+        ])
+    };
+    Json::object([
+        ("visited", Json::int(w.visited)),
+        ("koszul", insert(&w.koszul)),
+        ("koszul_skipped", Json::int(w.koszul_skipped)),
+        ("zero_row", insert(&w.zero_row)),
+        ("creation_queries", scan(&w.creation_queries)),
+        ("selection_queries", scan(&w.selection_queries)),
+        ("pushed", Json::int(w.pushed)),
+        ("rewriter_calls", Json::int(w.rewriter_calls)),
+        ("rewriter_scanned", Json::int(w.rewriter_scanned)),
+        ("rewriter_divisibility", Json::int(w.rewriter_divisibility)),
     ])
 }
 
