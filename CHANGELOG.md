@@ -9,6 +9,12 @@ change to `y` may break the public API.
 
 ### Added
 
+- `grobner::weight_detector` (#1192), opt-in research tooling: `detect_free_basis` searches for
+  positive weights under which the input generators' leading monomials are pairwise coprime, so the
+  input already is a Gröbner basis under `MonomialOrder::weighted`. Every hit is re-checked against
+  the polynomials. `weighted_homogeneous_weights` returns the least positive grading making every
+  generator weighted-homogeneous. No solving path calls either; findings in
+  `docs/research/weight-vector-detector.md`.
 - `util::build_profile()`: the concrete cargo profile the artifact was built with
   (`profile=…; opt-level=…; lto=…; codegen-units=…; debug-assertions=…; rustflags=…`), resolved by
   a new `build.rs` from `Cargo.toml` and the `CARGO_PROFILE_*` overrides. The comparison harnesses
