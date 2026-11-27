@@ -986,6 +986,14 @@ pub struct F4Options {
     ///
     /// Off at every preset; dispatch is #1123's.
     pub prime31_lane: bool,
+
+    /// #1184's opt-in Monte Carlo zero skipping on conventional F4. See
+    /// [`MonteCarloZeros`](super::monte_carlo::MonteCarloZeros).
+    ///
+    /// `None` at every preset. Only [`f4_monte_carlo`](super::f4_monte_carlo) accepts `Some`; the
+    /// exact entry points refuse it with [`F4Error::InvalidOptions`], so a probabilistic basis is
+    /// never returned where an exact one is promised.
+    pub monte_carlo: Option<super::monte_carlo::MonteCarloZeros>,
 }
 
 impl F4Options {
@@ -1027,6 +1035,7 @@ impl F4Options {
             parallel_symbolic: ParallelSymbolic::Serial,
             graded_engine: GradedEngine::Conventional,
             prime31_lane: false,
+            monte_carlo: None,
         }
     }
 

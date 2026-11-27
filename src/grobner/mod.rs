@@ -44,14 +44,15 @@ pub use buchberger::{
 pub use decompose::{f4_decomposed, ComponentReport, DecomposeReport, DecomposeRoute};
 pub use f4::{
     certify_f4_output, certify_f4_output_with_workers, certify_f4_output_within,
-    certify_submitted_basis, certify_submitted_basis_with_witnesses, f4, f4_observed,
-    f4_observed_reported, f4_reported, f4_with_options, trace_batches, verify_ideal_membership,
-    Allowance, BatchObserver, BatchOrder, BudgetApproach, BudgetLine, BudgetReport, CacheMode,
-    CertificationReport, CertificationStage, CertificationStopped, ConstructionTimings,
-    CountDisabled, CountRefusal, CountRoute, DegreeProfile, DegreeStatistics, DivmaskCalibration,
-    F4Error, F4Options, F4Statistics, Gf2Elimination, GradedEngine, HilbertCounts,
-    HilbertSelection, InterreductionRoute, MatrixInterreduction, MatrixRefusal, MembershipLimits,
-    MembershipStatus, PairMultiples, ParallelForward, ParallelSymbolic, Provenance,
+    certify_submitted_basis, certify_submitted_basis_with_witnesses, f4, f4_monte_carlo,
+    f4_observed, f4_observed_reported, f4_reported, f4_with_options, trace_batches,
+    verify_ideal_membership, Allowance, BatchObserver, BatchOrder, BudgetApproach, BudgetLine,
+    BudgetReport, CacheMode, CertificationReport, CertificationStage, CertificationStopped,
+    ConstructionTimings, CountDisabled, CountRefusal, CountRoute, DegreeProfile, DegreeStatistics,
+    DivmaskCalibration, F4Error, F4Options, F4Statistics, Gf2Elimination, GradedEngine,
+    HilbertCounts, HilbertSelection, InterreductionRoute, MatrixInterreduction, MatrixRefusal,
+    MembershipLimits, MembershipStatus, MonteCarloBasis, MonteCarloGuarantee, MonteCarloStatistics,
+    MonteCarloZeros, PairMultiples, ParallelForward, ParallelSymbolic, Provenance,
     ReducerSelection, ReductionStrategy, SelectionLimits, StopKind, SymbolicCounts,
     WitnessCertificationReport, WitnessError, WitnessLimit, DIVMASK_BITS,
 };

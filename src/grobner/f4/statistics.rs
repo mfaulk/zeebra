@@ -558,6 +558,9 @@ impl PackedGf2Statistics {
 /// What one batch of critical pairs cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BatchStatistics {
+    /// #1184's Monte Carlo screening of this batch; zero on the exact route.
+    pub monte_carlo: super::monte_carlo::MonteCarloStatistics,
+
     /// Candidate-only backward work; zero for echelon and research-override routes.
     pub candidate_reduction: CandidateReductionStatistics,
 
@@ -756,6 +759,9 @@ impl BatchStatistics {
 /// What a whole F4 computation cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct F4Statistics {
+    /// Aggregate #1184 Monte Carlo screening; zero on the exact route.
+    pub monte_carlo: super::monte_carlo::MonteCarloStatistics,
+
     /// The dispatch decision under [`GradedEngine::Adaptive`](super::GradedEngine::Adaptive) on a
     /// graded order; `None` when the option is off, the order is not graded, or the entry point
     /// does not route.
@@ -1121,6 +1127,7 @@ impl F4Statistics {
     pub fn record(&mut self, batch: &BatchStatistics) {
         self.batches += 1;
         self.candidate_reduction.record(&batch.candidate_reduction);
+        self.monte_carlo.record(&batch.monte_carlo);
         self.packed_gf2.record(&batch.packed_gf2);
         self.parallel_forward.record(&batch.parallel_forward);
         self.max_pairs_per_batch = self.max_pairs_per_batch.max(batch.pairs);

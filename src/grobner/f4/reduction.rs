@@ -262,6 +262,13 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     }
     clock.lap();
 
+    // #1184: screening rewrites pair rows before any backend sees them, so every elimination
+    // route below runs unchanged on the screened matrix. Its time is charged to elimination.
+    let monte_carlo = options
+        .monte_carlo
+        .map(|configuration| super::monte_carlo::screen(&mut matrix, &configuration))
+        .unwrap_or_default();
+
     let rows = matrix.num_rows();
     let columns = matrix.num_columns();
 
@@ -530,6 +537,7 @@ pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver
     };
 
     let statistics = BatchStatistics {
+        monte_carlo,
         candidate_reduction,
         packed_gf2,
         parallel_forward,
