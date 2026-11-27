@@ -604,6 +604,32 @@ check "lease-state: a withdrawal under another token leaves the claim live" \
   live "$(printf 'zb-b@feat/y\t2026-01-01T05:00:00Z\t2026-01-01T09:00:00Z\ttok-b\n' \
      | zb_claims_lease_state "$LS_NOW" 0 "$(printf 'zb-b@feat/y\t2026-01-01T05:10:00Z\ttok-z\n')")"
 
+# --- release --abandon writes a withdrawal (#1177) -------------------------
+
+# The marker `withdraw` and `release --abandon` both post is the one the parser reads.
+check "withdraw-marker: round-trips through the parser" \
+  "$(printf 'zb-a@feat/x\t2026-01-01T03:00:00Z\ttok-1')" \
+  "$(jq -n --arg b "$(zb_withdraw_marker zb-a@feat/x tok-1 2026-01-01T03:00:00Z)" '[$b]' | zb_parse_withdrawals)"
+
+# The #1156 shape, end to end over comment bodies: A claims, then abandons; B claims
+# afterwards. Before #1177 the abandon wrote nothing, A's lease stayed live, and B lost.
+AB_NOW=2026-01-01T03:00:00Z
+AB_BODIES="$(jq -n \
+  --arg c1 "$(marker_tok zb-a@feat/x tok-a 2026-01-01T01:00:00Z 2026-01-01T05:00:00Z)" \
+  --arg w1 "$(zb_abandon_comment zb-a@feat/x tok-a 2026-01-01T02:00:00Z)" \
+  '[$c1, $w1]')"
+AB_CLAIMS="$(printf '%s' "$AB_BODIES" | zb_parse_claims)"
+AB_W="$(printf '%s' "$AB_BODIES" | zb_parse_withdrawals)"
+check "abandon: the abandoned claim no longer holds the lease" \
+  stale "$(printf '%s\n' "$AB_CLAIMS" | zb_claims_lease_state "$AB_NOW" 0 "$AB_W")"
+
+AB_BODIES2="$(printf '%s' "$AB_BODIES" | jq \
+  --arg c2 "$(marker_tok zb-b@feat/y tok-b 2026-01-01T02:30:00Z 2026-01-01T06:30:00Z)" '. + [$c2]')"
+check "abandon: the next claimer wins the race against an abandoned claim" \
+  "$(printf 'held\tzb-b@feat/y\ttoken')" \
+  "$(printf '%s' "$AB_BODIES2" | zb_parse_claims \
+     | zb_resolve_claim zb-b@feat/y tok-b "$CUTOFF" "$(printf '%s' "$AB_BODIES2" | zb_parse_withdrawals)")"
+
 # ---------------------------------------------------------------------------
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
