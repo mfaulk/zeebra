@@ -103,8 +103,9 @@ research-sigf4-usage = ["research-sigf4"]
 research-reuse = ["research-sigf4", "research-work"]
 
 # #1075's adjacent-round census (`sigf4::adjacent`): a previous-batch buffer of each row's run-wide
-# monomial ids, counted (`Count`) or served in place of the products and interning (`Reuse`). Opt-in
-# per run; off in every shipping binary.
+# monomial ids, counted (`Count`) or served in place of the products and interning (`Reuse`), and
+# the same from a flat arena found by lead column (`FlatCount`, `Flat`). Opt-in per run; off in every
+# shipping binary.
 research-adjacent = ["research-sigf4"]
 
 # #1168's bounded ZDD normal-form prototype (`boolean`): Boolean polynomials in GF(2)[x]/<x_i^2+x_i>
