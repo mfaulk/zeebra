@@ -36,7 +36,7 @@ pub enum AdjacentMode {
     Count,
     /// Keep the buffer and serve its hits from the stored ids.
     Reuse,
-    /// Serve hits from the flat buffer ([`Flat`]).
+    /// Serve hits from the flat buffer (one arena of ids, found by lead column).
     Flat,
     /// Keep the flat buffer and count its hits; build every row.
     FlatCount,
