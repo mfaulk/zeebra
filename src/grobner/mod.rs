@@ -9,6 +9,7 @@ pub mod external;
 pub mod f4;
 pub mod fglm;
 pub mod field_equations;
+pub mod gf2_points;
 pub mod hilbert;
 pub mod pairs;
 pub mod planning;
@@ -64,6 +65,10 @@ pub use fglm::{
 };
 pub use field_equations::{
     field_equations, rational_points_by_enumeration, with_field_equations, FieldEquationError,
+};
+pub use gf2_points::{
+    gf2_all_points, gf2_solve_one, BooleanQuadraticSystem, CrossbredParameters,
+    CrossbredStatistics, Gf2Method, Gf2PointError, Gf2PointOptions, Gf2PointReport,
 };
 pub use hilbert::{
     is_homogeneous, leading_generators_by_degree, monomials_of_degree, top_forms,
