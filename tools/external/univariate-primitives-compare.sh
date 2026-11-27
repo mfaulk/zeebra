@@ -29,7 +29,7 @@ fi
 ZEEBRA_BIN="$1"
 WORK="$2"
 FIELDS="${FIELDS:-koalabear goldilocks p64m59 bn254fr}"
-PRIMITIVES="${PRIMITIVES:-mul divrem gcd xgcd powmod roots multieval interpolate compose resultant}"
+PRIMITIVES="${PRIMITIVES:-mul mulfft divrem gcd xgcd powmod roots multieval interpolate compose resultant}"
 MIN_LOG="${MIN_LOG:-8}"
 MAX_LOG="${MAX_LOG:-20}"
 ROUNDS="${ROUNDS:-3}"
