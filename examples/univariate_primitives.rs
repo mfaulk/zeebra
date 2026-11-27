@@ -185,41 +185,63 @@ fn values_line<F: KnownOrder>(v: &[F]) -> String {
         .join(" ")
 }
 
-/// Runs `primitive` once on `ops`, returning the output lines.
-fn execute<F: KnownOrder>(primitive: &str, ops: &[Vec<F>], rng: &mut StdRng) -> Vec<String> {
-    let poly = |i: usize| UnivariatePolynomial::new(&ops[i]);
-    match primitive {
-        "mul" => vec![poly_line(&(&poly(0) * &poly(1)))],
-        "divrem" => {
-            let (q, r) = poly(0).div_with_remainder(&poly(1));
-            vec![poly_line(&q), poly_line(&r)]
+/// What one call returns, kept typed so that formatting happens after the timer stops, as it
+/// does in the C drivers.
+enum Output<F: KnownOrder> {
+    Polys(Vec<UnivariatePolynomial<F>>),
+    Values(Vec<F>),
+    Roots(Vec<F>),
+    Scalar(F),
+}
+
+impl<F: KnownOrder> Output<F> {
+    fn lines(&self) -> Vec<String> {
+        match self {
+            Output::Polys(ps) => ps.iter().map(poly_line).collect(),
+            Output::Values(v) => vec![values_line(v)],
+            Output::Roots(r) => r.iter().map(ToString::to_string).collect(),
+            Output::Scalar(s) => vec![s.to_string()],
         }
-        "gcd" => vec![poly_line(&gcd(&poly(0), &poly(1)))],
+    }
+}
+
+/// Runs `primitive` once. `polys[i]` is `ops[i]` as a polynomial, built before the timer.
+fn execute<F: KnownOrder>(
+    primitive: &str,
+    ops: &[Vec<F>],
+    polys: &[UnivariatePolynomial<F>],
+    rng: &mut StdRng,
+) -> Output<F> {
+    match primitive {
+        "mul" => Output::Polys(vec![&polys[0] * &polys[1]]),
+        "divrem" => {
+            let (q, r) = polys[0].div_with_remainder(&polys[1]);
+            Output::Polys(vec![q, r])
+        }
+        "gcd" => Output::Polys(vec![gcd(&polys[0], &polys[1])]),
         "xgcd" => {
-            let (g, s, t) = xgcd(&poly(0), &poly(1));
-            vec![poly_line(&g), poly_line(&s), poly_line(&t)]
+            let (g, s, t) = xgcd(&polys[0], &polys[1]);
+            Output::Polys(vec![g, s, t])
         }
         "powmod" => {
             let x = UnivariatePolynomial::new(&[F::zero(), F::one()]);
-            vec![poly_line(&pow_mod_limbs(&x, F::order_limbs(), &poly(0)))]
+            Output::Polys(vec![pow_mod_limbs(&x, F::order_limbs(), &polys[0])])
         }
-        "roots" => roots(&poly(0), rng)
-            .iter()
-            .map(ToString::to_string)
-            .collect(),
-        "multieval" => vec![values_line(&multipoint_evaluate(&poly(0), &ops[1]))],
+        "roots" => Output::Roots(roots(&polys[0], rng)),
+        "multieval" => Output::Values(multipoint_evaluate(&polys[0], &ops[1])),
         "interpolate" => {
             let points: Vec<(F, F)> = ops[0].iter().copied().zip(ops[1].iter().copied()).collect();
-            vec![poly_line(&lagrange_interpolate(points))]
+            Output::Polys(vec![lagrange_interpolate(points)])
         }
-        "compose" => vec![poly_line(&compose_mod(&poly(0), &poly(1), &poly(2)))],
-        "resultant" => vec![resultant(&poly(0), &poly(1)).to_string()],
+        "compose" => Output::Polys(vec![compose_mod(&polys[0], &polys[1], &polys[2])]),
+        "resultant" => Output::Scalar(resultant(&polys[0], &polys[1])),
         other => panic!("unknown primitive {other}"),
     }
 }
 
-/// Times `reps` calls, each on freshly cloned operands so no call can reuse another's work, and
-/// prints the median and minimum. The operand clone is outside the timer.
+/// Times `reps` calls and prints the median and minimum. Parsing, building the operand
+/// polynomials and formatting the result are all outside the timer; the call itself, including
+/// allocating its result, is inside, as in the C drivers.
 fn run_in<F: KnownOrder>(
     modulus: &str,
     primitive: &str,
@@ -236,21 +258,24 @@ fn run_in<F: KnownOrder>(
                 .collect()
         })
         .collect();
+    let polys: Vec<UnivariatePolynomial<F>> =
+        ops.iter().map(|v| UnivariatePolynomial::new(v)).collect();
     let mut rng = StdRng::seed_from_u64(1206);
     let mut times: Vec<Duration> = Vec::with_capacity(reps);
-    let mut lines = Vec::new();
+    let mut last = None;
     for _ in 0..reps {
-        let ops = ops.clone();
+        drop(last.take());
         let start = Instant::now();
-        lines = execute(primitive, &ops, &mut rng);
+        let result = execute(primitive, &ops, &polys, &mut rng);
         times.push(start.elapsed());
-        std::hint::black_box(&lines);
+        last = Some(std::hint::black_box(result));
     }
     times.sort();
     println!("time_ns {}", times[times.len() / 2].as_nanos());
     println!("min_ns {}", times[0].as_nanos());
     if let Some(out) = out {
         // Every line newline-terminated, so no roots is an empty file, as the drivers write it.
+        let lines = last.expect("reps >= 1").lines();
         let text: String = lines.iter().map(|l| format!("{l}\n")).collect();
         std::fs::write(out, text).unwrap_or_else(|e| panic!("writing {}: {e}", out.display()));
     }
