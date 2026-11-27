@@ -186,7 +186,7 @@ static int run_nmod(const struct job *job, int reps, FILE *out)
     for (rep = 0; rep < reps; rep++)
     {
         long long start = now_ns();
-        if (strcmp(name, "mul") == 0)
+        if (strcmp(name, "mul") == 0 || strcmp(name, "mulfft") == 0)
             nmod_poly_mul(r1, a, b);
         else if (strcmp(name, "divrem") == 0)
             nmod_poly_divrem(r1, r2, a, b);
@@ -329,7 +329,7 @@ static int run_fmpz_mod(const struct job *job, int reps, FILE *out)
     for (rep = 0; rep < reps; rep++)
     {
         long long start = now_ns();
-        if (strcmp(name, "mul") == 0)
+        if (strcmp(name, "mul") == 0 || strcmp(name, "mulfft") == 0)
             fmpz_mod_poly_mul(r1, a, b, ctx);
         else if (strcmp(name, "divrem") == 0)
             fmpz_mod_poly_divrem(r1, r2, a, b, ctx);

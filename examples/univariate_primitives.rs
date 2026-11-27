@@ -27,8 +27,9 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     compose_mod,
     fields::{Bn254Fr, KoalaBear, Zp18446744069414584321, Zp18446744073709551557},
-    gcd, lagrange_interpolate, multipoint_evaluate, pow_mod_limbs_unstable as pow_mod_limbs,
-    resultant, roots, xgcd, KnownOrder, Polynomial, UnivariatePolynomial,
+    gcd, lagrange_interpolate, multiply, multipoint_evaluate,
+    pow_mod_limbs_unstable as pow_mod_limbs, resultant, roots, xgcd, KnownOrder, Polynomial,
+    UnivariatePolynomial,
 };
 
 const KOALABEAR: &str = "2130706433";
@@ -37,8 +38,12 @@ const P64_59: &str = "18446744073709551557";
 const BN254_FR: &str =
     "21888242871839275222246405745257275088548364400416034343698204186575808495617";
 
-/// Every primitive the comparison covers, in report order.
-const PRIMITIVES: [&str; 10] = [
+/// Every primitive the comparison covers. Append only: a job's seed is its primitive's index here.
+///
+/// `mulfft` is Zeebra's `multiply`, which reaches the transform; `mul` is the `&a * &b` operator
+/// the univariate layer is built on, which cannot (`fast-univariate.md` §4.1). The other libraries
+/// run their ordinary product for both.
+const PRIMITIVES: [&str; 11] = [
     "mul",
     "divrem",
     "gcd",
@@ -49,6 +54,7 @@ const PRIMITIVES: [&str; 10] = [
     "interpolate",
     "compose",
     "resultant",
+    "mulfft",
 ];
 
 /// Little-endian 64-bit limbs of a decimal string.
@@ -110,7 +116,7 @@ fn distinct_points<F: KnownOrder>(n: usize, rng: &mut StdRng) -> Vec<F> {
 /// The operands of `primitive` at size `n`, as `export` writes them.
 fn operands<F: KnownOrder>(primitive: &str, n: usize, rng: &mut StdRng) -> Vec<Vec<F>> {
     match primitive {
-        "mul" => vec![random_poly(n, false, rng), random_poly(n, false, rng)],
+        "mul" | "mulfft" => vec![random_poly(n, false, rng), random_poly(n, false, rng)],
         "divrem" => vec![random_poly(2 * n, false, rng), random_poly(n, false, rng)],
         "gcd" | "xgcd" | "resultant" => {
             vec![random_poly(n, false, rng), random_poly(n - 1, false, rng)]
@@ -214,6 +220,7 @@ fn execute<F: KnownOrder>(
 ) -> Output<F> {
     match primitive {
         "mul" => Output::Polys(vec![&polys[0] * &polys[1]]),
+        "mulfft" => Output::Polys(vec![multiply(&polys[0], &polys[1], rng)]),
         "divrem" => {
             let (q, r) = polys[0].div_with_remainder(&polys[1]);
             Output::Polys(vec![q, r])

@@ -33,6 +33,7 @@ harness sorts them. A primitive the library has no entry point for makes the dri
 | primitive | operands (n = 2^k) | output | FLINT, word / wide modulus | NTL |
 |---|---|---|---|---|
 | `mul` | `a`, `b` of degree n | `a·b` | `nmod_poly_mul` / `fmpz_mod_poly_mul` | `mul` |
+| `mulfft` | as `mul` | as `mul` | as `mul` | as `mul` |
 | `divrem` | `a` of degree 2n, `b` of degree n | `q`, `r` | `*_divrem` | `DivRem` |
 | `gcd` | `a` of degree n, `b` of degree n−1 | monic gcd | `*_gcd` | `GCD` |
 | `xgcd` | as `gcd` | `g`, `s`, `t` with `g = s·a + t·b` | `*_xgcd` | `XGCD` |
@@ -48,7 +49,10 @@ A word-size modulus goes to `nmod_poly` in FLINT. In NTL it goes to `zz_pX` when
 modulus goes to `fmpz_mod_poly` in FLINT and `ZZ_pX` in NTL.
 
 On Zeebra's side, `examples/univariate_primitives.rs` writes the jobs (`export`) and runs them
-with Zeebra's default public entry points (`run`): `&a * &b`, `div_with_remainder`, `gcd`, `xgcd`,
+with Zeebra's default public entry points (`run`). `mul` is the `&a * &b` operator that the
+univariate layer is built on. That operator cannot reach the transform, because its signature
+carries neither `KnownOrder` nor a random source (`docs/research/fast-univariate.md` §4.1).
+`mulfft` is `zeebra::multiply`, which can reach it. The other entry points are `div_with_remainder`, `gcd`, `xgcd`,
 `pow_mod_limbs` (the default route), `roots`, `multipoint_evaluate`, `lagrange_interpolate`,
 `compose_mod` and `resultant`.
 

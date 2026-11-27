@@ -128,7 +128,7 @@ static int run(const Job &job, int reps, std::ostream *out)
     for (int rep = 0; rep < reps; rep++)
     {
         auto start = std::chrono::steady_clock::now();
-        if (name == "mul")
+        if (name == "mul" || name == "mulfft")
             mul(r1, a, b);
         else if (name == "divrem")
             DivRem(r1, r2, a, b);
