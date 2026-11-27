@@ -475,6 +475,18 @@ class BenchJobTest(unittest.TestCase):
         with self.assertRaisesRegex(bj.JobError, 'workers'):
             bj.validate(m)
 
+    # An arm with `instances` runs only on those instances; an unknown or empty instance list is refused (#1107).
+    def test_arm_instances_restrict_the_plan(self):
+        m = self.manifest(reps=1)
+        m['arms'][1]['instances'] = ['i2']
+        cells = [(c['instance'], c['arm']) for c in bj.expand(m)]
+        self.assertEqual(sorted(cells), [('i1', 'a'), ('i2', 'a'), ('i2', 'b')])
+        bj.validate(m)
+        for bad in (['i9'], [], 'i2'):
+            m['arms'][1]['instances'] = bad
+            with self.assertRaisesRegex(bj.JobError, 'instances'):
+                bj.validate(m)
+
     # The manifest's output budget reaches the journal's limits; a non-positive or non-integer one is refused (#1020).
     def test_output_budget_is_read_and_validated(self):
         m = self.manifest(reps=1)

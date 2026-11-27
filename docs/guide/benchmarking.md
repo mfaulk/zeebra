@@ -513,7 +513,7 @@ a `binary-mismatch` stop record rather than run. A job never compiles.
 **Comparands and per-solver inputs (#966).** An externally provisioned comparand (msolve's
 tarball, a pinned grobx driver) records `build.comparand`, its provenance, in place of the
 `git archive` recipe. An instance can carry one file per solver format in `inputs`, named in argv as
-`{inputs[ms]}`, and an arm with its own `workers` list runs only at those counts.
+`{inputs[ms]}`, and an arm with its own `workers` list runs only at those counts, and one with an `instances` list only on those instances.
 `research/m33-baseline/campaign.py manifest` writes both M33-0 baseline jobs this way.
 
 **Where jobs live.** `$ZEEBRA_BENCH_JOBS`, default `/buildcache/bench-jobs`. A root under `$HOME`

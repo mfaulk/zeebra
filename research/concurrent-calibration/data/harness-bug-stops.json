@@ -1,0 +1,9 @@
+[
+ {
+  "session": "s1-20261125",
+  "slot": 0,
+  "cohort": "calibration",
+  "job": "bc5398bb0608",
+  "why": "harness bug, not an instrument failure: the m29 A/A was paired distinct2/every (the real effect) instead of distinct2/distinct (\u00a74.5). Recomputed correctly, all four calibration A/As pass. Fixed with a test; not counted toward \u00a77.3."
+ }
+]

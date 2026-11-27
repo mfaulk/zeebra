@@ -198,6 +198,10 @@ def validate(m):
         _require(arm.get('workers') is None or (isinstance(arm['workers'], list) and arm['workers']
                                                 and set(arm['workers']) <= set(workers)),
                  f'arm {arm["name"]}: workers must be a non-empty subset of run.workers')
+        names = {i['name'] for i in instances}
+        _require(arm.get('instances') is None or (isinstance(arm['instances'], list) and arm['instances']
+                                                  and set(arm['instances']) <= names),
+                 f'arm {arm["name"]}: instances must be a non-empty list of instance names')
     _require(isinstance(run.get('repetitions'), int) and run['repetitions'] > 0, 'run.repetitions must be >= 1')
     _require(run.get('interleave', 'rotate') == 'rotate', 'run.interleave supports only "rotate"')
     _require(all(isinstance(s, int) for s in run.get('seeds', [0])), 'run.seeds must be integers')
@@ -221,7 +225,8 @@ def expand(m):
     run = m['run']
     rows = [(dict(instance=i['name'], workers=w, seed=s), arms)
             for i in m['instances'] for w in run['workers'] for s in run.get('seeds', [0])
-            if (arms := [a['name'] for a in m['arms'] if w in a.get('workers', run['workers'])])]
+            if (arms := [a['name'] for a in m['arms'] if w in a.get('workers', run['workers'])
+                         and i['name'] in a.get('instances', [i['name']])])]
     return [dict(row, rep=rep, arm=arm) for rep, row, arm in campaign.plan(rows, run['repetitions'])]
 
 
