@@ -5,7 +5,7 @@ that published those figures, recovered from git rather than recorded at the tim
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
 its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
-`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its #850 planted, call-site and caller A/B were measured at `f3de297b`, the caller A/B against that tree with the dispatch disabled. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries. §4.5's #1207 subsection was measured at `dbba0700`, both kernels in one binary. **§4.1.3 was taken at `6ac0337b`** (the pre-rebase #1225 branch commit, not on `main`; its rebased equivalent is `62bb6662`, and the rebase onto `3879a2be` changed nothing under `src/`) against `d1f863f2` (`origin/main` at the time), two binaries, unpinned on an Apple M4 Pro laptop.
+`66acfed2` plus that change. **§4.3.5 was taken at `2ec9d3af` plus the change it measures** (the pre-rebase branch commit `646fe1d8`, not on `main`), both arms in that one binary. §4.5’s #194 sweep was measured at `abba625c`, with the caller comparison against `cbc0fa5b`. Its in-place step A/B was measured at `7e7de67e` against `810b29c3`. Its #850 planted, call-site and caller A/B were measured at `f3de297b`, the caller A/B against that tree with the dispatch disabled. Its lifted-reduction crossover sweep was measured at `8c51a8c6` against `92077561`, and its caller comparison at `8f2771a7` against `92077561` — pre-rebase branch commits, not on `main`, whose rebased equivalents are `713a102c` and `d1ffa39e` (the rebase added only an unrelated `[[example]]` entry). **§4.3.6 was taken at `e7bef01c`** (the #783 branch commit) against `810b29c3` (`origin/main` it was branched from), two binaries. §4.5's #1207 subsection was measured at `dbba0700`, both kernels in one binary. **§4.1.3 was taken at `6ac0337b`** (the pre-rebase #1225 branch commit, not on `main`; its rebased equivalent is `c308244f`, and the rebases onto `3879a2be` and `2e0f3cd0` did not touch the in-field path) against `d1f863f2` (`origin/main` at the time), two binaries, unpinned on an Apple M4 Pro laptop. Its multi-modular rows were taken at `995a366e` against `d1f863f2`, the same way.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1041,9 +1041,20 @@ multiplies through `multiply_over_domain`, the entry point `fft::multiply` uses,
 on the transform reaches both. There is no randomness anywhere in the route, and both routes
 compute the exact product, so the output is the Karatsuba output at every size. The tests check
 this against `test_support::schoolbook_product` across the crossover on KoalaBear, BabyBear,
-Goldilocks, Zp65537 and BN254. Fields with no usable root keep Karatsuba at every degree:
-Mersenne-31, `Zp7`, `GF(2^8)` and `GF(13^4)`, and `Zp12289` past its 4096-point limit. Every
-primitive named above gives the same answer with the route on and forced off.
+Goldilocks, Zp65537 and BN254. Fields with no usable root and no word residue keep Karatsuba
+at every degree: `GF(2^8)` and `GF(13^4)`. Mersenne-31, `Zp7` and `Zp12289` past its 4096-point
+limit keep it up to the multi-modular crossover. Every primitive named above gives the same
+answer with the route on and forced off.
+
+**Word primes without the two-adicity take #1226's multi-modular product.** Mersenne-31 and
+`2^64 - 59` are examples. Rebased onto #1229, the dispatcher's fallback arm calls
+`try_multiply_multimodular`, which is bounded on `FiniteField` and reads its modulus off
+`FiniteField::word_residue`, so it needs no `KnownOrder` either. It is costed and blocked like the
+in-field route, anchored at `multimodular_multiplication_crossover` (4096 for 8-byte elements,
+32 768 for 4-byte ones). It is considered only when the field's root cannot hold even the
+smallest block domain, the same order `fft::multiply` tries them in. Tests check `2^64 - 59`
+against the definition across that crossover, Mersenne-31 at its 4-byte crossover against
+Karatsuba, and Newton division and `pow_mod` over `2^64 - 59` on both routes.
 
 **The decision is a cost comparison, not `fft::multiply`'s degree rule.** Taking the transform at
 every product degree from `fft_multiplication_crossover` measured **0.85x** on a whole BN254
@@ -1093,6 +1104,17 @@ new.
 The cells at the smallest `n` run identical code in both binaries, so 0.97–1.02 there is this
 machine's spread. No cell above the crossover is slower.
 
+The multi-modular rows were taken in the same way after the rebase onto #1229: old `d1f863f2`,
+new `995a366e`. The in-field code path above is unchanged by that rebase.
+
+| field | primitive | ratio by `n` |
+|---|---|---|
+| `2^64 - 59` | `mul` | 2048: 1.00 · 4096: 1.65 · 16384: 3.06 · 2¹⁶: **5.75** |
+| `2^64 - 59` | `mul_unbal` | 8192: 1.00 · 16384: 1.79 · 2¹⁶: 3.09 |
+| `2^64 - 59` | `divrem` | 2048: 0.97 · 4096: 1.23 · 16384: 2.19 · 2¹⁶: 4.04 |
+| `2^64 - 59` | `powmod` | 4096: 1.31 · 8192: 1.81 |
+| Mersenne-31 | `mul` | 16384: 1.00 · 32768: 1.86 · 2¹⁷: 3.65 |
+
 ##### What this does not establish
 
 - **No pinned figure.** The deciding per-primitive measurement against FLINT and NTL
@@ -1107,9 +1129,8 @@ machine's spread. No cell above the crossover is slower.
   leaves long division in place at a few large unbalanced shapes, and none of the rows above.
 - **The short operand is transformed once per block.** Reusing its transform, and the transform's
   own constant, are #1208's work.
-- **Fields with no usable root** keep Karatsuba. #1226's multi-modular product lives in
-  `fft::multiply`, which needs `KnownOrder`. Reaching it from the operator would need a
-  `FiniteField`-bounded entry, and the fallback arm of `product::plan` is where it would go.
+- **Fields with neither a root nor a word residue** keep Karatsuba. These are the binary and
+  extension fields, and any prime wider than a word.
 
 ### 4.2 Modular composition: absent
 

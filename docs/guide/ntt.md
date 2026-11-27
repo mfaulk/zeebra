@@ -741,8 +741,9 @@ field whose `FiniteField::transform_root_of_unity` serves the domain, `&a * &b` 
 subproduct trees and half-GCD follow, being built on them. The root is the deterministic one #783
 added, so the operator still needs only `FiniteField` and no rng, and returns the same polynomial as
 Karatsuba. An unbalanced product cuts its long operand into blocks, and takes the transform only once
-the short operand's square reaches the crossover. Binary fields, extension fields and Mersenne-31
-keep Karatsuba. `docs/research/fast-univariate.md` §4.1.3 has the laptop figures.
+the short operand's square reaches the crossover. A word prime without the two-adicity,
+such as Mersenne-31 or `2^64 - 59`, takes #1226's `try_multiply_multimodular` above its own
+crossover in the same way. Binary and extension fields keep Karatsuba. `docs/research/fast-univariate.md` §4.1.3 has the laptop figures.
 
 | stage | KoalaBear | BN254 `Fr` |
 |---|---:|---:|
