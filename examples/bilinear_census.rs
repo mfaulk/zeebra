@@ -19,6 +19,16 @@
 //! - `ZB_ENTRIES=<n>` sets F4's live-entry budget to `n` (`F4Options::with_live_entries`) and
 //!   lifts the row and column caps.
 //! - `ZB_SHAPES=<k>x<n_y>-<kind>,...` runs only those shapes, for example `7x7-affine`.
+//!
+//! Four more split the cohort into one process per instance and arm, so that an outside watchdog
+//! can stop a run inside a batch, where the wall cap cannot, without losing the other arms. None
+//! changes what a completed run counts.
+//! - `ZB_INSTANCES=<field>/<support>/<seed>,...` runs only those instances.
+//! - `ZB_ARMS=bilinear,control,signature` runs only those arms. Without `bilinear` the row's status
+//!   is `partial` and its bilinear columns are `-`; the control still runs.
+//! - `ZB_WORKERS=<n>` caps F4's forward-elimination and symbolic-preprocessing threads.
+//! - `ZB_TRACE=1` prints each batch matrix's degree and rows × columns to stderr as it is built,
+//!   so a stopped run still shows the largest matrix it reached.
 
 use std::time::{Duration, Instant};
 
@@ -26,8 +36,12 @@ use zeebra::{
     fields::{Zp2147483647, Zp31, Zp32003},
     grobner::{
         benchmark_systems::{bilinear, BilinearSpec},
-        bilinear_census::{bidegree_census, CensusError, CensusSummary},
-        f4::F4Options,
+        bilinear_census::{BidegreeCensus, CensusSummary},
+        f4::{
+            f4_observed, BatchObserver, F4Options, MacaulayMatrix, MonicBasis, ParallelForward,
+            ParallelSymbolic,
+        },
+        pairs::CriticalPair,
         planning::BlockSplit,
         sigf4::{sig_f4_reported, SigF4Options},
         SigF4Error,
@@ -44,6 +58,40 @@ enum Outcome<T> {
     Done(T),
     Censored,
     Failed(String),
+    NotRun,
+}
+
+fn env_list(name: &str) -> Option<Vec<String>> {
+    std::env::var(name)
+        .ok()
+        .map(|s| s.split(',').map(str::to_owned).collect())
+}
+
+fn arm(name: &str) -> bool {
+    env_list("ZB_ARMS").is_none_or(|arms| arms.iter().any(|a| a == name))
+}
+
+/// The census, with each matrix's size echoed to stderr under `ZB_TRACE`.
+struct Traced(BidegreeCensus, bool);
+
+impl<const N: usize, F: FiniteField> BatchObserver<N, F> for Traced {
+    fn batch(&mut self, basis: &MonicBasis<N, F>, pairs: &[CriticalPair<N>]) {
+        BatchObserver::<N, F>::batch(&mut self.0, basis, pairs);
+    }
+
+    fn matrix(&mut self, matrix: &MacaulayMatrix<N, F>) {
+        BatchObserver::<N, F>::matrix(&mut self.0, matrix);
+        if self.1 {
+            let b = self.0.batches().last().expect("just pushed");
+            eprintln!(
+                "trace\tdegree {}\t{} x {}\t{}",
+                b.degree,
+                b.rows,
+                b.columns,
+                b.area()
+            );
+        }
+    }
 }
 
 fn census<const N: usize, F: FiniteField>(
@@ -64,10 +112,25 @@ fn census<const N: usize, F: FiniteField>(
         options.max_matrix_rows = usize::MAX;
         options.max_matrix_columns = usize::MAX;
     }
+    if let Some(workers) = std::env::var("ZB_WORKERS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+    {
+        options.parallel_forward = ParallelForward::Auto {
+            max_workers: workers,
+        };
+        options.parallel_symbolic = ParallelSymbolic::Auto {
+            max_workers: workers,
+        };
+    }
+    let mut observer = Traced(
+        BidegreeCensus::new(split),
+        std::env::var_os("ZB_TRACE").is_some(),
+    );
     let start = Instant::now();
-    let outcome = match bidegree_census(&system, &split, GREVLEX, &options) {
-        Ok((basis, _, census)) => Outcome::Done((census.summary(), basis.len())),
-        Err(CensusError::F4(e)) if e.limit_name() == "max_wall_time" => Outcome::Censored,
+    let outcome = match f4_observed(&system, GREVLEX, &options, &mut observer) {
+        Ok((basis, _)) => Outcome::Done((observer.0.summary(), basis.len())),
+        Err(e) if e.limit_name() == "max_wall_time" => Outcome::Censored,
         Err(e) => Outcome::Failed(format!("{e:?}")),
     };
     (outcome, start.elapsed())
@@ -101,9 +164,17 @@ fn shape<const N: usize>(k: usize, affine: bool, cap: Duration) {
             return;
         }
     }
+    let instances = env_list("ZB_INSTANCES");
     for field in ["31", "32003", "2147483647"] {
         for support in SUPPORTS {
             for seed in SEEDS {
+                let instance = format!("{field}/{support}/{seed}");
+                if instances
+                    .as_ref()
+                    .is_some_and(|only| !only.contains(&instance))
+                {
+                    continue;
+                }
                 let base = BilinearSpec {
                     x_variables: k,
                     equations,
@@ -139,11 +210,13 @@ fn shape<const N: usize>(k: usize, affine: bool, cap: Duration) {
                             }
                             Outcome::Censored => ("censored".into(), "censored".into()),
                             Outcome::Failed(e) => (format!("failed:{e}"), "-".into()),
+                            Outcome::NotRun => ("not-run".into(), "not-run".into()),
                         };
                         let (sig_rows, sig_columns) = match sig_run {
                             Outcome::Done((r, c)) => (r.to_string(), c.to_string()),
                             Outcome::Censored => ("censored".into(), "censored".into()),
                             Outcome::Failed(e) => (format!("failed:{e}"), "-".into()),
+                            Outcome::NotRun => ("not-run".into(), "not-run".into()),
                         };
                         println!(
                             "{prefix}\tdone\t{}\t{}\t{}\t{}\t{}\t{:.3}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -167,6 +240,20 @@ fn shape<const N: usize>(k: usize, affine: bool, cap: Duration) {
                         println!("{prefix}\tcensored");
                     }
                     Outcome::Failed(e) => println!("{prefix}\tfailed\t{e}"),
+                    Outcome::NotRun => {
+                        let (control_degree, control_area) = match control_run {
+                            Outcome::Done((c, _)) => {
+                                (c.max_degree.to_string(), c.largest_matrix.to_string())
+                            }
+                            Outcome::Censored => ("censored".into(), "censored".into()),
+                            Outcome::Failed(e) => (format!("failed:{e}"), "-".into()),
+                            Outcome::NotRun => ("not-run".into(), "not-run".into()),
+                        };
+                        println!(
+                            "{prefix}\tpartial{}\t{control_degree}\t{control_area}\t-\t-",
+                            "\t-".repeat(10)
+                        );
+                    }
                 }
             }
         }
@@ -184,13 +271,31 @@ fn run<const N: usize, F: FiniteField>(
     Outcome<(usize, usize)>,
     Duration,
 ) {
-    let (bilinear_run, elapsed) = census::<N, F>(base, cap);
-    if !matches!(bilinear_run, Outcome::Done(_)) {
-        return (bilinear_run, Outcome::Censored, Outcome::Censored, elapsed);
+    let start = Instant::now();
+    let bilinear_run = if arm("bilinear") {
+        census::<N, F>(base, cap).0
+    } else {
+        Outcome::NotRun
+    };
+    if matches!(bilinear_run, Outcome::Censored | Outcome::Failed(_)) {
+        return (
+            bilinear_run,
+            Outcome::Censored,
+            Outcome::Censored,
+            start.elapsed(),
+        );
     }
-    let (control_run, _) = census::<N, F>(control, cap);
-    let sig_run = signature::<N, F>(base, cap);
-    (bilinear_run, control_run, sig_run, elapsed)
+    let control_run = if arm("control") {
+        census::<N, F>(control, cap).0
+    } else {
+        Outcome::NotRun
+    };
+    let sig_run = if arm("signature") {
+        signature::<N, F>(base, cap)
+    } else {
+        Outcome::NotRun
+    };
+    (bilinear_run, control_run, sig_run, start.elapsed())
 }
 
 fn main() {

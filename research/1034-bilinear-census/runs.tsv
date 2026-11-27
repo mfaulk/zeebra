@@ -1,0 +1,216 @@
+control	ran	6	6	12	12	affine	31	1000	1	partial	-	-	-	-	-	-	-	-	-	-	12	1218985795444	-	-
+control	ran	6	6	12	12	affine	31	1000	2	partial	-	-	-	-	-	-	-	-	-	-	12	1197364644448	-	-
+control	ran	6	6	12	12	affine	31	600	1	partial	-	-	-	-	-	-	-	-	-	-	11	686336117016	-	-
+control	ran	6	6	12	12	affine	31	600	2	partial	-	-	-	-	-	-	-	-	-	-	11	694852374216	-	-
+control	ran	6	6	12	12	affine	31	300	1	partial	-	-	-	-	-	-	-	-	-	-	11	283653723580	-	-
+control	ran	6	6	12	12	affine	31	300	2	partial	-	-	-	-	-	-	-	-	-	-	11	576852251817	-	-
+control	ran	6	6	12	12	affine	32003	1000	1	partial	-	-	-	-	-	-	-	-	-	-	11	166645380446	-	-
+control	ran	6	6	12	12	affine	32003	1000	2	partial	-	-	-	-	-	-	-	-	-	-	11	412043387702	-	-
+control	ran	6	6	12	12	affine	32003	600	1	partial	-	-	-	-	-	-	-	-	-	-	12	1368988906554	-	-
+control	ran	6	6	12	12	affine	32003	600	2	partial	-	-	-	-	-	-	-	-	-	-	12	1438183570230	-	-
+control	ran	6	6	12	12	affine	32003	300	1	partial	-	-	-	-	-	-	-	-	-	-	11	326477678834	-	-
+control	ran	6	6	12	12	affine	32003	300	2	partial	-	-	-	-	-	-	-	-	-	-	12	938727426770	-	-
+control	ran	6	6	12	12	affine	2147483647	1000	1	partial	-	-	-	-	-	-	-	-	-	-	12	1001540921095	-	-
+control	ran	6	6	12	12	affine	2147483647	1000	2	partial	-	-	-	-	-	-	-	-	-	-	11	391348310280	-	-
+control	ran	6	6	12	12	affine	2147483647	600	1	partial	-	-	-	-	-	-	-	-	-	-	12	1556866447680	-	-
+control	ran	6	6	12	12	affine	2147483647	600	2	partial	-	-	-	-	-	-	-	-	-	-	11	1180160812386	-	-
+control	ran	6	6	12	12	affine	2147483647	300	1	partial	-	-	-	-	-	-	-	-	-	-	12	1427091808485	-	-
+control	ran	6	6	12	12	affine	2147483647	300	2	partial	-	-	-	-	-	-	-	-	-	-	12	165781723358	-	-
+bilinear	ran	7	7	14	14	affine	31	1000	1	done	3886	14	8	7224278490	330346632	21.869	22673378464	4877751945	431152	1906019	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	31	1000	2	done	3886	15	9	7612534125	351272012	21.671	19107312312	4080917146	417730	2052725	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	31	600	1	done	3886	15	9	7327328454	329221620	22.257	23544549097	5003899399	460897	2076270	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	31	600	2	done	3886	15	9	7802214684	330346632	23.618	25070115376	5336649349	476987	2099406	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	31	300	1	done	3884	15	9	9728739340	330322395	29.452	25249218938	5028917124	489629	2576366	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	31	300	2	done	3884	15	9	7979940100	330230888	24.165	21903481036	4783132435	458680	2504986	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	32003	1000	1	done	3886	15	9	7225295900	330346632	21.872	23397592816	4979150074	459661	2072538	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	32003	1000	2	done	3886	15	9	7225295900	330346632	21.872	23397519833	4979139051	459660	2072535	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	32003	600	1	done	3886	15	9	7225125876	330308160	21.874	23397420689	4979110495	459657	2072534	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	32003	600	2	done	3886	15	9	7225295900	330346632	21.872	23401411097	4979516766	459711	2072625	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	32003	300	1	done	3885	15	9	7764502446	330295225	23.508	21673926089	4688500916	457151	2346626	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	32003	300	2	done	3886	15	9	7850345900	327965150	23.937	24980731888	5318143655	475711	2102098	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	2147483647	1000	1	done	3886	15	9	7225295900	330346632	21.872	23397592816	4979150074	459661	2072538	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	2147483647	1000	2	done	3886	15	9	7225295900	330346632	21.872	23397592816	4979150074	459661	2072538	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	2147483647	600	1	done	3886	15	9	7225295900	330346632	21.872	23397833954	4979179711	459661	2072538	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	2147483647	600	2	done	3886	15	9	7225295900	330346632	21.872	23400177744	4979385361	459692	2072569	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	2147483647	300	1	done	3886	15	9	7388066004	330346632	22.365	23579122863	5021050964	460896	2075300	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	14	affine	2147483647	300	2	done	3884	15	9	9550610466	327672312	29.147	24537563646	4996407675	481401	2480483	not-run	not-run	not-run	not-run
+control	refused-rss	7	7	14	14	affine	31	1000	1
+control	skipped	7	7	14	14	affine	31	1000	2
+control	skipped	7	7	14	14	affine	31	600	1
+control	skipped	7	7	14	14	affine	31	600	2
+control	skipped	7	7	14	14	affine	31	300	1
+control	skipped	7	7	14	14	affine	31	300	2
+control	skipped	7	7	14	14	affine	32003	1000	1
+control	skipped	7	7	14	14	affine	32003	1000	2
+control	skipped	7	7	14	14	affine	32003	600	1
+control	skipped	7	7	14	14	affine	32003	600	2
+control	skipped	7	7	14	14	affine	32003	300	1
+control	skipped	7	7	14	14	affine	32003	300	2
+control	skipped	7	7	14	14	affine	2147483647	1000	1
+control	skipped	7	7	14	14	affine	2147483647	1000	2
+control	skipped	7	7	14	14	affine	2147483647	600	1
+control	skipped	7	7	14	14	affine	2147483647	600	2
+control	skipped	7	7	14	14	affine	2147483647	300	1
+control	skipped	7	7	14	14	affine	2147483647	300	2
+bilinear	ran	8	8	16	16	affine	31	1000	1	failed	TooManyNonzeros { nonzeros: 422931067, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	31	1000	2	failed	TooManyNonzeros { nonzeros: 422825383, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	31	600	1	failed	TooManyNonzeros { nonzeros: 422570930, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	31	600	2	failed	TooManyNonzeros { nonzeros: 422564350, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	31	300	1	failed	TooManyNonzeros { nonzeros: 428068119, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	31	300	2	failed	TooManyNonzeros { nonzeros: 421098097, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	32003	1000	1	failed	TooManyNonzeros { nonzeros: 436834068, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	32003	1000	2	failed	TooManyNonzeros { nonzeros: 436829232, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	32003	600	1	failed	TooManyNonzeros { nonzeros: 436578853, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	32003	600	2	failed	TooManyNonzeros { nonzeros: 436533981, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	32003	300	1	failed	TooManyNonzeros { nonzeros: 435957530, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	32003	300	2	failed	TooManyNonzeros { nonzeros: 451288548, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	2147483647	1000	1	failed	TooManyNonzeros { nonzeros: 436848198, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	2147483647	1000	2	failed	TooManyNonzeros { nonzeros: 436848198, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	2147483647	600	1	failed	TooManyNonzeros { nonzeros: 436635235, limit: 400000000 }
+bilinear	ran	8	8	16	16	affine	2147483647	600	2	failed	TooManyNonzeros { nonzeros: 436485714, limit: 400000000 }
+bilinear	refused-rss	8	8	16	16	affine	2147483647	300	1
+bilinear	skipped	8	8	16	16	affine	2147483647	300	2
+control	ran	6	6	12	10	homogeneous	31	1000	1	partial	-	-	-	-	-	-	-	-	-	-	13	316230798464	-	-
+control	ran	6	6	12	10	homogeneous	31	1000	2	partial	-	-	-	-	-	-	-	-	-	-	12	370058902668	-	-
+control	ran	6	6	12	10	homogeneous	31	600	1	partial	-	-	-	-	-	-	-	-	-	-	13	410017709022	-	-
+control	ran	6	6	12	10	homogeneous	31	600	2	partial	-	-	-	-	-	-	-	-	-	-	12	121015064688	-	-
+control	ran	6	6	12	10	homogeneous	31	300	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 444651293, limit: 400000000 }	-	-	-
+control	ran	6	6	12	10	homogeneous	31	300	2	partial	-	-	-	-	-	-	-	-	-	-	13	433806041522	-	-
+control	ran	6	6	12	10	homogeneous	32003	1000	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 436365108, limit: 400000000 }	-	-	-
+control	ran	6	6	12	10	homogeneous	32003	1000	2	partial	-	-	-	-	-	-	-	-	-	-	13	46515334185	-	-
+control	ran	6	6	12	10	homogeneous	32003	600	1	partial	-	-	-	-	-	-	-	-	-	-	12	374275986810	-	-
+control	ran	6	6	12	10	homogeneous	32003	600	2	partial	-	-	-	-	-	-	-	-	-	-	11	144567566325	-	-
+control	ran	6	6	12	10	homogeneous	32003	300	1	partial	-	-	-	-	-	-	-	-	-	-	16	431078597380	-	-
+control	ran	6	6	12	10	homogeneous	32003	300	2	partial	-	-	-	-	-	-	-	-	-	-	16	10100308626285	-	-
+control	ran	6	6	12	10	homogeneous	2147483647	1000	1	partial	-	-	-	-	-	-	-	-	-	-	12	76814670856	-	-
+control	ran	6	6	12	10	homogeneous	2147483647	1000	2	partial	-	-	-	-	-	-	-	-	-	-	18	8220017102920	-	-
+control	ran	6	6	12	10	homogeneous	2147483647	600	1	partial	-	-	-	-	-	-	-	-	-	-	15	36584563033	-	-
+control	ran	6	6	12	10	homogeneous	2147483647	600	2	partial	-	-	-	-	-	-	-	-	-	-	12	217552864592	-	-
+control	ran	6	6	12	10	homogeneous	2147483647	300	1	partial	-	-	-	-	-	-	-	-	-	-	14	149701989312	-	-
+control	ran	6	6	12	10	homogeneous	2147483647	300	2	partial	-	-	-	-	-	-	-	-	-	-	14	160269241815	-	-
+bilinear	ran	7	7	14	12	homogeneous	31	1000	1	done	3010	12	13	2849836620	983025628	2.899	9754665983	3160755825	266930	266930	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	31	1000	2	done	3004	12	13	2846093930	980330904	2.903	9858381462	3249302988	269493	269493	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	31	600	1	done	3010	12	13	2848660082	983401930	2.897	9758591679	3161718217	267007	267007	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	31	600	2	done	3010	12	13	2867191842	976451998	2.936	9801462592	3169558596	267567	267567	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	31	300	1	done	3010	12	13	2902491530	985598460	2.945	9904312375	3195933933	268816	268816	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	31	300	2	done	3007	12	13	3681949164	923867756	3.985	12356948662	3377123279	290636	290636	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	32003	1000	1	done	3010	12	13	2845559460	988489054	2.879	9758996601	3166749658	266996	266996	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	32003	1000	2	done	3010	12	13	2845559460	988489054	2.879	9758996601	3166749658	266996	266996	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	32003	600	1	done	3010	12	13	2847804570	988551940	2.881	9764773633	3167635889	267073	267073	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	32003	600	2	done	3010	12	13	2853367686	988740610	2.886	9778545800	3170083043	267247	267247	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	32003	300	1	done	3010	12	13	2852404452	986477758	2.892	9773431211	3168150510	267177	267177	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	32003	300	2	done	2994	12	13	61246548224	59863196379	1.023	208377535249	114972074863	1092637	1092637	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	2147483647	1000	1	done	3010	12	13	2845559460	988489054	2.879	9758996601	3166749658	266996	266996	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	2147483647	1000	2	done	3010	12	13	2845559460	988489054	2.879	9758996601	3166749658	266996	266996	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	2147483647	600	1	done	3010	12	13	2857222242	988614828	2.890	9787768225	3171942762	267359	267359	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	2147483647	600	2	done	3010	12	13	2848873980	988614828	2.882	9767004983	3167984716	267102	267102	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	2147483647	300	1	done	3010	12	13	2968712520	981019900	3.026	10106779020	3251509290	271288	271288	not-run	not-run	not-run	not-run
+bilinear	ran	7	7	14	12	homogeneous	2147483647	300	2	done	3010	12	13	2847804570	988489054	2.881	9763647780	3167393154	267055	267055	not-run	not-run	not-run	not-run
+control	refused-rss	4	8	12	12	affine	31	1000	1
+control	skipped	4	8	12	12	affine	31	1000	2
+control	skipped	4	8	12	12	affine	31	600	1
+control	skipped	4	8	12	12	affine	31	600	2
+control	skipped	4	8	12	12	affine	31	300	1
+control	skipped	4	8	12	12	affine	31	300	2
+control	skipped	4	8	12	12	affine	32003	1000	1
+control	skipped	4	8	12	12	affine	32003	1000	2
+control	skipped	4	8	12	12	affine	32003	600	1
+control	skipped	4	8	12	12	affine	32003	600	2
+control	skipped	4	8	12	12	affine	32003	300	1
+control	skipped	4	8	12	12	affine	32003	300	2
+control	skipped	4	8	12	12	affine	2147483647	1000	1
+control	skipped	4	8	12	12	affine	2147483647	1000	2
+control	skipped	4	8	12	12	affine	2147483647	600	1
+control	skipped	4	8	12	12	affine	2147483647	600	2
+control	skipped	4	8	12	12	affine	2147483647	300	1
+control	skipped	4	8	12	12	affine	2147483647	300	2
+control	ran	3	9	12	12	affine	31	1000	1	partial	-	-	-	-	-	-	-	-	-	-	10	114981501088	-	-
+control	ran	3	9	12	12	affine	31	1000	2	partial	-	-	-	-	-	-	-	-	-	-	11	410756988600	-	-
+control	ran	3	9	12	12	affine	31	600	1	partial	-	-	-	-	-	-	-	-	-	-	11	389108127360	-	-
+control	ran	3	9	12	12	affine	31	600	2	partial	-	-	-	-	-	-	-	-	-	-	10	75880429689	-	-
+control	ran	3	9	12	12	affine	31	300	1	partial	-	-	-	-	-	-	-	-	-	-	10	59074355040	-	-
+control	refused-rss	3	9	12	12	affine	31	300	2
+control	skipped	3	9	12	12	affine	32003	1000	1
+control	skipped	3	9	12	12	affine	32003	1000	2
+control	skipped	3	9	12	12	affine	32003	600	1
+control	skipped	3	9	12	12	affine	32003	600	2
+control	skipped	3	9	12	12	affine	32003	300	1
+control	skipped	3	9	12	12	affine	32003	300	2
+control	skipped	3	9	12	12	affine	2147483647	1000	1
+control	skipped	3	9	12	12	affine	2147483647	1000	2
+control	skipped	3	9	12	12	affine	2147483647	600	1
+control	skipped	3	9	12	12	affine	2147483647	600	2
+control	skipped	3	9	12	12	affine	2147483647	300	1
+control	skipped	3	9	12	12	affine	2147483647	300	2
+control	ran	4	8	12	10	homogeneous	31	1000	1	partial	-	-	-	-	-	-	-	-	-	-	12	147594234828	-	-
+control	ran	4	8	12	10	homogeneous	31	1000	2	partial	-	-	-	-	-	-	-	-	-	-	12	516986504229	-	-
+control	ran	4	8	12	10	homogeneous	31	600	1	partial	-	-	-	-	-	-	-	-	-	-	18	2022101869212	-	-
+control	ran	4	8	12	10	homogeneous	31	600	2	partial	-	-	-	-	-	-	-	-	-	-	12	359463591111	-	-
+control	ran	4	8	12	10	homogeneous	31	300	1	partial	-	-	-	-	-	-	-	-	-	-	15	579224971499	-	-
+control	ran	4	8	12	10	homogeneous	31	300	2	partial	-	-	-	-	-	-	-	-	-	-	13	353559521824	-	-
+control	ran	4	8	12	10	homogeneous	32003	1000	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 458461346, limit: 400000000 }	-	-	-
+control	ran	4	8	12	10	homogeneous	32003	1000	2	partial	-	-	-	-	-	-	-	-	-	-	14	655705052332	-	-
+control	ran	4	8	12	10	homogeneous	32003	600	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 458206660, limit: 400000000 }	-	-	-
+control	ran	4	8	12	10	homogeneous	32003	600	2	partial	-	-	-	-	-	-	-	-	-	-	19	13089615521926	-	-
+control	ran	4	8	12	10	homogeneous	32003	300	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 423292423, limit: 400000000 }	-	-	-
+control	ran	4	8	12	10	homogeneous	32003	300	2	partial	-	-	-	-	-	-	-	-	-	-	16	5009115508180	-	-
+control	ran	4	8	12	10	homogeneous	2147483647	1000	1	partial	-	-	-	-	-	-	-	-	-	-	13	36263067952	-	-
+control	ran	4	8	12	10	homogeneous	2147483647	1000	2	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 433103436, limit: 400000000 }	-	-	-
+control	ran	4	8	12	10	homogeneous	2147483647	600	1	partial	-	-	-	-	-	-	-	-	-	-	21	11592472044960	-	-
+control	ran	4	8	12	10	homogeneous	2147483647	600	2	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 411154766, limit: 400000000 }	-	-	-
+control	ran	4	8	12	10	homogeneous	2147483647	300	1	partial	-	-	-	-	-	-	-	-	-	-	15	1547485478028	-	-
+control	ran	4	8	12	10	homogeneous	2147483647	300	2	partial	-	-	-	-	-	-	-	-	-	-	16	5406808669056	-	-
+control	ran	3	9	12	10	homogeneous	31	1000	1	partial	-	-	-	-	-	-	-	-	-	-	16	508885695222	-	-
+control	ran	3	9	12	10	homogeneous	31	1000	2	partial	-	-	-	-	-	-	-	-	-	-	12	476795284098	-	-
+control	ran	3	9	12	10	homogeneous	31	600	1	partial	-	-	-	-	-	-	-	-	-	-	18	2402911844919	-	-
+control	ran	3	9	12	10	homogeneous	31	600	2	partial	-	-	-	-	-	-	-	-	-	-	14	659888995392	-	-
+control	ran	3	9	12	10	homogeneous	31	300	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 419740683, limit: 400000000 }	-	-	-
+control	ran	3	9	12	10	homogeneous	31	300	2	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 451259004, limit: 400000000 }	-	-	-
+control	ran	3	9	12	10	homogeneous	32003	1000	1	partial	-	-	-	-	-	-	-	-	-	-	19	9405899476677	-	-
+control	ran	3	9	12	10	homogeneous	32003	1000	2	partial	-	-	-	-	-	-	-	-	-	-	12	106775941657	-	-
+control	ran	3	9	12	10	homogeneous	32003	600	1	partial	-	-	-	-	-	-	-	-	-	-	15	348735271248	-	-
+control	ran	3	9	12	10	homogeneous	32003	600	2	partial	-	-	-	-	-	-	-	-	-	-	17	821224430972	-	-
+control	ran	3	9	12	10	homogeneous	32003	300	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 482087773, limit: 400000000 }	-	-	-
+control	ran	3	9	12	10	homogeneous	32003	300	2	partial	-	-	-	-	-	-	-	-	-	-	20	8572391723139	-	-
+control	ran	3	9	12	10	homogeneous	2147483647	1000	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 456034667, limit: 400000000 }	-	-	-
+control	ran	3	9	12	10	homogeneous	2147483647	1000	2	partial	-	-	-	-	-	-	-	-	-	-	14	518361235268	-	-
+control	ran	3	9	12	10	homogeneous	2147483647	600	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 547112970, limit: 400000000 }	-	-	-
+control	refused-rss	3	9	12	10	homogeneous	2147483647	600	2
+control	skipped	3	9	12	10	homogeneous	2147483647	300	1
+control	skipped	3	9	12	10	homogeneous	2147483647	300	2
+bilinear	refused-rss	8	8	16	14	homogeneous	31	1000	1
+bilinear	skipped	8	8	16	14	homogeneous	31	1000	2
+bilinear	skipped	8	8	16	14	homogeneous	31	600	1
+bilinear	skipped	8	8	16	14	homogeneous	31	600	2
+bilinear	skipped	8	8	16	14	homogeneous	31	300	1
+bilinear	skipped	8	8	16	14	homogeneous	31	300	2
+bilinear	skipped	8	8	16	14	homogeneous	32003	1000	1
+bilinear	skipped	8	8	16	14	homogeneous	32003	1000	2
+bilinear	skipped	8	8	16	14	homogeneous	32003	600	1
+bilinear	skipped	8	8	16	14	homogeneous	32003	600	2
+bilinear	skipped	8	8	16	14	homogeneous	32003	300	1
+bilinear	skipped	8	8	16	14	homogeneous	32003	300	2
+bilinear	skipped	8	8	16	14	homogeneous	2147483647	1000	1
+bilinear	skipped	8	8	16	14	homogeneous	2147483647	1000	2
+bilinear	skipped	8	8	16	14	homogeneous	2147483647	600	1
+bilinear	skipped	8	8	16	14	homogeneous	2147483647	600	2
+bilinear	skipped	8	8	16	14	homogeneous	2147483647	300	1
+bilinear	skipped	8	8	16	14	homogeneous	2147483647	300	2
+control	ran	7	7	14	12	homogeneous	31	1000	1	partial	-	-	-	-	-	-	-	-	-	-	failed:TooManyNonzeros { nonzeros: 477270839, limit: 400000000 }	-	-	-
+control	refused-rss	7	7	14	12	homogeneous	31	1000	2
+control	skipped	7	7	14	12	homogeneous	31	600	1
+control	skipped	7	7	14	12	homogeneous	31	600	2
+control	skipped	7	7	14	12	homogeneous	31	300	1
+control	skipped	7	7	14	12	homogeneous	31	300	2
+control	skipped	7	7	14	12	homogeneous	32003	1000	1
+control	skipped	7	7	14	12	homogeneous	32003	1000	2
+control	skipped	7	7	14	12	homogeneous	32003	600	1
+control	skipped	7	7	14	12	homogeneous	32003	600	2
+control	skipped	7	7	14	12	homogeneous	32003	300	1
+control	skipped	7	7	14	12	homogeneous	32003	300	2
+control	skipped	7	7	14	12	homogeneous	2147483647	1000	1
+control	skipped	7	7	14	12	homogeneous	2147483647	1000	2
+control	skipped	7	7	14	12	homogeneous	2147483647	600	1
+control	skipped	7	7	14	12	homogeneous	2147483647	600	2
+control	skipped	7	7	14	12	homogeneous	2147483647	300	1
+control	skipped	7	7	14	12	homogeneous	2147483647	300	2
