@@ -13,7 +13,8 @@ run this cohort at all: it is a GF(2) implementation (§3.2).
 `examples/m4gb_comparison.rs` in release, macOS arm64 (14 cores), unpinned, no RSS figure, one
 worker, 2026-11-24. **§8 (the decision):** `41a36e93` (tag `measured/1030-m4gb-held-out`), AMD
 Threadripper PRO 5995WX, Linux x86_64, rustc 1.99.1, CCDs 1–2 reserved, each child on CPU 8, with
-peak RSS. Evidence: [`research/1030-m4gb-reference/`](../../research/1030-m4gb-reference/README.md).
+peak RSS. **§9 (counters):** `6c07b4e8` (tag `measured/1030-m4gb-counters`), same host, unpinned.
+Evidence: [`research/1030-m4gb-reference/`](../../research/1030-m4gb-reference/README.md).
 
 Parent: #1028 (candidate A). Census this reconciles with: #1031. Gated prototype: #1032.
 Pre-declared cohort and rule: [#1030 comment](https://github.com/mfaulk/zeebra/issues/1030#issuecomment-7145421369).
@@ -196,7 +197,8 @@ Which share is which is the open question. A 3× from #945 would leave about 10�
 GF(32003) on these shapes, and both are still above the 1.5× gate. A route recommendation for #1032
 waits until the gap is attributed. That needs the comparison against Zeebra's best qualified
 configuration, and M4GB's per-iteration counters: basis size, pairs, and matrix rows and columns,
-which its log prints at `--loglevel 3`.
+which its log prints at `--loglevel 3`. §9 has M4GB's side: its work is fixed by the shape, and
+field width changes only its per-coefficient cost.
 
 ## 7. What is open
 
@@ -207,7 +209,8 @@ which its log prints at `--loglevel 3`.
    `sig_f4`, not through `F4Options` or the external-contract adapter. It cannot change the
    decision: the decision fails against grobx, not against Zeebra. Against Zeebra the margins are
    5.8× and 16×. A 3× lane would leave 1.9× and 5.3×, still past the gate.
-3. Counters from M4GB's log (`--loglevel 3`), for the attribution in §6.
+3. ~~Counters from M4GB's log~~: done in §9. Still open for §6: Zeebra's per-degree matrix
+   dimensions on the same shapes.
 
 M5GB: run under an owner exception and found unable to compute over GF(31) or GF(65521) (§3.2).
 The paper's Mathic-based code is the only route to an M5GB arm.
@@ -256,3 +259,56 @@ is grobx, which M33-G1 already attributes (symbolic preprocessing, bookkeeping a
 `docs/research/m33-grobx-attribution.md`). M4GB's 5.8–16× over Zeebra is real and is not a reuse
 saving (§6, #1031). It is evidence for that attribution, not for M4GB's organization: grobx is an
 F4 and beats M4GB without it.
+
+## 9. M4GB's iteration counters
+
+**Measured at:** `6c07b4e8` (tag `measured/1030-m4gb-counters`), `examples/m4gb_comparison.rs` in
+release, AMD Threadripper PRO 5995WX, Linux x86_64, unpinned, load average 2–4, one worker, one
+repetition, 2026-11-25. The counters are exact. The phase times are compared only as ratios within
+a shape, so their absolute values are not evidence. Evidence:
+[`counters/`](../../research/1030-m4gb-reference/counters/), 128 runs: the 32 held-out cells of §8
+and 96 development cells (n ∈ {14, 16} × m/n ∈ {1.5, 2, 3} × GF(31), GF(32003) × density
+1000/500 × seeds 1/2 × planted and unplanted).
+
+At `--loglevel 3` M4GB logs, after each update, matrix and selection phase: the basis size, the
+pending pairs, the entries in its store of tail-reduced multiples, and the dense tail width (the
+monomials no basis element reduces). `M4gbCounters` folds those into peaks per run. The log has no
+lookup, hit or reuse-distance counter; getting one would mean patching upstream.
+
+**The counters depend only on the shape.** Across all 128 runs, every counter is identical across
+the field (GF(31), GF(32003), GF(65521)), density 1000/500 and seed 1/2 for the same (n, m,
+planted). Planted rows, with unplanted differences in the notes below:
+
+| n | m | rounds | max lcm degree | peak basis | peak pairs | peak store | peak dense width | selection share of phase time |
+|---|---|---|---|---|---|---|---|---|
+| 14 | 21 | 4 | 5 | 331 | 2 671 | 10 374 | 1 254 | 96–99% |
+| 14 | 25 | 4 | 5 | 479 | 4 702 | 11 213 | 720 | 84–94% |
+| 14 | 28 | 2 | 4 | 140 | 1 057 | 2 513 | 547 | 95–98% |
+| 14 | 42 | 1 | 3 | 42 | 216 | 414 | 266 | 94–98% |
+| 16 | 24 | 12 | 6 | 1 585 | 18 812 | 72 492 | 2 929 | 96–98% |
+| 16 | 29 | 5 | 5 | 655 | 7 386 | 19 197 | 1 321 | 91–97% |
+| 16 | 32 | 5 | 5 | 807 | 9 385 | 19 884 | 1 080 | 82–92% |
+| 16 | 48 | 2 | 4 | 315 | 3 438 | 4 644 | 420 | 65–82% |
+
+- **The held-out shapes are (14, 25) and (16, 29).** In the share column the low end is GF(31) and
+  the high end the wider field.
+- **Unplanted rows** match their planted shape up to the last round, then throw `I=(1)`. That is
+  one round fewer, with the store at its pre-spike size (2 700 at (14, 25), 4 031 at (16, 29)) and
+  no phase totals logged.
+- **(16, 24) is unverified.** M4GB finished in about 13 s, but Zeebra's verification stopped at
+  its 32 M live-nonzero cap (41 M needed). §5 left this cell out for the same reason.
+
+**Field width multiplies selection time, not work.** Update time is flat across fields (52 ms at
+(14, 25) on both GF(31) and GF(65521); 95–103 ms at (16, 29)). Matrix time is under 1 ms
+throughout. Selection, which builds and reduces the store's multiples, is 2.1–2.6× slower at
+GF(32003) than at GF(31), and 3.0–3.4× slower at GF(65521), with identical counters. So the drop
+in M4GB's margin between the held-out fields in §8 is per-coefficient cost: against grobx it falls
+from 0.59× to 0.19× (a factor of 3.1), and against Zeebra from 16× to 5.8× (a factor of 2.8),
+matching the 3.4× selection slowdown at n = 16. It is consistent with the log tables of 2p entries
+(§3.1) leaving L1 at wide p, but that mechanism was not measured.
+
+**What the counters bound for §6.** At the deciding shape (16, 29), M4GB's whole run is 5 rounds,
+at most 7 386 pending pairs, and a store of at most 19 197 multiples over at most 1 321 dense
+columns. 91–97% of its time is selection. The comparison §6 still needs is Zeebra's own per-degree
+matrix rows, columns and zero rows on the same shapes, against these figures. Without it the 16× of
+§8 cannot be split between M4GB's organization and Zeebra's small-prime arithmetic (#945).

@@ -59,7 +59,7 @@ pub use groebner_jl::GroebnerJlSolver;
 #[cfg(feature = "external-runners")]
 pub use groebner_rs::GroebnerRsSolver;
 #[cfg(feature = "external-runners")]
-pub use m4gb::M4gbSolver;
+pub use m4gb::{M4gbCounters, M4gbSolver};
 #[cfg(feature = "external-runners")]
 pub use msolve::MsolveSolver;
 pub use process::{

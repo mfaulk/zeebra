@@ -13,6 +13,8 @@ Analysis: [`docs/research/m4gb-m5gb-reference.md`](../../docs/research/m4gb-m5gb
 | `bench-host/held-out.jsonl.gz` | The deciding run: 384 runs, 32 held-out cells (m/n = 1.8; GF(31), GF(65521); n = 14, 16; density 1000/500; seeds 1/2; planted and unplanted), 4 engines, 3 repetitions, pinned to CPU 8 on reserved CCDs 1–2 |
 | `bench-host/decide.py` → `bench-host/tables.md` | The pre-declared rule over that run: per-cell medians, M4GB's speedup over the best Zeebra arm and over grobx, and the verdict |
 | `bench-host/provenance.txt`, `bench-host/held-out.console.gz` | Commit, binary SHA-256, grobx driver identity, placement, START/END with load; the run's console |
+| `counters/held-out.jsonl.gz`, `counters/development.jsonl.gz` | Note §9: M4GB's iteration counters (`counters`) and phase totals (`stages`) over 128 runs, measured at `6c07b4e8` (tag `measured/1030-m4gb-counters`), bench host unpinned, 1 repetition |
+| `counters/summarize.py` → `counters/*.md` | One row per cell: counters (a range where seeds or densities disagree), verified basis length, selection's share of the phase time |
 
 One JSON object per run: the row, its input digest, engine, status, process wall (M4GB) or
 in-process wall (Zeebra), and M4GB's own `engine-solve` and `engine-cpu` stages.
@@ -42,4 +44,14 @@ tools/bench-reserve.sh run 1030 8-23 tools/external/m4gb-cohort.py --binary $B \
   --deciding-run --sizes 31:14,16 --sizes 65521:14,16 --ratios 1.8 --unplanted --wall 180
 tools/bench-reserve.sh release
 python3 research/1030-m4gb-reference/bench-host/decide.py held-out.jsonl
+```
+
+M4GB's iteration counters (note §9; needs M4GB binaries for n = 14, 16 at 31, 32003 and 65521):
+
+```sh
+tools/external/m4gb-cohort.py --binary $B --output counters/held-out.jsonl --engines m4gb --reps 1 \
+  --sizes 31:14,16 --sizes 65521:14,16 --ratios 1.8 --unplanted --deciding-run
+tools/external/m4gb-cohort.py --binary $B --output counters/development.jsonl --engines m4gb --reps 1 \
+  --sizes 31:14,16 --sizes 32003:14,16 --ratios 1.5,2,3 --unplanted
+counters/summarize.py counters/held-out.jsonl
 ```
