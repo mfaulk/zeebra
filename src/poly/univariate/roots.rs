@@ -22,8 +22,10 @@ use rand::{CryptoRng, RngCore};
 
 use crate::{
     poly::univariate::{
-        factorize::separate_equal_degree, gcd, pow_mod::pow_mod_limbs, Polynomial,
-        UnivariatePolynomial,
+        factorize::separate_equal_degree,
+        gcd,
+        pow_mod::{pow_mod_limbs_with_route, PowModRoute},
+        Polynomial, UnivariatePolynomial,
     },
     KnownOrder,
 };
@@ -37,6 +39,19 @@ use crate::{
 /// Panics if `f` is the zero polynomial, every element of which is a root.
 pub fn roots<F: KnownOrder, R: RngCore + CryptoRng>(
     f: &UnivariatePolynomial<F>,
+    rng: &mut R,
+) -> Vec<F> {
+    roots_with_frobenius_route(f, PowModRoute::Classical, rng)
+}
+
+/// [`roots`] with `x^q mod f` taken on the stated route, so #1205's gate can time both from one
+/// tree. A measurement hook, not API.
+///
+/// # Panics
+/// Panics if `f` is the zero polynomial.
+pub fn roots_with_frobenius_route<F: KnownOrder, R: RngCore + CryptoRng>(
+    f: &UnivariatePolynomial<F>,
+    route: PowModRoute,
     rng: &mut R,
 ) -> Vec<F> {
     assert!(
@@ -53,7 +68,7 @@ pub fn roots<F: KnownOrder, R: RngCore + CryptoRng>(
     // modulo f as it is built, since materializing it would need q coefficients, and the
     // exponent is the order's limbs so that a 254-bit q is no different from a 31-bit one.
     let x = UnivariatePolynomial::new(&[F::zero(), F::one()]);
-    let x_to_the_q = pow_mod_limbs(&x, F::order_limbs(), f);
+    let x_to_the_q = pow_mod_limbs_with_route(&x, F::order_limbs(), f, route).0;
     let linear_part = gcd(f, &(&x_to_the_q - &x));
 
     // A constant gcd means f shares no linear factor with x^q - x, i.e. has no root in F.

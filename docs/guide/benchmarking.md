@@ -923,6 +923,8 @@ cargo run --release --example karatsuba_crossover -- bn254
 cargo run --release --example division_crossover   # Newton inversion against long division, per field width
 cargo run --release --example division_crossover -- bn254
 cargo run --release --example division_crossover -- all max_log=13
+cargo run --release --example frobenius_power      # #1205: x^q mod f, classical against cached inverse
+cargo run --release --example frobenius_power -- all stage=roots min_log=12 max_log=14 reps=5
 cargo run --release --example subproduct_crossover  # the subproduct tree against the quadratic forms
 cargo run --release --example subproduct_crossover -- bn254
 cargo run --release --example transform_tree_ab -- all   # #606: transform-kernel subproduct tree vs its Karatsuba control

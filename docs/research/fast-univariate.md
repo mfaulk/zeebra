@@ -2078,6 +2078,13 @@ sub-quadratic: `div` joined the transforms on the other side of that line in #19
 remains is `roots`'s own structure rather than the cost of the division inside it. Goldilocks was
 not re-taken; its 2 048 below is a pre-#193 figure.
 
+**#1205 adds a cached-inverse route for the `x^q mod f` inside `roots`, not yet the default.**
+`PowModRoute::Auto` inverts `rev(f)` once and reduces every step by two truncated products where
+`%` would take Newton division, and is the classical loop step for step below that crossover.
+`examples/frobenius_power.rs` times it against the classical route from one build, interleaved,
+with per-route product and inversion counts; it becomes the default only once that run clears the
+issue's gate on the bench host.
+
 The figures in the rest of this section are pre-#193 and kept as the record of what the sweep said
 then. Arbitrary-point interpolation was
 the first stage to stop on the three narrow fields when this section was written, at n = 1 024;

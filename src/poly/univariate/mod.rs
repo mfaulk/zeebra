@@ -102,11 +102,18 @@ pub use pow_mod::pow_mod;
 // The limb-exponent form, for `examples/modular_composition.rs`: a 254-bit q does not fit a `u128`.
 #[doc(hidden)]
 pub use pow_mod::pow_mod_limbs as pow_mod_limbs_unstable;
+// The cached-inverse Frobenius candidate (#1205), for `examples/frobenius_power.rs`.
+#[doc(hidden)]
+pub use pow_mod::{
+    pow_mod_limbs_with_route as pow_mod_limbs_with_route_unstable, PowModRoute, PowModStats,
+};
 pub use power_permutation::{
     inverse_exponent, is_permutation_exponent, is_permutation_polynomial, permutation_exponents,
     PowerPermutation,
 };
 pub use roots::roots;
+#[doc(hidden)]
+pub use roots::roots_with_frobenius_route as roots_with_frobenius_route_unstable;
 use std::cmp::max;
 
 // Trim leading terms with zero coefficient so the highest power of x has non-zero coefficient.
