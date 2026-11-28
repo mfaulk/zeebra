@@ -1,0 +1,4 @@
+linalg-flint contract=1 library="FLINT 3.6.0" cflags="-O3 "
+linalg-m4ri contract=1 library="M4RI 20260122" cflags="-O3 "
+linalg-fflas contract=1 library="FFLAS-FFPACK 2.5.0" cflags="-O3 "
+linalg-spasm contract=1 library="SpaSM 1.3 @ 09c40943" cflags="-O3 "
