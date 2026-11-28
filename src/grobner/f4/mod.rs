@@ -26,6 +26,7 @@ pub mod reduction;
 pub mod statistics;
 pub mod structured;
 pub mod symbolic;
+pub mod tracing;
 // The serial-merge path ships behind `F4Options::parallel_symbolic` (#861); the rest of the
 // module — the sharded merge, the live override, the replay entry points — is #860's research.
 #[cfg(feature = "research-work")]
