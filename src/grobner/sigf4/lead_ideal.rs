@@ -114,7 +114,9 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             kept.push((m, lead, id));
         }
         kept.iter()
-            .map(|&(_, _, id)| MultivariatePolynomial::new(&self.basis[id].terms))
+            .map(|&(_, _, id)| {
+                MultivariatePolynomial::new(&self.basis[id].terms.pairs(&self.table))
+            })
             .collect()
     }
 }

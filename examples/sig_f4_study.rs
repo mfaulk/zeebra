@@ -48,6 +48,11 @@
 //! (`SigF4Options::small_prime_lane`) or #1183's 31-bit one above it, for `m31`
 //! (`SigF4Options::prime31_lane`); the basis is unchanged.
 //!
+//! `--id-terms` (sigf4) holds the signature basis's terms as monomial-table ids
+//! (`SigF4Options::id_terms`, #1240); the basis is unchanged. `--m M` (with `--generate`) gives the
+//! `mq-dense` rows `M` equations instead of `2n`, as #1030's `(n, m)` shapes (`--field gf31` also at
+//! n = 16).
+//!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
 //! `--features research-work`, `--density` (f4 or sigf4, one worker) adds #1033's
@@ -110,6 +115,8 @@ struct Args {
     replay: bool,
     claim: bool,
     lane: bool,
+    id_terms: bool,
+    equations: Option<usize>,
     symbolic: bool,
     min_frontier: usize,
     repeat: usize,
@@ -144,6 +151,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         replay: false,
         claim: false,
         lane: false,
+        id_terms: false,
+        equations: None,
         symbolic: false,
         min_frontier: 512,
         repeat: 1,
@@ -190,6 +199,16 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--replay" => parsed.replay = true,
             "--claim" => parsed.claim = true,
             "--lane" => parsed.lane = true,
+            "--id-terms" => parsed.id_terms = true,
+            "--m" => {
+                parsed.equations = Some(
+                    value()?
+                        .parse()
+                        .ok()
+                        .filter(|&m| m > 0)
+                        .ok_or("--m takes a positive integer")?,
+                )
+            }
             "--stages" => parsed.stages = true,
             "--fl" => parsed.fl = true,
             "--capture" => parsed.capture = Some(value()?),
@@ -544,8 +563,15 @@ fn modulus(field: &str) -> u64 {
     }
 }
 
-/// `--generate`: the row built from its generator at `field`, in the external contract's form.
+/// `generated_shaped` at each row's own equation count.
+#[cfg(test)]
 fn generated(field: &str, name: &str) -> Result<Input, String> {
+    generated_shaped(field, name, None)
+}
+
+/// `--generate`: the row built from its generator at `field`, in the external contract's form;
+/// `equations` is `--m`'s count for the dense MQ rows (#1030's `(n, m)` shapes).
+fn generated_shaped(field: &str, name: &str, equations: Option<usize>) -> Result<Input, String> {
     fn render<const N: usize, F: FiniteField>(
         name: &str,
         family: &str,
@@ -586,8 +612,14 @@ fn generated(field: &str, name: &str) -> Result<Input, String> {
     let n: usize = n.parse().map_err(|_| refused())?;
     let instance = match (fam, seed) {
         ("mq-random", Some(seed)) => corpus::random_mq_instance(n, seed, p, ORDER),
-        ("mq-dense", Some(seed)) => corpus::dense_mq_instance(n, seed, p, ORDER, true),
-        ("mq-dense-unplanted", Some(seed)) => corpus::dense_mq_instance(n, seed, p, ORDER, false),
+        ("mq-dense", Some(seed)) => match equations {
+            None => corpus::dense_mq_instance(n, seed, p, ORDER, true),
+            Some(m) => corpus::dense_mq_shaped(n, m, 1000, seed, p, ORDER, true),
+        },
+        ("mq-dense-unplanted", Some(seed)) => match equations {
+            None => corpus::dense_mq_instance(n, seed, p, ORDER, false),
+            Some(m) => corpus::dense_mq_shaped(n, m, 1000, seed, p, ORDER, false),
+        },
         (_, None) => match field {
             "goldilocks" => family::<Goldilocks>(name, fam, n, p),
             "wide64" => family::<Wide>(name, fam, n, p),
@@ -692,6 +724,11 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
         ("syzygy_signatures", size(s.syzygy_signatures)),
         ("peak_pending", size(s.peak_pending)),
         ("signature_metadata_bytes", size(s.signature_metadata_bytes)),
+        ("signature_basis_terms", size(s.signature_basis_terms)),
+        (
+            "signature_basis_term_bytes",
+            size(s.signature_basis_term_bytes),
+        ),
         ("bookkeeping_ns", Json::nanos(s.bookkeeping)),
         ("element_hashing_ns", Json::nanos(s.element_hashing)),
         ("bookkeeping_select_ns", Json::nanos(s.bookkeeping_select)),
@@ -1531,6 +1568,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 parallel_cascade: args.claim,
                 small_prime_lane: args.lane,
                 prime31_lane: args.lane,
+                id_terms: args.id_terms,
                 max_live_bytes: args
                     .live_gib
                     .map(|gib| gib << 30)
@@ -1651,6 +1689,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("engine", Json::string(&args.engine)),
         ("workers", Json::size(args.workers)),
         ("lane", Json::Bool(args.lane)),
+        ("id_terms", Json::Bool(args.id_terms)),
         ("status", Json::string(status)),
         ("call_ns", Json::nanos(elapsed)),
         (
@@ -1695,7 +1734,7 @@ fn main() {
         let catalog = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
         catalog_input(&catalog, &args.name, &args.field).unwrap_or_else(|e| panic!("{e}"))
     } else if args.generate {
-        generated(&args.field, &args.name).unwrap_or_else(|e| panic!("{e}"))
+        generated_shaped(&args.field, &args.name, args.equations).unwrap_or_else(|e| panic!("{e}"))
     } else {
         input(&args.field, &args.name)
     };
@@ -1738,8 +1777,8 @@ fn main() {
                 ("m31", 21) => run::<21, Zp2147483647>(input, &args),
                 ("m31", 22) => run::<22, Zp2147483647>(input, &args),
                 ("m31", 24) => run::<24, Zp2147483647>(input, &args),
-                // #1033's dense MQ rows, at the two small primes only.
-                ("gf31" | "gf32003", 15 | 18 | 20) => large(input, &args),
+                // #1033's dense MQ rows, at the two small primes only; 16 for #1030's shapes.
+                ("gf31", 15 | 16 | 18 | 20) | ("gf32003", 15 | 18 | 20) => large(input, &args),
                 (field, n) => panic!("no instantiation for {field} with {n} variables"),
             }
         };
@@ -1747,6 +1786,7 @@ fn main() {
     fn large(input: Input, args: &Args) -> Json {
         match (args.field.as_str(), input.variables.len()) {
             ("gf31", 15) => run::<15, Zp31>(input, args),
+            ("gf31", 16) => run::<16, Zp31>(input, args),
             ("gf31", 18) => run::<18, Zp31>(input, args),
             ("gf31", 20) => run::<20, Zp31>(input, args),
             ("gf32003", 15) => run::<15, Zp32003>(input, args),
@@ -1953,6 +1993,20 @@ mod tests {
         assert_eq!(planted.generators.len(), 12);
         assert_eq!(unplanted.generators.len(), 12);
         assert_ne!(planted.digest, unplanted.digest);
+    }
+
+    /// `--m` sets the dense rows' equation count; without it the row is `2n`, unchanged.
+    #[test]
+    fn generate_shapes_dense_mq_rows_by_equation_count() {
+        let shaped = generated_shaped("gf31", "mq-dense-6-s6", Some(9)).unwrap();
+        assert_eq!(shaped.generators.len(), 9);
+        let default = generated_shaped("gf31", "mq-dense-6-s6", None).unwrap();
+        assert_eq!(
+            default.digest,
+            generated("gf31", "mq-dense-6-s6").unwrap().digest
+        );
+        let twice = generated_shaped("gf31", "mq-dense-6-s6", Some(12)).unwrap();
+        assert_eq!(twice.digest, default.digest);
     }
 
     const CATALOG: &str = r#"[{"schema":"corpus-instance-v1","id":"x@p31","order":"grevlex",

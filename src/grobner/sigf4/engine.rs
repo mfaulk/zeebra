@@ -1,6 +1,7 @@
 //! The batched F4-RB main loop (RFC §9 design 1; Lairez Algorithm 8, EF Algorithm 4).
 
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     collections::{BTreeMap, HashSet},
     mem::size_of,
@@ -50,14 +51,204 @@ pub(super) const NONE: u32 = u32::MAX;
 /// A row after reduction: its remaining entries in column order, and the products spent.
 pub(super) type Reduced<F> = (Vec<(u32, F)>, u64);
 
-/// A signed basis element: `(s(α), ᾱ)` with `ᾱ` monic, terms in descending order, and each
-/// term's additive hash.
+/// A signed basis element: `(s(α), ᾱ)` with `ᾱ` monic and its terms in descending order.
 struct Element<const N: usize, F> {
     sig: Signature<N>,
     lead: Monomial<N>,
-    terms: Vec<(Monomial<N>, F)>,
-    hashes: Vec<u64>,
+    terms: Terms<N, F>,
 }
+
+/// An element's terms: by default each monomial with its coefficient and additive hash; under
+/// [`SigF4Options::id_terms`] (#1240) each monomial's run-wide table id beside its coefficient,
+/// the monomial and hash read back from the table. Every term is a batch column, so already
+/// interned.
+enum Terms<const N: usize, F> {
+    Full {
+        terms: Vec<(Monomial<N>, F)>,
+        hashes: Vec<u64>,
+    },
+    Ids {
+        ids: Vec<u32>,
+        coeffs: Vec<F>,
+    },
+}
+
+impl<const N: usize, F: FiniteField> Terms<N, F> {
+    fn view(&self) -> View<'_, N, F> {
+        match self {
+            Terms::Full { terms, hashes } => View::Full(terms, hashes),
+            Terms::Ids { ids, coeffs } => View::Ids(ids, coeffs),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.view().len()
+    }
+
+    /// The terms as `(monomial, coefficient)`, borrowed by default and built from the table
+    /// under id-backed terms: for the low-traffic readers (materialization, checks, handoff).
+    fn pairs<'a>(&'a self, table: &MonomialTable<N>) -> Cow<'a, [(Monomial<N>, F)]> {
+        match self {
+            Terms::Full { terms, .. } => Cow::Borrowed(terms),
+            Terms::Ids { ids, coeffs } => Cow::Owned(
+                ids.iter()
+                    .zip(coeffs)
+                    .map(|(&id, &c)| (*table.mono(id), c))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// The full terms, for #933's symbolic replay, which reads monomials off its own threads
+    /// without the table; it is not run under id-backed terms.
+    #[cfg(feature = "research-sigf4-replay")]
+    fn full(&self) -> &[(Monomial<N>, F)] {
+        match self {
+            Terms::Full { terms, .. } => terms,
+            Terms::Ids { .. } => panic!("symbolic replay runs without SigF4Options::id_terms"),
+        }
+    }
+
+    /// Heap bytes holding the terms.
+    fn bytes(&self) -> usize {
+        match self {
+            Terms::Full { terms, hashes } => {
+                terms.capacity() * size_of::<(Monomial<N>, F)>()
+                    + hashes.capacity() * size_of::<u64>()
+            }
+            Terms::Ids { ids, coeffs } => {
+                ids.capacity() * size_of::<u32>() + coeffs.capacity() * size_of::<F>()
+            }
+        }
+    }
+
+    /// Bytes of additive hashes, which [`SigF4Statistics::signature_metadata_bytes`] counts.
+    fn hash_bytes(&self) -> usize {
+        match self {
+            Terms::Full { hashes, .. } => hashes.len() * size_of::<u64>(),
+            Terms::Ids { .. } => 0,
+        }
+    }
+}
+
+/// A row source's terms, borrowed: an input's or an element's (`Terms`).
+#[derive(Clone, Copy)]
+enum View<'a, const N: usize, F> {
+    Full(&'a [(Monomial<N>, F)], &'a [u64]),
+    Ids(&'a [u32], &'a [F]),
+}
+
+impl<'a, const N: usize, F: FiniteField> View<'a, N, F> {
+    fn len(self) -> usize {
+        match self {
+            View::Full(_, hashes) => hashes.len(),
+            View::Ids(ids, _) => ids.len(),
+        }
+    }
+
+    fn lead_hash(self, table: &MonomialTable<N>) -> u64 {
+        match self {
+            View::Full(_, hashes) => hashes[0],
+            View::Ids(ids, _) => table.hash_of(ids[0]),
+        }
+    }
+
+    /// The sparse row `(column(handle), coefficient)`, one handle per term in term order.
+    #[inline]
+    fn entries(self, handles: Vec<u32>, column: impl Fn(u32) -> u32) -> Vec<(u32, F)> {
+        match self {
+            View::Full(terms, _) => handles
+                .into_iter()
+                .zip(terms)
+                .map(|(h, (_, c))| (column(h), *c))
+                .collect(),
+            View::Ids(_, coeffs) => handles
+                .into_iter()
+                .zip(coeffs)
+                .map(|(h, c)| (column(h), *c))
+                .collect(),
+        }
+    }
+
+    /// Term `k`'s monomial.
+    fn mono(self, table: &MonomialTable<N>, k: usize) -> Monomial<N> {
+        match self {
+            View::Full(terms, _) => terms[k].0,
+            View::Ids(ids, _) => *table.mono(ids[k]),
+        }
+    }
+
+    /// `(monomial, hash)` per term from `from` on, for the research instruments' product
+    /// iterators: borrowed by default, collected from the table under id-backed terms.
+    #[cfg(any(feature = "research-adjacent", feature = "research-sigf4-split"))]
+    fn products(self, table: &MonomialTable<N>, from: usize) -> Products<'a, N, F> {
+        match self {
+            View::Full(terms, hashes) => Products::Full(terms[from..].iter().zip(&hashes[from..])),
+            View::Ids(ids, _) => Products::Ids(
+                ids[from..]
+                    .iter()
+                    .map(|&id| (*table.mono(id), table.hash_of(id)))
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            ),
+        }
+    }
+
+    /// Interns `mult · term` for each term from `from` on, pushing each one's batch-local id.
+    /// `hm` must be `hash(mult)`.
+    #[inline]
+    fn intern_times(
+        self,
+        table: &mut MonomialTable<N>,
+        from: usize,
+        mult: &Monomial<N>,
+        hm: u64,
+        work: &mut Vec<u32>,
+        row: &mut Vec<u32>,
+    ) {
+        match self {
+            View::Full(terms, hashes) => {
+                for ((m, _), &h) in terms[from..].iter().zip(&hashes[from..]) {
+                    row.push(table.intern(*m * *mult, h.wrapping_add(hm), work));
+                }
+            }
+            View::Ids(ids, _) => {
+                for &id in &ids[from..] {
+                    row.push(table.intern_times(id, mult, hm, work));
+                }
+            }
+        }
+    }
+}
+
+/// [`View::products`].
+#[cfg(any(feature = "research-adjacent", feature = "research-sigf4-split"))]
+enum Products<'a, const N: usize, F> {
+    Full(std::iter::Zip<std::slice::Iter<'a, (Monomial<N>, F)>, std::slice::Iter<'a, u64>>),
+    Ids(std::vec::IntoIter<(Monomial<N>, u64)>),
+}
+
+#[cfg(any(feature = "research-adjacent", feature = "research-sigf4-split"))]
+impl<const N: usize, F> Iterator for Products<'_, N, F> {
+    type Item = (Monomial<N>, u64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Products::Full(it) => it.next().map(|((m, _), &h)| (*m, h)),
+            Products::Ids(it) => it.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Products::Full(it) => it.size_hint(),
+            Products::Ids(it) => it.size_hint(),
+        }
+    }
+}
+
+#[cfg(any(feature = "research-adjacent", feature = "research-sigf4-split"))]
+impl<const N: usize, F> ExactSizeIterator for Products<'_, N, F> {}
 
 /// What a pending signature reduces: an input, or `mult·element` (the pair's larger half), where
 /// `mult = sig / s(element)` and the smaller half is `(lcm / lm(other))·other`. Multipliers are
@@ -119,6 +310,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     new_leads: usize,
     /// Every column monomial of the run, with its least-ratio reducer search cached.
     table: MonomialTable<N>,
+    /// Under id-backed terms, the current batch's run-wide id per column (#1240).
+    column_ids: Vec<u32>,
     wall: Option<(Instant, Duration)>,
     stats: &'a mut SigF4Statistics,
     #[cfg(feature = "research-sigf4-usage")]
@@ -169,6 +362,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         pending: 0,
         new_leads: 0,
         table: MonomialTable::default(),
+        column_ids: Vec::new(),
         wall: options.max_wall_time.map(|budget| (started, budget)),
         input_hashes: inputs
             .iter()
@@ -275,7 +469,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         engine
             .basis
             .iter()
-            .map(|e| MultivariatePolynomial::new(&e.terms))
+            .map(|e| MultivariatePolynomial::new(&e.terms.pairs(&engine.table)))
             .collect()
     };
     #[cfg(feature = "research-sigf4-usage")]
@@ -304,8 +498,10 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         + engine
             .basis
             .iter()
-            .map(|e| e.hashes.len() * size_of::<u64>())
+            .map(|e| e.terms.hash_bytes())
             .sum::<usize>();
+    engine.stats.signature_basis_terms = engine.basis.iter().map(|e| e.terms.len()).sum();
+    engine.stats.signature_basis_term_bytes = engine.basis.iter().map(|e| e.terms.bytes()).sum();
     #[cfg(feature = "research-adjacent")]
     if let Some(census) = engine.adjacent.take() {
         engine.stats.adjacent = census.batches;
@@ -743,7 +939,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let clock = Instant::now();
         if self.options.check_signatures {
             for (sig, terms) in &new {
-                self.check_new_element(sig, &terms[0].0);
+                self.check_new_element(sig, &terms.view().mono(&self.table, 0));
             }
         }
         #[cfg(feature = "research-sigf4-usage")]
@@ -757,12 +953,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             ..Default::default()
         };
         for (sig, terms) in new {
-            if terms[0].0.is_one() {
+            if terms.view().mono(&self.table, 0).is_one() {
                 self.stats.bookkeeping += clock.elapsed();
                 return Ok(true);
             }
             #[cfg(feature = "research-sigf4-usage")]
-            let (inserted, lead, len) = (Instant::now(), terms[0].0, terms.len());
+            let (inserted, lead, len) = (
+                Instant::now(),
+                terms.view().mono(&self.table, 0),
+                terms.len(),
+            );
             self.insert(sig, terms)?;
             #[cfg(feature = "research-sigf4-usage")]
             {
@@ -811,18 +1011,12 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 mult: t.mult,
                 source: t.source,
             });
-            let (terms, hashes) = match t.source {
-                RowSource::Input(i) => (&self.inputs[i], &self.input_hashes[i]),
-                RowSource::Element(id) => {
-                    let e = &self.basis[id as usize];
-                    (&e.terms, &e.hashes)
-                }
-            };
+            let terms = source_view(&self.inputs, &self.input_hashes, &self.basis, t.source);
             let hm = hash(&t.mult);
             #[cfg(feature = "research-adjacent")]
             if let Some(adjacent) = self.adjacent.as_mut() {
                 let mut row = Vec::with_capacity(terms.len());
-                let products = terms.iter().map(|(m, _)| *m).zip(hashes.iter().copied());
+                let products = terms.products(&self.table, 0);
                 let key = (source_key(t.source), t.mult);
                 adjacent.row(
                     &mut self.table,
@@ -837,20 +1031,15 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 continue;
             }
             #[cfg(not(feature = "research-sigf4-split"))]
-            handles.push(
-                terms
-                    .iter()
-                    .zip(hashes)
-                    .map(|((m, _), &h)| {
-                        self.table
-                            .intern(*m * t.mult, h.wrapping_add(hm), &mut work)
-                    })
-                    .collect(),
-            );
+            {
+                let mut row = Vec::with_capacity(terms.len());
+                terms.intern_times(&mut self.table, 0, &t.mult, hm, &mut work, &mut row);
+                handles.push(row);
+            }
             #[cfg(feature = "research-sigf4-split")]
             {
                 let mut row = Vec::with_capacity(terms.len());
-                let products = terms.iter().map(|(m, _)| *m).zip(hashes.iter().copied());
+                let products = terms.products(&self.table, 0);
                 let table = &mut self.table;
                 split.row(
                     &mut scratch,
@@ -880,23 +1069,23 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 continue;
             }
             let e = &self.basis[id as usize];
+            let terms = e.terms.view();
             let mult = self
                 .table
                 .mono(column)
                 .checked_div(&e.lead)
                 .expect("the lead divides the column");
             // Additive: h(mult) = h(column) - h(lead).
-            let hm = self.table.hash_of(column).wrapping_sub(e.hashes[0]);
+            let hm = self
+                .table
+                .hash_of(column)
+                .wrapping_sub(terms.lead_hash(&self.table));
             let sig = e.sig.times(&mult);
-            let mut row = Vec::with_capacity(e.terms.len());
+            let mut row = Vec::with_capacity(terms.len());
             row.push(lead);
             #[cfg(feature = "research-adjacent")]
             if let Some(adjacent) = self.adjacent.as_mut() {
-                let products = e
-                    .terms
-                    .iter()
-                    .map(|(m, _)| *m)
-                    .zip(e.hashes.iter().copied());
+                let products = terms.products(&self.table, 0);
                 let key = (source_key(RowSource::Element(id)), mult);
                 let lead = Some(column);
                 adjacent.row(
@@ -918,18 +1107,10 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 continue;
             }
             #[cfg(not(feature = "research-sigf4-split"))]
-            for ((tm, _), &th) in e.terms[1..].iter().zip(&e.hashes[1..]) {
-                row.push(
-                    self.table
-                        .intern(*tm * mult, th.wrapping_add(hm), &mut work),
-                );
-            }
+            terms.intern_times(&mut self.table, 1, &mult, hm, &mut work, &mut row);
             #[cfg(feature = "research-sigf4-split")]
             {
-                let products = e.terms[1..]
-                    .iter()
-                    .map(|(m, _)| *m)
-                    .zip(e.hashes[1..].iter().copied());
+                let products = terms.products(&self.table, 1);
                 let table = &mut self.table;
                 split.row(
                     &mut scratch,
@@ -950,7 +1131,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         #[cfg(feature = "research-sigf4-split")]
         let sort = Instant::now();
         let order = self.order;
-        let work: Vec<Monomial<N>> = work.iter().map(|&id| *self.table.mono(id)).collect();
+        let ids = work;
+        let work: Vec<Monomial<N>> = ids.iter().map(|&id| *self.table.mono(id)).collect();
         let mut by_position: Vec<u32> = (0..work.len() as u32).collect();
         by_position.sort_unstable_by(|&a, &b| order.cmp(&work[b as usize], &work[a as usize]));
         let mut position = vec![0u32; work.len()];
@@ -963,6 +1145,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         let columns: Vec<Monomial<N>> = by_position.iter().map(|&id| work[id as usize]).collect();
+        self.column_ids.clear();
+        if self.options.id_terms {
+            self.column_ids
+                .extend(by_position.iter().map(|&k| ids[k as usize]));
+        }
         #[cfg(feature = "research-sigf4-split")]
         {
             split.column_sort = sort.elapsed();
@@ -1007,11 +1194,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         Ok((columns, rows, handles, reducers))
     }
 
-    fn terms_of(&self, source: RowSource) -> &[(Monomial<N>, F)] {
-        match source {
-            RowSource::Input(i) => &self.inputs[i],
-            RowSource::Element(id) => &self.basis[id as usize].terms,
-        }
+    fn terms_of(&self, source: RowSource) -> View<'_, N, F> {
+        source_view(&self.inputs, &self.input_hashes, &self.basis, source)
+    }
+
+    /// This batch's run-wide id per column, under id-backed terms (#1240).
+    fn batch_ids(&self) -> Option<&[u32]> {
+        self.options.id_terms.then_some(&self.column_ids[..])
     }
 
     /// Regular elimination: each target, in increasing signature order, is fully reduced by
@@ -1032,17 +1221,17 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         handles: Vec<Vec<u32>>,
         reducer_count: usize,
         target_count: usize,
-    ) -> Result<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>, SigF4Error> {
+    ) -> Result<Vec<(Signature<N>, Terms<N, F>)>, SigF4Error> {
         let clock = Instant::now();
         let order = self.order;
         if self.options.check_signatures {
             for (row, handles) in rows.iter().zip(&handles) {
                 let terms = self.terms_of(row.source);
                 assert_eq!(terms.len(), handles.len(), "one handle per term");
-                for ((m, _), &h) in terms.iter().zip(handles) {
+                for (k, &h) in handles.iter().enumerate() {
                     assert_eq!(
                         columns[h as usize],
-                        *m * row.mult,
+                        terms.mono(&self.table, k) * row.mult,
                         "a handle names its column"
                     );
                 }
@@ -1051,13 +1240,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let mut sparse_rows: Vec<Vec<(u32, F)>> = rows
             .iter()
             .zip(handles)
-            .map(|(row, handles)| {
-                handles
-                    .into_iter()
-                    .zip(self.terms_of(row.source))
-                    .map(|(h, (_, c))| (h, *c))
-                    .collect()
-            })
+            .map(|(row, handles)| self.terms_of(row.source).entries(handles, |h| h))
             .collect();
         let ncols = columns.len();
         let mut reducer_at: Vec<u32> = vec![NONE; ncols];
@@ -1313,7 +1496,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         self.stats.elimination += clock.elapsed();
-        Ok(finish_batch(results, columns))
+        Ok(finish_batch(results, columns, self.batch_ids()))
     }
 
     /// #1031: census this batch's reducer reuse, with the engine's own product count beside it.
@@ -1403,7 +1586,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         columns: &[Monomial<N>],
         clock: Instant,
         lane_bytes: usize,
-    ) -> Result<Option<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>>, SigF4Error> {
+    ) -> Result<Option<Vec<(Signature<N>, Terms<N, F>)>>, SigF4Error> {
         let rows_bytes = batch_rows_bytes(block, targets) + lane_bytes;
         let job = Claim {
             block,
@@ -1467,7 +1650,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
         }
         self.stats.elimination += clock.elapsed();
-        Ok(Some(finish_batch(results, columns)))
+        Ok(Some(finish_batch(results, columns, self.batch_ids())))
     }
 
     /// Design 1's per-target accounting: a zero row records its syzygy signature (RFC T6), a
@@ -1527,12 +1710,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     }
 
     /// Adds `(sig, terms)` to the basis, recording Koszul syzygies and the new pairs.
-    fn insert(
-        &mut self,
-        sig: Signature<N>,
-        terms: Vec<(Monomial<N>, F)>,
-    ) -> Result<(), SigF4Error> {
-        let lead = terms[0].0;
+    fn insert(&mut self, sig: Signature<N>, terms: Terms<N, F>) -> Result<(), SigF4Error> {
+        let lead = terms.view().mono(&self.table, 0);
         let lead_mask = mask(&lead);
         let id = self.basis.len() as u32;
         self.rank(&sig, &lead);
@@ -1547,15 +1726,17 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.new_leads += usize::from(!covered);
         self.by_index[sig.index as usize].push((mask(&sig.mono), id));
         self.lead_masks.push(lead_mask);
-        let hashing = Instant::now();
-        let hashes = terms.iter().map(|(m, _)| hash(m)).collect();
-        self.stats.element_hashing += hashing.elapsed();
-        self.basis.push(Element {
-            sig,
-            lead,
-            terms,
-            hashes,
-        });
+        // Id-backed terms read their hashes from the table.
+        let terms = match terms {
+            Terms::Full { terms, .. } => {
+                let hashing = Instant::now();
+                let hashes = terms.iter().map(|(m, _)| hash(m)).collect();
+                self.stats.element_hashing += hashing.elapsed();
+                Terms::Full { terms, hashes }
+            }
+            ids => ids,
+        };
+        self.basis.push(Element { sig, lead, terms });
         self.stats.elements_added += 1;
         if let Some(limit) = self.options.max_basis_elements {
             if self.basis.len() > limit {
@@ -1765,18 +1946,42 @@ impl LiveBudget {
     }
 }
 
-#[allow(clippy::type_complexity)]
+/// A row source's terms, from the engine's fields so the table can be borrowed beside them.
+fn source_view<'a, const N: usize, F: FiniteField>(
+    inputs: &'a [Vec<(Monomial<N>, F)>],
+    input_hashes: &'a [Vec<u64>],
+    basis: &'a [Element<N, F>],
+    source: RowSource,
+) -> View<'a, N, F> {
+    match source {
+        RowSource::Input(i) => View::Full(&inputs[i], &input_hashes[i]),
+        RowSource::Element(id) => basis[id as usize].terms.view(),
+    }
+}
+
+/// The batch's new elements' terms from their column entries: monomials, hashed on insertion, or
+/// under id-backed terms each column's run-wide table id (`ids`, by column).
 fn finish_batch<const N: usize, F: FiniteField>(
     results: Vec<(Signature<N>, Vec<(u32, F)>)>,
     columns: &[Monomial<N>],
-) -> Vec<(Signature<N>, Vec<(Monomial<N>, F)>)> {
+    ids: Option<&[u32]>,
+) -> Vec<(Signature<N>, Terms<N, F>)> {
     results
         .into_iter()
         .map(|(sig, entries)| {
-            let terms = entries
-                .into_iter()
-                .map(|(c, v)| (columns[c as usize], v))
-                .collect();
+            let terms = match ids {
+                None => Terms::Full {
+                    terms: entries
+                        .into_iter()
+                        .map(|(c, v)| (columns[c as usize], v))
+                        .collect(),
+                    hashes: Vec::new(),
+                },
+                Some(ids) => Terms::Ids {
+                    ids: entries.iter().map(|&(c, _)| ids[c as usize]).collect(),
+                    coeffs: entries.iter().map(|&(_, v)| v).collect(),
+                },
+            };
             (sig, terms)
         })
         .collect()

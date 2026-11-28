@@ -240,7 +240,7 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
                 let t = &self.targets[item];
                 let terms = match t.source {
                     RowSource::Input(i) => &view.inputs[i][..],
-                    RowSource::Element(id) => &view.basis[id as usize].terms[..],
+                    RowSource::Element(id) => view.basis[id as usize].terms.full(),
                 };
                 let row = Row {
                     sig: t.sig,
@@ -278,7 +278,7 @@ impl<const N: usize, F: FiniteField> Job<'_, N, F> {
                     mult,
                     source: RowSource::Element(best),
                 };
-                (row, Some(item as u32), &e.terms[1..])
+                (row, Some(item as u32), &e.terms.full()[1..])
             };
             out.refs.extend(lead);
             let (local, new) = (&mut out.local, &mut out.new);

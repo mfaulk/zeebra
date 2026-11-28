@@ -874,6 +874,132 @@ fn test_prime31_lane_is_off_by_default() {
     assert!(!checked_any_graded().prime31_lane);
 }
 
+/// #1240: the run with id-backed basis terms against the default, under `options`: the same
+/// pairs, batches (rows and outcomes, term for term), counters and reduced basis. Returns the two
+/// runs' basis term bytes, default first.
+fn id_terms_agree<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &SigF4Options,
+) -> (usize, usize) {
+    let ids = SigF4Options {
+        id_terms: true,
+        ..options.clone()
+    };
+    let (expected, before) = sig_f4_reported(system, order, options);
+    let (actual, after) = sig_f4_reported(system, order, &ids);
+    assert_eq!(actual.unwrap(), expected.unwrap(), "bases differ");
+    assert_eq!(after.pair_trace, before.pair_trace, "queued pairs differ");
+    assert_eq!(after.batch_trace, before.batch_trace, "batches differ");
+    let counts = |s: &super::SigF4Statistics| {
+        [
+            s.batches,
+            s.targets,
+            s.reducer_rows,
+            s.coefficient_products as usize,
+            s.reductions_to_zero,
+            s.elements_added,
+            s.signature_basis_elements,
+            s.reduced_basis_elements,
+            s.max_matrix_rows,
+            s.max_matrix_columns,
+            s.interreduction_columns,
+            s.interreduction_nonzeros,
+            usize::from(s.interreduction_in_columns),
+            usize::from(s.lead_ideal_stop),
+        ]
+    };
+    assert_eq!(counts(&after), counts(&before), "counters differ");
+    (
+        before.signature_basis_term_bytes,
+        after.signature_basis_term_bytes,
+    )
+}
+
+/// #1240: id-backed terms keep every batch and basis on each family, field and cascade here, on
+/// the graded-lex handoff, both lanes and the polynomial interreduction fallback.
+#[test]
+fn test_id_terms_keep_the_batches_and_basis() {
+    use crate::fields::{Mersenne31, Zp31};
+    let checked = SigF4Options {
+        check_signatures: true,
+        ..SigF4Options::default()
+    };
+    let design2 = SigF4Options {
+        workers: 3,
+        ..checked.clone()
+    };
+    let cascade = SigF4Options {
+        workers: 4,
+        parallel_cascade: true,
+        ..checked.clone()
+    };
+    let grlex = MonomialOrder::GradedLexicographic;
+    let lex = SigF4Options {
+        allow_graded_lex: true,
+        ..checked.clone()
+    };
+    let lanes = SigF4Options {
+        small_prime_lane: true,
+        prime31_lane: true,
+        ..checked.clone()
+    };
+    let fallback = SigF4Options {
+        interreduction_live_entries: Some(10),
+        ..checked.clone()
+    };
+    id_terms_agree(&eco::<7, Goldilocks>(), GREVLEX, &checked);
+    id_terms_agree(&eco::<8, Wide>(), GREVLEX, &design2);
+    id_terms_agree(&katsura::<6, Wide>(), GREVLEX, &cascade);
+    id_terms_agree(&katsura::<7, Goldilocks>(), GREVLEX, &checked);
+    id_terms_agree(&katsura::<6, Zp32003>(), grlex, &lex);
+    id_terms_agree(&cyclic::<5, Zp32003>(), GREVLEX, &checked);
+    id_terms_agree(&cyclic::<6, Zp32003>(), grlex, &lex);
+    id_terms_agree(&noon::<5, Wide>(), GREVLEX, &cascade);
+    id_terms_agree(&reimer::<4, Zp32003>(), GREVLEX, &checked);
+    id_terms_agree(&dense_quadratics::<6, Zp31>(2), GREVLEX, &lanes);
+    id_terms_agree(&dense_quadratics::<6, Mersenne31>(1), GREVLEX, &lanes);
+    id_terms_agree(&katsura::<6, Goldilocks>(), GREVLEX, &fallback);
+    // The research instruments read products through the table under id-backed terms.
+    #[cfg(feature = "research-adjacent")]
+    for adjacent in [
+        super::adjacent::AdjacentMode::Reuse,
+        super::adjacent::AdjacentMode::Flat,
+    ] {
+        let options = SigF4Options {
+            adjacent,
+            ..checked.clone()
+        };
+        id_terms_agree(&katsura::<6, Zp32003>(), GREVLEX, &options);
+    }
+}
+
+/// #1240: id-backed terms hold the basis in a table id and a coefficient per term, which on a
+/// 32-bit field is 8 bytes against the default's monomial, coefficient and hash.
+#[test]
+fn test_id_terms_shrink_the_basis_terms() {
+    let system = dense_quadratics::<8, crate::fields::Zp31>(3);
+    let (full, ids) = id_terms_agree(&system, GREVLEX, &SigF4Options::default());
+    let (result, s) = sig_f4_reported(&system, GREVLEX, &SigF4Options::default());
+    result.unwrap();
+    let terms = s.signature_basis_terms;
+    assert!(terms > 0);
+    let per_term = size_of::<Monomial<8>>() + size_of::<crate::fields::Zp31>() + 8;
+    assert!(
+        full >= terms * per_term,
+        "default {full} < {terms} × {per_term}"
+    );
+    assert!(ids >= terms * 8, "ids {ids} < {terms} × 8");
+    assert!(ids < full / 4, "ids {ids} against default {full}");
+}
+
+/// #1240: id-backed terms are opt-in.
+#[test]
+fn test_id_terms_are_off_by_default() {
+    assert!(!SigF4Options::default().id_terms);
+    assert!(!checked_any_graded().id_terms);
+}
+
 /// #961: a reducer multiple of the batch's degree whose lead an element of smaller signature has
 /// just taken is reduced in that batch, so on these inputs, which have no degree falls, every
 /// signature degree is one batch. Before, the pair naming it waited for another batch of the same

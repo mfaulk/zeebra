@@ -110,6 +110,21 @@ impl<const N: usize> MonomialTable<N> {
         self.local(id, work)
     }
 
+    /// [`Self::intern`] of `mult` times run-wide id `id`'s monomial (#1240). `hm` must be
+    /// `hash(mult)`.
+    #[inline]
+    pub(super) fn intern_times(
+        &mut self,
+        id: u32,
+        mult: &Monomial<N>,
+        hm: u64,
+        work: &mut Vec<u32>,
+    ) -> u32 {
+        let entry = &self.entries[id as usize];
+        let (m, h) = (entry.mono * *mult, entry.hash.wrapping_add(hm));
+        self.intern(m, h, work)
+    }
+
     /// Run-wide id `id`'s first-occurrence id in this batch, appending it to `work` on first
     /// sight: [`Self::intern`] without the product's probe.
     #[inline]
