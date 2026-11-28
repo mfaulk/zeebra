@@ -25,7 +25,7 @@ use zeebra::{
         Zp32003,
     },
     grobner::{
-        benchmark_systems::{cyclic, eco, katsura, noon},
+        benchmark_systems::{cyclic, eco, katsura, noon, reimer},
         differential::polynomial_to_string,
         external::{corpus, FieldSpec, Instance},
         f4_reported, f4_signature_reported, BatchOrder, F4Options, GradedEngine, ParallelForward,
@@ -216,7 +216,7 @@ fn full_mq<const N: usize, F: FiniteField>(seed: u64) -> Vec<MultivariatePolynom
         .collect()
 }
 
-/// `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, `mq-random-N-sS` or `mq-full-N-sS` at `p`, in the
+/// `katsura-N`, `eco-N`, `cyclic-N`, `noon-N`, `reimer-N`, `mq-random-N-sS` or `mq-full-N-sS` at `p`, in the
 /// external contract's canonical form, exactly as `sig_f4_study --generate` builds the M33 rows.
 fn generated(name: &str, p: u64) -> Result<Input, String> {
     fn render<const N: usize, F: FiniteField>(
@@ -240,7 +240,8 @@ fn generated(name: &str, p: u64) -> Result<Input, String> {
                     $(("katsura", $k) => Some(render(name, family, &katsura::<$k, F>(), p)),
                       ("eco", $k) => Some(render(name, family, &eco::<$k, F>(), p)),
                       ("cyclic", $k) => Some(render(name, family, &cyclic::<$k, F>(), p)),
-                      ("noon", $k) => Some(render(name, family, &noon::<$k, F>(), p)),)*
+                      ("noon", $k) => Some(render(name, family, &noon::<$k, F>(), p)),
+                      ("reimer", $k) => Some(render(name, family, &reimer::<$k, F>(), p)),)*
                     _ => None,
                 }
             };
@@ -687,6 +688,19 @@ mod tests {
         let fresh = generated("mq-full-10-s1", p).unwrap();
         assert_ne!(parse(&fresh), parse(&frozen));
         assert!(parse(&fresh).iter().all(|q| q.terms().len() == 1 + 10 + 55));
+    }
+
+    /// #1076: `reimer-N` renders the library's Reimer system, whose generators span degrees 2..=N+1.
+    #[test]
+    fn reimer_rows_are_generated() {
+        let input = generated("reimer-5", 2147483647).unwrap();
+        assert_eq!(input.generators.len(), 5);
+        assert_eq!(input.variables.len(), 5);
+        assert!(
+            input.generators[4].contains("x1^6"),
+            "{:?}",
+            input.generators[4]
+        );
     }
 
     /// Fields, orders and engines outside the suites are refused before any solve.
