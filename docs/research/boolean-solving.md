@@ -205,7 +205,9 @@ The alternative mechanism named in #218's question 2 — reducing exponents modu
 monomial arithmetic, as PolyBoRi does with a ZDD over `GF(2)` — is faster and changes what `Monomial`
 means. **Not taken**, and recorded as a separate decision rather than deferred silently. #1168
 prototyped it as a research module, normal forms only, without touching `Monomial`:
-[boolean-zdd-normal-forms.md](boolean-zdd-normal-forms.md).
+[boolean-zdd-normal-forms.md](boolean-zdd-normal-forms.md). Its follow-up proposal, a ZDD
+equivalence checker (#1211, not accepted), is
+[boolean-zdd-equivalence-proposal.md](boolean-zdd-equivalence-proposal.md).
 
 ## 6. The solving half, which the first pass did not assert
 
