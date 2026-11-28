@@ -6,7 +6,7 @@
 //! monomial table, and the tails-only sweep (#879) run in the engine's [`Workspace`], so the
 //! signature basis is never materialized as polynomials. Only the reduced basis is.
 
-use super::{divides, mask, Engine, Workspace, NONE};
+use super::{divides, mask, Engine, View, Workspace, NONE};
 use crate::{
     grobner::f4::interreduce::MatrixInterreductionReport, poly::MonomialOrder, FiniteField,
     Monomial, MultivariatePolynomial,
@@ -80,13 +80,18 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let mut sources: Vec<(u32, Monomial<N>)> = Vec::with_capacity(elements);
         let mut nonzeros = 0usize;
         for &id in &seeds {
-            let e = &self.basis[id as usize];
-            let row: Vec<u32> = e
-                .terms
-                .iter()
-                .zip(&e.hashes)
-                .map(|((m, _), &h)| self.table.intern(*m, h, &mut work))
-                .collect();
+            let row: Vec<u32> = match self.basis[id as usize].terms.view() {
+                View::Full(terms, hashes) => terms
+                    .iter()
+                    .zip(hashes)
+                    .map(|((m, _), &h)| self.table.intern(*m, h, &mut work))
+                    .collect(),
+                // Already interned: only the batch-local id is new.
+                View::Ids(ids, _) => ids
+                    .iter()
+                    .map(|&t| self.table.local(t, &mut work))
+                    .collect(),
+            };
             nonzeros += row.len();
             handles.push(row);
             sources.push((id, Monomial::one()));
@@ -101,20 +106,19 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 continue;
             }
             let e = &self.basis[id as usize];
+            let terms = e.terms.view();
             let mult = self
                 .table
                 .mono(column)
                 .checked_div(&e.lead)
                 .expect("the lead divides the column");
-            let hm = self.table.hash_of(column).wrapping_sub(e.hashes[0]);
-            let mut row = Vec::with_capacity(e.terms.len());
+            let hm = self
+                .table
+                .hash_of(column)
+                .wrapping_sub(terms.lead_hash(&self.table));
+            let mut row = Vec::with_capacity(terms.len());
             row.push(lead);
-            for ((tm, _), &th) in e.terms[1..].iter().zip(&e.hashes[1..]) {
-                row.push(
-                    self.table
-                        .intern(*tm * mult, th.wrapping_add(hm), &mut work),
-                );
-            }
+            terms.intern_times(&mut self.table, 1, &mult, hm, &mut work, &mut row);
             nonzeros += row.len();
             handles.push(row);
             sources.push((id, mult));
@@ -150,10 +154,10 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             .into_iter()
             .zip(&sources)
             .map(|(row, &(id, _))| {
-                row.into_iter()
-                    .zip(&self.basis[id as usize].terms)
-                    .map(|(h, (_, c))| (position[h as usize], *c))
-                    .collect()
+                self.basis[id as usize]
+                    .terms
+                    .view()
+                    .entries(row, |h| position[h as usize])
             })
             .collect();
         let mut pivot_at = vec![NONE; ncols];

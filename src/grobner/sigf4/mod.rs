@@ -90,6 +90,10 @@ pub struct SigF4Options {
     /// [`crate::linalg::lane::MAX_LANE_PRIME`] and below 2^31; ignored otherwise. Every row is
     /// unchanged. Off by default; dispatch is #1123's.
     pub prime31_lane: bool,
+    /// #1240 prototype: hold each signature-basis term as its run-wide monomial-table id and its
+    /// coefficient, in place of the monomial, coefficient and additive hash. Every batch and basis
+    /// is unchanged. Off by default.
+    pub id_terms: bool,
     /// #1031: census every serial batch's reducer reuse into [`SigF4Statistics::reuse`]. Replays
     /// each elimination three times, so never on in a timed run.
     #[cfg(feature = "research-reuse")]
@@ -129,6 +133,7 @@ impl Default for SigF4Options {
             lead_ideal_stop: true,
             small_prime_lane: false,
             prime31_lane: false,
+            id_terms: false,
             #[cfg(feature = "research-reuse")]
             reuse_census: false,
             #[cfg(feature = "research-adjacent")]
@@ -240,6 +245,11 @@ pub struct SigF4Statistics {
     pub peak_pending: usize,
     /// Signatures, ratios and masks on basis elements, the syzygy store and the peak queue.
     pub signature_metadata_bytes: usize,
+    /// Terms the signature basis holds at the end, and the heap bytes holding them: monomials,
+    /// coefficients and hashes by default, table ids and coefficients under
+    /// [`SigF4Options::id_terms`] (#1240).
+    pub signature_basis_terms: usize,
+    pub signature_basis_term_bytes: usize,
     /// Pair generation, the queue and every criterion: the bookkeeping RFC §5 leaves unpriced.
     pub bookkeeping: Duration,
     /// The part of `bookkeeping` spent hashing new elements' terms for the monomial table.
