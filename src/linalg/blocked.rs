@@ -630,8 +630,7 @@ fn micro4(
     let a1 = &a.row(i + 1)[pc..pc + kc];
     let a2 = &a.row(i + 2)[pc..pc + kc];
     let a3 = &a.row(i + 3)[pc..pc + kc];
-    for (kk, bk) in strip.chunks_exact(NR).enumerate().take(kc) {
-        let bk: &[f64; NR] = bk.try_into().unwrap();
+    for (kk, bk) in strip.as_chunks::<NR>().0.iter().enumerate().take(kc) {
         let (x0, x1, x2, x3) = (a0[kk], a1[kk], a2[kk], a3[kk]);
         for t in 0..NR {
             c0[t] = multiply_add(x0, bk[t], c0[t]);
@@ -662,7 +661,7 @@ fn micro1(
     let mut c0 = [0.0f64; NR];
     c0[..width].copy_from_slice(&acc.cells[i * n + column..i * n + column + width]);
     let a0 = &a.row(i)[pc..pc + kc];
-    for (kk, bk) in strip.chunks_exact(NR).enumerate().take(kc) {
+    for (kk, bk) in strip.as_chunks::<NR>().0.iter().enumerate().take(kc) {
         let x0 = a0[kk];
         for t in 0..NR {
             c0[t] = multiply_add(x0, bk[t], c0[t]);
@@ -1032,7 +1031,7 @@ fn sweep<F: FiniteField>(
             match &reducers[slot] {
                 Reducer::Dense { start, values } => {
                     let span = &mut work[start * SWEEP..(start + values.len()) * SWEEP];
-                    for (w, &v) in span.chunks_exact_mut(SWEEP).zip(values) {
+                    for (w, &v) in span.as_chunks_mut::<SWEEP>().0.iter_mut().zip(values) {
                         for r in 0..SWEEP {
                             w[r] = multiply_add(negated[r], v, w[r]);
                         }
