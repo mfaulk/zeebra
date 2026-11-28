@@ -339,6 +339,12 @@ jobs:
           python3 -m unittest discover -s research/1009-feature-costs -p 'test_*.py'
           python3 research/1009-feature-costs/summarize.py --check
 
+      - name: "#1135 size-gated worker count: gate and read"
+        if: ${{ !cancelled() }}
+        run: |
+          python3 -m unittest discover -s research/1135-size-gated-workers -p 'test_*.py'
+          python3 research/1135-size-gated-workers/study.py summarize --check
+
       - name: M33 G1 attribution helpers and tables
         if: ${{ !cancelled() }}
         run: |

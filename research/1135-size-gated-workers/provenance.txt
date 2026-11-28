@@ -1,0 +1,9 @@
+commit=68ed9b14 (the predeclaration; source tree of main f77dc563, the commit adds only research/ Python, docs and a CI step)
+host=Apple M4 Pro, 10 performance + 4 efficiency cores, 48 GB, macOS 15.7.3
+rustc=rustc 1.95.0 (59807616e 2026-04-14)
+binary=m34_matrix, cargo build --release --locked --features research-sigf4 (repository .cargo/config.toml, RUSTC_WRAPPER="", CARGO_INCREMENTAL=0)
+binary_sha256=30e2b51d31c2958ce6d91a83286b3d4d080816ee1d606447d88460c70533f514
+placement=unpinned (macOS has no affinity control); another agent's build shared the machine
+START 2026-11-28T17:10:06Z
+END   2026-11-28T17:15:20Z
+load_start=1-minute load at each attempt start, 3.2-5.7 (median 4.5)
