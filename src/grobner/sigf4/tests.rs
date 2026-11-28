@@ -1140,3 +1140,41 @@ fn test_syzygy_store_matches_a_naive_model() {
         }
     }
 }
+
+/// #1198's count leaves the basis and every statistic it does not own unchanged, records one
+/// entry per batch, and its ledger ends at the signature basis.
+#[cfg(feature = "research-reuse")]
+#[test]
+fn test_tail_store_census_observes_without_changing_the_run() {
+    let system = katsura::<5, Zp32003>();
+    let plain = SigF4Options::default();
+    let counted = SigF4Options {
+        tail_store_census: true,
+        ..SigF4Options::default()
+    };
+    let (expected, base) = sig_f4_reported(&system, GREVLEX, &plain);
+    let (actual, stats) = sig_f4_reported(&system, GREVLEX, &counted);
+    assert_eq!(actual.unwrap(), expected.unwrap());
+    assert!(base.tail_store.is_empty());
+    assert_eq!(stats.coefficient_products, base.coefficient_products);
+    assert_eq!(stats.claim_peak_live_bytes, base.claim_peak_live_bytes);
+    assert_eq!(stats.tail_store.len(), stats.batches);
+    let mut multiples = 0;
+    for b in &stats.tail_store {
+        // Every reducer leads at its own reducible column.
+        assert!(b.reducers <= b.columns - b.irreducible_before);
+        assert!(b.irreducible_after <= b.irreducible_before);
+        assert!(b.dense_cells_below_lead <= b.dense_cells);
+        assert!(b.live_peak_bytes as usize <= stats.claim_peak_live_bytes);
+        multiples += b.new_multiples;
+        assert_eq!(b.multiples, multiples);
+    }
+    let last = stats.tail_store.last().unwrap();
+    assert_eq!(last.basis_elements, stats.signature_basis_elements);
+    assert_eq!(
+        stats.tail_store.iter().map(|b| b.reducers).sum::<usize>(),
+        stats.reducer_rows
+    );
+    let peak = stats.tail_store.iter().map(|b| b.live_peak_bytes).max();
+    assert_eq!(peak, Some(stats.claim_peak_live_bytes as u64));
+}

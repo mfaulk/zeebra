@@ -141,6 +141,9 @@ case "$1" in
         cargo test --features research-reuse --lib grobner::reuse_census
         cargo test --features research-reuse --example reuse_census
         python3 research/1031-reuse-census/summarize.py research/1031-reuse-census/runs.jsonl.gz | diff - research/1031-reuse-census/tables.md
+        cargo test --features research-reuse --lib grobner::sigf4::tail_store
+        cargo test --features research-reuse --lib grobner::sigf4::tests::test_tail_store
+        python3 research/1198-irreducible-tail-store/summarize.py | diff - research/1198-irreducible-tail-store/tables.md
         ;;
     research-adjacent)
         cargo test --features research-adjacent --lib grobner::sigf4::adjacent

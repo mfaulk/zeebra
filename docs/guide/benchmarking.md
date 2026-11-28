@@ -1520,6 +1520,26 @@ python3 research/1031-reuse-census/summarize.py research/1031-reuse-census/runs.
   | diff - research/1031-reuse-census/tables.md
 ```
 
+### Irreducible-column count for a dense tail store (#1198)
+
+`reuse_census --row <row> --engine sigf4 --tail-store [--lane]`, built with
+`--features research-reuse`, records per batch of the signature engine the columns no basis lead
+divides, the cells of a dense row store over them against the sparse entries built, the distinct
+reducer multiples, the engine's live-byte peak, and the stored basis tails each new lead makes
+reducible (`sigf4::tail_store`). It reduces nothing and the basis is unchanged; the run is
+untimed. `--lane` turns on the opt-in small-prime and 31-bit lanes. Dense rows now go up to
+n = 18 (`dmq-n16-…`, `dmq-n18-…`). `research/1198-irreducible-tail-store/run.sh` runs `rows.txt`;
+a row named `<row>+lane` runs with the lanes. The
+[report](../research/irreducible-tail-store.md) declines the M4GB-style store and files #1240.
+Checks:
+
+```sh
+cargo test --features research-reuse --lib grobner::sigf4::tail_store
+cargo test --features research-reuse --lib grobner::sigf4::tests::test_tail_store
+python3 research/1198-irreducible-tail-store/summarize.py \
+  | diff - research/1198-irreducible-tail-store/tables.md
+```
+
 ### Input-feature extraction cost (#1009)
 
 `feature_costs --catalog <catalog.json> --id <record>` times each `grobner::planning` feature

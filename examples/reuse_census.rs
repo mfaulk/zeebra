@@ -3,13 +3,20 @@
 //!
 //! cargo run --release --features research-reuse --example reuse_census -- \
 //!     --row eco12-wide64|katsura11-m31|mq10-32003|mq10-m31|mq11-goldilocks|dmq-n<N>-m<M>-<field>-s<S>[-u]
-//!     --engine f4|sigf4 [--census] [--stages] [--adjacent off|count|reuse|flat|flat-count]
-//!     [--wall-s 180]
+//!     --engine f4|sigf4 [--census] [--tail-store] [--lane] [--stages]
+//!     [--adjacent off|count|reuse|flat|flat-count] [--wall-s 180]
 //!
 //! Without `--census` the run is the timed arm: the engine as it ships at one worker (`--stages` adds
 //! the conventional engine's stage clocks, which cost it a few percent). With `--census`
 //! (`--features research-reuse`) every batch is replayed by `grobner::reuse_census`; that run is
 //! untimed. Both report `basis_sha256`, which must agree.
+//!
+//! `--tail-store` (`--features research-reuse`, signature engine only) is #1198's count: per batch,
+//! the columns no basis lead divides, the cells of a dense tail store over them against the sparse
+//! entries built, and the stored tails each new lead invalidates. It reduces nothing and changes
+//! no row, but the run is untimed. Its record is `tail_store` in the report, with the byte sizes
+//! of one sparse entry and one coefficient. `--lane` (signature engine only) turns on the opt-in
+//! small-prime and 31-bit lanes, which change what a batch holds and no row.
 //!
 //! `--adjacent` (`--features research-adjacent`, signature engine only) is #1075's previous-batch
 //! buffer of run-wide monomial ids: `count` keeps it and counts its hits, `reuse` serves them, and
@@ -56,7 +63,7 @@ const PINNED: &[&str] = &[
     "grid5x5-m31",
 ];
 /// The variable counts a generated row may have; each is a separate monomorphization.
-const SIZES: &[usize] = &[6, 7, 8, 9, 10, 11, 12, 13, 14];
+const SIZES: &[usize] = &[6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
 const FIELDS: &[&str] = &["gf31", "gf32003", "m31", "p64"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,6 +77,8 @@ struct Args {
     row: String,
     engine: Engine,
     census: bool,
+    tail_store: bool,
+    lane: bool,
     stages: bool,
     adjacent: Adjacent,
     wall: Duration,
@@ -120,6 +129,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         row: String::new(),
         engine: Engine::F4,
         census: false,
+        tail_store: false,
+        lane: false,
         stages: false,
         adjacent: Adjacent::Off,
         wall: Duration::from_secs(180),
@@ -139,6 +150,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                 })
             }
             "--census" => parsed.census = true,
+            "--tail-store" => parsed.tail_store = true,
+            "--lane" => parsed.lane = true,
             "--stages" => parsed.stages = true,
             "--adjacent" => {
                 adjacent = Some(match value()?.as_str() {
@@ -177,6 +190,17 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             return Err("--adjacent is a timed signature-engine run".into());
         }
         parsed.adjacent = mode;
+    }
+    if parsed.tail_store {
+        if !cfg!(feature = "research-reuse") {
+            return Err("--tail-store needs --features research-reuse".into());
+        }
+        if parsed.engine != Engine::SigF4 || parsed.stages || adjacent.is_some() {
+            return Err("--tail-store is an untimed signature-engine run".into());
+        }
+    }
+    if parsed.lane && parsed.engine != Engine::SigF4 {
+        return Err("--lane is a signature-engine option".into());
     }
     if parsed.census && parsed.stages {
         return Err("--stages times a run; --census runs are untimed".into());
@@ -418,8 +442,12 @@ fn f4_options(args: &Args) -> F4Options {
 fn sig_options(args: &Args) -> SigF4Options {
     SigF4Options {
         max_wall_time: Some(args.wall),
+        small_prime_lane: args.lane,
+        prime31_lane: args.lane,
         #[cfg(feature = "research-reuse")]
         reuse_census: args.census,
+        #[cfg(feature = "research-reuse")]
+        tail_store_census: args.tail_store,
         #[cfg(feature = "research-adjacent")]
         adjacent: match args.adjacent {
             Adjacent::Off => zeebra::grobner::sigf4::adjacent::AdjacentMode::Off,
@@ -520,6 +548,8 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let started = Instant::now();
     #[cfg_attr(not(feature = "research-adjacent"), allow(unused_mut))]
     let mut adjacent = Json::Null;
+    #[cfg_attr(not(feature = "research-reuse"), allow(unused_mut))]
+    let mut tail_store = Json::Null;
     let (result, statistics, census, ledger) = match args.engine {
         Engine::F4 => {
             let options = f4_options(args);
@@ -546,6 +576,18 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                 });
             #[cfg(not(feature = "research-reuse"))]
             let census = Json::Null;
+            #[cfg(feature = "research-reuse")]
+            if args.tail_store {
+                tail_store = Json::object([
+                    ("entry_bytes", Json::size(size_of::<(u32, F)>())),
+                    ("coefficient_bytes", Json::size(size_of::<F>())),
+                    ("term_bytes", Json::size(bytes_per_term)),
+                    (
+                        "batches",
+                        Json::Array(stats.tail_store.iter().map(|b| b.json()).collect()),
+                    ),
+                ]);
+            }
             #[cfg(feature = "research-adjacent")]
             if args.adjacent != Adjacent::Off {
                 adjacent = Json::Array(stats.adjacent.iter().map(|b| b.json()).collect());
@@ -580,6 +622,8 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
             }),
         ),
         ("census", Json::Bool(args.census)),
+        ("tail_store_census", Json::Bool(args.tail_store)),
+        ("lane", Json::Bool(args.lane)),
         ("stages", Json::Bool(args.stages)),
         (
             "adjacent_mode",
@@ -615,6 +659,7 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("ledger", ledger),
         ("reuse", census),
         ("adjacent", adjacent),
+        ("tail_store", tail_store),
     ])
 }
 
@@ -711,7 +756,7 @@ fn main() {
         ),
         name => {
             let shape = parse_dense(name).expect("validated");
-            dense_dispatch!(shape, &args, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+            dense_dispatch!(shape, &args, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18)
         }
     };
     println!("{}", report.to_json().replace('\n', ""));
@@ -770,6 +815,10 @@ mod tests {
             cfg!(feature = "research-adjacent")
         );
         assert!(adjacent("f4").is_err());
+        let tail = |engine| args(&["--row", "mq10-m31", "--engine", engine, "--tail-store"]);
+        assert_eq!(tail("sigf4").is_ok(), cfg!(feature = "research-reuse"));
+        assert!(tail("f4").is_err());
+        assert!(args(&["--row", "mq10-m31", "--engine", "f4", "--lane"]).is_err());
     }
 
     // A generated row is deterministic, has its stated shape, and vanishes at its planted point.
@@ -809,6 +858,10 @@ mod tests {
         };
         let reference = digest(&["--row", row, "--engine", "f4"]);
         assert_eq!(digest(&["--row", row, "--engine", "sigf4"]), reference);
+        assert_eq!(
+            digest(&["--row", row, "--engine", "sigf4", "--lane"]),
+            reference
+        );
         if cfg!(feature = "research-adjacent") {
             for mode in ["count", "reuse", "flat", "flat-count"] {
                 let list = ["--row", row, "--engine", "sigf4", "--adjacent", mode];
@@ -822,6 +875,10 @@ mod tests {
             );
             assert_eq!(
                 digest(&["--row", row, "--engine", "sigf4", "--census"]),
+                reference
+            );
+            assert_eq!(
+                digest(&["--row", row, "--engine", "sigf4", "--tail-store"]),
                 reference
             );
         }
