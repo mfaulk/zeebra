@@ -18,7 +18,7 @@ check() { # <label> <expected> <actual>
   fi
 }
 
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/fetch-eprint-test.XXXXXX")
+WORK=$(cd "$(mktemp -d "${TMPDIR:-/tmp}/fetch-eprint-test.XXXXXX")" && pwd -P) # the tool prints resolved paths
 LOG="$WORK/requests.log"
 : >"$LOG"
 python3 "$HERE/eprint-fixture-server.py" --port-file "$WORK/port" --log "$LOG" &
@@ -37,7 +37,8 @@ run() { # runs the tool; sets OUT, ERR, RC
   ERR=$(cat "$WORK/stderr")
 }
 requests() { grep -c -- "$1" "$LOG"; }
-parts_left() { find "$EPRINT_CACHE_DIR" -name '*.part' 2>/dev/null | wc -l; }
+count_lines() { local n; n=$(wc -l); echo $((n)); } # BSD wc pads its count with spaces
+parts_left() { find "$EPRINT_CACHE_DIR" -name '*.part' 2>/dev/null | count_lines; }
 
 # --- identifier parsing (pure) ---
 
@@ -69,7 +70,7 @@ done
 # The CLI refuses a malformed id with status 64 and sends no request.
 run "https://evil.example/2025/2340.pdf"
 check "cli bad host rc" 64 "$RC"
-check "cli bad host no request" 0 "$(wc -l <"$LOG")"
+check "cli bad host no request" 0 "$(count_lines <"$LOG")"
 
 # A mirror base that is more than scheme://host[:port] is refused rather than used as a URL prefix.
 EPRINT_MIRROR_BASE="$BASE/x?y=" run 2025/2340
@@ -97,7 +98,7 @@ check "download rc" 0 "$RC"
 check "download path" "$WORK/cache/2025-2340.pdf" "$OUT"
 valid_pdf "$OUT"; check "downloaded file valid" 0 "$?"
 check "download one request" 1 "$(requests /2025/2340.pdf)"
-check "download mode" 644 "$(stat -c %a "$OUT")"
+check "download mode" 644 "$(stat -c %a "$OUT" 2>/dev/null || stat -f %Lp "$OUT")"
 
 # All three input forms resolve to the same cached file, served from cache with no new request.
 for form in 2025/2340 https://eprint.iacr.org/2025/2340 https://eprint.iacr.org/2025/2340.pdf; do
@@ -184,20 +185,67 @@ crc=0
 for p in "${pids[@]}"; do wait "$p" || crc=1; done
 check "concurrent all succeed" 0 "$crc"
 check "concurrent one request" $((before + 1)) "$(requests /2000/777.pdf)"
-check "concurrent same path" 1 "$(cat "$WORK"/c*.out | sort -u | wc -l)"
+check "concurrent same path" 1 "$(cat "$WORK"/c*.out | sort -u | count_lines)"
 valid_pdf "$WORK/cache/2000-777.pdf"; check "concurrent result valid" 0 "$?"
 
 # No incomplete download is left behind by any of the above.
 check "no part files left" 0 "$(parts_left)"
 
+# --- lock tool selection ---
+
+# Without flock(1), as on macOS, perl's flock(2) serializes fetches the same way.
+rm -f "$WORK/cache/2000-777.pdf"
+before=$(requests /2000/777.pdf)
+pids=()
+for i in $(seq 4); do
+  EPRINT_FLOCK=no-such-flock bash "$TOOL" 2000/777 >"$WORK/p$i.out" 2>"$WORK/p$i.err" &
+  pids+=("$!")
+done
+crc=0
+for p in "${pids[@]}"; do wait "$p" || crc=1; done
+check "perl lock all succeed" 0 "$crc"
+check "perl lock one request" $((before + 1)) "$(requests /2000/777.pdf)"
+check "perl lock same path" 1 "$(cat "$WORK"/p*.out | sort -u | count_lines)"
+
+# A lock held elsewhere times out with status 2 and says so, under each available tool.
+HOLDER=""
+hold_lock() { # holds 2000/888's lock from a background process until killed
+  perl -MFcntl=:flock -e 'open(my $f, ">", $ARGV[0]) or die; flock($f, LOCK_EX) or die;
+    open(my $r, ">", $ARGV[1]) or die; close $r; sleep 30' \
+    "$EPRINT_CACHE_DIR/.2000-888.lock" "$WORK/held" &
+  HOLDER=$!
+  for _ in $(seq 100); do [ -e "$WORK/held" ] && break; sleep 0.05; done
+}
+for tool in flock no-such-flock; do
+  [ "$tool" = no-such-flock ] || command -v "$tool" >/dev/null 2>&1 || continue
+  rm -f "$WORK/held"
+  hold_lock
+  EPRINT_FLOCK=$tool EPRINT_LOCK_WAIT=1 run 2000/888
+  kill "$HOLDER" 2>/dev/null
+  wait "$HOLDER" 2>/dev/null
+  check "held lock rc ($tool)" 2 "$RC"
+  check "held lock says timed out ($tool)" yes "$(grep -q 'timed out' <<<"$ERR" && echo yes || echo no)"
+done
+
+# With neither flock(1) nor perl the tool fails at once with status 2, names the missing tool
+# rather than reporting a timeout, and sends no request.
+n=$(count_lines <"$LOG")
+start=$SECONDS
+EPRINT_FLOCK=no-such-flock EPRINT_PERL=no-such-perl run 2000/999
+check "no lock tool rc" 2 "$RC"
+check "no lock tool named" yes "$(grep -q 'flock(1) not found' <<<"$ERR" && echo yes || echo no)"
+check "no lock tool is not a timeout" no "$(grep -q 'timed out' <<<"$ERR" && echo yes || echo no)"
+check "no lock tool fails fast" yes "$([ $((SECONDS - start)) -lt 5 ] && echo yes || echo no)"
+check "no lock tool sends no request" "$n" "$(count_lines <"$LOG")"
+
 # --- --import ---
 
 # A valid local PDF is installed as the paper without any request.
-n=$(wc -l <"$LOG")
+n=$(count_lines <"$LOG")
 run --import "$WORK/good.pdf" 1999/5
 check "import rc" 0 "$RC"
 check "import path" "$WORK/cache/1999-005.pdf" "$OUT"
-check "import no request" "$n" "$(wc -l <"$LOG")"
+check "import no request" "$n" "$(count_lines <"$LOG")"
 # A non-PDF is refused for import.
 run --import "$WORK/page.html" 1999/6
 check "import html rc" 1 "$RC"
