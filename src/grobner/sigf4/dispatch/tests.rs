@@ -664,3 +664,15 @@ fn test_signature_matrix_limits_scale_with_the_callers() {
         usize::MAX
     );
 }
+
+/// #1183: `F4Options::prime31_lane` reaches the signature engine Adaptive dispatches to, so the
+/// 31-bit lane is not confined to forced signature runs.
+#[test]
+fn test_prime31_lane_reaches_the_dispatched_signature_engine() {
+    assert!(!signature_options::<Zp32003>(&F4Options::default(), 1).prime31_lane);
+    let lane = F4Options {
+        prime31_lane: true,
+        ..F4Options::default()
+    };
+    assert!(signature_options::<Zp32003>(&lane, 1).prime31_lane);
+}

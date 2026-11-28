@@ -982,7 +982,8 @@ pub struct F4Options {
     /// ([`crate::linalg::lane`]) when the field is a prime between
     /// [`crate::linalg::lane::MAX_LANE_PRIME`] and 2^31 and the backend is [`Backend::Adaptive`],
     /// whose echelon form the lane reproduces entry for entry. Worker passes and the
-    /// Faugère–Lachartre order are unchanged.
+    /// Faugère–Lachartre order are unchanged. Under [`GradedEngine::Adaptive`] it also sets
+    /// `SigF4Options::prime31_lane` on the signature engine the dispatcher runs.
     ///
     /// Off at every preset; dispatch is #1123's.
     pub prime31_lane: bool,

@@ -455,6 +455,7 @@ pub(super) fn signature_options<F: FiniteField>(
         workers,
         parallel_cascade: workers > 1,
         max_live_bytes: Some(live),
+        prime31_lane: options.prime31_lane,
         ..SigF4Options::default()
     }
 }
