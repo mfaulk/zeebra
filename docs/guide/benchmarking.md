@@ -1569,6 +1569,21 @@ cargo test --example lex_pipeline
 python3 research/1039-wiedemann-lex/summarize.py | diff - research/1039-wiedemann-lex/tables.md
 ```
 
+### Module census and the polynomial-matrix cost model (#1191)
+
+`lex_pipeline --arm probe` also prints `grobner::fglm::module_census` of the grevlex staircase:
+`module_rank` (the order `t` of the polynomial matrix that multiplication by the last variable
+compresses to), `last_variable_leaders`, `stable`, `other_variables_standard` and
+`max_column_degree`. The counts are deterministic. `research/1191-polymatrix-change-of-order/probe.py`
+collects them per row, and `model.py` turns them and #1039's committed stage medians into
+`tables.md`. The [report](../research/polymatrix-change-of-order.md) is a no-go on a Hermite-form
+conversion. Checks:
+
+```sh
+cargo test --lib grobner::fglm::module_census
+python3 research/1191-polymatrix-change-of-order/model.py | diff - research/1191-polymatrix-change-of-order/tables.md
+```
+
 ### Persistent worker dispatch and border reduction
 
 The [worker-pool study](../../research/worker-pool/README.md) compares scoped threads, a bounded

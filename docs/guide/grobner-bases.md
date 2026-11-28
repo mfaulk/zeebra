@@ -507,6 +507,18 @@ actual caller workload. This increment verifies caller evidence and needs no pro
 F4 propagation, an independent trace verifier, and a bounded producer cost study remain separate
 follow-ups; no code from external engines is used here.
 
+## Staircase census for the last variable
+
+`fglm::module_census(leading, standard)` takes the leading monomials of a Gröbner basis and the
+standard monomials (`QuotientBasis::monomials`) and returns a `ModuleCensus`: how many standard
+monomials are free of the last variable (`module_rank`), the length of each chain of standard
+monomials in that variable (`column_degrees`, which sum to the quotient dimension), whether the
+leading monomials are stable in the sense of Berthomieu, Neiger and Safey El Din (`stable`), and
+whether every other variable is standard. It does no field arithmetic. On a stable staircase the
+non-unit columns of the last multiplication operator are the tails of the basis elements whose
+leading monomial the last variable divides. See
+[`polymatrix-change-of-order.md`](../research/polymatrix-change-of-order.md).
+
 ## Quotient operator polynomials
 
 An already constructed `QuotientAlgebra` exposes
