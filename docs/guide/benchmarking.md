@@ -1553,6 +1553,21 @@ cargo test --features external-runners --lib grobner::external::m4gb
 cargo test --features external-runners --lib grobner::external::corpus::tests::test_dense_mq_digests_are_pinned
 ```
 
+### The authors' M5GB on prime-field ideals (#1165)
+
+`tools/external/provision-m5gb-paper.sh [upstream|hash-probe|hash-narrow|repair-interreduce]`
+fetches the authors' Mathic-based M5GB (GPL-2.0-or-later headers) with its pinned Mathic and
+Memtailor to `~/.cache/zeebra-external/m5gb-paper/`, applies the build-only clang patches (and the
+variant's patch) from `$M5GB_PATCH_DIR`, and builds one binary with a `.build` sidecar. The patches
+are GPL-derived, so they are kept outside the repository: the script checks them against
+`tools/external/m5gb-paper/patches.sha256` and exits 3 if one is missing or differs. The note's §2
+describes how to recreate them. `tools/external/m5gb-paper/cohort.py`
+runs one M5GB process per row under its own wall and RSS watchdog, canonicalizes the signature basis
+it writes, and verifies it against Zeebra (`examples/m5gb_paper_reference.rs`, `--features
+external-runners`) and, for n ≤ 6, SymPy. It serves grevlex and lex over primes p < 2³² and crashes
+on zero or redundant inputs unless repaired. The [note](../research/m5gb-paper-reference.md) has the
+eligibility decision and the hash-key analysis. Check: `python3 tools/external/m5gb-paper/test_m5gb_paper.py`.
+
 ### Complete lex pipeline against grobx (#1039)
 
 `lex_pipeline --family <name> | --input <grobx request JSON> --arm

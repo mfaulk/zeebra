@@ -350,6 +350,10 @@ name = "m4gb_comparison"
 required-features = ["external-runners"]
 
 [[example]]
+name = "m5gb_paper_reference"
+required-features = ["external-runners"]
+
+[[example]]
 name = "sylvester_comparison"
 required-features = ["external-runners"]
 
