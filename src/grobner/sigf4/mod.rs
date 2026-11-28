@@ -28,6 +28,8 @@ mod engine;
 pub mod replay;
 pub mod signature;
 mod table;
+#[cfg(feature = "research-reuse")]
+pub mod tail_store;
 #[cfg(feature = "research-sigf4-replay")]
 pub use engine::symbolic_replay;
 #[cfg(all(test, feature = "research-sigf4"))]
@@ -94,6 +96,10 @@ pub struct SigF4Options {
     /// each elimination three times, so never on in a timed run.
     #[cfg(feature = "research-reuse")]
     pub reuse_census: bool,
+    /// #1198: count each batch's irreducible columns, the cells of a dense tail store over them
+    /// and the stored tails each new lead invalidates, into [`SigF4Statistics::tail_store`].
+    #[cfg(feature = "research-reuse")]
+    pub tail_store_census: bool,
     /// #1075: keep each batch's rows as run-wide monomial ids for the next batch, and count or
     /// serve the rows it repeats. Serial runs only.
     #[cfg(feature = "research-adjacent")]
@@ -131,6 +137,8 @@ impl Default for SigF4Options {
             prime31_lane: false,
             #[cfg(feature = "research-reuse")]
             reuse_census: false,
+            #[cfg(feature = "research-reuse")]
+            tail_store_census: false,
             #[cfg(feature = "research-adjacent")]
             adjacent: adjacent::AdjacentMode::Off,
             #[cfg(feature = "research-adjacent")]
@@ -285,6 +293,9 @@ pub struct SigF4Statistics {
     /// #1031's census as `(summary, batches)`, when [`SigF4Options::reuse_census`] asked for it.
     #[cfg(feature = "research-reuse")]
     pub reuse: Option<(crate::util::Json, crate::util::Json)>,
+    /// #1198's per-batch count, when [`SigF4Options::tail_store_census`] asked for it.
+    #[cfg(feature = "research-reuse")]
+    pub tail_store: Vec<tail_store::TailBatch>,
     /// #1075's per-batch adjacent-round census, when [`SigF4Options::adjacent`] asked for it.
     #[cfg(feature = "research-adjacent")]
     pub adjacent: Vec<adjacent::AdjacentBatch>,

@@ -125,6 +125,8 @@ struct Engine<'a, const N: usize, F: FiniteField> {
     usage: super::usage::UsageLog<N>,
     #[cfg(feature = "research-reuse")]
     reuse: Option<crate::grobner::reuse_census::ReuseCensus<N, Signature<N>>>,
+    #[cfg(feature = "research-reuse")]
+    tail_store: Option<super::tail_store::TailStoreCensus<N>>,
     #[cfg(feature = "research-adjacent")]
     adjacent: Option<super::adjacent::Adjacent<N>>,
 }
@@ -182,6 +184,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         #[cfg(feature = "research-reuse")]
         reuse: (options.reuse_census && options.workers <= 1 && !options.parallel_cascade)
             .then(Default::default),
+        #[cfg(feature = "research-reuse")]
+        tail_store: options.tail_store_census.then(Default::default),
         #[cfg(feature = "research-adjacent")]
         adjacent: super::adjacent::Adjacent::new(options.adjacent, options.adjacent_budget),
     };
@@ -309,6 +313,10 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     #[cfg(feature = "research-adjacent")]
     if let Some(census) = engine.adjacent.take() {
         engine.stats.adjacent = census.batches;
+    }
+    #[cfg(feature = "research-reuse")]
+    if let Some(census) = engine.tail_store.take() {
+        engine.stats.tail_store = census.batches;
     }
     #[cfg(feature = "research-reuse")]
     {
@@ -738,7 +746,33 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats.targets += targets.len();
 
         let (columns, rows, handles, reducer_count) = self.symbolic(&targets)?;
-        let new = self.eliminate(&columns, &rows, handles, reducer_count, targets.len())?;
+        #[cfg(feature = "research-reuse")]
+        let earlier_peak = self.tail_store.as_mut().map(|census| {
+            let built = rows.iter().zip(&handles).enumerate().map(|(k, (row, h))| {
+                super::tail_store::BuiltRow {
+                    multiple: match row.source {
+                        RowSource::Element(element) if k >= targets.len() => {
+                            Some((element, row.mult))
+                        }
+                        _ => None,
+                    },
+                    lead_column: h[0],
+                    entries: h.len(),
+                }
+            });
+            census.begin(targets[0].sig.degree(), &columns, built);
+            std::mem::take(&mut self.stats.claim_peak_live_bytes)
+        });
+        let new = self.eliminate(&columns, &rows, handles, reducer_count, targets.len());
+        #[cfg(feature = "research-reuse")]
+        if let Some(earlier) = earlier_peak {
+            let peak = self.stats.claim_peak_live_bytes;
+            self.stats.claim_peak_live_bytes = peak.max(earlier);
+            if let (Some(census), Ok(new)) = (self.tail_store.as_mut(), &new) {
+                census.end(&columns, new, peak);
+            }
+        }
+        let new = new?;
 
         let clock = Instant::now();
         if self.options.check_signatures {
