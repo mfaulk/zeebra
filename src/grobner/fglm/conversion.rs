@@ -27,8 +27,8 @@ use crate::{
         fglm::{
             incremental_span::IncrementalSpan,
             statistics::{FglmMemory, FglmStatistics},
-            FglmControl, FglmError, FglmOptions, FglmStage, QuotientAlgebra, QuotientStatistics,
-            SAFE_POINT_STRIDE,
+            ConversionStrategy, FglmControl, FglmError, FglmOptions, FglmStage, QuotientAlgebra,
+            QuotientStatistics, SAFE_POINT_STRIDE,
         },
         s_polynomial,
     },
@@ -201,41 +201,58 @@ fn convert<const N: usize, F: FiniteField>(
         max_quotient_dimension: super::wiedemann::dimension_ceiling::<N, F>(options),
         ..*options
     };
+    // A strategy that may convert by Wiedemann builds the one operator that route reads, and the
+    // rest only if it falls back (#1233).
     let mut quotient_statistics = QuotientStatistics::default();
-    let built = QuotientAlgebra::new_controlled(
-        source_basis,
-        source_order,
-        &enumeration,
-        control,
-        &mut quotient_statistics,
-    );
+    let built = if options.conversion_strategy == ConversionStrategy::Classical || N == 0 {
+        QuotientAlgebra::new_controlled(
+            source_basis,
+            source_order,
+            &enumeration,
+            control,
+            &mut quotient_statistics,
+        )
+    } else {
+        QuotientAlgebra::new_controlled_partial(
+            source_basis,
+            source_order,
+            &enumeration,
+            control,
+            &mut quotient_statistics,
+            N - 1,
+        )
+    };
     statistics.border = quotient_statistics.border;
     statistics.timings = quotient_statistics.timings;
     statistics.batches = quotient_statistics.batches;
-    let algebra = built.map_err(|e| match e {
+    let mut algebra = built.map_err(|e| match e {
         FglmError::QuotientDimensionExceeded { .. } => cap_exceeded,
         e => e,
     })?;
     let dimension = algebra.dimension();
     statistics.quotient_dimension = dimension;
-    statistics.operator_entries = algebra.operator_entries();
-    statistics.memory.operator_entries = statistics.operator_entries;
-    statistics.memory.operator_cells = algebra.operator_cells();
-    statistics.memory.operator_bytes = algebra.operator_bytes();
-    statistics.memory.dense_columns = algebra.dense_columns();
+    record_operators(&algebra, statistics);
 
     let walk = StageClock::new(options.measure_stages);
     let attempted = super::wiedemann::try_conversion(&algebra, options, control, statistics);
-    if let Some(basis) =
-        attempted.inspect_err(|_| statistics.timings.dependence = walk.elapsed())?
-    {
+    let scalar = walk.elapsed();
+    if let Some(basis) = attempted.inspect_err(|_| statistics.timings.dependence = scalar)? {
         statistics.target_basis_elements = basis.len();
-        statistics.timings.dependence = walk.elapsed();
+        statistics.timings.dependence = scalar;
         return Ok(basis);
     }
     if dimension > options.max_quotient_dimension {
         return Err(cap_exceeded);
     }
+
+    if !algebra.is_complete() {
+        let mut completion = QuotientStatistics::default();
+        let completed = algebra.complete_controlled(&enumeration, control, &mut completion);
+        merge_construction(statistics, &completion);
+        record_operators(&algebra, statistics);
+        completed.inspect_err(|_| statistics.timings.dependence = scalar)?;
+    }
+    let walk = StageClock::new(options.measure_stages);
 
     // Every dense cell the dependence machinery needs at full rank: the span's two triangular
     // blocks — the rows' pivot-offset coordinates and their combinations — and the accepted
@@ -281,7 +298,7 @@ fn convert<const N: usize, F: FiniteField>(
     // Safe point: a stop observed during or after a declined Wiedemann attempt keeps the fallback
     // from starting at all, rather than after it has allocated its blocks.
     if let Err(stop) = control.poll(FglmStage::ClassicalWalk) {
-        statistics.timings.dependence = walk.elapsed();
+        statistics.timings.dependence = scalar + walk.elapsed();
         return Err(stop);
     }
 
@@ -300,7 +317,7 @@ fn convert<const N: usize, F: FiniteField>(
         if statistics.candidates_considered % SAFE_POINT_STRIDE == SAFE_POINT_STRIDE - 1 {
             if let Err(stop) = control.poll(FglmStage::ClassicalWalk) {
                 statistics.span_row_operations = span.row_operations();
-                statistics.timings.dependence = walk.elapsed();
+                statistics.timings.dependence = scalar + walk.elapsed();
                 return Err(stop);
             }
         }
@@ -369,7 +386,7 @@ fn convert<const N: usize, F: FiniteField>(
 
     statistics.target_basis_elements = relations.len();
     statistics.span_row_operations = span.row_operations();
-    statistics.timings.dependence = walk.elapsed();
+    statistics.timings.dependence = scalar + walk.elapsed();
     Ok(relations)
 }
 
@@ -415,6 +432,31 @@ pub fn is_grobner_basis<const N: usize, F: FiniteField>(
         }
     }
     true
+}
+
+/// The operator figures of what `algebra` has built so far.
+fn record_operators<const N: usize, F: FiniteField>(
+    algebra: &QuotientAlgebra<N, F>,
+    statistics: &mut FglmStatistics,
+) {
+    statistics.operators_built = algebra.operators_built();
+    statistics.operator_entries = algebra.operator_entries();
+    statistics.memory.operator_entries = statistics.operator_entries;
+    statistics.memory.operator_cells = algebra.operator_cells();
+    statistics.memory.operator_bytes = algebra.operator_bytes();
+    statistics.memory.dense_columns = algebra.dense_columns();
+}
+
+/// Add what completing a partial algebra did to the construction's figures. The border's shape
+/// was recorded by the first stage and is unchanged; only the work counters grow.
+fn merge_construction(statistics: &mut FglmStatistics, completion: &QuotientStatistics) {
+    statistics.border.normal_form_calls += completion.border.normal_form_calls;
+    statistics.border.read_off_columns += completion.border.read_off_columns;
+    let (t, c) = (&mut statistics.timings, &completion.timings);
+    t.normal_forms += c.normal_forms;
+    t.border_symbolic += c.border_symbolic;
+    t.column_assembly += c.column_assembly;
+    super::batch::accumulate(&mut statistics.batches, &completion.batches);
 }
 
 /// `monomial - sum_j coefficients[j] * accepted[j]`, the relation a dependence stands for.
@@ -1193,6 +1235,48 @@ mod tests {
             fglm_to_lex_with_options(&source, order, &options).unwrap_err(),
             FglmError::QuotientDimensionExceeded { limit: 64 }
         );
+    }
+
+    /// The Wiedemann route builds the last operator alone, and a fallback builds the rest (#1233).
+    ///
+    /// Katsura-6 is stable under grevlex, so the one operator is read off the basis with no normal
+    /// form. Every route returns the classical walk's basis and reports the full operator figures
+    /// whenever it walked.
+    #[test]
+    fn test_the_wiedemann_route_builds_only_the_last_operator() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let source = f4(&katsura::<6, F>(), order).expect("within limits");
+        let classical = FglmOptions {
+            conversion_strategy: ConversionStrategy::Classical,
+            ..FglmOptions::recommended()
+        };
+        let (reference, full) =
+            fglm_to_lex_with_options(&source, order, &classical).expect("convertible");
+        assert_eq!(full.operators_built, 6);
+        assert_eq!(full.border.read_off_columns, 0);
+
+        let wiedemann = FglmOptions {
+            conversion_strategy: ConversionStrategy::Wiedemann,
+            ..FglmOptions::recommended()
+        };
+        let (basis, statistics) =
+            fglm_to_lex_with_options(&source, order, &wiedemann).expect("convertible");
+        assert_eq!(statistics.conversion_route, ConversionRoute::Wiedemann);
+        assert_eq!(basis, reference);
+        assert_eq!(statistics.operators_built, 1);
+        assert_eq!(statistics.border.normal_form_calls, 0);
+        assert!(statistics.border.read_off_columns > 0);
+        assert!(statistics.operator_entries < full.operator_entries);
+
+        // D = 32 is below the adaptive rule's 128: declined, completed, walked.
+        let (basis, statistics) =
+            fglm_to_lex_with_options(&source, order, &FglmOptions::recommended())
+                .expect("convertible");
+        assert_eq!(statistics.conversion_route, ConversionRoute::Classical);
+        assert_eq!(basis, reference);
+        assert_eq!(statistics.operators_built, 6);
+        assert_eq!(statistics.operator_entries, full.operator_entries);
+        assert_eq!(statistics.span_row_operations, full.span_row_operations);
     }
 
     /// Above the cap, a quotient Wiedemann declines is refused rather than walked classically.

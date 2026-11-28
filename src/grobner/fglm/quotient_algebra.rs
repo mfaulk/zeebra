@@ -21,6 +21,7 @@ use crate::{
             FglmError, FglmOptions, QuotientBasis,
         },
     },
+    poly::MonomialMap,
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
@@ -45,13 +46,42 @@ pub struct QuotientStatistics {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QuotientAlgebra<const N: usize, F: FiniteField> {
     basis: QuotientBasis<N>,
-    operators: Vec<MultiplicationOperator<F>>,
+
+    /// `T_i`, or `None` for an operator a partial construction deferred (#1233). Every operator is
+    /// present on an algebra a public constructor returned.
+    operators: Vec<Option<MultiplicationOperator<F>>>,
 
     /// The source Gröbner basis, kept so that `coordinates` can reduce a polynomial the caller
     /// supplies. The operators answer every question about *monomials*, but not about an
     /// arbitrary polynomial, and a Gröbner basis of a zero-dimensional ideal is a handful of
     /// elements against the operators' `N * D` columns.
     source: Vec<MultivariatePolynomial<N, F>>,
+
+    /// What a partial construction needs to build the deferred operators, or `None` once every
+    /// operator is built.
+    deferred: Option<Box<Construction<N, F>>>,
+}
+
+/// The construction's working state, kept between building one operator and building the rest.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct Construction<const N: usize, F: FiniteField> {
+    index: BorderIndex<N>,
+
+    /// Each distinct border monomial's normal form, once reduced, under the strategies that
+    /// share them. Empty under [`OperatorConstruction::PerColumn`].
+    shared: Vec<Option<Vec<(usize, F)>>>,
+
+    /// Entries in `shared`, stored columns' entries and bytes, and columns visited: the budgets
+    /// and the safe-point stride carry over from the first operator to the rest.
+    shared_entries: usize,
+    entries: usize,
+    bytes: usize,
+    columns: usize,
+
+    /// Whether a border monomial that is a source leading monomial with a standard tail is read
+    /// off that element rather than reduced. Set on the partial path only, so the full
+    /// construction's strategies stay an ablation of the reduction and nothing else.
+    read_off: bool,
 }
 
 impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
@@ -114,13 +144,103 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         control: &FglmControl<'_>,
         statistics: &mut QuotientStatistics,
     ) -> Result<Self, FglmError> {
+        Self::build(basis, order, options, control, statistics, None)
+    }
+
+    /// As [`Self::new_controlled`], building `T_variable` alone and deferring the other operators
+    /// to [`Self::complete_controlled`] (#1233).
+    ///
+    /// The scalar Wiedemann route reads one operator; building all `N` first spent most of its
+    /// time on operators it never applied. A border monomial that is the leading monomial of a
+    /// source element whose tail is standard is read off that element — `nf(lm(g)) = -tail(g) /
+    /// lc(g)`, which is what normal form would return, since a normal form modulo a Gröbner basis
+    /// is unique. On a stable staircase every border column of the last operator is of that kind.
+    ///
+    /// The operator budgets are checked against what is built, so a partial algebra can fit a
+    /// budget the full one would exceed; completing it checks them against all `N`.
+    ///
+    /// # Panics
+    /// If `variable` is not below `N`.
+    pub(crate) fn new_controlled_partial(
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        options: &FglmOptions,
+        control: &FglmControl<'_>,
+        statistics: &mut QuotientStatistics,
+        variable: usize,
+    ) -> Result<Self, FglmError> {
+        assert!(variable < N, "variable {} of {}", variable, N);
+        Self::build(basis, order, options, control, statistics, Some(variable))
+    }
+
+    /// Build every operator a partial construction deferred, adding what that did to
+    /// `statistics`. A no-op on a complete algebra.
+    ///
+    /// # Errors
+    /// As [`Self::new_controlled`]. The operator budgets count the operators already built.
+    pub(crate) fn complete_controlled(
+        &mut self,
+        options: &FglmOptions,
+        control: &FglmControl<'_>,
+        statistics: &mut QuotientStatistics,
+    ) -> Result<(), FglmError> {
+        let Some(mut construction) = self.deferred.take() else {
+            return Ok(());
+        };
+        let mut clock = StageClock::new(options.measure_stages);
+        let wanted: Vec<bool> = self.operators.iter().map(Option::is_none).collect();
+        construction.reduce_shared(
+            &wanted,
+            &self.source,
+            self.basis.order(),
+            &self.basis,
+            options,
+            control,
+            statistics,
+            &mut clock,
+        )?;
+        for (variable, slot) in self.operators.iter_mut().enumerate() {
+            if slot.is_none() {
+                *slot = Some(construction.assemble(
+                    variable,
+                    &self.source,
+                    self.basis.order(),
+                    &self.basis,
+                    options,
+                    control,
+                    statistics,
+                    &mut clock,
+                )?);
+            }
+        }
+        statistics.timings.column_assembly += clock.lap();
+        Ok(())
+    }
+
+    /// Whether every operator is built.
+    pub fn is_complete(&self) -> bool {
+        self.deferred.is_none()
+    }
+
+    /// How many of the `N` operators are built.
+    pub fn operators_built(&self) -> usize {
+        self.operators.iter().filter(|o| o.is_some()).count()
+    }
+
+    fn build(
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        options: &FglmOptions,
+        control: &FglmControl<'_>,
+        statistics: &mut QuotientStatistics,
+        only: Option<usize>,
+    ) -> Result<Self, FglmError> {
         let mut clock = StageClock::new(options.measure_stages);
 
         let quotient =
             QuotientBasis::new_controlled(basis, order, options.max_quotient_dimension, control);
         statistics.timings.quotient_basis = clock.lap();
         let quotient = quotient?;
-        let dimension = quotient.dimension();
 
         control.poll(FglmStage::BorderClassification)?;
         let index = BorderIndex::new(&quotient);
@@ -130,147 +250,52 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             border_columns: index.border_columns(),
             distinct_border_monomials: index.monomials().len(),
             normal_form_calls: 0,
+            read_off_columns: 0,
         };
         statistics.timings.border_classification = clock.lap();
         control.poll(FglmStage::OperatorConstruction)?;
 
-        // The shared answers, when they are shared. Indexed by border index, so a column's answer
-        // is a lookup — and `|∂B|` coordinate vectors are held at once, which the per-column path
-        // does not do. That is the trade this strategy makes.
-        //
-        // **Budgeted as it fills**, not left until the columns are pushed. Every distinct border
-        // monomial appears in at least one column, so the shared entries are bounded by the
-        // operators' own — which means checking them against `max_operator_entries` can never
-        // reject a system the reference path would have accepted, and the construction's peak
-        // under this strategy is at most twice the limit rather than unbounded.
-        let shared: Vec<Vec<(usize, F)>> = match options.operator_construction {
+        let shared = match options.operator_construction {
             OperatorConstruction::PerColumn => Vec::new(),
-            OperatorConstruction::DeduplicatedBorder => {
-                let mut shared = Vec::with_capacity(index.monomials().len());
-                for monomial in index.monomials() {
-                    control.poll(FglmStage::OperatorConstruction)?;
-                    shared.push(reduce_border_monomial(
-                        *monomial, basis, order, &quotient, statistics, &mut clock,
-                    ));
-                }
-                shared
+            OperatorConstruction::DeduplicatedBorder | OperatorConstruction::BatchedBorder => {
+                vec![None; index.monomials().len()]
             }
-            OperatorConstruction::BatchedBorder => batched_border(
-                index.monomials(),
-                basis,
-                order,
-                &quotient,
-                options,
-                control,
-                statistics,
-                &mut clock,
-            )?,
         };
-
-        // The shared vectors exist before any column does, so the entry budget is checked **as
-        // they fill**. That is sound in the direction that matters: every distinct border monomial
-        // appears in at least one column, so the shared entries never exceed the operators' own,
-        // and the early check can never reject a system the per-column path would have accepted.
-        // What it does change is the peak — up to twice the budget where the per-column path's is
-        // exactly the budget, which is the honest cost of sharing.
-        let mut shared_entries = 0usize;
-        for column in &shared {
-            shared_entries = shared_entries.checked_add(column.len()).ok_or(
-                FglmError::OperatorStorageExceeded {
-                    entries: usize::MAX,
-                    limit: options.max_operator_entries,
-                },
-            )?;
-            if shared_entries > options.max_operator_entries {
-                return Err(FglmError::OperatorStorageExceeded {
-                    entries: shared_entries,
-                    limit: options.max_operator_entries,
-                });
-            }
-        }
+        let mut construction = Construction {
+            index,
+            shared,
+            shared_entries: 0,
+            entries: 0,
+            bytes: 0,
+            columns: 0,
+            read_off: only.is_some(),
+        };
+        let wanted: Vec<bool> = (0..N).map(|i| only.is_none_or(|v| v == i)).collect();
+        construction.reduce_shared(
+            &wanted, basis, order, &quotient, options, control, statistics, &mut clock,
+        )?;
 
         let mut operators = Vec::with_capacity(N);
-        let mut entries = 0usize;
-        let mut bytes = 0usize;
-
-        let mut columns = 0usize;
-        for i in 0..N {
-            let mut builder = OperatorBuilder::new(dimension, options.operator_storage);
-            for target in index.column_targets(i) {
-                // Safe point: every border normal form on the per-column path, whose unit is one,
-                // and every `SAFE_POINT_STRIDE` columns otherwise, whose unit is a clone or a unit
-                // column.
-                let per_column_border = options.operator_construction
-                    == OperatorConstruction::PerColumn
-                    && matches!(target, ColumnTarget::Border(_));
-                if per_column_border || columns.is_multiple_of(SAFE_POINT_STRIDE) {
-                    control.poll(FglmStage::OperatorConstruction)?;
-                }
-                columns += 1;
-                let column = match *target {
-                    ColumnTarget::Standard(standard) => {
-                        builder.push_standard(standard);
-                        continue;
-                    }
-                    ColumnTarget::Border(border) => match options.operator_construction {
-                        // Cloned rather than shared behind a reference count: every column owning
-                        // its own vector is what M17 stored, so this strategy changes the time and
-                        // leaves the storage alone. Sharing the representation is M18-3's question.
-                        OperatorConstruction::DeduplicatedBorder
-                        | OperatorConstruction::BatchedBorder => shared[border].clone(),
-                        OperatorConstruction::PerColumn => reduce_border_monomial(
-                            index.monomials()[border],
-                            basis,
-                            order,
-                            &quotient,
-                            statistics,
-                            &mut clock,
-                        ),
-                    },
-                };
-
-                // Nonzeros, which is the older budget's unit. Counted from the column before it is
-                // stored, so it does not depend on the representation chosen for it.
-                entries = entries.checked_add(column.len()).ok_or(
-                    FglmError::OperatorStorageExceeded {
-                        entries: usize::MAX,
-                        limit: options.max_operator_entries,
-                    },
-                )?;
-                if entries > options.max_operator_entries {
-                    return Err(FglmError::OperatorStorageExceeded {
-                        entries,
-                        limit: options.max_operator_entries,
-                    });
-                }
-
-                // Bytes, which does depend on it: `push_reduced` reports what it stored, so the
-                // budget is enforced on the allocation that happened rather than on a model of it.
-                let stored = builder.push_reduced(column);
-                bytes = bytes
-                    .checked_add(stored)
-                    .ok_or(FglmError::OperatorBytesExceeded {
-                        bytes: usize::MAX,
-                        limit: options.max_operator_bytes,
-                    })?;
-                if bytes > options.max_operator_bytes {
-                    return Err(FglmError::OperatorBytesExceeded {
-                        bytes,
-                        limit: options.max_operator_bytes,
-                    });
-                }
-            }
-            operators.push(builder.finish());
+        for (variable, wanted) in wanted.iter().enumerate() {
+            operators.push(if *wanted {
+                Some(construction.assemble(
+                    variable, basis, order, &quotient, options, control, statistics, &mut clock,
+                )?)
+            } else {
+                None
+            });
         }
 
         // So that the stages partition the construction rather than leaving a tail outside all of
         // them. What is in this lap is the column loop's own bookkeeping and the clones.
         statistics.timings.column_assembly += clock.lap();
 
+        let complete = wanted.iter().all(|w| *w);
         Ok(Self {
             basis: quotient,
             operators,
             source: basis.to_vec(),
+            deferred: (!complete).then(|| Box::new(construction)),
         })
     }
 
@@ -278,6 +303,7 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     pub fn operator_entries(&self) -> usize {
         self.operators
             .iter()
+            .flatten()
             .map(MultiplicationOperator::stored_entries)
             .sum()
     }
@@ -286,6 +312,7 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     pub fn operator_cells(&self) -> usize {
         self.operators
             .iter()
+            .flatten()
             .map(MultiplicationOperator::stored_cells)
             .sum()
     }
@@ -295,6 +322,7 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     pub fn operator_bytes(&self) -> usize {
         self.operators
             .iter()
+            .flatten()
             .map(MultiplicationOperator::stored_bytes)
             .sum()
     }
@@ -303,6 +331,7 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     pub fn dense_columns(&self) -> usize {
         self.operators
             .iter()
+            .flatten()
             .map(MultiplicationOperator::dense_columns)
             .sum()
     }
@@ -320,9 +349,29 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     /// `T_i`, multiplication by `x_i`.
     ///
     /// # Panics
-    /// If `variable` is not below `N`.
+    /// If `variable` is not below `N`, or a partial construction deferred `T_variable`.
     pub fn operator(&self, variable: usize) -> &MultiplicationOperator<F> {
-        &self.operators[variable]
+        self.operators[variable].as_ref().unwrap_or_else(|| {
+            panic!(
+                "T_{} was deferred by a partial construction and is not built",
+                variable
+            )
+        })
+    }
+
+    /// The coordinate vector of the class of `x_variable`: `T_variable` applied to the class of 1,
+    /// or the normal form of `x_variable` where that operator is deferred. The two are equal.
+    ///
+    /// # Panics
+    /// If `variable` is not below `N`.
+    pub fn variable_class(&self, variable: usize) -> Vec<F> {
+        match &self.operators[variable] {
+            Some(operator) => operator.apply(&self.one()),
+            None => self.coordinates(&MultivariatePolynomial::new(&[(
+                Monomial::univariate(variable, 1),
+                F::one(),
+            )])),
+        }
     }
 
     /// The coordinate vector of the residue class of 1.
@@ -341,9 +390,10 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     /// `T_i` applied to a coordinate vector.
     ///
     /// # Panics
-    /// If `variable` is not below `N`, or `v` is not of length [`Self::dimension`].
+    /// If `variable` is not below `N`, `T_variable` is deferred, or `v` is not of length
+    /// [`Self::dimension`].
     pub fn multiply_by_variable(&self, variable: usize, v: &[F]) -> Vec<F> {
-        self.operators[variable].apply(v)
+        self.operator(variable).apply(v)
     }
 
     /// The coordinate vector of a polynomial's residue class.
@@ -394,6 +444,247 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     fn sparse_coordinates(&self, p: &MultivariatePolynomial<N, F>) -> Vec<(usize, F)> {
         let normal_form = p.normal_form(&self.source, self.basis.order());
         coordinates_of_normal_form(&normal_form, &self.basis)
+    }
+}
+
+impl<const N: usize, F: FiniteField> Construction<N, F> {
+    /// Reduce, once each, the border monomials the `wanted` operators' columns point at and that
+    /// are not reduced yet. Nothing under [`OperatorConstruction::PerColumn`], which reduces per
+    /// column in [`Self::assemble`].
+    ///
+    /// The shared vectors exist before any column does, so the entry budget is checked on them
+    /// as well. That is sound in the direction that matters: every distinct border monomial
+    /// appears in at least one column, so the shared entries never exceed the operators' own, and
+    /// the check can never reject a system the per-column path would have accepted. What it does
+    /// change is the peak — up to twice the budget where the per-column path's is exactly the
+    /// budget, which is the honest cost of sharing.
+    #[allow(clippy::too_many_arguments)]
+    fn reduce_shared(
+        &mut self,
+        wanted: &[bool],
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        quotient: &QuotientBasis<N>,
+        options: &FglmOptions,
+        control: &FglmControl<'_>,
+        statistics: &mut QuotientStatistics,
+        clock: &mut StageClock,
+    ) -> Result<(), FglmError> {
+        if options.operator_construction == OperatorConstruction::PerColumn {
+            return Ok(());
+        }
+        // Ascending border index, which is the index's own descending monomial order — the order
+        // the full construction has always reduced in, so its batches are unchanged.
+        let mut needed = vec![false; self.shared.len()];
+        for (variable, _) in wanted.iter().enumerate().filter(|(_, w)| **w) {
+            for target in self.index.column_targets(variable) {
+                if let ColumnTarget::Border(border) = *target {
+                    needed[border] = self.shared[border].is_none();
+                }
+            }
+        }
+        let read_off = self.read_off.then(|| ReadOff::new(basis, order, quotient));
+        let mut pending: Vec<usize> = Vec::new();
+        for (border, _) in needed.iter().enumerate().filter(|(_, n)| **n) {
+            let monomial = self.index.monomials()[border];
+            match read_off.as_ref().and_then(|r| r.column(&monomial)) {
+                Some(column) => {
+                    statistics.border.read_off_columns += 1;
+                    self.shared[border] = Some(column);
+                }
+                None => pending.push(border),
+            }
+        }
+        statistics.timings.column_assembly += clock.lap();
+
+        match options.operator_construction {
+            OperatorConstruction::PerColumn => unreachable!("returned above"),
+            OperatorConstruction::DeduplicatedBorder => {
+                for border in pending {
+                    control.poll(FglmStage::OperatorConstruction)?;
+                    self.shared[border] = Some(reduce_border_monomial(
+                        self.index.monomials()[border],
+                        basis,
+                        order,
+                        quotient,
+                        statistics,
+                        clock,
+                    ));
+                }
+            }
+            OperatorConstruction::BatchedBorder => {
+                let targets: Vec<Monomial<N>> = pending
+                    .iter()
+                    .map(|border| self.index.monomials()[*border])
+                    .collect();
+                let columns = batched_border(
+                    &targets, basis, order, quotient, options, control, statistics, clock,
+                )?;
+                for (border, column) in pending.into_iter().zip(columns) {
+                    self.shared[border] = Some(column);
+                }
+            }
+        }
+
+        for (border, _) in needed.iter().enumerate().filter(|(_, n)| **n) {
+            let len = self.shared[border].as_ref().map_or(0, Vec::len);
+            self.shared_entries =
+                self.shared_entries
+                    .checked_add(len)
+                    .ok_or(FglmError::OperatorStorageExceeded {
+                        entries: usize::MAX,
+                        limit: options.max_operator_entries,
+                    })?;
+            if self.shared_entries > options.max_operator_entries {
+                return Err(FglmError::OperatorStorageExceeded {
+                    entries: self.shared_entries,
+                    limit: options.max_operator_entries,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// `T_variable`, from the shared normal forms or, per column, from fresh reductions.
+    #[allow(clippy::too_many_arguments)]
+    fn assemble(
+        &mut self,
+        variable: usize,
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        quotient: &QuotientBasis<N>,
+        options: &FglmOptions,
+        control: &FglmControl<'_>,
+        statistics: &mut QuotientStatistics,
+        clock: &mut StageClock,
+    ) -> Result<MultiplicationOperator<F>, FglmError> {
+        let read_off = (self.read_off
+            && options.operator_construction == OperatorConstruction::PerColumn)
+            .then(|| ReadOff::new(basis, order, quotient));
+        let mut builder = OperatorBuilder::new(quotient.dimension(), options.operator_storage);
+        for target in self.index.column_targets(variable) {
+            // Safe point: every border normal form on the per-column path, whose unit is one,
+            // and every `SAFE_POINT_STRIDE` columns otherwise, whose unit is a clone or a unit
+            // column.
+            let per_column_border = options.operator_construction
+                == OperatorConstruction::PerColumn
+                && matches!(target, ColumnTarget::Border(_));
+            if per_column_border || self.columns.is_multiple_of(SAFE_POINT_STRIDE) {
+                control.poll(FglmStage::OperatorConstruction)?;
+            }
+            self.columns += 1;
+            let column = match *target {
+                ColumnTarget::Standard(standard) => {
+                    builder.push_standard(standard);
+                    continue;
+                }
+                ColumnTarget::Border(border) => match options.operator_construction {
+                    // Cloned rather than shared behind a reference count: every column owning
+                    // its own vector is what M17 stored, so this strategy changes the time and
+                    // leaves the storage alone. Sharing the representation is M18-3's question.
+                    OperatorConstruction::DeduplicatedBorder
+                    | OperatorConstruction::BatchedBorder => self.shared[border]
+                        .clone()
+                        .expect("every wanted border monomial is reduced before assembly"),
+                    OperatorConstruction::PerColumn => {
+                        let monomial = self.index.monomials()[border];
+                        match read_off.as_ref().and_then(|r| r.column(&monomial)) {
+                            Some(column) => {
+                                statistics.border.read_off_columns += 1;
+                                column
+                            }
+                            None => reduce_border_monomial(
+                                monomial, basis, order, quotient, statistics, clock,
+                            ),
+                        }
+                    }
+                },
+            };
+
+            // Nonzeros, which is the older budget's unit. Counted from the column before it is
+            // stored, so it does not depend on the representation chosen for it.
+            self.entries = self.entries.checked_add(column.len()).ok_or(
+                FglmError::OperatorStorageExceeded {
+                    entries: usize::MAX,
+                    limit: options.max_operator_entries,
+                },
+            )?;
+            if self.entries > options.max_operator_entries {
+                return Err(FglmError::OperatorStorageExceeded {
+                    entries: self.entries,
+                    limit: options.max_operator_entries,
+                });
+            }
+
+            // Bytes, which does depend on it: `push_reduced` reports what it stored, so the
+            // budget is enforced on the allocation that happened rather than on a model of it.
+            let stored = builder.push_reduced(column);
+            self.bytes =
+                self.bytes
+                    .checked_add(stored)
+                    .ok_or(FglmError::OperatorBytesExceeded {
+                        bytes: usize::MAX,
+                        limit: options.max_operator_bytes,
+                    })?;
+            if self.bytes > options.max_operator_bytes {
+                return Err(FglmError::OperatorBytesExceeded {
+                    bytes: self.bytes,
+                    limit: options.max_operator_bytes,
+                });
+            }
+        }
+        Ok(builder.finish())
+    }
+}
+
+/// The source elements whose normal form of the leading monomial needs no reduction: those whose
+/// tail is standard, keyed by leading monomial.
+struct ReadOff<'a, const N: usize, F: FiniteField> {
+    elements: MonomialMap<N, &'a MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    quotient: &'a QuotientBasis<N>,
+}
+
+impl<'a, const N: usize, F: FiniteField> ReadOff<'a, N, F> {
+    fn new(
+        basis: &'a [MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        quotient: &'a QuotientBasis<N>,
+    ) -> Self {
+        let mut elements: MonomialMap<N, &MultivariatePolynomial<N, F>> = MonomialMap::default();
+        for g in basis.iter().filter(|g| !g.is_zero()) {
+            let lead = g.leading_monomial(order);
+            let standard_tail = g
+                .terms()
+                .keys()
+                .all(|m| *m == lead || quotient.index_of(m).is_some());
+            if standard_tail {
+                elements.entry(lead).or_insert(g);
+            }
+        }
+        Self {
+            elements,
+            order,
+            quotient,
+        }
+    }
+
+    /// `nf(monomial)` as a sorted coordinate vector, if `monomial` is a readable leading monomial.
+    fn column(&self, monomial: &Monomial<N>) -> Option<Vec<(usize, F)>> {
+        let g = self.elements.get(monomial)?;
+        let scale = -g.leading_coefficient(self.order).inverse();
+        let mut entries: Vec<(usize, F)> = Vec::with_capacity(g.terms().len() - 1);
+        entries.extend(
+            g.terms()
+                .iter()
+                .filter(|(m, _)| **m != *monomial)
+                .map(|(m, c)| {
+                    let index = self.quotient.index_of(m).expect("a standard tail");
+                    (index, *c * scale)
+                }),
+        );
+        entries.sort_unstable_by_key(|(index, _)| *index);
+        Some(entries)
     }
 }
 
@@ -1745,6 +2036,119 @@ mod tests {
                     j
                 );
             }
+        }
+    }
+
+    /// A partial construction builds the full construction's operator, and completes to it.
+    ///
+    /// Every strategy, every variable, two-variable systems under three orders and Katsura,
+    /// cyclic and planted rows under grevlex: the read-off must give the normal form exactly, and
+    /// the deferred operators must come out as the full path builds them (#1233).
+    #[test]
+    fn test_a_partial_construction_completes_to_the_full_algebra() {
+        use super::QuotientStatistics;
+        use crate::grobner::fglm::FglmControl;
+
+        fn check<const N: usize>(
+            name: &str,
+            basis: &[MultivariatePolynomial<N, F>],
+            order: MonomialOrder,
+        ) {
+            for construction in [
+                OperatorConstruction::PerColumn,
+                OperatorConstruction::DeduplicatedBorder,
+                OperatorConstruction::BatchedBorder,
+            ] {
+                let options = FglmOptions::unbounded().with_operator_construction(construction);
+                let full = QuotientAlgebra::new(basis, order, &options).expect("finite");
+                let one = full.one();
+                for variable in 0..N {
+                    let mut statistics = QuotientStatistics::default();
+                    let control = FglmControl::unlimited();
+                    let mut partial = QuotientAlgebra::new_controlled_partial(
+                        basis,
+                        order,
+                        &options,
+                        &control,
+                        &mut statistics,
+                        variable,
+                    )
+                    .expect("finite");
+                    assert_eq!(partial.operators_built(), 1, "{name}: {construction:?}");
+                    assert_eq!(partial.is_complete(), N == 1, "{name}: {construction:?}");
+                    assert_eq!(
+                        partial.operator(variable),
+                        full.operator(variable),
+                        "{name}: {construction:?} built a different T_{variable}"
+                    );
+                    for i in 0..N {
+                        assert_eq!(
+                            partial.variable_class(i),
+                            full.multiply_by_variable(i, &one),
+                            "{name}: the class of x_{i}"
+                        );
+                    }
+                    partial
+                        .complete_controlled(&options, &control, &mut statistics)
+                        .expect("within limits");
+                    assert!(partial.is_complete());
+                    assert_eq!(
+                        partial, full,
+                        "{name}: {construction:?} completed differently"
+                    );
+                }
+            }
+        }
+
+        for order in ORDERS {
+            for system in SYSTEMS {
+                let generators = parse(system, ["x", "y"]);
+                let basis = f4(&generators, order).expect("within limits");
+                check(system[0], &basis, order);
+            }
+        }
+        let order = MonomialOrder::GradedReverseLexicographic;
+        check("katsura-5", &f4(&katsura::<5, F>(), order).unwrap(), order);
+        check("cyclic-5", &f4(&cyclic::<5, F>(), order).unwrap(), order);
+        let point: Vec<F> = [3u64, 5, 7, 11].iter().map(|v| F::new(*v)).collect();
+        check(
+            "planted-4",
+            &f4(&planted::<4, F>(&point), order).unwrap(),
+            order,
+        );
+    }
+
+    /// On Katsura's stable grevlex staircase the last operator needs no normal form at all: every
+    /// border column is `-tail(g)` for a basis element `g` (#1233).
+    #[test]
+    fn test_the_last_operator_of_a_stable_staircase_is_read_off() {
+        use super::QuotientStatistics;
+        use crate::grobner::fglm::FglmControl;
+
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = f4(&katsura::<6, F>(), order).unwrap();
+        for construction in [
+            OperatorConstruction::PerColumn,
+            OperatorConstruction::DeduplicatedBorder,
+            OperatorConstruction::BatchedBorder,
+        ] {
+            let options = FglmOptions::unbounded().with_operator_construction(construction);
+            let mut statistics = QuotientStatistics::default();
+            let partial = QuotientAlgebra::new_controlled_partial(
+                &basis,
+                order,
+                &options,
+                &FglmControl::unlimited(),
+                &mut statistics,
+                5,
+            )
+            .unwrap();
+            assert_eq!(partial.dimension(), 32);
+            assert_eq!(statistics.border.normal_form_calls, 0, "{construction:?}");
+            assert!(statistics.border.read_off_columns > 0, "{construction:?}");
+            // The full construction does not read off, so its strategies stay comparable.
+            let (_, full) = QuotientAlgebra::new_with_statistics(&basis, order, &options).unwrap();
+            assert_eq!(full.border.read_off_columns, 0);
         }
     }
 }
