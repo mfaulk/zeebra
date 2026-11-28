@@ -7,7 +7,7 @@ The data behind [`docs/research/m35-baseline.md`](../../docs/research/m35-baseli
 
 | File | What it is |
 |---|---|
-| `panel.json` | The declared panel: families, roles, splits, envelopes, why each family matters, characteristic-ladder gaps |
+| `panel.json` | The declared panel: families, roles, splits, envelopes, why each family matters, characteristic-ladder gaps, and (#1200) the R1/R2/R3 regime declaration of plan Amendment 1 |
 | `catalog.py` | Writes the panel as `corpus-instance-v1` records. M34 rows are copied from the M34 catalogs; ladder, MQ and GF(2) rows come from the Z0 generators via `--input-only` |
 | `catalog-digests.json` | The rebuilt catalog's SHA-256 and every record's `normalized_input_digest`. The catalog itself (about 3 MB) is not committed |
 | `probe.py` | Development-mode probe. Runs each record in fresh processes pinned to one CPU, with arms `f4-stages`, `f4`, `adaptive`, `sig-stages`, `grobx` and `grobx-certified` |
@@ -40,6 +40,21 @@ of 10–19, while another agent held CCDs 1–2.
 
 `probe.py` gained `--arms` and the `grobx-certified` arm after the harness tag. The edits are to
 the script only; every Zeebra attempt ran the `m34_matrix` binary built from `measured/1162-harness`.
+
+## Amendment 1 additions (#1200)
+
+#1200 changed the panel before the publication read, as plan §7.1 (Amendment 1) requires:
+
+- The R1 family (Chandrasekhar-H 11–13) and the R2 rows (Katsura-12, Eco-12, Eco-13) are added at
+  BabyBear (2013265921) and KoalaBear (2130706433) as R3 targets. `catalog.py` reduces the M34
+  public problems at those primes with `m34_public_corpus.reduce_record`, the same reduction that
+  made the p31 and p64 records. `m33_qualify --field babybear|koalabear` generates Katsura and Eco.
+- Eco-13 moves from the eco family's frontier to its rows: it completes under default limits on
+  both fields, so it is an R2 row rather than a frontier.
+- `panel.json` gains a `regimes` block naming every R1, R2 and R3 record id.
+
+`catalog-digests.json` is rebuilt from `measured/1200-harness`, whose `src/` is still Z0's. The
+publication read itself is in [`research/1200-m35-publication/`](../1200-m35-publication/).
 
 ## Not done here
 

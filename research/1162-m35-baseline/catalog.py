@@ -4,7 +4,8 @@ and grobx solve byte-identical inputs.
 
     catalog.py build --qualify BIN --study BIN [--out catalog.json]
 
-M34 rows are copied from the M34 catalogs by id. Ladder, MQ and GF(2) rows come from the Z0
+M34 rows are copied from the M34 catalogs by id; at BabyBear and KoalaBear (#1200) the M34 public
+problems are reduced by `m34_public_corpus.reduce_record` instead. Ladder, MQ and GF(2) rows come from the Z0
 generators through `--input-only`: `m33_qualify` for katsura/eco/cyclic/noon and `mq-random-N-sS`,
 `sig_f4_study --generate` for `mq-dense-N-sS`, which `m33_qualify` cannot generate.
 """
@@ -24,6 +25,8 @@ import m34_public_corpus as public  # noqa: E402
 M34_CATALOGS = [ROOT / 'research/m34-public-corpus/catalog.json',
                 ROOT / 'research/m34-structural-corpus/catalog.json']
 M34_FIELDS = {'p31', 'p64'}
+# #1200 (Amendment 1, #1189 item 1): M34 public rows re-keyed at these primes by the M34 reduction.
+REKEYED_PRIMES = {'babybear': 2013265921, 'koalabear': 2130706433}
 
 
 def panel_rows(panel):
@@ -44,6 +47,15 @@ def m34_records():
         for record in json.loads(path.read_text()):
             records[record['id']] = record
     return records
+
+
+def rekeyed(row, field):
+    """An M34 public problem reduced at a prime the M34 catalogs do not carry, exactly as
+    `m34_public_corpus.py` reduces it at p31 and p64."""
+    panel = json.loads(public.PANEL.read_text())
+    problem = next(p for p in panel['problems'] if p['id'] == row)
+    entry = public.problem_entry(problem, panel, json.loads(public.INPUTS.read_text()))
+    return public.reduce_record(problem, entry, field, REKEYED_PRIMES[field])
 
 
 def generated(family, row, field, qualify, study):
@@ -81,8 +93,8 @@ def build(args):
     m34 = m34_records()
     out = []
     for family, row, field in panel_rows(panel):
-        if field in M34_FIELDS:
-            rec = m34[f'{row}@{field}']
+        if field in M34_FIELDS or (field in REKEYED_PRIMES and f'{row}@p31' in m34):
+            rec = m34[f'{row}@{field}'] if field in M34_FIELDS else rekeyed(row, field)
             rec = dict(rec, lineage=dict(rec['lineage'], split=family['split'], role=family['role']))
         else:
             rec = generated(family, row, field, args.qualify, args.study)
