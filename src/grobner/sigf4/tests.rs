@@ -1145,12 +1145,15 @@ fn test_syzygy_store_matches_a_naive_model() {
 /// shipping F4's basis and reports the handoff it made.
 #[test]
 fn test_carried_runs_return_the_shipping_basis() {
-    use super::carry::{Carry, CarryMode};
+    use super::carry::{Boundary, Carry, CarryMode};
     fn check<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>], degree: u64) {
         let expected = f4(system, GREVLEX).expect("shipping F4 finishes");
         for mode in [CarryMode::Restart, CarryMode::Continue] {
             let options = SigF4Options {
-                carry: Some(Carry { degree, mode }),
+                carry: Some(Carry {
+                    boundary: Boundary::Degree(degree),
+                    mode,
+                }),
                 ..SigF4Options::default()
             };
             let (result, statistics) = sig_f4_reported(system, GREVLEX, &options);
@@ -1173,11 +1176,11 @@ fn test_carried_runs_return_the_shipping_basis() {
 /// #1076: a boundary past the run's last degree never hands off.
 #[test]
 fn test_carry_boundary_past_the_run_is_inert() {
-    use super::carry::{Carry, CarryMode};
+    use super::carry::{Boundary, Carry, CarryMode};
     let system = katsura::<4, Zp32003>();
     let options = SigF4Options {
         carry: Some(Carry {
-            degree: 1_000,
+            boundary: Boundary::Degree(1_000),
             mode: CarryMode::Continue,
         }),
         ..SigF4Options::default()
@@ -1185,4 +1188,26 @@ fn test_carry_boundary_past_the_run_is_inert() {
     let (result, statistics) = sig_f4_reported(&system, GREVLEX, &options);
     assert_eq!(result.unwrap(), f4(&system, GREVLEX).unwrap());
     assert!(statistics.carry.is_none());
+}
+
+/// #1076: the lead-fall boundary hands Cyclic-7 to F4 at the degree its minimal leads first fall
+/// (12, as on #1076's m31 row), returns shipping F4's basis, and never fires on Katsura-6.
+#[test]
+fn test_lead_fall_boundary_fires_on_cyclic_and_not_on_katsura() {
+    use super::carry::{Boundary, Carry, CarryMode};
+    let options = SigF4Options {
+        carry: Some(Carry {
+            boundary: Boundary::LeadFall,
+            mode: CarryMode::Continue,
+        }),
+        ..SigF4Options::default()
+    };
+    let cyclic = cyclic::<7, Zp32003>();
+    let (result, statistics) = sig_f4_reported(&cyclic, GREVLEX, &options);
+    assert_eq!(result.unwrap(), f4(&cyclic, GREVLEX).unwrap());
+    assert_eq!(statistics.carry.expect("Cyclic-7's leads fall").degree, 12);
+    let katsura = katsura::<6, Zp32003>();
+    let (result, statistics) = sig_f4_reported(&katsura, GREVLEX, &options);
+    assert_eq!(result.unwrap(), f4(&katsura, GREVLEX).unwrap());
+    assert!(statistics.carry.is_none(), "{:?}", statistics.carry);
 }
