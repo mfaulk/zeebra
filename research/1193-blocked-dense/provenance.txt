@@ -5,6 +5,9 @@ Toolchain   rustc 1.95.0 (59807616e 2026-04-14)
 Profile     release, CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16,
             RUSTC_WRAPPER="", repository .cargo/config.toml (no target-cpu flag on aarch64)
 
+Commits    3e1810b1, efbc8a6c and 14424217 are on 8abf1b4e, before the branch was rebased for its
+           pull request. Tag measured/1193-laptop-dev (at efbc8a6c) keeps all three.
+
 Binaries (examples/blocked_dense_study), SHA-256
   3e1810b1  5f8d429081bb61eabe88c357e2f7c1b626d79492f167ddae03bb0085f8bda52b  campaign
   efbc8a6c  ab686ae16c1411f416ab184c643b812d5b507475faaecfdea8e45f910749c26c  tune, gemm, verify

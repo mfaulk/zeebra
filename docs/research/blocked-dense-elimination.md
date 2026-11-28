@@ -4,8 +4,9 @@
 F4 or the signature engine calls it. **Measured at:** `3e1810b1` (§7, the campaign),
 `efbc8a6c` (§6 tuning and square products, and the §5 verification runs; it differs from
 `3e1810b1` only by a counter and the summary script) and `14424217` (§5 product counts,
-`--features research-work`; they count only shipped kernels, which no commit here changes). Binary
-SHA-256s are in `research/1193-blocked-dense/provenance.txt`. Release profile with **thin LTO and
+`--features research-work`; they count only shipped kernels, which no commit here changes). The
+three commits sit on `8abf1b4e`, before this branch was rebased, and are kept by the tag
+`measured/1193-laptop-dev`. Binary SHA-256s are in `research/1193-blocked-dense/provenance.txt`. Release profile with **thin LTO and
 16 codegen units** (`CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16`), not
 the repository's fat LTO, for every binary. **Host: Apple M4 Pro laptop, macOS, unpinned**, one
 thread per process, with four other agents building and testing on the same machine; the
