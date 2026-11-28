@@ -126,6 +126,10 @@ type that carries its stated error bound, and certification makes its output exa
 of FFLAS-style blocked dense elimination on F4's dense residual is in too, not wired into either
 engine. Laptop development figures put it only 1.1–1.6× ahead of the lane kernel on that
 residual, so the dense-MQ gap is in how much work there is, not in the arithmetic
-([note](docs/research/blocked-dense-elimination.md)).
+([note](docs/research/blocked-dense-elimination.md)). The signature engine can also hold its
+basis terms as monomial-table ids (`SigF4Options::id_terms`, opt-in), which gives bit-identical
+bases. On laptop development rows it lowers peak RSS by 12–54% at unchanged wall
+([note](docs/research/sigf4-id-terms.md)). The pinned measurement and the decision on whether to
+keep it wait for the bench host.
 
 Licensed under the [MIT licence](LICENSE-MIT).
