@@ -1296,7 +1296,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         #[cfg(feature = "research-sigf4-replay")]
         replay.finish();
         #[cfg(feature = "research-reuse")]
-        self.census_reuse(&block, &rows[target_count..], &reduced_rows, &finals);
+        self.census_reuse(
+            columns,
+            &block,
+            &rows[target_count..],
+            &reduced_rows,
+            &finals,
+        );
         #[cfg(feature = "research-sigf4-split")]
         {
             split.targets = finals.len();
@@ -1322,12 +1328,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     #[allow(clippy::type_complexity)]
     fn census_reuse(
         &mut self,
+        columns: &[Monomial<N>],
         block: &ReducerBlock<'_, N, F>,
         reducer_rows: &[Row<N>],
         targets: &[(Signature<N>, Vec<(u32, F)>)],
         finals: &[(Signature<N>, Kind, Vec<(u32, F)>, u64)],
     ) {
-        use crate::grobner::reuse_census::{Reducer, Target};
+        use crate::grobner::reuse_census::{Reducer, StoreContext, Target};
         let Some(census) = self.reuse.as_mut() else {
             return;
         };
@@ -1357,7 +1364,13 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let order = self.order;
         let cmp = move |a: &Signature<N>, b: &Signature<N>| a.cmp_in(b, order);
         let live = finals.iter().map(|f| f.3).sum();
-        census.observe(block.ncols, &reducers, &targets, Some(&cmp), Some(live));
+        let leads: Vec<Monomial<N>> = self.basis.iter().map(|e| e.lead).collect();
+        let context = StoreContext {
+            columns,
+            leads: &leads,
+        };
+        debug_assert_eq!(columns.len(), block.ncols);
+        census.observe_with_store(context, &reducers, &targets, Some(&cmp), Some(live));
     }
 
     /// Records a serial batch abandoned on its live budget, whole and before any settlement.

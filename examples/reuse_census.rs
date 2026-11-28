@@ -20,6 +20,9 @@
 //! (`benchmark_systems::noon`, as `m33_qualify` generates it) and `grid5x5-m31`, the
 //! `zb-col-grid-5x5@p31` record of `research/m34-structural-corpus/catalog.json`.
 //!
+//! With `--census` the report's `reuse.summary.store` is #1197's store ledger: eager against lazy
+//! updates of a never-evicting store of the tail-reduced multiples (`grobner::reuse_census`).
+//!
 //! `dmq-n<N>-m<M>-<field>-s<S>` is #1030's dense quadratic cohort: `M` equations in `N` variables
 //! over `gf31`, `gf32003`, `m31` (2^31-1) or `p64` (2^64-59), each of the 1 + N + N(N+1)/2 monomials
 //! of degree at most two present with probability one half under support seed `S`, coefficients
@@ -56,7 +59,7 @@ const PINNED: &[&str] = &[
     "grid5x5-m31",
 ];
 /// The variable counts a generated row may have; each is a separate monomorphization.
-const SIZES: &[usize] = &[6, 7, 8, 9, 10, 11, 12, 13, 14];
+const SIZES: &[usize] = &[6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
 const FIELDS: &[&str] = &["gf31", "gf32003", "m31", "p64"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -711,7 +714,7 @@ fn main() {
         ),
         name => {
             let shape = parse_dense(name).expect("validated");
-            dense_dispatch!(shape, &args, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+            dense_dispatch!(shape, &args, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18)
         }
     };
     println!("{}", report.to_json().replace('\n', ""));
@@ -740,6 +743,9 @@ mod tests {
         );
         assert!(!parse_dense("dmq-n10-m20-p64-s0-u").unwrap().planted);
         assert!(parse_dense("dmq-n99-m20-gf31-s0").is_none());
+        // #1197's shapes (16, 29) and n = 18.
+        assert_eq!(parse_dense("dmq-n18-m32-gf31-s1").map(|d| d.n), Some(18));
+        assert!(parse_dense("dmq-n15-m27-gf31-s1").is_none());
         assert!(parse_dense("dmq-n10-m5-gf31-s0").is_none());
         assert!(parse_dense("dmq-n10-m20-gf7-s0").is_none());
     }
