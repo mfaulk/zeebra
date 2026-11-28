@@ -203,6 +203,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     let mut early = None;
     #[cfg(feature = "research-sigf4")]
     let mut carried: Option<(u64, Vec<MultivariatePolynomial<N, F>>)> = None;
+    #[cfg(feature = "research-sigf4")]
+    let mut carry_stop = options.carry.map(super::carry::CarryStop::new);
     while let Some(degree) = engine.queue.keys().next().copied() {
         if let Some((clock, budget)) = wall {
             if engine.stats.batches > 0 && clock.elapsed() >= budget {
@@ -226,7 +228,10 @@ pub(super) fn run<const N: usize, F: FiniteField>(
             break;
         }
         #[cfg(feature = "research-sigf4")]
-        if let Some(carry) = options.carry.filter(|carry| carry.due(degree, next)) {
+        if let Some(carry) = carry_stop.as_mut().and_then(|stop| {
+            stop.due(degree, next, || engine.minimal_lead_count())
+                .then_some(stop.carry)
+        }) {
             let mut seed = match carry.mode {
                 super::carry::CarryMode::Restart => Vec::new(),
                 super::carry::CarryMode::Continue => engine.minimal_elements(),

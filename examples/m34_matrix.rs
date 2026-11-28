@@ -4,7 +4,7 @@
 //! cargo run --release --features research-sigf4 --example m34_matrix -- --catalog FILE --id ID
 //!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S] [--stages] [--lane31]
 //!     [--hilbert off|observe|certified-zeros+N] [--research-envelope]
-//!     [--carry restart@D|continue@D]
+//!     [--carry restart@D|continue@D|restart@fall|continue@fall]
 //!
 //! `--lane31` (#1183) sets `F4Options::prime31_lane` and `SigF4Options::prime31_lane`: the 31-bit
 //! lane on F4's serial forward pass and in the signature engine's reduction, for primes between
@@ -29,7 +29,9 @@
 //! `--carry` (#1076, M35 plan §7.3 arms 4 and 5) sets `SigF4Options::carry` on the `sig` arm: once
 //! signature degree `D` is finished, the run stops and conventional F4 finishes it on the same
 //! workers, from the original inputs (`restart`) or from the elements at minimal leads plus the
-//! inputs (`continue`). The handoff is reported as `carry`, and `call_ns` charges both legs.
+//! inputs (`continue`). `@fall` instead hands off after the first finished degree at which the
+//! minimal-lead count falls below its running maximum. The handoff is reported as `carry`, and
+//! `call_ns` charges both legs.
 //!
 //! `fallback` (#1134, research only) is `adaptive` followed by one rule. When the dispatcher's
 //! conventional route stops with a size refusal (`TooManyRows`, `TooManyColumns`,
@@ -74,8 +76,8 @@ struct Args {
     lane31: bool,
     hilbert: HilbertSelection,
     research_envelope: bool,
-    /// `--carry`: continue (true) or restart, and the boundary degree.
-    carry: Option<(bool, u64)>,
+    /// `--carry`: continue (true) or restart, and the boundary degree (`None` for `@fall`).
+    carry: Option<(bool, Option<u64>)>,
 }
 
 fn parse_args(raw: &[String]) -> Result<Args, String> {
@@ -120,10 +122,13 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
     Ok(a)
 }
 
-fn carry(spec: &str) -> Result<(bool, u64), String> {
-    let bad = || format!("--carry takes restart@D or continue@D, not {spec}");
+fn carry(spec: &str) -> Result<(bool, Option<u64>), String> {
+    let bad = || format!("--carry takes restart@D, continue@D or MODE@fall, not {spec}");
     let (mode, degree) = spec.split_once('@').ok_or_else(bad)?;
-    let degree = degree.parse().map_err(|_| bad())?;
+    let degree = match degree {
+        "fall" => None,
+        d => Some(d.parse().map_err(|_| bad())?),
+    };
     match mode {
         "restart" => Ok((false, degree)),
         "continue" => Ok((true, degree)),
@@ -400,9 +405,9 @@ fn sig_options(args: &Args, wall: Duration) -> zeebra::grobner::sigf4::SigF4Opti
         parallel_cascade: args.workers > 1,
         prime31_lane: args.lane31,
         carry: args.carry.map(|(proceed, degree)| {
-            use zeebra::grobner::sigf4::carry::{Carry, CarryMode};
+            use zeebra::grobner::sigf4::carry::{Boundary, Carry, CarryMode};
             Carry {
-                degree,
+                boundary: degree.map_or(Boundary::LeadFall, Boundary::Degree),
                 mode: if proceed {
                     CarryMode::Continue
                 } else {
@@ -824,19 +829,25 @@ mod tests {
         assert!(hilbert.contains("\"pairs_certified_zero\""), "{hilbert}");
     }
 
-    /// #1076: `--carry` parses both modes, refuses a malformed spec, and reaches `SigF4Options`.
+    /// #1076: `--carry` parses both modes and both boundaries, refuses a malformed spec, and
+    /// reaches `SigF4Options`.
     #[cfg(feature = "research-sigf4")]
     #[test]
     fn carry_is_parsed_and_set_on_the_signature_arm() {
-        use zeebra::grobner::sigf4::carry::{Carry, CarryMode};
+        use zeebra::grobner::sigf4::carry::{Boundary, Carry, CarryMode};
         let wall = Duration::from_secs(9);
         let a = args(&["--engine", "sig", "--carry", "continue@4"]).unwrap();
         assert_eq!(
             sig_options(&a, wall).carry,
             Some(Carry {
-                degree: 4,
+                boundary: Boundary::Degree(4),
                 mode: CarryMode::Continue
             })
+        );
+        let a = args(&["--engine", "sig", "--carry", "continue@fall"]).unwrap();
+        assert_eq!(
+            sig_options(&a, wall).carry.unwrap().boundary,
+            Boundary::LeadFall
         );
         let a = args(&["--engine", "sig", "--carry", "restart@7"]).unwrap();
         assert_eq!(
