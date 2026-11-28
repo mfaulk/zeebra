@@ -219,7 +219,9 @@ field width changes only its per-coefficient cost.
    `sig_f4`, not through `F4Options` or the external-contract adapter. It cannot change the
    decision: the decision fails against grobx, not against Zeebra. Against Zeebra the margins are
    5.8× and 16×. A 3× lane would leave 1.9× and 5.3×, still past the gate.
-3. ~~Counters from M4GB's log~~: done in §9. Still open for §6: Zeebra's per-degree matrix
+3. ~~Counters from M4GB's log~~: done in §9. Zeebra's side is counted in
+   [`irreducible-tail-store.md`](irreducible-tail-store.md) (#1198): the irreducible widths equal
+   M4GB's. Was open for §6: Zeebra's per-degree matrix
    dimensions on the same shapes.
 
 M5GB: `manschga/M5GB` was run under an owner exception and found unable to compute over GF(31) or

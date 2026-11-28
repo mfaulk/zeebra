@@ -14,6 +14,11 @@ change to `y` may break the public API.
   multiplication by the last variable compresses to, and whether the staircase is stable in the
   sense of Berthomieu, Neiger and Safey El Din. No conversion path calls it; findings in
   `docs/research/polymatrix-change-of-order.md`.
+- Behind `research-reuse`, `SigF4Options::tail_store_census` and `sigf4::tail_store` (#1198),
+  research tooling: per batch, the columns no basis lead divides, the cells of a dense row store
+  over them, and the stored tails each new lead invalidates, in `SigF4Statistics::tail_store`. It
+  reduces nothing. Findings in `docs/research/irreducible-tail-store.md`. Breaking for
+  `research-reuse`: an exhaustive `SigF4Options` or `SigF4Statistics` literal needs the new field.
 - `grobner::weight_detector` (#1192), opt-in research tooling: `detect_free_basis` searches for
   positive weights under which the input generators' leading monomials are pairwise coprime, so the
   input already is a Gröbner basis under `MonomialOrder::weighted`. Every hit is re-checked against
