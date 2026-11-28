@@ -188,3 +188,22 @@ Until both are done, every ratio above is a development hypothesis.
    not separated here.
 3. Noon-10's refusal is a fallback-order defect (signature, then F4), not a missing mechanism.
    The forced signature engine completes it.
+
+## 7. Publication-mode read (#1200, Amendment 1)
+
+**Measured at:** `ee691468` (tag `measured/1200-harness`; `src/` identical to Z0 `125658bb`, tag `measured/1162-z0`). grobx 0.155.1 is at `8005a2a1`, re-provisioned (`grobx-driver` sha256 `9dcb4f14c92feb8a…`). This is publication mode: an exclusive CCD 1–2 reservation, one worker, library-call seconds. Full table, sessions and caveats: [`research/1200-m35-publication/`](../../research/1200-m35-publication/README.md).
+
+| Regime | Geometric-mean R | 95% interval | Largest row median R |
+|---|---:|---|---:|
+| R1, Chandrasekhar-H 11–13 @ p64 | 1.13 | 1.13–1.14 | 1.20 (n = 11) |
+| R2, Katsura-12, Eco-12, Eco-13 @ 2⁶⁴ − 59 | 1.14 | 1.13–1.15 | 1.43 (Eco-13) |
+| R3, the same families at three 31-bit primes | 4.27 | 4.26–4.28 | 6.62 (Eco-13 @ BabyBear) |
+
+- **Z0 is short of §3's target on both primary regimes.** The geometric mean must reach ≤ 1.05, the upper bound ≤ 1.10, and every scale ≤ 1.10.
+- **The deciding baseline.** Adaptive is the fastest Zeebra arm on every R1, R2 and R3 row, so it is the baseline for B's and H's deciding reads.
+- **BabyBear and KoalaBear read 5–10% above 2³¹ − 1** on every R3 row.
+- **The development table holds.** It is reproduced within its bands on the regime rows.
+- **grobx's exact checker** agrees with grobx's default on all eight rows it was run on, at 38–300× the time.
+- **Two caveats.**
+  - 27 instances have 8 clean repetitions, not 9, because another session's compiler stopped the 9-rep job before its last repetition.
+  - The read cost 5.14 h of machine time against 4.94 h priced. 0.59 h of that was lost to a journal output budget that grobx's printed bases exceeded.
