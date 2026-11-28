@@ -17,8 +17,13 @@ impl<const N: usize> Signature<N> {
         Self { mono, index }
     }
 
-    /// Schreyer (`<lt-pot`) order: shifted monomial first, then index.
+    /// Schreyer (`<lt-pot`) order: shifted monomial first, then index. Under
+    /// `research-sigf4-variants`, the run's module order (#1194).
     pub fn cmp_in(&self, other: &Self, order: MonomialOrder) -> Ordering {
+        #[cfg(feature = "research-sigf4-variants")]
+        if let Some(ordering) = super::variants::cmp(self, other, order) {
+            return ordering;
+        }
         order
             .cmp(&self.mono, &other.mono)
             .then(self.index.cmp(&other.index))

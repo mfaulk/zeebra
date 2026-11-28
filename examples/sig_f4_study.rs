@@ -48,6 +48,11 @@
 //! (`SigF4Options::small_prime_lane`) or #1183's 31-bit one above it, for `m31`
 //! (`SigF4Options::prime31_lane`); the basis is unchanged.
 //!
+//! With `--features research-sigf4-variants`, `--module schreyer|dpot|pot` and `--rewrite
+//! ratio|newest` (sigf4, one worker) run one of #1194's module and rewrite orders
+//! (`sigf4::variants`); `--reverse` (any engine) reverses the generators first, which decides
+//! `pot`'s incremental order.
+//!
 //! `--basis` prints the reduced basis's SHA-256 (sorted rendered text), which is how two engines'
 //! outputs are compared coefficient for coefficient without holding both in one process. With
 //! `--features research-work`, `--density` (f4 or sigf4, one worker) adds #1033's
@@ -126,6 +131,9 @@ struct Args {
     batches: Vec<usize>,
     live_gib: Option<usize>,
     catalog: Option<String>,
+    module: String,
+    rewrite: String,
+    reverse: bool,
 }
 
 /// The engines that compute a basis independently of Zeebra's F4 and signature engines (#941).
@@ -160,6 +168,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         batches: Vec::new(),
         live_gib: None,
         catalog: None,
+        module: "schreyer".into(),
+        rewrite: "ratio".into(),
+        reverse: false,
     };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -184,6 +195,9 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             "--density" => parsed.density = true,
             "--generate" => parsed.generate = true,
             "--catalog" => parsed.catalog = Some(value()?),
+            "--module" => parsed.module = value()?,
+            "--rewrite" => parsed.rewrite = value()?,
+            "--reverse" => parsed.reverse = true,
             "--input-only" => parsed.input_only = true,
             "--digest-only" => parsed.digest_only = true,
             "--write-basis" => parsed.write_basis = Some(value()?),
@@ -288,10 +302,36 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     {
         return Err("--repeat times the solve alone".into());
     }
+    if !["schreyer", "dpot", "pot"].contains(&parsed.module.as_str())
+        || !["ratio", "newest"].contains(&parsed.rewrite.as_str())
+    {
+        return Err("--module is schreyer, dpot or pot; --rewrite is ratio or newest".into());
+    }
+    if (parsed.module != "schreyer" || parsed.rewrite != "ratio")
+        && (parsed.engine != "sigf4" || parsed.workers != 1 || parsed.claim || parsed.replay)
+    {
+        return Err("--module and --rewrite configure serial sigf4: --engine sigf4".into());
+    }
     if parsed.replay && (parsed.engine != "sigf4" || parsed.workers < 2) {
         return Err("--replay runs design 1 and design 2: --engine sigf4 --workers ≥ 2".into());
     }
     Ok(parsed)
+}
+
+/// #1194's variant from `--module` and `--rewrite`, which `parse_args` validated.
+#[cfg(feature = "research-sigf4-variants")]
+fn variant(args: &Args) -> zeebra::grobner::sigf4::variants::Variant {
+    use zeebra::grobner::sigf4::variants::{ModuleOrder, RewriteOrder, Variant};
+    let module = match args.module.as_str() {
+        "dpot" => ModuleOrder::DegreePot,
+        "pot" => ModuleOrder::Pot,
+        _ => ModuleOrder::Schreyer,
+    };
+    let rewrite = match args.rewrite.as_str() {
+        "newest" => RewriteOrder::Newest,
+        _ => RewriteOrder::Ratio,
+    };
+    Variant::new(module, rewrite)
 }
 
 /// Shipping defaults; only the forward and symbolic worker caps vary, as in `m29_cost_model`.
@@ -682,6 +722,7 @@ fn sig_statistics(s: &SigF4Statistics) -> Json {
             Json::int(s.lead_ideal_handoff.as_millis() as u64),
         ),
         ("signature_basis_elements", size(s.signature_basis_elements)),
+        ("dominated_at_birth", size(s.dominated_at_birth)),
         ("reduced_basis_elements", size(s.reduced_basis_elements)),
         ("interreduction_columns", size(s.interreduction_columns)),
         ("interreduction_nonzeros", size(s.interreduction_nonzeros)),
@@ -1450,11 +1491,14 @@ impl ThreadSampler {
 
 fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
     let names: [&str; N] = std::array::from_fn(|i| input.variables[i].as_str());
-    let system: Vec<MultivariatePolynomial<N, F>> = input
+    let mut system: Vec<MultivariatePolynomial<N, F>> = input
         .generators
         .iter()
         .map(|s| MultivariatePolynomial::parse(s, names).expect("generator parses"))
         .collect();
+    if args.reverse {
+        system.reverse();
+    }
     if args.symbolic {
         #[cfg(feature = "research-sigf4-replay")]
         return closure::report(&system, &names, &input.digest, args);
@@ -1535,8 +1579,15 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
                     .live_gib
                     .map(|gib| gib << 30)
                     .or(SigF4Options::default().max_live_bytes),
+                #[cfg(feature = "research-sigf4-variants")]
+                variant: variant(args),
                 ..SigF4Options::default()
             };
+            #[cfg(not(feature = "research-sigf4-variants"))]
+            assert!(
+                args.module == "schreyer" && args.rewrite == "ratio",
+                "--module and --rewrite require research-sigf4-variants"
+            );
             let solve = || sig_f4_reported(&system, args.order, &options);
             #[cfg(feature = "research-work")]
             let ((result, stats), work) = if args.density {
@@ -1651,6 +1702,9 @@ fn run<const N: usize, F: FiniteField>(input: Input, args: &Args) -> Json {
         ("engine", Json::string(&args.engine)),
         ("workers", Json::size(args.workers)),
         ("lane", Json::Bool(args.lane)),
+        ("module", Json::string(&args.module)),
+        ("rewrite", Json::string(&args.rewrite)),
+        ("reverse", Json::Bool(args.reverse)),
         ("status", Json::string(status)),
         ("call_ns", Json::nanos(elapsed)),
         (
@@ -1772,6 +1826,29 @@ mod tests {
 
     fn args(list: &[&str]) -> Result<Args, String> {
         parse_args(&list.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+    }
+
+    // #1194: a variant configures serial sigf4 only, and names outside the grid fail.
+    #[test]
+    fn variant_arguments_are_validated() {
+        let base = ["--field", "wide64", "--name", "eco-12", "--engine"];
+        let ok = args(
+            &[
+                &base[..],
+                &["sigf4", "--module", "pot", "--rewrite", "newest"],
+            ]
+            .concat(),
+        )
+        .unwrap();
+        assert_eq!((ok.module.as_str(), ok.rewrite.as_str()), ("pot", "newest"));
+        assert!(args(&[&base[..], &["sigf4", "--module", "dpot", "--reverse"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["f4", "--reverse"]].concat()).is_ok());
+        assert!(args(&[&base[..], &["f4", "--module", "pot"]].concat()).is_err());
+        assert!(
+            args(&[&base[..], &["sigf4", "--module", "pot", "--workers", "2"]].concat()).is_err()
+        );
+        assert!(args(&[&base[..], &["sigf4", "--module", "top"]].concat()).is_err());
+        assert!(args(&[&base[..], &["sigf4", "--rewrite", "oldest"]].concat()).is_err());
     }
 
     // Both engines take workers, the census is serial-F4-only, and unknown fields or engines fail.

@@ -155,6 +155,17 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     if inputs.is_empty() {
         return Ok(Vec::new());
     }
+    #[cfg(feature = "research-sigf4-variants")]
+    let _variant = {
+        if options.variant != Default::default()
+            && (options.workers > 1 || options.parallel_cascade)
+        {
+            return Err(SigF4Error::Unsupported {
+                reason: "a #1194 variant runs on one worker",
+            });
+        }
+        super::variants::Scope::new(options.variant)
+    };
 
     let mut engine = Engine {
         order,
@@ -295,6 +306,7 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         engine.stats.usage.minimal_elements = kept;
     }
     engine.stats.signature_basis_elements = engine.basis.len();
+    engine.stats.dominated_at_birth = engine.stats.elements_added - engine.new_leads;
     engine.stats.syzygy_signatures = engine.syzygies.len();
     engine.stats.signature_metadata_bytes = engine.basis.len()
         * (size_of::<Signature<N>>() + 2 * size_of::<u64>())
@@ -487,9 +499,7 @@ fn ratio_cmp<const N: usize, F>(
     b: u32,
 ) -> Ordering {
     let (a, b) = (&basis[a as usize], &basis[b as usize]);
-    order
-        .cmp(&(a.sig.mono * b.lead), &(b.sig.mono * a.lead))
-        .then(a.sig.index.cmp(&b.sig.index))
+    a.sig.times(&b.lead).cmp_in(&b.sig.times(&a.lead), order)
 }
 
 /// The least-ratio element whose lead divides `m`, the newest on a tie, resuming a cached
@@ -525,10 +535,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         self.stats
             .pair_trace
             .push(format!("{:?} {:?}", pending.sig, pending.source));
-        self.queue
-            .entry(pending.sig.degree())
-            .or_default()
-            .push(pending);
+        #[cfg(feature = "research-sigf4-variants")]
+        let key = super::variants::queue_key(&pending.sig);
+        #[cfg(not(feature = "research-sigf4-variants"))]
+        let key = pending.sig.degree();
+        self.queue.entry(key).or_default().push(pending);
         self.pending += 1;
         self.stats.peak_pending = self.stats.peak_pending.max(self.pending);
     }
@@ -549,9 +560,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         let basis = &self.basis;
         let cmp = |id: u32| {
             let e = &basis[id as usize];
-            order
-                .cmp(&(e.sig.mono * *lead), &(sig.mono * e.lead))
-                .then(e.sig.index.cmp(&sig.index))
+            e.sig.times(lead).cmp_in(&sig.times(&e.lead), order)
         };
         let at = self
             .by_ratio
@@ -600,6 +609,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             #[cfg(feature = "research-sigf4-usage")]
             self.usage.report.rewriter_scan(divisible);
             if !divisible {
+                continue;
+            }
+            #[cfg(feature = "research-sigf4-variants")]
+            if super::variants::newest_rewrites() {
+                best = id;
                 continue;
             }
             if best == NONE || self.newer_ratio_cmp(id, best) != Ordering::Less {
@@ -1711,11 +1725,16 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             Ordering::Greater,
             "a lead above its shifted signature means a reduction raised the signature"
         );
+        // #1194: `⊴_add` keeps singular elements (see `classify`).
+        #[cfg(feature = "research-sigf4-variants")]
+        let singular_allowed = super::variants::newest_rewrites();
+        #[cfg(not(feature = "research-sigf4-variants"))]
+        let singular_allowed = false;
         for e in &self.basis {
             if let Some(mult) = lead.checked_div(&e.lead) {
-                assert_eq!(
-                    e.sig.times(&mult).cmp_in(sig, self.order),
-                    Ordering::Greater,
+                let cmp = e.sig.times(&mult).cmp_in(sig, self.order);
+                assert!(
+                    cmp == Ordering::Greater || (singular_allowed && cmp == Ordering::Equal),
                     "a new element must be regular top-irreducible and not singular"
                 );
             }
@@ -1804,6 +1823,13 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
             return Kind::Zero;
         };
         let r = self.at[lead as usize];
+        // #1194: under `⊴_add` a singular element still joins the basis, as RB adds every
+        // non-syzygy (EF Algorithm 2, line 13): it is the newest rewriter of its signature's
+        // multiples, which discarding it would hand to an older element.
+        #[cfg(feature = "research-sigf4-variants")]
+        if super::variants::newest_rewrites() {
+            return Kind::Element;
+        }
         if r != NONE && self.sigs[r as usize] == *t {
             Kind::Singular
         } else {

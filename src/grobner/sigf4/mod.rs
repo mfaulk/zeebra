@@ -34,6 +34,8 @@ pub use engine::symbolic_replay;
 mod tests;
 #[cfg(feature = "research-sigf4-usage")]
 pub mod usage;
+#[cfg(feature = "research-sigf4-variants")]
+pub mod variants;
 
 use std::time::Duration;
 
@@ -101,6 +103,10 @@ pub struct SigF4Options {
     /// #1075: the flat modes' arena budget, in run-wide ids; rows past it are built and not kept.
     #[cfg(feature = "research-adjacent")]
     pub adjacent_budget: usize,
+    /// #1194: the module and rewrite order. Serial runs only; any other is refused with a
+    /// variant other than the default.
+    #[cfg(feature = "research-sigf4-variants")]
+    pub variant: variants::Variant,
     #[cfg(test)]
     pub(crate) adversary: Option<claim::Adversary>,
     /// Tests only: the column-space interreduction's live-entry budget, to force its fallback.
@@ -135,6 +141,8 @@ impl Default for SigF4Options {
             adjacent: adjacent::AdjacentMode::Off,
             #[cfg(feature = "research-adjacent")]
             adjacent_budget: adjacent::FLAT_BUDGET,
+            #[cfg(feature = "research-sigf4-variants")]
+            variant: variants::Variant::default(),
             #[cfg(test)]
             adversary: None,
             #[cfg(test)]
@@ -228,6 +236,9 @@ pub struct SigF4Statistics {
     pub lead_ideal_complete: bool,
     pub lead_ideal_handoff: Duration,
     pub signature_basis_elements: usize,
+    /// Elements whose lead an older element's lead already divided when they were inserted
+    /// (#1146's oversized-basis measure).
+    pub dominated_at_birth: usize,
     pub reduced_basis_elements: usize,
     /// Columns of the final interreduction matrix (0 when no matrix was needed).
     pub interreduction_columns: usize,
