@@ -365,12 +365,32 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     /// # Panics
     /// If `variable` is not below `N`.
     pub fn variable_class(&self, variable: usize) -> Vec<F> {
-        match &self.operators[variable] {
-            Some(operator) => operator.apply(&self.one()),
-            None => self.coordinates(&MultivariatePolynomial::new(&[(
-                Monomial::univariate(variable, 1),
-                F::one(),
-            )])),
+        if let Some(operator) = &self.operators[variable] {
+            return operator.apply(&self.one());
+        }
+        // Not `coordinates`: a general normal form prepares a reducer over the whole basis, which
+        // costs tens of milliseconds per call on the rows this route serves. `x_i` is either
+        // standard, or the leading monomial of a source element whose tail is usually standard.
+        let x = Monomial::univariate(variable, 1);
+        let mut v = vec![F::zero(); self.dimension()];
+        if let Some(index) = self.basis.index_of(&x) {
+            v[index] = F::one();
+            return v;
+        }
+        let order = self.basis.order();
+        let read = self
+            .source
+            .iter()
+            .filter(|g| !g.is_zero() && g.leading_monomial(order) == x)
+            .find_map(|g| ReadOff::new(std::slice::from_ref(g), order, &self.basis).column(&x));
+        match read {
+            Some(column) => {
+                for (index, value) in column {
+                    v[index] = value;
+                }
+                v
+            }
+            None => self.coordinates(&MultivariatePolynomial::new(&[(x, F::one())])),
         }
     }
 
