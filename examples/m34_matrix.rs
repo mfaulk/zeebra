@@ -26,6 +26,10 @@
 //! the plan's 64 GiB research envelope. A result under it is labelled and never credited as a
 //! default-limit completion (plan §8.3).
 //!
+//! `--row-layout baseline|source|u16|both` (#1078) sets `SigF4Options::row_layout` on the `sig` arm:
+//! source-backed reducer rows, `u16` batch-local columns, or both, in the serial cascade at one
+//! worker. The arm's live account under every layout is reported as `layout`.
+//!
 //! `--carry` (#1076, M35 plan §7.3 arms 4 and 5) sets `SigF4Options::carry` on the `sig` arm: once
 //! signature degree `D` is finished, the run stops and conventional F4 finishes it on the same
 //! workers, from the original inputs (`restart`) or from the elements at minimal leads plus the
@@ -74,6 +78,8 @@ struct Args {
     wall: Duration,
     stages: bool,
     lane31: bool,
+    /// `--row-layout` (#1078): an arm name from `sigf4::layout::ARMS`.
+    row_layout: String,
     hilbert: HilbertSelection,
     research_envelope: bool,
     /// `--carry`: continue (true) or restart, and the boundary degree (`None` for `@fall`).
@@ -89,6 +95,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         wall: Duration::from_secs(300),
         stages: false,
         lane31: false,
+        row_layout: "baseline".into(),
         hilbert: HilbertSelection::Off,
         research_envelope: false,
         carry: None,
@@ -104,6 +111,12 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--wall-s" => a.wall = Duration::from_secs(value()?.parse().map_err(|_| "--wall-s")?),
             "--stages" => a.stages = true,
             "--lane31" => a.lane31 = true,
+            "--row-layout" => {
+                a.row_layout = value()?;
+                if !ROW_LAYOUTS.contains(&a.row_layout.as_str()) {
+                    return Err(format!("--row-layout takes one of {ROW_LAYOUTS:?}"));
+                }
+            }
             "--hilbert" => a.hilbert = hilbert_selection(&value()?)?,
             "--research-envelope" => a.research_envelope = true,
             "--carry" => a.carry = Some(carry(&value()?)?),
@@ -404,6 +417,8 @@ fn sig_options(args: &Args, wall: Duration) -> zeebra::grobner::sigf4::SigF4Opti
         workers: args.workers,
         parallel_cascade: args.workers > 1,
         prime31_lane: args.lane31,
+        row_layout: zeebra::grobner::sigf4::layout::RowLayout::parse(&args.row_layout)
+            .expect("validated by args"),
         carry: args.carry.map(|(proceed, degree)| {
             use zeebra::grobner::sigf4::carry::{Boundary, Carry, CarryMode};
             Carry {
@@ -431,6 +446,9 @@ fn sig_options(args: &Args, wall: Duration) -> zeebra::grobner::sigf4::SigF4Opti
 /// The research envelope's signature-engine limits (`--research-envelope`).
 #[cfg(feature = "research-sigf4")]
 const RESEARCH_MATRIX_SIDE: usize = 20_000_000;
+/// `--row-layout`'s arms, in `sigf4::layout::ARMS` order.
+const ROW_LAYOUTS: [&str; 4] = ["baseline", "source", "u16", "both"];
+
 #[cfg(feature = "research-sigf4")]
 const RESEARCH_LIVE_BYTES: usize = 48 << 30;
 
@@ -688,6 +706,7 @@ fn main() {
         ("engine", Json::string(&args.engine)),
         ("workers", Json::size(args.workers)),
         ("lane31", Json::Bool(args.lane31)),
+        ("row_layout", Json::string(args.row_layout.as_str())),
     ];
     match solve(&record, &args) {
         Ok(solved) => fields.extend(solved),
@@ -931,6 +950,27 @@ mod tests {
         }
     }
 
+    /// #1078: `--row-layout` accepts the four arms, refuses any other, and every arm keeps the `sig`
+    /// arm's basis.
+    #[cfg(feature = "research-sigf4")]
+    #[test]
+    fn row_layout_is_parsed_and_keeps_the_basis() {
+        assert!(args(&["--row-layout", "u32"]).is_err());
+        let record = find_record(CATALOG, "x@p31").unwrap();
+        let digest = |arm: &str| {
+            let a = args(&["--engine", "sig", "--row-layout", arm]).unwrap();
+            assert_eq!(
+                sig_options(&a, a.wall).row_layout,
+                zeebra::grobner::sigf4::layout::RowLayout::parse(arm).unwrap()
+            );
+            let out = solve(&record, &a).unwrap();
+            field_of(&out, "basis_sha256").unwrap().to_json()
+        };
+        for arm in ROW_LAYOUTS {
+            assert_eq!(digest(arm), digest("baseline"), "{arm}");
+        }
+    }
+
     /// #1078: the `sig` arm reports the layout census, one peak per arm, the narrowest no larger
     /// than the baseline.
     #[cfg(feature = "research-sigf4")]
@@ -1011,6 +1051,7 @@ mod tests {
                     wall: Duration::from_secs(10),
                     stages: false,
                     lane31: false,
+                    row_layout: "baseline".into(),
                     hilbert: HilbertSelection::Off,
                     research_envelope: false,
                     carry: None,

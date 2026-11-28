@@ -1233,3 +1233,67 @@ fn test_layout_census_baseline_is_the_live_peak_and_arms_shrink_it() {
     check(&katsura::<6, Zp32003>());
     check(&katsura::<6, Goldilocks>());
 }
+
+/// #1078: every row layout returns the baseline's basis on 32-bit and 64-bit fields, builds every
+/// batch in its layout, and its live peak is the census's figure for that arm.
+#[cfg(feature = "research-sigf4")]
+#[test]
+fn test_every_row_layout_keeps_the_basis_and_meets_its_census() {
+    use super::layout::{RowLayout, ARMS};
+    use crate::fields::Zp2147483647;
+    fn check<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>]) {
+        let run = |row_layout| {
+            let options = SigF4Options {
+                row_layout,
+                check_signatures: true,
+                ..SigF4Options::default()
+            };
+            let (result, s) = sig_f4_reported(system, GREVLEX, &options);
+            (result.unwrap(), s)
+        };
+        let (expected, base) = run(RowLayout::Baseline);
+        assert_eq!(base.layout.layout_batches, 0);
+        for name in &ARMS[1..] {
+            let arm = RowLayout::parse(name).unwrap();
+            let (basis, s) = run(arm);
+            assert_eq!(basis, expected, "{arm:?}");
+            assert_eq!(s.layout.layout_batches, s.batches, "{arm:?}");
+            assert_eq!(
+                s.claim_peak_live_bytes,
+                base.layout.peak_live_bytes[arm.index()],
+                "{arm:?}"
+            );
+        }
+    }
+    check(&katsura::<6, Zp32003>());
+    check(&katsura::<6, Goldilocks>());
+    check(&cyclic::<5, Zp2147483647>());
+    check(&dense_quadratics::<6, Zp32003>(7));
+}
+
+/// #1078: a row layout is not applied where the batch reduces in a lane or across workers.
+#[cfg(feature = "research-sigf4")]
+#[test]
+fn test_row_layout_is_baseline_under_a_lane_or_workers() {
+    use super::layout::RowLayout;
+    let system = katsura::<6, Zp32003>();
+    for options in [
+        SigF4Options {
+            small_prime_lane: true,
+            ..SigF4Options::default()
+        },
+        SigF4Options {
+            workers: 2,
+            parallel_cascade: true,
+            ..SigF4Options::default()
+        },
+    ] {
+        let options = SigF4Options {
+            row_layout: RowLayout::Both,
+            ..options
+        };
+        let (result, s) = sig_f4_reported(&system, GREVLEX, &options);
+        assert_eq!(result.unwrap(), f4(&system, GREVLEX).unwrap());
+        assert_eq!(s.layout.layout_batches, 0);
+    }
+}

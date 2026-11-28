@@ -18,7 +18,7 @@ use super::{
     SigF4Error, SigF4Options, SigF4Statistics,
 };
 use crate::{
-    fields::ConcurrentJob,
+    fields::{ConcurrentJob, PreparedFactor},
     grobner::{
         buchberger::{minimal_basis_for_interreduction, reduce_grobner_basis_until},
         f4::{
@@ -1057,6 +1057,21 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         Ok((columns, rows, handles, reducers))
     }
 
+    /// #1078: the configured row layout where the serial cascade at one worker reduces without a
+    /// lane, or a research census reads the field rows; the baseline everywhere else.
+    fn row_layout(&self, lane_free: bool) -> super::layout::RowLayout {
+        #[cfg(feature = "research-reuse")]
+        let census = self.reuse.is_some();
+        #[cfg(not(feature = "research-reuse"))]
+        let census = false;
+        let serial = self.options.workers <= 1 && !self.options.parallel_cascade;
+        if lane_free && serial && !census {
+            self.options.row_layout
+        } else {
+            super::layout::RowLayout::Baseline
+        }
+    }
+
     fn terms_of(&self, source: RowSource) -> &[(Monomial<N>, F)] {
         match source {
             RowSource::Input(i) => &self.inputs[i],
@@ -1098,31 +1113,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 }
             }
         }
-        let mut sparse_rows: Vec<Vec<(u32, F)>> = rows
-            .iter()
-            .zip(handles)
-            .map(|(row, handles)| {
-                handles
-                    .into_iter()
-                    .zip(self.terms_of(row.source))
-                    .map(|(h, (_, c))| (h, *c))
-                    .collect()
-            })
-            .collect();
         let ncols = columns.len();
-        let mut reducer_at: Vec<u32> = vec![NONE; ncols];
-        let mut reducer_rows: Vec<Vec<(u32, F)>> = sparse_rows.split_off(target_count);
-        let reducer_sigs: Vec<Signature<N>> = rows[target_count..].iter().map(|r| r.sig).collect();
-        let targets: Vec<(Signature<N>, Vec<(u32, F)>)> = rows[..target_count]
-            .iter()
-            .map(|r| r.sig)
-            .zip(sparse_rows)
-            .collect();
-        debug_assert_eq!(reducer_rows.len(), reducer_count);
-        for (k, entries) in reducer_rows.iter().enumerate() {
-            reducer_at[entries[0].0 as usize] = k as u32;
-        }
-
         // #945, #1183: the reducer block in lane form, when the options and the field allow it.
         // A field has at most one of the two lanes.
         let lane = if self.options.small_prime_lane {
@@ -1137,6 +1128,80 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
                 None
             }
         });
+        // #1078: the batch's own rows in the chosen layout.
+        let arm = self.row_layout(lane.is_none());
+        let narrow = arm.narrow() && ncols <= super::layout::U16_COLUMNS;
+        let mut handles = handles;
+        let reducer_handles = handles.split_off(target_count);
+        #[cfg(any(feature = "research-sigf4", feature = "research-sigf4-split"))]
+        let (target_entry_count, reducer_entry_count): (usize, usize) = (
+            handles.iter().map(Vec::len).sum(),
+            reducer_handles.iter().map(Vec::len).sum(),
+        );
+        let owned = |row: &Row<N>, handles: Vec<u32>| -> Vec<(u32, F)> {
+            handles
+                .into_iter()
+                .zip(self.terms_of(row.source))
+                .map(|(h, (_, c))| (h, *c))
+                .collect()
+        };
+        let split = |row: &Row<N>, handles: Vec<u32>| -> (Vec<u16>, Vec<F>) {
+            let columns = handles.into_iter().map(|h| h as u16).collect();
+            let coefficients = self.terms_of(row.source).iter().map(|(_, c)| *c).collect();
+            (columns, coefficients)
+        };
+        let mut reducer_at: Vec<u32> = vec![NONE; ncols];
+        for (k, handles) in reducer_handles.iter().enumerate() {
+            reducer_at[handles[0] as usize] = k as u32;
+        }
+        let reducer_elements: Vec<u32> = rows[target_count..]
+            .iter()
+            .map(|r| match r.source {
+                RowSource::Element(id) => id,
+                RowSource::Input(_) => unreachable!("a reducer is a basis-element multiple"),
+            })
+            .collect();
+        let reducer_rows_of = || {
+            rows[target_count..]
+                .iter()
+                .zip(reducer_handles.iter().cloned())
+        };
+        let mut reducer_rows: Vec<Vec<(u32, F)>> = Vec::new();
+        let reducer_layout = match (arm.source(), narrow) {
+            (false, false) => {
+                reducer_rows = reducer_rows_of().map(|(r, h)| owned(r, h)).collect();
+                None
+            }
+            (true, false) => Some(ReducerLayout::Source(reducer_handles.clone())),
+            (false, true) => Some(ReducerLayout::Split(
+                reducer_rows_of().map(|(r, h)| split(r, h)).collect(),
+            )),
+            (true, true) => Some(ReducerLayout::Source16(
+                reducer_handles
+                    .iter()
+                    .map(|h| h.iter().map(|&c| c as u16).collect())
+                    .collect(),
+            )),
+        };
+        drop(reducer_handles);
+        let reducer_sigs: Vec<Signature<N>> = rows[target_count..].iter().map(|r| r.sig).collect();
+        let mut target_split: Vec<(Vec<u16>, Vec<F>)> = Vec::new();
+        let targets: Vec<(Signature<N>, Vec<(u32, F)>)> = rows[..target_count]
+            .iter()
+            .zip(handles)
+            .map(|(row, handles)| {
+                if narrow {
+                    target_split.push(split(row, handles));
+                    (row.sig, Vec::new())
+                } else {
+                    (row.sig, owned(row, handles))
+                }
+            })
+            .collect();
+        debug_assert_eq!(
+            reducer_at.iter().filter(|&&k| k != NONE).count(),
+            reducer_count
+        );
         // Each pivot is held once (#945's corrective iteration): in lane form only, unless a
         // research census reads the field rows.
         #[cfg(feature = "research-reuse")]
@@ -1144,7 +1209,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         #[cfg(not(feature = "research-reuse"))]
         let field_copies = lane.is_none();
         #[cfg(feature = "research-sigf4-split")]
-        let reducer_entries: u64 = reducer_rows.iter().map(|r| r.len() as u64).sum();
+        let reducer_entries = reducer_entry_count as u64;
         let lane_rows: Vec<LaneRow> = match &lane {
             None => Vec::new(),
             Some(lane) if field_copies => reducer_rows
@@ -1165,6 +1230,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             ncols,
             lane: lane.map(|lane| (lane, lane_rows.as_slice())),
             field_copies,
+            layout: reducer_layout.as_ref(),
+            elements: &reducer_elements,
         };
         if self.options.parallel_cascade {
             if let Some(done) = self.claim(&block, &targets, columns, clock, lane_bytes)? {
@@ -1176,7 +1243,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             targets: target_count,
             reducers: reducer_count,
             columns: ncols,
-            entries: targets.iter().map(|t| t.1.len() as u64).sum::<u64>() + reducer_entries,
+            entries: target_entry_count as u64 + reducer_entries,
             setup: clock.elapsed(),
             ..Default::default()
         };
@@ -1192,7 +1259,8 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         } else {
             0
         };
-        let fixed = batch_rows_bytes(&block, &targets)
+        let row_bytes = batch_rows_bytes(&block, &targets, &target_split);
+        let fixed = row_bytes
             + lane_bytes
             + 2 * ncols * size_of::<u32>()
             + (1 + phase_a_workers) * block.workspace_bytes();
@@ -1201,16 +1269,17 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         #[cfg(feature = "research-sigf4")]
         let layout_rows = {
-            let reducers: usize = block.rows.iter().map(Vec::len).sum();
             let rows = super::layout::row_bytes(
-                targets.iter().map(|t| t.1.len()).sum(),
-                reducers,
+                target_entry_count,
+                reducer_entry_count,
                 ncols,
                 size_of::<F>(),
                 size_of::<(u32, F)>(),
             );
-            debug_assert_eq!(rows[0], batch_rows_bytes(&block, &targets));
-            (rows, reducers * size_of::<F>())
+            if lane.is_none() {
+                debug_assert_eq!(rows[arm.index()], row_bytes, "{arm:?}");
+            }
+            rows
         };
         #[cfg(feature = "research-sigf4-split")]
         let pass_clock = Instant::now();
@@ -1271,12 +1340,25 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             };
             let (t, entries, earlier) = if from_targets {
                 let (t, raw) = &targets[next];
+                let k = next;
                 next += 1;
-                let (entries, earlier) = prereduced.next().unwrap_or_else(|| (raw.clone(), 0));
+                let (entries, earlier) = prereduced.next().unwrap_or_else(|| {
+                    let raw = match target_split.get(k) {
+                        Some((columns, coefficients)) => columns
+                            .iter()
+                            .map(|&c| u32::from(c))
+                            .zip(coefficients.iter().copied())
+                            .collect(),
+                        None => raw.clone(),
+                    };
+                    (raw, 0)
+                });
                 (*t, entries, earlier)
             } else {
                 let (t, r) = promoted.pop().expect("matched above");
-                (t, block.reducer_entries(r as usize), 0)
+                let entries = block
+                    .reducer_entries_in(r as usize, |id| self.basis[id as usize].terms.as_slice());
+                (t, entries, 0)
             };
             #[cfg(feature = "research-reuse")]
             if self.reuse.is_some() {
@@ -1284,8 +1366,11 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
             #[cfg(feature = "research-sigf4-split")]
             let mut cascade = 0u64;
+            let basis = &self.basis;
             let (mut out, later) = workspace.reduce_pivots(&entries, |c| {
-                let pivot = if let Some(pivot) = block.admissible_pivot(c, &t) {
+                let pivot = if let Some(pivot) =
+                    block.admissible_pivot_in(c, &t, |id| basis[id as usize].terms.as_slice())
+                {
                     Some(pivot)
                 } else if target_at[c] != NONE {
                     let (s, _, entries, _) = &finals[target_at[c] as usize];
@@ -1368,9 +1453,14 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         }
         self.stats.claim_peak_live_bytes = self.stats.claim_peak_live_bytes.max(live.peak);
         #[cfg(feature = "research-sigf4")]
-        self.stats
-            .layout
-            .record(layout_rows.0, fixed, live.peak, ncols, layout_rows.1);
+        self.stats.layout.record(
+            layout_rows,
+            fixed - row_bytes,
+            live.peak - fixed,
+            ncols,
+            reducer_entry_count * size_of::<F>(),
+            arm != super::layout::RowLayout::Baseline,
+        );
         let mut results = Vec::new();
         for ((t, kind, row, products), lane_row) in finals.into_iter().zip(final_lanes) {
             let row = block.field_row(row, lane_row);
@@ -1471,7 +1561,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         clock: Instant,
         lane_bytes: usize,
     ) -> Result<Option<Vec<(Signature<N>, Vec<(Monomial<N>, F)>)>>, SigF4Error> {
-        let rows_bytes = batch_rows_bytes(block, targets) + lane_bytes;
+        let rows_bytes = batch_rows_bytes(block, targets, &[]) + lane_bytes;
         let job = Claim {
             block,
             targets,
@@ -1794,10 +1884,27 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
 fn batch_rows_bytes<const N: usize, F>(
     block: &ReducerBlock<'_, N, F>,
     targets: &[(Signature<N>, Vec<(u32, F)>)],
+    target_split: &[(Vec<u16>, Vec<F>)],
 ) -> usize {
+    let split = |(c, v): &(Vec<u16>, Vec<F>)| size_of_val(c.as_slice()) + size_of_val(v.as_slice());
+    let layout = match block.layout {
+        None => 0,
+        Some(ReducerLayout::Source(rows)) => rows.iter().map(|r| size_of_val(r.as_slice())).sum(),
+        Some(ReducerLayout::Split(rows)) => rows.iter().map(split).sum(),
+        Some(ReducerLayout::Source16(rows)) => rows.iter().map(|r| size_of_val(r.as_slice())).sum(),
+    };
     (targets.iter().map(|(_, r)| r.len()).sum::<usize>()
         + block.rows.iter().map(Vec::len).sum::<usize>())
         * size_of::<(u32, F)>()
+        + target_split.iter().map(split).sum::<usize>()
+        + layout
+}
+
+/// #1078: a batch's reducer multiples in a non-baseline layout; [`ReducerBlock::rows`] is empty.
+pub(super) enum ReducerLayout<F> {
+    Source(Vec<Vec<u32>>),
+    Split(Vec<(Vec<u16>, Vec<F>)>),
+    Source16(Vec<Vec<u16>>),
 }
 
 /// The serial cascade's live-byte account, in the parallel cascade's units (#962): crossing the
@@ -1855,6 +1962,9 @@ pub(super) struct ReducerBlock<'a, const N: usize, F> {
     pub(super) rows: &'a [Vec<(u32, F)>],
     pub(super) sigs: &'a [Signature<N>],
     pub(super) at: &'a [u32],
+    /// #1078: the reducers' layout when not the baseline, and each reducer's basis element.
+    pub(super) layout: Option<&'a ReducerLayout<F>>,
+    pub(super) elements: &'a [u32],
     pub(super) ncols: usize,
     /// #945: the field's lane and `rows` in lane form, when the batch reduces in `u32` lanes.
     pub(super) lane: Option<(Lane<F>, &'a [LaneRow])>,
@@ -1892,14 +2002,36 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
     }
 
     /// [`Self::admissible`], in the representation the batch reduces in.
-    pub(super) fn admissible_pivot(&self, c: usize, t: &Signature<N>) -> Option<PivotRow<'_, F>> {
+    pub(super) fn admissible_pivot(
+        &self,
+        c: usize,
+        t: &Signature<N>,
+    ) -> Option<PivotRow<'_, N, F>> {
+        self.admissible_pivot_in(c, t, |_| unreachable!("a layout batch has its basis"))
+    }
+
+    /// [`Self::admissible_pivot`] for any layout: `terms` gives a basis element's terms, which a
+    /// source-backed reducer reads its coefficients from.
+    pub(super) fn admissible_pivot_in<'p>(
+        &'p self,
+        c: usize,
+        t: &Signature<N>,
+        terms: impl FnOnce(u32) -> &'p [(Monomial<N>, F)],
+    ) -> Option<PivotRow<'p, N, F>> {
         if !self.admits(c, t) {
             return None;
         }
         let r = self.at[c] as usize;
-        Some(match &self.lane {
-            Some((_, rows)) => PivotRow::Lane(&rows[r]),
-            None => PivotRow::Field(self.rows[r].as_slice()),
+        Some(match (&self.lane, self.layout) {
+            (Some((_, rows)), _) => PivotRow::Lane(&rows[r]),
+            (None, None) => PivotRow::Field(self.rows[r].as_slice()),
+            (None, Some(ReducerLayout::Source(rows))) => {
+                PivotRow::Source(&rows[r], terms(self.elements[r]))
+            }
+            (None, Some(ReducerLayout::Split(rows))) => PivotRow::Split(&rows[r].0, &rows[r].1),
+            (None, Some(ReducerLayout::Source16(rows))) => {
+                PivotRow::Source16(&rows[r], terms(self.elements[r]))
+            }
         })
     }
 
@@ -1916,13 +2048,34 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
     }
 
     /// Reducer `k`'s row in field form, from its lane form when no field copy was kept.
-    pub(super) fn reducer_entries(&self, k: usize) -> Vec<(u32, F)>
+    /// `terms` gives a basis element's terms, as for [`Self::admissible_pivot_in`].
+    pub(super) fn reducer_entries_in<'p>(
+        &'p self,
+        k: usize,
+        terms: impl FnOnce(u32) -> &'p [(Monomial<N>, F)],
+    ) -> Vec<(u32, F)>
     where
         F: FiniteField,
     {
-        match &self.lane {
-            Some((lane, rows)) if !self.field_copies => rows[k].to_field(lane),
-            _ => self.rows[k].clone(),
+        let borrowed = |columns: &mut dyn Iterator<Item = u32>, terms: &[(Monomial<N>, F)]| {
+            columns.zip(terms.iter().map(|(_, c)| *c)).collect()
+        };
+        match (&self.lane, self.layout) {
+            (Some((lane, rows)), _) if !self.field_copies => rows[k].to_field(lane),
+            (_, None) => self.rows[k].clone(),
+            (_, Some(ReducerLayout::Source(rows))) => {
+                borrowed(&mut rows[k].iter().copied(), terms(self.elements[k]))
+            }
+            (_, Some(ReducerLayout::Split(rows))) => rows[k]
+                .0
+                .iter()
+                .map(|&c| u32::from(c))
+                .zip(rows[k].1.iter().copied())
+                .collect(),
+            (_, Some(ReducerLayout::Source16(rows))) => borrowed(
+                &mut rows[k].iter().map(|&c| u32::from(c)),
+                terms(self.elements[k]),
+            ),
         }
     }
 
@@ -1953,19 +2106,58 @@ impl<const N: usize, F> ReducerBlock<'_, N, F> {
 }
 
 /// A pivot in whichever representation its batch reduces in.
-pub(super) enum PivotRow<'p, F> {
+pub(super) enum PivotRow<'p, const N: usize, F> {
     Field(&'p [(u32, F)]),
     Lane(&'p LaneRow),
+    /// #1078: a reducer multiple's columns, with its coefficients read from the element's terms.
+    Source(&'p [u32], &'p [(Monomial<N>, F)]),
+    /// #1078: `u16` columns beside their coefficients.
+    Split(&'p [u16], &'p [F]),
+    /// #1078: `u16` columns, coefficients from the element's terms.
+    Source16(&'p [u16], &'p [(Monomial<N>, F)]),
 }
 
-impl<F> PivotRow<'_, F> {
+impl<const N: usize, F> PivotRow<'_, N, F> {
+    /// Entries right of the lead, in a field-form pivot.
+    #[cfg_attr(not(feature = "research-work"), allow(dead_code))]
+    fn tail_len(&self) -> usize {
+        match self {
+            PivotRow::Field(row) => row.len() - 1,
+            PivotRow::Lane(_) => unreachable!("a lane pivot reduces in a lane workspace"),
+            PivotRow::Source(columns, _) => columns.len() - 1,
+            PivotRow::Split(columns, _) | PivotRow::Source16(columns, _) => columns.len() - 1,
+        }
+    }
+
     /// Products one application costs: the entries right of the lead.
     #[cfg(any(feature = "research-sigf4-split", feature = "research-sigf4-replay"))]
     pub(super) fn products(&self) -> u64 {
         match self {
-            PivotRow::Field(row) => row.len() as u64 - 1,
             PivotRow::Lane(row) => row.nonzeros(),
+            other => other.tail_len() as u64,
         }
+    }
+}
+
+/// Subtracts `factor` times a pivot's tail from the accumulator, marking each column touched.
+#[inline(always)]
+fn subtract_tail<'v, F: FiniteField + 'v>(
+    acc: &mut [F],
+    touched: &mut [u64],
+    factor: &PreparedFactor<F>,
+    tail: impl Iterator<Item = (usize, &'v F)>,
+    #[cfg(feature = "research-work")] nonzeros: &mut usize,
+) {
+    for (cc, v) in tail {
+        #[cfg(feature = "research-work")]
+        let before = acc[cc].is_zero();
+        acc[cc] -= v.mul_prepared(factor);
+        #[cfg(feature = "research-work")]
+        {
+            *nonzeros += usize::from(before);
+            *nonzeros -= usize::from(acc[cc].is_zero());
+        }
+        touched[cc >> 6] |= 1 << (cc & 63);
     }
 }
 
@@ -2010,10 +2202,10 @@ impl<F: FiniteField> Workspace<F> {
     ///
     /// # Panics
     /// If a pivot's representation is not the workspace's.
-    pub(super) fn reduce_pivots<'p>(
+    pub(super) fn reduce_pivots<'p, const N: usize>(
         &mut self,
         entries: &[(u32, F)],
-        mut pivot: impl FnMut(usize) -> Option<PivotRow<'p, F>>,
+        mut pivot: impl FnMut(usize) -> Option<PivotRow<'p, N, F>>,
     ) -> Reduced<F>
     where
         F: 'p,
@@ -2022,16 +2214,11 @@ impl<F: FiniteField> Workspace<F> {
             return lane.reduce(entries, |c| {
                 pivot(c).map(|p| match p {
                     PivotRow::Lane(row) => row,
-                    PivotRow::Field(_) => unreachable!("a field pivot in a lane workspace"),
+                    _ => unreachable!("a field pivot in a lane workspace"),
                 })
             });
         }
-        self.reduce(entries, |c| {
-            pivot(c).map(|p| match p {
-                PivotRow::Field(row) => row,
-                PivotRow::Lane(_) => unreachable!("a lane pivot in a field workspace"),
-            })
-        })
+        self.reduce_rows(entries, pivot)
     }
 
     /// Reduces `entries` column by column with whatever `pivot` offers (monic rows, lead first);
@@ -2041,6 +2228,18 @@ impl<F: FiniteField> Workspace<F> {
         &mut self,
         entries: &[(u32, F)],
         mut pivot: impl FnMut(usize) -> Option<&'p [(u32, F)]>,
+    ) -> Reduced<F>
+    where
+        F: 'p,
+    {
+        self.reduce_rows::<0>(entries, |c| pivot(c).map(PivotRow::Field))
+    }
+
+    /// [`Self::reduce`] over field-form pivots in any of #1078's layouts.
+    fn reduce_rows<'p, const N: usize>(
+        &mut self,
+        entries: &[(u32, F)],
+        mut pivot: impl FnMut(usize) -> Option<PivotRow<'p, N, F>>,
     ) -> Reduced<F>
     where
         F: 'p,
@@ -2087,25 +2286,67 @@ impl<F: FiniteField> Workspace<F> {
                             c,
                             ncols,
                             applied,
-                            row.len() - 1,
+                            row.tail_len(),
                         );
                         applied += 1;
                         nonzeros -= 1;
                     }
                     let factor = coefficient.prepare_factor();
-                    for (cc, v) in &row[1..] {
-                        let cc = *cc as usize;
-                        #[cfg(feature = "research-work")]
-                        let before = self.acc[cc].is_zero();
-                        self.acc[cc] -= v.mul_prepared(&factor);
-                        #[cfg(feature = "research-work")]
-                        {
-                            nonzeros += usize::from(before);
-                            nonzeros -= usize::from(self.acc[cc].is_zero());
+                    let (acc, touched) = (&mut self.acc[..], &mut self.touched[..]);
+                    let tail = match row {
+                        PivotRow::Field(row) => {
+                            let tail = row[1..].iter().map(|(cc, v)| (*cc as usize, v));
+                            subtract_tail(
+                                acc,
+                                touched,
+                                &factor,
+                                tail,
+                                #[cfg(feature = "research-work")]
+                                &mut nonzeros,
+                            );
+                            row.len() - 1
                         }
-                        self.touched[cc >> 6] |= 1 << (cc & 63);
-                    }
-                    products += (row.len() - 1) as u64;
+                        PivotRow::Source(columns, terms) => {
+                            let coefficients = terms[1..].iter().map(|(_, v)| v);
+                            let tail = columns[1..].iter().map(|&cc| cc as usize);
+                            subtract_tail(
+                                acc,
+                                touched,
+                                &factor,
+                                tail.zip(coefficients),
+                                #[cfg(feature = "research-work")]
+                                &mut nonzeros,
+                            );
+                            columns.len() - 1
+                        }
+                        PivotRow::Split(columns, coefficients) => {
+                            let tail = columns[1..].iter().map(|&cc| cc as usize);
+                            subtract_tail(
+                                acc,
+                                touched,
+                                &factor,
+                                tail.zip(&coefficients[1..]),
+                                #[cfg(feature = "research-work")]
+                                &mut nonzeros,
+                            );
+                            columns.len() - 1
+                        }
+                        PivotRow::Source16(columns, terms) => {
+                            let coefficients = terms[1..].iter().map(|(_, v)| v);
+                            let tail = columns[1..].iter().map(|&cc| cc as usize);
+                            subtract_tail(
+                                acc,
+                                touched,
+                                &factor,
+                                tail.zip(coefficients),
+                                #[cfg(feature = "research-work")]
+                                &mut nonzeros,
+                            );
+                            columns.len() - 1
+                        }
+                        PivotRow::Lane(_) => unreachable!("a lane pivot in a field workspace"),
+                    };
+                    products += tail as u64;
                 }
                 None => {
                     #[cfg(feature = "research-work")]
@@ -2218,5 +2459,66 @@ mod density_tests {
         assert_eq!(trace.rows_at_checkpoint[0][4], 1, "intake at 20%");
         // The row leaves with 8 nonzeros from column 2: 8 of 8, the top bucket.
         assert_eq!(trace.rows_at_end[19], 1);
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::{PivotRow, Workspace};
+    use crate::{
+        fields::{PrimeFieldElement64, Zp32003},
+        FiniteField, Monomial,
+    };
+
+    type Goldilocks = PrimeFieldElement64<18446744069414584321>;
+
+    /// Reduces a two-entry row by one monic pivot over `ncols` columns that reaches the last
+    /// column, in the field form and each #1078 layout.
+    fn reduce_in_every_layout<F: FiniteField>(ncols: usize) -> Vec<Vec<(u32, F)>> {
+        let last = ncols as u32 - 1;
+        let pivot: Vec<(u32, F)> = vec![(0, F::one()), (last - 1, F::new(3)), (last, F::new(5))];
+        let terms: Vec<(Monomial<1>, F)> =
+            pivot.iter().map(|&(_, v)| (Monomial::one(), v)).collect();
+        let columns: Vec<u32> = pivot.iter().map(|e| e.0).collect();
+        let narrow: Vec<u16> = columns.iter().map(|&c| c as u16).collect();
+        let coefficients: Vec<F> = pivot.iter().map(|e| e.1).collect();
+        let row = [(0, F::new(2)), (last, F::new(7))];
+        let mut workspace = Workspace::<F>::new(ncols);
+        let mut run = |p: PivotRow<'_, 1, F>| {
+            let mut p = Some(p);
+            workspace
+                .reduce_rows(&row, |c| if c == 0 { p.take() } else { None })
+                .0
+        };
+        let mut out = vec![
+            run(PivotRow::Field(&pivot)),
+            run(PivotRow::Source(&columns, &terms)),
+        ];
+        if ncols <= crate::grobner::sigf4::layout::U16_COLUMNS {
+            out.push(run(PivotRow::Split(&narrow, &coefficients)));
+            out.push(run(PivotRow::Source16(&narrow, &terms)));
+        }
+        out
+    }
+
+    /// #1078: at 65,535 and 65,536 columns every layout, `u16` ones included, reduces into the
+    /// last column exactly as the field form does; at 65,537 the `u32` layouts still agree.
+    #[test]
+    fn test_layouts_agree_at_the_u16_width_boundary() {
+        for (ncols, layouts) in [(65_535, 4), (65_536, 4), (65_537, 2)] {
+            let out = reduce_in_every_layout::<Zp32003>(ncols);
+            assert_eq!(out.len(), layouts, "{ncols}");
+            let last = ncols as u32 - 1;
+            let expected = vec![
+                (last - 1, -(Zp32003::new(2) * Zp32003::new(3))),
+                (last, Zp32003::new(7) - Zp32003::new(2) * Zp32003::new(5)),
+            ];
+            for row in &out {
+                assert_eq!(row, &expected, "{ncols}");
+            }
+            assert!(reduce_in_every_layout::<Goldilocks>(ncols)
+                .windows(2)
+                .all(|w| w[0] == w[1]));
+        }
     }
 }

@@ -378,6 +378,8 @@ impl<F: FiniteField> Synthetic<F> {
             ncols: self.ncols,
             lane: None,
             field_copies: true,
+            layout: None,
+            elements: &[],
         }
     }
 

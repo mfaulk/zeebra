@@ -26,7 +26,6 @@ mod claim;
 pub mod corpus;
 pub mod dispatch;
 mod engine;
-#[cfg(feature = "research-sigf4")]
 pub mod layout;
 #[cfg(feature = "research-sigf4-replay")]
 pub mod replay;
@@ -94,6 +93,9 @@ pub struct SigF4Options {
     /// [`crate::linalg::lane::MAX_LANE_PRIME`] and below 2^31; ignored otherwise. Every row is
     /// unchanged. Off by default; dispatch is #1123's.
     pub prime31_lane: bool,
+    /// #1078: the layout of the serial cascade's batch rows ([`layout::RowLayout`]). Every basis is
+    /// unchanged; [`layout::RowLayout::Baseline`] by default.
+    pub row_layout: layout::RowLayout,
     /// #1076: end the run at a fixed signature degree and finish with conventional F4
     /// ([`carry`]). `None`, the default, runs the signature basis to completion.
     #[cfg(feature = "research-sigf4")]
@@ -137,6 +139,7 @@ impl Default for SigF4Options {
             lead_ideal_stop: true,
             small_prime_lane: false,
             prime31_lane: false,
+            row_layout: layout::RowLayout::Baseline,
             #[cfg(feature = "research-sigf4")]
             carry: None,
             #[cfg(feature = "research-reuse")]

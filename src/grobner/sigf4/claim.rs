@@ -55,7 +55,7 @@ pub(super) struct Outcome<F> {
 }
 
 impl<F> Outcome<F> {
-    fn pivot(&self) -> PivotRow<'_, F> {
+    fn pivot<const N: usize>(&self) -> PivotRow<'_, N, F> {
         match &self.lane {
             Some(row) => PivotRow::Lane(row),
             None => PivotRow::Field(self.row.as_slice()),
