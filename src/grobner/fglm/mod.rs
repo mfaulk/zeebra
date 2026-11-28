@@ -14,6 +14,7 @@ mod control;
 mod conversion;
 mod errors;
 mod incremental_span;
+mod module_census;
 mod multiplication;
 mod options;
 mod quotient_algebra;
@@ -40,6 +41,7 @@ pub use conversion::{
 };
 pub use errors::FglmError;
 pub use incremental_span::{Dependence, IncrementalSpan};
+pub use module_census::{module_census, ModuleCensus};
 pub use multiplication::MultiplicationOperator;
 pub use options::{
     largest_quotient_dimension_within, ConversionStrategy, FglmOptions, OperatorConstruction,

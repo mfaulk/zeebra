@@ -9,6 +9,11 @@ change to `y` may break the public API.
 
 ### Added
 
+- `grobner::fglm::module_census` and `ModuleCensus` (#1191), research tooling: from the leading
+  and standard monomials alone, the order and column degrees of the polynomial matrix that
+  multiplication by the last variable compresses to, and whether the staircase is stable in the
+  sense of Berthomieu, Neiger and Safey El Din. No conversion path calls it; findings in
+  `docs/research/polymatrix-change-of-order.md`.
 - `grobner::weight_detector` (#1192), opt-in research tooling: `detect_free_basis` searches for
   positive weights under which the input generators' leading monomials are pairwise coprime, so the
   input already is a Gröbner basis under `MonomialOrder::weighted`. Every hit is re-checked against

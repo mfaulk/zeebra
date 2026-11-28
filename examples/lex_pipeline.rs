@@ -7,7 +7,7 @@
 //! Arms: `adaptive`, `wiedemann` and `classical` are grevlex F4 (the signature dispatch) followed by
 //! `fglm_to_lex_with_options` under that `ConversionStrategy`; `shape` is grevlex F4 then
 //! `shape_lex_basis`; `direct-lex` is F4 under lex; `probe` reports the quotient algebra's operator
-//! shape without converting. Every stage of the complete task is inside `call_ns`; the
+//! shape and the `module_census` of its staircase without converting. Every stage of the complete task is inside `call_ns`; the
 //! `m33-basis-v1` digest is computed after it, as the grobx driver's is.
 //!
 //! `--input FILE` takes the grobx driver's request JSON (`variables`, `modulus`, `generators`), so
@@ -23,8 +23,8 @@ use zeebra::{
         differential::polynomial_to_string,
         f4_reported, f4_signature_reported,
         fglm::{
-            fglm_to_lex_with_options, shape_lex_basis, ConversionRoute, ConversionStrategy,
-            FglmError, FglmOptions, FglmStatistics, QuotientAlgebra,
+            fglm_to_lex_with_options, module_census, shape_lex_basis, ConversionRoute,
+            ConversionStrategy, FglmError, FglmOptions, FglmStatistics, QuotientAlgebra,
         },
         F4Options, ParallelForward, ParallelSymbolic,
     },
@@ -392,7 +392,28 @@ fn pipeline<const N: usize, F: FiniteField>(
         Arm::Probe => QuotientAlgebra::new(&source, GREVLEX, &budget_options)
             .map(|algebra| {
                 let last = algebra.operator(N - 1);
+                let leading: Vec<_> = source
+                    .iter()
+                    .filter(|p| !p.is_zero())
+                    .map(|p| p.leading_monomial(GREVLEX))
+                    .collect();
+                let census = module_census(&leading, algebra.quotient_basis().monomials());
                 outcome.probe = vec![
+                    ("variables", Json::size(N)),
+                    ("module_rank", Json::size(census.module_rank)),
+                    (
+                        "last_variable_leaders",
+                        Json::size(census.last_variable_leaders),
+                    ),
+                    ("stable", Json::Bool(census.stable)),
+                    (
+                        "other_variables_standard",
+                        Json::Bool(census.other_variables_standard),
+                    ),
+                    (
+                        "max_column_degree",
+                        Json::size(census.max_column_degree() as usize),
+                    ),
                     ("dimension", Json::size(algebra.dimension())),
                     ("operator_entries", Json::size(algebra.operator_entries())),
                     ("dense_columns", Json::size(algebra.dense_columns())),
@@ -758,10 +779,11 @@ mod tests {
         assert_eq!(outcome.basis, Some(reference));
     }
 
-    /// The shipping budget refuses D above 4096 with a typed error instead of converting.
+    /// The shipping budget refuses the classical walk above D = 4096 with a typed error; since
+    /// #1111 that cap no longer applies to the Wiedemann route.
     #[test]
     fn shipping_budget_refuses_large_quotients() {
-        let outcome = run::<2>("wd-2-70", Arm::Adaptive, Budget::Shipping);
+        let outcome = run::<2>("wd-2-70", Arm::Classical, Budget::Shipping);
         assert_eq!(outcome.status, "refused");
         assert!(outcome.error.unwrap().contains("QuotientDimensionExceeded"));
         let lifted = run::<2>("wd-2-70", Arm::Adaptive, Budget::Lifted);
@@ -811,6 +833,10 @@ mod tests {
         };
         assert_eq!(get("dimension"), Some(Json::size(216)));
         assert!(get("last_stored_entries").is_some());
+        // The chain's box staircase: rank D / d, and not stable.
+        assert_eq!(get("module_rank"), Some(Json::size(36)));
+        assert_eq!(get("max_column_degree"), Some(Json::size(6)));
+        assert_eq!(get("stable"), Some(Json::Bool(false)));
     }
 
     fn key<const N: usize>(outcome: &Outcome<N, F>, name: &str) -> Option<Json> {
@@ -824,7 +850,7 @@ mod tests {
     #[test]
     fn selection_outcome_names_refusals_and_acceptance() {
         let outcome = |o: &str| Some(Json::string(o));
-        let refused = run::<2>("wd-2-70", Arm::Adaptive, Budget::Shipping);
+        let refused = run::<2>("wd-2-70", Arm::Classical, Budget::Shipping);
         assert_eq!(
             key(&refused, "selection_outcome"),
             outcome("memory-refusal")
