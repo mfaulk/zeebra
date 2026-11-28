@@ -987,6 +987,17 @@ pub struct F4Options {
     ///
     /// Off at every preset; dispatch is #1123's.
     pub prime31_lane: bool,
+    /// #945, #1123: under [`GradedEngine::Adaptive`], set `SigF4Options::small_prime_lane` on the
+    /// signature engine the dispatcher runs: its batches reduce in `u32` delayed-reduction lanes
+    /// when the field is a prime at most [`crate::linalg::lane::MAX_LANE_PRIME`]. Conventional F4
+    /// does not read it.
+    ///
+    /// Off at every preset.
+    pub small_prime_lane: bool,
+    /// #1123: the signature engine uses either lane only on a batch with at least this many matrix
+    /// entries, targets and reducers together; smaller batches stay on the field route. `0`
+    /// admits every batch. Passed to `SigF4Options::lane_min_entries` under Adaptive.
+    pub lane_min_entries: usize,
 
     /// #1184's opt-in Monte Carlo zero skipping on conventional F4. See
     /// [`MonteCarloZeros`](super::monte_carlo::MonteCarloZeros).
@@ -1036,6 +1047,8 @@ impl F4Options {
             parallel_symbolic: ParallelSymbolic::Serial,
             graded_engine: GradedEngine::Conventional,
             prime31_lane: false,
+            small_prime_lane: false,
+            lane_min_entries: 0,
             monte_carlo: None,
         }
     }

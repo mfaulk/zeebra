@@ -3,8 +3,13 @@
 //!
 //! cargo run --release --features research-sigf4 --example m34_matrix -- --catalog FILE --id ID
 //!     [--engine f4|cap16|adaptive|sig|fallback] [--workers N] [--wall-s S] [--stages] [--lane31]
+//!     [--lane16] [--lane-min-entries N]
 //!     [--hilbert off|observe|certified-zeros+N] [--research-envelope]
 //!     [--carry restart@D|continue@D|restart@fall|continue@fall]
+//!
+//! `--lane16` (#945, #1123) sets `F4Options::small_prime_lane` and `SigF4Options::small_prime_lane`, the
+//! `u32` lane for primes at most 46,337, which Adaptive reaches through its signature route.
+//! `--lane-min-entries N` keeps either lane off any batch with fewer than `N` entries (#1123's rule).
 //!
 //! `--lane31` (#1183) sets `F4Options::prime31_lane` and `SigF4Options::prime31_lane`: the 31-bit
 //! lane on F4's serial forward pass and in the signature engine's reduction, for primes between
@@ -74,6 +79,8 @@ struct Args {
     wall: Duration,
     stages: bool,
     lane31: bool,
+    lane16: bool,
+    lane_min_entries: usize,
     hilbert: HilbertSelection,
     research_envelope: bool,
     /// `--carry`: continue (true) or restart, and the boundary degree (`None` for `@fall`).
@@ -89,6 +96,8 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         wall: Duration::from_secs(300),
         stages: false,
         lane31: false,
+        lane16: false,
+        lane_min_entries: 0,
         hilbert: HilbertSelection::Off,
         research_envelope: false,
         carry: None,
@@ -104,6 +113,10 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--wall-s" => a.wall = Duration::from_secs(value()?.parse().map_err(|_| "--wall-s")?),
             "--stages" => a.stages = true,
             "--lane31" => a.lane31 = true,
+            "--lane16" => a.lane16 = true,
+            "--lane-min-entries" => {
+                a.lane_min_entries = value()?.parse().map_err(|_| "--lane-min-entries")?
+            }
             "--hilbert" => a.hilbert = hilbert_selection(&value()?)?,
             "--research-envelope" => a.research_envelope = true,
             "--carry" => a.carry = Some(carry(&value()?)?),
@@ -306,6 +319,8 @@ fn options(args: &Args) -> F4Options {
         max_wall_time: Some(args.wall),
         measure_stages: args.stages,
         prime31_lane: args.lane31,
+        small_prime_lane: args.lane16,
+        lane_min_entries: args.lane_min_entries,
         hilbert: args.hilbert,
         parallel_forward: if w == 1 {
             ParallelForward::Serial
@@ -404,6 +419,8 @@ fn sig_options(args: &Args, wall: Duration) -> zeebra::grobner::sigf4::SigF4Opti
         workers: args.workers,
         parallel_cascade: args.workers > 1,
         prime31_lane: args.lane31,
+        small_prime_lane: args.lane16,
+        lane_min_entries: args.lane_min_entries,
         carry: args.carry.map(|(proceed, degree)| {
             use zeebra::grobner::sigf4::carry::{Boundary, Carry, CarryMode};
             Carry {
@@ -806,6 +823,39 @@ mod tests {
         }
     }
 
+    /// #1123: `--lane16` and `--lane-min-entries` reach F4's options, which Adaptive passes on, and
+    /// the forced signature engine's; neither changes the basis.
+    #[test]
+    fn small_prime_lane_and_threshold_are_set_and_keep_the_basis() {
+        let a = args(&[
+            "--engine",
+            "adaptive",
+            "--lane16",
+            "--lane-min-entries",
+            "40",
+        ])
+        .unwrap();
+        assert!(options(&a).small_prime_lane);
+        assert_eq!(options(&a).lane_min_entries, 40);
+        assert!(!options(&args(&[]).unwrap()).small_prime_lane);
+        assert!(args(&["--lane-min-entries", "many"]).is_err());
+        #[cfg(feature = "research-sigf4")]
+        {
+            let s = sig_options(&a, Duration::from_secs(9));
+            assert!(s.small_prime_lane);
+            assert_eq!(s.lane_min_entries, 40);
+        }
+        let record = find_record(CATALOG, "x@p31").unwrap();
+        let digest = |extra: &[&str]| {
+            let out = solve(&record, &args(extra).unwrap()).unwrap();
+            field_of(&out, "basis_sha256").unwrap().to_json()
+        };
+        assert_eq!(
+            digest(&["--engine", "adaptive", "--lane16"]),
+            digest(&["--engine", "adaptive"])
+        );
+    }
+
     /// #1080: `--hilbert` sets the selection on every conventional arm, refuses an unknown mode, and
     /// an active mode reports the count route's outcome without `--stages`.
     #[test]
@@ -968,6 +1018,8 @@ mod tests {
                     wall: Duration::from_secs(10),
                     stages: false,
                     lane31: false,
+                    lane16: false,
+                    lane_min_entries: 0,
                     hilbert: HilbertSelection::Off,
                     research_envelope: false,
                     carry: None,
