@@ -300,7 +300,7 @@ fn split_arm<F: FiniteField>(args: &Args, matrix: SparseMatrix<F>, split: usize,
          \"blocked_seconds\":{blocked_seconds:.3},\
          \"leaf_rows\":{},\"winograd_from\":{},\"rank\":{},\"products\":{},\"reductions\":{},\
          \"additions\":{},\"winograd_splits\":{},\"classical_products\":{},\"inversions\":{},\
-         \"output_digest\":\"{ours_digest}\"{tail}}}",
+         \"clearing_products\":{},\"output_digest\":\"{ours_digest}\"{tail}}}",
         free.len(),
         residual_entries as f64 / cells.max(1) as f64,
         span_cells as f64 / cells.max(1) as f64,
@@ -319,6 +319,7 @@ fn split_arm<F: FiniteField>(args: &Args, matrix: SparseMatrix<F>, split: usize,
         counts.winograd_splits,
         counts.classical_products,
         counts.inversions,
+        counts.clearing_products,
     );
 }
 

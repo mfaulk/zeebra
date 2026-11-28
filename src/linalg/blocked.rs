@@ -174,6 +174,9 @@ pub struct BlockedCounts {
     pub classical_products: u64,
     /// Pivots normalized by an inverse.
     pub inversions: u64,
+    /// The part of `products` spent clearing the lower half's pivots from the upper half's rows:
+    /// the step a non-reduced echelon form would not take.
+    pub clearing_products: u64,
 }
 
 /// A dense row-major matrix of residues.
@@ -726,7 +729,9 @@ pub fn reduced_echelon(
     // Upper rows lose the lower pivot columns: F1 -= F1[:, P2] E2.
     if !lower_free_pivots.is_empty() {
         let multipliers = free_upper.gather(&lower_free_pivots);
+        let before = counts.products;
         let update = product(modulus, multipliers.view(), lower.view(), options, counts);
+        counts.clearing_products += counts.products - before;
         free_upper.subtract(modulus, &update, counts);
     }
 
@@ -829,6 +834,7 @@ fn leaf(
                     *r = modulus.reduce(multiply_add(negated, v, *r));
                 }
                 counts.products += (columns - lead - 1) as u64;
+                counts.clearing_products += (columns - lead - 1) as u64;
                 counts.reductions += (columns - lead - 1) as u64;
             }
         }
