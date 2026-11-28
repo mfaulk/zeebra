@@ -228,6 +228,9 @@ pub struct StoreTotals {
     pub eager_update_terms: u64,
     /// Exact hits on an entry no new lead had touched: a lazy store reuses them as stored.
     pub valid_hits: u64,
+    /// Of the valid hits, those on an entry with a blocked tail term: M5GB updates these too once
+    /// the row it serves has a larger signature than the blocking pivot (its case 2).
+    pub flagged_hits: u64,
     /// Exact hits on a stale entry: a lazy store's updates.
     pub stale_hits: u64,
     /// Episodes still open at the run's end: invalidated and never reused.
@@ -259,6 +262,7 @@ impl StoreTotals {
             ("eager_updates", u(self.eager_updates)),
             ("eager_update_terms", u(self.eager_update_terms)),
             ("valid_hits", u(self.valid_hits)),
+            ("flagged_hits", u(self.flagged_hits)),
             ("stale_hits", u(self.stale_hits)),
             ("stale_unreused", u(self.stale_unreused)),
             ("stale_tail_products", u(self.stale_tail_products)),
@@ -289,6 +293,7 @@ impl StoreTotals {
             eager_updates: u("eager_updates"),
             eager_update_terms: u("eager_update_terms"),
             valid_hits: u("valid_hits"),
+            flagged_hits: u("flagged_hits"),
             stale_hits: u("stale_hits"),
             stale_unreused: u("stale_unreused"),
             stale_tail_products: u("stale_tail_products"),
@@ -307,6 +312,8 @@ struct StoreEntry {
     tail: Vec<u32>,
     /// Tail length as stored, blocked terms included.
     terms: u64,
+    /// Blocked tail terms: M5GB's finite signature flag.
+    blocked: u64,
     stale_since: Option<usize>,
 }
 
@@ -383,7 +390,10 @@ impl<const N: usize> StoreLedger<N> {
                 true
             }
             None => {
-                self.totals.valid_hits += self.entries.contains_key(key) as u64;
+                if let Some(entry) = self.entries.get(key) {
+                    self.totals.valid_hits += 1;
+                    self.totals.flagged_hits += (entry.blocked > 0) as u64;
+                }
                 false
             }
         }
@@ -426,6 +436,7 @@ impl<const N: usize> StoreLedger<N> {
             StoreEntry {
                 tail: ids,
                 terms,
+                blocked,
                 stale_since,
             },
         );
@@ -1503,6 +1514,15 @@ mod tests {
         assert_eq!(totals.blocked_entries, 1);
         assert_eq!(totals.blocked_terms, 1);
         assert_eq!(totals.stored, 3);
+        // Built again under the same leads: three valid hits, one of them on the flagged r0.
+        let context = StoreContext {
+            columns: &columns,
+            leads: &leads,
+        };
+        census.observe_with_store(context, &reducers, &targets, Some(&cmp), None);
+        let totals = census.store_totals().unwrap();
+        assert_eq!(totals.valid_hits, 3);
+        assert_eq!(totals.flagged_hits, 1);
     }
 
     // A target that a discovered pivot zeroes is charged to the zero-row products.
