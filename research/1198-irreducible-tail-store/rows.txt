@@ -1,0 +1,20 @@
+# #1198 rows. Dense overdetermined quadratics at #1030's held-out shapes (14, 25) and (16, 29),
+# two fields and two supports each; the shapes (14, 28) and (16, 32) #1030 also has M4GB counters
+# for; dense MQ n = 18 at m = 2n; and the sparse-tail controls. `+lane` rows run with
+# `SigF4Options::small_prime_lane` on, the arm the issue's gate names.
+dmq-n14-m25-gf31-s1
+dmq-n14-m25-gf31-s2
+dmq-n14-m25-gf32003-s1
+dmq-n14-m28-gf31-s1
+dmq-n16-m29-gf31-s1
+dmq-n16-m29-gf31-s2
+dmq-n16-m29-gf32003-s1
+dmq-n16-m32-gf31-s1
+dmq-n18-m36-gf31-s1
+eco12-wide64
+katsura11-m31
+mq11-goldilocks
+dmq-n14-m25-gf31-s1+lane
+dmq-n16-m29-gf31-s1+lane
+dmq-n16-m29-gf32003-s1+lane
+dmq-n18-m36-gf31-s1+lane

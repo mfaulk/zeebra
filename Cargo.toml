@@ -99,7 +99,8 @@ research-sigf4-usage = ["research-sigf4"]
 
 # #1031's reduced-multiple reuse census (`grobner::reuse_census`): replays every batch with its
 # reducer block as built and tail-reduced, on the signature engine (opt-in per run) and, through
-# a batch observer, the conventional one. Off in every timed binary.
+# a batch observer, the conventional one. Off in every timed binary. Also #1198's count for a dense
+# tail store over irreducible monomials (`sigf4::tail_store`), which reduces nothing.
 research-reuse = ["research-sigf4", "research-work"]
 
 # #1075's adjacent-round census (`sigf4::adjacent`): a previous-batch buffer of each row's run-wide
