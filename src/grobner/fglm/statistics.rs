@@ -44,6 +44,11 @@ pub struct BorderStatistics {
     /// [`distinct_border_monomials`](Self::distinct_border_monomials) on a deduplicated one, which
     /// is how a caller tells which path ran.
     pub normal_form_calls: usize,
+
+    /// Border normal forms read off a source element instead of reduced: `nf(lm(g))` is
+    /// `-tail(g) / lc(g)` when the tail is standard. Only the partial construction the Wiedemann
+    /// route uses reads off (#1233); zero on every full construction.
+    pub read_off_columns: usize,
 }
 
 impl BorderStatistics {
@@ -267,6 +272,10 @@ pub struct FglmStatistics {
     /// what the operator budget is enforced on.
     pub operator_entries: usize,
 
+    /// Multiplication operators built: `N` on the classical walk, one when the Wiedemann route
+    /// converted without falling back (#1233).
+    pub operators_built: usize,
+
     /// Candidate monomials taken off the frontier.
     pub candidates_considered: usize,
 
@@ -333,6 +342,7 @@ mod tests {
             border_columns: 280,
             distinct_border_monomials: 120,
             normal_form_calls: 280,
+            read_off_columns: 0,
         };
         assert_eq!(border.repeated_border_columns(), 160);
         assert_eq!(border.duplication_rate(), Some(160.0 / 280.0));
