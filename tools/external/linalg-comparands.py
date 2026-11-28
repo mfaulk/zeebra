@@ -66,8 +66,12 @@ MUL = {
     + [(n, 2) for n in (2000, 8000, 32000)],
 }
 
-# The dense comparands allocate rows x cols words; the general Matrix path is cubic and generic.
-DENSE_CELL_CAP = 160_000_000
+# The dense comparands allocate rows x cols words and spend cubic time whatever the sparsity: FLINT
+# took 148 s on the 12391 x 12020 mq-random-10 batch at one thread (laptop, verification run), so
+# dense tools stop at 50 M cells. FFLAS-FFPACK above 2^26 is Modular<int64_t>, off its BLAS path,
+# and did not finish that batch in 5 minutes. The general Matrix path is cubic and generic.
+DENSE_CELL_CAP = 50_000_000
+FFLAS_WIDE_CELL_CAP = 5_000_000
 MATRIX_CELL_CAP = 1_100_000
 MATRIX_MUL_CAP = 1000
 
@@ -89,11 +93,12 @@ def rref_arms(prime, cells):
         arms.append(("zeebra", "matrix"))
     if cells <= DENSE_CELL_CAP:
         arms.append(("flint", None))
-        if prime < 2**31:
+        if prime < 2**26 or (prime < 2**31 and cells <= FFLAS_WIDE_CELL_CAP):
             arms.append(("fflas", None))
         if prime == 2:
             arms.append(("m4ri", None))
-    if prime < 2**32 - 5:
+    # SpaSM's dense fallback is Givaro's ModularBalanced<float>, which asserts p >= 3.
+    if 2 < prime < 2**32 - 5:
         arms.append(("spasm", None))
     return arms
 

@@ -126,6 +126,11 @@ type that carries its stated error bound, and certification makes its output exa
 of FFLAS-style blocked dense elimination on F4's dense residual is in too, not wired into either
 engine. Laptop development figures put it only 1.1–1.6× ahead of the lane kernel on that
 residual, so the dense-MQ gap is in how much work there is, not in the arithmetic
-([note](docs/research/blocked-dense-elimination.md)).
+([note](docs/research/blocked-dense-elimination.md)). A matrix-level comparison against
+FFLAS-FFPACK, SpaSM, M4RI and FLINT (separate processes, verified entry for entry before timing)
+has a laptop development read: on pinned F4 batches Zeebra's elimination is ahead of all four. It
+is behind on dense small-prime and 64-bit matrices and on GF(2) dense, and the general `Matrix`
+rank and product are 4–23× behind. The pinned read waits for the bench host
+([note](docs/research/linear-algebra-comparands.md)).
 
 Licensed under the [MIT licence](LICENSE-MIT).
