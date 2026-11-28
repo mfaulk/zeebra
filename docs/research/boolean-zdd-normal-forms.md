@@ -7,6 +7,8 @@ is kilobytes against megabytes. The third family (toy chi-SPN) fails the criteri
 MQ control is at or below parity, as expected. The win is in the **representation of the result**,
 not in avoided intermediate swell. Converting the results back to ANF leaves a 2–4× gain (§7). A GO
 here authorizes a separate proposal and nothing else: no solver integration and no default change.
+That proposal (#1211) is [`boolean-zdd-equivalence-proposal.md`](boolean-zdd-equivalence-proposal.md),
+an equivalence checker that never converts its result to ANF. It is not accepted.
 
 **Measured at:** `2eb16995` (branch `research/1168-zdd-normal-forms`), `examples/zdd_normal_forms.rs
 --mq-max 40` in release, thin LTO, codegen-units 16, one process, 570 s. macOS arm64 laptop (M4 Pro,
