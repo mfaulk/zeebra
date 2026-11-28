@@ -5,8 +5,9 @@ bench host, pinned), M4GB is 16.0× and 5.8× faster than Zeebra's best qualifie
 well past the 1.5× gate. But pinned grobx is faster than M4GB on every cell, at 0.59× and 0.19×
 M4GB's wall. The hypothesis needs M4GB to beat both, so it is disproved. Every M4GB and grobx
 basis agrees with Zeebra's coefficient for coefficient. The macOS development figures (§5) stand
-as development only. M5GB's only public code was run locally under an owner exception and cannot
-run this cohort at all: it is a GF(2) implementation (§3.2).
+as development only. `manschga/M5GB`, run locally under an owner exception, cannot run this
+cohort at all: it is a GF(2) implementation (§3.2). The authors' own Mathic-based M5GB is public
+too; it is evaluated in [`m5gb-paper-reference.md`](m5gb-paper-reference.md) (#1165).
 
 **Measured at:** `52268421` (planted rows, tag `measured/1030-m4gb-dev-planted`) and `4d1ec9b7`
 (unplanted rows, tag `measured/1030-m4gb-dev-unplanted`),
@@ -73,7 +74,15 @@ writing its basis, because the basis is its output.
 
 ### 3.2 M5GB
 
-The only public implementation found is `manschga/M5GB` at `2d063f74`. It has **no licence grant**:
+**Correction (#1165).** This section first said that `manschga/M5GB` was the only public
+implementation and that the paper's Mathic-based code "is not public". That was wrong. The paper
+names its repository, `extgit.iaik.tugraz.at/krypto/m5gb`, which now redirects to
+`extgit.isec.tugraz.at/krypto/m5gb` (HEAD `16ef968d` through both hostnames on 2026-11-25 and
+2026-11-27). It is built, licence-classified and checked in
+[`m5gb-paper-reference.md`](m5gb-paper-reference.md). The findings below are about
+`manschga/M5GB` only, and they stand.
+
+The implementation examined here is `manschga/M5GB` at `2d063f74`. It has **no licence grant**:
 no licence file, and no header in any of its 12 files. It is also a standalone program, not the
 Mathic-based proof of concept the paper describes.
 
@@ -101,8 +110,9 @@ The reasons are structural, so neither is a driver defect:
 
 So this code is a Boolean-ring (Fukuoka Type IV style) solver, and the #1030 cohort (GF(31),
 GF(65521)) is outside what it can compute. **M5GB is not an arm of this comparison**, and that
-needs no further licence decision. What would change it is the paper's Mathic-based code, which
-is not public. No timing is reported, because no run was on a cohort cell.
+needs no further licence decision. The paper's Mathic-based code is the route to an M5GB data point;
+it is public, and #1165 evaluates it separately. No timing is reported here, because no run was on a
+cohort cell.
 
 ## 4. Cohort
 
@@ -212,8 +222,11 @@ field width changes only its per-coefficient cost.
 3. ~~Counters from M4GB's log~~: done in §9. Still open for §6: Zeebra's per-degree matrix
    dimensions on the same shapes.
 
-M5GB: run under an owner exception and found unable to compute over GF(31) or GF(65521) (§3.2).
-The paper's Mathic-based code is the only route to an M5GB arm.
+M5GB: `manschga/M5GB` was run under an owner exception and found unable to compute over GF(31) or
+GF(65521) (§3.2). The paper's Mathic-based code is the route to an M5GB arm. It is public, contrary
+to what this note first said, and #1165 evaluates it
+([`m5gb-paper-reference.md`](m5gb-paper-reference.md)). M4GB's rejection (§8) does not depend on
+it.
 
 ## 8. Deciding run (bench host)
 

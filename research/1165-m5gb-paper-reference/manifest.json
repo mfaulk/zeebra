@@ -1,0 +1,4648 @@
+{
+ "issue": 1165,
+ "wall_cap_s": 60,
+ "rss_cap_bytes": 4294967296,
+ "rows": [
+  {
+   "name": "toy-n5_f101_0",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_0.ideal sha256=aed1b60f234bd354b75ae956c0d116180bfa788d6684ec3e1cbe446739e586d8",
+   "system_sha256": "2581a415554fa03a36ecf09aef7ad2a8cbb6fac5249f0cc728fda2945f3c2ba0"
+  },
+  {
+   "name": "toy-n5_f101_1",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_1.ideal sha256=703c0b61f90a8f30e17755df44e18f476ce90f320196adff0f5715191217461d",
+   "system_sha256": "a8444aadee8596b87048c93ff9db9ea6fd939e6dbaf253071a88df0351f5b213"
+  },
+  {
+   "name": "toy-n5_f101_10",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_10.ideal sha256=f37defea00a720fb8d514d181120cae3d02cf46f6678d45b985d0b5d5cd318d4",
+   "system_sha256": "ce1983220f472183aa75c192055948cd2872b736fcb4e4acfd2c82b4eb672121"
+  },
+  {
+   "name": "toy-n5_f101_2",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_2.ideal sha256=ba6f8c0800e2e50895e2e96470e77ba6ce9254e9c637c29b21c3199ee8dfed88",
+   "system_sha256": "78e28277d342aa3c8c70647a28ecf8a9c867835322abd4f01a9949bd323dd2f0"
+  },
+  {
+   "name": "toy-n5_f101_3",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_3.ideal sha256=fc4ea1a860a36690a00dd601b04370e96ab67e31691fc7f14e2b62962b0b952a",
+   "system_sha256": "7b903c8f52be47f750bc689960318eda874ad80f5703ee1157e5d262923f82b9"
+  },
+  {
+   "name": "toy-n5_f101_4",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_4.ideal sha256=df1e7bbb6c3acf334f46db5cbdba7f93c0bde5ed5dbc93cc640432a4d7c59983",
+   "system_sha256": "4f50ab321754a20ab3ec4119875e60ba28d167d39072157e020a20379eb9cfd2"
+  },
+  {
+   "name": "toy-n5_f101_5",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_5.ideal sha256=b4249cbd07ddd335676a12e1a742ec6dee7874970a9d2f2ad65249d79e6035b0",
+   "system_sha256": "aa9424818a037bcf6723b2cc9e6d83e75ba71baa179d0e20d61c28f148ad805e"
+  },
+  {
+   "name": "toy-n5_f101_6",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_6.ideal sha256=8951f75e81879e6e47e51f102024b9be86c00a2184ca50ae0c9393a31d572a03",
+   "system_sha256": "9069676ec1a6be28349246ce96b3f74340ed06677b56707ca69cf12ca558db87"
+  },
+  {
+   "name": "toy-n5_f101_7",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_7.ideal sha256=c021b392f0ddb228525d540b4d9332087c716b626f8c2fd4b6928e6f5b057c47",
+   "system_sha256": "b2752996d31cad8eaf1ac3a5f7ec9a3062af77886712906df4b66cf8db8d46c4"
+  },
+  {
+   "name": "toy-n5_f101_8",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_8.ideal sha256=056d3f2a99d8280f95eca89a9b1574b26e8522569085d4fea17779a286e2180e",
+   "system_sha256": "d4fef89ac7c8e299b7e459bd1beb1cbc4900edc4fbd629ec9e37244e39ef5fac"
+  },
+  {
+   "name": "toy-n5_f101_9",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 10,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n5_f101_9.ideal sha256=58263d10bbe18fda4fe169721f7537466bc95a43d012cbd8d1fd533cf05a8c00",
+   "system_sha256": "4e032c900830e3ac0de37762e6d9c5610a845669285e6a3caeb219caa73d1ca4"
+  },
+  {
+   "name": "toy-n6_f101_0",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_0.ideal sha256=f02ad957f03641bd77f51adc2289fbfe524d2118864c6a75c2100b2f9c27bc52",
+   "system_sha256": "3a53743036ee0f43d6e2ca0183c3e6514ae95343ee40022f59c9890890abeb75"
+  },
+  {
+   "name": "toy-n6_f101_1",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_1.ideal sha256=1e2b4f6242a50ca4836597f57eb6d306e44a480f78aff5098c4622816edddea1",
+   "system_sha256": "27b535111d65c425b5b57f1175afc804ef6fa50ea05726f41807098e7d319618"
+  },
+  {
+   "name": "toy-n6_f101_10",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_10.ideal sha256=688dcbc8e11cac35f0bd32368d15d77e23d5517633af570e304b3ed6731924c1",
+   "system_sha256": "270394f38ef87c8634a2e4ec4cfe0e9176d492871d971651f72bba1e6be0300f"
+  },
+  {
+   "name": "toy-n6_f101_2",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_2.ideal sha256=35ee11299b134ec15a9f0d655db663e3d3e1313ed477c273e961afb2cd6c5895",
+   "system_sha256": "0429638cdbb19120b879ce520655d26f7ccc94724b438521361c2f9a7ebad791"
+  },
+  {
+   "name": "toy-n6_f101_3",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_3.ideal sha256=c1065a02c576bb65bfe501fcabf99a3cd38598817efe7fd9ea25611cfa99cc9d",
+   "system_sha256": "48b93008be93a1059963b132c20d6eebd393e78710cecc4e7398252b4d8efaad"
+  },
+  {
+   "name": "toy-n6_f101_4",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_4.ideal sha256=56e49cdbb53df704b26cdf38073958c201b29fdff9ccf8518e8f4d5ded1d572b",
+   "system_sha256": "6441caa6ee8f6b942905c61439bc09fc420850c7cafc3e0b378cde9a9c94fc87"
+  },
+  {
+   "name": "toy-n6_f101_5",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_5.ideal sha256=3512361ccbbdebf2925241fdf3c7b0781506ed54aa8d3acddaee14974f4bbd9e",
+   "system_sha256": "b578016c2d94a8246d287a9143ee01d0b2bc03b2583fb93e69121cd16ac8db13"
+  },
+  {
+   "name": "toy-n6_f101_6",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_6.ideal sha256=236249aad3582860130c4c00ce27a824f2b255e5ae147891d179103b7004a1e2",
+   "system_sha256": "2a178a3fce4e7241da30777bc2be9b4f1da0e511e9e55084b6cbe4b2a672efcb"
+  },
+  {
+   "name": "toy-n6_f101_7",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_7.ideal sha256=868885fa67d0e415048c903826bcdd3dbf85d2975cff4c2c1d4992360e4605ff",
+   "system_sha256": "d563c6c8810f9d9359f97cd18703c68426a8d4fe492161202b20c201e2ffaa2a"
+  },
+  {
+   "name": "toy-n6_f101_8",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_8.ideal sha256=7c0da6dc5ca6282e2aa34af4279342e259533a34c07e8a283a1708d27af5024b",
+   "system_sha256": "3caea9b14d4b1be1ba905879ca4029500b2a7b5fd8310e574260121bf796c00b"
+  },
+  {
+   "name": "toy-n6_f101_9",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n6_f101_9.ideal sha256=6c8455688b58bf03f06cfb4e73d7392c086075661c23e471584057ec38f8c2e0",
+   "system_sha256": "9fdfe6bc21efa656ca5ed5da122cd0b9c41620016fbc774f3258e970a88b7839"
+  },
+  {
+   "name": "toy-n7_f101_0",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_0.ideal sha256=40348c89924b35795127fb2ec04ababc3df32b93bddb485ccfcf03afa9c24e8c",
+   "system_sha256": "ae5a74f9dd224b2e8b08aefae0d45b54e35ea7d297568d9e3a5bde66257ef888"
+  },
+  {
+   "name": "toy-n7_f101_1",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_1.ideal sha256=33b17cd980c21a783ae09219643e81f7ca06f05f60f48e28493da053a80ef1c1",
+   "system_sha256": "ff05121a0d233e0d6f69395ee85de72cf516655d1b973c1860a07dc4beba5276"
+  },
+  {
+   "name": "toy-n7_f101_10",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_10.ideal sha256=43195a1400699154d75cfe49ef512079aac311d5fa4e0a2886f4b4deca69cd2c",
+   "system_sha256": "bb24b4e65f58576971e163ae0afcfe7e0475670d65c75b04c5f22710ada4b741"
+  },
+  {
+   "name": "toy-n7_f101_2",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_2.ideal sha256=aab945229232f57aebdd6f5c47668fefdbb4eec0f4fdcd33b535226591cc9a1c",
+   "system_sha256": "2d130e3da9af11d2a97a499654fe5584f36ae30e4ecd94ab886f5082112212ef"
+  },
+  {
+   "name": "toy-n7_f101_3",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_3.ideal sha256=897fa6433220c919d5110d4c37a5d86139f6c774228de9cc0273e6e73c20c4f1",
+   "system_sha256": "d909f67a82dcee1da24ce491aa1af082be3344e8f9d0522c7ae1214947679395"
+  },
+  {
+   "name": "toy-n7_f101_4",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_4.ideal sha256=599225bef915d799e4acc14f1dece621c544ab659a661de0102a331cf4de40b7",
+   "system_sha256": "e58091b7f08cde282c3a7cdaf0871dab71744bb1779dcc0b55b700a5c4cb07ea"
+  },
+  {
+   "name": "toy-n7_f101_5",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_5.ideal sha256=bdae0e0de7727440de3bfddd662a07422e529e2e898b26d4a0eee7761c495b14",
+   "system_sha256": "ca875c6ac7d1d0eb48faea6f7d672c2128ef2fbda751e8ddb3d7a8e53f1e15da"
+  },
+  {
+   "name": "toy-n7_f101_6",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_6.ideal sha256=ffda7c2469075489847759d70f9d25792d6ff9f7013186894d00a9ef87f2afcd",
+   "system_sha256": "0c41cdeecc46bc476191d53f4d58f4b5ba8daaf94bc695020e349792aa30e0f3"
+  },
+  {
+   "name": "toy-n7_f101_7",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_7.ideal sha256=658dbbf959949dd986d374f79a142e6de0eb818155a2c3df67089cb73e2e7d5e",
+   "system_sha256": "e025c686f2cc2a5aaf319668aaf22395edacc2600ac2232690b14e3ae41a939d"
+  },
+  {
+   "name": "toy-n7_f101_8",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_8.ideal sha256=30092d52456d38fe16f188833a72eda9ec616f34dffff8a860c70cb843d157bd",
+   "system_sha256": "ee57abd6f1e242bdcf28a9db0c0e5ad175b38fac11788bf9a61eccbae24e1301"
+  },
+  {
+   "name": "toy-n7_f101_9",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7"
+   ],
+   "order": "grevlex",
+   "n": 7,
+   "m": 14,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n7_f101_9.ideal sha256=a1b6cb09d952146d5d4da7501e360ef9967b1003f312f6e38646afb2c5e6481b",
+   "system_sha256": "08b41fced0705dfaffef60ebb14b1299995b069f93cad25c161ad80ea42f4ccb"
+  },
+  {
+   "name": "toy-n8_f101_0",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_0.ideal sha256=820973d25fa9cdc75a69ff4b7e4325997b93dc90eb44e5edfcef3770c1414cfc",
+   "system_sha256": "81a4725ea26c1f47d7a1983aac5cb270cba05e3ef584f0ddcbfe7a2b273b1442"
+  },
+  {
+   "name": "toy-n8_f101_1",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_1.ideal sha256=f38da698e26475ef2a83794ad4b4221b175c8fa927b8538d3f705e8c42b98737",
+   "system_sha256": "a4f8fecffcee0cd0c9cb7d0ccf53bd43a054b119969843347a47d749dc43deb0"
+  },
+  {
+   "name": "toy-n8_f101_10",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_10.ideal sha256=ab954f008b4aa4e1f7cffb9bf28bfb2e166b94fa56d76b245ea4ee9749abe708",
+   "system_sha256": "0f9e350e8d6ac50d7f39648cc967245b84a05009f3936cd2442ce789c783825a"
+  },
+  {
+   "name": "toy-n8_f101_2",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_2.ideal sha256=8ff2ee4007c183c8602d5f1b09e88fc3627162752f39596d28576f97f1b72d4a",
+   "system_sha256": "83a5b9edbe54bcc646a5d4dba6ec8755e47565efa09ece7e62dfbd8cbabca4c8"
+  },
+  {
+   "name": "toy-n8_f101_3",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_3.ideal sha256=0a2a09aaf4dd30bde30344b846ee6a4d2555f9789b7498d5b91ad47e32440499",
+   "system_sha256": "e94cc42c2f9ed168cb8295c7ae9fab121cd8d496bf71d520c2a8800cc12fac04"
+  },
+  {
+   "name": "toy-n8_f101_4",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_4.ideal sha256=8659ceb78ae7ed3ddc9601c7a42523a6144ffa90c5f7f4990eb736f495cb36f3",
+   "system_sha256": "bea84ddf1bf39afba529384134b0cff809524fecf242f494b732d6aadbe6651f"
+  },
+  {
+   "name": "toy-n8_f101_5",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_5.ideal sha256=94ee74d9cb8669a77e2f4b6bc3b90c175b3814f85d7da6ec7cef2152d8b5253b",
+   "system_sha256": "d08721d8b2a50bd202d442593e9b1f125f482b3aa611491233d4bfd2ed02a47d"
+  },
+  {
+   "name": "toy-n8_f101_6",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_6.ideal sha256=51f24a18b777a59e9f916505789458954e3fcdef4d5bb62248e2be85ea30997a",
+   "system_sha256": "a3e41c399203a396f354b778236ee892324ab6a1e33aac6b2f7c87cfd3d2ff3d"
+  },
+  {
+   "name": "toy-n8_f101_7",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_7.ideal sha256=a0119f04972c7eefa2d671cdb56b178db5d85e589cd69495859f69e291bde04d",
+   "system_sha256": "4de0cd8e6ae745be07f61654cca7e35f19302352023357072b7fb7252c3ce31f"
+  },
+  {
+   "name": "toy-n8_f101_8",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_8.ideal sha256=49acf979b63d6a600f13ff1c6a1383ee3ec785d03a3dd6f80e36a88ef000ef10",
+   "system_sha256": "ae8fbb122b248c1fbf04728aea21c8ffa5dc4200bd741fd8dba52139f96e9eb5"
+  },
+  {
+   "name": "toy-n8_f101_9",
+   "family": "authors-toy",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "m5gb@16ef968d:code/bench_f101/toy-n8_f101_9.ideal sha256=f09e9cc79dd91905773b7f82da28e7ae1276b813b54eeb5ed7a37b53e628b9cb",
+   "system_sha256": "4d7fcca08d43e082b96cc037ab1875329ed7885e7d23a61b56b7b715ec282972"
+  },
+  {
+   "name": "redundant-combination",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "9c5bcfd60105a7737694f269c6c1c74fe149da984c4fb2716ac033e850127206"
+  },
+  {
+   "name": "duplicate-generator",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "ced9a5afbc3ad8b5631520496d3bbd8a1529bd1b962349800bf24f65abb0535c"
+  },
+  {
+   "name": "zero-generator",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "b9e568b01ce298895704f465d2b2a19479b589e408a40782f4e0621d7239c983"
+  },
+  {
+   "name": "unit-constant",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "6c343d5f0fe4b33c0560874caf57737b19cd0575c4a965caa00baa8089bf7b4b"
+  },
+  {
+   "name": "unit-inconsistent-linear",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 2,
+   "system_sha256": "2e2a1de560d23da5b1f92870f6be67506f6f3fe8bb53751808fb1d5cef046c62"
+  },
+  {
+   "name": "unit-dense",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "73eb8ab410943eb1eadfc99d330d951ca01f54eec234f0535319281d05a86286"
+  },
+  {
+   "name": "homogeneous-n5-m3",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "64a35ed6ce386aad84fbccb82edd23318f02f105b2d90f9d620f1f7775775739"
+  },
+  {
+   "name": "homogeneous-n5-m4",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 4,
+   "system_sha256": "169e2b1fd14e81e3a6e42e9d5d06e3532a047d8d3d053b1cf52270b4af6161cf"
+  },
+  {
+   "name": "homogeneous-n5-m5",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "0e606786ebf4814d2d622425d89062eddcd05673cbbf860f138b09ed2e09c076"
+  },
+  {
+   "name": "homogeneous-n5-m7",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 7,
+   "system_sha256": "6f6c858f9bf0cfd287f97d1499f683336cc308b0a79b3b7332848b923722f0a3"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "8397016890a364f3ee19411286e4da3c516c1c0837cc23c869f922312dd116bf"
+  },
+  {
+   "name": "sparse-affine-n6-m8",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 8,
+   "system_sha256": "e2e2505143af149b3f220996661ca2966b474eb8665b23808250b53fd9862644"
+  },
+  {
+   "name": "cubic-affine-n4-m5",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 5,
+   "system_sha256": "c610aeecd33c188448adcc2c46928e6e5bf323bd57469b388ef4fc2d1cd629d6"
+  },
+  {
+   "name": "triangular",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "f1938c6ea99fd9f29139d4a12f5297d1f40e4ca2321bf8c8b2e927d697c948e3"
+  },
+  {
+   "name": "nonradical",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "3f11c9ffbb749e63d460dd3a7da6417a1d6086a61d49dad97a22619977a52fea"
+  },
+  {
+   "name": "monomial",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "054a34500bf87b36a4b7f774d4ad22fc36718f8be8f3e2b9dd3866350d3db6f9"
+  },
+  {
+   "name": "cyclic-4",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "6070758dba2cbb5e4ef64fb354ce5af3e8ee6a61a0ee7ba1fbdcea9be86827a3"
+  },
+  {
+   "name": "single-generator",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 1,
+   "system_sha256": "6d20c78571ca6e4f7a89d9b5114276413a6a1baa55cdc37bc8695e601c6398de"
+  },
+  {
+   "name": "redundant-combination-lex",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "lex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "9c5bcfd60105a7737694f269c6c1c74fe149da984c4fb2716ac033e850127206"
+  },
+  {
+   "name": "triangular-lex",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "lex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "f1938c6ea99fd9f29139d4a12f5297d1f40e4ca2321bf8c8b2e927d697c948e3"
+  },
+  {
+   "name": "nonradical-lex",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "lex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "3f11c9ffbb749e63d460dd3a7da6417a1d6086a61d49dad97a22619977a52fea"
+  },
+  {
+   "name": "monomial-lex",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "lex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "054a34500bf87b36a4b7f774d4ad22fc36718f8be8f3e2b9dd3866350d3db6f9"
+  },
+  {
+   "name": "cyclic-4-lex",
+   "family": "control",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "lex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "6070758dba2cbb5e4ef64fb354ce5af3e8ee6a61a0ee7ba1fbdcea9be86827a3"
+  },
+  {
+   "name": "dense-n6-m9-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "5b9822105ec9e45eb6641a60edb4e36d690d4ef3ab6605ae6201510f145eac69"
+  },
+  {
+   "name": "dense-n6-m9-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "cae663e2adf8bcf3341bd2624fdb74fc0c30d6ebc7f2b3219436f3822e996f49"
+  },
+  {
+   "name": "dense-n6-m9-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "6bb685a7d61225e6d630c6dc8939e681abf3b46db398d5145da750a201e24156"
+  },
+  {
+   "name": "dense-n6-m9-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "86cbef2e09b9c326bec713577033b189b738ac7410b63b3856b032d43d6f06dd"
+  },
+  {
+   "name": "dense-n6-m9-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "9c26cf4b8fcb806dac1d8d85805c46bafe0e3c6aad6486787fbffc6c7a4dacbf"
+  },
+  {
+   "name": "dense-n6-m9-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "3fd2fc0b42255f8ea5d5fb4fd8ee52e500b34d3ff55c09653bbc4c54bf6c7128"
+  },
+  {
+   "name": "dense-n6-m9-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "f2744d2d99770923f5d72a1443a7c4d37212792d5c378320b6cc123851484de2"
+  },
+  {
+   "name": "dense-n6-m9-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 9,
+   "source": "corpus::dense_mq_shaped(6, 9, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "6331bab0dd9b899881e8eb414057ececa3e99d20697a5fc560dc3a68a7d77ef6"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "336a3bd17ee94621cfff49558ba6f3b0ebb909f2301c2e17eb965e9b37e8ce2f"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "3a9e751fabdff81152bfa37251e4ba3bf7d5077f706d4e7ae5552be027d6d124"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "c0e9791a20e242d1a6b87cf118eb63346e4d6bfb9ac0b9204a1a36c7f0eae7eb"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "32f9b82169c5c25d371fad8892c1bb541f5e39cffcd9ee2c60eed1fd4c793fef"
+  },
+  {
+   "name": "dense-n6-m12-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "2f9b18861f326f1888fe84dd3be9949626c6bb80bfdfb72a8b1e25028d60c192"
+  },
+  {
+   "name": "dense-n6-m12-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "b8450456024411a0cfb2d7ba9dd1dc3fd7712277fe1da124407073cda6b7b737"
+  },
+  {
+   "name": "dense-n6-m12-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "7854ad0502411a286e920094f1e730f28b3c015349a5ec90f7eb0c371e1507ab"
+  },
+  {
+   "name": "dense-n6-m12-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "8d94493122ca053d54869914153a86e7f370876e98601f3a4c07882376a9ab93"
+  },
+  {
+   "name": "dense-n6-m18-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "5e78a16afa9392756e9f9fe57da9347d71fd29284c904536d54bc7c221345054"
+  },
+  {
+   "name": "dense-n6-m18-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "76db82261367b92232ffe4c5430ddcca0c2c6587d78339c64248defe4bee9ee0"
+  },
+  {
+   "name": "dense-n6-m18-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "ebcac16f403a6f5b43883d056e29c71d0f2b2c9f4151e398fab2604555237b86"
+  },
+  {
+   "name": "dense-n6-m18-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "1a6b5952eba7a6cb099de6053df7cebe3e0a48e17ba6b612a049fcc8c7285e3a"
+  },
+  {
+   "name": "dense-n6-m18-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "49e844d15901dbcb7a3be0f520bf5771c4d05a67e0165ab8ab8670208fb9b410"
+  },
+  {
+   "name": "dense-n6-m18-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "759ef64b5c3322e5fcb5b1522b6c2e4e0631d004025fb903033b573c24c788f3"
+  },
+  {
+   "name": "dense-n6-m18-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "432cee0337a0874c31656e52265b7285943f83cc90a4f0c0869eb956c3e55687"
+  },
+  {
+   "name": "dense-n6-m18-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(6, 18, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "cde7ab94ec0738471c6ac06996e0600c6322b44b69d1fef7db56ad2856e2d180"
+  },
+  {
+   "name": "dense-n8-m12-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "e9cbcf7d46c91f435b47f13d23845889b865d8fce0d44efee70996811682f474"
+  },
+  {
+   "name": "dense-n8-m12-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "bc50dc99b9acecaf4f1b66352a1faf85154d5d93194c6c1cc5ab032f67ff7c8b"
+  },
+  {
+   "name": "dense-n8-m12-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "f88e41c1e20165c5737d11bcfb6d522c981cefafb92948cf12a46f61e4025d53"
+  },
+  {
+   "name": "dense-n8-m12-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "e693b84fa3faa9d3636962089b3b673788bd3854a1fae817d74f85dcbf0f6558"
+  },
+  {
+   "name": "dense-n8-m12-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "e33d5b42b1c4cc56fcb374d62eb905e5aaf9506ac07cb283c5bee5d29feaf6e8"
+  },
+  {
+   "name": "dense-n8-m12-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "88213684ddb6113f736019a7318b0c3f1039bdd165b8a2add47f99ad62c76db1"
+  },
+  {
+   "name": "dense-n8-m12-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "7f2605916c0568ce4b0f09c00c19195fc5884a81764e07275300a1db858bcd24"
+  },
+  {
+   "name": "dense-n8-m12-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "cc59afb949e52865a989238d5a3e6d5b24989b124850688c9c34b3cc2f3eeb15"
+  },
+  {
+   "name": "dense-n8-m16-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "ce93e1fe24f25cf71fc1b753e2e8dfc54037405d07768fca6351e0e2afe76292"
+  },
+  {
+   "name": "dense-n8-m16-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "d3b352db50aea3707b0ff4ef46f24e6eb82924487b09d7c6965fa36a14bf35bc"
+  },
+  {
+   "name": "dense-n8-m16-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "85953669684e6c611ab79bdfe0b98e8dc179a4d280b813542b89166b0c546df6"
+  },
+  {
+   "name": "dense-n8-m16-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "4384e480967a8cb59d5193b2043b12117e9dd8806f14bf41ce3605f27bc2b4a6"
+  },
+  {
+   "name": "dense-n8-m16-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "d257394a1783b8d414eb29302a5c3188fd306b2df22730807829048b9e8ec024"
+  },
+  {
+   "name": "dense-n8-m16-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "81d837b2bf558aac2054e300096f9eef0584918d928a392881b93ae9898161be"
+  },
+  {
+   "name": "dense-n8-m16-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "748df8a516f9b1a0dcc2cd7d5a9ff7f647a8e303e5dbb56d3fb7fb5eda51eea0"
+  },
+  {
+   "name": "dense-n8-m16-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "36e4d8863cc5444cf059d49831b2e1b78b1778bdb45903609d7b05bbe8735fc7"
+  },
+  {
+   "name": "dense-n8-m24-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "bbd4989c9693bce3fac9d48fc93e3c665d98de8662d5312f289c58c256ddac4f"
+  },
+  {
+   "name": "dense-n8-m24-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "388f85bc94d7cad2904306dfba796f8819f9964354dd459ac04f8be2e9d435ff"
+  },
+  {
+   "name": "dense-n8-m24-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "b78fa65a7cf6334871231764c015d29c1bc154ad5ad9433d08514f06270c7b6b"
+  },
+  {
+   "name": "dense-n8-m24-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "a48a910ce84426efefe9684183cb6606c8965a9dcbabeae6a1c9107238f10203"
+  },
+  {
+   "name": "dense-n8-m24-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "030442e5e3a65d3cabde53d58775241c453c9292bd2103ecd02a433162d1a43a"
+  },
+  {
+   "name": "dense-n8-m24-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "ce3917e1ef079c4692c67fda63a58346287fdf6e2f18efda25db773abcdbdb7b"
+  },
+  {
+   "name": "dense-n8-m24-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "999150b2f33a192a442080199ab387f232a75a8d55d7cbe5c66ba805b8c1eb7c"
+  },
+  {
+   "name": "dense-n8-m24-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(8, 24, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "451cff5cefd54cfac6c1c08863f4ea31f50a4545f9e4c03f8d956dac00e176ed"
+  },
+  {
+   "name": "dense-n10-m15-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "3371590f048de418c838a2e83fcc4ed7ed8328879bdac08c036955b37a5b3992"
+  },
+  {
+   "name": "dense-n10-m15-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "e38eb3a3e479ac52b59d4c9813aa8ab00bb00767678c614696f9dc2c75ec3727"
+  },
+  {
+   "name": "dense-n10-m15-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "81d062b93bbeb15e57ab8b338888b33cd5fdcd8f3cf5253600ceb6d8d9dbab97"
+  },
+  {
+   "name": "dense-n10-m15-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "d93897bdc15780c5d50c90ef412cebe775680ac454bcc6baccbfd9976f636631"
+  },
+  {
+   "name": "dense-n10-m15-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "626b0b2dfa8d9d7e3531d03113d78b2fe6cda53800f96af65032ba4ab3d32041"
+  },
+  {
+   "name": "dense-n10-m15-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "1b29c915cedbb29c0ff814f4a9fd03c4b805ae21b491ab1c99fc4d22eb4bde99"
+  },
+  {
+   "name": "dense-n10-m15-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "a7460e62e2c54fb6d6a1adcaed6734ae8174283c4a33db2c8750c0f1d4288808"
+  },
+  {
+   "name": "dense-n10-m15-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 15,
+   "source": "corpus::dense_mq_shaped(10, 15, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "a4eeae748654899cf1efa7ed3dbb8dcee461ac6bcb71524ca2656887b0eced50"
+  },
+  {
+   "name": "dense-n10-m20-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "ae4e93d49e866d9d6024692fb8405ff4267640df3ea73a0db0260921096675bc"
+  },
+  {
+   "name": "dense-n10-m20-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "38a302ad8f8801e20a1877d63b044fcbf1d61baa4b11cc570ddf7a012d838e38"
+  },
+  {
+   "name": "dense-n10-m20-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "170464df62fc25ceaaf95e8a8bba56edecc65fb50093a93c2edfbd99d65e4d10"
+  },
+  {
+   "name": "dense-n10-m20-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "32e29757efac1359208f1c88d2def05a5de75d558134114b669ba62f061065fb"
+  },
+  {
+   "name": "dense-n10-m20-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "b28b5f115408d4c631d2f94e24fc93e8c7aa4000e3bf04ee147a650d503ac3ff"
+  },
+  {
+   "name": "dense-n10-m20-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "cb43e80fbea635f9279f07c0f749e502eadd8b2b0ec95d74bcfd7d0e23b96cec"
+  },
+  {
+   "name": "dense-n10-m20-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "83d21bfa0e449b057da0c3485ce8e1a3d394826f1bdbbcbea6db278a6f3c1f2f"
+  },
+  {
+   "name": "dense-n10-m20-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 20,
+   "source": "corpus::dense_mq_shaped(10, 20, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "a8191803fd43b00f8306790c8329aba76abea70ead8a6f8718a446c709d2f746"
+  },
+  {
+   "name": "dense-n10-m30-d1000-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 1000, 116501, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "77192994e65669e216daba8d0828b496a6b421029838a43116f1f1ed448b55bd"
+  },
+  {
+   "name": "dense-n10-m30-d1000-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 1000, 116501, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "e6edabfd7bec139f2c8062eefcd8bc267ab2348516a8ff31dd0591ecd6bb5f0b"
+  },
+  {
+   "name": "dense-n10-m30-d1000-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 1000, 116502, 101, grevlex, True)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "8debbc3f6a6cf1bcb116490dc141a00d0c80aa3077d5b4ca66f3b7fbd2bc1643"
+  },
+  {
+   "name": "dense-n10-m30-d1000-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 1000, 116502, 101, grevlex, False)",
+   "density": 1000,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "248771416d7d2e2049bc9215c26802655f77acd862d7323f25c5ad84734b08df"
+  },
+  {
+   "name": "dense-n10-m30-d500-s116501-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 500, 116501, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "a22bc6671d0c54e637f11145b90f657f6104fd0eee6c50ff5a14e3054c1a75d4"
+  },
+  {
+   "name": "dense-n10-m30-d500-s116501-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 500, 116501, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "36865fc79726b3d372bb8d86ea9c494ae0660787aa4bfa907a2b49a56d7de84a"
+  },
+  {
+   "name": "dense-n10-m30-d500-s116502-p101-planted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 500, 116502, 101, grevlex, True)",
+   "density": 500,
+   "seed": 116502,
+   "planted": true,
+   "system_sha256": "38409697b712921d8f03aa7bea75ef574839d829db2a754a9e1899014c2eb2c4"
+  },
+  {
+   "name": "dense-n10-m30-d500-s116502-p101-unplanted",
+   "family": "dense-mq",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10"
+   ],
+   "order": "grevlex",
+   "n": 10,
+   "m": 30,
+   "source": "corpus::dense_mq_shaped(10, 30, 500, 116502, 101, grevlex, False)",
+   "density": 500,
+   "seed": 116502,
+   "planted": false,
+   "system_sha256": "c76ed2d77151bd34e95503a163a641c11eefb53e6e983eb077bc1442c373eebe"
+  },
+  {
+   "name": "collision-two-terms",
+   "family": "hash-collision",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 1,
+   "collision": {
+    "a": [
+     0,
+     0,
+     1,
+     0,
+     2,
+     0,
+     0,
+     0,
+     0,
+     1,
+     1,
+     2
+    ],
+    "b": [
+     1,
+     0,
+     0,
+     0,
+     0,
+     0,
+     3,
+     2,
+     1,
+     0,
+     0,
+     0
+    ]
+   },
+   "system_sha256": "7cf1c8ed7253916c4f952769443c2ed542bd689da1eedb594671e00cce5bb0c9"
+  },
+  {
+   "name": "collision-separate",
+   "family": "hash-collision",
+   "modulus": 101,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 3,
+   "collision": {
+    "a": [
+     0,
+     0,
+     1,
+     0,
+     2,
+     0,
+     0,
+     0,
+     0,
+     1,
+     1,
+     2
+    ],
+    "b": [
+     1,
+     0,
+     0,
+     0,
+     0,
+     0,
+     3,
+     2,
+     1,
+     0,
+     0,
+     0
+    ]
+   },
+   "system_sha256": "b1637a34d2625b6c003c862a19da806ad0cb4ace9874b74322e049eaa58dc6a9"
+  },
+  {
+   "name": "dense-n12-m18-d1000-s116501-p31-planted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(12, 18, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "d74616e6c7ebbfada33739cf987049e792a2b6149255b2ea425070070f56fc2e"
+  },
+  {
+   "name": "dense-n12-m18-d1000-s116501-p31-unplanted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(12, 18, 1000, 116501, 31, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "002fc0c86113788d7bebe8bb0e40d433112a10763a2fca59e449dac982277c0c"
+  },
+  {
+   "name": "dense-n12-m24-d1000-s116501-p31-planted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(12, 24, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "fda05feef407a83abcd5ac33a6e953e3e5f5ccb8f838e98d7e8cf0aff650e351"
+  },
+  {
+   "name": "dense-n12-m24-d1000-s116501-p31-unplanted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(12, 24, 1000, 116501, 31, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "8c5985399b17a80ecc7ed19db63ca3c40b68a3e83dfe98b42e0584e55d32d704"
+  },
+  {
+   "name": "dense-n12-m36-d1000-s116501-p31-planted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 36,
+   "source": "corpus::dense_mq_shaped(12, 36, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "a7ebd6165b6e7d56c86b24ff6bb3e1f767edeb5924558ae146da987eabb613d1"
+  },
+  {
+   "name": "dense-n12-m36-d1000-s116501-p31-unplanted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 36,
+   "source": "corpus::dense_mq_shaped(12, 36, 1000, 116501, 31, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "5ed96842641a98e95352de3c377b74964048947e26eeb8fb8a53229b8199dbfc"
+  },
+  {
+   "name": "dense-n14-m28-d1000-s116501-p31-planted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14"
+   ],
+   "order": "grevlex",
+   "n": 14,
+   "m": 28,
+   "source": "corpus::dense_mq_shaped(14, 28, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "78574278638b1370086bc872fe3a5d8035f52997aaaf412daa3ac66be811e7f3"
+  },
+  {
+   "name": "dense-n14-m42-d1000-s116501-p31-planted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14"
+   ],
+   "order": "grevlex",
+   "n": 14,
+   "m": 42,
+   "source": "corpus::dense_mq_shaped(14, 42, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "9feea89d940754cf8af92bc0e169834d01ffccc9d458c95f074413963962c8f3"
+  },
+  {
+   "name": "dense-n16-m32-d1000-s116501-p31-planted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14",
+    "x15",
+    "x16"
+   ],
+   "order": "grevlex",
+   "n": 16,
+   "m": 32,
+   "source": "corpus::dense_mq_shaped(16, 32, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "cef090afb4c0a2d2370b09e61a47522691ecab09e9fcf82cc8181ad920721ad8"
+  },
+  {
+   "name": "dense-n16-m48-d1000-s116501-p31-planted",
+   "family": "scale",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14",
+    "x15",
+    "x16"
+   ],
+   "order": "grevlex",
+   "n": 16,
+   "m": 48,
+   "source": "corpus::dense_mq_shaped(16, 48, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "50e9111da754cd8d9dc1552409c2dd8854a9430c0c215bfdb9058162ac6cadca"
+  },
+  {
+   "name": "dense-n12-m18-d1000-s116501-p65521-planted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(12, 18, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "c884d066c312bf13965c139bd04daf663c829c96d3b5cdaa6c4463fa5b3399f8"
+  },
+  {
+   "name": "dense-n12-m18-d1000-s116501-p65521-unplanted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 18,
+   "source": "corpus::dense_mq_shaped(12, 18, 1000, 116501, 65521, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "f3b4e3a1b7c0427f206cd15ab8fd12d8da3450136d70020d5fcb3612f91027e9"
+  },
+  {
+   "name": "dense-n12-m24-d1000-s116501-p65521-planted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(12, 24, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "20ee8e7df0dd963715791512c77164da8cb4e9d8aa407ac285decaa498a6c21b"
+  },
+  {
+   "name": "dense-n12-m24-d1000-s116501-p65521-unplanted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 24,
+   "source": "corpus::dense_mq_shaped(12, 24, 1000, 116501, 65521, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "e62d6587a3a28981c0b1d5be256cbecc0de548231d36a7add6f680c4385e7828"
+  },
+  {
+   "name": "dense-n12-m36-d1000-s116501-p65521-planted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 36,
+   "source": "corpus::dense_mq_shaped(12, 36, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "9507a365f051f0688430d746d3efb708d3c518cc3fe56604be56f3bdee10a0e2"
+  },
+  {
+   "name": "dense-n12-m36-d1000-s116501-p65521-unplanted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12"
+   ],
+   "order": "grevlex",
+   "n": 12,
+   "m": 36,
+   "source": "corpus::dense_mq_shaped(12, 36, 1000, 116501, 65521, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "7471e5bdd9a618466b85ce74da7067678f49b152a2a639a16adde7db9d1f595b"
+  },
+  {
+   "name": "dense-n14-m28-d1000-s116501-p65521-planted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14"
+   ],
+   "order": "grevlex",
+   "n": 14,
+   "m": 28,
+   "source": "corpus::dense_mq_shaped(14, 28, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "c95830567c80a02f4338cb6bbce82cf8a72226cf1586eb3021ab6d0915870bf3"
+  },
+  {
+   "name": "dense-n14-m42-d1000-s116501-p65521-planted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14"
+   ],
+   "order": "grevlex",
+   "n": 14,
+   "m": 42,
+   "source": "corpus::dense_mq_shaped(14, 42, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "eef1a8e95b68dd534d1e553a8b89b8f515793dec1d885db730b37e68ba6ac697"
+  },
+  {
+   "name": "dense-n16-m32-d1000-s116501-p65521-planted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14",
+    "x15",
+    "x16"
+   ],
+   "order": "grevlex",
+   "n": 16,
+   "m": 32,
+   "source": "corpus::dense_mq_shaped(16, 32, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "749669c0ea54a7bfb395643acf92309fcb682f40b39a6bfe6a11de8ee6e0ded4"
+  },
+  {
+   "name": "dense-n16-m48-d1000-s116501-p65521-planted",
+   "family": "scale",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14",
+    "x15",
+    "x16"
+   ],
+   "order": "grevlex",
+   "n": 16,
+   "m": 48,
+   "source": "corpus::dense_mq_shaped(16, 48, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "4f7470ec42a2e2b5df637e5af60b7536ad160011e72802903f79905043a8924c"
+  },
+  {
+   "name": "redundant-combination-p31",
+   "family": "control",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "dd3c45c8bd71b1e90aff96f471ea11a53ee6d0fc76074500b9b1b1c78e6897c8"
+  },
+  {
+   "name": "unit-dense-p31",
+   "family": "control",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "2f23ddfdcf65aa8b0e7efc9b8a5c861df4917fbf0dcbe800c4028a930c5a24aa"
+  },
+  {
+   "name": "homogeneous-n5-m5-p31",
+   "family": "control",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "e524a0a006a73c9b8986b713e13bb11b2213e27d1ff1bdb7d1389c342c9a842e"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3-p31",
+   "family": "control",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "31ec734230e40410627a7e286f024934b650fff9a8f2eb95d36061286d548f21"
+  },
+  {
+   "name": "triangular-p31",
+   "family": "control",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "86ca89e6feb274ad19901034e91669855f940b9526da3e432f17eb085a1963e5"
+  },
+  {
+   "name": "nonradical-p31",
+   "family": "control",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "9d2dbfcea6e7fb2fb44fa7d9a6187cc19bcc97224fe9157155b369680e2ce738"
+  },
+  {
+   "name": "cyclic-4-p31",
+   "family": "control",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "2860f11bd01a9db0358fd7b3a8f2abe106ff9370a354868e975151f31b8a5f31"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p31-planted-p31",
+   "family": "dense-mq",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "dcc9f5c4eea960414941f3b82ed11edc7cac59e0e67829f0e62e88ad66dbaecf"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p31-unplanted-p31",
+   "family": "dense-mq",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 31, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "4acd1c496b895437f3d80dd88f3ee95c674deefd55a708d85a6cfb70d7d9e3c8"
+  },
+  {
+   "name": "dense-n8-m12-d1000-s116501-p31-planted-p31",
+   "family": "dense-mq",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "24835d179880f177cf142f627e6c9a68a4e0571dafaf6e6f61a588b8bbe0d08c"
+  },
+  {
+   "name": "dense-n8-m16-d1000-s116501-p31-planted-p31",
+   "family": "dense-mq",
+   "modulus": 31,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 1000, 116501, 31, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "7ff5622ac6c20251788914d26a5e8ae2bc8ec8a835922552e679bee25b9a998a"
+  },
+  {
+   "name": "redundant-combination-p32003",
+   "family": "control",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "073b38feb167b3edb1ab1d3dcaed9251de0e123ba98503ad5f9f0a89d160bbeb"
+  },
+  {
+   "name": "unit-dense-p32003",
+   "family": "control",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "3d5de817088eaf39dcd911c5ac4168917bda8f751bf35963556481773b49dab8"
+  },
+  {
+   "name": "homogeneous-n5-m5-p32003",
+   "family": "control",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "39f25de7aadd6a37630437e6c4458db03171ed516981b6c357c195ed02a35181"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3-p32003",
+   "family": "control",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "2a3c3261b3d9a87766cc360954403be9612247e1e16def043d391ec6c9d8f934"
+  },
+  {
+   "name": "triangular-p32003",
+   "family": "control",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "150b2dd73c11d267436443abb8b133553b4e3a8f5e9bc069c9b830be7b75963d"
+  },
+  {
+   "name": "nonradical-p32003",
+   "family": "control",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "d0738d060677042c17df5d78e18c43de3b208d13f41d40df3f0905f0880ba021"
+  },
+  {
+   "name": "cyclic-4-p32003",
+   "family": "control",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "b173756a4065261060692e5d48e1e66972235501b7867dc4103974079ded7caf"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p32003-planted-p32003",
+   "family": "dense-mq",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 32003, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "5491dfe68dd887fcb023014f5c71726443880534f08ff1c650c81c02ebb4cf3a"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p32003-unplanted-p32003",
+   "family": "dense-mq",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 32003, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "41394f39e5f8609f295aa20db7527bc27cb95adcebb558a769226d0d57804ea0"
+  },
+  {
+   "name": "dense-n8-m12-d1000-s116501-p32003-planted-p32003",
+   "family": "dense-mq",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 1000, 116501, 32003, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "b55b01df4d11d16758ca593244ffb2be37e2e74f90c232261976396b3e586fb2"
+  },
+  {
+   "name": "dense-n8-m16-d1000-s116501-p32003-planted-p32003",
+   "family": "dense-mq",
+   "modulus": 32003,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 1000, 116501, 32003, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "e54e98cd99d84499f1b0e1d486d42b2d4724bb78d39aa3b9b78466a8fac9f979"
+  },
+  {
+   "name": "redundant-combination-p65521",
+   "family": "control",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "e254c1d6d02f6dde1d3071aaf0cfe3a31c35c9d2f7bc68364966f70e7564420f"
+  },
+  {
+   "name": "unit-dense-p65521",
+   "family": "control",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "3565294895ae40c47bbc4a894b58e478168279091ed905ad71f48c764de72d03"
+  },
+  {
+   "name": "homogeneous-n5-m5-p65521",
+   "family": "control",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "022db376cbb53b898d7a61e198568429e97d26bbaed280d262fa8d9f02266afd"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3-p65521",
+   "family": "control",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "73ba949b1358750c1fca3561fcadb9f1e5d02c98cdc623526cddd505698e0994"
+  },
+  {
+   "name": "triangular-p65521",
+   "family": "control",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "3d158f26b079dccf4a00419812edc3c2a594ecebe4e3f90d5305d4c3a661c500"
+  },
+  {
+   "name": "nonradical-p65521",
+   "family": "control",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "06eb5f65fbd8dfa2611d976119e069aee9a6ca929eb90af4e46068732c9637e7"
+  },
+  {
+   "name": "cyclic-4-p65521",
+   "family": "control",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "91e624e47e328715314014ff5d49a2e3ded7366a3089c95783949d1add3421f5"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p65521-planted-p65521",
+   "family": "dense-mq",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "5aa2ed8f756c6b1d599a7cf800129788df2ac046f7d45b2ba09e8adb19d7040f"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p65521-unplanted-p65521",
+   "family": "dense-mq",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 65521, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "494cb4104a9082971f937699b082efdce0a0b7ede5ab30f09072fcbcd573904c"
+  },
+  {
+   "name": "dense-n8-m12-d1000-s116501-p65521-planted-p65521",
+   "family": "dense-mq",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(8, 12, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "16880f2453f6369f0e07895757a9100c145dff66ffff38734bdbf2f3f3300efb"
+  },
+  {
+   "name": "dense-n8-m16-d1000-s116501-p65521-planted-p65521",
+   "family": "dense-mq",
+   "modulus": 65521,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8"
+   ],
+   "order": "grevlex",
+   "n": 8,
+   "m": 16,
+   "source": "corpus::dense_mq_shaped(8, 16, 1000, 116501, 65521, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "4cb37e312dd4510f292019bd49b21b95599dd3aaf0294c31e951133c7a11f944"
+  },
+  {
+   "name": "redundant-combination-p2147483647",
+   "family": "control",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "5781862b7b74d73cf01e8f87dcd99ba498dac881c034b0c3c209efff84097cf4"
+  },
+  {
+   "name": "unit-dense-p2147483647",
+   "family": "control",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "4d8dc09acc1a4c3dcdc597f269b4155627d8ac9df518bd313df73ab1cc4d7fd5"
+  },
+  {
+   "name": "homogeneous-n5-m5-p2147483647",
+   "family": "control",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "3ea61edb6489e62b28ee5d81d3d134cea10c10c248aff06f34fc73fa266179a4"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3-p2147483647",
+   "family": "control",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "ed269e73244c9df33f3ce140e7954e3483cf2326c963b2ff92dfbde4f9a0845f"
+  },
+  {
+   "name": "triangular-p2147483647",
+   "family": "control",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "a09c47599054d1d09b289d15ddc1bb8e41f3f4b9a2ebb9f7c3138ae40c7bbb23"
+  },
+  {
+   "name": "nonradical-p2147483647",
+   "family": "control",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "cda4e3f7bd8eeb59b694750363522184f516ab4775b9aa98d528701ebd86e7dd"
+  },
+  {
+   "name": "cyclic-4-p2147483647",
+   "family": "control",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "6952fd716147d5b3c4c57ca00fffe766e856ead08573f250683c7df119baa69d"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p2147483647-planted-p2147483647",
+   "family": "dense-mq",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 2147483647, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "d54e8f2da6bfd692a77902eef0361c3290ac999f9cf5ad77fd646a2cec9b9dfb"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p2147483647-unplanted-p2147483647",
+   "family": "dense-mq",
+   "modulus": 2147483647,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 2147483647, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "6f976620a7a579f91a967a02cd8c4d011c9f3f599d0efbbdae1b9969049dbae4"
+  },
+  {
+   "name": "redundant-combination-p4294967291",
+   "family": "control",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "170c311620fa6bcb352c0dcd6b28e4bf934d8601a6c1406f2ff6e889342a4cab"
+  },
+  {
+   "name": "unit-dense-p4294967291",
+   "family": "control",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "457d7a773d624f725215f60a36c966ac577fd4c1e76ff3f89765bd40763505e0"
+  },
+  {
+   "name": "homogeneous-n5-m5-p4294967291",
+   "family": "control",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "158181e773a3e20476e944f293981175caf740a7387538093c499239ee2fe1b0"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3-p4294967291",
+   "family": "control",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "67dcf0613a5d89975bfb06bc2cc835d8726b6842964f872360e9bc48638dd3bf"
+  },
+  {
+   "name": "triangular-p4294967291",
+   "family": "control",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "0aabbc969e02b225f989a7444989bbde92f4df797579bcffae8cc460de40a6dc"
+  },
+  {
+   "name": "nonradical-p4294967291",
+   "family": "control",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "531004972beb1647077c5639ca1fb88144bd0007689771f8db5bd9c63e6fa639"
+  },
+  {
+   "name": "cyclic-4-p4294967291",
+   "family": "control",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "2fa69d1e0771f290bdea4e5861933071a762f4df01cd9a22026761746a7b9f33"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p4294967291-planted-p4294967291",
+   "family": "dense-mq",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 4294967291, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "ce86e40e4d89b9b2b580cca78420188f09a91c31bac7a2b615557cd3d5cfd102"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p4294967291-unplanted-p4294967291",
+   "family": "dense-mq",
+   "modulus": 4294967291,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 4294967291, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "30bedf5caa1b612f94ea3b06d39444c25b7cd6d146d060ba6171f9a4ed534160"
+  },
+  {
+   "name": "redundant-combination-p4294967311",
+   "family": "control",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "b745193e1f789e64e9750858ce2d2addf8c48c83cb9a6ae0ab002c978bc097ed"
+  },
+  {
+   "name": "unit-dense-p4294967311",
+   "family": "control",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "df5fe735d4fb7e8d7d13988dd2ddd7cfb9d11b6402846ccde9bb1fc73a07941e"
+  },
+  {
+   "name": "homogeneous-n5-m5-p4294967311",
+   "family": "control",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "e828bb3a4ea47a0b075ae4de4f9b672c0a34420956707ee415e81795f246f8da"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3-p4294967311",
+   "family": "control",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "b33009cdbf9f7f32de9741438fd2c209044c0c51c2a5bf3336885dceb90edba8"
+  },
+  {
+   "name": "triangular-p4294967311",
+   "family": "control",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "bc1e782b0de8cd991763cda24f3eeecc69752cf6ad3f50551c49ebc4e1e0cbeb"
+  },
+  {
+   "name": "nonradical-p4294967311",
+   "family": "control",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "2327738902e7df6b6eec8be3a2963757812777f9307aa6eadbd1fefbf7f9eb32"
+  },
+  {
+   "name": "cyclic-4-p4294967311",
+   "family": "control",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "95470ecc4518a973ed08b0be12448c22308c2bdfcccbf9a1c59ee9d7521cdc87"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p4294967311-planted-p4294967311",
+   "family": "dense-mq",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 4294967311, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "df23bb52e438ae4debb6e5b9c1ac581512f3929878b1e4f281c4ef12ff53d30b"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p4294967311-unplanted-p4294967311",
+   "family": "dense-mq",
+   "modulus": 4294967311,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 4294967311, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "03a7919baca2506cffce4c758f5750d97d84f2c54590eb25368c611184e7b2fd"
+  },
+  {
+   "name": "redundant-combination-p9223372036854775783",
+   "family": "control",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "3666038bffdff38136293a839ecb3d2512842575e64cd5db49e4be5c29a33baa"
+  },
+  {
+   "name": "unit-dense-p9223372036854775783",
+   "family": "control",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 6,
+   "system_sha256": "7e35352e43d6ca32360ca515786637a52b2ddf64d8c522289a32fd187be37b5c"
+  },
+  {
+   "name": "homogeneous-n5-m5-p9223372036854775783",
+   "family": "control",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 5,
+   "system_sha256": "0e3b1aeae9e315588d8f84282d4912eb968e99d94908bdb85b7d5ed3344d0395"
+  },
+  {
+   "name": "affine-underdetermined-n5-m3-p9223372036854775783",
+   "family": "control",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5"
+   ],
+   "order": "grevlex",
+   "n": 5,
+   "m": 3,
+   "system_sha256": "57c55ff88cf23d18952ff03c67beebd9ae6a2eda612a0593db278ec20722b50c"
+  },
+  {
+   "name": "triangular-p9223372036854775783",
+   "family": "control",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3"
+   ],
+   "order": "grevlex",
+   "n": 3,
+   "m": 3,
+   "system_sha256": "961e5c55b8643b0644f25ee009d18154253f5591b01e4f4b7f1efcbf11c396db"
+  },
+  {
+   "name": "nonradical-p9223372036854775783",
+   "family": "control",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2"
+   ],
+   "order": "grevlex",
+   "n": 2,
+   "m": 3,
+   "system_sha256": "a4a18e70093bf7c7e720a29b8e7f594d3f02ef15470154c7b48ae015c55bbefa"
+  },
+  {
+   "name": "cyclic-4-p9223372036854775783",
+   "family": "control",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4"
+   ],
+   "order": "grevlex",
+   "n": 4,
+   "m": 4,
+   "system_sha256": "5d7d086453514e3101814b0469d960f2ca929594dda940b0f36af086e68bdf9f"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p9223372036854775783-planted-p9223372036854775783",
+   "family": "dense-mq",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 9223372036854775783, grevlex, True)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": true,
+   "system_sha256": "fc2fc95874ad6e4d78e70aa617511130338b87b494f4a5b30b16f613473b32fc"
+  },
+  {
+   "name": "dense-n6-m12-d1000-s116501-p9223372036854775783-unplanted-p9223372036854775783",
+   "family": "dense-mq",
+   "modulus": 9223372036854775783,
+   "variables": [
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "order": "grevlex",
+   "n": 6,
+   "m": 12,
+   "source": "corpus::dense_mq_shaped(6, 12, 1000, 116501, 9223372036854775783, grevlex, False)",
+   "density": 1000,
+   "seed": 116501,
+   "planted": false,
+   "system_sha256": "573804055d7f224d17279327c3fc27bf194c1b9209306cb5a96b047e5a5aa293"
+  }
+ ]
+}
