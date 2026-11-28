@@ -1,0 +1,33 @@
+#1193 laptop-stage provenance. Development figures only.
+
+Host        Apple M4 Pro, 14 cores, 48 GB, macOS 15.7.3, unpinned; other agents building alongside
+Toolchain   rustc 1.95.0 (59807616e 2026-04-14)
+Profile     release, CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16,
+            RUSTC_WRAPPER="", repository .cargo/config.toml (no target-cpu flag on aarch64)
+
+Binaries (examples/blocked_dense_study), SHA-256
+  3e1810b1  5f8d429081bb61eabe88c357e2f7c1b626d79492f167ddae03bb0085f8bda52b  campaign
+  efbc8a6c  ab686ae16c1411f416ab184c643b812d5b507475faaecfdea8e45f910749c26c  tune, gemm, verify
+  14424217  d361fe4b164f525070573a7c3ac81be6262f94dc863fecb6d16ba2ed84dabfb1  counts, --features research-work
+            (built from the working tree just before 14424217; its counts arm and the shipped
+            kernels it calls are unchanged at 14424217 and every later commit here)
+
+Sessions, 2026-11-27 (PST), 1-minute load at start / end
+  campaign  15:35:58 9.40  ->  16:11:52 3.16   (per-line loads in campaign-3e1810b1.jsonl)
+  tune      16:14:08 4.49  ->  16:21:42 2.73
+  gemm      16:38:37 2.23  ->  16:39:41 3.23   (one counts process running on another core)
+  verify, counts  16:23 -> 16:52, two processes at once; their timings are not used
+
+Captures (sig_f4_study --capture at 8abf1b4e, origin/main at the start; GF(31) SHA-256s equal
+research/1033-dense-rebaseline/captures.json)
+  gf31__mq-dense-18-s18__b3.zmat     c07a614681ef318ce23cc9417b7542d94faeba7d80629cc198743cf5aabd89fb
+  gf31__mq-dense-18-s18__b2.zmat     4badb4f91c6e773cd74ffff89fd2924d5204b324f1a6c1b38f343a6d91bc729e
+  gf31__mq-dense-20-s20__b3.zmat     4b0105ef5472a4caf4fc9971556eedac9299d77690b30b229587d8c12f1d3947
+  gf32003__mq-dense-18-s18__b3.zmat  a0fbf1b91f1787c34a68fb9d5d4929b768ba1a1ce3e42b477a560a2d3832d3be
+  gf32003__mq-dense-18-s18__b2.zmat  46863fab3e7d3f282bc15fe412c50d19beb282f4a2d6abc3970b3d8b5e98238a
+  gf32003__mq-dense-20-s20__b3.zmat  11141dcc9f305c79ce7e5f14d607586ceee95ead3b486764592328fe8d081c66
+
+Peak RSS (/usr/bin/time -l)
+  split --lane-residual, n = 20 GF(31)                          8.40 GB
+  split --lane-residual --accumulator-sweep --verify, n = 18 b3  5.24 GB (GF(31)), 5.15 GB (GF(32003))
+  lane, n = 20 GF(31)                                           2.40 GB
