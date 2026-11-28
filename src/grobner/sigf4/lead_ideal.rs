@@ -93,6 +93,19 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
 
     /// One element per minimal lead, the first inserted on a tie.
     pub(super) fn minimal_elements(&self) -> Vec<MultivariatePolynomial<N, F>> {
+        self.minimal_ids()
+            .into_iter()
+            .map(|id| MultivariatePolynomial::new(&self.basis[id].terms))
+            .collect()
+    }
+
+    /// How many minimal leads the elements have.
+    #[cfg(feature = "research-sigf4")]
+    pub(super) fn minimal_lead_count(&self) -> usize {
+        self.minimal_ids().len()
+    }
+
+    fn minimal_ids(&self) -> Vec<usize> {
         let order = self.order;
         let mut ids: Vec<usize> = (0..self.basis.len()).collect();
         // A divisor of a lead is never above it, so scanning upwards only checks kept leads.
@@ -113,8 +126,6 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             }
             kept.push((m, lead, id));
         }
-        kept.iter()
-            .map(|&(_, _, id)| MultivariatePolynomial::new(&self.basis[id].terms))
-            .collect()
+        kept.into_iter().map(|(_, _, id)| id).collect()
     }
 }
