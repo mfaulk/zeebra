@@ -1123,20 +1123,21 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             reducer_at[entries[0].0 as usize] = k as u32;
         }
 
-        // #945, #1183: the reducer block in lane form, when the options and the field allow it.
-        // A field has at most one of the two lanes.
-        let lane = if self.options.small_prime_lane {
-            F::small_prime_lane()
-        } else {
-            None
-        }
-        .or_else(|| {
-            if self.options.prime31_lane {
-                F::prime31_lane()
-            } else {
-                None
-            }
-        });
+        // #945, #1183: the reducer block in lane form, when the options and the field allow it
+        // and the batch is large enough (#1123). A field has at most one of the two lanes.
+        let entries: usize = reducer_rows.iter().map(Vec::len).sum::<usize>()
+            + targets.iter().map(|t| t.1.len()).sum::<usize>();
+        let small = || {
+            self.options
+                .small_prime_lane
+                .then(F::small_prime_lane)
+                .flatten()
+        };
+        let wide = || self.options.prime31_lane.then(F::prime31_lane).flatten();
+        let lane = (entries >= self.options.lane_min_entries)
+            .then(|| small().or_else(wide))
+            .flatten();
+        self.stats.lane_batches += usize::from(lane.is_some());
         // Each pivot is held once (#945's corrective iteration): in lane form only, unless a
         // research census reads the field rows.
         #[cfg(feature = "research-reuse")]

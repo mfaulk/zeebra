@@ -676,3 +676,20 @@ fn test_prime31_lane_reaches_the_dispatched_signature_engine() {
     };
     assert!(signature_options::<Zp32003>(&lane, 1).prime31_lane);
 }
+
+/// #1123: `F4Options::small_prime_lane` and its batch threshold reach the signature engine
+/// Adaptive dispatches to.
+#[test]
+fn test_small_prime_lane_and_threshold_reach_the_dispatched_signature_engine() {
+    let at_default = signature_options::<Zp32003>(&F4Options::default(), 1);
+    assert!(!at_default.small_prime_lane);
+    assert_eq!(at_default.lane_min_entries, 0);
+    let lane = F4Options {
+        small_prime_lane: true,
+        lane_min_entries: 5_000,
+        ..F4Options::default()
+    };
+    let options = signature_options::<Zp32003>(&lane, 1);
+    assert!(options.small_prime_lane);
+    assert_eq!(options.lane_min_entries, 5_000);
+}

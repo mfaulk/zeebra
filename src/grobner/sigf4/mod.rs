@@ -92,6 +92,9 @@ pub struct SigF4Options {
     /// [`crate::linalg::lane::MAX_LANE_PRIME`] and below 2^31; ignored otherwise. Every row is
     /// unchanged. Off by default; dispatch is #1123's.
     pub prime31_lane: bool,
+    /// #1123: use a lane only on a batch with at least this many entries, targets and reducers
+    /// together, known before any row is converted. `0`, the default, admits every batch.
+    pub lane_min_entries: usize,
     /// #1076: end the run at a fixed signature degree and finish with conventional F4
     /// ([`carry`]). `None`, the default, runs the signature basis to completion.
     #[cfg(feature = "research-sigf4")]
@@ -135,6 +138,7 @@ impl Default for SigF4Options {
             lead_ideal_stop: true,
             small_prime_lane: false,
             prime31_lane: false,
+            lane_min_entries: 0,
             #[cfg(feature = "research-sigf4")]
             carry: None,
             #[cfg(feature = "research-reuse")]
@@ -229,6 +233,8 @@ pub struct SigF4Statistics {
     pub products_on_singular_rows: u64,
     pub max_matrix_rows: usize,
     pub max_matrix_columns: usize,
+    /// #1123: batches whose reducer block ran in a lane.
+    pub lane_batches: usize,
     pub elements_added: usize,
     /// #1140: the run handed its elements at minimal leads to conventional F4 once a signature
     /// degree added no new lead, whether F4 kept exactly those leads, and the handoff's wall.

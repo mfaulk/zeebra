@@ -1211,3 +1211,46 @@ fn test_lead_fall_boundary_fires_on_cyclic_and_not_on_katsura() {
     assert_eq!(result.unwrap(), f4(&katsura, GREVLEX).unwrap());
     assert!(statistics.carry.is_none(), "{:?}", statistics.carry);
 }
+
+/// #1123: the lane runs only on batches with at least `lane_min_entries` entries, and every
+/// threshold returns the same basis.
+#[test]
+fn test_lane_threshold_selects_batches_and_keeps_the_basis() {
+    let system = katsura::<6, Zp32003>();
+    let expected = f4(&system, GREVLEX).unwrap();
+    let run = |lane_min_entries| {
+        let options = SigF4Options {
+            small_prime_lane: true,
+            lane_min_entries,
+            ..SigF4Options::default()
+        };
+        let (result, statistics) = sig_f4_reported(&system, GREVLEX, &options);
+        assert_eq!(result.unwrap(), expected, "threshold {lane_min_entries}");
+        statistics
+    };
+    let always = run(0);
+    assert!(always.batches > 0);
+    assert_eq!(always.lane_batches, always.batches);
+    assert_eq!(run(usize::MAX).lane_batches, 0);
+    let some = run(300).lane_batches;
+    assert!(
+        0 < some && some < always.batches,
+        "{some} of {}",
+        always.batches
+    );
+}
+
+/// #1123: the threshold binds the 31-bit lane too, so a batch below it stays on the field route.
+#[test]
+fn test_lane_threshold_binds_the_31_bit_lane() {
+    use crate::fields::Mersenne31;
+    let system = katsura::<5, Mersenne31>();
+    let options = SigF4Options {
+        prime31_lane: true,
+        lane_min_entries: usize::MAX,
+        ..SigF4Options::default()
+    };
+    let (result, statistics) = sig_f4_reported(&system, GREVLEX, &options);
+    assert_eq!(result.unwrap(), f4(&system, GREVLEX).unwrap());
+    assert_eq!(statistics.lane_batches, 0);
+}
