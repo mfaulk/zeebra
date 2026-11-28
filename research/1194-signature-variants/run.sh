@@ -4,12 +4,16 @@
 # solve is the record; the clocks are for scale only.
 #
 #   cargo build --release --features research-sigf4-variants --example sig_f4_study
-#   research/1194-signature-variants/run.sh [path/to/sig_f4_study] [wall seconds]
+#   research/1194-signature-variants/run.sh [path/to/sig_f4_study] [wall seconds] [live GiB]
+#
+# The signature arms run under a 6 GiB live budget rather than the shipping 512 MB, which stops
+# several variants' largest batches: a budget decides only whether a run finishes, never its counts.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 bin="${1:-${CARGO_TARGET_DIR:-target}/release/examples/sig_f4_study}"
 wall="${2:-600}"
+live="${3:-6}"
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
@@ -34,7 +38,7 @@ for row in "${rows[@]}"; do
   "$bin" $row --engine f4 --workers 1 --wall-s "$wall" --digest-only >>"$tmp" || true
   for cell in "${cells[@]}"; do
     # shellcheck disable=SC2086
-    "$bin" $row --engine sigf4 $cell --workers 1 --wall-s "$wall" --digest-only >>"$tmp" ||
+    "$bin" $row --engine sigf4 $cell --workers 1 --wall-s "$wall" --live-gib "$live" --digest-only >>"$tmp" ||
       printf '{"row":"%s","cell":"%s","status":"process-failed"}\n' "$row" "$cell" >>"$tmp"
   done
 done
