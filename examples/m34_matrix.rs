@@ -37,7 +37,10 @@ use std::time::{Duration, Instant};
 #[cfg(feature = "research-sigf4")]
 use zeebra::grobner::{F4Error, ShippingReason, SignatureRoute};
 use zeebra::{
-    fields::{BabyBear, KoalaBear, Zp18446744073709551557, Zp2, Zp2147483647, Zp32003},
+    fields::{
+        BabyBear, KoalaBear, PrimeFieldElement64, Zp18446744073709551557, Zp2, Zp2147483647,
+        Zp32003,
+    },
     grobner::{
         f4_reported, F4Options, F4Statistics, GradedEngine, HilbertSelection, ParallelForward,
         ParallelSymbolic,
@@ -580,7 +583,9 @@ fn solve(record: &Record, args: &Args) -> Result<Vec<(&'static str, Json)>, Stri
     Ok(dispatch!(
         2 => Zp2, 32003 => Zp32003, 2147483647 => Zp2147483647,
         2013265921 => BabyBear, 2130706433 => KoalaBear,
-        18446744073709551557 => Zp18446744073709551557
+        18446744073709551557 => Zp18446744073709551557,
+        18446744069414584321 => PrimeFieldElement64<18446744069414584321>,
+        18446744073709551263 => PrimeFieldElement64<18446744073709551263>
     ))
 }
 
@@ -786,6 +791,19 @@ mod tests {
     #[test]
     fn thirty_one_bit_ao_primes_are_instantiated() {
         for p in ["2013265921", "2130706433"] {
+            let out = solve(&record_at(p), &args(&[]).unwrap()).unwrap();
+            assert_eq!(
+                field_of(&out, "status").unwrap().to_json(),
+                "\"complete\"",
+                "p = {p}"
+            );
+        }
+    }
+
+    /// #1080: the wide-corpus dense MQ primes, Goldilocks and 2^64 - 353, solve, not refuse.
+    #[test]
+    fn wide_corpus_primes_are_instantiated() {
+        for p in ["18446744069414584321", "18446744073709551263"] {
             let out = solve(&record_at(p), &args(&[]).unwrap()).unwrap();
             assert_eq!(
                 field_of(&out, "status").unwrap().to_json(),
