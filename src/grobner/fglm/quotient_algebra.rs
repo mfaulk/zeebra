@@ -82,6 +82,12 @@ struct Construction<const N: usize, F: FiniteField> {
     /// off that element rather than reduced. Set on the partial path only, so the full
     /// construction's strategies stay an ablation of the reduction and nothing else.
     read_off: bool,
+
+    /// The monic source the batched strategy reduces against, prepared on first use.
+    monic: Option<MonicBasis<N, F>>,
+
+    /// [`readable_elements`] of the source, found on first use.
+    readable: Option<MonomialMap<N, usize>>,
 }
 
 impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
@@ -269,6 +275,8 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             bytes: 0,
             columns: 0,
             read_off: only.is_some(),
+            monic: None,
+            readable: None,
         };
         let wanted: Vec<bool> = (0..N).map(|i| only.is_none_or(|v| v == i)).collect();
         construction.reduce_shared(
@@ -382,7 +390,16 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             .source
             .iter()
             .filter(|g| !g.is_zero() && g.leading_monomial(order) == x)
-            .find_map(|g| ReadOff::new(std::slice::from_ref(g), order, &self.basis).column(&x));
+            .find_map(|g| {
+                let one = std::slice::from_ref(g);
+                ReadOff {
+                    elements: &readable_elements(one, order, &self.basis),
+                    basis: one,
+                    order,
+                    quotient: &self.basis,
+                }
+                .column(&x)
+            });
         match read {
             Some(column) => {
                 for (index, value) in column {
@@ -503,7 +520,16 @@ impl<const N: usize, F: FiniteField> Construction<N, F> {
                 }
             }
         }
-        let read_off = self.read_off.then(|| ReadOff::new(basis, order, quotient));
+        if self.read_off {
+            self.readable
+                .get_or_insert_with(|| readable_elements(basis, order, quotient));
+        }
+        let read_off = self.readable.as_ref().map(|elements| ReadOff {
+            elements,
+            basis,
+            order,
+            quotient,
+        });
         let mut pending: Vec<usize> = Vec::new();
         for (border, _) in needed.iter().enumerate().filter(|(_, n)| **n) {
             let monomial = self.index.monomials()[border];
@@ -532,18 +558,28 @@ impl<const N: usize, F: FiniteField> Construction<N, F> {
                     ));
                 }
             }
-            OperatorConstruction::BatchedBorder => {
+            OperatorConstruction::BatchedBorder if !pending.is_empty() => {
                 let targets: Vec<Monomial<N>> = pending
                     .iter()
                     .map(|border| self.index.monomials()[*border])
                     .collect();
+                // Monic, with leading monomials precomputed, once for every batch and kept for a
+                // completion: preparing it sorts every element's terms, about 30 ms on katsura-11.
+                // Zero elements are not valid divisors and `MonicBasis::new` rejects them, so they
+                // are filtered rather than passed on.
+                let monic = self.monic.get_or_insert_with(|| {
+                    let nonzero: Vec<MultivariatePolynomial<N, F>> =
+                        basis.iter().filter(|p| !p.is_zero()).cloned().collect();
+                    MonicBasis::new(&nonzero, order)
+                });
                 let columns = batched_border(
-                    &targets, basis, order, quotient, options, control, statistics, clock,
+                    &targets, basis, monic, order, quotient, options, control, statistics, clock,
                 )?;
                 for (border, column) in pending.into_iter().zip(columns) {
                     self.shared[border] = Some(column);
                 }
             }
+            OperatorConstruction::BatchedBorder => {}
         }
 
         for (border, _) in needed.iter().enumerate().filter(|(_, n)| **n) {
@@ -578,9 +614,45 @@ impl<const N: usize, F: FiniteField> Construction<N, F> {
         statistics: &mut QuotientStatistics,
         clock: &mut StageClock,
     ) -> Result<MultiplicationOperator<F>, FglmError> {
-        let read_off = (self.read_off
-            && options.operator_construction == OperatorConstruction::PerColumn)
-            .then(|| ReadOff::new(basis, order, quotient));
+        if self.read_off && options.operator_construction == OperatorConstruction::PerColumn {
+            self.readable
+                .get_or_insert_with(|| readable_elements(basis, order, quotient));
+        }
+        let readable = self.readable.take();
+        let read_off = readable.as_ref().map(|elements| ReadOff {
+            elements,
+            basis,
+            order,
+            quotient,
+        });
+        let assembled = self.assemble_with(
+            variable,
+            read_off.as_ref(),
+            basis,
+            order,
+            quotient,
+            options,
+            control,
+            statistics,
+            clock,
+        );
+        self.readable = readable;
+        assembled
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn assemble_with(
+        &mut self,
+        variable: usize,
+        read_off: Option<&ReadOff<'_, N, F>>,
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        quotient: &QuotientBasis<N>,
+        options: &FglmOptions,
+        control: &FglmControl<'_>,
+        statistics: &mut QuotientStatistics,
+        clock: &mut StageClock,
+    ) -> Result<MultiplicationOperator<F>, FglmError> {
         let mut builder = OperatorBuilder::new(quotient.dimension(), options.operator_storage);
         for target in self.index.column_targets(variable) {
             // Safe point: every border normal form on the per-column path, whose unit is one,
@@ -657,41 +729,39 @@ impl<const N: usize, F: FiniteField> Construction<N, F> {
     }
 }
 
-/// The source elements whose normal form of the leading monomial needs no reduction: those whose
-/// tail is standard, keyed by leading monomial.
+/// The source elements whose leading monomial's normal form needs no reduction, those whose tail
+/// is standard: their positions in `basis`, keyed by leading monomial.
+fn readable_elements<const N: usize, F: FiniteField>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    quotient: &QuotientBasis<N>,
+) -> MonomialMap<N, usize> {
+    let mut elements: MonomialMap<N, usize> = MonomialMap::default();
+    for (position, g) in basis.iter().enumerate().filter(|(_, g)| !g.is_zero()) {
+        let lead = g.leading_monomial(order);
+        let standard_tail = g
+            .terms()
+            .keys()
+            .all(|m| *m == lead || quotient.index_of(m).is_some());
+        if standard_tail {
+            elements.entry(lead).or_insert(position);
+        }
+    }
+    elements
+}
+
+/// Border normal forms read off the source, over [`readable_elements`].
 struct ReadOff<'a, const N: usize, F: FiniteField> {
-    elements: MonomialMap<N, &'a MultivariatePolynomial<N, F>>,
+    elements: &'a MonomialMap<N, usize>,
+    basis: &'a [MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     quotient: &'a QuotientBasis<N>,
 }
 
-impl<'a, const N: usize, F: FiniteField> ReadOff<'a, N, F> {
-    fn new(
-        basis: &'a [MultivariatePolynomial<N, F>],
-        order: MonomialOrder,
-        quotient: &'a QuotientBasis<N>,
-    ) -> Self {
-        let mut elements: MonomialMap<N, &MultivariatePolynomial<N, F>> = MonomialMap::default();
-        for g in basis.iter().filter(|g| !g.is_zero()) {
-            let lead = g.leading_monomial(order);
-            let standard_tail = g
-                .terms()
-                .keys()
-                .all(|m| *m == lead || quotient.index_of(m).is_some());
-            if standard_tail {
-                elements.entry(lead).or_insert(g);
-            }
-        }
-        Self {
-            elements,
-            order,
-            quotient,
-        }
-    }
-
+impl<const N: usize, F: FiniteField> ReadOff<'_, N, F> {
     /// `nf(monomial)` as a sorted coordinate vector, if `monomial` is a readable leading monomial.
     fn column(&self, monomial: &Monomial<N>) -> Option<Vec<(usize, F)>> {
-        let g = self.elements.get(monomial)?;
+        let g = &self.basis[*self.elements.get(monomial)?];
         let scale = -g.leading_coefficient(self.order).inverse();
         let mut entries: Vec<(usize, F)> = Vec::with_capacity(g.terms().len() - 1);
         entries.extend(
@@ -722,6 +792,7 @@ impl<'a, const N: usize, F: FiniteField> ReadOff<'a, N, F> {
 fn batched_border<const N: usize, F: FiniteField>(
     targets: &[Monomial<N>],
     basis: &[MultivariatePolynomial<N, F>],
+    monic: &MonicBasis<N, F>,
     order: MonomialOrder,
     quotient: &QuotientBasis<N>,
     options: &FglmOptions,
@@ -729,12 +800,6 @@ fn batched_border<const N: usize, F: FiniteField>(
     statistics: &mut QuotientStatistics,
     clock: &mut StageClock,
 ) -> Result<Vec<Vec<(usize, F)>>, FglmError> {
-    // Monic, with leading monomials precomputed, once for every batch. Zero elements are not valid
-    // divisors and `MonicBasis::new` rejects them, so they are filtered rather than passed on.
-    let nonzero: Vec<MultivariatePolynomial<N, F>> =
-        basis.iter().filter(|p| !p.is_zero()).cloned().collect();
-    let monic = MonicBasis::new(&nonzero, order);
-
     let chunk = options.border_batch.size.chunk(targets.len());
     let groups: Vec<&[Monomial<N>]> = targets.chunks(chunk).collect();
     let workers = if groups.len() < MIN_CONCURRENT_BATCHES {
@@ -755,7 +820,7 @@ fn batched_border<const N: usize, F: FiniteField>(
     if workers > 1 {
         let job = BorderJob {
             groups: &groups,
-            basis: &monic,
+            basis: monic,
             order,
             quotient,
             limits: &options.border_batch,
@@ -780,7 +845,7 @@ fn batched_border<const N: usize, F: FiniteField>(
                 control.poll(FglmStage::OperatorConstruction)?;
                 let outcome = batch::reduce_batch(
                     group,
-                    &monic,
+                    monic,
                     order,
                     &options.border_batch,
                     options.measure_stages,
