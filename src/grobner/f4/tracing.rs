@@ -259,6 +259,9 @@ pub enum Divergence {
     /// ones: terms cancelled. A replay that builds the learned rows carries those as zero
     /// columns, so the comparison stops here only because this one is exact.
     SupportShrank,
+    /// The same columns and rows in another order: reducer choice or emission order moved,
+    /// the support did not. A replay that keeps the learned order is unaffected by it.
+    Reordered,
     /// Same matrix shape, and a row the learned trace kept ends differently. A replay sees a
     /// vanished or moved pivot.
     KeptRow,
@@ -331,7 +334,10 @@ fn round_divergence<const N: usize>(a: &TraceRound<N>, b: &TraceRound<N>) -> Opt
         let rows: std::collections::HashSet<_> = a.rows.iter().map(key).collect();
         let shrank = b.columns.iter().all(|c| columns.contains(c))
             && b.rows.iter().all(|r| rows.contains(&key(r)));
-        return Some(if shrank {
+        let same_size = b.columns.len() == a.columns.len() && b.rows.len() == a.rows.len();
+        return Some(if shrank && same_size {
+            Divergence::Reordered
+        } else if shrank {
             Divergence::SupportShrank
         } else {
             Divergence::Support
@@ -484,6 +490,27 @@ mod tests {
         assert_eq!(
             compare(&shrunk, &learned).divergence,
             Some(Divergence::Support)
+        );
+    }
+
+    // Same rows in another order is neither a shrink nor a growth.
+    #[test]
+    fn test_reordered_rows_are_their_own_divergence() {
+        let (_, learned) = learn(&katsura::<5, F>(), GREVLEX, &F4Options::default()).unwrap();
+        let round = learned
+            .rounds
+            .iter()
+            .position(|r| r.rows.iter().filter(|x| x.fate == RowFate::Reducer).count() > 1)
+            .unwrap();
+        let mut reordered = learned.clone();
+        let rows = &mut reordered.rounds[round].rows;
+        let reducers: Vec<usize> = (0..rows.len())
+            .filter(|&i| rows[i].fate == RowFate::Reducer)
+            .collect();
+        rows.swap(reducers[0], reducers[1]);
+        assert_eq!(
+            compare(&learned, &reordered).divergence,
+            Some(Divergence::Reordered)
         );
     }
 

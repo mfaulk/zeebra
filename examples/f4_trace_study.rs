@@ -143,6 +143,7 @@ fn kind(d: Divergence) -> &'static str {
         Divergence::Pairs => "pairs",
         Divergence::Support => "support-grew",
         Divergence::SupportShrank => "support-shrank",
+        Divergence::Reordered => "reordered",
         Divergence::KeptRow => "kept-row",
         Divergence::SkippedRow => "SILENT",
         Divergence::Length => "length",
