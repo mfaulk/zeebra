@@ -28,6 +28,9 @@ ROWS = [(f'mq-full-{n}-s0', f, 'regime') for n in (10, 11, 12) for f in ('goldil
     ('mq-dense-15-s15', 'm31', 'regime'), ('mq-dense-18-s18', 'm31', 'regime'),
     ('eco-12', 'w59', 'control'), ('katsura-11', 'm31', 'control'),
     ('mq-random-10-s10', 'm31', 'control'), ('cyclic-8', 'm31', 'control')]
+# Generated only after the rule was frozen on #1080 (predicate.py); never seen by the sweep.
+HELD_OUT = [('mq-full-11-s1', 'goldilocks', 'regime'), ('mq-full-13-s1', 'goldilocks', 'regime'),
+            ('mq-dense-16-s16', 'm31', 'regime')]
 SLACKS = (0, 2, 8, 32)
 CAP_S = 300
 
@@ -41,9 +44,10 @@ def key(row, field):
 
 
 def catalog(a):
-    for row, field, role in ROWS:
+    split = 'held-out' if a.held_out else 'development'
+    for row, field, role in HELD_OUT if a.held_out else ROWS:
         family = dict(lineage=f'm35-b/{row.rsplit("-", 2)[0] if row.startswith("mq-") else row.rsplit("-", 1)[0]}',
-                      split='development', role=role)
+                      split=split, role=role)
         rec = baseline.generated(family, row, field, a.qualify, a.study)
         d = Path(a.out, key(row, field))
         d.mkdir(parents=True, exist_ok=True)
@@ -99,6 +103,7 @@ def main():
     c.add_argument('--qualify', required=True)
     c.add_argument('--study', required=True)
     c.add_argument('--out', required=True)
+    c.add_argument('--held-out', action='store_true', help='write the held-out rows instead')
     m = sub.add_parser('manifest')
     m.add_argument('--binary', required=True)
     m.add_argument('--commit', required=True)

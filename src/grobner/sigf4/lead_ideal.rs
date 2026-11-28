@@ -92,7 +92,7 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
     }
 
     /// One element per minimal lead, the first inserted on a tie.
-    fn minimal_elements(&self) -> Vec<MultivariatePolynomial<N, F>> {
+    pub(super) fn minimal_elements(&self) -> Vec<MultivariatePolynomial<N, F>> {
         let order = self.order;
         let mut ids: Vec<usize> = (0..self.basis.len()).collect();
         // A divisor of a lead is never above it, so scanning upwards only checks kept leads.

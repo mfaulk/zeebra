@@ -201,6 +201,8 @@ pub(super) fn run<const N: usize, F: FiniteField>(
     let mut inconsistent = false;
     let mut stop = lead_ideal::LeadIdealStop::new(order, options.lead_ideal_stop);
     let mut early = None;
+    #[cfg(feature = "research-sigf4")]
+    let mut carried: Option<(u64, Vec<MultivariatePolynomial<N, F>>)> = None;
     while let Some(degree) = engine.queue.keys().next().copied() {
         if let Some((clock, budget)) = wall {
             if engine.stats.batches > 0 && clock.elapsed() >= budget {
@@ -223,6 +225,37 @@ pub(super) fn run<const N: usize, F: FiniteField>(
             early = Some(engine.hand_off(generators, wall)?);
             break;
         }
+        #[cfg(feature = "research-sigf4")]
+        if let Some(carry) = options.carry.filter(|carry| carry.due(degree, next)) {
+            let mut seed = match carry.mode {
+                super::carry::CarryMode::Restart => Vec::new(),
+                super::carry::CarryMode::Continue => engine.minimal_elements(),
+            };
+            seed.extend(generators.iter().cloned());
+            carried = Some((degree, seed));
+            break;
+        }
+    }
+    #[cfg(feature = "research-sigf4")]
+    if let Some((degree, seed)) = carried.take() {
+        let signature_elements = engine.basis.len();
+        drop(engine);
+        let prefix = started.elapsed();
+        let clock = std::time::Instant::now();
+        let remaining = wall.map(|(start, budget)| budget.saturating_sub(start.elapsed()));
+        let f4_options = super::carry::conventional_options(options, remaining);
+        let (result, f4_stats) = crate::grobner::f4::f4_reported(&seed, order, &f4_options);
+        stats.carry = Some(super::carry::CarryReport {
+            degree,
+            seed: seed.len(),
+            signature_elements,
+            prefix,
+            conventional: clock.elapsed(),
+            conventional_batches: f4_stats.batches,
+        });
+        let reduced = result.map_err(SigF4Error::Budget)?;
+        stats.reduced_basis_elements = reduced.len();
+        return certified(generators, reduced, order, options, stats, started);
     }
 
     // Interreduce from the engine's rows (G2-2); a budget refusal falls back to the polynomial
@@ -366,6 +399,18 @@ pub(super) fn run<const N: usize, F: FiniteField>(
         }
     }
 
+    certified(generators, reduced, order, options, stats, started)
+}
+
+/// Certifies `reduced` when `options.certify` asks, then records the run's total wall.
+fn certified<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    reduced: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    options: &SigF4Options,
+    stats: &mut SigF4Statistics,
+    started: Instant,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, SigF4Error> {
     if options.certify {
         // As the shipping F4 certifies (#909, #912): on the engine's workers, under the
         // certificate's own budget when one is set, and a stop is never a rejection.

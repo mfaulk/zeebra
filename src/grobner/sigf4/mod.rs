@@ -17,6 +17,8 @@
 
 #[cfg(feature = "research-adjacent")]
 pub mod adjacent;
+#[cfg(feature = "research-sigf4")]
+pub mod carry;
 #[cfg(all(test, feature = "research-sigf4"))]
 mod cascade_tests;
 mod claim;
@@ -90,6 +92,10 @@ pub struct SigF4Options {
     /// [`crate::linalg::lane::MAX_LANE_PRIME`] and below 2^31; ignored otherwise. Every row is
     /// unchanged. Off by default; dispatch is #1123's.
     pub prime31_lane: bool,
+    /// #1076: end the run at a fixed signature degree and finish with conventional F4
+    /// ([`carry`]). `None`, the default, runs the signature basis to completion.
+    #[cfg(feature = "research-sigf4")]
+    pub carry: Option<carry::Carry>,
     /// #1031: census every serial batch's reducer reuse into [`SigF4Statistics::reuse`]. Replays
     /// each elimination three times, so never on in a timed run.
     #[cfg(feature = "research-reuse")]
@@ -129,6 +135,8 @@ impl Default for SigF4Options {
             lead_ideal_stop: true,
             small_prime_lane: false,
             prime31_lane: false,
+            #[cfg(feature = "research-sigf4")]
+            carry: None,
             #[cfg(feature = "research-reuse")]
             reuse_census: false,
             #[cfg(feature = "research-adjacent")]
@@ -227,6 +235,9 @@ pub struct SigF4Statistics {
     pub lead_ideal_stop: bool,
     pub lead_ideal_complete: bool,
     pub lead_ideal_handoff: Duration,
+    /// #1076: the handoff [`SigF4Options::carry`] made, if its boundary was reached.
+    #[cfg(feature = "research-sigf4")]
+    pub carry: Option<carry::CarryReport>,
     pub signature_basis_elements: usize,
     pub reduced_basis_elements: usize,
     /// Columns of the final interreduction matrix (0 when no matrix was needed).
