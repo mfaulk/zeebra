@@ -1140,3 +1140,49 @@ fn test_syzygy_store_matches_a_naive_model() {
         }
     }
 }
+
+/// #1076: a run carried into conventional F4 at a fixed degree, by restart or continue, returns
+/// shipping F4's basis and reports the handoff it made.
+#[test]
+fn test_carried_runs_return_the_shipping_basis() {
+    use super::carry::{Carry, CarryMode};
+    fn check<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>], degree: u64) {
+        let expected = f4(system, GREVLEX).expect("shipping F4 finishes");
+        for mode in [CarryMode::Restart, CarryMode::Continue] {
+            let options = SigF4Options {
+                carry: Some(Carry { degree, mode }),
+                ..SigF4Options::default()
+            };
+            let (result, statistics) = sig_f4_reported(system, GREVLEX, &options);
+            assert_eq!(result.expect("carried run finishes"), expected, "{mode:?}");
+            let report = statistics
+                .carry
+                .expect("the boundary is reached with work left");
+            assert!(report.degree >= degree, "{mode:?}: {report:?}");
+            let inputs = system.len();
+            match mode {
+                CarryMode::Restart => assert_eq!(report.seed, inputs),
+                CarryMode::Continue => assert!(report.seed > inputs, "{report:?}"),
+            }
+        }
+    }
+    check(&cyclic::<6, Zp32003>(), 4);
+    check(&katsura::<6, Zp32003>(), 3);
+}
+
+/// #1076: a boundary past the run's last degree never hands off.
+#[test]
+fn test_carry_boundary_past_the_run_is_inert() {
+    use super::carry::{Carry, CarryMode};
+    let system = katsura::<4, Zp32003>();
+    let options = SigF4Options {
+        carry: Some(Carry {
+            degree: 1_000,
+            mode: CarryMode::Continue,
+        }),
+        ..SigF4Options::default()
+    };
+    let (result, statistics) = sig_f4_reported(&system, GREVLEX, &options);
+    assert_eq!(result.unwrap(), f4(&system, GREVLEX).unwrap());
+    assert!(statistics.carry.is_none());
+}
