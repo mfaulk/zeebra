@@ -200,7 +200,9 @@ Regret is `adaptive` ÷ the faster of `classical` and `wiedemann`.
   non-shape controls, where the classical walk dominates, and 1.36 on `cyclic-7`, the one row over
   1.2x, where the failed projections are 26% of the route.
 - **Dense operators.** On `katsura-11` the `D²/4` test sends the route to classical, and forcing
-  Wiedemann there costs 12% more (3.77 s against 3.36 s). The rule is right.
+  Wiedemann there costs 12% more (3.77 s against 3.36 s). The rule is right. *(Later: #1233 removed
+  most of the operator stage from the Wiedemann route, so this comparison has to be made again
+  before the rule is relied on; see [`wiedemann-last-operator.md`](wiedemann-last-operator.md).)*
 
 **No routing change.** Regret exceeds 1.2x on one row of one family (`cyclic-7`), and the
 pre-declared rule needs two families. The nearest miss, `pquad-10-1` at 1.12x, is the dense-operator
