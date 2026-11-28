@@ -21,6 +21,9 @@ CONNECT_TIMEOUT="${EPRINT_CONNECT_TIMEOUT:-10}"
 MAX_TIME="${EPRINT_MAX_TIME:-120}"
 LOCK_WAIT="${EPRINT_LOCK_WAIT:-300}"
 PDFTOTEXT="${EPRINT_PDFTOTEXT:-pdftotext}"
+# Test hooks: the lock tools, so the suite can take flock(1) or perl away.
+FLOCK="${EPRINT_FLOCK:-flock}"
+PERL="${EPRINT_PERL:-perl}"
 USER_AGENT="fetch-eprint/1.0 (curl)"
 
 die() { local rc=$1; shift; printf '%s: %s\n' "$PROG" "$*" >&2; exit "$rc"; }
@@ -82,7 +85,8 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 install_atomically() { # <validated temp file in CACHE_DIR> <dest>
-  chmod 0644 -- "$1" && mv -f -- "$1" "$2" && TMP=""
+  # No `--` for chmod: BSD chmod reads it as a file after a numeric mode. $1 is absolute.
+  chmod 0644 "$1" && mv -f -- "$1" "$2" && TMP=""
 }
 
 # One HTTP attempt. Sets HTTP_CODE and CURL_RC; body lands in $1.
@@ -105,6 +109,35 @@ $PROG: could not retrieve $id from $MIRROR_BASE: $3
     scripts/fetch-eprint --import /path/to/paper.pdf $id
   Do not retry this source in a loop.
 EOF
+}
+
+# Prints the lock tool to use: flock(1) where installed (Linux), else perl, whose flock(2) is in
+# macOS's base system where flock(1) is not. Fails when neither exists.
+lock_tool() {
+  if command -v -- "$FLOCK" >/dev/null 2>&1; then printf 'flock\n'
+  elif command -v -- "$PERL" >/dev/null 2>&1; then printf 'perl\n'
+  else return 1
+  fi
+}
+
+# Takes an exclusive lock on fd 9 within LOCK_WAIT seconds. flock(2) locks the open file
+# description, which the shell's fd 9 shares, so the lock outlives the child that took it.
+# Returns 0 locked, 1 timed out, 2 the lock call itself failed.
+acquire_lock() { # <tool>
+  local rc=0
+  if [ "$1" = flock ]; then
+    "$FLOCK" -w "$LOCK_WAIT" 9 || rc=$?
+  else
+    "$PERL" -MFcntl=:flock -e '
+      open(my $fh, ">&=", 9) or exit 2;
+      my $deadline = time + $ARGV[0];
+      until (flock($fh, LOCK_EX | LOCK_NB)) {
+        exit 2 unless $!{EWOULDBLOCK};
+        exit 1 if time >= $deadline;
+        select(undef, undef, undef, 0.1);
+      }' "$LOCK_WAIT" || rc=$?
+  fi
+  case $rc in 0 | 1) return "$rc" ;; *) return 2 ;; esac
 }
 
 # Downloads into the cache under the caller's lock. Returns the script's exit codes.
@@ -189,8 +222,16 @@ main() {
     if text_fresh "$txt" "$pdf"; then printf '%s\n' "$txt"; return 0; fi
   fi
 
+  local tool lrc=0
+  tool=$(lock_tool) ||
+    die 2 "flock(1) not found, and no perl to lock with; install util-linux's flock or perl"
   exec 9>"$CACHE_DIR/.$year-$num.lock" || die 2 "cannot open lock file in $CACHE_DIR"
-  flock -w "$LOCK_WAIT" 9 || die 2 "timed out after ${LOCK_WAIT}s waiting for another fetch of $year/$num"
+  acquire_lock "$tool" || lrc=$?
+  case $lrc in
+    0) ;;
+    1) die 2 "timed out after ${LOCK_WAIT}s waiting for another fetch of $year/$num" ;;
+    *) die 2 "could not lock $CACHE_DIR/.$year-$num.lock with $tool" ;;
+  esac
 
   if [ -n "$import" ]; then
     valid_pdf "$import" || die 1 "--import: '$import' is not a complete PDF"
