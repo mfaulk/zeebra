@@ -73,7 +73,7 @@ mod basis_digest;
 
 use std::time::{Duration, Instant};
 use zeebra::{
-    fields::{PrimeFieldElement64, Zp2147483647, Zp31, Zp32003},
+    fields::{PrimeFieldElement32, PrimeFieldElement64, Zp2147483647, Zp31, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, eco, katsura, noon},
         certify_f4_output_with_workers,
@@ -230,8 +230,10 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
             other => return Err(format!("unexpected argument {other}")),
         }
     }
-    if !["goldilocks", "wide64", "gf32003", "m31", "gf31"].contains(&parsed.field.as_str()) {
-        return Err("--field must be goldilocks, wide64, gf32003, m31 or gf31".into());
+    if !["goldilocks", "wide64", "gf32003", "m31", "gf31", "gf7681"]
+        .contains(&parsed.field.as_str())
+    {
+        return Err("--field must be goldilocks, wide64, gf32003, m31, gf31 or gf7681".into());
     }
     if !["sigf4", "f4", "entry", "adaptive"].contains(&parsed.engine.as_str())
         && !REFERENCES.contains(&parsed.engine.as_str())
@@ -540,6 +542,8 @@ fn modulus(field: &str) -> u64 {
         "gf32003" => 32003,
         "m31" => 2147483647,
         "gf31" => 31,
+        // #1123: an unseen field inside the small-prime lane, for generated rows only.
+        "gf7681" => 7681,
         _ => panic!("unknown field {field}"),
     }
 }
@@ -593,6 +597,7 @@ fn generated(field: &str, name: &str) -> Result<Input, String> {
             "wide64" => family::<Wide>(name, fam, n, p),
             "gf32003" => family::<Zp32003>(name, fam, n, p),
             "gf31" => family::<Zp31>(name, fam, n, p),
+            "gf7681" => family::<PrimeFieldElement32<7681>>(name, fam, n, p),
             _ => family::<Zp2147483647>(name, fam, n, p),
         }
         .ok_or_else(refused)?,

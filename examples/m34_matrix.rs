@@ -56,8 +56,8 @@ use std::time::{Duration, Instant};
 use zeebra::grobner::{F4Error, ShippingReason, SignatureRoute};
 use zeebra::{
     fields::{
-        BabyBear, KoalaBear, PrimeFieldElement64, Zp18446744073709551557, Zp2, Zp2147483647,
-        Zp32003,
+        BabyBear, KoalaBear, PrimeFieldElement32, PrimeFieldElement64, Zp18446744073709551557, Zp2,
+        Zp2147483647, Zp31, Zp32003,
     },
     grobner::{
         f4_reported, F4Options, F4Statistics, GradedEngine, HilbertSelection, ParallelForward,
@@ -661,8 +661,8 @@ fn solve(record: &Record, args: &Args) -> Result<Vec<(&'static str, Json)>, Stri
         };
     }
     Ok(dispatch!(
-        2 => Zp2, 32003 => Zp32003, 2147483647 => Zp2147483647,
-        2013265921 => BabyBear, 2130706433 => KoalaBear,
+        2 => Zp2, 31 => Zp31, 7681 => PrimeFieldElement32<7681>, 32003 => Zp32003,
+        2147483647 => Zp2147483647, 2013265921 => BabyBear, 2130706433 => KoalaBear,
         18446744073709551557 => Zp18446744073709551557,
         18446744069414584321 => PrimeFieldElement64<18446744069414584321>,
         18446744073709551263 => PrimeFieldElement64<18446744073709551263>
@@ -956,6 +956,29 @@ mod tests {
             assert_eq!(
                 field_of(&out, "status").unwrap().to_json(),
                 "\"complete\"",
+                "p = {p}"
+            );
+        }
+    }
+
+    /// #1123: GF(31) and GF(7681) records are instantiated, and Adaptive with `--lane16` returns
+    /// the same basis there as without it.
+    #[test]
+    fn small_lane_primes_are_instantiated_and_the_lane_keeps_the_basis() {
+        for p in ["31", "7681"] {
+            let record = record_at(p);
+            let digest = |extra: &[&str]| {
+                let out = solve(&record, &args(extra).unwrap()).unwrap();
+                assert_eq!(
+                    field_of(&out, "status").unwrap().to_json(),
+                    "\"complete\"",
+                    "p = {p}"
+                );
+                field_of(&out, "basis_sha256").unwrap().to_json()
+            };
+            assert_eq!(
+                digest(&["--engine", "adaptive", "--lane16"]),
+                digest(&["--engine", "adaptive"]),
                 "p = {p}"
             );
         }
