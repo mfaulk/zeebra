@@ -1211,3 +1211,25 @@ fn test_lead_fall_boundary_fires_on_cyclic_and_not_on_katsura() {
     assert_eq!(result.unwrap(), f4(&katsura, GREVLEX).unwrap());
     assert!(statistics.carry.is_none(), "{:?}", statistics.carry);
 }
+
+/// #1078: the layout census's baseline peak is the serial cascade's own live peak, and each narrower
+/// arm holds no more than it, at a 32-bit and a 64-bit field.
+#[cfg(feature = "research-sigf4")]
+#[test]
+fn test_layout_census_baseline_is_the_live_peak_and_arms_shrink_it() {
+    fn check<const N: usize, F: FiniteField>(system: &[MultivariatePolynomial<N, F>]) {
+        let (result, s) = sig_f4_reported(system, GREVLEX, &SigF4Options::default());
+        result.unwrap();
+        let c = &s.layout;
+        assert_eq!(c.batches, s.batches);
+        assert_eq!(c.peak_live_bytes[0], s.claim_peak_live_bytes);
+        let [base, source, narrow, both] = c.peak_live_bytes;
+        assert!(
+            both <= source && source < base && both <= narrow && narrow < base,
+            "{c:?}"
+        );
+        assert_eq!(c.wide_batches, 0);
+    }
+    check(&katsura::<6, Zp32003>());
+    check(&katsura::<6, Goldilocks>());
+}

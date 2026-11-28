@@ -26,6 +26,8 @@ mod claim;
 pub mod corpus;
 pub mod dispatch;
 mod engine;
+#[cfg(feature = "research-sigf4")]
+pub mod layout;
 #[cfg(feature = "research-sigf4-replay")]
 pub mod replay;
 pub mod signature;
@@ -238,6 +240,9 @@ pub struct SigF4Statistics {
     /// #1076: the handoff [`SigF4Options::carry`] made, if its boundary was reached.
     #[cfg(feature = "research-sigf4")]
     pub carry: Option<carry::CarryReport>,
+    /// #1078: the serial cascade's live account under each row layout ([`layout`]).
+    #[cfg(feature = "research-sigf4")]
+    pub layout: layout::LayoutCensus,
     pub signature_basis_elements: usize,
     pub reduced_basis_elements: usize,
     /// Columns of the final interreduction matrix (0 when no matrix was needed).

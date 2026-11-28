@@ -1199,6 +1199,19 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
         if let Err(stop) = live.charge(fixed) {
             return Err(self.abandon(&live, clock, stop));
         }
+        #[cfg(feature = "research-sigf4")]
+        let layout_rows = {
+            let reducers: usize = block.rows.iter().map(Vec::len).sum();
+            let rows = super::layout::row_bytes(
+                targets.iter().map(|t| t.1.len()).sum(),
+                reducers,
+                ncols,
+                size_of::<F>(),
+                size_of::<(u32, F)>(),
+            );
+            debug_assert_eq!(rows[0], batch_rows_bytes(&block, &targets));
+            (rows, reducers * size_of::<F>())
+        };
         #[cfg(feature = "research-sigf4-split")]
         let pass_clock = Instant::now();
         let prereduced: Vec<Reduced<F>> = if phase_a {
@@ -1354,6 +1367,10 @@ impl<const N: usize, F: FiniteField> Engine<'_, N, F> {
             self.stats.split.batches.push(split);
         }
         self.stats.claim_peak_live_bytes = self.stats.claim_peak_live_bytes.max(live.peak);
+        #[cfg(feature = "research-sigf4")]
+        self.stats
+            .layout
+            .record(layout_rows.0, fixed, live.peak, ncols, layout_rows.1);
         let mut results = Vec::new();
         for ((t, kind, row, products), lane_row) in finals.into_iter().zip(final_lanes) {
             let row = block.field_row(row, lane_row);

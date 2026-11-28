@@ -449,6 +449,26 @@ fn run<const N: usize, F: FiniteField>(record: &Record, args: &Args) -> Vec<(&'s
             if args.stages {
                 staged.push(("counters", sig_counters(&statistics)));
             }
+            {
+                use zeebra::grobner::sigf4::layout::ARMS;
+                let c = &statistics.layout;
+                let per_arm = |v: &[usize; 4]| {
+                    Json::object(ARMS.iter().zip(v).map(|(arm, b)| (*arm, Json::size(*b))))
+                };
+                staged.push((
+                    "layout",
+                    Json::object([
+                        ("peak_live_bytes", per_arm(&c.peak_live_bytes)),
+                        ("row_bytes", per_arm(&c.row_bytes)),
+                        (
+                            "reducer_coefficient_bytes",
+                            Json::size(c.reducer_coefficient_bytes),
+                        ),
+                        ("batches", Json::size(c.batches)),
+                        ("wide_batches", Json::size(c.wide_batches)),
+                    ]),
+                ));
+            }
             if let Some(report) = &statistics.carry {
                 staged.push((
                     "carry",
@@ -909,6 +929,29 @@ mod tests {
                 "p = {p}"
             );
         }
+    }
+
+    /// #1078: the `sig` arm reports the layout census, one peak per arm, the narrowest no larger
+    /// than the baseline.
+    #[cfg(feature = "research-sigf4")]
+    #[test]
+    fn sig_arm_reports_the_layout_census() {
+        let record = find_record(CATALOG, "x@p31").unwrap();
+        let out = solve(&record, &args(&["--engine", "sig"]).unwrap()).unwrap();
+        let layout = field_of(&out, "layout").unwrap().to_json();
+        let peak = |arm: &str| {
+            let key = format!("\"{arm}\": ");
+            let at = layout
+                .find(&key)
+                .unwrap_or_else(|| panic!("{arm} in {layout}"))
+                + key.len();
+            let digits: String = layout[at..]
+                .chars()
+                .take_while(char::is_ascii_digit)
+                .collect();
+            digits.parse::<u64>().unwrap()
+        };
+        assert!(peak("both") <= peak("baseline"), "{layout}");
     }
 
     /// `--stages` attaches the F4 stage clocks and always-on counters; without it neither appears.
