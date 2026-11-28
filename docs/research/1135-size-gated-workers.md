@@ -1,10 +1,15 @@
 # #1135: a size-gated worker count for `GradedEngine::Adaptive` (laptop stage)
 
-**Measured at:** `36fd4137` for the development figures (tag `measured/1012-matrix`, bench host,
-re-read, not re-measured). The laptop read is pending; this section is the predeclaration, committed
-before any fresh row was timed.
+**Measured at:** `68ed9b14` for the laptop read (source tree of `main` `f77dc563`; the commit adds
+only research Python, documents and a CI step), Apple M4 Pro, unpinned, 2026-11-28
+(`research/1135-size-gated-workers/provenance.txt`). The development figures are from `36fd4137`
+(tag `measured/1012-matrix`, bench host), re-read and not re-measured. Sections 3 and 4 were
+committed at `68ed9b14` and posted on #1135 (issue comment 7242437140) before any fresh row was
+timed.
 
-**Status:** laptop stage. No default changes. **Classification:** hypothesis.
+**Status:** laptop stage. No default changes. **Verdict: not supported** (§5).
+**Classification:** hypothesis. The gate is refuted on this machine, and the bench-host question
+is open.
 
 **Parent:** #1003. **Found by:** #1015 (`docs/research/m34-selection-findings.md` §7.3, §8 item C).
 **Related:** #978 and #1141 (the `WorkerCrossover` band), #1009 (feature extraction must be cheap
@@ -124,6 +129,74 @@ scored rows and no scored row has regret above 1.25. Otherwise it is **not suppo
 threshold is moved on this data. Either way no default changes, and the geometric-mean regrets of
 the gate, always-1 and always-10 are reported as description.
 
-## 5. Result
+## 5. Result: not supported
 
-Pending.
+The session ran 2026-11-28 17:10–17:15 UTC: 130 attempts, all completed. Every row's bases agree
+across all ten of its attempts. Tables are in `research/1135-size-gated-workers/tables.md`, and every
+attempt is in `attempts.jsonl.gz`.
+
+| row | B | gate | 1 w (ms) | 10 w (ms) | 1 w ÷ 10 w | scored | agrees |
+|---|---:|:-:|---:|---:|---:|:-:|:-:|
+| `zb-katsura-10` | 512 | 1 | 108.5 | 76.1 | 1.42 | no (76 ms) | – |
+| `zb-katsura-11` | 1,024 | 1 | 622.4 | 320.9 | **1.94** | yes | **no** |
+| `zb-katsura-13` | 4,096 | 10 | 25,163.5 | 7,139.5 | 3.52 | yes | yes |
+| `zb-eco-10` | 13,122 | 10 | 49.0 | 46.9 | 1.04 | no (47 ms) | – |
+| `zb-eco-11` | 39,366 | 10 | 257.0 | 197.0 | 1.30 | yes | yes |
+| `zb-eco-13` | 354,294 | 10 | 10,045.9 | 7,187.2 | 1.40 | yes | yes |
+| `zb-cyclic-8` | 40,320 | 10 | 2,938.8 | 781.3 | 3.76 | yes | yes |
+| `zb-noon-8` | 6,561 | 10 | 256.5 | 256.8 | 1.00 | yes | yes |
+| `zb-noon-9` | 19,683 | 10 | 1,716.3 | 1,683.3 | 1.02 | yes | yes |
+| `zb-reimer-7` | 40,320 | 10 | 1,716.3 | 513.7 | 3.34 | yes | yes |
+| `zb-col-grid-4x6` | 16,777,216 | 10 | 784.0 | 739.5 | 1.06 | yes | yes |
+| `zb-col-gnm-16-28-s1` | 65,536 | 10 | 30.0 | 34.0 | 0.88 | no (30 ms) | – |
+| `zb-col-ktree2-16-s1` | 65,536 | 10 | 22.9 | 26.4 | 0.87 | no (23 ms) | – |
+
+Medians are of 5 fresh processes per arm, process wall. The 1-minute load at attempt start was
+3.2–5.7. The repetitions are tight: katsura-13 at one worker spans 25.09–25.22 s, and cyclic-8 at
+10 workers 758–801 ms.
+
+**Pre-declared read.** Nine rows are scored. The gate agrees on 8 of 9 (89%, criterion ≥ 80%),
+but its worst regret is **1.94** on `zb-katsura-11`, against a bound of 1.25. **The gate is not
+supported.** No threshold is moved on this data.
+
+What the read shows, descriptively:
+
+- **In the band, 10 workers never lost.** Always-10 has geometric-mean regret 1.000 over the nine
+  scored rows. The gate's is 1.076 and always-1's is 1.769. Ten workers gain 1.3–3.8× on six rows
+  and tie on three: noon-8 and noon-9, which the signature route's small team holds to 8 workers,
+  and col-grid-4x6.
+- **The gate's closed side is wrong on both of its rows.** katsura-10 and katsura-11 run the
+  signature engine on the full team, and 10 workers are 1.42× and 1.94× faster. On the bench host
+  the matching development row went the other way: `gen-chandrasekhar-h-10` (10 variables,
+  quadratic, signature route, no `WorkerCrossover`) was 0.73× as fast at 16 workers. That
+  boundary is what put the threshold at 2,048, and it does not reproduce here. Whether it is a
+  16-worker effect, a Zen cross-CCD effect or a property of chandrasekhar-h is not separable on a
+  laptop.
+- **Where one worker wins, the row is under 100 ms.** The only rows that 10 workers slow down are
+  the two 16-vertex colourings (0.87–0.88×, 23–34 ms), the case §3 flagged. The gate opens on both.
+  On this evidence a worker-count gate earns its keep below the issue's band, if anywhere, and
+  input size does not pick out those rows.
+
+So on this machine the gate does no better than passing the caller's workers through, and on one
+row it is 1.94× worse. The development finding behind #1135, "P8-w1 is the best fixed arm", holds
+because the development cohort is 87.5% small problems. It does not carry over to rows of
+100 ms – 300 s.
+
+## 6. Classification and next stage
+
+- **Refuted at the laptop stage:** the predeclared Bezout gate at 2^11. **Distribution-specific:**
+  fresh rungs of five ladder families and the colouring family over GF(2³¹−1), on one machine at 10
+  workers.
+- **Hypothesis, still open:** whether *any* static size gate helps on the bench host at 16
+  workers. The only development evidence for a closed side above 100 ms is chandrasekhar-h-9 and
+  -10. A bench-host stage should:
+  1. re-read katsura-10 and katsura-11 (both fresh to the bench host) and chandrasekhar-h-10 at 1,
+     8 and 16 workers, pinned, to see whether the loss at 16 workers is a team-size effect;
+  2. widen the rows with small B and 100 ms – 300 s solves before any gate is fitted again. These
+     families have almost none.
+- **Not recommended:** fitting a new threshold on these rows. The read was spent on this gate.
+- **Worth a separate issue if pursued:** a gate that reads elapsed time rather than input size.
+  Start on one worker and widen the team at a batch boundary once a wall-clock threshold passes.
+  The rows that lose on many workers are the ones that finish within milliseconds, which input
+  size does not identify (§3, and the colourings here). A wall-clock gate would identify them. It
+  needs both engines to accept a team change between batches, which neither does today.
