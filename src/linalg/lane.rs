@@ -134,6 +134,11 @@ impl<F> Lane<F> {
         self.modulus
     }
 
+    /// The canonical representative of `x`, in `[0, p)`.
+    pub fn canonical(&self, x: &F) -> u32 {
+        (self.canonical)(x)
+    }
+
     /// Bytes one working-row cell takes: 4 in the small lane, 8 in the 31-bit lane.
     pub fn cell_bytes(&self) -> usize {
         match self.kind {

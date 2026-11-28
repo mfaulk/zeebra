@@ -122,6 +122,10 @@ pair bookkeeping, and scores conditional mechanisms on a regime gate and a dispa
 ([design note](docs/research/31-bit-lane.md)); its timings wait for the bench host. An opt-in
 Monte Carlo zero-skipping mode for conventional F4 (`f4_monte_carlo`) returns a distinct result
 type that carries its stated error bound, and certification makes its output exact
-([note](docs/research/monte-carlo-zero-skipping.md)). It is never a default.
+([note](docs/research/monte-carlo-zero-skipping.md)). It is never a default. A research prototype
+of FFLAS-style blocked dense elimination on F4's dense residual is in too, not wired into either
+engine. Laptop development figures put it only 1.1–1.6× ahead of the lane kernel on that
+residual, so the dense-MQ gap is in how much work there is, not in the arithmetic
+([note](docs/research/blocked-dense-elimination.md)).
 
 Licensed under the [MIT licence](LICENSE-MIT).
