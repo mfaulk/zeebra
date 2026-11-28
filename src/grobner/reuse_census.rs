@@ -134,6 +134,14 @@ pub struct BatchCensus {
     pub residual_mismatches: usize,
     /// The engine's own product count for the batch, which `plain.total()` must equal.
     pub live_products: Option<u64>,
+    /// #1197's store ledger, when kept: leads new since the last batch, entries they made stale
+    /// and entries they hit at all (an eager store's updates this round), exact hits on stale
+    /// entries (a lazy store's updates) and the tail-reduction products those hits cost here.
+    pub new_elements: u64,
+    pub invalidated: u64,
+    pub eager_updates: u64,
+    pub stale_hits: u64,
+    pub stale_tail_products: u64,
 }
 
 impl BatchCensus {
@@ -172,6 +180,11 @@ impl BatchCensus {
             ),
             ("residual_mismatches", n(self.residual_mismatches)),
             ("live_products", self.live_products.map_or(Json::Null, u)),
+            ("new_elements", u(self.new_elements)),
+            ("invalidated", u(self.invalidated)),
+            ("eager_updates", u(self.eager_updates)),
+            ("stale_hits", u(self.stale_hits)),
+            ("stale_tail_products", u(self.stale_tail_products)),
         ])
     }
 }
@@ -185,6 +198,265 @@ struct Lru<const N: usize> {
     total: u64,
     peak: u64,
     hits: u64,
+}
+
+/// What #1197's store ledger needs beyond a batch's rows.
+pub struct StoreContext<'a, const N: usize> {
+    /// Each column's monomial, by column index.
+    pub columns: &'a [Monomial<N>],
+    /// Every basis element's leading monomial as the batch starts, by element index. Elements
+    /// are only ever appended.
+    pub leads: &'a [Monomial<N>],
+}
+
+/// #1197: a never-evicting store of the tail-reduced multiples, keyed as `CacheMode::Count`, under
+/// M4GB's two update policies. An entry is *stale* once a lead that joined the basis after it
+/// was built divides one of its irreducible tail terms. Eager maintenance re-reduces it in each
+/// round that happens; lazy maintenance re-reduces it only when the key is next built.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StoreTotals {
+    /// Leads that joined the basis, as later batches saw them.
+    pub new_elements: u64,
+    /// Entries put into the store, a rebuilt key counting again.
+    pub stored: u64,
+    /// Valid-to-stale transitions: episodes, each ending in a stale hit or at the run's end.
+    pub invalidations: u64,
+    /// (entry, round) pairs in which a new lead divided a term of the entry's tail as last
+    /// built: an eager store's updates. Each episode costs at least one.
+    pub eager_updates: u64,
+    /// Those entries' tail lengths summed: the terms an eager store would revisit.
+    pub eager_update_terms: u64,
+    /// Exact hits on an entry no new lead had touched: a lazy store reuses them as stored.
+    pub valid_hits: u64,
+    /// Of the valid hits, those on an entry with a blocked tail term: M5GB updates these too once
+    /// the row it serves has a larger signature than the blocking pivot (its case 2).
+    pub flagged_hits: u64,
+    /// Exact hits on a stale entry: a lazy store's updates.
+    pub stale_hits: u64,
+    /// Episodes still open at the run's end: invalidated and never reused.
+    pub stale_unreused: u64,
+    /// Products spent tail-reducing the stale hits in their batch, an upper bound on a lazy
+    /// update's work (it need only reduce the newly reducible terms).
+    pub stale_tail_products: u64,
+    /// Stale hits by rounds from invalidation to reuse: 0, 1, 2, 3–4, 5–8, 9 and more.
+    pub since_invalidation: [u64; 6],
+    /// Entries stored with a term an earlier lead already divides; zero when every reducible
+    /// column has a pivot, as both engines guarantee.
+    pub born_stale: u64,
+    /// Stored entries keeping a tail term whose pivot had a larger signature (M5GB's finite
+    /// signature flag), and those terms.
+    pub blocked_entries: u64,
+    pub blocked_terms: u64,
+    /// Stored tail terms at a column only a target leads: reducible, but by no reducer, so the
+    /// census's tail reduction leaves them. Not part of the irreducible tail.
+    pub unreduced_terms: u64,
+}
+
+impl StoreTotals {
+    pub fn json(&self) -> Json {
+        let u = |v: u64| Json::int(v);
+        Json::object([
+            ("new_elements", u(self.new_elements)),
+            ("stored", u(self.stored)),
+            ("invalidations", u(self.invalidations)),
+            ("eager_updates", u(self.eager_updates)),
+            ("eager_update_terms", u(self.eager_update_terms)),
+            ("valid_hits", u(self.valid_hits)),
+            ("flagged_hits", u(self.flagged_hits)),
+            ("stale_hits", u(self.stale_hits)),
+            ("stale_unreused", u(self.stale_unreused)),
+            ("stale_tail_products", u(self.stale_tail_products)),
+            (
+                "since_invalidation",
+                Json::Array(self.since_invalidation.iter().map(|&d| u(d)).collect()),
+            ),
+            ("born_stale", u(self.born_stale)),
+            ("blocked_entries", u(self.blocked_entries)),
+            ("blocked_terms", u(self.blocked_terms)),
+            ("unreduced_terms", u(self.unreduced_terms)),
+        ])
+    }
+
+    /// The inverse of [`Self::json`]; a missing field reads as zero.
+    pub fn from_json(json: &Json) -> Self {
+        let u = |key: &str| json.get(key).and_then(Json::as_int).unwrap_or(0) as u64;
+        let mut since_invalidation = [0; 6];
+        if let Some(list) = json.get("since_invalidation") {
+            for (slot, v) in since_invalidation.iter_mut().zip(list.items()) {
+                *slot = v.as_int().unwrap_or(0) as u64;
+            }
+        }
+        Self {
+            new_elements: u("new_elements"),
+            stored: u("stored"),
+            invalidations: u("invalidations"),
+            eager_updates: u("eager_updates"),
+            eager_update_terms: u("eager_update_terms"),
+            valid_hits: u("valid_hits"),
+            flagged_hits: u("flagged_hits"),
+            stale_hits: u("stale_hits"),
+            stale_unreused: u("stale_unreused"),
+            stale_tail_products: u("stale_tail_products"),
+            since_invalidation,
+            born_stale: u("born_stale"),
+            blocked_entries: u("blocked_entries"),
+            blocked_terms: u("blocked_terms"),
+            unreduced_terms: u("unreduced_terms"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct StoreEntry {
+    /// Interned ids of the irreducible tail terms, as last built.
+    tail: Vec<u32>,
+    /// Tail length as stored, blocked terms included.
+    terms: u64,
+    /// Blocked tail terms: M5GB's finite signature flag.
+    blocked: u64,
+    stale_since: Option<usize>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct StoreLedger<const N: usize> {
+    ids: HashMap<Monomial<N>, u32, BuildMonomialHasher>,
+    monomials: Vec<Monomial<N>>,
+    /// Per interned monomial: some lead seen so far divides it.
+    reducible: Vec<bool>,
+    entries: HashMap<(u32, Monomial<N>), StoreEntry, BuildMonomialHasher>,
+    known_leads: usize,
+    totals: StoreTotals,
+}
+
+impl<const N: usize> StoreLedger<N> {
+    /// Takes the leads that joined since the last batch; returns the entries this round made
+    /// stale and the entries it hit at all.
+    fn advance(&mut self, batch: usize, leads: &[Monomial<N>]) -> (u64, u64) {
+        let fresh: Vec<(u64, Monomial<N>)> = leads[self.known_leads.min(leads.len())..]
+            .iter()
+            .map(|l| (l.degree(), *l))
+            .collect();
+        self.known_leads = self.known_leads.max(leads.len());
+        self.totals.new_elements += fresh.len() as u64;
+        if fresh.is_empty() {
+            return (0, 0);
+        }
+        let mut newly = vec![false; self.monomials.len()];
+        let mut any = false;
+        for (id, m) in self.monomials.iter().enumerate() {
+            if self.reducible[id] {
+                continue;
+            }
+            let d = m.degree();
+            if fresh.iter().any(|(ld, l)| *ld <= d && divides(l, m)) {
+                self.reducible[id] = true;
+                newly[id] = true;
+                any = true;
+            }
+        }
+        let (mut invalidated, mut hit) = (0, 0);
+        if !any {
+            return (0, 0);
+        }
+        for entry in self.entries.values_mut() {
+            if entry.tail.iter().any(|&id| newly[id as usize]) {
+                hit += 1;
+                self.totals.eager_update_terms += entry.terms;
+                if entry.stale_since.is_none() {
+                    entry.stale_since = Some(batch);
+                    invalidated += 1;
+                }
+            }
+        }
+        self.totals.eager_updates += hit;
+        self.totals.invalidations += invalidated;
+        (invalidated, hit)
+    }
+
+    /// An exact hit on `key` in `batch`: true if the entry was stale.
+    fn hit(&mut self, key: &(u32, Monomial<N>), batch: usize) -> bool {
+        match self.entries.get(key).and_then(|e| e.stale_since) {
+            Some(since) => {
+                self.totals.stale_hits += 1;
+                let bucket = match batch - since {
+                    0 => 0,
+                    1 => 1,
+                    2 => 2,
+                    3..=4 => 3,
+                    5..=8 => 4,
+                    _ => 5,
+                };
+                self.totals.since_invalidation[bucket] += 1;
+                true
+            }
+            None => {
+                if let Some(entry) = self.entries.get(key) {
+                    self.totals.valid_hits += 1;
+                    self.totals.flagged_hits += (entry.blocked > 0) as u64;
+                }
+                false
+            }
+        }
+    }
+
+    /// Stores `key` as built in `batch`, with these irreducible tail monomials and `terms` tail
+    /// terms in all, `blocked` of them kept by the signature bound.
+    fn store(
+        &mut self,
+        key: (u32, Monomial<N>),
+        batch: usize,
+        tail: impl Iterator<Item = Monomial<N>>,
+        terms: u64,
+        blocked: u64,
+    ) {
+        let mut ids = Vec::new();
+        let mut born_stale = false;
+        for m in tail {
+            let next = self.monomials.len() as u32;
+            let id = *self.ids.entry(m).or_insert(next);
+            if id == next {
+                self.monomials.push(m);
+                self.reducible.push(false);
+            }
+            born_stale |= self.reducible[id as usize];
+            ids.push(id);
+        }
+        self.totals.stored += 1;
+        if blocked > 0 {
+            self.totals.blocked_entries += 1;
+            self.totals.blocked_terms += blocked;
+        }
+        let stale_since = born_stale.then(|| {
+            self.totals.born_stale += 1;
+            self.totals.invalidations += 1;
+            batch
+        });
+        self.entries.insert(
+            key,
+            StoreEntry {
+                tail: ids,
+                terms,
+                blocked,
+                stale_since,
+            },
+        );
+    }
+
+    fn totals(&self) -> StoreTotals {
+        StoreTotals {
+            stale_unreused: self
+                .entries
+                .values()
+                .filter(|e| e.stale_since.is_some())
+                .count() as u64,
+            ..self.totals.clone()
+        }
+    }
+}
+
+/// `a | b`.
+fn divides<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
+    a.exponents().iter().zip(b.exponents()).all(|(x, y)| x <= y)
 }
 
 /// The run's cross-batch ledger and its per-batch records.
@@ -207,6 +479,8 @@ pub struct ReuseCensus<const N: usize, S> {
     /// Targets stop at their first unpivoted column, as the conventional engine's forward
     /// elimination does; otherwise every pivot column is cleared, as the signature engine does.
     echelon: bool,
+    /// #1197's store ledger, kept once a batch arrives with a [`StoreContext`].
+    store: Option<StoreLedger<N>>,
     pub batches: Vec<BatchCensus>,
 }
 
@@ -240,6 +514,7 @@ impl<const N: usize, S> ReuseCensus<N, S> {
             distances: [0; 5],
             tail_budget_factor: 16,
             echelon: false,
+            store: None,
             batches: Vec::new(),
         }
     }
@@ -261,6 +536,44 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
     pub fn observe<F: FiniteField>(
         &mut self,
         columns: usize,
+        reducers: &[Reducer<'_, N, S, F>],
+        targets: &[Target<'_, S, F>],
+        cmp: Option<SignatureOrder<'_, S>>,
+        live_products: Option<u64>,
+    ) {
+        self.observe_in(columns, None, reducers, targets, cmp, live_products);
+    }
+
+    /// [`Self::observe`], also keeping #1197's store ledger from the batch's column monomials and
+    /// the basis leads.
+    pub fn observe_with_store<F: FiniteField>(
+        &mut self,
+        context: StoreContext<'_, N>,
+        reducers: &[Reducer<'_, N, S, F>],
+        targets: &[Target<'_, S, F>],
+        cmp: Option<SignatureOrder<'_, S>>,
+        live_products: Option<u64>,
+    ) {
+        let columns = context.columns.len();
+        self.observe_in(
+            columns,
+            Some(context),
+            reducers,
+            targets,
+            cmp,
+            live_products,
+        );
+    }
+
+    /// The store ledger's totals, when one was kept.
+    pub fn store_totals(&self) -> Option<StoreTotals> {
+        self.store.as_ref().map(StoreLedger::totals)
+    }
+
+    fn observe_in<F: FiniteField>(
+        &mut self,
+        columns: usize,
+        context: Option<StoreContext<'_, N>>,
         reducers: &[Reducer<'_, N, S, F>],
         targets: &[Target<'_, S, F>],
         cmp: Option<SignatureOrder<'_, S>>,
@@ -304,8 +617,19 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
             at[r.row[0].0 as usize] = k as u32;
         }
 
+        // The store ledger first takes the leads that joined since the last batch.
+        if let Some(context) = &context {
+            let ledger = self.store.get_or_insert_with(StoreLedger::default);
+            let before = ledger.totals.new_elements;
+            let (invalidated, hit) = ledger.advance(batch, context.leads);
+            record.new_elements = ledger.totals.new_elements - before;
+            record.invalidated = invalidated;
+            record.eager_updates = hit;
+        }
+
         // The cross-batch ledger, read before this batch writes it.
         let mut hit = vec![false; reducers.len()];
+        let mut stale = vec![false; reducers.len()];
         for (k, r) in reducers.iter().enumerate() {
             let key = (r.element, r.multiplier);
             record.block_entries += r.row.len() as u64;
@@ -321,6 +645,10 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
                     _ => 4,
                 };
                 self.distances[bucket] += 1;
+                if let (Some(ledger), Some(_)) = (self.store.as_mut(), &context) {
+                    stale[k] = ledger.hit(&key, batch);
+                    record.stale_hits += stale[k] as u64;
+                }
                 for lru in &mut self.lru {
                     if lru.entries.contains_key(&key) {
                         lru.hits += 1;
@@ -392,6 +720,9 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
             if hit[k] {
                 record.tail_products_hits += products.total();
             }
+            if stale[k] {
+                record.stale_tail_products += products.total();
+            }
             let mut out = Vec::with_capacity(tail.len() + 1);
             out.push(row[0]);
             out.extend(tail);
@@ -434,7 +765,20 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
             record.residual_mismatches += mismatches(&residuals, &rows, self.echelon);
         }
 
-        // Write the ledger and the stores.
+        // Write the ledger and the stores. A column only a target leads (an S-pair half's lcm,
+        // under conventional F4) has no reducer but is reducible all the same.
+        let target_led: Vec<bool> = match &context {
+            Some(_) => {
+                let mut led = vec![false; columns];
+                for t in targets {
+                    if let Some(&(c, _)) = t.row.first() {
+                        led[c as usize] = true;
+                    }
+                }
+                led
+            }
+            None => Vec::new(),
+        };
         let block = record.reduced_block_entries.unwrap_or(record.block_entries);
         self.largest_block = self.largest_block.max(block);
         for (k, r) in reducers.iter().enumerate() {
@@ -453,12 +797,40 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
             self.store_entries += len;
             self.store_built_entries += built;
             self.leads.insert(r.lead, (key, r.signature.clone()));
+            if let (Some(ledger), Some(context)) = (self.store.as_mut(), &context) {
+                // A row the abandoned tail reduction never reached is stored as built.
+                let (stored, from_reduced) = if reduced[k].is_empty() {
+                    (r.row, false)
+                } else {
+                    (reduced[k].as_slice(), true)
+                };
+                let tail = &stored[1..];
+                let blocked = if from_reduced {
+                    tail.iter().filter(|(c, _)| at[*c as usize] != NONE).count() as u64
+                } else {
+                    0
+                };
+                let unpivoted = |c: u32| at[c as usize] == NONE;
+                let unreduced = tail
+                    .iter()
+                    .filter(|(c, _)| unpivoted(*c) && target_led[*c as usize])
+                    .count() as u64;
+                let irreducible = tail
+                    .iter()
+                    .filter(|(c, _)| unpivoted(*c) && !target_led[*c as usize])
+                    .map(|(c, _)| context.columns[*c as usize]);
+                ledger.store(key, batch, irreducible, tail.len() as u64, blocked);
+                ledger.totals.unreduced_terms += unreduced;
+            }
             for lru in &mut self.lru {
                 if let Some((old, _)) = lru.entries.insert(key, (len, batch)) {
                     lru.total -= old;
                 }
                 lru.total += len;
             }
+        }
+        if let Some(ledger) = self.store.as_mut() {
+            ledger.totals.stale_tail_products += record.stale_tail_products;
         }
         self.peak_store_entries = self.peak_store_entries.max(self.store_entries);
         self.peak_store_built_entries = self.peak_store_built_entries.max(self.store_built_entries);
@@ -563,6 +935,12 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
                         .collect(),
                 ),
             ),
+            (
+                "store",
+                self.store_totals()
+                    .as_ref()
+                    .map_or(Json::Null, StoreTotals::json),
+            ),
         ])
     }
 
@@ -576,6 +954,8 @@ impl<const N: usize, S: Clone> ReuseCensus<N, S> {
 #[derive(Clone, Debug)]
 pub struct F4Census<const N: usize> {
     pub census: ReuseCensus<N, ()>,
+    /// The basis leads as the current batch started.
+    leads: Vec<Monomial<N>>,
 }
 
 impl<const N: usize> Default for F4Census<N> {
@@ -588,12 +968,16 @@ impl<const N: usize> F4Census<N> {
     pub fn new() -> Self {
         Self {
             census: ReuseCensus::echelon(),
+            leads: Vec::new(),
         }
     }
 }
 
 impl<const N: usize, F: FiniteField> BatchObserver<N, F> for F4Census<N> {
-    fn batch(&mut self, _: &MonicBasis<N, F>, _: &[CriticalPair<N>]) {}
+    fn batch(&mut self, basis: &MonicBasis<N, F>, _: &[CriticalPair<N>]) {
+        self.leads.clear();
+        self.leads.extend(basis.leading_monomials());
+    }
 
     fn matrix(&mut self, matrix: &MacaulayMatrix<N, F>) {
         let narrow = |index: usize| -> Vec<(u32, F)> {
@@ -631,8 +1015,12 @@ impl<const N: usize, F: FiniteField> BatchObserver<N, F> for F4Census<N> {
             .iter()
             .map(|row| Target { signature: (), row })
             .collect();
+        let context = StoreContext {
+            columns,
+            leads: &self.leads,
+        };
         self.census
-            .observe(matrix.num_columns(), &reducers, &targets, None, None);
+            .observe_with_store(context, &reducers, &targets, None, None);
     }
 }
 
@@ -935,6 +1323,208 @@ mod tests {
         assert_eq!(record.residual_mismatches, 0);
     }
 
+    // #1197's store ledger: batch `k` runs under the leads `leads[k]` and builds reducer `(0, x)`,
+    // lead `x^3`, with the terms of `tail` no lead divides (an engine pivots the others), when it
+    // is batch 0 or `reuse[k - 1]`; otherwise an unrelated key.
+    fn store_run(tail: &[[u32; 2]], leads: &[&[[u32; 2]]], reuse: &[bool]) -> super::StoreTotals {
+        use super::StoreContext;
+        let mut columns = vec![m(&[3, 0])];
+        columns.extend(tail.iter().map(|e| m(e)));
+        let other = row(&[(0, 1)]);
+        let target = row(&[(0, 1)]);
+        let targets = [Target {
+            signature: (),
+            row: &target,
+        }];
+        let mut census = ReuseCensus::<2, ()>::new();
+        for (k, leads) in leads.iter().enumerate() {
+            let leads: Vec<_> = leads.iter().map(|e| m(e)).collect();
+            let built: Vec<(u32, F)> = (0..columns.len() as u32)
+                .filter(|&c| {
+                    c == 0
+                        || !leads
+                            .iter()
+                            .any(|l| super::divides(l, &columns[c as usize]))
+                })
+                .map(|c| (c, F::new(1)))
+                .collect();
+            let (element, row) = if k == 0 || reuse[k - 1] {
+                (0, &built)
+            } else {
+                (7, &other)
+            };
+            let reducers = [Reducer {
+                element,
+                multiplier: m(&[1, 0]),
+                lead: columns[0],
+                signature: (),
+                row,
+            }];
+            let context = StoreContext {
+                columns: &columns,
+                leads: &leads,
+            };
+            census.observe_with_store(context, &reducers, &targets, None, None);
+        }
+        census.store_totals().expect("store ledger kept")
+    }
+
+    // A new lead dividing a stored tail term makes the entry stale; reusing it is one lazy update.
+    #[test]
+    fn an_invalidated_entry_reused_is_one_lazy_update() {
+        let totals = store_run(&[[0, 3]], &[&[[2, 0]], &[[2, 0], [0, 2]]], &[true]);
+        assert_eq!(totals.new_elements, 2);
+        assert_eq!(totals.invalidations, 1);
+        assert_eq!(totals.eager_updates, 1);
+        assert_eq!(totals.stale_hits, 1);
+        assert_eq!(totals.valid_hits, 0);
+        assert_eq!(totals.stale_unreused, 0);
+        assert_eq!(totals.since_invalidation, [1, 0, 0, 0, 0, 0]);
+        assert_eq!(totals.born_stale, 0);
+    }
+
+    // A new lead dividing no stored tail term leaves the entry valid: its reuse costs no update.
+    #[test]
+    fn an_entry_no_new_lead_divides_is_a_free_hit() {
+        let totals = store_run(&[[0, 3]], &[&[[2, 0]], &[[2, 0], [1, 1]]], &[true]);
+        assert_eq!(totals.invalidations, 0);
+        assert_eq!(totals.eager_updates, 0);
+        assert_eq!(totals.valid_hits, 1);
+        assert_eq!(totals.stale_hits, 0);
+    }
+
+    // An eager store updates an entry in every round a new lead hits its tail; a lazy one pays
+    // nothing for an entry never used again, which ends the run as an unreused episode.
+    #[test]
+    fn eager_pays_per_round_and_an_unreused_episode_costs_lazy_nothing() {
+        let totals = store_run(
+            &[[0, 3], [1, 2]],
+            &[&[[2, 0]], &[[2, 0], [0, 3]], &[[2, 0], [0, 3], [1, 1]]],
+            &[false, false],
+        );
+        assert_eq!(totals.new_elements, 3);
+        assert_eq!(totals.invalidations, 1);
+        assert_eq!(totals.eager_updates, 2);
+        assert_eq!(totals.eager_update_terms, 4);
+        assert_eq!(totals.stale_hits, 0);
+        assert_eq!(totals.stale_unreused, 1);
+    }
+
+    // An entry rebuilt on reuse starts a new episode; its second invalidation is counted again.
+    #[test]
+    fn a_rebuilt_entry_can_be_invalidated_again() {
+        let totals = store_run(
+            &[[0, 3], [1, 2]],
+            &[
+                &[[2, 0]],
+                &[[2, 0], [0, 3]],
+                &[[2, 0], [0, 3], [1, 1]],
+                &[[2, 0], [0, 3], [1, 1]],
+            ],
+            &[true, false, true],
+        );
+        // Batch 1 reuses it stale at once and rebuilds it without y^3; batch 2's x*y makes the
+        // rebuilt entry stale, and batch 3 reuses it one round later.
+        assert_eq!(totals.invalidations, 2);
+        assert_eq!(totals.eager_updates, 2);
+        assert_eq!(totals.stale_hits, 2);
+        assert_eq!(totals.stale_unreused, 0);
+        assert_eq!(totals.since_invalidation, [1, 1, 0, 0, 0, 0]);
+        assert_eq!(totals.born_stale, 0);
+    }
+
+    // A tail term at a column only a target leads is reducible though no reducer pivots it: it is
+    // counted apart, and a later lead dividing it does not invalidate the entry.
+    #[test]
+    fn a_tail_term_a_target_leads_is_not_irreducible() {
+        use super::StoreContext;
+        let columns = [m(&[3, 0]), m(&[0, 3])];
+        let reducer_row = row(&[(0, 1), (1, 1)]);
+        let a = row(&[(0, 1)]);
+        let b = row(&[(1, 1)]);
+        let mut census = ReuseCensus::<2, ()>::new();
+        for leads in [
+            vec![m(&[2, 0]), m(&[0, 3])],
+            vec![m(&[2, 0]), m(&[0, 3]), m(&[0, 2])],
+        ] {
+            let reducers = [Reducer {
+                element: 0,
+                multiplier: m(&[1, 0]),
+                lead: columns[0],
+                signature: (),
+                row: &reducer_row,
+            }];
+            let targets = [
+                Target {
+                    signature: (),
+                    row: &a,
+                },
+                Target {
+                    signature: (),
+                    row: &b,
+                },
+            ];
+            let context = StoreContext {
+                columns: &columns,
+                leads: &leads,
+            };
+            census.observe_with_store(context, &reducers, &targets, None, None);
+        }
+        let totals = census.store_totals().unwrap();
+        assert_eq!(totals.unreduced_terms, 2);
+        assert_eq!(totals.invalidations, 0);
+        assert_eq!(totals.valid_hits, 1);
+    }
+
+    // Under a signature bound a tail term whose pivot has the larger signature stays in the
+    // stored row (M5GB's finite flag); only the unpivoted terms are its irreducible tail.
+    #[test]
+    fn a_signature_bound_leaves_blocked_tail_terms() {
+        use super::StoreContext;
+        let block = chain();
+        let target = row(&[(0, 1), (4, 1)]);
+        let mut census = ReuseCensus::<2, u32>::new();
+        let keys = [(0, [1, 0]), (1, [0, 1]), (2, [0, 0])];
+        let sigs = [1u32, 5, 2];
+        let columns: Vec<_> = (0..5).map(|c| m(&[9 - c, 0])).collect();
+        let reducers: Vec<Reducer<'_, 2, u32, F>> = block
+            .iter()
+            .zip(keys.iter().zip(sigs))
+            .map(|(row, (&(element, mult), signature))| Reducer {
+                element,
+                multiplier: m(&mult),
+                lead: columns[row[0].0 as usize],
+                signature,
+                row,
+            })
+            .collect();
+        let targets = [Target {
+            signature: 3u32,
+            row: &target,
+        }];
+        let cmp = |a: &u32, b: &u32| a.cmp(b);
+        let leads = [m(&[8, 0])];
+        let context = StoreContext {
+            columns: &columns,
+            leads: &leads,
+        };
+        census.observe_with_store(context, &reducers, &targets, Some(&cmp), None);
+        let totals = census.store_totals().unwrap();
+        // r0 keeps column 1 (r1's signature is larger); r1 reduces to c1 - c3; r2 is c2 + c3.
+        assert_eq!(totals.blocked_entries, 1);
+        assert_eq!(totals.blocked_terms, 1);
+        assert_eq!(totals.stored, 3);
+        // Built again under the same leads: three valid hits, one of them on the flagged r0.
+        let context = StoreContext {
+            columns: &columns,
+            leads: &leads,
+        };
+        census.observe_with_store(context, &reducers, &targets, Some(&cmp), None);
+        let totals = census.store_totals().unwrap();
+        assert_eq!(totals.valid_hits, 3);
+        assert_eq!(totals.flagged_hits, 1);
+    }
+
     // A target that a discovered pivot zeroes is charged to the zero-row products.
     #[test]
     fn a_repeated_target_is_a_zero_row_against_the_discovered_pivot() {
@@ -998,6 +1588,58 @@ mod tests {
             assert_eq!(int("live_mismatches"), 0);
             assert_eq!(int("reducers") as usize, stats.reducer_rows);
             assert!(int("exact_hits") > 0);
+        }
+    }
+
+    // On both engines every stale episode ends in a reuse or at the run's end, every exact hit is
+    // valid or stale, and no stored irreducible tail term was already reducible.
+    #[test]
+    fn the_store_ledger_balances_on_both_engines() {
+        use super::{F4Census, StoreTotals};
+        use crate::{
+            fields::Zp2147483647,
+            grobner::{
+                benchmark_systems::{cyclic, katsura},
+                f4_observed,
+                sigf4::{sig_f4_reported, SigF4Options},
+                F4Options, ParallelForward, ParallelSymbolic,
+            },
+            MonomialOrder,
+        };
+        type G = Zp2147483647;
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let check = |t: &StoreTotals, exact_hits: u64, name: &str| {
+            assert_eq!(t.valid_hits + t.stale_hits, exact_hits, "{name}");
+            assert_eq!(t.invalidations, t.stale_hits + t.stale_unreused, "{name}");
+            assert!(t.eager_updates >= t.invalidations, "{name}");
+            assert_eq!(t.born_stale, 0, "{name}");
+            assert!(t.new_elements > 0 && t.invalidations > 0, "{name}");
+            assert_eq!(t.since_invalidation.iter().sum::<u64>(), t.stale_hits);
+        };
+        let systems: [Vec<crate::MultivariatePolynomial<6, G>>; 2] = [katsura(), cyclic()];
+        for (system, name) in systems.iter().zip(["katsura-6", "cyclic-6"]) {
+            let census = SigF4Options {
+                reuse_census: true,
+                ..SigF4Options::default()
+            };
+            let (_, stats) = sig_f4_reported(system, order, &census);
+            let (summary, _) = stats.reuse.expect("census requested");
+            let totals = StoreTotals::from_json(summary.get("store").expect("store ledger"));
+            let hits = summary.get("exact_hits").and_then(|v| v.as_int()).unwrap();
+            check(&totals, hits as u64, &format!("sigf4 {name}"));
+
+            let options = F4Options {
+                parallel_forward: ParallelForward::Serial,
+                parallel_symbolic: ParallelSymbolic::Serial,
+                ..F4Options::default()
+            };
+            let mut observer = F4Census::<6>::new();
+            f4_observed(system, order, &options, &mut observer).unwrap();
+            let census = &observer.census;
+            let hits: usize = census.batches.iter().map(|b| b.exact_hits).sum();
+            let totals = census.store_totals().expect("store ledger");
+            assert_eq!(totals.blocked_entries, 0, "{name}: no signature bound");
+            check(&totals, hits as u64, &format!("f4 {name}"));
         }
     }
 

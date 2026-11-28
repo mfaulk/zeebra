@@ -208,6 +208,10 @@ engines.**
 - **Follow-up.** Conditions (b)–(d) are formally met, so #1069 was filed (Low) rather than closing
   the question silently. It covers revising #809 §6.1 to gate on the counterfactual product
   census, not on recurrence. Nothing was implemented.
+- **Update policy (#1197).** [`lazy-reductor-updates.md`](lazy-reductor-updates.md) extends this
+  census with a store ledger. On its shapes, (14, 25) to (18, 32), 96–100% of the hits' upkeep
+  falls on entries a new lead had already made stale. So the upkeep column already prices a lazy
+  store, and no update policy changes the verdict.
 
 ## 7. Limits
 
