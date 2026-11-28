@@ -325,7 +325,7 @@ pub(super) fn shape_relations_vanish_controlled<const N: usize, F: FiniteField>(
                         "shape relation has a nonlinear other variable"
                     );
                     assert_eq!(exponents[t], 0, "a shape relation has no mixed term");
-                    let class = algebra.multiply_by_variable(*variable, &algebra.one());
+                    let class = algebra.variable_class(*variable);
                     for (slot, value) in total.iter_mut().zip(&class) {
                         *slot += *coefficient * *value;
                     }

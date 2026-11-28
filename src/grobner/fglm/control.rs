@@ -457,7 +457,8 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // A cancellation set after the last Wiedemann safe point keeps the fallback from starting.
+    // A cancellation set after the last Wiedemann safe point keeps the fallback from starting: it
+    // stops at the fallback's first safe point, completing the deferred operators (#1233).
     #[test]
     fn test_cancellation_before_the_fallback_prevents_it() {
         let source = source2(&NON_SEPARATING);
@@ -483,11 +484,12 @@ mod tests {
         assert_eq!(
             result,
             Err(FglmError::Cancelled {
-                stage: FglmStage::ClassicalWalk
+                stage: FglmStage::OperatorConstruction
             })
         );
         assert_eq!(statistics.candidates_considered, 0);
-        assert_eq!(statistics.stopped_at, Some(FglmStage::ClassicalWalk));
+        assert_eq!(statistics.stopped_at, Some(FglmStage::OperatorConstruction));
+        assert_eq!(statistics.operators_built, 1);
     }
 
     // A stop inside the classical walk keeps the counters of the candidates it had considered.

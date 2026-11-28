@@ -145,7 +145,7 @@ fn reconstruct<const N: usize, F: FiniteField>(
     let operator = algebra.operator(last);
     // Sparse coordinate classes make moment queries cheap when variables remain standard.
     let classes: Vec<Vec<(usize, F)>> = std::iter::once(algebra.one())
-        .chain((0..last).map(|i| algebra.multiply_by_variable(i, &algebra.one())))
+        .chain((0..last).map(|i| algebra.variable_class(i)))
         .map(|v| {
             v.into_iter()
                 .enumerate()
