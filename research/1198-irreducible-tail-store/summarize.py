@@ -153,8 +153,12 @@ def main():
         "re-reduction would add: a lower bound. `touches / lead` is the stored elements a new lead",
         "invalidates, averaged over the leads that invalidate any.",
         "",
-        "| Row | basis elements | tail terms | born reducible | invalidated | leads that invalidate | touches / lead | basis sparse MiB | basis dense MiB |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "`before the last adding batch` is the same share over the batches before the last one",
+        "that adds an element, against the tail terms stored by then: on a planted dense row the",
+        "last adding batch is the collapse to linear leads, after which no stored tail is read.",
+        "",
+        "| Row | basis elements | tail terms | born reducible | invalidated | before the last adding batch | leads that invalidate | touches / lead | basis sparse MiB | basis dense MiB |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in runs:
         t = r.get("tail_store") or {}
@@ -169,11 +173,15 @@ def main():
         leads = sum(b["invalidating_leads"] for b in ts)
         touches = sum(b["invalidated_elements"] for b in ts)
         width = max(b["basis_irreducible_monomials"] for b in ts)
+        adding = max(i for i, b in enumerate(ts) if b["elements"])
+        early = sum(b["invalidated_terms"] for b in ts[:adding])
+        stored = ts[adding - 1]["basis_terms"] - ts[adding - 1]["basis_elements"] if adding else 0
         sparse = last["basis_terms"] * (t["term_bytes"] + 8)
         dense = elements * width * t["coefficient_bytes"]
         out.append(
             f"| `{r['row']}` | {elements:,} | {tails:,} | {born / max(tails, 1):.3f} | "
-            f"{invalidated / max(tails - born, 1):.3f} | {leads:,} of {elements:,} | "
+            f"{invalidated / max(tails - born, 1):.3f} | {early / max(stored, 1):.3f} | "
+            f"{leads:,} of {elements:,} | "
             f"{touches / max(leads, 1):,.1f} | {mib(sparse)} | {mib(dense)} |"
         )
 
